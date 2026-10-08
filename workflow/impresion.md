@@ -59,7 +59,7 @@ ni sale en Impresión ni en el cierre de caja; si el papel se pierde (HUB-F199) 
 Si falla: sin sesión, 401. Identificador vacío, tipo de documento que no es de los ocho, documento que
 no es un objeto, vacío o de más de 512 KiB, papel desconocido, o una función que este hub no tiene:
 422 con el motivo (y, en la función, las que sí hay). Nada se guarda. Las pantallas de los módulos sí entran por aquí (puerta `erplora.print`); solo las órdenes de módulo que emiten `…print.due` entran por HUB-F191.
-Implicados: HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F77, INVENTORY-F25, KITCHEN-F08, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_FISCAL-F07
+Implicados: HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F77, HUB_SHELL-F78, INVENTORY-F25, KITCHEN-F08, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_FISCAL-F07
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB-F191 Pedir imprimir desde un módulo, un flujo o el asistente

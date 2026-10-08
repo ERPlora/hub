@@ -222,7 +222,7 @@ sin los datos que exige (emisor, número, cliente, NIF del cliente, desglose de 
 impresora apagada, sin papel o fuera de la red, tras los 3 intentos solo se anota; la comanda o el
 tique no salen y ni el cajero ni la cocina reciben aviso. Es lo que el guion de QA (§10, «impresora
 sin papel/offline: el trabajo queda pendiente y la pantalla informa») no consigue hoy.
-Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_ALTA-F17
+Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, HUB_SHELL-F78, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_ALTA-F17
 
 QA: qa-hub-restaurant §16, qa-hub §8
 
@@ -310,13 +310,14 @@ Pasos:
    debajo; la nota del camarero con «>>» y sin realce; las líneas de un menú, agrupadas bajo su nombre
    y sangradas.
 4. Una comanda marcada urgente cierra con «URGENTE» en grande. Se corta el papel.
+5. El vale de anulación de una ronda cancelada (HUB_SHELL-F78) es esta misma comanda: «ANULADA · Mesa 4» donde va la mesa y cada plato con la cantidad en negativo («-2x Croquetas», «-0.5x Flan»); el signo sale tal cual, nunca se redondea a positivo.
 Entra: el documento que compone `kitchen` (o el shell): número, etiqueta de sala, camarero, ronda,
 prioridad y líneas con cantidad, nombre, suplementos, nota y menú.
 Sale: el papel. La función (Cocina o Barra) la decide el hub; esta parte pinta lo mismo en las dos.
 Si falla: un documento que no es objeto se rechaza antes de imprimir. Con un campo sin rellenar sale
 con su valor por omisión (cantidad 1). Sin comprobar que sea una comanda: una comanda sin líneas sale
 con la cabecera y nada más.
-Implicados: HUB_SHELL-F72, KITCHEN-F08, KITCHEN-F17, PRINTING-F10
+Implicados: HUB_SHELL-F72, HUB_SHELL-F78, KITCHEN-F08, KITCHEN-F17, PRINTING-F10
 QA: qa-hub-restaurant §08, qa-hub-restaurant §16
 
 ### HUB_PERIPHERALS-F11 Sacar la cuenta de la mesa

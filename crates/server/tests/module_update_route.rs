@@ -35,6 +35,15 @@ struct MockCloud {
     packages: HashMap<(String, String), (Vec<u8>, String)>,
     /// module id → versions offered by `versions/`, newest last.
     offered: HashMap<String, Vec<String>>,
+    /// Versions `versions/` lists with `is_active: false` — support marked them broken (hub#2596).
+    /// The plan and the download still serve them: the hub's own door is what is under test.
+    quarantined: Vec<String>,
+    /// Versions `versions/` leaves out although the plan and the download still serve them. This is
+    /// how erplora.com shows a quarantined version: `visible_versions` keeps only `is_active` rows,
+    /// so a version support marked broken is simply absent from the list (hub#2596).
+    withdrawn: Vec<String>,
+    /// `versions/` answers 500: the hub cannot read what is published («I don't know», hub#2336).
+    versions_down: bool,
     calls: Mutex<Vec<String>>,
 }
 
@@ -98,8 +107,15 @@ struct VersionQuery {
 }
 
 async fn spawn_mock_cloud(mock: Shared) -> String {
-    async fn versions(State(m): State<Shared>, AxumPath(id): AxumPath<String>) -> Json<Value> {
+    async fn versions(
+        State(m): State<Shared>,
+        AxumPath(id): AxumPath<String>,
+    ) -> axum::response::Response {
+        use axum::response::IntoResponse;
         m.calls.lock().unwrap().push(format!("versions:{id}"));
+        if m.versions_down {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
         let list: Vec<Value> = m
             .offered
             .get(&id)
@@ -107,18 +123,20 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
                 versions
                     .iter()
                     .rev()
+                    .filter(|v| !m.withdrawn.contains(v))
                     .map(|v| {
                         let sha = m
                             .packages
                             .get(&(id.clone(), v.clone()))
                             .map(|(_, s)| s.clone())
                             .unwrap_or_default();
-                        json!({ "version": v, "is_active": true, "sha256": sha })
+                        let is_active = !m.quarantined.contains(v);
+                        json!({ "version": v, "is_active": is_active, "sha256": sha })
                     })
                     .collect()
             })
             .unwrap_or_default();
-        Json(json!(list))
+        Json(json!(list)).into_response()
     }
     async fn download(
         State(m): State<Shared>,
@@ -329,6 +347,9 @@ async fn updating_really_installs_the_new_version_and_does_not_just_say_it_did()
     let mock = Arc::new(MockCloud {
         packages,
         offered: HashMap::from([("parts".to_string(), vec!["2.0.0".to_string()])]),
+        quarantined: Vec::new(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     });
     let (router, session, state, temp) = fixture("installs", mock.clone()).await;
@@ -392,6 +413,9 @@ async fn a_version_that_cannot_install_keeps_the_old_one_and_says_so_without_a_5
     let mock = Arc::new(MockCloud {
         packages,
         offered: HashMap::from([("parts".to_string(), vec!["2.0.0".to_string()])]),
+        quarantined: Vec::new(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     });
     let (router, session, state, temp) = fixture("rollback", mock).await;
@@ -444,6 +468,9 @@ async fn a_hub_already_on_the_latest_is_told_so_without_downloading_anything() {
     let mock = Arc::new(MockCloud {
         packages,
         offered: HashMap::from([("parts".to_string(), vec!["1.0.0".to_string()])]),
+        quarantined: Vec::new(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     });
     let (router, session, _state, temp) = fixture("uptodate", mock.clone()).await;
@@ -473,6 +500,9 @@ async fn updating_a_module_this_hub_does_not_have_is_a_404_not_an_install() {
     let mock = Arc::new(MockCloud {
         packages: HashMap::new(),
         offered: HashMap::new(),
+        quarantined: Vec::new(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     });
     let (router, session, state, temp) = fixture("absent", mock).await;
@@ -520,6 +550,9 @@ async fn an_update_leaves_a_trace_the_owner_can_read_later() {
     let mock = Arc::new(MockCloud {
         packages,
         offered: HashMap::from([("parts".to_string(), vec!["2.0.0".to_string()])]),
+        quarantined: Vec::new(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     });
     let (router, session, state, temp) = fixture("history", mock).await;
@@ -568,6 +601,9 @@ async fn pressing_update_on_something_already_current_writes_nothing() {
     let mock = Arc::new(MockCloud {
         packages: HashMap::new(),
         offered: HashMap::from([("parts".to_string(), vec!["1.0.0".to_string()])]),
+        quarantined: Vec::new(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     });
     let (router, session, state, temp) = fixture("nonevent", mock).await;
@@ -618,8 +654,14 @@ async fn pin_support_version(state: &AppState, version: &str) {
 /// A marketplace that publishes `parts` 0.5.0, 1.0.0 and 2.0.0, every one of them installable: if
 /// the door lets a version through, it really lands, so a refusal is the only way to stay put.
 fn three_published_versions() -> Shared {
+    published_versions(&["0.5.0", "1.0.0", "2.0.0"], &[])
+}
+
+/// A marketplace that publishes these `parts` versions (oldest first) with every zip installable,
+/// and lists the `quarantined` ones as marked broken (hub#2596).
+fn published_versions(versions: &[&str], quarantined: &[&str]) -> Shared {
     let mut packages = HashMap::new();
-    for version in ["0.5.0", "1.0.0", "2.0.0"] {
+    for version in versions {
         let zip = parts_package(version, None);
         let sha = sha256_hex(&zip);
         packages.insert(("parts".to_string(), version.to_string()), (zip, sha));
@@ -628,8 +670,11 @@ fn three_published_versions() -> Shared {
         packages,
         offered: HashMap::from([(
             "parts".to_string(),
-            vec!["0.5.0".into(), "1.0.0".into(), "2.0.0".into()],
+            versions.iter().map(|v| v.to_string()).collect(),
         )]),
+        quarantined: quarantined.iter().map(|v| v.to_string()).collect(),
+        withdrawn: Vec::new(),
+        versions_down: false,
         calls: Mutex::new(Vec::new()),
     })
 }
@@ -767,6 +812,163 @@ async fn hub2546_latest_is_still_the_resolver_and_not_an_explicit_version() {
     let body = json_body(response).await;
     assert_eq!(body["data"]["version"], json!("2.0.0"), "{body}");
     assert_eq!(recorded_version(&state).await, "2.0.0");
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+// ── 7. An explicit version support marked broken is refused at the door (hub#2596) ─────────────
+
+/// hub#2596: the version list (HUB-F24) never offers a quarantined version, but an administrator
+/// asking the API for it by name got past the door, which judged it as if it were active. The door
+/// now reads what is published first: refused with the same code as the list's other rules,
+/// before the plan is asked and before anything is downloaded — even from a marketplace that would
+/// still serve the zip.
+#[tokio::test]
+async fn hub2596_an_explicit_quarantined_version_is_refused_before_the_plan() {
+    let mock = published_versions(&["1.0.0", "2.0.0"], &["2.0.0"]);
+    let (router, session, state, temp) = fixture("hub2596-quarantined", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_refused_and_untouched(response, &mock, &state).await;
+    let calls = mock.calls.lock().unwrap().clone();
+    assert!(
+        !calls.iter().any(|c| c.starts_with("plan:")),
+        "a refused version is not even planned: {calls:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2596, the other side: quarantine refuses the version that is broken, not the app. Another
+/// forward version that is published and active still installs.
+#[tokio::test]
+async fn hub2596_a_quarantined_sibling_does_not_block_an_active_version() {
+    let mock = published_versions(&["1.0.0", "2.0.0", "3.0.0"], &["3.0.0"]);
+    let (router, session, state, temp) = fixture("hub2596-sibling", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["data"]["updated"], json!(true), "{body}");
+    assert_eq!(recorded_version(&state).await, "2.0.0");
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2596: support's pin wins over quarantine, as it does for the resolver (`resolve`): asking
+/// for the pinned version goes to the pin even if that version is marked broken for everyone else.
+#[tokio::test]
+async fn hub2596_the_support_pin_still_wins_over_quarantine() {
+    let mock = published_versions(&["1.0.0", "2.0.0"], &["2.0.0"]);
+    let (router, session, state, temp) = fixture("hub2596-pin", mock.clone()).await;
+    pin_support_version(&state, "2.0.0").await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["data"]["version"], json!("2.0.0"), "{body}");
+    assert_eq!(recorded_version(&state).await, "2.0.0");
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2596: asking erplora.com is only for what the hub cannot decide alone. A step back or a
+/// version other than the pin is refused without a call, as before — a refusal never waits on
+/// the marketplace.
+#[tokio::test]
+async fn hub2596_a_refusal_the_hub_decides_alone_does_not_ask_erplora() {
+    for (tag, pin) in [
+        ("hub2596-alone-down", None),
+        ("hub2596-alone-pin", Some("1.0.0")),
+    ] {
+        let mock = published_versions(&["0.5.0", "1.0.0", "2.0.0"], &["2.0.0"]);
+        let (router, session, state, temp) = fixture(tag, mock.clone()).await;
+        if let Some(pin) = pin {
+            pin_support_version(&state, pin).await;
+        }
+        let asked = if pin.is_some() { "2.0.0" } else { "0.5.0" };
+
+        let response = router
+            .oneshot(update_request(
+                &session,
+                &format!(r#"{{"version":"{asked}"}}"#),
+            ))
+            .await
+            .unwrap();
+        assert_refused_and_untouched(response, &mock, &state).await;
+        let calls = mock.calls.lock().unwrap().clone();
+        assert!(
+            calls.is_empty(),
+            "{tag}: refused without asking erplora.com: {calls:?}"
+        );
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
+}
+
+/// hub#2596, as erplora.com really shows it: a quarantined version is not listed with
+/// `is_active: false`, it is left out of `versions/` (`visible_versions` keeps only active rows).
+/// A version the list the hub just read does not name is one the list would never offer: refused
+/// before the plan, even from a marketplace whose plan and download would still serve the zip.
+#[tokio::test]
+async fn hub2596_a_version_left_out_of_the_published_list_is_refused_before_the_plan() {
+    let mock = Arc::new(MockCloud {
+        withdrawn: vec!["2.0.0".to_string()],
+        ..Arc::try_unwrap(published_versions(&["1.0.0", "2.0.0"], &[]))
+            .ok()
+            .expect("fresh mock")
+    });
+    let (router, session, state, temp) = fixture("hub2596-withdrawn", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_refused_and_untouched(response, &mock, &state).await;
+    let calls = mock.calls.lock().unwrap().clone();
+    assert!(
+        !calls.iter().any(|c| c.starts_with("plan:")),
+        "a refused version is not even planned: {calls:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2596: when `versions/` cannot be read the hub does not know what is published, and it does
+/// not guess: the local rule (pin, forwards) still applies and the rest is left to the plan and the
+/// download, which erplora.com refuses for a version it does not publish (SAAS_PUBLIC-F09).
+#[tokio::test]
+async fn hub2596_without_the_published_list_the_plan_decides() {
+    let mock = Arc::new(MockCloud {
+        versions_down: true,
+        ..Arc::try_unwrap(published_versions(&["1.0.0", "2.0.0"], &[]))
+            .ok()
+            .expect("fresh mock")
+    });
+    let (router, session, state, temp) = fixture("hub2596-versions-down", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["data"]["updated"], json!(true), "{body}");
+    assert_eq!(recorded_version(&state).await, "2.0.0");
+    let calls = mock.calls.lock().unwrap().clone();
+    assert!(
+        calls.iter().any(|c| c.starts_with("versions:")),
+        "the door did try to read the list: {calls:?}"
+    );
 
     let _ = std::fs::remove_dir_all(temp);
 }

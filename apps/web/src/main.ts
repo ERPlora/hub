@@ -50,7 +50,8 @@ import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/pr
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
-import { comandaFailureNotice } from './lib/print-comanda-notice';
+import { comandaFailureNotice, voidFailureNotice } from './lib/print-comanda-notice';
+import { bootPrintVoid } from './lib/print-void';
 import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './lib/appointment-notice';
 import { bootBellNotices } from './lib/bell-notice';
 import { loadBellCounterModuleIds } from './lib/bell-counters';
@@ -374,6 +375,19 @@ bootPrintComanda(getClient(), {
   notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
     await notices.notify(title, body, path);
+  },
+});
+
+// VOID slip when a round already sent to the kitchen is cancelled (kitchen#168), by hand or because
+// its bill was deleted: a paper-only station never sees the card leave the screen. Same door and
+// same printer as the comanda above; the word on the paper is the app's, and a slip that does not
+// come out tells this till to warn the station out loud (print-comanda-notice.ts, with its test).
+bootPrintVoid(getClient(), {
+  print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
+  onFailure: (f) => {
+    const n = voidFailureNotice(f, i18n.global);
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
 });
 

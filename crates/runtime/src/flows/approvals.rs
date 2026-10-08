@@ -641,8 +641,13 @@ pub async fn sweep_expired(
         .collect())
 }
 
-/// Records the decision. Called AFTER the command has run (or not), so the row never says
-/// «approved» about something that did not happen the way it says.
+/// Records a decision that runs nothing in the business database — a rejection, an answered
+/// question, or an approval whose command FAILED — so the row never says «approved» about
+/// something that did not happen the way it says. An approval whose command succeeded is written
+/// by [`approve_op`], inside the command's transaction.
+///
+/// Only one decision is ever written: if the row is no longer `pending`, this refuses with the
+/// same code [`claim_pending`] would (hub#2502).
 pub async fn mark_decided(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -676,15 +681,77 @@ pub async fn mark_decided_with_comment(
     p.insert("error".into(), json!(error));
     p.insert("comment".into(), json!(comment));
     p.insert("now".into(), json!(now));
-    db.execute(
-        "UPDATE _flow_approvals \
-         SET status = :status, decided_by = :by, decided_at = :now, error = :error, \
-             comment = :comment, updated_at = :now \
-         WHERE id = :id AND hub_id = :hub_id AND status = 'pending' AND deleted_at IS NULL",
-        &p,
-    )
-    .await?;
+    let written = db
+        .execute(
+            "UPDATE _flow_approvals \
+             SET status = :status, decided_by = :by, decided_at = :now, error = :error, \
+                 comment = :comment, updated_at = :now \
+             WHERE id = :id AND hub_id = :hub_id AND status = 'pending' AND deleted_at IS NULL",
+            &p,
+        )
+        .await?;
+    // hub#2502: zero rows means somebody else decided it (a person or the sweep) between the
+    // caller's read and this write. Saying so is what stops the loser from ending a run the
+    // winner already moved on.
+    if written.affected == 0 {
+        return Err(lost_race(db, hub_id, id).await);
+    }
     get(db, hub_id, id).await
+}
+
+/// The statement that DECIDES an approved command, run inside the command's own transaction
+/// (`extra_ops` of `commands::execute_at`) — hub#2502.
+///
+/// Reading `pending` and then running the command left a gap in which two approvals (or an
+/// approval and the expiry sweep) both went ahead, and the command ran twice. Writing the decision
+/// in the same transaction closes it: Postgres serialises the two `UPDATE`s on the row, and the
+/// second one re-reads it after the first commits.
+///
+/// It has to make the whole transaction FAIL when it loses, and a plain `WHERE status = 'pending'`
+/// would only match zero rows and let the command commit. So the guard is in the `SET`: on a row
+/// that is no longer pending the `CASE` yields `NULL`, the column is `NOT NULL`, and the
+/// transaction rolls back with the command's effects and its events. The caller then reads the row
+/// to tell the person who won ([`lost_race`]).
+pub(crate) fn approve_op(
+    hub_id: &str,
+    id: &str,
+    decided_by: &str,
+    comment: &str,
+) -> (String, Params) {
+    let now = now_rfc3339();
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_APPROVED));
+    p.insert("by".into(), json!(decided_by));
+    p.insert("comment".into(), json!(comment));
+    p.insert("now".into(), json!(now));
+    (
+        "UPDATE _flow_approvals \
+         SET status = CASE WHEN status = 'pending' AND deleted_at IS NULL THEN :status END, \
+             decided_by = :by, decided_at = :now, error = '', comment = :comment, \
+             updated_at = :now \
+         WHERE id = :id AND hub_id = :hub_id"
+            .to_string(),
+        p,
+    )
+}
+
+/// Why a decision that found the row no longer pending lost: the same refusal [`claim_pending`]
+/// gives, so the person sees «somebody already answered» or «it expired» and not a database error.
+/// A row still pending here was not decided by anybody else; that is not a lost race, and its
+/// caller's own error stands — hence `already_decided` only as the last resort.
+pub(crate) async fn lost_race(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> RuntimeError {
+    match claim_pending(db, hub_id, id).await {
+        Err(refusal) => refusal,
+        Ok(approval) => RuntimeError::Domain {
+            code: ERR_APPROVAL_ALREADY_DECIDED.to_string(),
+            message: format!(
+                "approval `{id}` could not be decided: it is `{}` and was not written",
+                approval.status
+            ),
+        },
+    }
 }
 
 /// A row written before the `kind` column existed is a model's proposal — that is what the table

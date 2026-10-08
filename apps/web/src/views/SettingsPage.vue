@@ -546,11 +546,19 @@
       <template v-else-if="tab === 'data'">
         <DataPanel :initial="dataView" />
       </template>
-    <!-- Footer tab bar -->
+    <!-- Footer tab bar. `scrollable`, like Staff and System: five tabs overflow a phone, and it is
+         what makes Ionic bring the tab just chosen into view — without it a tab tapped while it
+         peeked under the edge fade stayed there, faded (hub#2617). -->
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment class="ok-tabbar" data-testid="settings-tabs" :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
+        <ion-segment
+          class="ok-tabbar"
+          data-testid="settings-tabs"
+          :value="tab"
+          scrollable
+          @ion-change="tab = ($event.detail.value as Tab)"
+        >
           <ion-segment-button value="hub" data-testid="settings-tab-hub">
             <HubIcon name="business-outline" />
             <ion-label>{{ t('settings.tabHub') }}</ion-label>

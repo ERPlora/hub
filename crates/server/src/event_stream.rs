@@ -43,7 +43,12 @@
 //! gets [`ERR_CREDENTIAL_ENDED`] as its last frame and closes. A ticket minted before its session
 //! signed out opens nothing afterwards. Until hub#2522 a till that signed out, or an integration
 //! whose key was revoked, kept hearing everything it heard at connect time until it reconnected.
-//! Changing a person's role or permissions does **not** cut yet: that is a different door.
+//! Changing a person's access cuts their [`person_tag`] the same way (hub#2571).
+//!
+//! A session also ends **by itself**, when its time runs out (hub#2600): no door is called then, so
+//! no cut is issued. The session's [`Lifeline`] carries that instant instead ([`Lifeline::ends_at`],
+//! read when the ticket is minted) and the channel ends at it with the same last frame. A session
+//! never lengthens with use (HUB-F136), so the instant read at mint time is the one that holds.
 //!
 //! # How the credential travels
 //!
@@ -89,7 +94,7 @@ use erplora_runtime::RequestContext;
 use serde_json::{json, Value};
 
 use crate::auth;
-use crate::state::{AppState, WsEvent, FRAME_MODULE};
+use crate::state::{AppState, AuthMode, WsEvent, FRAME_MODULE};
 
 /// Marks a stream ticket apart from an API key token (`erpl_live_…`), so one door can take both
 /// and neither is ever mistaken for the other.
@@ -153,10 +158,30 @@ pub enum TicketHolder {
 /// word, spent up to [`TICKET_TTL_SECONDS`] later). A cut issued after `checked_at` ends the
 /// channel; one issued before it does not, because that check already saw the credential's new
 /// state — that is what lets a rotated key reconnect with its new secret at once.
+///
+/// `ends_at` is when the credential runs out by itself (hub#2600): a session's expiry. Nothing cuts
+/// at that instant — no door is called — so the channel watches the clock as well as the cut. `None`
+/// for what does not run out: an API key, a person.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lifeline {
     pub tag: String,
     pub checked_at: Instant,
+    pub ends_at: Option<Instant>,
+}
+
+impl Lifeline {
+    /// Whether the credential has run out by itself at `now`.
+    fn has_run_out(&self, now: Instant) -> bool {
+        self.ends_at.is_some_and(|ends_at| ends_at <= now)
+    }
+}
+
+/// The monotonic instant at which the wall-clock `ends` falls, as seen now; `now` if it has passed.
+fn instant_at(ends: chrono::DateTime<chrono::Utc>) -> Instant {
+    let left = (ends - chrono::Utc::now())
+        .to_std()
+        .unwrap_or(Duration::ZERO);
+    Instant::now() + left
 }
 
 /// The [`Lifeline`] tag of a person's session: a digest of its token, so the hub never keeps a
@@ -247,24 +272,27 @@ impl StreamTickets {
     }
 
     /// Mints a ticket for a person's session (hub#2501): the socket it opens listens with the
-    /// permissions of `ctx`, not with any key, and closes when `session_token` ends (hub#2522) or
-    /// the person's access changes (hub#2571). `checked_at` is when `ctx` was about to be read:
-    /// taken before, so a change that lands while it is read counts as after the check.
+    /// permissions of `ctx`, not with any key, and closes when the session ends (hub#2522) or runs
+    /// out (hub#2600), or the person's access changes (hub#2571). `session` is the session's token
+    /// and when it runs out, if it does. `checked_at` is when `ctx` was about to be read: taken
+    /// before, so a change that lands while it is read counts as after the check.
     pub fn mint_session(
         &self,
         hub_id: &str,
         ctx: &RequestContext,
-        session_token: Option<&str>,
+        session: Option<(&str, Option<Instant>)>,
         checked_at: Instant,
     ) -> String {
         let mut lifelines = vec![Lifeline {
             tag: person_tag(hub_id, &ctx.user_id),
             checked_at,
+            ends_at: None,
         }];
-        if let Some(token) = session_token {
+        if let Some((token, ends_at)) = session {
             lifelines.push(Lifeline {
                 tag: session_tag(token),
                 checked_at,
+                ends_at,
             });
         }
         self.mint_for_at(
@@ -404,15 +432,20 @@ impl StreamLimiter {
         }
     }
 
-    /// Whether `lifeline`'s credential was cut after it was checked — the socket must not open.
+    /// Whether `lifeline`'s credential was cut after it was checked, or has run out (hub#2600) —
+    /// the socket must not open.
     pub fn has_ended(&self, lifeline: &Lifeline) -> bool {
+        if lifeline.has_run_out(Instant::now()) {
+            return true;
+        }
         let cuts = self.cuts.lock().unwrap_or_else(|p| p.into_inner());
         cuts.ended_after(lifeline)
     }
 
     /// Ties a channel to its credential: the returned [`CutWatch`] resolves when the credential is
-    /// [`cut`](Self::cut) — at once, if that already happened after `lifeline` was checked. Hold it
-    /// for the life of the channel; dropping it is what forgets the channel.
+    /// [`cut`](Self::cut) — at once, if that already happened after `lifeline` was checked — or
+    /// when it runs out ([`Lifeline::ends_at`]). Hold it for the life of the channel; dropping it is
+    /// what forgets the channel.
     pub fn watch(self: &Arc<Self>, lifeline: Lifeline) -> CutWatch {
         let mut cuts = self.cuts.lock().unwrap_or_else(|p| p.into_inner());
         if cuts.ended_after(&lifeline) {
@@ -422,6 +455,7 @@ impl StreamLimiter {
                 tag: lifeline.tag,
                 signal: None,
                 ended,
+                ends_at: lifeline.ends_at,
             };
         }
         let entry = cuts.live.entry(lifeline.tag.clone()).or_insert_with(|| {
@@ -434,6 +468,7 @@ impl StreamLimiter {
             tag: lifeline.tag,
             ended: entry.1.subscribe(),
             signal: Some(Arc::clone(&entry.1)),
+            ends_at: lifeline.ends_at,
         }
     }
 
@@ -474,14 +509,26 @@ pub struct CutWatch {
     /// The signal this channel was registered under; `None` for one born already cut.
     signal: Option<Arc<tokio::sync::watch::Sender<bool>>>,
     ended: tokio::sync::watch::Receiver<bool>,
+    /// When the credential runs out by itself ([`Lifeline::ends_at`], hub#2600).
+    ends_at: Option<Instant>,
 }
 
 impl CutWatch {
-    /// Resolves once the credential has been cut. Cancel-safe, so it can sit in a `select!`.
+    /// Resolves once the credential has been cut or has run out. Cancel-safe, so it can sit in a
+    /// `select!`: the deadline is an absolute instant, not a timer that restarts on every poll.
     pub async fn ended(&mut self) {
         // The sender lives as long as this watch holds `signal`, so `Err` cannot happen; if it
         // ever did, the safe reading of "nobody can tell me any more" is that the channel ends.
-        let _ = self.ended.wait_for(|ended| *ended).await;
+        let cut = self.ended.wait_for(|ended| *ended);
+        match self.ends_at {
+            Some(ends_at) => tokio::select! {
+                _ = cut => {}
+                _ = tokio::time::sleep_until(tokio::time::Instant::from_std(ends_at)) => {}
+            },
+            None => {
+                let _ = cut.await;
+            }
+        }
     }
 }
 
@@ -515,7 +562,7 @@ fn credential_ended_frame() -> Value {
     json!({
         "type": "stream.error",
         "code": ERR_CREDENTIAL_ENDED,
-        "message": "the credential this channel was opened with has ended (signed out, revoked, rotated, or the person's access changed)",
+        "message": "the credential this channel was opened with has ended (signed out, expired, revoked, rotated, or the person's access changed)",
     })
 }
 
@@ -741,6 +788,7 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
             let lifeline = Lifeline {
                 tag: key_tag(&principal.key_id),
                 checked_at,
+                ends_at: None,
             };
             if principal.scope.can_read() {
                 StreamAuth::Granted(Box::new(StreamGrant {
@@ -828,9 +876,38 @@ pub async fn mint_ticket(State(st): State<AppState>, headers: HeaderMap) -> Resp
         }
     };
     let session = auth::session_token(&headers);
-    let ticket = st
-        .stream_tickets
-        .mint_session(&hub_id, &ctx, session.as_deref(), checked_at);
+    // hub#2600: when the session runs out, so does the channel this ticket opens. Read through the
+    // same scoped door that just resolved it; a session that ran out in between is refused like
+    // any other. Without sessions (`AuthMode::Dev`) there is nothing to run out.
+    let ends_at = match (&st.config.auth_mode, session.as_deref()) {
+        (AuthMode::Session, Some(token)) => match rt.session_expires_at(token).await {
+            Ok(Some(ends)) => Some(instant_at(ends)),
+            Ok(None) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({
+                        "ok": false,
+                        "error": {
+                            "code": ERR_UNAUTHENTICATED,
+                            "message": "the session ended while the ticket was being minted",
+                        }
+                    })),
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                let (status, body) = crate::dispatch_api::error_payload(&e);
+                return (status, Json(body)).into_response();
+            }
+        },
+        _ => None,
+    };
+    let ticket = st.stream_tickets.mint_session(
+        &hub_id,
+        &ctx,
+        session.as_deref().map(|token| (token, ends_at)),
+        checked_at,
+    );
     Json(json!({
         "ok": true,
         "data": { "ticket": ticket, "expires_in_seconds": TICKET_TTL_SECONDS }
@@ -1693,6 +1770,7 @@ mod tests {
         Lifeline {
             tag: tag.into(),
             checked_at: Instant::now(),
+            ends_at: None,
         }
     }
 

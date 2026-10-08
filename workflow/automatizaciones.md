@@ -143,7 +143,7 @@ Implicados: FLOWS-F03, FLOWS-F11, FLOWS-F21
 QA: qa-hub-flows R10
 
 ### HUB-F87 Pausar una automatización y volver a encenderla
-Estado: parcial — pausar no frena todo: una propuesta que esperaba se puede aprobar y su acción se ejecuta, los mensajes que ya estaban en cola salen, una llamada a otro sistema en vuelo se hace, y un turno del asistente en curso puede ejecutar su acción o dejar una propuesta nueva aunque ya esté en pausa; y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
+Estado: parcial — pausar no frena todo (hub#2650): una propuesta que esperaba se puede aprobar y su acción se ejecuta, los mensajes que ya estaban en cola salen, una llamada a otro sistema en vuelo se hace, y un turno del asistente en curso puede ejecutar su acción o dejar una propuesta nueva aunque ya esté en pausa; y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
 Actor: administrador
 Pantalla: FLOWS: Automatizaciones
 Pasos:
@@ -332,18 +332,18 @@ Implicados: FLOWS-F16
 QA: qa-hub-flows R5
 
 ### HUB-F100 Decidir una pregunta o una propuesta que espera
-Estado: parcial — dos aprobaciones a la vez de la misma propuesta pueden ejecutar la acción dos veces, y una aprobación que coincide con el barrido de caducadas la ejecuta aunque la fila acabe «caducada» y la ejecución cancelada (leído, sin ejecutar); y aprobar ejecuta aunque la automatización esté en pausa
+Estado: parcial — aprobar ejecuta aunque la automatización esté en pausa (hub#2650)
 Actor: administrador
 Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. La bandeja lista lo que espera respuesta (hasta 100), con lo que se preguntó ya rellenado.
 2. Un administrador aprueba o rechaza, con una nota si quiere.
-3. Si es una propuesta del asistente y se aprueba, el hub vuelve a comprobar en ese momento el permiso y los datos, y ejecuta **exactamente** lo propuesto, sin volver a preguntar al asistente.
+3. Si es una propuesta del asistente y se aprueba, el hub vuelve a comprobar en ese momento el permiso y los datos, y ejecuta **exactamente** lo propuesto, sin volver a preguntar al asistente. La acción y el «aprobada» se guardan juntos: o quedan las dos cosas o ninguna.
 4. Si es una pregunta, no ejecuta nada: la ejecución sigue con la respuesta como dato.
 5. Un no hace lo que el paso dijo (parar o seguir).
 Entra: la pregunta o propuesta, la decisión, la nota y la sesión (de ahí sale quién decidió, nunca del cuerpo).
 Sale: la decisión guardada con quién, cuándo y la nota; la ejecución sigue, se cancela o, si la acción aprobada falla, queda fallida con el error. Al llegar y al caducar una propuesta sale un aviso efímero por el canal en vivo (`flow.approval.created` / `flow.approval.expired`) que refresca la bandeja.
-Si falla: ya decidida, «alguien ya contestó» (`flow.approval_already_decided`); caducada, `flow.approval_expired`; de otro rol y sin ser administrador, `flow.approval_not_yours`. Si al aprobar falta el permiso, la propuesta sigue pendiente.
+Si falla: ya decidida, «alguien ya contestó» (`flow.approval_already_decided`); caducada, `flow.approval_expired`; de otro rol y sin ser administrador, `flow.approval_not_yours`. Si al aprobar falta el permiso, la propuesta sigue pendiente. Si dos personas deciden a la vez (o una aprueba justo cuando el repaso de HUB-F101 la cierra), gana una sola: la acción se ejecuta como mucho una vez, y la otra recibe «alguien ya contestó» o «caducada» sin que se haya hecho nada por ella.
 Implicados: FLOWS-F24
 QA: qa-hub-flows R6
 
@@ -356,7 +356,7 @@ Pasos:
 2. Las cierra como caducadas y hace lo que dice cada una: contar como un no, parar o seguir. Una propuesta del asistente caduca a las 72 horas y no se ejecuta.
 Entra: las preguntas y propuestas pendientes con su plazo.
 Sale: la pregunta caducada (quién la cerró: el propio hub) y su ejecución terminada o reanudada; una vez terminada, entra en la poda de 90 días.
-Si falla: si el repaso falla, se apunta en el registro del servidor y se intenta a la hora siguiente. Hasta que pasa el repaso, la pregunta vencida sigue en la bandeja pero ya no se puede contestar.
+Si falla: si el repaso falla, se apunta en el registro del servidor y se intenta a la hora siguiente. Hasta que pasa el repaso, la pregunta vencida sigue en la bandeja pero ya no se puede contestar. Si una aprobación estaba ejecutando su acción cuando el repaso cierra la propuesta, esa acción se deshace entera y no queda nada hecho.
 Implicados: FLOWS-F18, FLOWS-F24
 QA: qa-hub-flows R6
 
@@ -526,7 +526,7 @@ QA: qa-hub-flows R7
 | «Solo si» y «seguir si falla» por paso | hecho; sin reintento por paso | HUB-F97 |
 | Permisos por automatización con límites | parcial (escritura no todo-o-nada) | HUB-F98 |
 | Secretos de solo escritura y protección de llamadas salientes | hecho | HUB-F94, HUB-F99 |
-| Aprobación con plazo y qué pasa con el no y el silencio | parcial: el rol no restringe; doble aprobación posible | HUB-F96, HUB-F100, HUB-F101 |
+| Aprobación con plazo y qué pasa con el no y el silencio | parcial: el rol no restringe; aprobar ejecuta con la automatización en pausa (hub#2650) | HUB-F96, HUB-F100, HUB-F101 |
 | Historial paginado con retención | hecho (90 días) | HUB-F102 |
 | Reanudar desde el paso que falló (Make, Power Automate) | no hecho (hub#952) | HUB-F103 |
 | Recetas de fábrica: servir, encender, apagar, restaurar | parcial: encender no es todo-o-nada; restaurar con hueco de pausa | HUB-F104…F107 |
