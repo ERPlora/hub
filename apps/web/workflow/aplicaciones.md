@@ -67,22 +67,22 @@ Pasos:
 2. Mientras llega: «Cargando el catálogo…». Después, tarjetas (en un móvil siempre tarjetas) o tabla con «App», «Versión», «Categoría», «Descripción», «Precio» y «Estado» («Instalado», «Disponible», «No disponible», «Instalando…», «Actualizar a {version}» o «Necesita ERPlora {version}»).
 3. Busca en «Buscar apps para añadir…» (nombre, descripción y categoría) y filtra por categoría, precio y estado.
 4. Un administrador ve la acción «Instalar» o «Actualizar» en la fila que corresponda (HUB_SHELL-F109 y F116); en una demo, no: «Estás viendo el catálogo real en modo demostración. Conecta un negocio real para instalar apps.».
-Entra: el catálogo de erplora.com que reenvía el hub; el hub pide el idioma del negocio (`?lang=`), pero esa puerta de erplora.com lo ignora: con la credencial de máquina sale en el idioma que manda la pantalla (`Accept-Language`, que el hub reenvía) y, si va con la cuenta de la persona, en el que tenga guardado en erplora.com (solo la puerta pública, la de un hub sin enrolar, respeta `?lang=`); cruzado con las apps instaladas en el hub, que es lo que manda para decir «Instalado» (el catálogo puede ir por detrás).
+Entra: el catálogo de erplora.com que reenvía el hub, en el idioma del negocio que el hub pide con `?lang=` (desde saas#2609 lo respetan las dos puertas, la de la credencial de máquina y la pública de un hub sin enrolar); cruzado con las apps instaladas en el hub, que es lo que manda para decir «Instalado» (el catálogo puede ir por detrás).
 Sale: nada guardado. Recupera el catálogo al volver el foco a la ventana, para ver al instante una suscripción contratada fuera.
 Si falla: «No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.» con «Reintentar»; las filas que ya había se conservan. Sin respuesta todavía, «Cargando el catálogo…»; con una búsqueda sin resultados, «No hay apps que coincidan con tu búsqueda.» (cada situación con su frase).
 Implicados: SAAS_PUBLIC-F12, SAAS_PUBLIC-F13, SAAS_PUBLIC-F14
 QA: BD-03
 
 ### HUB_SHELL-F108 Saber cuánto cuesta una app antes de instalarla
-Estado: hecho
+Estado: parcial — una app con un plan gratis y otros de pago dice «Gratis» pero sale en la pestaña **De pago** (hub#2655)
 Actor: administrador, responsable, empleado
 Pantalla: Apps
 Pasos:
-1. En el catálogo, la columna «Precio» dice «Gratis», «Incluida en tu plan», «{price} €/mes», «{price} €/año», «{price} €» (pago único) o «Consultar».
-2. La pantalla pintaría tal cual una etiqueta de precio propia de erplora.com, pero el catálogo de erplora.com no la manda nunca: el importe sale del precio más bajo que declara (`price_from`, el mínimo de sus planes de pago).
+1. En el catálogo, la columna «Precio» pinta tal cual la etiqueta que manda erplora.com (`price_label`, en el idioma del negocio), escrita con la misma regla que su marketplace y su web: «Gratis», «Pago por uso», «19,00 €/año», «Desde 30,00 €/mes», con el periodo en que de verdad se cobra.
+2. Sin etiqueta, la pone el hub: «Gratis», «Incluida en tu plan» (erplora.com no manda etiqueta para una app que va en el plan, y lo dice `included_in_plan`), «{price} €/mes», «{price} €/año», «{price} €» (pago único) o «Consultar»; con un erplora.com anterior a saas#2609, el importe sale de `price_from`.
 3. Una app sin importe conocido nunca enseña la unidad sola («€/mes» sin cifra): sale «Consultar».
 4. La pestaña **De pago** reúne todo lo que no es gratis, incluidas las «Incluida en tu plan».
-Entra: el precio, el ciclo y si va en el plan, que manda erplora.com.
+Entra: la etiqueta de precio, el precio, el ciclo y si va en el plan, que manda erplora.com.
 Sale: nada guardado. El hub no cobra ni lleva a comprar: contratar es cosa de erplora.com (HUB_SHELL-F111).
 Si falla: sin catálogo, HUB_SHELL-F107.
 Implicados: REC_ALTA-F22, SAAS_PUBLIC-F12
