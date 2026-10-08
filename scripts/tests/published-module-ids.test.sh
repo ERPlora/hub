@@ -105,6 +105,11 @@ case "$out" in *invoice_series*) fail "1: an ARCHIVED repo (a retired module) is
 case "$out" in *hub*|*blueprints*) fail "1: a repo without module.json on the branch is not a module" ;; esac
 case "$out" in *module-toolkit*) fail "1: a repo name that is not a module id must be dropped" ;; esac
 ok
+# Regression test for ERPlora/hub#2035: a module born AFTER the hand-kept list (`attendance`,
+# 2026-10-06, no deploy key in the bundle) is published the moment its repo is, with nobody
+# editing anything — the org IS the list. The alert of hub#2035 fired 40 runs in a row on it.
+case "$out" in *attendance*) ;; *) fail "1: hub#2035 — a module born after the key bundle (attendance) must be published without anyone editing a list" ;; esac
+ok
 grep -q 'module-toolkit' <<<"$err" \
     || fail "1: a dropped non-id repo carrying module.json must be NAMED on stderr, not vanish"
 ok
