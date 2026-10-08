@@ -109,6 +109,36 @@ pub struct RowGate {
     pub min: u64,
 }
 
+/// A contiguous group of ops that only runs if an EARLIER op of the same transaction changed at
+/// least one row (hub#2612).
+///
+/// It is the opposite end of [`RowGate`]: a gate turns "too few rows" into a ROLLBACK and an
+/// error; a condition turns "zero rows" into "skip these ops, commit the rest". It exists for the
+/// `_event_outbox` INSERT of an `emit[].when_rows` entry — a periodic sweep that found nothing to
+/// do must commit (its scheduler bookkeeping included) without announcing anything, and the only
+/// place that knows the anchor's count before the INSERT runs is the transaction itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OpCondition {
+    /// Index (into `ops`) of the op whose affected rows decide. It must come BEFORE the group: an
+    /// anchor that has not run yet counts as "changed nothing" and the group is skipped.
+    pub anchor: usize,
+    /// Index of the group's first op inside `ops`.
+    pub first: usize,
+    /// How many consecutive ops the group spans.
+    pub count: usize,
+}
+
+impl OpCondition {
+    /// Whether op `index` has to be skipped, given the counts of the ops already run.
+    pub fn skips(conditions: &[OpCondition], index: usize, per_op: &[u64]) -> bool {
+        conditions.iter().any(|c| {
+            index >= c.first
+                && index < c.first.saturating_add(c.count)
+                && per_op.get(c.anchor).copied().unwrap_or(0) == 0
+        })
+    }
+}
+
 /// What a column of a SELECT holds, boiled down to the only distinction the list engine's `range`
 /// filter needs (ERPlora/hub#1542): does `>=` compare NUMBERS or does it compare STRINGS?
 ///
@@ -174,6 +204,10 @@ pub trait DatabaseAdapter: Send + Sync {
     /// - Gates are evaluated **in order**, and the FIRST failure decides: it is the one whose
     ///   sub-command the caller will name in the error.
     ///
+    /// - `conditions`: groups of ops that only run if their anchor op changed something
+    ///   ([`OpCondition`], hub#2612). A skipped op is reported with a count of 0. An empty slice
+    ///   runs every op, as before.
+    ///
     /// On commit returns [`TxGatedOutcome::Committed`] with every per-op count (diagnostics); on a
     /// gate failure returns [`TxGatedOutcome::RolledBack`] naming the failed gate, so the runtime
     /// can build the stable error of THAT sub-command. A real DB error propagates as `Err` (the tx
@@ -184,6 +218,7 @@ pub trait DatabaseAdapter: Send + Sync {
         &self,
         ops: &[(String, Params)],
         gates: &[RowGate],
+        conditions: &[OpCondition],
     ) -> Result<TxGatedOutcome, DbError>;
 
     /// Runs a query and returns the rows as JSON objects.
@@ -685,11 +720,17 @@ impl DatabaseAdapter for PgAdapter {
         &self,
         ops: &[(String, Params)],
         gates: &[RowGate],
+        conditions: &[OpCondition],
     ) -> Result<TxGatedOutcome, DbError> {
         on_the_leader!(self, |conn| {
         let mut tx = conn.begin().await?;
         let mut per_op = Vec::with_capacity(ops.len());
-        for (sql, params) in ops {
+        for (index, (sql, params)) in ops.iter().enumerate() {
+            // hub#2612: an op whose anchor changed nothing is not run, and counts as 0.
+            if OpCondition::skips(conditions, index, &per_op) {
+                per_op.push(0);
+                continue;
+            }
             let (tsql, names) = translate(sql);
             let q = build_query!(tsql, names, params);
             per_op.push(q.execute(&mut *tx).await?.rows_affected());
@@ -2428,6 +2469,7 @@ mod tests {
             .execute_tx_gated(
                 &[("UPDATE appts SET state = 'done' WHERE id = 1".to_string(), params(json!({})))],
                 &[RowGate { first: 0, count: 1, min: 1 }],
+                &[],
             )
             .await
             .expect("a gated transaction must survive a switchover too (hub#1376)");

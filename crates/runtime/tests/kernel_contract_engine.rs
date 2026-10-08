@@ -205,10 +205,10 @@ fn generate() -> String {
         "the string form never declares `dedup_key`"
     );
     out.push_str("commands.*.emit[] = string\n");
-    let dedup_fields = item_members(&manifest_src, "pub struct", "EmitDedupKey");
+    let dedup_fields = item_members(&manifest_src, "pub struct", "EmitSpec");
     assert!(
         !dedup_fields.is_empty(),
-        "the fields of `EmitDedupKey` were not read"
+        "the fields of `EmitSpec` were not read"
     );
     for field in &dedup_fields {
         out.push_str(&format!("commands.*.emit[].{field}\n"));
@@ -218,6 +218,17 @@ fn generate() -> String {
             .expect("the object form of `emit[]` must parse");
     assert_eq!(keyed.event(), "sale.completed");
     assert_eq!(keyed.dedup_key(), Some("wa_message_id"));
+    // hub#2612: the same object form may gate the event on one of the command's statements.
+    let gated: erplora_runtime::manifest::EmitDef =
+        serde_json::from_value(json!({"event": "hold.released", "when_rows": "commands/x.sql"}))
+            .expect("the `when_rows` object form of `emit[]` must parse");
+    assert_eq!(gated.when_rows(), Some("commands/x.sql"));
+    assert!(gated.dedup_key().is_none());
+    assert!(
+        serde_json::from_value::<erplora_runtime::manifest::EmitDef>(json!({"event": "x.y"}))
+            .is_err(),
+        "an object that refines nothing is refused, as the schema does"
+    );
 
     // What a flow's permissions may FIX (hub#1623/#1662), which `erplora validate` mirrors so a
     // template cannot publish a pin the hub refuses at install — nor be refused one the hub

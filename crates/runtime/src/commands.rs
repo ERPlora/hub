@@ -1,7 +1,7 @@
 //! Ejecución de commands declarativos (mutaciones) + emisión de eventos. ARQUITECTURA.md §4.
 //! Tier 0/1 (SQL declarativo), Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2)
 //! y plugins **nativos first-party** (ADR-0009, `native.rs`).
-use erplora_db::{DatabaseAdapter, Params, RowGate, TxGatedOutcome};
+use erplora_db::{DatabaseAdapter, OpCondition, Params, RowGate, TxGatedOutcome};
 use erplora_wasm_host::{Operation, Output};
 use serde_json::{json, Value as Json};
 
@@ -672,6 +672,19 @@ async fn execute_unnamed(
             event.dedup_key(),
         ));
     }
+    // hub#2612: an `emit[].when_rows` entry writes its outbox row only if the anchored statement
+    // changed something — decided by the transaction itself, so the answer and the scheduler's
+    // `extra_ops` (its `next_run`) commit either way. `extra_ops` are NEVER inside a condition.
+    let mut conditions: Vec<OpCondition> = Vec::new();
+    for (i, event) in cmd.def.emit.iter().enumerate() {
+        if let Some(anchor) = event.when_rows() {
+            conditions.push(OpCondition {
+                anchor: when_rows_statement_index(cmd, name, anchor)?,
+                first: sql_op_count + i,
+                count: 1,
+            });
+        }
+    }
     ops.extend_from_slice(extra_ops);
 
     // Gate de filas afectadas (hub#140). `min_affected_rows` es OPT-IN: `None` mantiene el
@@ -714,7 +727,7 @@ async fn execute_unnamed(
         }
         (None, _) => Vec::new(),
     };
-    match db.execute_tx_gated(&ops, &gates).await? {
+    let per_op = match db.execute_tx_gated(&ops, &gates, &conditions).await? {
         TxGatedOutcome::RolledBack { sql_counts, .. } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
             let affected: u64 = sql_counts.iter().sum();
@@ -734,19 +747,31 @@ async fn execute_unnamed(
                 kind: crate::errors::affected_kind(affected, min),
             });
         }
-        TxGatedOutcome::Committed { .. } => {}
-    }
+        TxGatedOutcome::Committed { per_op } => per_op,
+    };
+    // What the outbox really received: an entry whose `when_rows` anchor changed nothing was
+    // skipped inside the tx, and must not be sealed nor pushed live either (hub#2612).
+    let emitted: Vec<crate::manifest::EmitDef> = cmd
+        .def
+        .emit
+        .iter()
+        .enumerate()
+        .filter(|(i, event)| {
+            event.when_rows().is_none() || per_op.get(sql_op_count + i).copied().unwrap_or(0) > 0
+        })
+        .map(|(_, event)| event.clone())
+        .collect();
 
     // ADR-0273 D3 (hub#551): si esta transacción acaba de arrancar una cadena fiscal EN PRODUCCIÓN,
     // el go-live queda cerrado para siempre. Se sella DESPUÉS del commit y solo si commiteó —
     // sellar algo que revirtió cerraría la vuelta atrás por una venta que no existió.
-    seal_first_record_if_fiscal(db, ctx, &cmd.def.emit).await;
+    seal_first_record_if_fiscal(db, ctx, &emitted).await;
 
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
     // durable a listeners la hace el relay desde el outbox. El emisor viaja con el evento
     // (hub#529): es lo único que el canal puede creerse para filtrar por módulo.
     // hub#1980: and the shell tab that sent the request, so only the till that charged prints.
-    for event in &cmd.def.emit {
+    for event in &emitted {
         events::notify_sink_from(
             registry,
             crate::registry::EventSource::Module(&cmd.module_id),
@@ -1600,7 +1625,7 @@ async fn persist_handler_output(
     // Misma semántica de rollback que el camino declarativo (hub#139/#140): si una operación no
     // alcanza su mínimo, revierte la transacción ENTERA — ni las otras operaciones ni el outbox —
     // y el error que sale es el del sub-command que rompió su contrato, no uno del command raíz.
-    match db.execute_tx_gated(&tx_ops, &gates).await? {
+    match db.execute_tx_gated(&tx_ops, &gates, &[]).await? {
         TxGatedOutcome::RolledBack { gate, sql_counts } => {
             let (command, target) = gated_commands[gate];
             if let Some(expect) = &target.def.expect_rows {
@@ -1912,6 +1937,22 @@ fn anchored_statement_index(cmd: &RegisteredCommand, name: &str, anchor: &str) -
         .ok_or_else(|| {
             RuntimeError::Other(format!(
                 "command `{name}` anchors `expect_rows.statement` to `{anchor}`, \
+             which is not one of its sql statements"
+            ))
+        })
+}
+
+/// Index of the statement an `emit[].when_rows` entry anchors to (hub#2612). The installer refuses
+/// an anchor that is not one of the command's `sql` paths, so this only fails on a registry that
+/// bypassed it — loudly, never by announcing every execution.
+fn when_rows_statement_index(cmd: &RegisteredCommand, name: &str, anchor: &str) -> Result<usize> {
+    cmd.def
+        .sql
+        .iter()
+        .position(|path| path == anchor)
+        .ok_or_else(|| {
+            RuntimeError::Other(format!(
+                "command `{name}` anchors `emit[].when_rows` to `{anchor}`, \
              which is not one of its sql statements"
             ))
         })
@@ -3723,6 +3764,7 @@ mod tests {
             &self,
             _ops: &[(String, Params)],
             _gates: &[erplora_db::RowGate],
+            _conditions: &[erplora_db::OpCondition],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             panic!(
                 "DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes"
@@ -3764,6 +3806,7 @@ mod tests {
             &self,
             ops: &[(String, Params)],
             gates: &[erplora_db::RowGate],
+            _conditions: &[erplora_db::OpCondition],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             // Por defecto cada op "muta" 1 fila: simula un INSERT/UPDATE que casa. Si algún gate
             // exige más de lo que su grupo afecta, revierte. Los tests de hub#140 construyen su
@@ -4674,6 +4717,7 @@ mod tests {
             &self,
             ops: &[(String, Params)],
             gates: &[erplora_db::RowGate],
+            _conditions: &[erplora_db::OpCondition],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             let per_op: Vec<u64> = ops.iter().map(|(sql, _)| self.affected(sql)).collect();
             for (i, g) in gates.iter().enumerate() {
