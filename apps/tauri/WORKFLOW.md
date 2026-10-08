@@ -116,26 +116,41 @@ Ajustes` (Hub › «Arrancar al iniciar sesión») · `HUB_SHELL: Barra superior
 
 ## Qué puede hacer cada página (los tres juegos de permisos)
 
-La aplicación no «cambia de modo»: **Tauri decide por el origen de la página que enseña la ventana**
-qué órdenes nativas acepta. Hay tres juegos (`capabilities/*.json`), todos para la ventana `main`.
-Cualquier otra ventana (la de impresión) no tiene ninguno.
+La aplicación no «cambia de modo»: hay **dos puertas** y una orden de la aplicación tiene que pasar
+las dos (HUB_APP-F10).
+
+1. **Por patrón** (Tauri): decide por el origen de la página qué órdenes nativas acepta. Hay tres juegos
+   (`capabilities/*.json`), todos para la ventana `main`. Cualquier otra ventana (la de impresión) no
+   tiene ninguno.
+2. **Por el negocio enlazado** (`src/hub_link.rs`, ERPlora/hub#2504): de las páginas que deja pasar el
+   patrón, **solo la del negocio enlazado** (mismo origen que `hub.url`: esquema, nombre y puerto) usa las
+   órdenes de la aplicación, y solo **una vez cargada** si la ventana llegó a ella desde otro origen (la
+   dirección de la ventana cambia al empezar la navegación, mientras la página anterior sigue viva). Las
+   únicas abiertas a cualquier página que pase el patrón son
+   `device_context`, `forget_hub` y `shell_retry`; cualquier otra, también una que se añada mañana, contesta
+   el error `not_the_linked_hub` sin ejecutarse. Sin negocio enlazado (instalación nueva, tras «Cambiar
+   de negocio» o tras olvidar uno borrado) ninguna página maneja el equipo. Las órdenes de los **plugins**
+   (`plugin:erplora-android`, `plugin:notification`, `plugin:app`) no pasan por esta puerta
+   (ERPlora/hub#2642).
 
 | Juego | Se aplica a | Puede | No puede |
 |---|---|---|---|
-| `default` | `https://*.erplora.com/*`: **cualquier subdominio** (los hubs de cualquier negocio, y también `www` y `pre`, que sirven el SaaS), `http://127.0.0.1:8787` y `:5173` (puertos de desarrollo que viajan en el binario de producción) **y la página incluida en la aplicación** | Todo el hardware (buscar, añadir, probar, imprimir, cajón, funciones, nombres, quitar), `device_context`, `forget_hub`, abrir enlace externo, guardar descarga, imprimir A4, avisos del sistema, reclamar el toque de un aviso, NFC, arranque automático, `core:default` (incluye la versión de la aplicación) y los permisos de Android | Las órdenes crudas del plugin de abrir ficheros; navegar la ventana |
+| `default` | `https://*.erplora.com/*`: **cualquier subdominio** (los hubs de cualquier negocio, y también `www` y `pre`, que sirven el SaaS), `http://127.0.0.1:8787` y `:5173` (puertos de desarrollo que viajan en el binario de producción) **y la página incluida en la aplicación** | **Si además es el negocio enlazado (segunda puerta)**: todo el hardware (buscar, añadir, probar, imprimir, cajón, funciones, nombres, quitar), `device_context`, `forget_hub`, abrir enlace externo, guardar descarga, imprimir A4, avisos del sistema, reclamar el toque de un aviso, NFC, arranque automático, `core:default` (incluye la versión de la aplicación) y los permisos de Android | Las órdenes crudas del plugin de abrir ficheros; navegar la ventana |
 | `onboarding` | `https://erplora.com/*` (el apex, el SaaS) y `127.0.0.1:8001` (desarrollo) | Solo `device_context` (identidad para iniciar sesión) y `forget_hub` | Todo el hardware, abrir enlaces, guardar, imprimir, avisos, NFC, permisos de Android, versión |
 | `degraded` | Solo la página incluida en la aplicación (sin `remote`) | Añade solo `shell_retry` (comprobar la red y mover la ventana) | Nada más propio; hereda de `default` lo que ya tiene esa página |
 
 Lo que esto significa de verdad:
 
-- El hardware **no es «del negocio de la persona»**: lo recibe cualquier página de cualquier subdominio de
-  erplora.com, de cualquier negocio, y de `www` y `pre` (el SaaS completo, `navigation.rs:40-43`). Lo que el
-  juego `onboarding` quería evitar para el apex ocurre igualmente en esos dos. `[SEG]`
-- El bucle local entra con hardware solo en `:8787` y `:5173`, pero un enlace profundo lo acepta con
-  **cualquier puerto** (`lib.rs:297-304`) y la captura lo deja recordado también con `https` (`lib.rs:617-619`):
-  un proceso local que escuche en un puerto y un enlace dejan el mostrador arrancando siempre en su página,
-  sin barra de direcciones y titulada «ERPlora» (en Android release lo frenaría quizá
-  `usesCleartextTraffic=false`: sin confirmar). `[SEG]`
+- El hardware **es del negocio enlazado**: otro negocio, `www`, `pre` o el bucle local pasan el patrón pero
+  la segunda puerta les contesta `not_the_linked_hub`. Una página no se enlaza a sí misma: `?shell=1` solo
+  enlaza cuando la ventana llega desde la página de entrada del SaaS (o es el negocio ya enlazado). Lo que
+  queda abierto: las órdenes de los plugins (ERPlora/hub#2642) y un enlace `erplora://hub/…`, que enlaza su
+  destino sin preguntar (ERPlora/hub#2644), también `www`/`pre` (ERPlora/hub#2645). `[SEG]`
+- El bucle local pasa el patrón solo en `:8787` y `:5173`, pero un enlace profundo lo acepta —y lo enlaza—
+  con **cualquier puerto** (`hub_url_for_host`) y la captura lo deja recordado también con `https`
+  (`trusted_hub_origin`): un proceso local que escuche en un puerto y un enlace dejan el mostrador arrancando
+  siempre en su página, sin barra de direcciones y titulada «ERPlora» (en Android release lo frenaría quizá
+  `usesCleartextTraffic=false`: sin confirmar; ERPlora/hub#2643). `[SEG]`
 - Una página de otro dominio (dominio propio del negocio) **no puede ni pedir su identidad**, así que parece
   funcionar y no imprime. El SaaS usa para el alta el `app_access_url` (dirección de la plataforma) por esto
   (hub#448, cerrada).
@@ -190,7 +205,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | HUB_APP-F07 | Android pide los permisos en su momento | parcial | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
 | HUB_APP-F08 | Volver a activar un permiso negado | hecho | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
 | HUB_APP-F09 | Red local en ordenador (macOS y Windows) | parcial | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
-| HUB_APP-F10 | Cada página tiene su juego de permisos | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
+| HUB_APP-F10 | Cada página tiene su juego de permisos | parcial | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F11 | Cuando no hay conexión con el negocio | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F12 | En la copia de Google Play, solo páginas del SaaS que no cobran | parcial | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F13 | Buscar impresoras | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
@@ -226,7 +241,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | Escanear un QR dentro de la aplicación para enlazar | no existe (la aplicación no tiene cámara; el QR del menú abre el negocio por https en el móvil) | F03 |
 | Permisos de Android con explicación previa | parcial | F07, F08 |
 | Permiso de red local en macOS | parcial | F09 |
-| Juegos de permisos por origen | hecho | F10 |
+| Juegos de permisos por origen y hardware solo para el negocio enlazado | parcial: plugins sin la segunda puerta (hub#2642) | F10 |
 | Pantalla sin conexión y vuelta sola | hecho | F11 |
 | Buscar impresoras (red, Bluetooth, USB) | parcial: Bluetooth negado sin aviso | F13 |
 | Añadir por IP | hecho | F14 |
@@ -273,9 +288,15 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 
 ## Reglas que no se rompen
 
-- **El hardware solo se concede a orígenes `*.erplora.com`, al bucle local en dos puertos y a la página
-  incluida; el apex queda fuera** (`capabilities/default.json`, `tests/remote_acl.rs`). **No** distingue el negocio
-  propio de otro ni un hub del SaaS servido en `www`/`pre` (defecto `[SEG]`).
+- **El hardware solo lo usa el negocio enlazado** (ERPlora/hub#2504): la primera puerta lo limita a orígenes
+  `*.erplora.com`, al bucle local en dos puertos y a la página incluida, sin el apex (`capabilities/default.json`,
+  `tests/remote_acl.rs`); la segunda, al origen exacto del negocio enlazado **ya cargado** (`src/hub_link.rs`:
+  tras una navegación a otro origen nada maneja el equipo hasta que la página nueva termina de cargar). Toda orden nueva
+  nace cerrada: solo `device_context`, `forget_hub` y `shell_retry` están abiertas a cualquier página del patrón.
+  Las órdenes de los plugins aún no pasan por la segunda puerta (ERPlora/hub#2642, `[SEG]`).
+- **Solo el SaaS elige el negocio**: `?shell=1` enlaza y se recuerda solo si la ventana sale de la página de
+  entrada (el origen del SaaS; en desarrollo también el de `ERPLORA_SHELL_URL`) o cae en el negocio ya enlazado.
+  La aplicación enlaza por su cuenta el negocio recordado al arrancar y el destino de un enlace `erplora://hub/…`.
 - **Solo se recuerda o se abre por enlace** `<etiqueta>.erplora.com` (incluidos `www` y `pre`) o el bucle local
   con cualquier puerto; al navegador del sistema también van el apex y `checkout.stripe.com`.
 - **El enlace profundo se resuelve, no se abre**: la dirección se reconstruye desde el nombre.
@@ -303,6 +324,8 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 - No escanea códigos QR ni usa la cámara.
 - No maneja impresoras de etiquetas (ZPL/TSPL/EPL) ni imprime imágenes (`HUB_PERIPHERALS`).
 - No sigue con permisos las páginas de otros dominios: un negocio con dominio propio no recibe hardware.
+- No deja el hardware a una página de erplora.com que no sea el negocio enlazado, aunque la ventana la
+  enseñe (otro negocio, la web pública, el entorno de pruebas): contesta `not_the_linked_hub`.
 - No pregunta antes de cambiar el negocio recordado cuando llega un enlace `erplora://hub/…` (defecto, F03).
 - No deja ningún registro de lo que falla: la aplicación no instala destino para `log`/`tracing`.
 
@@ -326,9 +349,10 @@ Se resuelven con `market-decision`; no las decide el worker.
 7. La ventana emergente de **Meta** («Tu número» de WhatsApp) usa una ventana nueva del navegador integrado,
    que en la aplicación no abre ninguna (`window.open` no hace nada): sin confirmar cómo se completa ahí.
 
-8. `[SEG]` **¿Se restringe el hardware a los hubs?** Hoy lo reciben `www`, `pre` y cualquier subdominio de
-   erplora.com, y el bucle local en dos puertos; hace falta el inventario de DNS de `*.erplora.com` (¿algún
-   subdominio sirve contenido de terceros?).
+8. ~~`[SEG]` ¿Se restringe el hardware a los hubs?~~ Resuelta por ERPlora/hub#2504: solo el negocio enlazado
+   usa las órdenes de la aplicación. Quedan las de los plugins (ERPlora/hub#2642), el enlace sin confirmación
+   (ERPlora/hub#2644), `www`/`pre` como negocio (ERPlora/hub#2645) y el bucle local en producción
+   (ERPlora/hub#2643).
 9. `[SEG]` **Cambiar de negocio** debería cerrar la sesión del hub (`runtimeLogout`), borrar los tokens de
    erplora.com y parar la escucha de Android; hoy no lo hace.
 10. **Sin confirmar en un dispositivo**: que `usesCleartextTraffic=false` impida en Android release cargar el

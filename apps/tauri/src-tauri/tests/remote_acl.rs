@@ -15,6 +15,10 @@
 //! - `onboarding.json` — the SaaS apex (`https://erplora.com`), where the app BOOTS (ADR-0196).
 //!   It gets the device identity and nothing else: the onboarding page never prints.
 //!
+//! The ACL is the FIRST gate, by pattern. A pattern cannot name the one business this till belongs
+//! to, so `src/hub_link.rs` (hub#2504) is the second: of the pages these patterns let through, only
+//! the one whose origin is the LINKED hub runs the commands that are not open to every page.
+//!
 //! Every assertion below reads the REAL `capabilities/*.json` — the whole directory, not a list
 //! hardcoded here, so a capability file added tomorrow is covered the day it lands — and runs the
 //! patterns through the SAME engine Tauri uses at runtime (`RemoteUrlPattern`, WHATWG URLPattern).
