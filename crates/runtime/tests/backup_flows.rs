@@ -819,7 +819,7 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
     .await
     .expect("export");
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
-    // The bundle also names a command nobody has: a hand-edited zip, or a module renamed since.
+    // The bundle also names a command nobody has: a module renamed since the copy was taken.
     let mut manifest = bundle.manifest.clone();
     manifest.flows[0]
         .grants
@@ -828,6 +828,8 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
             value: "ghost.module.act".into(),
             payload: Default::default(),
         });
+    // Re-sealed by the same hub (hub#2497): a hand-edited zip would no longer be its own copy.
+    erplora_runtime::export::seal_manifest(&mut manifest);
 
     let report = import_sections(
         &mut restored,

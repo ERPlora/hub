@@ -257,6 +257,9 @@ async fn a_capability_the_installed_module_does_not_declare_is_refused_and_leave
         .get_mut("verifactu")
         .expect("the module is in the manifest")
         .push("printer".into());
+    // Re-sealed by the same hub (hub#2497): this is the hub's own copy carrying a grant its newer
+    // module no longer declares, not a zip edited by hand (that one would be refused as foreign).
+    erplora_runtime::export::seal_manifest(&mut bundle.manifest);
 
     // The destination runs a NEWER VeriFactu that no longer asks for the network.
     let mut restored = runtime("h1").await;
