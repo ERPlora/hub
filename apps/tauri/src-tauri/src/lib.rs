@@ -1794,11 +1794,26 @@ fn usb_send(target: &discovery::UsbTarget, _payload: &[u8]) -> Result<(), Hardwa
     ))
 }
 
-/// ⚠️ `(async)` is load-bearing (ADR-0204): the bluetooth arm crosses into Kotlin through
+/// Sends a document to a network printer and answers with what happened to the paper (hub#2494):
+/// `Ok` once it is on the printer, the unreachable error once the queue's retries ran out. Before,
+/// the answer came on the hand-over to the in-memory queue, so a switched-off printer lost the
+/// ticket with nobody told — the till heard «done», and so did the hub for a job from its queue.
+async fn print_to_network(
+    queue: &PrintQueue,
+    target: discovery::NetworkTarget,
+    payload: Vec<u8>,
+    job_id: Option<String>,
+) -> Result<(), HardwareError> {
+    queue.print(PrintJob { job_id, target, payload, attempts: 0 }).await?;
+    Ok(())
+}
+
+/// ⚠️ `async` is load-bearing (ADR-0204): the bluetooth arm crosses into Kotlin through
 /// `run_mobile_plugin`, which dispatches onto Android's main looper and BLOCKS for the answer — a
-/// plain command runs on that very thread and the till would hang on the press that prints.
-#[tauri::command(async)]
-fn erplora_print(
+/// plain command runs on that very thread and the till would hang on the press that prints. And the
+/// network arm awaits the paper (hub#2494), retries included, which only an async command can do.
+#[tauri::command]
+async fn erplora_print(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
@@ -1815,12 +1830,7 @@ fn erplora_print(
     let payload = escpos::render_document(doc, &data)?;
     match target {
         discovery::PrintTarget::Network(target) => {
-            state.queue.enqueue(PrintJob {
-                job_id,
-                target,
-                payload,
-                attempts: 0,
-            })?;
+            print_to_network(&state.queue, target, payload, job_id).await?;
         }
         discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
         discovery::PrintTarget::Usb(usb) => usb_send(&usb, &payload)?,
@@ -1828,10 +1838,11 @@ fn erplora_print(
     Ok(())
 }
 
-/// `erplora_test_print` — encola una página de prueba en la impresora dada (o la envía por SPP si
-/// la impresora es Bluetooth, ADR-0204). `(async)` por la misma razón que `erplora_print`.
-#[tauri::command(async)]
-fn erplora_test_print(
+/// `erplora_test_print` — prints a test page on the given printer (over SPP when it is Bluetooth,
+/// ADR-0204). `async` for the same reasons as `erplora_print`: «Probar» on a switched-off network
+/// printer now says it did not print (hub#2494).
+#[tauri::command]
+async fn erplora_test_print(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
@@ -1844,12 +1855,7 @@ fn erplora_test_print(
     let payload = escpos::render_test_page(&printer_id, &data);
     match target {
         discovery::PrintTarget::Network(target) => {
-            state.queue.enqueue(PrintJob {
-                job_id: None,
-                target,
-                payload,
-                attempts: 0,
-            })?;
+            print_to_network(&state.queue, target, payload, None).await?;
         }
         discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
         discovery::PrintTarget::Usb(usb) => usb_send(&usb, &payload)?,
@@ -2334,6 +2340,56 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#2494: a ticket that does not come out is an error for whoever printed it ────────────
+    //
+    // The network arm answered `Ok` as soon as the bytes were in the in-memory queue: with the
+    // printer switched off the till heard nothing and the device draining the hub's queue
+    // confirmed «printed». Now it waits for the paper, retries included.
+
+    #[test]
+    fn a_switched_off_network_printer_is_an_error_for_whoever_printed_hub2494() {
+        let queue = std::sync::Arc::new(PrintQueue::new(RetryPolicy {
+            max_attempts: 1,
+            backoff_ms: 0,
+            connect_timeout_ms: 500,
+            write_timeout_ms: 500,
+        }));
+        let worker = queue.clone();
+        tauri::async_runtime::spawn(async move {
+            let (outcomes, _ignored) = tokio::sync::mpsc::unbounded_channel();
+            worker.run(outcomes).await;
+        });
+        // A port nobody listens on any more: a printer that is off.
+        let port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind a free port");
+            listener.local_addr().expect("its address").port()
+        };
+        let target = discovery::NetworkTarget { host: "127.0.0.1".into(), port };
+
+        let printed = tauri::async_runtime::block_on(print_to_network(
+            &queue,
+            target,
+            b"ticket".to_vec(),
+            Some("sale-1".into()),
+        ));
+
+        let err = printed.expect_err("a ticket that never reached the printer is not printed");
+        assert!(
+            matches!(err, HardwareError::Peripheral(erplora_peripherals::PeripheralError::Unreachable(_))),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn every_network_print_waits_for_the_paper_hub2494() {
+        // `erplora_print` and `erplora_test_print` («Probar») both go through `print_to_network`;
+        // a hand-over that answers on the enqueue is the bug coming back.
+        let source = include_str!("lib.rs");
+        let shell = source.split("\n#[cfg(test)]\nmod tests").next().unwrap_or_default();
+        assert!(!shell.contains("queue.enqueue("), "a network print answers on the hand-over again");
+        assert_eq!(shell.matches("print_to_network(&state.queue").count(), 2, "print and test print");
+    }
 
     // ── hub#2305: the id a tap on a notice comes back with ───────────────────────────────────────
     //
