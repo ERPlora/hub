@@ -333,3 +333,54 @@ async fn hub2517_a_card_locked_at_the_pinpad_is_locked_at_the_approval_dialog() 
         .unwrap();
     assert_locked(resp, "the same card at the approval dialog").await;
 }
+
+/// Tapping the wrong person is a mistake anybody makes, and it is not a guess at a PIN: twenty
+/// honest refusals of someone who cannot approve leave the address budget untouched, so the till
+/// is not locked out of its own approvals — nor its pinpad — for using the dialog (HUB-F135: «elegir
+/// a una persona que no puede aprobarlo no cuenta como fallo»).
+#[tokio::test]
+async fn hub2517_tapping_someone_who_cannot_approve_never_spends_the_address_budget() {
+    let app = fixture().await;
+    let client = "198.51.100.21";
+
+    // Nacho's PIN is RIGHT; he just cannot approve a payment.
+    for i in 0..MAX_GUESSES {
+        let resp = app
+            .clone()
+            .oneshot(approve_with_pin(client, "Nacho", "4692"))
+            .await
+            .unwrap();
+        assert_eq!(
+            body_json(resp).await["error"]["code"],
+            json!("hub.elevation.approver_cannot"),
+            "refusal {i} is about the person, not the digits"
+        );
+    }
+
+    let resp = app
+        .clone()
+        .oneshot(approve_with_pin(client, "Sofía", "8317"))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the right manager still approves from that address"
+    );
+
+    let resp = app
+        .oneshot(pin_login(client, "Nacho", "4692"))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "and the pinpad is still open"
+    );
+
+    let lines = failure_lines(client);
+    assert!(
+        lines.is_empty(),
+        "no auth_failed line for a refusal that is not a guess: {lines:#?}"
+    );
+}
