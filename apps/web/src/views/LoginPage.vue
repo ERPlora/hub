@@ -311,7 +311,6 @@
                         <ion-card-content class="ion-text-center">
                           <ok-avatar :name="u.name" size="lg"></ok-avatar>
                           <p class="user-name">{{ u.name }}</p>
-                          <p v-if="u.email" class="user-email">{{ u.email }}</p>
                         </ion-card-content>
                       </ion-card>
                     </div>
@@ -443,6 +442,7 @@ import { openExternal } from '../lib/open-external';
 import { getDeviceContext } from '../lib/device';
 import { takeCourierFailure } from '../lib/courier';
 import { lockRefusal, sayRefusal, type Refusal } from '../lib/lock-refusal';
+import { readTrustedUsers, saveTrustedUsers, type TrustedUser } from '../lib/trusted-users';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -450,13 +450,6 @@ import { lockRefusal, sayRefusal, type Refusal } from '../lib/lock-refusal';
 type Step = 'pin' | 'email' | 'twoFactor' | 'setup';
 
 const { t } = useI18n();
-
-interface TrustedUser {
-  id: string;
-  name: string;
-  email?: string;
-  initials: string;
-}
 
 // ---------------------------------------------------------------------------
 // Tema: estado compartido (lib/theme) — mismo modo que el toggle de la topbar.
@@ -473,21 +466,12 @@ function onLogoError(ev: Event): void {
 }
 
 // ---------------------------------------------------------------------------
-// Estado de la sesión de dispositivo (PIN / trust)
-// PIN y lista de usuarios de confianza se persisten en localStorage bajo
-// 'erplora.trusted' y 'erplora.trusted_users'. El flujo de AUTH real del
-// Cloud (ARQUITECTURA.md §2.9) se implementa en cloud.ts; aquí solo leemos
-// el flag y la lista para mostrar/ocultar los pasos.
+// Device session state (PIN / trust)
+// The flag lives in localStorage under 'erplora.trusted'; the faces of the PIN grid under
+// 'erplora.trusted_users', through lib/trusted-users (name and initials, never an e-mail: hub#2536).
+// The real Cloud AUTH flow (ARQUITECTURA.md §2.9) lives in cloud.ts; here we only read the flag and
+// the list to show or hide the steps.
 // ---------------------------------------------------------------------------
-function readTrustedUsers(): TrustedUser[] {
-  try {
-    const raw = localStorage.getItem('erplora.trusted_users');
-    return raw ? (JSON.parse(raw) as TrustedUser[]) : [];
-  } catch { return []; }
-}
-function saveTrustedUsers(list: TrustedUser[]): void {
-  try { localStorage.setItem('erplora.trusted_users', JSON.stringify(list)); } catch { /* ignore */ }
-}
 function saveTrustedFlag(val: boolean): void {
   try {
     if (val) localStorage.setItem('erplora.trusted', '1');
@@ -526,8 +510,8 @@ const step = ref<Step>(pinAvailable.value ? 'pin' : 'email');
 const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && step.value !== 'twoFactor');
 
 // El RUNTIME (`GET /api/hub/context` → pin_users) es la AUTORIDAD de quién puede hacer login local
-// por PIN. localStorage NO añade usuarios: solo **decora** con email/iniciales (hub_user no guarda
-// email), cacheados del login cloud y pegados a la entrada del runtime que coincida por id. Antes se
+// por PIN. localStorage NO añade usuarios: solo **decora** con iniciales, y nunca con el correo de
+// nadie (hub#2536: la rejilla de una caja compartida lo enseñaba a quien se acercase). Antes se
 // "conservaban" los de localStorage ausentes del runtime → podía resucitar usuarios obsoletos
 // (drift); ya no. El flujo de seguridad (§2.9) NO cambia: esto solo decide qué pestaña se muestra;
 // la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
@@ -557,12 +541,10 @@ watch(
       step.value = 'email';
       return;
     }
-    const cachedById = new Map(trustedUsers.value.map((u) => [u.id, u]));
     trustedUsers.value = users.map((u) => ({
       id: u.id,
       name: u.name,
       initials: initials(u.name),
-      email: cachedById.get(u.id)?.email,
     }));
     saveTrustedUsers(trustedUsers.value);
     saveTrustedFlag(true);
@@ -699,7 +681,6 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
     const userEntry: TrustedUser = {
       id: sess.user.id,
       name: result.user.name,
-      email: result.user.email,
       initials: initials(result.user.name)
     };
     const existing = trustedUsers.value.filter((u) => u.id !== sess.user.id);
@@ -963,10 +944,12 @@ async function checkPin(pin: string): Promise<void> {
     // belong to somebody else.
     clearTokens();
     // Rol LOCAL del runtime (mismo que el gate del backend) → gatea la UI admin (pestaña API keys).
+    // hub#2536: the e-mail comes from the hub's profile, which the shell reads once signed in —
+    // never from what this browser remembers about the faces of its grid.
     setUser({
       id: sess.user.id,
       name: u.name,
-      email: u.email ?? '',
+      email: '',
       role: sess.user.role,
       permissions: sess.permissions,
     });
@@ -1011,7 +994,7 @@ async function signInWithBadge(badge: string): Promise<void> {
     setUser({
       id: sess.user.id,
       name: sess.user.name,
-      email: trustedUsers.value.find((u) => u.id === sess.user.id)?.email ?? '',
+      email: '', // hub#2536: from the hub's profile, as with the PIN
       role: sess.user.role,
       permissions: sess.permissions,
     });
@@ -1296,15 +1279,6 @@ async function onSetupComplete(pin: string): Promise<void> {
   text-overflow: ellipsis;
   white-space: nowrap;
   margin: 0;
-}
-.user-email {
-  font-size: 11px;
-  color: var(--ion-color-medium);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin: 2px 0 0;
 }
 
 /* ---- PIN user info ---- */

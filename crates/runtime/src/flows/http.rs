@@ -164,6 +164,21 @@ fn idempotency_key(run_id: &str, step_id: &str) -> String {
     .to_string()
 }
 
+/// The run scope plus a `run` root carrying the key of this call (hub#2675) — the same one
+/// [`Prepared::with_idempotency_key`] puts in `Idempotency-Key`, so an author who also writes it in
+/// the body (Square) or in another header (PayPal) sends one key, not two. Built per step, like the
+/// `secret` root, because the key belongs to one step.
+pub(crate) fn with_run_key(scope: &Json, run_id: &str, step_id: &str) -> Json {
+    let mut out = scope.clone();
+    if let Some(map) = out.as_object_mut() {
+        map.insert(
+            def::ROOT_RUN.to_string(),
+            json!({ def::RUN_IDEMPOTENCY_KEY: idempotency_key(run_id, step_id) }),
+        );
+    }
+    out
+}
+
 /// Builds the request of an `http` step, or refuses it.
 ///
 /// Refuses when: the rendered URL is not an absolute http(s) URL, a referenced secret does not
@@ -659,5 +674,47 @@ mod tests {
         );
         assert_ne!(key, idempotency_key("run-2", "charge"), "another run");
         assert_eq!(key.len(), 36, "fits every provider's limit (Square: 45)");
+    }
+
+    /// hub#2675 — `run.idempotency_key` is the key of THIS step: the one the standard header
+    /// carries, wherever the author places it (Square: the body; PayPal: its own header), and
+    /// another step of the same run gets another one.
+    #[tokio::test]
+    async fn hub2675_the_run_key_the_author_places_is_the_key_of_this_step() {
+        let db = db().await;
+        let authority = allow(&db, "https://api.example.com/*").await;
+        let paying = |id: &str| {
+            step(json!({
+                "id": id, "kind": "http", "method": "POST",
+                "url": "https://api.example.com/v2/payments",
+                "headers": { "PayPal-Request-Id": "{{run.idempotency_key}}" },
+                "body": { "idempotency_key": "run.idempotency_key" }
+            }))
+        };
+        let mut sent = Vec::new();
+        for id in ["pay", "refund"] {
+            let scope = with_run_key(&scope(), "run-1", id);
+            let prepared = prepare(&db, HUB, FLOW, &paying(id), &scope, &authority)
+                .await
+                .unwrap()
+                .with_idempotency_key("run-1", id);
+            let key = idempotency_key("run-1", id);
+            let header = |name: &str| {
+                prepared
+                    .request
+                    .headers
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                    .map(|(_, v)| v.clone())
+            };
+            assert_eq!(header("PayPal-Request-Id"), Some(key.clone()));
+            assert_eq!(header(IDEMPOTENCY_KEY_HEADER), Some(key.clone()));
+            let body: Json = serde_json::from_str(prepared.request.body.as_deref().unwrap()).unwrap();
+            assert_eq!(body["idempotency_key"], json!(key));
+            // Not a secret: the run history shows it where it went out.
+            assert_eq!(prepared.recorded_input["headers"]["PayPal-Request-Id"], json!(key));
+            sent.push(key);
+        }
+        assert_ne!(sent[0], sent[1], "two calls of one run are two calls");
     }
 }
