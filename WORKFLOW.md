@@ -242,7 +242,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F97 | «Solo si» y «seguir si falla» en cada paso | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F98 | Conceder, limitar y retirar los permisos de una automatización | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F99 | Guardar secretos que no se pueden volver a leer | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
-| HUB-F100 | Decidir una pregunta o una propuesta que espera | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
+| HUB-F100 | Decidir una pregunta o una propuesta que espera | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F101 | Cerrar lo que nadie contestó a tiempo | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F102 | Guardar el historial de ejecuciones | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F103 | Reanudar una ejecución desde el paso que falló | no hecho | [automatizaciones.md](workflow/automatizaciones.md) |
