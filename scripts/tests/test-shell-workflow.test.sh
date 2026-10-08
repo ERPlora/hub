@@ -80,7 +80,16 @@ check(
 )
 for event, block in (("pull_request", pr), ("push", push)):
     paths = block.get("paths") or []
-    for wanted in ("apps/tauri/**", "crates/tauri-plugin-erplora-android/**", ".github/workflows/test-shell.yml", SELF):
+    # `.github/workflows/*.yml`: `release_runner_assumptions.rs` reads EVERY workflow, so a change to
+    # any of them can turn this suite red — on 08/10 a guard added to another workflow did, and
+    # develop stayed red in the shell with no run saying so.
+    for wanted in (
+        "apps/tauri/**",
+        "crates/tauri-plugin-erplora-android/**",
+        ".github/workflows/test-shell.yml",
+        ".github/workflows/*.yml",
+        SELF,
+    ):
         check(
             f"`{event}.paths` includes `{wanted}`",
             wanted in paths,
