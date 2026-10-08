@@ -214,7 +214,12 @@ async fn an_update_gives_the_app_turn_back_before_indexing_hub2663() {
     );
     embeddings.wait_until_held().await;
     assert_eq!(
-        state.runtime.read().await.registry().module_version("parts"),
+        state
+            .runtime
+            .read()
+            .await
+            .registry()
+            .module_version("parts"),
         "2.0.0",
         "the update is indexing, so the new version is already in place"
     );
@@ -251,6 +256,9 @@ async fn an_update_gives_the_app_turn_back_before_indexing_hub2663() {
             .iter()
             .any(|hit| hit.chunk.version == "2.0.0" && hit.chunk.content.contains("version 2.0.0")),
         "the update must still index the new version for the assistant: {:?}",
-        indexed.iter().map(|h| (&h.chunk.version, &h.chunk.content)).collect::<Vec<_>>()
+        indexed
+            .iter()
+            .map(|h| (&h.chunk.version, &h.chunk.content))
+            .collect::<Vec<_>>()
     );
 }
