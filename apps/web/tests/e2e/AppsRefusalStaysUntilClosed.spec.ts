@@ -80,6 +80,28 @@ const ACTIONS = [
     },
     says: fill(es.apps.updateBlocked, { name: APP.name, missing: 'payroll' }),
   },
+  {
+    door: 'update',
+    label: 'update ran out of time',
+    button: es.apps.actionUpdate,
+    confirm: null,
+    // hub#2556: the download of the new version trickled past the ceiling, the runtime put the
+    // previous version back and answers 200 with the warning (`module_api.rs` `update_module`).
+    answer: {
+      status: 200,
+      body: {
+        ok: true,
+        data: { module_id: APP.id, version: '1.0.0', updated: false },
+        warning: {
+          code: 'module.update_failed_kept_previous',
+          cause: 'install_cloud_timeout',
+          message: 'the cloud did not answer in time',
+        },
+      },
+    },
+    says: fill(es.apps.updateTimedOut, { name: APP.name }),
+    retry: es.apps.installRetry,
+  },
 ] as const;
 
 let session: Awaited<ReturnType<typeof loginByPin>>;
@@ -179,7 +201,8 @@ test.describe('a refusal in «My apps» stays until it is closed (hub#2594)', ()
 
   for (const size of SIZES) {
     for (const action of ACTIONS) {
-      test(`${size.width}x${size.height}: ${action.door} refused`, async ({ page }, testInfo) => {
+      const label = 'label' in action ? action.label : `${action.door} refused`;
+      test(`${size.width}x${size.height}: ${label}`, async ({ page }, testInfo) => {
         await page.setViewportSize(size);
         await withSession(page, session);
         await refuse(page, action);
@@ -204,7 +227,22 @@ test.describe('a refusal in «My apps» stays until it is closed (hub#2594)', ()
         await page.waitForTimeout(PAST_THE_OLD_TIMEOUT_MS);
         await expect(notice).toBeVisible();
         await expect(notice).toContainText(action.says);
-        const shot = `apps-refusal-${action.door}-${size.width}x${size.height}.png`;
+        if ('retry' in action) {
+          // A slow erplora.com is usually a passing thing: the notice offers to try again.
+          const retry = notice.getByRole('button', { name: action.retry, exact: true });
+          await expect(retry).toBeVisible();
+          await expect(retry).toBeEnabled();
+        }
+        // The click on the row left the pointer where the notice now is: take it away so the
+        // picture shows the notice at rest, not a hovered button (in `ios` mode a hovered toast
+        // button fades to 0.6 and back with a transition).
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(400);
+        const box = await notice.boundingBox();
+        expect(box, 'the notice is on screen').not.toBeNull();
+        expect(box!.x >= 0 && box!.x + box!.width <= size.width, 'the notice fits the window width').toBe(true);
+        const slug = label.replace(/\s+/g, '-');
+        const shot = `apps-refusal-${slug}-${size.width}x${size.height}.png`;
         await page.screenshot({ path: SHOTS_DIR ? join(SHOTS_DIR, shot) : testInfo.outputPath(shot) });
 
         // …and «Cerrar» takes it away.

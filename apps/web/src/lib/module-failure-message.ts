@@ -70,3 +70,29 @@ export function moduleFailureMessage(error: unknown, fallback: string, i18n: Tra
   const sentence = serverSentence(error);
   return sentence && sentence.trim() ? sentence : fallback;
 }
+
+/** The stable reason of a download that ran out of time (`install_error_response`, hub#2556). */
+const CLOUD_TIMEOUT = 'install_cloud_timeout';
+
+/**
+ * `UPDATE_KEPT_PREVIOUS` of `./runtime`, spelled here on purpose: screen tests mock `./runtime`
+ * and a mock without that export would throw the moment this module read it.
+ */
+const KEPT_PREVIOUS = 'module.update_failed_kept_previous';
+
+/**
+ * What the person reads when updating `name` did not work (hub#2556).
+ *
+ * An update the runtime rolled back (`UpdateKeptPreviousError`) is told apart by its CODE, not by
+ * `instanceof`: screens mock `./runtime`, and the rule must not depend on which class the mock
+ * kept. Its English `message` is for the log; the screen says whether erplora.com ran out of time
+ * (try again) or, for any other reason, the honest generic line. Every other failure goes through
+ * `moduleFailureMessage`, with the generic line as fallback.
+ */
+export function updateFailureMessage(error: unknown, name: string, i18n: Translator): string {
+  if (error && typeof error === 'object' && (error as { code?: unknown }).code === KEPT_PREVIOUS) {
+    const reason = (error as { reason?: unknown }).reason;
+    return i18n.t(reason === CLOUD_TIMEOUT ? 'apps.updateTimedOut' : 'apps.updateError', { name });
+  }
+  return moduleFailureMessage(error, i18n.t('apps.updateError', { name }), i18n);
+}

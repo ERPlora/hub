@@ -139,15 +139,18 @@ async function press(w: Wrapper, actionId: 'toggle' | 'uninstall' | 'update'): P
   await settle();
 }
 
-/** The refusal stays until closed: red, sticky, and its only button is «Close». */
-function expectStickyRefusal(w: Wrapper, message: string): void {
+/**
+ * The refusal stays until closed: red, sticky, and it ends with «Close». `before` are the buttons
+ * that come first — only a failed update has one, «Retry» (hub#2556).
+ */
+function expectStickyRefusal(w: Wrapper, message: string, before: string[] = []): void {
   const n = toast(w);
   expect(n.message).toBe(message);
   expect(n.color).toBe('danger');
   // 0 = until the person closes it. It was 2500: gone before anyone could read it.
   expect(n.duration).toBe(0);
-  expect(n.buttons.map((b) => b.text)).toEqual([enCatalogue.apps.noticeClose]);
-  expect(n.buttons[0].role).toBe('cancel');
+  expect(n.buttons.map((b) => b.text)).toEqual([...before, enCatalogue.apps.noticeClose]);
+  expect(n.buttons[before.length].role).toBe('cancel');
 }
 
 const unsentRecords = () =>
@@ -210,7 +213,9 @@ describe('a refusal to switch off, uninstall or update an app stays until closed
     await settle();
     await press(w, 'update');
     expect(runtimeMocks.updateModule).toHaveBeenCalledWith('verifactu', '2.0.0');
-    expectStickyRefusal(w, 'The marketplace did not answer');
+    // hub#2556: a failed update also offers «Retry» before «Close», like a failed install
+    // (hub#2244) — a slow or unreachable erplora.com is usually a passing thing.
+    expectStickyRefusal(w, 'The marketplace did not answer', [enCatalogue.apps.installRetry]);
   });
 
   it('🔴 updating blocked by paid apps not subscribed to can be closed too', async () => {
