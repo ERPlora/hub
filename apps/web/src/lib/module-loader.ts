@@ -525,7 +525,8 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
  * `loadComponent`/`provides_slots`) y devuelve el tag a montar. El WC consulta sus datos él mismo.
  */
 export async function loadModuleComponent(mod: InstalledManifest, tag: string): Promise<string> {
-  // Rejecting is the caller's error state: the widget card says «No disponible», a slot skips it.
+  // Rejecting is the caller's error state: the widget card says «No disponible», the settings
+  // preview skips the field (hub#2635).
   if (!mod.entryUrl) throw new Error(`module ${mod.moduleId} declares no ui.entry to mount <${tag}>`);
   await loadEntryUrl(mod.entryUrl);
   return tag;
