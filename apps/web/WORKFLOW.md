@@ -366,7 +366,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F105 | Ver las apps instaladas en el negocio | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F106 | Abrir una app desde Apps | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F107 | Buscar una app en el catálogo | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
-| HUB_SHELL-F108 | Saber cuánto cuesta una app antes de instalarla | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
+| HUB_SHELL-F108 | Saber cuánto cuesta una app antes de instalarla | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F109 | Instalar una app | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F110 | Saber qué más se ha instalado de paso | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F111 | Intentar instalar una app que necesita suscripción | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
