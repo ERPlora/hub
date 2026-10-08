@@ -272,3 +272,79 @@ async fn the_own_backup_edited_to_grant_one_more_permission_grants_none() {
         &SectionStatus::Ignored(ignore_reason::CAPABILITY_GRANTS_NOT_PORTABLE.into()),
     );
 }
+
+/// 🔴 The person has to be TOLD. A backup taken before this change (no seal), or one edited
+/// afterwards, names this hub and still comes in like another business's file: without staff,
+/// permissions or armed automations. The report says so with `origin_unproven`, so the screen can
+/// explain why the people did not come back instead of claiming the file is someone else's. A
+/// genuine own copy and a file that never named this hub do not raise it.
+#[tokio::test]
+async fn a_file_that_names_this_hub_without_its_seal_is_reported_as_unproven() {
+    let origin = runtime("hub-legacy").await;
+    add_person(&origin, "hub-legacy", "Lucia", "admin", "4821").await;
+    let sealed = export_hub(
+        &origin,
+        "hub-legacy",
+        &backup_with_people(),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
+    // The same backup as a hub made it before the seal existed.
+    let mut legacy = sealed.manifest.clone();
+    legacy.origin_seal = None;
+
+    let mut restored = runtime("hub-legacy").await;
+    let report = import_sections(
+        &mut restored,
+        &legacy,
+        &sealed.files,
+        &import_people(),
+        "hub-legacy",
+    )
+    .await
+    .expect("the import runs");
+    assert!(
+        report.origin_unproven,
+        "a file naming this hub without its seal must be reported as unproven"
+    );
+    assert_eq!(
+        row(&report, "hub_users"),
+        &SectionStatus::Ignored(ignore_reason::IDENTITY_NOT_PORTABLE.into()),
+    );
+    let wire = serde_json::to_value(&report).expect("the report serialises");
+    assert_eq!(wire["origin_unproven"], serde_json::json!(true));
+
+    // The genuine copy: proven, so nothing to explain.
+    let mut again = runtime("hub-legacy").await;
+    let report = import_sections(
+        &mut again,
+        &sealed.manifest,
+        &sealed.files,
+        &import_people(),
+        "hub-legacy",
+    )
+    .await
+    .expect("the import runs");
+    assert!(!report.origin_unproven, "the sealed own copy is proven");
+    let wire = serde_json::to_value(&report).expect("the report serialises");
+    assert!(
+        wire.get("origin_unproven").is_none(),
+        "the field only travels when it is true: {wire}"
+    );
+
+    // Another business's file never claimed to be this hub's copy: nothing to explain either.
+    let mut elsewhere = runtime("hub-other").await;
+    let report = import_sections(
+        &mut elsewhere,
+        &legacy,
+        &sealed.files,
+        &import_people(),
+        "hub-other",
+    )
+    .await
+    .expect("the import runs");
+    assert!(!report.origin_unproven, "a foreign file is not «unproven»");
+}

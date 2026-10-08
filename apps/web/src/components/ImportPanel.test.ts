@@ -819,3 +819,41 @@ describe('hub#1905 · al terminar de importar se piden los permisos de sus apps'
     expect(askPermissionsAfterImport).not.toHaveBeenCalled();
   });
 });
+
+describe('ImportPanel · hub#2497 — a file that names this hub but is not proven as its copy', () => {
+  const i18nReal = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en },
+  });
+
+  async function reportStep(report: Record<string, unknown>) {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mount(ImportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    const vm = w.vm as unknown as Record<string, unknown>;
+    vm.report = report;
+    vm.step = 'report';
+    await flushPromises();
+    return w;
+  }
+
+  const discardedPeople = { section: 'hub_users', status: { Ignored: 'identity_not_portable' }, discarded_rows: 2 };
+
+  it('says why the people did not come back when the engine could not prove the copy', async () => {
+    const w = await reportStep({ sections: [discardedPeople], origin_unproven: true });
+    const note = w.find('[data-testid="import-report-origin-unproven"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain(en.importPage.reportOriginUnproven);
+  });
+
+  it('says nothing of the kind for a proven copy or another business file', async () => {
+    const w = await reportStep({ sections: [discardedPeople] });
+    expect(w.find('[data-testid="import-report-origin-unproven"]').exists()).toBe(false);
+  });
+});

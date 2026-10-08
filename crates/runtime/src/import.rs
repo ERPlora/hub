@@ -82,6 +82,12 @@ pub struct ImportReport {
     /// round-trip. The client reads it through the persisted report, not this field.
     #[serde(default, skip_serializing, skip_deserializing)]
     pub batch_id: Option<String>,
+    /// The file names this hub as its origin but does not carry its valid origin seal (hub#2497):
+    /// a backup taken before the seal existed, or one edited afterwards. It was imported like
+    /// another business's file, and the screen says why instead of calling it someone else's.
+    /// Only on the wire when `true`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub origin_unproven: bool,
 }
 
 /// Aplica en el hub las secciones seleccionadas del bundle, bajo el tenant `target_hub_id`
@@ -148,6 +154,7 @@ pub async fn import_sections(
     // identity it exported — ADR-0113 §1) from any other bundle (which may not), for both the
     // accounts of hub#331 and the settings of hub#405.
     let same_hub = is_same_hub(manifest, target_hub_id);
+    report.origin_unproven = names_this_hub(manifest, target_hub_id) && !same_hub;
     for section in &manifest.sections {
         // The role set of the vertical is NOT a section of data (hub#354): it travels as keys in
         // `manifest.active_roles` and is applied once, after this loop, through the role catalogue's
@@ -1965,6 +1972,7 @@ mod tests {
                 },
             ],
             batch_id: None,
+            origin_unproven: false,
         };
         let json = serde_json::to_string(&r).unwrap();
         let back: ImportReport = serde_json::from_str(&json).unwrap();
@@ -1986,6 +1994,7 @@ mod tests {
         let r = ImportReport {
             sections: Vec::new(),
             batch_id: Some("b-1".into()),
+            origin_unproven: false,
         };
 
         let back: ImportReport = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
