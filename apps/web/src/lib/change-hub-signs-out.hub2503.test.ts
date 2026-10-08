@@ -33,12 +33,7 @@ vi.mock('./device', () => ({
 }));
 vi.mock('@ionic/vue', () => ({ alertController: { create } }));
 
-import {
-  LEAVE_HUB_REVOKE_WAIT_MS,
-  requestChangeHub,
-  signOutAndForgetHub,
-  type ChangeHubLabels,
-} from './change-hub';
+import { LEAVE_HUB_REVOKE_WAIT_MS, requestChangeHub, signOutAndForgetHub, type ChangeHubLabels } from './change-hub';
 import { setTokens } from './cloud';
 import main from '../main.ts?raw';
 import { createNoticeListening, KEEP_LISTENING_COMMAND, registerNoticeListening } from './notice-listening';
