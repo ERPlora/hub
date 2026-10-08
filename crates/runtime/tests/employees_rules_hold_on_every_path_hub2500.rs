@@ -345,3 +345,68 @@ async fn hub2500_the_members_door_cannot_take_off_the_last_administrator_either(
     assert!(after.is_active);
     assert_eq!(after.role, "admin");
 }
+
+/// **The demotion WAITS for the administrators' lock** — the guard that dies if the lock is taken
+/// away from the write. The race above is real but its window is microseconds, so a test of two
+/// tasks rarely sees it (measured: removing the lock leaves it green). The deterministic side, the
+/// same one hub#1804 uses for the seats: another connection holds this hub's `<hub>/admins` lock,
+/// and taking administration away from somebody cannot finish before it lets go.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn hub2500_taking_administration_away_waits_for_the_administrators_lock() {
+    use erplora_db::{DatabaseAdapter, Params};
+    use serde_json::json;
+    use std::time::{Duration, Instant};
+
+    const HUB: &str = "hub-2500-k";
+    const HELD_FOR: Duration = Duration::from_millis(1_500);
+
+    let tdb = erplora_db::testutil::TestDb::new().await;
+    let rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), HUB);
+    rt.ensure_system_tables().await.unwrap();
+    let a = rt
+        .get_or_link_cloud_user("cloud-a", "Ana", "admin", None, None)
+        .await
+        .unwrap();
+    let _b = rt
+        .get_or_link_cloud_user("cloud-b", "Bea", "admin", None, None)
+        .await
+        .unwrap();
+
+    let holder = tdb.adapter().await;
+    let mut held = Params::new();
+    held.insert("admins_key".into(), json!(format!("{HUB}/admins")));
+    let holding = tokio::spawn(async move {
+        holder
+            .execute_tx_gated(
+                &[
+                    (
+                        "SELECT pg_advisory_xact_lock(hashtext(:admins_key))".to_string(),
+                        held.clone(),
+                    ),
+                    (
+                        format!("SELECT pg_sleep({})", HELD_FOR.as_secs_f64()),
+                        held.clone(),
+                    ),
+                ],
+                &[],
+                &[],
+            )
+            .await
+            .expect("the connection holding the lock cannot fail");
+    });
+    // The lock is taken inside the transaction above: give it time to get it.
+    tokio::time::sleep(Duration::from_millis(400)).await;
+
+    let started = Instant::now();
+    rt.update_hub_user(&a.id, &set_role("employee"), 0)
+        .await
+        .expect("another administrator stays: the demotion goes through, only after waiting");
+    let waited = started.elapsed();
+    holding.await.expect("the holder finishes");
+
+    assert!(
+        waited >= Duration::from_millis(700),
+        "the demotion has to WAIT for the administrators' lock before counting and writing; it \
+         came back in {waited:?}, so it counted without serializing with anybody"
+    );
+}
