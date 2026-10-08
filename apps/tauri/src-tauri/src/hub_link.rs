@@ -804,6 +804,19 @@ mod tests {
     }
 
     #[test]
+    fn the_wrapped_notification_plugin_is_still_the_plugin_the_page_talks_to() {
+        // The gate wraps the plugin, it does not replace it: the same name routes
+        // `plugin:notification|…` to it, and the same script still puts the plugin's
+        // `window.Notification` in every page.
+        use tauri::plugin::Plugin;
+        let raw = tauri_plugin_notification::init::<tauri::test::MockRuntime>();
+        let wrapped = notification_plugin::<tauri::test::MockRuntime>();
+        assert_eq!(wrapped.name(), raw.name());
+        assert!(raw.initialization_script().is_some(), "the plugin ships a script");
+        assert_eq!(wrapped.initialization_script(), raw.initialization_script());
+    }
+
+    #[test]
     fn without_a_link_state_nobody_hears_the_taps() {
         let till = till_with_the_notification_plugin("https://panaderia.a.erplora.com/", None);
         assert_eq!(ask_notification(&till, "register_listener"), refused());
