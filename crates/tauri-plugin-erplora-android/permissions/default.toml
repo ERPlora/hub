@@ -1,10 +1,13 @@
-# Concedidos por defecto: preguntar y pedir permisos NUNCA es peligroso —lo peligroso es no poder
-# pedirlos y que el hardware quede muerto sin que nadie sepa por qué. `allow-leave-app` (hub#1906)
-# manda la app al fondo, lo mismo que el Atrás del sistema en la pantalla raíz: no hay nada que
-# proteger detrás. `allow-open-app-settings` (hub#1886) solo abre la ficha de la app en los ajustes
-# del sistema: quien decide sigue siendo la persona.
+# Granted by default: asking about and requesting permissions is NEVER the danger — the danger is
+# not being able to ask, and the hardware going dead with nobody knowing why. `allow-leave-app`
+# (hub#1906) sends the app to the background, the same as the system Back on the root screen: there
+# is nothing to protect behind it. `allow-open-app-settings` (hub#1886) only opens the app's page in
+# the system settings: the person still decides.
 # `allow-keep-listening` (hub#2307) keeps the app running with the screen off, with Android's ongoing
 # notification saying so; the page only asks for it while somebody is signed in with notices on.
+# The app grants this set to every page under erplora.com, but registers the plugin with its
+# linked-hub gate in front (`init(gate)`, hub#2642): any other page gets `not_the_linked_hub` and no
+# command runs.
 "$schema" = "schemas/schema.json"
 
 [default]

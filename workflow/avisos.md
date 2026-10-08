@@ -202,7 +202,7 @@ Implicados: INVOICE-F06, REC_FISCAL-F09, HUB_SHELL-F60, HUB_SHELL-F62
 QA: BD-09
 
 ### HUB-F60 Avisar a las pantallas en vivo
-Estado: parcial — apagar un rol de una aplicación (hub#2601) no corta un canal ya abierto: sigue oyendo lo que podía al conectarse hasta que se reconecta
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -211,7 +211,7 @@ Pasos:
 3. Cada pantalla reacciona por su cuenta: la cocina pinta la comanda, el TPV que cobró imprime el tique, la campana o el aviso del sistema avisan.
 4. Si la conexión se corta, la aplicación pide otro pase y se vuelve a conectar.
 5. Si la persona cierra sesión, o la llave con la que entró una integración se revoca o se rota, su canal abierto recibe un último mensaje (`stream.error` con `events.credential_ended`) y se cierra al momento, por WebSocket y por SSE; el resto de canales no se tocan (hub#2522). Lo mismo cuando su sesión caduca por tiempo (HUB-F136), aunque nadie la cierre: el canal abierto con ella recibe ese último mensaje y se cierra en el instante en que caduca, y los de sus otros dispositivos siguen (hub#2600). Tras cerrar sesión o caducar no hay pase nuevo; tras rotar, la integración entra con la llave nueva.
-6. Lo mismo, con el mismo último mensaje, cuando cambia lo que esa persona puede oír (hub#2571): si el administrador le cambia el rol (en Empleados o al volver a invitar su correo con otro rol) o la da de baja (en Empleados o quitando su correo de los miembros), se cierran **todos** sus canales, en todos sus dispositivos; si el plan admite un solo dispositivo y otro entra, se cierra el canal del dispositivo desalojado. También cuando el hub se entera de que erplora.com le quitó el acceso al negocio (HUB-F144): se cierran todos los canales de cada ficha que esa revocación da de baja, también los de las pantallas en las que entró con su PIN (hub#2598). Y cuando el administrador quita un dispositivo del negocio, o limpia los que nadie usa desde hace 30 días (HUB-F141), se cierran los canales de las sesiones de ese dispositivo y solo esos: la misma persona sigue oyendo en sus otros dispositivos (hub#2599). Cambiarle el nombre, el PIN, la placa o el correo, o guardar el rol que ya tenía, no cierra nada. La aplicación pide otro pase y vuelve con lo que le toca ahora; tras la baja o el desalojo no hay pase nuevo.
+6. Lo mismo, con el mismo último mensaje, cuando cambia lo que esa persona puede oír (hub#2571): si el administrador le cambia el rol (en Empleados o al volver a invitar su correo con otro rol) o la da de baja (en Empleados o quitando su correo de los miembros), se cierran **todos** sus canales, en todos sus dispositivos; si el plan admite un solo dispositivo y otro entra, se cierra el canal del dispositivo desalojado. También cuando el hub se entera de que erplora.com le quitó el acceso al negocio (HUB-F144): se cierran todos los canales de cada ficha que esa revocación da de baja, también los de las pantallas en las que entró con su PIN (hub#2598). Y cuando el administrador quita un dispositivo del negocio, o limpia los que nadie usa desde hace 30 días (HUB-F141), se cierran los canales de las sesiones de ese dispositivo y solo esos: la misma persona sigue oyendo en sus otros dispositivos (hub#2599). Cambiarle el nombre, el PIN, la placa o el correo, o guardar el rol que ya tenía, no cierra nada. Encender o apagar un rol de una aplicación en **Empleados → Roles** (HUB-F150) tampoco: solo decide si se puede asignar, y quien ya lo tiene conserva sus permisos, así que su canal sigue oyendo lo mismo que puede leer (hub#2601). La aplicación pide otro pase y vuelve con lo que le toca ahora; tras la baja o el desalojo no hay pase nuevo.
 Entra: la sesión de una persona del hub (para el pase, que queda atado a esa persona y a los permisos de su rol al pedirlo), o una API key del hub que pueda leer (para una integración), siempre en la cabecera `Authorization`: en la dirección del canal SSE solo viaja el pase (hub#2523).
 Sale: cada aviso con su contenido, el módulo que lo emitió y la pantalla que mandó la orden (`client_instance`), por WebSocket (`/ws`) o por SSE (`/api/events`). La aplicación entra como la persona que la usa (hub#2501): recibe los avisos de los módulos en los que su rol puede leer al menos una consulta —la misma regla que la puerta de las consultas—, los avisos propios del hub sin datos (módulo instalado, actualizado, encendido, apagado o quitado; trabajo de impresión en cola) y, solo si administra el hub, los demás avisos del hub, como las preguntas de las automatizaciones, que nombran al cliente. Un cajero sin permiso de lectura en Clientes no recibe sus avisos. Un módulo instalado después de abrir el canal se oye al reconectar. Una llave de integración `read_only` o `full` lo recibe todo; una `custom`, solo lo de los módulos que puede leer, y nada del hub. Los avisos propios del hub (módulo instalado, impresión) llevan otra forma de mensaje (`{"type": …}`).
 En este mismo documento se apoya en: HUB-F136 (Mantener la sesión abierta y cerrarla), HUB-F155 (Crear, rotar y revocar llaves de API).
@@ -220,18 +220,19 @@ Implicados: KITCHEN-F05, HUB_APP-F24, HUB_APP-F26, HUB_SHELL-F35, HUB_SHELL-F65,
 QA: qa-hub-restaurant §7.08
 
 ### HUB-F61 Mandar el email o el WhatsApp que pide un módulo o una automatización
-Estado: parcial — un mensaje puede salir dos veces: el envío y la marca de «enviado» son dos escrituras separadas y a ERPlora no se le pasa clave de no repetición (leído, sin ejecutar)
+Estado: parcial — un mensaje aún puede salir dos veces si falla algo entre el envío y la marca de «enviado»: el hub ya manda en cada intento la misma clave de no repetición, pero erplora.com todavía no la reconoce (saas#2633)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Un módulo (o un paso «Enviar un mensaje» de una automatización, HUB-F93) deja un aviso de mensaje pendiente: por qué canal, a quién, con qué plantilla y qué texto.
 2. El hub comprueba, antes de que salga nada, que quien lo pide puede: un módulo necesita el permiso de mensajes concedido, haber declarado ese canal y que el destinatario sea del propio hub (la lista de destinatarios permitidos de los ajustes, o el correo de un usuario activo); una automatización necesita sus dos permisos vivos, canal y de dónde sale el destinatario, que se vuelven a leer en ese momento.
 3. Lo manda por ERPlora: el correo sale con el remitente verificado de ERPlora y la respuesta va al negocio; el WhatsApp sale con el número del negocio, descontando su cuota.
-4. Después, en una escritura aparte, lo apunta como enviado, con el identificador que le dio WhatsApp, para no repetir lo que ya consta como enviado y para saber qué automatización preguntó si el cliente contesta tocando un botón.
+4. Cada intento de ese mismo mensaje (los reintentos de la escalera, el que retoma otra copia tras una caída, el reenvío a mano desde «Eventos caídos») lleva la misma clave de no repetición, que es el identificador del aviso en la cola; dos mensajes distintos, aunque digan lo mismo al mismo cliente, llevan claves distintas.
+5. Después, en una escritura aparte, lo apunta como enviado, con el identificador que le dio WhatsApp, para no repetir lo que ya consta como enviado y para saber qué automatización preguntó si el cliente contesta tocando un botón.
 Entra: el aviso de mensaje (`*.reminder.due`): canal, destinatario, plantilla y variables.
-Sale: el mensaje entregado al proveedor y la marca de envío con el identificador del proveedor, la automatización y su paso. Un archivo de cabecera subido al hub se firma en cada intento para que WhatsApp lo pueda descargar.
+Sale: la petición a erplora.com con la cabecera `Idempotency-Key` (el `event_id` del aviso), el mensaje entregado al proveedor y la marca de envío con el identificador del proveedor, la automatización y su paso. Un archivo de cabecera subido al hub se firma en cada intento para que WhatsApp lo pueda descargar.
 En este mismo documento se apoya en: HUB-F266 (Mandar un WhatsApp desde el hub), HUB-F272 (Reflejar en el hub el cupo y el consumo de WhatsApp del mes).
-Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402/429) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, o falla apuntar la marca, el reintento lo vuelve a mandar: el cliente puede recibir el mismo WhatsApp o correo dos veces. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
+Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402/429) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, el hub se cae esperándola, ERPlora contesta un error después de entregarlo o falla apuntar la marca, el reintento lo vuelve a pedir con la misma clave: un erplora.com que la reconoce contesta lo de la primera vez sin mandarlo otra vez (hub#2648); mientras no la reconozca (saas#2633), el cliente puede recibir el mismo WhatsApp o correo dos veces. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
 Implicados: FLOWS-F15, SAAS-F05, SAAS-F06, SAAS_WHATSAPP_INBOX-F12, SAAS_WHATSAPP_INBOX-F13
 QA: qa-hub-flows R7
 
@@ -286,7 +287,7 @@ QA: ninguno
 | Elemento | Estado | Flujo |
 |---|---|---|
 | Guardar el aviso con la orden, sin perderlo en un reinicio | hecho | HUB-F50 |
-| Entrega al menos una vez, sin repetir por receptor | hecho para los módulos; un correo o WhatsApp puede salir dos veces | HUB-F51, HUB-F61 |
+| Entrega al menos una vez, sin repetir por receptor | hecho para los módulos; un correo o WhatsApp lleva su clave de no repetición en cada intento, y puede salir dos veces hasta que erplora.com la reconozca (saas#2633) | HUB-F51, HUB-F61 |
 | Reintentos con espera creciente y número máximo | hecho (8, ~4 min, fijo; no configurable) | HUB-F52 |
 | Negativas que no merece la pena reintentar, al momento | hecho | HUB-F53 |
 | Cola de errores visible con el motivo | parcial: 100 más recientes, sin paginar | HUB-F54 |
@@ -349,7 +350,9 @@ HUB-F254).
 - **Un módulo que escucha nunca recibe dos veces el mismo aviso** (marca por receptor en la misma
   transacción que sus efectos); los módulos no tienen que ser idempotentes. Un mensaje al exterior
   (correo, WhatsApp) y una llamada de un paso «Llamar a otro sistema» salen **al menos una vez**: se
-  pueden repetir (HUB-F61, HUB-F94).
+  pueden repetir (HUB-F61, HUB-F94). Todos los intentos de un mismo mensaje llevan la misma clave de
+  no repetición (`Idempotency-Key` = el `event_id` del aviso), para que erplora.com no lo mande dos
+  veces (HUB-F61).
 - **Un receptor reacciona con la autoridad de su módulo**, nunca con la del cajero; el `hub_id` sale
   siempre de la fila; la atribución (`created_by`) es la persona que causó el aviso. Las comprobaciones
   fiscales, de permisos de host y de esquema siguen aplicándose a los receptores.

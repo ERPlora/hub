@@ -27,7 +27,9 @@ Sale: el estado real de cada permiso; un «no» **se contesta, no se rechaza**: 
 que seguir vendiendo. El NFC y el servicio en primer plano son permisos de instalación: no hay diálogo.
 Si falla: sin el permiso de red local el barrido y el envío a la red son tiempos de espera, no errores
 (Android los bloquea por debajo de la API): sin protección parecería «no hay impresoras» (HUB_APP-F13).
-Después de dos «no» Android deja de mostrar el diálogo para siempre: la salida es HUB_APP-F08.
+Después de dos «no» Android deja de mostrar el diálogo para siempre: la salida es HUB_APP-F08. Una página que
+no es el negocio enlazado (otro negocio, la web pública, el entorno de pruebas) no puede preguntar ni pedir
+ningún permiso: recibe `not_the_linked_hub` y Android no enseña nada (HUB_APP-F10, ERPlora/hub#2642).
 Implicados: HUB_PERIPHERALS-F01, HUB_SHELL-F68, HUB_SHELL-F139, PRINTING-F02, REC_ALTA-F17
 QA: qa-hub-android Fase 2, qa-hub-android Fase 3
 
@@ -46,7 +48,8 @@ Sale: la aplicación abierta en los ajustes; nada guardado.
 Si falla: un dispositivo sin esa página (modo quiosco) o una aplicación más antigua que la orden rechaza,
 y la pantalla dice dónde ir en vez de quedarse muda («Tu dispositivo no ha vuelto a preguntar. Abre sus
 ajustes, busca ERPlora y concédele el acceso a la red local.»). En ordenador no hay estado: la ausencia
-del permiso se lee como «no aplica», nunca como «negado».
+del permiso se lee como «no aplica», nunca como «negado». Una página que no es el negocio enlazado no puede
+abrir los ajustes de la aplicación: recibe `not_the_linked_hub` (HUB_APP-F10).
 Implicados: HUB_SHELL-F68, HUB_SHELL-F139, HUB_SHELL-F140
 QA: qa-hub-android Fase 2
 
@@ -133,5 +136,7 @@ Sale: el servicio y su notificación silenciosa, sin sonido ni insignia. No se r
 Si falla: Android 12 o posterior no deja arrancar un servicio en primer plano desde el segundo plano: la
 orden rechaza y los avisos siguen funcionando con la aplicación en pantalla. Sin los permisos de servicio
 (Android 14) lanza error. En ordenador no se necesita: la aplicación no se duerme mientras esté abierta.
+Una página que no es el negocio enlazado no puede encender ni apagar la escucha: recibe `not_the_linked_hub`
+(HUB_APP-F10, ERPlora/hub#2642).
 Implicados: HUB-F60, HUB_SHELL-F69, HUB_SHELL-F139
 QA: qa-hub-android Pendiente (pantalla apagada y segundo plano)
