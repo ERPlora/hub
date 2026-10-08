@@ -147,7 +147,7 @@ Pasos:
 4. Mientras el negocio está vacío hay además el panel «Configura tu negocio» — «Carga una plantilla para tu negocio o restaura una copia para empezar.» con «Configurar», que lleva a Ajustes › Datos y copias; desaparece del catálogo en cuanto hay apps.
 Entra: el bloque `widgets` del `module.json` de cada app activa, del plan y con menú visible para quien mira; los datos de cada panel, pedidos por la puerta normal de consultas con los permisos de quien mira, como mucho cuatro a la vez.
 Sale: nada guardado en el hub.
-Si falla: panel sin filas: «Sin datos». Consulta rechazada o rota: «No disponible», nunca una cifra vieja o inventada. Si no se pueden leer los manifiestos, no hay paneles de apps y el tablero dice «Panel vacío. Pulsa ⋮ para añadir widgets.».
+Si falla: panel sin filas: «Sin datos». Consulta rechazada o rota: «No disponible», nunca una cifra vieja o inventada. Si no se pueden leer los manifiestos, no hay paneles de apps y el tablero dice «Panel vacío. Pulsa ⋮ para añadir widgets.». Una app que declara paneles sin bloque `ui` en su `module.json` (la instalación no lo exige) no tumba el tablero: sus paneles declarativos se pintan, el que es un trozo de su pantalla sale «No disponible» y los de las demás apps siguen (hub#2635).
 Implicados: CASH_REGISTER-F12, HUB-F34, INVENTORY-F17, VERIFACTU-F31
 QA: R-01, qa-hub-restaurant §7.12
 
