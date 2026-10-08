@@ -316,6 +316,18 @@ async fn a_file_that_names_this_hub_without_its_seal_is_reported_as_unproven() {
     );
     let wire = serde_json::to_value(&report).expect("the report serialises");
     assert_eq!(wire["origin_unproven"], serde_json::json!(true));
+    // The warning is still there when the Data tab reopens the stored report (HUB_SHELL-F178).
+    let stored = erplora_runtime::reset::last_import_report_for_hub(&restored, "hub-legacy")
+        .await
+        .expect("the stored report reads")
+        .expect("the import stored its report");
+    let stored: serde_json::Value =
+        serde_json::from_str(&stored.report).expect("the stored report is JSON");
+    assert_eq!(
+        stored["origin_unproven"],
+        serde_json::json!(true),
+        "the stored report keeps the warning: {stored}"
+    );
 
     // The genuine copy: proven, so nothing to explain.
     let mut again = runtime("hub-legacy").await;
