@@ -4,8 +4,10 @@
 //! pattern cannot name the one business this till belongs to: the hub is chosen at run time, from
 //! the SaaS, long after the binary was built. So the ACL lets every page under erplora.com through
 //! — another business's hub, the public website, the test SaaS — and this module is the second
-//! gate, in front of the app's own commands: the printer, the drawer, the card reader, the way out
-//! to the browser and the Downloads folder answer only the page whose ORIGIN is the linked hub.
+//! gate, in front of the app's own commands and of the Android plugin's (hub#2642): the printer,
+//! the drawer, the card reader, the way out to the browser, the Downloads folder, Android's
+//! permission dialogs, the listening service and the way out of the app answer only the page whose
+//! ORIGIN is the linked hub.
 //!
 //! The link itself needs the same care, or the gate is one navigation away from moot: any page
 //! the window shows could navigate to its own address with `?shell=1` and become "the hub". So a
