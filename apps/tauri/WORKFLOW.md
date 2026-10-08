@@ -354,7 +354,7 @@ Se resuelven con `market-decision`; no las decide el worker.
 3. **macOS**: el `.dmg` sale sin notarizar y `downloadPlatform` no tiene destino para él. ¿Se publica una
    descarga o se declara fuera del MVP?
 4. **Impresora de red encendida pero sin papel o con la tapa abierta**: hoy contesta «correcto». ¿Se
-   consulta su estado ESC/POS en tiempo real antes de dar el papel por salido? (La impresora apagada ya
+   consulta su estado ESC/POS en tiempo real antes de dar el papel por salido? (hub#2716; la impresora apagada ya
    la cerró hub#2494: se confirma la escritura en el socket y la caja ve un aviso fijo con «Reintentar».)
 5. **Puesto de impresión que solo imprime** en Android: ¿debe mantenerse a la escucha aunque no haya cocina,
    citas ni contador de campana? Hoy no.

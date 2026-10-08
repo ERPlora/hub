@@ -20,7 +20,7 @@ Prefijo: HUB_SHELL
 > impresora de red; con ella apagada, «impresora inalcanzable» a los ~13 s): por el directo la caja
 > lo avisa con un aviso fijo y «Reintentar» (tique, comanda y vale); por la cola el dispositivo
 > contesta «falló» y el trabajo vuelve a la cola sin que nadie lo vea (HUB_SHELL-F74). Una impresora
-> de red encendida pero sin papel sigue contestando «hecho» (HUB_PERIPHERALS-F06).
+> de red encendida pero sin papel sigue contestando «hecho» (HUB_PERIPHERALS-F06, hub#2716).
 
 ## Referencia adoptada
 
@@ -196,7 +196,7 @@ Implicados: HUB_APP-F26
 QA: ninguno
 
 ### HUB_SHELL-F70 Imprimir el tique al cobrar, solo en el dispositivo que cobró
-Estado: parcial — por la cola, con la impresora de red de quien la saca apagada, el tique vuelve «fallido» sin aviso (HUB_SHELL-F74), y una impresora de red sin papel pero encendida se da por impresa (HUB_PERIPHERALS-F06); si la pantalla estaba desconectada del canal en vivo al cobrar, o se recargó antes de oír la venta, no se imprime ni se avisa; la hora del papel es la de imprimir; y el papel no lleva quién atendió
+Estado: parcial — por la cola, con la impresora de red de quien la saca apagada, el tique vuelve «fallido» sin aviso (HUB_SHELL-F74), y una impresora de red sin papel pero encendida se da por impresa (HUB_PERIPHERALS-F06, hub#2716); si la pantalla estaba desconectada del canal en vivo al cobrar, o se recargó antes de oír la venta, no se imprime ni se avisa; la hora del papel es la de imprimir; y el papel no lleva quién atendió
 Vertical: comun
 Actor: sistema
 Pantalla: sales: Cobro

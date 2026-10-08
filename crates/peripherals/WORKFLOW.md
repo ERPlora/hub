@@ -195,7 +195,7 @@ Implicados: PRINTING-F02
 QA: ninguno
 
 ### HUB_PERIPHERALS-F06 Sacar un documento por una impresora de red
-Estado: parcial — desde hub#2494 la aplicación contesta lo que pasó con el papel (correcto cuando llegó a la impresora, «impresora inalcanzable» cuando se agotaron los intentos), y la caja que lo pidió directo avisa con «Reintentar» (HUB_SHELL-F70); pero la cola interna sigue en memoria (se pierde al cerrar la aplicación), tiene un solo trabajador (una impresora apagada retiene ~13 s los trabajos de otras impresoras del mismo dispositivo) y un trabajo de la cola del hub que falla vuelve «fallido» sin que nadie lo vea (HUB_SHELL-F74)
+Estado: parcial — desde hub#2494 la aplicación contesta lo que pasó con el papel (correcto cuando llegó a la impresora, «impresora inalcanzable» cuando se agotaron los intentos), y la caja que lo pidió directo avisa con «Reintentar» (HUB_SHELL-F70); pero la cola interna sigue en memoria (se pierde al cerrar la aplicación), tiene un solo trabajador (una impresora apagada retiene ~13 s los trabajos de otras impresoras del mismo dispositivo) y un trabajo de la cola del hub que falla vuelve «fallido» sin que nadie lo vea (HUB_SHELL-F74); y una impresora encendida sin papel se da por impresa (hub#2716)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -228,7 +228,7 @@ impresora apagada o fuera de la red, tras los 3 intentos vuelve «impresora inal
 pidió: la caja que lo mandó directo lo avisa y deja reintentar (HUB_SHELL-F70); un trabajo de la cola
 del hub vuelve «fallido» y hoy nadie lo ve (HUB_SHELL-F74). Una impresora sin papel que sigue
 aceptando la conexión se queda los bytes: el puerto 9100 no cuenta si hay papel, así que eso sigue sin
-detectarse. Mientras se agotan los intentos, la cola de un solo trabajador retiene los trabajos de las
+detectarse (hub#2716). Mientras se agotan los intentos, la cola de un solo trabajador retiene los trabajos de las
 otras impresoras de red del mismo dispositivo.
 Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, HUB_SHELL-F78, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_ALTA-F17
 

@@ -275,7 +275,7 @@ Si falla: un trabajo solo muere por fallos **antes** del envío (la aplicación 
 función —también si se la quitaron sin retirarlo del hub, HUB-F197—, o una Bluetooth no contestó) o por
 desconexiones; una USB nunca recibe trabajos de la cola. Una impresora de red apagada sí cuenta desde
 hub#2494 (el dispositivo contesta «falló», HUB-F199); una encendida sin papel no, porque se da por
-impresa. Un dispositivo que falla deja de pedir esa función
+impresa (hub#2716). Un dispositivo que falla deja de pedir esa función
 hasta que le llegue un aviso o se reconecte, para no gastar las cinco entregas en milisegundos; y el trabajo devuelto no despierta a nadie (HUB-F199).
 Implicados: HUB_SHELL-F74, PRINTING-F14
 QA: qa-hub-restaurant §16
