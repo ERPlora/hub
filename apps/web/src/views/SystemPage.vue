@@ -469,8 +469,8 @@
                   </template>
                   <template v-else>
                     <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
-                    <!-- hub#827: una fila que NO se puede reintentar dice qué sí ayuda, en vez de
-                         ofrecer un botón que vuelve a `pending` y muere igual. -->
+                    <!-- hub#827: a row that CANNOT be retried says what does help, instead of
+                         offering a button that puts it back to `pending` to die the same way. -->
                     <div class="events-hint" v-if="!ev.retryable">{{ t('system.deadEventNotRetryable') }}</div>
                   </template>
                 </div>

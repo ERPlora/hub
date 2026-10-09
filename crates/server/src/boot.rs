@@ -848,10 +848,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
-    // **Estados de entrega de WhatsApp** (hub#2723): Meta acepta un envío y su suerte llega
-    // después (`delivered`, `read`, `failed`). El hub los recoge del SaaS como recoge la bandeja,
-    // con el mismo gate (sin `whatsapp_inbox` activo y con entitlement no sale ninguna petición) y
-    // su propio tick de 30 s: un envío fallido pasa a «Eventos caídos» con su motivo.
+    // **WhatsApp delivery statuses** (hub#2723): Meta accepts a send and its fate arrives later
+    // (`delivered`, `read`, `failed`). The hub collects them from the SaaS the way it collects the
+    // inbox, behind the same gate (no request leaves without `whatsapp_inbox` active and an
+    // entitlement) and on its own 30 s tick: a failed send lands in «Eventos caídos» with its reason.
     {
         let status_state = state.clone();
         let poller = crate::whatsapp_statuses::StatusPoller::new(
