@@ -1682,14 +1682,44 @@ mod tests {
         chained(db, &core, hub, "", kernel, done, "", said.clone()).await;
         chained(db, &copy, hub, "", kernel, done, "", said.clone()).await;
         let inbox = format!("{p}ev-received");
-        chained(db, &inbox, hub, WHATSAPP, received, done, &core, with_row(msg)).await;
+        chained(
+            db,
+            &inbox,
+            hub,
+            WHATSAPP,
+            received,
+            done,
+            &core,
+            with_row(msg),
+        )
+        .await;
         let copy_inbox = format!("{p}ev-received-copy");
         let fresh = crate::registry::new_id();
-        chained(db, &copy_inbox, hub, WHATSAPP, received, done, &copy, with_row(&fresh)).await;
+        chained(
+            db,
+            &copy_inbox,
+            hub,
+            WHATSAPP,
+            received,
+            done,
+            &copy,
+            with_row(&fresh),
+        )
+        .await;
         let link = "whatsapp_inbox.conversation.link_pending";
         let fresh = crate::registry::new_id();
         let reacted = format!("{p}ev-link");
-        chained(db, &reacted, hub, WHATSAPP, link, done, &inbox, with_row(&fresh)).await;
+        chained(
+            db,
+            &reacted,
+            hub,
+            WHATSAPP,
+            link,
+            done,
+            &inbox,
+            with_row(&fresh),
+        )
+        .await;
         let flow = format!("{p}run-wa");
         run(db, &flow, hub, "done", &core, said.clone(), json!({})).await;
         event(
@@ -1744,7 +1774,15 @@ mod tests {
         inbox_thread(db, BEA, CONV_BEA, MSG_BEA).await;
         wa_message(db, HUB, "ana-", MSG_ANA, "+34600111222", "Hola, soy Ana").await;
         wa_message(db, HUB, "bea-", MSG_BEA, "+34600333444", "Hola, soy Bea").await;
-        wa_message(db, OTHER_HUB, "h2-", MSG_ANA, "+34600111222", "Hola, soy Ana").await;
+        wa_message(
+            db,
+            OTHER_HUB,
+            "h2-",
+            MSG_ANA,
+            "+34600111222",
+            "Hola, soy Ana",
+        )
+        .await;
     }
 
     /// hub#2477: erasing Ana's sheet empties what she wrote on WhatsApp — the kernel's copy, the
@@ -1844,7 +1882,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(event_payload(&db, "ana-ev-link").await.contains("+34600111222"));
+        assert!(event_payload(&db, "ana-ev-link")
+            .await
+            .contains("+34600111222"));
         assert_eq!(event_payload(&db, "ana-ev-received").await, EMPTY);
     }
 }
