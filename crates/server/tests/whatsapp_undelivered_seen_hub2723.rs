@@ -223,13 +223,14 @@ async fn hub(cloud: &FakeCloud, with_inbox: bool) -> SharedRuntime {
                 "id": MODULE, "name": "WhatsApp Inbox", "version": "1.0.0",
                 "capabilities": { "notify": { "channels": ["whatsapp"] } },
                 "commands": {
-                    "remind": {
+                    format!("{MODULE}.remind"): {
                         "permission": "",
                         "transaction": true,
                         "sql": ["sql/remind.sql"],
                         "emit": [format!("{MODULE}.reminder.due")],
                     }
                 },
+                "events": { "emits": [format!("{MODULE}.reminder.due")] },
             })
             .to_string(),
         )

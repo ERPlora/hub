@@ -1512,7 +1512,7 @@ onBeforeUnmount(() => {
 .history-item__name {
   font-weight: 600;
   min-width: 0;
-  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .history-item__jump {
   font-variant-numeric: tabular-nums;
