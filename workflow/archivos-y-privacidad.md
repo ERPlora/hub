@@ -72,7 +72,7 @@ Implicados: CUSTOMERS-F16
 QA: L-10, WA-06 (discrepa)
 
 ### HUB-F249 Vaciar el historial del hub que nombra a la persona
-Estado: parcial — no repasa lo que estaba en curso al borrar y acaba después (hub#2484), ni el propio aviso de borrado, ni un mensaje de WhatsApp que la bandeja no guardó (sin fila que seguir, se queda hasta la retención)
+Estado: parcial — no repasa lo que estaba en curso al borrar y acaba después (hub#2484), ni el propio aviso de borrado
 Actor: sistema
 Pantalla: ninguna
 Pasos:

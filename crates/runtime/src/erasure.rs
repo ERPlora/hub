@@ -36,9 +36,11 @@
 //!   a live run needs its memory to finish. Emptying any of them is data loss, not erasure.
 //! - **By id, not by guesswork.** The event brings the id and nothing else; the sheet it names is
 //!   already pseudonymised when this runs. The hub follows ids through the apps' rows, never a
-//!   phone number or a name: a message the inbox did not store (over its quota) has no row to
-//!   follow and keeps its copy until `retention`. A person with no sheet is erased by the app that
-//!   holds her: the inbox names its own thread (`whatsapp_inbox.conversation.anonymized`).
+//!   phone number or a name: a copy with no app row behind it has nothing to be followed from and
+//!   keeps its payload until `retention` (the inbox stores every inbound message, over its quota
+//!   too, since whatsapp_inbox#288, so today that is no message). A person with no sheet is erased
+//!   by the app that holds her: the inbox names its own thread
+//!   (`whatsapp_inbox.conversation.anonymized`).
 //! - **The kernel does not know the customers module.** The trigger is the naming convention
 //!   (`<subject>.anonymized` + `<subject>_id`), the same kind of contract as `.reminder.due` and
 //!   `.print.due`. Today `customer.anonymized` and `whatsapp_inbox.conversation.anonymized`

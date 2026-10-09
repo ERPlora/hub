@@ -347,7 +347,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F248 | Borrar los datos de una persona: el aviso único | parcial | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
 | HUB-F249 | Vaciar el historial del hub que nombra a la persona | parcial | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
 | HUB-F250 | Lo que le toca a cada app al recibir el aviso de borrado | parcial | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
-| HUB-F251 | Borrar los datos de un número sin ficha | no hecho | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
+| HUB-F251 | Borrar los datos de un número sin ficha | hecho | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
 | HUB-F252 | Borrar los datos de una persona del equipo | no hecho | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
 | HUB-F253 | Purgar el historial por retención | hecho | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
 | HUB-F254 | Registrar la actividad del negocio para el SaaS | hecho | [archivos-y-privacidad.md](workflow/archivos-y-privacidad.md) |
@@ -570,9 +570,10 @@ Comunes a varias áreas:
    a las automatizaciones y a WhatsApp.
 3. **Hub pausado** (HUB-F162): el servidor no tiene ese estado y la pantalla «Activación requerida»
    no se alcanza. ¿Qué debe ver el negocio cuando erplora.com le suspende el plan?
-4. **Borrado RGPD de lo que no lleva el identificador de la ficha**: los WhatsApp entrantes, la cola
-   de impresión, los localizadores, las ejecuciones vivas (HUB-F249, HUB-F251, HUB-F206). Cruza
-   negocio y datos, avisos, automatizaciones, WhatsApp e impresión.
+4. **Borrado RGPD de lo que no lleva el identificador de la ficha**: la cola de impresión, los
+   localizadores, las ejecuciones vivas (HUB-F249, HUB-F206). Los WhatsApp entrantes ya se alcanzan
+   siguiendo las filas de la bandeja (HUB-F249, HUB-F251). Cruza negocio y datos, avisos,
+   automatizaciones, WhatsApp e impresión.
 5. **Borrado RGPD de una persona del equipo que lo pide al irse** (HUB-F149, HUB-F252): hoy solo se
    desactiva. El recibo de aprobaciones se conserva 4 años por ley, pero nombre, correo y foto del
    perfil no tienen camino de borrado. ¿Se borran, o se seudonimiza la ficha? Cruza acceso y negocio
