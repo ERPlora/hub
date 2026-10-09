@@ -8,7 +8,8 @@
 //!      de módulos, con el SHA256 calculado sobre la marcha (hub#981: el zip no vive en RAM).
 //!   3. verify SHA256 + unzip    → reusa `erplora-source::ModuleStore` (anti zip-slip + cache),
 //!      leyendo del fichero (`install_from_file`).
-//!   4. `Runtime::install_from_dir` → migra, registra capacidades, deja el módulo activo.
+//!   4. `Runtime::install_from_dir` → migra, registra capacidades; activo si es la primera vez,
+//!      y si no con el estado que ya tenía en este hub (hub#2544).
 //!   5. `POST mark_installed/`   → registra la instalación en el Cloud (best-effort).
 //!
 //! Auth = JWT del usuario activo (`Authorization: Bearer`) + `X-Hub-Id` (cabeceras de la
@@ -21,7 +22,76 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 
 use cloud_client::{Auth, CloudClient, InstallGrant, ModuleVersion};
+use erplora_runtime::Runtime;
 use source::{Fetcher, ModuleStore, SourceError};
+
+/// How an install reaches the runtime (hub#2508).
+///
+/// `Held`: the caller already owns the runtime exclusively — boot (before the hub serves anything),
+/// the reconciler and the tests. `Shared`: the runtime every request of the hub reads; the install
+/// takes its write lock **only** to register a package that is already downloaded and verified, and
+/// a read lock only for the instant it looks something up. Asking erplora.com for the plan or the
+/// versions, the download and the verification happen with no lock at all, so the till keeps
+/// charging while an app installs or updates.
+pub enum RuntimeAccess<'a> {
+    Held(&'a mut Runtime),
+    Shared(&'a tokio::sync::RwLock<Runtime>),
+}
+
+impl<'a> From<&'a mut Runtime> for RuntimeAccess<'a> {
+    fn from(runtime: &'a mut Runtime) -> Self {
+        Self::Held(runtime)
+    }
+}
+
+impl<'a> From<&'a tokio::sync::RwLock<Runtime>> for RuntimeAccess<'a> {
+    fn from(runtime: &'a tokio::sync::RwLock<Runtime>) -> Self {
+        Self::Shared(runtime)
+    }
+}
+
+/// A read view of the runtime, as short-lived as the statement that asks for it.
+pub enum RuntimeRead<'g> {
+    Held(&'g Runtime),
+    Shared(tokio::sync::RwLockReadGuard<'g, Runtime>),
+}
+
+impl std::ops::Deref for RuntimeRead<'_> {
+    type Target = Runtime;
+    fn deref(&self) -> &Runtime {
+        match self {
+            Self::Held(runtime) => runtime,
+            Self::Shared(guard) => guard,
+        }
+    }
+}
+
+impl RuntimeAccess<'_> {
+    /// Read the runtime. Never keep the result across a call to erplora.com: a writer waiting
+    /// behind it would hold back every request of the hub (tokio's `RwLock` is fair to writers).
+    pub async fn read(&self) -> RuntimeRead<'_> {
+        match self {
+            Self::Held(runtime) => RuntimeRead::Held(runtime),
+            Self::Shared(lock) => RuntimeRead::Shared(lock.read().await),
+        }
+    }
+
+    /// [`register`] under the write lock, held for that step alone.
+    async fn register(
+        &mut self,
+        dir: &std::path::Path,
+        module_id: &str,
+        updating: Option<&str>,
+    ) -> Result<String, InstallError> {
+        match self {
+            Self::Held(runtime) => register(runtime, dir, module_id, updating).await,
+            Self::Shared(lock) => {
+                let mut runtime = lock.write().await;
+                register(&mut runtime, dir, module_id, updating).await
+            }
+        }
+    }
+}
 
 /// Módulo del plan que exige compra: lo que la UI necesita para ofrecer el consentimiento.
 /// Es el nodo del plan del Cloud + su `module_id` (que el serializer deja en el nodo, no en
@@ -90,6 +160,10 @@ pub enum InstallError {
     /// no headers, or the zip stopped arriving. Retrying later is all there is to do.
     #[error("the marketplace did not answer in time")]
     CloudTimeout,
+    /// An explicit version the update door does not move this hub to (hub#2546): support pinned the
+    /// module, or the version is behind the installed one. Same rule as the version list (HUB-F24).
+    #[error("`{module_id}` cannot be moved to {version} on this hub")]
+    VersionNotOffered { module_id: String, version: String },
 }
 
 impl InstallError {
@@ -130,6 +204,7 @@ impl InstallError {
             InstallError::NotInCatalog { .. } => "install_not_in_catalog",
             InstallError::CloudRejected { .. } => "install_cloud_rejected",
             InstallError::CloudTimeout => "install_cloud_timeout",
+            InstallError::VersionNotOffered { .. } => "update_version_not_offered",
         }
     }
 }
@@ -385,14 +460,16 @@ fn acquire_from_file(
 /// sin cablear y el M2M `Module.dependencies` del Cloud está vacío en prod, así que un plan
 /// Cloud-side no ordenaría nada. El entitlement se sigue aplicando por módulo en cada `download/`.
 ///
-/// `runtime` se bloquea por el llamador (server) y se pasa por `&mut`; el resto del I/O
-/// (red, FS) es async/blocking sin tocar el lock más de lo necesario.
+/// `runtime` is either held by the caller (`&mut Runtime`) or the hub's shared one
+/// (`&RwLock<Runtime>`), whose write lock is then taken only to register each verified package
+/// (hub#2508, [`RuntimeAccess`]).
+#[allow(clippy::too_many_arguments)]
 pub async fn install_from_cloud(
     http: &reqwest::Client,
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: &mut erplora_runtime::Runtime,
+    runtime: impl Into<RuntimeAccess<'_>>,
     module_id: &str,
     requested_version: &str,
     on_progress: OnProgress<'_>,
@@ -403,7 +480,7 @@ pub async fn install_from_cloud(
         cloud_base_url,
         cache_root,
         auth,
-        runtime,
+        &mut runtime.into(),
         module_id,
         requested_version,
         on_progress,
@@ -436,18 +513,20 @@ pub async fn install_from_cloud(
 /// the store publishes first and installs the newest version compatible with the recorded one
 /// ([`module_update::resolve_template_version`]) — otherwise a salon opened today runs on the day
 /// the template was exported until its next boot moves it forward.
+#[allow(clippy::too_many_arguments)]
 pub async fn install_bundle_module(
     http: &reqwest::Client,
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: &mut erplora_runtime::Runtime,
+    runtime: impl Into<RuntimeAccess<'_>>,
     module_id: &str,
     manifest_version: &str,
     purpose: erplora_runtime::export::BundlePurpose,
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<Installed, InstallError> {
+    let mut runtime = runtime.into();
     if purpose.is_template() {
         if let Some(current) =
             template_target(http, cloud_base_url, auth, module_id, manifest_version).await
@@ -460,16 +539,17 @@ pub async fn install_bundle_module(
                     "template: installing the newest version compatible with the recorded one (hub#1904)"
                 );
             }
-            return install_from_cloud(
+            return acquire_and_install(
                 http,
                 cloud_base_url,
                 cache_root,
                 auth,
-                runtime,
+                &mut runtime,
                 module_id,
                 &current,
                 on_progress,
                 signature_policy,
+                None,
             )
             .await;
         }
@@ -477,16 +557,17 @@ pub async fn install_bundle_module(
         // below tries it as is and reports the real reason if it cannot be installed either.
     }
 
-    let pinned = install_from_cloud(
+    let pinned = acquire_and_install(
         http,
         cloud_base_url,
         cache_root,
         auth,
-        runtime,
+        &mut runtime,
         module_id,
         manifest_version,
         on_progress,
         signature_policy,
+        None,
     )
     .await;
 
@@ -513,16 +594,17 @@ pub async fn install_bundle_module(
         installing = %substitute,
         "el marketplace ya no publica la versión que fija el bundle: se instala la más nueva compatible (hub#751)"
     );
-    install_from_cloud(
+    acquire_and_install(
         http,
         cloud_base_url,
         cache_root,
         auth,
-        runtime,
+        &mut runtime,
         module_id,
         &substitute,
         on_progress,
         signature_policy,
+        None,
     )
     .await
 }
@@ -587,7 +669,7 @@ async fn acquire_and_install(
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: &mut erplora_runtime::Runtime,
+    runtime: &mut RuntimeAccess<'_>,
     module_id: &str,
     requested_version: &str,
     on_progress: OnProgress<'_>,
@@ -610,7 +692,7 @@ async fn acquire_and_install(
         http,
         cloud_base_url,
         auth,
-        runtime,
+        &*runtime,
         module_id,
         requested_version,
         updating,
@@ -939,11 +1021,24 @@ pub async fn available_versions(
     auth: &Auth,
     module_id: &str,
 ) -> Vec<erplora_runtime::module_update::Available> {
-    as_available(
-        &versions_as_published(http, cloud_base_url, auth, module_id)
-            .await
-            .unwrap_or_default(),
-    )
+    listed_versions(http, cloud_base_url, auth, module_id)
+        .await
+        .unwrap_or_default()
+}
+
+/// What the marketplace's `versions/` lists for this hub, or `None` when it could not be read — the
+/// same «I don't know» as [`available_versions`], kept apart for the caller that has to tell «not
+/// listed» from «could not ask» (the explicit version of an update, hub#2596). A 404 is an answer:
+/// nothing listed.
+pub async fn listed_versions(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+) -> Option<Vec<erplora_runtime::module_update::Available>> {
+    versions_as_published(http, cloud_base_url, auth, module_id)
+        .await
+        .map(|published| as_available(&published))
 }
 
 /// What the resolver needs from each published version.
@@ -1045,25 +1140,29 @@ pub fn installed_version(runtime: &erplora_runtime::Runtime, module_id: &str) ->
 
 /// A qué versión debe ir un módulo instalado si se le pide actualizar (hub#516).
 ///
-/// Una versión **explícita** es nuestra (soporte): manda tal cual, sin resolver — es la única forma
-/// de bajar a alguien a `sales@3.1` mientras se arregla la `3.2`. Vacío o `latest` es el botón del
-/// dueño y el arranque, y ahí decide el **resolutor del arranque**: nunca una versión en cuarentena,
-/// nunca hacia atrás, y el pin de soporte gana.
+/// An **explicit** version goes as-is, unresolved: the administrator's door has already held it to
+/// the version list's rule (`module_update::may_request`, hub#2546), and the rollback of a failed
+/// update and the reconcile between copies (HUB-F26) pass explicit versions that are nobody's
+/// choice. Moving a customer back to `sales@3.1` while `3.2` is fixed is support's pin, not this.
+/// Empty or `latest` is the owner's button and the boot, and there the **boot resolver** decides:
+/// never a quarantined version, never backwards, and support's pin wins.
 ///
 /// Devuelve **siempre una versión concreta** (la instalada si no hay nada mejor), porque quien la
 /// pide necesita saber a dónde volver si el intento se cae.
+///
+/// The runtime is read before asking erplora.com and released before the call (hub#2508).
 pub async fn resolve_update_target(
     http: &reqwest::Client,
     cloud_base_url: &str,
     auth: &Auth,
-    runtime: &erplora_runtime::Runtime,
+    runtime: &RuntimeAccess<'_>,
     module_id: &str,
     requested_version: &str,
 ) -> String {
-    let installed = runtime.registry().module_version(module_id);
+    let installed = runtime.read().await.registry().module_version(module_id);
     match requested_version.trim() {
         "" | "latest" => {
-            let pin = support_pin(runtime, module_id).await;
+            let pin = support_pin(&*runtime.read().await, module_id).await;
             resolve_target(
                 http,
                 cloud_base_url,
@@ -1117,21 +1216,25 @@ pub async fn update_from_cloud(
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: &mut erplora_runtime::Runtime,
+    runtime: impl Into<RuntimeAccess<'_>>,
     module_id: &str,
     requested_version: &str,
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<Updated, InstallError> {
-    if !runtime.registry().is_installed(module_id) {
-        return Err(InstallError::NotInstalled(module_id.to_string()));
-    }
-    let from = runtime.registry().module_version(module_id);
+    let mut runtime = runtime.into();
+    let from = {
+        let runtime = runtime.read().await;
+        if !runtime.registry().is_installed(module_id) {
+            return Err(InstallError::NotInstalled(module_id.to_string()));
+        }
+        runtime.registry().module_version(module_id)
+    };
     let to = resolve_update_target(
         http,
         cloud_base_url,
         auth,
-        runtime,
+        &runtime,
         module_id,
         requested_version,
     )
@@ -1153,7 +1256,7 @@ pub async fn update_from_cloud(
         cloud_base_url,
         cache_root,
         auth,
-        runtime,
+        &mut runtime,
         module_id,
         &to,
         on_progress,
@@ -1200,12 +1303,14 @@ async fn fetch_install_plan(
     http: &reqwest::Client,
     cloud_base_url: &str,
     auth: &Auth,
-    runtime: &erplora_runtime::Runtime,
+    runtime: &RuntimeAccess<'_>,
     module_id: &str,
     requested_version: &str,
     updating: Option<&str>,
 ) -> Result<cloud_client::InstallPlan, PlanUnavailable> {
     let installed: Vec<String> = runtime
+        .read()
+        .await
         .registry()
         .installed
         .iter()
@@ -1300,7 +1405,7 @@ async fn execute_plan(
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: &mut erplora_runtime::Runtime,
+    runtime: &mut RuntimeAccess<'_>,
     module_id: &str,
     plan: cloud_client::InstallPlan,
     on_progress: OnProgress<'_>,
@@ -1326,7 +1431,7 @@ async fn execute_plan(
         //
         // La excepción es el módulo que se está ACTUALIZANDO (hub#516): saltarlo por «ya
         // instalado» era exactamente lo que dejaba un bug de módulo sin arreglo posible.
-        if runtime.registry().is_installed(&node.module_id)
+        if runtime.read().await.registry().is_installed(&node.module_id)
             && Some(node.module_id.as_str()) != updating
         {
             continue;
@@ -1391,6 +1496,8 @@ async fn execute_plan(
         // drifted (e.g. saas#1352: every plan came back single-node): bail out so the caller
         // falls back to manifest resolution. Registering would only die in `MissingDependency`.
         let missing: Vec<String> = runtime
+            .read()
+            .await
             .missing_dependencies(&dir)
             .map_err(InstallError::from_runtime)?
             .into_iter()
@@ -1404,11 +1511,13 @@ async fn execute_plan(
         }
 
         on_progress(&node.module_id, "installing");
-        let installed_id = register(runtime, &dir, &node.module_id, updating).await?;
+        let installed_id = runtime
+            .register(&dir, &node.module_id, updating)
+            .await?;
 
         // hub#571: la copia propia del hub, para el arranque en el que el marketplace no conteste.
         remember_package_from_file(
-            runtime,
+            &*runtime.read().await,
             &node.module_id,
             &node.version,
             sha,
@@ -1446,10 +1555,10 @@ async fn execute_plan(
             i.also_installed = dragged_in;
             Ok(PlanOutcome::Installed(i))
         }
-        None if runtime.registry().is_installed(module_id) => {
+        None if runtime.read().await.registry().is_installed(module_id) => {
             Ok(PlanOutcome::Installed(Installed {
                 module_id: module_id.to_string(),
-                version: runtime.registry().module_version(module_id),
+                version: runtime.read().await.registry().module_version(module_id),
                 dir: cache_root.to_path_buf(),
                 also_installed: dragged_in,
             }))
@@ -1483,12 +1592,12 @@ async fn mark_installed(
 /// re-expande — el runtime la rechazará luego con `MissingDependency` si el ciclo es real, que es
 /// lo correcto (un ciclo es un error de autoría del módulo, no algo a resolver aquí).
 #[allow(clippy::too_many_arguments)]
-fn install_recursive<'a>(
+fn install_recursive<'a, 'r: 'a>(
     http: &'a reqwest::Client,
     cloud_base_url: &'a str,
     cache_root: &'a std::path::Path,
     auth: &'a Auth,
-    runtime: &'a mut erplora_runtime::Runtime,
+    runtime: &'a mut RuntimeAccess<'r>,
     module_id: String,
     requested_version: String,
     installing: &'a mut std::collections::HashSet<String>,
@@ -1547,12 +1656,14 @@ fn install_recursive<'a>(
         //     El runtime exige que las deps estén registradas al instalar (installer.rs::install);
         //     aquí se satisface ese contrato descargándolas del Cloud en orden de profundidad.
         let missing = runtime
+            .read()
+            .await
             .missing_dependencies(&dir)
             .map_err(InstallError::from_runtime)?;
         installing.insert(module_id.clone());
         for dep in missing {
             // Ya en la cadena en curso (ciclo) o ya instalada por otra rama (dep en diamante): saltar.
-            if installing.contains(&dep) || runtime.registry().is_installed(&dep) {
+            if installing.contains(&dep) || runtime.read().await.registry().is_installed(&dep) {
                 continue;
             }
             let installed_dep = install_recursive(
@@ -1576,14 +1687,17 @@ fn install_recursive<'a>(
             dragged_in.push(installed_dep.module_id);
         }
 
-        // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
+        // (5) Install the module (migrates, registers; keeps a recorded on/off state, hub#2544) —
+        // its deps already present.
         on_progress(&module_id, "installing");
-        let installed_id = register(runtime, &dir, &module_id, updating.as_deref()).await?;
+        let installed_id = runtime
+            .register(&dir, &module_id, updating.as_deref())
+            .await?;
 
         // (5bis) hub#571: guardar la copia propia del hub, para el arranque en el que el
         //        marketplace no conteste. Después de instalar, nunca antes.
         remember_package_from_file(
-            runtime,
+            &*runtime.read().await,
             &module_id,
             &version.version,
             &sha,

@@ -266,7 +266,11 @@ else
     ok "\`pull_request\` is back, with \`ready_for_review\` in its types"
 fi
 pr_paths="$(on_sub_block pull_request)"
-for p in "apps/web/**" "packages/**" "$guard_path" ".github/workflows/test-web.yml"; do
+# `crates/**`, `Cargo.toml` and `Cargo.lock` came back on 2026-10-08 (hub#2705, pm#655 J3): the
+# `e2e` job builds `erplora-server` and drives the shell against the REAL runtime, and a runtime
+# regression that broke the shell only surfaced on the nightly or on the next web PR. They were
+# left out by hub#1251 to spare the single self-hosted runner, which is no longer the ceiling.
+for p in "apps/web/**" "packages/**" "$guard_path" ".github/workflows/test-web.yml" "crates/**" "Cargo.toml" "Cargo.lock"; do
     grep -qF "$p" <<<"$pr_paths" \
         && ok "\`pull_request.paths\` includes \`$p\`" \
         || bad "\`pull_request.paths\` includes \`$p\`" "a PR touching it would open with no web check"
@@ -697,6 +701,24 @@ for p in "$published_script" scripts/tests/install-published-outfitkit.test.sh; 
             "a change to it alone would trigger no check"
     fi
 done
+
+# ── 15. A push to develop/main is never cancelled by the next one (hub#2689) ─
+# `cancel-in-progress: true` was sized for the single self-hosted runner (hub#572).
+# On GitHub's runners it made every merge cancel the previous develop run: on
+# 08/10 six pushes in a row ended `cancelled` and develop was never verified.
+# A newer run still supersedes the older one where it really replaces it: a PR's
+# new head, a merge-check re-dispatched for the same PR (pm#331, its group carries
+# the PR) and a newer OutfitKit notice (hub#2321). A push, the nightly cron and a
+# plain manual run are left to finish — the cron shares `refs/heads/main` with the
+# push to main, so it must not cancel either.
+expected_cancel="\${{ github.event_name == 'pull_request' || github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && inputs.pr != '') }}"
+cancel_line=$(awk '/^concurrency:/ {f=1; next} f && /^  cancel-in-progress:/ {sub(/^  cancel-in-progress:[[:space:]]*/, ""); print; exit} f && /^[A-Za-z]/ {exit}' "$workflow")
+if [ "$cancel_line" = "$expected_cancel" ]; then
+    ok "a push to develop/main finishes; only a superseded PR, merge-check or OutfitKit run is cancelled (hub#2689)"
+else
+    bad "a push to develop/main finishes; only a superseded PR, merge-check or OutfitKit run is cancelled (hub#2689)" \
+        "concurrency.cancel-in-progress is '${cancel_line:-absent}', expected '$expected_cancel': every merge would cancel the develop run before it ends"
+fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -274,7 +274,7 @@ import {
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { columnsForScreen, TABLE_PHONE_QUERY, type TableView } from '../lib/apps-list-columns';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
-import { moduleFailureMessage } from '../lib/module-failure-message';
+import { moduleFailureMessage, updateFailureMessage as describeUpdateFailure } from '../lib/module-failure-message';
 import {
   defaultVersion, hasUncheckedUpdates, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo, type UpdateAllResult, type UpdateAllTarget,
@@ -548,10 +548,19 @@ const installedIds = computed<Set<string>>(() => new Set(installedModules.value.
 // is blocked: the runtime still refuses a too-new app at install time (hub#1620).
 const hubVersion = ref<string | null>(null);
 async function loadHubVersion(): Promise<void> {
+  // The version travels in the System state, which the runtime gives to an owner or an administrator
+  // only (hub#2519) — and installing is theirs too: nobody else is asked for, nor warned about, a
+  // floor they cannot act on.
+  if (!isAdmin.value) {
+    hubVersion.value = null;
+    return;
+  }
   const info = await fetchSystemInfo();
   if (!info) console.warn('[apps] could not read the hub version: the catalog cannot warn about app floors');
   hubVersion.value = info?.hubVersion ?? null;
 }
+// The session may resolve after the page opened, or change hands on a shared till.
+watch(isAdmin, () => void loadHubVersion());
 
 // Los ids que el CATÁLOGO trae hoy. Estar ahí ya es la respuesta: la lista del marketplace sólo
 // sirve `publication_status='listed'` (lo filtra el SaaS en su acción `list`), así que un módulo
@@ -898,6 +907,15 @@ function closeButton(): ToastButton {
 }
 
 /**
+ * The hub refused to switch off, uninstall or update an app (hub#2594). The reason is a long
+ * sentence that says what to do next («Open VeriFactu to send them…»): it stays in red until the
+ * person closes it, like a failed install (hub#2244). It used to go away after 2.5 s, unread.
+ */
+function notifyRefusal(msg: string): void {
+  showToast(msg, 'danger', 0, [closeButton()]);
+}
+
+/**
  * El módulo entró pero sus permisos NO se concedieron (pm#132).
  *
  * Es la red de seguridad: sin ella el siguiente paso del usuario es abrir el módulo y leer «no
@@ -1011,6 +1029,15 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
   // Antes de tocar nada: si hay varias versiones, que elija. Cancelar aquí no deja rastro.
   const version = await chooseVersion(id, name);
   if (version === null) return;
+  await runUpdate(id, name, version);
+}
+
+/**
+ * Runs one update the person already asked for: `version` is what they chose, so «Retry» repeats
+ * exactly this request without asking again (hub#2556).
+ */
+async function runUpdate(id: string, name: string, version: string): Promise<void> {
+  if (updatingIds.value.has(id) || updateAllRunning.value) return;
   setUpdating(id, true);
   notify(t('apps.updating', { name }), 'primary', 0);
   try {
@@ -1028,18 +1055,18 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
     reloadForModuleUpdate();
   } catch (e) {
     if (e instanceof InstallBlockedError) {
-      // ADR-0060: a la versión nueva le faltan módulos de pago sin contratar. No se ha tocado nada
-      // y NO se ha cobrado nada; el módulo sigue en la versión anterior. Sticky para poder leerlo.
-      notify(
-        t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') }),
-        'danger',
-        0,
-      );
+      // ADR-0060: the new version needs paid apps not subscribed to. Nothing was touched and
+      // NOTHING was charged; the app stays on its previous version. Sticky so it can be read.
+      notifyRefusal(t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') }));
     } else {
-      // What the RUNTIME said, and only if it said anything (hub#673). What matters about the
-      // message is still that the module was NOT left half-done — the runtime guarantees that,
-      // not the sentence.
-      notify(moduleFailureMessage(e, t('apps.updateError', { name }), { t, te }), 'danger');
+      // What the RUNTIME said, and only if it said anything (hub#673); an update that ran out of
+      // time says so (hub#2556). What matters is still that the module was NOT left half-done —
+      // the runtime guarantees that, not the sentence. Sticky with «Retry», like a failed install
+      // (hub#2244): a slow erplora.com is usually a passing thing.
+      showToast(updateFailureMessage(e, name), 'danger', 0, [
+        { text: t('apps.installRetry'), handler: () => { void runUpdate(id, name, version); } },
+        closeButton(),
+      ]);
     }
   } finally {
     setUpdating(id, false);
@@ -1053,8 +1080,9 @@ function updateFailureMessage(e: unknown, name: string): string {
     // ADR-0060: nothing changed and nothing was charged; the app keeps the version it had.
     return t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') });
   }
-  // What the RUNTIME said, and only if it said anything (hub#673).
-  return moduleFailureMessage(e, t('apps.updateError', { name }), { t, te });
+  // What the RUNTIME said, and only if it said anything (hub#673); a download that ran out of time
+  // says so (hub#2556).
+  return describeUpdateFailure(e, name, { t, te });
 }
 
 // --- «Update all» (hub#2331) ---
@@ -1439,18 +1467,17 @@ async function toggleModule(m: InstalledModule): Promise<void> {
     await loadInstalled();
     void refreshModuleNav();
   } catch (e) {
-    notify(moduleFailureMessage(e, t('apps.toggleError', { name: m.name }), { t, te }), 'danger');
+    notifyRefusal(moduleFailureMessage(e, t('apps.toggleError', { name: m.name }), { t, te }));
   }
 }
 
-/** Desinstala un módulo y refresca la lista + la nav del shell. */
+/** Uninstalls a module and refreshes the list and the shell nav. */
 async function removeModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  // Qué se lleva por delante, ANTES de llevárselo (hub#773). El diálogo decía qué se CONSERVA
-  // («los datos y archivos se guardan») y callaba lo único irreversible del momento: las otras apps
-  // que dependen de esta se quedan sin ella. Se nombran, transitivamente y aunque estén apagadas —
-  // desinstalar no es desactivar: el paquete se va, así que una dependiente apagada ya no se podrá
-  // volver a encender.
+  // What goes with it, BEFORE it goes (hub#773). The apps that depend on this one —
+  // transitively and even when switched off — are named, because confirming uninstalls them too:
+  // the runtime removes the whole set together, the farthest first (hub#2545, HUB-F29), as Odoo
+  // and Business Central do. Their data stays, like the app's own.
   const breaks = dependentsOf(m.id, installedModules.value);
   const body = breaks.length
     ? `${t('apps.uninstallBreaks', { name: m.name })}\n${breaks.map((a) => `· ${a.name}`).join('\n')}\n\n${t('apps.uninstallBody')}`
@@ -1472,26 +1499,26 @@ async function removeModule(m: InstalledModule): Promise<void> {
   const result = await alert.onDidDismiss();
   if (result.role !== 'confirm') return;
   try {
-    // hub#1101: el runtime rechaza por su cuenta si algo depende de esta app, y hace bien — esa
-    // guarda existe para el que NUNCA vio esta lista (un script, el asistente, un flujo, un
-    // `curl`). Aquí sí se vio y sí se confirmó, así que la pantalla contesta esa pregunta. Sin
-    // dependientes no se manda nada: si la lista se hubiera quedado vieja, el rechazo tiene que
-    // llegar en lugar de colarse.
+    // hub#1101: the runtime refuses on its own when something depends on this app, and rightly so
+    // — that guard is for whoever NEVER saw this list (a script, the assistant, a flow, a `curl`).
+    // Here it was seen and confirmed, so the screen answers that question. With no dependents
+    // nothing is forced: if the list had gone stale, the refusal must arrive instead of slipping
+    // through.
     await uninstallModule(m.id, { force: breaks.length > 0 });
     notify(t('apps.uninstalled', { name: m.name }), 'primary');
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
   } catch (e) {
-    // Ese caso — la lista con la que se pintó el diálogo era vieja — llega con su código estable y
-    // sus dependientes. La frase del runtime va en inglés (es código), así que se traduce y se
-    // nombran las apps QUE MANDÓ ÉL, que son las de verdad.
+    // That case — the list the dialog was drawn from had gone stale — arrives with its stable code
+    // and its dependents. The runtime's sentence is English (it is code), so it is translated and
+    // names the apps THE RUNTIME sent, which are the real ones.
     if (e instanceof ModuleActionError && e.code === 'has_dependents') {
       const names = (e.dependents ?? []).join(', ');
-      notify(t('apps.uninstallBlocked', { name: m.name, apps: names }), 'danger');
+      notifyRefusal(t('apps.uninstallBlocked', { name: m.name, apps: names }));
       await loadInstalled();
       return;
     }
-    notify(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name }), { t, te }), 'danger');
+    notifyRefusal(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name }), { t, te }));
   }
 }
 
@@ -1741,6 +1768,18 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
+}
+/* hub#2651 — On a phone OutfitKit lays a `fill` list out as tall as its content, scrolling WITH the
+   page (outfitkit#218, the 640px below which it does so). Pinned to the scroller's height, this box
+   left that list as overflow: the page lost its bottom padding and, at its end, the card sat flush
+   on the tabbar (half a pixel under it at 320×568). Here the box grows with the list, and is still
+   at least the scroller's height (and the floor), so a short list keeps reaching down to the
+   page's bottom margin as before. */
+@media (max-width: 640px) {
+  .fill {
+    height: auto;
+    min-height: max(100%, var(--ok-work-surface-min));
+  }
 }
 /* hub#2331 — «Update all». The offer is one line with its button (wrapping on a phone); the result
    lists every app of the batch, and with nine of them it scrolls inside itself instead of pushing

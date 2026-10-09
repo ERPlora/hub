@@ -18,7 +18,9 @@ ADR-0154) y las notificaciones del SO.
 
 **Estado**: miembro del workspace raíz. `cargo test -p erplora-tauri` pasa en verde; su CI propio es
 [`test-shell.yml`](../../.github/workflows/test-shell.yml), que se dispara **solo** cuando cambia el
-shell (el `cargo test --workspace` del gate principal lo excluye: tauri/wry arrastra GTK/webkit2gtk).
+shell (el `cargo test --workspace` del gate principal lo excluye: tauri/wry arrastra GTK/webkit2gtk)
+y compila y prueba en **Linux, Windows y macOS** en la propia PR (hub#2705); los tests Kotlin del
+plugin de Android, solo en Linux.
 
 **Para construir el binario** (`cargo tauri build`):
 1. Toolchain Tauri v2 + WebView del SO (macOS WKWebView / Windows WebView2 / Linux webkit2gtk).

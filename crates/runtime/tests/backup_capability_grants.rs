@@ -58,6 +58,7 @@ const CREATED_AT: &str = "2026-08-15T10:00:00Z";
 const ACTOR: &str = "hub_user:admin";
 
 async fn runtime(hub_id: &str) -> Runtime {
+    ensure_master_key();
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.ensure_system_tables().await.unwrap();
@@ -256,6 +257,9 @@ async fn a_capability_the_installed_module_does_not_declare_is_refused_and_leave
         .get_mut("verifactu")
         .expect("the module is in the manifest")
         .push("printer".into());
+    // Re-sealed by the same hub (hub#2497): this is the hub's own copy carrying a grant its newer
+    // module no longer declares, not a zip edited by hand (that one would be refused as foreign).
+    erplora_runtime::export::seal_manifest(&mut bundle.manifest);
 
     // The destination runs a NEWER VeriFactu that no longer asks for the network.
     let mut restored = runtime("h1").await;
@@ -582,4 +586,18 @@ async fn restoring_never_revokes_what_the_bundle_does_not_name() {
         vec!["certificate", "network"],
         "an old backup adds what it brings; it does not take away what came later"
     );
+}
+
+/// `HUB_SECRETS_KEY` once for this binary, as every production hub has it: a hub's own copy is
+/// only proven by the origin seal derived from it (hub#2497), so a restore of the hub's own backup
+/// needs it at both ends.
+fn ensure_master_key() {
+    use base64::Engine as _;
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let key = base64::engine::general_purpose::STANDARD.encode([0x24u8; 32]);
+        // SAFETY: `Once` runs this before any test reads the variable, and nothing writes it again.
+        unsafe { std::env::set_var("HUB_SECRETS_KEY", key) };
+    });
 }

@@ -1,7 +1,43 @@
 <template>
   <AppPage :title="t('nav.settings')" content-layout="detail">
+      <!-- hub#2541 — General and Business are painted from `GET /api/settings`. Until this visit has
+           read it they show neither made-up values (Spain, EUR, Spanish were the defaults of the
+           empty cache) nor anything that saves on top of them: «loading», or «could not load» with
+           Retry, in place of the cards that depend on the read. -->
+      <template v-if="(tab === 'hub' || tab === 'business') && !settingsShown">
+        <div
+          v-if="settingsRead === 'loading'"
+          class="flex justify-center py-6"
+          role="status"
+          :aria-label="t('settings.loading')"
+          data-testid="settings-loading"
+        >
+          <ion-spinner name="dots" />
+        </div>
+        <ok-empty-state
+          v-else
+          class="mb-3"
+          data-testid="settings-load-error"
+          icon="cloud-offline-outline"
+          :heading="t('settings.loadError')"
+          :message="t('settings.loadErrorBody')"
+        >
+          <ion-button
+            slot="action"
+            size="small"
+            fill="outline"
+            data-testid="settings-load-retry"
+            :disabled="settingsRetrying"
+            @click="retrySettingsRead"
+          >
+            {{ t('settings.retry') }}
+          </ion-button>
+        </ok-empty-state>
+      </template>
+
       <!-- ── Tab: Hub ── -->
       <template v-if="tab === 'hub'">
+        <template v-if="settingsShown">
         <h2 class="text-base font-semibold mb-2 px-1">{{ t('settings.hubWide') }}</h2>
         <ion-card>
           <ion-card-content class="p-0">
@@ -160,6 +196,7 @@
             </ion-item>
           </ion-card-content>
         </ion-card>
+        </template>
 
         <!-- «Este dispositivo» (hub#358): si esta terminal pide PIN. Es del DISPOSITIVO, no del hub
              —el mostrador y el portátil del despacho conviven en el mismo negocio—, así que va bajo
@@ -171,8 +208,11 @@
              es del hub —vale para todo el negocio—, así que va justo DEBAJO del del dispositivo:
              se leen juntos, y quien pone «nunca» tiene que ver antes de qué dispositivo habla. El
              runtime los compone por el lado restrictivo; ninguno afloja lo que el otro apretó. -->
-        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('pinPolicy.title') }}</h2>
-        <PinPolicyCard />
+        <!-- hub#2541: its idle stops and PIN length come from the same read — not before it worked. -->
+        <template v-if="settingsShown">
+          <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('pinPolicy.title') }}</h2>
+          <PinPolicyCard />
+        </template>
 
         <!-- Los DEMÁS dispositivos (hub#455). Va justo después de los dos controles de arriba y no
              antes: aquellos describen el dispositivo que tienes delante, este es el inventario —y el
@@ -239,7 +279,7 @@
       </template>
 
       <!-- ── Tab: Negocio (identidad fiscal genérica) ── -->
-      <template v-else-if="tab === 'business'">
+      <template v-else-if="tab === 'business' && settingsShown">
         <!-- Identidad de NEGOCIO GLOBAL (fuente única país-agnóstica, ADR-0061): identificador fiscal
              (NIF/CIF/VAT…) + razón social + dirección. La leen invoice (emisor) y los módulos fiscales
              por país. Lo específico de país (IVA/IGIC, e-factura) vive en módulos, no aquí. Solo admin. -->
@@ -506,11 +546,19 @@
       <template v-else-if="tab === 'data'">
         <DataPanel :initial="dataView" />
       </template>
-    <!-- Footer tab bar -->
+    <!-- Footer tab bar. `scrollable`, like Staff and System: five tabs overflow a phone, and it is
+         what makes Ionic bring the tab just chosen into view — without it a tab tapped while it
+         peeked under the edge fade stayed there, faded (hub#2617). -->
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment class="ok-tabbar" data-testid="settings-tabs" :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
+        <ion-segment
+          class="ok-tabbar"
+          data-testid="settings-tabs"
+          :value="tab"
+          scrollable
+          @ion-change="tab = ($event.detail.value as Tab)"
+        >
           <ion-segment-button value="hub" data-testid="settings-tab-hub">
             <HubIcon name="business-outline" />
             <ion-label>{{ t('settings.tabHub') }}</ion-label>
@@ -732,9 +780,38 @@ onUnmounted(() => {
   zoneNowTimer = null;
 });
 
-// Refresca los settings del hub al abrir Ajustes (best-effort; degrada a la cache sembrada).
+// hub#2541 — every visit reads the hub's settings again, and a failed read is SAID: it used to be
+// swallowed here (`.catch(() => null)`) and the screen painted the empty cache's defaults as the
+// business's. A cache from an earlier read is painted only while this visit's read is on its way
+// (no flash on every visit); once that read fails, it does not stand in for it — saving on top of
+// values this screen could not confirm is what the issue is about.
+const settingsRead = ref<'loading' | 'ready' | 'error'>('loading');
+const settingsRetrying = ref(false);
+const settingsShown = computed<boolean>(
+  () => settingsRead.value === 'ready' || (settingsRead.value === 'loading' && hubSettings.value !== null),
+);
+
+async function readSettings(): Promise<void> {
+  try {
+    await getHubSettings();
+    settingsRead.value = 'ready';
+  } catch {
+    settingsRead.value = 'error';
+  }
+}
+
+/** Retry keeps the error card on screen (button disabled) until the answer: no flash of the form. */
+async function retrySettingsRead(): Promise<void> {
+  settingsRetrying.value = true;
+  try {
+    await readSettings();
+  } finally {
+    settingsRetrying.value = false;
+  }
+}
+
 onMounted(() => {
-  void getHubSettings().catch(() => null);
+  void readSettings();
 });
 
 // ── «Start on login» (ADR-0204 §7, hub#389) — a setting of THIS device, kept by the OS ──────────

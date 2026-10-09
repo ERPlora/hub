@@ -41,8 +41,11 @@ async fn serve() -> Server {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
+    // The owner: this file is about the DOOR (anonymous vs authenticated), and the sale below is
+    // a frame of the hub's own shape, which since hub#2501 only an administrator's session hears.
+    // What each role hears is `event_stream_session_scope_hub2501.rs`.
     let user = rt
-        .create_user("Cashier", "1111", "employee", None)
+        .create_user("Owner", "1111", "admin", None)
         .await
         .unwrap();
     let session = rt.create_session(&user, 3600, None).await.unwrap();
@@ -319,6 +322,11 @@ async fn the_sse_door_refuses_a_request_without_a_credential() {
     let resp = sse(&srv, "/api/events", None).await;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(code_of(resp).await, "unauthenticated");
+
+    // An empty `?ticket=` is no credential either, not a key in the address (hub#2523).
+    let resp = sse(&srv, "/api/events?ticket=", None).await;
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(code_of(resp).await, "unauthenticated");
 }
 
 #[tokio::test]
@@ -362,6 +370,59 @@ async fn the_sse_door_takes_a_ticket_in_the_query_and_spends_it() {
     );
 }
 
+/// **A key never rides in the address** (hub#2523). `?ticket=` exists because `EventSource` sets
+/// no headers, and it is acceptable only for something that is spent by the time anyone reads the
+/// access log. A key is not: an integration that put its `erpl_live_…` there left it in every
+/// proxy log on the way, readable — and usable to read the business — by whoever reads the logs.
+/// The refusal has its own code so the integration learns WHY, and the same key in the header
+/// still opens: the door did not close to the key, only to the address.
+#[tokio::test]
+async fn the_sse_door_refuses_a_key_in_the_address_and_takes_it_in_the_header() {
+    let srv = serve().await;
+    let read_key = key_with(&srv, ApiKeyAccess::ReadOnly).await;
+
+    let resp = sse(&srv, &format!("/api/events?ticket={read_key}"), None).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(code_of(resp).await, "events.key_in_url");
+
+    let resp = sse(&srv, "/api/events", Some(&read_key)).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the header is the key's door"
+    );
+}
+
+/// The refusal is decided by the SHAPE of what is in the address, before anything is looked up:
+/// a real key and a made-up one get the same answer. If the hub resolved it first, the address
+/// would still be an oracle for which keys exist — and argon2 would still run for every guess.
+#[tokio::test]
+async fn a_key_in_the_address_is_refused_without_being_looked_up() {
+    let srv = serve().await;
+    let made_up = "erpl_live_0000000000000000_not-a-key-of-anybody";
+
+    let resp = sse(&srv, &format!("/api/events?ticket={made_up}"), None).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(code_of(resp).await, "events.key_in_url");
+}
+
+/// A key in the header does not launder a key in the address: the secret is in the log the moment
+/// the request is made, so the request is refused even though the header alone would open.
+#[tokio::test]
+async fn a_key_in_the_address_is_refused_even_with_a_good_header() {
+    let srv = serve().await;
+    let read_key = key_with(&srv, ApiKeyAccess::ReadOnly).await;
+
+    let resp = sse(
+        &srv,
+        &format!("/api/events?ticket={read_key}"),
+        Some(&read_key),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(code_of(resp).await, "events.key_in_url");
+}
+
 /// **The ticket door needs a session.** If it did not, the hub would be handing its own read-only
 /// credential to anybody who asked, and the whole chain above would be decoration.
 #[tokio::test]
@@ -375,18 +436,15 @@ async fn the_ticket_door_needs_a_session() {
     let resp = ticket_over_http(&srv, Some("not-a-session")).await;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 
-    // With a real session it mints — and the key it minted is the hub's own, marked so the keys
-    // screen shows it and refuses to delete it.
+    // With a real session it mints — bound to that session (hub#2501), so no key is minted for
+    // it: the hub's blanket `read_only` key is exactly what used to hand a cashier every event.
     let t = ticket(&srv).await;
     assert!(t.starts_with("erpl_tkt_"));
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
     let rt = arc.read().await;
     let keys = rt.list_api_keys().await.unwrap();
-    assert_eq!(
-        keys.len(),
-        1,
-        "one key, however many tickets were asked for"
+    assert!(
+        keys.is_empty(),
+        "a session's ticket mints no API key: {keys:?}"
     );
-    assert!(keys[0].system);
-    assert_eq!(keys[0].access, ApiKeyAccess::ReadOnly);
 }

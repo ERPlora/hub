@@ -112,14 +112,35 @@
 
     <!-- ── Actividad ── (data-table: filtros de columna + búsqueda + orden + paginación) -->
     <template v-else-if="tab === 'actividad'">
-      <ion-list v-if="loadingFeed" inset>
+      <ion-list v-if="activityDisplay === 'loading'" inset>
         <ion-item lines="none">
           <ion-spinner slot="start" name="crescent" />
           <ion-label>{{ t('dashboard.loading') }}</ion-label>
         </ion-item>
       </ion-list>
-      <!-- El estado vacío lo aporta la propia ok-data-table (sin filas). -->
-      <div v-else class="fill">
+      <!-- A failed read is said, never painted as «no sales» (hub#2505); the sales already on screen
+           stay under it. -->
+      <ok-inline-feedback
+        v-if="activityError"
+        class="load-feedback"
+        data-testid="dashboard-activity-load-error"
+        tone="warning"
+        icon="cloud-offline-outline"
+        :heading="t('dashboard.activityLoadErrorTitle')"
+      >
+        {{ t('dashboard.activityLoadErrorBody') }}
+        <ion-button
+          slot="actions"
+          size="small"
+          fill="outline"
+          data-testid="dashboard-activity-retry"
+          @click="loadActivity"
+        >
+          {{ t('dashboard.activityRetry') }}
+        </ion-button>
+      </ok-inline-feedback>
+      <!-- The empty state is the ok-data-table's own (no rows). -->
+      <div v-if="activityDisplay === 'items' || activityDisplay === 'empty'" class="fill">
         <ok-data-table
           ref="activityTable"
           fill
@@ -190,7 +211,17 @@ import {
   refreshActiveModuleIds,
   type InstalledModule,
 } from '../lib/runtime';
-import { loadRecentSales, type ActivityRow } from '../lib/dashboard-activity';
+import {
+  ACTIVITY_STATUS_KEY,
+  FEED_MODULE,
+  activityMethodName,
+  formatActivityAmount,
+  loadRecentSales,
+  type ActivityRow,
+} from '../lib/dashboard-activity';
+import { loadModuleLocale } from '../lib/module-loader';
+import { moduleBase } from '../lib/module-url';
+import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { hubIsEmpty } from '../lib/blueprint-hero';
@@ -208,7 +239,6 @@ import { fetchWhatsAppNumbers, type WhatsAppNumber } from '../lib/whatsapp-conne
 import { fetchPrintHosts, type PrintRoleCoverage } from '../lib/print-coverage';
 import { GREETING_KEY, panelHeading } from '../lib/dashboard-heading';
 import { hubSettings } from '../lib/hub-settings';
-import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
 import { formatDate, formatDateTime } from '../lib/format-datetime';
 
@@ -431,10 +461,6 @@ watch(locale, () => {
   void loadWidgets();
 });
 
-// Formateador de dinero con la MONEDA DEL HUB (money.ts; no más 'EUR' hardcodeado). Datos en
-// unidades mayores. Sin decimales para los KPI, con 2 para el feed.
-const eur = (n: number, dec = 0): string => formatAmount(n, { maximumFractionDigits: dec });
-
 // ── Zone 1 — The header: the business + today's date ─────────────────────────────────────────
 // The `<h1>` is the hub's business name (`business_legal_name`, the single business identity of
 // ADR-0061), and the hour of the day while the hub still has no name — never the session user, who
@@ -533,16 +559,31 @@ function badgeCell(text: string, tone: Tone): Node {
 }
 
 const activityRaw = ref<ActivityRow[]>([]);
-// Display rows: `status` is translated here and ONLY here, so the badge, the select filter and its
-// options all see the same localized word — and a locale switch repaints them (the fetched value
-// underneath stays stable, so nothing ever compares against a translation).
+// `sales`' own screen strings in the language on screen: the factory payment methods are named
+// with ITS words, the ones the Sales history paints (hub#2590). Read only once there are sales to
+// name, so a hub without a till never asks for the catalogue of an app it does not have.
+// `loadModuleLocale` never throws: a missing or failed catalogue leaves the stored names.
+const salesUi = ref<Record<string, unknown> | undefined>(undefined);
+async function loadSalesWords(): Promise<void> {
+  const lang = locale.value;
+  const file = await loadModuleLocale(moduleBase(FEED_MODULE), lang);
+  // A slower read for the previous language must not overwrite the current one.
+  if (lang === locale.value) salesUi.value = file?.ui;
+}
+// Display rows: `status` and `method` are translated here and ONLY here, so the cell, the select
+// filter and its options all see the same localized word — and a locale switch repaints them (the
+// fetched value underneath stays stable, so nothing ever compares against a translation).
 const activity = computed(() =>
   activityRaw.value.map((r) => ({
     ...r,
-    status: t(r.status === 'completed' ? 'dashboard.activityStatusCompleted' : 'dashboard.activityStatusPending'),
+    method: activityMethodName(r.method, salesUi.value),
+    status: t(ACTIVITY_STATUS_KEY[r.status]),
   })),
 );
-const loadingFeed = ref<boolean>(true);
+const activityState = ref<ListLoadState>('loading');
+// A failed read keeps the last good list and says so next to it (hub#2505, `list-load-state.ts`).
+const activityError = computed(() => activityState.value === 'error');
+const activityDisplay = computed(() => listDisplay(activityState.value, activityRaw.value.length));
 const activityTable = ref<HTMLElement | null>(null);
 
 const activityColumns = computed<DataTableColumn[]>(() => [
@@ -554,7 +595,8 @@ const activityColumns = computed<DataTableColumn[]>(() => [
     key: 'amount',
     header: t('dashboard.activityAmount'),
     align: 'right',
-    format: (r) => eur(Number(r.amount) || 0, 2),
+    // `amount` is in cents, as `sales` serves it: `formatAmount` painted 12,50 € as 1.250,00 € (hub#2505).
+    format: (r) => formatActivityAmount({ amount: Number(r.amount) || 0 }, { locale: locale.value }),
   },
   {
     key: 'status',
@@ -575,9 +617,11 @@ watch(locale, () => {
   if (activityTable.value) {
     (activityTable.value as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
   }
+  if (activityRaw.value.length) void loadSalesWords();
 });
 
 async function loadActivity(): Promise<void> {
+  activityState.value = 'loading';
   try {
     // `sales` is optional (hub#1211): the read is gated on the ACTIVE module set the SDK's own
     // short-circuit reads, so a hub without a till never asks the till for its sales (that 404 on
@@ -585,10 +629,12 @@ async function loadActivity(): Promise<void> {
     // best-effort and session-guarded; an unknown set still travels, as before.
     await refreshActiveModuleIds();
     activityRaw.value = await loadRecentSales(client, activeModuleIds());
+    activityState.value = 'ready';
+    // Not awaited: the table never waits on a secondary read; the cells repaint when it lands.
+    if (activityRaw.value.length) void loadSalesWords();
   } catch {
-    activityRaw.value = [];
-  } finally {
-    loadingFeed.value = false;
+    // Not `[]`: «I could not ask» is not «nothing was sold» (hub#2505). The rows already on screen stay.
+    activityState.value = 'error';
   }
 }
 

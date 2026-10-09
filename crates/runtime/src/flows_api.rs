@@ -661,30 +661,36 @@ impl Runtime {
             });
         }
 
+        // Step 3b (hub#2502) — **the decision commits with the command, or neither does.** The
+        // row is written `approved` inside the command's own transaction, guarded so that a row
+        // somebody else decided in the meantime (a second person, a rejection, the expiry sweep)
+        // rolls the whole command back. Reading `pending` above is only the early answer; this is
+        // the one that makes «approve» run once.
         let (run, _) =
             flows::store::get_run(self.db.as_ref(), &self.hub_id, &approval.run_id).await?;
-        let outcome = self
-            .execute_flow_command(
-                &approval.flow_id,
-                &approval.run_id,
-                run.depth,
-                &approval.command,
-                &payload,
-            )
-            .await;
+        let ctx = self.automation_ctx(&approval.flow_id, &approval.run_id).await?;
+        let outcome = commands::execute_at(
+            self.db.as_ref(),
+            &self.registry,
+            &approval.command,
+            &payload,
+            &ctx,
+            run.depth.max(0) as u32,
+            &[flows::approvals::approve_op(
+                &self.hub_id,
+                id,
+                decided_by,
+                comment,
+            )],
+            commands::Origin::Automation,
+            // Same as `execute_flow_command`: nobody at the counter, no PIN to spend (hub#361).
+            None,
+        )
+        .await;
 
         match outcome {
             Ok(result) => {
-                let decided = flows::approvals::mark_decided_with_comment(
-                    self.db.as_ref(),
-                    &self.hub_id,
-                    id,
-                    flows::approvals::STATUS_APPROVED,
-                    decided_by,
-                    "",
-                    comment,
-                )
-                .await?;
+                let decided = flows::approvals::get(self.db.as_ref(), &self.hub_id, id).await?;
                 // The step's output is the WHOLE turn: what the model produced before it
                 // proposed (parked on the step row hours ago) plus how the proposal ended.
                 let mut output = self.parked_step_output(&approval.run_id).await;
@@ -705,6 +711,28 @@ impl Runtime {
             Err(e) => {
                 // The person DID approve; what broke is the command. Both facts are recorded, and
                 // the error is returned so the tray shows a failure instead of a green tick.
+                //
+                // Unless this approval LOST (hub#2502): somebody else decided the row while the
+                // command ran, so the guard rolled it back. Then the mark refuses with who won,
+                // nothing of ours is written, the winner's decision ends the run, and the rollback
+                // is not reported as a broken command — it is the guard doing its job.
+                //
+                // Or unless the automation is PAUSED (hub#2650): the same guard refuses to decide a
+                // proposal of a paused automation, so the command was rolled back and nobody
+                // decided anything. The row stays pending — approvable once it is back on — and the
+                // person is told why instead of «approved, and it failed».
+                let flow =
+                    flows::store::get(self.db.as_ref(), &self.hub_id, &approval.flow_id).await?;
+                if !flow.enabled {
+                    return Err(RuntimeError::Domain {
+                        code: flows::executor::ERR_FLOW_DISABLED.to_string(),
+                        message: format!(
+                            "automation `{}` is paused: nothing was executed and the proposal is \
+                             still PENDING. Turn the automation back on to approve it, or reject it.",
+                            approval.flow_id
+                        ),
+                    });
+                }
                 let message = format!("{e}");
                 flows::approvals::mark_decided_with_comment(
                     self.db.as_ref(),
@@ -716,6 +744,7 @@ impl Runtime {
                     comment,
                 )
                 .await?;
+                self.report_dispatch_error(&e, "command", &approval.command, &payload);
                 self.complete_flow_io(
                     &approval.run_id,
                     &approval.step_id,

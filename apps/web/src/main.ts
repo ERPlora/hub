@@ -42,15 +42,21 @@ import {
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { isAuthed, logout } from './lib/session';
+import { signOutAndForgetHub } from './lib/change-hub';
 import { invokeTauri, listenTauriEvent, listenTauriPlugin } from './lib/device';
 import { sendSystemNotice } from './lib/bridge-transport';
 import { claimNoticeTaps, createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
 import { bootPrintOnSale } from './lib/print-on-sale';
-import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
+import {
+  presentPrintNotice,
+  saleTicketFailureNotice,
+  saleTicketWithoutFiscalNotice,
+} from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
-import { comandaFailureNotice } from './lib/print-comanda-notice';
+import { comandaFailureNotice, voidFailureNotice } from './lib/print-comanda-notice';
+import { bootPrintVoid } from './lib/print-void';
 import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './lib/appointment-notice';
 import { bootBellNotices } from './lib/bell-notice';
 import { loadBellCounterModuleIds } from './lib/bell-counters';
@@ -73,6 +79,7 @@ import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
 import { preloadTeleportedStyles } from './lib/teleported-styles';
 import { bootTheme } from './lib/theme';
+import { forgetTrustedUserEmails } from './lib/trusted-users';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
@@ -172,6 +179,11 @@ import './theme/global.css';
 
 // Aplica el modo de tema guardado (claro/oscuro/system) antes del primer render.
 bootTheme();
+
+// hub#2536: the PIN grid used to keep each face's e-mail in this browser, where any passer-by at a
+// shared till could read it. Forget what an older version stored, on every device and before the
+// first render (a till that keeps its session never opens Acceso to rewrite the list).
+forgetTrustedUserEmails();
 
 // Module names are localized BY THE RUNTIME and travel baked into the navigation (ADR-0055), so it
 // has to be ASKED FOR AGAIN when the language changes: the personal preference arrives after the
@@ -281,13 +293,12 @@ bootPrintOnSale(getClient(), {
   // tone) in lib/print-on-sale-notice (hub#2210): a receipt waiting for a printer is not a fault
   // (hub#1731), the lost and the never-composed ones are (hub#1921), the one out without its
   // VeriFactu QR is a warning (hub#1867) — and none of them names the sale by its internal id.
+  // A printer that did not answer stays up with «Retry» (hub#2494): presentPrintNotice paints it.
   onFailure: (f) => {
-    const n = saleTicketFailureNotice(f);
-    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
+    void presentPrintNotice(saleTicketFailureNotice(f));
   },
   onPrintedWithoutFiscal: () => {
-    const n = saleTicketWithoutFiscalNotice();
-    void toast(i18n.global.t(n.messageKey), n.color, n.duration);
+    void presentPrintNotice(saleTicketWithoutFiscalNotice());
   },
 });
 
@@ -353,8 +364,7 @@ bootPrintComanda(getClient(), {
   // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
   // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const n = comandaFailureNotice(f, i18n.global);
-    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
+    void presentPrintNotice(comandaFailureNotice(f, i18n.global));
   },
   // A SYSTEM notice, not a toast: a toast is only seen by whoever is looking at THIS screen, and in
   // a kitchen the tablet is usually propped up, on another view or locked. It goes through the
@@ -374,6 +384,18 @@ bootPrintComanda(getClient(), {
   notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
     await notices.notify(title, body, path);
+  },
+});
+
+// VOID slip when a round already sent to the kitchen is cancelled (kitchen#168), by hand or because
+// its bill was deleted: a paper-only station never sees the card leave the screen. Same door and
+// same printer as the comanda above; the word on the paper is the app's, and a slip that does not
+// come out tells this till to warn the station out loud (print-comanda-notice.ts, with its test).
+bootPrintVoid(getClient(), {
+  print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
+  onFailure: (f) => {
+    void presentPrintNotice(voidFailureNotice(f, i18n.global));
   },
 });
 
@@ -451,14 +473,16 @@ setOnRuntimeSessionExpired((reason) => {
   });
 });
 
-// El Cloud reportó que el hub fue borrado/revocado (410 hub_not_found, vía el gate de
-// entitlement): olvidamos la identidad de máquina local (`forget_hub` borra token + hub_id +
-// entitlement cacheado) y cerramos sesión. El `device.id` se conserva, así que el próximo login
-// re-registra el hub por dispositivo (§2.9b). Distinto de un token caducado (que solo refresca).
+// The Cloud reported the hub deleted/revoked (410 hub_not_found, through the entitlement gate):
+// sign out and only then forget the remembered hub (`forget_hub` drops `hub.url` and navigates the
+// window; `device.id` is kept, so the next sign-in registers the device again, §2.9b). Signing out
+// first is what lets the Android listening stop while this page is still the linked business
+// (hub#2503). In a browser there is nothing to forget and the login screen is where it ends.
+// Not the same as an expired token (that only refreshes).
 setOnHubGone(() => {
-  void invokeTauri('forget_hub').catch(() => null);
-  logout();
-  void router.replace('/login');
+  void signOutAndForgetHub(false)
+    .catch(() => null)
+    .then(() => router.replace('/login'));
 });
 
 // Resolves the hub context (`GET /api/hub/context`: hub_id, PIN users, settings) BEFORE mounting, so

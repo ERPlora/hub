@@ -49,13 +49,15 @@ pub(crate) async fn request_install(
         }));
     };
 
-    let mut rt = st.runtime.write().await;
+    // hub#2508: no runtime lock while erplora.com answers and the zip downloads — only to register
+    // it — so the till keeps charging on every device; `module_ops` serializes app changes.
+    let _module_ops = st.module_ops.lock().await;
     let result = install::install_from_cloud(
         &st.marketplace_http,
         &st.config.cloud_base_url,
         &st.config.module_cache,
         &auth,
-        &mut rt,
+        &*st.runtime,
         &req.module_id,
         &req.version,
         &on_progress,
@@ -65,8 +67,9 @@ pub(crate) async fn request_install(
 
     match result {
         Ok(installed) => {
-            let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
-            drop(rt);
+            let chunks =
+                ingest::collect_chunks(st.runtime.read().await.registry(), &installed.module_id);
+            drop(_module_ops);
             index_module_embeddings(&st, &auth, &installed.module_id, &installed.version, chunks)
                 .await;
 
@@ -133,8 +136,9 @@ pub(crate) async fn index_module_embeddings(
     }
 }
 
-/// Cuerpo (opcional) de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo
-/// que se ofrece por defecto; con `version` = la que se eligió (palanca de soporte).
+/// Optional body of `POST /api/modules/:id/update`. No `version` = **the latest**, the default
+/// offer; with `version` = the one picked from the list, and only one the list would offer
+/// (forwards, or the pin when support set one — hub#2546).
 ///
 /// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
 /// (ADR-0269 — nadie se queda atrás). Clavar es el **pin de soporte**, herramienta nuestra, y no se
@@ -198,6 +202,8 @@ pub(crate) async fn update_module(
             .into_response();
     };
 
+    // hub#2508: one app change at a time, and no runtime lock while erplora.com answers.
+    let _module_ops = st.module_ops.lock().await;
     // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
     let installed = {
         let rt = st.runtime.read().await;
@@ -216,18 +222,46 @@ pub(crate) async fn update_module(
         .unwrap_or_default()
         .version
         .unwrap_or_default();
-    let target = {
-        let rt = st.runtime.read().await;
-        install::resolve_update_target(
-            &st.marketplace_http,
-            &st.config.cloud_base_url,
-            &auth,
-            &rt,
-            &module_id,
-            &requested,
-        )
-        .await
-    };
+    // hub#2546: an explicit version is held to the version list's rule (`module_update::offer`),
+    // or typing it into the request walks around the support pin and goes backwards. Checked here,
+    // at the administrator's door, and not in `resolve_update_target`: the rollback below and the
+    // reconcile between copies (HUB-F26) pass explicit versions that are not anyone's choice.
+    // hub#2596: the rule includes what erplora.com publishes — it leaves a quarantined version out
+    // of `versions/`. It is asked only when the hub's own rule lets the version through and the
+    // answer can change it (no pin, a real move), with the runtime released, like the version list
+    // (hub#2508): a pin or a step back is still refused without a call. A list that cannot be read
+    // is «I don't know», and then the plan and the download decide.
+    let explicit = requested.trim();
+    if !matches!(explicit, "" | "latest") {
+        use erplora_runtime::module_update::may_request;
+        let pinned = install::support_pin(&*st.runtime.read().await, &module_id).await;
+        let mut allowed = may_request(&installed, pinned.as_deref(), explicit, None);
+        if allowed && pinned.is_none() && explicit != installed {
+            let published = install::listed_versions(
+                &st.marketplace_http,
+                &st.config.cloud_base_url,
+                &auth,
+                &module_id,
+            )
+            .await;
+            allowed = may_request(&installed, None, explicit, published.as_deref());
+        }
+        if !allowed {
+            return install_error_response(&install::InstallError::VersionNotOffered {
+                module_id,
+                version: explicit.to_string(),
+            });
+        }
+    }
+    let target = install::resolve_update_target(
+        &st.marketplace_http,
+        &st.config.cloud_base_url,
+        &auth,
+        &install::RuntimeAccess::from(&*st.runtime),
+        &module_id,
+        &requested,
+    )
+    .await;
 
     // Mismas fases que instalar (`resolving → downloading → verifying → installing`): la card del
     // catálogo ya sabe pintarlas, así que actualizar se ve igual de vivo que instalar.
@@ -259,13 +293,12 @@ pub(crate) async fn update_module(
         let on_progress = &on_progress;
         let first_error = first_error.clone();
         async move {
-            let mut rt = st.runtime.write().await;
             let result = install::update_from_cloud(
                 &st.marketplace_http,
                 &st.config.cloud_base_url,
                 &st.config.module_cache,
                 &auth,
-                &mut rt,
+                &*st.runtime,
                 &module_id,
                 &version,
                 on_progress,
@@ -289,7 +322,12 @@ pub(crate) async fn update_module(
     // una transición, así que si no se escribe cuando ocurre, no existe. Misma decisión que el
     // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
     // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
-    {
+    //
+    // hub#2663: what is read from the registry is read here, still holding the turn, and then the
+    // turn goes back — like installing does — because the version is in place (or the previous one
+    // is back): the history line and the assistant's indexing (an erplora.com call of up to 60 s)
+    // must not keep the next app change waiting.
+    let (module_name, chunks) = {
         let rt = st.runtime.read().await;
         let module_name = rt
             .registry()
@@ -298,6 +336,17 @@ pub(crate) async fn update_module(
             .find(|m| m.id == module_id)
             .map(|m| m.name.clone())
             .unwrap_or_else(|| module_id.clone());
+        // The new version may describe different tools: an index left with the previous one's
+        // texts routes blindly.
+        let chunks = match outcome {
+            Outcome::Updated { .. } => ingest::collect_chunks(rt.registry(), &module_id),
+            _ => Vec::new(),
+        };
+        (module_name, chunks)
+    };
+    drop(_module_ops);
+    {
+        let rt = st.runtime.read().await;
         if let Some(change) = erplora_runtime::update_history::from_module_outcome(
             &module_id,
             &module_name,
@@ -330,12 +379,6 @@ pub(crate) async fn update_module(
             Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
         }
         Outcome::Updated { from, to } => {
-            // La versión nueva puede describir tools distintas: un índice que se queda con el texto
-            // de la anterior enruta a ciegas.
-            let chunks = {
-                let rt = st.runtime.read().await;
-                ingest::collect_chunks(rt.registry(), &module_id)
-            };
             index_module_embeddings(&st, &auth, &module_id, &to, chunks).await;
             // Lo único que el dueño ve de toda la maquinaria (ADR-0269 §3.5): qué cambió y de qué
             // versión a cuál. `module.installed` va detrás porque es el evento que el shell YA
@@ -349,14 +392,27 @@ pub(crate) async fn update_module(
             st.broadcast(json!({ "type": "module.installed", "module_id": module_id }));
             Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
         }
-        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
-        // error haría pensar que el hub se quedó tocado, y no es el caso.
-        Outcome::RolledBack { stayed_on, error } => Json(json!({
-            "ok": true,
-            "data": { "module_id": module_id, "version": stayed_on, "updated": false },
-            "warning": { "code": "module.update_failed_kept_previous", "message": error },
-        }))
-        .into_response(),
+        // 200, not 5xx: the update did not go in, but **the module keeps working**. Answering with
+        // an error would suggest the hub was left broken, and it was not.
+        // `cause` is the stable code of why the new version did not go in (hub#2556): the screen
+        // says «erplora.com did not answer in time, try again» for a download that ran out of time
+        // instead of a bare «could not update». The English `message` stays for the log.
+        Outcome::RolledBack { stayed_on, error } => {
+            let cause = first_error
+                .lock()
+                .ok()
+                .and_then(|first| first.as_ref().map(|e| e.code()));
+            Json(json!({
+                "ok": true,
+                "data": { "module_id": module_id, "version": stayed_on, "updated": false },
+                "warning": {
+                    "code": "module.update_failed_kept_previous",
+                    "cause": cause,
+                    "message": error,
+                },
+            }))
+            .into_response()
+        }
         Outcome::Lost { ref module, ref error } => update_lost_response(module, error),
     }
 }
@@ -566,6 +622,9 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
         // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
         install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        // hub#2546: the module's state (a support pin, or a newer version installed) is what
+        // refuses the version asked for — nothing failed, nothing was touched.
+        install::InstallError::VersionNotOffered { .. } => StatusCode::CONFLICT,
         // hub#1720: el Cloud CONTESTÓ que ese módulo no está en el catálogo de este hub. Es la
         // misma frase que `VersionNotFound` un escalón más arriba —«eso no existe para ti»—, así
         // que se cuenta igual y no como una avería.
@@ -1032,31 +1091,44 @@ pub(crate) async fn uninstall_module(
     body: Option<Json<UninstallReq>>,
 ) -> Response {
     let force = body.map(|Json(b)| b.force).unwrap_or_default();
+    let _module_ops = st.module_ops.lock().await;
     let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
+    // hub#2545: forcing takes the dependents with it (farthest first), so `also` names them.
     let outcome = if force {
         rt.uninstall_forced(&id).await
     } else {
-        rt.uninstall(&id).await
+        rt.uninstall(&id).await.map(|()| Vec::new())
     };
     match outcome {
-        Ok(()) => {
+        Ok(also) => {
             drop(rt);
             // hub#1317: emitted NOW, before the best-effort embeddings cleanup below — what
             // matters to another tab/device is that the runtime already uninstalled the module,
-            // not whether the best-effort vector index cleanup finished. Same for `force`: the
-            // module is gone either way.
-            st.broadcast(json!({ "type": "module.uninstalled", "module_id": id }));
-            // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
-            // Best-effort: no falla la desinstalación si el store da error.
+            // not whether the best-effort vector index cleanup finished. One frame per app that
+            // left, in the order they left: a dependent removed by `force` is just as gone.
+            let gone: Vec<&String> = also.iter().chain(std::iter::once(&id)).collect();
+            for module_id in &gone {
+                st.broadcast(json!({ "type": "module.uninstalled", "module_id": module_id }));
+            }
+            // Drops each departed module's chunks from the vector index (§9.6): uninstall →
+            // delete chunks. Best-effort: a store error does not fail the uninstall.
             if let Some(store) = &st.vector {
-                if let Err(e) = embed::drop_module(store.as_ref(), &st.hub_id(), &id).await {
-                    tracing::warn!(module_id = %id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
+                for module_id in &gone {
+                    if let Err(e) =
+                        embed::drop_module(store.as_ref(), &st.hub_id(), module_id).await
+                    {
+                        tracing::warn!(module_id = %module_id, error = %e, "could not drop the module's embeddings (non-critical)");
+                    }
                 }
             }
-            Json(json!({ "ok": true })).into_response()
+            if also.is_empty() {
+                Json(json!({ "ok": true })).into_response()
+            } else {
+                Json(json!({ "ok": true, "also_uninstalled": also })).into_response()
+            }
         }
         Err(e) => err_response(e),
     }
@@ -1097,6 +1169,7 @@ mod install_error_status_tests {
         NotInCatalog,
         CloudRejected,
         CloudTimeout,
+        VersionNotOffered,
     );
 
     fn tag(e: &install::InstallError) -> Tag {
@@ -1113,6 +1186,7 @@ mod install_error_status_tests {
             install::InstallError::NotInCatalog { .. } => Tag::NotInCatalog,
             install::InstallError::CloudRejected { .. } => Tag::CloudRejected,
             install::InstallError::CloudTimeout => Tag::CloudTimeout,
+            install::InstallError::VersionNotOffered { .. } => Tag::VersionNotOffered,
         }
     }
 
@@ -1145,6 +1219,10 @@ mod install_error_status_tests {
             },
             Tag::CloudRejected => install::InstallError::CloudRejected { status: 500 },
             Tag::CloudTimeout => install::InstallError::CloudTimeout,
+            Tag::VersionNotOffered => install::InstallError::VersionNotOffered {
+                module_id: "sales".into(),
+                version: "0.5.0".into(),
+            },
         }
     }
 

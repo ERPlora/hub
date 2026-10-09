@@ -73,7 +73,7 @@
               type="email"
               autocomplete="email"
               :maxlength="254"
-              :helper-text="isEdit ? '' : t('employeeForm.accountEmailHelp')"
+              :helper-text="emailHelp"
               :error-text="emailError"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(EMAIL_ISSUES)) }"
             />
@@ -88,7 +88,7 @@
               :error-text="issueOn(ROLE_ISSUES) ? t(`employeeForm.errors.${issueOn(ROLE_ISSUES)}`) : ''"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(ROLE_ISSUES)) }"
             >
-              <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
+              <ion-select-option v-for="role in roleOptions" :key="role.name" :value="role.name">
                 {{ roleLabel(role.name) }}
               </ion-select-option>
             </ion-select>
@@ -227,15 +227,18 @@ import {
   accountUserIssue,
   createHubUser,
   hubUserErrorKey,
+  isAdminRole,
   listHubRoles,
   listHubUsers,
   localUserIssue,
+  pinLockRefusal,
   updateHubUser,
   type HubRole,
   type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
 import { runtimeErrorKey } from '../lib/runtime-error-sentence';
+import { sayRefusal } from '../lib/lock-refusal';
 import { fieldRefusalOf, invalidFieldMessage } from '../lib/invalid-field';
 import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
@@ -279,6 +282,12 @@ const roles = ref<HubRole[]>([]);
 const users = ref<HubUser[]>([]);
 const hasPin = ref(false);
 const hasBadge = ref(false);
+/**
+ * hub#2500 — the record being edited has no erplora.com account: a PIN is all this person has, so
+ * administration is not offered to them until an email to invite them with is typed. Only an
+ * explicit `false` counts: a runtime older than hub#2500 does not say, and then the hub decides.
+ */
+const pinOnly = ref(false);
 const loading = ref(true);
 const saving = ref(false);
 const loadError = ref(false);
@@ -318,7 +327,13 @@ const isLocal = computed(() => !isEdit.value && form.local);
  * autoridad: `pin_in_use` solo lo sabe él (los PIN están hasheados) y llega en la respuesta.
  */
 const altaIssue = computed(() => {
-  if (isEdit.value) return '';
+  if (isEdit.value) {
+    // hub#2500 — the edit-side half of `local_cannot_administer` (HUB-F148). A record already in
+    // that state keeps its role, so it can still be renamed or given a lower one.
+    return pinOnly.value && !form.email.trim() && isAdminRole(form.role) && form.role !== initial.role
+      ? 'local_cannot_administer'
+      : '';
+  }
   return isLocal.value
     ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value)
     : accountUserIssue({ email: form.email, role: form.role, pin: form.pin }, users.value);
@@ -396,6 +411,19 @@ const pinHelp = computed(() => {
   // En el alta de cuenta el PIN es un extra —entra con su cuenta—, no la vía de acceso.
   return isEdit.value ? t('employeeForm.pinHelp', n) : t('employeeForm.accountPinHelp', n);
 });
+/**
+ * The roles the select offers. For a PIN-only person the administrator ones wait for an email
+ * (hub#2500), except the one the record already has, which the select has to be able to show.
+ */
+const roleOptions = computed(() =>
+  pinOnly.value && !form.email.trim()
+    ? roles.value.filter((role) => !isAdminRole(role.name) || role.name === initial.role)
+    : roles.value,
+);
+const emailHelp = computed(() => {
+  if (!isEdit.value) return t('employeeForm.accountEmailHelp');
+  return pinOnly.value && !form.email.trim() ? t('employeeForm.pinOnlyEmailHelp') : '';
+});
 const canSubmit = computed(
   () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value && !badgeError.value,
 );
@@ -429,9 +457,13 @@ async function load(): Promise<void> {
       if (!target) throw new Error(t('employeeForm.notFound'));
       hasPin.value = target.has_pin;
       hasBadge.value = target.has_badge === true;
+      pinOnly.value = target.has_account === false;
+      // The address typed in «My profile» is not the one they would sign in with: an empty field
+      // says «no account yet», and typing one there is what invites them (HUB_SHELL-F84).
+      const accessEmail = pinOnly.value ? '' : target.email;
       Object.assign(form, {
         name: target.name,
-        email: target.email,
+        email: accessEmail,
         role: target.role,
         pin: '',
         badge: '',
@@ -439,7 +471,7 @@ async function load(): Promise<void> {
       });
       initial = {
         name: target.name,
-        email: target.email,
+        email: accessEmail,
         role: target.role,
         isActive: target.is_active,
       };
@@ -520,8 +552,12 @@ async function onSave(): Promise<void> {
     // pintarlo tal cual es lo que dejaba «the name is required» delante de una encargada. Se
     // conserva como ÚLTIMO recurso porque dice más que cualquier genérico inventado (misma regla
     // que `platformFailureMessage`, hub#1102).
+    // hub#2518 — the editor's PIN budget is spent: how long to wait goes first.
+    const lock = pinLockRefusal(error);
     const key = hubUserErrorKey(error);
-    const message = key
+    const message = lock
+      ? sayRefusal(t, lock)
+      : key
       ? t(`employeeForm.errors.${key}`)
       : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
         platformFailureMessage(error, locale.value) ??

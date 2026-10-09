@@ -3,7 +3,9 @@
 use crate::*;
 
 impl Runtime {
-    /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
+    /// Installs a module already extracted in `dir` (reads `module.json`, migrates, registers). A
+    /// first install starts active; a module this hub already records keeps its on/off state
+    /// (hub#2544).
     pub async fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
         installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
     }
@@ -108,10 +110,9 @@ impl Runtime {
                 ),
             }
         }
-        // 2) Estado persistido por hub ANTES de instalar (hub#31): `install` reactiva todo al
-        // re-registrar desde disco, así que capturamos aquí el activo/inactivo previo **de este
-        // hub** (filtrado por `hub_id`; en BD compartida no toma el estado de otro hub) para
-        // reponerlo tras instalar. Lo leemos antes porque el upsert de `install` lo sobreescribiría.
+        // 2) This hub's recorded on/off state (hub#31), filtered by `hub_id` (a shared database never
+        // lends another hub's state). Registering keeps it (hub#2544); it is read here so step 5 can
+        // re-derive the cascade from the modules switched off by hand.
         let persisted = installer::installed_status(self.db.as_ref(), &self.hub_id).await?;
 
         // 3) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
@@ -144,12 +145,10 @@ impl Runtime {
         // reponer estados dejaría el hub incompleto Y sin la anotación que lo explica.
         self.registry.failed_installs = failures;
 
-        // 5) Repón el estado inactivo previo de este hub sobre el registro recién reconstruido y
-        // persístelo (el upsert del install lo había dejado `active`). Solo módulos presentes en
-        // disco; un estado huérfano de un módulo ya borrado se ignora. Basta con reponer los
-        // MANUALES: `deactivate` re-deriva la cascada (ADR-0128), así que los `inactive_auto`
-        // persistidos renacen solos de su raíz — y si su raíz ya no existe, quedan activos, que
-        // es lo coherente (sin causa no hay caída).
+        // 5) Re-derive the cascade (ADR-0128) from the modules this hub switched off BY HAND.
+        // Registering already kept every recorded state (hub#2544); this pass makes sure what
+        // depends on a manual `inactive` is down with it. Only modules present on disk; an orphan
+        // state of a module already gone is ignored.
         for (id, status) in persisted {
             if status == ModuleStatus::Inactive && self.registry.is_installed(&id) {
                 // `_unchecked`: reponer un estado ya persistido no es una decisión nueva, así que
@@ -170,7 +169,7 @@ impl Runtime {
     /// Idempotente y tolerante: salta los ya registrados (p. ej. los de `modules_dir`); un módulo
     /// cuya carpeta falte o cuyo install falle se omite con log (no tumba el arranque). `install_from_dir`
     /// reaplica migraciones sin efecto (registradas en `_hub_migrations`). Respeta el estado inactivo
-    /// persistido. Devuelve los ids re-hidratados.
+    /// persistido (hub#2544: registrar ya lo conserva). Devuelve los ids re-hidratados.
     pub async fn rehydrate_installed(&mut self, cache_root: &Path) -> Result<Vec<String>> {
         let persisted =
             installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
@@ -190,8 +189,9 @@ impl Runtime {
             match self.install_from_dir(&dir).await {
                 Ok(rid) => {
                     if status == ModuleStatus::Inactive {
-                        // `_unchecked`: repón inactivo (install lo dejó active). Es estado ya
-                        // persistido, no una decisión nueva → sin retention gate (hub#314).
+                        // Re-derives the cascade from a manual `inactive` (registering already kept
+                        // the state, hub#2544). `_unchecked`: a recorded state is not a new
+                        // decision → no retention gate (hub#314).
                         let _ = self.deactivate_unchecked(&rid).await;
                     }
                     eprintln!("✓ módulo re-hidratado: {rid}@{version}");
@@ -358,10 +358,10 @@ impl Runtime {
     }
 
     /// Puts back a status that is ALREADY persisted, after the module was registered again
-    /// (hub#1875: another task of this hub installed or updated it). Registering always leaves a
-    /// module active, so without this a module the admin switched off would come back on just
-    /// because it was reloaded. Same rule as the rehydration at boot: restoring a persisted state is
-    /// not a new decision, so it does not go through the retention gate (hub#314).
+    /// (hub#1875: another task of this hub installed or updated it). Registering keeps the state
+    /// this hub records (hub#2544); this re-derives the cascade from a manual `inactive`. Same rule
+    /// as the rehydration at boot: restoring a persisted state is not a new decision, so it does
+    /// not go through the retention gate (hub#314).
     pub async fn restore_persisted_status(
         &mut self,
         module_id: &str,
@@ -451,38 +451,65 @@ impl Runtime {
     /// hub#1101: y se rechaza si otros módulos instalados lo declaran en `depends_on`, nombrándolos
     /// ([`Self::dependents_of`]). Para saltárselo hace falta [`Self::uninstall_forced`].
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        self.uninstall_with(module_id, false).await
+        self.uninstall_with(module_id, false).await.map(|_| ())
     }
 
-    /// [`Self::uninstall`] **saltándose el gate de dependientes** (hub#1101) — y solo ese.
+    /// [`Self::uninstall`] **skipping the dependents gate** (hub#1101) — and only that one.
     ///
-    /// Es la respuesta a UNA pregunta: «otras apps necesitan esta, ¿la quito igualmente?». La
-    /// contesta el dueño, al que la pantalla le ha nombrado antes lo que se rompe (hub#773), o
-    /// soporte por API. Lo que NO abre es el lado fiscal: si el motor aún debe registros a una
-    /// autoridad, o si el módulo es el último proveedor fiscal del hub, esto sigue rechazando —
-    /// esas dos no son preguntas del dueño (ADR-0202 R2, ADR-0273 D5).
-    pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<()> {
+    /// It answers ONE question: «other apps need this one, remove it anyway?». The owner answers
+    /// it, after the screen has named the dependents (hub#773), or support through the API. It
+    /// does NOT open the fiscal side: if an engine still owes records to an authority, or the set
+    /// would take the hub's last fiscal provider, this still refuses — neither is the owner's
+    /// question (ADR-0202 R2, ADR-0273 D5).
+    ///
+    /// hub#2545: the dependents go WITH it, as in Odoo and Business Central — the list the owner
+    /// confirmed is the list of what is removed. Leaving them installed kept them «Active» on a
+    /// dependency that no longer exists, and on the next boot their re-download dragged the removed
+    /// app back in. Since the whole set leaves, both fiscal locks look at the whole set (the same
+    /// rule as [`Self::deactivate`]). Returns the dependents removed along with it, in the order
+    /// they left (the farthest first).
+    pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<Vec<String>> {
         self.uninstall_with(module_id, true).await
     }
 
-    async fn uninstall_with(&mut self, module_id: &str, force: bool) -> Result<()> {
-        // ADR-0273 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
-        // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
-        self.ensure_fiscal_provider_remains(&[module_id.to_string()])
-            .await?;
-        self.ensure_module_can_go(module_id).await?;
-        // El último, y a propósito: es el ÚNICO forzable, así que va detrás de los candados que no
-        // lo son. Ponerlo delante haría que un `force` los saltara por el orden de las guardas.
+    async fn uninstall_with(&mut self, module_id: &str, force: bool) -> Result<Vec<String>> {
+        let dependents = if force {
+            self.dependents_of(module_id)
+        } else {
+            Vec::new()
+        };
+        let leaving: Vec<String> = std::iter::once(module_id.to_string())
+            .chain(dependents.iter().cloned())
+            .collect();
+        // ADR-0273 D5 (hub#553): before R2, and for the same reason — with an empty queue R2 lets
+        // the last provider go, and from then on the hub sells with nobody recording.
+        self.ensure_fiscal_provider_remains(&leaving).await?;
+        for id in &leaving {
+            self.ensure_module_can_go(id).await?;
+        }
+        // Last, on purpose: it is the ONLY forceable gate, so it goes after the ones that are not.
+        // Putting it first would let a `force` skip them through the order of the guards.
         if !force {
             self.ensure_nobody_depends_on(module_id)?;
         }
-        installer::uninstall(
-            self.db.as_ref(),
-            &mut self.registry,
-            &self.hub_id,
-            module_id,
-        )
-        .await
+        // An app leaves only once nothing still installed depends on it — the farthest first, the
+        // requested one last — so even if a later step fails nothing is left registered on a
+        // dependency that has already gone. The waves of `dependents_of` are not that order: an app
+        // declaring both the requested one and one of its dependents lands in the first wave. With a
+        // dependency cycle in the manifests nobody qualifies, so the farthest wave goes first.
+        let mut pending = leaving;
+        let mut gone: Vec<String> = Vec::with_capacity(pending.len());
+        while !pending.is_empty() {
+            let next = pending
+                .iter()
+                .rposition(|id| self.dependents_of(id).is_empty())
+                .unwrap_or(pending.len() - 1);
+            let id = pending.remove(next);
+            installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, &id).await?;
+            gone.push(id);
+        }
+        gone.retain(|id| id != module_id);
+        Ok(gone)
     }
 
     /// Rechaza si algún módulo instalado depende de `module_id` (hub#1101).

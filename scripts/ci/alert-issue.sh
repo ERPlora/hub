@@ -29,9 +29,12 @@
 #                 query server-side — `gh issue list --label` filters on the issue's own field,
 #                 not the flaky search index, so it is safe to combine with the local title
 #                 match instead of relying on the title alone.
+#                 A new issue in ERPlora/hub or ERPlora/saas also gets `module:ci` (pm#663).
 #   BODY          the comment/issue body. Read from stdin instead when BODY is unset — so a
 #                 caller building a multi-line body can pipe it in rather than cram it into one
-#                 environment variable.
+#                 environment variable. Inside a run (GITHUB_RUN_ID set) a NEW issue gets
+#                 `## Cómo se reproduce` + `- Run: <run url>` unless the body already has a
+#                 `- Run:` line; a refresh comment is posted exactly as given.
 #
 # `GH_TOKEN`/`GITHUB_TOKEN` auth is inherited from the environment, same as any other `gh` call
 # in these workflows — this script does not touch it.
@@ -105,9 +108,48 @@ if [ -n "$existing" ]; then
     gh issue comment "$existing" --repo "$repo" --body "$body"
 else
     echo "Opening a new alert issue"
+    # Every issue says how the failure is seen (pm#656); for a CI alert that is the red run.
+    # A here-string, not `printf | grep -q`: grep quitting early would SIGPIPE printf and,
+    # under pipefail, read as "no run line" and add a second one.
+    if [ -n "${GITHUB_RUN_ID:-}" ] && ! grep -q '^- Run:' <<<"$body"; then
+        body="$body
+
+## Cómo se reproduce
+- Run: ${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-$repo}/actions/runs/$GITHUB_RUN_ID"
+    fi
     create_args=(issue create --repo "$repo" --title "$title" --body "$body")
     if [ -n "$label" ]; then
         create_args+=(--label "$label")
     fi
-    gh "${create_args[@]}"
+    # hub and saas split their issues by handbook area and each area's queue is
+    # `gh issue list --label module:<key>`, so an alert there without one reaches nobody (pm#663).
+    # Only on create, never in the lookup: alerts already open were created without it, and
+    # narrowing by it would miss them and open a twin (hub#1246). Module repos have no such
+    # labels (the repo is the module), and a missing label fails the whole `gh issue create`.
+    case "$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')" in
+        erplora/hub | erplora/saas) create_args+=(--label module:ci) ;;
+    esac
+    created_url=$(gh "${create_args[@]}") || exit $?
+    printf '%s\n' "$created_url"
+    created=${created_url##*/}
+
+    # Two jobs can race here (pm#655: `test-hub-modules.yml` runs the battery alert in two matrix
+    # parts at once): both listed nothing, both created. List again and keep the OLDEST open
+    # twin; the job that lost the race moves its alert there and closes its own as a duplicate.
+    # Both jobs see the same list, so exactly one issue survives whichever finishes first.
+    case "$match" in
+        exact)  oldest_program="[.[] | select(.title == \"$escaped_value\") | .number] | min // empty" ;;
+        prefix) oldest_program="[.[] | select(.title | startswith(\"$escaped_value\")) | .number] | min // empty" ;;
+    esac
+    list_args=(issue list --repo "$repo" --state open --limit 500 --json number,title --jq "$oldest_program")
+    if [ -n "$label" ]; then
+        list_args+=(--label "$label")
+    fi
+    oldest=$(gh "${list_args[@]}") || oldest=""
+    if [ -n "$oldest" ] && [ "$oldest" != "$created" ] && [ "$created" -gt "$oldest" ] 2> /dev/null; then
+        echo "Another job opened #$oldest first: moving the alert there and closing #$created"
+        gh issue comment "$oldest" --repo "$repo" --body "$body"
+        gh issue close "$created" --repo "$repo" --reason "not planned" \
+            --comment "Duplicate of #$oldest: two CI jobs opened the same alert at once."
+    fi
 fi

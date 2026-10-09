@@ -75,6 +75,7 @@ pub(crate) async fn auth_pin(
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session(
                 &rt,
+                &st.stream_limiter,
                 user,
                 device_id,
                 max_devices,
@@ -186,6 +187,67 @@ pub(crate) async fn device_trust_gate(
     None
 }
 
+/// Whether this caller may learn WHO works here — the faces of the pinpad that the boot context
+/// carries (hub#2510). They exist for the pinpad, and the pinpad only opens on a device the PIN
+/// door would let through, so the question is asked in the order that door asks it:
+///
+/// 1. a **live session** says yes: the approval dialog and «switch user» run behind one, also on a
+///    browser that came in through the panel courier and was never trusted (HUB-F131). A session
+///    is not stopped by the address lock (HUB-F135: whoever is in keeps working). One that does
+///    not resolve counts against the address like at any other door (hub#2282), or this read would
+///    be a free oracle for session tokens;
+/// 2. a **locked address** says no, before looking at the device — the PIN door's first check;
+/// 3. the **device**, by the PIN door's own rule: trust disarmed, trusted, or the first device of a
+///    virgin demo ([`device_mode::demo_would_adopt`], shared so the two cannot drift).
+///
+/// Fail-closed: a lookup that errors withholds; the login screen then offers the account door.
+pub(crate) async fn may_name_the_team(
+    st: &AppState,
+    rt: &erplora_runtime::Runtime,
+    headers: &HeaderMap,
+) -> bool {
+    let client = crate::address_guard::client_address(headers);
+    if let Some(token) = auth::session_token(headers) {
+        match rt.resolve_session(&token).await {
+            Ok(Some(_)) => return true,
+            Ok(None) => crate::address_guard::record_rejected_credential(
+                st,
+                client.as_deref(),
+                crate::address_guard::Failure::SessionInvalid,
+                &token,
+            ),
+            Err(error) => {
+                tracing::warn!(%error, "hub context: could not resolve the presented session");
+                return false;
+            }
+        }
+    }
+    if client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
+        .is_some()
+    {
+        return false;
+    }
+    if !st.config.device_trust_enforce {
+        return true;
+    }
+    let device_id = device_mode::device_id_of(headers);
+    if device_id.is_empty() {
+        return false;
+    }
+    match rt.is_device_trusted(device_id).await {
+        Ok(true) => true,
+        Ok(false) => device_mode::demo_would_adopt(st.config.demo, rt, device_id)
+            .await
+            .unwrap_or(false),
+        Err(error) => {
+            tracing::warn!(%error, "hub context: could not read the device trust");
+            false
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 pub(crate) struct BadgeReq {
     /// Lo que el lector escribió como ráfaga de teclado (o lo que se tecleó, para un iButton).
@@ -246,6 +308,7 @@ pub(crate) async fn auth_badge(
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session(
                 &rt,
+                &st.stream_limiter,
                 matched.user,
                 device_id,
                 max_devices,
@@ -397,12 +460,21 @@ pub(crate) async fn open_cloud_session(
     // todas esas puertas. Se hace ANTES de responder y con el mismo token autenticado que prueba
     // la revocación.
     if !claims.is_member_of_hub(&hub_id) {
-        if let Err(e) = rt
+        match rt
             .revoke_cloud_access(&cloud_user_id, login_email.as_deref())
             .await
         {
+            // hub#2598: deleting the sessions does not reach a channel that is already open, so the
+            // people just closed are cut too — after the write, as every door of hub#2571.
+            Ok(closed) => {
+                for user_id in &closed {
+                    crate::hub_users::end_live_channels_of(st, user_id);
+                }
+            }
             // El cierre local falló, pero el rechazo no se negocia: se registra y se sigue.
-            tracing::error!(error = %e, "rule D: could not deactivate the revoked hub_user");
+            Err(e) => {
+                tracing::error!(error = %e, "rule D: could not deactivate the revoked hub_user")
+            }
         }
         return (
             StatusCode::FORBIDDEN,
@@ -461,6 +533,7 @@ pub(crate) async fn open_cloud_session(
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session_with_extra(
                 &rt,
+                &st.stream_limiter,
                 user,
                 device_id.as_deref(),
                 max_devices,
@@ -642,7 +715,21 @@ pub(crate) struct SetPinReq {
 /// PIN (hub#1430) — el usuario ya está autenticado por su sesión y elige su PIN en este
 /// dispositivo. Body `{pin, current_pin?}` (`pin`: 4/6 dígitos, vacío lo borra; `current_pin`
 /// obligatorio si ya hay un PIN, y tiene que coincidir con el de hoy). → `{ok}` (401 sin sesión,
-/// 409 si el PIN actual no coincide o el nuevo ya lo tiene otro).
+/// 409 si el PIN actual no coincide o el nuevo ya lo tiene otro, 429 `too_many_attempts` con el
+/// presupuesto de intentos gastado).
+///
+/// **Brute-force guard (hub#2499).** PINs are unique (hub#355), so this door has to say «that one
+/// is taken» — which, unbraked, let anybody with a session probe numbers until they hit a
+/// colleague's, then try it against the names on the pinpad grid. It spends a budget of tries
+/// against the PERSON ([`crate::login_throttle::LoginThrottle::pin_change`]: thirty an hour,
+/// hub#2564, fewer a day than the pinpad's five every five minutes), and every try counts, the
+/// accepted ones too: an
+/// accepted number becomes the prober's PIN and they carry on, so counting only refusals would
+/// still hand out a taken PIN per refusal. The key is the user id, in a map kept apart from the
+/// pinpad's (`pin_change_throttle`, shared with the PIN doors of Empleados, hub#2518): the pinpad's counter is keyed by whatever name the caller types, a
+/// successful login clears it, and five wrong PINs under a name lock it — none of which may reach
+/// this budget. No per-address guard here: the caller holds a session that resolves, and the
+/// person is a key they cannot rotate the way an attacker rotates names.
 pub(crate) async fn auth_set_pin(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -661,6 +748,11 @@ pub(crate) async fn auth_set_pin(
         }
         Err(e) => return err_response(e),
     };
+    // Checked BEFORE the runtime looks at the digits: a locked caller gets no taken/free signal.
+    if let Some(retry_after_secs) = st.pin_change_throttle.locked_for(&user.id) {
+        return too_many_attempts(retry_after_secs);
+    }
+    st.pin_change_throttle.record_attempt(&user.id);
     match rt
         .set_pin(&user.id, req.current_pin.as_deref(), &req.pin)
         .await
@@ -675,6 +767,9 @@ pub(crate) async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) 
     if let Some(token) = auth::session_token(&headers) {
         let rt = st.runtime.read().await;
         let _ = rt.delete_session(&token).await;
+        // hub#2522: after the row is gone, so a ticket minted from now on cannot see it alive.
+        st.stream_limiter
+            .cut(&crate::event_stream::session_tag(&token));
     }
     Json(json!({ "ok": true })).into_response()
 }
@@ -923,16 +1018,28 @@ pub(crate) async fn auth_handoff(
 /// petición al no resolver). `0` = ilimitado / sin `device_id` = comportamiento actual.
 pub(crate) async fn mint_session(
     rt: &erplora_runtime::Runtime,
+    stream_limiter: &crate::event_stream::StreamLimiter,
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
     credential: &erplora_runtime::identity::Credential,
 ) -> Response {
-    mint_session_with_extra(rt, user, device_id, max_devices, credential, None).await
+    mint_session_with_extra(
+        rt,
+        stream_limiter,
+        user,
+        device_id,
+        max_devices,
+        credential,
+        None,
+    )
+    .await
 }
 
 pub(crate) async fn mint_session_with_extra(
     rt: &erplora_runtime::Runtime,
+    // hub#2571: the live channels of the sessions the device limit throws out close with them.
+    stream_limiter: &crate::event_stream::StreamLimiter,
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
@@ -942,8 +1049,13 @@ pub(crate) async fn mint_session_with_extra(
     credential: &erplora_runtime::identity::Credential,
     extra: Option<Value>,
 ) -> Response {
-    if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
-        return err_response(e);
+    match rt.enforce_device_limit(max_devices, device_id).await {
+        Ok(evicted) => {
+            for token in evicted {
+                stream_limiter.cut(&crate::event_stream::session_tag(&token));
+            }
+        }
+        Err(e) => return err_response(e),
     }
     // Cuánto vive la sesión lo decide el MODO DEL DISPOSITIVO (hub#358), no una constante global:
     // un mostrador caduca dentro del turno que abrió y el equipo propio conserva la sesión larga.

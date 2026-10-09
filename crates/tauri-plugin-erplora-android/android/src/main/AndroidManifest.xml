@@ -88,6 +88,26 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Where the device is, for a module that calls `navigator.geolocation` (hub#2552). The
+         first consumer is the `attendance` module, which can require an employee clocking in from
+         a personal phone to be near the venue. RUNTIME permissions: wry's
+         `RustWebChromeClient.onGeolocationPermissionsShowPrompt` asks for both when the page
+         asks for a position. Without the declaration that request is answered DENIED with no
+         dialog, forever, the page gets PERMISSION_DENIED and the clock-in is rejected. FINE for a
+         GPS fix, COARSE because Android 12+ lets the user grant only an approximate one. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- 🔴 Load-bearing, same trap as the NFC feature above. Either location permission makes
+         Google Play add an IMPLICIT `android.hardware.location` requirement, and unlike the
+         `.gps` / `.network` sub-features this parent one is implied whatever the target SDK
+         (read back with aapt2 at targetSdk 36). The till itself never needs a position: only a
+         module like `attendance` asks for one, and it already handles a device without it.
+         Saying `required="false"` keeps the listing open to tablets without location hardware. -->
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false" />
+
     <application>
         <!-- `specialUse` because none of the typed foreground services (dataSync, mediaPlayback,
              …) describes «stay reachable for incoming orders»; Google Play asks for the subtype

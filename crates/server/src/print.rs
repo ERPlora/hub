@@ -487,17 +487,27 @@ fn device_required() -> Response {
         .into_response()
 }
 
-/// A registered host over the wire.
-fn host_json(host: &PrintHost) -> Value {
-    json!({
-        "deviceId": host.device_id,
+/// A registered host over the wire. `deviceId` goes out only when `reveal_id` (hub#2551).
+///
+/// The id is the proof the access doors take for a trusted device (`auth_api.rs`, hub#2510), and
+/// the hub cannot tell the device from whoever presents its id. So it reaches its own device (it
+/// already holds it) and an administrator (retiring a lost till names it, HUB-F197) — never a
+/// cashier reading who prints. `name` is what every audience paints, and it is not the id either
+/// ([`print_hosts::display_name`]).
+fn host_json(host: &PrintHost, reveal_id: bool) -> Value {
+    let mut view = json!({
+        "name": print_hosts::display_name(&host.label, &host.device_id),
         "role": host.role,
         "label": host.label,
         "live": host.live,
         "registeredAt": host.registered_at,
         "registeredBy": host.registered_by,
         "lastSeenAt": host.last_seen_at,
-    })
+    });
+    if reveal_id {
+        view["deviceId"] = json!(host.device_id);
+    }
+    view
 }
 
 /// Per-role coverage over the wire: facts, not a sentence. The phrasing the owner reads ("nothing
@@ -595,7 +605,8 @@ pub async fn register_host(
     {
         Ok(host) => Json(json!({
             "ok": true,
-            "host": host_json(&host),
+            // The caller registered ITSELF (the id came from its own header): nothing to hide.
+            "host": host_json(&host, true),
             // The hub publishes the cadence so the client does not hard-code one that could drift
             // away from the window the hub uses to decide who is live.
             "heartbeatSeconds": print_hosts::HEARTBEAT_SECONDS,
@@ -669,6 +680,10 @@ pub async fn host_heartbeat(State(st): State<AppState>, headers: HeaderMap) -> R
 }
 
 /// GET /api/print/hosts — the registry plus per-role coverage. Auth = any user session.
+///
+/// Every session reads who prints and whether it is live; only an administrator reads every
+/// device's id, anybody else only their own (hub#2551, see [`host_json`]). Filtered, never
+/// refused: the cashier's "is anything printing?" must not turn into a `403`.
 pub async fn list_hosts(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let hub_id = st.hub_id();
     let arc = match st.runtime_for(&hub_id).await {
@@ -676,9 +691,14 @@ pub async fn list_hosts(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.read().await;
-    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
-    }
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => return unauthorized(e),
+    };
+    // Same predicate as the queue's stamps (`print_queue::audience_of`): one answer to "is this
+    // the back office?" for every print door.
+    let admin = print_queue::audience_of(&ctx) == print_queue::QueueAudience::Admin;
+    let own = device_id_of(&headers);
     let hosts = match rt.print_hosts().await {
         Ok(hosts) => hosts,
         Err(e) => return crate::err_response(e),
@@ -686,7 +706,10 @@ pub async fn list_hosts(State(st): State<AppState>, headers: HeaderMap) -> Respo
     match rt.print_coverage().await {
         Ok(coverage) => Json(json!({
             "ok": true,
-            "hosts": hosts.iter().map(host_json).collect::<Vec<_>>(),
+            "hosts": hosts
+                .iter()
+                .map(|h| host_json(h, admin || (!own.is_empty() && h.device_id == own)))
+                .collect::<Vec<_>>(),
             "coverage": coverage.iter().map(coverage_json).collect::<Vec<_>>(),
         }))
         .into_response(),

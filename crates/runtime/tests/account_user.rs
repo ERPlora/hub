@@ -186,7 +186,7 @@ async fn a_membership_that_was_revoked_is_not_resurrected_by_the_alta() {
         .revoke_cloud_access("cloud-9", Some("ana@example.com"))
         .await
         .unwrap();
-    assert_eq!(closed, 1, "the SaaS revoked her membership");
+    assert_eq!(closed.len(), 1, "the SaaS revoked her membership");
 
     let err = rt
         .create_hub_user(&account("Ana Soto Gil", "ana@example.com", "admin"), 0)

@@ -162,6 +162,55 @@ fn the_linux_job_installs_what_the_appimage_takes_from_the_machine() {
 /// running on the OTHER slot of the same machine.
 const CACHE_SAVE_GUARD: &str = "save-if: ${{ runner.environment != 'self-hosted' }}";
 
+/// The condition inside [`CACHE_SAVE_GUARD`]: `false` on `ci-runner-1`, `true` on hosted images.
+const SELF_HOSTED_SKIP: &str = "runner.environment != 'self-hosted'";
+
+/// Is this line a `save-if:` that keeps rust-cache from cleaning on the shared runner?
+///
+/// Read as the expression Actions evaluates, not as a string (hub#2713): [`SELF_HOSTED_SKIP`] has
+/// to be a term of a pure conjunction, so the whole `save-if:` is `false` wherever the runner is
+/// self-hosted, whatever the other terms say. An `||` anywhere voids it — the other side could
+/// still answer `true` — and so does a negation, a comment or a mention outside `save-if:`.
+fn is_cache_save_guard(line: &str) -> bool {
+    let Some(value) = line.trim().strip_prefix("save-if:") else {
+        return false;
+    };
+    let Some(expr) = value
+        .trim()
+        .strip_prefix("${{")
+        .and_then(|rest| rest.strip_suffix("}}"))
+    else {
+        return false;
+    };
+    if expr.contains("||") {
+        return false;
+    }
+    expr.split("&&")
+        .map(|term| {
+            term.trim()
+                .trim_start_matches('(')
+                .trim_end_matches(')')
+                .trim()
+        })
+        .any(|term| term == SELF_HOSTED_SKIP)
+}
+
+/// How many `save-if:` lines of a workflow carry the guard.
+fn cache_save_guards(code: &str) -> usize {
+    code.lines()
+        .filter(|line| is_cache_save_guard(line))
+        .count()
+}
+
+/// `Some("<name>: N guard(s) for M cache step(s)")` when a workflow has rust-cache steps without the
+/// guard, `None` when every one of them carries it.
+fn guard_shortfall(name: &str, code: &str) -> Option<String> {
+    let cache_steps = code.matches("uses: Swatinem/rust-cache").count();
+    let guards = cache_save_guards(code);
+    (guards != cache_steps)
+        .then(|| format!("{name}: {guards} guard(s) for {cache_steps} cache step(s)"))
+}
+
 #[test]
 fn the_cargo_cache_does_not_prune_the_registry_a_concurrent_job_is_reading() {
     let code = workflow_code();
@@ -186,7 +235,7 @@ fn the_cargo_cache_does_not_prune_the_registry_a_concurrent_job_is_reading() {
         "expected the desktop and Android jobs to both cache cargo; found {cache_steps}"
     );
     assert_eq!(
-        code.matches(CACHE_SAVE_GUARD).count(),
+        cache_save_guards(&code),
         cache_steps,
         "every `Swatinem/rust-cache` step must carry `{CACHE_SAVE_GUARD}`. Without it the `Post` \
          of whichever job finishes first deletes the registry sources the other one is building \
@@ -239,14 +288,10 @@ fn no_workflow_on_the_shared_runner_prunes_the_cargo_registry() {
     let mut unguarded = Vec::new();
 
     for (name, code) in all_workflows_code() {
-        let cache_steps = code.matches("uses: Swatinem/rust-cache").count();
-        if cache_steps == 0 || !code.contains(SELF_HOSTED_MARKER) {
+        if !code.contains("uses: Swatinem/rust-cache") || !code.contains(SELF_HOSTED_MARKER) {
             continue;
         }
-        let guards = code.matches(CACHE_SAVE_GUARD).count();
-        if guards != cache_steps {
-            unguarded.push(format!("{name}: {guards} guard(s) for {cache_steps} cache step(s)"));
-        }
+        unguarded.extend(guard_shortfall(&name, &code));
     }
 
     assert!(
@@ -257,6 +302,75 @@ fn no_workflow_on_the_shared_runner_prunes_the_cargo_registry() {
          still compiling from it — measured on v1.1.1: `Cleaning cargo registry` at 00:54:22 and \
          the Android build dead at 00:54:30 with `could not parse/generate dep info ... No such \
          file or directory` (hub#886)"
+    );
+}
+
+/// Regression test for ERPlora/hub#2713: the guard is a CONDITION, not a string.
+///
+/// hub#2706 split `test-hub.yml` into six nextest partitions and only partition 1 saves the cache:
+/// `save-if: ${{ runner.environment != 'self-hosted' && matrix.part == 1 }}`. On the shared runner
+/// that still evaluates to `false` — rust-cache never reaches its cleaning — yet the literal string
+/// match counted "1 guard(s) for 2 cache step(s)" and turned this suite red on every OS, unseen on
+/// develop because `test-shell.yml` only runs when `apps/tauri/**` changes.
+///
+/// So the guard is read as what Actions evaluates: the self-hosted condition has to be a TERM of a
+/// conjunction (`&&`), which forces the whole expression to `false` on `ci-runner-1`. Anywhere
+/// else it proves nothing: without it, or under an `||`, the other side can still say `true` and
+/// the `Post` prunes the registry the other runner slot is compiling from (hub#886).
+#[test]
+fn the_cache_save_guard_is_read_as_a_conjunction_hub2713() {
+    let guarded = [
+        "save-if: ${{ runner.environment != 'self-hosted' }}",
+        "          save-if: ${{ runner.environment != 'self-hosted' && matrix.part == 1 }}",
+        "save-if: ${{ matrix.part == 1 && runner.environment != 'self-hosted' }}",
+        "save-if: ${{ (runner.environment != 'self-hosted') && github.ref == 'refs/heads/main' }}",
+    ];
+    for line in guarded {
+        assert!(
+            is_cache_save_guard(line),
+            "this `save-if:` is false on the shared runner, so it guards: {line}"
+        );
+    }
+
+    // Positive control: each of these lets the `Post` clean the registry on `ci-runner-1`.
+    let unguarded = [
+        "save-if: ${{ matrix.part == 1 }}",
+        "save-if: ${{ runner.environment != 'self-hosted' || matrix.part == 1 }}",
+        "save-if: ${{ matrix.part == 1 || runner.environment != 'self-hosted' && true }}",
+        // `&&` binds tighter: this is `part == 1 || (true && skip)`, `true` on the shared runner
+        // for partition 1 although the condition sits right after an `&&`.
+        "save-if: ${{ matrix.part == 1 || true && runner.environment != 'self-hosted' }}",
+        "save-if: ${{ !(runner.environment != 'self-hosted') }}",
+        "save-if: ${{ runner.environment == 'self-hosted' }}",
+        "save-if: true",
+        "# save-if: ${{ runner.environment != 'self-hosted' }}",
+        "run: echo \"runner.environment != 'self-hosted'\"",
+    ];
+    for line in unguarded {
+        assert!(
+            !is_cache_save_guard(line),
+            "this line does NOT keep rust-cache from cleaning on the shared runner: {line}"
+        );
+    }
+
+    // The same reading over a whole workflow: the partition shape of hub#2706 passes, and a cache
+    // step whose `save-if:` dropped the condition still turns the check red.
+    let partitioned = "\
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ runner.environment != 'self-hosted' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ runner.environment != 'self-hosted' && matrix.part == 1 }}
+";
+    assert_eq!(guard_shortfall("partitioned.yml", partitioned), None);
+    let dropped = partitioned.replace(
+        "runner.environment != 'self-hosted' && matrix.part == 1",
+        "matrix.part == 1",
+    );
+    assert_eq!(
+        guard_shortfall("dropped.yml", &dropped).as_deref(),
+        Some("dropped.yml: 1 guard(s) for 2 cache step(s)")
     );
 }
 

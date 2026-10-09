@@ -527,3 +527,58 @@ describe('the reason a receipt did not print is for the log, not for the till (h
     }
   });
 });
+
+// hub#2494 — the till's own printer is switched off or out of paper: the door now says so
+// (`printerFailed`) instead of «done». The till hears it and gets a way to print it again right
+// there (Square, Toast, Lightspeed), not «go and find the sale».
+describe('a receipt whose printer did not answer (hub#2494)', () => {
+  const DEAD: PrintResult = { via: 'none', role: 'receipt', error: 'unreachable: connection refused', printerFailed: true };
+
+  it('is reported as a printer failure, with a Retry that prints the same receipt again', async () => {
+    const answers: PrintResult[] = [DEAD, { via: 'bridge', role: 'receipt' }];
+    const print = vi.fn(async (_req: PrintRequest) => answers.shift()!);
+    const onFailure = vi.fn();
+    const { client, emit, openDrawer } = fakeClient({ settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 }, devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }] });
+    bootPrintOnSale(client, { print, onFailure, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    const failure = onFailure.mock.calls[0]![0];
+    expect(failure).toMatchObject({ saleId: '42', printerFailed: true });
+    expect(typeof failure.retry).toBe('function');
+
+    await failure.retry();
+
+    expect(print).toHaveBeenCalledTimes(2);
+    expect(print.mock.calls[1]![0]).toMatchObject({ role: 'receipt', jobId: 'sale-42', data: PAPER });
+    // Printed this time: no second warning, and Retry is about the paper — the drawer stays as it was.
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(openDrawer).toHaveBeenCalledTimes(1);
+  });
+
+  it('a Retry that fails again warns again, with its own Retry', async () => {
+    const print = vi.fn(async (_req: PrintRequest) => DEAD);
+    const onFailure = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print, onFailure, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42' });
+    await onFailure.mock.calls[0]![0].retry();
+
+    expect(onFailure).toHaveBeenCalledTimes(2);
+    expect(onFailure.mock.calls[1]![0]).toMatchObject({ saleId: '42', printerFailed: true });
+    expect(typeof onFailure.mock.calls[1]![0].retry).toBe('function');
+  });
+
+  it('a receipt with no printer and no queue at all is not a printer failure: no Retry to offer', async () => {
+    const onFailure = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: fakeGate({ via: 'none', role: 'receipt', error: 'no printer' }).print, onFailure, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure.mock.calls[0]![0].printerFailed).toBeUndefined();
+    expect(onFailure.mock.calls[0]![0].retry).toBeUndefined();
+  });
+});

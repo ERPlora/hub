@@ -45,6 +45,7 @@ fn fixture(name: &str) -> PathBuf {
 /// A hub with the two fixture modules of the kernel's own e2e: `sales` emits `sale.completed`,
 /// `crm` owns the command a flow reaches for.
 async fn hub_with(hub_id: &str, modules: &[&str]) -> Runtime {
+    ensure_master_key();
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
     rt.ensure_system_tables().await.unwrap();
     for m in modules {
@@ -818,7 +819,7 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
     .await
     .expect("export");
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
-    // The bundle also names a command nobody has: a hand-edited zip, or a module renamed since.
+    // The bundle also names a command nobody has: a module renamed since the copy was taken.
     let mut manifest = bundle.manifest.clone();
     manifest.flows[0]
         .grants
@@ -827,6 +828,8 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
             value: "ghost.module.act".into(),
             payload: Default::default(),
         });
+    // Re-sealed by the same hub (hub#2497): a hand-edited zip would no longer be its own copy.
+    erplora_runtime::export::seal_manifest(&mut manifest);
 
     let report = import_sections(
         &mut restored,

@@ -399,13 +399,44 @@ async fn register_module(
     // borra las retiradas del manifest. El `command` de cada tarea debe ser del propio módulo.
     crate::scheduler::seed_module_tasks(db, &manifest.id, &manifest.scheduled_tasks).await?;
 
+    // Registering again is not a decision (hub#2544): a module this hub already records keeps the
+    // on/off state it has — re-downloaded at boot, put back from the local copy, reloaded by the
+    // reconciliation or updated. Only a module with no row yet starts active. Forcing `Active` here
+    // switched every app the owner had turned off back on at each Hub Cloud deploy, and overwrote
+    // the row, so not even the next boot could tell it had been off. A module that fell in cascade
+    // whose dependencies are all on already has no cause to stay down (ADR-0128): it comes back.
     let id = manifest.id.clone();
     let version = manifest.version.clone();
+    let status = match recorded_status(db, hub_id, &id).await? {
+        None => ModuleStatus::Active,
+        Some(ModuleStatus::InactiveAuto)
+            if manifest
+                .depends_on
+                .iter()
+                .all(|d| registry.is_active(&d.id)) =>
+        {
+            ModuleStatus::Active
+        }
+        Some(recorded) => recorded,
+    };
     registry.installed.push(manifest);
-    registry.status.insert(id.clone(), ModuleStatus::Active);
+    registry.status.insert(id.clone(), status);
 
-    persist_status(db, hub_id, &id, &version, ModuleStatus::Active).await?;
+    persist_status(db, hub_id, &id, &version, status).await?;
     Ok(id)
+}
+
+/// The status `hub_module` records for `module_id` in this hub, or `None` if it has no row.
+async fn recorded_status(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    module_id: &str,
+) -> Result<Option<ModuleStatus>> {
+    Ok(installed_status_versioned(db, hub_id)
+        .await?
+        .into_iter()
+        .find(|(id, _, _)| id == module_id)
+        .map(|(_, _, status)| status))
 }
 
 /// **The SQL a module's COMMANDS and SEED ship may only WRITE its own tables** (hub#633,
@@ -818,6 +849,34 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                         manifest.id, command.sql
                     )));
                 }
+            }
+        }
+        // hub#2612: `emit[].when_rows` gates an event on ONE of the command's own statements. An
+        // anchor that names none would read as "announces only on change" while the runtime
+        // cannot honour it; and a command resolved by a handler does not run its `sql` list as
+        // written, so there is no statement count to anchor to. Both refused here, before any
+        // side effect, instead of announcing every execution in silence.
+        for event in &command.emit {
+            let Some(anchor) = event.when_rows() else {
+                continue;
+            };
+            if command.handler.is_some() {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` gates `{}` with `emit[].when_rows`, but it is \
+                     resolved by a handler, whose statements are not the ones it declares; \
+                     return the event from the handler instead",
+                    manifest.id,
+                    event.event()
+                )));
+            }
+            if !command.sql.iter().any(|sql| sql == anchor) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` anchors `emit[].when_rows` of `{}` to \
+                     `{anchor}`, which is not one of its `sql` entries {:?}",
+                    manifest.id,
+                    event.event(),
+                    command.sql
+                )));
             }
         }
     }

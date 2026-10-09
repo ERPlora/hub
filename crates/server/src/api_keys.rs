@@ -18,6 +18,7 @@ use serde_json::{json, Map, Value};
 use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyScope, ScopeEntry};
 
 use crate::auth;
+use crate::event_stream;
 use crate::state::AppState;
 
 // ── 1) Gestión de keys (auth = sesión admin owner/admin) ────────────────────────────────────
@@ -112,7 +113,11 @@ pub async fn rotate_key(
         return admin_unauthorized(e);
     }
     match rt.rotate_api_key(&id).await {
-        Ok(Some(secret)) => Json(json!({ "ok": true, "data": secret })).into_response(),
+        Ok(Some(secret)) => {
+            // hub#2522: the old secret is dead, and so is every live channel it opened.
+            st.stream_limiter.cut(&event_stream::key_tag(&id));
+            Json(json!({ "ok": true, "data": secret })).into_response()
+        }
         Ok(None) => key_not_found(),
         Err(e) => key_err(e),
     }
@@ -130,7 +135,11 @@ pub async fn revoke_key(
         return admin_unauthorized(e);
     }
     match rt.revoke_api_key(&id).await {
-        Ok(true) => Json(json!({ "ok": true })).into_response(),
+        Ok(true) => {
+            // hub#2522: a kill-switch that leaves the open channels listening is not one.
+            st.stream_limiter.cut(&event_stream::key_tag(&id));
+            Json(json!({ "ok": true })).into_response()
+        }
         Ok(false) => key_not_found(),
         Err(e) => key_err(e),
     }
@@ -206,9 +215,10 @@ pub(crate) async fn external_principal(
     Ok(principal)
 }
 
-/// `404` cuando la operación no existe, no pertenece al `{module}` de la ruta, o no está
-/// `expose_api` (primera de las dos puertas, §5). NO revela si la operación existe pero es privada
-/// (mismo 404 para "no existe" y "no expuesta"): no filtra la superficie interna a un tercero.
+/// `404` when the operation does not exist, does not belong to the `{module}` of the path, or is
+/// not `expose_api` (first of the two gates, §5). Only a caller with a valid key gets here
+/// (hub#2550), and it gets the same `404` for "does not exist" and "not exposed": the internal
+/// surface does not leak to a third party.
 fn not_exposed(kind: &str, module: &str, name: &str) -> Response {
     (
         StatusCode::NOT_FOUND,
@@ -238,15 +248,17 @@ pub async fn data_query(
     };
     let rt = arc.read().await;
 
-    // Puerta 1: la operación debe existir, pertenecer al módulo de la ruta y estar `expose_api`.
-    if !rt.registry().is_query_exposed(&module, &name) {
-        return not_exposed("query", &module, &name);
-    }
-    // Auth de API key (puerta 2 = el gate de permisos lo aplica `execute_query` con el ctx de la key).
+    // The key (and its quota) first, the operation second (hub#2550): looking the operation up
+    // before the key answered `404` or `401` to anybody, and told them by trying names which
+    // operations this hub has installed and open. The permission gate is `execute_query`'s.
     let ctx = match external_principal(&headers, &st.config, &rt).await {
         Ok(principal) => principal.context,
         Err(response) => return response,
     };
+    // Gate 1: the operation exists, belongs to the module of the path and is `expose_api`.
+    if !rt.registry().is_query_exposed(&module, &name) {
+        return not_exposed("query", &module, &name);
+    }
 
     if rt.is_list_query(&name) {
         match rt.execute_query_page(&name, &body.params, &ctx).await {
@@ -278,13 +290,14 @@ pub async fn data_command(
     };
     let rt = arc.read().await;
 
-    if !rt.registry().is_command_exposed(&module, &name) {
-        return not_exposed("command", &module, &name);
-    }
+    // Same order as `data_query` (hub#2550): key, quota, then the operation.
     let ctx = match external_principal(&headers, &st.config, &rt).await {
         Ok(principal) => principal.context,
         Err(response) => return response,
     };
+    if !rt.registry().is_command_exposed(&module, &name) {
+        return not_exposed("command", &module, &name);
+    }
 
     match rt.execute_command(&name, &body.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),

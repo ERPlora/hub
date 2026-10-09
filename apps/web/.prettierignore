@@ -330,5 +330,3 @@ src/views/shell-setup-strip.test.ts
 src/views/system-hardware-door.test.ts
 src/views/system-local-network-blocked.hub1773.test.ts
 src/views/system-notices-blocked.hub1732.test.ts
-src/views/system-usage-panels.test.ts
-src/views/SystemPage.vue

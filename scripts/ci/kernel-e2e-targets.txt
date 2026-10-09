@@ -28,6 +28,11 @@ blueprint_seed_reglas_no_duplican
 capability_denied_listener_e2e
 dashboard_widgets_e2e
 emit_schema_contract_hub1076
+erasure_foreign_notice_hub2535                   # un aviso de borrado ajeno no llega a ninguna app
+                                                 # ni arranca automatizaciones (hub#2535)
+erasure_owner_gate_hub2485
+erasure_whatsapp_history_hub2477                 # el borrado sigue ficha → conversación → mensaje
+                                                 # por las filas de whatsapp_inbox (hub#2477, hub#2474)
 export_test
 fixture_quantities_match_the_published_grid
 import_no_duplica_lo_sembrado
@@ -51,6 +56,8 @@ read_unavailable_reason_hub2410                  # por qué no resolvió una rea
 reads_e2e
 reset_test
 reset_undo_test
+restore_own_backup_roundtrip_hub2513              # el IMPORT conserva los ids de la copia propia
+                                                  # (hub#2513): `taxes` + `inventory` son el banco
 sale_event_client_instance                       # el DISPATCHER pasa la pestaña al sink en el
                                                  # sitio WASM (hub#1980): `sales` es el banco
 sale_refused_without_route_in_production_hub1935 # el gate fiscal del DISPATCHER (hub#1935):

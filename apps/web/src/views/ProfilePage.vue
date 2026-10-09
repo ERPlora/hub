@@ -9,7 +9,7 @@
           :src="user?.avatarUrl || undefined"
           size="lg"
         ></ok-avatar>
-        <div class="avatar-actions">
+        <div v-if="profileRead === 'ready'" class="avatar-actions">
           <input
             ref="avatarInput"
             data-testid="profile-avatar-input"
@@ -51,6 +51,39 @@
         </div>
       </section>
 
+      <!-- hub#2541 — the cards below are painted from `GET /api/profile`. A failed read left them
+           EMPTY with «Save my details» live, and pressing it wiped the person's name and e-mail; the
+           PIN card guessed «no PIN yet». Until the read works: «loading», or «could not load» with
+           Retry, and nothing that saves. The header (from the session) and account management stay. -->
+      <div
+        v-if="profileRead === 'loading'"
+        class="profile-loading"
+        role="status"
+        :aria-label="t('profile.loading')"
+        data-testid="profile-loading"
+      >
+        <ion-spinner name="dots" />
+      </div>
+      <ok-empty-state
+        v-else-if="profileRead === 'error'"
+        data-testid="profile-load-error"
+        icon="cloud-offline-outline"
+        :heading="t('profile.loadError')"
+        :message="t('profile.loadErrorBody')"
+      >
+        <ion-button
+          slot="action"
+          size="small"
+          fill="outline"
+          data-testid="profile-load-retry"
+          :disabled="profileRetrying"
+          @click="retryProfileRead"
+        >
+          {{ t('profile.retry') }}
+        </ion-button>
+      </ok-empty-state>
+
+      <template v-else>
       <div class="profile-grid">
         <ion-card class="profile-card">
           <ion-card-header>
@@ -96,7 +129,7 @@
                 <span>{{ t('profile.role') }}: <strong>{{ roleLabel }}</strong></span>
                 <span>{{ accountTypeLabel }}</span>
               </div>
-              <ion-button expand="block" data-testid="profile-save" :disabled="profileSaving || loading" @click="saveIdentity">
+              <ion-button expand="block" data-testid="profile-save" :disabled="profileSaving" @click="saveIdentity">
                 {{ profileSaving ? t('profile.saving') : t('profile.saveProfile') }}
               </ion-button>
             </div>
@@ -229,6 +262,7 @@
           </form>
         </ion-card-content>
       </ion-card>
+      </template>
 
       <section class="management-panel">
         <span class="management-icon">
@@ -267,6 +301,7 @@ import {
   IonInputPasswordToggle,
   IonSelect,
   IonSelectOption,
+  IonSpinner,
 } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
 import HubIcon from '../components/HubIcon.vue';
@@ -274,6 +309,7 @@ import { availableLocales } from '../i18n';
 import { getAccessToken, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
 import { HUB_USERS_ERROR_PREFIX, isGuessablePin } from '../lib/hub-users';
+import { lockRefusal } from '../lib/lock-refusal';
 import { openExternal } from '../lib/open-external';
 import { hubPinLength } from '../lib/pin-length';
 import { saasDoor } from '../lib/saas-door';
@@ -306,7 +342,9 @@ const selectedLocale = ref<string>('');
 const firstName = ref('');
 const lastName = ref('');
 const email = ref('');
-const loading = ref(true);
+// hub#2541: what the cards are painted from has been read in this visit, or not (yet).
+const profileRead = ref<'loading' | 'ready' | 'error'>('loading');
+const profileRetrying = ref(false);
 const profileSaving = ref(false);
 const avatarSaving = ref(false);
 const avatarInput = ref<HTMLInputElement | null>(null);
@@ -322,9 +360,11 @@ const currentPin = ref('');
 const newPin = ref('');
 const confirmPin = ref('');
 const pinSaving = ref(false);
-// '' | 'length' | 'clientMismatch' (comprobados aquí) | el tail de un código `hub.users.*` que
-// devolvió el runtime (`pin_too_simple`, `pin_in_use`, `pin_current_mismatch`…).
+// '' | 'length' | 'clientMismatch' (checked here) | the tail of a `hub.users.*` code the runtime
+// returned (`pin_too_simple`, `pin_in_use`, `pin_current_mismatch`…) | 'tooManyAttempts'
+// (hub#2499: the door's budget of tries is spent; the wait travels in `pinLockMinutes`).
 const pinErrorCode = ref('');
+const pinLockMinutes = ref<number | undefined>(undefined);
 const pinError = computed<string>(() => {
   switch (pinErrorCode.value) {
     case '':
@@ -333,6 +373,10 @@ const pinError = computed<string>(() => {
       return t('employeeForm.errors.pin_length', { n: hubPinLength.value });
     case 'clientMismatch':
       return t('profile.pinMismatch');
+    case 'tooManyAttempts':
+      return pinLockMinutes.value === undefined
+        ? t('profile.pinTooManyAttemptsNoWait')
+        : t('profile.pinTooManyAttempts', { minutes: pinLockMinutes.value }, pinLockMinutes.value);
     default:
       return t(`employeeForm.errors.${pinErrorCode.value}`);
   }
@@ -381,7 +425,10 @@ async function savePin(): Promise<void> {
     await toast(t('profile.pinSaved'), 'success');
   } catch (error) {
     const key = pinErrorKeyFrom(error);
-    if (key) {
+    if ((error as { code?: string } | null)?.code === 'too_many_attempts') {
+      pinLockMinutes.value = lockRefusal(error).minutes;
+      pinErrorCode.value = 'tooManyAttempts';
+    } else if (key) {
       pinErrorCode.value = key;
     } else {
       await toast(t('profile.saveError'), 'danger');
@@ -572,15 +619,28 @@ async function deleteCloudAccount(): Promise<void> {
   }
 }
 
-onMounted(async () => {
+async function readProfile(): Promise<void> {
   try {
     await getUserProfile();
     syncForm();
+    profileRead.value = 'ready';
   } catch {
-    await toast(t('profile.loadError'), 'danger');
-  } finally {
-    loading.value = false;
+    profileRead.value = 'error';
   }
+}
+
+/** Retry keeps the error card on screen (button disabled) until the answer. */
+async function retryProfileRead(): Promise<void> {
+  profileRetrying.value = true;
+  try {
+    await readProfile();
+  } finally {
+    profileRetrying.value = false;
+  }
+}
+
+onMounted(() => {
+  void readProfile();
 });
 </script>
 
@@ -672,6 +732,12 @@ onMounted(async () => {
 .management-icon :deep(.hub-icon) {
   width: 18px;
   height: 18px;
+}
+
+.profile-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
 }
 
 .profile-grid {

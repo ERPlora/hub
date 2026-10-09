@@ -183,6 +183,55 @@ describe('listening for the taps (hub#2305)', () => {
     ).resolves.toBeTypeOf('function');
   });
 
+  // hub#2658: the installed app answers the subscription only to the linked hub, and only once its
+  // page has finished loading. `main.ts` subscribes while the page is still loading, so right after
+  // the SaaS sends the window to the hub the app says `not_the_linked_hub` for a moment.
+  it('the linked hub still loading hears the taps once the app lets it (hub#2658)', async () => {
+    const { send, navigate, notices } = door();
+    let report: ((payload: unknown) => void) | undefined;
+    let asked = 0;
+    const listen: NoticeTapListen = vi.fn(async (cb) => {
+      asked += 1;
+      if (asked < 3) throw 'not_the_linked_hub';
+      report = cb;
+      return () => {};
+    });
+    const wait = vi.fn(async () => {});
+
+    await listenForNoticeTaps(notices, listen, wait);
+    await notices.notify('t', 'b', '/m/kitchen');
+    report!(tapOf(send.mock.calls[0]![2]));
+
+    expect(listen).toHaveBeenCalledTimes(3);
+    expect(navigate).toHaveBeenCalledWith('/m/kitchen');
+  });
+
+  it('a page that is not the linked hub stops asking, quietly (hub#2658)', async () => {
+    const { notices } = door();
+    const listen: NoticeTapListen = vi.fn(async () => {
+      throw 'not_the_linked_hub';
+    });
+    const wait = vi.fn(async () => {});
+
+    await expect(listenForNoticeTaps(notices, listen, wait)).resolves.toBeTypeOf('function');
+
+    expect(wait).toHaveBeenCalled();
+    expect(vi.mocked(listen).mock.calls.length).toBeLessThanOrEqual(8);
+  });
+
+  it('a refusal that is not the gate is not asked again (hub#2658)', async () => {
+    const { notices } = door();
+    const listen: NoticeTapListen = vi.fn(async () => {
+      throw new Error('notification.register_listener not allowed');
+    });
+    const wait = vi.fn(async () => {});
+
+    await listenForNoticeTaps(notices, listen, wait);
+
+    expect(listen).toHaveBeenCalledTimes(1);
+    expect(wait).not.toHaveBeenCalled();
+  });
+
   it('the function it returns stops the listener', async () => {
     const { notices } = door();
     const stop = vi.fn();

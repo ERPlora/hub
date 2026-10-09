@@ -232,6 +232,9 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
     'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
     // hub#2434: the fiscal precondition — its `Display` is a log line with the setting keys in it.
     'fiscal_precondition_failed',
+    // hub#2383: a query asked without a value it needs — its `Display` is an English line for the
+    // log and the assistant, with the query and the bind in backticks.
+    'missing_required_param',
   ] as const;
 
   for (const code of codes) {
@@ -725,4 +728,30 @@ test('hub#2434: every requirement the fiscal gate can refuse on is named here, i
       );
     }
   }
+});
+
+// ── hub#2383: a query asked without a value it needs is not «there is nothing» ─────────────────
+//
+// The runtime refuses it with `missing_required_param` and names the query and the bind as FIELDS.
+// That is for whoever fixes the call; the person at the counter gets a sentence in their language
+// that says nothing was looked up, without the internal query name or backticks.
+test('hub#2383: `missing_required_param` reads as a sentence, never as the query or the bind', () => {
+  for (const locale of ['es', 'en'] as const) {
+    const message = platformFailureMessage(
+      {
+        code: 'missing_required_param',
+        query: 'appointments.appointments.get',
+        message: 'query `appointments.appointments.get` needs the parameter `:appointment_id`',
+      } as PlatformFailure,
+      locale,
+    );
+    assert.ok(message, `no sentence for ${locale}`);
+    assert.ok(!message.includes('appointments.'), `${locale}: the internal query name leaked: ${message}`);
+    assert.ok(!message.includes('`'), `${locale}: backticks reached the screen: ${message}`);
+  }
+  assert.notEqual(
+    platformFailureMessage({ code: 'missing_required_param' }, 'es'),
+    platformFailureMessage({ code: 'missing_required_param' }, 'en'),
+    'the Spanish sentence is a translation, not the English one',
+  );
 });

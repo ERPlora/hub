@@ -22,15 +22,33 @@
 //! prefix of the event's name, which is a convention nothing verifies: a module may declare
 //! `emit: ["invoice.paid"]` and hand itself another module's audience.
 //!
-//! # Our own app is not an exception
+//! # Our own app listens as the person using it (hub#2501)
 //!
-//! The shell — the webview that prints tickets and refreshes the dashboard — needs this channel.
-//! It gets in the same way an accountant's integration does: with a key. The difference is only
-//! **who issues it**: the hub mints itself a `read_only` key the first time the app connects
-//! ([`erplora_runtime::api_keys::ensure_app_key`]), and that key cannot be revoked from the keys
-//! screen. There is no `if this_is_our_app` anywhere in this file, and that is the point — the
-//! first exception is what turns one model into a sieve. If the minting code is ever deleted, the
-//! app stops reading the stream on the next connect. Loud, not silent.
+//! The shell — the webview that prints tickets and refreshes the dashboard — needs this channel,
+//! and it has no key: it has a person's session. It asks `POST /api/events/ticket` for a ticket
+//! **bound to that session** ([`TicketHolder::Session`]), and the socket it opens hears what that
+//! person's role reads through the normal API ([`StreamAudience::Session`]): the frames of the
+//! modules with a query their permissions let through, the hub's housekeeping frames, and the
+//! hub's own named events (a flow's question names the customer) only if they administer the hub.
+//! Until hub#2501 the ticket was bound to a `read_only` key the hub minted for itself, so a
+//! cashier's till heard every customer, every WhatsApp and every approval of the business. There
+//! is still no `if this_is_our_app` anywhere in this file: the person is the principal, exactly as
+//! on the query door.
+//!
+//! # Ending the credential ends the channel (hub#2522)
+//!
+//! The audience is decided once, when the channel opens — but the credential it opened with can
+//! end while it is open. Signing out, revoking a key and rotating it call
+//! [`StreamLimiter::cut`] with the credential's [`Lifeline`] tag, and every channel opened with it
+//! gets [`ERR_CREDENTIAL_ENDED`] as its last frame and closes. A ticket minted before its session
+//! signed out opens nothing afterwards. Until hub#2522 a till that signed out, or an integration
+//! whose key was revoked, kept hearing everything it heard at connect time until it reconnected.
+//! Changing a person's access cuts their [`person_tag`] the same way (hub#2571).
+//!
+//! A session also ends **by itself**, when its time runs out (hub#2600): no door is called then, so
+//! no cut is issued. The session's [`Lifeline`] carries that instant instead ([`Lifeline::ends_at`],
+//! read when the ticket is minted) and the channel ends at it with the same last frame. A session
+//! never lengthens with use (HUB-F136), so the instant read at mint time is the one that holds.
 //!
 //! # How the credential travels
 //!
@@ -40,7 +58,7 @@
 //! |--------|-----|
 //! | Anything that controls headers (an integration, `websocat`, `erplora-sync`) | `Authorization: Bearer erpl_live_…` on the handshake / the SSE request |
 //! | The browser, on `/ws` | the **first frame**: `{"type":"auth","token":…}` — the same shape `/ws/print` uses (hub#343), and for the same reason: the query string ends up in every access log and proxy trace along the way |
-//! | The browser, on `/api/events` | `?ticket=erpl_tkt_…`, because SSE has no first frame |
+//! | The browser, on `/api/events` | `?ticket=erpl_tkt_…`, because SSE has no first frame — and **only** a ticket: a key there is refused ([`ERR_KEY_IN_URL`], hub#2523) |
 //!
 //! **A ticket is not a key.** It is minted by `POST /api/events/ticket`, which needs a hub session,
 //! and it is single-use and lives [`TICKET_TTL_SECONDS`] seconds, in memory only. That is what lets
@@ -59,8 +77,11 @@
 //! | [`ERR_UNAUTHENTICATED`] | 401 | no credential, or one this hub does not recognise — including a key of **another hub**, whose rows are not this hub's (the *message* tells them apart, the code does not: existence is not something to leak) |
 //! | [`ERR_READ_REQUIRED`] | 403 | a valid key that may not read (a `write_only` feed). It is a different answer from "who are you?" on purpose: if both refusals said the same thing, either guard could be deleted and every test would still pass |
 //! | [`ERR_NOT_READY`] | — | any frame on `/ws` before the socket authenticated |
-use std::collections::HashMap;
+//! | [`ERR_CREDENTIAL_ENDED`] | — | the last frame of an open channel whose credential ended: the session signed out, or the key was revoked or rotated (hub#2522) |
+//! | [`ERR_KEY_IN_URL`] | 400 | `/api/events?ticket=` carrying anything but a ticket — a key in the address is a key in the log, so it is refused by its shape, unresolved, even with a good header beside it (hub#2523) |
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
@@ -68,11 +89,12 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyPrincipal, ApiKeyScope};
+use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyScope};
+use erplora_runtime::RequestContext;
 use serde_json::{json, Value};
 
 use crate::auth;
-use crate::state::{AppState, WsEvent, FRAME_MODULE};
+use crate::state::{AppState, AuthMode, WsEvent, FRAME_MODULE};
 
 /// Marks a stream ticket apart from an API key token (`erpl_live_…`), so one door can take both
 /// and neither is ever mistaken for the other.
@@ -100,13 +122,96 @@ pub const ERR_NOT_READY: &str = "events.not_ready";
 pub const ERR_INVALID_FRAME: &str = "invalid_payload";
 /// A peer pushing more than [`MAX_FRAME_BYTES`] at a socket that may not even be authenticated.
 pub const ERR_FRAME_TOO_LARGE: &str = "events.frame_too_large";
+/// The last frame of a channel whose credential ended while it was open (hub#2522): the session
+/// signed out, or the key was revoked or rotated. The channel closes right after it.
+pub const ERR_CREDENTIAL_ENDED: &str = "events.credential_ended";
+/// Something other than a ticket in the address of `/api/events` (hub#2523): a key there is a key
+/// in every access log on the way. Refused by its shape, before anything is looked up.
+pub const ERR_KEY_IN_URL: &str = "events.key_in_url";
+
+/// Who a ticket was minted for, and so who the socket it opens listens as.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TicketHolder {
+    /// An API key, by id: the socket hears what the key's scope may read ([`may_receive`]).
+    Key(String),
+    /// A person of the hub (hub#2501): the session's user and the permissions its role had when
+    /// the ticket was minted. The socket hears what those permissions read through the normal API
+    /// ([`StreamAudience::Session`]) — never the hub's blanket key, which used to hand a cashier
+    /// every event of the business.
+    Session {
+        user_id: String,
+        permissions: HashSet<String>,
+        /// What ends the socket (hub#2522, hub#2571), checked when the ticket was minted: the
+        /// person's [`person_tag`] — their role changed, they were taken off the team — and the
+        /// session's [`session_tag`] — it signed out, a device limit threw it out. The session's
+        /// is missing only without a session token (`AuthMode::Dev`).
+        lifelines: Vec<Lifeline>,
+    },
+}
+
+/// **What a channel listens with, so that ending it ends the channel** (hub#2522).
+///
+/// The audience of a channel is decided once, when it opens; this is what still ties it to the
+/// credential afterwards. `tag` names the credential — [`session_tag`] for a person's session,
+/// [`key_tag`] for an API key — and `checked_at` is when the hub last saw it valid: for a key, when
+/// the socket presented it; for a session, when its ticket was minted (the ticket is the session's
+/// word, spent up to [`TICKET_TTL_SECONDS`] later). A cut issued after `checked_at` ends the
+/// channel; one issued before it does not, because that check already saw the credential's new
+/// state — that is what lets a rotated key reconnect with its new secret at once.
+///
+/// `ends_at` is when the credential runs out by itself (hub#2600): a session's expiry. Nothing cuts
+/// at that instant — no door is called — so the channel watches the clock as well as the cut. `None`
+/// for what does not run out: an API key, a person.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Lifeline {
+    pub tag: String,
+    pub checked_at: Instant,
+    pub ends_at: Option<Instant>,
+}
+
+impl Lifeline {
+    /// Whether the credential has run out by itself at `now`.
+    fn has_run_out(&self, now: Instant) -> bool {
+        self.ends_at.is_some_and(|ends_at| ends_at <= now)
+    }
+}
+
+/// The monotonic instant at which the wall-clock `ends` falls, as seen now; `now` if it has passed.
+fn instant_at(ends: chrono::DateTime<chrono::Utc>) -> Instant {
+    let left = (ends - chrono::Utc::now())
+        .to_std()
+        .unwrap_or(Duration::ZERO);
+    Instant::now() + left
+}
+
+/// The [`Lifeline`] tag of a person's session: a digest of its token, so the hub never keeps a
+/// second copy of a live credential in memory to be able to find it again.
+pub fn session_tag(session_token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(session_token.as_bytes());
+    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    format!("session:{hex}")
+}
+
+/// The [`Lifeline`] tag of a person of the hub (hub#2571): what they may hear was decided by their
+/// role when their channel opened, so changing the role or taking them off the team ends every
+/// channel they hold, on every device. By hub as well as by id: one process can serve several hubs
+/// (ADR-0005), and a cut in one must never close a channel of the other.
+pub fn person_tag(hub_id: &str, user_id: &str) -> String {
+    format!("person:{hub_id}:{user_id}")
+}
+
+/// The [`Lifeline`] tag of an API key, by id — every secret the key ever had, old and new.
+pub fn key_tag(key_id: &str) -> String {
+    format!("key:{key_id}")
+}
 
 /// One minted, not yet spent, stream ticket.
 struct Ticket {
     /// The hub it was minted in. One process can serve several (ADR-0005), so a ticket that
     /// forgot this would be a door between tenants.
     hub_id: String,
-    key_id: String,
+    holder: TicketHolder,
     expires_at: i64,
 }
 
@@ -128,6 +233,11 @@ impl std::fmt::Debug for StreamTickets {
 impl StreamTickets {
     /// Mints a ticket for `key_id` in `hub_id`, valid for [`TICKET_TTL_SECONDS`] from `now`.
     pub fn mint_at(&self, hub_id: &str, key_id: &str, now: i64) -> String {
+        self.mint_for_at(hub_id, TicketHolder::Key(key_id.to_string()), now)
+    }
+
+    /// Mints a ticket for `holder` in `hub_id`, valid for [`TICKET_TTL_SECONDS`] from `now`.
+    pub fn mint_for_at(&self, hub_id: &str, holder: TicketHolder, now: i64) -> String {
         let ticket = format!("{TICKET_PREFIX}{}", random_ticket_secret());
         if let Ok(mut held) = self.inner.lock() {
             // Sweep what nobody came back for, so a hub that runs for months does not grow a map
@@ -137,7 +247,7 @@ impl StreamTickets {
                 ticket.clone(),
                 Ticket {
                     hub_id: hub_id.to_string(),
-                    key_id: key_id.to_string(),
+                    holder,
                     expires_at: now + TICKET_TTL_SECONDS,
                 },
             );
@@ -145,23 +255,58 @@ impl StreamTickets {
         ticket
     }
 
-    /// Spends a ticket: `Some(key_id)` once, and never again. A ticket of another hub, or an
+    /// Spends a ticket: `Some(holder)` once, and never again. A ticket of another hub, or an
     /// expired one, resolves to nothing **and is not spent** — refusing it must not be a way to
     /// burn somebody else's ticket.
-    pub fn redeem_at(&self, ticket: &str, hub_id: &str, now: i64) -> Option<String> {
+    pub fn redeem_at(&self, ticket: &str, hub_id: &str, now: i64) -> Option<TicketHolder> {
         let mut held = self.inner.lock().ok()?;
         let found = held.get(ticket)?;
         if found.hub_id != hub_id || found.expires_at <= now {
             return None;
         }
-        held.remove(ticket).map(|t| t.key_id)
+        held.remove(ticket).map(|t| t.holder)
     }
 
     pub fn mint(&self, hub_id: &str, key_id: &str) -> String {
         self.mint_at(hub_id, key_id, chrono::Utc::now().timestamp())
     }
 
-    pub fn redeem(&self, ticket: &str, hub_id: &str) -> Option<String> {
+    /// Mints a ticket for a person's session (hub#2501): the socket it opens listens with the
+    /// permissions of `ctx`, not with any key, and closes when the session ends (hub#2522) or runs
+    /// out (hub#2600), or the person's access changes (hub#2571). `session` is the session's token
+    /// and when it runs out, if it does. `checked_at` is when `ctx` was about to be read: taken
+    /// before, so a change that lands while it is read counts as after the check.
+    pub fn mint_session(
+        &self,
+        hub_id: &str,
+        ctx: &RequestContext,
+        session: Option<(&str, Option<Instant>)>,
+        checked_at: Instant,
+    ) -> String {
+        let mut lifelines = vec![Lifeline {
+            tag: person_tag(hub_id, &ctx.user_id),
+            checked_at,
+            ends_at: None,
+        }];
+        if let Some((token, ends_at)) = session {
+            lifelines.push(Lifeline {
+                tag: session_tag(token),
+                checked_at,
+                ends_at,
+            });
+        }
+        self.mint_for_at(
+            hub_id,
+            TicketHolder::Session {
+                user_id: ctx.user_id.clone(),
+                permissions: ctx.permissions.clone(),
+                lifelines,
+            },
+            chrono::Utc::now().timestamp(),
+        )
+    }
+
+    pub fn redeem(&self, ticket: &str, hub_id: &str) -> Option<TicketHolder> {
         self.redeem_at(ticket, hub_id, chrono::Utc::now().timestamp())
     }
 
@@ -201,9 +346,37 @@ pub const ERR_TOO_MANY_CONNECTIONS: &str = "events.too_many_connections";
 /// it decrements on its own when the socket goes away — on a clean close, on an error, on a panic,
 /// on the auth-timeout. A counter that only ever goes up is a ceiling that ends up locking the hub
 /// out of its own channel, which is exactly the failure this exists to prevent.
+///
+/// It is also where a credential's end reaches the channels it opened (hub#2522): every live
+/// channel holds a [`CutWatch`] on its [`Lifeline`], and [`StreamLimiter::cut`] — called by the
+/// doors that end a credential: sign-out, revoking a key, rotating it — closes all of them.
 #[derive(Default)]
 pub struct StreamLimiter {
     inner: Mutex<HashMap<String, usize>>,
+    cuts: Mutex<Cuts>,
+}
+
+/// How long a cut is remembered. A credential is checked before its channel registers — a key
+/// when the socket presents it (milliseconds), a session when its ticket is minted (up to
+/// [`TICKET_TTL_SECONDS`] earlier) — so a cut that lands in between must still be there when the
+/// channel registers. Twice the ticket's life covers both with room to spare.
+const CUT_MEMORY: Duration = Duration::from_secs(2 * TICKET_TTL_SECONDS as u64);
+
+/// The live channels by [`Lifeline`] tag, and the tags cut recently.
+#[derive(Default)]
+struct Cuts {
+    /// Tag → (how many channels watch it, the signal that ends them).
+    live: HashMap<String, (usize, Arc<tokio::sync::watch::Sender<bool>>)>,
+    /// Tag → when it was cut. Swept on every cut, after [`CUT_MEMORY`].
+    ended: HashMap<String, Instant>,
+}
+
+impl Cuts {
+    fn ended_after(&self, lifeline: &Lifeline) -> bool {
+        self.ended
+            .get(&lifeline.tag)
+            .is_some_and(|cut_at| *cut_at >= lifeline.checked_at)
+    }
 }
 
 impl std::fmt::Debug for StreamLimiter {
@@ -237,6 +410,68 @@ impl StreamLimiter {
         })
     }
 
+    /// Ends every live channel opened with the credential `tag` names ([`session_tag`],
+    /// [`key_tag`]) and remembers the cut for [`CUT_MEMORY`], so a channel whose credential was
+    /// checked before this instant and has not registered yet is ended as it registers. Call it
+    /// **after** the credential's new state is stored: a check that starts after the cut must see
+    /// it. Returns how many channels were told.
+    pub fn cut(&self, tag: &str) -> usize {
+        // A poisoned lock is recovered, never skipped: a cut that silently does nothing is the
+        // hole this exists to close.
+        let mut cuts = self.cuts.lock().unwrap_or_else(|p| p.into_inner());
+        let now = Instant::now();
+        cuts.ended
+            .retain(|_, cut_at| now.duration_since(*cut_at) < CUT_MEMORY);
+        cuts.ended.insert(tag.to_string(), now);
+        match cuts.live.remove(tag) {
+            Some((watching, signal)) => {
+                signal.send_replace(true);
+                watching
+            }
+            None => 0,
+        }
+    }
+
+    /// Whether `lifeline`'s credential was cut after it was checked, or has run out (hub#2600) —
+    /// the socket must not open.
+    pub fn has_ended(&self, lifeline: &Lifeline) -> bool {
+        if lifeline.has_run_out(Instant::now()) {
+            return true;
+        }
+        let cuts = self.cuts.lock().unwrap_or_else(|p| p.into_inner());
+        cuts.ended_after(lifeline)
+    }
+
+    /// Ties a channel to its credential: the returned [`CutWatch`] resolves when the credential is
+    /// [`cut`](Self::cut) — at once, if that already happened after `lifeline` was checked — or
+    /// when it runs out ([`Lifeline::ends_at`]). Hold it for the life of the channel; dropping it is
+    /// what forgets the channel.
+    pub fn watch(self: &Arc<Self>, lifeline: Lifeline) -> CutWatch {
+        let mut cuts = self.cuts.lock().unwrap_or_else(|p| p.into_inner());
+        if cuts.ended_after(&lifeline) {
+            let (_, ended) = tokio::sync::watch::channel(true);
+            return CutWatch {
+                limiter: Arc::clone(self),
+                tag: lifeline.tag,
+                signal: None,
+                ended,
+                ends_at: lifeline.ends_at,
+            };
+        }
+        let entry = cuts.live.entry(lifeline.tag.clone()).or_insert_with(|| {
+            let (signal, _) = tokio::sync::watch::channel(false);
+            (0, Arc::new(signal))
+        });
+        entry.0 += 1;
+        CutWatch {
+            limiter: Arc::clone(self),
+            tag: lifeline.tag,
+            ended: entry.1.subscribe(),
+            signal: Some(Arc::clone(&entry.1)),
+            ends_at: lifeline.ends_at,
+        }
+    }
+
     /// How many live connections `key_id` holds. Only tests need this: the limiter is correct when
     /// its observable effect (a 17th socket is refused) is correct, not when a number is.
     pub fn held_by(&self, key_id: &str) -> usize {
@@ -265,6 +500,70 @@ impl Drop for StreamSlot {
             }
         }
     }
+}
+
+/// A live channel's hold on its credential ([`StreamLimiter::watch`], hub#2522).
+pub struct CutWatch {
+    limiter: Arc<StreamLimiter>,
+    tag: String,
+    /// The signal this channel was registered under; `None` for one born already cut.
+    signal: Option<Arc<tokio::sync::watch::Sender<bool>>>,
+    ended: tokio::sync::watch::Receiver<bool>,
+    /// When the credential runs out by itself ([`Lifeline::ends_at`], hub#2600).
+    ends_at: Option<Instant>,
+}
+
+impl CutWatch {
+    /// Resolves once the credential has been cut or has run out. Cancel-safe, so it can sit in a
+    /// `select!`: the deadline is an absolute instant, not a timer that restarts on every poll.
+    pub async fn ended(&mut self) {
+        // The sender lives as long as this watch holds `signal`, so `Err` cannot happen; if it
+        // ever did, the safe reading of "nobody can tell me any more" is that the channel ends.
+        let cut = self.ended.wait_for(|ended| *ended);
+        match self.ends_at {
+            Some(ends_at) => tokio::select! {
+                _ = cut => {}
+                _ = tokio::time::sleep_until(tokio::time::Instant::from_std(ends_at)) => {}
+            },
+            None => {
+                let _ = cut.await;
+            }
+        }
+    }
+}
+
+impl Drop for CutWatch {
+    fn drop(&mut self) {
+        let Some(signal) = &self.signal else { return };
+        let mut cuts = self.limiter.cuts.lock().unwrap_or_else(|p| p.into_inner());
+        // Only the entry this watch registered under: after a cut, the same tag may already name
+        // the channels of a NEW check (a rotated key reconnecting), whose count is not ours.
+        if let Some((watching, live)) = cuts.live.get_mut(&self.tag) {
+            if Arc::ptr_eq(live, signal) {
+                *watching = watching.saturating_sub(1);
+                if *watching == 0 {
+                    cuts.live.remove(&self.tag);
+                }
+            }
+        }
+    }
+}
+
+/// Resolves when any of `watches` is cut; never, for a channel with nothing to watch.
+async fn credential_ended(watches: &mut [CutWatch]) {
+    if watches.is_empty() {
+        return std::future::pending().await;
+    }
+    futures_util::future::select_all(watches.iter_mut().map(|w| Box::pin(w.ended()))).await;
+}
+
+/// The last frame of a channel whose credential ended ([`ERR_CREDENTIAL_ENDED`]).
+fn credential_ended_frame() -> Value {
+    json!({
+        "type": "stream.error",
+        "code": ERR_CREDENTIAL_ENDED,
+        "message": "the credential this channel was opened with has ended (signed out, expired, revoked, rotated, or the person's access changed)",
+    })
 }
 
 /// **The one filter: what a listener may be sent** (hub#529).
@@ -302,16 +601,107 @@ pub fn may_receive(scope: &ApiKeyScope, frame: &WsEvent) -> bool {
     }
 }
 
+/// The hub's own frames that say nothing about anybody and that every screen needs, whoever is
+/// looking at it (hub#2501): an app was installed, updated, switched on or off, removed — the
+/// menu refreshes — and a ticket was queued for a print role, which carries the role and nothing
+/// else (`print.rs` says so on purpose). Anything else that belongs to no module is a fact about
+/// the business with content in it, and goes only to whoever can see it ([`StreamAudience`]).
+fn is_housekeeping(frame: &WsEvent) -> bool {
+    match frame.get("type").and_then(Value::as_str) {
+        Some(kind) => kind.starts_with("module.") || kind == crate::print_ws::EVENT_JOB_QUEUED,
+        None => false,
+    }
+}
+
+/// **Who a live connection is talking to**, decided once when it authenticates.
+///
+/// | Audience | Gets |
+/// |----------|------|
+/// | an API key | [`may_receive`] on its scope (hub#529) |
+/// | a person's session (hub#2501) | the frames of the modules their role may read through the normal API ([`erplora_runtime::Registry::modules_readable_by`] — the query door's own predicate), the hub's housekeeping frames, and the hub's own named events (a flow's question, which names the customer) only if they administer the hub, which is who the approvals tray serves |
+///
+/// The default grants **nothing**, so a connection that somehow reached the fan-out without
+/// authenticating is sent nothing rather than everything.
+#[derive(Debug, Clone)]
+pub enum StreamAudience {
+    Key(ApiKeyScope),
+    Session {
+        /// The session holds `*` (dev mode, the runtime's own contexts): it reads everything.
+        wildcard: bool,
+        /// It holds [`erplora_runtime::hub_users::ADMINISTER_PERMISSION`].
+        administers: bool,
+        /// Active modules with at least one query its permissions let through.
+        modules: HashSet<String>,
+    },
+}
+
+impl Default for StreamAudience {
+    fn default() -> Self {
+        StreamAudience::Key(ApiKeyScope::default())
+    }
+}
+
+impl StreamAudience {
+    /// The session audience of `ctx`, read against the modules installed right now.
+    pub fn of_session(registry: &erplora_runtime::Registry, ctx: &RequestContext) -> Self {
+        StreamAudience::Session {
+            wildcard: ctx
+                .permissions
+                .contains(erplora_runtime::permissions::WILDCARD),
+            administers: erplora_runtime::permissions::has(
+                ctx,
+                erplora_runtime::hub_users::ADMINISTER_PERMISSION,
+            ),
+            modules: registry.modules_readable_by(ctx),
+        }
+    }
+
+    /// Whether this audience is entitled to `frame`. **One rule for both transports**: the socket
+    /// loop and the SSE stream both ask here.
+    pub fn may_receive(&self, frame: &WsEvent) -> bool {
+        match self {
+            StreamAudience::Key(scope) => may_receive(scope, frame),
+            StreamAudience::Session {
+                wildcard,
+                administers,
+                modules,
+            } => {
+                if *wildcard {
+                    return true;
+                }
+                match frame.get(FRAME_MODULE).and_then(Value::as_str) {
+                    Some(module) => modules.contains(module),
+                    None => is_housekeeping(frame) || *administers,
+                }
+            }
+        }
+    }
+}
+
+/// What a credential that may listen is granted.
+#[derive(Debug)]
+pub struct StreamGrant {
+    /// Whose connections the per-holder cap counts ([`StreamLimiter`]): the key's id, or
+    /// `session:<user id>` for a person — so one person's tabs never lock another person out.
+    pub holder_id: String,
+    pub audience: StreamAudience,
+    /// What the channel ends with (hub#2522, hub#2571): the key, or the person and their session.
+    pub lifelines: Vec<Lifeline>,
+}
+
 /// What presenting a credential to this channel gets you.
 #[derive(Debug)]
 pub enum StreamAuth {
-    /// A key of this hub that may read.
-    Granted(Box<ApiKeyPrincipal>),
+    /// A key of this hub that may read, or a person's session ticket.
+    Granted(Box<StreamGrant>),
     /// No credential, or one this hub does not know. The string is the *message* — it tells
     /// "you sent none" from "yours is not valid here" without the code leaking which.
     Unauthenticated(String),
     /// A real key of this hub that may not read anything.
     ReadRequired,
+    /// Something other than a ticket in the address (hub#2523). Never resolved: whether it was a
+    /// real key is not something the address gets to learn.
+    KeyInUrl,
 }
 
 impl StreamAuth {
@@ -320,6 +710,7 @@ impl StreamAuth {
             StreamAuth::Granted(_) => "",
             StreamAuth::Unauthenticated(_) => ERR_UNAUTHENTICATED,
             StreamAuth::ReadRequired => ERR_READ_REQUIRED,
+            StreamAuth::KeyInUrl => ERR_KEY_IN_URL,
         }
     }
 
@@ -330,6 +721,9 @@ impl StreamAuth {
             StreamAuth::ReadRequired => {
                 "this API key may not read: the event stream is a read".into()
             }
+            StreamAuth::KeyInUrl => "the address only takes a single-use ticket from \
+                 POST /api/events/ticket: send an API key in the Authorization header"
+                .into(),
         }
     }
 
@@ -338,6 +732,7 @@ impl StreamAuth {
             StreamAuth::Granted(_) => StatusCode::OK,
             StreamAuth::Unauthenticated(_) => StatusCode::UNAUTHORIZED,
             StreamAuth::ReadRequired => StatusCode::FORBIDDEN,
+            StreamAuth::KeyInUrl => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -351,6 +746,10 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
             "this channel needs an API key of this hub: none was sent".into(),
         );
     }
+    // hub#2522: taken BEFORE the key is looked up, so a revocation that lands while it is being
+    // verified (argon2 is slow on purpose) counts as after the check: the channel is born cut
+    // when it registers (`StreamLimiter::watch`) and closes before it forwards anything.
+    let checked_at = Instant::now();
     let hub_id = st.hub_id();
     let arc = match st.runtime_for(&hub_id).await {
         Ok(rt) => rt,
@@ -360,7 +759,25 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
 
     let resolved = if credential.starts_with(TICKET_PREFIX) {
         match st.stream_tickets.redeem(credential, &hub_id) {
-            Some(key_id) => rt.resolve_api_key_id(&key_id).await,
+            Some(TicketHolder::Key(key_id)) => rt.resolve_api_key_id(&key_id).await,
+            Some(TicketHolder::Session {
+                user_id,
+                permissions,
+                lifelines,
+            }) => {
+                // hub#2522: a ticket minted before its session signed out is the word of a session
+                // that no longer exists — and, hub#2571, one minted before the person's role changed
+                // carries permissions they no longer have.
+                if lifelines.iter().any(|l| st.stream_limiter.has_ended(l)) {
+                    return credential_not_valid();
+                }
+                let ctx = RequestContext::new(hub_id.clone(), user_id.clone(), permissions);
+                return StreamAuth::Granted(Box::new(StreamGrant {
+                    holder_id: format!("session:{user_id}"),
+                    audience: StreamAudience::of_session(rt.registry(), &ctx),
+                    lifelines,
+                }));
+            }
             None => Ok(None),
         }
     } else {
@@ -368,24 +785,49 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
     };
     match resolved {
         Ok(Some(principal)) => {
+            let lifeline = Lifeline {
+                tag: key_tag(&principal.key_id),
+                checked_at,
+                ends_at: None,
+            };
             if principal.scope.can_read() {
-                StreamAuth::Granted(Box::new(principal))
+                StreamAuth::Granted(Box::new(StreamGrant {
+                    holder_id: principal.key_id,
+                    audience: StreamAudience::Key(principal.scope),
+                    lifelines: vec![lifeline],
+                }))
             } else {
                 StreamAuth::ReadRequired
             }
         }
         // Unknown, revoked, wrong secret, expired ticket, or a credential of ANOTHER hub — all the
         // same answer: this hub does not know it.
-        Ok(None) | Err(_) => StreamAuth::Unauthenticated(
-            "this credential is not valid in this hub (unknown, revoked or expired)".into(),
-        ),
+        Ok(None) | Err(_) => credential_not_valid(),
     }
+}
+
+fn credential_not_valid() -> StreamAuth {
+    StreamAuth::Unauthenticated(
+        "this credential is not valid in this hub (unknown, revoked or expired)".into(),
+    )
 }
 
 /// Credential presented on an HTTP request: the `Authorization: Bearer` header, else the `ticket`
 /// query parameter (the browser's only option on `EventSource`).
-fn http_credential(headers: &HeaderMap, ticket: Option<&str>) -> Option<String> {
-    auth::api_key_token(headers).or_else(|| ticket.map(str::to_string))
+///
+/// hub#2523: the address takes a **ticket** and nothing else. Anything else there is refused by its
+/// prefix, here and not in [`authenticate`] — so it is never resolved (the address is no oracle for
+/// which keys exist) and a good header beside it does not launder it: the secret reached the access
+/// log the moment the request was made, and the integration has to hear that.
+fn http_credential(
+    headers: &HeaderMap,
+    ticket: Option<&str>,
+) -> Result<Option<String>, StreamAuth> {
+    let ticket = ticket.map(str::trim).filter(|t| !t.is_empty());
+    if ticket.is_some_and(|t| !t.starts_with(TICKET_PREFIX)) {
+        return Err(StreamAuth::KeyInUrl);
+    }
+    Ok(auth::api_key_token(headers).or_else(|| ticket.map(str::to_string)))
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -407,9 +849,10 @@ fn refused(auth: &StreamAuth) -> Response {
 
 /// `POST /api/events/ticket` — **the app asking the hub for its own credential.**
 ///
-/// Authenticated by the hub session, so an anonymous browser cannot get one. It ensures the hub's
-/// own read-only key exists (minting it on a hub that has just been created or restored) and hands
-/// back a ticket bound to it.
+/// Authenticated by the hub session, so an anonymous browser cannot get one. The ticket is bound to
+/// **that session's permissions** (hub#2501): the socket it opens hears what the person's role may
+/// read, not what the hub's own blanket key may — which used to give a cashier every event of the
+/// business, customers and flow questions included.
 pub async fn mint_ticket(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let hub_id = st.hub_id();
     let arc = match st.runtime_for(&hub_id).await {
@@ -417,21 +860,54 @@ pub async fn mint_ticket(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.read().await;
-    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({
-                "ok": false,
-                "error": { "code": ERR_UNAUTHENTICATED, "message": e.message() }
-            })),
-        )
-            .into_response();
-    }
-    let key_id = match rt.ensure_app_api_key().await {
-        Ok(id) => id,
-        Err(e) => return crate::err_response(e),
+    // hub#2571: before the session and its role are read (see `StreamTickets::mint_session`).
+    let checked_at = Instant::now();
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({
+                    "ok": false,
+                    "error": { "code": ERR_UNAUTHENTICATED, "message": e.message() }
+                })),
+            )
+                .into_response();
+        }
     };
-    let ticket = st.stream_tickets.mint(&hub_id, &key_id);
+    let session = auth::session_token(&headers);
+    // hub#2600: when the session runs out, so does the channel this ticket opens. Read through the
+    // same scoped door that just resolved it; a session that ran out in between is refused like
+    // any other. Without sessions (`AuthMode::Dev`) there is nothing to run out.
+    let ends_at = match (&st.config.auth_mode, session.as_deref()) {
+        (AuthMode::Session, Some(token)) => match rt.session_expires_at(token).await {
+            Ok(Some(ends)) => Some(instant_at(ends)),
+            Ok(None) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({
+                        "ok": false,
+                        "error": {
+                            "code": ERR_UNAUTHENTICATED,
+                            "message": "the session ended while the ticket was being minted",
+                        }
+                    })),
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                let (status, body) = crate::dispatch_api::error_payload(&e);
+                return (status, Json(body)).into_response();
+            }
+        },
+        _ => None,
+    };
+    let ticket = st.stream_tickets.mint_session(
+        &hub_id,
+        &ctx,
+        session.as_deref().map(|token| (token, ends_at)),
+        checked_at,
+    );
     Json(json!({
         "ok": true,
         "data": { "ticket": ticket, "expires_in_seconds": TICKET_TTL_SECONDS }
@@ -449,14 +925,17 @@ pub async fn sse(
     headers: HeaderMap,
     Query(q): Query<StreamQuery>,
 ) -> Response {
-    let credential = http_credential(&headers, q.ticket.as_deref());
-    let principal = match authenticate(&st, credential.as_deref()).await {
-        StreamAuth::Granted(p) => p,
+    let credential = match http_credential(&headers, q.ticket.as_deref()) {
+        Ok(credential) => credential,
+        Err(refusal) => return refused(&refusal),
+    };
+    let grant = match authenticate(&st, credential.as_deref()).await {
+        StreamAuth::Granted(g) => g,
         refusal => return refused(&refusal),
     };
     // hub#531: the per-key cap applies to SSE too — `EventSource` reconnects on its own, and a bug
     // that spawns reconnections without closing the old one reaches the ceiling the same way.
-    let slot = match st.stream_limiter.acquire(&principal.key_id) {
+    let slot = match st.stream_limiter.acquire(&grant.holder_id) {
         Some(s) => s,
         None => {
             return (
@@ -473,30 +952,53 @@ pub async fn sse(
         }
     };
     let rx = st.events.subscribe();
-    // hub#529: the same filter the socket applies, from the same function. The scope travels with
-    // the stream so a later frame is judged by the key that opened it, not by a re-read.
-    let scope = principal.scope.clone();
-    let stream =
-        futures_util::stream::unfold((rx, slot, scope), |(mut rx, slot, scope)| async move {
+    // hub#529, hub#2501: the same filter the socket applies, from the same function. The audience
+    // travels with the stream so a later frame is judged by who opened it, not by a re-read.
+    let audience = grant.audience;
+    // hub#2522: …and the credential travels with it too, so ending it ends the stream.
+    let watches: Vec<CutWatch> = grant
+        .lifelines
+        .into_iter()
+        .map(|l| st.stream_limiter.watch(l))
+        .collect();
+    let stream = futures_util::stream::unfold(
+        (rx, slot, audience, watches, false),
+        |(mut rx, slot, audience, mut watches, ended)| async move {
+            if ended {
+                // The last frame went out: end the response. `slot` and `watches` drop here.
+                return None;
+            }
             loop {
-                match rx.recv().await {
-                    Ok(ev) => {
-                        if !may_receive(&scope, &ev) {
-                            continue;
-                        }
-                        let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
+                tokio::select! {
+                    // A cut wins over a frame queued at the same instant: nothing more goes out.
+                    biased;
+                    _ = credential_ended(&mut watches) => {
+                        let data = credential_ended_frame().to_string();
                         return Some((
                             Ok::<Event, std::convert::Infallible>(Event::default().data(data)),
-                            (rx, slot, scope),
+                            (rx, slot, audience, watches, true),
                         ));
                     }
-                    // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                    // Canal cerrado: termina el stream. `slot` drops here, releasing the limiter count.
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+                    event = rx.recv() => match event {
+                        Ok(ev) => {
+                            if !audience.may_receive(&ev) {
+                                continue;
+                            }
+                            let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
+                            return Some((
+                                Ok(Event::default().data(data)),
+                                (rx, slot, audience, watches, false),
+                            ));
+                        }
+                        // A slow subscriber skips what it lost and carries on (as the socket does).
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        // Broadcast closed: the stream ends. `slot` drops here, releasing the count.
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+                    },
                 }
             }
-        });
+        },
+    );
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
@@ -520,12 +1022,14 @@ pub async fn upgrade(
 /// "not authenticated" state — there is no boolean anybody can forget to set.
 #[derive(Debug, Default)]
 pub struct StreamConnection {
+    /// Whose connections the cap counts: a key id, or `session:<user id>` ([`StreamGrant`]).
     key_id: String,
-    /// What the key that opened this socket may read (hub#529). The default —
-    /// [`ApiKeyAccess::Custom`] with no modules — grants **nothing**, so a socket that somehow
-    /// reached the fan-out without going through [`handle_frame`] is sent nothing rather than
-    /// everything.
-    scope: ApiKeyScope,
+    /// What the credential that opened this socket may read (hub#529, hub#2501). The default
+    /// grants **nothing**, so a socket that somehow reached the fan-out without going through
+    /// [`handle_frame`] is sent nothing rather than everything.
+    audience: StreamAudience,
+    /// What the socket ends with (hub#2522, hub#2571), until the loop turns it into [`CutWatch`]es.
+    lifelines: Vec<Lifeline>,
 }
 
 impl StreamConnection {
@@ -536,7 +1040,7 @@ impl StreamConnection {
     /// Whether this socket is entitled to `frame`. Delegates to [`may_receive`] — the socket loop
     /// must not grow a second copy of the rule.
     pub fn may_receive(&self, frame: &WsEvent) -> bool {
-        may_receive(&self.scope, frame)
+        self.audience.may_receive(frame)
     }
 }
 
@@ -567,10 +1071,12 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
         .get("type")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    if frame_type != "auth" {
-        // This channel speaks ONE client frame. Before `auth` that is an unauthenticated peer
+    if frame_type != "auth" || conn.is_ready() {
+        // This channel speaks ONE client frame, ONCE. Before `auth` that is an unauthenticated peer
         // trying its luck and the socket goes; after it, a client talking nonsense on a channel
-        // that only listens — two different facts, so two different answers.
+        // that only listens — two different facts, so two different answers. A second `auth` is
+        // the second kind (hub#2501): a socket keeps the audience it opened with, so a cashier's
+        // socket cannot be widened by presenting somebody else's key.
         let (code, message) = if conn.is_ready() {
             (
                 ERR_INVALID_FRAME,
@@ -592,12 +1098,18 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
         .and_then(Value::as_str)
         .unwrap_or_default();
     match authenticate(st, Some(token)).await {
-        StreamAuth::Granted(principal) => {
-            conn.key_id = principal.key_id.clone();
+        StreamAuth::Granted(grant) => {
+            let StreamGrant {
+                holder_id,
+                audience,
+                lifelines,
+            } = *grant;
+            conn.key_id = holder_id;
             // hub#529: what this socket may be sent is decided here, once, from the credential it
-            // presented — not re-read per frame, where a revoked key would change the answer
-            // mid-stream in a way nothing tests.
-            conn.scope = principal.scope.clone();
+            // presented. What a later change of that credential does is the lifeline's job
+            // (hub#2522): ending it closes the socket, so the audience is never re-read per frame.
+            conn.audience = audience;
+            conn.lifelines = lifelines;
             Reply {
                 frame: json!({ "type": "stream.ready" }),
                 keep_open: true,
@@ -624,6 +1136,10 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
     // panic, the auth-timeout, any `break`. Without a guard tied to the loop's lifetime the counter
     // only goes up and the limit becomes a denial-of-service against the hub's owner.
     let mut slot: Option<StreamSlot> = None;
+    // hub#2522: the socket's hold on its credential, taken with the slot. Ending the credential
+    // (sign-out, revoked or rotated key) or, hub#2571, changing the person's access resolves it and
+    // the loop closes the socket.
+    let mut watches: Vec<CutWatch> = Vec::new();
     // Subscribed BEFORE authenticating, and read only after: verifying a credential takes real
     // time (argon2 is slow on purpose), and a sale that happens during the handshake belongs to a
     // listener that turns out to be entitled to it. Holding the receiver is not hearing anything —
@@ -631,17 +1147,26 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
     let mut rx = st.events.subscribe();
     // A client that could set a header is already authenticated; it never sends a frame.
     if let Some(credential) = handshake_credential {
-        if let StreamAuth::Granted(principal) = authenticate(&st, Some(&credential)).await {
+        if let StreamAuth::Granted(grant) = authenticate(&st, Some(&credential)).await {
             // hub#531: a correct, read-entitled key that has opened too many sockets is a third
             // refusal. The handshake path closes the socket right here.
-            match st.stream_limiter.acquire(&principal.key_id) {
+            match st.stream_limiter.acquire(&grant.holder_id) {
                 Some(s) => {
                     slot = Some(s);
-                    conn.key_id = principal.key_id.clone();
-                    // hub#529: the handshake path sets the scope too. Setting only the id here is
-                    // exactly how a socket would end up entitled to nothing (or, before the
+                    let StreamGrant {
+                        holder_id,
+                        audience,
+                        lifelines,
+                    } = *grant;
+                    watches = lifelines
+                        .into_iter()
+                        .map(|l| st.stream_limiter.watch(l))
+                        .collect();
+                    conn.key_id = holder_id;
+                    // hub#529: the handshake path sets the audience too. Setting only the id here
+                    // is exactly how a socket would end up entitled to nothing (or, before the
                     // fail-closed default, to everything).
-                    conn.scope = principal.scope.clone();
+                    conn.audience = audience;
                 }
                 None => {
                     let frame = json!({
@@ -660,6 +1185,15 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
 
     loop {
         tokio::select! {
+            // A cut wins over a frame queued at the same instant: nothing more goes out.
+            biased;
+            // hub#2522: the credential ended while the socket was open. Say why, and close.
+            _ = credential_ended(&mut watches), if !watches.is_empty() => {
+                let frame = credential_ended_frame().to_string();
+                let _ = socket.send(Message::Text(frame)).await;
+                let _ = socket.send(Message::Close(None)).await;
+                break;
+            }
             incoming = socket.recv() => {
                 let Some(Ok(message)) = incoming else { break };
                 let text = match message {
@@ -678,7 +1212,13 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
                 // any second `auth`).
                 if conn.is_ready() && slot.is_none() {
                     match st.stream_limiter.acquire(&conn.key_id) {
-                        Some(s) => slot = Some(s),
+                        Some(s) => {
+                            slot = Some(s);
+                            watches = std::mem::take(&mut conn.lifelines)
+                                .into_iter()
+                                .map(|l| st.stream_limiter.watch(l))
+                                .collect();
+                        }
                         None => {
                             let frame = json!({
                                 "type": "stream.error",
@@ -1011,8 +1551,8 @@ mod tests {
         let t = tickets.mint_at(HUB_ID, "key-1", 1_000);
         assert!(t.starts_with(TICKET_PREFIX));
         assert_eq!(
-            tickets.redeem_at(&t, HUB_ID, 1_000).as_deref(),
-            Some("key-1")
+            tickets.redeem_at(&t, HUB_ID, 1_000),
+            Some(TicketHolder::Key("key-1".into()))
         );
         assert_eq!(
             tickets.redeem_at(&t, HUB_ID, 1_000),
@@ -1032,13 +1572,13 @@ mod tests {
         let second = tickets.mint_at(HUB_ID, "key-1", 1_001);
 
         assert_eq!(
-            tickets.redeem_at(&first, HUB_ID, 1_001).as_deref(),
-            Some("key-1"),
+            tickets.redeem_at(&first, HUB_ID, 1_001),
+            Some(TicketHolder::Key("key-1".into())),
             "the first tab's ticket survived the second tab asking for one"
         );
         assert_eq!(
-            tickets.redeem_at(&second, HUB_ID, 1_001).as_deref(),
-            Some("key-1")
+            tickets.redeem_at(&second, HUB_ID, 1_001),
+            Some(TicketHolder::Key("key-1".into()))
         );
     }
 
@@ -1095,8 +1635,8 @@ mod tests {
         let t = tickets.mint_at(HUB_ID, "key-1", 1_000);
         assert_eq!(tickets.redeem_at(&t, NEIGHBOUR_ID, 1_000), None);
         assert_eq!(
-            tickets.redeem_at(&t, HUB_ID, 1_000).as_deref(),
-            Some("key-1"),
+            tickets.redeem_at(&t, HUB_ID, 1_000),
+            Some(TicketHolder::Key("key-1".into())),
             "the rightful owner can still spend it"
         );
     }
@@ -1127,18 +1667,21 @@ mod tests {
         assert_eq!(tickets.redeem_at("erpl_tkt_made_up", HUB_ID, 1_000), None);
     }
 
-    /// The app's route end to end: session → key issued → ticket → socket open. This is the
+    /// The app's route end to end: session → ticket from the real door → socket open. This is the
     /// **only** thing standing between the shell and a dead dashboard, so it is asserted through
     /// the real door, not through a helper that fabricates an authenticated context.
     #[tokio::test]
     async fn the_app_reaches_the_stream_with_a_ticket_it_asked_for() {
         let f = fixture().await;
-        let key_id = {
-            let arc = f.st.runtime_for(&f.st.hub_id()).await.unwrap();
-            let rt = arc.read().await;
-            rt.ensure_app_api_key().await.unwrap()
-        };
-        let ticket = f.st.stream_tickets.mint(&f.st.hub_id(), &key_id);
+        let mut headers = HeaderMap::new();
+        headers.insert("x-hub-session", f.session.parse().unwrap());
+        let resp = mint_ticket(State(f.st.clone()), headers).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&bytes).unwrap();
+        let ticket = body["data"]["ticket"].as_str().unwrap().to_string();
 
         let mut conn = StreamConnection::default();
         let r = send(&f.st, &mut conn, auth_frame(&ticket)).await;
@@ -1213,6 +1756,126 @@ mod tests {
             0,
             "the slot was released when the scope ended"
         );
+    }
+
+    // ── hub#2522: ending a credential ends its channels ─────────────────────
+
+    /// Whether `watch` has been cut, without waiting for it.
+    fn is_cut(watch: &mut CutWatch) -> bool {
+        use futures_util::FutureExt;
+        watch.ended().now_or_never().is_some()
+    }
+
+    fn lifeline(tag: &str) -> Lifeline {
+        Lifeline {
+            tag: tag.into(),
+            checked_at: Instant::now(),
+            ends_at: None,
+        }
+    }
+
+    #[test]
+    fn a_persons_tag_names_the_hub_too() {
+        // hub#2571, ADR-0005: one process serves several hubs, so a role change in one must not
+        // close the channels of a person with the same id in the other.
+        let lim = Arc::new(StreamLimiter::default());
+        let mut here = lim.watch(lifeline(&person_tag("hub-a", "u-1")));
+        let mut next_door = lim.watch(lifeline(&person_tag("hub-b", "u-1")));
+        assert_eq!(lim.cut(&person_tag("hub-a", "u-1")), 1);
+        assert!(is_cut(&mut here));
+        assert!(!is_cut(&mut next_door));
+    }
+
+    #[test]
+    fn a_cut_ends_every_channel_of_that_credential_and_no_other() {
+        let lim = Arc::new(StreamLimiter::default());
+        let mut till = lim.watch(lifeline("session:till"));
+        let mut tab = lim.watch(lifeline("session:till"));
+        let mut phone = lim.watch(lifeline("session:phone"));
+        assert!(!is_cut(&mut till), "nothing was cut yet");
+
+        assert_eq!(lim.cut("session:till"), 2, "both channels were told");
+
+        assert!(is_cut(&mut till));
+        assert!(is_cut(&mut tab));
+        assert!(!is_cut(&mut phone), "another credential keeps listening");
+    }
+
+    /// The race the ticket opens: the session is checked when its ticket is minted, signs out, and
+    /// only then does the channel register. It must be born cut.
+    #[test]
+    fn a_channel_checked_before_the_cut_is_born_cut() {
+        let lim = Arc::new(StreamLimiter::default());
+        let checked = lifeline("session:till");
+        lim.cut("session:till");
+
+        assert!(lim.has_ended(&checked));
+        assert!(is_cut(&mut lim.watch(checked)));
+    }
+
+    /// A rotated key reconnects with its new secret at once: that check came after the cut and saw
+    /// the new state, so it is not cut by the old one.
+    #[test]
+    fn a_channel_checked_after_the_cut_listens() {
+        let lim = Arc::new(StreamLimiter::default());
+        lim.cut("key:k1");
+        let fresh = lifeline("key:k1");
+
+        assert!(!lim.has_ended(&fresh));
+        assert!(!is_cut(&mut lim.watch(fresh)));
+    }
+
+    /// A channel cut before a reconnection must not, on closing, forget the NEW channel of the same
+    /// credential — or the next cut would find nobody to tell.
+    #[test]
+    fn closing_a_cut_channel_leaves_the_reconnected_one_registered() {
+        let lim = Arc::new(StreamLimiter::default());
+        let old = lim.watch(lifeline("key:k1"));
+        lim.cut("key:k1");
+        let mut reconnected = lim.watch(lifeline("key:k1"));
+
+        drop(old);
+        assert_eq!(
+            lim.cut("key:k1"),
+            1,
+            "the reconnected channel is still known"
+        );
+        assert!(is_cut(&mut reconnected));
+    }
+
+    #[test]
+    fn a_closed_channel_is_forgotten() {
+        let lim = Arc::new(StreamLimiter::default());
+        drop(lim.watch(lifeline("session:till")));
+        assert_eq!(lim.cut("session:till"), 0, "nothing left to tell");
+    }
+
+    #[test]
+    fn a_cut_is_forgotten_after_its_memory() {
+        let lim = Arc::new(StreamLimiter::default());
+        let checked = lifeline("session:old");
+        lim.cut("session:old");
+        // Age the cut past its memory, then cut something else: the sweep runs on every cut.
+        if let Ok(mut cuts) = lim.cuts.lock() {
+            let aged = Instant::now() - CUT_MEMORY - Duration::from_secs(1);
+            cuts.ended.insert("session:old".into(), aged);
+        }
+        lim.cut("session:other");
+
+        let cuts = lim.cuts.lock().unwrap();
+        assert!(!cuts.ended.contains_key("session:old"), "swept");
+        assert!(cuts.ended.contains_key("session:other"));
+        drop(cuts);
+        assert!(!lim.has_ended(&checked));
+    }
+
+    #[test]
+    fn a_session_tag_never_carries_the_token() {
+        let tag = session_tag("hub-session-secret");
+        assert!(tag.starts_with("session:"));
+        assert!(!tag.contains("hub-session-secret"));
+        assert_eq!(tag, session_tag("hub-session-secret"), "stable");
+        assert_ne!(tag, session_tag("another-session"));
     }
 
     // ── hub#529: what a listener may be sent ────────────────────────────────

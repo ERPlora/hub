@@ -165,6 +165,17 @@ const _status = ref<SetupStatus | null>(null);
 export const setupStatus = computed<SetupStatus | null>(() => _status.value);
 
 /**
+ * Forgets the document read for the person who had the session (hub#2506).
+ *
+ * The runtime answers it for the session that asks (`actionable`, hub#435), and a failed refresh
+ * keeps the previous answer on purpose — so a hand-over clears it first, or a failed re-read would
+ * leave the previous person's checklist in front of the next one.
+ */
+export function resetSetupStatus(): void {
+  _status.value = null;
+}
+
+/**
  * Reads `hub.setup.status` — once, for the whole hub.
  *
  * Best-effort, like everything around this subsystem: a query that fails (early boot, denied

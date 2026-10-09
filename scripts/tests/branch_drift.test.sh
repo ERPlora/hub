@@ -251,6 +251,44 @@ if [ -f "$signal" ]; then
         fail "a missing ref must exit 3 (not 0: an unmeasured run must never read as a clean one), got $status: $output"
     fi
 
+    # ── Both signals open their issue in the CI area's queue (pm#663) ─────────
+    # hub issues are split by handbook area and each area's queue is `gh issue list --label
+    # module:<key>`: a signal issue without `module:ci` reaches nobody.
+    labels_report=$(SIGNAL="$signal" python3 - <<'PY'
+import importlib.util, os, sys, types
+
+spec = importlib.util.spec_from_file_location("branch_drift", os.environ["SIGNAL"])
+mod = importlib.util.module_from_spec(spec)
+sys.modules["branch_drift"] = mod  # @dataclass looks its module up there
+spec.loader.exec_module(mod)
+
+class Issues:
+    def __init__(self):
+        self.created = []
+    def find_open(self, marker):
+        return None
+    def create(self, title, body, labels):
+        self.created.append(labels)
+
+issues = Issues()
+mod.sync_issue(types.SimpleNamespace(drifting=True), title="t", body="b", issues=issues)
+mod.sync_issue(types.SimpleNamespace(drifting=True), title="t", body="b", issues=issues,
+               marker=mod.RETURN_MARKER, close_comment=mod.RETURN_CLOSE_COMMENT)
+for labels in issues.created:
+    print(",".join(sorted(labels)))
+# The lookup must NOT move to module:ci: the signal issues already open were created without it,
+# and a lookup that misses them opens a twin every run.
+queries = []
+mod.GhIssues("ERPlora/hub", run=lambda args: queries.append(args) or "[]").find_open(mod.MARKER)
+print("lookup:" + queries[0][queries[0].index("--label") + 1])
+PY
+)
+    if [ "$labels_report" = "$(printf 'area:ci-cd,module:ci,prio:P1\narea:ci-cd,module:ci,prio:P1\nlookup:area:ci-cd')" ]; then
+        ok
+    else
+        fail "both signal issues must be created with prio:P1, area:ci-cd and module:ci, and still be looked up by area:ci-cd (pm#663); got: $labels_report"
+    fi
+
     # ── Stdlib only: the signal must not depend on resolving any environment ──
     stdlib_report=$(SIGNAL="$signal" python3 - <<'PY'
 import ast, os, sys

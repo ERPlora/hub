@@ -734,3 +734,61 @@ describe('the reason a kitchen order did not print is for the log, not for the f
     });
   }
 });
+
+// hub#2494 — the station's printer on this device did not answer (switched off, out of paper).
+// The floor is told, and Retry prints THAT station's docket again — not the whole order, so the
+// station that did get its paper does not get a second one (Toast's «Reprint to this station»).
+describe('a docket whose printer did not answer (hub#2494)', () => {
+  const DEAD: PrintResult = { via: 'none', role: 'kitchen', error: 'unreachable', printerFailed: true };
+  const kitchenAndBar = () =>
+    fakeClient({
+      query: vi.fn(async (name: string) => {
+        if (name === 'kitchen.orders.items') return [CROQUETAS, FLAN];
+        if (name === 'kitchen.orders.get') return [{ id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018' }];
+        return [];
+      }),
+    });
+
+  it('warns with a Retry that prints only that station again', async () => {
+    const print = vi.fn(async (req: PrintRequest): Promise<PrintResult> =>
+      req.role === 'kitchen' && print.mock.calls.length === 1 ? DEAD : { via: 'bridge', role: req.role ?? '' },
+    );
+    const onFailure = vi.fn();
+
+    await onKitchenOrderCreated(kitchenAndBar(), { order_id: 'k-1' }, { print, onFailure });
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    const failure = onFailure.mock.calls[0]![0];
+    expect(failure).toMatchObject({ orderId: 'k-1', role: 'kitchen', label: 'Mesa 4', printerFailed: true });
+    expect(print).toHaveBeenCalledTimes(2); // kitchen (dead) + bar (printed)
+
+    await failure.retry();
+
+    expect(print).toHaveBeenCalledTimes(3);
+    const again = print.mock.calls[2]![0];
+    expect(again.role).toBe('kitchen');
+    expect(again.jobId).toBe('kitchen-k-1-kitchen');
+    expect(again.data).toEqual(print.mock.calls[0]![0].data);
+    expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it('a Retry that fails again warns again', async () => {
+    const print = vi.fn(async (req: PrintRequest): Promise<PrintResult> => ({ ...DEAD, role: req.role ?? '' }));
+    const onFailure = vi.fn();
+
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+    await onFailure.mock.calls[0]![0].retry();
+
+    expect(onFailure).toHaveBeenCalledTimes(2);
+    expect(typeof onFailure.mock.calls[1]![0].retry).toBe('function');
+  });
+
+  it('a station with no printer at all is not a printer failure: no Retry to offer', async () => {
+    const print = vi.fn(async (): Promise<PrintResult> => ({ via: 'none', role: 'kitchen', error: 'no printer' }));
+    const onFailure = vi.fn();
+
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+
+    expect(onFailure.mock.calls[0]![0].retry).toBeUndefined();
+  });
+});

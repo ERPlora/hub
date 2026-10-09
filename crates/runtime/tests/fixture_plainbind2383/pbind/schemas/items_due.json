@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pbind.items.due params",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apply_horizon"],
+  "properties": {
+    "apply_horizon": { "type": "integer", "enum": [0, 1] },
+    "due_horizon": { "type": ["string", "null"] }
+  }
+}

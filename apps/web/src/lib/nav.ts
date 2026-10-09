@@ -40,6 +40,19 @@ export const moduleNav = ref<ModuleNavItem[]>([]);
  */
 export const moduleNavState = ref<ListLoadState>('loading');
 
+/**
+ * Forgets the list built for the person who had the session (hub#2506).
+ *
+ * The runtime filters `/api/navigation` by the permissions of whoever asks, so after a hand-over the
+ * list on screen is the previous person's. `refreshModuleNav` keeps the last good list when a read
+ * fails — right for a refresh of the same person, wrong across people — so the hand-over empties it
+ * first: a failed re-read then says «could not load», never «here are her apps».
+ */
+export function resetModuleNav(): void {
+  moduleNav.value = [];
+  moduleNavState.value = 'loading';
+}
+
 /** (Re)carga las entradas de menú desde el runtime (`/api/navigation`). No lanza. */
 export async function refreshModuleNav(): Promise<void> {
   try {

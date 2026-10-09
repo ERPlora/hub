@@ -71,6 +71,8 @@ on:
       # esperar a los 45 min del job de módulos: una PR que solo toque el corredor se entera aquí.
       - 'scripts/ci/run-module-hub-batteries.sh'
       - 'scripts/tests/run-module-hub-batteries.test.sh'
+      - 'scripts/ci/published-module-ids.sh'
+      - 'scripts/tests/published-module-ids.test.sh'
       # El cerrojo entre las dos listas (hub#1995): una PR que borra un e2e del kernel no puede
       # dejar su relevo «pendiente de publicar». Sus SUJETOS son las dos listas de arriba; estas
       # rutas son para el cerrojo y su test, que no dispararían nada por su cuenta.
@@ -136,6 +138,12 @@ on:
       - 'apps/web/src/lib/print.ts'
       - 'crates/peripherals/**'
       - 'crates/runtime/src/print_*.rs'
+      # Los documentos WORKFLOW del hub (hub#2491). El guardia entra por el glob
+      # `scripts/tests/*.test.sh`; estas rutas son sus SUJETOS: la PR que añade un flujo a un fichero
+      # de área y no lo lista en el índice, reutiliza un ID o cambia un estado en un solo sitio tiene
+      # que encontrar el rojo aquí, y esa PR puede no tocar nada más.
+      - '**/WORKFLOW.md'
+      - '**/workflow/*.md'
       # El SUJETO del guardia de lote aplastado (hub#1878). Su test ya entra por el glob
       # `scripts/tests/*.test.sh` de arriba, y el workflow que lo lleva por
       # `.github/workflows/**`; esta ruta es para el script en sí, que vive en `scripts/` y no
@@ -318,6 +326,15 @@ jobs:
           set -euo pipefail
           bash ./scripts/tests/run-module-hub-batteries.test.sh
 
+      # ── De dónde sale la lista de módulos publicados (pm#655) ─────────────────────────
+      # `test-hub-modules.yml` clona los módulos que dice la org (repos públicos, no archivados,
+      # con `module.json` en `main`), no un paquete de claves mantenido a mano. El test usa un
+      # `gh` falso: no gasta API y caza un filtro que se pierda (privados, archivados, lista vacía).
+      - name: Lista de módulos publicados (pm#655)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/published-module-ids.test.sh
+
       # ── Y el cerrojo entre las dos listas (hub#1995) ──────────────────────────────────
       # La marca `# pending-publication:` (kitchen#84) sirve para baterías NUEVAS. Si la misma PR
       # que borra un e2e del kernel la pone sobre su heredera, la cobertura no la corre nadie
@@ -466,6 +483,18 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/print-chain-doc-truth.test.sh
+
+      # ── Los WORKFLOW del hub siguen siendo un mapa que se puede seguir (hub#2491) ──────
+      # El hub tiene escrito qué debe hacer cada flujo (`WORKFLOW.md` + `workflow/<área>.md` por
+      # componente), y quien toca código lee el índice y el fichero de su área. Ese mapa se pudre
+      # en silencio: un flujo que no llega al índice, un ID reutilizado —lo citan 19 módulos y los
+      # recorridos—, un estado cambiado en el fichero y no en la tabla. Todo eso se decide desde
+      # este repo, así que se ancla en vez de fiarse. NO comprueba que un flujo diga la verdad
+      # sobre el código: eso lo contrasta el verificador independiente del contrato.
+      - name: "Contrato: los WORKFLOW del hub se sostienen (hub#2491)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/workflow-doc-truth.test.sh
 
       # ── Un lote develop → main que entra APLASTADO se caza (hub#1878) ─────────────────
       # `develop-main-drift.yml` solo se dispara por cron, por push a `main` y a mano, así que

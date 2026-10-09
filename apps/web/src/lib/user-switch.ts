@@ -40,6 +40,12 @@ import { deviceMode, deviceTrusted, type DeviceMode } from './device-mode';
 import { asksForPin, pinPolicy, type PinPolicy } from './pin-policy';
 import { clearTokens, runtimeLogout, runtimePinLogin } from './cloud';
 import { clearAssistantHistory } from './assistant-history';
+import { forgetAssistantPanel } from './shell';
+import { resolveEntitlement } from './entitlement';
+import { refreshModuleNav, resetModuleNav, type ModuleNavItem } from './nav';
+import type { ListLoadState } from './list-load-state';
+import { refreshSetupStatus, resetSetupStatus } from './setup-status';
+import { getClient } from './runtime';
 import { getHubSession, isAuthed, setHubSession, setUser } from './session';
 import { getUserProfile, resetUserProfile } from './user-profile';
 import { resetUserThemePreferences } from './theme';
@@ -92,6 +98,47 @@ export function openUserSwitch(): void {
 /** Take the overlay away. Idempotent: the backdrop, the button and a successful swap all land here. */
 export function closeUserSwitch(): void {
   userSwitchOpen.value = false;
+}
+
+/**
+ * How many hand-overs this page has seen (hub#2539). App.vue keys the screen and the assistant panel
+ * on it: every screen mounted for the person who left read its data with HER session and keeps it in
+ * its own state, where no store reset reaches. Mounting them again makes each one read for whoever
+ * arrived — and that is the only thing a hand-over may leave on screen.
+ */
+export const handovers = ref(0);
+
+/** The slice of the current route {@link screenAfterHandover} reads. */
+export interface HandoverRoute {
+  name?: unknown;
+  params: Record<string, unknown>;
+}
+
+/**
+ * Where the till goes after a hand-over: `null` to stay, or the path of Home.
+ *
+ * Only an app screen can be out of reach for the person who arrived — the launcher the runtime just
+ * re-read for her (`moduleNav`, filtered by HER permissions) is the list of what she may open, down
+ * to each tab. The shell's own screens stay: mounted again, each one asks the runtime for her and
+ * shows what the runtime lets her see. A launcher that could not be read cannot vouch for the screen,
+ * so the till goes Home rather than remount something that may not be hers.
+ *
+ * Decided BEFORE the screen is mounted again: remounting a forbidden app would fire its queries
+ * under her session just to be refused.
+ */
+export function screenAfterHandover(
+  route: HandoverRoute,
+  nav: readonly ModuleNavItem[],
+  navState: ListLoadState,
+): string | null {
+  if (route.name !== 'module') return null;
+  const HOME = '/dashboard';
+  if (navState !== 'ready') return HOME;
+  const item = nav.find((m) => m.path === `/m/${String(route.params.moduleId)}`);
+  if (!item) return HOME;
+  const navId = route.params.navId;
+  if (navId && !item.tabs?.some((tab) => tab.id === navId)) return HOME;
+  return null;
 }
 
 /**
@@ -160,6 +207,26 @@ export async function switchUser(name: string, pin: string): Promise<void> {
   resetUserThemePreferences();
   resetUserLocale();
   await getUserProfile().catch(() => null);
+
+  // What the shell built for the person who left goes too (hub#2506): the launcher and «My apps»
+  // (filtered by HER permissions), the plan (resolved with HER erplora.com credentials, cleared
+  // above) and the setup checklist (answered for HER session). The shell only re-reads them when
+  // `isAuthed` flips, and a hand-over never flips it. Emptied first, so a failed re-read leaves
+  // «could not load» on screen and not her lists; then re-read in the order of a fresh sign-in
+  // (`gateAndRefresh` in App.vue): the plan gates the launcher.
+  resetModuleNav();
+  resetSetupStatus();
+  await resolveEntitlement();
+  await refreshModuleNav();
+  await refreshSetupStatus(getClient());
+
+  // The assistant panel goes with her as well (hub#2538): closed and out of the setup mode she
+  // opened it in. Its unsent text, attachments and quota notice live inside the panel, so they leave
+  // when App.vue mounts it again below.
+  forgetAssistantPanel();
+  // Last, once her launcher has been re-read: App.vue decides from it where the till goes, then
+  // mounts the screen again for the person who arrived (hub#2539).
+  handovers.value += 1;
 }
 
 /**

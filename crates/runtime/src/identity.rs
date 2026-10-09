@@ -641,7 +641,56 @@ pub(crate) async fn write_taking_a_seat(
         min: 1,
     }];
     Ok(matches!(
-        db.execute_tx_gated(&ops, &gates).await?,
+        db.execute_tx_gated(&ops, &gates, &[]).await?,
+        TxGatedOutcome::Committed { .. }
+    ))
+}
+
+/// «…and somebody else still administers this hub». The `WHERE` piece that makes a write which
+/// takes administration away from the row `:id` check, while it writes, that another active
+/// administrator remains (hub#2500). `owner`/`admin` in any capitals, exactly like
+/// [`crate::hub_users::is_admin_role`].
+const ANOTHER_ADMIN_REMAINS: &str = "EXISTS (SELECT 1 FROM hub_user other \
+      WHERE other.hub_id = :hub_id AND other.id != :id AND other.is_active = 1 \
+        AND LOWER(other.role) IN ('owner', 'admin'))";
+
+/// Runs a write that **takes administration away** from the row `:id` (a demotion or a baja) only
+/// if another active administrator remains, counting and writing in the same step (hub#2500).
+///
+/// `sql` is the statement up to its `WHERE …` (or `AND …`): [`ANOTHER_ADMIN_REMAINS`] is glued on
+/// here, so no caller can forget it. `p` has to carry `hub_id` and `id`. `Ok(false)` = it would have
+/// left the hub without an administrator and **nothing was written**.
+///
+/// The advisory lock is what makes it hold, for the reason measured in [`write_taking_a_seat`]: in
+/// READ COMMITTED two overlapping demotions do not see each other's row, and both would find «the
+/// other one is still an administrator». With the lock taken by a previous statement, the second
+/// write's snapshot starts after the first one committed. Its own key space (`<hub>/admins`), so it
+/// never waits behind a seat or a boot migration.
+pub(crate) async fn write_keeping_an_admin(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    sql_up_to_the_admin_clause: &str,
+    p: &Params,
+) -> Result<bool> {
+    let mut p = p.clone();
+    p.insert("admins_key".into(), json!(format!("{hub_id}/admins")));
+    let ops = [
+        (
+            "SELECT pg_advisory_xact_lock(hashtext(:admins_key))".to_string(),
+            p.clone(),
+        ),
+        (
+            format!("{sql_up_to_the_admin_clause}{ANOTHER_ADMIN_REMAINS}"),
+            p.clone(),
+        ),
+    ];
+    let gates = [RowGate {
+        first: 1,
+        count: 1,
+        min: 1,
+    }];
+    Ok(matches!(
+        db.execute_tx_gated(&ops, &gates, &[]).await?,
         TxGatedOutcome::Committed { .. }
     ))
 }
@@ -973,7 +1022,7 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> 
     p.insert("email".into(), json!(email));
     let existing = db
         .query(
-            "SELECT id FROM hub_user WHERE hub_id = :hub_id AND email = :email",
+            "SELECT id FROM hub_user WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email)",
             &p,
         )
         .await?;
@@ -1092,13 +1141,16 @@ async fn raise_role_to_floor(
 /// Alcanza tanto la fila ya enlazada (`cloud_user_id`) como la **pre-provisionada por email** que
 /// aún no ha hecho login (invitación/owner sembrado): el email del JWT está autenticado (firma del
 /// SaaS) y es la misma clave con la que `get_or_link_cloud_user` enlaza, así que no amplía la
-/// confianza. Idempotente: solo toca filas activas. Devuelve cuántas cerró.
+/// confianza. Idempotente: solo toca filas activas.
+///
+/// Returns the ids of the rows it closed, so the caller can end those people's live channels
+/// (hub#2598): deleting the sessions does not reach a socket that is already open.
 pub async fn revoke_cloud_access(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     cloud_user_id: &str,
     email: Option<&str>,
-) -> Result<usize> {
+) -> Result<Vec<String>> {
     let mut ids: Vec<String> = Vec::new();
     let mut by_cloud_id = Params::new();
     by_cloud_id.insert("hub_id".into(), json!(hub_id));
@@ -1118,7 +1170,7 @@ pub async fn revoke_cloud_access(
         let invited = db
             .query(
                 "SELECT id FROM hub_user \
-                  WHERE hub_id = :hub_id AND email = :email AND is_active = 1",
+                  WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email) AND is_active = 1",
                 &by_email,
             )
             .await?;
@@ -1142,7 +1194,7 @@ pub async fn revoke_cloud_access(
         )
         .await?;
     }
-    Ok(ids.len())
+    Ok(ids)
 }
 
 /// Acumula los `id` de un resultado en `out` sin repetir (las dos búsquedas de
@@ -1271,7 +1323,7 @@ pub async fn get_or_link_cloud_user(
         let by_email = db
             .query(
                 "SELECT id, name, role, cloud_user_id, is_active, cloud_revoked_at FROM hub_user \
-                  WHERE hub_id = :hub_id AND email = :email AND cloud_user_id IS NULL",
+                  WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email) AND cloud_user_id IS NULL",
                 &pe,
             )
             .await?;
@@ -1400,7 +1452,7 @@ pub async fn create_login_user(
     let existing = db
         .query(
             "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
-              WHERE hub_id = :hub_id AND email = :email",
+              WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email)",
             &p,
         )
         .await?;
@@ -1417,12 +1469,16 @@ pub async fn create_login_user(
         // está dentro, no. Por eso la plaza solo se pide en el primer caso — y se pide en el mismo
         // paso que la escritura (hub#1804), no antes.
         if user.is_active {
-            db.execute(
-                "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
-                  WHERE id = :id AND hub_id = :hub_id",
-                &up,
-            )
-            .await?;
+            let sql = "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
+                  WHERE id = :id AND hub_id = :hub_id";
+            // The same last-administrator rule as Personal, in the write (hub#2500).
+            if crate::hub_users::is_admin_role(&user.role) && !crate::hub_users::is_admin_role(role) {
+                if !write_keeping_an_admin(db, hub_id, &format!("{sql} AND "), &up).await? {
+                    return Err(crate::hub_users::last_admin());
+                }
+            } else {
+                db.execute(sql, &up).await?;
+            }
         } else {
             up.insert("max_users".into(), json!(seat_ceiling(max_users)));
             let reactivated = write_taking_a_seat(
@@ -1484,20 +1540,38 @@ pub async fn deactivate_login_user(
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email));
-    let res = db
-        .execute(
-            "UPDATE hub_user SET is_active = 0, cloud_revoked_at = '' \
-              WHERE hub_id = :hub_id AND email = :email AND is_active = 1",
+    // The address in any capitals, like every other email lookup of the hub (hub#2500).
+    let active = db
+        .query(
+            "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
+              WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email) AND is_active = 1",
             &p,
         )
         .await?;
-    if res.affected == 0 {
+    let Some(row) = active.rows.first() else {
+        return Ok(false);
+    };
+    let user = row_to_user(row);
+    let mut up = Params::new();
+    up.insert("id".into(), json!(user.id));
+    up.insert("hub_id".into(), json!(hub_id));
+    let sql = "UPDATE hub_user SET is_active = 0, cloud_revoked_at = '' \
+          WHERE id = :id AND hub_id = :hub_id AND is_active = 1";
+    // The same last-administrator rule as Personal, in the write (hub#2500).
+    let written = if crate::hub_users::is_admin_role(&user.role) {
+        if !write_keeping_an_admin(db, hub_id, &format!("{sql} AND "), &up).await? {
+            return Err(crate::hub_users::last_admin());
+        }
+        true
+    } else {
+        db.execute(sql, &up).await?.affected > 0
+    };
+    if !written {
         return Ok(false);
     }
     db.execute(
-        "DELETE FROM hub_session WHERE hub_id = :hub_id AND user_id IN \
-          (SELECT id FROM hub_user WHERE hub_id = :hub_id AND email = :email)",
-        &p,
+        "DELETE FROM hub_session WHERE hub_id = :hub_id AND user_id = :id",
+        &up,
     )
     .await?;
     Ok(true)
@@ -1648,10 +1722,10 @@ pub async fn enforce_device_limit(
     hub_id: &str,
     max_devices: u32,
     device_id: Option<&str>,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     // Solo el plan de 1 dispositivo con un device_id conocido desaloja. 0 = ilimitado.
     let (1, Some(device_id)) = (max_devices, device_id) else {
-        return Ok(());
+        return Ok(Vec::new());
     };
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -1681,7 +1755,19 @@ pub async fn enforce_device_limit(
         &p,
     )
     .await?;
-    Ok(())
+    // The tokens just thrown out, so the server closes their live channels (hub#2571). The
+    // previous generation was swept above, so every tombstone left is this one's.
+    let evicted = db
+        .query(
+            "SELECT token FROM hub_session WHERE hub_id = :hub_id AND ended_reason = :reason",
+            &p,
+        )
+        .await?;
+    Ok(evicted
+        .rows
+        .iter()
+        .filter_map(|row| row["token"].as_str().map(str::to_string))
+        .collect())
 }
 
 /// El código estable que viaja hasta la pantalla de entrada cuando a alguien lo desalojó otro
@@ -1753,6 +1839,38 @@ pub async fn resolve_session(
         )
         .await?;
     Ok(res.rows.first().map(row_to_user))
+}
+
+/// When the session behind `token` runs out, if it is a live session of this hub (hub#2600): the
+/// live channel it opens closes at that instant. Read through the same scoped `JOIN` as
+/// [`resolve_session`] — it answers for a bearer token, so the neighbour's token, an expired one or
+/// one of a person taken off the team has no end to give here (`None`).
+pub async fn session_expires_at(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    token: &str,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("token".into(), json!(token));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .query(
+            "SELECT s.expires_at \
+              FROM hub_session s JOIN hub_user u ON u.id = s.user_id AND u.hub_id = s.hub_id \
+              WHERE s.hub_id = :hub_id AND s.token = :token \
+                AND s.expires_at > :now AND u.is_active = 1",
+            &p,
+        )
+        .await?;
+    let Some(row) = res.rows.first() else {
+        return Ok(None);
+    };
+    let stored = row["expires_at"].as_str().unwrap_or_default();
+    let ends = chrono::DateTime::parse_from_rfc3339(stored).map_err(|e| {
+        crate::errors::RuntimeError::Other(format!("hub_session.expires_at is not a date: {e}"))
+    })?;
+    Ok(Some(ends.with_timezone(&chrono::Utc)))
 }
 
 /// [`resolve_session`], also saying **what the identity was proved with** when the session opened.
@@ -2311,6 +2429,68 @@ mod tests {
                 .unwrap()
                 .id,
             uid
+        );
+    }
+
+    #[tokio::test]
+    async fn enforce_device_limit_names_exactly_the_sessions_it_threw_out() {
+        // hub#2571: the server closes the live channels of the sessions an eviction ends, so it
+        // has to be told which ones — this time's, of this hub, and none it kept.
+        let db = fresh_db().await;
+        setup_identity(&db).await;
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None)
+            .await
+            .unwrap();
+        let earlier = create_session(&db, HUB, &uid, 3600, Some("dev-0"))
+            .await
+            .unwrap();
+        enforce_device_limit(&db, HUB, 1, Some("dev-A"))
+            .await
+            .unwrap();
+        let on_a = create_session(&db, HUB, &uid, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        let unnamed = create_session(&db, HUB, &uid, 3600, None).await.unwrap();
+        let on_b = create_session(&db, HUB, &uid, 3600, Some("dev-B"))
+            .await
+            .unwrap();
+        let next_door_user = create_user(&db, "hub-next-door", "Bea", "5678", "admin", None)
+            .await
+            .unwrap();
+        let next_door = create_session(&db, "hub-next-door", &next_door_user, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        // The business next door has just thrown its own device out: its tombstone is not ours.
+        enforce_device_limit(&db, "hub-next-door", 1, Some("dev-Z"))
+            .await
+            .unwrap();
+
+        let mut evicted = enforce_device_limit(&db, HUB, 1, Some("dev-B"))
+            .await
+            .unwrap();
+        evicted.sort();
+        let mut expected = vec![on_a, unnamed];
+        expected.sort();
+        assert_eq!(evicted, expected);
+        assert!(
+            !evicted.contains(&on_b),
+            "the device signing in keeps its session"
+        );
+        assert!(
+            !evicted.contains(&earlier),
+            "the previous eviction is not this one"
+        );
+        assert!(
+            !evicted.contains(&next_door),
+            "another hub's sessions are not ours"
+        );
+
+        assert!(
+            enforce_device_limit(&db, HUB, 0, Some("dev-C"))
+                .await
+                .unwrap()
+                .is_empty(),
+            "without a limit nobody is thrown out"
         );
     }
 
@@ -2956,8 +3136,8 @@ mod tests {
             revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com"))
                 .await
                 .unwrap(),
-            1,
-            "closes the one row of that cloud identity",
+            vec![user.id.clone()],
+            "closes the one row of that cloud identity and names it (hub#2598: its channels end)",
         );
 
         assert!(
@@ -2984,7 +3164,8 @@ mod tests {
         assert_eq!(
             revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com"))
                 .await
-                .unwrap(),
+                .unwrap()
+                .len(),
             0,
             "idempotent: a second revocation touches nothing",
         );
@@ -3004,7 +3185,8 @@ mod tests {
         assert_eq!(
             revoke_cloud_access(&db, HUB, "99", Some("socia@bar.com"))
                 .await
-                .unwrap(),
+                .unwrap()
+                .len(),
             1,
         );
         assert!(!list_login_users(&db, HUB).await.unwrap()[0].is_active);
@@ -3180,6 +3362,10 @@ mod tests {
         // (crea o reactiva+re-rol); baja = desactiva (simétrica, idempotente).
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
+        // Another administrator stays on the team: the door never takes off the last one (hub#2500).
+        create_login_user(&db, HUB, "boss@bar.com", "admin", 0)
+            .await
+            .unwrap();
 
         // Alta nueva.
         let u = create_login_user(&db, HUB, "ana@bar.com", "manager", 0)
@@ -3198,7 +3384,7 @@ mod tests {
             .unwrap();
         assert_eq!(u2.id, u.id, "reusa la fila del email (no duplica)");
         assert_eq!(u2.role, "admin", "actualiza el rol");
-        assert_eq!(list_login_users(&db, HUB).await.unwrap().len(), 1);
+        assert_eq!(list_login_users(&db, HUB).await.unwrap().len(), 2);
 
         // Baja: desactiva (true la primera vez, false si ya estaba inactiva = idempotente).
         assert!(deactivate_login_user(&db, HUB, "ana@bar.com")
@@ -3208,8 +3394,9 @@ mod tests {
             .await
             .unwrap());
         let listed = list_login_users(&db, HUB).await.unwrap();
-        assert_eq!(listed.len(), 1, "sigue listada (audit), pero inactiva");
-        assert!(!listed[0].is_active);
+        assert_eq!(listed.len(), 2, "sigue listada (audit), pero inactiva");
+        let ana = listed.iter().find(|l| l.email == "ana@bar.com").unwrap();
+        assert!(!ana.is_active);
 
         // Re-alta reactiva la misma fila.
         let u3 = create_login_user(&db, HUB, "ana@bar.com", "employee", 0)

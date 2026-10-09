@@ -446,6 +446,14 @@ export default {
     // Status badge of an activity row; it agrees with «venta» — the row is a sale (hub#863).
     activityStatusCompleted: 'Completada',
     activityStatusPending: 'Pendiente',
+    // The words of the sales history (`sales` locales), so a sale reads the same in both places (hub#2505).
+    activityStatusDraft: 'Borrador',
+    activityStatusVoided: 'Anulada',
+    activityStatusRefunded: 'Devuelta',
+    activityStatusOther: 'Otro',
+    activityLoadErrorTitle: 'No se han podido cargar las últimas ventas',
+    activityLoadErrorBody: 'Comprueba la conexión y vuelve a intentarlo.',
+    activityRetry: 'Reintentar',
     widgets: 'Widgets',
     loadingWidgets: 'Cargando widgets…',
     customizePanel: 'Personalizar panel',
@@ -514,6 +522,9 @@ export default {
     saved: 'Perfil guardado',
     saveError: 'No se pudo guardar el perfil',
     loadError: 'No se pudo cargar el perfil',
+    loadErrorBody: 'Tus datos siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    loading: 'Cargando tu perfil…',
+    retry: 'Reintentar',
     photoSaved: 'Foto actualizada',
     photoError: 'No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.',
     manageTitle: 'Gestión de la cuenta',
@@ -533,6 +544,10 @@ export default {
     setPin: 'Establecer PIN',
     pinSaved: 'PIN actualizado',
     pinMismatch: 'Los dos PIN no coinciden.',
+    // hub#2499: every try spends the budget, the accepted ones too — so not «failed attempts».
+    pinTooManyAttempts:
+      'Demasiados intentos de cambiar el PIN. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados intentos de cambiar el PIN. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados intentos de cambiar el PIN. Espera unos minutos y vuelve a intentarlo.',
   },
   // hub#358 — «este dispositivo»: si esta terminal pregunta quién la está usando. El texto dice la
   // CONSECUENCIA de cada modo, nunca su nombre técnico: el dueño de un bar tiene que poder deducir,
@@ -607,6 +622,8 @@ export default {
     offConsequence:
       'Nadie teclea un PIN. Quien abriera la caja por la mañana es el nombre de todas las ventas hasta que acabe el turno, las hiciera quien las hiciera: no podrás saber quién vendió qué ni quién hizo un descuento. El personal que solo tiene PIN y no tiene cuenta no podrá entrar.',
     idleTitle: 'Volver a preguntar tras inactividad',
+    unreadableIdleLock:
+      'No se ha podido leer cómo pide el PIN esta caja. Por seguridad, volverá al pinpad tras {n} minutos sin usarla.',
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Hasta cerrar sesión',
     idleMinutesConsequence:
@@ -618,6 +635,10 @@ export default {
   },
   // Ver la nota del bloque equivalente en `en.ts`.
   settings: {
+    loading: 'Cargando los ajustes del negocio…',
+    loadError: 'No se pudieron cargar los ajustes del negocio',
+    loadErrorBody: 'Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    retry: 'Reintentar',
     hubWide: 'Ajustes generales',
     currency: 'Moneda',
     currencyDesc: 'Moneda de tu negocio para precios y totales',
@@ -770,6 +791,9 @@ export default {
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
     ticketFailed: 'El tique NO se imprimió. Vuelve a imprimirlo desde la pantalla del tique.',
+    ticketPrinterFailed:
+      'El tique NO se imprimió: la impresora no contesta. Comprueba que está encendida y con papel y pulsa «Reintentar».',
+    retry: 'Reintentar',
     ticketWaitingForPrinter:
       'El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
     ticketNotComposed:
@@ -787,6 +811,20 @@ export default {
     comandaNoticeFor: 'Nueva comanda · {label}',
     comandaNoticeLines: '{n} línea | {n} líneas',
     comandaDefaultLabel: 'sala',
+    // kitchen#168 — the VOID slip of a cancelled round.
+    voidLabel: 'ANULADA · {label}',
+    voidLabelBare: 'ANULADA',
+    voidFailed:
+      'No se imprimió el vale de anulación de {station} de {label}. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
+    voidWaitingForPrinter:
+      'El vale de anulación de {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
+    // hub#2640 — the slip of ONE dish the till voided.
+    voidDishLabel: 'PLATO ANULADO · {label}',
+    voidDishLabelBare: 'PLATO ANULADO',
+    voidDishFailed:
+      'No se imprimió el vale de anulación de {dish} para {station} de {label}. Avisa en {station} de viva voz: ese plato ya no se prepara.',
+    voidDishWaitingForPrinter:
+      'El vale de anulación de {dish} para {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {station} de viva voz: ese plato ya no se prepara.',
   },
   // hub#2168 — system notices for a booking or cancellation that did NOT come from a till.
   appointmentNotice: {
@@ -915,6 +953,8 @@ export default {
     updateSuccessReloading: '{name} actualizado: {from} → {to}. Recargando para usar la versión nueva…',
     updateUpToDate: '{name} ya está en la última versión.',
     updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
+    // hub#2556: the new version's download ran out of time; the app stayed on the one it had.
+    updateTimedOut: 'ERPlora no ha contestado a tiempo, así que {name} no se ha actualizado. Sigue funcionando con la versión que tenía. Inténtalo en unos minutos.',
     updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
     updateAllOffer: '{n} app tiene una versión nueva. | {n} apps tienen una versión nueva.',
     updateAllAction: 'Actualizar todas',
@@ -944,7 +984,7 @@ export default {
     toggleOnBody: '{name} vuelve al TPV, con los datos que ya tenía.',
     toggleOnConfirm: 'Activar',
     uninstallTitle: 'Desinstalar {name}',
-    uninstallBreaks: 'Estas apps necesitan {name} y dejarán de funcionar:',
+    uninstallBreaks: 'Estas apps necesitan {name} y también se desinstalarán:',
     uninstallBody: 'La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',
@@ -1140,6 +1180,11 @@ export default {
   },
   employeeForm: {
     titleEdit: 'Editar usuario',
+    // hub#2518: creating or editing a person with a PIN spends the editor's budget of tries (the
+    // one «My profile» spends too, hub#2499) — every try counts, so not «failed attempts».
+    pinTooManyAttempts:
+      'Demasiados cambios de PIN en poco tiempo. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados cambios de PIN en poco tiempo. Espera unos minutos y vuelve a intentarlo.',
     titleNew: 'Nuevo usuario',
     fullName: 'Nombre y apellidos',
     email: 'Email',
@@ -1164,6 +1209,8 @@ export default {
     localPinHelp: '{n} dígitos. Obligatorio: es cómo entra esta persona.',
     accountEmailHelp:
       'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
+    pinOnlyEmailHelp:
+      'Entra solo con PIN. Escribe su email para invitarle con una cuenta de ERPlora: administrar el hub la necesita.',
     accountPinHelp:
       'Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {
@@ -1300,6 +1347,7 @@ export default {
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
+    resourcesAdminOnly: 'Solo el dueño o un administrador puede ver cuánto está usando el hub.',
     // Selector de rango de las series de uso (saas#1511). El contrato para en 3 días a propósito.
     usageRange3h: '3 h',
     usageRange24h: '24 h',
@@ -1698,6 +1746,8 @@ export default {
     reasonVersionSubstituted: 'La plantilla traía la {requested}; ha entrado la más reciente compatible, la {installed}.',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del negocio que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso al tuyo.',
+    reportOriginUnproven:
+      'Este fichero dice ser una copia de seguridad de este negocio, pero no se ha podido comprobar: se hizo con una versión anterior o se modificó después. Se ha cargado como un fichero de otro negocio, así que se han dejado fuera las personas, los PIN, los permisos de las apps y los de las automatizaciones.',
     reasonSettingsNotPortable:
       'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
     reasonRolesNotActivatable:
@@ -1747,10 +1797,14 @@ export default {
     tab: 'Ajustes',
     loading: 'Cargando ajustes…',
     loadError: 'No se pudieron cargar los ajustes.',
+    retry: 'Reintentar',
+    loadErrorBody: 'Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    noPermissionTitle: 'No puedes ver estos ajustes',
+    noPermissionBody: 'Pide a un administrador que los revise o los cambie si hace falta.',
     save: 'Guardar',
     saved: 'Ajustes guardados.',
     saveError: 'No se pudieron guardar los ajustes.',
-    adminOnly: 'Solo un administrador puede cambiar estos ajustes.',
+    noSavePermission: 'No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.',
     textPlaceholder: 'Escribe aquí…',
     invalidFields: 'Revisa los campos marcados y vuelve a guardar.',
     fieldInvalid: 'Este valor no se admite.',
@@ -1895,6 +1949,8 @@ export default {
       'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
     install_cloud_timeout:
       'ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.',
+    update_version_not_offered:
+      'Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, es anterior a la que tienes o se ha retirado por un fallo. No ha cambiado nada.',
     core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
@@ -1902,6 +1958,14 @@ export default {
     module: {
       update_lost:
         'La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.',
+    },
+    verifactu: {
+      unsent_records:
+        'VeriFactu aún tiene registros que la AEAT no ha aceptado. Abre VeriFactu para enviarlos o corregirlos y vuelve a intentarlo.',
+    },
+    fiscal: {
+      no_provider_left:
+        'Tu negocio tiene que conservar una app que envíe sus facturas a Hacienda, y así se quedaría sin ninguna. Instala antes otra app que lo haga y vuelve a intentarlo.',
     },
     default: 'No ha funcionado. Vuelve a intentarlo dentro de un minuto.',
   },

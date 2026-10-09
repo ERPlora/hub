@@ -62,6 +62,9 @@ tempfile = "3"
 erplora-db = { path = "../db", features = ["test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+# Paused clock (`tokio::time::pause`): the production time limits of the client to erplora.com
+# are proven without waiting them out (`tests/daily_turn_survives_a_hung_cloud_hub2509.rs`).
+tokio = { version = "1", features = ["test-util"] }
 # Fixtures del test de progreso de instalación (`tests/install_progress.rs`): zips de módulo
 # reales en memoria + su SHA256 (la verificación ADR-0015 es obligatoria, el mock no la salta).
 zip = "2"

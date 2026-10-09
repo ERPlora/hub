@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 
 use crate::discovery::NetworkTarget;
 use crate::{PeripheralError, Result};
@@ -54,13 +54,16 @@ impl Default for RetryPolicy {
     }
 }
 
+/// A job in the worker's channel, with where to answer its outcome when someone waits for it.
+type Queued = (PrintJob, Option<oneshot::Sender<JobOutcome>>);
+
 /// Cola de impresión. Encola trabajos y los procesa con reintentos contra el socket TCP.
 pub struct PrintQueue {
     policy: RetryPolicy,
-    /// Productor de la cola: `enqueue` empuja trabajos aquí.
-    tx: UnboundedSender<PrintJob>,
+    /// Productor de la cola: `enqueue` y `print` empujan trabajos aquí.
+    tx: UnboundedSender<Queued>,
     /// Consumidor de la cola, tras un `Mutex` para que `run(&self)` pueda tomar `&mut` al recibir.
-    rx: Mutex<UnboundedReceiver<PrintJob>>,
+    rx: Mutex<UnboundedReceiver<Queued>>,
 }
 
 impl PrintQueue {
@@ -71,7 +74,32 @@ impl PrintQueue {
 
     /// Encola un trabajo para envío asíncrono.
     pub fn enqueue(&self, job: PrintJob) -> Result<()> {
-        self.tx.send(job).map_err(|e| {
+        self.push(job, None)
+    }
+
+    /// Prints a job and answers with what happened to the PAPER (hub#2494): `Ok` once the bytes
+    /// are on the printer, the unreachable error once every retry failed. The job still goes
+    /// through the single worker, so it never interleaves with another job's bytes, and its
+    /// outcome still reaches the `run` stream.
+    ///
+    /// `enqueue` answers on the hand-over; with the network printer switched off that was a
+    /// «done» for a ticket that never came out — the till was not told and the device draining
+    /// the hub's queue confirmed it printed.
+    pub async fn print(&self, job: PrintJob) -> Result<()> {
+        let (reply, outcome) = oneshot::channel();
+        self.push(job, Some(reply))?;
+        match outcome.await {
+            Ok(JobOutcome::Completed { .. }) => Ok(()),
+            Ok(JobOutcome::Failed { error, .. }) => Err(PeripheralError::Unreachable(error)),
+            // The worker dropped the job without an outcome: it stopped, nothing was printed.
+            Err(_) => Err(PeripheralError::Unreachable(
+                "the print queue stopped before printing the job".into(),
+            )),
+        }
+    }
+
+    fn push(&self, job: PrintJob, reply: Option<oneshot::Sender<JobOutcome>>) -> Result<()> {
+        self.tx.send((job, reply)).map_err(|e| {
             PeripheralError::InvalidPayload(format!("cola de impresión cerrada: {e}"))
         })
     }
@@ -117,7 +145,7 @@ impl PrintQueue {
     /// Bucle worker: drena la cola y reintenta según la política; emite cada `JobOutcome` por
     /// `outcomes` (el consumidor lo mapea a `print_complete` / `print_error`).
     pub async fn run(&self, outcomes: UnboundedSender<JobOutcome>) {
-        while let Some(job) = {
+        while let Some((job, reply)) = {
             let mut rx = self.rx.lock().await;
             rx.recv().await
         } {
@@ -129,6 +157,10 @@ impl PrintQueue {
                 JobOutcome::Failed { job_id, error } => {
                     tracing::warn!(?job_id, %error, "trabajo de impresión fallido");
                 }
+            }
+            // Whoever waits on `print` hears it first; one that gave up only loses its answer.
+            if let Some(reply) = reply {
+                let _ = reply.send(outcome.clone());
             }
             // Si el consumidor se fue, solo se pierde el reporte (no el procesado de la cola).
             let _ = outcomes.send(outcome);
@@ -610,5 +642,97 @@ mod tests {
             other => panic!("the healthy printer must still get its job: {other:?}"),
         }
         assert_eq!(mock.captured_bytes().await, b"bar ticket");
+    }
+
+    // ── hub#2494: whoever prints hears what happened to the PAPER, not to the hand-over ─────────
+    // `enqueue` answers as soon as the job is in memory, and `erplora_print` used it: with the
+    // network printer switched off the till heard «done», nobody was told, and the device draining
+    // the hub's queue confirmed «printed» for a ticket that never came out. `print` waits for the
+    // job's own outcome, retries included.
+
+    /// A switched-off printer is an ERROR for whoever asked, with the stable unreachable code the
+    /// shell already maps to «not printed».
+    #[tokio::test]
+    async fn printing_to_a_switched_off_printer_fails_for_the_caller_hub2494() {
+        let printer = SwitchedOffPrinter::new();
+        let queue = Arc::new(PrintQueue::new(fast_policy(2)));
+        let _outcomes = spawn_worker(queue.clone());
+
+        let err = queue
+            .print(job(printer.target.clone(), b"ticket"))
+            .await
+            .expect_err("a ticket that never reached the printer cannot be reported as printed");
+
+        assert_eq!(err.code(), "printer_unreachable", "got {err}");
+    }
+
+    /// `print` answers only once the bytes are on the printer, never on the hand-over.
+    #[tokio::test]
+    async fn printing_answers_after_the_paper_reached_the_printer_hub2494() {
+        let mock = MockPrinter::start().await;
+        let queue = Arc::new(PrintQueue::new(fast_policy(3)));
+        let _outcomes = spawn_worker(queue.clone());
+
+        queue
+            .print(job(mock.target.clone(), b"kitchen order"))
+            .await
+            .expect("a printer that takes the bytes is a printed job");
+
+        assert_eq!(mock.captured_bytes().await, b"kitchen order");
+    }
+
+    /// The retries still happen before the answer: a printer that comes back on during them prints,
+    /// and the caller hears «printed», not the first failed attempt.
+    #[tokio::test]
+    async fn a_printer_switched_on_during_the_retries_is_a_printed_job_hub2494() {
+        let printer = SwitchedOffPrinter::new();
+        let target = printer.target.clone();
+        let policy = RetryPolicy { max_attempts: 20, backoff_ms: 50, connect_timeout_ms: 100, write_timeout_ms: 1000 };
+        let queue = Arc::new(PrintQueue::new(policy));
+        let _outcomes = spawn_worker(queue.clone());
+
+        let printing = tokio::spawn({
+            let queue = queue.clone();
+            async move { queue.print(job(target, b"late")).await }
+        });
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let listener = printer.switch_on();
+        let (mut stream, _) = listener.accept().await.expect("the retry reaches the printer");
+        let mut got = Vec::new();
+        stream.read_to_end(&mut got).await.unwrap();
+
+        printing.await.unwrap().expect("printed on a later attempt");
+        assert_eq!(got, b"late");
+    }
+
+    /// The other producers of the worker (the outcome stream the app logs) keep hearing every job.
+    #[tokio::test]
+    async fn a_printed_job_is_still_reported_on_the_outcome_stream_hub2494() {
+        let mock = MockPrinter::start().await;
+        let queue = Arc::new(PrintQueue::new(fast_policy(3)));
+        let mut outcomes = spawn_worker(queue.clone());
+
+        queue.print(job(mock.target.clone(), b"x")).await.unwrap();
+
+        assert!(matches!(outcomes.recv().await, Some(JobOutcome::Completed { .. })));
+    }
+
+    /// A job the worker dropped without an outcome (it stopped mid-job) was NOT printed: the caller
+    /// hears the unreachable error, never «printed». Reviewer's test for hub#2718: `Err(_) => Ok(())`
+    /// on the dropped reply survived every test above.
+    #[tokio::test]
+    async fn a_job_the_worker_dropped_without_an_outcome_is_not_printed_hub2494() {
+        let queue = Arc::new(PrintQueue::new(fast_policy(1)));
+        // No worker running: the job is pulled by hand and its reply dropped unanswered, which is
+        // what a worker that dies between taking the job and reporting it leaves behind.
+        let printing = tokio::spawn({
+            let queue = queue.clone();
+            async move { queue.print(job(unreachable_target(), b"x")).await }
+        });
+        let (_job, reply) = queue.rx.lock().await.recv().await.expect("the job was handed over");
+        drop(reply);
+
+        let err = printing.await.unwrap().expect_err("a job nobody printed cannot be «printed»");
+        assert_eq!(err.code(), "printer_unreachable", "got {err}");
     }
 }

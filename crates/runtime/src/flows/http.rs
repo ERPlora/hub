@@ -119,6 +119,66 @@ pub(crate) struct Prepared {
     pub recorded_input: Json,
 }
 
+/// The header an API reads to recognise a repeated request (Stripe, Adyen, GoCardless, Mollie and
+/// the IETF `Idempotency-Key` draft spell it this way).
+pub const IDEMPOTENCY_KEY_HEADER: &str = "Idempotency-Key";
+
+impl Prepared {
+    /// **One key per run and step** (hub#2659). The step is at-least-once — a hub that dies mid-call
+    /// re-issues it once the lease expires — so every attempt carries the same `Idempotency-Key`
+    /// and the other system can tell the repeat from a second order. It is derived, not stored:
+    /// the reclaimed run rebuilds exactly the same one, and another run of the same flow gets
+    /// another one.
+    ///
+    /// A key the author wrote (any casing) wins: they may want the other system to dedupe on their
+    /// own data, such as an order number, and two keys in one request would be read as neither.
+    /// The run history records the key too, so a call can be matched against the other side's log.
+    pub(crate) fn with_idempotency_key(mut self, run_id: &str, step_id: &str) -> Self {
+        if self
+            .request
+            .headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case(IDEMPOTENCY_KEY_HEADER))
+        {
+            return self;
+        }
+        let key = idempotency_key(run_id, step_id);
+        self.request
+            .headers
+            .push((IDEMPOTENCY_KEY_HEADER.to_string(), key.clone()));
+        if let Some(recorded) = self.recorded_input["headers"].as_object_mut() {
+            recorded.insert(IDEMPOTENCY_KEY_HEADER.to_string(), json!(key));
+        }
+        self
+    }
+}
+
+/// A UUID (36 characters, inside every provider's length limit) that only depends on the run and
+/// the step. The run id is already unique per hub and per execution; the step id tells apart two
+/// calls of the same run.
+fn idempotency_key(run_id: &str, step_id: &str) -> String {
+    uuid::Uuid::new_v5(
+        &uuid::Uuid::NAMESPACE_URL,
+        format!("erplora:flow-run:{run_id}:step:{step_id}").as_bytes(),
+    )
+    .to_string()
+}
+
+/// The run scope plus a `run` root carrying the key of this call (hub#2675) — the same one
+/// [`Prepared::with_idempotency_key`] puts in `Idempotency-Key`, so an author who also writes it in
+/// the body (Square) or in another header (PayPal) sends one key, not two. Built per step, like the
+/// `secret` root, because the key belongs to one step.
+pub(crate) fn with_run_key(scope: &Json, run_id: &str, step_id: &str) -> Json {
+    let mut out = scope.clone();
+    if let Some(map) = out.as_object_mut() {
+        map.insert(
+            def::ROOT_RUN.to_string(),
+            json!({ def::RUN_IDEMPOTENCY_KEY: idempotency_key(run_id, step_id) }),
+        );
+    }
+    out
+}
+
 /// Builds the request of an `http` step, or refuses it.
 ///
 /// Refuses when: the rendered URL is not an absolute http(s) URL, a referenced secret does not
@@ -595,5 +655,66 @@ mod tests {
             1,
             "the author declared the type; nothing is added on top"
         );
+    }
+
+    /// hub#2659 — the e2e (`flow_http_sent_once_after_restart_hub2659`) pins one step across a
+    /// restart and two runs; this pins the third axis: two calls of the SAME run are two calls.
+    #[test]
+    fn hub2659_the_idempotency_key_is_stable_per_run_and_step_and_differs_between_steps() {
+        let key = idempotency_key("run-1", "charge");
+        assert_eq!(
+            key,
+            idempotency_key("run-1", "charge"),
+            "same attempt, same key"
+        );
+        assert_ne!(
+            key,
+            idempotency_key("run-1", "refund"),
+            "another step of the run"
+        );
+        assert_ne!(key, idempotency_key("run-2", "charge"), "another run");
+        assert_eq!(key.len(), 36, "fits every provider's limit (Square: 45)");
+    }
+
+    /// hub#2675 — `run.idempotency_key` is the key of THIS step: the one the standard header
+    /// carries, wherever the author places it (Square: the body; PayPal: its own header), and
+    /// another step of the same run gets another one.
+    #[tokio::test]
+    async fn hub2675_the_run_key_the_author_places_is_the_key_of_this_step() {
+        let db = db().await;
+        let authority = allow(&db, "https://api.example.com/*").await;
+        let paying = |id: &str| {
+            step(json!({
+                "id": id, "kind": "http", "method": "POST",
+                "url": "https://api.example.com/v2/payments",
+                "headers": { "PayPal-Request-Id": "{{run.idempotency_key}}" },
+                "body": { "idempotency_key": "run.idempotency_key" }
+            }))
+        };
+        let mut sent = Vec::new();
+        for id in ["pay", "refund"] {
+            let scope = with_run_key(&scope(), "run-1", id);
+            let prepared = prepare(&db, HUB, FLOW, &paying(id), &scope, &authority)
+                .await
+                .unwrap()
+                .with_idempotency_key("run-1", id);
+            let key = idempotency_key("run-1", id);
+            let header = |name: &str| {
+                prepared
+                    .request
+                    .headers
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                    .map(|(_, v)| v.clone())
+            };
+            assert_eq!(header("PayPal-Request-Id"), Some(key.clone()));
+            assert_eq!(header(IDEMPOTENCY_KEY_HEADER), Some(key.clone()));
+            let body: Json = serde_json::from_str(prepared.request.body.as_deref().unwrap()).unwrap();
+            assert_eq!(body["idempotency_key"], json!(key));
+            // Not a secret: the run history shows it where it went out.
+            assert_eq!(prepared.recorded_input["headers"]["PayPal-Request-Id"], json!(key));
+            sent.push(key);
+        }
+        assert_ne!(sent[0], sent[1], "two calls of one run are two calls");
     }
 }

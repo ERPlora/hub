@@ -38,6 +38,7 @@ const ORIGIN_RECIPIENT: &str = "jefe@barpepe.es";
 const CREATED_AT: &str = "2026-08-06T10:00:00Z";
 
 async fn fresh(hub: &str) -> Runtime {
+    ensure_master_key();
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), hub);
     rt.ensure_system_tables().await.expect("system tables");
@@ -442,6 +443,7 @@ async fn an_unknown_settings_key_from_a_foreign_bundle_is_not_written() {
         capability_grants: Default::default(),
         flows: Vec::new(),
         sha256,
+        origin_seal: None,
     };
 
     import_sections(&mut b, &manifest, &files, &import_settings(), "h2")
@@ -541,4 +543,18 @@ async fn a_real_hub_restoring_its_own_backup_gets_its_identity_back_too() {
         Some(ORIGIN_TAX_ID),
         "a real hub must get its own tax id back after a redeploy"
     );
+}
+
+/// `HUB_SECRETS_KEY` once for this binary, as every production hub has it: a hub's own copy is
+/// only proven by the origin seal derived from it (hub#2497), so a restore of the hub's own backup
+/// needs it at both ends.
+fn ensure_master_key() {
+    use base64::Engine as _;
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let key = base64::engine::general_purpose::STANDARD.encode([0x24u8; 32]);
+        // SAFETY: `Once` runs this before any test reads the variable, and nothing writes it again.
+        unsafe { std::env::set_var("HUB_SECRETS_KEY", key) };
+    });
 }

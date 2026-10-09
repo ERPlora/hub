@@ -58,13 +58,15 @@ describe('moduleFailureMessage', () => {
     expect(moduleFailureMessage(new InstallFailedError('x', 'install_failed', '   '), FALLBACK, I18N)).toBe(FALLBACK);
   });
 
-  it('carries the reason of an action the runtime REFUSED', () => {
-    // hub#314: deactivating or removing a module that still owes records to the AEAT is refused
-    // with a domain code and a sentence that says how many are left. Same rule, same helper — this
-    // used to live in a private `reasonOf` inside AppsPage, which is why install never got it.
-    const error = new ModuleActionError('VeriFactu still has 3 records to submit.', 'verifactu.unsent_records');
+  it('carries the reason of an action the runtime REFUSED with a code the catalogue does not know', () => {
+    // hub#314: deactivating or removing a module that still owes work to an authority is refused
+    // with a domain code and a sentence. Same rule, same helper — this used to live in a private
+    // `reasonOf` inside AppsPage, which is why install never got it. The engine's sentence is the
+    // last resort for a code this shell has no line for yet (an engine published after it); the
+    // codes it does know are translated (hub#2579, below).
+    const error = new ModuleActionError('Acme still has 3 filings to submit.', 'acme.unsent_records');
 
-    expect(moduleFailureMessage(error, FALLBACK, I18N)).toBe('VeriFactu still has 3 records to submit.');
+    expect(moduleFailureMessage(error, FALLBACK, I18N)).toBe('Acme still has 3 filings to submit.');
   });
 
   it('does not invent a reason for a transport failure of a module action', () => {
@@ -136,6 +138,8 @@ describe('moduleFailureMessage · cada causa de instalación tiene SU frase, no 
     'install_cloud_rejected',
     // hub#2251 — the marketplace took the call and went silent.
     'install_cloud_timeout',
+    // hub#2546 — the version asked for is one this hub does not move to (support pin, or behind).
+    'update_version_not_offered',
   ] as const;
 
   it.each(CAUSES)('%s reads as a sentence of the catalogue, never as the engine prose', (code) => {
@@ -172,5 +176,18 @@ describe('moduleFailureMessage — an update that lost the module', () => {
   it('has its Spanish sentence too (en + es, ADR-0055)', () => {
     expect(typeof es.runtimeErrors.module.update_lost).toBe('string');
     expect(es.runtimeErrors.module.update_lost).not.toBe(en.runtimeErrors.module.update_lost);
+  });
+});
+
+// hub#2546 — an update refused because support pinned the app (or the version is behind the one
+// installed) is told as such, in both languages, never as the engine's English prose.
+describe('moduleFailureMessage — a version the hub does not move to (hub#2546)', () => {
+  it('has its own sentence in en and es', () => {
+    const code = 'update_version_not_offered';
+    const enLine = (en.runtimeErrors as Record<string, unknown>)[code];
+    const esLine = (es.runtimeErrors as Record<string, unknown>)[code];
+    expect(typeof enLine).toBe('string');
+    expect(typeof esLine).toBe('string');
+    expect(esLine).not.toBe(enLine);
   });
 });

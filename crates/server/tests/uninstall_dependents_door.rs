@@ -9,7 +9,8 @@
 //! So what is pinned here is the wire contract the screen and any other caller program against:
 //! **409** with the stable code `has_dependents` and the dependents as a **FIELD** — a list nobody
 //! has to parse out of a sentence — plus the explicit `{"force": true}` that a confirmed owner
-//! sends.
+//! sends — which removes the dependents along with it and names them in `also_uninstalled`
+//! (hub#2545).
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
@@ -189,11 +190,20 @@ async fn an_explicit_force_removes_it_anyway() {
         .unwrap();
 
     assert_eq!(res.status(), StatusCode::OK);
-    assert_eq!(json_body(res).await["ok"], json!(true));
-    assert_eq!(
-        installed(&router, &session).await,
-        vec!["dloose", "dmid", "dtop"]
-    );
+    let body = json_body(res).await;
+    assert_eq!(body["ok"], json!(true));
+    // hub#2545: the dependents the dialog listed go with it, and the answer names them. Leaving
+    // them installed kept them «Active» on a dependency that no longer existed, and their
+    // re-download at the next boot brought `dbase` back on its own.
+    let mut also: Vec<String> = body["also_uninstalled"]
+        .as_array()
+        .expect("the dependents that went with it travel as an array")
+        .iter()
+        .map(|d| d.as_str().unwrap().to_string())
+        .collect();
+    also.sort();
+    assert_eq!(also, vec!["dmid", "dtop"]);
+    assert_eq!(installed(&router, &session).await, vec!["dloose"]);
 }
 
 #[tokio::test]
@@ -232,6 +242,8 @@ async fn a_module_nobody_depends_on_still_uninstalls_with_no_body() {
         StatusCode::OK,
         "the gate must not tax the normal case, and the caller sends no body"
     );
+    // Nothing went with it, so the answer stays the one every caller already reads.
+    assert_eq!(json_body(res).await, json!({ "ok": true }));
     assert_eq!(
         installed(&router, &session).await,
         vec!["dbase", "dmid", "dtop"]

@@ -144,7 +144,10 @@ describe('the shell paints the receipt warnings through these notices', () => {
     expect(call).not.toContain('saleId }');
     // The tone and the time are the notice's: a literal colour here (or the default 2.6 s) would
     // paint the waiting receipt red again while every test above stays green.
-    expect(call.match(/, n\.color, n\.duration\)/g)).toHaveLength(2);
+    // hub#2494: painted by presentPrintNotice, which keeps the notice's tone, time and Retry
+    // (print-retry-notice.hub2494.test.ts).
+    expect(call.match(/presentPrintNotice\(/g)).toHaveLength(2);
+    expect(call).not.toContain('toast(');
     expect(call).not.toMatch(/'(danger|warning|primary|success|medium)'/);
   });
 
@@ -152,7 +155,7 @@ describe('the shell paints the receipt warnings through these notices', () => {
     const call = printOnSaleCall(MAIN);
     // The text too, not only the tone: the notice's key, translated WITH its parameters (without
     // them a sentence that asks for one paints a gap), and nothing of the failure's own `error`.
-    expect(call).toContain('i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration)');
+    expect(call).toContain('presentPrintNotice(saleTicketFailureNotice(f))');
     expect(call).not.toContain('.error');
   });
 

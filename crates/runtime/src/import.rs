@@ -82,6 +82,12 @@ pub struct ImportReport {
     /// round-trip. The client reads it through the persisted report, not this field.
     #[serde(default, skip_serializing, skip_deserializing)]
     pub batch_id: Option<String>,
+    /// The file names this hub as its origin but does not carry its valid origin seal (hub#2497):
+    /// a backup taken before the seal existed, or one edited afterwards. It was imported like
+    /// another business's file, and the screen says why instead of calling it someone else's.
+    /// Only on the wire when `true`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub origin_unproven: bool,
 }
 
 /// Aplica en el hub las secciones seleccionadas del bundle, bajo el tenant `target_hub_id`
@@ -148,6 +154,7 @@ pub async fn import_sections(
     // identity it exported — ADR-0113 §1) from any other bundle (which may not), for both the
     // accounts of hub#331 and the settings of hub#405.
     let same_hub = is_same_hub(manifest, target_hub_id);
+    report.origin_unproven = names_this_hub(manifest, target_hub_id) && !same_hub;
     for section in &manifest.sections {
         // The role set of the vertical is NOT a section of data (hub#354): it travels as keys in
         // `manifest.active_roles` and is applied once, after this loop, through the role catalogue's
@@ -632,7 +639,16 @@ pub mod ignore_reason {
 /// bundles older than that field read as unknown origin, and treating «unknown == unknown» as the
 /// same hub would hand exactly the artefacts this defends against (the blueprints published before
 /// the field existed) the one answer that lets their rows through.
+///
+/// And the id alone proves nothing (hub#2497): it is public — `GET /api/hub/context` serves it
+/// without a session — so any file can write it. The bundle must also carry this deployment's
+/// origin seal over the manifest exactly as it arrived ([`crate::export::has_valid_origin_seal`]).
 fn is_same_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
+    names_this_hub(manifest, target_hub_id) && crate::export::has_valid_origin_seal(manifest)
+}
+
+/// Does the bundle SAY it comes from this hub? A claim, never a proof: see [`is_same_hub`].
+fn names_this_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
     !manifest.hub.hub_id.is_empty() && manifest.hub.hub_id == target_hub_id
 }
 
@@ -956,7 +972,7 @@ async fn apply_section(
     // hueco que el módulo ya te había sembrado.
     let seed_declared = (!same_hub).then(|| rt.registry());
     let keys = natural_keys_for_sql(rt.db(), seed_declared, &sql).await;
-    let sql = remap_section_ids(&sql, target_hub_id, &keys);
+    let sql = remap_section_ids(&sql, target_hub_id, &keys, same_hub);
     // 🌱 hub#1548: la foto de lo que hay AHORA en cada tabla de objeto único, ANTES de aplicar.
     // Lo que la sección meta encima sustituye a esto, no convive con ello — y comparar las dos
     // fotos es además la única forma honesta de saber si la sección llegó a entrar EN ESTA TABLA
@@ -1044,8 +1060,10 @@ async fn apply_section(
             if section == "hub_users" {
                 for extra in ["data/hub_user_profile.sql", "data/hub_user_pref.sql"] {
                     if let Some(bytes) = files.get(extra) {
-                        if let Err(e) =
-                            apply_identity_extra(rt, extra, bytes, target_hub_id, batch_id).await
+                        if let Err(e) = apply_identity_extra(
+                            rt, extra, bytes, target_hub_id, batch_id, same_hub,
+                        )
+                        .await
                         {
                             return (SectionStatus::Failed(e.to_string()), 0);
                         }
@@ -1071,6 +1089,7 @@ async fn apply_identity_extra(
     bytes: &[u8],
     target_hub_id: &str,
     batch_id: Option<&str>,
+    same_hub: bool,
 ) -> Result<(), crate::RuntimeError> {
     let raw = std::str::from_utf8(bytes)
         .map_err(|_| crate::RuntimeError::Other(format!("{path} no es UTF-8 válido")))?;
@@ -1084,7 +1103,7 @@ async fn apply_identity_extra(
     // Sin claves de seed (hub#842): estas son tablas de IDENTIDAD del core, que ningún módulo
     // siembra — y esta ruta solo corre para la copia del PROPIO hub (`identity_not_portable`).
     let keys = natural_keys_for_sql(rt.db(), None, &sql).await;
-    let sql = remap_section_ids(&sql, target_hub_id, &keys);
+    let sql = remap_section_ids(&sql, target_hub_id, &keys, same_hub);
     match batch_id {
         Some(batch) => {
             crate::reset::apply_tracked_into(rt, batch, target_hub_id, &sql, &scope).await?;
@@ -1289,6 +1308,7 @@ fn remap_section_ids(
     sql: &str,
     target_hub_id: &str,
     keys: &std::collections::HashMap<String, Vec<crate::export::NaturalKey>>,
+    same_hub: bool,
 ) -> String {
     let Ok(stmts) = crate::import_sql::split_statements(sql) else {
         return sql.to_string(); // el import lo rechazará igual con el mismo troceo
@@ -1304,27 +1324,39 @@ fn remap_section_ids(
     // versión «barata» del fix de fondo del issue: no reasigna ids al azar (rompería la idempotencia)
     // ni reutiliza los del origen (rompería la PK global). Se hace sobre TODAS las sentencias antes
     // de reescribir, así una fila HIJA que se emita ANTES que su padre sigue remapeando su FK.
+    //
+    // 🔴 hub#2513: FOREIGN bundles ONLY. A hub restoring its OWN copy (`same_hub`) already has
+    // these rows under the very ids the bundle carries: deriving fresh ids made the
+    // `(hub_id, id)` guard ask for an id that never existed → the row landed AGAIN as a duplicate
+    // on the live hub, and on an empty install it landed under a different id than the one the FKs
+    // in the bundle's OTHER files (`hub_user_profile`, any reference that crosses sections) keep
+    // pointing at. Keeping the source id keeps idempotency too: the guard matches the row that is
+    // already there. No global PK at stake: these ids were born in THIS hub, so no sibling hub can
+    // hold them (this hub's bundle imported somewhere else goes through the `!same_hub` path, which
+    // does derive).
     let mut id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    for stmt in &stmts {
-        let Some(parsed) = parse_insert(stmt) else {
-            continue;
-        };
-        // Solo las filas ACOTADAS POR HUB entran al mapa: son las únicas cuyo `id` se remapea.
-        // Meter aquí el id de una fila no hub-scoped (`hub_user`) haría que una FK que lo
-        // referenciase se reescribiera hacia un id que nunca se insertó.
-        if !parsed.cols.iter().any(|c| c == "hub_id") {
-            continue;
-        }
-        if let Some(old) = parsed.id_literal() {
-            let derived = derive_id(target_hub_id, &old);
-            id_map.entry(old).or_insert(derived);
+    if !same_hub {
+        for stmt in &stmts {
+            let Some(parsed) = parse_insert(stmt) else {
+                continue;
+            };
+            // Solo las filas ACOTADAS POR HUB entran al mapa: son las únicas cuyo `id` se remapea.
+            // Meter aquí el id de una fila no hub-scoped (`hub_user`) haría que una FK que lo
+            // referenciase se reescribiera hacia un id que nunca se insertó.
+            if !parsed.cols.iter().any(|c| c == "hub_id") {
+                continue;
+            }
+            if let Some(old) = parsed.id_literal() {
+                let derived = derive_id(target_hub_id, &old);
+                id_map.entry(old).or_insert(derived);
+            }
         }
     }
 
     // 2ª pasada: reescribir cada sentencia con los nuevos ids y la guarda acotada.
     let mut out = String::with_capacity(sql.len());
     for stmt in &stmts {
-        out.push_str(&rewrite_insert(stmt, &id_map, target_hub_id, keys));
+        out.push_str(&rewrite_insert(stmt, &id_map, target_hub_id, keys, same_hub));
     }
     out
 }
@@ -1388,6 +1420,7 @@ fn rewrite_insert(
     id_map: &std::collections::HashMap<String, String>,
     target_hub_id: &str,
     keys: &std::collections::HashMap<String, Vec<crate::export::NaturalKey>>,
+    same_hub: bool,
 ) -> String {
     let trimmed = stmt.trim();
     let Some(after_into) = trimmed.strip_prefix("INSERT INTO ") else {
@@ -1476,6 +1509,13 @@ fn rewrite_insert(
         };
         let mapped = if col == "id" && !hub_scoped {
             // Identidad del core: conserva su id (idempotente para toda la organización).
+            None
+        } else if col == "id" && same_hub {
+            // 🔴 hub#2513: a hub restoring its OWN copy keeps the id the row already has. Deriving
+            // a new one broke the guard's idempotency (`(hub_id, id)` would ask for an id that never
+            // existed → duplicate on the live hub) and dangled every reference to this id living in
+            // the bundle's OTHER files (`hub_user_profile.user_id`, and any FK that crosses
+            // sections): each section is remapped with its OWN map.
             None
         } else if col == "id" {
             // El propio id: siempre el nuevo (del mapa si se captó en la 1ª pasada; si no, se
@@ -1898,6 +1938,7 @@ mod tests {
             &self,
             _ops: &[(String, erplora_db::Params)],
             _gates: &[erplora_db::RowGate],
+            _conditions: &[erplora_db::OpCondition],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             panic!("el filtro de tablas retiradas no escribe");
         }
@@ -1955,6 +1996,7 @@ mod tests {
                 },
             ],
             batch_id: None,
+            origin_unproven: false,
         };
         let json = serde_json::to_string(&r).unwrap();
         let back: ImportReport = serde_json::from_str(&json).unwrap();
@@ -1976,6 +2018,7 @@ mod tests {
         let r = ImportReport {
             sections: Vec::new(),
             batch_id: Some("b-1".into()),
+            origin_unproven: false,
         };
 
         let back: ImportReport = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
@@ -2007,7 +2050,28 @@ mod tests {
             capability_grants: Default::default(),
             flows: Vec::new(),
             sha256: BTreeMap::new(),
+            origin_seal: None,
         }
+    }
+
+    /// `HUB_SECRETS_KEY` set for the test, under the process-wide env lock (hub#2184): the
+    /// origin seal of hub#2497 is derived from it, both when sealing and when checking.
+    fn hub_key() -> (
+        crate::secret_box::test_support::EnvLockGuard,
+        crate::secret_box::test_support::EnvVarGuard,
+    ) {
+        use crate::secret_box::test_support::{env_lock, test_key_b64, EnvVarGuard};
+        let lock = env_lock();
+        let key = EnvVarGuard::set(&test_key_b64(0x31));
+        (lock, key)
+    }
+
+    /// [`manifest_from`] as THIS hub's export leaves it: sealed with the hub's key (hub#2497).
+    /// Needs [`hub_key`] held.
+    fn sealed_from(origin_hub_id: &str) -> BlueprintManifest {
+        let mut m = manifest_from(origin_hub_id);
+        assert!(crate::export::seal_manifest(&mut m), "the test key seals");
+        m
     }
 
     /// Identities belong to ONE installation: only that installation restoring itself may write
@@ -2015,8 +2079,9 @@ mod tests {
     /// zip — is discarded whatever its `purpose` says.
     #[test]
     fn identities_travel_only_within_the_same_hub() {
+        let _key = hub_key();
         assert_eq!(
-            identity_not_portable(&manifest_from("h1"), "hub_users", "h1"),
+            identity_not_portable(&sealed_from("h1"), "hub_users", "h1"),
             None,
             "a hub restoring its own backup keeps its users (ADR-0113 §1)"
         );
@@ -2042,6 +2107,11 @@ mod tests {
     /// ever match, a bundle would only need to omit the field to get its accounts in.
     #[test]
     fn an_unknown_origin_is_never_the_same_hub() {
+        let _key = hub_key();
+        assert!(
+            !is_same_hub(&sealed_from(""), ""),
+            "unknown origin must not match anything, sealed or not"
+        );
         assert!(
             !is_same_hub(&manifest_from(""), ""),
             "unknown origin must not match anything"
@@ -2054,6 +2124,99 @@ mod tests {
             identity_not_portable(&manifest_from(""), "hub_users", "h2").as_deref(),
             Some(ignore_reason::IDENTITY_NOT_PORTABLE)
         );
+    }
+
+    /// 🔴 hub#2497 — naming this hub is a claim, not a proof: the id is public. Without the hub's
+    /// seal a bundle that says `hub_id: h1` is any other file to `h1`.
+    #[test]
+    fn naming_this_hub_without_its_seal_is_not_the_same_hub() {
+        let _key = hub_key();
+        assert!(!is_same_hub(&manifest_from("h1"), "h1"));
+        assert_eq!(
+            identity_not_portable(&manifest_from("h1"), "hub_users", "h1").as_deref(),
+            Some(ignore_reason::IDENTITY_NOT_PORTABLE)
+        );
+        assert!(is_same_hub(&sealed_from("h1"), "h1"), "the sealed copy is");
+    }
+
+    /// 🔴 hub#2497 — the seal covers the whole manifest: rewriting the origin id of another hub's
+    /// sealed backup, or adding one permission to this hub's own, breaks it.
+    #[test]
+    fn a_sealed_manifest_edited_afterwards_is_not_the_same_hub() {
+        let _key = hub_key();
+        let mut other_hubs = sealed_from("h2");
+        other_hubs.hub.hub_id = "h1".into();
+        assert!(!is_same_hub(&other_hubs, "h1"), "an id rewritten by hand");
+
+        let mut widened = sealed_from("h1");
+        widened
+            .capability_grants
+            .insert("verifactu".into(), vec!["certificate".into()]);
+        assert!(!is_same_hub(&widened, "h1"), "one more permission");
+
+        let mut one_more_file = sealed_from("h1");
+        one_more_file
+            .sha256
+            .insert("data/hub_users.sql".into(), "00".repeat(32));
+        assert!(!is_same_hub(&one_more_file, "h1"), "one more file");
+
+        let mut garbage = sealed_from("h1");
+        garbage.origin_seal = Some("zz".into());
+        assert!(!is_same_hub(&garbage, "h1"), "a seal that is not hex");
+    }
+
+    /// 🔴 hub#2497 — the key is per hub: a seal made under another hub's key does not verify here,
+    /// and a hub without a key cannot tell its own copy from anybody's (it fails closed).
+    #[test]
+    fn only_this_hub_s_key_proves_the_copy() {
+        use crate::secret_box::test_support::{env_lock, test_key_b64, EnvVarGuard};
+        let _lock = env_lock();
+        let sealed_elsewhere = {
+            let _other = EnvVarGuard::set(&test_key_b64(0x77));
+            sealed_from("h1")
+        };
+        {
+            let _mine = EnvVarGuard::set(&test_key_b64(0x31));
+            assert!(!is_same_hub(&sealed_elsewhere, "h1"), "another hub's key");
+        }
+        let sealed_here = {
+            let _mine = EnvVarGuard::set(&test_key_b64(0x31));
+            sealed_from("h1")
+        };
+        let _none = EnvVarGuard::unset();
+        assert!(!is_same_hub(&sealed_here, "h1"), "no key here");
+        let mut unsealable = manifest_from("h1");
+        assert!(
+            !crate::export::seal_manifest(&mut unsealable),
+            "without a key nothing is sealed"
+        );
+        assert_eq!(unsealable.origin_seal, None);
+    }
+
+    /// The seal is checked on the manifest the import PARSED from `manifest.json`, so it has to
+    /// survive the trip through the file — pretty-printed, with a flow document inside — unchanged.
+    #[test]
+    fn the_seal_survives_the_trip_through_manifest_json() {
+        let _key = hub_key();
+        let mut m = manifest_from("h1");
+        m.flows.push(crate::export::FlowSpec {
+            name: "Reorder".into(),
+            enabled: true,
+            definition: serde_json::json!({
+                "version": 1,
+                "trigger": {"cron": "0 9 * * 1"},
+                "steps": [{"z": 1, "a": {"ratio": 0.1, "big": 12345678901u64, "neg": -3}}]
+            }),
+            grants: Vec::new(),
+        });
+        m.capability_grants
+            .insert("verifactu".into(), vec!["network".into()]);
+        assert!(crate::export::seal_manifest(&mut m));
+
+        let file = serde_json::to_vec_pretty(&m).unwrap();
+        let parsed: BlueprintManifest = serde_json::from_slice(&file).unwrap();
+
+        assert!(is_same_hub(&parsed, "h1"));
     }
 
     /// A destination registry where one module is installed, declaring (or not) that its data
@@ -2082,6 +2245,7 @@ mod tests {
     /// the flag, not the name.
     #[test]
     fn installation_bound_data_is_declared_by_the_module_not_named_by_the_core() {
+        let _key = hub_key();
         let bound = registry_with("ticketbai", true);
         assert_eq!(
             installation_bound_not_portable(
@@ -2098,7 +2262,7 @@ mod tests {
         assert_eq!(
             installation_bound_not_portable(
                 &bound,
-                &manifest_from("h1"),
+                &sealed_from("h1"),
                 "modules/ticketbai",
                 "h1"
             ),
@@ -2132,6 +2296,7 @@ mod tests {
     /// republication. Nothing else in the engine may grow a second name.
     #[test]
     fn verifactu_stays_bound_while_its_published_manifest_has_no_flag() {
+        let _key = hub_key();
         let published = registry_with("verifactu", false);
         assert_eq!(
             installation_bound_not_portable(
@@ -2147,7 +2312,7 @@ mod tests {
         assert_eq!(
             installation_bound_not_portable(
                 &published,
-                &manifest_from("h1"),
+                &sealed_from("h1"),
                 "modules/verifactu",
                 "h1"
             ),
@@ -2288,7 +2453,7 @@ mod tests {
         let sql = "INSERT INTO inventory_product (\"id\", \"hub_id\", \"name\", \"sku\") \
                    SELECT 'src-prod', 'h2', 'Café', 'CAF' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');";
-        let out = remap_section_ids(sql, "h2", &Default::default());
+        let out = remap_section_ids(sql, "h2", &Default::default(), false);
         // El id de origen NO aparece (fue reescrito por el derivado).
         assert!(
             !out.contains("'src-prod'"),
@@ -2307,7 +2472,7 @@ mod tests {
         // Idempotencia: misma entrada → misma salida (el id derivado es estable).
         assert_eq!(
             out,
-            remap_section_ids(sql, "h2", &Default::default()),
+            remap_section_ids(sql, "h2", &Default::default(), false),
             "el remap debe ser determinista"
         );
     }
@@ -2334,6 +2499,7 @@ mod tests {
             sql,
             "56f2bbe7-792e-44d3-adfe-c18891cfc925",
             &Default::default(),
+            false,
         );
 
         assert!(
@@ -2361,12 +2527,71 @@ mod tests {
         let sql = "INSERT INTO hub_user (\"hub_id\", \"id\", \"name\", \"role\") \
                    SELECT '__HUB_ID__', 'u-1', 'Ana', 'admin' \
                    WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'u-1');";
-        let out = remap_section_ids(sql, "hub-destino", &Default::default());
+        let out = remap_section_ids(sql, "hub-destino", &Default::default(), false);
 
         assert_eq!(
             out.matches("\"hub_id\"").count(),
             2,
             "una en la lista de columnas y una en la guarda — ni una tercera inyectada:\n{out}"
+        );
+    }
+
+    /// 🔴 hub#2513: a hub restoring its OWN backup (`same_hub`) keeps the ids its rows already
+    /// live under. The person row travels hub-scoped (every bundle since hub#497 carries
+    /// `hub_id`), which used to route it through id derivation: the guard then asked for a derived
+    /// id nobody ever wrote → the row landed twice on the live hub, and on an empty install it
+    /// landed under an id that `hub_user_profile.user_id` (remapped in its own file, with its own
+    /// empty map) kept pointing past. Keeping the source id keeps the guard honest — it matches
+    /// the row that is already there — and no sibling hub can hold these ids, because they were
+    /// born in THIS hub.
+    #[test]
+    fn a_hub_restoring_its_own_backup_keeps_the_ids_it_already_has() {
+        let sql = "INSERT INTO hub_user (\"hub_id\", \"id\", \"name\", \"role\") \
+                   SELECT 'h1', 'u-1', 'Ana', 'admin' \
+                   WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'u-1');\n\
+                   INSERT INTO inventory_product (\"id\", \"hub_id\", \"name\", \"sku\") \
+                   SELECT 'src-prod', 'h1', 'Café', 'CAF' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');\n\
+                   INSERT INTO inventory_product_categories (\"product_id\", \"category_id\") \
+                   SELECT 'src-prod', 'src-cat' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product_categories WHERE product_id = 'src-prod');";
+        let out = remap_section_ids(sql, "h1", &Default::default(), true);
+
+        // The ids are NOT rewritten: the guard asks for the id the row already has.
+        assert!(
+            out.contains("'u-1'") && out.contains("'src-prod'"),
+            "same-hub restore must keep the source ids: {out}"
+        );
+        // The guards are still regenerated and hub-scoped, so the restore stays idempotent
+        // (the `WHERE NOT EXISTS` skips whoever is already there).
+        assert!(
+            out.contains("SELECT 1 FROM hub_user WHERE \"hub_id\" = 'h1' AND id = 'u-1'"),
+            "the guard must ask for the ORIGINAL id under the target hub: {out}"
+        );
+        assert!(
+            out.contains(
+                "SELECT 1 FROM inventory_product WHERE \"hub_id\" = 'h1' AND id = 'src-prod'"
+            ),
+            "module rows keep their ids too: {out}"
+        );
+        // And no derived id leaked in: every literal the bundle carried is still there, which
+        // also means the FKs of the bundle's OTHER files (not remapped, or remapped with their
+        // own empty map) still point at rows that exist.
+        assert_eq!(
+            out.matches(derive_id("h1", "u-1").as_str()).count()
+                + out.matches(derive_id("h1", "src-prod").as_str()).count(),
+            0,
+            "same-hub restore derived ids nobody asked for: {out}"
+        );
+        // The M2M link is a FK-only row in the SAME file: rewriting it (or its guard) towards a
+        // derived id would point at a product nobody inserted and duplicate the link on re-import.
+        let link = out
+            .lines()
+            .find(|l| l.contains("INSERT INTO inventory_product_categories"))
+            .expect("the link row survived the rewrite");
+        assert!(
+            link.contains("'src-prod'") && link.contains("'src-cat'"),
+            "same-hub restore must not rewrite the link's FKs: {link}"
         );
     }
 
@@ -2386,7 +2611,7 @@ mod tests {
                    INSERT INTO inventory_product_categories (\"product_id\", \"category_id\") \
                    SELECT 'src-prod', 'src-cat' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product_categories WHERE product_id = 'src-prod');";
-        let out = remap_section_ids(sql, "h2", &Default::default());
+        let out = remap_section_ids(sql, "h2", &Default::default(), false);
 
         assert!(
             !out.contains("'src-prod'"),
@@ -2437,7 +2662,7 @@ mod tests {
                    INSERT INTO inventory_product (\"id\", \"hub_id\", \"category_id\", \"tax_rate_id\") \
                    SELECT 'src-prod', 'h2', 'src-cat', 'ext-rate' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');";
-        let out = remap_section_ids(sql, "h2", &Default::default());
+        let out = remap_section_ids(sql, "h2", &Default::default(), false);
 
         // `ext-rate` no es id de ninguna fila del bundle → se conserva (referencia externa).
         assert!(
@@ -2501,7 +2726,7 @@ mod tests {
                 seeded_only: false,
             }],
         );
-        let out = remap_section_ids(sql, "h2", &keys);
+        let out = remap_section_ids(sql, "h2", &keys, false);
 
         assert!(
             out.contains("\"hub_id\" = 'h2' AND id = "),

@@ -20,6 +20,12 @@
 //!   her (a phone) without necessarily repeating her id;
 //! - **the events those runs queued** (`run_id`), for the same reason: a reminder carries the phone.
 //!
+//! "Names that id" reaches further than the id itself (hub#2477, hub#2474): the hub also looks for
+//! the rows that the emitter and the apps that LISTEN to the erasure keep about her — her WhatsApp
+//! thread, then its messages ([`reach`]) — and, when one of those events was caused by a kernel
+//! entry (an inbound WhatsApp message: no emitter, no run, no cause), for that entry and every
+//! event that descends from it. That is what the person SAID, and none of it repeats her id.
+//!
 //! # The lines this draws
 //!
 //! - **Empty, never delete.** The row is the trace (`/api/hub/events/{id}/trace`, the run history
@@ -29,21 +35,36 @@
 //!   `dead` one waits for a human and may be the sale whose invoice still has to reach the AEAT;
 //!   a live run needs its memory to finish. Emptying any of them is data loss, not erasure.
 //! - **By id, not by guesswork.** The event brings the id and nothing else; the sheet it names is
-//!   already pseudonymised when this runs. A copy that holds her number but neither her id nor a
-//!   link to a run that touched her (a raw inbound WhatsApp message, before any sheet is linked) is
-//!   NOT reachable from here: that needs the module to say what identified her (hub#2477).
+//!   already pseudonymised when this runs. The hub follows ids through the apps' rows, never a
+//!   phone number or a name: a copy with no app row behind it has nothing to be followed from and
+//!   keeps its payload until `retention` (the inbox stores every inbound message, over its quota
+//!   too, since whatsapp_inbox#288, so today that is no message). A person with no sheet is erased
+//!   by the app that holds her: the inbox names its own thread
+//!   (`whatsapp_inbox.conversation.anonymized`).
 //! - **The kernel does not know the customers module.** The trigger is the naming convention
 //!   (`<subject>.anonymized` + `<subject>_id`), the same kind of contract as `.reminder.due` and
-//!   `.print.due`. Today only `customer.anonymized` follows it.
+//!   `.print.due`. Today `customer.anonymized` and `whatsapp_inbox.conversation.anonymized`
+//!   follow it.
+//! - **Only the owner erases (hub#2485).** The id must have the shape the hub generates (a
+//!   canonical uuid) and be a row of one of the EMITTER's tables in this hub. Anything else is
+//!   refused with a code (`erasure.invalid_subject_id`, `erasure.subject_not_owned`): nothing is
+//!   emptied and the row is not marked delivered — it retries and ends in the dead letters, where
+//!   a human sees it.
+//! - **Only the owner is heard (hub#2535).** The apps that listen to the event erase what they keep
+//!   of her, so the relay asks the same owner question BEFORE delivering ([`gate_delivery`]): a
+//!   foreign erasure, or one that names nobody, reaches no listener and starts no automation.
 //!
 //! **Cost.** There is no index on payload content: one erasure reads the hub's terminal history
-//! once (at most ninety days of it, thanks to `retention`). Erasures are rare, manual and
-//! idempotent — an already-emptied row no longer contains the id, so a redelivery finds nothing.
+//! once (at most ninety days of it, thanks to `retention`), extracting the ids each payload holds
+//! and matching them against the set it looks for, plus one query per linked table and hop.
+//! Erasures are rare, manual and idempotent — an already-emptied row no longer contains the ids,
+//! so a redelivery finds nothing.
 
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
-use crate::errors::Result;
+use crate::errors::{Result, RuntimeError};
+use crate::registry::Registry;
 
 /// The suffix of the events that erase their subject from the kernel's history.
 pub const ANONYMIZED_SUFFIX: &str = ".anonymized";
@@ -79,31 +100,294 @@ pub fn subject_id(event_name: &str, payload: &Params) -> Option<String> {
     }
 }
 
+/// Whether `id` has the shape of the ids the hub hands out: the canonical hyphenated uuid of
+/// `registry::new_id` (36 characters). Anything else — a word, a number, the braced or compact
+/// spellings `uuid` would also parse — is refused as a needle: `"id"` is a KEY of nearly every
+/// payload, so naming it would empty the whole history (hub#2485).
+pub(crate) fn is_generated_id(id: &str) -> bool {
+    id.len() == 36 && uuid::Uuid::try_parse(id).is_ok()
+}
+
+/// A refused erasure, with its stable code first in the message so the dead-letter row says it.
+fn refused(code: &str, detail: String) -> RuntimeError {
+    RuntimeError::Domain {
+        code: code.to_string(),
+        message: format!("{code}: {detail}"),
+    }
+}
+
+/// The tables of this hub's database that carry both `id` and `hub_id`: the row contract every
+/// module table follows, and the only ones an owner check can ask.
+const ROW_TABLES: &str = "\
+SELECT table_name AS name FROM information_schema.columns \
+ WHERE table_schema = current_schema() AND column_name IN ('id', 'hub_id') \
+ GROUP BY table_name HAVING COUNT(*) = 2";
+
+/// **The owner gate (hub#2485).** An app may only erase a subject that is its own data: `id` must
+/// be a row of one of the EMITTER's tables, in THIS hub. Ownership is the longest installed prefix
+/// (`export::table_owner`, the rule export and reset use), so the kernel (no emitter), an app that
+/// is not installed and an app naming another app's row are all refused — the same way
+/// `.reminder.due` and `.print.due` only open their host door to the app that declared it.
+async fn authorize(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    id: &str,
+) -> Result<()> {
+    if !is_generated_id(id) {
+        return Err(refused(
+            "erasure.invalid_subject_id",
+            format!("`{emitter}` named `{id}`, which is not an id the hub generates"),
+        ));
+    }
+    owns(db, registry, hub_id, emitter, id).await
+}
+
+/// Whether `id` is a row of one of `emitter`'s tables in this hub, whatever its shape; refused
+/// with `erasure.subject_not_owned` otherwise.
+async fn owns(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    id: &str,
+) -> Result<()> {
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    let tables = db.query(ROW_TABLES, &Params::new()).await?;
+    let own = tables
+        .rows
+        .iter()
+        .filter_map(|r| r["name"].as_str())
+        .filter(|t| crate::export::safe_ident(t))
+        // No installed id is empty, so the kernel (`emitter == ""`) owns no table.
+        .filter(|t| crate::export::table_owner(t, &installed).as_deref() == Some(emitter));
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("id".into(), json!(id));
+    for table in own {
+        let hit = db
+            .query(
+                &format!(
+                    "SELECT 1 AS hit FROM \"{table}\" \
+                     WHERE hub_id = :hub_id AND CAST(id AS TEXT) = :id LIMIT 1"
+                ),
+                &p,
+            )
+            .await?;
+        if !hit.rows.is_empty() {
+            return Ok(());
+        }
+    }
+    Err(refused(
+        "erasure.subject_not_owned",
+        format!("`{id}` is not a row of `{emitter}` in this hub, so `{emitter}` cannot erase it"),
+    ))
+}
+
+/// **Who hears an erasure (hub#2535).** The apps that listen to `<subject>.anonymized` erase what
+/// they keep of the subject, and an automation it triggers acts on her — so the relay hands an
+/// erasure to no one unless its emitter owns the subject, the owner rule of [`authorize`]. An
+/// erasure that names no usable subject (`erasure.invalid_subject_id`) cannot be shown to come
+/// from the owner, so it is refused too. The SHAPE rule is not asked here: an owner whose id the
+/// hub did not generate still reaches its listeners; it only may not empty the hub's history.
+///
+/// Any other event passes untouched, without a query.
+pub async fn gate_delivery(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    event_name: &str,
+    payload: &Params,
+) -> Result<()> {
+    if !event_name.ends_with(ANONYMIZED_SUFFIX) {
+        return Ok(());
+    }
+    let Some(id) = subject_id(event_name, payload) else {
+        return Err(refused(
+            "erasure.invalid_subject_id",
+            format!("`{emitter}` emitted `{event_name}` without naming whose data to erase"),
+        ));
+    };
+    owns(db, registry, hub_id, emitter, &id).await
+}
+
+/// How many links the hub follows from the subject through the rows of the apps that hold it
+/// (customer → conversation → message is two). A bound, not a tuning knob: every hop is one query
+/// per table that has the column.
+const MAX_HOPS: usize = 3;
+
+/// The `<entity>_id` columns of this hub's row tables (see [`ROW_TABLES`]).
+const ID_COLUMNS: &str = "\
+SELECT c.table_name AS tbl, c.column_name AS col FROM information_schema.columns c \
+ WHERE c.table_schema = current_schema() AND c.column_name LIKE '%\\_id' \
+   AND c.column_name <> 'hub_id' AND c.table_name IN (\
+     SELECT table_name FROM information_schema.columns \
+      WHERE table_schema = current_schema() AND column_name IN ('id', 'hub_id') \
+      GROUP BY table_name HAVING COUNT(*) = 2)";
+
+/// **What else names her (hub#2477, hub#2474).** History keeps copies that never repeat the
+/// subject's id: an inbound WhatsApp message names the row the inbox wrote for it, and that row
+/// points at the thread, and the thread at her sheet. Those links live only in the apps' tables, so
+/// the hub follows them there and adds every row it reaches to the ids it looks for:
+///
+/// - **Whose rows:** the emitter's and those of the apps that LISTEN to this erasure — the apps
+///   that took on erasing her. An app that merely keeps a `customer_id` lends nothing.
+/// - **Which links:** first the rows whose `<subject>_id` is the subject; from a row of
+///   `<app>_<entity>`, the rows whose `<entity>_id` is that row. At most [`MAX_HOPS`] links.
+/// - **Where:** only in this hub. Only ids of the shape the hub generates can match a payload
+///   ([`NAMED_ID`]), so following another shape adds nothing to erase.
+///
+/// The subject comes first; the result has no repeats.
+async fn reach(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    event_name: &str,
+    subject_id: &str,
+) -> Result<Vec<String>> {
+    let mut apps = vec![emitter.to_string()];
+    for command in registry.listeners.get(event_name).into_iter().flatten() {
+        if let Some(c) = registry.commands.get(command) {
+            if !apps.contains(&c.module_id) {
+                apps.push(c.module_id.clone());
+            }
+        }
+    }
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    // (table, entity, its `_id` columns), for the apps that lend their rows.
+    let mut tables: Vec<(String, String, Vec<String>)> = Vec::new();
+    for row in db.query(ID_COLUMNS, &Params::new()).await?.rows {
+        let (Some(table), Some(col)) = (row["tbl"].as_str(), row["col"].as_str()) else {
+            continue;
+        };
+        if !crate::export::safe_ident(table) || !crate::export::safe_ident(col) {
+            continue;
+        }
+        let Some(owner) = crate::export::table_owner(table, &installed) else {
+            continue;
+        };
+        if !apps.contains(&owner) {
+            continue;
+        }
+        match tables.iter_mut().find(|t| t.0 == table) {
+            Some(t) => t.2.push(col.to_string()),
+            None => {
+                let entity = table
+                    .strip_prefix(&format!("{owner}_"))
+                    .unwrap_or(table)
+                    .to_string();
+                tables.push((table.to_string(), entity, vec![col.to_string()]));
+            }
+        }
+    }
+
+    let subject = event_name
+        .strip_suffix(ANONYMIZED_SUFFIX)
+        .and_then(|s| s.rsplit('.').next())
+        .unwrap_or_default();
+    let mut found = vec![subject_id.to_string()];
+    // Each step: the column that points at these ids, and the ids.
+    let mut frontier: Vec<(String, Vec<String>)> =
+        vec![(format!("{subject}_id"), vec![subject_id.to_string()])];
+    for _ in 0..MAX_HOPS {
+        let mut next = Vec::new();
+        for (col, ids) in &frontier {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
+            p.insert("ids".into(), json!(Json::from(ids.clone()).to_string()));
+            for (table, entity, cols) in &tables {
+                if !cols.contains(col) {
+                    continue;
+                }
+                let rows = db
+                    .query(
+                        &format!(
+                            "SELECT CAST(id AS TEXT) AS id FROM \"{table}\" \
+                             WHERE hub_id = :hub_id AND CAST(\"{col}\" AS TEXT) IN \
+                               (SELECT jsonb_array_elements_text(CAST(:ids AS jsonb)))"
+                        ),
+                        &p,
+                    )
+                    .await?;
+                let fresh: Vec<String> = rows
+                    .rows
+                    .iter()
+                    .filter_map(|r| r["id"].as_str())
+                    .filter(|id| !found.iter().any(|f| f == id))
+                    .map(str::to_string)
+                    .collect();
+                if !fresh.is_empty() {
+                    found.extend(fresh.iter().cloned());
+                    next.push((format!("{entity}_id"), fresh));
+                }
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        frontier = next;
+    }
+    Ok(found)
+}
+
+/// The ids a payload names: every string of the shape the hub generates, keys included. Matching
+/// whole quoted strings keeps an id from matching as a fragment of a longer one.
+const NAMED_ID: &str = "\"([0-9A-Fa-f-]{36})\"";
+
 /// Everything named in the module header, in ONE statement so the erasure is atomic and every
 /// sub-statement sees the same snapshot (each table is written exactly once).
 ///
-/// `hit` is every event that names her, live or not: a run is history even when the event that
-/// triggered it is still `dead`. Whether an EVENT may be emptied is decided once, at its write.
+/// `named` is every event that names one of the ids, live or not: a run is history even when the
+/// event that triggered it is still `dead`. Whether an EVENT may be emptied is decided once, at
+/// its write.
 ///
-/// `:needle` is the id JSON-encoded (`"<id>"`, quotes included), so it matches the id as a string
-/// VALUE and never as a fragment of a longer one. `hub_id` filters every read and every write:
-/// the same id in another hub belongs to another hub. The `<> '{}'` guards make the counts say
-/// what was actually emptied, so a redelivery reports zero.
+/// **What the person said (hub#2477).** An inbound WhatsApp message enters as a KERNEL event —
+/// no emitter, no run, no cause (`module_id`, `run_id` and `parent_event_id` all empty) — with the
+/// number and the text and no id of any row. When an event that names her was caused by such an
+/// entry, the entry is hers too, and so is everything that descends from it (`parent_event_id`):
+/// the inbox's copy, what reacted to it. A completed copy of the same message is another kernel
+/// entry whose id is the first one's plus `~<digest>` (hub#2102); it is the same message.
+///
+/// `:needles` is the JSON array of ids, `:named_id` the pattern above. `hub_id` filters every read
+/// and every write: the same id in another hub belongs to another hub. The `<> '{}'` guards make
+/// the counts say what was actually emptied, so a redelivery reports zero.
 const ERASE: &str = "\
-WITH hit AS (\
-  SELECT id FROM _event_outbox \
-   WHERE hub_id = :hub_id AND strpos(payload, :needle) > 0\
+WITH RECURSIVE needle AS (\
+  SELECT jsonb_array_elements_text(CAST(:needles AS jsonb)) AS id\
+), named AS (\
+  SELECT DISTINCT e.id, e.parent_event_id FROM _event_outbox e \
+   CROSS JOIN LATERAL regexp_matches(e.payload, :named_id, 'g') m \
+   WHERE e.hub_id = :hub_id AND m[1] IN (SELECT id FROM needle)\
+), entry AS (\
+  SELECT k.id FROM _event_outbox k \
+   WHERE k.hub_id = :hub_id AND split_part(k.id, '~', 1) IN (\
+       SELECT split_part(n.id, '~', 1) FROM _event_outbox n \
+        WHERE n.hub_id = :hub_id AND n.module_id = '' AND n.run_id = '' AND n.parent_event_id = '' \
+          AND (n.id IN (SELECT id FROM named) OR n.id IN (SELECT parent_event_id FROM named)))\
+), descends(id) AS (\
+  SELECT id FROM entry \
+  UNION \
+  SELECT c.id FROM _event_outbox c JOIN descends d ON c.parent_event_id = d.id \
+   WHERE c.hub_id = :hub_id\
+), hit AS (\
+  SELECT id FROM named UNION SELECT id FROM descends\
 ), touched AS (\
   SELECT r.id FROM _flow_runs r \
    WHERE r.hub_id = :hub_id AND r.status IN ('done', 'failed', 'cancelled') \
-     AND (strpos(r.input, :needle) > 0 OR strpos(r.vars, :needle) > 0 \
-          OR r.parent_event_id IN (SELECT id FROM hit) \
+     AND (r.parent_event_id IN (SELECT id FROM hit) \
+          OR EXISTS (SELECT 1 FROM regexp_matches(r.input || ' ' || r.vars, :named_id, 'g') m \
+                      WHERE m[1] IN (SELECT id FROM needle)) \
           OR EXISTS (SELECT 1 FROM _flow_run_steps s \
+                      CROSS JOIN LATERAL regexp_matches(s.input || ' ' || s.output, :named_id, 'g') m \
                       WHERE s.hub_id = :hub_id AND s.run_id = r.id \
-                        AND (strpos(s.input, :needle) > 0 OR strpos(s.output, :needle) > 0)) \
+                        AND m[1] IN (SELECT id FROM needle)) \
           OR EXISTS (SELECT 1 FROM _flow_approvals a \
+                      CROSS JOIN LATERAL regexp_matches(a.payload, :named_id, 'g') m \
                       WHERE a.hub_id = :hub_id AND a.run_id = r.id \
-                        AND strpos(a.payload, :needle) > 0))\
+                        AND m[1] IN (SELECT id FROM needle)))\
 ), events AS (\
   UPDATE _event_outbox SET payload = '{}' \
    WHERE hub_id = :hub_id AND status IN ('delivered', 'discarded') AND payload <> '{}' \
@@ -130,16 +414,21 @@ WITH hit AS (\
 /// Anything else is a no-op that touches the database not at all.
 pub async fn on_event(
     db: &dyn DatabaseAdapter,
+    registry: &Registry,
     hub_id: &str,
+    emitter: &str,
     event_name: &str,
     payload: &Params,
 ) -> Result<ErasureReport> {
     let Some(id) = subject_id(event_name, payload) else {
         return Ok(ErasureReport::default());
     };
+    authorize(db, registry, hub_id, emitter, &id).await?;
+    let needles = reach(db, registry, hub_id, emitter, event_name, &id).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    p.insert("needle".into(), json!(Json::String(id).to_string()));
+    p.insert("needles".into(), json!(Json::from(needles).to_string()));
+    p.insert("named_id".into(), json!(NAMED_ID));
     let res = db.query(ERASE, &p).await?;
     Ok(ErasureReport {
         events: cell(&res, "events"),
@@ -165,7 +454,6 @@ fn cell(res: &erplora_db::QueryResult, key: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::Registry;
     use erplora_db::testutil::fresh_db;
     use erplora_db::PgAdapter;
 
@@ -180,6 +468,49 @@ mod tests {
         crate::outbox::ensure_tables(db).await.unwrap();
         crate::system_migrations::apply(db, HUB).await.unwrap();
         crate::flows::store::ensure_indexes(db).await.unwrap();
+        // The emitter's own data: the customers app owns Ana and Bea in both hubs, and the
+        // intruder owns a row of its own whose id is a common word.
+        db.execute_batch(
+            "CREATE TABLE customers_customer (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+                                              name TEXT NOT NULL DEFAULT ''); \
+             CREATE TABLE intruder_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
+        for id in [ANA, BEA] {
+            owned_row(db, "customers_customer", id, HUB).await;
+        }
+        owned_row(db, "intruder_item", "id", HUB).await;
+    }
+
+    async fn owned_row(db: &PgAdapter, table: &str, id: &str, hub: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub));
+        db.execute(
+            &format!("INSERT INTO {table} (id, hub_id) VALUES (:id, :hub_id)"),
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    const CUSTOMERS: &str = "customers";
+    const INTRUDER: &str = "intruder";
+
+    /// The customers app and an intruder, both installed: ownership is decided by the installed
+    /// apps' table prefixes (the same rule as export and reset).
+    fn registry() -> Registry {
+        let mut reg = Registry::new();
+        for id in [CUSTOMERS, INTRUDER] {
+            reg.installed.push(
+                serde_json::from_str(&format!(
+                    r#"{{"id":"{id}","name":"{id}","version":"1.0.0"}}"#
+                ))
+                .unwrap(),
+            );
+        }
+        reg
     }
 
     fn now() -> String {
@@ -514,9 +845,16 @@ mod tests {
         system_schema(&db).await;
         ana_history(&db, HUB, "").await;
 
-        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let report = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             event_payload(&db, "ev-upd").await,
@@ -573,9 +911,16 @@ mod tests {
         ana_history(&db, HUB, "").await;
         ana_history(&db, OTHER_HUB, "b-").await;
 
-        on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert!(event_payload(&db, "b-ev-upd").await.contains("Ana Pérez"));
         assert!(event_payload(&db, "b-ev-sale").await.contains(ANA));
@@ -646,9 +991,16 @@ mod tests {
         )
         .await;
 
-        on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert!(event_payload(&db, "ev-bea").await.contains("Bea"));
         assert!(run_memory(&db, "run-bea").await.contains(BEA));
@@ -735,9 +1087,16 @@ mod tests {
         )
         .await;
 
-        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let report = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             report,
@@ -795,9 +1154,16 @@ mod tests {
             anonymized(Json::Null),
             missing,
         ] {
-            let report = on_event(&db, HUB, "customer.anonymized", &payload)
-                .await
-                .unwrap();
+            let report = on_event(
+                &db,
+                &registry(),
+                HUB,
+                CUSTOMERS,
+                "customer.anonymized",
+                &payload,
+            )
+            .await
+            .unwrap();
             assert_eq!(report, ErasureReport::default(), "{payload:?}");
         }
         assert!(event_payload(&db, "ev-blank").await.contains("Carla"));
@@ -812,9 +1178,16 @@ mod tests {
         ana_history(&db, HUB, "").await;
 
         for name in ["customer.updated", "sale.completed", "customer.deleted"] {
-            let report = on_event(&db, HUB, name, &anonymized(json!(ANA)))
-                .await
-                .unwrap();
+            let report = on_event(
+                &db,
+                &registry(),
+                HUB,
+                CUSTOMERS,
+                name,
+                &anonymized(json!(ANA)),
+            )
+            .await
+            .unwrap();
             assert_eq!(report, ErasureReport::default(), "{name}");
         }
         assert!(event_payload(&db, "ev-upd").await.contains("Ana Pérez"));
@@ -828,12 +1201,26 @@ mod tests {
         system_schema(&db).await;
         ana_history(&db, HUB, "").await;
 
-        let first = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
-        let second = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let first = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+        let second = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert!(first.total() > 0);
         assert_eq!(second, ErasureReport::default());
@@ -859,7 +1246,7 @@ mod tests {
         )
         .await;
 
-        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+        crate::outbox::drain(&db, &registry()).await.unwrap();
 
         assert_eq!(event_payload(&db, "ev-upd").await, EMPTY);
         assert_eq!(run_memory(&db, "run").await, EMPTY_RUN);
@@ -903,7 +1290,7 @@ mod tests {
         .await
         .unwrap();
 
-        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+        crate::outbox::drain(&db, &registry()).await.unwrap();
 
         assert_eq!(
             cell(
@@ -938,7 +1325,7 @@ mod tests {
         )
         .await
         .unwrap();
-        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+        crate::outbox::drain(&db, &registry()).await.unwrap();
 
         assert_eq!(
             cell(
@@ -971,9 +1358,16 @@ mod tests {
         )
         .await;
 
-        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let report = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(run_memory(&db, "run-in").await, EMPTY_RUN);
         assert_eq!(step_memory(&db, "run-in-s").await, EMPTY_RUN);
@@ -1014,5 +1408,770 @@ mod tests {
         ] {
             assert_eq!(subject_id(name, &payload), None, "{name}");
         }
+    }
+
+    /// The code a refused erasure carries (tests assert on codes, never on prose — ADR-0055).
+    fn refusal_code(err: &crate::errors::RuntimeError) -> &str {
+        match err {
+            crate::errors::RuntimeError::Domain { code, .. } => code,
+            other => panic!("expected a coded refusal, got {other:?}"),
+        }
+    }
+
+    /// Everything of Ana's history in `HUB` still says who she is.
+    async fn assert_ana_history_intact(db: &PgAdapter) {
+        assert!(event_payload(db, "ev-upd").await.contains("Ana Pérez"));
+        assert!(run_memory(db, "run").await.contains("Ana Pérez"));
+        assert!(step_memory(db, "step").await.contains("+34600111222"));
+        assert!(approval_payload(db, "appr").await.contains("Hola Ana"));
+        assert!(event_payload(db, "ev-reminder")
+            .await
+            .contains("+34600111222"));
+    }
+
+    /// hub#2485, the owner gate: an app may only erase a subject that is ITS OWN data. An app that
+    /// names Ana — whose sheet belongs to `customers` — is refused, and so is the kernel (no app
+    /// behind the event) and an app that is not installed. Not one byte of her history moves.
+    #[tokio::test]
+    async fn an_app_cannot_erase_a_subject_it_does_not_own() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        // A table that holds Ana's id but whose app is not installed owns nothing.
+        db.execute_batch("CREATE TABLE ghost_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);")
+            .await
+            .unwrap();
+        owned_row(&db, "ghost_item", ANA, HUB).await;
+
+        for emitter in [INTRUDER, "", "ghost"] {
+            let err = on_event(
+                &db,
+                &registry(),
+                HUB,
+                emitter,
+                "customer.anonymized",
+                &anonymized(json!(ANA)),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                refusal_code(&err),
+                "erasure.subject_not_owned",
+                "{emitter:?}"
+            );
+        }
+        assert_ana_history_intact(&db).await;
+    }
+
+    /// The owner gate goes through `hub_id`: Ana's sheet in ANOTHER hub does not make her this
+    /// hub's subject. Without the filter, any id the app owns anywhere would open the door here.
+    #[tokio::test]
+    async fn owning_the_subject_in_another_hub_does_not_open_this_one() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        db.execute(
+            "UPDATE customers_customer SET hub_id = 'h2' WHERE id = :id",
+            &{
+                let mut p = Params::new();
+                p.insert("id".into(), json!(ANA));
+                p
+            },
+        )
+        .await
+        .unwrap();
+
+        let err = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(refusal_code(&err), "erasure.subject_not_owned");
+        assert_ana_history_intact(&db).await;
+    }
+
+    /// The vector of hub#2485: an app that OWNS a row whose id is a common word (`"id"`) names it
+    /// as the subject. As a needle, `"id"` is a key of nearly every payload, so the erasure would
+    /// empty the hub's whole history. The hub only takes ids of the shape it generates itself.
+    #[tokio::test]
+    async fn an_id_that_is_not_one_the_hub_generates_is_refused_even_from_its_owner() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+
+        let mut payload = Params::new();
+        payload.insert("item_id".into(), json!("id"));
+        let err = on_event(&db, &registry(), HUB, INTRUDER, "item.anonymized", &payload)
+            .await
+            .unwrap_err();
+
+        assert_eq!(refusal_code(&err), "erasure.invalid_subject_id");
+        assert_ana_history_intact(&db).await;
+    }
+
+    /// The shape: a canonical hyphenated uuid, the form `registry::new_id` produces. Words,
+    /// numbers and the other spellings `uuid` would parse are not ids the hub handed out.
+    #[test]
+    fn only_a_canonical_uuid_is_an_id_the_hub_generates() {
+        assert!(is_generated_id(ANA));
+        assert!(is_generated_id(&crate::registry::new_id()));
+        for id in [
+            "id",
+            "1",
+            "whatsapp",
+            "name",
+            "6f1c2a7e0d4b4f539a3e6c1d2b7e8f90",
+            "{6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f90}",
+            "urn:uuid:6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f90",
+            "6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f9",
+            "6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f9z",
+        ] {
+            assert!(!is_generated_id(id), "{id}");
+        }
+    }
+
+    /// The real path, with a test app: `intruder` emits `customer.anonymized` naming Ana through
+    /// the outbox. The relay refuses it — the event is NOT delivered (a refused erasure is never
+    /// swallowed), the refusal is labelled as the erasure's with its code, and her history is
+    /// intact. The same event from `customers` erases (the wiring test above).
+    #[tokio::test]
+    async fn the_relay_refuses_an_erasure_from_an_app_that_does_not_own_the_subject() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        event(
+            &db,
+            Ev {
+                id: "ev-anon",
+                hub: HUB,
+                status: "pending",
+                name: "customer.anonymized",
+                payload: json!({"customer_id": ANA, "reason": "gdpr request"}),
+                run_id: "",
+            },
+        )
+        .await;
+        db.execute(
+            "UPDATE _event_outbox SET module_id = 'intruder' WHERE id = 'ev-anon'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+
+        crate::outbox::drain(&db, &registry()).await.unwrap();
+
+        assert_eq!(
+            cell(
+                &db,
+                "SELECT status AS v FROM _event_outbox WHERE id = :id",
+                "ev-anon"
+            )
+            .await,
+            "pending"
+        );
+        let last_error = cell(
+            &db,
+            "SELECT last_error AS v FROM _event_outbox WHERE id = :id",
+            "ev-anon",
+        )
+        .await;
+        assert!(last_error.starts_with("erasure:"), "{last_error}");
+        assert!(
+            last_error.contains("erasure.subject_not_owned"),
+            "{last_error}"
+        );
+        assert_ana_history_intact(&db).await;
+    }
+
+    // ── Who hears an erasure (hub#2535) ─────────────────────────────────────────────────────────
+
+    async fn gate(db: &PgAdapter, emitter: &str, name: &str, payload: &Params) -> Result<()> {
+        gate_delivery(db, &registry(), HUB, emitter, name, payload).await
+    }
+
+    /// hub#2535: the apps that listen to `customer.anonymized` erase what they keep of her, so an
+    /// erasure is only handed to them when its emitter owns the subject — the same owner rule as
+    /// the history (hub#2485). The kernel and an app that is not installed own nothing.
+    #[tokio::test]
+    async fn only_the_owner_gets_an_erasure_delivered_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        db.execute_batch("CREATE TABLE ghost_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);")
+            .await
+            .unwrap();
+        owned_row(&db, "ghost_item", ANA, HUB).await;
+
+        gate(&db, CUSTOMERS, "customer.anonymized", &anonymized(json!(ANA)))
+            .await
+            .expect("her owner's erasure is delivered");
+        for emitter in [INTRUDER, "", "ghost"] {
+            let err = gate(&db, emitter, "customer.anonymized", &anonymized(json!(ANA)))
+                .await
+                .unwrap_err();
+            assert_eq!(
+                refusal_code(&err),
+                "erasure.subject_not_owned",
+                "{emitter:?}"
+            );
+        }
+    }
+
+    /// Owning the subject in ANOTHER hub does not make the erasure deliverable here.
+    #[tokio::test]
+    async fn owning_the_subject_in_another_hub_does_not_get_it_delivered_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(ANA));
+        db.execute("UPDATE customers_customer SET hub_id = 'h2' WHERE id = :id", &p)
+            .await
+            .unwrap();
+
+        let err = gate(&db, CUSTOMERS, "customer.anonymized", &anonymized(json!(ANA)))
+            .await
+            .unwrap_err();
+        assert_eq!(refusal_code(&err), "erasure.subject_not_owned");
+    }
+
+    /// An erasure that does not say whose cannot be shown to come from the owner: refused for
+    /// everyone, the owner app included, before any listener reads a missing or empty id.
+    #[tokio::test]
+    async fn an_erasure_that_names_nobody_is_delivered_to_no_one_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        for payload in [
+            anonymized(json!("")),
+            anonymized(json!(42)),
+            anonymized(Json::Null),
+            Params::new(),
+        ] {
+            for emitter in [CUSTOMERS, INTRUDER] {
+                let err = gate(&db, emitter, "customer.anonymized", &payload)
+                    .await
+                    .unwrap_err();
+                assert_eq!(
+                    refusal_code(&err),
+                    "erasure.invalid_subject_id",
+                    "{emitter} {payload:?}"
+                );
+            }
+        }
+    }
+
+    /// The gate is about erasures only: any other event that names her is delivered as always,
+    /// and an owner whose id the hub did not generate still reaches its listeners — what it may
+    /// not do is empty the hub's history (hub#2485), which `on_event` refuses on its own.
+    #[tokio::test]
+    async fn the_delivery_gate_only_asks_who_owns_the_erased_subject_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        for name in ["sale.completed", "customer.updated", "customer.anonymized.done"] {
+            gate(&db, INTRUDER, name, &anonymized(json!(ANA)))
+                .await
+                .unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+        let mut own = Params::new();
+        own.insert("item_id".into(), json!("id"));
+        gate(&db, INTRUDER, "item.anonymized", &own)
+            .await
+            .expect("its own row, whatever its shape");
+    }
+
+    // ── What she wrote on WhatsApp (hub#2477, hub#2474) ────────────────────────────────────────
+    //
+    // An inbound message lands in history as a chain that never names her sheet: the kernel's
+    // `hub.whatsapp.message_received` (number + text), the inbox's `whatsapp_inbox.message.received`
+    // (the same, plus the id of the message row it wrote) and whatever reacted to that. The only
+    // link to her is in the inbox's own tables: conversation → customer, message → conversation.
+
+    const WHATSAPP: &str = "whatsapp_inbox";
+    const CONV_ANA: &str = "1b2c3d4e-5f60-4a1b-8c2d-3e4f5a6b7c8d";
+    const MSG_ANA: &str = "2c3d4e5f-6071-4b2c-9d3e-4f5a6b7c8d9e";
+    const CONV_BEA: &str = "3d4e5f60-7182-4c3d-8e4f-5a6b7c8d9e0f";
+    const MSG_BEA: &str = "4e5f6071-8293-4d4e-9f50-6b7c8d9e0f1a";
+
+    /// The installed apps of [`registry`] plus the inbox; `listens` says whether the inbox
+    /// subscribes to `customer.anonymized` (it does in production).
+    fn registry_with_inbox(listens: bool) -> Registry {
+        let mut reg = registry();
+        reg.installed.push(
+            serde_json::from_str(&format!(
+                r#"{{"id":"{WHATSAPP}","name":"{WHATSAPP}","version":"1.0.0"}}"#
+            ))
+            .unwrap(),
+        );
+        if listens {
+            let command = "whatsapp_inbox._on_customer_anonymized";
+            reg.commands.insert(
+                command.into(),
+                crate::registry::RegisteredCommand {
+                    module_id: WHATSAPP.into(),
+                    def: serde_json::from_value(json!({"permission": ""})).unwrap(),
+                    sql: Vec::new(),
+                    wasm: None,
+                    schema: None,
+                },
+            );
+            reg.listeners
+                .insert("customer.anonymized".into(), vec![command.into()]);
+        }
+        reg
+    }
+
+    async fn inbox_tables(db: &PgAdapter) {
+        db.execute_batch(
+            "CREATE TABLE whatsapp_inbox_conversation (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+                                                       customer_id TEXT NOT NULL DEFAULT ''); \
+             CREATE TABLE whatsapp_inbox_message (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+                                                  conversation_id TEXT);",
+        )
+        .await
+        .unwrap();
+    }
+
+    async fn inbox_row(db: &PgAdapter, sql: &str, id: &str, link: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("link".into(), json!(link));
+        db.execute(sql, &p).await.unwrap();
+    }
+
+    /// One conversation of `customer` with one message, as the inbox stores it.
+    async fn inbox_thread(db: &PgAdapter, customer: &str, conv: &str, msg: &str) {
+        inbox_row(
+            db,
+            "INSERT INTO whatsapp_inbox_conversation (id, hub_id, customer_id) \
+             VALUES (:id, :hub_id, :link)",
+            conv,
+            customer,
+        )
+        .await;
+        inbox_row(
+            db,
+            "INSERT INTO whatsapp_inbox_message (id, hub_id, conversation_id) \
+             VALUES (:id, :hub_id, :link)",
+            msg,
+            conv,
+        )
+        .await;
+    }
+
+    /// A history row with the columns the relay writes for a chain: who emitted it and which
+    /// event caused it.
+    #[allow(clippy::too_many_arguments)]
+    async fn chained(
+        db: &PgAdapter,
+        id: &str,
+        hub: &str,
+        module: &str,
+        name: &str,
+        status: &str,
+        parent: &str,
+        payload: Json,
+    ) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub));
+        p.insert("module".into(), json!(module));
+        p.insert("name".into(), json!(name));
+        p.insert("status".into(), json!(status));
+        p.insert("parent".into(), json!(parent));
+        p.insert("payload".into(), json!(payload.to_string()));
+        p.insert("at".into(), json!(now()));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, payload, status, next_attempt_at, \
+              created_at, delivered_at, module_id, parent_event_id) \
+             VALUES (:id, :hub_id, 'u1', '[\"*\"]', :name, :payload, :status, :at, :at, \
+                     CASE WHEN :status = 'delivered' THEN :at END, :module, :parent)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// What one inbound message leaves in `hub`'s history, ids prefixed by `p`: the kernel's event,
+    /// a completed copy of it (`~<digest>`, hub#2102), the inbox's event naming the message row
+    /// `msg`, the inbox's event for the copy (its fresh `new_id` is no row: the copy updated the
+    /// first one), what reacted to the inbox's event, a flow the kernel's event started and the
+    /// auto-reply that flow queued. All of it holds `phone` and `text`; none of it her sheet's id.
+    async fn wa_message(db: &PgAdapter, hub: &str, p: &str, msg: &str, phone: &str, text: &str) {
+        let said = json!({"from": phone, "contact": phone, "text": text});
+        let with_row = |id: &str| {
+            let mut v = said.clone();
+            v["new_id"] = json!(id);
+            v
+        };
+        let core = format!("{p}wa-wamid.1");
+        let copy = format!("{core}~0a1b2c3d");
+        let done = "delivered";
+        let kernel = "hub.whatsapp.message_received";
+        let received = "whatsapp_inbox.message.received";
+        chained(db, &core, hub, "", kernel, done, "", said.clone()).await;
+        chained(db, &copy, hub, "", kernel, done, "", said.clone()).await;
+        let inbox = format!("{p}ev-received");
+        chained(
+            db,
+            &inbox,
+            hub,
+            WHATSAPP,
+            received,
+            done,
+            &core,
+            with_row(msg),
+        )
+        .await;
+        let copy_inbox = format!("{p}ev-received-copy");
+        let fresh = crate::registry::new_id();
+        chained(
+            db,
+            &copy_inbox,
+            hub,
+            WHATSAPP,
+            received,
+            done,
+            &copy,
+            with_row(&fresh),
+        )
+        .await;
+        let link = "whatsapp_inbox.conversation.link_pending";
+        let fresh = crate::registry::new_id();
+        let reacted = format!("{p}ev-link");
+        chained(
+            db,
+            &reacted,
+            hub,
+            WHATSAPP,
+            link,
+            done,
+            &inbox,
+            with_row(&fresh),
+        )
+        .await;
+        let flow = format!("{p}run-wa");
+        run(db, &flow, hub, "done", &core, said.clone(), json!({})).await;
+        event(
+            db,
+            Ev {
+                id: &format!("{p}ev-autoreply"),
+                hub,
+                status: "delivered",
+                name: "flow.reminder.due",
+                payload: json!({"to": phone, "body": "Gracias"}),
+                run_id: &flow,
+            },
+        )
+        .await;
+    }
+
+    /// Every row [`wa_message`] wrote with prefix `p`.
+    fn wa_rows(p: &str) -> Vec<String> {
+        [
+            "wa-wamid.1",
+            "wa-wamid.1~0a1b2c3d",
+            "ev-received",
+            "ev-received-copy",
+            "ev-link",
+            "ev-autoreply",
+        ]
+        .iter()
+        .map(|id| format!("{p}{id}"))
+        .collect()
+    }
+
+    async fn assert_wa_emptied(db: &PgAdapter, p: &str) {
+        for id in wa_rows(p) {
+            assert_eq!(event_payload(db, &id).await, EMPTY, "{id}");
+        }
+        assert_eq!(run_memory(db, &format!("{p}run-wa")).await, EMPTY_RUN);
+    }
+
+    async fn assert_wa_intact(db: &PgAdapter, p: &str, phone: &str) {
+        for id in wa_rows(p) {
+            assert!(event_payload(db, &id).await.contains(phone), "{id}");
+        }
+        assert!(run_memory(db, &format!("{p}run-wa")).await.contains(phone));
+    }
+
+    /// Ana and Bea both wrote; Ana's thread is linked to her sheet, Bea's to hers; the same
+    /// message id also appears in another hub's history.
+    async fn two_whatsapp_customers(db: &PgAdapter) {
+        system_schema(db).await;
+        inbox_tables(db).await;
+        inbox_thread(db, ANA, CONV_ANA, MSG_ANA).await;
+        inbox_thread(db, BEA, CONV_BEA, MSG_BEA).await;
+        wa_message(db, HUB, "ana-", MSG_ANA, "+34600111222", "Hola, soy Ana").await;
+        wa_message(db, HUB, "bea-", MSG_BEA, "+34600333444", "Hola, soy Bea").await;
+        wa_message(
+            db,
+            OTHER_HUB,
+            "h2-",
+            MSG_ANA,
+            "+34600111222",
+            "Hola, soy Ana",
+        )
+        .await;
+    }
+
+    /// hub#2477: erasing Ana's sheet empties what she wrote on WhatsApp — the kernel's copy, the
+    /// inbox's, what reacted to it and the flow it started — reached through the inbox, which
+    /// listens to the erasure and links her sheet to her thread. Bea's messages and the other hub's
+    /// copies stay.
+    #[tokio::test]
+    async fn erasing_a_customer_empties_what_she_wrote_on_whatsapp() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_wa_emptied(&db, "ana-").await;
+        assert_wa_intact(&db, "bea-", "+34600333444").await;
+        assert_wa_intact(&db, "h2-", "+34600111222").await;
+    }
+
+    /// hub#2474: «Erase this number's data» on a thread with no sheet. The inbox names its own
+    /// conversation in `whatsapp_inbox.conversation.anonymized`; the hub follows it to the
+    /// messages of that thread and empties the same chain. Bea's thread stays.
+    #[tokio::test]
+    async fn erasing_a_whatsapp_number_empties_what_it_wrote() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        let mut payload = Params::new();
+        payload.insert("conversation_id".into(), json!(CONV_ANA));
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            WHATSAPP,
+            "whatsapp_inbox.conversation.anonymized",
+            &payload,
+        )
+        .await
+        .unwrap();
+
+        assert_wa_emptied(&db, "ana-").await;
+        assert_wa_intact(&db, "bea-", "+34600333444").await;
+        assert_wa_intact(&db, "h2-", "+34600111222").await;
+    }
+
+    /// The reach is bounded by consent: only the emitter and the apps that LISTEN to the erasure
+    /// lend their rows. An app that keeps a `customer_id` but does not subscribe is not followed.
+    #[tokio::test]
+    async fn an_app_that_does_not_listen_to_the_erasure_is_not_followed() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(false),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_wa_intact(&db, "ana-", "+34600111222").await;
+    }
+
+    /// A message still in flight keeps its payload: the terminal rule of the module header holds
+    /// for the rows reached through the inbox too.
+    /// Tenancy of the reach: another hub's rows and events are never followed, not even when
+    /// they point at this hub's ids. Every `x-` row below is of THIS hub and is not Ana's; each one
+    /// would be reached through another hub's row:
+    ///
+    /// - `x-by-row` names a message of another hub's thread, and that thread names Ana's id;
+    /// - `x-by-chain` descends from another hub's event, which descends from Ana's message;
+    /// - `x-by-cause` caused another hub's event that names Ana's message;
+    /// - `x-h2-cause~1a2b3c4d` is a copy of another hub's entry, which caused an event here that
+    ///   names Ana's message (that event is hers and is emptied);
+    /// - `x-under-h2-copy` descends from another hub's copy of Ana's message.
+    #[tokio::test]
+    async fn another_hubs_rows_and_events_are_not_followed() {
+        const CONV_H2: &str = "5f607182-93a4-4e5f-8061-7c8d9e0f1a2b";
+        const MSG_H2: &str = "60718293-a4b5-4f60-9172-8d9e0f1a2b3c";
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        let conv = "INSERT INTO whatsapp_inbox_conversation (id, hub_id, customer_id) \
+                    VALUES (:id, 'h2', :link)";
+        inbox_row(&db, conv, CONV_H2, ANA).await;
+        let msg = "INSERT INTO whatsapp_inbox_message (id, hub_id, conversation_id) \
+                   VALUES (:id, 'h2', :link)";
+        inbox_row(&db, msg, MSG_H2, CONV_H2).await;
+
+        let kept = json!({"text": "not hers", "new_id": MSG_H2});
+        let names_her = json!({"new_id": MSG_ANA});
+        let kernel = "hub.whatsapp.message_received";
+        let inbox = "whatsapp_inbox.message.received";
+        // (id, hub, emitter, event, cause, payload)
+        let rows: [(&str, &str, &str, &str, &str, &Json); 9] = [
+            ("x-by-row", HUB, WHATSAPP, inbox, "", &kept),
+            ("x-h2", OTHER_HUB, WHATSAPP, inbox, "ana-wa-wamid.1", &kept),
+            ("x-by-chain", HUB, WHATSAPP, inbox, "x-h2", &kept),
+            ("x-by-cause", HUB, "", kernel, "", &kept),
+            (
+                "x-h2-names",
+                OTHER_HUB,
+                WHATSAPP,
+                inbox,
+                "x-by-cause",
+                &names_her,
+            ),
+            ("x-h2-cause", OTHER_HUB, "", kernel, "", &kept),
+            ("x-h2-cause~1a2b3c4d", HUB, "", kernel, "", &kept),
+            (
+                "x-names-her",
+                HUB,
+                WHATSAPP,
+                inbox,
+                "x-h2-cause",
+                &names_her,
+            ),
+            ("ana-wa-wamid.1~5e6f7a8b", OTHER_HUB, "", kernel, "", &kept),
+        ];
+        for (id, hub, module, name, cause, payload) in rows {
+            chained(
+                &db,
+                id,
+                hub,
+                module,
+                name,
+                "delivered",
+                cause,
+                payload.clone(),
+            )
+            .await;
+        }
+        let under = "x-under-h2-copy";
+        let copy = "ana-wa-wamid.1~5e6f7a8b";
+        chained(
+            &db,
+            under,
+            HUB,
+            WHATSAPP,
+            inbox,
+            "delivered",
+            copy,
+            kept.clone(),
+        )
+        .await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_wa_emptied(&db, "ana-").await;
+        assert_eq!(event_payload(&db, "x-names-her").await, EMPTY);
+        for id in [
+            "x-by-row",
+            "x-by-chain",
+            "x-by-cause",
+            "x-h2-cause~1a2b3c4d",
+            "x-under-h2-copy",
+        ] {
+            assert!(event_payload(&db, id).await.contains("not hers"), "{id}");
+        }
+    }
+
+    /// Only what entered through the kernel brings its descendants along: an APP event that names
+    /// her is emptied, but what it caused (a sale, an invoice) is someone else's record and does
+    /// not name her.
+    #[tokio::test]
+    async fn what_an_app_event_about_her_caused_is_not_hers() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        let named = json!({"customer_id": ANA});
+        let sale = json!({"sale_id": "s-1", "total": 1250});
+        let done = "delivered";
+        chained(
+            &db,
+            "x-updated",
+            HUB,
+            CUSTOMERS,
+            "customer.updated",
+            done,
+            "",
+            named,
+        )
+        .await;
+        chained(
+            &db,
+            "x-sale",
+            HUB,
+            "sales",
+            "sale.completed",
+            done,
+            "x-updated",
+            sale,
+        )
+        .await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(event_payload(&db, "x-updated").await, EMPTY);
+        assert!(event_payload(&db, "x-sale").await.contains("1250"));
+    }
+
+    #[tokio::test]
+    async fn a_whatsapp_message_still_in_flight_keeps_its_payload() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        db.execute(
+            "UPDATE _event_outbox SET status = 'pending', delivered_at = NULL \
+              WHERE id = 'ana-ev-link'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert!(event_payload(&db, "ana-ev-link")
+            .await
+            .contains("+34600111222"));
+        assert_eq!(event_payload(&db, "ana-ev-received").await, EMPTY);
     }
 }

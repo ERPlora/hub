@@ -370,23 +370,55 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     expect(iframePrint).not.toHaveBeenCalled();
   });
 
-  it('un fallo del Bridge al imprimir también va a la cola antes que al navegador', async () => {
-    // Hay Bridge y hay impresora del rol, pero print() falla (sin papel, apagada…). El tique no se
-    // pierde: a la cola, por si un print host del rol lo saca.
+  // hub#2494 — this device's own printer did not answer (switched off, out of paper). Queueing it
+  // used to look safe, but the device that drains that role is this same one, with the same dead
+  // printer: the job failed again there, nobody asked for it again, and it came out much later as a
+  // surprise duplicate — while the till heard nothing. Square, Toast and Lightspeed tell the till
+  // and let it retry; so the door says «the printer failed» and the caller offers Retry.
+  it('a printer of this device that does not answer is NOT queued: the caller hears printerFailed (hub#2494)', async () => {
     const devicesWithReceipt = [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }];
     const failingPrint = {
       getDevices: vi.fn(async () => devicesWithReceipt),
-      print: vi.fn(async () => { throw new Error('sin papel'); }),
+      print: vi.fn(async () => { throw new Error('unreachable: connection refused'); }),
     };
     const enqueue = vi.fn(async () => ({ queued: true }));
     const browserPrint = vi.fn();
-    const print = createPrintService(fakeClient({ peripherals: failingPrint }), { enqueue, browserPrint });
+    const print = createPrintService(fakeClient({ peripherals: failingPrint }), {
+      enqueue,
+      browserPrint,
+      installedApp: () => true,
+    });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
+    const r = await print({
+      role: 'receipt',
+      documentType: 'receipt',
+      jobId: 'sale-42',
+      data: { total: 1 },
+      fallbackToBrowser: false,
+    });
 
-    expect(r.via).toBe('queue');
     expect(failingPrint.print).toHaveBeenCalled();
+    expect(r.via).toBe('none');
+    expect(r.printerFailed).toBe(true);
+    expect(r.error).toContain('unreachable');
+    expect(enqueue).not.toHaveBeenCalled();
     expect(browserPrint).not.toHaveBeenCalled();
+  });
+
+  it('a delivered paper and a road with no printer at all never say printerFailed (hub#2494)', async () => {
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const printed = createPrintService(
+      fakeClient({ peripherals: { getDevices: vi.fn(async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }]), print: vi.fn(async () => undefined) } }),
+      { enqueue, installedApp: () => true },
+    );
+    const queued = createPrintService(
+      fakeClient({ peripherals: { getDevices: vi.fn(async () => []), print: vi.fn() } }),
+      { enqueue, installedApp: () => true },
+    );
+
+    const req = { role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 }, fallbackToBrowser: false };
+    expect((await printed(req)).printerFailed).toBeUndefined();
+    expect((await queued(req)).printerFailed).toBeUndefined();
   });
 
   it('sin enqueue cableado, mantiene el comportamiento anterior (al navegador)', async () => {

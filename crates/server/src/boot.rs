@@ -410,7 +410,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                             .map(|m| m.name.clone())
                             .unwrap_or_else(|| id.clone());
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        let attempt = match install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
+                        let attempt = match install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut *rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
                             Ok(_) if target.is_update() => {
                                 eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version());
                                 Some(erplora_runtime::module_update::Outcome::Updated { from: version.clone(), to: target.version().to_string() })
@@ -421,7 +421,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                                 // un hub con la versión de ayer funciona, uno sin el módulo no. Se
                                 // cae a la que tenía registrada.
                                 eprintln!("✗ actualización de {id} a {}: {e} — vuelvo a {version}", target.version());
-                                let fallback = install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await;
+                                let fallback = install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut *rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await;
                                 match &fallback {
                                     Ok(_) => eprintln!("✓ {id} sigue en {version}"),
                                     Err(e) => eprintln!("✗ {id}@{version} tampoco: {e}"),
@@ -866,111 +866,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 .ok()
                 .as_deref(),
         );
-        tokio::spawn(async move {
-            let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
-            loop {
-                tick.tick().await;
-                let Some(auth) = auth::machine_auth(&st) else {
-                    continue;
-                };
-                // Same 24h tick, no second scheduler: report canonical daily business usage.
-                // Collection happens before network I/O, then both Cloud calls run independently:
-                // an entitlement failure must not suppress business-usage retention (or vice versa).
-                let now = entitlement::now_unix();
-                let now_iso = chrono::Utc::now().to_rfc3339();
-                let mut usage = {
-                    let runtime = st.runtime.read().await;
-                    // Lo que cada motor instalado debe a su autoridad (hub#326/hub#1406) — la
-                    // pregunta va al REGISTRO, no a un motor con nombre; mismo lock barato que
-                    // el resto del snapshot.
-                    let pending = runtime.pending_obligations().await;
-                    daily_usage::collect_daily_usage(
-                        runtime.db(),
-                        runtime.hub_id(),
-                        &now_iso,
-                        &pending,
-                    )
-                    .await
-                };
-                // ADR-0175: la actividad de usuario viaja en ESTE heartbeat, y solo si la hubo.
-                // Un hub encendido que nadie toca no manda la marca — que es exactamente lo que el
-                // Cloud tiene que observar para poder apagarlo.
-                let pending_activity = st.activity.pending();
-                usage.last_user_activity_at = pending_activity.map(activity::to_iso8601);
-                // hub#975: la telemetría de recursos viaja en el MISMO latido, del sampler único
-                // de `system_metrics` (fuera del lock de arriba: el muestreo de CPU duerme 100 ms).
-                // Best-effort: fuera de contenedor los campos viajan ausentes, nunca un 0 falso.
-                daily_usage::sample_resource_metrics()
-                    .await
-                    .apply_to(&mut usage);
-                let entitlement_request = entitlement::fetch_verified_claims(
-                    &st.http,
-                    &st.config.cloud_base_url,
-                    &auth,
-                    now,
-                );
-                let heartbeat_request =
-                    daily_usage::send_heartbeat(&st.http, &st.config.cloud_base_url, &auth, &usage);
-                let (outcome, heartbeat_result) =
-                    tokio::join!(entitlement_request, heartbeat_request);
-                entitlement::record_outcome(&st.entitlement, outcome, now);
-                // La cuota del canal de WhatsApp se refleja en el medidor del módulo (hub#1089).
-                // Se lee EN VIVO de `whatsapp/plan/` con esta MISMA credencial de máquina, no de
-                // un claim del token: ese endpoint devuelve tier + consumo, y el consumo es un
-                // contador que se mueve con cada mensaje. Si el Cloud no contesta no se escribe
-                // nada — el medidor conserva lo que ya medía, porque en este canal `0` significa
-                // «sin tope» y un fallo de red no es un plan. Un hub sin el módulo ni pregunta.
-                match whatsapp_quota::sync_once(
-                    &st.runtime,
-                    &st.http,
-                    &st.config.cloud_base_url,
-                    &auth,
-                )
-                .await
-                {
-                    whatsapp_quota::QuotaSync::Written {
-                        monthly_limit,
-                        monthly_usage,
-                    } => {
-                        tracing::debug!(monthly_limit, monthly_usage, "cuota de WhatsApp al día")
-                    }
-                    // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
-                    // en la flota que no compró el canal): aquí no se repite el ruido.
-                    other => tracing::trace!(?other, "sincronización de cuota de WhatsApp"),
-                }
-                match heartbeat_result {
-                    // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
-                    // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
-                    Ok(ref answer) => {
-                        // The same, one step further down (saas#2129): the events this beat
-                        // carried are settled, and the buffer keeps draining in THIS tick while
-                        // the bite comes full — the tick is daily, so leaving the surplus for the
-                        // next one is how a busy till loses its oldest events for ever. Only
-                        // `activity_ack` deletes: a bare 2xx is also what a broken ingest answers.
-                        let settled = daily_usage::settle_activity(
-                            &st.runtime,
-                            &st.http,
-                            &st.config.cloud_base_url,
-                            &auth,
-                            &usage.activity,
-                            answer.activity_ack,
-                        )
-                        .await;
-                        if settled.confirmed > 0 {
-                            tracing::debug!(
-                                confirmed = settled.confirmed,
-                                rounds = settled.rounds,
-                                "business activity delivered to the Cloud"
-                            );
-                        }
-                        if let Some(ts) = pending_activity {
-                            st.activity.mark_reported(ts);
-                        }
-                    }
-                    Err(error) => tracing::warn!(%error, "daily usage heartbeat failed"),
-                }
-            }
-        });
+        daily_usage::spawn_daily_turn(
+            st,
+            std::time::Duration::from_secs(secs),
+            daily_usage::DAILY_STEP_DEADLINE,
+        );
     }
 
     // ⛔ Aquí iba el import del blueprint DECLARADO por el SaaS (ADR-0212 / hub#406), y ya no va:
@@ -1037,43 +937,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // eso es peor que tardar. En su propia task y best-effort, como el import de blueprint y el
     // refetch del certificado: un plano de control inalcanzable deja un hub que FUNCIONA.
     boot_announce::spawn(&announce_state);
-    // Precalentar los handlers WASM (hub#926). La caché en disco de wasmtime vive DENTRO del
-    // contenedor, así que un deploy la estrena vacía: medido en producción, las dos primeras ventas
-    // tras desplegar costaron 8,2 s y 5,7 s, y las siguientes 75-91 ms. Compilar hay que compilar;
-    // lo que se elige aquí es hacerlo mientras nadie espera, no en el primer cobro del día.
-    //
-    // En su propia task y DESPUÉS de bindear, como el resto del arranque: el hub ya atiende, y si
-    // el precalentado tarda —o un módulo trae bytes rotos— no retrasa ni tumba nada.
-    {
-        tokio::spawn(async move {
-            // Se toma la caché (un `Arc` compartido con el registro) y se SUELTA el candado del
-            // runtime antes de compilar: calentar no puede bloquear a quien esté cobrando.
-            let (cache, modules) = {
-                let rt = warm_state.runtime.read().await;
-                (
-                    std::sync::Arc::clone(&rt.registry().wasm_cache),
-                    rt.registry().handlers_to_warm_up(),
-                )
-            };
-            if modules.is_empty() {
-                return;
-            }
-            let total = modules.len();
-            // `spawn_blocking`: compilar es trabajo de CPU y no debe ocupar un worker async.
-            match tokio::task::spawn_blocking(move || {
-                erplora_runtime::wasm_cache::warm_up(
-                    &cache,
-                    &modules,
-                    erplora_runtime::wasm_cache::Limits::from_env(),
-                )
-            })
-            .await
-            {
-                Ok(warmed) => eprintln!("wasm: {warmed}/{total} handler(s) precalentados"),
-                Err(e) => eprintln!("wasm: precalentado abortado: {e}"),
-            }
-        });
-    }
+    // Warm up the WASM handlers (hub#926) and announce the end in the log (hub#2693): see
+    // `boot_warm_up`. After binding, like the rest of the boot: the hub already serves.
+    crate::boot_warm_up::spawn(&warm_state);
 
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).

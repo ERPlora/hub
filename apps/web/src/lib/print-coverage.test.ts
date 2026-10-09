@@ -28,6 +28,7 @@ import {
 
 const host = (over: Partial<PrintHostEntry> = {}): PrintHostEntry => ({
   deviceId: 'dev-1',
+  name: '',
   role: 'kitchen',
   label: 'Kitchen tablet',
   live: true,
@@ -78,6 +79,21 @@ describe('coverageRows — what the screen paints, worst first', () => {
       [host({ deviceId: 'till-9', label: '', live: true })],
     );
     expect(rows[0]!.hosts).toEqual(['till-9']);
+  });
+
+  // hub#2551: the device id is the proof of a trusted device. A cashier's read carries no
+  // `deviceId` for other devices, and the hub names a nameless host by the tail of its id.
+  it('hub2551: names a nameless host by the name the hub gives, never by its device id', () => {
+    const rows = coverageRows(
+      [cov({ liveHosts: 2 })],
+      [
+        // An administrator's read: the id is there, and still not what the screen paints.
+        host({ deviceId: 'dev_3f9c2b1c4d5e6f708192a3b4c5d6e7f8', name: '…e7f8', label: '' }),
+        // A cashier's read: no id at all, and the row is never blank.
+        host({ deviceId: '', name: '…e8f9', label: '' }),
+      ],
+    );
+    expect(rows[0]!.hosts).toEqual(['…e7f8', '…e8f9']);
   });
 
   it('orders the alarm first, then lost coverage, then reassurance', () => {
@@ -148,6 +164,26 @@ describe('fetchPrintHosts — the wire read, fetch stubbed (hub#770: real functi
       vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false }), { status: 401 })),
     );
     await expect(fetchPrintHosts()).rejects.toThrow();
+  });
+
+  it('hub2551: reads the name the hub gives and a host without deviceId (a cashier\'s read)', async () => {
+    const payload = {
+      ok: true,
+      hosts: [{ name: '…e7f8', role: 'receipt', label: '', live: true }],
+      coverage: [],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 })),
+    );
+    const answer = await fetchPrintHosts();
+    expect(answer.hosts[0]).toEqual({
+      deviceId: '',
+      name: '…e7f8',
+      role: 'receipt',
+      label: '',
+      live: true,
+    });
   });
 
   it('tolerates malformed rows without inventing numbers', async () => {

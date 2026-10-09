@@ -76,6 +76,31 @@ pub(crate) fn plan_max_users(st: &AppState) -> u32 {
     st.entitlement.read().map(|g| g.max_users()).unwrap_or(0)
 }
 
+/// Spends one try of the editor's PIN budget when a PIN travels in the request (hub#2518).
+///
+/// PINs are unique (hub#355), so the alta and the edit have to say «that one is taken» — which,
+/// unbraked, let whoever manages the staff type numbers into any record until the refusal named a
+/// colleague's PIN, the account owner's included. Same budget, same map and same key as changing
+/// one's own PIN (`auth_api::auth_set_pin`, hub#2499): thirty tries an hour against the EDITOR's id
+/// ([`crate::login_throttle::LoginThrottle::pin_change`]), every try counted (an accepted number is
+/// stored and the prober moves on), and one budget per person across the three doors — a budget
+/// per door would only multiply the tries. Thirty, not the pinpad's five every five minutes, so
+/// that setting up a whole staff in one sitting never waits (hub#2564), while a prober still gets
+/// fewer tries a day than under those five.
+/// Never `login_throttle`: that one is keyed by whatever name the caller types at the pinpad.
+/// Checked BEFORE the runtime looks at the digits. A request without a PIN (or with an empty one,
+/// which reveals nothing) spends nothing and is never locked.
+fn spend_pin_try(st: &AppState, editor_id: &str, pin: Option<&str>) -> Result<(), Response> {
+    if !pin.is_some_and(|p| !p.trim().is_empty()) {
+        return Ok(());
+    }
+    if let Some(retry_after_secs) = st.pin_change_throttle.locked_for(editor_id) {
+        return Err(crate::auth_api::too_many_attempts(retry_after_secs));
+    }
+    st.pin_change_throttle.record_attempt(editor_id);
+    Ok(())
+}
+
 fn not_found() -> Response {
     (
         StatusCode::NOT_FOUND,
@@ -195,6 +220,9 @@ pub async fn create_user(
     if let Some(Guard::Forbidden { code, message }) = grant_decision(&actor.role, &input.role) {
         return forbidden(code, message);
     }
+    if let Err(response) = spend_pin_try(&st, &actor.id, Some(&input.pin)) {
+        return response;
+    }
     // …y el plan tiene que tener plaza (hub#1685). El tope lo trae el entitlement, que vive aquí y
     // no en el runtime; `0` (incluido «aún no hubo refresh exitoso») = sin tope. Viaja CON el alta
     // y no como comprobación previa (hub#1804): mirarlo antes dejaba una ventana en la que otra
@@ -210,9 +238,9 @@ pub async fn create_user(
     };
     // Suelta el lock ANTES de la I/O de red al SaaS (mismo patrón que `members::add_member`).
     drop(rt);
-    if !created.email.is_empty() {
+    if !created.access_email.is_empty() {
         if let Err(e) =
-            crate::members::notify_member_added(&st, &created.email, &created.role).await
+            crate::members::notify_member_added(&st, &created.access_email, &created.role).await
         {
             return crate::members::members_error_response(e);
         }
@@ -286,6 +314,9 @@ async fn apply_update(
         Ok(target) => target,
         Err(response) => return response,
     };
+    if let Err(response) = spend_pin_try(&st, &admin.id, input.pin.as_deref()) {
+        return response;
+    }
     // **Reactivar es dar de alta** (hub#1685): la baja liberó la plaza y puede haberla ocupado otro,
     // así que volver a entrar vuelve a pedirla. Editar a quien ya está dentro (rol, nombre, PIN) no
     // gasta ninguna: si el tope se mirase en toda escritura, un hub Gratis con sus tres usuarios no
@@ -307,6 +338,11 @@ async fn apply_update(
             Err(e) => return crate::err_response(e),
         }
     };
+    // hub#2571: after the write (a ticket asked for from now on reads the new role) and before
+    // erplora.com is told (which may fail and return): the person's open channels close here.
+    if ends_live_channels(&target, &input) {
+        end_live_channels_of(&st, id);
+    }
 
     if let AccessSync::Revoke { email } = &plan {
         if let Err(e) = crate::members::notify_member_removed(&st, email).await {
@@ -399,6 +435,33 @@ pub(crate) async fn enforce_seat_for_email(
 
 /// El id de la fila del censo cuyo email de **ACCESO** es `email`.
 ///
+/// **Whether an edit changes what the person's live channels may hear** (hub#2571): what a channel
+/// hears was decided by the role when it opened, so a new role or a removal ends it. The name, the
+/// PIN, the badge and the email do not change a single permission, and saving the role the person
+/// already has (the form sends every field back) neither.
+fn ends_live_channels(target: &HubUserRow, input: &UpdateHubUser) -> bool {
+    input.is_active == Some(false) || input.role.as_deref().is_some_and(|r| r != target.role)
+}
+
+/// Closes every live channel (`/ws`, `/api/events`) of the person `user_id`, on every device, with
+/// `events.credential_ended` (hub#2571); the app reconnects with a ticket that carries their new
+/// role, or gets none if they were taken off the team.
+pub(crate) fn end_live_channels_of(st: &AppState, user_id: &str) {
+    st.stream_limiter
+        .cut(&crate::event_stream::person_tag(&st.hub_id(), user_id));
+}
+
+/// The census row whose ACCESS email is `email` ([`census_id_by_access_email`]) — what the members
+/// door is about to write over, so it can tell what the write changes (hub#2571).
+pub(crate) async fn census_row_by_access_email(
+    rt: &Runtime,
+    email: &str,
+) -> erplora_runtime::Result<Option<HubUserRow>> {
+    let users = rt.list_hub_users().await?;
+    Ok(census_id_by_access_email(&users, email)
+        .and_then(|id| users.into_iter().find(|u| u.id == id)))
+}
+
 /// Se compara contra `hub_user.email` a propósito y no contra el email que pinta Personal, que es un
 /// `COALESCE` con el del perfil: el del perfil lo edita cada uno en «Mi perfil» y sin control de
 /// unicidad, así que dejarlo decidir permitiría hacerse pasar por la fila de otro —la del dueño, la
@@ -413,7 +476,7 @@ fn census_id_by_access_email(users: &[HubUserRow], email: &str) -> Option<String
     }
     users
         .iter()
-        .find(|u| !u.email.is_empty() && u.email.eq_ignore_ascii_case(email))
+        .find(|u| !u.access_email.is_empty() && u.access_email.eq_ignore_ascii_case(email))
         .map(|u| u.id.clone())
 }
 
@@ -437,7 +500,7 @@ fn access_sync_plan(target: &HubUserRow, input: &UpdateHubUser) -> AccessSync {
         .as_deref()
         .map(str::trim)
         .filter(|e| !e.is_empty())
-        .unwrap_or(&target.email)
+        .unwrap_or(&target.access_email)
         .to_string();
     if email.is_empty() {
         return AccessSync::Nothing; // Identidad puramente local.
@@ -447,7 +510,7 @@ fn access_sync_plan(target: &HubUserRow, input: &UpdateHubUser) -> AccessSync {
     }
     let role = input.role.as_deref().unwrap_or(&target.role);
     let changes_the_membership = role != target.role
-        || !email.eq_ignore_ascii_case(&target.email)
+        || !email.eq_ignore_ascii_case(&target.access_email)
         || (input.is_active == Some(true) && !target.is_active);
     if changes_the_membership {
         AccessSync::Grant {
@@ -652,6 +715,8 @@ mod tests {
             id: id.into(),
             name: id.into(),
             email: String::new(),
+            access_email: String::new(),
+            has_account: false,
             role: role.into(),
             cloud_user_id: None,
             is_active,
@@ -1039,7 +1104,28 @@ mod tests {
 
     fn with_email(mut row: HubUserRow, email: &str) -> HubUserRow {
         row.email = email.into();
+        row.access_email = email.into();
+        row.has_account = true;
         row
+    }
+
+    /// A person who signs in with a PIN only and typed an address in «My profile»: the screen shows
+    /// it, but it is not the key of any access (hub#2500).
+    fn with_profile_email_only(mut row: HubUserRow, email: &str) -> HubUserRow {
+        row.email = email.into();
+        row
+    }
+
+    #[test]
+    fn hub2500_an_address_typed_in_my_profile_never_reaches_the_saas() {
+        let marta = with_profile_email_only(user("marta", "employee", true), "ioan@example.com");
+        assert_eq!(access_sync_plan(&marta, &deactivate()), AccessSync::Nothing);
+        assert_eq!(
+            access_sync_plan(&marta, &set_role("manager")),
+            AccessSync::Nothing
+        );
+        // …and the members door, which names people by address, does not take her for its owner.
+        assert_eq!(census_id_by_access_email(&[marta], "ioan@example.com"), None);
     }
 
     /// hub#1429 — **what the SaaS is told, and therefore what has to be asked first.**

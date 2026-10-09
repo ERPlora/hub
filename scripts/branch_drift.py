@@ -65,7 +65,9 @@ DEFAULT_MAX_AGE_DAYS = 2.0
 # instead of in the title, so retitling the issue by hand never orphans it.
 MARKER = "<!-- erplora:develop-main-drift -->"
 ISSUE_TITLE = "Hay trabajo terminado que no está en producción: `main` se ha quedado atrás de `develop`"
-ISSUE_LABELS = ("prio:P1", "area:ci-cd")
+# `module:ci` puts it in the CI area's queue (`gh issue list --label module:ci`, pm#663); the
+# lookup stays on LOOKUP_LABEL, so the issues opened before it are still found.
+ISSUE_LABELS = ("prio:P1", "area:ci-cd", "module:ci")
 # The label is also how the issue is FOUND again (see `GhIssues.find_open`): scanning a label is
 # deterministic, while searching the body depends on GitHub's search index catching up — and a
 # stale index means a duplicate issue every morning.

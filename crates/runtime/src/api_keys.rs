@@ -351,8 +351,10 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<ApiKeyIn
     Ok(res.rows.iter().map(row_to_info).collect())
 }
 
-/// **The key the hub issues to itself** (hub#504), so our own app reads the event stream through
-/// the same door as everybody else instead of through a hole cut for it.
+/// **The key the hub issues to itself** (hub#504). It used to be what our own app read the event
+/// stream with; since hub#2501 the app listens as the person using it (a stream ticket bound to
+/// the session, `event_stream.rs`), because this blanket key handed a cashier every event of the
+/// business. Nothing in production asks for it any more; retiring it is hub#2524.
 ///
 /// Idempotent: returns the id of the existing one, or mints it. Three properties are the design:
 ///
@@ -364,9 +366,6 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<ApiKeyIn
 ///  - **Re-issued, never restored.** A hub poured from a blueprint or restored from a backup has
 ///    no `hub_api_key` rows (credentials must not travel in an export, same reasoning hub#361 used
 ///    for the elevation window). The app asks again on connect and gets a **new** key.
-///
-/// If this function is ever deleted, the app stops reading the stream — loudly, on the next
-/// connect. That is the intended failure: an auth hole would be silent.
 pub async fn ensure_app_key(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<String> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -659,14 +658,25 @@ async fn principal_from_row(
     }
 }
 
-/// Consume una unidad de la ventana actual. El UPSERT es una única sentencia PostgreSQL, así que
-/// dos workers concurrentes no pueden sobrepasar la cuota por una carrera read-then-write.
+/// Where the API-key quota reads "now", in Unix seconds (hub#2628). The window is the clock
+/// minute, so whoever asserts that two calls share it has to own the clock: a test that read the
+/// wall clock twice failed whenever the minute turned between its calls.
+pub type QuotaClock = std::sync::Arc<dyn Fn() -> i64 + Send + Sync>;
+
+/// The real clock, the one every host runs with.
+pub fn wall_clock() -> QuotaClock {
+    std::sync::Arc::new(|| chrono::Utc::now().timestamp())
+}
+
+/// Consumes one call from the window `clock` is in. The UPSERT is a single PostgreSQL statement,
+/// so two concurrent workers cannot overrun the quota through a read-then-write race.
 pub async fn consume_rate_limit(
     db: &dyn DatabaseAdapter,
     key_id: &str,
     limit: i64,
+    clock: &QuotaClock,
 ) -> Result<RateLimitDecision> {
-    consume_rate_limit_at(db, key_id, limit, chrono::Utc::now().timestamp()).await
+    consume_rate_limit_at(db, key_id, limit, clock()).await
 }
 
 async fn consume_rate_limit_at(
@@ -1154,6 +1164,25 @@ mod tests {
         let reset = consume_rate_limit_at(&db, "key-1", 2, 180).await.unwrap();
         assert!(reset.allowed);
         assert_eq!(reset.remaining, 1);
+    }
+
+    /// hub#2628: the window is the clock minute, not "sixty seconds since the first call". A key
+    /// of one call a minute gets a second one if it lands a second later on the other side of
+    /// the minute — so any test that expects the second call refused has to pin the clock.
+    #[tokio::test]
+    async fn a_call_on_each_side_of_the_minute_boundary_opens_a_new_window_hub2628() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let last_second = consume_rate_limit_at(&db, "key-edge", 1, 119)
+            .await
+            .unwrap();
+        assert!(last_second.allowed);
+        assert_eq!(last_second.retry_after_seconds, 1);
+        let next_minute = consume_rate_limit_at(&db, "key-edge", 1, 120)
+            .await
+            .unwrap();
+        assert!(next_minute.allowed);
+        assert_eq!(next_minute.remaining, 0);
     }
 
     #[tokio::test]

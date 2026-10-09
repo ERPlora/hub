@@ -140,6 +140,9 @@ fn media_with_cookie(client: &str, token: &str) -> Request<Body> {
         .unwrap()
 }
 
+/// The invented tickets below carry the ticket prefix (`erpl_tkt_`) because that is what a guesser
+/// has to send: since hub#2523 anything else in the address is refused by its shape (400), never
+/// looked up, and so is not a guess this guard needs to count.
 fn events_with_ticket(client: &str, ticket: &str) -> Request<Body> {
     Request::builder()
         .uri(format!("/api/events?ticket={ticket}"))
@@ -274,12 +277,39 @@ async fn invented_event_tickets_count_like_sessions() {
     for i in 0..MAX_FORGED_SESSIONS {
         let (status, _) = send(
             &router,
-            events_with_ticket(attacker, &format!("evt_forged{i}")),
+            events_with_ticket(attacker, &format!("erpl_tkt_evt_forged{i}")),
         )
         .await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
     assert_locked(&router, attacker).await;
+}
+
+/// hub#2549: `/readyz` shows its whole diagnosis to an owner or administrator session and answers
+/// the same status code to everybody else — so without counting, it would tell an attacker, for
+/// free and without limit, which invented token is an administrator's. A forged session there
+/// counts against the address like at any other door (hub#2282), while the probe itself keeps
+/// answering: its status code is the orchestrator's verdict, never a `401`.
+#[tokio::test]
+async fn invented_sessions_at_the_readiness_probe_count_like_sessions_hub2549() {
+    let router = fixture().await;
+    let attacker = "198.51.100.70";
+    for i in 0..MAX_FORGED_SESSIONS {
+        let request = Request::builder()
+            .uri("/readyz")
+            .header("x-hub-session", format!("forged-readyz-{i:052}"))
+            .header("x-forwarded-for", forwarded(attacker))
+            .body(Body::empty())
+            .unwrap();
+        let (status, body) = send(&router, request).await;
+        assert_ne!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "the probe never rejects: {body}"
+        );
+    }
+    assert_locked(&router, attacker).await;
+    assert_signs_in(&router, "198.51.100.71").await;
 }
 
 /// infra#334: a till retrying its one dead session all day long is not an attack.
@@ -294,7 +324,11 @@ async fn a_till_repeating_its_dead_session_never_locks_the_shop() {
         )
         .await;
         send(&router, media_with_cookie(shop, "dead-session-of-the-till")).await;
-        send(&router, events_with_ticket(shop, "evt_used_ticket")).await;
+        send(
+            &router,
+            events_with_ticket(shop, "erpl_tkt_evt_used_ticket"),
+        )
+        .await;
     }
     assert_signs_in(&router, shop).await;
 }
@@ -305,7 +339,7 @@ async fn every_failure_leaves_a_stable_log_line() {
     let client = "198.51.100.80";
     send(&router, pin_login(client, "Admin", "0000")).await;
     send(&router, profile_with_session(client, "forged-token")).await;
-    send(&router, events_with_ticket(client, "evt_forged")).await;
+    send(&router, events_with_ticket(client, "erpl_tkt_evt_forged")).await;
     let lines = failure_lines(client);
     for reason in ["pin", "session_invalid", "ticket_invalid"] {
         assert!(
@@ -421,12 +455,16 @@ async fn hub2293_a_rejected_session_line_carries_the_token_fingerprint() {
     let client = "198.51.100.110";
     send(&router, profile_with_session(client, "forged-header-2293")).await;
     send(&router, media_with_cookie(client, "forged-cookie-2293")).await;
-    send(&router, events_with_ticket(client, "evt_forged_2293")).await;
+    send(
+        &router,
+        events_with_ticket(client, "erpl_tkt_evt_forged_2293"),
+    )
+    .await;
     let lines = failure_lines(client);
     for (reason, token) in [
         ("session_invalid", "forged-header-2293"),
         ("session_invalid", "forged-cookie-2293"),
-        ("ticket_invalid", "evt_forged_2293"),
+        ("ticket_invalid", "erpl_tkt_evt_forged_2293"),
     ] {
         let tail = format!(
             "reason={reason} client={client} token={} hub={HUB_ID}",

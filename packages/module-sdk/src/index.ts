@@ -117,6 +117,14 @@ export interface Notification {
   message: string;
 }
 
+/**
+ * How much identity friction THIS device asks for (hub#357/#358): `shared` is the till at the
+ * counter that several people take turns at; `personal` is somebody's own phone or laptop. The pair
+ * is CLOSED — the same two spellings as `DeviceMode::parse` in the runtime. Read it through
+ * `erplora.deviceMode`.
+ */
+export type DeviceMode = 'shared' | 'personal';
+
 /** Opciones de formateo de dinero (ADR-0059). Mismo shape que `apps/web/src/lib/money.ts`. */
 export interface FormatMoneyOptions {
   /** ISO-4217. Por defecto, la moneda del hub (`erplora.currency`). */
@@ -950,6 +958,10 @@ const PLATFORM_FAILURES: Record<
   // hub#2434: not plumbing and not the request — the business has not filled in what an invoice
   // needs. The runtime lists it in `missing`; the sentence names it and says where it is done.
   fiscal_precondition_failed: (_app, failure) => fiscalSetupMissing(missingOf(failure)),
+  // hub#2383: a query asked without a value its SQL needs. It used to answer «there is nothing»;
+  // now it refuses, naming the query and the bind as fields for whoever fixes the call. The person
+  // reading did nothing wrong and cannot fix it here, but «nothing was found» would be a lie.
+  missing_required_param: () => ASKED_WITHOUT_A_VALUE,
   db: () => PLUMBING,
   io: () => PLUMBING,
   wasm: () => PLUMBING,
@@ -1050,6 +1062,15 @@ const TOO_LONG_AT_ONCE: Bilingual = {
  * read of an installed, active app failed — a passing fault, not something Apps can fix. The app is
  * deliberately NOT named: naming it is what sent the owner to Apps to look for it.
  */
+/**
+ * «The screen asked without a value it needs, so nothing was looked up» (hub#2383): NOT «there is
+ * nothing», which is what the empty answer used to say.
+ */
+const ASKED_WITHOUT_A_VALUE: Bilingual = {
+  en: 'This screen asked for information without a value it needs, so nothing was looked up. Try again, and tell an administrator if it keeps happening.',
+  es: 'Esta pantalla pidió información sin un dato que necesita, así que no se ha buscado nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+};
+
 const READ_FAILED: Bilingual = {
   en: 'Some information this action needs could not be read, so nothing was done. Try again, and tell an administrator if it keeps happening.',
   es: 'No se pudo leer un dato que esta acción necesita, así que no se ha hecho nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
@@ -3356,6 +3377,13 @@ export class ErploraClient {
        * be the SYMMETRIC regression: a real query silently skipped. Injectable for tests.
        */
       installedModules?: () => ReadonlySet<string> | undefined;
+      /**
+       * The mode of THIS device as the hub last answered (`GET /api/device/mode`, hub#358),
+       * injected by the shell from its reactive `deviceMode`. A module cannot ask the hub itself:
+       * the device id is native in the installable app and the runtime URL is not the page origin.
+       * Re-read on every access, so a revoked `personal` is seen at once. Injectable for tests.
+       */
+      deviceMode?: () => DeviceMode;
     } = {},
     bridge?: BridgeTransport,
   ) {
@@ -3907,6 +3935,23 @@ export class ErploraClient {
       /* noop — degradación elegante */
     }
     return 'UTC';
+  }
+
+  /**
+   * The mode of THIS device (hub#358): `shared` (the till at the counter) or `personal` (somebody's
+   * own device). Modules use it to pick the friction a flow asks for — e.g. the time clock only
+   * checks the geofence on a `personal` device, since the till is already at the shop.
+   *
+   * **Fails towards the strict mode**, like the shell's `device-mode.ts`: no injected getter, a
+   * getter that throws, or anything that is not EXACTLY `'personal'` reads as `'shared'`. It is a
+   * friction hint, never a permission — the runtime revalidates every call.
+   */
+  get deviceMode(): DeviceMode {
+    try {
+      return this.opts.deviceMode?.() === 'personal' ? 'personal' : 'shared';
+    } catch {
+      return 'shared';
+    }
   }
 
   /** `Intl.NumberFormat` de moneda con la moneda del hub (o `opts.currency`) y el locale activo. */

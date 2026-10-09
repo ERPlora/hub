@@ -53,6 +53,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Where the device is, for a module that calls `navigator.geolocation` (hub#2552); first
+         consumer: the `attendance` module (clock-in near the venue). Runtime permissions, asked
+         by wry's `RustWebChromeClient.onGeolocationPermissionsShowPrompt`; undeclared, the
+         request is DENIED with no dialog. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- 🔴 Same trap as the NFC feature: the location permissions make Google Play add an
+         IMPLICIT android.hardware.location requirement (whatever the target SDK) and hide the app
+         from every device without it. The till does not need a position; only a module asks. -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 

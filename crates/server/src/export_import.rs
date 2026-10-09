@@ -329,6 +329,10 @@ pub async fn export_blueprint(
         }
     }
 
+    // The certificate and the media changed the manifest after the runtime sealed it: seal it
+    // again, last, or the hub's own backup would come back as another business's file (hub#2497).
+    export::seal_manifest(&mut manifest);
+
     // Empaquetado: manifest.json (fuente de verdad, actualizado con los sha añadidos) + files.
     let manifest_bytes = match serde_json::to_vec_pretty(&manifest) {
         Ok(b) => b,
@@ -676,9 +680,11 @@ pub(crate) async fn run_import(
             .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
-        let mut rt = arc.write().await;
+        // hub#2508: the runtime is locked only to register each downloaded app, so the till keeps
+        // charging while a template installs; `module_ops` keeps it from crossing another install.
+        let _module_ops = st.module_ops.lock().await;
         for m in &manifest.modules {
-            if rt.registry().is_installed(&m.id) {
+            if arc.read().await.registry().is_installed(&m.id) {
                 installed_modules.push(
                     json!({ "id": m.id, "version": m.version, "status": "already_installed" }),
                 );
@@ -713,7 +719,7 @@ pub(crate) async fn run_import(
                         &st.config.cloud_base_url,
                         &st.config.module_cache,
                         auth_cred,
-                        &mut rt,
+                        &*arc,
                         &m.id,
                         &m.version,
                         manifest.purpose,

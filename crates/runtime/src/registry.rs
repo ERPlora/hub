@@ -995,6 +995,22 @@ impl Registry {
             .collect()
     }
 
+    /// Ids of the modules `ctx` may read through the normal API: those with at least one query whose
+    /// permission [`crate::permissions::has`] lets `ctx` through (hub#2501).
+    ///
+    /// It is the dispatcher's own question — the same predicate `queries::execute` gates on — asked
+    /// for every query at once, so the live event channel can hand a person exactly the modules the
+    /// query door would serve them, and the two never disagree about what a permission means.
+    /// Whether the module is switched on is not part of it: a module that is off emits nothing, and
+    /// one switched back on while a screen listens must be heard without a reconnect.
+    pub fn modules_readable_by(&self, ctx: &RequestContext) -> HashSet<String> {
+        self.queries
+            .values()
+            .filter(|q| crate::permissions::has(ctx, &q.def.permission))
+            .map(|q| q.module_id.clone())
+            .collect()
+    }
+
     /// Ids de los módulos **activos** que exponen al menos una query/command `expose_api`
     /// (orden estable por id). Lo usan el generador OpenAPI y la matriz de scope de la UI.
     pub fn modules_with_public_api(&self) -> Vec<String> {

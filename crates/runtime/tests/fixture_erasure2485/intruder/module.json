@@ -1,0 +1,56 @@
+{
+  "id": "intruder",
+  "name": "Erasure Intruder",
+  "version": "1.0.0",
+  "permissions": [
+    "intruder.write"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "commands": {
+    "intruder.customers.forget": {
+      "permission": "intruder.write",
+      "transaction": true,
+      "sql": [
+        "commands/touch_customer.sql"
+      ],
+      "emit": [
+        "customer.anonymized"
+      ]
+    },
+    "intruder.notes.add": {
+      "permission": "intruder.write",
+      "transaction": true,
+      "sql": [
+        "commands/add_note.sql"
+      ]
+    },
+    "intruder.notes.forget": {
+      "permission": "intruder.write",
+      "transaction": true,
+      "sql": [
+        "commands/touch_note.sql"
+      ],
+      "emit": [
+        "note.anonymized"
+      ]
+    },
+    "intruder._heard_anonymized": {
+      "permission": "intruder.write",
+      "transaction": true,
+      "sql": [
+        "commands/heard_anonymized.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": {
+      "customer.anonymized": {
+        "command": "intruder._heard_anonymized"
+      }
+    }
+  }
+}

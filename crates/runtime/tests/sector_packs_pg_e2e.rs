@@ -106,6 +106,16 @@ const REQUIRED_LIST_BINDS: &[(&str, &[(&str, &str)])] = &[
         "appointments.blocked_times.list",
         &[("from_datetime", "2026-01-01T00:00:00")],
     ),
+    // The day agenda is a PLAIN query over `[:day_start, :day_end)`. Asked without its window it
+    // used to bind NULL and answer `[]`; since hub#2383 it refuses with `missing_required_param`,
+    // so the smoke asks it the way the agenda screen does: one day.
+    (
+        "appointments.appointments.list",
+        &[
+            ("day_start", "2026-01-01T00:00:00"),
+            ("day_end", "2026-01-02T00:00:00"),
+        ],
+    ),
 ];
 
 /// Ejercita cada query `*.list` declarada por los módulos instalados: las de contexto con el bind

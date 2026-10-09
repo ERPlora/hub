@@ -54,9 +54,51 @@ pub async fn execute(
     params: &Params,
     ctx: &RequestContext,
 ) -> Result<Vec<Json>> {
+    execute_all(db, registry, name, params, ctx, PlainBinds::Enforce).await
+}
+
+/// [`execute`] for a read a MODULE declared inside its own command — the preloaded `reads`
+/// (ADR-0069), a `protects` guard, a `patch` read. Their params are a mapping the author wrote
+/// (`payload.staff_id` resolves to null when the payload has none, by design) and the command owns
+/// what "no row" means, so a plain query's absent bind keeps binding NULL there (hub#2383): the
+/// published `appointments.availability.slots` asks a REQUIRED read with an optional `staff_id`, and
+/// refusing it would abort every "any professional" availability check. Lists are unaffected —
+/// their required binds (hub#1086) are enforced for every caller, as before.
+pub(crate) async fn execute_declared_read(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    params: &Params,
+    ctx: &RequestContext,
+) -> Result<Vec<Json>> {
+    execute_all(db, registry, name, params, ctx, PlainBinds::AsMapped).await
+}
+
+/// Whether a PLAIN query refuses a required bind that arrived absent or null (hub#2383).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlainBinds {
+    /// Every caller that ASKS: screens, the assistant, integrations, flows. The default.
+    Enforce,
+    /// A module's own command-time reads, whose params are the author's mapping — see
+    /// [`execute_declared_read`].
+    AsMapped,
+}
+
+async fn execute_all(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    params: &Params,
+    ctx: &RequestContext,
+    plain_binds: PlainBinds,
+) -> Result<Vec<Json>> {
     // El llamador puso su propio tope: se respeta tal cual, en un solo viaje.
     if params.get("limit").and_then(|v| v.as_u64()).is_some() {
-        return Ok(execute_page(db, registry, name, params, ctx).await?.rows);
+        return Ok(
+            execute_page_with(db, registry, name, params, ctx, plain_binds)
+                .await?
+                .rows,
+        );
     }
 
     // La PRIMERA página se pide con los `params` TAL CUAL llegaron, sin añadir nada.
@@ -65,7 +107,7 @@ pub async fn execute(
     // Schema con `additionalProperties: false`, así que meterles un `offset` que no declaran las
     // hace fallar. Y fallaba justo donde más duele — el `settings_query` de un `protects` se
     // saltaba con «guard skipped (open)», o sea que el arreglo ABRÍA un guard que debía denegar.
-    let first = execute_page(db, registry, name, params, ctx).await?;
+    let first = execute_page_with(db, registry, name, params, ctx, plain_binds).await?;
     let total = first.total;
     let mut offset = first.offset + first.rows.len() as u64;
     let mut out = first.rows;
@@ -81,7 +123,7 @@ pub async fn execute(
         }
         let mut page_params = params.clone();
         page_params.insert("offset".into(), serde_json::json!(offset));
-        let page = execute_page(db, registry, name, &page_params, ctx).await?;
+        let page = execute_page_with(db, registry, name, &page_params, ctx, plain_binds).await?;
         if page.rows.is_empty() {
             break; // el `total` mentía; parar es mejor que girar en vacío
         }
@@ -99,6 +141,17 @@ pub async fn execute_page(
     name: &str,
     params: &Params,
     ctx: &RequestContext,
+) -> Result<QueryPage> {
+    execute_page_with(db, registry, name, params, ctx, PlainBinds::Enforce).await
+}
+
+async fn execute_page_with(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    params: &Params,
+    ctx: &RequestContext,
+    plain_binds: PlainBinds,
 ) -> Result<QueryPage> {
     // **Namespace reservado del core** (ADR-0192): `hub.*` no pertenece a ningún módulo — lo sirve
     // el propio runtime. Un módulo no puede pegar a las rutas HTTP del core (el contrato es
@@ -239,6 +292,17 @@ pub async fn execute_page(
                 params,
                 ctx,
             )?;
+            // hub#2383: and the half hub#1913 left — a bind the SQL NEEDS that arrived absent or
+            // null bound NULL and answered zero rows, the same "there is nothing" as a record that
+            // does not exist. Checked on `bound`: the kernel's own params are always there.
+            if plain_binds == PlainBinds::Enforce {
+                reject_missing_plain_binds(
+                    name,
+                    &q.sql,
+                    q.schema.as_ref().map(|s| s.raw.as_ref()),
+                    &bound,
+                )?;
+            }
             let rows = db.query(&q.sql, &bound).await?.rows;
             let total = rows.len() as u64;
             Ok(QueryPage {
@@ -449,6 +513,187 @@ fn plain_vocabulary(sql: &str, schema: Option<&serde_json::Value>) -> Vec<String
     out.sort();
     out.dedup();
     out
+}
+
+/// Refuses the first bind a PLAIN query needs that arrived absent or null (hub#2383).
+///
+/// The silence it closes is the list's (hub#1086), on the reads that fetch ONE record:
+/// `appointments.appointments.get` asked with `{}` bound `:appointment_id` as NULL and answered
+/// `[]` — the empty ticket of sales#316, reached by forgetting the id instead of misspelling it.
+/// Same error and code as the list (`missing_required_param`, 422), naming the query and the
+/// parameter; the first one in SQL order, like its twins.
+///
+/// `bound` is the caller's params with the kernel's injected: those are never null, so they never
+/// trip it.
+pub(crate) fn reject_missing_plain_binds(
+    query: &str,
+    sql: &str,
+    schema: Option<&serde_json::Value>,
+    bound: &Params,
+) -> Result<()> {
+    for name in plain_required_binds(sql, schema) {
+        if !bound.get(&name).is_some_and(|v| !v.is_null()) {
+            return Err(RuntimeError::MissingRequiredParam {
+                query: query.to_string(),
+                param: name,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The binds a PLAIN query cannot answer truthfully without, in SQL order (hub#2383).
+///
+/// Read from what the module WROTE, never guessed — the list rule ([`required_binds`]) is not
+/// enough here, because plain queries carry optional filters written without a bare `COALESCE`.
+/// The sweep of the 27 modules (`origin/main`, 04/10/2026) found three idioms of "absent is on
+/// purpose", and a bind that shows any of them on ANY occurrence stays optional:
+///
+///  1. inside the first argument of a `COALESCE(…)` — `appointments.appointments.list` writes
+///     `(COALESCE(CAST(:status AS text), '') = '' OR status = :status)`;
+///  2. tested for null — `:x IS NULL`, `CAST(:x AS text) IS NOT NULL`, `:x::text IS NULL`
+///     (`appointments.availability.own_slots`, `modifiers.for_target`);
+///  3. declared OPTIONAL by the query's JSON Schema (a `properties` entry not in `required`) —
+///     `tasks.tasks.my`, whose screen sends `due_horizon: null` on purpose.
+///
+/// The engine's paging pair (`limit`/`offset`) is never required: the SDK's whole-set readers send
+/// it to any query, and `LIMIT NULL` is "no limit".
+pub(crate) fn plain_required_binds(sql: &str, schema: Option<&serde_json::Value>) -> Vec<String> {
+    let bytes = sql.as_bytes();
+    let code = code_spans(bytes);
+    let mut handled = coalesce_first_arg_spans(bytes, &code);
+    handled.extend(null_tested_spans(bytes, &code));
+    let schema_optional: Vec<&str> = match schema
+        .and_then(|raw| raw.get("properties"))
+        .and_then(|p| p.as_object())
+    {
+        Some(props) => {
+            let required: Vec<&str> = schema
+                .and_then(|raw| raw.get("required"))
+                .and_then(|r| r.as_array())
+                .map(|r| r.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+            props
+                .keys()
+                .map(String::as_str)
+                .filter(|k| !required.contains(k))
+                .collect()
+        }
+        None => Vec::new(),
+    };
+
+    let occurrences = bind_occurrences(sql, &code);
+    let mut out: Vec<String> = Vec::new();
+    for (name, _) in &occurrences {
+        let optional = matches!(name.as_str(), "limit" | "offset")
+            || schema_optional.contains(&name.as_str())
+            || occurrences
+                .iter()
+                .any(|(n, at)| n == name && handled.iter().any(|(s, e)| at >= s && at < e));
+        if !optional && !out.contains(name) {
+            out.push(name.clone());
+        }
+    }
+    out
+}
+
+/// Every `:name` occurrence in the code spans, with the absolute byte offset of the name — the
+/// reading rules of [`required_binds`] (`::` is a cast, literals and comments are verbatim).
+fn bind_occurrences(sql: &str, code: &[(usize, usize)]) -> Vec<(String, usize)> {
+    let mut out: Vec<(String, usize)> = Vec::new();
+    for (start, end) in code {
+        let seg = &sql[*start..*end];
+        let b = seg.as_bytes();
+        let mut i = 0usize;
+        while i < seg.len() {
+            if b[i] == b':' {
+                if b.get(i + 1) == Some(&b':') {
+                    i += 2;
+                    continue;
+                }
+                let mut j = i + 1;
+                while j < seg.len() && (b[j].is_ascii_alphanumeric() || b[j] == b'_') {
+                    j += 1;
+                }
+                if j > i + 1 {
+                    out.push((seg[i + 1..j].to_string(), start + i + 1));
+                    i = j;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Byte spans (absolute) of every operand tested with `IS NULL` / `IS NOT NULL`: the parenthesised
+/// group that closes right before it (`CAST(:x AS text) IS NULL`, `(:x) IS NULL`), or else the
+/// token (`:x IS NULL`, `:x::text IS NULL`). Case-insensitive, word-bounded, inside code only.
+fn null_tested_spans(bytes: &[u8], code: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    let is_word = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+    let word_at = |i: usize, word: &[u8]| -> bool {
+        bytes.len() >= i + word.len()
+            && bytes[i..i + word.len()].eq_ignore_ascii_case(word)
+            && (i == 0 || !is_word(bytes[i - 1]))
+            && bytes.get(i + word.len()).is_none_or(|b| !is_word(*b))
+    };
+    let skip_ws = |mut i: usize, end: usize| {
+        while i < end && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        i
+    };
+    let mut spans = Vec::new();
+    for (start, end) in code {
+        let (start, end) = (*start, *end);
+        let mut i = start;
+        while i < end {
+            if !word_at(i, b"IS") {
+                i += 1;
+                continue;
+            }
+            let mut k = skip_ws(i + 2, end);
+            if word_at(k, b"NOT") {
+                k = skip_ws(k + 3, end);
+            }
+            if !word_at(k, b"NULL") {
+                i += 2;
+                continue;
+            }
+            // The operand ends at the last non-blank byte before `IS`.
+            let mut last = i;
+            while last > start && bytes[last - 1].is_ascii_whitespace() {
+                last -= 1;
+            }
+            if last > start && bytes[last - 1] == b')' {
+                let mut depth = 0usize;
+                let mut open = last;
+                while open > start {
+                    open -= 1;
+                    match bytes[open] {
+                        b')' => depth += 1,
+                        b'(' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                spans.push((open, last));
+            } else {
+                let mut first = last;
+                while first > start && (is_word(bytes[first - 1]) || bytes[first - 1] == b':') {
+                    first -= 1;
+                }
+                spans.push((first, last));
+            }
+            i = k + 4;
+        }
+    }
+    spans
 }
 
 /// Todos los binds `:name` que un SQL referencia, con las MISMAS reglas de lectura que
@@ -1224,5 +1469,53 @@ mod tests {
         let _ = FilterSpec {
             op: FilterOp::Range,
         };
+    }
+
+    // ── hub#2383: the binds a PLAIN query needs ──────────────────────────────────────────────
+
+    use super::plain_required_binds;
+
+    #[test]
+    fn a_plain_bind_compared_bare_is_required() {
+        let sql = "SELECT * FROM t WHERE hub_id = :hub_id AND id = :id AND deleted_at IS NULL";
+        assert_eq!(
+            plain_required_binds(sql, None),
+            vec!["hub_id", "id"],
+            "a column tested for null is not a bind: `:id` stays required"
+        );
+    }
+
+    #[test]
+    fn a_null_test_in_any_case_or_after_a_cast_makes_the_bind_optional() {
+        let sql = "SELECT * FROM t WHERE (:a is not null AND a = :a) \
+                   OR (:b::text IS NULL OR b = :b) \
+                   OR (CAST(:c AS text) IS NULL OR c = :c) \
+                   OR ((:d) Is Null OR d = :d)";
+        assert!(
+            plain_required_binds(sql, None).is_empty(),
+            "lower/mixed case, `::` casts, CAST(...) and a parenthesised operand all mark the guard"
+        );
+    }
+
+    #[test]
+    fn an_is_null_inside_a_literal_or_a_comment_guards_nothing() {
+        let sql = "SELECT * FROM t WHERE a = :a AND note <> ' IS NULL' -- :b IS NULL\n\
+                   AND b = :b";
+        assert_eq!(plain_required_binds(sql, None), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn only_a_property_left_out_of_required_is_schema_optional() {
+        let sql = "SELECT * FROM t WHERE a = :a AND b = :b AND c = :c";
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": { "a": {}, "b": {} },
+            "required": ["a"]
+        });
+        assert_eq!(
+            plain_required_binds(sql, Some(&schema)),
+            vec!["a", "c"],
+            "`b` is declared optional; `c` is not declared at all, so the SQL rule applies"
+        );
     }
 }

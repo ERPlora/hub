@@ -685,6 +685,158 @@ pub async fn send_heartbeat(
     Ok(answer)
 }
 
+/// How long each step of the daily turn may take before the turn moves on without it (hub#2509).
+pub const DAILY_STEP_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+/// The daily turn (HUB-F162 + HUB-F164): every `period`, the plan check and the heartbeat.
+///
+/// First tick at once (seeds the entitlement as soon as possible). Without a machine credential
+/// (dev/local, not enrolled) the tick is skipped WITHOUT counting a failure, so the gate stays
+/// fail-open.
+pub fn spawn_daily_turn(
+    st: crate::AppState,
+    period: std::time::Duration,
+    step_deadline: std::time::Duration,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(period);
+        loop {
+            tick.tick().await;
+            let Some(auth) = crate::auth::machine_auth(&st) else {
+                continue;
+            };
+            daily_turn_once(&st, &auth, step_deadline).await;
+        }
+    })
+}
+
+async fn daily_turn_once(
+    st: &crate::AppState,
+    auth: &cloud_client::Auth,
+    step_deadline: std::time::Duration,
+) {
+    // Same 24h tick, no second scheduler: report canonical daily business usage.
+    // Collection happens before network I/O, then both Cloud calls run independently:
+    // an entitlement failure must not suppress business-usage retention (or vice versa).
+    let now = crate::entitlement::now_unix();
+    let now_iso = chrono::Utc::now().to_rfc3339();
+    let mut usage = {
+        let runtime = st.runtime.read().await;
+        // Lo que cada motor instalado debe a su autoridad (hub#326/hub#1406) — la
+        // pregunta va al REGISTRO, no a un motor con nombre; mismo lock barato que
+        // el resto del snapshot.
+        let pending = runtime.pending_obligations().await;
+        collect_daily_usage(runtime.db(), runtime.hub_id(), &now_iso, &pending).await
+    };
+    // ADR-0175: la actividad de usuario viaja en ESTE heartbeat, y solo si la hubo.
+    // Un hub encendido que nadie toca no manda la marca — que es exactamente lo que el
+    // Cloud tiene que observar para poder apagarlo.
+    let pending_activity = st.activity.pending();
+    usage.last_user_activity_at = pending_activity.map(crate::activity::to_iso8601);
+    // hub#975: la telemetría de recursos viaja en el MISMO latido, del sampler único
+    // de `system_metrics` (fuera del lock de arriba: el muestreo de CPU duerme 100 ms).
+    // Best-effort: fuera de contenedor los campos viajan ausentes, nunca un 0 falso.
+    sample_resource_metrics().await.apply_to(&mut usage);
+    // Each step has its own deadline (hub#2509): a call erplora.com leaves hanging costs this
+    // turn that step, never the next turn — the shared client already bounds every call, and this
+    // holds even for a call that asks for a longer ceiling of its own.
+    let entitlement_request = within(
+        step_deadline,
+        "entitlement",
+        crate::entitlement::fetch_verified_claims(&st.http, &st.config.cloud_base_url, auth, now),
+    );
+    let heartbeat_request = within(
+        step_deadline,
+        "heartbeat",
+        send_heartbeat(&st.http, &st.config.cloud_base_url, auth, &usage),
+    );
+    let (outcome, heartbeat_result) = tokio::join!(entitlement_request, heartbeat_request);
+    // A check that never came back is a failed check: it counts towards the paid apps' cut-off.
+    let outcome = outcome.unwrap_or_else(|| Err(STEP_TIMED_OUT.to_string()));
+    let heartbeat_result = heartbeat_result.unwrap_or_else(|| Err(STEP_TIMED_OUT.to_string()));
+    crate::entitlement::record_outcome(&st.entitlement, outcome, now);
+    // La cuota del canal de WhatsApp se refleja en el medidor del módulo (hub#1089).
+    // Se lee EN VIVO de `whatsapp/plan/` con esta MISMA credencial de máquina, no de
+    // un claim del token: ese endpoint devuelve tier + consumo, y el consumo es un
+    // contador que se mueve con cada mensaje. Si el Cloud no contesta no se escribe
+    // nada — el medidor conserva lo que ya medía, porque en este canal `0` significa
+    // «sin tope» y un fallo de red no es un plan. Un hub sin el módulo ni pregunta.
+    match within(
+        step_deadline,
+        "whatsapp_quota",
+        crate::whatsapp_quota::sync_once(&st.runtime, &st.http, &st.config.cloud_base_url, auth),
+    )
+    .await
+    {
+        None => {}
+        Some(crate::whatsapp_quota::QuotaSync::Written {
+            monthly_limit,
+            monthly_usage,
+        }) => {
+            tracing::debug!(monthly_limit, monthly_usage, "cuota de WhatsApp al día")
+        }
+        // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
+        // en la flota que no compró el canal): aquí no se repite el ruido.
+        Some(other) => tracing::trace!(?other, "sincronización de cuota de WhatsApp"),
+    }
+    match heartbeat_result {
+        // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
+        // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
+        Ok(ref answer) => {
+            // The beat that carried the mark is in: confirmed now, whatever the settling below
+            // does with its own deadline.
+            if let Some(ts) = pending_activity {
+                st.activity.mark_reported(ts);
+            }
+            // The same, one step further down (saas#2129): the events this beat
+            // carried are settled, and the buffer keeps draining in THIS tick while
+            // the bite comes full — the tick is daily, so leaving the surplus for the
+            // next one is how a busy till loses its oldest events for ever. Only
+            // `activity_ack` deletes: a bare 2xx is also what a broken ingest answers.
+            let settled = within(
+                step_deadline,
+                "settle_activity",
+                settle_activity(
+                    &st.runtime,
+                    &st.http,
+                    &st.config.cloud_base_url,
+                    auth,
+                    &usage.activity,
+                    answer.activity_ack,
+                ),
+            )
+            .await;
+            if let Some(settled) = settled.filter(|settled| settled.confirmed > 0) {
+                tracing::debug!(
+                    confirmed = settled.confirmed,
+                    rounds = settled.rounds,
+                    "business activity delivered to the Cloud"
+                );
+            }
+        }
+        Err(error) => tracing::warn!(%error, "daily usage heartbeat failed"),
+    }
+}
+
+/// What a step of the daily turn that ran out of time reports (hub#2509).
+const STEP_TIMED_OUT: &str = "daily_turn_step_timed_out";
+
+/// Runs one step of the daily turn within `deadline`; `None` (and a warning naming the step) if
+/// it did not finish in time.
+async fn within<T>(
+    deadline: std::time::Duration,
+    step: &'static str,
+    work: impl std::future::Future<Output = T>,
+) -> Option<T> {
+    match tokio::time::timeout(deadline, work).await {
+        Ok(done) => Some(done),
+        Err(_) => {
+            tracing::warn!(step, ?deadline, "daily turn step timed out (hub#2509)");
+            None
+        }
+    }
+}
+
 fn value_as_u64(value: &Value) -> Option<u64> {
     match value {
         Value::Number(number) => number

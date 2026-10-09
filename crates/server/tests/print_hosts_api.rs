@@ -123,13 +123,19 @@ async fn register(
 }
 
 async fn registry(router: &axum::Router, session: &str) -> Value {
+    registry_from(router, session, None).await
+}
+
+/// `GET /api/print/hosts` from `device_id`. A counter session reads the `deviceId` of its OWN
+/// device only (hub#2551), so a test that checks a device's own row asks from that device.
+async fn registry_from(router: &axum::Router, session: &str, device_id: Option<&str>) -> Value {
     let resp = router
         .clone()
         .oneshot(request(
             "GET",
             "/api/print/hosts",
             Some(session),
-            None,
+            device_id,
             None,
         ))
         .await
@@ -202,7 +208,7 @@ async fn a_device_registers_itself_and_shows_up_live() {
     assert_eq!(body["host"]["label"], json!("Counter till"));
     assert_eq!(body["host"]["live"], json!(true));
 
-    let body = registry(&router, &employee).await;
+    let body = registry_from(&router, &employee, Some("till-1")).await;
     assert_eq!(body["hosts"].as_array().unwrap().len(), 1);
     assert_eq!(body["hosts"][0]["deviceId"], json!("till-1"));
     assert_eq!(body["hosts"][0]["live"], json!(true));
@@ -475,7 +481,8 @@ async fn a_padded_device_header_names_the_same_device() {
     let (router, _admin, employee) = fixture().await;
 
     register(&router, &employee, Some(" till-1 "), "kitchen", "Counter").await;
-    let body = registry(&router, &employee).await;
+    // Read from the same padded header: it is the same device, so it reads its own id (hub#2551).
+    let body = registry_from(&router, &employee, Some(" till-1 ")).await;
     assert_eq!(
         body["hosts"].as_array().unwrap().len(),
         1,
@@ -749,7 +756,8 @@ async fn hub1560_the_owner_reads_a_name_on_the_coverage_and_never_the_device_id(
 }
 
 #[tokio::test]
-async fn hub1560_a_name_the_owner_took_back_falls_to_the_platform_or_the_id_never_to_a_blank() {
+async fn hub1560_a_name_the_owner_took_back_falls_to_the_platform_or_the_id_tail_never_to_a_blank()
+{
     let (router, admin, _employee, probe) = fixture_with_db().await;
     let rt = behind(probe);
     rt.trust_device_with_default_name(TILL, "Marta Ruiz", "Chrome · Android")
@@ -761,12 +769,13 @@ async fn hub1560_a_name_the_owner_took_back_falls_to_the_platform_or_the_id_neve
 
     // The till boots: no name from the business, so the platform it announces.
     register_bare(&router, &admin, TILL, "receipt", Some(ANDROID_UA)).await;
-    // A device nobody named, that announces nothing and that this hub never saw: the id, spelled
-    // out — never an empty string, which the screen would render as a dangling comma.
+    // A device nobody named, that announces nothing and that this hub never saw: the tail of its
+    // id — never the id itself, which is the proof of a trusted device (hub#2551), and never an
+    // empty string, which the screen would render as a dangling comma.
     register_bare(&router, &admin, TABLET, "receipt", None).await;
 
     let labels = labels_of(&coverage_row(&router, &admin, "receipt").await);
-    assert_eq!(labels, ["Chrome · Android", TABLET]);
+    assert_eq!(labels, ["Chrome · Android", "…e8f9"]);
     assert!(
         labels.iter().all(|l| !l.trim().is_empty()),
         "no entry of the list is ever blank: {labels:?}"
@@ -794,8 +803,8 @@ async fn hub1560_a_host_the_fleet_registered_nameless_is_named_on_its_next_boot(
     let before = labels_of(&coverage_row(&router, &admin, "receipt").await);
     assert_eq!(
         before,
-        [TABLET, TILL],
-        "the rows the fleet has today read as ids"
+        ["…e7f8", "…e8f9"],
+        "the rows the fleet has today read as the tail of their ids, never the ids (hub#2551)"
     );
 
     register_bare(&router, &admin, TILL, "receipt", Some(ANDROID_UA)).await;

@@ -26,7 +26,8 @@ import { normalizePinLength } from './pin-length';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
-import { setRuntimeClientKind } from './device';
+import { resolveDeviceId, setRuntimeClientKind } from './device';
+import { deviceMode } from './device-mode';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 import { sessionEndReason } from './session-end-reason';
@@ -63,7 +64,10 @@ export interface HubContext {
   registration_required?: boolean;
   /** La clave pública RSA del SaaS está disponible para validar el JWT de usuario. */
   public_key_loaded?: boolean;
-  /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
+  /**
+   * Active users with a PIN (the ones who can sign in locally). `[]` unless the read carried a live
+   * session or came from a device the PIN door trusts (hub#2510).
+   */
   pin_users?: PinUser[];
   /**
    * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`). Lo usa
@@ -118,9 +122,10 @@ export function getHubSector(): string | null {
 }
 
 /**
- * Usuarios-PIN del hub resueltos en el boot (`GET /api/hub/context`). El LoginPage los usa para
- * mostrar el grid de PIN directamente cuando el hub ya tiene usuarios (p. ej. el demo: "Demo"),
- * sin depender de un flag en localStorage. `[]` hasta que el boot responde.
+ * The hub's PIN users, from `GET /api/hub/context`. The login screen paints the PIN grid from them
+ * (e.g. the demo's "Demo") without depending on a localStorage flag. `[]` until the boot answers,
+ * and also when the hub withholds them — a device it does not trust, without a session (hub#2510);
+ * signing in re-reads them ([`refreshHubIdentity`]).
  */
 export const pinUsers = ref<PinUser[]>([]);
 /** `true` cuando `/api/hub/context` respondió y `pinUsers` ya es una lista autoritativa. */
@@ -403,6 +408,12 @@ export function getClient(): ErploraClient {
         // it, the only way to learn a module was missing was to ask the transport anyway and catch
         // `module_not_installed` after the request had already travelled.
         installedModules: activeModuleIds,
+        // The mode the hub answered for THIS device (hub#358), read live from the shell's ref: a
+        // module cannot ask itself (the device id is native in the app and the runtime URL is not
+        // the page origin), so `erplora.deviceMode` is the shell's answer. The SDK resolves
+        // anything but `personal` to `shared`. Read lazily, so the import cycle with
+        // `device-mode.ts` (which imports `RUNTIME_URL` from here) never touches an unready binding.
+        deviceMode: () => deviceMode.value,
         notifier: (n) => {
           const color: ToastColor =
             n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';
@@ -727,16 +738,17 @@ async function moduleAction(
 }
 
 /**
- * Pide al runtime **actualizar** un módulo instalado (hub#516). Mismo pipeline verificado que
- * instalar (SHA256 + firma ed25519 + manifest + plan de dependencias) y las mismas fases por WS.
+ * Asks the runtime to **update** an installed module (hub#516). Same verified pipeline as
+ * installing (SHA256 + ed25519 signature + manifest + dependency plan) and the same WS phases.
  *
- * Sin versión, el runtime resuelve la que toca con el resolutor del arranque: nunca una en
- * cuarentena, nunca hacia atrás, y el pin de soporte gana. `updated: false` **no es un fallo**: es
- * «ya está en la versión que le toca».
+ * Without a version the runtime resolves the right one with the boot resolver: never a quarantined
+ * one, never backwards, and the support pin wins. `updated: false` **is not a failure**: it means
+ * «already on the version it should be on».
  *
- * Los errores llegan con el mismo contrato que `requestInstall`: un 409 por dependencia de pago sin
- * contratar sale como [`InstallBlockedError`] (nunca se cobra solo), el resto como
- * [`InstallFailedError`] con su `code` estable.
+ * Errors follow the `requestInstall` contract: a 409 for an unpaid paid dependency comes out as
+ * [`InstallBlockedError`] (nothing is ever charged on its own), the rest as [`InstallFailedError`]
+ * with its stable `code`. An update the runtime rolled back — 200 with a `warning` — comes out as
+ * [`UpdateKeptPreviousError`] (hub#2556).
  */
 export async function updateModule(moduleId: string, version = ''): Promise<ModuleUpdateResult> {
   beginRequest();
@@ -770,9 +782,54 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
       }
       throw new InstallFailedError(message, code, detail, coreVersionParams(body));
     }
-    return (await res.json()) as ModuleUpdateResult;
+    // hub#2556: the runtime answers inside `data`, and an update that could not go in comes back
+    // as a 200 with `warning` (the app keeps running the version it had). Reading the top level
+    // found nothing, so every outcome — a real update included — read as «already up to date».
+    const body = (await res.json()) as {
+      ok?: boolean;
+      data?: { module_id?: string; from?: string; version?: string; updated?: boolean };
+      warning?: { code?: string; cause?: string | null };
+    };
+    const data = body.data ?? {};
+    const runsVersion = data.version ?? '';
+    if (body.warning?.code === UPDATE_KEPT_PREVIOUS) {
+      throw new UpdateKeptPreviousError(moduleId, body.warning.cause ?? null, runsVersion);
+    }
+    return {
+      ok: body.ok === true,
+      module_id: data.module_id ?? moduleId,
+      from: data.from ?? runsVersion,
+      to: runsVersion,
+      updated: data.updated === true,
+    };
   } finally {
     endRequest();
+  }
+}
+
+/** The warning code of an update that did not go in while the app kept its version (hub#2556). */
+export const UPDATE_KEPT_PREVIOUS = 'module.update_failed_kept_previous';
+
+/**
+ * An update that did not go in: the runtime put the previous version back and the app keeps
+ * running it (hub#2556). It is a failure for the person — they asked for the new version and did
+ * not get it — even though the runtime answers 200.
+ *
+ * `reason` is the stable code of why (`install_cloud_timeout` for a download that ran out of
+ * time), or `null` from a runtime that does not send one. `detail` is always `null`: the warning's
+ * English message is for the log, never for the screen.
+ */
+export class UpdateKeptPreviousError extends Error {
+  readonly code = UPDATE_KEPT_PREVIOUS;
+  readonly reason: string | null;
+  readonly version: string;
+  readonly detail: null = null;
+
+  constructor(moduleId: string, reason: string | null, version: string) {
+    super(`update ${moduleId} kept ${version}${reason ? ` (${reason})` : ''}`);
+    this.name = 'UpdateKeptPreviousError';
+    this.reason = reason;
+    this.version = version;
   }
 }
 
@@ -1134,6 +1191,12 @@ export interface ImportReport {
    * Absent on reports older than the field: same meaning as `local`, no origin to go back to.
    */
   origin?: ImportReportOrigin;
+  /**
+   * hub#2497 — the bundle names this hub but carries no valid seal of it (made before the seal
+   * existed, or edited afterwards), so the engine applied it as another business's file. Absent
+   * (= false) for a proven own copy and for a file from another hub.
+   */
+  origin_unproven?: boolean;
 }
 
 /** The persisted origin of an import (hub#845) — what decides whether a retry can act. */
@@ -1573,7 +1636,7 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
     let res: Response;
     try {
       res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: await contextHeaders(),
         signal: controller.signal,
       });
     } catch {
@@ -1623,6 +1686,48 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
     clearTimeout(timer);
     // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
     resolveCloudApiUrl(cloudBaseUrl);
+  }
+}
+
+/**
+ * Who is asking for the context (hub#2510): the faces of the pinpad only reach a caller with a live
+ * session or a device the PIN door trusts, so the read says which device this is and presents the
+ * session it holds. Never throws: a device that cannot name itself just asks anonymously and gets
+ * the context that names nobody.
+ */
+async function contextHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // `try`, not `.catch`: a resolver that throws before handing back a promise must not take the
+  // boot read down with it — the login screen would lose its Cloud URL and its PIN length.
+  let device: string | null = null;
+  try {
+    device = await resolveDeviceId();
+  } catch {
+    device = null;
+  }
+  if (device) headers['X-Device-Id'] = device;
+  const session = getHubSession();
+  if (session) headers['X-Hub-Session'] = session;
+  return headers;
+}
+
+/**
+ * Re-reads the context right after signing in (hub#2510). A browser the hub did not trust yet was
+ * not told the faces at boot; with the new session it is. They are what the login screen reads to
+ * know whether this person already has a PIN (hub#772), and what «switch user» and the approval
+ * dialog paint. The hub id is republished too: it is what later calls send as `X-Hub-Id`.
+ * Deliberately narrow: it does not touch the currency, language or timezone the boot already
+ * published. Never throws; a failed answer keeps what was known.
+ */
+export async function refreshHubIdentity(): Promise<void> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/context`, { headers: await contextHeaders() });
+    if (!res.ok) return;
+    const ctx = (await res.json()) as HubContext;
+    if (ctx.hub_id) config.hubId = ctx.hub_id;
+    if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
+  } catch {
+    // Best effort: the session is already open; the next boot reads the context again.
   }
 }
 

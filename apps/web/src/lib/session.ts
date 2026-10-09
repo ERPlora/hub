@@ -196,39 +196,74 @@ export function setHubSession(token: string | null, credentialKind?: string | nu
 }
 
 /**
- * Apaga un subsistema al cerrar sesión, **sin esperarlo y sin dejar el rechazo suelto**.
+ * Shuts a subsystem down on sign-out **without the caller having to wait and without leaving the
+ * rejection loose**.
  *
- * Cerrar sesión no puede quedarse colgado de que cargue un chunk, así que estos `import()` van
- * sueltos a propósito. Lo que no puede quedar suelto es su RECHAZO: un chunk que no llega (red
- * caída a mitad de un deploy; en los tests, el entorno desmontado antes de que resuelva) dejaba una
- * promesa rechazada sin dueño. No rompía nada visible —ningún test fallaba— pero `vitest run`
- * terminaba con código 1 por un `EnvironmentTeardownError` que no era de nadie.
+ * Signing out cannot hang on a chunk loading, so these `import()` calls are fire-and-forget on
+ * purpose; the returned promise is only awaited by whoever must know it finished before the page
+ * goes away (`logoutBeforeLeaving`, hub#2503). What cannot stay loose is the REJECTION: a chunk that
+ * never arrives (network down mid-deploy; in tests, the environment torn down before it resolves)
+ * left an orphan rejected promise — nothing visible broke, but `vitest run` exited 1 with an
+ * `EnvironmentTeardownError` that belonged to no one.
  *
- * Se traga con comentario porque aquí NO hay remedio: si el módulo no carga, tampoco hay a quién
- * decírselo, y cada apagado es idempotente y protegido por su propia guarda de sesión (el sondeo de
- * dead-letters, por ejemplo, ya no hace nada sin `isAuthed`).
+ * It is swallowed on purpose because there is NO remedy here: if the module does not load there is
+ * no one to tell either, and each shutdown is idempotent and guarded by its own session check (the
+ * dead-letter poll, for instance, already does nothing without `isAuthed`). Never rejects.
  */
-function shutDown<T>(load: Promise<T>, apply: (m: T) => void): void {
-  void load.then(apply).catch(() => {
-    /* noop: ver la doc de arriba */
-  });
+function shutDown<T>(load: Promise<T>, apply: (m: T) => unknown): Promise<void> {
+  return load
+    .then(apply)
+    .then(() => undefined)
+    .catch(() => {
+      /* noop: see the doc above */
+    });
 }
 
 export function logout(): void {
-  // Revoca la sesión server-side del runtime ANTES de borrar el token local (best-effort).
+  void closeSession();
+}
+
+/**
+ * Signs out and WAITS for what cannot be left half-done when the page is about to go away
+ * (hub#2503, «switch business»): the erplora.com tokens are gone from this device and the hub has
+ * answered the revocation of its session — or `revokeWaitMs` passed, so a hub that does not answer
+ * never keeps the person from leaving (the token is already erased here; the row expires by TTL).
+ * Never rejects.
+ */
+export async function logoutBeforeLeaving(revokeWaitMs: number): Promise<void> {
+  const { revoked, tokensCleared } = closeSession();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const gaveUp = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, revokeWaitMs);
+  });
+  await Promise.all([tokensCleared, Promise.race([revoked, gaveUp])]);
+  clearTimeout(timer);
+}
+
+function closeSession(): { revoked: Promise<void>; tokensCleared: Promise<void> } {
+  // Revoke the runtime's server-side session BEFORE erasing the local token (best effort).
   const token = getHubSession();
-  if (token) shutDown(import('./cloud'), (m) => m.runtimeLogout(token));
+  const revoked = token
+    ? shutDown(import('./cloud'), (m) => m.runtimeLogout(token))
+    : Promise.resolve();
   setUser(null);
   setHubSession(null);
-  shutDown(import('./cloud'), (m) => m.clearTokens());
+  const tokensCleared = shutDown(import('./cloud'), (m) => m.clearTokens());
   shutDown(import('./user-profile'), (m) => m.resetUserProfile());
   shutDown(import('./theme'), (m) => m.resetUserThemePreferences());
   shutDown(import('../i18n'), (m) => m.resetUserLocale());
   // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
   shutDown(import('./entitlement'), (m) => m.resetEntitlement());
-  // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.
+  // The launcher and the setup checklist were read for this person; both keep their last answer
+  // when a read fails, so the next person on a shared till would see them (hub#2506).
+  shutDown(import('./nav'), (m) => m.resetModuleNav());
+  shutDown(import('./setup-status'), (m) => m.resetSetupStatus());
+  // The assistant thread dies with the session (ADR-0149): the Cloud keeps no copy.
   shutDown(import('./assistant-history'), (m) => m.clearAssistantHistory());
+  // …and the panel's setup mode, which otherwise outlived the sign-out until a reload (hub#2538).
+  shutDown(import('./shell'), (m) => m.forgetAssistantPanel());
   // La campana de dead-letters deja de sondear y se limpia (hub#660): sin sesión no hay cola que
   // mirar, y el badge no debe sobrevivir al logout.
   shutDown(import('./dead-letter'), (m) => m.stopDeadLetterWatch());
+  return { revoked, tokensCleared };
 }

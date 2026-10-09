@@ -2,6 +2,8 @@
 //! (sin red): gestión de keys, superficie de datos con `Auth::ApiKey` (doble puerta `expose_api`),
 //! y el OpenAPI 3.1 dinámico per-hub. Usa `tower::ServiceExt::oneshot` como `tests/http.rs`.
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -45,6 +47,42 @@ async fn make_app() -> axum::Router {
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture()).await.unwrap();
     app(AppState::with_config(rt, dev_config()))
+}
+
+/// Unix second 59 of a minute (1_800_000_000 is a whole minute): the worst instant for a test
+/// that reads the wall clock, the one where the next call already lands in another window.
+const LAST_SECOND_OF_A_MINUTE: i64 = 1_800_000_059;
+
+/// Same app, but the API-key quota reads `now` instead of the wall clock (hub#2628): a test that
+/// expects two calls to share the minute owns the minute.
+async fn make_app_at(now: Arc<AtomicI64>) -> axum::Router {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
+    rt.set_api_key_clock(Arc::new(move || now.load(Ordering::SeqCst)));
+    rt.ensure_system_tables().await.unwrap();
+    rt.install_from_dir(&fixture()).await.unwrap();
+    app(AppState::with_config(rt, dev_config()))
+}
+
+/// A `catalog` read+write key allowed `per_minute` calls; returns its secret.
+async fn create_key_with_quota(app: &axum::Router, per_minute: i64) -> String {
+    let resp = app
+        .clone()
+        .oneshot(admin_post(
+            "/api/keys",
+            json!({
+                "name": "Limited",
+                "scope": [{ "module": "catalog", "read": true, "write": true }],
+                "rate_limit_per_minute": per_minute
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    body_json(resp).await["data"]["secret"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {
@@ -349,6 +387,168 @@ async fn data_surface_rejects_non_api_key_bearer() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// POST to the data surface with no credential at all.
+fn anonymous_post(uri: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// The paths a prober tries: an exposed query and command, operations that exist but are private,
+/// operations that do not exist, an exposed query under the wrong module, and a module that is not
+/// installed at all. Without a usable key every one of them must look the same.
+const PROBED_PATHS: [&str; 8] = [
+    "/api/v1/catalog/q/items.list",
+    "/api/v1/catalog/c/item.create",
+    "/api/v1/catalog/q/items.secret",
+    "/api/v1/catalog/c/item.purge",
+    "/api/v1/catalog/q/does.not.exist",
+    "/api/v1/catalog/c/does.not.exist",
+    "/api/v1/other/q/items.list",
+    "/api/v1/nope/q/anything",
+];
+
+/// hub#2550: the key is checked BEFORE the operation is looked up. Answering `404` for an
+/// operation that is not published and `401` for one that is told anybody without a key which
+/// operations a hub has installed and open, by trying names. Without a usable key the answer is
+/// the same `401` with the same body, whatever is asked for.
+#[tokio::test]
+async fn without_a_usable_key_every_operation_answers_the_same_401_hub2550() {
+    let app = make_app().await;
+    let credentials: [(&str, Option<&str>); 3] = [
+        ("no credential", None),
+        (
+            "an invented key",
+            Some("erpl_live_deadbeef_notasecretatall"),
+        ),
+        ("a bearer that is not a key", Some("some-jwt-token")),
+    ];
+    for (label, token) in credentials {
+        let mut bodies = Vec::new();
+        for path in PROBED_PATHS {
+            let request = match token {
+                Some(token) => api_post(path, token, json!({})),
+                None => anonymous_post(path, json!({})),
+            };
+            let resp = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(
+                resp.status(),
+                StatusCode::UNAUTHORIZED,
+                "{label} at {path} must be 401, not a hint of whether the operation exists"
+            );
+            bodies.push((path, body_json(resp).await));
+        }
+        let (_, first) = &bodies[0];
+        for (path, body) in &bodies {
+            assert_eq!(
+                body, first,
+                "{label}: the body at {path} must not differ from the one at an exposed operation"
+            );
+        }
+    }
+}
+
+/// hub#2550: with a valid key, asking for an operation that is not published is still `404`, and
+/// that answer is paid from the key's quota like any other call — otherwise a key holder could
+/// map the private surface of the hub without ever meeting the limit.
+#[tokio::test]
+async fn an_unpublished_operation_asked_with_a_valid_key_spends_its_quota_hub2550() {
+    // The clock is pinned (hub#2628): on the wall clock the second call sometimes landed in the
+    // next minute, found a fresh quota and answered 200.
+    let app = make_app_at(Arc::new(AtomicI64::new(LAST_SECOND_OF_A_MINUTE))).await;
+    // (unpublished operation, published one of the same kind, body of the published one)
+    let cases = [
+        (
+            "/api/v1/catalog/q/does.not.exist",
+            "/api/v1/catalog/q/items.list",
+            json!({}),
+        ),
+        (
+            "/api/v1/catalog/c/item.purge",
+            "/api/v1/catalog/c/item.create",
+            json!({ "payload": { "name": "X" } }),
+        ),
+    ];
+    for (unpublished, published, body) in cases {
+        let secret = create_key_with_quota(&app, 1).await;
+
+        let resp = app
+            .clone()
+            .oneshot(api_post(unpublished, &secret, json!({})))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{unpublished}");
+        assert_eq!(body_json(resp).await["error"]["code"], json!("not_found"));
+
+        let resp = app
+            .clone()
+            .oneshot(api_post(published, &secret, body))
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "the 404 at {unpublished} must have spent the only call of the minute"
+        );
+        assert_eq!(
+            body_json(resp).await["error"]["code"],
+            json!("rate_limited")
+        );
+    }
+}
+
+/// hub#2628: a key's quota window is the clock minute the runtime reads. Pinned at the last
+/// second of a minute, a one-a-minute key is refused the second call and told to come back in
+/// one second; one second later the minute has turned and the same call goes through — which is
+/// exactly what the hub#2550 test met on a slow runner when it read the wall clock.
+#[tokio::test]
+async fn a_key_quota_window_is_the_minute_of_the_runtime_clock_hub2628() {
+    let now = Arc::new(AtomicI64::new(LAST_SECOND_OF_A_MINUTE));
+    let app = make_app_at(Arc::clone(&now)).await;
+    let secret = create_key_with_quota(&app, 1).await;
+    let list = "/api/v1/catalog/q/items.list";
+
+    let resp = app
+        .clone()
+        .oneshot(api_post(list, &secret, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the only call of the minute");
+
+    let resp = app
+        .clone()
+        .oneshot(api_post(list, &secret, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        resp.headers()
+            .get(axum::http::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok()),
+        Some("1"),
+        "at second 59 the window reopens in one second"
+    );
+    assert_eq!(
+        body_json(resp).await["error"]["code"],
+        json!("rate_limited")
+    );
+
+    now.fetch_add(1, Ordering::SeqCst);
+    let resp = app
+        .clone()
+        .oneshot(api_post(list, &secret, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the minute turned: the key has a new call"
+    );
 }
 
 /// GET con cabeceras de **sesión de usuario** (en `AuthMode::Dev` del fixture, la identidad la

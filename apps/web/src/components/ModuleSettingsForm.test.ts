@@ -17,7 +17,7 @@ import { createI18n } from 'vue-i18n';
 
 vi.mock('../lib/session', async () => {
   const { ref } = await import('vue');
-  return { isAdmin: ref(true) };
+  return { isAdmin: ref(true), hasPermission: () => false };
 });
 vi.mock('../lib/toast', () => ({ toastSuccess: vi.fn(), toastError: vi.fn() }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
@@ -559,5 +559,97 @@ describe('hub#1426 · a module can offer a TEST action next to one of its settin
     // One preview declared ⇒ exactly one Test button, next to that field and not to its neighbour.
     const tests = wrapper.findAllComponents({ name: 'IonButton' }).filter((b) => b.text().includes('Test'));
     expect(tests.length).toBe(1);
+  });
+});
+
+// ── hub#2511 ────────────────────────────────────────────────────────────────────────────────
+//
+// A failed READ of the stored values (a network blink, the hub restarting, a 5xx) was swallowed:
+// `query(get).catch(() => null)` left `current = null`, every field took the schema `default`, and
+// the screen looked exactly like the business's settings. An administrator pressing «Save» then
+// sent that whole snapshot of factory values and overwrote everything stored — in Caja, «Enable
+// the cash drawer» came back on/off at the schema's whim. What the market does (Square, Shopify,
+// Odoo): a screen that could not read says so, offers «Retry», and never offers to save.
+describe('hub#2511 · a settings screen whose values could not be read never shows nor saves factory values', () => {
+  // Stored values that differ from every schema default, so «factory values» is observable.
+  const STORED = { print_receipt: 0, receipt_footer: 'Gracias por su visita' };
+
+  beforeEach(() => {
+    query.mockReset();
+    command.mockClear();
+  });
+
+  it('shows «could not read» with Retry instead of the form, and offers no Save', async () => {
+    query.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const wrapper = mountForm();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="module-settings-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="module-settings-retry"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'IonToggle' }).exists(), 'no factory value on screen').toBe(false);
+    expect(wrapper.find('[data-testid="module-settings-save"]').exists(), 'nothing to save over').toBe(false);
+    expect(command).not.toHaveBeenCalled();
+  });
+
+  it('treats a server error on the read the same way (the hub restarting, a 5xx)', async () => {
+    const { ErploraError } = await import('@erplora/module-sdk');
+    query.mockRejectedValueOnce(new ErploraError('internal', 'boom'));
+    const wrapper = mountForm();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="module-settings-retry"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="module-settings-save"]').exists()).toBe(false);
+  });
+
+  it('Retry reads again and, once read, saving keeps the stored values of every untouched field', async () => {
+    query.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce([STORED]);
+    const wrapper = mountForm();
+    await flushPromises();
+
+    await wrapper.find('[data-testid="module-settings-retry"]').trigger('click');
+    await flushPromises();
+    expect(query).toHaveBeenCalledTimes(2);
+
+    // The administrator changes ONE field…
+    const footer = wrapper
+      .findAllComponents({ name: 'IonInput' })
+      .find((i) => i.attributes('aria-label') === 'Pie del recibo');
+    footer!.vm.$emit('ionInput', { detail: { value: 'Hasta pronto' } });
+    await wrapper.find('[data-testid="module-settings-save"]').trigger('click');
+    await flushPromises();
+
+    // …and the other one travels with the value that was READ, never with the schema default (1).
+    expect(command).toHaveBeenCalledTimes(1);
+    expect(command).toHaveBeenCalledWith('sales.settings_update', {
+      print_receipt: 0,
+      receipt_footer: 'Hasta pronto',
+    });
+  });
+
+  // `requires_elevation` (hub#360) is also a refusal of the PERSON: retrying will not change it.
+  it.each(['permission_denied', 'requires_elevation'])(
+    'says the person may not see these settings, without a Retry that cannot help (%s)',
+    async (code) => {
+    const { ErploraError } = await import('@erplora/module-sdk');
+    query.mockRejectedValueOnce(new ErploraError(code, 'requires sales.manage_settings'));
+    const wrapper = mountForm();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="module-settings-no-permission"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="module-settings-retry"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'IonToggle' }).exists()).toBe(false);
+    expect(wrapper.find('[data-testid="module-settings-save"]').exists()).toBe(false);
+    },
+  );
+
+  it('a read that succeeds with NO row yet is a first save: the defaults show and can be saved', async () => {
+    query.mockResolvedValueOnce([]);
+    const wrapper = mountForm();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="module-settings-error"]').exists()).toBe(false);
+    await wrapper.find('[data-testid="module-settings-save"]').trigger('click');
+    await flushPromises();
+    expect(command).toHaveBeenCalledWith('sales.settings_update', { print_receipt: 1, receipt_footer: '' });
   });
 });

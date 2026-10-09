@@ -133,8 +133,9 @@ pub fn parse_auth_mode(raw: Option<&str>) -> AuthMode {
 /// propia —presentaba el `hub_id`, o nada—, así que armarla habría dejado un hub recién creado sin
 /// ningún login por PIN posible. Ya la tiene, y desde el primer arranque. Lo que queda al otro lado
 /// del interruptor es un PIN de **cuatro dígitos** contestando a internet entero en
-/// `{slug}.erplora.com`, con la lista de nombres publicada sin sesión por `GET /api/hub/context`:
-/// el device-trust es el segundo factor de *sitio* que hace que esos cuatro dígitos valgan algo.
+/// `{slug}.erplora.com` (y, con el freno apagado, `GET /api/hub/context` nombra al equipo a
+/// cualquiera, hub#2510): el device-trust es el segundo factor de *sitio* que hace que esos
+/// cuatro dígitos valgan algo.
 ///
 /// `false`, `0` y `no` **arman** la puerta, aunque suenen a interruptor. Honrarlos daría tres
 /// grafías de «abierto» contra una de «cerrado», y la que se colara sería siempre la insegura.
@@ -932,18 +933,55 @@ pub type SharedRuntime = Arc<tokio::sync::RwLock<Runtime>>;
 /// zip — before an install or update gives up (hub#2251).
 pub const MARKETPLACE_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// The ceiling of a whole call to the marketplace — the zip included — however steadily it keeps
+/// sending (hub#2556). The biggest published package was ~3 MB zipped in 2026-10: this lets it
+/// through at ~10 KB/s, and app changes queue behind an install (hub#2508), so a crawling line
+/// must not hold the next one for longer.
+pub const MARKETPLACE_CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
 /// The client every install/update/version call to the marketplace goes through (hub#2251).
 ///
-/// `stall` bounds each wait — connecting, the headers, every next chunk (reqwest arms the read
-/// limit when the request starts) — not the whole call: a slow line that keeps sending finishes
-/// the zip, a silent one ends as `install_cloud_timeout`.
-/// The shared `http` client cannot take this limit: the assistant's stream may be quiet for longer.
-pub fn marketplace_client(stall: std::time::Duration) -> reqwest::Client {
+/// Two limits, both ending as `install_cloud_timeout`: `stall` bounds each wait — connecting, the
+/// headers, every next chunk (reqwest arms the read limit when the request starts) —, so a silent
+/// marketplace gives up early; `ceiling` bounds the whole call, so a line that trickles a byte now
+/// and then still ends (hub#2556).
+/// The shared `http` client cannot take these limits: the assistant's stream may be quiet for longer.
+pub fn marketplace_client(
+    stall: std::time::Duration,
+    ceiling: std::time::Duration,
+) -> reqwest::Client {
     reqwest::Client::builder()
         .read_timeout(stall)
+        .timeout(ceiling)
         .build()
         .unwrap_or_else(|e| {
             tracing::error!(error = %e, "marketplace client without stall limit (hub#2251)");
+            reqwest::Client::new()
+        })
+}
+
+/// How long connecting to erplora.com may take before a call gives up (hub#2509).
+pub const CLOUD_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The ceiling of every call through the shared [`AppState::http`] client (hub#2509): a control
+/// plane that accepts the connection and never answers ends the call here, instead of freezing
+/// whatever waits on it — the daily plan check and heartbeat did, until the next restart.
+pub const CLOUD_CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The ceiling a call that streams or carries a file asks for on its own request (the assistant's
+/// stream, media and file uploads and downloads): long enough for a slow line, never endless.
+pub const CLOUD_TRANSFER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The shared client every call to erplora.com goes through (hub#2509): `connect` bounds the
+/// connection, `call` the whole call — a request that needs longer asks for it with its own
+/// `.timeout(...)`, which overrides this one.
+pub fn cloud_client(connect: std::time::Duration, call: std::time::Duration) -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(connect)
+        .timeout(call)
+        .build()
+        .unwrap_or_else(|e| {
+            tracing::error!(error = %e, "cloud client without time limits (hub#2509)");
             reqwest::Client::new()
         })
 }
@@ -970,7 +1008,8 @@ pub struct AppState {
     /// Identidad de Hub **viva**. Token e id se actualizan juntos al completar el registro de la
     /// máquina, evitando firmar una llamada con el token nuevo y el UUID placeholder anterior.
     pub hub_id: HubId,
-    /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
+    /// Shared async HTTP client (rustls) to talk to the Cloud, built by [`cloud_client`]: every
+    /// call has a ceiling (hub#2509); a stream or a file transfer asks for a longer one per request.
     pub http: reqwest::Client,
     /// Client for the marketplace side of erplora.com: install, update and version listings
     /// (hub#2251). Unlike `http` it gives up on a stalled answer, so «Installing…» always ends.
@@ -998,6 +1037,14 @@ pub struct AppState {
     /// Brute-force guard for the PIN login (hub#329). A PIN is 4 digits on a host that lives on
     /// the public internet; without a failure counter those are 10,000 free tries.
     pub login_throttle: Arc<crate::login_throttle::LoginThrottle>,
+    /// The budget of tries of every door that sets a PIN and so answers «that one is taken», per
+    /// person: the own-PIN change (hub#2499) and the alta and edit of Empleados (hub#2518), one
+    /// budget shared by the three, and its own size (`LoginThrottle::pin_change`, thirty an hour,
+    /// hub#2564) so that setting up a whole staff never waits. Its own map on purpose:
+    /// `login_throttle` is keyed by whatever
+    /// NAME the caller types at the pinpad or the approval dialog, so a key of these doors kept
+    /// there could be locked — or cleared — by typing it as a name.
+    pub pin_change_throttle: Arc<crate::login_throttle::LoginThrottle>,
     /// The same guard per CLIENT ADDRESS (hub#2282): wrong PINs/badges across any name, and
     /// session credentials that do not resolve. The edge stopped banning on 401s (infra#335), so
     /// this is where somebody failing again and again gets stopped.
@@ -1014,6 +1061,11 @@ pub struct AppState {
     /// beyond the cap queue on the semaphore instead of failing. Each permit is held for the
     /// whole life of the streamed response body, not just the handler call.
     pub media_fetch_limiter: Arc<tokio::sync::Semaphore>,
+    /// One install, update, template import or uninstall at a time (hub#2508). Installing no longer
+    /// holds the runtime's write lock while it talks to erplora.com, so this is what keeps two of
+    /// them from interleaving (or an app from being removed halfway through its update) without
+    /// making a sale wait for a download.
+    pub module_ops: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl AppState {
@@ -1064,20 +1116,25 @@ impl AppState {
             config,
             machine_token,
             hub_id,
-            http: reqwest::Client::new(),
-            marketplace_http: marketplace_client(MARKETPLACE_STALL_TIMEOUT),
+            http: cloud_client(CLOUD_CONNECT_TIMEOUT, CLOUD_CALL_TIMEOUT),
+            marketplace_http: marketplace_client(
+                MARKETPLACE_STALL_TIMEOUT,
+                MARKETPLACE_CALL_TIMEOUT,
+            ),
             tenants: None,
             vector: None,
             entitlement: crate::entitlement::new_shared(),
             entitlement_proxy: crate::entitlement::new_shared_proxy_cache(),
             activity: Arc::new(crate::activity::ActivityState::new()),
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
+            pin_change_throttle: Arc::new(crate::login_throttle::LoginThrottle::pin_change()),
             address_guard: Arc::new(crate::address_guard::AddressGuard::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
             stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),
             media_fetch_limiter: Arc::new(tokio::sync::Semaphore::new(
                 crate::media::MAX_CONCURRENT_MEDIA_FETCHES,
             )),
+            module_ops: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 

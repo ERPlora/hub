@@ -2337,6 +2337,14 @@ PY
     && ok "hub#2398: test-gate.yml runs when test-web.yml changes, on push and on pull_request" \
     || bad "hub#2398: test-gate.yml runs when test-web.yml changes, on push and on pull_request" "$gate_wf_gap"
 
+# (a1b) A push to develop/main finishes (hub#2689): `cancel-in-progress: true` let each merge
+#       cancel the previous develop run. Only a PR's newer head supersedes its older run.
+gate_cancel=$(awk '/^concurrency:/ {f=1; next} f && /^  cancel-in-progress:/ {sub(/^  cancel-in-progress:[[:space:]]*/, ""); print; exit} f && /^[A-Za-z]/ {exit}' "$ROOT/.github/workflows/test-gate.yml")
+[ "$gate_cancel" = "\${{ github.event_name == 'pull_request' }}" ] \
+    && ok "hub#2689: test-gate.yml lets a push to develop/main finish; only a PR's newer head cancels" \
+    || bad "hub#2689: test-gate.yml lets a push to develop/main finish; only a PR's newer head cancels" \
+        "cancel-in-progress is '${gate_cancel:-absent}': every merge would cancel the develop run before it ends"
+
 # (a2) …and triggering is not enough: the default light command RUNS the check of every light
 #      file. `web-format.test.sh` (hub#2156) and `merge-check-tree*` (pm#331) entered
 #      `on.push.paths` without entering the hook; listing them alone would trigger a stage that

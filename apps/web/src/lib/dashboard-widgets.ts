@@ -565,11 +565,14 @@ function formatAxisTick(
   if (format === 'percent') {
     return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(value);
   }
+  // A tick admits as many decimals as the painted currency has (3 in a dinar, hub#2469): with a
+  // flat 2, a chart of thousandths collapsed its ticks into «0,01 · 0,01 · 0 · 0». Never fewer
+  // than 2: a 0-decimal currency still renders the exact halves of a 2,5 step (7,5 ¥), not «8 ¥».
   return new Intl.NumberFormat(locale, {
     ...(format === 'currency' ? { style: 'currency', currency } : {}),
     notation: 'compact',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: format === 'currency' ? Math.max(currencyDecimals(currency), 2) : 2,
   }).format(value);
 }
 

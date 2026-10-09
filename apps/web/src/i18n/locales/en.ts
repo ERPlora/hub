@@ -497,6 +497,14 @@ export default {
     // Status badge of an activity row; it agrees with «sale» — the row is a sale (hub#863).
     activityStatusCompleted: 'Completed',
     activityStatusPending: 'Pending',
+    // The words of the sales history (`sales` locales), so a sale reads the same in both places (hub#2505).
+    activityStatusDraft: 'Draft',
+    activityStatusVoided: 'Voided',
+    activityStatusRefunded: 'Refunded',
+    activityStatusOther: 'Other',
+    activityLoadErrorTitle: 'Could not load the latest sales',
+    activityLoadErrorBody: 'Check the connection and try again.',
+    activityRetry: 'Retry',
     widgets: 'Widgets',
     loadingWidgets: 'Loading widgets…',
     customizePanel: 'Customize panel',
@@ -564,6 +572,9 @@ export default {
     saved: 'Profile saved',
     saveError: 'Could not save the profile',
     loadError: 'Could not load the profile',
+    loadErrorBody: 'Your details are unchanged. Check the connection and try again.',
+    loading: 'Loading your profile…',
+    retry: 'Retry',
     photoSaved: 'Photo updated',
     photoError: 'Could not save the photo. Use a JPG, PNG or WebP up to 2 MB.',
     manageTitle: 'Account management',
@@ -583,6 +594,10 @@ export default {
     setPin: 'Set PIN',
     pinSaved: 'PIN updated',
     pinMismatch: 'The two PINs do not match.',
+    // hub#2499: every try spends the budget, the accepted ones too — so not «failed attempts».
+    pinTooManyAttempts:
+      'Too many PIN change attempts. Wait {minutes} minute and try again. | Too many PIN change attempts. Wait {minutes} minutes and try again.',
+    pinTooManyAttemptsNoWait: 'Too many PIN change attempts. Wait a few minutes and try again.',
   },
   // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
   // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,
@@ -670,6 +685,8 @@ export default {
     offConsequence:
       'Nobody types a PIN. Whoever opened the till in the morning is the name on every sale until the shift ends, whoever actually made them — so you cannot tell who sold what, or who gave a discount. Staff who only have a PIN and no account will not be able to sign in.',
     idleTitle: 'Ask again after inactivity',
+    unreadableIdleLock:
+      "This till's PIN settings could not be read. To be safe, it will go back to the PIN pad after {n} minutes without use.",
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Until you sign out',
     idleMinutesConsequence:
@@ -684,6 +701,10 @@ export default {
   // sirve el runtime, que es quien lo archiva — una copia en el bundle sería el mismo documento
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
   settings: {
+    loading: 'Loading the business settings…',
+    loadError: 'Could not load the business settings',
+    loadErrorBody: 'Your saved settings are unchanged. Check the connection and try again.',
+    retry: 'Retry',
     hubWide: 'General settings',
     currency: 'Currency',
     currencyDesc: 'Your business currency for prices and totals',
@@ -865,6 +886,11 @@ export default {
     // cashier hunting for a jam that is not there.
     // hub#2239: no machine reason after the colon — it told the cashier nothing to act on.
     ticketFailed: 'The receipt did NOT print. Print it again from the receipt screen.',
+    // hub#2494: this till's own printer did not take the paper; the notice carries a Retry button.
+    ticketPrinterFailed:
+      'The receipt did NOT print: the printer is not answering. Check it is on and has paper, then tap Retry.',
+    // hub#2494: the button on a print notice that prints that same paper again.
+    retry: 'Retry',
     ticketWaitingForPrinter:
       'The receipt is waiting: no printer is set up yet. Set one up and it will print on its own.',
     // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so
@@ -894,6 +920,23 @@ export default {
     // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
     // named in the warning, or the sentence reads «the order for ()».
     comandaDefaultLabel: 'the floor',
+    // kitchen#168: the VOID slip of a cancelled round. The word goes where the floor label goes on
+    // the comanda (double height), so keep it short: «VOID · Table 4» fits a 58 mm roll wide.
+    voidLabel: 'VOID · {label}',
+    voidLabelBare: 'VOID',
+    // The slip did not come out: the card has already left the kitchen screen, so the way out is a voice.
+    voidFailed:
+      'The {station} void slip for {label} did not print. Tell the {station} out loud: that order is no longer to be made.',
+    voidWaitingForPrinter:
+      'The {station} void slip for {label} is waiting: no printer is set up for that station yet. Tell the {station} out loud: that order is no longer to be made.',
+    // hub#2640: the slip of ONE dish the till voided. Not «VOID» alone: on paper that reads as the
+    // whole round, and the cook would bin the rest of the table.
+    voidDishLabel: 'VOID ITEM · {label}',
+    voidDishLabelBare: 'VOID ITEM',
+    voidDishFailed:
+      'The {station} void slip for {dish} at {label} did not print. Tell the {station} out loud: that dish is no longer to be made.',
+    voidDishWaitingForPrinter:
+      'The {station} void slip for {dish} at {label} is waiting: no printer is set up for that station yet. Tell the {station} out loud: that dish is no longer to be made.',
   },
   // The system notices for a booking or a cancellation that did NOT come from a till (hub#2168):
   // a salon's twin of the kitchen order's notice above. `createdFor`/`cancelledFor` name the
@@ -1048,6 +1091,8 @@ export default {
     updateSuccessReloading: '{name} updated: {from} → {to}. Reloading to use the new version…',
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
+    // hub#2556: the new version's download ran out of time; the app stayed on the one it had.
+    updateTimedOut: 'erplora.com did not answer in time, so {name} was not updated. It keeps running the version it had. Try again in a few minutes.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
     // hub#2331 — «Update all» in «My apps». Same per-app update as the row button, one after another.
     updateAllOffer: '{n} app has a new version. | {n} apps have a new version.',
@@ -1089,7 +1134,7 @@ export default {
     uninstallTitle: 'Uninstall {name}',
     // What the old text said was what is KEPT. This is the half it left out: the apps that need
     // this one stop working, and unlike deactivating, there is no switching them back on.
-    uninstallBreaks: 'These apps need {name} and will stop working:',
+    uninstallBreaks: 'These apps need {name} and will be uninstalled too:',
     uninstallBody: 'The app will no longer be available. Its data and files will be kept for a later reinstall.',
     uninstallConfirm: 'Uninstall',
     toggleError: 'Could not change the status of {name}.',
@@ -1307,6 +1352,11 @@ export default {
   },
   employeeForm: {
     titleEdit: 'Edit user',
+    // hub#2518: creating or editing a person with a PIN spends the editor's budget of tries (the
+    // one «My profile» spends too, hub#2499) — every try counts, so not «failed attempts».
+    pinTooManyAttempts:
+      'Too many PIN changes in a short time. Wait {minutes} minute and try again. | Too many PIN changes in a short time. Wait {minutes} minutes and try again.',
+    pinTooManyAttemptsNoWait: 'Too many PIN changes in a short time. Wait a few minutes and try again.',
     titleNew: 'New user',
     fullName: 'Full name',
     email: 'Email',
@@ -1335,6 +1385,8 @@ export default {
     localPinHelp: '{n} digits. Required: it is how this person signs in.',
     accountEmailHelp:
       'We email them an invitation to this hub. They choose their own password — you never see it.',
+    pinOnlyEmailHelp:
+      'Signs in with a PIN only. Type their email to invite them with an ERPlora account: administering the hub needs one.',
     accountPinHelp:
       'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
@@ -1502,6 +1554,8 @@ export default {
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
+    // hub#2519 — the server's usage is an owner's or an administrator's; everybody else is told so.
+    resourcesAdminOnly: 'Only an owner or an administrator can see how much the hub is using.',
     // Usage-series range selector (saas#1511). The contract stops at 3 days on purpose.
     usageRange3h: '3 h',
     usageRange24h: '24 h',
@@ -1947,6 +2001,10 @@ export default {
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
       'Users, roles and PINs belong to the business that created them. Accounts discarded: {n}. Nobody was given access to yours.',
+    // hub#2497 — the file names this hub but is not sealed as its own copy (made before the seal,
+    // or edited afterwards), so it was loaded like another business's file.
+    reportOriginUnproven:
+      'This file says it is a backup of this business, but it could not be verified as one: it was made with an older version or changed afterwards. It was loaded like a file from another business, so staff, PINs, app permissions and automation permissions were left out.',
     // hub#405 — the settings that came in and the ones that did not. The tax id is the one that
     // matters: with someone else's, this hub would invoice under their name.
     reasonSettingsNotPortable:
@@ -2028,10 +2086,14 @@ export default {
     tab: 'Settings',
     loading: 'Loading settings…',
     loadError: 'Could not load settings.',
+    retry: 'Retry',
+    loadErrorBody: 'Your saved settings have not changed. Check the connection and try again.',
+    noPermissionTitle: 'You cannot see these settings',
+    noPermissionBody: 'Ask an administrator if you need to check or change them.',
     save: 'Save',
     saved: 'Settings saved.',
     saveError: 'Could not save settings.',
-    adminOnly: 'Only an administrator can change these settings.',
+    noSavePermission: 'You do not have permission to change these settings. Ask an administrator if you need to.',
     textPlaceholder: 'Type here…',
     invalidFields: 'Check the fields marked below and save again.',
     fieldInvalid: 'This value is not accepted.',
@@ -2214,6 +2276,11 @@ export default {
     // hub#2251 — erplora.com took the call and then went silent: the hub gave up waiting.
     install_cloud_timeout:
       'erplora.com did not answer in time, so the app was not installed. Try again in a few minutes.',
+    // hub#2546 · hub#2596 — the version asked for is not one this app can move to here: support has
+    // fixed its version on this hub, it is older than the one installed, or support marked it broken
+    // (quarantine). Nothing changed.
+    update_version_not_offered:
+      'This app cannot be moved to that version: support has fixed the version it runs, it is older than the one you have, or it has been withdrawn because of a fault. Nothing has changed.',
     // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
     // not run whole); the owner can act on it by updating the hub. The line that names both versions
     // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.
@@ -2227,6 +2294,19 @@ export default {
     module: {
       update_lost:
         'The update failed and the previous version could not be restored, so this app is no longer installed. Install it again from Apps; if that fails too, contact support.',
+    },
+    // hub#2579 — the two FISCAL refusals of switching off or uninstalling an app. The runtime sends
+    // a stable code and an English line for the log; without these the Apps toast painted that line
+    // on a Spanish screen. Each one says what to do, because the way out is different: the engine
+    // still owes records to the AEAT (ADR-0202 R2), or the hub would be left with no app filing its
+    // regime (ADR-0273 D5).
+    verifactu: {
+      unsent_records:
+        'VeriFactu still has records the AEAT has not accepted. Open VeriFactu to send or correct them, then try again.',
+    },
+    fiscal: {
+      no_provider_left:
+        'Your business has to keep an app that sends its invoices to the tax authority, and this would leave it without one. Install another app that does it first, then try again.',
     },
     default: 'Something went wrong. Try again in a minute.',
   },

@@ -262,13 +262,23 @@ pub async fn add_member(
         if let Some(response) = crate::hub_users::enforce_seat_for_email(&rt, &st, &email).await {
             return response;
         }
-        match rt
+        let before = match crate::hub_users::census_row_by_access_email(&rt, &email).await {
+            Ok(before) => before,
+            Err(e) => return crate::err_response(e),
+        };
+        let user = match rt
             .create_login_user(&email, &role, crate::hub_users::plan_max_users(&st))
             .await
         {
             Ok(user) => user,
             Err(e) => return crate::err_response(e),
+        };
+        // hub#2571: rewriting the role of somebody already inside is a role change — their open
+        // channels heard with the old one.
+        if before.is_some_and(|u| u.is_active && u.role != role) {
+            crate::hub_users::end_live_channels_of(&st, &user.id);
         }
+        user
     };
     // Notifica el alta al SaaS (fuente de verdad del acceso). Si falla, el alta local persiste.
     if let Err(e) = notify_member_added(&st, &email, &role).await {
@@ -309,10 +319,19 @@ pub async fn remove_member(
         {
             return response;
         }
-        match rt.deactivate_login_user(&email).await {
+        let before = match crate::hub_users::census_row_by_access_email(&rt, &email).await {
+            Ok(before) => before,
+            Err(e) => return crate::err_response(e),
+        };
+        let existed = match rt.deactivate_login_user(&email).await {
             Ok(existed) => existed,
             Err(e) => return crate::err_response(e),
+        };
+        // hub#2571: closed here, before erplora.com is told — the local door does not wait for it.
+        if let Some(person) = before {
+            crate::hub_users::end_live_channels_of(&st, &person.id);
         }
+        existed
     };
     if let Err(e) = notify_member_removed(&st, &email).await {
         return members_error_response(e);

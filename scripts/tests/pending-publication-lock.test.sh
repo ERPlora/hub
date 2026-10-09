@@ -251,8 +251,8 @@ ok
 
 # ── 11 · The caller really runs the lock on every pull request ─────────────────────────────
 # The lock only protects anything if a workflow that runs ON PULL REQUESTS executes it against
-# the PR's base. `test-hub-modules.yml` does not run on `pull_request` (2026-08-29), so the
-# caller is `actionlint.yml`, whose `paths:` already carries both lists. Checked on the parsed
+# the PR's base. `test-hub-modules.yml` runs on kernel PRs again (pm#655) but skips drafts and
+# watches other paths, so the caller is `actionlint.yml`, whose `paths:` already carries both lists. Checked on the parsed
 # YAML (comments inside `run:` stripped), because a comment naming the script runs nothing:
 #   a) a step runs `bash ./scripts/ci/pending-publication-lock.sh --base HEAD^1`, with no
 #      `continue-on-error` (a red that cannot fail the job is decoration);

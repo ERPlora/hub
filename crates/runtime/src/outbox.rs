@@ -420,6 +420,26 @@ fn backoff_seconds(attempts: i64) -> i64 {
     (1i64 << attempts.clamp(0, 12)).min(3600)
 }
 
+/// How long a delivery the proxy rate-limited waits when the proxy named no `Retry-After`
+/// (hub#2649) — the email door's `@quota` answers a bare 429.
+const RATE_LIMIT_FALLBACK_WAIT_SECS: i64 = 60;
+
+/// The longest a rate-limited delivery waits, whatever the proxy asks: the ladder's own cap. A
+/// reminder for this afternoon is worth trying again within the hour.
+const RATE_LIMIT_MAX_WAIT_SECS: i64 = 3600;
+
+/// The wait a proxy's `Retry-After` turns into (hub#2649): what it asked, at least a second (a
+/// `0` would have the relay hammer it in the same drain) and at most [`RATE_LIMIT_MAX_WAIT_SECS`];
+/// [`RATE_LIMIT_FALLBACK_WAIT_SECS`] when it named none.
+fn rate_limit_wait_secs(retry_after_secs: Option<u64>) -> i64 {
+    match retry_after_secs {
+        Some(secs) => i64::try_from(secs)
+            .unwrap_or(RATE_LIMIT_MAX_WAIT_SECS)
+            .clamp(1, RATE_LIMIT_MAX_WAIT_SECS),
+        None => RATE_LIMIT_FALLBACK_WAIT_SECS,
+    }
+}
+
 /// Un ciclo del relay: procesa hasta [`BATCH`] eventos vencidos. Devuelve cuántas filas tomó
 /// (0 = nada vencido). Las filas que fallan quedan diferidas (`next_attempt_at` futuro), así que
 /// no se vuelven a tomar en este `now`; los eventos en cascada que generen las entregas con éxito
@@ -529,6 +549,24 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     let ctx = listener_ctx(row);
     let payload = parse_payload(row);
 
+    // ── Only the owner announces an erasure (hub#2535) ──────────────────────────────────────
+    // Every listener of `<subject>.anonymized` erases what its app keeps of her, so a refused
+    // erasure reaches NO ONE — no listener, no wait, no automation — and the row climbs the
+    // ladder with the refusal's code to the dead letters, where a human sees it. Asked before
+    // anything is delivered: once a listener ran, her data is already gone.
+    if let Err(e) = crate::erasure::gate_delivery(
+        db,
+        registry,
+        &ctx.hub_id,
+        row["module_id"].as_str().unwrap_or_default(),
+        &event_name,
+        &payload,
+    )
+    .await
+    {
+        return defer_or_dead(db, &id, attempts, &format!("erasure: {e}")).await;
+    }
+
     // Listeners actuales (solo módulos activos). Si no hay, la entrega es trivialmente completa.
     //
     // **Cada listener es independiente (hub#142):** antes, un listener que fallaba hacía
@@ -551,6 +589,8 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // quota (nothing to say beyond the error), a code for a refusal with a name.
     let mut dead_now = false;
     let mut dead_now_kind = "";
+    // …or one the proxy asked the hub to wait out (hub#2649): seconds until the next attempt.
+    let mut wait_secs: Option<i64> = None;
     for listener in &listeners {
         if delivery_exists(db, &ctx.hub_id, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
@@ -623,6 +663,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
                 dead_now = true;
                 dead_now_kind = kind;
             }
+            wait_secs = f.wait_secs;
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {}", f.error));
             }
@@ -660,7 +701,16 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // subject (`crate::erasure`). No module can do it: these tables are the kernel's (ADR-0127).
     // Idempotent by construction (an emptied payload no longer holds the id), so it needs no
     // `_event_delivery` marker; a failure here defers the row like any listener's.
-    if let Err(e) = crate::erasure::on_event(db, &ctx.hub_id, &event_name, &payload).await {
+    if let Err(e) = crate::erasure::on_event(
+        db,
+        registry,
+        &ctx.hub_id,
+        row["module_id"].as_str().unwrap_or_default(),
+        &event_name,
+        &payload,
+    )
+    .await
+    {
         failures += 1;
         if first_err.is_none() {
             first_err = Some(format!("erasure: {e}"));
@@ -721,6 +771,12 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         if failures == 1 && dead_now {
             return mark_dead_as(db, &id, &err, dead_now_kind).await;
         }
+        // A rate limit is waited out, not climbed (hub#2649): when the proxy's «slow down» is the
+        // only thing that failed, the row waits what it asked and keeps every rung of its ladder.
+        // Alongside another failure the ladder applies as usual — that failure is real.
+        if let (1, Some(secs)) = (failures, wait_secs) {
+            return wait_without_spending(db, &id, secs, &err).await;
+        }
         return defer_or_dead(db, &id, attempts, &err).await;
     }
 
@@ -749,6 +805,10 @@ struct NotifyFailure {
     /// dead-letter BY `failure_kind`, so a row that dies unclassified is never put back when the
     /// owner grants the capability — the reminder is lost, not delayed.
     dead_now: Option<&'static str>,
+    /// Not a failure of the delivery at all (hub#2649): the proxy asked the hub to slow down. The
+    /// row waits these seconds and is tried again **without spending an attempt**. `None` = not
+    /// a rate limit.
+    wait_secs: Option<i64>,
 }
 
 impl NotifyFailure {
@@ -758,6 +818,7 @@ impl NotifyFailure {
             error,
             permanent: Some(kind),
             dead_now: None,
+            wait_secs: None,
         }
     }
 
@@ -768,6 +829,17 @@ impl NotifyFailure {
             error,
             permanent: None,
             dead_now: Some(kind),
+            wait_secs: None,
+        }
+    }
+
+    /// The proxy's «slow down» (hub#2649), waited out for `secs` without spending an attempt.
+    fn rate_limited(secs: i64, error: RuntimeError) -> Self {
+        Self {
+            error,
+            permanent: None,
+            dead_now: None,
+            wait_secs: Some(secs),
         }
     }
 }
@@ -781,6 +853,7 @@ impl From<RuntimeError> for NotifyFailure {
             error,
             permanent: None,
             dead_now: None,
+            wait_secs: None,
         }
     }
 }
@@ -856,6 +929,24 @@ async fn deliver_host_notify(
             Ok(flow_id) => asking_flow = flow_id,
             Err(e) => return Err(NotifyFailure::permanent(FAILURE_RELEASE_REVOKED, e)),
         }
+        // A PAUSED automation's message does not go out (hub#2650): pausing is the owner's «stop»,
+        // and a message queued before it is part of what they stopped. Unlike a revoked release the
+        // owner may want it after all, so it dies now with its recipient and stays resendable by
+        // hand; turning the automation back on does not send it by itself, because a reminder that
+        // sat out the pause may be about something already over. Read at every attempt, so a hand
+        // resend while still paused dies the same way.
+        if !crate::flows::store::get(db, hub_id, &asking_flow)
+            .await?
+            .enabled
+        {
+            return Err(NotifyFailure::dead_now(
+                "",
+                RuntimeError::Notify(format!(
+                    "the automation `{asking_flow}` is paused, so its message was not sent; turn \
+                     it back on and resend it from «Eventos caídos»"
+                )),
+            ));
+        }
         host_notify::check_recipient_syntax(intent.channel, &intent.to)?;
     } else {
         // Puerta 1 — capability del MÓDULO emisor (no del hub): sin `notify` concedida, no hay
@@ -902,7 +993,9 @@ async fn deliver_host_notify(
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
     let premium = !registry.premium_whatsapp_modules.is_empty();
     let routing = host_notify::route_channel(intent.channel, premium);
-    let message_id = match transport.send(&intent, routing).await? {
+    // The outbox row's id is the delivery's key (hub#2648): one per message, the same on every
+    // attempt of it — the ladder's, the reclaimed lease's and a hand resend from «Eventos caídos».
+    let message_id = match transport.send(&intent, routing, event_id).await? {
         host_notify::SendOutcome::Sent { message_id } => message_id,
         // A spent quota is not a stumble (hub#971): no ladder, dead now — but retryable by hand,
         // because a quota, unlike a revoked release, comes back.
@@ -912,6 +1005,20 @@ async fn deliver_host_notify(
             return Err(NotifyFailure::dead_now(
                 "",
                 RuntimeError::Notify(format!("quota exceeded: {detail}")),
+            ));
+        }
+        // The proxy's rate limit, not the quota (hub#2649): it lifts on its own, so the row waits
+        // what the proxy asked — no ladder spent, nothing filed in «Eventos caídos».
+        host_notify::SendOutcome::RateLimited {
+            retry_after_secs,
+            detail,
+        } => {
+            let secs = rate_limit_wait_secs(retry_after_secs);
+            return Err(NotifyFailure::rate_limited(
+                secs,
+                RuntimeError::Notify(format!(
+                    "erplora.com asked the hub to slow down; trying again in {secs} s: {detail}"
+                )),
             ));
         }
     };
@@ -927,8 +1034,9 @@ async fn deliver_host_notify(
     } else {
         ""
     };
-    // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark), y con
-    // ella la ÚNICA pareja que existe entre el id del proveedor y quién preguntó.
+    // A successful send → record the delivery, and with it the ONLY pairing there is between the
+    // provider's id and who asked. A separate write, so a failure here retries the send: it is
+    // the `event_id` key above that keeps that retry from reaching the customer twice.
     let (sql, p) = delivery_op_sent(
         hub_id,
         event_id,
@@ -1202,6 +1310,28 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
     p.insert("err".into(), json!(err));
     db.execute(
         "UPDATE _event_outbox SET attempts = :attempts, next_attempt_at = :next_at, last_error = :err, claim_expires_at = NULL WHERE id = :id",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Puts a row the proxy rate-limited back in the queue `secs` from now (hub#2649), **leaving
+/// `attempts` alone**: waiting out a «slow down» is not a failed delivery, so it can neither kill
+/// the row nor bring it closer to `MAX_ATTEMPTS`. Clears the lease like [`defer_or_dead`].
+async fn wait_without_spending(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    secs: i64,
+    err: &str,
+) -> Result<()> {
+    let next_at = (chrono::Utc::now() + chrono::Duration::seconds(secs)).to_rfc3339();
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("next_at".into(), json!(next_at));
+    p.insert("err".into(), json!(err));
+    db.execute(
+        "UPDATE _event_outbox SET next_attempt_at = :next_at, last_error = :err, claim_expires_at = NULL WHERE id = :id",
         &p,
     )
     .await?;
@@ -1827,6 +1957,17 @@ mod tests {
     use crate::registry::{ModuleStatus, Principal, RegisteredCommand};
     use erplora_db::{testutil::fresh_db, PgAdapter};
 
+    /// What the proxy's `Retry-After` becomes (hub#2649): its seconds, never 0 (the relay would
+    /// hammer it in the same drain), never past the hour, and a minute when it named none.
+    #[test]
+    fn a_rate_limit_waits_what_the_proxy_asks_within_bounds_hub2649() {
+        assert_eq!(rate_limit_wait_secs(Some(30)), 30);
+        assert_eq!(rate_limit_wait_secs(Some(0)), 1);
+        assert_eq!(rate_limit_wait_secs(Some(86_400)), 3600);
+        assert_eq!(rate_limit_wait_secs(Some(u64::MAX)), 3600);
+        assert_eq!(rate_limit_wait_secs(None), 60);
+    }
+
     fn cmd(module: &str, sql: &str, emit: Vec<crate::manifest::EmitDef>) -> RegisteredCommand {
         RegisteredCommand {
             module_id: module.to_string(),
@@ -2284,11 +2425,20 @@ mod tests {
         .unwrap();
     }
 
+    /// A run and the automation it belongs to, switched on — a run never exists without its
+    /// automation, and the release reads whether that automation is paused (hub#2650).
     async fn seed_flow_run(db: &PgAdapter, run_id: &str, flow_id: &str) {
         let mut p = Params::new();
         p.insert("id".into(), json!(run_id));
         p.insert("flow_id".into(), json!(flow_id));
         p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _flow (id, hub_id, name, enabled, created_at, updated_at) \
+             VALUES (:flow_id, 'h1', :flow_id, 1, :at, :at) ON CONFLICT (id) DO NOTHING",
+            &p,
+        )
+        .await
+        .unwrap();
         db.execute(
             "INSERT INTO _flow_runs (id, hub_id, flow_id, status, created_at, updated_at) \
              VALUES (:id, 'h1', :flow_id, 'done', :at, :at)",

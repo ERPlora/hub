@@ -9,6 +9,7 @@ impl Runtime {
             registry: Registry::new(),
             hub_id: DEV_HUB_ID.to_string(),
             elevation: elevation::Grants::new(),
+            api_key_clock: api_keys::wall_clock(),
         }
     }
 
@@ -20,6 +21,7 @@ impl Runtime {
             registry: Registry::new(),
             hub_id: hub_id.into(),
             elevation: elevation::Grants::new(),
+            api_key_clock: api_keys::wall_clock(),
         }
     }
 

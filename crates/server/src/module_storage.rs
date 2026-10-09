@@ -50,7 +50,12 @@ impl ModuleMediaStorage {
             base_url: base_url.into().trim_end_matches('/').to_string(),
             hub_id: hub_id.into(),
             machine_token,
-            http: reqwest::Client::new(),
+            // The same limits as every other call to erplora.com (hub#2509); the upload asks for
+            // the transfer ceiling on its own request.
+            http: crate::state::cloud_client(
+                crate::state::CLOUD_CONNECT_TIMEOUT,
+                crate::state::CLOUD_CALL_TIMEOUT,
+            ),
         }
     }
 
@@ -179,7 +184,11 @@ impl ModuleStorage for ModuleMediaStorage {
         };
         let url = format!("{}/api/v1/hub/device/media/", self.base_url);
         let headers = cloud_client::CloudClient::new(&self.base_url).headers_for(&url, &auth);
-        let mut request = self.http.post(&url).multipart(form);
+        let mut request = self
+            .http
+            .post(&url)
+            .multipart(form)
+            .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
         for (key, value) in headers {
             request = request.header(key, value);
         }

@@ -39,6 +39,7 @@ set -uo pipefail
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 script="$script_dir/../ci/run-module-hub-batteries.sh"
+repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/erplora-run-module-hub-batteries-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
@@ -77,7 +78,7 @@ make_module() { # $1=catalogue, $2=id, rest=battery relative paths
             printf '#!/usr/bin/env python3\n'
             printf 'import os, sys\n'
             printf 'print("battery %s of %s at", os.environ.get("ERPLORA_HUB_BASE_URL"))\n' "$rel" "$id"
-            printf 'open(os.environ["BATTERY_LOG"], "a").write("%s/%s %%s\\n" %% os.environ.get("ERPLORA_HUB_BASE_URL"))\n' "$id" "$rel"
+            printf 'open(os.environ["BATTERY_LOG"], "a").write("%s/%s %%s warm=%%d\\n" %% (os.environ.get("ERPLORA_HUB_BASE_URL"), os.path.exists(os.environ.get("WARM_MARK", "/nonexistent"))))\n' "$id" "$rel"
             printf 'open(os.environ["PSQL_LOG"], "a").write("%s/%s\\t%%s\\n" %% os.environ.get("ERPLORA_HUB_PSQL", "<unset>"))\n' "$id" "$rel"
             printf 'sys.exit(int(os.environ.get("BATTERY_EXIT_%s", "0")))\n' "$(printf '%s' "$id" | tr '[:lower:]-' '[:upper:]_')"
         } > "$catalogue/$id/$rel"
@@ -93,8 +94,21 @@ make_fake_server() { # $1=path
 printf '%s %s %s\n' "${HUB_DATABASE_URL:-}" "${HUB_BIND:-}" "${HUB_MODULES_DIR:-}" >> "$BOOT_LOG"
 port=${HUB_BIND##*:}
 exec python3 - "$port" <<'PY'
-import json, os, sys
+import json, os, sys, threading, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# What the real server prints on stderr (its log) once the boot warm-up of the WASM handlers is
+# over (hub#2693). `WARMUP_DELAY` holds it back, `WARMUP_NEVER=1` never prints it; `WARM_MARK`
+# is touched at the same moment, so a fake battery can tell whether it started on a warm hub.
+print("fake-server: booting, a line only the hub log has", file=sys.stderr, flush=True)
+def warm_up():
+    time.sleep(float(os.environ.get("WARMUP_DELAY", "0")))
+    if os.environ.get("WARMUP_NEVER") == "1":
+        return
+    if os.environ.get("WARM_MARK"):
+        open(os.environ["WARM_MARK"], "a").close()
+    print("wasm: warm-up done: 2/2 handler module(s)", file=sys.stderr, flush=True)
+threading.Thread(target=warm_up, daemon=True).start()
 
 installed = [m for m in os.environ.get("INSTALLED", "").split(",") if m]
 
@@ -160,6 +174,7 @@ run_runner() { # rest=extra args; env: INSTALLED, BATTERY_EXIT_*
     : > "$tmp_dir/db.log"
     : > "$tmp_dir/battery.log"
     : > "$tmp_dir/psql.log"
+    rm -f "$tmp_dir/warm.mark"
     local stdout_file="$tmp_dir/stdout" stderr_file="$tmp_dir/stderr"
     # Under a watchdog when one is available, and with stdin CLOSED. Case 9 hands the runner a
     # database admin that reads stdin the way `docker exec -i` does: a runner that lets it reach
@@ -168,6 +183,7 @@ run_runner() { # rest=extra args; env: INSTALLED, BATTERY_EXIT_*
     DB_LOG="$tmp_dir/db.log" \
     BATTERY_LOG="$tmp_dir/battery.log" \
     PSQL_LOG="$tmp_dir/psql.log" \
+    WARM_MARK="$tmp_dir/warm.mark" \
         $watchdog "${RUNNER_BASH:-bash}" "$script" \
             --catalogue "$catalogue" \
             --manifest "$manifest" \
@@ -376,6 +392,91 @@ beta_db=$(awk '{ n = split($1, p, "/"); if (index(p[n], "_beta_")) print p[n] }'
 got=$(awk -F'\t' '$1 == "beta/tests/only.hub.test.py" { print $2 }' "$tmp_dir/psql.log")
 [ "$got" = "docker exec -i ci-pg psql -U erplora -v ON_ERROR_STOP=1 -d $beta_db" ] \
     || fail "11b: ERPLORA_HUB_PSQL is '$got', not the toolkit's shape for ci-pg/$beta_db"
+ok
+
+# ── 12 · `--shard k/n` splits the MODULES across jobs, and the shards add up (pm#655) ─────
+# The batteries are ~28 of the ~42 minutes of `test-hub-modules.yml`; back on kernel PRs they run
+# as parallel jobs. A shard takes whole modules (one hub per module is not negotiable, see the
+# header), the shards are disjoint, and together they run every battery exactly once — a module
+# that falls between two shards is the hole hub#1381 exists to close.
+shard_ran=""
+for k in 1 2; do
+    INSTALLED=alpha,beta run_runner --shard "$k/2"
+    [ "$rc" -eq 0 ] || fail "12: shard $k/2 of a green catalogue must exit 0, got $rc"
+    boots=$(grep -c . "$tmp_dir/boot.log")
+    [ "$boots" -eq 1 ] || fail "12: shard $k/2 must boot ONE hub (one module of two), got $boots"
+    shard_ran="$shard_ran$(cut -d' ' -f1 "$tmp_dir/battery.log")"$'\n'
+done
+ok
+got=$(printf '%s' "$shard_ran" | sed '/^$/d' | sort)
+expected=$(printf 'alpha/tests/one.hub.test.py\nalpha/tests/two.hub.test.py\nbeta/tests/only.hub.test.py')
+[ "$got" = "$expected" ] || fail "12: shards 1/2 + 2/2 must run every battery exactly once, got:
+$got"
+ok
+
+# A shard that cannot be honoured is an ENVIRONMENT error (exit 2), never a green with nothing
+# run: a matrix asking for more shards than there are modules would otherwise pass empty.
+for bad in 0/2 3/2 2 a/b 1/0 3/3; do
+    INSTALLED=alpha,beta run_runner --shard "$bad"
+    [ "$rc" -eq 2 ] || fail "12: --shard $bad must exit 2 (environment), got $rc"
+    boots=$(grep -c . "$tmp_dir/boot.log")
+    [ "$boots" -eq 0 ] || fail "12: --shard $bad must not boot any hub, got $boots"
+done
+ok
+
+# ── 13 · The batteries start on a WARM hub: the runner waits for the WASM warm-up (hub#2693) ─
+# The server binds, answers /readyz UP and only THEN compiles every WASM handler in the
+# background (hub#926: on purpose, so nobody waits for it in production). On a fresh
+# `ubuntu-latest` runner — empty wasmtime disk cache, debug build, 4 vCPU — that compilation is
+# still running when the first battery charges a sale, and `cash_register/reverse_on_void` timed
+# out after 8 s waiting for a movement in 2 of 3 runs (hub#2693, pm#655). Reproduced on a Mac with
+# an empty cache and `taskpolicy -c background`. A battery measures the module on a hub as a
+# cashier meets it — warmed up — so the runner waits for the line that says the warm-up is over.
+INSTALLED=alpha,beta WARMUP_DELAY=2 run_runner
+[ "$rc" -eq 0 ] || fail "13: a hub that finishes its warm-up 2 s after /readyz UP must be green, got $rc"
+ok
+cold=$(grep -c 'warm=0' "$tmp_dir/battery.log")
+[ "$cold" -eq 0 ] || fail "13: $cold battery/ies started BEFORE the hub said its warm-up was over:
+$(cat "$tmp_dir/battery.log")"
+ok
+warm=$(grep -c 'warm=1' "$tmp_dir/battery.log")
+[ "$warm" -eq 3 ] || fail "13: expected the 3 batteries to run on a warm hub, got $warm"
+ok
+
+# A hub that never says its warm-up is over is the ENVIRONMENT (exit 2), not a module verdict,
+# its batteries do not run, and the report says what was awaited and shows the hub's own log.
+INSTALLED=alpha,beta WARMUP_NEVER=1 run_runner --warmup-timeout 3
+[ "$rc" -eq 2 ] || fail "13: a hub that never finishes its warm-up must exit 2, got $rc"
+ok
+[ -s "$tmp_dir/battery.log" ] && fail "13: no battery may run on a hub that never finished its warm-up:
+$(cat "$tmp_dir/battery.log")"
+ok
+grep -q 'wasm: warm-up done' <<<"$err" \
+    || fail "13: the report must name the line it waited for"
+ok
+grep -q 'a line only the hub log has' <<<"$err" \
+    || fail "13: the report must carry the hub's own log tail"
+ok
+
+# The line is a CONTRACT with the server: the runner waits for exactly what the runtime prints.
+# Rename one side and every hub here would time out — this case says so before the CI does.
+const_line=$(grep -E '^pub const WARM_UP_DONE: &str = "' "$repo_root/crates/runtime/src/wasm_cache.rs")
+[ -n "$const_line" ] || fail "13: crates/runtime/src/wasm_cache.rs no longer declares WARM_UP_DONE"
+ok
+const_value=$(printf '%s' "$const_line" | sed -E 's/.*= "([^"]*)";.*/\1/')
+grep -qF -- "$const_value" "$script" \
+    || fail "13: the runner does not wait for \`$const_value\` (WARM_UP_DONE in wasm_cache.rs)"
+ok
+
+# ── 14 · A RED battery carries the tail of its hub's log (hub#2693) ──────────────────────
+# A battery only sees HTTP answers. When the cause is inside the hub — a listener that failed, a
+# handler still compiling — the hub log is the only witness, and the runner used to delete it with
+# the scratch directory: hub#2693 could not be diagnosed from the CI at all.
+INSTALLED=alpha,beta BATTERY_EXIT_BETA=1 run_runner
+[ "$rc" -eq 1 ] || fail "14: a failing battery must still exit 1, got $rc"
+ok
+grep -q 'a line only the hub log has' <<<"$out$err" \
+    || fail "14: the report of a failed battery must carry the hub's log tail"
 ok
 
 printf 'run-module-hub-batteries.test.sh: %s checks passed\n' "$passed"

@@ -27,15 +27,15 @@
 #      network path there).
 #   4. Any of the above failing is RED, naming exactly what broke (the tag, or the query).
 #
-# Cadence — decided in hub#1282, not left to measure later:
-#   NOT `pull_request`. The hub gate is already the throughput ceiling of the whole fleet
-#   (~40 min/push, serialized on `ci-runner-1`'s two slots — hub#1207), and this job adds a
-#   Postgres service PLUS building N from source PLUS booting two binaries. Same cadence as
-#   `image-freshness.yml` (hub#652): `schedule` daily + `workflow_dispatch` — cheap enough to run
-#   often, without adding to the per-PR critical path. `workflow_dispatch` doubles as the
-#   "before a release" run: the release runbook (`architecture/hub/release-pipeline.md`) triggers
-#   it by hand, from `main`, right before cutting a `v*` tag — the one moment N and N-1 truly
-#   need to coexist, and the one a scheduled run the night before cannot guarantee it caught.
+# Cadence — hub#1282 kept it off `pull_request` while the single self-hosted runner was the fleet's
+# ceiling. Since 08/10 the hub runs on GitHub's runners (public repo), so it runs on the PR that can
+# change N's schema (hub#2705, ERPlora/pm#655 J3): the system tables are written from
+# `crates/runtime/src/**`, `crates/db/**`, `crates/server/src/**` and `crates/plugins/**`, plus this
+# workflow and its script. A draft PR spends nothing; a red PR does not open the alert issue (that
+# one is the nightly's: it says the released line is broken, not that a PR is). The daily `schedule`
+# stays, and `workflow_dispatch` doubles as the "before a release" run: the release runbook
+# (`architecture/hub/release-pipeline.md`) triggers it by hand, from `main`, right before cutting a
+# `v*` tag.
 #
 # NOTE (same as image-freshness.yml): `schedule` only fires from the workflow file on the
 # DEFAULT branch. Until this file reaches `main`, only `workflow_dispatch` runs it.
@@ -47,20 +47,35 @@ on:
   schedule:
     - cron: '17 6 * * *'   # daily, off the top of the hour — same reasoning as image-freshness.yml
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/runtime/src/**"
+      - "crates/db/**"
+      - "crates/server/src/**"
+      - "crates/plugins/**"
+      - "scripts/ci/n-minus-one.sh"
+      - "scripts/tests/n-minus-one.test.sh"
+      - ".github/workflows/n-minus-one.yml"
 
 permissions:
   contents: read
 
-# Repo-wide group (no ref): the script binds ONE fixed host port (`--bind 0.0.0.0:8788`, and N-1
-# runs with `--network host`), and `ci-runner-1`/`ci-runner-1b` share a single Docker host — two
-# runs from different refs at once would fight over that port and paint a false RED.
+# Per ref (hub#2705). It was repo-wide because the script binds ONE fixed host port
+# (`--bind 0.0.0.0:8788`, N-1 with `--network host`) and the self-hosted slots shared a single
+# Docker host. Each GitHub-hosted job has its own machine, and a repo-wide group would let one PR
+# cancel another PR's run and the nightly. A PR's newer head cancels its older run; the nightly and
+# a manual run finish (hub#2689).
 concurrency:
-  group: n-minus-one
-  cancel-in-progress: true
+  group: n-minus-one-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   n-minus-one:
     name: N-1 binary against N's schema
+    # Draft = no CI: the run happens once, when the PR is marked ready (measured 29/08: half the
+    # runner minutes were runs cancelled by the reviewer's re-push on drafts).
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     # Same switch as the rest of the hub's CI: the dedicated `ci-runner-1` when the org Variable
     # is set, GitHub's `ubuntu-latest` otherwise.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
@@ -166,7 +181,9 @@ jobs:
       # was waiting for landed as `scripts/ci/alert-issue.sh` (hub#1246), so it delegates like
       # every other alert step instead of keeping a copy that can drift (hub#1327).
       - name: Open or refresh the alert issue
-        if: failure() && steps.check.outcome == 'failure'
+        # Not on a PR: the PR's own red check is the signal there, and this issue means "the
+        # released line is broken" — one red PR would otherwise reopen it for everyone (hub#2705).
+        if: failure() && steps.check.outcome == 'failure' && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

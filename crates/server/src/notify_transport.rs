@@ -69,6 +69,11 @@ const RESERVED_VARS: &[&str] = &[
     "components",
 ];
 
+/// The header that names one delivery to the proxy, identical on each of its retries (hub#2648):
+/// erplora.com answers a key it has already sent with the stored result instead of sending again
+/// (ERPlora/saas#2633), the way Stripe, Twilio and SendGrid treat theirs.
+pub const IDEMPOTENCY_KEY_HEADER: &str = "Idempotency-Key";
+
 /// The longest name of a header's PDF the transport sends (hub#2405), in characters. A chat
 /// shows far less; the cut only keeps a runaway mapped value from travelling whole.
 const MAX_DOCUMENT_NAME_CHARS: usize = 200;
@@ -142,8 +147,19 @@ impl CloudNotifyTransport {
     }
 
     /// POSTs `body` to a prepared request. Any non-2xx is an `Err` — never a silent success.
-    async fn post(&self, request: &PreparedRequest, body: &Value) -> Result<SendOutcome> {
-        let mut builder = self.http.post(&request.url).json(body);
+    ///
+    /// `delivery_key` travels as [`IDEMPOTENCY_KEY_HEADER`] on every attempt (hub#2648).
+    async fn post(
+        &self,
+        request: &PreparedRequest,
+        body: &Value,
+        delivery_key: &str,
+    ) -> Result<SendOutcome> {
+        let mut builder = self
+            .http
+            .post(&request.url)
+            .header(IDEMPOTENCY_KEY_HEADER, delivery_key)
+            .json(body);
         for (name, value) in &request.headers {
             builder = builder.header(*name, value);
         }
@@ -156,6 +172,7 @@ impl CloudNotifyTransport {
         })?;
 
         let status = response.status();
+        let retry_after = retry_after_secs(response.headers());
         if status.is_success() {
             // The id the provider gave the message — Meta's `wamid` (hub#1951). A 200 is a send
             // whatever the body says: email has no id worth threading a conversation by, and a
@@ -176,26 +193,50 @@ impl CloudNotifyTransport {
         // The reason has to reach whoever reads the dead-letter row: `quota_exceeded`,
         // `no_whatsapp_number` and `invalid_recipients` each need a different human action, and a
         // bare status code names none of them.
-        let detail: String = response
-            .text()
-            .await
-            .unwrap_or_default()
-            .trim()
-            .chars()
-            .take(MAX_DETAIL)
-            .collect();
-        // A spent quota is an ANSWER, not a stumble (hub#971): the proxy says so with 429 or 402,
-        // and the relay must not spend eight rungs of backoff against it. Everything else stays an
-        // `Err` and keeps its ladder.
-        if status == reqwest::StatusCode::TOO_MANY_REQUESTS
-            || status == reqwest::StatusCode::PAYMENT_REQUIRED
-        {
+        let text = response.text().await.unwrap_or_default();
+        let quota_spent = names_quota_exceeded(&text);
+        let detail: String = text.trim().chars().take(MAX_DETAIL).collect();
+        // A spent quota is an ANSWER, not a stumble (hub#971): the proxy says so with 402, or with
+        // 429 and `{"error": "quota_exceeded"}`, and the relay must not spend eight rungs of
+        // backoff against it. Any OTHER 429 is the proxy's rate limit (DRF's throttle, the email
+        // door's `@quota`), which lifts on its own: the relay waits it out (hub#2649). Everything
+        // else stays an `Err` and keeps its ladder.
+        if status == reqwest::StatusCode::PAYMENT_REQUIRED {
             return Ok(SendOutcome::QuotaExceeded { detail });
+        }
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            if quota_spent {
+                return Ok(SendOutcome::QuotaExceeded { detail });
+            }
+            return Ok(SendOutcome::RateLimited {
+                retry_after_secs: retry_after,
+                detail,
+            });
         }
         Err(RuntimeError::Notify(format!(
             "notify proxy answered {status}: {detail}"
         )))
     }
+}
+
+/// The proxy's own name for a spent quota: `{"error": "quota_exceeded", …}`
+/// (ERPlora/saas `whatsapp_inbox/api/notify.py`). Read from the code, never from the prose
+/// (ADR-0055); a body that is not that JSON is not the quota.
+fn names_quota_exceeded(body: &str) -> bool {
+    serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_owned))
+        .is_some_and(|code| code == "quota_exceeded")
+}
+
+/// `Retry-After` in seconds. It may also be an HTTP date; DRF always sends seconds, and a date or
+/// an unreadable value is `None` — the relay then applies its own bounded wait rather than an
+/// invented reading of somebody else's (the rule `cloud_proxy` already follows).
+fn retry_after_secs(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    headers
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u64>().ok())
 }
 
 impl CloudNotifyTransport {
@@ -317,7 +358,12 @@ pub(crate) fn header_media_kind(file: &str) -> Option<&'static str> {
 
 #[async_trait]
 impl NotifyTransport for CloudNotifyTransport {
-    async fn send(&self, intent: &NotifyIntent, _routing: Routing) -> Result<SendOutcome> {
+    async fn send(
+        &self,
+        intent: &NotifyIntent,
+        _routing: Routing,
+        delivery_key: &str,
+    ) -> Result<SendOutcome> {
         // The credential first: with no machine token there is nothing to send WITH, so there is
         // no point building a body or opening a socket.
         let auth = self.machine_auth()?;
@@ -337,7 +383,7 @@ impl NotifyTransport for CloudNotifyTransport {
                         .to_string(),
                 )),
             };
-        self.post(&request, &body).await
+        self.post(&request, &body, delivery_key).await
     }
 }
 
@@ -874,6 +920,7 @@ mod tests {
                     json!({"subject": "Tu cita de mañana", "text": "Te esperamos a las 10:00"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect("a 200 from the proxy is a send");
@@ -917,6 +964,7 @@ mod tests {
                     json!({"text": "¿Confirmas?"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect("a 200 from the proxy is a send");
@@ -943,6 +991,7 @@ mod tests {
                     json!({"subject": "Tu cita", "text": "Te esperamos"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect("a 200 with no id is still a send");
@@ -952,6 +1001,45 @@ mod tests {
                 message_id: String::new()
             }
         );
+    }
+
+    /// **hub#2648 — every attempt of a delivery names it with the same key.** The relay sends
+    /// first and records the send afterwards; whatever breaks in between retries the send. The
+    /// proxy only recognises the retry by the `Idempotency-Key` it carries, so both channels
+    /// carry the key they were handed, unchanged on a retry and different for another delivery.
+    #[tokio::test]
+    async fn every_attempt_of_a_delivery_carries_its_idempotency_key() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "m"})).await;
+        let t = transport(&cloud.base_url, Some("machine-tok"));
+        let whatsapp = intent(Channel::Whatsapp, "+34600111222", "reminder", json!({}));
+        let email = intent(
+            Channel::Email,
+            "cliente@x.com",
+            "reminder",
+            json!({"subject": "Tu cita", "text": "Te esperamos"}),
+        );
+        for (message, key) in [
+            (&whatsapp, "ev-wa"),
+            (&whatsapp, "ev-wa"),
+            (&email, "ev-mail"),
+        ] {
+            t.send(message, Routing::CloudProxy, key)
+                .await
+                .expect("a 200 from the proxy is a send");
+        }
+
+        let keys: Vec<String> = cloud
+            .calls()
+            .iter()
+            .map(|(_, headers, _)| {
+                headers
+                    .get(IDEMPOTENCY_KEY_HEADER)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("<missing>")
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(keys, ["ev-wa", "ev-wa", "ev-mail"]);
     }
 
     /// Without a subject in `vars`, the template NAME is the subject — the SaaS rejects an empty
@@ -998,6 +1086,7 @@ mod tests {
                     json!({"language": "es", "when": "10:00", "who": "Ana"}),
                 ),
                 Routing::CloudProxy,
+                "ev-1",
             )
             .await
             .unwrap();
@@ -1068,6 +1157,7 @@ mod tests {
                     json!({"subject": "s", "text": "t"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect_err("a 502 from the proxy is not a delivery");
@@ -1086,6 +1176,7 @@ mod tests {
                 .send(
                     &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
                     Routing::CloudProxy,
+                    "ev-1",
                 )
                 .await
                 .unwrap_or_else(|e| panic!("{status} is an answer, not a transport error: {e}"));
@@ -1107,10 +1198,115 @@ mod tests {
             .send(
                 &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
                 Routing::CloudProxy,
+                "ev-1",
             )
             .await
             .unwrap_err();
         assert!(format!("{err}").contains("502"), "{err}");
+    }
+
+    /// Fake SaaS answering every notify call with `status`, the raw `body` and, if given, a
+    /// `Retry-After` header — the shapes DRF's throttle and the email door's `@quota` produce.
+    async fn answering_cloud(
+        status: StatusCode,
+        retry_after: Option<&'static str>,
+        body: String,
+    ) -> (String, tokio::task::JoinHandle<()>) {
+        let reply = move || {
+            let body = body.clone();
+            async move {
+                let mut headers = HeaderMap::new();
+                if let Some(value) = retry_after {
+                    headers.insert(
+                        axum::http::header::RETRY_AFTER,
+                        axum::http::HeaderValue::from_static(value),
+                    );
+                }
+                (status, headers, body)
+            }
+        };
+        let app = Router::new()
+            .route("/api/v1/hub/device/notify/email/", post(reply.clone()))
+            .route("/api/v1/hub/device/notify/whatsapp/", post(reply));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (format!("http://{addr}"), server)
+    }
+
+    async fn outcome_of(
+        status: StatusCode,
+        retry_after: Option<&'static str>,
+        body: &str,
+    ) -> SendOutcome {
+        let (base_url, server) = answering_cloud(status, retry_after, body.to_string()).await;
+        let outcome = transport(&base_url, Some("machine-tok"))
+            .send(
+                &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
+                Routing::CloudProxy,
+                "ev-1",
+            )
+            .await
+            .unwrap_or_else(|e| panic!("{status} is an answer, not a transport error: {e}"));
+        server.abort();
+        outcome
+    }
+
+    /// A 429 that does not say `quota_exceeded` is erplora.com's rate limit (hub#2649): the
+    /// relay is told to wait, with the proxy's `Retry-After` when it is a number of seconds.
+    #[tokio::test]
+    async fn a_429_that_is_not_the_quota_is_a_rate_limit_hub2649() {
+        let drf = r#"{"detail": "Request was throttled. Expected available in 30 seconds."}"#;
+        let cases: [(Option<&'static str>, &str, Option<u64>); 5] = [
+            (Some("30"), drf, Some(30)),
+            (Some(" 7 "), drf, Some(7)),
+            // The email door's `@quota` names no wait.
+            (
+                None,
+                r#"{"detail": "Too many requests. Please try again later."}"#,
+                None,
+            ),
+            // An HTTP date is legal, but the hub does not guess at it: the relay's default applies.
+            (Some("Wed, 21 Oct 2026 07:28:00 GMT"), drf, None),
+            // A gateway's HTML page in front of erplora.com is not the quota either.
+            (None, "<html>429 Too Many Requests</html>", None),
+        ];
+        for (retry_after, body, expected) in cases {
+            match outcome_of(StatusCode::TOO_MANY_REQUESTS, retry_after, body).await {
+                SendOutcome::RateLimited {
+                    retry_after_secs,
+                    detail,
+                } => {
+                    assert_eq!(retry_after_secs, expected, "Retry-After {retry_after:?}");
+                    assert_eq!(detail, body.trim(), "the proxy's answer travels to the row");
+                }
+                other => panic!("429 {body} must be RateLimited, got {other:?}"),
+            }
+        }
+    }
+
+    /// The quota is told apart by its CODE, read from the whole body: a long `detail` the
+    /// dead-letter text would cut must not turn a spent quota into a wait (hub#2649). And a 402 is
+    /// the quota whatever it carries.
+    #[tokio::test]
+    async fn the_quota_is_read_from_the_whole_body_and_402_is_always_the_quota_hub2649() {
+        let long = format!(
+            r#"{{"detail": "{}", "error": "quota_exceeded"}}"#,
+            "x".repeat(MAX_DETAIL * 2)
+        );
+        for (status, retry_after, body) in [
+            (StatusCode::TOO_MANY_REQUESTS, Some("30"), long.as_str()),
+            (
+                StatusCode::PAYMENT_REQUIRED,
+                Some("30"),
+                r#"{"detail": "throttled"}"#,
+            ),
+        ] {
+            match outcome_of(status, retry_after, body).await {
+                SendOutcome::QuotaExceeded { .. } => {}
+                other => panic!("{status} {body:.60} must be QuotaExceeded, got {other:?}"),
+            }
+        }
     }
 
     /// An un-enrolled hub has no machine credential, so there is nothing to sign the call with.
@@ -1127,6 +1323,7 @@ mod tests {
                     json!({"subject": "s", "text": "t"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .unwrap_err();
@@ -1143,6 +1340,7 @@ mod tests {
             .send(
                 &intent(Channel::Sms, "+34600999888", "t", json!({"text": "hola"})),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .unwrap_err();
@@ -1159,6 +1357,7 @@ mod tests {
             .send(
                 &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .unwrap();
@@ -1342,6 +1541,7 @@ mod tests {
                     json!({"header_image": " whatsapp/headers/0b8e.jpg ", "who": "Ana"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect("an uploaded header is sent");
@@ -1383,6 +1583,7 @@ mod tests {
                     json!({"header_image": "https://cdn.example.com/salon.jpg"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect("a link is sent");
@@ -1422,6 +1623,7 @@ mod tests {
                         json!({ "header_image": stray }),
                     ),
                     Routing::Tenant,
+                    "ev-1",
                 )
                 .await
                 .expect_err(stray);
@@ -1444,6 +1646,7 @@ mod tests {
                     json!({"header_image": "whatsapp/headers/missing.jpg"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect_err("no file, no send");
@@ -1469,6 +1672,7 @@ mod tests {
                     json!({"header_image": "whatsapp/headers/refused.jpg"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect_err("a refusal is not a link");
@@ -1490,6 +1694,7 @@ mod tests {
                     json!({"header_image": "whatsapp/headers/odd.jpg"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect_err("file:// is not a link Meta can fetch");
@@ -1523,6 +1728,7 @@ mod tests {
                         json!({ key: format!(" {file} ") }),
                     ),
                     Routing::Tenant,
+                    "ev-1",
                 )
                 .await
                 .unwrap_or_else(|e| panic!("{key}: an uploaded header is sent: {e}"));
@@ -1676,6 +1882,7 @@ mod tests {
                 .send(
                     &intent(Channel::Whatsapp, "+34600111222", " autumn_menu ", vars),
                     Routing::Tenant,
+                    "ev-1",
                 )
                 .await
                 .unwrap_or_else(|e| panic!("{written}: an uploaded PDF is sent: {e}"));
@@ -1708,6 +1915,7 @@ mod tests {
                     json!({"header_text": "whatsapp/headers/0b8e.jpg"}),
                 ),
                 Routing::Tenant,
+                "ev-1",
             )
             .await
             .expect("a title is sent as written");
@@ -1738,6 +1946,7 @@ mod tests {
                         json!({ key: file }),
                     ),
                     Routing::Tenant,
+                    "ev-1",
                 )
                 .await
                 .expect_err(file);

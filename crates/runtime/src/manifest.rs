@@ -1041,38 +1041,74 @@ pub enum ExpectRowsOp {
     Min,
 }
 
-/// The `dedup_key` half of a `command.emit` entry (hub#1076): the name of a field in the
-/// command's bound payload (`context.payload` plus what `system_params` injects — same source a
-/// `:name` bind reads from) whose value derives the outbox row's id.
+/// The object form of a `command.emit` entry: the event plus at least one of two opt-in
+/// refinements. A manifest names whichever it needs; `{"event": "x"}` alone is refused (it reads
+/// like a misspelt plain string, and the plain string is the form for "no refinement").
 ///
-/// This is what makes a repeated emission with the same key a no-op instead of a second event —
-/// `outbox::insert_op` turns it into the exact `ON CONFLICT (id) DO NOTHING` shape
-/// `outbox::insert_core_event_once` already uses for a core-ingested event
-/// (`"wa-<wa_message_id>"`). It is the outbox idempotency-key pattern (Stripe's
-/// `Idempotency-Key`, Kafka's keyed dedup): the key is evaluated against the request, and a
-/// repeat within the store's own uniqueness window is absorbed, never rejected — the shape a
-/// webhook redelivery or an outbox-relay retry needs, which `min_affected_rows`/`expect_rows`
-/// cannot give (both roll back the whole transaction and hand the caller an error).
+/// - `dedup_key` (hub#1076): the name of a field in the command's bound payload
+///   (`context.payload` plus what `system_params` injects — same source a `:name` bind reads
+///   from) whose value derives the outbox row's id. A repeated emission with the same key is a
+///   no-op instead of a second event — `outbox::insert_op` turns it into the exact
+///   `ON CONFLICT (id) DO NOTHING` shape `outbox::insert_core_event_once` already uses for a
+///   core-ingested event (`"wa-<wa_message_id>"`). It is the outbox idempotency-key pattern
+///   (Stripe's `Idempotency-Key`, Kafka's keyed dedup): the key is evaluated against the
+///   request, and a repeat within the store's own uniqueness window is absorbed, never rejected.
+/// - `when_rows` (hub#2612): one of the command's own `sql` paths. The event is written only when
+///   THAT statement affected at least one row, decided inside the same transaction. Zero rows is
+///   the normal "nothing to do" of a periodic sweep: the command still answers `ok` and its other
+///   effects commit — unlike `min_affected_rows`/`expect_rows`, which roll the whole transaction
+///   back and hand the caller an error (in a scheduled task: `next_run` never advances).
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct EmitDedupKey {
+#[serde(try_from = "EmitSpecWire")]
+pub struct EmitSpec {
     pub event: String,
-    pub dedup_key: String,
+    pub dedup_key: Option<String>,
+    pub when_rows: Option<String>,
 }
 
-/// One entry of a command's `emit` list (hub#1076).
+/// What the object form looks like on the wire, before [`EmitSpec`] checks it refines something.
+#[derive(serde::Deserialize)]
+struct EmitSpecWire {
+    event: String,
+    #[serde(default)]
+    dedup_key: Option<String>,
+    #[serde(default)]
+    when_rows: Option<String>,
+}
+
+impl TryFrom<EmitSpecWire> for EmitSpec {
+    type Error = String;
+
+    fn try_from(wire: EmitSpecWire) -> std::result::Result<Self, Self::Error> {
+        if wire.dedup_key.is_none() && wire.when_rows.is_none() {
+            return Err(format!(
+                "emit entry `{}` is an object without `dedup_key` nor `when_rows`; \
+                 write the plain event name instead",
+                wire.event
+            ));
+        }
+        Ok(EmitSpec {
+            event: wire.event,
+            dedup_key: wire.dedup_key,
+            when_rows: wire.when_rows,
+        })
+    }
+}
+
+/// One entry of a command's `emit` list (hub#1076, hub#2612).
 ///
 /// Two wire shapes, kept wire-compatible with every published module:
 /// - a plain string (`"sale.completed"`) — the legacy, always-emits-by-execution behaviour;
-/// - an object naming `dedup_key` (`{"event": "...", "dedup_key": "wa_message_id"}`) — opt-in,
-///   see [`EmitDedupKey`].
+/// - an object (`{"event": "...", "dedup_key": "wa_message_id"}`,
+///   `{"event": "...", "when_rows": "commands/expire.sql"}`) — opt-in, see [`EmitSpec`].
 ///
 /// A manifest that only ever wrote `emit: ["a.b"]` deserialises exactly as it always has: the
-/// field is additive, never a behaviour change for a module that has not adopted it.
+/// fields are additive, never a behaviour change for a module that has not adopted them.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(untagged)]
 pub enum EmitDef {
     Name(String),
-    Keyed(EmitDedupKey),
+    Spec(EmitSpec),
 }
 
 impl EmitDef {
@@ -1080,7 +1116,7 @@ impl EmitDef {
     pub fn event(&self) -> &str {
         match self {
             EmitDef::Name(name) => name,
-            EmitDef::Keyed(k) => &k.event,
+            EmitDef::Spec(s) => &s.event,
         }
     }
 
@@ -1088,7 +1124,16 @@ impl EmitDef {
     pub fn dedup_key(&self) -> Option<&str> {
         match self {
             EmitDef::Name(_) => None,
-            EmitDef::Keyed(k) => Some(&k.dedup_key),
+            EmitDef::Spec(s) => s.dedup_key.as_deref(),
+        }
+    }
+
+    /// The `sql` path of the statement whose affected rows gate this event, if it declared one
+    /// (hub#2612). `None` = written once per execution, as always.
+    pub fn when_rows(&self) -> Option<&str> {
+        match self {
+            EmitDef::Name(_) => None,
+            EmitDef::Spec(s) => s.when_rows.as_deref(),
         }
     }
 }

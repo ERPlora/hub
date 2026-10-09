@@ -220,4 +220,57 @@ grep -qE '^HUB_CLOUD_API_URL=http://127\.0\.0\.1:[0-9]+$' "$apply_log" \
     || fail "N must be booted with the same explicit loopback HUB_CLOUD_API_URL, got: $(cat "$apply_log")"
 passed=$((passed + 1))
 
+# ── Case 7: the workflow runs on the PR that changes N's schema (hub#2705, pm#655 J3) ────────
+# hub#1282 kept this job off `pull_request` because the single self-hosted runner was the
+# fleet's ceiling. On GitHub's runners that reason is gone: a schema change that breaks N-1
+# is found on its own PR, not the morning after the merge. What must hold with it: no drafts,
+# a red PR never opens the nightly's alert issue, and runs are grouped per ref — the repo-wide
+# group only guarded a host port shared by the self-hosted slots, and on PRs it would let one
+# PR cancel another's run and the nightly.
+workflow="$script_dir/../../.github/workflows/n-minus-one.yml"
+python3 -c 'import yaml' 2>/dev/null || fail "python3 with PyYAML is required to read $workflow"
+wf_gaps=$(WORKFLOW="$workflow" python3 - <<'PY'
+import os
+import yaml
+
+doc = yaml.safe_load(open(os.environ["WORKFLOW"], encoding="utf-8"))
+on = doc.get("on", doc.get(True)) or {}
+gaps = []
+pr = on.get("pull_request")
+if not isinstance(pr, dict):
+    gaps.append("no `on.pull_request`")
+    pr = {}
+if "ready_for_review" not in (pr.get("types") or []):
+    gaps.append("`pull_request.types` lacks `ready_for_review`")
+paths = pr.get("paths") or []
+for wanted in (
+    "crates/runtime/src/**",
+    "crates/db/**",
+    "crates/server/src/**",
+    "crates/plugins/**",
+    "scripts/ci/n-minus-one.sh",
+    "scripts/tests/n-minus-one.test.sh",
+    ".github/workflows/n-minus-one.yml",
+):
+    if wanted not in paths:
+        gaps.append(f"`pull_request.paths` lacks `{wanted}`")
+if "schedule" not in on:
+    gaps.append("the nightly `schedule` is gone")
+job = (doc.get("jobs") or {}).get("n-minus-one") or {}
+if str(job.get("if", "")).strip() != "github.event_name != 'pull_request' || !github.event.pull_request.draft":
+    gaps.append(f"the job does not skip drafts (if: {job.get('if')!r})")
+alert = [s for s in job.get("steps") or [] if s.get("name") == "Open or refresh the alert issue"]
+if not alert or "github.event_name != 'pull_request'" not in str(alert[0].get("if", "")):
+    gaps.append("a red PR would open the nightly's alert issue")
+conc = doc.get("concurrency") or {}
+if "github.ref" not in str(conc.get("group", "")):
+    gaps.append(f"the concurrency group is repo-wide ({conc.get('group')!r})")
+if str(conc.get("cancel-in-progress")).strip() != "${{ github.event_name == 'pull_request' }}":
+    gaps.append(f"cancel-in-progress is {conc.get('cancel-in-progress')!r}, not PR-only")
+print("; ".join(gaps))
+PY
+) || fail "could not read $workflow"
+[ -z "$wf_gaps" ] || fail "n-minus-one.yml does not run on the PR that changes N's schema (hub#2705): $wf_gaps"
+passed=$((passed + 1))
+
 echo "OK — n-minus-one.sh: $passed cases passed"

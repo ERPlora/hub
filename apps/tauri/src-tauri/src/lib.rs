@@ -21,6 +21,10 @@ use serde::Serialize;
 /// What the window shows when the network dies under it (hub#1716).
 mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
+/// Only the linked hub drives the device (hub#2504).
+mod hub_link;
+/// A link to another hub waits for the person's word (hub#2644).
+mod link_consent;
 mod navigation;
 mod notice_tap;
 pub use navigation::{NavigationVerdict, navigation_verdict};
@@ -740,6 +744,55 @@ fn initial_url_for(
     onboarding_url(saas_base)
 }
 
+/// Which pages may choose a hub (the entries of [`hub_link::HubLink`]) and which hub the window
+/// starts linked to, by the precedence of [`initial_url_for`] (hub#2504).
+///
+/// The development override is an entry (it may boot at a local SaaS that chooses the hub) and is
+/// linked only when it is a hub of ours that is not the SaaS itself (a local PWA).
+fn boot_link(
+    override_url: Option<&str>,
+    persisted: Option<&str>,
+    saas_base: &str,
+) -> (Vec<String>, Option<String>) {
+    let origin = |raw: &str| raw.parse::<tauri::Url>().ok().map(|u| u.origin().ascii_serialization());
+    let hub = |raw: &str| raw.parse::<tauri::Url>().ok().as_ref().and_then(trusted_hub_origin);
+    let saas = origin(saas_base);
+    let mut entries: Vec<String> = saas.iter().cloned().collect();
+    if let Some(dev) = override_url.and_then(origin) {
+        if !entries.contains(&dev) {
+            entries.push(dev);
+        }
+    }
+    let linked = match override_url {
+        Some(dev) => hub(dev).filter(|dev| Some(dev) != saas.as_ref()),
+        None => persisted.map(str::to_string),
+    };
+    (entries, linked)
+}
+
+/// What a cold start does with the link it was launched by (hub#2644).
+#[derive(Debug, PartialEq, Eq)]
+enum ColdStartLink {
+    /// Launched without one.
+    None,
+    /// A link to the hub the device is linked to: the window boots on it, as it always did.
+    Open(String),
+    /// A link to any other hub: the window boots where it would without a link, and the person is
+    /// asked ([`open_hub_from_link`]) before anything is linked.
+    Ask(String),
+}
+
+fn cold_start_link(deep_link: Option<&str>, linked: Option<&str>) -> ColdStartLink {
+    let Some(target) = deep_link else {
+        return ColdStartLink::None;
+    };
+    let hub = target.parse::<tauri::Url>().ok().as_ref().and_then(trusted_hub_origin);
+    match hub {
+        Some(hub) if linked == Some(hub.as_str()) => ColdStartLink::Open(target.to_string()),
+        _ => ColdStartLink::Ask(target.to_string()),
+    }
+}
+
 /// Where the window goes after forgetting the hub (hub#447).
 ///
 /// Two callers, two intents. The 410 path (`choose = false`) keeps the plain onboarding: the hub
@@ -769,6 +822,7 @@ fn forget_hub(app: tauri::AppHandle, choose: Option<bool>) -> Result<(), ShellEr
         .app_data_dir()
         .map_err(|e| ShellError::Io(e.to_string()))?;
     clear_hub_url(&cache_dir);
+    forget_linked_hub(&app);
     if let Some(window) = app.get_webview_window("main") {
         if let Ok(url) =
             forget_destination(&saas_base_url(), choose.unwrap_or(false)).parse::<tauri::Url>()
@@ -998,12 +1052,71 @@ fn spawn_hub_liveness_check(app: tauri::AppHandle, cache_dir: PathBuf, origin: S
 
         log::info!("shell: el hub recordado ({origin}) ya no existe ({probe:?}); vuelvo al onboarding");
         clear_hub_url(&cache_dir);
+        forget_linked_hub(&app);
         if let Some(window) = app.get_webview_window("main") {
             if let Ok(url) = onboarding_url(&saas_base_url()).parse::<tauri::Url>() {
                 let _ = window.navigate(url);
             }
         }
     });
+}
+
+/// The device stops answering the hub it was linked to (hub#2504).
+fn forget_linked_hub<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::Manager;
+    if let Some(link) = app.try_state::<hub_link::HubLink>() {
+        link.forget();
+    }
+}
+
+/// A link the system handed the app (ADR-0196 §7).
+///
+/// A link to the linked hub just takes the window there. A link to any other hub would hand it the
+/// printer, the drawer and the card reader and make it the business the app boots on (hub#2504), and
+/// anyone can send one — an email, a web page, a message — so the person in front of the device is
+/// asked first, by the system's own dialog (hub#2644): «Open» links it and goes there, anything else
+/// leaves the device as it was. With nobody to ask, the link is refused, never followed.
+///
+/// `target` comes out of [`resolve_deep_link`], already a hub of ours; it is checked again here so
+/// this function does not lean on its caller for what it links.
+fn open_hub_from_link<R: tauri::Runtime>(app: &tauri::AppHandle<R>, target: &str) {
+    use tauri::Manager;
+    let Some(hub) = target.parse::<tauri::Url>().ok().as_ref().and_then(trusted_hub_origin) else {
+        log::warn!("shell: link ignored, it does not lead to a hub of ours ({target})");
+        return;
+    };
+    let Some(link) = app.try_state::<hub_link::HubLink>() else {
+        log::warn!("shell: link ignored, the device does not know its hub yet ({target})");
+        return;
+    };
+    let linked = link.linked();
+    if linked.as_deref() == Some(hub.as_str()) {
+        navigate_main_window(app, target);
+        return;
+    }
+    let Some(asker) = app.try_state::<link_consent::AskBeforeLinking>() else {
+        log::warn!("shell: link ignored, nobody to ask before linking {hub}");
+        return;
+    };
+    let question = link_consent::Question {
+        to: link_consent::host_of(&hub),
+        from: linked.as_deref().map(link_consent::host_of),
+    };
+    let handle = app.clone();
+    let target = target.to_string();
+    asker.ask(
+        question,
+        Box::new(move |open| {
+            if !open {
+                log::info!("shell: the person kept this device on its business; {hub} was not linked");
+                return;
+            }
+            if let Some(link) = handle.try_state::<hub_link::HubLink>() {
+                link.link(&hub);
+            }
+            navigate_main_window(&handle, &target);
+        }),
+    );
 }
 
 /// Lleva la ventana principal a `url`. Best-effort a propósito: sin ventana (o con una URL que no
@@ -1056,8 +1169,20 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
     // el ejecutable otra vez con la URL como argumento, así que aquí es donde llega. En macOS/iOS/
     // Android llega como evento y lo recoge `on_open_url` (ver `run`).
     let deep_link = deep_link_from_args(std::env::args());
+    // The second gate in front of the commands (hub#2504): only the linked hub drives the device.
+    let (entries, linked) = boot_link(
+        override_url.as_deref(),
+        persisted.as_deref(),
+        &saas_base_url(),
+    );
+    // Only a link to the linked hub boots on it; one to another hub asks first (hub#2644).
+    let cold = cold_start_link(deep_link.as_deref(), linked.as_deref());
+    let opens = match &cold {
+        ColdStartLink::Open(target) => Some(target.clone()),
+        ColdStartLink::None | ColdStartLink::Ask(_) => None,
+    };
     let initial = initial_url_for(
-        deep_link.as_deref(),
+        opens.as_deref(),
         override_url.as_deref(),
         persisted.as_deref(),
         &saas_base_url(),
@@ -1076,10 +1201,10 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
     // de abrir la ventana, no antes: bloquear el arranque de un TPV por una petición de red sería
     // peor que la pantalla que se intenta evitar.
     //
-    // Con deep link NO se comprueba: la ventana está en el hub del ENLACE, no en el recordado, y
-    // este chequeo termina navegando al onboarding — se llevaría por delante justo lo que el
-    // usuario acaba de pedir. El `?shell=1` del enlace ya reemplaza el `hub.url` recordado.
-    if override_url.is_none() && deep_link.is_none() {
+    // Not when the window boots on a link's hub: this check ends up navigating to the onboarding,
+    // and would take away exactly what the person just asked for. A link to ANOTHER hub boots on the
+    // remembered one, so that one is checked as usual while the person is asked (hub#2644).
+    if override_url.is_none() && opens.is_none() {
         if let (Some(dir), Some(origin)) = (cache_dir.clone(), persisted.clone()) {
             spawn_hub_liveness_check(app.handle().clone(), dir, origin);
         }
@@ -1096,6 +1221,11 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
             .parse()
             .map_err(tauri::Error::InvalidUrl)?,
     };
+    let hub_link = hub_link::HubLink::new(entries, Some(&initial_target));
+    if let Some(origin) = linked {
+        hub_link.link(&origin);
+    }
+    app.manage(hub_link);
     let nav_state = Arc::new(ShellNav::new(initial_target));
     app.manage(nav_state.clone());
 
@@ -1107,6 +1237,15 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
         .title("ERPlora")
         .inner_size(1280.0, 800.0)
         .min_inner_size(960.0, 600.0)
+        // The hardware waits for the page to have LOADED (hub#2504): the window's URL flips at the
+        // start of a navigation, while the page that started it still runs until the new one commits.
+        .on_page_load(|window, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                if let Some(link) = window.try_state::<hub_link::HubLink>() {
+                    link.landed(payload.url());
+                }
+            }
+        })
         .on_navigation(move |nav| {
             // hub#1915: the Play copy follows only the SaaS pages that cannot take money. First,
             // so a refused page is neither remembered as the hub nor watched by the guard below.
@@ -1115,7 +1254,9 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
                 refuse_navigation(&refusals, verdict, &saas_base, nav);
                 return false;
             }
-            if let (Some(dir), Some(origin)) = (cache_dir.as_deref(), shell_capture_origin(nav)) {
+            // `?shell=1` links a hub only when the SaaS chose it, or it is the linked one (hub#2504).
+            let captured = refusals.try_state::<hub_link::HubLink>().and_then(|link| link.follow(nav));
+            if let (Some(dir), Some(origin)) = (cache_dir.as_deref(), captured) {
                 if let Ok(mut guard) = last.lock() {
                     if guard.as_deref() != Some(origin.as_str()) {
                         match persist_hub_url(dir, &origin) {
@@ -1137,6 +1278,11 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 
     // From here on, a load that never lands has an answer (hub#1716).
     spawn_connectivity_guard(window, nav_state);
+    // With the window up, a link to another hub gets its question (hub#2644).
+    match cold {
+        ColdStartLink::Ask(target) => open_hub_from_link(app.handle(), &target),
+        ColdStartLink::None | ColdStartLink::Open(_) => {}
+    }
     Ok(())
 }
 
@@ -1648,11 +1794,26 @@ fn usb_send(target: &discovery::UsbTarget, _payload: &[u8]) -> Result<(), Hardwa
     ))
 }
 
-/// ⚠️ `(async)` is load-bearing (ADR-0204): the bluetooth arm crosses into Kotlin through
+/// Sends a document to a network printer and answers with what happened to the paper (hub#2494):
+/// `Ok` once it is on the printer, the unreachable error once the queue's retries ran out. Before,
+/// the answer came on the hand-over to the in-memory queue, so a switched-off printer lost the
+/// ticket with nobody told — the till heard «done», and so did the hub for a job from its queue.
+async fn print_to_network(
+    queue: &PrintQueue,
+    target: discovery::NetworkTarget,
+    payload: Vec<u8>,
+    job_id: Option<String>,
+) -> Result<(), HardwareError> {
+    queue.print(PrintJob { job_id, target, payload, attempts: 0 }).await?;
+    Ok(())
+}
+
+/// ⚠️ `async` is load-bearing (ADR-0204): the bluetooth arm crosses into Kotlin through
 /// `run_mobile_plugin`, which dispatches onto Android's main looper and BLOCKS for the answer — a
-/// plain command runs on that very thread and the till would hang on the press that prints.
-#[tauri::command(async)]
-fn erplora_print(
+/// plain command runs on that very thread and the till would hang on the press that prints. And the
+/// network arm awaits the paper (hub#2494), retries included, which only an async command can do.
+#[tauri::command]
+async fn erplora_print(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
@@ -1669,12 +1830,7 @@ fn erplora_print(
     let payload = escpos::render_document(doc, &data)?;
     match target {
         discovery::PrintTarget::Network(target) => {
-            state.queue.enqueue(PrintJob {
-                job_id,
-                target,
-                payload,
-                attempts: 0,
-            })?;
+            print_to_network(&state.queue, target, payload, job_id).await?;
         }
         discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
         discovery::PrintTarget::Usb(usb) => usb_send(&usb, &payload)?,
@@ -1682,10 +1838,11 @@ fn erplora_print(
     Ok(())
 }
 
-/// `erplora_test_print` — encola una página de prueba en la impresora dada (o la envía por SPP si
-/// la impresora es Bluetooth, ADR-0204). `(async)` por la misma razón que `erplora_print`.
-#[tauri::command(async)]
-fn erplora_test_print(
+/// `erplora_test_print` — prints a test page on the given printer (over SPP when it is Bluetooth,
+/// ADR-0204). `async` for the same reasons as `erplora_print`: «Probar» on a switched-off network
+/// printer now says it did not print (hub#2494).
+#[tauri::command]
+async fn erplora_test_print(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
@@ -1698,12 +1855,7 @@ fn erplora_test_print(
     let payload = escpos::render_test_page(&printer_id, &data);
     match target {
         discovery::PrintTarget::Network(target) => {
-            state.queue.enqueue(PrintJob {
-                job_id: None,
-                target,
-                payload,
-                attempts: 0,
-            })?;
+            print_to_network(&state.queue, target, payload, None).await?;
         }
         discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
         discovery::PrintTarget::Usb(usb) => usb_send(&usb, &payload)?,
@@ -2029,8 +2181,45 @@ fn on_second_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, argv: Vec<Stri
         return;
     }
     if let Some(target) = deep_link_from_args(argv) {
-        navigate_main_window(app, &target);
+        open_hub_from_link(app, &target);
     }
+}
+
+/// Every command the app answers. `run` hands it to Tauri, and the tests drive the same
+/// dispatcher through the IPC.
+fn app_commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
+        device_context,
+        forget_hub,
+        open_external_url,
+        save_download,
+        // The system print dialog for an A4 document (hub#2006).
+        print_document,
+        // The way out when the network dies under the window (hub#1716).
+        shell_retry,
+        // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
+        // Camino de hardware: impresoras de red ESC/POS + cajón → peripherals.
+        erplora_bridge_status,
+        erplora_discover_printers,
+        erplora_get_devices,
+        erplora_print,
+        erplora_test_print,
+        erplora_open_drawer,
+        erplora_set_device_role,
+        erplora_add_network_printer,
+        erplora_set_device_name,
+        erplora_remove_device,
+        erplora_notify,
+        // The tap the page was not there to hear (hub#2360).
+        erplora_take_notice_tap,
+        // La placa por NFC (hub#988): la segunda vía de la MISMA puerta que el lector-teclado.
+        erplora_nfc_read,
+        // «Start on login» (hub#389): desktop-only in effect — on mobile they answer an
+        // error, and the settings toggle never renders there.
+        autostart_is_enabled,
+        autostart_enable,
+        autostart_disable
+    ]
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2062,8 +2251,8 @@ pub fn run() {
                 .state::<PrintDocuments>()
                 .respond(request.uri().path())
         })
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_erplora_android::init())
+        .plugin(hub_link::notification_plugin())
+        .plugin(hub_link::android_plugin())
         // The user's own browser (hub#475). Registered for its RUST api only: no `opener:*`
         // permission is granted to any origin (`tests/remote_acl.rs`), so the page cannot reach the
         // plugin's own commands — which take any address, and two of which open FILES. What the
@@ -2092,7 +2281,7 @@ pub fn run() {
                     return;
                 }
                 match deep_link_from_args(urls) {
-                    Some(target) => navigate_main_window(&handle, &target),
+                    Some(target) => open_hub_from_link(&handle, &target),
                     None => log::warn!("shell: enlace ignorado, no apunta a un hub nuestro"),
                 }
             });
@@ -2128,7 +2317,10 @@ pub fn run() {
             app.manage(PrintDocuments::default());
             // The notice tap the page was not there to hear, until it claims it (hub#2360).
             app.manage(notice_tap::KeptNoticeTap::default());
-            // Ventana única: onboarding del SaaS o el hub capturado (modo app).
+            // Who asks before a link links another hub (hub#2644): before the window, so a cold
+            // start by such a link already has somebody to ask.
+            app.manage(link_consent::native(app.handle().clone()));
+            // Single window: the SaaS onboarding or the captured hub (app mode).
             if let Err(e) = open_main_window(app, cache_dir) {
                 eprintln!("no se pudo crear la ventana principal: {e}");
             }
@@ -2138,38 +2330,7 @@ pub fn run() {
             notice_tap::answer_link(app.handle(), std::env::args());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            device_context,
-            forget_hub,
-            open_external_url,
-            save_download,
-            // The system print dialog for an A4 document (hub#2006).
-            print_document,
-            // The way out when the network dies under the window (hub#1716).
-            shell_retry,
-            // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
-            // Camino de hardware: impresoras de red ESC/POS + cajón → peripherals.
-            erplora_bridge_status,
-            erplora_discover_printers,
-            erplora_get_devices,
-            erplora_print,
-            erplora_test_print,
-            erplora_open_drawer,
-            erplora_set_device_role,
-            erplora_add_network_printer,
-            erplora_set_device_name,
-            erplora_remove_device,
-            erplora_notify,
-            // The tap the page was not there to hear (hub#2360).
-            erplora_take_notice_tap,
-            // La placa por NFC (hub#988): la segunda vía de la MISMA puerta que el lector-teclado.
-            erplora_nfc_read,
-            // «Start on login» (hub#389): desktop-only in effect — on mobile they answer an
-            // error, and the settings toggle never renders there.
-            autostart_is_enabled,
-            autostart_enable,
-            autostart_disable
-        ])
+        .invoke_handler(hub_link::guard(app_commands()))
         .run(tauri::generate_context!())
         .expect("error while running ERPlora shell");
 }
@@ -2179,6 +2340,56 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#2494: a ticket that does not come out is an error for whoever printed it ────────────
+    //
+    // The network arm answered `Ok` as soon as the bytes were in the in-memory queue: with the
+    // printer switched off the till heard nothing and the device draining the hub's queue
+    // confirmed «printed». Now it waits for the paper, retries included.
+
+    #[test]
+    fn a_switched_off_network_printer_is_an_error_for_whoever_printed_hub2494() {
+        let queue = std::sync::Arc::new(PrintQueue::new(RetryPolicy {
+            max_attempts: 1,
+            backoff_ms: 0,
+            connect_timeout_ms: 500,
+            write_timeout_ms: 500,
+        }));
+        let worker = queue.clone();
+        tauri::async_runtime::spawn(async move {
+            let (outcomes, _ignored) = tokio::sync::mpsc::unbounded_channel();
+            worker.run(outcomes).await;
+        });
+        // A port nobody listens on any more: a printer that is off.
+        let port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind a free port");
+            listener.local_addr().expect("its address").port()
+        };
+        let target = discovery::NetworkTarget { host: "127.0.0.1".into(), port };
+
+        let printed = tauri::async_runtime::block_on(print_to_network(
+            &queue,
+            target,
+            b"ticket".to_vec(),
+            Some("sale-1".into()),
+        ));
+
+        let err = printed.expect_err("a ticket that never reached the printer is not printed");
+        assert!(
+            matches!(err, HardwareError::Peripheral(erplora_peripherals::PeripheralError::Unreachable(_))),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn every_network_print_waits_for_the_paper_hub2494() {
+        // `erplora_print` and `erplora_test_print` («Probar») both go through `print_to_network`;
+        // a hand-over that answers on the enqueue is the bug coming back.
+        let source = include_str!("lib.rs");
+        let shell = source.split("\n#[cfg(test)]\nmod tests").next().unwrap_or_default();
+        assert!(!shell.contains("queue.enqueue("), "a network print answers on the hand-over again");
+        assert_eq!(shell.matches("print_to_network(&state.queue").count(), 2, "print and test print");
+    }
 
     // ── hub#2305: the id a tap on a notice comes back with ───────────────────────────────────────
     //
@@ -2233,7 +2444,7 @@ mod tests {
     fn app_with_kept_tap() -> tauri::App<tauri::test::MockRuntime> {
         use tauri::Manager;
         let app = tauri::test::mock_builder()
-            .plugin(tauri_plugin_erplora_android::init())
+            .plugin(hub_link::android_plugin())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .expect("mock app");
         app.manage(notice_tap::KeptNoticeTap::default());
@@ -2621,6 +2832,241 @@ mod tests {
         assert_eq!(
             forget_destination("https://erplora.com", false),
             "https://erplora.com/shell/"
+        );
+    }
+
+    // ── hub#2504: which hub the window starts linked to, and the wiring of the gate ─────────────
+
+    #[test]
+    fn a_fresh_install_starts_linked_to_nothing_and_lets_the_saas_choose() {
+        let (entries, linked) = boot_link(None, None, "https://erplora.com");
+        assert_eq!(entries, vec!["https://erplora.com".to_string()]);
+        assert_eq!(linked, None);
+    }
+
+    #[test]
+    fn the_remembered_hub_is_the_linked_one_at_boot() {
+        let (_, linked) = boot_link(None, Some("https://panaderia.a.erplora.com"), "https://erplora.com");
+        assert_eq!(linked.as_deref(), Some("https://panaderia.a.erplora.com"));
+    }
+
+    // ── hub#2644: a link to another hub waits for the person's word ─────────────────────────────
+
+    #[test]
+    fn a_cold_start_by_a_link_to_another_hub_boots_on_the_linked_one_and_asks() {
+        let (_, linked) = boot_link(None, Some("https://panaderia.a.erplora.com"), "https://erplora.com");
+        assert_eq!(linked.as_deref(), Some("https://panaderia.a.erplora.com"));
+        assert_eq!(
+            cold_start_link(Some("https://otronegocio.a.erplora.com/?shell=1"), linked.as_deref()),
+            ColdStartLink::Ask("https://otronegocio.a.erplora.com/?shell=1".into())
+        );
+    }
+
+    #[test]
+    fn a_cold_start_by_a_link_to_the_linked_hub_boots_on_it_without_asking() {
+        assert_eq!(
+            cold_start_link(
+                Some("https://panaderia.a.erplora.com/?shell=1"),
+                Some("https://panaderia.a.erplora.com")
+            ),
+            ColdStartLink::Open("https://panaderia.a.erplora.com/?shell=1".into())
+        );
+    }
+
+    #[test]
+    fn a_cold_start_by_a_link_on_a_device_linked_to_nothing_asks() {
+        assert_eq!(
+            cold_start_link(Some("https://otronegocio.a.erplora.com/?shell=1"), None),
+            ColdStartLink::Ask("https://otronegocio.a.erplora.com/?shell=1".into())
+        );
+        assert_eq!(cold_start_link(None, Some("https://panaderia.a.erplora.com")), ColdStartLink::None);
+    }
+
+    /// A till as it stands after booting on the bakery it remembers (`boot_link` links it, the
+    /// window shows it), and the person in front of it: `None` is nobody there to ask.
+    fn till_of_the_bakery(
+        linked: Option<&str>,
+        person: Option<bool>,
+    ) -> (tauri::App<tauri::test::MockRuntime>, Arc<std::sync::Mutex<Vec<link_consent::Question>>>) {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        let (entries, _) = boot_link(None, linked, "https://erplora.com");
+        let showing = linked.map(|hub| url(&format!("{hub}/")));
+        let link = hub_link::HubLink::new(entries, showing.as_ref());
+        if let Some(hub) = linked {
+            link.link(hub);
+        }
+        app.manage(link);
+        let start = showing.unwrap_or_else(|| url("https://erplora.com/shell/"));
+        tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::External(start))
+            .build()
+            .expect("mock window");
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        if let Some(open) = person {
+            let heard = asked.clone();
+            app.manage(link_consent::AskBeforeLinking::new(move |question, answer| {
+                heard.lock().expect("questions").push(question);
+                answer(open);
+            }));
+        }
+        (app, asked)
+    }
+
+    fn window_url(app: &tauri::App<tauri::test::MockRuntime>) -> String {
+        use tauri::Manager;
+        app.get_webview_window("main").expect("window").url().expect("url").to_string()
+    }
+
+    fn linked_hub(app: &tauri::App<tauri::test::MockRuntime>) -> Option<String> {
+        use tauri::Manager;
+        app.state::<hub_link::HubLink>().linked()
+    }
+
+    const BAKERY: &str = "https://panaderia.a.erplora.com";
+    const OTHER_LINK: &str = "https://otronegocio.a.erplora.com/?shell=1";
+
+    #[test]
+    fn a_link_to_another_hub_does_not_move_the_till_with_nobody_to_ask() {
+        let (app, _) = till_of_the_bakery(Some(BAKERY), None);
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY), "the printer went to the link's hub");
+        assert_eq!(window_url(&app), "https://panaderia.a.erplora.com/");
+    }
+
+    #[test]
+    fn a_link_to_another_hub_links_it_once_the_person_says_open() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(true));
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(
+            *asked.lock().expect("questions"),
+            vec![link_consent::Question {
+                to: "otronegocio.a.erplora.com".into(),
+                from: Some("panaderia.a.erplora.com".into()),
+            }]
+        );
+        assert_eq!(linked_hub(&app).as_deref(), Some("https://otronegocio.a.erplora.com"));
+        assert_eq!(window_url(&app), OTHER_LINK);
+    }
+
+    #[test]
+    fn cancelling_leaves_the_till_on_its_business() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(false));
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(asked.lock().expect("questions").len(), 1, "nobody was asked");
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY));
+        assert_eq!(window_url(&app), "https://panaderia.a.erplora.com/");
+    }
+
+    #[test]
+    fn a_link_to_the_linked_hub_opens_it_without_asking() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(false));
+        open_hub_from_link(app.handle(), "https://panaderia.a.erplora.com/?shell=1");
+        assert!(asked.lock().expect("questions").is_empty(), "the till asked to open its own hub");
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY));
+        assert_eq!(window_url(&app), "https://panaderia.a.erplora.com/?shell=1");
+    }
+
+    #[test]
+    fn a_link_on_a_till_linked_to_nothing_asks_too() {
+        // A fresh install (or one that just changed business): yes would link the hub AND remember
+        // it for every boot to come, so a link from an email has to ask here as well.
+        let (app, asked) = till_of_the_bakery(None, Some(false));
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(
+            *asked.lock().expect("questions"),
+            vec![link_consent::Question { to: "otronegocio.a.erplora.com".into(), from: None }]
+        );
+        assert_eq!(linked_hub(&app), None);
+        assert_eq!(window_url(&app), "https://erplora.com/shell/");
+    }
+
+    #[test]
+    fn the_development_override_links_a_local_hub_but_not_a_local_saas() {
+        let (entries, linked) =
+            boot_link(Some("http://127.0.0.1:5173/"), None, "https://erplora.com");
+        assert_eq!(linked.as_deref(), Some("http://127.0.0.1:5173"));
+        assert!(entries.contains(&"http://127.0.0.1:5173".to_string()));
+        let (entries, linked) = boot_link(
+            Some("http://127.0.0.1:8001/shell/"),
+            Some("https://panaderia.a.erplora.com"),
+            "http://127.0.0.1:8001",
+        );
+        assert_eq!(linked, None, "the local SaaS became the linked hub");
+        assert_eq!(entries, vec!["http://127.0.0.1:8001".to_string()]);
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_link_handed_over_by_a_second_launch_asks_before_linking_its_hub() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(false));
+        on_second_launch(app.handle(), vec!["ERPlora.exe".into(), "erplora://hub/otronegocio.a.erplora.com".into()]);
+        assert_eq!(asked.lock().expect("questions").len(), 1, "nobody was asked");
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY));
+    }
+
+    #[test]
+    fn forgetting_the_hub_unlinks_it() {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        let link = hub_link::HubLink::new(vec!["https://erplora.com".into()], None);
+        link.link("https://panaderia.a.erplora.com");
+        app.manage(link);
+        forget_linked_hub(app.handle());
+        assert_eq!(app.state::<hub_link::HubLink>().linked(), None);
+    }
+
+    #[test]
+    fn the_app_wires_the_linked_hub_gate() {
+        // The gate and the link are only as good as their call sites: each of these lines going
+        // missing hands the device back to every page under erplora.com.
+        let source = include_str!("lib.rs");
+        let shell = source.split("\n#[cfg(test)]\nmod tests").next().unwrap_or_default();
+        let body_of = |start: &str| shell.split(start).nth(1).unwrap_or_default().split("\n}\n").next().unwrap_or_default();
+        assert!(
+            body_of("pub fn run() {").contains(".invoke_handler(hub_link::guard(app_commands()))"),
+            "run() hands Tauri the commands without the gate"
+        );
+        assert!(
+            body_of("pub fn run() {").contains(".plugin(hub_link::android_plugin())"),
+            "run() registers the Android plugin without the gate (hub#2642)"
+        );
+        assert!(
+            body_of("pub fn run() {").contains(".plugin(hub_link::notification_plugin())")
+                && !shell.contains(".plugin(tauri_plugin_notification::init())"),
+            "run() registers the notification plugin without the gate (hub#2658)"
+        );
+        let window = body_of("fn open_main_window(");
+        assert!(window.contains("app.manage(hub_link)"), "the window opens with no link state");
+        let navigation = window.split(".on_navigation(").nth(1).unwrap_or_default();
+        assert!(navigation.contains(".follow(nav)"), "a navigation links a hub without asking who chose it");
+        assert!(!navigation.contains("shell_capture_origin(nav)"), "a navigation links a hub without asking who chose it");
+        let loaded = window.split(".on_page_load(").nth(1).unwrap_or_default();
+        assert!(
+            loaded.contains("PageLoadEvent::Finished") && loaded.contains(".landed("),
+            "the hardware opens before the hub's page has finished loading: the page that sent the window there may still run"
+        );
+        assert!(body_of("fn forget_hub(").contains("forget_linked_hub(&app)"), "«Change business» keeps the old hub linked");
+        assert!(
+            body_of("fn spawn_hub_liveness_check(").contains("forget_linked_hub(&app)"),
+            "a deleted hub stays linked"
+        );
+        assert!(
+            body_of("pub fn run() {").contains("Some(target) => open_hub_from_link(&handle, &target)"),
+            "a link with the app open navigates without linking its hub"
+        );
+        // hub#2644: the person is asked by the system's own dialog, set up before the window
+        // exists, and a cold start by a link to another hub goes through that same question.
+        let setup = body_of("pub fn run() {").split(".setup(|app| {").nth(1).unwrap_or_default();
+        let asker = setup.find("app.manage(link_consent::native(app.handle().clone()))");
+        let window_opens = setup.find("open_main_window(app, cache_dir)");
+        assert!(
+            matches!((asker, window_opens), (Some(a), Some(w)) if a < w),
+            "a link reaches a till with nobody to ask (asker {asker:?}, window {window_opens:?})"
+        );
+        assert!(window.contains("cold_start_link(deep_link.as_deref(), linked.as_deref())"));
+        assert!(
+            window.contains("ColdStartLink::Ask(target) => open_hub_from_link(app.handle(), &target)"),
+            "a cold start by a link to another hub never asks"
         );
     }
 

@@ -12,7 +12,7 @@
 //
 // Both name the station in the app's language (hub#2257), not in the code's word («kitchen»).
 import type { ComandaPrintFailure } from './print-comanda';
-import { READ_A_SENTENCE_MS, type PrintNotice } from './print-on-sale-notice';
+import { READ_A_SENTENCE_MS, withRetry, type PrintNotice } from './print-on-sale-notice';
 
 /** The slice of the app's catalogue the notice reads: the words that fill its sentence. */
 export interface NoticeWords {
@@ -42,5 +42,38 @@ export function comandaFailureNotice(f: ComandaPrintFailure, words: NoticeWords)
   }
   // hub#2257: the door's reason (`f.error`) is for the log — it told the floor nothing to act on.
   // Its sentence carries the way out, so it stays up as long as the waiting one, not toastError's.
-  return { messageKey: 'print.comandaFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS };
+  // hub#2494: the station's printer did not answer — the notice stays up with its Retry.
+  return withRetry(
+    { messageKey: 'print.comandaFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS },
+    f.retry,
+  );
+}
+
+/**
+ * The VOID slip of a cancelled round did not come out, or is waiting for a printer (kitchen#168).
+ * Same tones as the comanda's, other sentences: the card has just left the kitchen screen, so the
+ * way out is to tell the station out loud that the dish is no longer to be made.
+ */
+export function voidFailureNotice(f: ComandaPrintFailure, words: NoticeWords): PrintNotice {
+  const params = { label: f.label || words.t('print.comandaDefaultLabel'), station: stationName(f.role, words) };
+  // ONE dish voided (hub#2640): «that order is no longer to be made» would stop the whole table.
+  if (f.dish) {
+    const dishParams = { ...params, dish: f.dish };
+    if (f.awaitingHost) {
+      return {
+        messageKey: 'print.voidDishWaitingForPrinter',
+        params: dishParams,
+        color: 'warning',
+        duration: READ_A_SENTENCE_MS,
+      };
+    }
+    return withRetry(
+      { messageKey: 'print.voidDishFailed', params: dishParams, color: 'danger', duration: READ_A_SENTENCE_MS },
+      f.retry,
+    );
+  }
+  if (f.awaitingHost) {
+    return { messageKey: 'print.voidWaitingForPrinter', params, color: 'warning', duration: READ_A_SENTENCE_MS };
+  }
+  return withRetry({ messageKey: 'print.voidFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS }, f.retry);
 }

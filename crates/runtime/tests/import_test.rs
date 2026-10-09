@@ -35,6 +35,14 @@ fn modules_root() -> PathBuf {
     erplora_runtime::e2e_support::modules_root()
 }
 
+/// The RETIRED `invoice_series` module (invoice_series#20, ADR-0369), frozen as a kernel fixture
+/// with only what these tests use. Its repo is archived and private, so the published catalogue the
+/// CI materialises no longer brings it (pm#655) — but hubs that still have it installed keep its
+/// tables, and the kernel still treats them by name (`export::TEMPLATE_EXCLUDED_TABLES`).
+fn invoice_series_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/invoice_series")
+}
+
 fn ctx(hub: &str) -> RequestContext {
     RequestContext::new(hub, "u1", ["*".to_string()])
 }
@@ -56,6 +64,7 @@ async fn fresh() -> Runtime {
 /// the rules started traveling (hub#576) — same correction `blueprint_seed_reglas_no_duplican`
 /// already made for its fixtures.
 async fn fresh_as(hub: &str) -> Runtime {
+    ensure_master_key();
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub); // ctx y runtime comparten hub (como en prod)
     rt.install_from_dir(&modules_root().join("taxes"))
@@ -680,6 +689,7 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
 
     // Destino SIN inventory (solo taxes): la sección de inventory falla con motivo claro,
     // la de taxes se aplica. (Instalar módulos que faltan es del server, no de este motor.)
+    ensure_master_key();
     let db = fresh_db().await;
     let mut b = Runtime::with_hub_id(Box::new(db), "h2");
     b.install_from_dir(&modules_root().join("taxes"))
@@ -1013,9 +1023,10 @@ async fn una_fila_con_la_misma_clave_natural_que_el_destino_no_rompe_la_seccion(
 
 /// Runtime con `invoice_series` instalado sobre un esquema nuevo, bajo `hub`.
 async fn fresh_series(hub: &str) -> Runtime {
+    ensure_master_key();
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub);
-    rt.install_from_dir(&modules_root().join("invoice_series"))
+    rt.install_from_dir(&invoice_series_fixture())
         .await
         .expect("instalar invoice_series");
     rt
@@ -1605,4 +1616,18 @@ async fn a_valid_statement_the_filter_cannot_read_is_never_counted_as_retired() 
         "a live table must never be reported as gone: {:?}",
         inv.status
     );
+}
+
+/// `HUB_SECRETS_KEY` once for this binary, as every production hub has it: a hub's own copy is
+/// only proven by the origin seal derived from it (hub#2497), so a restore of the hub's own backup
+/// needs it at both ends.
+fn ensure_master_key() {
+    use base64::Engine as _;
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let key = base64::engine::general_purpose::STANDARD.encode([0x24u8; 32]);
+        // SAFETY: `Once` runs this before any test reads the variable, and nothing writes it again.
+        unsafe { std::env::set_var("HUB_SECRETS_KEY", key) };
+    });
 }

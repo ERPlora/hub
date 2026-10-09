@@ -280,8 +280,9 @@ impl erplora_db::DatabaseAdapter for BlindToColumnKinds {
         &self,
         ops: &[(String, Params)],
         gates: &[erplora_db::RowGate],
+        conditions: &[erplora_db::OpCondition],
     ) -> Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
-        self.0.execute_tx_gated(ops, gates).await
+        self.0.execute_tx_gated(ops, gates, conditions).await
     }
 
     async fn query(
