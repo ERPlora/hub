@@ -29,6 +29,8 @@ capability_denied_listener_e2e
 dashboard_widgets_e2e
 emit_schema_contract_hub1076
 erasure_owner_gate_hub2485
+erasure_whatsapp_history_hub2477                 # el borrado sigue ficha → conversación → mensaje
+                                                 # por las filas de whatsapp_inbox (hub#2477, hub#2474)
 export_test
 fixture_quantities_match_the_published_grid
 import_no_duplica_lo_sembrado

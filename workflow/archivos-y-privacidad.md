@@ -58,31 +58,32 @@ Implicados: VERIFACTU-F15
 QA: ninguno
 
 ### HUB-F248 Borrar los datos de una persona: el aviso único
-Estado: parcial — el aviso lo emite Clientes y solo lo escuchan WhatsApp, Servicios y el hub; Citas, Reservas y Reservas online no; el motivo escrito por el administrador queda en el propio aviso durante 90 días
+Estado: parcial — Reservas online no escucha el aviso (pm#637); el motivo escrito por el administrador queda en el propio aviso durante 90 días
 Actor: administrador, sistema
 Pantalla: CUSTOMERS: Ficha de cliente
 Pasos:
 1. El administrador pulsa **Borrar datos personales** en la ficha (flujo de Clientes).
 2. Clientes sustituye los datos de la ficha y publica `customer.anonymized`.
 3. El hub entrega ese aviso a quien lo escucha y vacía su propio historial (HUB-F249).
-Entra: el aviso `<sujeto>.anonymized` con su `<sujeto>_id` (de Clientes: `customer_id` y `reason`, hasta 500 caracteres).
-Sale: el contrato es solo un nombre: el hub reconoce cualquier evento que acabe en `.anonymized` con el identificador del sujeto como cadena y no nombra a ningún módulo. Cada módulo que guarda algo de la persona se suscribe a ese aviso y borra lo suyo (HUB-F250); lo que no lo hace, se queda. Es idempotente: repetirlo no cambia nada. Solo vacía el historial la app **dueña** del dato (hub#2485): el identificador tiene que tener la forma de los que genera el hub y ser una fila de una tabla de la app que emite el aviso, en este negocio. Una app que nombra a una persona que no es suya, el núcleo o una app no instalada no vacían nada.
+Entra: el aviso `<sujeto>.anonymized` con su `<sujeto>_id` (de Clientes: `customer_id` y `reason`, hasta 500 caracteres; de la bandeja de WhatsApp, al borrar un número sin ficha: `whatsapp_inbox.conversation.anonymized` con `conversation_id`, HUB-F251).
+Sale: el contrato es solo un nombre: el hub reconoce cualquier evento que acabe en `.anonymized` con el identificador del sujeto como cadena y no nombra a ningún módulo. Cada módulo que guarda algo de la persona se suscribe a ese aviso y borra lo suyo (HUB-F250); lo que no lo hace, se queda. Suscribirse es también lo que deja al hub seguir el aviso por las filas de esa app hasta las copias de su historial que no repiten el identificador (HUB-F249). Es idempotente: repetirlo no cambia nada. Solo vacía el historial la app **dueña** del dato (hub#2485): el identificador tiene que tener la forma de los que genera el hub y ser una fila de una tabla de la app que emite el aviso, en este negocio. Una app que nombra a una persona que no es suya, el núcleo o una app no instalada no vacían nada.
 Si falla: si el identificador no es uno que genera el hub (`erasure.invalid_subject_id`) o no es de la app que emite (`erasure.subject_not_owned`), el hub no vacía nada de su historial y el aviso no queda como entregado: se reintenta y acaba en «Eventos caídos» con ese código, donde lo ve una persona. Las apps suscritas al aviso sí lo reciben, una vez cada una: la puerta protege el historial del hub, no la entrega. Si el vaciado del hub falla, el aviso se difiere y se reintenta con espera creciente hasta 8 veces; después queda atascado (dead-letter) hasta que alguien lo reintente. El identificador se busca como cadena entre comillas en cualquier punto del contenido, claves incluidas.
 Implicados: CUSTOMERS-F16
 QA: L-10, WA-06 (discrepa)
 
 ### HUB-F249 Vaciar el historial del hub que nombra a la persona
-Estado: parcial — no repasa lo que estaba en curso al borrar y acaba después (hub#2484), ni las copias que llevan el dato sin el identificador (hub#2477, hub#2474), ni el propio aviso de borrado
+Estado: parcial — no repasa lo que estaba en curso al borrar y acaba después (hub#2484), ni el propio aviso de borrado
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. El hub entrega un aviso `<sujeto>.anonymized`.
-2. En una sola sentencia vacía (`{}`) lo terminal que nombra ese identificador.
-3. Registra cuántas filas vació.
+2. Busca los identificadores que la nombran: el del aviso y, siguiendo las filas de la app que lo emite y de las que lo escuchan, las de lo que guardan de ella (su conversación de WhatsApp, y de ahí sus mensajes).
+3. En una sola sentencia vacía (`{}`) lo terminal que nombra alguno de esos identificadores.
+4. Registra cuántas filas vació.
 Entra: el identificador y el hub.
-Sale: se vacían, sin borrar la fila: los avisos entregados o descartados cuyo contenido tiene el identificador como valor; las ejecuciones terminadas (hechas, fallidas, canceladas) que lo tocan en entrada, variables, paso o propuesta, o que nacieron de un aviso así; todos los pasos y propuestas de esas ejecuciones; y los avisos que esas ejecuciones encolaron (un recordatorio lleva el teléfono sin el identificador). No se tocan los avisos pendientes o atascados ni las ejecuciones vivas: conservan los datos hasta procesarse o hasta la retención de 90 días (HUB-F253). Se conserva la fila porque es el rastro de la trazabilidad. Solo este hub; reentrega sin efecto. Coste: un barrido de todo `_event_outbox` del hub y de las ejecuciones terminales por cada borrado. No toca la cola de impresión ni los localizadores públicos (`_public_claim`).
+Sale: los identificadores se siguen por columnas `<sujeto>_id` (del aviso) y después `<entidad>_id` de la misma tabla de origen o de otra app que presta sus filas (la emisora y las suscritas al aviso), hasta 3 saltos, solo en este hub; una app que guarda un `customer_id` pero no escucha el aviso no presta nada. Se vacían, sin borrar la fila: los avisos entregados o descartados cuyo contenido tiene alguno de esos identificadores como valor; el mensaje de WhatsApp tal como entró en el hub (el aviso del núcleo, sin app ni causa, con número y texto) que causó uno de esos avisos, sus copias completadas (`<id>~<huella>`) y todo lo que desciende de él (lo que la bandeja guardó, lo que reaccionó); las ejecuciones terminadas (hechas, fallidas, canceladas) que lo tocan en entrada, variables, paso o propuesta, o que nacieron de un aviso así; todos los pasos y propuestas de esas ejecuciones; y los avisos que esas ejecuciones encolaron (un recordatorio lleva el teléfono sin el identificador). No se tocan los avisos pendientes o atascados ni las ejecuciones vivas: conservan los datos hasta procesarse o hasta la retención de 90 días (HUB-F253). Se conserva la fila porque es el rastro de la trazabilidad. Solo este hub; reentrega sin efecto. Coste: un barrido de todo `_event_outbox` del hub y de las ejecuciones terminales por cada borrado, más una consulta por tabla enlazada y salto. No toca la cola de impresión ni los localizadores públicos (`_public_claim`).
 Si falla: error de base de datos; el aviso queda sin entregar y el reintento lo completa; nada queda medio vaciado.
-Implicados: CUSTOMERS-F16, WHATSAPP_INBOX-F11
+Implicados: CUSTOMERS-F16, WHATSAPP_INBOX-F10, WHATSAPP_INBOX-F11
 QA: L-10
 
 ### HUB-F250 Lo que le toca a cada app al recibir el aviso de borrado
@@ -99,16 +100,17 @@ Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11
 QA: L-10, WA-06 (discrepa)
 
 ### HUB-F251 Borrar los datos de un número sin ficha
-Estado: no hecho — la bandeja de WhatsApp borra sus conversaciones pero no emite ningún aviso `.anonymized` con un identificador que el hub pueda buscar: los mensajes y su número siguen 90 días en el historial del hub (hub#2474, hub#2477)
+Estado: hecho
 Actor: administrador
 Pantalla: WHATSAPP_INBOX: Bandeja de entrada
 Pasos:
 1. El administrador pulsa **Borrar datos de este número** en una conversación.
 2. La app borra lo suyo.
-3. Debería avisar al hub para vaciar las copias de los mensajes.
-Entra: el identificador de la conversación o una huella del número.
-Sale: hoy, nada en el hub. `hub.whatsapp.message_received` y `whatsapp_inbox.message.received` guardan número, nombre y texto sin identificador de ficha.
-Si falla: sin confirmar (no existe).
+3. La app publica `whatsapp_inbox.conversation.anonymized` con el identificador de la conversación.
+4. El hub vacía su historial como en HUB-F249: sigue la conversación hasta sus mensajes y vacía las copias de cada uno (el aviso del núcleo con número y texto, el de la bandeja y lo que reaccionó).
+Entra: el identificador de la conversación (nunca el número).
+Sale: lo terminal de esa conversación vaciado en el historial del hub; lo de otros números, intacto. La conversación tiene que ser de la bandeja y de este negocio (HUB-F248).
+Si falla: como HUB-F248: el aviso se reintenta y acaba en «Eventos caídos» si el vaciado no se completa.
 Implicados: WHATSAPP_INBOX-F10
 QA: L-11, WA-06 (discrepa)
 
