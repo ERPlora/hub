@@ -458,10 +458,21 @@
                     <span class="event-row__module" v-if="ev.module_id">{{ ev.module_id }}</span>
                     <span class="event-row__when">{{ formatWhen(ev.created_at) }}</span>
                   </div>
-                  <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
-                  <!-- hub#827: una fila que NO se puede reintentar dice qué sí ayuda, en vez de
-                       ofrecer un botón que vuelve a `pending` y muere igual. -->
-                  <div class="events-hint" v-if="!ev.retryable">{{ t('system.deadEventNotRetryable') }}</div>
+                  <!-- hub#2723: a WhatsApp WhatsApp refused, or accepted and did not deliver, says
+                       so and why in the owner's words; the raw error stays below for support. -->
+                  <template v-if="whatsappFailure(ev.failure_kind)">
+                    <div class="event-row__reason">
+                      {{ t(whatsappFailure(ev.failure_kind)!.stageKey, { reason: t(whatsappFailure(ev.failure_kind)!.reasonKey) }) }}
+                    </div>
+                    <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
+                    <div class="events-hint">{{ t(whatsappFailure(ev.failure_kind)!.hintKey) }}</div>
+                  </template>
+                  <template v-else>
+                    <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
+                    <!-- hub#827: a row that CANNOT be retried says what does help, instead of
+                         offering a button that puts it back to `pending` to die the same way. -->
+                    <div class="events-hint" v-if="!ev.retryable">{{ t('system.deadEventNotRetryable') }}</div>
+                  </template>
                 </div>
                 <div class="event-row__actions">
                   <ion-button
@@ -589,6 +600,7 @@ import {
   retryDeadLetter,
   retryAllDeadLetters,
   discardDeadLetter,
+  whatsappFailure,
   refreshDeadLetterCount,
   type DeadEvent,
 } from '../lib/dead-letter';
@@ -1602,6 +1614,12 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* hub#2723: the owner-facing reason wraps — it is a sentence, unlike the raw error below it. */
+.event-row__reason {
+  font-size: 0.9em;
+  color: var(--ion-text-color, #000);
+  white-space: normal;
 }
 .event-row__actions {
   display: flex;

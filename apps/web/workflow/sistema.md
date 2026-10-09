@@ -171,16 +171,17 @@ Implicados: HUB-F166
 QA: ninguno
 
 ### HUB_SHELL-F145 Ver los eventos caídos
-Estado: parcial — quien no administra ve «Todo en orden» sin que nadie haya mirado la cola; la lista enseña solo los 100 más recientes y cada fila no muestra el contenido ni quién lo causó (el hub los da); la fila enseña el nombre interno del evento y el último error sin traducir
+Estado: parcial — quien no administra ve «Todo en orden» sin que nadie haya mirado la cola; la lista enseña solo los 100 más recientes y cada fila no muestra el contenido ni quién lo causó (el hub los da); la fila enseña el nombre interno del evento y el último error sin traducir (salvo en un WhatsApp, que dice qué pasó y por qué)
 Actor: administrador
 Pantalla: Sistema › Eventos caídos
 Pasos:
 1. Un administrador llega desde la fila «Eventos caídos» de la campana (que lleva a `#events`) o pulsando la pestaña **Eventos caídos**.
 2. Mientras carga, un círculo. Con eventos, sale el texto «Arregla la causa (permiso, módulo caído…) y reenvía. El contenido no se edita: si la causa sigue, el evento vuelve a morir aquí.».
 3. Cada fila trae el nombre interno del evento (en código), una insignia «{n}× intentos», el identificador de la app que lo emitió, cuándo ocurrió y el último error tal cual. Si el evento no se puede reenviar, debajo dice «Este no se puede reenviar: la autorización que lo permitía se retiró y el destinatario ya no está en la fila. Vuelve a conceder el permiso y relanza el flujo.» y no lleva el botón de reenviar.
-4. Cada fila lleva a la derecha dos iconos sin texto: reenviar (F146) y descartar (F148). Encima, **Reenviar todos** (F147).
-5. Sin eventos: «Todo en orden — No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde.».
-6. Un perfil que no es dueño ni administrador no pide la cola (el hub se la negaría) y la pestaña le sale como si estuviera vacía.
+4. Un WhatsApp que no llegó (HUB-F266) dice además, encima del error, qué pasó y por qué, en el idioma del negocio: «WhatsApp rechazó este mensaje: {motivo}» y debajo «No llegó a enviarse. Arregla la causa y reenvíalo.», o «WhatsApp aceptó este mensaje pero no lo entregó: {motivo}» y debajo «Reenviarlo no lo volvería a mandar: WhatsApp ya lo tiene. Avisa al cliente por otra vía, o contéstale desde la conversación cuando te escriba.» (sin botón de reenviar). El motivo es una frase por cada causa que da WhatsApp (por ejemplo, «el cliente no te ha escrito en las últimas 24 horas y, fuera de ese plazo, WhatsApp solo deja mandar una plantilla aprobada.»); una causa que la pantalla no conoce sale como «WhatsApp no dijo por qué.».
+5. Cada fila lleva a la derecha dos iconos sin texto: reenviar (F146) y descartar (F148). Encima, **Reenviar todos** (F147).
+6. Sin eventos: «Todo en orden — No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde.».
+7. Un perfil que no es dueño ni administrador no pide la cola (el hub se la negaría) y la pestaña le sale como si estuviera vacía.
 Entra: la cola de eventos caídos del hub (HUB-F54); solo un dueño o administrador.
 Sale: nada guardado. La lista se carga al entrar en la pestaña y cuando la sesión pasa a ser de administrador; no se refresca sola ni tiene botón de recargar.
 En este mismo documento se apoya en: HUB_SHELL-F60 (Ver en la campana lo que espera atención), HUB_SHELL-F62 (Ver en la campana los avisos entre apps que no se entregaron).

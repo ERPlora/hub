@@ -204,6 +204,15 @@ impl CloudNotifyTransport {
         if status == reqwest::StatusCode::PAYMENT_REQUIRED {
             return Ok(SendOutcome::QuotaExceeded { detail });
         }
+        // Meta refused it on the spot and erplora.com said why (hub#2723, ERPlora/saas#2669):
+        // `{"error": "meta_send_failed", "meta_error": {code, reason, title, detail}}`. An answer,
+        // not a stumble — the relay decides whether that reason is worth the ladder.
+        if let Some(meta_error) = meta_send_failure(&text) {
+            return Ok(SendOutcome::Refused {
+                reason: crate::whatsapp_statuses::meta_reason(&meta_error),
+                detail: crate::whatsapp_statuses::describe_meta_error(&meta_error),
+            });
+        }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
             if quota_spent {
                 return Ok(SendOutcome::QuotaExceeded { detail });
@@ -227,6 +236,22 @@ fn names_quota_exceeded(body: &str) -> bool {
         .ok()
         .and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_owned))
         .is_some_and(|code| code == "quota_exceeded")
+}
+
+/// The `meta_error` of a `meta_send_failed` answer that names a reason (ERPlora/saas#2669); `None`
+/// for any other body, including a bare `meta_send_failed` from an older erplora.com — that one
+/// stays an `Err` on the ladder.
+fn meta_send_failure(body: &str) -> Option<Value> {
+    let body: Value = serde_json::from_str(body).ok()?;
+    if body.get("error").and_then(Value::as_str) != Some("meta_send_failed") {
+        return None;
+    }
+    let meta_error = body.get("meta_error")?;
+    meta_error
+        .get("reason")
+        .and_then(Value::as_str)
+        .filter(|r| !r.trim().is_empty())?;
+    Some(meta_error.clone())
 }
 
 /// `Retry-After` in seconds. It may also be an HTTP date; DRF always sends seconds, and a date or
@@ -1187,6 +1212,35 @@ mod tests {
                 ),
                 other => panic!("{status} must be QuotaExceeded, got {other:?}"),
             }
+        }
+    }
+
+    /// Meta refused in the act and erplora.com said why (ERPlora/saas#2669): the reason comes
+    /// back as an answer, so the relay can tell the refusal the eighth attempt would repeat
+    /// (hub#2723) from a stumble. Meta's code reaches the dead-letter.
+    #[tokio::test]
+    async fn a_refusal_meta_explains_comes_back_with_its_reason_hub2723() {
+        let cloud = fake_cloud(
+            StatusCode::BAD_GATEWAY,
+            json!({"error": "meta_send_failed", "meta_error": {
+                "code": 131047, "reason": "outside_window",
+                "title": "Re-engagement message", "detail": "More than 24 hours."}}),
+        )
+        .await;
+        let outcome = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
+                Routing::CloudProxy,
+                "ev-1",
+            )
+            .await
+            .expect("a refusal with its reason is an answer");
+        match outcome {
+            SendOutcome::Refused { reason, detail } => {
+                assert_eq!(reason, "outside_window");
+                assert!(detail.contains("131047"), "{detail}");
+            }
+            other => panic!("expected Refused, got {other:?}"),
         }
     }
 

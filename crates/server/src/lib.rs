@@ -110,6 +110,8 @@ pub mod whatsapp_quota;
 pub mod whatsapp_templates;
 pub mod whatsapp_header_samples;
 pub mod whatsapp_media;
+/// What became of the WhatsApp this hub sent: Meta's delivery statuses (hub#2723).
+pub mod whatsapp_statuses;
 
 pub use state::{
     cloud_client, marketplace_client, AppState, AuthMode, HubConfig, HubId, MachineToken,

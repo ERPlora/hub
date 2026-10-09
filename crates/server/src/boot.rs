@@ -848,6 +848,42 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // **WhatsApp delivery statuses** (hub#2723): Meta accepts a send and its fate arrives later
+    // (`delivered`, `read`, `failed`). The hub collects them from the SaaS the way it collects the
+    // inbox, behind the same gate (no request leaves without `whatsapp_inbox` active and an
+    // entitlement) and on its own 30 s tick: a failed send lands in «Eventos caídos» with its reason.
+    {
+        let status_state = state.clone();
+        let poller = crate::whatsapp_statuses::StatusPoller::new(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+        );
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(
+                crate::whatsapp_statuses::DEFAULT_INTERVAL_SECS,
+            ));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tick.tick().await;
+                match poller
+                    .poll_once(&status_state.runtime, &status_state.entitlement)
+                    .await
+                {
+                    Ok(report) if report.recorded > 0 => tracing::info!(
+                        recorded = report.recorded,
+                        acked = report.acked,
+                        "whatsapp statuses: sends WhatsApp did not deliver are now in «Eventos caídos»"
+                    ),
+                    Ok(_) => {}
+                    // Not fatal: the statuses stay pending on the SaaS and the next tick reads them.
+                    Err(e) => tracing::warn!("whatsapp statuses: {e}"),
+                }
+            }
+        });
+    }
+
     // Job de **revalidación híbrida del entitlement** (crate::entitlement): refresca el token
     // firmado del Cloud cada `HUB_ENTITLEMENT_REVALIDATE_SECS` (default 24h) con la credencial
     // de máquina y actualiza el estado que leen el gate de query/command y `/api/entitlement`.
