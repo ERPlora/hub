@@ -1858,8 +1858,9 @@ mod tests {
     /// for the rows reached through the inbox too.
     /// Tenancy of the reach: another hub's rows and events are never followed, not even when
     /// they point at this hub's ids. Another hub's thread names Ana's id; this hub's history names
-    /// that thread's message. And another hub's event descends from Ana's message, with a child of
-    /// its own back in this hub. Neither of this hub's rows is hers.
+    /// that thread's message. Another hub's event descends from Ana's message, with a child of its
+    /// own back in this hub. And another hub's event that names Ana's message was caused by a
+    /// kernel entry of this hub. None of those rows of this hub is hers.
     #[tokio::test]
     async fn another_hubs_rows_and_events_are_not_followed() {
         const CONV_H2: &str = "5f607182-93a4-4e5f-8061-7c8d9e0f1a2b";
@@ -1908,7 +1909,31 @@ mod tests {
             json!({}),
         )
         .await;
-        chained(&db, "x-by-chain", HUB, WHATSAPP, other, done, "x-h2", kept).await;
+        chained(
+            &db,
+            "x-by-chain",
+            HUB,
+            WHATSAPP,
+            other,
+            done,
+            "x-h2",
+            kept.clone(),
+        )
+        .await;
+        let kernel = "hub.whatsapp.message_received";
+        chained(&db, "x-by-cause", HUB, "", kernel, done, "", kept).await;
+        let names_her = json!({"new_id": MSG_ANA});
+        chained(
+            &db,
+            "x-h2-names",
+            OTHER_HUB,
+            WHATSAPP,
+            received,
+            done,
+            "x-by-cause",
+            names_her,
+        )
+        .await;
 
         on_event(
             &db,
@@ -1922,7 +1947,7 @@ mod tests {
         .unwrap();
 
         assert_wa_emptied(&db, "ana-").await;
-        for id in ["x-by-row", "x-by-chain"] {
+        for id in ["x-by-row", "x-by-chain", "x-by-cause"] {
             assert!(event_payload(&db, id).await.contains("not hers"), "{id}");
         }
     }
