@@ -178,3 +178,48 @@ export async function discardDeadLetter(id: string): Promise<void> {
   });
   await unwrap<unknown>(res);
 }
+
+// ── A WhatsApp that did not reach the customer (hub#2723) ────────────────────────────────────
+//
+// The hub stamps `whatsapp.refused.<reason>` when WhatsApp turned the message down on the spot,
+// and `whatsapp.undelivered.<reason>` when it accepted it and failed it later (24 h window, a
+// number without WhatsApp…). The row says which, why, and whether resending helps, in the owner's
+// words; the raw error stays below it for support.
+
+/** The keys a WhatsApp dead-letter reads with. Literal, so the key sweep checks every one. */
+const WHATSAPP_REASON_KEYS: Record<string, string> = {
+  outside_window: 'system.whatsappReasons.outside_window',
+  recipient_unreachable: 'system.whatsappReasons.recipient_unreachable',
+  recipient_opted_out: 'system.whatsappReasons.recipient_opted_out',
+  marketing_limit: 'system.whatsappReasons.marketing_limit',
+  recipient_not_allowed: 'system.whatsappReasons.recipient_not_allowed',
+  payment_issue: 'system.whatsappReasons.payment_issue',
+  unsupported_message: 'system.whatsappReasons.unsupported_message',
+  template_not_found: 'system.whatsappReasons.template_not_found',
+  permission_expired: 'system.whatsappReasons.permission_expired',
+  meta_error: 'system.whatsappReasons.meta_error',
+};
+
+const WHATSAPP_STAGES: Record<string, { stageKey: string; hintKey: string }> = {
+  refused: { stageKey: 'system.whatsappRefused', hintKey: 'system.whatsappRefusedHint' },
+  undelivered: { stageKey: 'system.whatsappUndelivered', hintKey: 'system.whatsappUndeliveredHint' },
+};
+
+/** What a WhatsApp dead-letter says on screen: `stageKey` takes `{ reason }`. */
+export interface WhatsappFailure {
+  stageKey: string;
+  reasonKey: string;
+  hintKey: string;
+}
+
+/** The lines for a WhatsApp dead-letter, or `null` when `failureKind` is not one. */
+export function whatsappFailure(failureKind: string): WhatsappFailure | null {
+  const [channel, stage, ...rest] = failureKind.split('.');
+  const lines = channel === 'whatsapp' ? WHATSAPP_STAGES[stage] : undefined;
+  if (!lines) return null;
+  const reason = rest.join('.');
+  return {
+    ...lines,
+    reasonKey: WHATSAPP_REASON_KEYS[reason] ?? WHATSAPP_REASON_KEYS.meta_error,
+  };
+}

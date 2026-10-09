@@ -848,6 +848,42 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // **Estados de entrega de WhatsApp** (hub#2723): Meta acepta un envío y su suerte llega
+    // después (`delivered`, `read`, `failed`). El hub los recoge del SaaS como recoge la bandeja,
+    // con el mismo gate (sin `whatsapp_inbox` activo y con entitlement no sale ninguna petición) y
+    // su propio tick de 30 s: un envío fallido pasa a «Eventos caídos» con su motivo.
+    {
+        let status_state = state.clone();
+        let poller = crate::whatsapp_statuses::StatusPoller::new(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+        );
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(
+                crate::whatsapp_statuses::DEFAULT_INTERVAL_SECS,
+            ));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tick.tick().await;
+                match poller
+                    .poll_once(&status_state.runtime, &status_state.entitlement)
+                    .await
+                {
+                    Ok(report) if report.recorded > 0 => tracing::info!(
+                        recorded = report.recorded,
+                        acked = report.acked,
+                        "whatsapp statuses: sends WhatsApp did not deliver are now in «Eventos caídos»"
+                    ),
+                    Ok(_) => {}
+                    // Not fatal: the statuses stay pending on the SaaS and the next tick reads them.
+                    Err(e) => tracing::warn!("whatsapp statuses: {e}"),
+                }
+            }
+        });
+    }
+
     // Job de **revalidación híbrida del entitlement** (crate::entitlement): refresca el token
     // firmado del Cloud cada `HUB_ENTITLEMENT_REVALIDATE_SECS` (default 24h) con la credencial
     // de máquina y actualiza el estado que leen el gate de query/command y `/api/entitlement`.

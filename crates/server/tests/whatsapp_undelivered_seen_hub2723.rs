@@ -215,6 +215,8 @@ async fn hub(cloud: &FakeCloud, with_inbox: bool) -> SharedRuntime {
     rt.ensure_system_tables().await.unwrap();
     if with_inbox {
         let dir = scratch_dir("wa-2723");
+        std::fs::create_dir_all(dir.join("sql")).unwrap();
+        std::fs::write(dir.join("sql/remind.sql"), "SELECT 1").unwrap();
         std::fs::write(
             dir.join("module.json"),
             json!({
@@ -224,7 +226,7 @@ async fn hub(cloud: &FakeCloud, with_inbox: bool) -> SharedRuntime {
                     "remind": {
                         "permission": "",
                         "transaction": true,
-                        "sql": ["SELECT 1"],
+                        "sql": ["sql/remind.sql"],
                         "emit": [format!("{MODULE}.reminder.due")],
                     }
                 },

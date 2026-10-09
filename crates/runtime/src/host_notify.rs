@@ -396,6 +396,16 @@ pub enum SendOutcome {
         retry_after_secs: Option<u64>,
         detail: String,
     },
+    /// WhatsApp refused the message on the spot and erplora.com named why (hub#2723,
+    /// ERPlora/saas#2669): `reason` is erplora.com's word for Meta's error code (`outside_window`,
+    /// `recipient_unreachable`… or `meta_error` when it cannot name one) and `detail` carries the
+    /// code and Meta's words. The relay decides whether that reason is one the eighth attempt
+    /// would repeat ([`crate::outbox::whatsapp_refused_kind`]); if not, it climbs the ladder like
+    /// any failure.
+    Refused {
+        reason: String,
+        detail: String,
+    },
 }
 
 /// Transporte de notificación: el cliente real de un canal. **Trait inyectable** para no atar el

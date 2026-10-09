@@ -982,7 +982,7 @@ fn detail(body: &str) -> String {
 
 /// Classify a non-2xx answer: a refused credential (401/403) is its own kind of failure, because
 /// it is the one the poller must stop retrying every tick (hub#733).
-fn rejection(status: reqwest::StatusCode, body: &str) -> PollError {
+pub(crate) fn rejection(status: reqwest::StatusCode, body: &str) -> PollError {
     if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
         PollError::AuthRejected(format!("{status}: {}", detail(body)))
     } else {

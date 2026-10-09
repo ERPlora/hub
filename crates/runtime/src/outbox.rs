@@ -82,7 +82,67 @@ pub const FAILURE_CAPABILITY_DENIED: &str = "module.capability_denied";
 /// code in the queue **and** its retry, so the two questions had to come apart. Retryability is now
 /// derived here, in the one place the screen, [`retry`] and [`retry_all`] all read.
 pub fn is_retryable(failure_kind: &str) -> bool {
-    failure_kind.is_empty() || failure_kind == FAILURE_CAPABILITY_DENIED
+    failure_kind.is_empty()
+        || failure_kind == FAILURE_CAPABILITY_DENIED
+        || WHATSAPP_REASONS
+            .iter()
+            .any(|(_, refused, _)| *refused == failure_kind)
+}
+
+/// **Why WhatsApp did not take a message, and the two stamps that say so** (hub#2723).
+///
+/// `(reason, refused, undelivered)`: the reason erplora.com names from Meta's error code
+/// (ERPlora/saas#2669, `meta_error` when it cannot name a better one), the stamp of a send Meta
+/// refused **on the spot**, and the stamp of one Meta accepted and **failed later**. The two are
+/// different promises to the owner:
+///
+///  - `whatsapp.refused.*` — nothing left the hub: erplora.com forgets the key of a refused send,
+///    so resending sends. Retryable, and swept by [`retry_all`].
+///  - `whatsapp.undelivered.*` — WhatsApp has the message: erplora.com remembers the key of an
+///    accepted send and would answer the old id without sending, so a resend button would lie.
+///    Not retryable; the row is there so the business finds out.
+///
+/// A closed list on purpose: the screen translates each reason, and an unknown one reads as
+/// `meta_error` rather than reaching the owner as a code.
+pub const WHATSAPP_REASONS: [(&str, &str, &str); 10] = [
+    ("outside_window", "whatsapp.refused.outside_window", "whatsapp.undelivered.outside_window"),
+    ("recipient_unreachable", "whatsapp.refused.recipient_unreachable", "whatsapp.undelivered.recipient_unreachable"),
+    ("recipient_opted_out", "whatsapp.refused.recipient_opted_out", "whatsapp.undelivered.recipient_opted_out"),
+    ("marketing_limit", "whatsapp.refused.marketing_limit", "whatsapp.undelivered.marketing_limit"),
+    ("recipient_not_allowed", "whatsapp.refused.recipient_not_allowed", "whatsapp.undelivered.recipient_not_allowed"),
+    ("payment_issue", "whatsapp.refused.payment_issue", "whatsapp.undelivered.payment_issue"),
+    ("unsupported_message", "whatsapp.refused.unsupported_message", "whatsapp.undelivered.unsupported_message"),
+    ("template_not_found", "whatsapp.refused.template_not_found", "whatsapp.undelivered.template_not_found"),
+    ("permission_expired", "whatsapp.refused.permission_expired", "whatsapp.undelivered.permission_expired"),
+    ("meta_error", "whatsapp.refused.meta_error", "whatsapp.undelivered.meta_error"),
+];
+
+/// The reason erplora.com gives when Meta's error names nothing the hub can act on.
+const WHATSAPP_GENERIC_REASON: &str = "meta_error";
+
+/// The stamp of a send Meta refused for `reason`, or `None` when the refusal is not one the
+/// eighth attempt would repeat: an unknown reason, or the generic one (Meta down, a hiccup), keep
+/// the ladder.
+pub fn whatsapp_refused_kind(reason: &str) -> Option<&'static str> {
+    WHATSAPP_REASONS
+        .iter()
+        .find(|(r, _, _)| *r == reason && *r != WHATSAPP_GENERIC_REASON)
+        .map(|(_, refused, _)| *refused)
+}
+
+/// The stamp of a send Meta accepted and failed later for `reason`; an unknown reason is the
+/// generic one, never dropped.
+pub fn whatsapp_undelivered_kind(reason: &str) -> &'static str {
+    WHATSAPP_REASONS
+        .iter()
+        .find(|(r, _, _)| *r == reason)
+        .or_else(|| {
+            WHATSAPP_REASONS
+                .iter()
+                .find(|(r, _, _)| *r == WHATSAPP_GENERIC_REASON)
+        })
+        .map(|(_, _, undelivered)| *undelivered)
+        .unwrap_or("whatsapp.undelivered.meta_error")
 }
 
 /// The key that replaces the recipient in the payload of a row that can never be delivered — the
@@ -412,6 +472,82 @@ pub async fn who_asked(
     Ok(AskedBy {
         flow_id: text("flow_id"),
         step_id: text("step_id"),
+    })
+}
+
+/// What [`record_undelivered`] did with a status Meta reported as `failed` (hub#2723) — and so
+/// whether the caller may acknowledge it to erplora.com.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Undelivered {
+    /// The reminder's row is now a dead-letter with its reason. Acknowledge.
+    Recorded,
+    /// No send of THIS hub carries that id (another hub's, one the owner typed on the phone, or
+    /// the empty id). Nothing to record. Acknowledge.
+    NotOurs,
+    /// The row is already terminal (dead, discarded, or pruned by retention): recorded before, or
+    /// in the operator's hands. Acknowledge.
+    AlreadySettled,
+    /// The send went out but the relay has not settled the row (another listener of the same
+    /// event is still on its ladder). Do NOT acknowledge: the status comes back next tick.
+    NotYetSettled,
+}
+
+/// **A WhatsApp Meta accepted and then failed shows in «Eventos caídos»** (hub#2723).
+///
+/// Meta's id for the message (`wamid`) is paired with the outbox row only in the delivery marker
+/// [`delivery_op_sent`] wrote at send time, so that is where the lookup starts — scoped to
+/// `hub_id`, to the `host.notify` listener and never to the empty id every email delivery writes.
+/// A `delivered` row becomes `dead`, stamped [`whatsapp_undelivered_kind`] with `detail` (Meta's
+/// code and words) as its error. The payload is left whole: who did not get the message is what
+/// the owner needs to see.
+pub async fn record_undelivered(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    wamid: &str,
+    reason: &str,
+    detail: &str,
+) -> Result<Undelivered> {
+    if wamid.is_empty() {
+        return Ok(Undelivered::NotOurs);
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("wamid".into(), json!(wamid));
+    p.insert("listener_command".into(), json!(HOST_NOTIFY_LISTENER));
+    let res = db
+        .query(
+            "SELECT d.event_id, o.status FROM _event_delivery d \
+             LEFT JOIN _event_outbox o ON o.id = d.event_id AND o.hub_id = d.hub_id \
+             WHERE d.hub_id = :hub_id AND d.provider_message_id = :wamid \
+               AND d.provider_message_id <> '' AND d.listener_command = :listener_command",
+            &p,
+        )
+        .await?;
+    let Some(row) = res.rows.first() else {
+        return Ok(Undelivered::NotOurs);
+    };
+    match row["status"].as_str() {
+        Some("delivered") => {}
+        Some("pending") => return Ok(Undelivered::NotYetSettled),
+        _ => return Ok(Undelivered::AlreadySettled),
+    }
+    let mut p = Params::new();
+    p.insert("id".into(), json!(row["event_id"].as_str().unwrap_or_default()));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("err".into(), json!(format!("{HOST_NOTIFY_LISTENER}: {detail}")));
+    p.insert("kind".into(), json!(whatsapp_undelivered_kind(reason)));
+    let updated = db
+        .execute(
+            "UPDATE _event_outbox SET status = 'dead', last_error = :err, failure_kind = :kind, \
+             claim_expires_at = NULL \
+             WHERE id = :id AND hub_id = :hub_id AND status = 'delivered'",
+            &p,
+        )
+        .await?;
+    Ok(if updated.affected > 0 {
+        Undelivered::Recorded
+    } else {
+        Undelivered::AlreadySettled
     })
 }
 
@@ -1006,6 +1142,17 @@ async fn deliver_host_notify(
                 "",
                 RuntimeError::Notify(format!("quota exceeded: {detail}")),
             ));
+        }
+        // WhatsApp refused it on the spot and said why (hub#2723). A reason the eighth attempt
+        // would get again (the 24 h window, a number without WhatsApp, an expired connection…)
+        // dies now, stamped, and stays resendable: erplora.com forgot the key of a refused send,
+        // so a resend does send. A reason that names nothing keeps the ladder.
+        host_notify::SendOutcome::Refused { reason, detail } => {
+            let error = RuntimeError::Notify(format!("WhatsApp refused the message: {detail}"));
+            return Err(match whatsapp_refused_kind(&reason) {
+                Some(kind) => NotifyFailure::dead_now(kind, error),
+                None => error.into(),
+            });
         }
         // The proxy's rate limit, not the quota (hub#2649): it lifts on its own, so the row waits
         // what the proxy asked — no ladder spent, nothing filed in «Eventos caídos».
@@ -1756,7 +1903,11 @@ pub fn clamp_discard_reason(reason: &str) -> String {
 /// A capability refusal (hub#1171) is the opposite case and IS swept: granting the capability is
 /// exactly «the cause has since been fixed».
 pub async fn retry_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u64> {
-    requeue_dead(db, hub_id, &["", FAILURE_CAPABILITY_DENIED]).await
+    // A WhatsApp Meta refused never left the hub, so it is swept too (hub#2723); one it accepted
+    // and failed later is not — resending it would not send it.
+    let mut kinds = vec!["", FAILURE_CAPABILITY_DENIED];
+    kinds.extend(WHATSAPP_REASONS.iter().map(|(_, refused, _)| *refused));
+    requeue_dead(db, hub_id, &kinds).await
 }
 
 /// Puts back every dead-letter of this hub stamped with one of `kinds`, clearing the stamp so a row
@@ -5353,5 +5504,150 @@ mod tests {
             1,
             "…and the reminder reached the customer after the blip"
         );
+    }
+
+    // ── hub#2723: a WhatsApp Meta accepted and then failed ────────────────────────────────────
+
+    /// A reminder the relay already handed to Meta: its outbox row in `status` and, when
+    /// `wamid` is not empty, the delivery marker that pairs it with Meta's id.
+    async fn seed_sent_whatsapp(db: &PgAdapter, hub: &str, id: &str, status: &str, wamid: &str) {
+        let mut payload = reminder_payload("+34600111222");
+        payload.insert("channel".into(), json!("whatsapp"));
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub".into(), json!(hub));
+        p.insert("status".into(), json!(status));
+        p.insert("payload".into(), json!(Json::Object(payload).to_string()));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, payload, status, \
+              attempts, next_attempt_at, last_error, created_at) \
+             VALUES (:id, :hub, '', '[]', 'whatsapp_inbox.reminder.due', 'whatsapp_inbox', \
+                     :payload, :status, 0, :at, '', :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+        if !wamid.is_empty() {
+            let (sql, p) = delivery_op_sent(hub, id, HOST_NOTIFY_LISTENER, wamid, "", "");
+            db.execute(&sql, &p).await.unwrap();
+        }
+    }
+
+    async fn outbox_row(db: &PgAdapter, id: &str) -> Json {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        db.query(
+            "SELECT status, failure_kind, last_error, payload FROM _event_outbox WHERE id = :id",
+            &p,
+        )
+        .await
+        .unwrap()
+        .rows
+        .first()
+        .cloned()
+        .unwrap_or(Json::Null)
+    }
+
+    /// The tenancy proof: a `wamid` belongs to the hub that sent it. Another hub asking about the
+    /// same id is told it is not its own and the first hub's row stays as it was; the hub that
+    /// sent it gets the row dead, classified, with the recipient still on it.
+    #[tokio::test]
+    async fn an_undelivered_whatsapp_is_recorded_only_in_the_hub_that_sent_it_hub2723() {
+        let db = db_for_notify().await;
+        seed_sent_whatsapp(&db, "h1", "ev-a", "delivered", "wamid.A").await;
+
+        let other = record_undelivered(&db, "h2", "wamid.A", "outside_window", "Meta 131047")
+            .await
+            .unwrap();
+        assert_eq!(other, Undelivered::NotOurs);
+        assert_eq!(outbox_row(&db, "ev-a").await["status"], "delivered");
+
+        let own = record_undelivered(&db, "h1", "wamid.A", "outside_window", "Meta 131047")
+            .await
+            .unwrap();
+        assert_eq!(own, Undelivered::Recorded);
+        let row = outbox_row(&db, "ev-a").await;
+        assert_eq!(row["status"], STATUS_DEAD);
+        assert_eq!(row["failure_kind"], "whatsapp.undelivered.outside_window");
+        assert!(row["last_error"].as_str().unwrap().contains("131047"));
+        assert!(
+            row["payload"].as_str().unwrap().contains("+34600111222"),
+            "who did not get it stays on the row: {row}"
+        );
+        assert!(!is_retryable("whatsapp.undelivered.outside_window"));
+
+        let again = record_undelivered(&db, "h1", "wamid.A", "outside_window", "Meta 131047")
+            .await
+            .unwrap();
+        assert_eq!(again, Undelivered::AlreadySettled, "a status served twice is recorded once");
+    }
+
+    /// A row whose send went out but whose OTHER listeners have not settled yet is still the
+    /// relay's: the status waits for the next tick instead of racing it.
+    #[tokio::test]
+    async fn an_undelivered_whatsapp_waits_while_its_row_is_still_pending_hub2723() {
+        let db = db_for_notify().await;
+        seed_sent_whatsapp(&db, "h1", "ev-a", "pending", "wamid.A").await;
+        let got = record_undelivered(&db, "h1", "wamid.A", "outside_window", "Meta 131047")
+            .await
+            .unwrap();
+        assert_eq!(got, Undelivered::NotYetSettled);
+        assert_eq!(outbox_row(&db, "ev-a").await["status"], "pending");
+    }
+
+    /// A reason this hub does not know lands with the generic one, and the empty id — every
+    /// email delivery writes one — never matches anything.
+    #[tokio::test]
+    async fn an_unknown_reason_is_generic_and_the_empty_id_is_nobodys_hub2723() {
+        let db = db_for_notify().await;
+        seed_sent_whatsapp(&db, "h1", "ev-a", "delivered", "wamid.A").await;
+        seed_sent_whatsapp(&db, "h1", "ev-mail", "delivered", "").await;
+        let (sql, p) = delivery_op_sent("h1", "ev-mail", HOST_NOTIFY_LISTENER, "", "", "");
+        db.execute(&sql, &p).await.unwrap();
+
+        assert_eq!(
+            record_undelivered(&db, "h1", "", "outside_window", "x").await.unwrap(),
+            Undelivered::NotOurs
+        );
+        assert_eq!(outbox_row(&db, "ev-mail").await["status"], "delivered");
+        record_undelivered(&db, "h1", "wamid.A", "something_new", "x")
+            .await
+            .unwrap();
+        assert_eq!(
+            outbox_row(&db, "ev-a").await["failure_kind"],
+            "whatsapp.undelivered.meta_error"
+        );
+    }
+
+    /// The two halves of the table: a refusal Meta explained can be resent by hand and by
+    /// «Reenviar todos» (the send never happened); an accepted send that failed later cannot
+    /// (erplora.com would answer the old id without sending).
+    #[tokio::test]
+    async fn refused_whatsapps_are_swept_by_retry_all_and_undelivered_ones_are_not_hub2723() {
+        assert_eq!(
+            whatsapp_refused_kind("outside_window"),
+            Some("whatsapp.refused.outside_window")
+        );
+        assert_eq!(whatsapp_refused_kind("meta_error"), None, "no reason, no shortcut");
+        assert_eq!(whatsapp_refused_kind("something_new"), None);
+        for (reason, refused, undelivered) in WHATSAPP_REASONS {
+            assert!(is_retryable(refused), "{reason}");
+            assert!(!is_retryable(undelivered), "{reason}");
+        }
+
+        let db = db_for_notify().await;
+        seed_sent_whatsapp(&db, "h1", "ev-refused", "pending", "").await;
+        seed_sent_whatsapp(&db, "h1", "ev-undelivered", "pending", "").await;
+        mark_dead_as(&db, "ev-refused", "x", "whatsapp.refused.outside_window")
+            .await
+            .unwrap();
+        mark_dead_as(&db, "ev-undelivered", "x", "whatsapp.undelivered.outside_window")
+            .await
+            .unwrap();
+        assert_eq!(retry_all(&db, "h1").await.unwrap(), 1);
+        assert_eq!(outbox_row(&db, "ev-refused").await["status"], "pending");
+        assert_eq!(outbox_row(&db, "ev-undelivered").await["status"], STATUS_DEAD);
     }
 }
