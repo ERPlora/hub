@@ -95,25 +95,30 @@ Implicados: HUB_SHELL-F19, SAAS_DASHBOARD-F06
 QA: ninguno
 
 ### HUB_APP-F04 Cambiar de negocio
-Estado: parcial — el aviso dice «Este dispositivo cerrará la sesión de este negocio», pero no se cierra nada: quedan en la ventana la sesión del hub (12 h en dispositivo compartido, hasta 30 días en personal), el nombre y el correo de la persona y sus credenciales de erplora.com; el servidor no revoca la sesión; un enlace `erplora://hub/<el anterior>` vuelve a entrar sin pasar por erplora.com con solo contestar «Abrir» (HUB_APP-F03); y en Android sigue encendido el aviso «a la escucha» (leído, sin ejecutar)
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: HUB_SHELL: Barra superior
 Pasos:
 1. Dentro de la aplicación (no en un navegador), pulsa el icono «Cambiar de negocio».
 2. Lee «¿Cambiar de negocio?» y confirma con «Cambiar» (o «Cancelar», o toca fuera: es un no).
-3. La aplicación olvida el negocio recordado y lleva la ventana a la lista de negocios del SaaS
+3. Antes de olvidar nada, la aplicación cierra la sesión de verdad (ERPlora/hub#2503), en este orden: en
+   Android deja de estar a la escucha (HUB_APP-F26), mientras la página aún es el negocio enlazado; el hub
+   revoca la sesión (espera su respuesta hasta 5 s: si no contesta, se sigue igual); y se borran del
+   dispositivo la sesión, el nombre y el correo de la persona y sus credenciales de erplora.com.
+4. Solo entonces olvida el negocio recordado y lleva la ventana a la lista de negocios del SaaS
    (`/shell/?choose=1`), que fuerza la lista aunque solo haya uno.
-4. Elige otro: se recuerda como en HUB_APP-F02.
+5. Elige otro: se recuerda como en HUB_APP-F02. Volver al anterior (con su enlace o desde la lista) pide
+   entrar otra vez, con la cuenta o con el PIN.
 Entra: la confirmación de la persona.
-Sale: el fichero `hub.url` borrado y el negocio desenlazado (ninguna página maneja el hardware hasta elegir
-otro), y nada más (`forget_hub`; `requestChangeHub` no llama a
-`logout()`, `change-hub.ts:44-55`, a diferencia del 410, `main.ts:458-462`). Siguen en el almacenamiento del origen del
-negocio anterior el token de sesión del hub (`session.ts:29,163`), el usuario con nombre y correo
-(`session.ts:24,135`) y los tokens de acceso y refresco de erplora.com (`cloud.ts:101-113`). **Se conserva `device.id`** (ancla de la sesión única por
-dispositivo): reasignar una caja a otro local no obliga a desinstalar (en Android, desinstalar lo
-destruiría).
-Si falla: sin ventana no falla, simplemente no navega. Defecto de seguridad `[SEG]`: ver «Dudas abiertas» y los huecos. Con un solo negocio, sin `?choose=1` el SaaS lo
-volvería a abrir al instante; por eso este camino lo lleva.
+Sale: la sesión revocada en el hub; en el almacenamiento del origen del negocio anterior ya no quedan el token
+de sesión del hub, el usuario con nombre y correo ni los tokens de acceso y refresco de erplora.com
+(`signOutAndForgetHub` en `change-hub.ts`, el mismo camino que el 410 de HUB_APP-F05); la escucha de Android
+apagada; el fichero `hub.url` borrado y el negocio desenlazado (ninguna página maneja el hardware hasta elegir
+otro). **Se conserva `device.id`** (ancla de la sesión única por dispositivo): reasignar una caja a otro
+local no obliga a desinstalar (en Android, desinstalar lo destruiría).
+Si falla: un hub que no contesta a la revocación no retiene a la persona: a los 5 s se sigue (lo local ya está
+borrado y la sesión caduca sola). Sin ventana no falla, simplemente no navega. Con un solo negocio, sin
+`?choose=1` el SaaS lo volvería a abrir al instante; por eso este camino lo lleva.
 Implicados: HUB_SHELL-F16, SAAS_DASHBOARD-F07
 QA: qa-hub-android Fase 1
 
@@ -126,9 +131,10 @@ Pasos:
    aplicación le hace una petición `HEAD` (6 s de plazo).
 2. Si contesta 404 o 410 (el negocio se borró), la aplicación olvida `hub.url`, lo desenlaza y lleva la
    ventana al SaaS. Cualquier otra respuesta —viva, sin sesión, caída— o ningún contacto: lo conserva.
-3. Además, si estando dentro el Cloud contesta 410 «negocio no encontrado», el hub pide olvidar
-   (`forget_hub` sin lista forzada) y cierra la sesión; como `forget_hub` navega toda la ventana, la persona acaba
-   en `/shell/` del SaaS, no en el acceso del hub.
+3. Además, si estando dentro el Cloud contesta 410 «negocio no encontrado», el hub cierra la sesión como en
+   HUB_APP-F04 (escucha de Android apagada, sesión revocada, credenciales borradas) y solo después pide olvidar
+   (`forget_hub` sin lista forzada); como `forget_hub` navega toda la ventana, la persona acaba en `/shell/` del
+   SaaS, no en el acceso del hub (en un navegador, en el acceso del hub).
 Entra: el `hub.url` y la respuesta del negocio.
 Sale: el fichero borrado y la ventana en el SaaS. La asimetría es a propósito: olvidar de más obliga a
 rehacer el alta; olvidar de menos deja una pantalla fea que se arregla sola.

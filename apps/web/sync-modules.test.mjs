@@ -161,4 +161,14 @@ describe('the dev list of modules', () => {
     // marketplace and never reads this list (see the header of sync-modules.mjs).
     expect(MODULES).not.toContain('invoice_series');
   });
+
+  it('does NOT carry `tickets` or `payment_gateways`: both modules were DELETED', () => {
+    // Deleted on 2026-10-09 because nothing used them: neither was ever published to the
+    // marketplace and no other module.json depends on them (`tickets` was a frozen helpdesk whose
+    // name collided with the sales ticket; `payment_gateways` overlapped `payments`). Their repos
+    // and their folders under modules-workspace go away, so a name left here would point the dev
+    // bench at a module that no longer exists.
+    expect(MODULES).not.toContain('tickets');
+    expect(MODULES).not.toContain('payment_gateways');
+  });
 });

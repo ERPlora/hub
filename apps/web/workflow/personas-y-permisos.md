@@ -53,7 +53,7 @@ Pasos:
 3. Puede buscar en «Buscar usuario…», filtrar por rol, estado y fecha de alta, elegir columnas y exportar la tabla a un CSV llamado `personal`.
 4. Un administrador ve además el botón de añadir (HUB_SHELL-F81) y, en cada fila, «Editar» y «Dar de baja». El resto lo ve en solo lectura.
 Entra: la lista de personas y la de roles, pedidas a la vez al hub; la sesión.
-Sale: nada guardado. El correo de la columna «Email» es el de acceso o, si no lo hay, el que la persona escribió en su Mi perfil; con ese correo se da y se quita el acceso en erplora.com (ERPlora/hub#2500). Esa misma lista (identificador, nombre, rol y si está activa) es la que los módulos piden para nombrar a quien atiende o a quien envió una comanda; el correo y la forma de entrar no viajan a ellos (HUB-F158).
+Sale: nada guardado. El correo de la columna «Email» es el de acceso o, si no lo hay, el que la persona escribió en su Mi perfil; solo el de acceso da y quita el acceso en erplora.com: el del perfil se enseña y nada más (ERPlora/hub#2500). Esa misma lista (identificador, nombre, rol y si está activa) es la que los módulos piden para nombrar a quien atiende o a quien envió una comanda; el correo y la forma de entrar no viajan a ellos (HUB-F158).
 Si falla: si falla cualquiera de las dos lecturas, sale «No se pudo cargar el personal» con «El Hub no respondió con la lista de usuarios. Vuelve a intentarlo.» y el botón «Reintentar»; el botón de añadir desaparece hasta que cargue. Una lista realmente vacía dice «Aún no hay nadie más en este Hub.».
 Implicados: HUB-F158, KITCHEN-F10, STAFF-F03
 QA: qa-hub-restaurant §6
@@ -111,12 +111,12 @@ Actor: administrador
 Pantalla: Ficha de usuario
 Pasos:
 1. En **Empleados › Personal**, el administrador pulsa «Editar» en la fila: se abre la **Ficha de usuario** («Editar usuario»).
-2. Cambia lo que haga falta: «Nombre y apellidos», «Email» (en todas las fichas: ponérselo a una persona local la convierte en persona con cuenta e invita a ese correo; con un rol de app, erplora.com lo rechaza y el aviso habla de la dirección, no del rol), «Rol» y la casilla «Usuario activo». Los cambios de PIN y de placa son HUB_SHELL-F85 a F87.
+2. Cambia lo que haga falta: «Nombre y apellidos», «Email» (en todas las fichas: ponérselo a una persona local la convierte en persona con cuenta e invita a ese correo; con un rol de app, erplora.com lo rechaza y el aviso habla de la dirección, no del rol), «Rol» y la casilla «Usuario activo». En la ficha de quien solo entra con PIN, «Email» sale vacío aunque la persona haya escrito uno en su Mi perfil, con la ayuda «Entra solo con PIN. Escribe su email para invitarle con una cuenta de ERPlora: administrar el hub la necesita.», y «Rol» no ofrece «Administrador» hasta que se escribe un email (ERPlora/hub#2500). Los cambios de PIN y de placa son HUB_SHELL-F85 a F87.
 3. Pulsa «Guardar». Solo viaja lo que ha cambiado. Sale «Usuario actualizado.» y vuelve a la lista.
 4. Si hay cambios sin guardar y el administrador pulsa «Cancelar» o sale de la ficha, la pantalla pregunta «Cambios sin guardar» («Si sales ahora perderás los cambios realizados.») con «Seguir editando» y «Descartar cambios».
 Entra: la ficha cargada desde la lista de personas y de roles; los campos que cambian.
 Sale: pide al servidor la edición (HUB-F148). El rol nuevo vale desde la siguiente acción de esa persona.
-Si falla: sin la ficha, «No se pudo abrir el usuario» con «El registro no está disponible o no tienes permiso para consultarlo.» y «Reintentar»; una persona que ya no está en la lista da el mismo aviso que un fallo de carga (la frase «Usuario no encontrado.» se descarta). La ficha del dueño de la cuenta solo la abre él: a otro administrador la tabla le avisa «La ficha del dueño de la cuenta solo la cambia él. Para traspasar el negocio, transfiere la cuenta en ERPlora.» y no abre el formulario (si llegara, «Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»). Quitar el rol de administrador al último, o apagar «Usuario activo» a quien lo es, solo lo rechaza el servidor («No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.»), también cuando lo que se hizo fue degradarlo. Un rechazo por campo sale bajo el campo que lo causó (nombre, email, PIN o placa) y cualquier otro en el banner de arriba. Sin conexión con erplora.com al cambiar rol o email: los avisos «cloud_*» de HUB_SHELL-F82.
+Si falla: sin la ficha, «No se pudo abrir el usuario» con «El registro no está disponible o no tienes permiso para consultarlo.» y «Reintentar»; una persona que ya no está en la lista da el mismo aviso que un fallo de carga (la frase «Usuario no encontrado.» se descarta). La ficha del dueño de la cuenta solo la abre él: a otro administrador la tabla le avisa «La ficha del dueño de la cuenta solo la cambia él. Para traspasar el negocio, transfiere la cuenta en ERPlora.» y no abre el formulario (si llegara, «Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»). Quitar el rol de administrador al último, o apagar «Usuario activo» a quien lo es, solo lo rechaza el servidor («No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.»), también cuando lo que se hizo fue degradarlo o cuando otro administrador degradó a otro en el mismo instante. Si el rol que trae la ficha de quien solo tiene PIN ya era de administrador (de antes de ERPlora/hub#2500), se conserva y la ficha se puede renombrar o bajar de rol; quitarle el email a un administrador que aún no ha entrado con su cuenta lo rechaza el servidor, bajo «Rol»: «Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.». Un rechazo por campo sale bajo el campo que lo causó (nombre, email, rol, PIN o placa) y cualquier otro en el banner de arriba. Sin conexión con erplora.com al cambiar rol o email: los avisos «cloud_*» de HUB_SHELL-F82.
 Implicados: HUB-F148, STAFF-F03
 QA: qa-hub-restaurant §6
 
@@ -170,7 +170,7 @@ Actor: administrador
 Pantalla: Empleados
 Pasos:
 1. En **Empleados › Personal**, el administrador pulsa «Dar de baja» en la fila de la persona.
-2. La pantalla pregunta «Dar de baja»: «Vas a dar de baja a «{name}». Perderá el acceso al Hub, pero su historial se conserva.», con «Cancelar» y «Dar de baja». La pregunta no dice que en erplora.com se quita el acceso del correo que enseña la columna «Email», aunque sea el que la persona escribió en su Mi perfil (ERPlora/hub#2500).
+2. La pantalla pregunta «Dar de baja»: «Vas a dar de baja a «{name}». Perderá el acceso al Hub, pero su historial se conserva.», con «Cancelar» y «Dar de baja». Si la persona solo tiene el correo de su Mi perfil, la baja no toca erplora.com (ERPlora/hub#2500).
 3. Confirma. Sale «Usuario dado de baja.» y la fila pasa a «De baja».
 Entra: la persona; la sesión de administrador.
 Sale: pide al servidor la baja (HUB-F149): se desactiva, nunca se borra, y sus sesiones se cierran. Antes de preguntar, la pantalla se niega si el servidor lo rechazaría, con el aviso «No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.»; el servidor revalida.
@@ -179,7 +179,7 @@ Implicados: HUB-F149, STAFF-F03
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F89 Reincorporar a una persona dada de baja
-Estado: parcial — con el plan lleno, a una persona con cuenta erplora.com ya la ha readmitido cuando la pantalla dice que no hay plaza (ERPlora/hub#2500)
+Estado: parcial — con el plan lleno, a una persona con cuenta erplora.com ya la ha readmitido cuando la pantalla dice que no hay plaza (ERPlora/hub#2700)
 Actor: administrador
 Pantalla: Ficha de usuario
 Pasos:
@@ -223,13 +223,13 @@ Implicados: HUB-F20, HUB-F150, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F92 Asignar un rol a una persona
-Estado: parcial — los roles de una app salen con su identificador (`kitchen`) en el alta, en la ficha y en la columna «Rol»; y al editar se puede hacer administradora a una persona que solo entra con PIN (ERPlora/hub#2500) (leído en el código, sin ejecutar)
+Estado: parcial — los roles de una app salen con su identificador (`kitchen`) en el alta, en la ficha y en la columna «Rol» (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
 1. Al dar de alta (HUB_SHELL-F81 y F82) o al editar (HUB_SHELL-F84), el administrador abre el desplegable «Rol».
 2. En el alta rápida solo salen los roles que se pueden asignar hoy; en la ficha completa salen todos. Los tres de fábrica salen con su nombre («Administrador», «Encargado», «Empleado»); el de cajero lo trae el módulo de Venta y es uno más de los de app.
-3. Al dar de alta, una cuenta solo admite administrador, encargado o empleado y el personal local no puede ser administrador. Al editar, la ficha ofrece todos los roles, también «Administrador» para alguien que solo tiene PIN, y el hub lo acepta (ERPlora/hub#2500): desde ese momento su PIN administra el hub. A una persona con cuenta, la ficha le ofrece roles de app y erplora.com los rechaza, con un aviso que habla de la dirección.
+3. Al dar de alta, una cuenta solo admite administrador, encargado o empleado y el personal local no puede ser administrador. Al editar, la ficha ofrece todos los roles salvo «Administrador» a quien solo tiene PIN mientras no se le escriba un email, y el hub aplica la misma regla: un PIN nunca administra el hub (ERPlora/hub#2500). A una persona con cuenta, la ficha le ofrece roles de app y erplora.com los rechaza, con un aviso que habla de la dirección.
 4. Guarda; el rol se ve en la columna «Rol» de la lista.
 Entra: el catálogo de roles (HUB_SHELL-F91).
 Sale: el rol en la ficha (HUB-F148). Repartir administración solo lo hace quien ya administra. Las claves `admin`, `manager` y `employee` son un contrato con erplora.com, los módulos y las traducciones: no se renombran.
@@ -423,7 +423,7 @@ QA: ninguno
 | PIN de otra persona: poner, cambiar, retirar | hecho | HUB_SHELL-F85, F86 |
 | Placa: alta por lector USB o NFC y revocar | hecho | HUB_SHELL-F87 |
 | Ver cómo entra cada persona | hecho | HUB_SHELL-F90 |
-| Roles de fábrica y de apps; encender los de apps | parcial (identificadores a la vista; la ficha hace administrador a quien solo tiene PIN, hub#2500) | HUB_SHELL-F91, F92 |
+| Roles de fábrica y de apps; encender los de apps | parcial (identificadores a la vista) | HUB_SHELL-F91, F92 |
 | Crear un rol propio / editar qué permite un rol | no hecho (decisión del servidor: los roles los fijan las apps) | HUB_SHELL-F91 |
 | Ver qué permisos concretos tiene un rol y quiénes son sus miembros | no hecho (solo recuentos) | HUB_SHELL-F91 |
 | Registro de aprobaciones por PIN | parcial (códigos técnicos) | HUB_SHELL-F93 |
@@ -488,8 +488,8 @@ Se resuelven con `market-decision`; no las decide el worker.
 
 - Servidor HUB-F147: «la pantalla ofrece «Actualizar plan»». Solo la Ficha de usuario lo ofrece, y
   en la práctica solo al reincorporar; el alta de la tabla y Sistema › Plan y límites no.
-- HUB-F145 «Pasos: elige un rol que se pueda asignar» vale en el alta; la ficha de edición ofrece todos
-  (hub#2500).
+- HUB-F145 «Pasos: elige un rol que se pueda asignar» vale en el alta; la ficha de edición ofrece todos,
+  también los de una app apagada (HUB_SHELL-F84), salvo «Administrador» a quien solo tiene PIN (hub#2500).
 - Servidor HUB-F140: «Guarda» como paso. Las tarjetas del pinpad guardan al mover cada control, sin
   botón.
 - Servidor HUB-F153: «qué acción». La tabla enseña el código de la orden y del permiso.

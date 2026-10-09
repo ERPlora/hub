@@ -42,7 +42,7 @@ Pasos:
 4. La persona aparece en la lista y en el pinpad de los dispositivos compartidos de confianza.
 Entra: la sesión de administrador; el nombre (hasta 150 caracteres), el rol, el PIN y la placa opcional; las plazas del plan (HUB-F147).
 Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148). Como el PIN es único, «ya lo tiene otro usuario activo» dice que ese número es de alguien: por eso cada alta que lleva PIN gasta un intento del presupuesto de **quien da el alta**, el mismo que el cambio del propio PIN (HUB-F132): 30 intentos por hora contados desde el primero, también los aceptados; agotado, no mira el número ni escribe nada durante una hora (ERPlora/hub#2518). Treinta caben para dar de alta a toda la plantilla seguida sin esperar, y aun así quien prueba números saca menos intentos al día que con los 5 en 5 minutos de antes (ERPlora/hub#2564).
-Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: el **alta** de un usuario local no admite administrador (ojo: la edición de la ficha sí deja subirlo después a administrador, HUB-F148, y un administrador con PIN entra por el pinpad con todos sus permisos; solo el pase a erplora.com, HUB-F142, exige haber entrado con la cuenta); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin decir si el número estaba libre.
+Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: un usuario local no administra el hub, ni al darlo de alta ni después al editar su ficha (HUB-F148, ERPlora/hub#2500); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin decir si el número estaba libre.
 Implicados: HUB_SHELL-F81, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §7.02
 
@@ -62,7 +62,7 @@ Implicados: HUB_SHELL-F82, STAFF-F01, STAFF-F03, REC_ALTA-F15, SAAS_DASHBOARD-F1
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F147 Llegar al tope de plazas del plan
-Estado: parcial — al reincorporar a una persona con cuenta, erplora.com recibe el alta antes de que el hub compruebe la plaza; quien entra con su cuenta por primera vez no pasa por el tope
+Estado: parcial — al reincorporar a una persona con cuenta, erplora.com recibe el alta antes de que el hub compruebe la plaza (ERPlora/hub#2700); quien entra con su cuenta por primera vez no pasa por el tope
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
@@ -86,13 +86,13 @@ Pasos:
 3. Guarda.
 4. El rol nuevo vale desde la siguiente acción de esa persona, también en sesiones ya abiertas, y sus pantallas abiertas pierden el canal de avisos en vivo y lo vuelven a abrir con el rol nuevo (HUB-F60, ERPlora/hub#2571).
 Entra: la sesión de administrador; los campos que cambian (solo esos).
-Sale: la ficha. El orden depende del cambio: lo que concede (rol, correo, reincorporación) se pide primero a erplora.com y solo después se escribe aquí; el nombre, el PIN y la placa no se cuentan a erplora.com y funcionan aunque no conteste. El correo con el que se habla con erplora.com es el de acceso o, si no lo hay, el del perfil de la persona (HUB-F143). Una edición que trae PIN gasta un intento del presupuesto de **quien edita**, compartido con el alta (HUB-F145) y con el cambio del propio PIN (HUB-F132), sea cual sea la ficha: así nadie averigua en unos minutos el PIN de un compañero, el del dueño incluido, probando números en otra ficha (ERPlora/hub#2518); yendo despacio todavía se puede (ERPlora/hub#2526). Lo que no lleva PIN (nombre, rol, correo, baja) no gasta ni se frena. La edición **no** repite la guarda del alta local: un administrador puede subir a administrador a una persona que solo tiene PIN, y desde ese momento ese PIN abre una sesión de administrador (ver huecos).
-Si falla: la ficha del dueño de la cuenta solo la cambia él, PIN incluido («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»); nadie se da de alta su propia placa («Nadie da de alta su propia placa. Pídeselo a otro administrador.», salvo el dueño); la placa no puede quedar como única forma de entrar («La placa no puede ser su única vía de entrada…»); quitar el rol de administrador al último que queda, «No puedes dar de baja al último administrador…»; un rol de un módulo que está apagado, «Ya no se puede asignar «{role}».»; PIN o correo repetidos, los avisos de HUB-F132 y HUB-F146; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin mirar el número ni escribir nada.
+Sale: la ficha. El orden depende del cambio: lo que concede (rol, correo, reincorporación) se pide primero a erplora.com y solo después se escribe aquí; el nombre, el PIN y la placa no se cuentan a erplora.com y funcionan aunque no conteste. El correo con el que se habla con erplora.com es solo el de acceso: el que la persona escribió en «Mi perfil» no da ni quita ninguna membresía (HUB-F143, ERPlora/hub#2500). Una edición que trae PIN gasta un intento del presupuesto de **quien edita**, compartido con el alta (HUB-F145) y con el cambio del propio PIN (HUB-F132), sea cual sea la ficha: así nadie averigua en unos minutos el PIN de un compañero, el del dueño incluido, probando números en otra ficha (ERPlora/hub#2518); yendo despacio todavía se puede (ERPlora/hub#2526). Lo que no lleva PIN (nombre, rol, correo, baja) no gasta ni se frena. La edición aplica la regla del alta local: el rol de administrador exige un correo de acceso o una cuenta de erplora.com ya enlazada, así que a quien solo tiene PIN se le puede hacer administrador solo si en la misma edición se le pone correo (y erplora.com recibe la invitación), y a un administrador sin cuenta enlazada no se le quita el correo. Una ficha que ya estaba así de antes se puede renombrar, bajar de rol o dar de baja (ERPlora/hub#2500). Quitar el rol de administrador lo escribe el hub con el candado de administradores del negocio y solo si queda otro administrador activo: dos administradores que se degradan a la vez no dejan el negocio sin ninguno (ERPlora/hub#2500).
+Si falla: la ficha del dueño de la cuenta solo la cambia él, PIN incluido («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»); nadie se da de alta su propia placa («Nadie da de alta su propia placa. Pídeselo a otro administrador.», salvo el dueño); la placa no puede quedar como única forma de entrar («La placa no puede ser su única vía de entrada…»); quitar el rol de administrador al último que queda, «No puedes dar de baja al último administrador…» (también cuando otro administrador ha degradado a otro en el mismo instante); hacer administrador a quien no tiene correo de acceso ni cuenta enlazada, o quitarle el correo a un administrador así, «Un usuario local no puede administrar el hub…» (`local_cannot_administer`, bajo el rol); un rol de un módulo que está apagado, «Ya no se puede asignar «{role}».»; PIN o correo repetidos, los avisos de HUB-F132 y HUB-F146; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin mirar el número ni escribir nada.
 Implicados: HUB_SHELL-F84, HUB_SHELL-F85, HUB_SHELL-F86, HUB_SHELL-F87, HUB_SHELL-F92, STAFF-F03
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F149 Dar de baja y reincorporar a una persona
-Estado: hecho
+Estado: parcial — si dos administradores se degradan a la vez, el hub rechaza el segundo cambio pero erplora.com ya se ha quedado con el rol nuevo (ERPlora/hub#2701); al reincorporar con el plan lleno, erplora.com ya ha mandado la invitación (ERPlora/hub#2700)
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
@@ -100,7 +100,7 @@ Pasos:
 2. El hub la desactiva, cierra sus sesiones y sus canales de avisos en vivo al momento (HUB-F60, ERPlora/hub#2571) y, si tenía cuenta, pide a erplora.com que le quite la membresía.
 3. Para volver a contar con ella, abre su ficha y la reactiva: vuelve la misma persona, con su historial, si queda plaza.
 Entra: la sesión de administrador; la persona.
-Sale: la ficha desactivada (nunca borrada: ventas, aprobaciones y auditoría siguen nombrándola), sus sesiones borradas, y fuera del pinpad y de la lista de personas activas; la membresía retirada en erplora.com. Cerrar la puerta va primero en local y no depende de que erplora.com conteste. Reactivar pide plaza (HUB-F147) y la membresía otra vez, y erplora.com le vuelve a mandar el correo de invitación. La baja no toca las llaves de máquina del negocio: si esa persona, siendo dueña o administradora, acuñó una con la puerta de alta de dispositivo de erplora.com (que el hub no usa), sigue valiendo. Si la persona no tiene correo de acceso, la baja quita en erplora.com la membresía del correo de su perfil (HUB-F143). La comprobación del último administrador se hace antes de llamar a erplora.com y la escritura después: dos bajas o degradaciones simultáneas pueden dejar el negocio sin administrador (ver huecos). La revocación desde erplora.com (HUB-F144) tampoco mira si es el último.
+Sale: la ficha desactivada (nunca borrada: ventas, aprobaciones y auditoría siguen nombrándola), sus sesiones borradas, y fuera del pinpad y de la lista de personas activas; la membresía retirada en erplora.com. Cerrar la puerta va primero en local y no depende de que erplora.com conteste. Reactivar pide plaza (HUB-F147) y la membresía otra vez, y erplora.com le vuelve a mandar el correo de invitación. La baja no toca las llaves de máquina del negocio: si esa persona, siendo dueña o administradora, acuñó una con la puerta de alta de dispositivo de erplora.com (que el hub no usa), sigue valiendo. Si la persona no tiene correo de acceso, la baja no toca erplora.com: el correo que escribió en su perfil no es su acceso (HUB-F143, ERPlora/hub#2500). La propia escritura comprueba, con el candado de administradores del negocio, que queda otro administrador activo: dos bajas o degradaciones simultáneas no dejan el negocio sin administrador, y la segunda se rechaza con `last_admin`. Lo mismo hace la puerta `/api/members` (que la pantalla no usa) al dar de baja o cambiar el rol por correo, y busca ese correo sin distinguir mayúsculas (ERPlora/hub#2500). Una degradación que pierde esa carrera ya ha contado el rol nuevo a erplora.com (lo que concede se pide primero, HUB-F148), así que allí queda con el rol bajo mientras la ficha del hub sigue de administradora (ERPlora/hub#2701). La revocación desde erplora.com (HUB-F144) tampoco mira si es el último.
 Si falla: «No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.»; la ficha del dueño no la da de baja nadie más. Si erplora.com no contesta al quitar la membresía, la baja local se queda y la respuesta lo dice; esa persona no podrá entrar en el hub, pero sigue siendo miembro allí hasta que se repita.
 Implicados: HUB_SHELL-F88, HUB_SHELL-F89, STAFF-F03, SAAS_AUTH-F22, SAAS_DASHBOARD-F16, SAAS_DASHBOARD-F61
 QA: qa-hub-restaurant §7.02
@@ -281,12 +281,13 @@ No hay borrado RGPD de empleados: la baja desactiva y conserva (HUB-F149; ver la
 
 ## Reglas que no se rompen
 
-- El **alta** de un usuario local no admite rol de administrador (la edición sí lo deja: hueco D1).
-  Las puertas de administración del hub miran el **rol**, nunca la credencial: un administrador con
+- Un usuario local (sin correo de acceso ni cuenta de erplora.com enlazada) no es administrador: lo
+  rechazan el alta y la edición (ERPlora/hub#2500). Las puertas de administración del hub miran el **rol**, nunca la credencial: un administrador con
   PIN entra por el pinpad con sesión de administrador; solo el pase a erplora.com exige la cuenta.
   Un rol declarado por un módulo no abre esas puertas (salvo un `*` en el manifiesto, hueco D10).
-- Nadie se da de baja a sí mismo; Personal rechaza dejar el negocio sin un administrador activo (no
-  lo impiden la revocación desde erplora.com ni dos cambios simultáneos: D11); la ficha del dueño
+- Nadie se da de baja a sí mismo; Personal y `/api/members` rechazan dejar el negocio sin un
+  administrador activo, también con dos cambios simultáneos, porque lo comprueba la propia escritura
+  (no lo impide la revocación desde erplora.com: D11); la ficha del dueño
   solo la toca el dueño; nadie da de alta su propia placa (salvo el dueño); nadie reparte un rol
   por encima del suyo.
 - Personal nunca borra a una persona: la desactiva y borra sus sesiones. El restablecimiento del hub
@@ -305,8 +306,6 @@ No hay borrado RGPD de empleados: la baja desactiva y conserva (HUB-F149; ver la
 
 ## Dudas abiertas
 
-- **¿Puede un usuario solo-PIN ser administrador?** El alta lo prohíbe y la edición lo permite (D1):
-  hay que decidir cuál de las dos es la regla y aplicarla en las dos puertas.
 - **Revocar una llave «no se puede deshacer»** según la pantalla, pero «Rotar» la vuelve a activar.
 - **Aprobación durante un despliegue**: el pase vive en un proceso; con dos copias del hub (o tras
   un reinicio) hay que volver a pedirlo.
@@ -319,8 +318,5 @@ No hay borrado RGPD de empleados: la baja desactiva y conserva (HUB-F149; ver la
   y apagado responde 404 (HUB-F157).
 - `crates/runtime/src/hub_users.rs` (comentario cerca de la l. 1420) dice «no soft-delete»; la baja sí
   es desactivación (HUB-F149).
-- `crates/server/src/members.rs` (`census_id_by_access_email`, comentario) dice que el correo del
-  perfil no decide; la lista de Personal (`COALESCE`, `crates/runtime/src/hub_users.rs:741-747`) sí lo
-  usa para hablar con erplora.com cuando no hay correo de acceso.
 - El aviso de Personal ante una invitación fallida dice «vuelve a guardar»; guardar sin cambios no
   reenvía nada (`crates/server/src/hub_users.rs:448-459`) (HUB-F146).

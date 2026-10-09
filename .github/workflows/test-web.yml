@@ -51,18 +51,19 @@
 # `alert-develop` copia su patrón: notificar por Actions no notifica a nadie
 # (image-freshness.yml, hub#652, lo demostró), una issue sí.
 #
-# ── Por qué `crates/**` NO está en los `paths` ───────────────────────────────
-# El job `e2e` compila el runtime, así que la tentación es disparar el workflow
-# también cuando cambia Rust. No se hace: `crates/**` es lo que más se toca en
-# este repo y el techo de la flota es el GATE, no los workers — meter ~20 min de
-# e2e en CADA PR de Rust (que ya paga `test-hub.yml` entero) compra poco y cuesta
-# mucho. El precio de no hacerlo: una regresión del runtime que rompa el shell no
-# sale hasta la siguiente PR del web. Si algún día eso pasa de verdad, la palanca
-# es añadir `crates/**` aquí — no antes.
+# ── `crates/**` on pull requests, not on push (hub#2705, ERPlora/pm#655 J3) ──
+# The `e2e` job builds the runtime and drives the shell against it, so a runtime
+# change can break the shell without touching `apps/web/**`. hub#1251 left
+# `crates/**` out to spare the single self-hosted runner (the fleet's ceiling
+# then); on GitHub's runners that reason is gone, so `crates/**`, `Cargo.toml` and
+# `Cargo.lock` are back in the `pull_request` paths: a Rust PR that breaks the
+# shell goes red on its own PR. They stay out of the `push` paths: the pre-push
+# hook mirrors that list (hub#1356), and the nightly below already re-runs
+# develop as any merge left it.
 #
 # ── nightly `schedule` on develop (hub#1253) ─────────────────────────────────
-# The paragraph above leaves a gap: without `crates/**` in `paths`, a Rust-only merge
-# on `develop` never triggers this file, so a runtime regression that breaks the shell
+# Without `crates/**` in the `push` paths, a Rust-only merge on `develop` never
+# triggers this file after the merge, so a runtime regression that breaks the shell
 # (an endpoint that changes shape, a new 428/403) does not surface until the next PR
 # that touches `apps/web/**` — and lands on someone else. `schedule` is the boring,
 # standard mechanism (same pattern as `test-hub-modules.yml`, hub#1239): it runs the
@@ -129,14 +130,14 @@ on:
       - "scripts/ci/install-published-outfitkit.sh"
       - "scripts/tests/install-published-outfitkit.test.sh"
       - ".github/workflows/test-web.yml"
-  # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Fuera del 29/08 al 03/09 (pm#197): la suite
-  # corría en el gate pre-push local. Medido en la tanda R2 del 02/09: ese gate es UN lock para
-  # toda la máquina, ~20 min por pasada, y cada arreglo del revisor lo paga entero. Ahora el gate
-  # local se queda con check + fmt + clippy (sin atestación) y `pnpm verify` + playwright corren
-  # AQUÍ, en paralelo. Mismos `paths` que `push`: lo que no toca web no abre un check web.
-  # Con filtro de borradores en `verify` (medido 29/08: la mitad de los minutos del runner se iban
-  # en runs cancelados por el re-push del revisor sobre borradores); `ready_for_review` en `types`
-  # porque el filtro se salta `opened`/`synchronize` del borrador.
+  # `pull_request` came BACK on 2026-09-03 (hub#1466). Out from 29/08 to 03/09 (pm#197): the suite
+  # ran in the local pre-push gate. Measured on tanda R2 (02/09): that gate is ONE lock for the
+  # whole machine, ~20 min per pass, and every reviewer fix pays it again. Now the local gate keeps
+  # check + fmt + clippy (no attestation) and `pnpm verify` + playwright run HERE, in parallel.
+  # Same `paths` as `push`, plus the Rust tree the `e2e` job builds (hub#2705, see the header).
+  # With the draft filter on every job (measured 29/08: half the runner minutes went to runs
+  # cancelled by the reviewer's re-push on drafts); `ready_for_review` in `types` because the
+  # filter skips the draft's `opened`/`synchronize`.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -153,6 +154,10 @@ on:
       - "scripts/ci/install-published-outfitkit.sh"
       - "scripts/tests/install-published-outfitkit.test.sh"
       - ".github/workflows/test-web.yml"
+      # hub#2705 — the `e2e` job builds the runtime: a Rust change runs it on its own PR.
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
   schedule:
     - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
   # Sent by ERPlora/outfitkit's `publish.yml` after `npm publish` (hub#2321), with

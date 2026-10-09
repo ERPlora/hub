@@ -1,4 +1,28 @@
+use std::path::Path;
+
+/// The application manifest every executable of this crate needs on Windows (hub#2705): the
+/// dependency on Common Controls v6, the same content as tauri-build's default.
+const WINDOWS_MANIFEST: &str = "windows-app-manifest.xml";
+
 fn main() {
+    // tauri-build embeds its default manifest through tauri-winres with `rustc-link-arg-bins`:
+    // the app binary gets it, the test harnesses do not. Tauri's menu crate (`muda`) imports
+    // `TaskDialogIndirect` from comctl32.dll, which only v6 exports, so without the manifest every
+    // test executable fails to load (`0xc0000139 STATUS_ENTRYPOINT_NOT_FOUND`). Tauri's documented
+    // fix: turn its manifest off and embed the same one with `rustc-link-arg`, which reaches every
+    // target of the package. MSVC linker flags, so only for the MSVC toolchain on Windows.
+    // Guarded by `tests/windows_test_manifest.rs`.
+    let windows_msvc = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+        && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
+    let mut windows = tauri_build::WindowsAttributes::new();
+    if windows_msvc {
+        windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join(WINDOWS_MANIFEST);
+        println!("cargo:rerun-if-changed={}", manifest.display());
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
+    }
+
     // ADR-0159 (cliente fino): la ventana carga ORÍGENES REMOTOS (el SaaS para el onboarding y la
     // PWA del hub cloud en `https://<sub>.erplora.com`). El ACL de Tauri solo permite un `invoke`
     // desde un origen remoto si el comando tiene un permiso `allow-<cmd>` concedido por una
@@ -7,8 +31,9 @@ fn main() {
     // app-manifest desactiva el gate). Declaramos aquí los comandos para que `tauri-build`
     // autogenere `allow-<cmd>`; la capability los concede. Mantener en sync con
     // `generate_handler![...]` en `lib.rs`.
+    let attributes = tauri_build::Attributes::new().windows_attributes(windows);
     tauri_build::try_build(
-        tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
+        attributes.app_manifest(tauri_build::AppManifest::new().commands(&[
             // Identidad de dispositivo (X-Device-Id, sesión única ADR-0154) + olvido del hub.
             "device_context",
             "forget_hub",

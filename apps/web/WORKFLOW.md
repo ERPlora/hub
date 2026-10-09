@@ -279,7 +279,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F13 | Abrir ERPlora cuando el hub no contesta | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F14 | Saber que no hay conexión con el hub | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F15 | Moverse por el menú lateral y la barra superior | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
-| HUB_SHELL-F16 | Ir a erplora.com ya identificado | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
+| HUB_SHELL-F16 | Ir a erplora.com ya identificado | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F17 | Abrir una dirección que el hub no tiene | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F18 | Poner la pantalla de una app a pantalla completa | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F19 | Abrir el hub en el móvil y dejarlo como aplicación | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |

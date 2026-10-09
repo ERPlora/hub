@@ -23,13 +23,14 @@ const PUBLIC_DST = join(HERE, 'public/modules');
 // A RETIRED module is the mirror case and is deliberately absent: `invoice_series` was retired by
 // ADR-0369 (invoice_series#20) because fiscal numbering has a single owner, `invoice`. Listing it
 // here brought back the duplicated «Tu numeración de facturas» setup step on every local bench.
-// Its absence is pinned by a test too, so nobody re-adds it by copying an old list.
+// Its absence is pinned by a test too, so nobody re-adds it by copying an old list. The same goes
+// for `tickets` and `payment_gateways`, deleted on 2026-10-09 (never published, nothing used them).
 export const MODULES = [
   'appointments', 'cart_checkout', 'cash_register', 'customers', 'flows', 'inventory',
   'invoice', 'kitchen', 'online_booking',
-  'payment_gateways', 'payments', 'pricing', 'reservations',
+  'payments', 'pricing', 'reservations',
   'printing', 'sales', 'schedules', 'services', 'staff', 'tables',
-  'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
+  'tasks', 'taxes', 'verifactu', 'whatsapp_inbox',
 ];
 
 // Main checkout of THIS repo, via the git common dir (absolute even from a worktree).

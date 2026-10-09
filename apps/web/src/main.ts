@@ -42,6 +42,7 @@ import {
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { isAuthed, logout } from './lib/session';
+import { signOutAndForgetHub } from './lib/change-hub';
 import { invokeTauri, listenTauriEvent, listenTauriPlugin } from './lib/device';
 import { sendSystemNotice } from './lib/bridge-transport';
 import { claimNoticeTaps, createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
@@ -471,14 +472,16 @@ setOnRuntimeSessionExpired((reason) => {
   });
 });
 
-// El Cloud reportó que el hub fue borrado/revocado (410 hub_not_found, vía el gate de
-// entitlement): olvidamos la identidad de máquina local (`forget_hub` borra token + hub_id +
-// entitlement cacheado) y cerramos sesión. El `device.id` se conserva, así que el próximo login
-// re-registra el hub por dispositivo (§2.9b). Distinto de un token caducado (que solo refresca).
+// The Cloud reported the hub deleted/revoked (410 hub_not_found, through the entitlement gate):
+// sign out and only then forget the remembered hub (`forget_hub` drops `hub.url` and navigates the
+// window; `device.id` is kept, so the next sign-in registers the device again, §2.9b). Signing out
+// first is what lets the Android listening stop while this page is still the linked business
+// (hub#2503). In a browser there is nothing to forget and the login screen is where it ends.
+// Not the same as an expired token (that only refreshes).
 setOnHubGone(() => {
-  void invokeTauri('forget_hub').catch(() => null);
-  logout();
-  void router.replace('/login');
+  void signOutAndForgetHub(false)
+    .catch(() => null)
+    .then(() => router.replace('/login'));
 });
 
 // Resolves the hub context (`GET /api/hub/context`: hub_id, PIN users, settings) BEFORE mounting, so
