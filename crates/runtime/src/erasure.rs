@@ -20,6 +20,12 @@
 //!   her (a phone) without necessarily repeating her id;
 //! - **the events those runs queued** (`run_id`), for the same reason: a reminder carries the phone.
 //!
+//! "Names that id" reaches further than the id itself (hub#2477, hub#2474): the hub also looks for
+//! the rows that the emitter and the apps that LISTEN to the erasure keep about her — her WhatsApp
+//! thread, then its messages ([`reach`]) — and, when one of those events was caused by a kernel
+//! entry (an inbound WhatsApp message: no emitter, no run, no cause), for that entry and every
+//! event that descends from it. That is what the person SAID, and none of it repeats her id.
+//!
 //! # The lines this draws
 //!
 //! - **Empty, never delete.** The row is the trace (`/api/hub/events/{id}/trace`, the run history
@@ -29,12 +35,14 @@
 //!   `dead` one waits for a human and may be the sale whose invoice still has to reach the AEAT;
 //!   a live run needs its memory to finish. Emptying any of them is data loss, not erasure.
 //! - **By id, not by guesswork.** The event brings the id and nothing else; the sheet it names is
-//!   already pseudonymised when this runs. A copy that holds her number but neither her id nor a
-//!   link to a run that touched her (a raw inbound WhatsApp message, before any sheet is linked) is
-//!   NOT reachable from here: that needs the module to say what identified her (hub#2477).
+//!   already pseudonymised when this runs. The hub follows ids through the apps' rows, never a
+//!   phone number or a name: a message the inbox did not store (over its quota) has no row to
+//!   follow and keeps its copy until `retention`. A person with no sheet is erased by the app that
+//!   holds her: the inbox names its own thread (`whatsapp_inbox.conversation.anonymized`).
 //! - **The kernel does not know the customers module.** The trigger is the naming convention
 //!   (`<subject>.anonymized` + `<subject>_id`), the same kind of contract as `.reminder.due` and
-//!   `.print.due`. Today only `customer.anonymized` follows it.
+//!   `.print.due`. Today `customer.anonymized` and `whatsapp_inbox.conversation.anonymized`
+//!   follow it.
 //! - **Only the owner erases (hub#2485).** The id must have the shape the hub generates (a
 //!   canonical uuid) and be a row of one of the EMITTER's tables in this hub. Anything else is
 //!   refused with a code (`erasure.invalid_subject_id`, `erasure.subject_not_owned`): nothing is
@@ -43,8 +51,10 @@
 //!   event still get it, once each.
 //!
 //! **Cost.** There is no index on payload content: one erasure reads the hub's terminal history
-//! once (at most ninety days of it, thanks to `retention`). Erasures are rare, manual and
-//! idempotent — an already-emptied row no longer contains the id, so a redelivery finds nothing.
+//! once (at most ninety days of it, thanks to `retention`), extracting the ids each payload holds
+//! and matching them against the set it looks for, plus one query per linked table and hop.
+//! Erasures are rare, manual and idempotent — an already-emptied row no longer contains the ids,
+//! so a redelivery finds nothing.
 
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
