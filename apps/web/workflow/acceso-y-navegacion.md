@@ -262,14 +262,14 @@ Implicados: HUB-F31, HUB_APP-F28
 QA: BD-03
 
 ### HUB_SHELL-F16 Ir a erplora.com ya identificado
-Estado: parcial — [SEG] «Cambiar de negocio» dice que cierra la sesión y no la cierra: la sesión del hub y los tokens de erplora.com quedan vivos hasta que caducan
+Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: Barra superior
 Pasos:
 1. Para gestionar el negocio: botón «erplora.com» de la barra («Gestiona tu negocio en erplora.com» en el menú del móvil). Solo lo ve quien administra el hub y entró con su cuenta (no con PIN).
 2. Para cambiar de plan: «Actualizar plan» al pie del menú lateral, visible para todos.
 3. erplora.com se abre en otra pestaña (en la app instalada, en el navegador del sistema) ya identificado, en la página pedida; ERPlora se queda donde estaba.
-4. En la app instalada, «Cambiar de negocio» pregunta «¿Cambiar de negocio?» — «Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.»; «Cambiar» olvida la dirección del negocio y abre la lista de erplora.com, pero no cierra la sesión ni borra los tokens; «Cancelar» no hace nada.
+4. En la app instalada, «Cambiar de negocio» pregunta «¿Cambiar de negocio?» — «Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.»; «Cambiar» cierra la sesión (el hub la revoca y se borran la sesión, el usuario y los tokens de erplora.com del dispositivo), y después olvida la dirección del negocio y abre la lista de erplora.com (HUB_APP-F04); «Cancelar» no hace nada.
 Entra: la sesión (con cuenta), el permiso de administrar y la distribución de la app.
 Sale: pide siempre al hub un pase de un solo uso hacia erplora.com; el hub solo lo da a una sesión abierta con la cuenta, y si no lo da la pantalla abre el enlace normal, que pide la contraseña.
 Si falla: «No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.» o, para el plan, «…para gestionar tu plan.». En la copia de Google Play no salen ni «erplora.com» ni «Actualizar plan».
@@ -403,7 +403,7 @@ QA: L-17
 | Elemento de la referencia | Estado | Flujo |
 |---|---|---|
 | Arranque sin servidor: aviso y reintentar | hecho | F13 |
-| Cambiar de negocio cerrando la sesión | parcial: no la cierra | F16 |
+| Cambiar de negocio cerrando la sesión | hecho | F16 |
 | Trabajar sin conexión con el hub | no existe (hub en la nube): solo se avisa | F14 |
 | Franja persistente sin conexión | hecho | F14 |
 | Menú filtrado por el rol | parcial: el menú enseña todo; recortan las pantallas | F15 |
@@ -427,7 +427,7 @@ HUB-F143). Lo que esta área guarda en **el navegador del dispositivo** (leído 
 |---|---|---|---|
 | `erplora.session` | identificador, nombre, correo, foto, rol y permisos de quien tiene la sesión | sí | al cerrar sesión o perderla |
 | `erplora.hub_session`, `erplora.hub_session_credential` | la sesión del hub y cómo se abrió (cuenta, PIN, placa) | credencial | al cerrar sesión |
-| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión, en el relevo de turno, al entrar con PIN o placa y al empezar un acceso con cuenta (que solo los guarda cuando el hub le da la sesión); **no** con «Cambiar de negocio» [SEG] |
+| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión, en el relevo de turno, al entrar con PIN o placa y al empezar un acceso con cuenta (que solo los guarda cuando el hub le da la sesión), y al cambiar de negocio |
 | `erplora.trusted_users`, `erplora.trusted` | id, nombre e iniciales de quien entró con su cuenta en este navegador sin desmarcar «Confiar» (marcada por defecto, también donde no se ve); nunca el correo (hub#2536): el que guardaba una versión anterior se borra al abrir ERPlora | sí (el nombre) | nunca al cerrar sesión, al quitar el dispositivo ni al pasarlo a personal; se recorta contra la lista del hub al abrir Acceso y se vacía si nadie tiene PIN |
 | `erplora.device_id` | el identificador de este dispositivo | no | nunca (es lo que el hub reconoce como de confianza) |
 | `erplora.locale` | el idioma activo | no | se rehace en cada arranque |
@@ -460,7 +460,7 @@ Solo lo que el código hace cumplir:
 
 Lo que hoy **no** se cumple y no es una regla, sino un hueco de seguridad [SEG] (detalle en sus
 flujos): tras el relevo la pantalla abierta es la de quien se fue hasta navegar (HUB_SHELL-F09,
-hub#2539); «Cambiar de negocio» no cierra la sesión (HUB_SHELL-F16).
+hub#2539).
 
 ## Lo que NO hace, a propósito
 

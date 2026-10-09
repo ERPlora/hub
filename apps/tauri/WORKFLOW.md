@@ -178,7 +178,7 @@ tests `tests/shell_surface.rs`, `app_update_channel.rs` y `notice_tap.rs`.
 | Orden | Quién la llama | Flujos HUB_APP | Fuera de HUB_APP |
 |---|---|---|---|
 | `device_context` | `device.ts` (inicio de sesión) | F06 | HUB-F137, HUB-F139; SaaS (login) |
-| `forget_hub` | `change-hub.ts`, `main.ts:459` | F04, F05 | HUB_SHELL Barra superior |
+| `forget_hub` | `change-hub.ts` (`signOutAndForgetHub`, también el 410 de `main.ts`) | F04, F05 | HUB_SHELL Barra superior |
 | `open_external_url` | `open-external.ts` (pago, plan, descarga) | F29, F31 | HUB_SHELL Aplicaciones/plan, Sistema |
 | `save_download` | `save-download.ts` | F30 | HUB_SHELL Archivos, Ajustes |
 | `print_document` | `native-print.ts` → `print.ts` | F22 | PRINTING-F08 |
@@ -212,7 +212,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | HUB_APP-F01 | Instalar la aplicación | parcial | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F02 | Primer arranque: entrar y abrir el negocio | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F03 | Abrir un negocio desde un enlace | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
-| HUB_APP-F04 | Cambiar de negocio | parcial | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
+| HUB_APP-F04 | Cambiar de negocio | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F05 | Olvidar un negocio que ya no existe | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F06 | Saber qué equipo es este | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F07 | Android pide los permisos en su momento | parcial | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
@@ -249,7 +249,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | Instalador directo de Windows y `.dmg` de macOS | parcial: sin firmar / sin notarizar | F01 |
 | Elegir negocio y recordarlo | hecho | F02 |
 | Enlace profundo para abrir un negocio | hecho | F03 |
-| Cambiar de negocio | parcial: no cierra la sesión | F04 |
+| Cambiar de negocio | hecho | F04 |
 | Olvidar un negocio borrado | hecho | F05 |
 | Escanear un QR dentro de la aplicación para enlazar | no existe (la aplicación no tiene cámara; el QR del menú abre el negocio por https en el móvil) | F03 |
 | Permisos de Android con explicación previa | parcial | F07, F08 |
@@ -288,7 +288,8 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
   usuario con nombre y correo (`erplora.session`), los tokens de acceso y refresco de erplora.com
   (`erplora.access`, `erplora.refresh`), la memoria de «ya te pregunté» de los permisos
   (`erplora.notifications.primerAnswered`, `erplora.localNetwork.primerAnswered`) y la última versión
-  anunciada. **Sobreviven a «Cambiar de negocio»** (HUB_APP-F04).
+  anunciada. «Cambiar de negocio» (HUB_APP-F04) borra la sesión, el usuario y los tokens; sobreviven la memoria
+  de los permisos y la última versión anunciada, que son del dispositivo.
 - **Del hub**: la cola de impresión, los puestos, las funciones, las sesiones (HUB, área Impresión y
   Acceso). **Del SaaS**: la cuenta, los negocios y las versiones publicadas.
 - **Datos personales** (inventario RGPD): la aplicación no guarda ninguno por su cuenta, pero **sí hay datos
@@ -368,8 +369,9 @@ Se resuelven con `market-decision`; no las decide el worker.
    ERPlora/hub#2658 los toques de los avisos y la versión. Desde ERPlora/hub#2644 un enlace a otro negocio
    pregunta antes de enlazarlo. Quedan `www`/`pre` como negocio (ERPlora/hub#2645) y el bucle local en producción
    (ERPlora/hub#2643).
-9. `[SEG]` **Cambiar de negocio** debería cerrar la sesión del hub (`runtimeLogout`), borrar los tokens de
-   erplora.com y parar la escucha de Android; hoy no lo hace.
+9. ~~`[SEG]` **Cambiar de negocio** debería cerrar la sesión del hub.~~ Resuelta por ERPlora/hub#2503: para la
+   escucha de Android, revoca la sesión, borra la sesión, el usuario y los tokens de erplora.com y solo entonces
+   olvida el negocio (HUB_APP-F04); el 410 de HUB_APP-F05 va por el mismo camino.
 10. **Sin confirmar en un dispositivo**: que `usesCleartextTraffic=false` impida en Android release cargar el
     bucle local por http; que la notificación del servicio en primer plano sea descartable en Android 14+;
     si el aviso de la comanda suena (canal por defecto del plugin); si `ping`/`arp` del vigilante hacen
@@ -384,15 +386,12 @@ Se resuelven con `market-decision`; no las decide el worker.
   manifiesto declara el servicio en primer plano `specialUse` desde hub#2307 y lo arranca la página.
 - `apps/tauri/README.md` y los comentarios de `app-update.ts` dicen que macOS «se construye solo en local»;
   `tauri-release.yml` ya construye el `.dmg` en CI (sin notarizar).
-- El texto de «¿Cambiar de negocio?» («cerrará la sesión») no se corresponde con el código (HUB_APP-F04).
 - El guion de QA de Android (`qa-hub-android.md`) no tiene identificadores de escenario, solo fases;
   `PRINTING` cita `qa-hub-android §15`, que es el paso 15 de la Fase 3: debería escribirse `qa-hub-android Fase 3`.
 - **No hay registro técnico**: el shell escribe con `log::` y el crate de periféricos con `tracing::`, pero la
   aplicación no instala ningún destino (ni `tauri-plugin-log`, ni `android_logger`, ni `tracing-subscriber`;
   `Cargo.lock`), y los `eprintln!` van a un stderr que nadie lee. El comentario de `Cargo.toml` («sin `log`, un
   fallo es invisible en logcat») es falso, como el de `usb.rs:19-22` sobre las colas USB sin función.
-- `main.ts:455-456` dice que `forget_hub` «borra token + hub_id + entitlement»: solo borra `hub.url`; y
-  `change-hub.ts:11` («drops the local PWA session») es falso.
 - `PRINTING-F02` dice que el permiso de red local negado sale «sin traducir»; por el código el shell lo cambia
   por la frase en español (`bridge-transport.ts:151-167`): verificar en pantalla.
 - `KITCHEN-F05` omite tres condiciones del aviso «Nueva comanda»: avisos sin negar, la escucha de Android

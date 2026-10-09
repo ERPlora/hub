@@ -8,10 +8,21 @@
 // `device.id`, the stable anchor of ADR-0154's single-device session; `forget_hub` preserves it
 // on purpose).
 //
-// Confirmation is part of the contract, not politeness: forgetting the hub drops the local PWA
-// session, so nothing happens until the user says so — and a backdrop tap is a "no".
+// Confirmation is part of the contract, not politeness: switching signs the person out of this
+// business, so nothing happens until the user says so — and a backdrop tap is a "no".
+//
+// hub#2503: and it really signs out. `forget_hub` only drops the remembered address and navigates
+// the whole window, so the session, the person's name and email and their erplora.com tokens used to
+// stay in this origin's storage — the next person on the tablet could open the business again with
+// a link and be inside. Everything is finished BEFORE the forget: the navigation cuts a revocation
+// still in flight, and once the hub is forgotten this page may no longer stop the Android listening.
 import { alertController } from '@ionic/vue';
 import { invokeTauri, isTauri } from './device';
+import { stopNoticeListening } from './notice-listening';
+import { logoutBeforeLeaving } from './session';
+
+/** How long the switch waits for the hub to revoke the session before leaving anyway. */
+export const LEAVE_HUB_REVOKE_WAIT_MS = 5000;
 
 /** The words the confirmation puts in front of the user — the CALLER owns i18n (ADR-0055). */
 export interface ChangeHubLabels {
@@ -43,7 +54,7 @@ export async function requestChangeHub(labels: ChangeHubLabels): Promise<boolean
     message: labels.message,
     buttons: [
       { text: labels.cancel, role: 'cancel' },
-      // `destructive`: the local session is lost. It is also the role the handler keys on, so a
+      // `destructive`: the session is closed. It is also the role the handler keys on, so a
       // backdrop dismissal (role `backdrop`) can never count as a yes.
       { text: labels.confirm, role: 'destructive' },
     ],
@@ -51,6 +62,18 @@ export async function requestChangeHub(labels: ChangeHubLabels): Promise<boolean
   await alert.present();
   const { role } = await alert.onDidDismiss();
   if (role !== 'destructive') return false;
-  await invokeTauri('forget_hub', { choose: true });
+  await signOutAndForgetHub(true);
   return true;
+}
+
+/**
+ * Closes everything of the person on this device and only THEN forgets the hub — the one way out,
+ * shared by «switch business» (`choose: true`) and the Cloud's 410 «hub not found» (`main.ts`).
+ * The order is the contract: the listening stops while this page is still the linked business, the
+ * session is revoked before the navigation can cut the request, and the forget comes last.
+ */
+export async function signOutAndForgetHub(choose: boolean): Promise<void> {
+  await stopNoticeListening();
+  await logoutBeforeLeaving(LEAVE_HUB_REVOKE_WAIT_MS);
+  await invokeTauri('forget_hub', choose ? { choose: true } : undefined);
 }
