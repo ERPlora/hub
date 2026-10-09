@@ -2338,6 +2338,46 @@ mod tests {
         assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
     }
 
+    /// hub#2723 — the delivery statuses of what this hub sent. A background tick, so the machine
+    /// credential: nobody is logged in when it runs.
+    #[test]
+    fn whatsapp_statuses_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_statuses(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/statuses/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    #[test]
+    fn whatsapp_statuses_ack_is_a_machine_authenticated_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_statuses_ack(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/statuses/ack/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
     /// hub#1610 — the door the «Plantillas» tab reaches through the runtime. Machine credential:
     /// the SaaS keeps the Meta token (ADR-0012) and the browser never gets to hold this one.
     #[test]
