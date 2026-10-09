@@ -191,10 +191,9 @@ SELECT c.table_name AS tbl, c.column_name AS col FROM information_schema.columns
 /// - **Whose rows:** the emitter's and those of the apps that LISTEN to this erasure — the apps
 ///   that took on erasing her. An app that merely keeps a `customer_id` lends nothing.
 /// - **Which links:** first the rows whose `<subject>_id` is the subject; from a row of
-///   `<app>_<entity>`, the rows of the SAME app whose `<entity>_id` is that row — an entity name is
-///   the app's own vocabulary. At most [`MAX_HOPS`] links.
-/// - **Which ids:** only those of the shape the hub generates, like the subject (hub#2485), and
-///   only in this hub.
+///   `<app>_<entity>`, the rows whose `<entity>_id` is that row. At most [`MAX_HOPS`] links.
+/// - **Where:** only in this hub. Only ids of the shape the hub generates can match a payload
+///   ([`NAMED_ID`]), so following another shape adds nothing to erase.
 ///
 /// The subject comes first; the result has no repeats.
 async fn reach(
@@ -214,8 +213,8 @@ async fn reach(
         }
     }
     let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
-    // (table, owning app, entity, its `_id` columns), for the apps that lend their rows.
-    let mut tables: Vec<(String, String, String, Vec<String>)> = Vec::new();
+    // (table, entity, its `_id` columns), for the apps that lend their rows.
+    let mut tables: Vec<(String, String, Vec<String>)> = Vec::new();
     for row in db.query(ID_COLUMNS, &Params::new()).await?.rows {
         let (Some(table), Some(col)) = (row["tbl"].as_str(), row["col"].as_str()) else {
             continue;
@@ -230,13 +229,13 @@ async fn reach(
             continue;
         }
         match tables.iter_mut().find(|t| t.0 == table) {
-            Some(t) => t.3.push(col.to_string()),
+            Some(t) => t.2.push(col.to_string()),
             None => {
                 let entity = table
                     .strip_prefix(&format!("{owner}_"))
                     .unwrap_or(table)
                     .to_string();
-                tables.push((table.to_string(), owner, entity, vec![col.to_string()]));
+                tables.push((table.to_string(), entity, vec![col.to_string()]));
             }
         }
     }
@@ -246,18 +245,17 @@ async fn reach(
         .and_then(|s| s.rsplit('.').next())
         .unwrap_or_default();
     let mut found = vec![subject_id.to_string()];
-    // Each step: (the column that points at these ids, the app whose tables to read — `None` for
-    // every lending app — and the ids).
-    let mut frontier: Vec<(String, Option<String>, Vec<String>)> =
-        vec![(format!("{subject}_id"), None, vec![subject_id.to_string()])];
+    // Each step: the column that points at these ids, and the ids.
+    let mut frontier: Vec<(String, Vec<String>)> =
+        vec![(format!("{subject}_id"), vec![subject_id.to_string()])];
     for _ in 0..MAX_HOPS {
         let mut next = Vec::new();
-        for (col, app, ids) in &frontier {
+        for (col, ids) in &frontier {
             let mut p = Params::new();
             p.insert("hub_id".into(), json!(hub_id));
             p.insert("ids".into(), json!(Json::from(ids.clone()).to_string()));
-            for (table, owner, entity, cols) in &tables {
-                if !cols.contains(col) || app.as_ref().is_some_and(|a| a != owner) {
+            for (table, entity, cols) in &tables {
+                if !cols.contains(col) {
                     continue;
                 }
                 let rows = db
@@ -274,12 +272,12 @@ async fn reach(
                     .rows
                     .iter()
                     .filter_map(|r| r["id"].as_str())
-                    .filter(|id| is_generated_id(id) && !found.iter().any(|f| f == id))
+                    .filter(|id| !found.iter().any(|f| f == id))
                     .map(str::to_string)
                     .collect();
                 if !fresh.is_empty() {
                     found.extend(fresh.iter().cloned());
-                    next.push((format!("{entity}_id"), Some(owner.clone()), fresh));
+                    next.push((format!("{entity}_id"), fresh));
                 }
             }
         }
@@ -321,8 +319,7 @@ WITH RECURSIVE needle AS (\
    WHERE e.hub_id = :hub_id AND m[1] IN (SELECT id FROM needle)\
 ), entry AS (\
   SELECT k.id FROM _event_outbox k \
-   WHERE k.hub_id = :hub_id AND k.module_id = '' AND k.run_id = '' AND k.parent_event_id = '' \
-     AND split_part(k.id, '~', 1) IN (\
+   WHERE k.hub_id = :hub_id AND split_part(k.id, '~', 1) IN (\
        SELECT split_part(n.id, '~', 1) FROM _event_outbox n \
         WHERE n.hub_id = :hub_id AND n.module_id = '' AND n.run_id = '' AND n.parent_event_id = '' \
           AND (n.id IN (SELECT id FROM named) OR n.id IN (SELECT parent_event_id FROM named)))\
@@ -1859,6 +1856,77 @@ mod tests {
 
     /// A message still in flight keeps its payload: the terminal rule of the module header holds
     /// for the rows reached through the inbox too.
+    /// Tenancy of the reach: another hub's rows and events are never followed, not even when
+    /// they point at this hub's ids. Another hub's thread names Ana's id; this hub's history names
+    /// that thread's message. And another hub's event descends from Ana's message, with a child of
+    /// its own back in this hub. Neither of this hub's rows is hers.
+    #[tokio::test]
+    async fn another_hubs_rows_and_events_are_not_followed() {
+        const CONV_H2: &str = "5f607182-93a4-4e5f-8061-7c8d9e0f1a2b";
+        const MSG_H2: &str = "60718293-a4b5-4f60-9172-8d9e0f1a2b3c";
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        inbox_row(
+            &db,
+            "INSERT INTO whatsapp_inbox_conversation (id, hub_id, customer_id) \
+             VALUES (:id, 'h2', :link)",
+            CONV_H2,
+            ANA,
+        )
+        .await;
+        inbox_row(
+            &db,
+            "INSERT INTO whatsapp_inbox_message (id, hub_id, conversation_id) \
+             VALUES (:id, 'h2', :link)",
+            MSG_H2,
+            CONV_H2,
+        )
+        .await;
+        let kept = json!({"text": "not hers", "new_id": MSG_H2});
+        let done = "delivered";
+        let received = "whatsapp_inbox.message.received";
+        chained(
+            &db,
+            "x-by-row",
+            HUB,
+            WHATSAPP,
+            received,
+            done,
+            "",
+            kept.clone(),
+        )
+        .await;
+        let other = "whatsapp_inbox.conversation.link_pending";
+        chained(
+            &db,
+            "x-h2",
+            OTHER_HUB,
+            WHATSAPP,
+            other,
+            done,
+            "ana-wa-wamid.1",
+            json!({}),
+        )
+        .await;
+        chained(&db, "x-by-chain", HUB, WHATSAPP, other, done, "x-h2", kept).await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_wa_emptied(&db, "ana-").await;
+        for id in ["x-by-row", "x-by-chain"] {
+            assert!(event_payload(&db, id).await.contains("not hers"), "{id}");
+        }
+    }
+
     #[tokio::test]
     async fn a_whatsapp_message_still_in_flight_keeps_its_payload() {
         let db = fresh_db().await;
