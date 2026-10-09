@@ -342,7 +342,7 @@ Pasos:
 3. «Cambiar foto» sube una JPG, PNG o WebP («Foto actualizada»); «Quitar» la borra.
 4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» (modo «Sistema (auto)», «Claro», «Oscuro» y la paleta) se guardan al elegir y se aplican al momento; «Usar la apariencia del negocio» deshace lo propio.
 Entra: el perfil de quien tiene la sesión.
-Sale: pide al hub guardar el perfil, las preferencias y la foto; el idioma y la apariencia siguen a la persona en cualquier dispositivo en el que entre. El «Correo electrónico» no es solo de contacto: en una persona sin correo de acceso (todo usuario local), el hub lo usa para decidir qué membresía de erplora.com da o quita al cambiarle el rol o darla de baja (HUB-F143).
+Sale: pide al hub guardar el perfil, las preferencias y la foto; el idioma y la apariencia siguen a la persona en cualquier dispositivo en el que entre. El «Correo electrónico» es solo de contacto: no es el correo con el que se entra y el hub nunca da ni quita con él una membresía de erplora.com, ni al cambiarle el rol ni al darla de baja (HUB-F143, ERPlora/hub#2500).
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» («Tus datos siguen igual. Comprueba la conexión y vuelve a intentarlo.») con «Reintentar» en lugar de «Datos de la cuenta», «Preferencias» y «PIN», y sin «Cambiar foto»: no hay nada que guardar hasta que la lectura funcione; la cabecera (nombre y rol, de la sesión) y «Gestión de la cuenta» siguen, y mientras se lee sale el indicador de carga (hub#2541). Al guardar: «No se pudo guardar el perfil»; foto rechazada: «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.».
 Implicados: HUB-F143
 QA: ninguno

@@ -199,8 +199,22 @@ pub fn is_extendable_base_role(role: &str) -> bool {
 pub struct HubUserRow {
     pub id: String,
     pub name: String,
-    /// Email del perfil (`hub_user_profile`); vacío si el usuario aún no tiene perfil.
+    /// The email the screen shows: the access email, or else the one the person typed in «My
+    /// profile» (`hub_user_profile`); empty if there is neither.
     pub email: String,
+    /// The **access** email (`hub_user.email`) and nothing else: the address erplora.com knows this
+    /// person by, written only by provisioning, `/api/members` and Personal. Empty for somebody who
+    /// signs in with a PIN only, even if their profile shows an address (hub#2500): that one is
+    /// typed by the person, without any uniqueness check, so deciding with it would let anybody
+    /// point a grant or a revocation at somebody else's account. Never serialized: the screen keeps
+    /// reading `email`.
+    #[serde(skip)]
+    pub access_email: String,
+    /// `true` when this person signs in with an erplora.com account: an access email (invited) or a
+    /// linked account (`cloud_user_id`). It is what the screen reads to never offer administration
+    /// to somebody who would only have a PIN to exercise it (hub#2500): `email` above cannot say
+    /// it, because it may be the address typed in «My profile».
+    pub has_account: bool,
     pub role: String,
     /// Id del usuario en el Cloud si la identidad está vinculada al portal (owner/admin), o `None`
     /// para el personal **solo-local** (§2.9).
@@ -617,11 +631,7 @@ async fn ensure_local_identity(
         ));
     }
     if is_admin_role(role) {
-        return Err(reject(
-            "local_cannot_administer",
-            "a local user cannot administer the hub: administration comes from an ERPlora account, \
-             never from a PIN",
-        ));
+        return Err(local_cannot_administer());
     }
     if identity::name_is_known(db, hub_id, name).await? {
         return Err(reject(
@@ -633,6 +643,51 @@ async fn ensure_local_identity(
         ));
     }
     Ok(())
+}
+
+/// The refusal of «a PIN administering the hub», the same at the sign-up and at the edit (hub#2500).
+fn local_cannot_administer() -> RuntimeError {
+    reject(
+        "local_cannot_administer",
+        "a local user cannot administer the hub: administration comes from an ERPlora account, \
+         never from a PIN",
+    )
+}
+
+/// The edit-side half of rule 3 of [`ensure_local_identity`] (hub#2500): the sign-up refused to
+/// make a PIN-only person an administrator, and editing the record afterwards let it through.
+///
+/// What is judged is the record **after** the edit: an administrator role with neither an access
+/// email nor a linked erplora.com account is a PIN administering the hub, whichever field the edit
+/// moved to get there (raising the role of a local person, or removing the email of an invited
+/// administrator who never signed in). Only an edit that moves the role or the email is judged, so a
+/// record already in that state —written before this guard existed— can still be renamed, given a
+/// lower role or taken off the team.
+fn ensure_an_admin_keeps_an_account(
+    current: &HubUserRow,
+    role: &str,
+    email: Option<&str>,
+    role_changes: bool,
+) -> Result<()> {
+    let email_changes = email.is_some_and(|e| e != current.access_email);
+    if !(role_changes || email_changes) || !is_admin_role(role) {
+        return Ok(());
+    }
+    let access_email = email.unwrap_or(&current.access_email);
+    if access_email.is_empty() && current.cloud_user_id.is_none() {
+        return Err(local_cannot_administer());
+    }
+    Ok(())
+}
+
+/// The refusal of the write that would leave the hub without an active administrator, with the
+/// same stable code the HTTP guard answers (`last_admin`), so the screen says the same sentence
+/// whichever of the two caught it (hub#2500).
+pub(crate) fn last_admin() -> RuntimeError {
+    reject(
+        "last_admin",
+        "the hub would be left without any active administrator: name another owner/admin first",
+    )
 }
 
 /// ¿Puede el SaaS poner este rol en una membresía? Exactamente [`BASE_ROLES`], insensible a
@@ -744,7 +799,8 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
                     CASE WHEN u.pin_hash IS NULL OR u.pin_hash = '' THEN 0 ELSE 1 END AS has_pin, \
                     CASE WHEN u.badge_hash IS NULL OR u.badge_hash = '' THEN 0 ELSE 1 END \
                       AS has_badge, \
-                    COALESCE(NULLIF(u.email, ''), p.email, '') AS email \
+                    COALESCE(NULLIF(u.email, ''), p.email, '') AS email, \
+                    COALESCE(u.email, '') AS access_email \
                FROM hub_user u \
                LEFT JOIN hub_user_profile p ON p.user_id = u.id AND p.hub_id = :hub_id \
               WHERE u.hub_id = :hub_id \
@@ -761,13 +817,21 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
         .iter()
         .map(|r| {
             let id = r["id"].as_str().unwrap_or_default().to_string();
+            let access_email = r["access_email"]
+                .as_str()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            let cloud_user_id = r["cloud_user_id"].as_str().map(ToString::to_string);
             HubUserRow {
                 access_email_conflict: conflicts.iter().find(|c| c.user_id == id).map(|c| c.reason),
                 id,
                 name: r["name"].as_str().unwrap_or_default().to_string(),
                 email: r["email"].as_str().unwrap_or_default().to_string(),
+                has_account: !access_email.is_empty() || cloud_user_id.is_some(),
+                access_email,
                 role: r["role"].as_str().unwrap_or_default().to_string(),
-                cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
+                cloud_user_id,
                 is_active: truthy(&r["is_active"]),
                 is_account_owner: truthy(&r["is_account_owner"]),
                 has_pin: truthy(&r["has_pin"]),
@@ -994,9 +1058,11 @@ pub async fn update(
     // El rol solo pasa por el catálogo cuando la edición lo CAMBIA (hub#352): revalidar el rol que
     // ya tenía la fila convertiría desinstalar un módulo en «este usuario ya no se puede editar»,
     // y quien queda con un rol huérfano es justo a quien hay que poder reasignar.
-    if input.role.is_some() && role != current.role {
+    let role_changes = input.role.is_some() && role != current.role;
+    if role_changes {
         crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
     }
+    ensure_an_admin_keeps_an_account(&current, &role, email.as_deref(), role_changes)?;
     if is_active && name != current.name {
         ensure_name_is_free(db, hub_id, &name, Some(user_id)).await?;
     }
@@ -1052,17 +1118,26 @@ pub async fn update(
             return Err(user_limit_reached(max_users));
         }
     } else {
-        db.execute(
-            if touches_the_door {
-                "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active, \
-                   cloud_revoked_at = '' WHERE id = :id AND hub_id = :hub_id"
-            } else {
-                "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active \
-                   WHERE id = :id AND hub_id = :hub_id"
-            },
-            &p,
-        )
-        .await?;
+        let sql = if touches_the_door {
+            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active, \
+               cloud_revoked_at = '' WHERE id = :id AND hub_id = :hub_id"
+        } else {
+            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active \
+               WHERE id = :id AND hub_id = :hub_id"
+        };
+        // hub#2500 — taking away the last active administrator is refused by the WRITE, not only by
+        // the HTTP guard: that one decides on a picture of the team read before the write, so two
+        // administrators demoting each other at the same time both passed it.
+        let removes_an_admin = current.is_active
+            && is_admin_role(&current.role)
+            && !(is_active && is_admin_role(&role));
+        if removes_an_admin {
+            if !identity::write_keeping_an_admin(db, hub_id, &format!("{sql} AND "), &p).await? {
+                return Err(last_admin());
+            }
+        } else {
+            db.execute(sql, &p).await?;
+        }
     }
 
     if let Some(email) = email {

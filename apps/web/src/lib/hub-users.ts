@@ -24,8 +24,17 @@ import { RUNTIME_URL, runtimeHeaders } from './runtime';
 export interface HubUser {
   id: string;
   name: string;
-  /** Email del perfil; cadena vacía si aún no tiene. */
+  /**
+   * The address shown: the access email or, without one, the one typed in «My profile»; empty if
+   * there is neither. It is not proof of an account — that is `has_account`.
+   */
   email: string;
+  /**
+   * `true` if this person signs in with an erplora.com account (invited by email or already
+   * linked). `false` = a PIN (or a badge) is all they have, so administration is not for them
+   * (hub#2500). Absent in a runtime older than hub#2500.
+   */
+  has_account?: boolean;
   role: string;
   /** Id en el Cloud si la identidad está vinculada al portal; `null` en el personal solo-local. */
   cloud_user_id: string | null;
@@ -551,6 +560,11 @@ export function canEditUser(users: HubUser[], actorId: string, targetId: string)
   const target = users.find((u) => u.id === targetId);
   if (!target) return false;
   return !target.is_account_owner || target.id === actorId;
+}
+
+/** Is this one of the roles that administer the hub (`is_admin_role` in the runtime)? */
+export function isAdminRole(role: string): boolean {
+  return ADMIN_ROLES.includes(role.trim().toLowerCase());
 }
 
 /** ¿Este usuario administra el hub y está activo? */
