@@ -716,4 +716,23 @@ mod tests {
 
         assert!(matches!(outcomes.recv().await, Some(JobOutcome::Completed { .. })));
     }
+
+    /// A job the worker dropped without an outcome (it stopped mid-job) was NOT printed: the caller
+    /// hears the unreachable error, never «printed». Reviewer's test for hub#2718: `Err(_) => Ok(())`
+    /// on the dropped reply survived every test above.
+    #[tokio::test]
+    async fn a_job_the_worker_dropped_without_an_outcome_is_not_printed_hub2494() {
+        let queue = Arc::new(PrintQueue::new(fast_policy(1)));
+        // No worker running: the job is pulled by hand and its reply dropped unanswered, which is
+        // what a worker that dies between taking the job and reporting it leaves behind.
+        let printing = tokio::spawn({
+            let queue = queue.clone();
+            async move { queue.print(job(unreachable_target(), b"x")).await }
+        });
+        let (_job, reply) = queue.rx.lock().await.recv().await.expect("the job was handed over");
+        drop(reply);
+
+        let err = printing.await.unwrap().expect_err("a job nobody printed cannot be «printed»");
+        assert_eq!(err.code(), "printer_unreachable", "got {err}");
+    }
 }
