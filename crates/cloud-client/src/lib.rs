@@ -850,6 +850,30 @@ impl CloudClient {
         )
     }
 
+    /// **The delivery statuses Meta reported for the WhatsApp this hub sent** (hub#2723,
+    /// saas#2634).
+    ///
+    /// `GET /api/v1/hub/device/whatsapp/statuses/` with the machine credential — the caller is a
+    /// background tick. Response: `{"statuses": [{"wa_message_id", "status"
+    /// (sent|delivered|read|failed), "error": {"code", "reason", "title", "detail"} | null,
+    /// "status_at"}]}`, at most 100, oldest first, only those this hub has not acked yet.
+    pub fn whatsapp_statuses(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/statuses/", auth)
+    }
+
+    /// **Acknowledge the delivery statuses this hub has already recorded** (hub#2723).
+    ///
+    /// `POST /api/v1/hub/device/whatsapp/statuses/ack/`. **Body**: `{"statuses": [{"wa_message_id",
+    /// "status"}, …]}` (500 max); response `{"acked": <count>}`. The SaaS only confirms a status
+    /// that is still the current one: one that moved on is served again.
+    pub fn whatsapp_statuses_ack(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/whatsapp/statuses/ack/", self.base_url),
+            auth,
+        )
+    }
+
     /// **El plan del canal de WhatsApp y su consumo del mes** (hub#1089).
     ///
     /// `GET /api/v1/hub/device/whatsapp/plan/` con la credencial de **máquina** — el llamador es
