@@ -137,6 +137,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'import-manifest',
       'import-report',
       'import-report-dismiss',
+      'import-report-origin-unproven',
       'import-report-recovered',
       'import-report-retry',
       'import-retry-error',

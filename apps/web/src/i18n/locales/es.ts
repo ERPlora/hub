@@ -1746,6 +1746,8 @@ export default {
     reasonVersionSubstituted: 'La plantilla traía la {requested}; ha entrado la más reciente compatible, la {installed}.',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del negocio que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso al tuyo.',
+    reportOriginUnproven:
+      'Este fichero dice ser una copia de seguridad de este negocio, pero no se ha podido comprobar: se hizo con una versión anterior o se modificó después. Se ha cargado como un fichero de otro negocio, así que se han dejado fuera las personas, los PIN, los permisos de las apps y los de las automatizaciones.',
     reasonSettingsNotPortable:
       'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
     reasonRolesNotActivatable:

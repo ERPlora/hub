@@ -2001,6 +2001,10 @@ export default {
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
       'Users, roles and PINs belong to the business that created them. Accounts discarded: {n}. Nobody was given access to yours.',
+    // hub#2497 — the file names this hub but is not sealed as its own copy (made before the seal,
+    // or edited afterwards), so it was loaded like another business's file.
+    reportOriginUnproven:
+      'This file says it is a backup of this business, but it could not be verified as one: it was made with an older version or changed afterwards. It was loaded like a file from another business, so staff, PINs, app permissions and automation permissions were left out.',
     // hub#405 — the settings that came in and the ones that did not. The tax id is the one that
     // matters: with someone else's, this hub would invoice under their name.
     reasonSettingsNotPortable:

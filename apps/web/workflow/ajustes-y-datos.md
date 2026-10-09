@@ -370,13 +370,14 @@ Actor: administrador
 Pantalla: Ajustes › Datos y copias › Importar
 Pasos:
 1. Al terminar, «Informe de la importación»: una fila por sección (Usuarios, Ajustes, Fiscal, Imágenes y media, Roles, Permisos de las apps, Automatizaciones, «App {id}»…) con su estado a la derecha y, debajo, el motivo: **Aplicado**, **Saltado**, **Descartado**, **Aplicado en parte** o **Falló**.
-2. Los descartes se explican en una frase con su número: por ejemplo, «Los usuarios, roles y PIN son del negocio que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso al tuyo.», «Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.», «Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal…», «Automatizaciones restauradas, pero apagadas…». Las imágenes que no se copiaron salen como «{n} sin copiar».
-3. Debajo, el bloque «Apps»: cada app con su nombre, **Aplicado** si se instaló, **Saltado** si ya estaba, **Falló** con su motivo, o **Requiere contratación** con qué contratar y su precio («No se ha instalado: necesita apps que aún no tienes contratadas: Facturación (9,00 €). Contrátalas y vuelve a cargarla — no se ha tocado nada más.»). Si entró otra versión de la pedida: «La plantilla traía la {x}; ha entrado la más reciente compatible, la {y}.».
-4. **Ir al inicio** lleva a Inicio; los permisos de las apps instaladas se piden en la ventana de F169.
-Entra: el informe que devuelve el hub (HUB-F239).
+2. Si el fichero dice ser una copia de este negocio pero el hub no puede comprobarlo (no lleva su sello: se hizo con una versión anterior o se modificó después, HUB-F236), encima del informe sale un aviso: «Este fichero dice ser una copia de seguridad de este negocio, pero no se ha podido comprobar: se hizo con una versión anterior o se modificó después. Se ha cargado como un fichero de otro negocio, así que se han dejado fuera las personas, los PIN, los permisos de las apps y los de las automatizaciones.». Sale también al volver a abrir el informe guardado (HUB_SHELL-F179).
+3. Los descartes se explican en una frase con su número: por ejemplo, «Los usuarios, roles y PIN son del negocio que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso al tuyo.», «Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.», «Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal…», «Automatizaciones restauradas, pero apagadas…». Las imágenes que no se copiaron salen como «{n} sin copiar».
+4. Debajo, el bloque «Apps»: cada app con su nombre, **Aplicado** si se instaló, **Saltado** si ya estaba, **Falló** con su motivo, o **Requiere contratación** con qué contratar y su precio («No se ha instalado: necesita apps que aún no tienes contratadas: Facturación (9,00 €). Contrátalas y vuelve a cargarla — no se ha tocado nada más.»). Si entró otra versión de la pedida: «La plantilla traía la {x}; ha entrado la más reciente compatible, la {y}.».
+5. **Ir al inicio** lleva a Inicio; los permisos de las apps instaladas se piden en la ventana de F169.
+Entra: el informe que devuelve el hub (HUB-F239), con `origin_unproven` cuando el fichero nombra este hub sin su sello (HUB-F236).
 Sale: nada guardado en la pantalla; el informe queda guardado en el hub.
 Si falla: un estado que la pantalla no conoce se pinta como «Falló» con el texto tal cual, nunca como un éxito inventado.
-Implicados: HUB-F239, INVENTORY-F12
+Implicados: HUB-F236, HUB-F239, INVENTORY-F12
 QA: qa-hub §4
 
 ### HUB_SHELL-F179 Volver al informe de una importación que no entró entera y reintentar

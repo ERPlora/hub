@@ -179,6 +179,11 @@ export default defineConfig({
         // Token de máquina (X-Hub-Token): en prod lo inyecta el provisioning; sin él la sesión por
         // PIN no tiene credencial hub-scoped y el proxy del asistente contesta 401.
         HUB_CLOUD_API_TOKEN: 'e2e-machine-token',
+        // The hub's master key, which the SaaS generates for every hub it provisions and injects as
+        // this env (both providers). Without it the bench is not a real hub: a backup leaves without
+        // the hub's origin seal, so exporting and importing it back is treated as another
+        // business's file and the people stay out (hub#2497). A fixed, non-secret 32-byte value.
+        HUB_SECRETS_KEY: Buffer.from('e2e-bench-master-key-not-secret!', 'utf8').toString('base64'),
         // 🔴 EL BANCO NO LLAMA A PRODUCCIÓN. Sin esto, `cloud_base_url` es `https://erplora.com` y
         // el hub del banco —que allí no existe— recibe **410 `hub_not_found`** del gate de
         // entitlement; el shell lo trata como «este hub fue borrado» (`setOnHubGone`, main.ts),

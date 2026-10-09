@@ -329,6 +329,10 @@ pub async fn export_blueprint(
         }
     }
 
+    // The certificate and the media changed the manifest after the runtime sealed it: seal it
+    // again, last, or the hub's own backup would come back as another business's file (hub#2497).
+    export::seal_manifest(&mut manifest);
+
     // Empaquetado: manifest.json (fuente de verdad, actualizado con los sha añadidos) + files.
     let manifest_bytes = match serde_json::to_vec_pretty(&manifest) {
         Ok(b) => b,

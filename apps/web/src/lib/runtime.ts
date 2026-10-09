@@ -1191,6 +1191,12 @@ export interface ImportReport {
    * Absent on reports older than the field: same meaning as `local`, no origin to go back to.
    */
   origin?: ImportReportOrigin;
+  /**
+   * hub#2497 — the bundle names this hub but carries no valid seal of it (made before the seal
+   * existed, or edited afterwards), so the engine applied it as another business's file. Absent
+   * (= false) for a proven own copy and for a file from another hub.
+   */
+  origin_unproven?: boolean;
 }
 
 /** The persisted origin of an import (hub#845) — what decides whether a retry can act. */

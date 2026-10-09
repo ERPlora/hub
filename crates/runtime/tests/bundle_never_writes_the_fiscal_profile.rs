@@ -133,6 +133,7 @@ fn tampered_bundle() -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
         capability_grants: Default::default(),
         flows: Vec::new(),
         sha256,
+        origin_seal: None,
     };
     (manifest, files)
 }
