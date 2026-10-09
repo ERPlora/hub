@@ -1857,81 +1857,82 @@ mod tests {
     /// A message still in flight keeps its payload: the terminal rule of the module header holds
     /// for the rows reached through the inbox too.
     /// Tenancy of the reach: another hub's rows and events are never followed, not even when
-    /// they point at this hub's ids. Another hub's thread names Ana's id; this hub's history names
-    /// that thread's message. Another hub's event descends from Ana's message, with a child of its
-    /// own back in this hub. And another hub's event that names Ana's message was caused by a
-    /// kernel entry of this hub. None of those rows of this hub is hers.
+    /// they point at this hub's ids. Every `x-` row below is of THIS hub and is not Ana's; each one
+    /// would be reached through another hub's row:
+    ///
+    /// - `x-by-row` names a message of another hub's thread, and that thread names Ana's id;
+    /// - `x-by-chain` descends from another hub's event, which descends from Ana's message;
+    /// - `x-by-cause` caused another hub's event that names Ana's message;
+    /// - `x-h2-cause~1a2b3c4d` is a copy of another hub's entry, which caused an event here that
+    ///   names Ana's message (that event is hers and is emptied);
+    /// - `x-under-h2-copy` descends from another hub's copy of Ana's message.
     #[tokio::test]
     async fn another_hubs_rows_and_events_are_not_followed() {
         const CONV_H2: &str = "5f607182-93a4-4e5f-8061-7c8d9e0f1a2b";
         const MSG_H2: &str = "60718293-a4b5-4f60-9172-8d9e0f1a2b3c";
         let db = fresh_db().await;
         two_whatsapp_customers(&db).await;
-        inbox_row(
-            &db,
-            "INSERT INTO whatsapp_inbox_conversation (id, hub_id, customer_id) \
-             VALUES (:id, 'h2', :link)",
-            CONV_H2,
-            ANA,
-        )
-        .await;
-        inbox_row(
-            &db,
-            "INSERT INTO whatsapp_inbox_message (id, hub_id, conversation_id) \
-             VALUES (:id, 'h2', :link)",
-            MSG_H2,
-            CONV_H2,
-        )
-        .await;
+        let conv = "INSERT INTO whatsapp_inbox_conversation (id, hub_id, customer_id) \
+                    VALUES (:id, 'h2', :link)";
+        inbox_row(&db, conv, CONV_H2, ANA).await;
+        let msg = "INSERT INTO whatsapp_inbox_message (id, hub_id, conversation_id) \
+                   VALUES (:id, 'h2', :link)";
+        inbox_row(&db, msg, MSG_H2, CONV_H2).await;
+
         let kept = json!({"text": "not hers", "new_id": MSG_H2});
-        let done = "delivered";
-        let received = "whatsapp_inbox.message.received";
-        chained(
-            &db,
-            "x-by-row",
-            HUB,
-            WHATSAPP,
-            received,
-            done,
-            "",
-            kept.clone(),
-        )
-        .await;
-        let other = "whatsapp_inbox.conversation.link_pending";
-        chained(
-            &db,
-            "x-h2",
-            OTHER_HUB,
-            WHATSAPP,
-            other,
-            done,
-            "ana-wa-wamid.1",
-            json!({}),
-        )
-        .await;
-        chained(
-            &db,
-            "x-by-chain",
-            HUB,
-            WHATSAPP,
-            other,
-            done,
-            "x-h2",
-            kept.clone(),
-        )
-        .await;
-        let kernel = "hub.whatsapp.message_received";
-        chained(&db, "x-by-cause", HUB, "", kernel, done, "", kept).await;
         let names_her = json!({"new_id": MSG_ANA});
+        let kernel = "hub.whatsapp.message_received";
+        let inbox = "whatsapp_inbox.message.received";
+        // (id, hub, emitter, event, cause, payload)
+        let rows: [(&str, &str, &str, &str, &str, &Json); 9] = [
+            ("x-by-row", HUB, WHATSAPP, inbox, "", &kept),
+            ("x-h2", OTHER_HUB, WHATSAPP, inbox, "ana-wa-wamid.1", &kept),
+            ("x-by-chain", HUB, WHATSAPP, inbox, "x-h2", &kept),
+            ("x-by-cause", HUB, "", kernel, "", &kept),
+            (
+                "x-h2-names",
+                OTHER_HUB,
+                WHATSAPP,
+                inbox,
+                "x-by-cause",
+                &names_her,
+            ),
+            ("x-h2-cause", OTHER_HUB, "", kernel, "", &kept),
+            ("x-h2-cause~1a2b3c4d", HUB, "", kernel, "", &kept),
+            (
+                "x-names-her",
+                HUB,
+                WHATSAPP,
+                inbox,
+                "x-h2-cause",
+                &names_her,
+            ),
+            ("ana-wa-wamid.1~5e6f7a8b", OTHER_HUB, "", kernel, "", &kept),
+        ];
+        for (id, hub, module, name, cause, payload) in rows {
+            chained(
+                &db,
+                id,
+                hub,
+                module,
+                name,
+                "delivered",
+                cause,
+                payload.clone(),
+            )
+            .await;
+        }
+        let under = "x-under-h2-copy";
+        let copy = "ana-wa-wamid.1~5e6f7a8b";
         chained(
             &db,
-            "x-h2-names",
-            OTHER_HUB,
+            under,
+            HUB,
             WHATSAPP,
-            received,
-            done,
-            "x-by-cause",
-            names_her,
+            inbox,
+            "delivered",
+            copy,
+            kept.clone(),
         )
         .await;
 
@@ -1947,7 +1948,14 @@ mod tests {
         .unwrap();
 
         assert_wa_emptied(&db, "ana-").await;
-        for id in ["x-by-row", "x-by-chain", "x-by-cause"] {
+        assert_eq!(event_payload(&db, "x-names-her").await, EMPTY);
+        for id in [
+            "x-by-row",
+            "x-by-chain",
+            "x-by-cause",
+            "x-h2-cause~1a2b3c4d",
+            "x-under-h2-copy",
+        ] {
             assert!(event_payload(&db, id).await.contains("not hers"), "{id}");
         }
     }
