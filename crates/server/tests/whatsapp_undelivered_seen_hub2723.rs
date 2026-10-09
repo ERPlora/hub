@@ -383,6 +383,52 @@ async fn an_unknown_reason_still_lands_with_the_generic_one_hub2723() {
     assert_eq!(dead[0].failure_kind, "whatsapp.undelivered.meta_error");
 }
 
+/// The status can arrive while the reminder is still in the queue (another listener of the same
+/// event failed and it is climbing the ladder). It is not acknowledged — acknowledging would lose
+/// it — and once the reminder settles as sent, the next tick records it.
+#[tokio::test]
+async fn a_status_for_a_reminder_still_in_the_queue_waits_for_the_next_tick_hub2723() {
+    let cloud = fake_cloud(SendAnswer::Accept).await;
+    let runtime = hub(&cloud, true).await;
+    queue_reminder(&runtime).await;
+    relay_once(&runtime).await;
+    set_reminder_status(&runtime, "pending").await;
+
+    cloud.report("wamid.1", "failed", outside_window_error());
+    let poller = poller(&cloud);
+    poller
+        .poll_once(&runtime, &entitlement::new_shared())
+        .await
+        .unwrap();
+    assert!(dead(&runtime).await.is_empty());
+    assert_eq!(cloud.pending().len(), 1, "not acknowledged, so served again");
+
+    set_reminder_status(&runtime, "delivered").await;
+    poller
+        .poll_once(&runtime, &entitlement::new_shared())
+        .await
+        .unwrap();
+    let dead = dead(&runtime).await;
+    assert_eq!(dead.len(), 1);
+    assert_eq!(dead[0].failure_kind, "whatsapp.undelivered.outside_window");
+    assert!(cloud.pending().is_empty());
+}
+
+async fn set_reminder_status(runtime: &SharedRuntime, status: &str) {
+    let mut p = Params::new();
+    p.insert("status".into(), json!(status));
+    runtime
+        .read()
+        .await
+        .db()
+        .execute(
+            "UPDATE _event_outbox SET status = :status WHERE event_name LIKE '%.reminder.due'",
+            &p,
+        )
+        .await
+        .unwrap();
+}
+
 /// No inbox module, no request: a hub that does not run WhatsApp must not ask 120 times an hour.
 #[tokio::test]
 async fn without_the_inbox_no_request_leaves_the_hub_hub2723() {

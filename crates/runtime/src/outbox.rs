@@ -5621,6 +5621,25 @@ mod tests {
         );
     }
 
+    /// A send stamp that names another hub's event (a corrupted or forged row) must not let this
+    /// hub turn that hub's reminder into a dead-letter: the read and the write both stay in the
+    /// hub that asks.
+    #[tokio::test]
+    async fn a_stamp_pointing_at_another_hubs_event_kills_nothing_there_hub2723() {
+        let db = db_for_notify().await;
+        seed_sent_whatsapp(&db, "h2", "ev-theirs", "delivered", "").await;
+        let (sql, p) = delivery_op_sent("h1", "ev-theirs", HOST_NOTIFY_LISTENER, "wamid.X", "", "");
+        db.execute(&sql, &p).await.unwrap();
+
+        let got = record_undelivered(&db, "h1", "wamid.X", "outside_window", "Meta 131047")
+            .await
+            .unwrap();
+        assert_ne!(got, Undelivered::Recorded);
+        let row = outbox_row(&db, "ev-theirs").await;
+        assert_eq!(row["status"], "delivered", "the other hub's row is untouched: {row}");
+        assert_eq!(row["failure_kind"], "");
+    }
+
     /// The two halves of the table: a refusal Meta explained can be resent by hand and by
     /// «Reenviar todos» (the send never happened); an accepted send that failed later cannot
     /// (erplora.com would answer the old id without sending).
