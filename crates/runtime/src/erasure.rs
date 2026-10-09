@@ -159,31 +159,184 @@ async fn authorize(
     ))
 }
 
+/// How many links the hub follows from the subject through the rows of the apps that hold it
+/// (customer → conversation → message is two). A bound, not a tuning knob: every hop is one query
+/// per table that has the column.
+const MAX_HOPS: usize = 3;
+
+/// The `<entity>_id` columns of this hub's row tables (see [`ROW_TABLES`]).
+const ID_COLUMNS: &str = "\
+SELECT c.table_name AS tbl, c.column_name AS col FROM information_schema.columns c \
+ WHERE c.table_schema = current_schema() AND c.column_name LIKE '%\\_id' \
+   AND c.column_name <> 'hub_id' AND c.table_name IN (\
+     SELECT table_name FROM information_schema.columns \
+      WHERE table_schema = current_schema() AND column_name IN ('id', 'hub_id') \
+      GROUP BY table_name HAVING COUNT(*) = 2)";
+
+/// **What else names her (hub#2477, hub#2474).** History keeps copies that never repeat the
+/// subject's id: an inbound WhatsApp message names the row the inbox wrote for it, and that row
+/// points at the thread, and the thread at her sheet. Those links live only in the apps' tables, so
+/// the hub follows them there and adds every row it reaches to the ids it looks for:
+///
+/// - **Whose rows:** the emitter's and those of the apps that LISTEN to this erasure — the apps
+///   that took on erasing her. An app that merely keeps a `customer_id` lends nothing.
+/// - **Which links:** first the rows whose `<subject>_id` is the subject; from a row of
+///   `<app>_<entity>`, the rows of the SAME app whose `<entity>_id` is that row — an entity name is
+///   the app's own vocabulary. At most [`MAX_HOPS`] links.
+/// - **Which ids:** only those of the shape the hub generates, like the subject (hub#2485), and
+///   only in this hub.
+///
+/// The subject comes first; the result has no repeats.
+async fn reach(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    event_name: &str,
+    subject_id: &str,
+) -> Result<Vec<String>> {
+    let mut apps = vec![emitter.to_string()];
+    for command in registry.listeners.get(event_name).into_iter().flatten() {
+        if let Some(c) = registry.commands.get(command) {
+            if !apps.contains(&c.module_id) {
+                apps.push(c.module_id.clone());
+            }
+        }
+    }
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    // (table, owning app, entity, its `_id` columns), for the apps that lend their rows.
+    let mut tables: Vec<(String, String, String, Vec<String>)> = Vec::new();
+    for row in db.query(ID_COLUMNS, &Params::new()).await?.rows {
+        let (Some(table), Some(col)) = (row["tbl"].as_str(), row["col"].as_str()) else {
+            continue;
+        };
+        if !crate::export::safe_ident(table) || !crate::export::safe_ident(col) {
+            continue;
+        }
+        let Some(owner) = crate::export::table_owner(table, &installed) else {
+            continue;
+        };
+        if !apps.contains(&owner) {
+            continue;
+        }
+        match tables.iter_mut().find(|t| t.0 == table) {
+            Some(t) => t.3.push(col.to_string()),
+            None => {
+                let entity = table
+                    .strip_prefix(&format!("{owner}_"))
+                    .unwrap_or(table)
+                    .to_string();
+                tables.push((table.to_string(), owner, entity, vec![col.to_string()]));
+            }
+        }
+    }
+
+    let subject = event_name
+        .strip_suffix(ANONYMIZED_SUFFIX)
+        .and_then(|s| s.rsplit('.').next())
+        .unwrap_or_default();
+    let mut found = vec![subject_id.to_string()];
+    // Each step: (the column that points at these ids, the app whose tables to read — `None` for
+    // every lending app — and the ids).
+    let mut frontier: Vec<(String, Option<String>, Vec<String>)> =
+        vec![(format!("{subject}_id"), None, vec![subject_id.to_string()])];
+    for _ in 0..MAX_HOPS {
+        let mut next = Vec::new();
+        for (col, app, ids) in &frontier {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
+            p.insert("ids".into(), json!(Json::from(ids.clone()).to_string()));
+            for (table, owner, entity, cols) in &tables {
+                if !cols.contains(col) || app.as_ref().is_some_and(|a| a != owner) {
+                    continue;
+                }
+                let rows = db
+                    .query(
+                        &format!(
+                            "SELECT CAST(id AS TEXT) AS id FROM \"{table}\" \
+                             WHERE hub_id = :hub_id AND CAST(\"{col}\" AS TEXT) IN \
+                               (SELECT jsonb_array_elements_text(CAST(:ids AS jsonb)))"
+                        ),
+                        &p,
+                    )
+                    .await?;
+                let fresh: Vec<String> = rows
+                    .rows
+                    .iter()
+                    .filter_map(|r| r["id"].as_str())
+                    .filter(|id| is_generated_id(id) && !found.iter().any(|f| f == id))
+                    .map(str::to_string)
+                    .collect();
+                if !fresh.is_empty() {
+                    found.extend(fresh.iter().cloned());
+                    next.push((format!("{entity}_id"), Some(owner.clone()), fresh));
+                }
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        frontier = next;
+    }
+    Ok(found)
+}
+
+/// The ids a payload names: every string of the shape the hub generates, keys included. Matching
+/// whole quoted strings keeps an id from matching as a fragment of a longer one.
+const NAMED_ID: &str = "\"([0-9A-Fa-f-]{36})\"";
+
 /// Everything named in the module header, in ONE statement so the erasure is atomic and every
 /// sub-statement sees the same snapshot (each table is written exactly once).
 ///
-/// `hit` is every event that names her, live or not: a run is history even when the event that
-/// triggered it is still `dead`. Whether an EVENT may be emptied is decided once, at its write.
+/// `named` is every event that names one of the ids, live or not: a run is history even when the
+/// event that triggered it is still `dead`. Whether an EVENT may be emptied is decided once, at
+/// its write.
 ///
-/// `:needle` is the id JSON-encoded (`"<id>"`, quotes included), so it matches the id as a string
-/// VALUE and never as a fragment of a longer one. `hub_id` filters every read and every write:
-/// the same id in another hub belongs to another hub. The `<> '{}'` guards make the counts say
-/// what was actually emptied, so a redelivery reports zero.
+/// **What the person said (hub#2477).** An inbound WhatsApp message enters as a KERNEL event —
+/// no emitter, no run, no cause (`module_id`, `run_id` and `parent_event_id` all empty) — with the
+/// number and the text and no id of any row. When an event that names her was caused by such an
+/// entry, the entry is hers too, and so is everything that descends from it (`parent_event_id`):
+/// the inbox's copy, what reacted to it. A completed copy of the same message is another kernel
+/// entry whose id is the first one's plus `~<digest>` (hub#2102); it is the same message.
+///
+/// `:needles` is the JSON array of ids, `:named_id` the pattern above. `hub_id` filters every read
+/// and every write: the same id in another hub belongs to another hub. The `<> '{}'` guards make
+/// the counts say what was actually emptied, so a redelivery reports zero.
 const ERASE: &str = "\
-WITH hit AS (\
-  SELECT id FROM _event_outbox \
-   WHERE hub_id = :hub_id AND strpos(payload, :needle) > 0\
+WITH RECURSIVE needle AS (\
+  SELECT jsonb_array_elements_text(CAST(:needles AS jsonb)) AS id\
+), named AS (\
+  SELECT DISTINCT e.id, e.parent_event_id FROM _event_outbox e \
+   CROSS JOIN LATERAL regexp_matches(e.payload, :named_id, 'g') m \
+   WHERE e.hub_id = :hub_id AND m[1] IN (SELECT id FROM needle)\
+), entry AS (\
+  SELECT k.id FROM _event_outbox k \
+   WHERE k.hub_id = :hub_id AND k.module_id = '' AND k.run_id = '' AND k.parent_event_id = '' \
+     AND split_part(k.id, '~', 1) IN (\
+       SELECT split_part(n.id, '~', 1) FROM _event_outbox n \
+        WHERE n.hub_id = :hub_id AND n.module_id = '' AND n.run_id = '' AND n.parent_event_id = '' \
+          AND (n.id IN (SELECT id FROM named) OR n.id IN (SELECT parent_event_id FROM named)))\
+), descends(id) AS (\
+  SELECT id FROM entry \
+  UNION \
+  SELECT c.id FROM _event_outbox c JOIN descends d ON c.parent_event_id = d.id \
+   WHERE c.hub_id = :hub_id\
+), hit AS (\
+  SELECT id FROM named UNION SELECT id FROM descends\
 ), touched AS (\
   SELECT r.id FROM _flow_runs r \
    WHERE r.hub_id = :hub_id AND r.status IN ('done', 'failed', 'cancelled') \
-     AND (strpos(r.input, :needle) > 0 OR strpos(r.vars, :needle) > 0 \
-          OR r.parent_event_id IN (SELECT id FROM hit) \
+     AND (r.parent_event_id IN (SELECT id FROM hit) \
+          OR EXISTS (SELECT 1 FROM regexp_matches(r.input || ' ' || r.vars, :named_id, 'g') m \
+                      WHERE m[1] IN (SELECT id FROM needle)) \
           OR EXISTS (SELECT 1 FROM _flow_run_steps s \
+                      CROSS JOIN LATERAL regexp_matches(s.input || ' ' || s.output, :named_id, 'g') m \
                       WHERE s.hub_id = :hub_id AND s.run_id = r.id \
-                        AND (strpos(s.input, :needle) > 0 OR strpos(s.output, :needle) > 0)) \
+                        AND m[1] IN (SELECT id FROM needle)) \
           OR EXISTS (SELECT 1 FROM _flow_approvals a \
+                      CROSS JOIN LATERAL regexp_matches(a.payload, :named_id, 'g') m \
                       WHERE a.hub_id = :hub_id AND a.run_id = r.id \
-                        AND strpos(a.payload, :needle) > 0))\
+                        AND m[1] IN (SELECT id FROM needle)))\
 ), events AS (\
   UPDATE _event_outbox SET payload = '{}' \
    WHERE hub_id = :hub_id AND status IN ('delivered', 'discarded') AND payload <> '{}' \
@@ -220,9 +373,11 @@ pub async fn on_event(
         return Ok(ErasureReport::default());
     };
     authorize(db, registry, hub_id, emitter, &id).await?;
+    let needles = reach(db, registry, hub_id, emitter, event_name, &id).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    p.insert("needle".into(), json!(Json::String(id).to_string()));
+    p.insert("needles".into(), json!(Json::from(needles).to_string()));
+    p.insert("named_id".into(), json!(NAMED_ID));
     let res = db.query(ERASE, &p).await?;
     Ok(ErasureReport {
         events: cell(&res, "events"),
@@ -1381,5 +1536,305 @@ mod tests {
             "{last_error}"
         );
         assert_ana_history_intact(&db).await;
+    }
+
+    // ── What she wrote on WhatsApp (hub#2477, hub#2474) ────────────────────────────────────────
+    //
+    // An inbound message lands in history as a chain that never names her sheet: the kernel's
+    // `hub.whatsapp.message_received` (number + text), the inbox's `whatsapp_inbox.message.received`
+    // (the same, plus the id of the message row it wrote) and whatever reacted to that. The only
+    // link to her is in the inbox's own tables: conversation → customer, message → conversation.
+
+    const WHATSAPP: &str = "whatsapp_inbox";
+    const CONV_ANA: &str = "1b2c3d4e-5f60-4a1b-8c2d-3e4f5a6b7c8d";
+    const MSG_ANA: &str = "2c3d4e5f-6071-4b2c-9d3e-4f5a6b7c8d9e";
+    const CONV_BEA: &str = "3d4e5f60-7182-4c3d-8e4f-5a6b7c8d9e0f";
+    const MSG_BEA: &str = "4e5f6071-8293-4d4e-9f50-6b7c8d9e0f1a";
+
+    /// The installed apps of [`registry`] plus the inbox; `listens` says whether the inbox
+    /// subscribes to `customer.anonymized` (it does in production).
+    fn registry_with_inbox(listens: bool) -> Registry {
+        let mut reg = registry();
+        reg.installed.push(
+            serde_json::from_str(&format!(
+                r#"{{"id":"{WHATSAPP}","name":"{WHATSAPP}","version":"1.0.0"}}"#
+            ))
+            .unwrap(),
+        );
+        if listens {
+            let command = "whatsapp_inbox._on_customer_anonymized";
+            reg.commands.insert(
+                command.into(),
+                crate::registry::RegisteredCommand {
+                    module_id: WHATSAPP.into(),
+                    def: serde_json::from_value(json!({"permission": ""})).unwrap(),
+                    sql: Vec::new(),
+                    wasm: None,
+                    schema: None,
+                },
+            );
+            reg.listeners
+                .insert("customer.anonymized".into(), vec![command.into()]);
+        }
+        reg
+    }
+
+    async fn inbox_tables(db: &PgAdapter) {
+        db.execute_batch(
+            "CREATE TABLE whatsapp_inbox_conversation (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+                                                       customer_id TEXT NOT NULL DEFAULT ''); \
+             CREATE TABLE whatsapp_inbox_message (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+                                                  conversation_id TEXT);",
+        )
+        .await
+        .unwrap();
+    }
+
+    async fn inbox_row(db: &PgAdapter, sql: &str, id: &str, link: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("link".into(), json!(link));
+        db.execute(sql, &p).await.unwrap();
+    }
+
+    /// One conversation of `customer` with one message, as the inbox stores it.
+    async fn inbox_thread(db: &PgAdapter, customer: &str, conv: &str, msg: &str) {
+        inbox_row(
+            db,
+            "INSERT INTO whatsapp_inbox_conversation (id, hub_id, customer_id) \
+             VALUES (:id, :hub_id, :link)",
+            conv,
+            customer,
+        )
+        .await;
+        inbox_row(
+            db,
+            "INSERT INTO whatsapp_inbox_message (id, hub_id, conversation_id) \
+             VALUES (:id, :hub_id, :link)",
+            msg,
+            conv,
+        )
+        .await;
+    }
+
+    /// A history row with the columns the relay writes for a chain: who emitted it and which
+    /// event caused it.
+    #[allow(clippy::too_many_arguments)]
+    async fn chained(
+        db: &PgAdapter,
+        id: &str,
+        hub: &str,
+        module: &str,
+        name: &str,
+        status: &str,
+        parent: &str,
+        payload: Json,
+    ) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub));
+        p.insert("module".into(), json!(module));
+        p.insert("name".into(), json!(name));
+        p.insert("status".into(), json!(status));
+        p.insert("parent".into(), json!(parent));
+        p.insert("payload".into(), json!(payload.to_string()));
+        p.insert("at".into(), json!(now()));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, payload, status, next_attempt_at, \
+              created_at, delivered_at, module_id, parent_event_id) \
+             VALUES (:id, :hub_id, 'u1', '[\"*\"]', :name, :payload, :status, :at, :at, \
+                     CASE WHEN :status = 'delivered' THEN :at END, :module, :parent)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// What one inbound message leaves in `hub`'s history, ids prefixed by `p`: the kernel's event,
+    /// a completed copy of it (`~<digest>`, hub#2102), the inbox's event naming the message row
+    /// `msg`, the inbox's event for the copy (its fresh `new_id` is no row: the copy updated the
+    /// first one), what reacted to the inbox's event, a flow the kernel's event started and the
+    /// auto-reply that flow queued. All of it holds `phone` and `text`; none of it her sheet's id.
+    async fn wa_message(db: &PgAdapter, hub: &str, p: &str, msg: &str, phone: &str, text: &str) {
+        let said = json!({"from": phone, "contact": phone, "text": text});
+        let with_row = |id: &str| {
+            let mut v = said.clone();
+            v["new_id"] = json!(id);
+            v
+        };
+        let core = format!("{p}wa-wamid.1");
+        let copy = format!("{core}~0a1b2c3d");
+        let done = "delivered";
+        let kernel = "hub.whatsapp.message_received";
+        let received = "whatsapp_inbox.message.received";
+        chained(db, &core, hub, "", kernel, done, "", said.clone()).await;
+        chained(db, &copy, hub, "", kernel, done, "", said.clone()).await;
+        let inbox = format!("{p}ev-received");
+        chained(db, &inbox, hub, WHATSAPP, received, done, &core, with_row(msg)).await;
+        let copy_inbox = format!("{p}ev-received-copy");
+        let fresh = crate::registry::new_id();
+        chained(db, &copy_inbox, hub, WHATSAPP, received, done, &copy, with_row(&fresh)).await;
+        let link = "whatsapp_inbox.conversation.link_pending";
+        let fresh = crate::registry::new_id();
+        let reacted = format!("{p}ev-link");
+        chained(db, &reacted, hub, WHATSAPP, link, done, &inbox, with_row(&fresh)).await;
+        let flow = format!("{p}run-wa");
+        run(db, &flow, hub, "done", &core, said.clone(), json!({})).await;
+        event(
+            db,
+            Ev {
+                id: &format!("{p}ev-autoreply"),
+                hub,
+                status: "delivered",
+                name: "flow.reminder.due",
+                payload: json!({"to": phone, "body": "Gracias"}),
+                run_id: &flow,
+            },
+        )
+        .await;
+    }
+
+    /// Every row [`wa_message`] wrote with prefix `p`.
+    fn wa_rows(p: &str) -> Vec<String> {
+        [
+            "wa-wamid.1",
+            "wa-wamid.1~0a1b2c3d",
+            "ev-received",
+            "ev-received-copy",
+            "ev-link",
+            "ev-autoreply",
+        ]
+        .iter()
+        .map(|id| format!("{p}{id}"))
+        .collect()
+    }
+
+    async fn assert_wa_emptied(db: &PgAdapter, p: &str) {
+        for id in wa_rows(p) {
+            assert_eq!(event_payload(db, &id).await, EMPTY, "{id}");
+        }
+        assert_eq!(run_memory(db, &format!("{p}run-wa")).await, EMPTY_RUN);
+    }
+
+    async fn assert_wa_intact(db: &PgAdapter, p: &str, phone: &str) {
+        for id in wa_rows(p) {
+            assert!(event_payload(db, &id).await.contains(phone), "{id}");
+        }
+        assert!(run_memory(db, &format!("{p}run-wa")).await.contains(phone));
+    }
+
+    /// Ana and Bea both wrote; Ana's thread is linked to her sheet, Bea's to hers; the same
+    /// message id also appears in another hub's history.
+    async fn two_whatsapp_customers(db: &PgAdapter) {
+        system_schema(db).await;
+        inbox_tables(db).await;
+        inbox_thread(db, ANA, CONV_ANA, MSG_ANA).await;
+        inbox_thread(db, BEA, CONV_BEA, MSG_BEA).await;
+        wa_message(db, HUB, "ana-", MSG_ANA, "+34600111222", "Hola, soy Ana").await;
+        wa_message(db, HUB, "bea-", MSG_BEA, "+34600333444", "Hola, soy Bea").await;
+        wa_message(db, OTHER_HUB, "h2-", MSG_ANA, "+34600111222", "Hola, soy Ana").await;
+    }
+
+    /// hub#2477: erasing Ana's sheet empties what she wrote on WhatsApp — the kernel's copy, the
+    /// inbox's, what reacted to it and the flow it started — reached through the inbox, which
+    /// listens to the erasure and links her sheet to her thread. Bea's messages and the other hub's
+    /// copies stay.
+    #[tokio::test]
+    async fn erasing_a_customer_empties_what_she_wrote_on_whatsapp() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_wa_emptied(&db, "ana-").await;
+        assert_wa_intact(&db, "bea-", "+34600333444").await;
+        assert_wa_intact(&db, "h2-", "+34600111222").await;
+    }
+
+    /// hub#2474: «Erase this number's data» on a thread with no sheet. The inbox names its own
+    /// conversation in `whatsapp_inbox.conversation.anonymized`; the hub follows it to the
+    /// messages of that thread and empties the same chain. Bea's thread stays.
+    #[tokio::test]
+    async fn erasing_a_whatsapp_number_empties_what_it_wrote() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        let mut payload = Params::new();
+        payload.insert("conversation_id".into(), json!(CONV_ANA));
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            WHATSAPP,
+            "whatsapp_inbox.conversation.anonymized",
+            &payload,
+        )
+        .await
+        .unwrap();
+
+        assert_wa_emptied(&db, "ana-").await;
+        assert_wa_intact(&db, "bea-", "+34600333444").await;
+        assert_wa_intact(&db, "h2-", "+34600111222").await;
+    }
+
+    /// The reach is bounded by consent: only the emitter and the apps that LISTEN to the erasure
+    /// lend their rows. An app that keeps a `customer_id` but does not subscribe is not followed.
+    #[tokio::test]
+    async fn an_app_that_does_not_listen_to_the_erasure_is_not_followed() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(false),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_wa_intact(&db, "ana-", "+34600111222").await;
+    }
+
+    /// A message still in flight keeps its payload: the terminal rule of the module header holds
+    /// for the rows reached through the inbox too.
+    #[tokio::test]
+    async fn a_whatsapp_message_still_in_flight_keeps_its_payload() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        db.execute(
+            "UPDATE _event_outbox SET status = 'pending', delivered_at = NULL \
+              WHERE id = 'ana-ev-link'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert!(event_payload(&db, "ana-ev-link").await.contains("+34600111222"));
+        assert_eq!(event_payload(&db, "ana-ev-received").await, EMPTY);
     }
 }
