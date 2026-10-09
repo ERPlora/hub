@@ -136,9 +136,10 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     //
     // `orders_order` estuvo aquí y se ha ido: el módulo `orders` no existe — nunca se publicó. La
     // entrada venía del inventario del plan de migración a céntimos, que lo daba por futuro.
-    // payment_gateways
-    ("payment_gateways_transaction", &["amount"]),
-    ("payment_gateways_refund", &["amount_refunded"]),
+    //
+    // `payment_gateways_transaction` and `payment_gateways_refund` were here and are gone: the
+    // `payment_gateways` module was deleted (2026-10-09) without ever being published, so no hub
+    // creates those tables. Payments live in `payments`, right below.
     // payments
     ("payments_payment", &["amount"]),
     // pricing
