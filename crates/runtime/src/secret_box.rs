@@ -85,6 +85,16 @@ impl SecretsKey {
             .expect("SecretsKey siempre tiene 32 bytes, la longitud exacta de AES_256_GCM");
         LessSafeKey::new(unbound)
     }
+
+    /// An HMAC-SHA256 key for one purpose, derived from the master key under `label` (hub#2497).
+    ///
+    /// The master key is never used as-is outside AES-GCM: each other use gets its own key, so
+    /// what one purpose signs can never be replayed as another's (domain separation).
+    pub(crate) fn derived_hmac_key(&self, label: &[u8]) -> ring::hmac::Key {
+        let master = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &self.0);
+        let derived = ring::hmac::sign(&master, label);
+        ring::hmac::Key::new(ring::hmac::HMAC_SHA256, derived.as_ref())
+    }
 }
 
 /// Lee y valida la master key desde [`MASTER_KEY_ENV`]. `Ok(None)` si la variable no está

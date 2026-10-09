@@ -369,6 +369,50 @@ async fn the_export_never_carries_the_delegated_certificate() {
     );
 }
 
+/// hub#2497 — the downloaded backup is still the hub's OWN copy after the server adds to it.
+///
+/// The runtime seals the manifest it builds, and then this layer adds the certificate (and the
+/// media) with their hashes. A seal taken before that no longer matches the manifest inside the
+/// zip, so the hub would treat its own backup as another business's file and leave its people,
+/// permissions and automations behind. Mutation this test has to catch: dropping the re-seal in
+/// `export_blueprint`.
+#[tokio::test]
+async fn the_downloaded_backup_with_its_certificate_is_still_sealed_as_the_hub_s_own() {
+    // The seal is keyed by the deployment's master key; without it a bundle leaves unsealed.
+    // SAFETY: every test of this binary that touches this variable writes this same value.
+    unsafe {
+        std::env::set_var(
+            "HUB_SECRETS_KEY",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        )
+    };
+    let (app, db) = make_app_with_db(AuthMode::Dev, "export_sealed_with_fiscal").await;
+    seed_certificate_slot(&db, "own", OWN_P12_B64).await;
+
+    let entries = export_with_fiscal(app, "sellado").await;
+    assert!(
+        entries
+            .iter()
+            .any(|(name, _)| name == "data/fiscal/certificate.p12"),
+        "the scenario needs the server to add something after the runtime's export"
+    );
+    let manifest_bytes = entries
+        .iter()
+        .find(|(name, _)| name == "manifest.json")
+        .map(|(_, b)| b.clone())
+        .expect("manifest.json");
+    let manifest: erplora_runtime::export::BlueprintManifest =
+        serde_json::from_slice(&manifest_bytes).expect("manifest.json parses");
+    assert!(
+        manifest.sha256.contains_key("data/fiscal/certificate.p12"),
+        "the certificate is covered by the manifest"
+    );
+    assert!(
+        erplora_runtime::export::has_valid_origin_seal(&manifest),
+        "the manifest inside the zip must carry a seal that verifies as it is"
+    );
+}
+
 // ─────────────────────── POST /api/hub/import/inspect ───────────────────────
 
 /// Sin credencial → 401 antes de tocar el zip.

@@ -110,6 +110,7 @@ fn blueprint(name: &str, active_roles: &[&str]) -> BlueprintManifest {
         capability_grants: Default::default(),
         flows: Vec::new(),
         sha256: BTreeMap::new(),
+        origin_seal: None,
     }
 }
 

@@ -39,10 +39,25 @@ fn ctx(hub: &str) -> RequestContext {
     RequestContext::new(hub, "u1", ["*".to_string()])
 }
 
+/// `HUB_SECRETS_KEY` once for this binary, as every production hub has it: a hub's own copy is
+/// only proven by the origin seal derived from it (hub#2497), so a restore of the hub's own backup
+/// needs it at both ends.
+fn ensure_master_key() {
+    use base64::Engine as _;
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let key = base64::engine::general_purpose::STANDARD.encode([0x24u8; 32]);
+        // SAFETY: `Once` runs this before any test reads the variable, and nothing writes it again.
+        unsafe { std::env::set_var("HUB_SECRETS_KEY", key) };
+    });
+}
+
 /// A hub with the modules installed (and therefore seeded) UNDER ITS OWN hub_id — like in
 /// production, where the server installs the manifest modules for the destination hub before
 /// calling the motor.
 async fn fresh() -> Runtime {
+    ensure_master_key();
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&erplora_runtime::e2e_support::modules_root().join("taxes"))
