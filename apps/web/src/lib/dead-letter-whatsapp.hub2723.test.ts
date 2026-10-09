@@ -56,7 +56,13 @@ describe('a WhatsApp in «Eventos caídos» says what happened (hub#2723)', () =
   });
 
   it('anything that is not a WhatsApp failure keeps the screen as it was', () => {
-    for (const kind of ['', 'flow.release_revoked', 'module.capability_denied', 'whatsapp.other.x']) {
+    for (const kind of [
+      '',
+      'flow.release_revoked',
+      'module.capability_denied',
+      'whatsapp.other.x',
+      'email.undelivered.outside_window',
+    ]) {
       expect(whatsappFailure(kind)).toBeNull();
     }
   });
