@@ -49,8 +49,10 @@
 //!   canonical uuid) and be a row of one of the EMITTER's tables in this hub. Anything else is
 //!   refused with a code (`erasure.invalid_subject_id`, `erasure.subject_not_owned`): nothing is
 //!   emptied and the row is not marked delivered — it retries and ends in the dead letters, where
-//!   a human sees it. The gate guards this history, not the delivery: the apps that listen to the
-//!   event still get it, once each.
+//!   a human sees it.
+//! - **Only the owner is heard (hub#2535).** The apps that listen to the event erase what they keep
+//!   of her, so the relay asks the same owner question BEFORE delivering ([`gate_delivery`]): a
+//!   foreign erasure, or one that names nobody, reaches no listener and starts no automation.
 //!
 //! **Cost.** There is no index on payload content: one erasure reads the hub's terminal history
 //! once (at most ninety days of it, thanks to `retention`), extracting the ids each payload holds
@@ -139,6 +141,18 @@ async fn authorize(
             format!("`{emitter}` named `{id}`, which is not an id the hub generates"),
         ));
     }
+    owns(db, registry, hub_id, emitter, id).await
+}
+
+/// Whether `id` is a row of one of `emitter`'s tables in this hub, whatever its shape; refused
+/// with `erasure.subject_not_owned` otherwise.
+async fn owns(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    id: &str,
+) -> Result<()> {
     let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
     let tables = db.query(ROW_TABLES, &Params::new()).await?;
     let own = tables
@@ -169,6 +183,34 @@ async fn authorize(
         "erasure.subject_not_owned",
         format!("`{id}` is not a row of `{emitter}` in this hub, so `{emitter}` cannot erase it"),
     ))
+}
+
+/// **Who hears an erasure (hub#2535).** The apps that listen to `<subject>.anonymized` erase what
+/// they keep of the subject, and an automation it triggers acts on her — so the relay hands an
+/// erasure to no one unless its emitter owns the subject, the owner rule of [`authorize`]. An
+/// erasure that names no usable subject (`erasure.invalid_subject_id`) cannot be shown to come
+/// from the owner, so it is refused too. The SHAPE rule is not asked here: an owner whose id the
+/// hub did not generate still reaches its listeners; it only may not empty the hub's history.
+///
+/// Any other event passes untouched, without a query.
+pub async fn gate_delivery(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    event_name: &str,
+    payload: &Params,
+) -> Result<()> {
+    if !event_name.ends_with(ANONYMIZED_SUFFIX) {
+        return Ok(());
+    }
+    let Some(id) = subject_id(event_name, payload) else {
+        return Err(refused(
+            "erasure.invalid_subject_id",
+            format!("`{emitter}` emitted `{event_name}` without naming whose data to erase"),
+        ));
+    };
+    owns(db, registry, hub_id, emitter, &id).await
 }
 
 /// How many links the hub follows from the subject through the rows of the apps that hold it
@@ -1545,6 +1587,100 @@ mod tests {
             "{last_error}"
         );
         assert_ana_history_intact(&db).await;
+    }
+
+    // ── Who hears an erasure (hub#2535) ─────────────────────────────────────────────────────────
+
+    async fn gate(db: &PgAdapter, emitter: &str, name: &str, payload: &Params) -> Result<()> {
+        gate_delivery(db, &registry(), HUB, emitter, name, payload).await
+    }
+
+    /// hub#2535: the apps that listen to `customer.anonymized` erase what they keep of her, so an
+    /// erasure is only handed to them when its emitter owns the subject — the same owner rule as
+    /// the history (hub#2485). The kernel and an app that is not installed own nothing.
+    #[tokio::test]
+    async fn only_the_owner_gets_an_erasure_delivered_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        db.execute_batch("CREATE TABLE ghost_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);")
+            .await
+            .unwrap();
+        owned_row(&db, "ghost_item", ANA, HUB).await;
+
+        gate(&db, CUSTOMERS, "customer.anonymized", &anonymized(json!(ANA)))
+            .await
+            .expect("her owner's erasure is delivered");
+        for emitter in [INTRUDER, "", "ghost"] {
+            let err = gate(&db, emitter, "customer.anonymized", &anonymized(json!(ANA)))
+                .await
+                .unwrap_err();
+            assert_eq!(
+                refusal_code(&err),
+                "erasure.subject_not_owned",
+                "{emitter:?}"
+            );
+        }
+    }
+
+    /// Owning the subject in ANOTHER hub does not make the erasure deliverable here.
+    #[tokio::test]
+    async fn owning_the_subject_in_another_hub_does_not_get_it_delivered_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(ANA));
+        db.execute("UPDATE customers_customer SET hub_id = 'h2' WHERE id = :id", &p)
+            .await
+            .unwrap();
+
+        let err = gate(&db, CUSTOMERS, "customer.anonymized", &anonymized(json!(ANA)))
+            .await
+            .unwrap_err();
+        assert_eq!(refusal_code(&err), "erasure.subject_not_owned");
+    }
+
+    /// An erasure that does not say whose cannot be shown to come from the owner: refused for
+    /// everyone, the owner app included, before any listener reads a missing or empty id.
+    #[tokio::test]
+    async fn an_erasure_that_names_nobody_is_delivered_to_no_one_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        for payload in [
+            anonymized(json!("")),
+            anonymized(json!(42)),
+            anonymized(Json::Null),
+            Params::new(),
+        ] {
+            for emitter in [CUSTOMERS, INTRUDER] {
+                let err = gate(&db, emitter, "customer.anonymized", &payload)
+                    .await
+                    .unwrap_err();
+                assert_eq!(
+                    refusal_code(&err),
+                    "erasure.invalid_subject_id",
+                    "{emitter} {payload:?}"
+                );
+            }
+        }
+    }
+
+    /// The gate is about erasures only: any other event that names her is delivered as always,
+    /// and an owner whose id the hub did not generate still reaches its listeners — what it may
+    /// not do is empty the hub's history (hub#2485), which `on_event` refuses on its own.
+    #[tokio::test]
+    async fn the_delivery_gate_only_asks_who_owns_the_erased_subject_hub2535() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        for name in ["sale.completed", "customer.updated", "customer.anonymized.done"] {
+            gate(&db, INTRUDER, name, &anonymized(json!(ANA)))
+                .await
+                .unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+        let mut own = Params::new();
+        own.insert("item_id".into(), json!("id"));
+        gate(&db, INTRUDER, "item.anonymized", &own)
+            .await
+            .expect("its own row, whatever its shape");
     }
 
     // ── What she wrote on WhatsApp (hub#2477, hub#2474) ────────────────────────────────────────

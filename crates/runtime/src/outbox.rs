@@ -549,6 +549,24 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     let ctx = listener_ctx(row);
     let payload = parse_payload(row);
 
+    // ── Only the owner announces an erasure (hub#2535) ──────────────────────────────────────
+    // Every listener of `<subject>.anonymized` erases what its app keeps of her, so a refused
+    // erasure reaches NO ONE — no listener, no wait, no automation — and the row climbs the
+    // ladder with the refusal's code to the dead letters, where a human sees it. Asked before
+    // anything is delivered: once a listener ran, her data is already gone.
+    if let Err(e) = crate::erasure::gate_delivery(
+        db,
+        registry,
+        &ctx.hub_id,
+        row["module_id"].as_str().unwrap_or_default(),
+        &event_name,
+        &payload,
+    )
+    .await
+    {
+        return defer_or_dead(db, &id, attempts, &format!("erasure: {e}")).await;
+    }
+
     // Listeners actuales (solo módulos activos). Si no hay, la entrega es trivialmente completa.
     //
     // **Cada listener es independiente (hub#142):** antes, un listener que fallaba hacía
