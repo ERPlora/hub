@@ -195,7 +195,7 @@ Implicados: PRINTING-F02
 QA: ninguno
 
 ### HUB_PERIPHERALS-F06 Sacar un documento por una impresora de red
-Estado: parcial — si la impresora de red está apagada o sin papel, el documento no sale y nadie se entera: `erplora_print` (`apps/tauri/src-tauri/src/lib.rs:1671-1683`) pone los bytes en una cola en memoria y contesta `Ok`; sus 3 intentos solo dejan rastro con `eprintln!` (`lib.rs:1256-1266`); el dispositivo manda `done` (`apps/web/src/lib/print-drain.ts:212-213`) y el hub marca el trabajo «hecho»; no hay reintento, estado «fallido» ni aviso
+Estado: parcial — desde hub#2494 la aplicación contesta lo que pasó con el papel (correcto cuando llegó a la impresora, «impresora inalcanzable» cuando se agotaron los intentos), y la caja que lo pidió directo avisa con «Reintentar» (HUB_SHELL-F70); pero la cola interna sigue en memoria (se pierde al cerrar la aplicación), tiene un solo trabajador (una impresora apagada retiene ~13 s los trabajos de otras impresoras del mismo dispositivo) y un trabajo de la cola del hub que falla vuelve «fallido» sin que nadie lo vea (HUB_SHELL-F74); y una impresora encendida sin papel se da por impresa (hub#2716)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -205,23 +205,31 @@ Pasos:
    la cola. En los dos casos se lo pasa a la aplicación con la impresora de esa función, el tipo de documento y el documento.
 2. La aplicación comprueba que el tipo de documento es uno conocido y compone los bytes ESC/POS
    (HUB_PERIPHERALS-F09 a F13).
-3. Pone los bytes en su cola interna y contesta «correcto» al dispositivo.
-4. En segundo plano, una cola con un solo trabajador los manda a `<ip>:<puerto>`: hasta 3 intentos
-   seguidos, 2 s entre intento e intento, 3 s para conectar y 10 s para escribir en cada uno.
+3. Pone los bytes en su cola interna y **espera** a que salgan.
+4. Una cola con un solo trabajador los manda a `<ip>:<puerto>`: hasta 3 intentos seguidos, 2 s entre
+   intento e intento, 3 s para conectar y 10 s para escribir en cada uno. Cuando la impresora se los
+   queda contesta «correcto» al dispositivo; si los 3 intentos fallan, contesta el error (con la
+   impresora apagada, unos 13 s después de pedirlo).
 Entra: el identificador de la impresora (`network:<ip>:<puerto>`), el tipo de documento (uno de
 ocho: tique, factura, comanda, albarán, etiqueta, cierre de caja, cuenta, genérico) y el documento ya
 estructurado (nunca HTML).
-Sale: los bytes en el papel. El resultado de cada intento (completado o fallido, con el motivo) se
-escribe en el registro técnico de la aplicación y nada más: ni vuelve a quien pidió el papel, el hub lo marca «hecho» si venía de la cola (si salió directo, no sabe nada) y la persona no lo ve. La cola interna vive en memoria: lo que está esperando se pierde si
-se cierra la aplicación. El trabajo no se deduplica aquí (la clave `jobId` viaja pero no se
+Sale: los bytes en el papel y la respuesta a quien lo pidió: «correcto» solo cuando el papel llegó a la
+impresora, el error cuando no (hub#2494). Si venía de la cola del hub, el dispositivo la confirma
+«hecho» o «fallido» según esa respuesta; si salió directo de la caja, la caja avisa (HUB_SHELL-F70,
+F72, F78). El resultado de cada intento se sigue escribiendo también en el registro técnico de la
+aplicación. La cola interna vive en memoria: lo que está esperando se pierde si se cierra la
+aplicación. El trabajo no se deduplica aquí (la clave `jobId` viaja pero no se
 comprueba): un mismo trabajo mandado dos veces saca dos papeles.
 Si falla: antes de ponerlo en la cola sí hay error y vuelve a quien lo pidió: identificador de
 impresora mal formado («printer id inválido»), tipo de documento que no se conoce («tipo de
 documento desconocido»), documento que no es un objeto, una cuenta sin líneas o una factura completa
 sin los datos que exige (emisor, número, cliente, NIF del cliente, desglose de IVA). Después, con la
-impresora apagada, sin papel o fuera de la red, tras los 3 intentos solo se anota; la comanda o el
-tique no salen y ni el cajero ni la cocina reciben aviso. Es lo que el guion de QA (§10, «impresora
-sin papel/offline: el trabajo queda pendiente y la pantalla informa») no consigue hoy.
+impresora apagada o fuera de la red, tras los 3 intentos vuelve «impresora inalcanzable» a quien lo
+pidió: la caja que lo mandó directo lo avisa y deja reintentar (HUB_SHELL-F70); un trabajo de la cola
+del hub vuelve «fallido» y hoy nadie lo ve (HUB_SHELL-F74). Una impresora sin papel que sigue
+aceptando la conexión se queda los bytes: el puerto 9100 no cuenta si hay papel, así que eso sigue sin
+detectarse (hub#2716). Mientras se agotan los intentos, la cola de un solo trabajador retiene los trabajos de las
+otras impresoras de red del mismo dispositivo.
 Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, HUB_SHELL-F78, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_ALTA-F17
 
 QA: qa-hub-restaurant §16, qa-hub §8
@@ -269,7 +277,7 @@ Implicados: PRINTING-F02
 QA: ninguno
 
 ### HUB_PERIPHERALS-F09 Sacar el tique o la factura
-Estado: parcial — la fecha y la hora del papel son las del momento de imprimir (reloj del dispositivo), no las de la venta: un tique que esperó en la cola, o una reimpresión, sale con otra hora; y una impresora de red apagada lo pierde sin aviso (HUB_PERIPHERALS-F06)
+Estado: parcial — la fecha y la hora del papel son las del momento de imprimir (reloj del dispositivo), no las de la venta: un tique que esperó en la cola, o una reimpresión, sale con otra hora; con una impresora de red apagada, la caja que lo mandó avisa y deja reintentar (hub#2494), pero un tique que iba por la cola del hub vuelve «fallido» sin aviso (HUB_PERIPHERALS-F06)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -298,7 +306,7 @@ Implicados: HUB_APP-F15, HUB_SHELL-F76, PRINTING-F07, PRINTING-F08, SALES-F01
 QA: R-09, qa-hub §8
 
 ### HUB_PERIPHERALS-F10 Sacar la comanda de cocina o barra
-Estado: parcial — la hora que sale en la comanda es la de imprimir, no la de pedir; y una impresora de red apagada la pierde sin aviso (HUB_PERIPHERALS-F06)
+Estado: parcial — la hora que sale en la comanda es la de imprimir, no la de pedir; con una impresora de red apagada, la caja que la disparó avisa y deja reintentar esa estación (hub#2494), pero una comanda que iba por la cola del hub vuelve «fallida» sin aviso (HUB_PERIPHERALS-F06)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -321,7 +329,7 @@ Implicados: HUB_SHELL-F72, HUB_SHELL-F78, KITCHEN-F08, KITCHEN-F17, PRINTING-F10
 QA: qa-hub-restaurant §08, qa-hub-restaurant §16
 
 ### HUB_PERIPHERALS-F11 Sacar la cuenta de la mesa
-Estado: parcial — una impresora de red apagada la pierde sin aviso (HUB_PERIPHERALS-F06)
+Estado: parcial — con una impresora de red apagada el error ya vuelve a quien la pidió (HUB_PERIPHERALS-F06, hub#2494), y que la persona lo vea depende de Ventas, que es quien la pide (el aviso con «Reintentar» del shell cubre el tique, la comanda y el vale, no la cuenta); por la cola del hub vuelve «fallida» sin aviso
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -374,7 +382,7 @@ Implicados: PRINTING-F16, PRINTING-F17
 QA: ninguno
 
 ### HUB_PERIPHERALS-F14 Hacer una hoja de prueba
-Estado: parcial — con una impresora de red, «Probar» no avisa si la impresora no contesta (mismo motivo que HUB_PERIPHERALS-F06)
+Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: printing: Impresoras
 Pasos:
@@ -385,8 +393,9 @@ Entra: el identificador de la impresora, y opcionalmente el nombre del negocio y
 llegan, sale «ERPlora» y en español).
 Sale: la hoja, por la cola interna si es de red (F06) y directa si es USB o Bluetooth. Va en el idioma
 del hub, firmada con el nombre del negocio, y no pasa por la cola del hub.
-Si falla: con una impresora de red no hay error aunque no conteste (`lib.rs:1687-1712` la pone en la misma cola en memoria que `erplora_print`, `lib.rs:1671-1683`). Con USB o Bluetooth, el error de la
-impresora vuelve y sale en rojo en la pantalla.
+Si falla: con una impresora de red que no contesta, tras los intentos de HUB_PERIPHERALS-F06 (unos
+13 s) vuelve «impresora inalcanzable» (hub#2494). Con USB o Bluetooth, el error de la impresora vuelve
+en el momento. En los tres casos sale en rojo en la pantalla.
 Implicados: HUB_APP-F15, HUB_APP-F20, PRINTING-F05
 QA: qa-hub §8
 
@@ -444,15 +453,15 @@ QA: ninguno
 | Impresora Bluetooth (Android) | complemento de Android (HUB_APP); aquí solo se valida el identificador | F06 |
 | Función por impresora recordada | parcial: no se puede quitar | F04 |
 | Vigilar la impresora y recuperarla tras un cambio de IP | parcial: sin aviso, sin MAC no hay recuperación | F05 |
-| Cola con reintentos hacia la impresora de red | parcial: en memoria, sin aviso del resultado | F06 |
-| Aviso cuando el papel no sale | no hecho para impresora de red; hecho para USB (comprueba y cancela) | F06, F07 |
+| Cola con reintentos hacia la impresora de red | parcial: en memoria, un solo trabajador | F06 |
+| Aviso cuando el papel no sale | parcial: la red devuelve el error a quien lo pidió (la caja avisa con «Reintentar»; la cola del hub no avisa); sin papel no se detecta por red; USB comprueba y cancela | F06, F07 |
 | Tique con QR fiscal, «DUPLICADO» y QR promocional | parcial: la hora es la de imprimir | F09 |
 | Factura completa con desglose de IVA | hecho | F09 |
 | Comanda con etiqueta de sala, ronda, suplementos y urgente | parcial: la hora es la de imprimir | F10 |
-| Cuenta no fiscal | parcial: pérdida sin aviso con la red apagada | F11 |
+| Cuenta no fiscal | parcial: con la red apagada el error vuelve a Ventas; el aviso con «Reintentar» del shell no la cubre | F11 |
 | Etiqueta con código de barras nativo | parcial: térmica de tiques, no de etiquetas | F12 |
 | Cierre de caja, albarán, genérico | parcial: sin productor | F13 |
-| Hoja de prueba | parcial: sin aviso con red apagada | F14 |
+| Hoja de prueba | hecho | F14 |
 | Cajón (pin 2 y pin 5) | parcial: nunca por USB, error descartado, sin plazo | F15 |
 | Ancho 58 y 80 mm | no hecho: siempre 32 columnas | F16 |
 | Logo e imágenes en el papel | no hecho | F16 |
@@ -522,9 +531,7 @@ Se resuelven con `market-decision`; no las decide el worker.
 3. ¿Entra **Windows USB** (hub#1269) en el MVP, o basta la IP en esa plataforma?
 4. ¿Debe la hora del papel ser la del documento (la venta) y no la de imprimir? Hoy es la del
    dispositivo; una reimpresión o un tique que espera en cola sale con otra.
-5. ¿Debe una impresora de red que no contesta **devolver el fallo** al hub (para que el trabajo siga
-   pendiente y se avise) en vez de darlo por hecho? Es la decisión que cierra el defecto de F06.
-6. ¿Debe cada impresora saber el ancho de su papel (58 o 80 mm) y componer el documento a él?
+5. ¿Debe cada impresora saber el ancho de su papel (58 o 80 mm) y componer el documento a él?
 
 ## Fuentes contrastadas
 
@@ -532,10 +539,8 @@ Contra `origin/develop` del hub (05/10/2026). Una línea por discrepancia; manda
 
 - **`architecture/hub/print-queue.md` («Tarde, no perdido»)** y el guion `qa-hub-restaurant` §10/§16
   («impresora sin papel/offline: el trabajo queda pendiente y la UI informa»): con una impresora de red
-  del propio dispositivo apagada, el trabajo no queda pendiente ni se informa; la aplicación lo da por
-  entregado y el hub por hecho (F06).
-- **`README.md` del crate**: dice que la cola con reintentos es el camino de red y «el fallo no se
-  pierde, vuelve al llamante» para Bluetooth y USB; para la red el fallo no vuelve (F06).
+  del propio dispositivo apagada, la caja avisa y deja reintentar (hub#2494), pero el trabajo no
+  queda pendiente en la cola y uno que venía de la cola del hub vuelve «fallido» sin aviso (F06).
 - **`README.md` del crate y `usb.rs`** hablan de «un recibo con logo»: no hay imágenes en el
   renderizador (F16).
 - **Comentario de `escpos.rs` («80 mm ≈ 32 caracteres»)**: en una térmica de 80 mm con la fuente A caben

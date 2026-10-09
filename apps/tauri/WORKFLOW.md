@@ -228,7 +228,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | HUB_APP-F17 | Dar nombre y función a una impresora, y quitarla | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
 | HUB_APP-F18 | Ser el puesto que imprime | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
 | HUB_APP-F19 | Imprimir un tique, una factura o una comanda | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
-| HUB_APP-F20 | Hacer una hoja de prueba | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
+| HUB_APP-F20 | Hacer una hoja de prueba | hecho | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
 | HUB_APP-F21 | Abrir el cajón | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
 | HUB_APP-F22 | Imprimir un documento A4 con el diálogo del sistema | hecho | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
 | HUB_APP-F23 | Leer una tarjeta NFC para entrar | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
@@ -262,8 +262,8 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | Impresora USB | parcial / no hecho en Windows | F16 |
 | Nombre, función y quitar impresora | parcial | F17 |
 | Puesto de impresión | parcial | F18 |
-| Imprimir tique y comanda con aviso si falla | parcial: red sin aviso | F19 |
-| Hoja de prueba | parcial: red sin aviso | F20 |
+| Imprimir tique y comanda con aviso si falla | parcial: red sin papel sin aviso | F19 |
+| Hoja de prueba | hecho | F20 |
 | Abrir el cajón | parcial | F21 |
 | Imprimir A4 con el diálogo del sistema | hecho | F22 |
 | Tarjeta NFC | parcial: sin validar con hardware | F23 |
@@ -317,8 +317,8 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
   con cualquier puerto; al navegador del sistema también van el apex y `checkout.stripe.com`.
 - **El enlace profundo se resuelve, no se abre**: la dirección se reconstruye desde el nombre.
 - **Una orden que no pudo hacerse se devuelve, no se traga** (abrir enlace, guardar, imprimir A4, NFC,
-  Bluetooth, USB). *Excepción vigente y defecto*: la impresora de red encola y contesta «correcto»
-  (HUB_APP-F19, ERPlora/hub#2494).
+  Bluetooth, USB). También la impresora de red: espera a que el papel llegue a la impresora y, si no
+  llega, devuelve el error (HUB_APP-F19, hub#2494).
 - **La copia de Google Play no sigue páginas del SaaS que cobran ni nombra otro sitio donde pagar**, salvo los
   cambios de página por dentro del panel y las salidas al navegador del sistema, que no pasan por la lista
   (ERPlora/hub#1918, abierta).
@@ -354,9 +354,9 @@ Se resuelven con `market-decision`; no las decide el worker.
    de producto los ofrece, pero la descarga web de erplora.com sí reparte la AppImage. ¿Se retira de la matriz o se declara?
 3. **macOS**: el `.dmg` sale sin notarizar y `downloadPlatform` no tiene destino para él. ¿Se publica una
    descarga o se declara fuera del MVP?
-4. **Aviso al administrador cuando una impresora de red no saca el papel** (ERPlora/hub#2494): ¿consultar
-   el estado de la impresora (ESC/POS en tiempo real) o confirmar el envío al socket? ¿qué se enseña a la
-   cajera?
+4. **Impresora de red encendida pero sin papel o con la tapa abierta**: hoy contesta «correcto». ¿Se
+   consulta su estado ESC/POS en tiempo real antes de dar el papel por salido? (hub#2716; la impresora apagada ya
+   la cerró hub#2494: se confirma la escritura en el socket y la caja ve un aviso fijo con «Reintentar».)
 5. **Puesto de impresión que solo imprime** en Android: ¿debe mantenerse a la escucha aunque no haya cocina,
    citas ni contador de campana? Hoy no.
 6. **El QR del menú abre el negocio por https**, no `erplora://`: en un móvil con la aplicación instalada se

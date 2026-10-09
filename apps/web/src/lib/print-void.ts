@@ -171,7 +171,8 @@ async function printVoidSlips(
 ): Promise<void> {
   const { orderId, label } = who;
   const named = who.dish ? { dish: who.dish } : {};
-  for (const group of groups) {
+  // One station's slip. Also what a Retry runs (hub#2494): only that station, the same paper.
+  const printSlip = async (group: ComandaGroup): Promise<void> => {
     try {
       const result = await deps.print({
         role: group.role,
@@ -190,7 +191,14 @@ async function printVoidSlips(
         },
       });
       if (result.via === 'none') {
-        fail(deps, { orderId, role: group.role, label, ...named, error: result.error ?? 'void_slip_not_delivered' });
+        fail(deps, {
+          orderId,
+          role: group.role,
+          label,
+          ...named,
+          error: result.error ?? 'void_slip_not_delivered',
+          ...(result.printerFailed ? { printerFailed: true, retry: () => printSlip(group) } : {}),
+        });
       } else if (result.via === 'queue' && result.awaitingHost) {
         fail(deps, {
           orderId,
@@ -204,7 +212,9 @@ async function printVoidSlips(
     } catch (e) {
       fail(deps, { orderId, role: group.role, label, ...named, error: e instanceof Error ? e.message : String(e) });
     }
-  }
+  };
+
+  for (const group of groups) await printSlip(group);
 }
 
 function fail(deps: Deps, f: ComandaPrintFailure): void {

@@ -16,10 +16,11 @@ Prefijo: HUB_SHELL
 > **Los dos caminos del papel.** Cuando este dispositivo tiene una impresora con la función pedida
 > (de red o Bluetooth), el papel sale **directo** por ella y el hub no guarda ninguna fila. Cuando no
 > la tiene, el trabajo va a la **cola del hub** y lo saca el dispositivo dado de alta para esa
-> función. En los dos, con una impresora de red apagada o sin papel el error se pierde: la app
-> instalada contesta «hecho» al dejar el trabajo en su cola en memoria
-> (`apps/tauri/src-tauri/src/lib.rs:1671-1683`), así que por el directo nadie se entera y por la cola
-> el dispositivo confirma «salió» y el hub lo marca hecho. Defecto abierto: ERPlora/hub#2494.
+> función. Desde hub#2494 la app instalada contesta lo que pasó con el papel (espera a la
+> impresora de red; con ella apagada, «impresora inalcanzable» a los ~13 s): por el directo la caja
+> lo avisa con un aviso fijo y «Reintentar» (tique, comanda y vale); por la cola el dispositivo
+> contesta «falló» y el trabajo vuelve a la cola sin que nadie lo vea (HUB_SHELL-F74). Una impresora
+> de red encendida pero sin papel sigue contestando «hecho» (HUB_PERIPHERALS-F06, hub#2716).
 
 ## Referencia adoptada
 
@@ -101,7 +102,7 @@ Pasos:
 4. Cuando un dispositivo de esa función se conecta y vacía lo pendiente, la fila desaparece.
 Entra: las funciones sin atender, ya decididas por el hub (`GET /api/print/undrained`, HUB-F201): cuántos esperan y desde cuándo.
 Sale: nada.
-Si falla: solo ve lo que pasó por la cola del hub. Un tique impreso directo que no salió (impresora apagada) no llega nunca aquí (hub#2494). Un dispositivo cuenta como vivo, y la fila no sale, aunque no saque nada: si dejó de tener esa función en la app pero sigue dado de alta; si su canal de impresión se paró para siempre por un rechazo (sesión caducada al reconectar, retirada, saludo tardío) mientras su alta sigue latiendo; o si un trabajo le falló y nadie lo vuelve a pedir (HUB_SHELL-F74). Los trabajos se apilan hasta reiniciar la app de ese dispositivo.
+Si falla: solo ve lo que pasó por la cola del hub. Un tique impreso directo que no salió (impresora apagada) no llega nunca aquí: lo avisa la caja que lo pidió, con «Reintentar» (HUB_SHELL-F70). Un dispositivo cuenta como vivo, y la fila no sale, aunque no saque nada: si dejó de tener esa función en la app pero sigue dado de alta; si su canal de impresión se paró para siempre por un rechazo (sesión caducada al reconectar, retirada, saludo tardío) mientras su alta sigue latiendo; o si un trabajo le falló y nadie lo vuelve a pedir (HUB_SHELL-F74). Los trabajos se apilan hasta reiniciar la app de ese dispositivo.
 Implicados: HUB-F201, HUB-F202
 QA: qa-hub §8, qa-hub-restaurant §16
 
@@ -195,7 +196,7 @@ Implicados: HUB_APP-F26
 QA: ninguno
 
 ### HUB_SHELL-F70 Imprimir el tique al cobrar, solo en el dispositivo que cobró
-Estado: parcial — con la impresora de red del dispositivo apagada o sin papel el tique no sale y nadie lo sabe, vaya directo o por la cola (hub#2494); si la pantalla estaba desconectada del canal en vivo al cobrar, o se recargó antes de oír la venta, no se imprime ni se avisa; la hora del papel es la de imprimir; y el papel no lleva quién atendió
+Estado: parcial — por la cola, con la impresora de red de quien la saca apagada, el tique vuelve «fallido» sin aviso (HUB_SHELL-F74), y una impresora de red sin papel pero encendida se da por impresa (HUB_PERIPHERALS-F06, hub#2716); si la pantalla estaba desconectada del canal en vivo al cobrar, o se recargó antes de oír la venta, no se imprime ni se avisa; la hora del papel es la de imprimir; y el papel no lleva quién atendió
 Vertical: comun
 Actor: sistema
 Pantalla: sales: Cobro
@@ -205,10 +206,11 @@ Pasos:
 3. Ventas compone el papel y espera hasta unos 10 s al número fiscal y al QR de VeriFactu; si en 15 s no hay papel, sale «El tique no se pudo preparar…».
 4. Camino directo: si este dispositivo tiene una impresora con función «Recibo» (de red o Bluetooth), el tique sale por ella. El hub no guarda nada.
 5. Camino por la cola: si no la tiene (un navegador, un móvil sin impresora), el tique se encola en el hub y lo saca el dispositivo dado de alta para «Recibo» (HUB_SHELL-F74).
-6. Si salió antes de que el QR estuviera listo: «El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.».
+6. Si la impresora «Recibo» de este dispositivo no lo coge (apagada, fuera de la red), a los ~13 s sale un aviso rojo que **se queda** hasta que la cajera actúa: «El tique NO se imprimió: la impresora no contesta. Comprueba que está encendida y con papel y pulsa «Reintentar».», con los botones «Reintentar» (vuelve a sacar ese mismo tique; si vuelve a fallar, vuelve a avisar con su «Reintentar») y «OK». No se manda a la cola: quien la saca es este mismo dispositivo, con la misma impresora apagada (hub#2494).
+7. Si salió antes de que el QR estuviera listo: «El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.».
 Entra: el aviso en vivo «venta cobrada» con la pantalla que la mandó (`sale.completed`, HUB-F60); los ajustes de Impresión; el papel que compone Ventas (`erp-sales-document`).
 Sale: el papel, o un trabajo en la cola del hub con clave `sale-<id>` (HUB-F190).
-Si falla: la venta nunca se cae. En la caja sale: «El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.» (en cola sin nadie); «El tique NO se imprimió. Vuelve a imprimirlo desde la pantalla del tique.» (no hay impresora ni cola); «El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.». Por el directo con la impresora de red apagada no sale nada en pantalla y el hub no tiene fila; por la cola, el dispositivo confirma «salió» y el hub lo marca hecho (leído en el código, sin ejecutar). Una venta hecha por la API o un flujo no la imprime ninguna caja. Sin Impresión instalada, o si la persona no puede leer sus ajustes (un rol personalizado sin `printing.view_settings`), no se imprime ni se avisa. Con más de 16 pantallas de la misma persona conectadas al canal en vivo, la 17.ª no oye la venta; una pantalla cuya persona no puede leer Ventas tampoco la oye (HUB-F60). Si el tique fue por la cola y el dispositivo que la saca tiene el canal parado o le falló, se queda esperando sin aviso en la caja ni fila en la campana (HUB_SHELL-F74).
+Si falla: la venta nunca se cae. En la caja sale: «El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.» (en cola sin nadie); «El tique NO se imprimió. Vuelve a imprimirlo desde la pantalla del tique.» (no hay impresora ni cola); «El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.». Por el directo con la impresora de red apagada, el aviso fijo con «Reintentar» del paso 6; el hub no tiene fila. Por la cola, el dispositivo que la saca contesta «falló» y el trabajo vuelve a la cola sin aviso en la caja (HUB_SHELL-F74). Una venta hecha por la API o un flujo no la imprime ninguna caja. Sin Impresión instalada, o si la persona no puede leer sus ajustes (un rol personalizado sin `printing.view_settings`), no se imprime ni se avisa. Con más de 16 pantallas de la misma persona conectadas al canal en vivo, la 17.ª no oye la venta; una pantalla cuya persona no puede leer Ventas tampoco la oye (HUB-F60). Si el tique fue por la cola y el dispositivo que la saca tiene el canal parado o le falló, se queda esperando sin aviso en la caja ni fila en la campana (HUB_SHELL-F74).
 Implicados: HUB-F60, HUB-F190, HUB-F199, HUB_PERIPHERALS-F06, PRINTING-F07, REC_FISCAL-F07, SALES-F01
 QA: R-09, L-04, qa-hub §8 (discrepa)
 
@@ -228,7 +230,7 @@ Implicados: HUB-F207, HUB_PERIPHERALS-F15, PRINTING-F13, SALES-F01
 QA: R-09, qa-hub §8
 
 ### HUB_SHELL-F72 Imprimir la comanda al disparar la ronda, solo en el TPV que la envió
-Estado: parcial — con la impresora de red apagada o sin papel la comanda no sale y nadie lo sabe (hub#2494); si no se pueden leer las líneas de la comanda, no se imprime nada y tampoco se avisa; y la hora del papel es la de imprimir
+Estado: parcial — por la cola, con la impresora de quien la saca apagada, la comanda vuelve «fallida» sin aviso (HUB_SHELL-F74); si no se pueden leer las líneas de la comanda, no se imprime nada y tampoco se avisa; y la hora del papel es la de imprimir
 Vertical: restaurante
 Actor: sistema
 Pantalla: sales: Vender
@@ -240,12 +242,12 @@ Pasos:
 5. Las demás cajas no imprimen; solo dan el aviso «Nueva comanda» (HUB_SHELL-F65).
 Entra: el aviso de comanda creada con la pantalla que la mandó; las líneas y la cabecera (de Cocina); el nombre de quien la disparó, leído a la lista de personas del hub y, si no está, al equipo de Personal.
 Sale: una hoja por función, clave `kitchen-<pedido>-<función>`.
-Si falla: nunca bloquea a la camarera. Una comanda sin caja que la disparó, con todas las pantallas cerradas o desconectadas (un pedido online de madrugada), no la encola nadie: ni papel ni aviso; y si la cola no tiene quien la saque, cada pantalla abierta saca el aviso de espera. Avisos: «No se imprimió la comanda de {estación} de {mesa}. Revisa la impresora y avisa en {estación}: la comanda está en la pantalla de cocina.»; «La comanda de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.». Nunca se desvía a la impresora de tiques. Sin nombre que poner (la persona ya no está, no se pudo leer), la línea de camarero no sale.
+Si falla: nunca bloquea a la camarera. Una comanda sin caja que la disparó, con todas las pantallas cerradas o desconectadas (un pedido online de madrugada), no la encola nadie: ni papel ni aviso; y si la cola no tiene quien la saque, cada pantalla abierta saca el aviso de espera. Avisos: «No se imprimió la comanda de {estación} de {mesa}. Revisa la impresora y avisa en {estación}: la comanda está en la pantalla de cocina.» — si fue la impresora de esa estación de este dispositivo la que no contestó, el aviso se queda hasta que la camarera actúa y lleva «Reintentar», que vuelve a sacar solo la hoja de esa estación (la otra ya tiene la suya; hub#2494); «La comanda de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.». Nunca se desvía a la impresora de tiques. Sin nombre que poner (la persona ya no está, no se pudo leer), la línea de camarero no sale.
 Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN-F08, PRINTING-F10, STAFF-F09
 QA: qa-hub-restaurant §08, BD-08
 
 ### HUB_SHELL-F73 Dar de alta este dispositivo como el que imprime
-Estado: parcial — una impresora USB nunca da de alta al dispositivo; quitarle la función a una impresora (o borrarla) no lo da de baja en el hub, que sigue contándolo como vivo para esa función; y el alta sigue latiendo aunque el canal de impresión se haya parado para siempre (sesión caducada al reconectar, retirada por el hub, saludo tardío): el dispositivo cuenta como vivo sin sacar nada hasta reiniciar la app
+Estado: parcial — una impresora USB nunca da de alta al dispositivo; quitarle la función a una impresora (o borrarla) no lo da de baja en el hub, que sigue contándolo como vivo para esa función; y el alta sigue latiendo aunque el canal de impresión se haya parado para siempre (sesión caducada al reconectar, retirada por el hub, saludo tardío): el dispositivo cuenta como vivo sin sacar nada hasta reiniciar la app (hub#2712)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -261,18 +263,18 @@ Implicados: HUB-F196, HUB-F197, HUB_APP-F18, HUB_PERIPHERALS-F04, PRINTING-F04
 QA: qa-hub §8, qa-hub-android §Fase 2
 
 ### HUB_SHELL-F74 Sacar los trabajos de la cola y confirmar que salieron
-Estado: parcial — el dispositivo confirma «salió» en cuanto deja el trabajo en su cola en memoria, no cuando sale el papel: con la impresora de red apagada el hub lo marca hecho y no sale (hub#2494)
+Estado: parcial — desde hub#2494 el dispositivo confirma «salió» cuando el papel llegó a la impresora y «falló» cuando no, pero un trabajo que falla vuelve a la cola sin despertar a nadie ni avisar en la caja o en la cocina (hub#2711)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Dado de alta, el dispositivo abre el canal de impresión del hub y se presenta con su sesión e identificador.
 2. Pide el trabajo de cada una de sus funciones; el hub le entrega el más antiguo.
-3. Lo manda a su impresora con esa función y contesta «salió».
+3. Lo manda a su impresora con esa función y espera: contesta «salió» cuando la impresora se queda el papel y «falló» con el motivo cuando no (una de red apagada, a los ~13 s).
 4. Cuando no queda nada, espera a que el hub le avise de que hay trabajo.
 5. Si se cae la conexión, se reconecta esperando cada vez más, y vuelve a confirmar lo que imprimió y no llegó a confirmar, para no sacar dos papeles.
 Entra: los trabajos de la cola, con el documento ya compuesto (HUB-F198, HUB-F199).
 Sale: «salió» o «falló» con el motivo por cada trabajo.
-Si falla: si el dispositivo no puede imprimirlo (ya no tiene impresora con esa función, «no printer on this device holds the … role»; una Bluetooth que no contesta), contesta «falló» y deja de pedir esa función. El trabajo vuelve a la cola, pero el hub no despierta a nadie: nadie lo vuelve a pedir hasta que llega otro de esa función o el dispositivo se reconecta; a los 5 intentos muere. Mientras, el dispositivo late y cuenta como vivo, y la campana calla. Si el hub le dice que no imprime nada aquí, que la sesión no vale o que saludó tarde, el canal se para para siempre (no reintenta en bucle) y solo lo anota en la consola, pero el alta sigue latiendo por su lado (HUB_SHELL-F73).
+Si falla: si el dispositivo no puede imprimirlo (ya no tiene impresora con esa función, «no printer on this device holds the … role»; una Bluetooth o una de red que no contesta), contesta «falló» y deja de pedir esa función. El trabajo vuelve a la cola, pero el hub no despierta a nadie: nadie lo vuelve a pedir hasta que llega otro de esa función o el dispositivo se reconecta; a los 5 intentos muere. Mientras, el dispositivo late y cuenta como vivo, y la campana calla. Si el hub le dice que no imprime nada aquí, que la sesión no vale o que saludó tarde, el canal se para para siempre (no reintenta en bucle) y solo lo anota en la consola, pero el alta sigue latiendo por su lado (HUB_SHELL-F73).
 Implicados: HUB-F198, HUB-F199, HUB-F200, HUB_APP-F18, HUB_PERIPHERALS-F06, PRINTING-F14
 QA: qa-hub-restaurant §16
 
@@ -320,12 +322,12 @@ Pasos:
 5. La app dice lo que pasó con lo que le contesta la puerta.
 Entra: la petición de la app (función, tipo de documento, documento, papel), por la puerta única del shell (`erplora.print`): ninguna app abre el hardware ni el diálogo del navegador por su cuenta.
 Sale: el papel, un trabajo en la cola (HUB-F190) o el diálogo de impresión.
-Si falla: dentro de la app instalada no hay respaldo de navegador: si no hay impresora ni cola, la respuesta es «no salió» y la app avisa. Un documento sin contenido estructurado no se encola (saldría en blanco). Con la impresora de red apagada vale lo de HUB_SHELL-F70.
+Si falla: dentro de la app instalada no hay respaldo de navegador: si no hay impresora ni cola, la respuesta es «no salió» y la app avisa. Un documento sin contenido estructurado no se encola (saldría en blanco). Con la impresora de red de este dispositivo apagada, la respuesta es «no salió» con `printerFailed` y la app que lo pidió decide cómo avisarlo (el aviso con «Reintentar» del shell es el del tique, la comanda y el vale).
 Implicados: HUB-F190, HUB_APP-F22, HUB_PERIPHERALS-F06, INVENTORY-F25, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F09
 QA: qa-hub §8
 
 ### HUB_SHELL-F78 Imprimir el vale de anulación al cancelar una ronda o anular un plato ya enviados
-Estado: parcial — con la impresora de red apagada o sin papel el vale no sale y nadie lo sabe, como la comanda (hub#2494); y si la cancelación o la anulación no la hizo ninguna caja y todas las pantallas están cerradas, no lo encola nadie
+Estado: parcial — por la cola, con la impresora de quien la saca apagada, el vale vuelve «fallido» sin aviso, como la comanda (HUB_SHELL-F74); y si la cancelación o la anulación no la hizo ninguna caja y todas las pantallas están cerradas, no lo encola nadie
 Vertical: restaurante
 Actor: sistema
 Pantalla: kitchen: Comandas
@@ -337,7 +339,7 @@ Pasos:
 5. Si en el TPV se anula **un plato** ya enviado (KITCHEN-F29) y Cocina lo tacha, la pantalla que lo anuló saca su vale con solo ese plato: «PLATO ANULADO · Mesa 4» (o «PLATO ANULADO» sin etiqueta) y el plato en negativo («-1x Croquetas»), en la impresora de su función, por el mismo camino del paso 4. Un menú anulado entero saca un vale por función con sus platos, no uno por plato; un plato del menú que ya se había servido no entra. Si era el último plato vivo de la ronda, la ronda se cancela y no sale otro vale de ronda encima.
 Entra: el aviso en vivo de comanda cancelada (`kitchen.order.cancelled`) o de plato anulado (`kitchen.item.voided`, con la línea de cocina), con la pantalla que lo pidió (HUB-F60); las líneas y la cabecera de la comanda, de Cocina.
 Sale: una hoja por función, clave `kitchen-void-<pedido>-<función>` para la ronda y `kitchen-void-<pedido>-<línea de venta>-<función>` para un plato (distintas de la de la comanda, para que la cola no las tome por repetidas); un mismo plato no se imprime dos veces aunque el aviso llegue repetido.
-Si falla: nunca bloquea la cancelación ni la anulación. Avisos en la pantalla que canceló: «No se imprimió el vale de anulación de {estación} de {mesa}. Avisa en {estación} de viva voz: esa comanda ya no se prepara.»; «El vale de anulación de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {estación} de viva voz: esa comanda ya no se prepara.». Para un plato, la misma frase con el plato: «No se imprimió el vale de anulación de {plato} para {estación} de {mesa}. Avisa en {estación} de viva voz: ese plato ya no se prepara.» y su versión «está en espera». Sin aviso del sistema del dispositivo. Nunca se desvía a la impresora de tiques. Si no se pueden leer las líneas, no sale nada y no se avisa (como la comanda, HUB_SHELL-F72).
+Si falla: nunca bloquea la cancelación ni la anulación. Avisos en la pantalla que canceló: «No se imprimió el vale de anulación de {estación} de {mesa}. Avisa en {estación} de viva voz: esa comanda ya no se prepara.»; «El vale de anulación de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {estación} de viva voz: esa comanda ya no se prepara.». Para un plato, la misma frase con el plato: «No se imprimió el vale de anulación de {plato} para {estación} de {mesa}. Avisa en {estación} de viva voz: ese plato ya no se prepara.» y su versión «está en espera». Si fue la impresora de esa estación de este dispositivo la que no contestó, el aviso se queda hasta que se actúa y lleva «Reintentar», que vuelve a sacar solo ese vale (hub#2494). Sin aviso del sistema del dispositivo. Nunca se desvía a la impresora de tiques. Si no se pueden leer las líneas, no sale nada y no se avisa (como la comanda, HUB_SHELL-F72).
 Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN-F22, KITCHEN-F28, KITCHEN-F29
 Pendiente de enlazar: printing — PRINTING-F10, la impresora con la función «Cocina» o «Barra» que saca la comanda saca también su vale de anulación
 QA: qa-hub-restaurant §7.13
@@ -351,14 +353,15 @@ QA: qa-hub-restaurant §7.13
 | Avisos en el navegador (Web Push) | no hecho (por diseño: decisión «sin push FCM por ahora») | — |
 | Permiso de avisos en contexto, una vez | hecho | HUB_SHELL-F68 |
 | Avisos con la pantalla apagada (Android) | hecho | HUB_SHELL-F69 |
-| Tique en el terminal que cobró | parcial (impresora apagada mudo, hub#2494) | HUB_SHELL-F70 |
+| Tique en el terminal que cobró | parcial (impresora apagada: aviso con «Reintentar» por el directo, mudo por la cola) | HUB_SHELL-F70 |
 | Cajón solo con efectivo, «Sin venta» con permiso y registro | no hecho (se abre con cualquier pago, sin manual) | HUB_SHELL-F71 |
-| Comanda al disparar, con quién la disparó | parcial (impresora apagada mudo; lectura fallida mudo) | HUB_SHELL-F72 |
+| Comanda al disparar, con quién la disparó | parcial (impresora apagada mudo por la cola; lectura fallida mudo) | HUB_SHELL-F72 |
 | Alta y baja del dispositivo que imprime | parcial (USB fuera; quitar función no da de baja; canal parado sigue «vivo») | HUB_SHELL-F73 |
-| Confirmación de papel real | no hecho (se confirma al encolar en el dispositivo) | HUB_SHELL-F74 |
+| Confirmación de papel real | parcial (red: se confirma cuando la impresora se queda los bytes; sin papel no se detecta) | HUB_SHELL-F74 |
 | Reintento de un trabajo que falló | parcial (vuelve a la cola sin despertar a nadie) | HUB_SHELL-F74 |
 | Comanda de un pedido sin caja con todas las pantallas cerradas | no hecho (no sale ni avisa) | HUB_SHELL-F72 |
-| Vale de anulación en la impresora de la comanda al cancelar la ronda o anular un plato | parcial (impresora apagada mudo, hub#2494) | HUB_SHELL-F78 |
+| Reintentar desde el aviso un papel que no salió (Square, Toast, Lightspeed) | hecho (tique, comanda y vale por el directo) | HUB_SHELL-F70, F72, F78 |
+| Vale de anulación en la impresora de la comanda al cancelar la ronda o anular un plato | parcial (impresora apagada mudo por la cola) | HUB_SHELL-F78 |
 | Cobertura por función visible | parcial (recalcula el estado; puede mentir) | HUB_SHELL-F75 |
 | Hora de la venta y nombre de quien atiende en el tique | no hecho | HUB_SHELL-F76 |
 | A4 con diálogo del sistema / navegador | hecho | HUB_SHELL-F77 |
@@ -391,6 +394,9 @@ papel del tique y en la fila de la cola del hub cuando va por ella.
   cerradas no la encola nadie (hueco, no regla).
 - **Una venta o una comanda nunca se caen por la impresión**: la impresión es posterior y sus
   fallos solo avisan.
+- **Un papel que la impresora de este dispositivo no cogió no se manda a la cola**: la sacaría este
+  mismo dispositivo con la misma impresora; se avisa con «Reintentar» y el aviso no se va solo
+  (`print.ts`, `print-on-sale-notice.ts`, hub#2494).
 - **La comanda y su vale de anulación nunca se desvían a la impresora de tiques** (`print-comanda.ts:263`, `print-void.ts`).
 - **Dentro de la app instalada no hay «impreso por el navegador»**: sin impresora ni cola la
   respuesta es «no salió» (`print.ts:354-362`).
@@ -419,8 +425,9 @@ papel del tique y en la fila de la cola del hub cuando va por ella.
 - `architecture/hub/print-queue.md` dice que el estado «atascado» llega resuelto y que ninguna
   pantalla lo recalcula; la tarjeta «Estado de impresión» de Ajustes lo recalcula (`classifyRole` en
   `print-coverage.ts`) y su «El dispositivo que imprimía esto no responde» no es el «sin atender» del hub.
-- `qa-hub.md` §8 pide «impresora caída → el trabajo espera en cola y se avisa»: con impresora de red
-  no se avisa ni espera (hub#2494) — `qa-hub §8 (discrepa)` en HUB_SHELL-F70.
+- `qa-hub.md` §8 pide «impresora caída → el trabajo espera en cola y se avisa»: por el directo se avisa
+  con «Reintentar» pero no espera en la cola (a propósito: la sacaría la misma impresora); por la cola
+  vuelve sin aviso (HUB_SHELL-F74) — `qa-hub §8 (discrepa)` en HUB_SHELL-F70.
 - `hand-book/hub/10-asistente-y-notificaciones.md` dice que al pulsar un aviso de la campana se va
   «a Sistema o a la app correspondiente»; la impresión parada lleva a Ajustes › Impresión. Tampoco
   cuenta los contadores de las apps ni las actualizaciones.

@@ -520,3 +520,39 @@ function tillHearingAll(base: unknown) {
   };
   return { client, emit };
 }
+
+// hub#2494 — the void slip's printer did not answer: the floor is told (as before) and can Retry
+// that station's slip, not the whole set.
+describe('a void slip whose printer did not answer (hub#2494)', () => {
+  it('warns with a Retry that prints only that station’s slip again', async () => {
+    const print = vi.fn(async (req: PrintRequest): Promise<PrintResult> =>
+      req.role === 'kitchen' && print.mock.calls.length === 1
+        ? { via: 'none', role: 'kitchen', error: 'unreachable', printerFailed: true }
+        : { via: 'bridge', role: req.role ?? '' },
+    );
+    const onFailure = vi.fn();
+
+    await onKitchenOrderCancelled(fakeClient([CROQUETAS, FLAN]), { order_id: 'k-1' }, { print, t, onFailure });
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    const failure = onFailure.mock.calls[0]![0];
+    expect(failure).toMatchObject({ orderId: 'k-1', role: 'kitchen', printerFailed: true });
+
+    await failure.retry();
+
+    expect(print).toHaveBeenCalledTimes(3);
+    expect(print.mock.calls[2]![0].role).toBe('kitchen');
+    expect(print.mock.calls[2]![0].jobId).toBe(print.mock.calls[0]![0].jobId);
+    expect(print.mock.calls[2]![0].data).toEqual(print.mock.calls[0]![0].data);
+    expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it('a slip with no printer at all offers no Retry', async () => {
+    const print = vi.fn(async (): Promise<PrintResult> => ({ via: 'none', role: 'kitchen', error: 'no printer' }));
+    const onFailure = vi.fn();
+
+    await onKitchenOrderCancelled(fakeClient([CROQUETAS]), { order_id: 'k-1' }, { print, t, onFailure });
+
+    expect(onFailure.mock.calls[0]![0].retry).toBeUndefined();
+  });
+});

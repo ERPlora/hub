@@ -60,6 +60,17 @@ export interface SaleTicketFailure {
    * and the till says that in words — `error` carries the code for the log, never for the screen.
    */
   notComposed?: boolean;
+  /**
+   * This till's receipt printer did not take the paper: switched off, out of paper (hub#2494).
+   * The till is told so — not «reprint from the ticket screen» — and gets {@link retry}.
+   */
+  printerFailed?: boolean;
+  /**
+   * Prints this same receipt again (same paper, same job) — the notice's «Retry» button. Only on a
+   * printer failure: with no printer or queue at all, retrying here would fail the same way.
+   * A Retry that fails again reports again, with its own Retry.
+   */
+  retry?: () => Promise<void>;
 }
 
 interface Deps {
@@ -161,7 +172,12 @@ async function printTicket(deps: Deps, saleId: string): Promise<void> {
       return;
     }
   } else if (result.via !== 'bridge') {
-    fail(deps, { saleId, error: result.error ?? 'receipt_not_delivered' });
+    fail(deps, {
+      saleId,
+      error: result.error ?? 'receipt_not_delivered',
+      // hub#2494: the till's own printer did not answer — the same receipt, again, from the notice.
+      ...(result.printerFailed ? { printerFailed: true, retry: () => printTicket(deps, saleId) } : {}),
+    });
     return;
   }
   // Delivered. If it went out before its fiscal number or QR, the till hears where the complete

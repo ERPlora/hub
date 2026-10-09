@@ -23,6 +23,24 @@ describe('toast()', () => {
     await toast('The PIN settings could not be read', 'warning', 8000, 'some-notice');
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: 'some-notice' }));
   });
+
+  // hub#2494 — a receipt whose printer did not answer is retried from the notice itself.
+  it('puts an action button before the close button when given one, and taps run its handler', async () => {
+    const handler = vi.fn();
+    await toast('The receipt did NOT print', 'danger', 0, undefined, { text: 'Retry', handler });
+    const buttons = (create.mock.calls[0]![0] as { buttons: { text: string; role?: string; handler?: () => void }[] })
+      .buttons;
+    expect(buttons.map((b) => b.text)).toEqual(['Retry', 'OK']);
+    expect(buttons[1]!.role).toBe('cancel');
+    buttons[0]!.handler!();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('without an action it keeps only the close button', async () => {
+    await toast('Saved', 'success');
+    const buttons = (create.mock.calls[0]![0] as { buttons: { text: string }[] }).buttons;
+    expect(buttons.map((b) => b.text)).toEqual(['OK']);
+  });
 });
 
 describe('dismissToast()', () => {

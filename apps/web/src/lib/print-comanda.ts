@@ -96,6 +96,14 @@ export interface ComandaPrintFailure {
    * the station is told to stop that dish and not the whole table.
    */
   dish?: string;
+  /** This device's printer for the station did not take the paper (switched off, out of paper — hub#2494). */
+  printerFailed?: boolean;
+  /**
+   * Prints this station's sheet again — the same paper, the same job, and only this station: the
+   * other one already has its paper (hub#2494). Only on a printer failure. A Retry that fails
+   * again reports again, with its own Retry.
+   */
+  retry?: () => Promise<void>;
 }
 
 /**
@@ -236,9 +244,8 @@ export async function onKitchenOrderCreated(
   // Another till fired it and prints it (hub#2029); the notice above was all this device owed.
   if (route === 'elsewhere') return;
 
-  // En secuencia y cada una con su try: una impresora sin papel no puede impedir que la otra
-  // estación reciba su comanda.
-  for (const group of groups) {
+  // One station's sheet. Also what a Retry runs (hub#2494): only that station, the same paper.
+  const printGroup = async (group: ComandaGroup): Promise<void> => {
     try {
       const result = await deps.print({
         role: group.role,
@@ -266,7 +273,13 @@ export async function onKitchenOrderCreated(
       // la comanda de cocina por la impresora de tiquets deja al camarero con el papel y a la
       // cocina sin comida.
       if (result.via === 'none') {
-        fail(deps, { orderId, role: group.role, label, error: result.error ?? 'comanda_not_delivered' });
+        fail(deps, {
+          orderId,
+          role: group.role,
+          label,
+          error: result.error ?? 'comanda_not_delivered',
+          ...(result.printerFailed ? { printerFailed: true, retry: () => printGroup(group) } : {}),
+        });
       } else if (result.via === 'queue' && result.awaitingHost) {
         // Encolada y sin nadie dado de alta para esa estación (hub#1731): la hoja no se ha perdido
         // —sale en cuanto se dé de alta la impresora— pero AHORA no va a por ella nadie, y una
@@ -288,7 +301,11 @@ export async function onKitchenOrderCreated(
         error: e instanceof Error ? e.message : String(e),
       });
     }
-  }
+  };
+
+  // En secuencia y cada una con su try: una impresora sin papel no puede impedir que la otra
+  // estación reciba su comanda.
+  for (const group of groups) await printGroup(group);
 }
 
 /**
