@@ -28,6 +28,8 @@ blueprint_seed_reglas_no_duplican
 capability_denied_listener_e2e
 dashboard_widgets_e2e
 emit_schema_contract_hub1076
+erasure_foreign_notice_hub2535                   # un aviso de borrado ajeno no llega a ninguna app
+                                                 # ni arranca automatizaciones (hub#2535)
 erasure_owner_gate_hub2485
 erasure_whatsapp_history_hub2477                 # el borrado sigue ficha → conversación → mensaje
                                                  # por las filas de whatsapp_inbox (hub#2477, hub#2474)
