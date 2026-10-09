@@ -1960,6 +1960,54 @@ mod tests {
         }
     }
 
+    /// Only what entered through the kernel brings its descendants along: an APP event that names
+    /// her is emptied, but what it caused (a sale, an invoice) is someone else's record and does
+    /// not name her.
+    #[tokio::test]
+    async fn what_an_app_event_about_her_caused_is_not_hers() {
+        let db = fresh_db().await;
+        two_whatsapp_customers(&db).await;
+        let named = json!({"customer_id": ANA});
+        let sale = json!({"sale_id": "s-1", "total": 1250});
+        let done = "delivered";
+        chained(
+            &db,
+            "x-updated",
+            HUB,
+            CUSTOMERS,
+            "customer.updated",
+            done,
+            "",
+            named,
+        )
+        .await;
+        chained(
+            &db,
+            "x-sale",
+            HUB,
+            "sales",
+            "sale.completed",
+            done,
+            "x-updated",
+            sale,
+        )
+        .await;
+
+        on_event(
+            &db,
+            &registry_with_inbox(true),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(event_payload(&db, "x-updated").await, EMPTY);
+        assert!(event_payload(&db, "x-sale").await.contains("1250"));
+    }
+
     #[tokio::test]
     async fn a_whatsapp_message_still_in_flight_keeps_its_payload() {
         let db = fresh_db().await;
