@@ -177,6 +177,14 @@ class TestAdminCallback:
         assert fake.calls == []
         assert not get_user_model().objects.exists()
 
+    def test_a_next_that_is_no_deep_link_is_explained_in_the_request_s_language(self, client, fake_saas):
+        fake_saas(body=ROOT)
+        response = client.post("/auth/callback", {"code": "c1", "next": "/"}, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es")
+        assert response.json()["error"] == {
+            "code": "invalid_next",
+            "message": "next debe ser el enlace directo /admin/hub/<slug>/ de un hub.",
+        }
+
     @pytest.mark.parametrize(
         ("saas_answer", "error"),
         [

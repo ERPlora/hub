@@ -23,8 +23,16 @@ def test_demo_is_a_free_module_of_the_organization_group():
     assert config.premium is False
     # The same icon as its menu entry, with its Iconify set prefix.
     assert config.icon == "ion:flask-outline"
-    # The apps page shows icon and name only (Ioan, 2026-10-13).
-    assert not hasattr(config, "description")
+
+
+def test_demo_has_the_store_metadata_but_stays_out_of_the_store():
+    # Round 16 (PLAN §21): every module declares what the public store shows; demo is the technical
+    # reference and is not sold (its WORKBOOK), so listed = False and it belongs to no vertical.
+    config = demo()
+    assert 0 < len(str(config.summary)) <= 120
+    assert str(config.description)
+    assert config.verticals == []
+    assert config.listed is False
 
 
 def test_permissions():

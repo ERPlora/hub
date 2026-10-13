@@ -60,6 +60,9 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("demo")
     lazies = [
         config.verbose_name,
+        # The public store's texts (round 16): register_apps writes them in en and es.
+        config.summary,
+        config.description,
         *(nav.label for nav in config.navigation),
         queries.ITEM_NOT_FOUND,
         services.ITEM_DONE,

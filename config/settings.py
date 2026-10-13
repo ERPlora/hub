@@ -3,10 +3,12 @@
 Configuration comes from the environment (or a ``.env`` file) through python-decouple. ``DEBUG`` is
 off unless set: local development opts in with ``DEBUG=True`` in ``.env`` and then gets defaults for
 ``compose.yaml`` and the local SaaS; without it the settings demand ``SECRET_KEY``, ``SAAS_URL`` and
-``INTERNAL_SHARED_SECRET``.
+``INTERNAL_SHARED_SECRET``. The production variables are the contract of ``aws-next/stacks/prod/apps.tf``
+(``aws-next/README.md``, «Contrato app ↔ infra»).
 """
 
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from decouple import Csv, config
 from live.csp import base_policy, debug_policy
@@ -16,8 +18,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Off by default: a missing variable must never run production with DEBUG.
 DEBUG = config("DEBUG", default=False, cast=bool)
 # Only local development may fall back to a known key; production refuses to start without one.
-SECRET_KEY = config("SECRET_KEY", default="django-insecure-local-only") if DEBUG else config("SECRET_KEY")
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default=".localhost,127.0.0.1,localhost", cast=Csv())
+SECRET_KEY = (
+    config("SECRET_KEY", default="django-insecure-local-only")
+    if DEBUG
+    else config("SECRET_KEY")
+)
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS", default=".localhost,127.0.0.1,localhost", cast=Csv()
+)
+
+# HTTPS: the ALB terminates TLS, redirects HTTP to HTTPS and sets X-Forwarded-Proto (daphne
+# --proxy-headers reads it as well). Django does not redirect: the SaaS calls /internal over plain
+# HTTP on the private name (saas → hub.erplora.internal), never through the ALB.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# HSTS on the hub's own hosts (<slug>.erplora.com, hubs.erplora.com). Subdomains and the preload list
+# are the apex's domain-wide decision (erplora.com, the SaaS): opt-in here.
+SECURE_HSTS_SECONDS = config(
+    "SECURE_HSTS_SECONDS", default=0 if DEBUG else 31536000, cast=int
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False, cast=bool
+)
+SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=False, cast=bool)
+# What the platform answers elsewhere: the ALB redirects to HTTPS (W008); HSTS for subdomains and the
+# preload list is the apex's (W005, W021).
+SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W008", "security.W021"]
 
 VITE_DEV_SERVER = "http://localhost:5173"
 
@@ -29,6 +56,8 @@ INSTALLED_APPS = [
     "daphne",
     # Before the admin: base/templates/admin/ overrides its templates (the chosen hub's banner).
     "base",
+    # The mirror of the SaaS's `shared` schema (round 16): only base/catalog.py writes it.
+    "shared",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -86,7 +115,21 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Database: Postgres only, also locally (compose.yaml). Django's native pool, never
-# CONN_MAX_AGE > 0 with it.
+# CONN_MAX_AGE > 0 with it. In production every connection verifies Aurora's certificate and host
+# name (DB_SSLMODE=verify-full, DB_SSLROOTCERT = the RDS bundle in the image) and names its task
+# (DB_APPLICATION_NAME, pg_stat_activity); each option only when set. A dead database fails within
+# DB_CONNECT_TIMEOUT seconds, both waiting for a pooled connection and per connection attempt
+# (psycopg: 30 s and 130 s), so /readyz answers 503 before its probes give up.
+
+db_optional_options = {
+    "DB_SSLMODE": "sslmode",
+    "DB_SSLROOTCERT": "sslrootcert",
+    "DB_APPLICATION_NAME": "application_name",
+}
+db_connect_timeout = config("DB_CONNECT_TIMEOUT", default=5, cast=int)
+# Not test_hub: that one belongs to the packages/live suite, which may run at the same time. Two runs
+# of this suite at once (two sessions, two checkouts) each set their own TEST_DB_NAME, as saas-next.
+TEST_DB_NAME = config("TEST_DB_NAME", default="test_hub_next")
 
 DATABASES = {
     "default": {
@@ -96,21 +139,82 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD", default="hub"),
         "HOST": config("DB_HOST", default="127.0.0.1"),
         "PORT": config("DB_PORT", default=5432, cast=int),
-        "OPTIONS": {"pool": {"min_size": 1, "max_size": 8}},
-        # Not test_hub: that one belongs to the packages/live suite, which may run at the same time.
-        "TEST": {"NAME": "test_hub_next"},
+        "OPTIONS": {
+            "pool": {"min_size": 1, "max_size": 8, "timeout": db_connect_timeout},
+            "connect_timeout": db_connect_timeout,
+            **{
+                option: value
+                for env, option in db_optional_options.items()
+                if (value := config(env, default=""))
+            },
+        },
+        "TEST": {"NAME": TEST_DB_NAME},
     }
 }
 
+# The SaaS's `saas` database, schema `shared`, only for register_apps (round 16, PLAN §21; spec §3.3).
+# Declared only where its credentials exist: in production the worker task (SHARED_DB_USER, role
+# hub_shared), locally always (compose.yaml's user). Straight to Aurora's writer (the PgBouncer
+# sidecar only knows hub_app) with the TLS and timeout of every direct connection; one short
+# connection when the worker starts, no pool.
+SHARED_DB_USER = config("SHARED_DB_USER", default="hub" if DEBUG else "")
+if SHARED_DB_USER:
+    DATABASES["shared"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config("SHARED_DB_NAME", default="saas"),
+        "USER": SHARED_DB_USER,
+        "PASSWORD": config("SHARED_DB_PASSWORD", default="hub")
+        if DEBUG
+        else config("SHARED_DB_PASSWORD"),
+        "HOST": config("DB_HOST", default="127.0.0.1"),
+        "PORT": config("DB_PORT", default=5432, cast=int),
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": {
+            option: value
+            for option, value in DATABASES["default"]["OPTIONS"].items()
+            if option != "pool"
+        },
+        "TEST": {"NAME": f"{TEST_DB_NAME}_shared"},
+    }
+# First: the models of `shared` go to that alias only (phase 2's TenantRouter goes after it).
+DATABASE_ROUTERS = ["base.routers.SharedRouter"]
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project, a
+# TTL on every key (never TIMEOUT=None) and 2 s socket timeouts (a Valkey that hangs fails the call,
+# not the request; Django hands OPTIONS to redis-py); otherwise this process's memory.
+
+VALKEY_URL = config("VALKEY_URL", default="")
+CACHES = {
+    "default": (
+        {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": VALKEY_URL,
+            "KEY_PREFIX": "hub",
+            "TIMEOUT": 300,
+            "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
+        }
+        if VALKEY_URL
+        else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    )
+}
 
 # Login through the SaaS (PLAN-SAAS §2.1): its URL, and the secret both sign /internal calls with
 # (the same value in saas-next). Production refuses to start without them.
 
-# The SaaS is erplora.com, locally http://localhost:8001 (hubs.localhost is the Hub admin's host).
-SAAS_URL = config("SAAS_URL", default="http://localhost:8001") if DEBUG else config("SAAS_URL")
+# The SaaS is erplora.com, locally http://localhost:8001 (hubs.localhost is the Hub admin's host):
+# SAAS_URL is where the browser goes (/hub-login/, the admin's Hubs page, the logout).
+SAAS_URL = (
+    config("SAAS_URL", default="http://localhost:8001") if DEBUG else config("SAAS_URL")
+)
+# Where the Hub calls the SaaS's /internal/*: the ALB answers 404 to it, so production uses the private
+# name (http://saas.erplora.internal:8000); without it, the public URL (local development).
+SAAS_INTERNAL_URL = config("SAAS_INTERNAL_URL", default=SAAS_URL)
 INTERNAL_SHARED_SECRET = (
-    config("INTERNAL_SHARED_SECRET", default="local-internal-shared-secret") if DEBUG else config("INTERNAL_SHARED_SECRET")
+    config("INTERNAL_SHARED_SECRET", default="local-internal-shared-secret")
+    if DEBUG
+    else config("INTERNAL_SHARED_SECRET")
 )
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
 # for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
@@ -122,7 +226,9 @@ PLATFORM_HOST_LABEL = "hubs"
 # Password validation
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -139,6 +245,10 @@ USE_TZ = True
 # Content Security Policy (Django's native middleware, with a nonce per response).
 
 SECURE_CSP = debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy()
+# form-action filters the whole redirect chain of a form post: the SPA's logout POSTs to /auth/logout,
+# which answers 302 to the SaaS's logout (one hop, no page of our own in between).
+saas_origin = "{0.scheme}://{0.netloc}".format(urlsplit(SAAS_URL))
+SECURE_CSP["form-action"] = [*SECURE_CSP["form-action"], saas_origin]
 
 # Static files: WhiteNoise. Vite already hashes its build, so no Manifest storage; the SPA build
 # is served under /static/spa/ (Vite's `base`) and its hashed assets are immutable.
@@ -152,13 +262,30 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
 WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/spa/assets/"
+# Django's two finders plus the modules' documentation images: apps/<id>/docs/img/ is published as
+# /static/catalog/<id>/img/ (round 16, spec §4.4), on hubs.erplora.com and on every hub.
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "base.catalog.AppImagesFinder",
+]
+
+# The apps' registry in the SaaS (round 16, PLAN §21; spec §4). The image's build fixes the release:
+# APP_VERSION (the commit's sha) and APP_RELEASED_AT (its time, ISO 8601), which register_apps
+# demands in production and which decide that an older release never overwrites a newer one.
+APP_VERSION = config("APP_VERSION", default="")
+APP_RELEASED_AT = config("APP_RELEASED_AT", default="")
+# translate_workbooks (development only: the anthropic client is a dev dependency; ANTHROPIC_API_KEY
+# in the local .env) writes each module's WORKBOOK.en.md with this model.
+WORKBOOK_TRANSLATION_MODEL = config(
+    "WORKBOOK_TRANSLATION_MODEL", default="claude-haiku-5-5"
+)
 
 # Operations, live queries and the SPA (packages/live).
 
 LIVE = {
     "context_builder": "base.operations.HubContextBuilder",
     "control_alias": "default",
-    "apps_dirs": [BASE_DIR / "apps"],
     # Hub slugs (live.slugs): 3–63 characters in production; local development also opens the
     # one-letter demo hubs a and b (a.localhost:8000, b.localhost:8000).
     "hub_slug_min_length": 1 if DEBUG else 3,
@@ -167,16 +294,63 @@ LIVE = {
         "manifest": SPA_DIST / ".vite" / "manifest.json",
         "dev_server": VITE_DEV_SERVER if DEBUG else None,
         "palette_default": "erplora",
-        "palettes": ["erplora"],
+        # THEME_PALETTES of packages/ui/src/shell/theme.ts: the ep_palette cookie may name any of them.
+        "palettes": [
+            "erplora",
+            "terracotta",
+            "corporate",
+            "minimal",
+            "forest",
+            "ocean",
+            "violet",
+        ],
     },
     # The repo is its own pnpm workspace (packages/ui is a submodule), so Vite runs from here.
     "vite": {"command": ["pnpm", "run", "dev"], "cwd": str(BASE_DIR)},
 }
 
-# Email
+# Email: the console locally; in production the SES API signed by the task role (no static keys,
+# PLAN-AWS §3), or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
+smtp_email_backend = "django.core.mail.backends.smtp.EmailBackend"
+ses_email_backend = "django_ses.SESBackend"
+if DEBUG:
+    default_email_backend = "django.core.mail.backends.console.EmailBackend"
+else:
+    default_email_backend = (
+        ses_email_backend if config("SES_REGION", default="") else smtp_email_backend
+    )
+email_backend = config("EMAIL_BACKEND", default=default_email_backend)
+MAILERS = {"default": {"BACKEND": email_backend}}
+if email_backend == ses_email_backend:
+    AWS_SES_REGION_NAME = config("SES_REGION")
+    AWS_SES_REGION_ENDPOINT = f"email.{AWS_SES_REGION_NAME}.amazonaws.com"
+    # The throttle first calls ses:GetSendQuota, which the task role may not (only SendEmail/SendRawEmail).
+    AWS_SES_AUTO_THROTTLE = None
+elif email_backend == smtp_email_backend:
+    MAILERS["default"]["OPTIONS"] = {
+        "host": config("EMAIL_HOST", default="localhost"),
+        "port": config("EMAIL_PORT", default=587, cast=int),
+        "username": config("EMAIL_HOST_USER", default=""),
+        "password": config("EMAIL_HOST_PASSWORD", default=""),
+        "use_tls": config("EMAIL_USE_TLS", default=True, cast=bool),
+        "timeout": 10,
+    }
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@erplora.com")
+
+# Logging: everything to the console (CloudWatch Logs in production), at LOG_LEVEL.
+
+LOG_LEVEL = config("LOG_LEVEL", default="INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"}
+    },
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    # Django's own logger writes once, through the same handler (not also through its DEBUG-only one).
+    "loggers": {
+        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False}
     },
 }

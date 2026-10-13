@@ -67,3 +67,22 @@ def test_spa_config_points_the_auth_gate_at_the_saas_login_of_its_hub(client, se
     _, config = json_block(client.get("/demo/items", HTTP_HOST=host), "spa-config")
     # Without next: the SPA's auth gate appends `&next=` itself.
     assert config["loginUrl"] == f"http://localhost:8001/hub-login/?hub={hub}"
+
+
+def test_the_csp_header_lets_the_logout_form_go_on_to_the_saas(client, settings):
+    # /auth/logout answers 302 to the SaaS's logout; form-action filters that redirect too.
+    response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
+    directives = dict(
+        directive.strip().split(" ", 1) for directive in response["Content-Security-Policy"].split(";") if directive.strip()
+    )
+    assert directives["form-action"] == f"'self' {settings.SAAS_URL.rstrip('/')}"
+
+
+@pytest.mark.parametrize(
+    ("cookie", "painted"),
+    [*[(p, p) for p in ("erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet")], ("neon", "erplora")],
+)
+def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(client, cookie, painted):
+    client.cookies["ep_palette"] = cookie
+    response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
+    assert f'data-ep-palette="{painted}"' in response.content.decode()

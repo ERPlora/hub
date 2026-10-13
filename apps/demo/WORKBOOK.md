@@ -60,6 +60,8 @@ Tabla con Nombre, Estado («Abierto» / «Hecho»), Líneas (cuántas tiene) y A
 puede gestionar. Tocar una fila abre la ficha. Encima, las cifras «Abiertos», «Hechos» y «Líneas»,
 solo para quien puede gestionar.
 
+![La lista de elementos en el móvil, con las cifras, el buscador y el filtro de estado](docs/img/items-list.png)
+
 ### Ficha del elemento
 Nombre, estado, nota y la lista de líneas (texto y cantidad, en el orden en que se añadieron).
 Acciones para quien puede gestionar: «Editar», «Eliminar» y «Añadir línea». Si otra persona cambia

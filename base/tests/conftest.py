@@ -4,9 +4,11 @@ import json
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connections
 
 from base import auth
 from base.models import Membership
+from shared.models import App, AppDoc
 
 SECRET = "test-internal-secret"
 ANA = {"user_id": "42", "email": "ana@example.com", "name": "Ana", "locale": "es", "role": "hub_manager"}
@@ -30,8 +32,9 @@ def superuser(db):
 
 @pytest.fixture
 def saas(settings):
-    """The local SaaS's URL and the shared secret, whatever the environment says."""
+    """The local SaaS's URLs (public and internal) and the shared secret, whatever the environment says."""
     settings.SAAS_URL = "http://localhost:8001"
+    settings.SAAS_INTERNAL_URL = "http://localhost:8001"
     settings.INTERNAL_SHARED_SECRET = SECRET
 
 
@@ -58,3 +61,23 @@ def fake_saas(monkeypatch, saas):
         return fake
 
     return install
+
+
+@pytest.fixture(scope="session")
+def shared_schema(django_db_setup, django_db_blocker):
+    """The SaaS's ``shared`` schema in the test database of the ``shared`` alias (``test_hub_next_shared``).
+
+    The Hub never migrates it (``SharedRouter``), so it is built here from the mirror, as the SaaS's
+    migration creates it: the schema, then both tables with their unique constraint. Tests that use
+    it ask for ``django_db(databases=["default", "shared"])``, whose transaction rolls their rows back.
+    """
+    with django_db_blocker.unblock():
+        connection = connections["shared"]
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS shared")
+            cursor.execute("SELECT to_regclass('shared.app')")
+            exists = cursor.fetchone()[0] is not None
+        if not exists:
+            with connection.schema_editor() as editor:
+                editor.create_model(App)
+                editor.create_model(AppDoc)

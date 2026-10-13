@@ -101,6 +101,14 @@ def test_the_api_of_a_host_that_is_no_hub_is_a_404_envelope(client, path):
     assert (response.status_code, response.json()["error"]["code"]) == (404, "not_found")
 
 
+@pytest.mark.parametrize(("language", "message"), [("en", "Not found"), ("es", "No encontrado.")])
+def test_the_404_envelope_of_a_host_that_is_no_hub_is_the_api_s_own_in_the_request_s_language(client, language, message):
+    # The same envelope as an unknown API path (live.api_errors), in the language the browser asks for.
+    no_hub = client.get("/api/me", HTTP_HOST="www.localhost:8000", HTTP_ACCEPT_LANGUAGE=language)
+    unknown = client.get("/api/nope", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT_LANGUAGE=language)
+    assert no_hub.json() == unknown.json() == {"error": {"code": "not_found", "message": message}}
+
+
 def test_the_login_callback_of_a_host_that_is_no_hub_is_not_found(client):
     response = client.post("/auth/callback", {"code": "c1", "next": "/"}, HTTP_HOST="hub.localhost:8000")
     assert response.status_code == 404
@@ -205,6 +213,16 @@ class TestPlatformHost:
     ])  # fmt: skip
     def test_health_static_and_auth_are_left_alone(self, client, path, method, status):
         assert browse(client, path, PLATFORM, method=method).status_code == status
+
+    def test_a_module_s_documentation_image_is_served_without_a_session(self, client, settings):
+        # Round 16 (spec §4.4): the SaaS's store links /static/catalog/<id>/img/ on this host; WhiteNoise
+        # serves what AppImagesFinder publishes (from the finders here, from STATIC_ROOT once collected).
+        settings.WHITENOISE_USE_FINDERS = True
+        response = browse(client, "/static/catalog/demo/img/items-list.png", PLATFORM)
+        assert response.status_code == 200
+        assert response["Content-Type"] == "image/png"
+        assert not response.has_header("Location")
+        assert b"".join(response.streaming_content).startswith(b"\x89PNG")
 
     def test_csp_reports_are_left_alone(self, client):
         response = client.post("/csp-report/", "{}", content_type="application/csp-report", HTTP_HOST=PLATFORM)

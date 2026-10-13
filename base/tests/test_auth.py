@@ -160,6 +160,29 @@ class TestRedeemCodeForTheHubAdmin:
         assert fake.calls == []
 
 
+# In production the ALB answers 404 to /internal/* (aws-next/stacks/shared/alb.tf): the Hub reaches the
+# SaaS's /internal over the private name (SAAS_INTERNAL_URL), the browser over the public one (SAAS_URL).
+PUBLIC = "https://erplora.com"
+INTERNAL = "http://saas.erplora.internal:8000"
+
+
+class TestInternalUrl:
+    def test_the_redeem_goes_to_the_internal_url_with_the_same_signature(self, fake_saas, settings):
+        fake = fake_saas()
+        settings.SAAS_URL, settings.SAAS_INTERNAL_URL = PUBLIC, f"{INTERNAL}/"
+        assert auth.redeem_code("c1", "a").ok
+        [call] = fake.calls
+        assert call["url"] == f"{INTERNAL}/internal/auth/redeem"
+        timestamp = call["headers"]["X-Erplora-Timestamp"]
+        assert call["headers"]["X-Erplora-Signature"] == auth.sign(SECRET, timestamp, call["body"])
+
+    def test_the_browser_redirects_keep_the_public_url(self, settings):
+        settings.SAAS_URL, settings.SAAS_INTERNAL_URL = PUBLIC, f"{INTERNAL}/"
+        assert auth.login_url("a", "/demo/items") == f"{PUBLIC}/hub-login/?hub=a&next=/demo/items"
+        assert auth.admin_hubs_url("invalid_code") == f"{PUBLIC}/admin/accounts/hubs/?error=invalid_code"
+        assert auth.saas_url("/accounts/logout/") == f"{PUBLIC}/accounts/logout/"
+
+
 class _SaasHandler(BaseHTTPRequestHandler):
     answer: tuple[int, bytes] = (200, json.dumps(ANA).encode())
     received: list[dict] = []
@@ -184,7 +207,9 @@ def local_saas(settings):
     server = HTTPServer(("127.0.0.1", 0), _SaasHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    settings.SAAS_URL = f"http://127.0.0.1:{server.server_port}"
+    # The redeem is server-to-server: it goes to the internal URL, never to the public one.
+    settings.SAAS_URL = "https://erplora.com"
+    settings.SAAS_INTERNAL_URL = f"http://127.0.0.1:{server.server_port}"
     yield _SaasHandler
     server.shutdown()
     server.server_close()
@@ -204,5 +229,5 @@ class TestOverHttp:
         assert auth.redeem_code("c1", "a").error == "invalid_code"
 
     def test_a_closed_port_is_saas_unavailable(self, local_saas, settings):
-        settings.SAAS_URL = "http://127.0.0.1:9"
+        settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
         assert auth.redeem_code("c1", "a").error == "saas_unavailable"

@@ -21,6 +21,11 @@ def test_healthz(client):
     assert (response.status_code, response.json()) == (200, {"status": "ok"})
 
 
+def test_readyz(client):
+    response = client.get("/readyz", HTTP_HOST=HOST)
+    assert (response.status_code, response.json()) == (200, {"status": "ok"})
+
+
 def test_openapi(client):
     assert client.get("/api/openapi.json", HTTP_HOST=HOST).status_code == 200
 

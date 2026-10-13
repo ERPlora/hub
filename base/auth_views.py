@@ -18,6 +18,7 @@ from django.conf import settings
 from django.contrib.auth import logout
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.utils import translation
+from django.utils.translation import gettext
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
@@ -63,7 +64,7 @@ def _admin_callback(request: HttpRequest) -> HttpResponse:
     next_path = request.POST.get("next")
     slug = admin_hub_slug(next_path)
     if slug is None:
-        error = OperationError("next must be the deep link /admin/hub/<slug>/ of a hub.", code=INVALID_NEXT)
+        error = OperationError(gettext("next must be the deep link /admin/hub/<slug>/ of a hub."), code=INVALID_NEXT)
         return JsonResponse(error.envelope(), status=error.status)
     result = auth.redeem_code(request.POST.get("code"), slug, audience=auth.HUB_ADMIN_AUDIENCE)
     if not result.ok:

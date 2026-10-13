@@ -22,6 +22,7 @@ import {
   shown,
   startRunserver,
   uniqueName,
+  viteReady,
   waitFor,
 } from './helpers';
 
@@ -71,6 +72,7 @@ test('runserver down 10 s → «Reconnecting…», one reconnection, same subscr
   startRunserver();
   const bootMs = await waitFor(healthy, 60_000);
   const requestsBeforeHealthy = liveRequests.length - firstAfterKill;
+  await waitFor(viteReady, 60_000); // the new tab's HTML loads its modules from Vite
 
   // Another tab creates an item while the first one is (still) reconnecting.
   const other = await context.newPage();

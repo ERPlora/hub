@@ -2,10 +2,14 @@
 
 Without a session, a browser goes to the SaaS's ``/hub-login/?hub=<slug>&next=<path>``
 (:func:`login_url`). The SaaS answers with a form that POSTs a one-time code to ``/auth/callback``,
-and the Hub redeems it server-side (:func:`redeem_code`): ``POST {SAAS_URL}/internal/auth/redeem``
+and the Hub redeems it server-side (:func:`redeem_code`): ``POST {SAAS_INTERNAL_URL}/internal/auth/redeem``
 with ``{"code", "hub"}``, signed with HMAC-SHA256 over ``f"{timestamp}.{raw_body}"`` (key
 ``INTERNAL_SHARED_SECRET``), the scheme of Stripe's webhook signatures. The HTTP call is
 :func:`post`, which tests replace.
+
+Two URLs of the SaaS: ``SAAS_URL`` (:func:`saas_url`) is where the browser goes; every ``/internal/*``
+call goes to ``SAAS_INTERNAL_URL`` (:func:`saas_internal_url`), the private name in production,
+because the ALB answers 404 to ``/internal`` from outside.
 
 The staff's jump to the Hub admin (round 13, PLAN §18.1) is the same exchange with the audience
 ``hub-admin``: it starts on the SaaS admin's Hubs page (:func:`admin_hubs_url`), lands on the
@@ -88,7 +92,13 @@ class RedeemResult:
 
 
 def saas_url(path: str) -> str:
+    """``path`` on the SaaS's public URL: for the browser."""
     return f"{settings.SAAS_URL.rstrip('/')}{path}"
+
+
+def saas_internal_url(path: str) -> str:
+    """``path`` on the SaaS's internal URL: for every server-to-server ``/internal/*`` call."""
+    return f"{settings.SAAS_INTERNAL_URL.rstrip('/')}{path}"
 
 
 def login_url(slug: str, next_path: str | None = None, error: str | None = None) -> str:
@@ -148,7 +158,7 @@ def redeem_code(code: str | None, slug: str, audience: str = HUB_SESSION_AUDIENC
         SIGNATURE_HEADER: sign(settings.INTERNAL_SHARED_SECRET, timestamp, body),
     }
     try:
-        status, answer = post(saas_url(REDEEM_PATH), body, headers, TIMEOUT_SECONDS)
+        status, answer = post(saas_internal_url(REDEEM_PATH), body, headers, TIMEOUT_SECONDS)
     except OSError as exc:
         logger.warning("Redeeming a login code for hub %r: the SaaS is unreachable (%s).", slug, exc)
         return RedeemResult(error=SAAS_UNAVAILABLE)

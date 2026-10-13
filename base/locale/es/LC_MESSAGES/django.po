@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-13 19:09+0200\n"
+"POT-Creation-Date: 2026-10-13 22:13+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,55 +18,63 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
 "1 : 2;\n"
 
-#: admin.py:48
+#: admin.py:50
 #, python-format
 msgid "Hub: %(slug)s"
 msgstr "Hub: %(slug)s"
 
-#: apps.py:13
+#: apps.py:15
 msgid "Base"
 msgstr "Base"
 
-#: models.py:25
+#: auth_views.py:67
+msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
+msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
+
+#: middleware.py:69
+msgid "Not found"
+msgstr "No encontrado."
+
+#: models.py:26
 msgid "Owner"
 msgstr "Propietario"
 
-#: models.py:26
+#: models.py:27
 msgid "Admin"
 msgstr "Administrador"
 
-#: models.py:27
+#: models.py:28
 msgid "Manager"
 msgstr "Encargado"
 
-#: models.py:28
+#: models.py:29
 msgid "Employee"
 msgstr "Empleado"
 
-#: models.py:34
+#: models.py:35
 msgid "user"
 msgstr "usuario"
 
-#: models.py:37
+#: models.py:38
 msgid "host"
 msgstr "host"
 
-#: models.py:39
+#: models.py:40
 msgid "Enter the first label of the host, e.g. “a” for a.localhost."
 msgstr "Introduce la primera etiqueta del host, p. ej. «a» para a.localhost."
 
-#: models.py:40
+#: models.py:41
 msgid "First label of the host, e.g. “a” for a.localhost."
 msgstr "Primera etiqueta del host, p. ej. «a» para a.localhost."
 
-#: models.py:42
+#: models.py:43
 msgid "role"
 msgstr "rol"
 
-#: models.py:45
+#: models.py:46
 msgid "membership"
 msgstr "membresía"
 
-#: models.py:46
+#: models.py:47
 msgid "memberships"
 msgstr "membresías"

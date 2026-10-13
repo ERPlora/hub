@@ -24,6 +24,8 @@ COPY packages/ui packages/ui
 COPY tsconfig.json vite.config.ts ./
 COPY frontend frontend
 COPY apps apps
+# Build-time scripts (gen:app-icons): vue-tsc checks the tests that import them.
+COPY scripts scripts
 RUN pnpm build
 
 # 2) The virtualenv, the compiled catalogues and the collected static files; no database, no secrets.
@@ -46,8 +48,11 @@ RUN find packages/live/live -name '*.po' -exec sh -c 'msgfmt --check-format -o "
  && uv sync --frozen --no-dev --no-editable
 COPY . .
 COPY --from=web /app/frontend/dist frontend/dist
+# register_apps --check (round 16, spec §4.3): no image with invalid module metadata, icons or
+# documentation; it reads only files (no database, no network).
 RUN DEBUG=1 python manage.py compilemessages --ignore=packages \
  && DEBUG=1 python manage.py collectstatic --noinput \
+ && DEBUG=1 python manage.py register_apps --check \
  && rm -rf packages
 
 # 3) Runtime: read-only filesystem except /tmp (the sidecar writes its config there).
@@ -67,6 +72,12 @@ RUN useradd --system --uid 10001 --home-dir /app app
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/project /app/project
 WORKDIR /app/project
+# The release travels with the image (round 16, spec §4.3): deploy.yml passes the commit's sha and its
+# time (ISO 8601); register_apps refuses to write without them in production. Late, for the cache.
+ARG APP_VERSION=""
+ARG APP_RELEASED_AT=""
+ENV APP_VERSION=${APP_VERSION} \
+    APP_RELEASED_AT=${APP_RELEASED_AT}
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

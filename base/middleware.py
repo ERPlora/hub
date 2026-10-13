@@ -6,7 +6,8 @@ hub path (the SPA, ``/api``, ``/auth``…), before ninja's session auth, so an a
 the 404 envelope and not a 401. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``)
 is no hub either: it is marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The
 Hub admin lives only there (PLAN §18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404,
-never the admin's own login. Static files and CSP reports are left alone on every host.
+never the admin's own login. Static files, CSP reports and ``/readyz`` (Route 53 and the deploy probe
+it on the platform host and on the private name) are left alone on every host.
 
 Every gate looks at ``request.path_info``, the path Django resolves: ``request.path`` also carries the
 script prefix, which behind Daphne comes from the client's own ``Daphne-Root-Path`` header, so a made-up
@@ -16,8 +17,8 @@ prefix would walk past a check made on it.
 §18.1). Without a session, the staff go to the SaaS admin's Hubs page, where the jump with a
 ``hub-admin`` code starts (no login of its own); with a session but no staff, 403, never the login
 (it would loop through the SaaS); staff outside ``/admin/`` go to ``/admin/``. ``/auth/*`` (the
-callback and the logout), static files, CSP reports and ``/healthz`` (answered before any of this)
-are left alone. The SPA and the API never answer on this host.
+callback and the logout), static files, CSP reports, ``/readyz`` (exactly that path) and ``/healthz``
+(answered before any of this) are left alone. The SPA and the API never answer on this host.
 
 ``SaasLoginRequiredMiddleware``: the Hub has no login of its own; the login is the SaaS's.
 
@@ -33,10 +34,12 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import get_script_prefix, reverse
 from django.utils.deprecation import MiddlewareMixin
+from django.utils.translation import gettext
 from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
 from base.auth import admin_hubs_url, login_url
+from base.health import READYZ_PATH
 from base.operations import HostScopeResolver, is_platform_host
 from base.spa import spa
 
@@ -55,14 +58,15 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         if path.startswith(self.ADMIN_PREFIX):
             # Before resolving the hub, so a host that is no hub gets the same 404.
             raise Http404("The Hub admin is only on the platform host.")
-        if path.startswith(self.OPEN_PREFIXES):
+        if path.startswith(self.OPEN_PREFIXES) or path == READYZ_PATH:
             return None
         try:
             HostScopeResolver().resolve(request)
         except Http404:
             api_prefix = getattr(settings, "LIVE", {}).get("api_prefix", DEFAULT_API_PREFIX).rstrip("/") + "/"
             if path.startswith(api_prefix):
-                error = NotFound("Not found.")
+                # The envelope of an unknown API path (live.api_errors), in the request's language.
+                error = NotFound(gettext("Not found"))
                 return JsonResponse(error.envelope(), status=error.status)
             raise
         return None
@@ -75,7 +79,8 @@ class PlatformHostMiddleware(MiddlewareMixin):
 
     def process_request(self, request: HttpRequest) -> HttpResponse | None:
         path = request.path_info
-        if not getattr(request, "platform_host", False) or path.startswith(self.OPEN_PREFIXES):
+        open_path = path.startswith(self.OPEN_PREFIXES) or path == READYZ_PATH
+        if not getattr(request, "platform_host", False) or open_path:
             return None
         if not request.user.is_authenticated:
             return HttpResponseRedirect(admin_hubs_url())

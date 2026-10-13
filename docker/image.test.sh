@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the built hub image against the app ↔ infra contract (aws-next/README.md, «Imagen»).
-#   docker buildx build --platform linux/arm64 --provenance=false -t erplora/hub:test --load .
+#   docker buildx build --platform linux/arm64 --provenance=false -t erplora/hub:test --load \
+#     --build-arg APP_VERSION="$(git rev-parse HEAD)" --build-arg APP_RELEASED_AT="$(git show -s --format=%cI HEAD)" .
 #   bash docker/image.test.sh erplora/hub:test
 # Every container runs like on Fargate here: read-only root filesystem, writable /tmp only.
 # Conditions are single-quoted on purpose: check() evaluates them later (SC2016, SC2034).
@@ -63,6 +64,16 @@ entry = json.load(open(\"frontend/dist/.vite/manifest.json\"))[\"frontend/main.t
 assert os.path.isfile(root / \"spa\" / entry), entry
 assert os.path.isfile(root / \"admin\" / \"css\" / \"base.css\")
 "'
+check "the modules' documentation images are collected under catalog/<id>/img/" \
+  'in_image sh -c "test -f staticfiles/catalog/demo/img/items-list.png && ! test -e staticfiles/catalog/demo/WORKBOOK.md"'
+# Round 16 (spec §4.3): the build already ran it; the image carries what it needs (icons, WORKBOOKs, catalogues).
+check "register_apps --check passes without any database" \
+  'docker run --rm --read-only --tmpfs /tmp "${PROD_ENV[@]}" "$image" python manage.py register_apps --check > /dev/null'
+check "the release is fixed in the image: APP_VERSION and APP_RELEASED_AT" '
+  env_json="$(docker image inspect -f "{{json .Config.Env}}" "$image")"
+  [[ $env_json == *\"APP_VERSION=* && $env_json == *\"APP_RELEASED_AT=* ]]'
+check "the translation client is a development dependency only" \
+  '! in_image python -c "import anthropic" 2> /dev/null'
 check "compilemessages ran: the Spanish catalogues are compiled" \
   'in_image sh -c "test -f base/locale/es/LC_MESSAGES/django.mo"'
 check "settings import with DEBUG off: manage.py check" \

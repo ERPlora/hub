@@ -1,0 +1,439 @@
+"""The databases and roles of a new cluster (aws-next README, «Contrato»; PLAN-DB §6, §10, §12.2).
+
+``manage.py bootstrap_databases`` (the one-off ``db-bootstrap`` task) runs it as the RDS master,
+connected to ``postgres``, before any application database exists, and again to rotate the
+passwords. Idempotent: every step checks or converges, so N runs leave the same cluster.
+
+1. Roles ``hub_app``, ``hub_migrator`` (``CREATEDB``), ``hub_admin``, ``saas_app``,
+   ``saas_migrator`` and ``hub_shared``, ``LOGIN``, created if missing; every run sets the password
+   of its ``*_PASSWORD`` (hashed here as SCRAM, so the plain text never reaches the server or its
+   logs) and the timeouts per role: 15 s / 5 s for the app roles and ``hub_shared``, none for the
+   migrators. No RLS and no ``BYPASSRLS`` anywhere (PLAN-DB §10).
+2. The master becomes a member of both migrators (``INHERIT``, ``SET``): PostgreSQL 16+ asks it to
+   ``CREATE DATABASE … OWNER`` them and to run their statements after ``SET ROLE`` (spec §3.3).
+3. Databases ``hub`` (control) and ``hub_template`` (no vertical, only ``base``) owned by
+   ``hub_migrator``, and ``saas`` owned by ``saas_migrator``.
+4. ``REVOKE ALL … FROM PUBLIC`` on each; ``CONNECT, TEMPORARY`` to ``hub_app`` and ``hub_admin``
+   on control, to ``hub_admin`` only on the template (a connection to it would block the clone of
+   a hub, PLAN-DB §6), to ``saas_app`` on ``saas``, and ``CONNECT`` to ``hub_shared`` on ``saas``.
+5. Default privileges for what the migrators create in ``public``: DML to ``hub_app`` (control and
+   template, which the clones copy) and to ``saas_app``; ``SELECT`` to ``hub_admin`` (``pg_dump``).
+6. Extension ``vector`` in the template, as the master. Missing on the server: an error in
+   production, a warning and ``skipped`` locally (the ``postgres:17`` image has no pgvector).
+7. Schema ``shared`` in ``saas``, owned by ``saas_migrator``, with the privileges of spec §3.3:
+   ``SELECT``, ``INSERT`` and ``UPDATE`` to ``hub_shared``, ``SELECT`` to ``saas_app``.
+
+The only module that reaches the server as the master (``tests/test_guardrails.py``): plain
+``psycopg`` with the ``default`` connection's parameters, in ``autocommit`` (``CREATE DATABASE``
+cannot run in a transaction). Every failure is a ``BootstrapError`` naming its step.
+"""
+
+import logging
+import re
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass, fields
+
+import psycopg
+from decouple import config
+from django.db import DEFAULT_DB_ALIAS, connections
+from psycopg import sql
+
+logger = logging.getLogger(__name__)
+
+#: Longest identifier PostgreSQL keeps (``NAMEDATALEN - 1``).
+MAX_IDENTIFIER = 63
+PREFIX_RE = re.compile(r"[a-z][a-z0-9_]*")
+#: Extensions of ``hub_template``; the vertical templates and every hub inherit them by cloning.
+TEMPLATE_EXTENSIONS = ("vector",)
+#: PLAN-DB §12.2: per role, never global, so migrations and ``LISTEN`` are never cut.
+APP_TIMEOUTS = {"statement_timeout": "15s", "lock_timeout": "5s"}
+NO_LIMIT = {"statement_timeout": "0", "lock_timeout": "0"}
+#: ``get_connection_params()`` keys that are Django's or psycopg's, not libpq's.
+NON_LIBPQ = frozenset(
+    {"cursor_factory", "context", "prepare_threshold", "server_side_binding"}
+)
+
+
+class BootstrapError(Exception):
+    """A missing input or a failed step; the message names it, never a password."""
+
+
+@dataclass(frozen=True)
+class Names:
+    """The databases and roles, as production names them; tests prefix them all."""
+
+    control: str = "hub"
+    template: str = "hub_template"
+    saas: str = "saas"
+    hub_app: str = "hub_app"
+    hub_migrator: str = "hub_migrator"
+    hub_admin: str = "hub_admin"
+    saas_app: str = "saas_app"
+    saas_migrator: str = "saas_migrator"
+    hub_shared: str = "hub_shared"
+
+    @classmethod
+    def with_prefix(cls, prefix: str) -> Names:
+        """Every name with ``prefix`` in front; ``""`` gives production's."""
+        longest = max(len(field.default) for field in fields(cls))
+        if prefix and (
+            not PREFIX_RE.fullmatch(prefix) or len(prefix) + longest > MAX_IDENTIFIER
+        ):
+            raise ValueError(
+                f"Invalid prefix {prefix!r}: lowercase letters, digits and underscores, starting "
+                f"with a letter, at most {MAX_IDENTIFIER - longest} characters."
+            )
+        return cls(**{field.name: prefix + field.default for field in fields(cls)})
+
+
+@dataclass(frozen=True)
+class Role:
+    key: str  #: Field of ``Names``.
+    variable: str  #: Its password's environment variable (aws-next, ``db-bootstrap``).
+    createdb: bool = False
+    timeouts: Mapping[str, str] | None = None
+
+
+ROLES = (
+    Role("hub_app", "HUB_APP_PASSWORD", timeouts=APP_TIMEOUTS),
+    Role("hub_migrator", "HUB_MIGRATOR_PASSWORD", createdb=True, timeouts=NO_LIMIT),
+    Role("hub_admin", "HUB_ADMIN_PASSWORD"),
+    Role("saas_app", "SAAS_APP_PASSWORD", timeouts=APP_TIMEOUTS),
+    Role("saas_migrator", "SAAS_MIGRATOR_PASSWORD", timeouts=NO_LIMIT),
+    Role("hub_shared", "HUB_SHARED_PASSWORD", timeouts=APP_TIMEOUTS),
+)
+
+
+@dataclass(frozen=True)
+class Step:
+    """One line of the summary: ``<subject>: created|exists|updated|skipped (<detail>)``."""
+
+    subject: str
+    status: str
+    detail: str = ""
+
+    def __str__(self) -> str:
+        return f"{self.subject}: {self.status}" + (
+            f" ({self.detail})" if self.detail else ""
+        )
+
+
+def read_passwords() -> dict[str, str]:
+    """Each role's password from its ``*_PASSWORD`` (environment or ``.env``), by role key."""
+    passwords = {role.key: config(role.variable, default="") for role in ROLES}
+    missing = [role.variable for role in ROLES if not passwords[role.key]]
+    if missing:
+        raise BootstrapError(f"Missing or empty: {', '.join(missing)}.")
+    return passwords
+
+
+def admin_conninfo() -> dict:
+    """The ``default`` connection in libpq terms (in ``db-bootstrap``: the master, ``postgres``)."""
+    params = connections[DEFAULT_DB_ALIAS].get_connection_params()
+    return {key: value for key, value in params.items() if key not in NON_LIBPQ}
+
+
+def bootstrap(
+    *,
+    passwords: Mapping[str, str],
+    names: Names | None = None,
+    conninfo: Mapping | None = None,
+    require_extensions: bool = True,
+    template_extensions: Sequence[str] = TEMPLATE_EXTENSIONS,
+    report: Callable[[Step], None] | None = None,
+) -> list[Step]:
+    """Converge the cluster to the databases and roles above; return the steps in order.
+
+    ``report`` sees each step as soon as it is done, so a failure still shows what came before.
+    """
+    conninfo = dict(admin_conninfo() if conninfo is None else conninfo)
+    n = Names() if names is None else names
+    steps: list[Step] = []
+
+    def step(subject: str, action: Callable[..., tuple[str, str] | str], *args) -> None:
+        steps.append(done := _run(subject, action, *args))
+        if report is not None:
+            report(done)
+
+    database_access = (
+        (n.control, n.hub_migrator, {"CONNECT, TEMPORARY": (n.hub_app, n.hub_admin)}),
+        (n.template, n.hub_migrator, {"CONNECT, TEMPORARY": (n.hub_admin,)}),
+        (
+            n.saas,
+            n.saas_migrator,
+            {"CONNECT, TEMPORARY": (n.saas_app,), "CONNECT": (n.hub_shared,)},
+        ),
+    )
+    with _connect(conninfo) as admin:
+        for role in ROLES:
+            step(
+                f"role {getattr(n, role.key)}", _ensure_role, admin, n, role, passwords
+            )
+        for migrator in (n.hub_migrator, n.saas_migrator):
+            step(f"membership in {migrator}", _ensure_membership, admin, migrator)
+        for database, owner, grants in database_access:
+            step(f"database {database}", _ensure_database, admin, database, owner)
+            step(
+                f"access to {database}", _ensure_access, admin, database, owner, grants
+            )
+    with _connect(conninfo, n.control) as conn:
+        step(f"default privileges on {n.control}", _hub_default_privileges, conn, n)
+    with _connect(conninfo, n.template) as conn:
+        step(f"default privileges on {n.template}", _hub_default_privileges, conn, n)
+        for extension in template_extensions:
+            subject = f"extension {extension} on {n.template}"
+            step(subject, _ensure_extension, conn, extension, require_extensions)
+    with _connect(conninfo, n.saas) as conn:
+        step(f"default privileges on {n.saas}", _saas_default_privileges, conn, n)
+        step(f"schema shared on {n.saas}", _ensure_shared_schema, conn, n)
+        step(f"privileges on {n.saas}.shared", _shared_privileges, conn, n)
+    return steps
+
+
+# ── Steps ──────────────────────────────────────────────────────────────────────────────────────
+
+
+def _connect(conninfo: Mapping, dbname: str | None = None) -> psycopg.Connection:
+    params = dict(conninfo) | ({"dbname": dbname} if dbname else {})
+    try:
+        return psycopg.connect(**params, autocommit=True)
+    except psycopg.Error as error:
+        raise BootstrapError(
+            f"connection to {params.get('dbname')!r} failed: {_reason(error)}"
+        ) from error
+
+
+def _run(subject: str, action: Callable[..., tuple[str, str] | str], *args) -> Step:
+    """Run one step; its ``psycopg`` failure becomes a ``BootstrapError`` naming the subject."""
+    try:
+        outcome = action(*args)
+    except psycopg.Error as error:
+        raise BootstrapError(f"{subject}: {_reason(error)}") from error
+    status, detail = outcome if isinstance(outcome, tuple) else (outcome, "")
+    return Step(subject, status, detail)
+
+
+def _reason(error: psycopg.Error) -> str:
+    """The server's primary message, never the statement (it carries the password's hash)."""
+    diag = getattr(error, "diag", None)
+    return (diag and diag.message_primary) or str(error).strip()
+
+
+def _exists(conn: psycopg.Connection, query: str, *params) -> bool:
+    return conn.execute(query, params).fetchone() is not None
+
+
+@contextmanager
+def _as_role(conn: psycopg.Connection, role: str) -> Iterator[None]:
+    """Statements on objects ``role`` owns run as ``role`` (spec §3.3); then back to the master."""
+    conn.execute(sql.SQL("SET ROLE {}").format(sql.Identifier(role)))
+    try:
+        yield
+    finally:
+        conn.execute("RESET ROLE")
+
+
+def _ensure_role(
+    conn: psycopg.Connection, names: Names, role: Role, passwords: Mapping[str, str]
+) -> tuple[str, str]:
+    name = getattr(names, role.key)
+    existed = _exists(conn, "SELECT 1 FROM pg_roles WHERE rolname = %s", name)
+    verifier = conn.pgconn.encrypt_password(
+        passwords[role.key].encode(), name.encode(), b"scram-sha-256"
+    ).decode()
+    conn.execute(
+        sql.SQL("{verb} {role} WITH LOGIN {createdb} PASSWORD {verifier}").format(
+            verb=sql.SQL("ALTER ROLE" if existed else "CREATE ROLE"),
+            role=sql.Identifier(name),
+            createdb=sql.SQL("CREATEDB" if role.createdb else "NOCREATEDB"),
+            verifier=sql.Literal(verifier),
+        )
+    )
+    detail = ["password set"]
+    for setting, value in (role.timeouts or {}).items():
+        conn.execute(
+            sql.SQL("ALTER ROLE {} SET {} TO {}").format(
+                sql.Identifier(name), sql.Identifier(setting), sql.Literal(value)
+            )
+        )
+        detail.append(f"{setting}={value}")
+    return ("updated" if existed else "created"), ", ".join(detail)
+
+
+def _ensure_membership(conn: psycopg.Connection, role: str) -> str:
+    granted = _exists(
+        conn,
+        "SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid "
+        "WHERE r.rolname = %s "
+        "AND m.member = (SELECT oid FROM pg_roles WHERE rolname = current_user) "
+        "AND m.inherit_option AND m.set_option",
+        role,
+    )
+    if granted:
+        return "exists"
+    conn.execute(
+        sql.SQL("GRANT {} TO CURRENT_USER WITH INHERIT TRUE, SET TRUE").format(
+            sql.Identifier(role)
+        )
+    )
+    return "created"
+
+
+def _ensure_database(
+    conn: psycopg.Connection, database: str, owner: str
+) -> tuple[str, str]:
+    row = conn.execute(
+        "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = %s", [database]
+    ).fetchone()
+    if row is None:
+        try:
+            conn.execute(
+                sql.SQL("CREATE DATABASE {} OWNER {}").format(
+                    sql.Identifier(database), sql.Identifier(owner)
+                )
+            )
+        except psycopg.errors.DuplicateDatabase:
+            return _ensure_database(
+                conn, database, owner
+            )  # created meanwhile: converge
+        return "created", f"owner {owner}"
+    if row[0] != owner:
+        conn.execute(
+            sql.SQL("ALTER DATABASE {} OWNER TO {}").format(
+                sql.Identifier(database), sql.Identifier(owner)
+            )
+        )
+        return "updated", f"owner {owner}, was {row[0]}"
+    return "exists", f"owner {owner}"
+
+
+def _ensure_access(
+    conn: psycopg.Connection,
+    database: str,
+    owner: str,
+    grants: Mapping[str, Sequence[str]],
+) -> tuple[str, str]:
+    detail = ["none to PUBLIC"]
+    with _as_role(conn, owner):
+        conn.execute(
+            sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(
+                sql.Identifier(database)
+            )
+        )
+        for privileges, roles in grants.items():
+            conn.execute(
+                sql.SQL("GRANT {} ON DATABASE {} TO {}").format(
+                    sql.SQL(privileges),
+                    sql.Identifier(database),
+                    sql.SQL(", ").join(map(sql.Identifier, roles)),
+                )
+            )
+            detail.append(f"{privileges} to {', '.join(roles)}")
+    return "updated", "; ".join(detail)
+
+
+def _default_privileges(
+    conn: psycopg.Connection, schema: str, grants: Sequence[tuple[str, str, str]]
+) -> None:
+    """The current role's ``ALTER DEFAULT PRIVILEGES`` in ``schema``: ``(privileges, kind, to)``."""
+    for privileges, kind, grantee in grants:
+        conn.execute(
+            sql.SQL(
+                "ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT {} ON {} TO {}"
+            ).format(
+                sql.Identifier(schema),
+                sql.SQL(privileges),
+                sql.SQL(kind),
+                sql.Identifier(grantee),
+            )
+        )
+
+
+def _hub_default_privileges(conn: psycopg.Connection, names: Names) -> tuple[str, str]:
+    with _as_role(conn, names.hub_migrator):
+        _default_privileges(
+            conn,
+            "public",
+            (
+                ("SELECT, INSERT, UPDATE, DELETE", "TABLES", names.hub_app),
+                ("USAGE, SELECT", "SEQUENCES", names.hub_app),
+                ("SELECT", "TABLES", names.hub_admin),
+                ("SELECT", "SEQUENCES", names.hub_admin),
+            ),
+        )
+    return "updated", f"DML to {names.hub_app}, SELECT to {names.hub_admin}"
+
+
+def _saas_default_privileges(conn: psycopg.Connection, names: Names) -> tuple[str, str]:
+    with _as_role(conn, names.saas_migrator):
+        _default_privileges(
+            conn,
+            "public",
+            (
+                ("SELECT, INSERT, UPDATE, DELETE", "TABLES", names.saas_app),
+                ("USAGE, SELECT", "SEQUENCES", names.saas_app),
+            ),
+        )
+    return "updated", f"DML to {names.saas_app}"
+
+
+def _ensure_extension(
+    conn: psycopg.Connection, extension: str, required: bool
+) -> tuple[str, str] | str:
+    if _exists(conn, "SELECT 1 FROM pg_extension WHERE extname = %s", extension):
+        return "exists"
+    if not _exists(
+        conn, "SELECT 1 FROM pg_available_extensions WHERE name = %s", extension
+    ):
+        if required:
+            raise BootstrapError(
+                f"extension {extension} on {conn.info.dbname}: not available on this server."
+            )
+        logger.warning(
+            "bootstrap_databases: extension %s is not available on this server; skipped.",
+            extension,
+        )
+        return "skipped", "not available on this server"
+    conn.execute(
+        sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(sql.Identifier(extension))
+    )
+    return "created"
+
+
+def _ensure_shared_schema(conn: psycopg.Connection, names: Names) -> tuple[str, str]:
+    existed = _exists(conn, "SELECT 1 FROM pg_namespace WHERE nspname = 'shared'")
+    with _as_role(conn, names.saas_migrator):
+        conn.execute("CREATE SCHEMA IF NOT EXISTS shared")
+    return ("exists" if existed else "created"), f"owner {names.saas_migrator}"
+
+
+def _shared_privileges(conn: psycopg.Connection, names: Names) -> tuple[str, str]:
+    """Spec §3.3: future tables by default, the existing ones (a rerun after the migration) now."""
+    with _as_role(conn, names.saas_migrator):
+        conn.execute(
+            sql.SQL("GRANT USAGE ON SCHEMA shared TO {}, {}").format(
+                sql.Identifier(names.hub_shared), sql.Identifier(names.saas_app)
+            )
+        )
+        _default_privileges(
+            conn,
+            "shared",
+            (
+                ("SELECT, INSERT, UPDATE", "TABLES", names.hub_shared),
+                ("SELECT", "TABLES", names.saas_app),
+            ),
+        )
+        for privileges, grantee in (
+            ("SELECT, INSERT, UPDATE", names.hub_shared),
+            ("SELECT", names.saas_app),
+        ):
+            conn.execute(
+                sql.SQL("GRANT {} ON ALL TABLES IN SCHEMA shared TO {}").format(
+                    sql.SQL(privileges), sql.Identifier(grantee)
+                )
+            )
+    return (
+        "updated",
+        f"SELECT, INSERT, UPDATE to {names.hub_shared}; SELECT to {names.saas_app}",
+    )

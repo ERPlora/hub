@@ -44,9 +44,10 @@ async function cleanup(context: BrowserContext, prefix: string): Promise<void> {
 }
 
 /** Picks an option of the toolbar status filter through its Ionic popover, and waits until the
- *  popover is gone (a click while it is still dismissing lands on its backdrop and opens nothing). */
+ *  popover is gone (a click while it is still dismissing lands on its backdrop and opens nothing).
+ *  Only the `ion-select` popovers: the shell's user menu keeps its own `ion-popover` in the DOM. */
 async function filterBy(page: Page, label: 'All' | 'Open' | 'Done'): Promise<void> {
-  const popover = page.locator('ion-popover');
+  const popover = page.locator('ion-popover.select-popover');
   await expect(popover).toHaveCount(0);
   await shown(page).locator('[data-testid=demo-items-status-filter]').click({ timeout: 10_000 });
   await popover.locator('ion-radio').filter({ hasText: new RegExp(`^\\s*${label}\\s*$`) }).click({ timeout: 10_000 });

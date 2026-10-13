@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hub-next demo\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-13 12:52+0200\n"
-"PO-Revision-Date: 2026-10-13 12:55+0200\n"
+"POT-Creation-Date: 2026-10-13 23:02+0200\n"
+"PO-Revision-Date: 2026-10-13 23:05+0200\n"
 "Last-Translator: ERPlora\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
@@ -15,9 +15,31 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
 "1 : 2;\n"
 
-#: apps.py:11 apps.py:24
+#: apps.py:11 apps.py:35
 msgid "Demo"
 msgstr "Demo"
+
+#: apps.py:16
+msgid ""
+"Items with lines that show up on every tablet at once: the platform's "
+"reference app."
+msgstr ""
+"Elementos con líneas que aparecen a la vez en todas las tabletas: la app de "
+"referencia de la plataforma."
+
+#: apps.py:18
+msgid ""
+"Demo keeps items with a name, a status and a note, each with its own list of "
+"lines. It solves no business problem: it proves on the tablet that the "
+"platform works end to end, with every change shown live on the other "
+"screens, lines added instantly and permissions enforced. It is the app every "
+"other app is copied from."
+msgstr ""
+"Demo guarda elementos con un nombre, un estado y una nota, cada uno con su "
+"lista de líneas. No resuelve ningún problema del negocio: comprueba en la "
+"tableta que la plataforma funciona de punta a punta, con cada cambio en vivo "
+"en las demás pantallas, las líneas al instante y los permisos aplicados. Es "
+"la app de la que se copian todas las demás."
 
 #: models.py:14
 msgid "Open"

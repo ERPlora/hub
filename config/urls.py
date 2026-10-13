@@ -1,7 +1,7 @@
 """URLconf of hub-next: Django's own prefixes first, then the SPA for every other path.
 
 ``/healthz`` is answered by ``base.health.HealthCheckMiddleware`` before the Host is validated,
-so it has no route here.
+so it has no route here; ``/readyz`` (it reads the database) is a route on the real hosts.
 """
 
 from django.contrib import admin
@@ -12,6 +12,7 @@ from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
 
 from base.admin import open_hub
 from base.auth_views import auth_callback, auth_logout
+from base.health import readyz
 from base.spa import spa
 from config.api import api
 
@@ -28,6 +29,7 @@ urlpatterns = [
     path("api/live", live_stream, name="live-stream"),
     path("api/", api.urls),
     path("csp-report/", csp_report, name="csp-report"),
+    path("readyz", readyz, name="readyz"),
     path("auth/callback", auth_callback, name="auth-callback"),
     path("auth/logout", auth_logout, name="auth-logout"),
     re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),

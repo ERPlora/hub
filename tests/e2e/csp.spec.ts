@@ -48,7 +48,8 @@ test('CSP header with nonce, strict-dynamic, Trusted Types and connect-src ipc:;
   await shown(page).locator('[data-testid=demo-items-view-table]').click();
   await shown(page).locator('.data-table__page-size-select').click();
   await page.locator('ion-popover ion-radio').filter({ hasText: /^\s*25\s*$/ }).click();
-  await expect(page.locator('ion-popover')).toBeHidden();
+  // The `ion-select` popover only: the shell's user menu keeps its own `ion-popover` in the DOM.
+  await expect(page.locator('ion-popover.select-popover')).toBeHidden();
   visited.push('search+empty', 'cards', 'page-size popover');
 
   // Detail → edit (422) → back → delete alert (cancel) → list → «New item» → back.

@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
+import { withRetry } from './retry';
+
 export const A = 'http://a.localhost:8000';
 export const B = 'http://b.localhost:8000';
 
@@ -16,7 +18,7 @@ export const HUB_DIR = join(HERE, '..', '..');
 export const REPO_DIR = join(HUB_DIR, '..');
 export const ARTIFACTS = join(HERE, '.artifacts');
 const METRICS = join(ARTIFACTS, 'metrics');
-const RUNSERVER_LOG = '/tmp/erplora-runserver.log';
+const RUNSERVER_LOG = '/tmp/erplora-hub-runserver.log';
 
 export interface Item {
   id: string;
@@ -69,6 +71,11 @@ export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 
  * to `origin/auth/callback` → the Hub opens its session and lands on `next`. Whatever sign-in page
  * the SaaS shows (allauth's template or the SPA's `/login`), it has one e-mail and one password:
  * those of `credentials` (the owner unless told otherwise).
+ *
+ * runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
+ * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
+ * `origin + next` again, because a POST that died leaves Chrome's error page, with no form to
+ * submit; if the SaaS did sign in, the second trip skips its form. Any other failure fails at once.
  */
 export async function login(
   page: Page,
@@ -78,25 +85,33 @@ export async function login(
 ): Promise<void> {
   const target = `${origin}${next}`;
   const inHub = () => page.locator('ion-menu').waitFor({ state: 'attached', timeout: 30_000 });
-  await page.goto(target);
-  const where = await Promise.race([
-    page.waitForURL((url) => url.origin === SAAS, { timeout: 30_000 }).then(() => 'saas' as const, () => null),
-    inHub().then(() => 'hub' as const, () => null),
-  ]);
-  if (where === null) throw new Error(`login on ${origin}: neither the SaaS nor the hub's shell showed up`);
-  if (where === 'saas') {
-    const password = page.locator('input[type=password]').first();
-    const step = await Promise.race([
-      password.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'form' as const, () => null),
-      page.waitForURL((url) => url.origin === origin, { timeout: 30_000 }).then(() => 'back' as const, () => null),
-    ]);
-    if (step === 'form') {
-      await page.locator('input[type=email], input[autocomplete=username]').first().fill(credentials.email);
-      await password.fill(credentials.password);
-      await page.locator('form [type=submit]:visible').first().click();
-    }
-  }
-  await page.waitForURL(target, { timeout: 30_000 });
+  await withRetry(
+    async () => {
+      await page.goto(target);
+      const where = await Promise.race([
+        page.waitForURL((url) => url.origin === SAAS, { timeout: 30_000 }).then(() => 'saas' as const, () => null),
+        inHub().then(() => 'hub' as const, () => null),
+      ]);
+      if (where === null) throw new Error(`login on ${origin}: neither the SaaS nor the hub's shell showed up`);
+      if (where === 'saas') {
+        const password = page.locator('input[type=password]').first();
+        const step = await Promise.race([
+          password.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'form' as const, () => null),
+          page.waitForURL((url) => url.origin === origin, { timeout: 30_000 }).then(() => 'back' as const, () => null),
+        ]);
+        if (step === 'form') {
+          await page.locator('input[type=email], input[autocomplete=username]').first().fill(credentials.email);
+          await password.fill(credentials.password);
+          await page.locator('form [type=submit]:visible').first().click();
+        }
+      }
+      await page.waitForURL(target, { timeout: 30_000 });
+    },
+    {
+      onRetry: (error) =>
+        console.warn(`login on ${origin}: ${String(error).split('\n')[0]}; trying once more in 1 s`),
+    },
+  );
   await inHub();
 }
 
@@ -285,6 +300,20 @@ export function listeningPids(port: number): number[] {
 export async function healthy(): Promise<boolean> {
   try {
     const res = await fetch('http://127.0.0.1:8000/healthz', { signal: AbortSignal.timeout(1500) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * runserver's Vite (`pnpm run dev` in hub-next) answers. It starts after Django: `healthy()` alone
+ * lets a page load HTML whose module scripts point at a Vite that is not listening yet, and that page
+ * stays blank (nothing retries a failed module script).
+ */
+export async function viteReady(): Promise<boolean> {
+  try {
+    const res = await fetch('http://localhost:5173/static/spa/@vite/client', { signal: AbortSignal.timeout(1500) });
     return res.ok;
   } catch {
     return false;

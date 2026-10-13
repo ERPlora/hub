@@ -1,4 +1,6 @@
-"""Django admin of base (only on the platform host ``hubs.erplora.com`` in production; phase 1 serves it everywhere).
+"""Django admin of base: only on the platform host (``hubs.erplora.com``, locally ``hubs.localhost:8000``), for the staff.
+
+Every other host answers 404 to ``/admin/`` (``base.middleware``, round 13, PLAN §18.1).
 
 The deep link ``/admin/hub/<slug>/`` (round 13, PLAN §18.1), where «Open in the Hub admin» of the
 SaaS admin lands, chooses the hub the admin works on: it is kept in the session and every admin
