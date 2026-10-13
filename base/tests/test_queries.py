@@ -1,0 +1,133 @@
+"""base.session.me: who is in front of the SPA, what they may do and the menu they see."""
+
+from dataclasses import dataclass, field
+
+import pytest
+from django.utils.translation import gettext_lazy
+from live.context import OperationContext, Scope
+from live.meta import Nav
+from live.operations import get
+
+from base.schemas import SessionMeIn, SessionMeOut
+
+pytestmark = pytest.mark.django_db
+
+A = Scope("host", "a")
+DEMO_MENU = {
+    "id": "demo",
+    "label": "Demo",
+    "items": [{"path": "/demo/items", "label": "Demo", "icon": "ion:flask-outline"}],
+}
+
+
+def session_me(actor=None, permissions=(), language="en"):
+    ctx = OperationContext(scope=A, actor=actor, permissions=frozenset(permissions), language=language)
+    return get("base.session.me")(ctx, SessionMeIn()).model_dump(mode="json")
+
+
+def test_declaration():
+    op = get("base.session.me")
+    assert (op.kind, op.permission, op.input, op.output) == ("query", None, SessionMeIn, SessionMeOut)
+
+
+def test_anonymous():
+    assert session_me(language="es") == {
+        "user": None,
+        "scope": {"kind": "host", "key": "a"},
+        "permissions": [],
+        "menu": [],
+        "apps": [],
+        "language": "es",
+    }
+
+
+def test_superuser_sees_every_app(superuser):
+    me = session_me(superuser, {"*"})
+    assert me["user"] == {"id": str(superuser.pk), "label": "root"}
+    assert me["permissions"] == ["*"]
+    assert me["menu"] == [DEMO_MENU]
+    assert me["apps"] == [{"label": "demo", "state": "on"}]
+
+
+def test_employee_sees_demo(make_user):
+    user = make_user("ana", first_name="Ana", last_name="García")
+    me = session_me(user, {"demo.view"})
+    assert me["user"] == {"id": str(user.pk), "label": "Ana García"}
+    assert me["permissions"] == ["demo.view"]
+    assert me["menu"] == [DEMO_MENU]
+
+
+def test_user_without_role_sees_no_app(make_user):
+    me = session_me(make_user())
+    assert (me["menu"], me["apps"], me["permissions"]) == ([], [], [])
+
+
+@dataclass
+class FakeApp:
+    """Stands in for a LiveAppConfig: only what the menu reads."""
+
+    label: str
+    verbose_name: str
+    permissions: list[str]
+    navigation: list[Nav] = field(default_factory=list)
+    kind: str = "app"
+
+
+@pytest.fixture
+def two_apps(monkeypatch):
+    """Two modules with a menu, one without, and a platform app (which never shows)."""
+    apps = [
+        FakeApp("demo", "Demo", ["demo.view", "demo.manage"], [Nav("demo", "Demo", "ion:flask-outline", "/demo/items")]),
+        FakeApp("stock", gettext_lazy("January"), ["stock.view", "stock.count"], [
+            Nav("stock", gettext_lazy("January"), "mdi:package-variant", "/stock"),
+            Nav("stock-count", "Count", "mdi:counter", "/stock/count"),
+        ]),
+        FakeApp("reports", "Reports", ["reports.view"]),
+        FakeApp("platform", "Platform", ["platform.view"], [Nav("platform", "Platform", "ion:home", "/platform")],
+                kind="platform"),
+    ]
+    # Patched at the source, so the stand-ins go through the real module_configs() filter.
+    monkeypatch.setattr("live.meta.all_live_app_configs", lambda: apps)
+    return apps
+
+
+def test_menu_lists_only_permitted_apps(make_user, two_apps):
+    me = session_me(make_user(), {"demo.view"})
+    assert [group["id"] for group in me["menu"]] == ["demo"]
+    assert me["apps"] == [{"label": "demo", "state": "on"}]
+
+
+def test_any_permission_of_an_app_makes_it_visible(make_user, two_apps):
+    me = session_me(make_user(), {"stock.count"})
+    assert [group["id"] for group in me["menu"]] == ["stock"]
+    assert [item["path"] for item in me["menu"][0]["items"]] == ["/stock", "/stock/count"]
+
+
+def test_app_without_navigation_is_listed_but_has_no_menu(make_user, two_apps):
+    me = session_me(make_user(), {"reports.view"})
+    assert me["menu"] == []
+    assert me["apps"] == [{"label": "reports", "state": "on"}]
+
+
+def test_labels_are_translated_to_the_context_language(make_user, two_apps):
+    me = session_me(make_user(), {"stock.view"}, language="es")
+    assert me["menu"][0]["label"] == "enero"
+    assert me["menu"][0]["items"][0]["label"] == "enero"
+
+
+def test_platform_apps_never_appear_even_with_a_menu_and_every_permission(make_user, two_apps):
+    me = session_me(make_user(), {"*", "platform.view"})
+    assert "platform" not in [group["id"] for group in me["menu"]]
+    assert "platform" not in [app["label"] for app in me["apps"]]
+
+
+def test_superuser_does_not_see_base_among_its_apps(superuser):
+    me = session_me(superuser, {"*"})
+    assert "base" not in [app["label"] for app in me["apps"]]
+    assert "base" not in [group["id"] for group in me["menu"]]
+
+
+def test_system_actor(two_apps):
+    me = session_me("system", {"*"})
+    assert me["user"] == {"id": "system", "label": "system"}
+    assert [app["label"] for app in me["apps"]] == ["demo", "stock", "reports"]

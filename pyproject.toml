@@ -3,9 +3,21 @@ name = "hub"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "django>=6.0",
+    "django>=6.1",
     "daphne>=4.2",
+    "erplora-live",
+    "psycopg[binary,pool]>=3.3",
+    "whitenoise>=6.12",
+    "python-decouple>=3.8",
 ]
+
+[dependency-groups]
+dev = ["pytest>=9", "pytest-django>=4.14", "pytest-asyncio>=1.4"]
 
 [tool.uv]
 package = false
+
+# erplora-live is the packages/live submodule (`git submodule update --init`); editable locally,
+# the Dockerfile installs it with --no-editable.
+[tool.uv.sources]
+erplora-live = { path = "packages/live", editable = true }

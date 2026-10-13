@@ -1,0 +1,8 @@
+[submodule "packages/live"]
+	path = packages/live
+	url = https://github.com/ERPlora/live.git
+	branch = main
+[submodule "packages/ui"]
+	path = packages/ui
+	url = https://github.com/ERPlora/ui.git
+	branch = main

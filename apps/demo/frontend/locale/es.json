@@ -1,0 +1,75 @@
+{
+  "demo": {
+    "status": {
+      "open": "Abierto",
+      "done": "Hecho"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "retry": "Reintentar",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "items": {
+      "title": "Elementos",
+      "search": "Buscar…",
+      "new": "Nuevo elemento",
+      "lineCount": "sin líneas | {n} línea | {n} líneas",
+      "loadError": "No se pudieron cargar los elementos",
+      "emptyHeading": "Todavía no hay elementos",
+      "emptyMessage": "Crea el primero con «Nuevo elemento».",
+      "noResultsHeading": "Sin resultados",
+      "noResultsMessage": "Ningún elemento coincide con la búsqueda o el filtro.",
+      "columns": {
+        "name": "Nombre",
+        "lines": "Líneas",
+        "status": "Estado",
+        "updated": "Actualizado"
+      },
+      "filter": {
+        "label": "Filtrar por estado",
+        "all": "Todos"
+      }
+    },
+    "stats": {
+      "label": "Cifras",
+      "open": "Abiertos",
+      "done": "Hechos",
+      "lines": "Líneas",
+      "loadError": "No se pudieron cargar las cifras"
+    },
+    "detail": {
+      "title": "Elemento",
+      "loadError": "No se pudo cargar el elemento",
+      "note": "Nota",
+      "saveNote": "Guardar nota",
+      "updatedElsewhere": "Actualizado en otro sitio",
+      "updatedElsewhereBody": "Alguien ha cambiado esta nota mientras la escribías. Tu texto sigue aquí.",
+      "reload": "Recargar",
+      "edit": "Editar",
+      "markDone": "Marcar como hecho",
+      "reopen": "Reabrir",
+      "delete": "Eliminar",
+      "deleteConfirm": "¿Eliminar este elemento y sus líneas?",
+      "cancel": "Cancelar",
+      "lines": "Líneas",
+      "noLines": "Todavía no hay líneas",
+      "lineText": "Texto",
+      "lineQty": "Cantidad",
+      "addLine": "Añadir línea",
+      "pending": "Guardando…"
+    },
+    "create": {
+      "title": "Nuevo elemento"
+    },
+    "edit": {
+      "title": "Editar elemento"
+    },
+    "form": {
+      "name": "Nombre",
+      "status": "Estado",
+      "note": "Nota",
+      "save": "Guardar",
+      "noPermission": "No tienes permiso"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{% extends "admin/base_site.html" %}
+{% comment %}
+Django's own base_site.html (branding included) plus the hub chosen with the deep link
+/admin/hub/<slug>/ (round 13, PLAN §18.1). Phase 2 adds the hub-DB selector here (PLAN §17).
+{% endcomment %}
+{% block branding %}{{ block.super }}{% if admin_hub_label %}<div id="admin-hub">{{ admin_hub_label }}</div>{% endif %}{% endblock %}

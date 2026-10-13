@@ -1,0 +1,56 @@
+// The Vite config is a contract with Django (`packages/live/live/spa.py` and `LIVE["spa"]` in
+// `config/settings.py`): the dev server URLs and the manifest Django reads come from here.
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { PluginOption } from 'vite';
+import { describe, expect, it } from 'vitest';
+
+import config from './vite.config';
+
+const HUB_DIR = dirname(fileURLToPath(import.meta.url));
+
+function pluginNames(options: PluginOption[] | undefined): string[] {
+  return (options ?? []).flat(Infinity as 1).flatMap((p) => (p && 'name' in p ? [p.name] : []));
+}
+
+describe('vite.config', () => {
+  it('serves from the hub-next directory under /static/spa/ (dev and build alike)', () => {
+    expect(config.root).toBe(HUB_DIR);
+    expect(config.base).toBe('/static/spa/');
+  });
+
+  it('uses the shared ERPlora plugins (Vue, baked icons, Tailwind, defines)', () => {
+    expect(pluginNames(config.plugins)).toEqual(expect.arrayContaining(['vite:vue', 'unplugin-icons', 'erplora:defines']));
+  });
+
+  it('builds frontend/main.ts into frontend/dist with the manifest Django reads', () => {
+    const build = config.build ?? {};
+    expect(build.outDir).toBe('frontend/dist');
+    expect(build.emptyOutDir).toBe(true);
+    // settings.LIVE["spa"]["manifest"] = SPA_DIST / ".vite" / "manifest.json"
+    expect(build.manifest).toBe('.vite/manifest.json');
+    expect(build.target).toBe('es2022');
+    // settings.LIVE["spa"]["entry"] = "frontend/main.ts" is the manifest key of this input.
+    expect(build.rollupOptions?.input).toBe('frontend/main.ts');
+  });
+
+  it('runs the dev server on localhost:5173 only, with absolute asset URLs and HMR there', () => {
+    // live/spa.py points DEBUG pages at http://localhost:5173/static/spa/{@vite/client,frontend/main.ts}.
+    expect(config.server).toMatchObject({
+      host: 'localhost',
+      port: 5173,
+      strictPort: true,
+      origin: 'http://localhost:5173',
+      hmr: { host: 'localhost', port: 5173 },
+    });
+  });
+
+  it('tests the shell entry and every app frontend in happy-dom', () => {
+    expect(config.test?.environment).toBe('happy-dom');
+    expect(config.test?.include).toEqual(
+      expect.arrayContaining(['frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts']),
+    );
+    // Vitest's default `exclude` drops every `vite.config.*`, this test included.
+    expect(config.test?.exclude).toEqual(['**/node_modules/**', '**/dist/**']);
+  });
+});

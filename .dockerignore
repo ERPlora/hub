@@ -1,0 +1,16 @@
+**/.git
+.github
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.venv
+.env*
+**/.pytest_cache
+**/.ruff_cache
+frontend/dist
+staticfiles
+docs
+db.sqlite3
+**/.terraform
+tests/e2e/.artifacts
+**/.DS_Store

@@ -1,22 +1,34 @@
-"""
-URL configuration for config project.
+"""URLconf of hub-next: Django's own prefixes first, then the SPA for every other path.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+``/healthz`` is answered by ``base.health.HealthCheckMiddleware`` before the Host is validated,
+so it has no route here.
 """
+
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from live.csp import csp_report
+from live.live_view import live_stream
+from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
+
+from base.admin import open_hub
+from base.auth_views import auth_callback, auth_logout
+from base.spa import spa
+from config.api import api
+
+# Prefixes of hub-next on top of the shared ones: the print socket, the public pages and the login
+# through the SaaS.
+NON_SPA_PREFIXES = (*BASE_NON_SPA_PREFIXES, "ws", "p", "auth")
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # The deep link of the SaaS admin's «Open in the Hub admin» (PLAN §18.1); before the admin's own
+    # admin/<app_label>/, which would otherwise take it.
+    path("admin/hub/<str:slug>/", admin.site.admin_view(open_hub), name="admin-hub"),
+    path("admin/", admin.site.urls),
+    # Before the API's prefix, which would otherwise answer it.
+    path("api/live", live_stream, name="live-stream"),
+    path("api/", api.urls),
+    path("csp-report/", csp_report, name="csp-report"),
+    path("auth/callback", auth_callback, name="auth-callback"),
+    path("auth/logout", auth_logout, name="auth-logout"),
+    re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),
 ]

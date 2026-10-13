@@ -1,0 +1,8 @@
+# @erplora/ui is the packages/ui submodule (`git submodule update --init`); install from here only,
+# never inside packages/ui.
+packages:
+  - packages/ui
+patchedDependencies:
+  '@ionic/vue@8.8.9': patches/@ionic__vue@8.8.9.patch
+onlyBuiltDependencies:
+  - esbuild

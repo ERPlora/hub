@@ -1,0 +1,75 @@
+{
+  "demo": {
+    "status": {
+      "open": "Open",
+      "done": "Done"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "retry": "Retry",
+      "appInactive": "This app is not active in this business"
+    },
+    "items": {
+      "title": "Demo items",
+      "search": "Search…",
+      "new": "New item",
+      "lineCount": "no lines | {n} line | {n} lines",
+      "loadError": "The items could not be loaded",
+      "emptyHeading": "No items yet",
+      "emptyMessage": "Create the first one with «New item».",
+      "noResultsHeading": "No results",
+      "noResultsMessage": "No item matches your search or filter.",
+      "columns": {
+        "name": "Name",
+        "lines": "Lines",
+        "status": "Status",
+        "updated": "Updated"
+      },
+      "filter": {
+        "label": "Filter by status",
+        "all": "All"
+      }
+    },
+    "stats": {
+      "label": "Figures",
+      "open": "Open",
+      "done": "Done",
+      "lines": "Lines",
+      "loadError": "The figures could not be loaded"
+    },
+    "detail": {
+      "title": "Item",
+      "loadError": "The item could not be loaded",
+      "note": "Note",
+      "saveNote": "Save note",
+      "updatedElsewhere": "Updated elsewhere",
+      "updatedElsewhereBody": "Someone changed this note while you were writing it. Your text is still here.",
+      "reload": "Reload",
+      "edit": "Edit",
+      "markDone": "Mark done",
+      "reopen": "Reopen",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this item and its lines?",
+      "cancel": "Cancel",
+      "lines": "Lines",
+      "noLines": "No lines yet",
+      "lineText": "Text",
+      "lineQty": "Quantity",
+      "addLine": "Add line",
+      "pending": "Saving…"
+    },
+    "create": {
+      "title": "New item"
+    },
+    "edit": {
+      "title": "Edit item"
+    },
+    "form": {
+      "name": "Name",
+      "status": "Status",
+      "note": "Note",
+      "save": "Save",
+      "noPermission": "You do not have permission"
+    }
+  }
+}

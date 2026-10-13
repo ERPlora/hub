@@ -1,0 +1,16 @@
+{% load static %}<!DOCTYPE html>
+<html>
+<head>
+    <link type="text/css" rel="stylesheet" href="{% static 'ninja/swagger-ui.css' %}">
+    {% include "ninja/favicons.html" %}
+    <title>{{ api.title }}</title>
+</head>
+<body
+    data-csrf-token="{% if add_csrf %}{{ csrf_token }}{% endif %}"
+    data-api-csrf="{% if add_csrf %}true{% endif %}">
+    <script type="application/json" id="swagger-settings" nonce="{{ csp_nonce }}">{{ swagger_settings|safe }}</script>
+    <div id="swagger-ui"></div>
+    <script src="{% static 'ninja/swagger-ui-bundle.js' %}" nonce="{{ csp_nonce }}"></script>
+    <script src="{% static 'ninja/swagger-ui-init.js' %}" nonce="{{ csp_nonce }}"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+# Spanish translation of the demo app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next demo\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-13 12:52+0200\n"
+"PO-Revision-Date: 2026-10-13 12:55+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: apps.py:11 apps.py:24
+msgid "Demo"
+msgstr "Demo"
+
+#: models.py:14
+msgid "Open"
+msgstr "Abierto"
+
+#: models.py:15
+msgid "Done"
+msgstr "Hecho"
+
+#: models.py:17
+msgid "name"
+msgstr "nombre"
+
+#: models.py:18
+msgid "status"
+msgstr "estado"
+
+#: models.py:19
+msgid "note"
+msgstr "nota"
+
+#: models.py:20
+msgid "created at"
+msgstr "creado el"
+
+#: models.py:21
+msgid "updated at"
+msgstr "actualizado el"
+
+#: models.py:24 models.py:35
+msgid "item"
+msgstr "elemento"
+
+#: models.py:25
+msgid "items"
+msgstr "elementos"
+
+#: models.py:36
+msgid "text"
+msgstr "texto"
+
+#: models.py:37
+msgid "quantity"
+msgstr "cantidad"
+
+#: models.py:38
+msgid "position"
+msgstr "posición"
+
+#: models.py:40
+msgid "client line id"
+msgstr "id de línea del cliente"
+
+#: models.py:43
+msgid "line"
+msgstr "línea"
+
+#: models.py:44
+msgid "lines"
+msgstr "líneas"
+
+#: queries.py:14
+msgid "This item no longer exists."
+msgstr "Este elemento ya no existe."
+
+#: services.py:21
+msgid "This item is closed: open it to add lines."
+msgstr "Este elemento está cerrado: ábrelo para añadir líneas."
