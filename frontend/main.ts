@@ -3,7 +3,7 @@
 // 🔴 Import order (hub#1060): the shell barrel goes first so its boot hooks wrap `customElements.define`
 // before anything loads `@ionic/vue` (the SDK does). Vite hoists eager globs above everything, so an
 // app's `routes.ts` only imports types; its pages load with `() => import(…)`. Guards: main.test.ts.
-import { createShell, type CreateShellOptions, type SessionMe, type SessionStatus } from '@erplora/ui/shell';
+import { createShell, type CreateShellOptions, logout, type SessionMe, type SessionStatus } from '@erplora/ui/shell';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
 import { ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
@@ -69,6 +69,10 @@ export async function boot(
     messages: appMessages(catalogues),
     // The hub has no login of its own: the SaaS's, for this hub (Django fills it in spa-config).
     loginPath: config.loginUrl,
+    // The apps of the hub as a grid at `/` (where the login lands without `next`), «Home» in the menu.
+    home: true,
+    // Sign out is the Hub's: a form POST to `/auth/logout`, then the SaaS's logout page.
+    userMenu: { logout },
   });
   provideLiveClient(client, app);
   try {

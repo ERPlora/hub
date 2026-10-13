@@ -9,14 +9,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 const sdk = vi.hoisted(() => ({ client: { api: { call: (() => undefined) as (...args: unknown[]) => unknown } } }));
 
-vi.mock('@erplora/ui/shell', () => ({ createShell: vi.fn() }));
+vi.mock('@erplora/ui/shell', () => ({ createShell: vi.fn(), logout: vi.fn() }));
 vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   createLiveClient: vi.fn(() => sdk.client),
   provideLiveClient: vi.fn(),
 }));
 
-import { createShell } from '@erplora/ui/shell';
+import { createShell, logout } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
 
 import { OPERATION_ROUTES } from './generated/operation-routes';
@@ -136,6 +136,18 @@ describe('main.ts', () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().loginPath).toBe(LOGIN_URL);
+  });
+
+  it("turns the shell's Home on: the apps grid at / (where the login lands) and «Home» first in the menu", async () => {
+    fakeShell();
+    await main.boot({});
+    expect(shellOptions().home).toBe(true);
+  });
+
+  it("gives the user menu the Hub's sign out (a form POST to /auth/logout), and nothing else", async () => {
+    fakeShell();
+    await main.boot({});
+    expect(shellOptions().userMenu).toEqual({ logout });
   });
 
   it('without an embedded session, asks GET /api/me (base.session.me) and goes live with its answer', async () => {
