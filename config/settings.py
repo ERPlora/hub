@@ -1,4 +1,4 @@
-"""Django settings of hub-next (phase 1: one Postgres database, scope = first label of the Host).
+"""Django settings of hub-next (phase 1: one Postgres database, scope = the Host's label on HUB_BASE_DOMAIN).
 
 Configuration comes from the environment (or a ``.env`` file) through python-decouple. ``DEBUG`` is
 off unless set: local development opts in with ``DEBUG=True`` in ``.env`` and then gets defaults for
@@ -11,12 +11,22 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from decouple import Csv, config
+from django.core.exceptions import ImproperlyConfigured
 from live.csp import base_policy, debug_policy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Off by default: a missing variable must never run production with DEBUG.
 DEBUG = config("DEBUG", default=False, cast=bool)
+# The deployment: prod, or pre (the team's pre-production, pre.erplora.com; plan
+# 2026-10-14-entorno-pre). Both run in one cluster on one Valkey, so the cache keys carry it.
+ERPLORA_ENVIRONMENTS = ("prod", "pre")
+ERPLORA_ENVIRONMENT = config("ERPLORA_ENVIRONMENT", default="prod")
+if ERPLORA_ENVIRONMENT not in ERPLORA_ENVIRONMENTS:
+    raise ImproperlyConfigured(
+        f"ERPLORA_ENVIRONMENT must be one of {', '.join(ERPLORA_ENVIRONMENTS)}, "
+        f"not {ERPLORA_ENVIRONMENT!r}."
+    )
 # Only local development may fall back to a known key; production refuses to start without one.
 SECRET_KEY = (
     config("SECRET_KEY", default="django-insecure-local-only")
@@ -186,17 +196,19 @@ DATABASE_ROUTERS = ["base.routers.SharedRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project, a
-# TTL on every key (never TIMEOUT=None) and 2 s socket timeouts (a Valkey that hangs fails the call,
-# not the request; Django hands OPTIONS to redis-py); otherwise this process's memory.
+# Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project and
+# environment (hub, pre-hub: pre shares prod's Valkey), a TTL on every key (never TIMEOUT=None) and
+# 2 s socket timeouts (a Valkey that hangs fails the call, not the request; Django hands OPTIONS to
+# redis-py); otherwise this process's memory.
 
 VALKEY_URL = config("VALKEY_URL", default="")
+CACHE_KEY_PREFIX = "hub" if ERPLORA_ENVIRONMENT == "prod" else f"{ERPLORA_ENVIRONMENT}-hub"
 CACHES = {
     "default": (
         {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": VALKEY_URL,
-            "KEY_PREFIX": "hub",
+            "KEY_PREFIX": CACHE_KEY_PREFIX,
             "TIMEOUT": 300,
             "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
         }
@@ -224,6 +236,16 @@ INTERNAL_SHARED_SECRET = (
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
 # for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
 PLATFORM_HOST_LABEL = "hubs"
+# The domain the hubs live under: a hub is <slug>.<HUB_BASE_DOMAIN> and the platform host
+# hubs.<HUB_BASE_DOMAIN>; any other host is no hub (base.operations). erplora.com in prod,
+# pre.erplora.com in pre, localhost locally. Empty: no base domain, the hub is the Host's first label
+# wherever it is (the behaviour before 2026-10-14).
+HUB_BASE_DOMAIN = (
+    config("HUB_BASE_DOMAIN", default="localhost" if DEBUG else "erplora.com")
+    .strip()
+    .strip(".")
+    .lower()
+)
 # SESSION_COOKIE_SAMESITE stays "Lax": /auth/callback is a top-level POST from the SaaS (cross-site
 # locally, localhost:8001 → a.localhost:8000), which carries no Lax cookie in; but the session cookie it
 # SETS on its response is stored, and the redirect to `next` is a top-level GET that sends it.

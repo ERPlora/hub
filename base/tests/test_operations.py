@@ -69,6 +69,96 @@ def test_the_platform_host_follows_the_setting(settings):
     assert not is_platform_host(request_for("hubs.localhost"))
 
 
+# ── HUB_BASE_DOMAIN: a hub is one label on the base domain (plan 2026-10-14-entorno-pre, H-2) ──
+# prod (erplora.com) and pre (pre.erplora.com) share one ALB, whose wildcard *.erplora.com also matches
+# x.pre.erplora.com: the Hub of one environment never serves a host of the other.
+
+
+@pytest.fixture
+def base_domain(settings):
+    """Production's slugs (3 letters at least) under the given base domain; any Host gets past
+    ``ALLOWED_HOSTS``, which is not what these tests are about."""
+    settings.LIVE = {**settings.LIVE, "hub_slug_min_length": 3}
+    settings.ALLOWED_HOSTS = ["*"]
+
+    def use(domain: str) -> None:
+        settings.HUB_BASE_DOMAIN = domain
+
+    return use
+
+
+@pytest.mark.parametrize(
+    ("domain", "host", "key"),
+    [
+        ("erplora.com", "acme.erplora.com", "acme"),
+        ("erplora.com", "ACME.Erplora.com:443", "acme"),
+        ("pre.erplora.com", "acme.pre.erplora.com", "acme"),
+        ("localhost", "acme.localhost:8000", "acme"),
+    ],
+)
+def test_with_a_base_domain_the_hub_is_the_label_on_it(base_domain, domain, host, key):
+    base_domain(domain)
+    assert HostScopeResolver().resolve(request_for(host)) == Scope("host", key)
+
+
+@pytest.mark.parametrize(
+    ("domain", "host"),
+    [
+        # pre's hosts on prod's Hub, and prod's on pre's.
+        ("erplora.com", "acme.pre.erplora.com"),
+        ("erplora.com", "hubs.pre.erplora.com"),
+        ("pre.erplora.com", "acme.erplora.com"),
+        # The base domain itself, a look-alike and another domain.
+        ("erplora.com", "erplora.com"),
+        ("pre.erplora.com", "pre.erplora.com"),
+        ("erplora.com", "acmeerplora.com"),
+        ("erplora.com", "acme.erplora.com.example.org"),
+        ("erplora.com", "acme.example.org"),
+        ("erplora.com", "acme.localhost:8000"),
+        # The private name answers only /readyz (and, later, /internal): no hub there.
+        ("erplora.com", "hub.erplora.internal"),
+    ],
+)
+def test_with_a_base_domain_a_host_of_another_domain_is_no_hub(base_domain, domain, host):
+    base_domain(domain)
+    with pytest.raises(Http404):
+        HostScopeResolver().resolve(request_for(host))
+
+
+def test_pre_is_reserved_for_the_pre_environment(base_domain):
+    # pre.erplora.com is pre's SaaS: no customer may take the slug pre (live.slugs).
+    base_domain("erplora.com")
+    with pytest.raises(Http404):
+        HostScopeResolver().resolve(request_for("pre.erplora.com"))
+
+
+@pytest.mark.parametrize(
+    ("domain", "host", "expected"),
+    [
+        ("erplora.com", "hubs.erplora.com", True),
+        ("erplora.com", "HUBS.erplora.com:443", True),
+        ("pre.erplora.com", "hubs.pre.erplora.com", True),
+        ("localhost", "hubs.localhost:8000", True),
+        ("erplora.com", "hubs.pre.erplora.com", False),
+        ("pre.erplora.com", "hubs.erplora.com", False),
+        ("erplora.com", "hubs.localhost:8000", False),
+        ("erplora.com", "hubs.erplora.com.example.org", False),
+        ("erplora.com", "hubs.example.org", False),
+        ("erplora.com", "erplora.com", False),
+    ],
+)
+def test_the_platform_host_is_hubs_of_the_base_domain_only(base_domain, domain, host, expected):
+    base_domain(domain)
+    assert is_platform_host(request_for(host)) is expected
+
+
+def test_without_a_base_domain_the_hub_is_the_first_label_anywhere(base_domain):
+    # HUB_BASE_DOMAIN="": the behaviour before 2026-10-14.
+    base_domain("")
+    assert HostScopeResolver().resolve(request_for("acme.pre.erplora.com")) == Scope("host", "acme")
+    assert is_platform_host(request_for("hubs.pre.erplora.com"))
+
+
 def test_production_enforces_three_letters(settings):
     settings.LIVE = {**settings.LIVE, "hub_slug_min_length": 3}
     assert HostScopeResolver().resolve(request_for("acme.localhost")) == Scope("host", "acme")
