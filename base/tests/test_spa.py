@@ -38,7 +38,10 @@ def test_logged_in_shell_embeds_its_session_on_that_host(client, make_user):
     client.force_login(make_user("ana", host="a", role="hub_employee"))
     _, on_a = json_block(client.get("/demo/items", HTTP_HOST="a.localhost:8000"), "session-me")
     _, on_b = json_block(client.get("/demo/items", HTTP_HOST="b.localhost:8000"), "session-me")
-    assert (on_a["user"]["label"], on_a["permissions"], [g["id"] for g in on_a["menu"]]) == ("ana", ["demo.view"], ["demo"])
+    # demo is the reference app; the other modules' grants and menus are pinned by their own tests.
+    demo_permissions = [permission for permission in on_a["permissions"] if permission.startswith("demo.")]
+    assert (on_a["user"]["label"], demo_permissions) == ("ana", ["demo.view"])
+    assert "demo" in [g["id"] for g in on_a["menu"]]
     assert (on_b["permissions"], on_b["menu"]) == ([], [])
 
 
@@ -61,12 +64,11 @@ def test_only_get_and_head(client):
     assert client.head("/demo/items", HTTP_HOST="a.localhost").status_code == 200
 
 
-@pytest.mark.parametrize(("host", "hub"), [("a.localhost:8000", "a"), ("b.localhost", "b")])
-def test_spa_config_points_the_auth_gate_at_the_saas_login_of_its_hub(client, settings, host, hub):
-    settings.SAAS_URL = "http://localhost:8001"
+@pytest.mark.parametrize("host", ["a.localhost:8000", "b.localhost"])
+def test_spa_config_points_the_auth_gate_at_the_hub_s_own_jump_to_the_saas_login(client, host):
+    # /auth/login gives the jump its state (and this browser its cookie); the gate appends `?next=`.
     _, config = json_block(client.get("/demo/items", HTTP_HOST=host), "spa-config")
-    # Without next: the SPA's auth gate appends `&next=` itself.
-    assert config["loginUrl"] == f"http://localhost:8001/hub-login/?hub={hub}"
+    assert config["loginUrl"] == "/auth/login"
 
 
 def test_the_csp_header_lets_the_logout_form_go_on_to_the_saas(client, settings):

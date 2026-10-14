@@ -1,20 +1,27 @@
 """Login through the SaaS (PLAN-SAAS §2.1, §3.1 steps 4–6): the Hub has no login of its own.
 
-Without a session, a browser goes to the SaaS's ``/hub-login/?hub=<slug>&next=<path>``
-(:func:`login_url`). The SaaS answers with a form that POSTs a one-time code to ``/auth/callback``,
-and the Hub redeems it server-side (:func:`redeem_code`): ``POST {SAAS_INTERNAL_URL}/internal/auth/redeem``
-with ``{"code", "hub"}``, signed with HMAC-SHA256 over ``f"{timestamp}.{raw_body}"`` (key
-``INTERNAL_SHARED_SECRET``), the scheme of Stripe's webhook signatures. The HTTP call is
-:func:`post`, which tests replace.
+Without a session, a browser jumps to the SaaS's ``/hub-login/?hub=<slug>&next=<path>&state=<state>``
+(:func:`login_redirect`). The SaaS answers with a form that POSTs a one-time code and that ``state``,
+as it got it, to ``/auth/callback``, and the Hub redeems the code server-side (:func:`redeem_code`):
+``POST {SAAS_INTERNAL_URL}/internal/auth/redeem`` with ``{"code", "hub"}``, signed with HMAC-SHA256
+over ``f"{timestamp}.{raw_body}"`` (key ``INTERNAL_SHARED_SECRET``), the scheme of Stripe's webhook
+signatures. The HTTP call is :func:`post`, which tests replace.
+
+The ``state`` (OAuth 2.0, RFC 6749 §10.12) binds the login to the browser that started it: the jump
+leaves it in the cookie ``hub_login_state`` (signed, 600 s, only for ``/auth/callback``), and the
+callback redeems no code whose ``state`` is not that one (:func:`state_matches`). Without it, a code
+stolen from someone else, posted from this browser, would open their session here (login CSRF).
 
 Two URLs of the SaaS: ``SAAS_URL`` (:func:`saas_url`) is where the browser goes; every ``/internal/*``
 call goes to ``SAAS_INTERNAL_URL`` (:func:`saas_internal_url`), the private name in production,
 because the ALB answers 404 to ``/internal`` from outside.
 
-The staff's jump to the Hub admin (round 13, PLAN §18.1) is the same exchange with the audience
-``hub-admin``: it starts on the SaaS admin's Hubs page (:func:`admin_hubs_url`), lands on the
-platform host's ``/auth/callback`` and answers a platform role (``platform_admin``,
-``platform_support``), never a customer's.
+The staff's jump to the Hub admin (round 13, PLAN §18.1) is the same exchange, with its ``state``,
+and the audience ``hub-admin``: the SaaS admin's button opens the platform host's
+``/auth/login?hub=<slug>&next=/admin/hub/<slug>/``, which jumps to ``/hub-login/?hub=<slug>&audience=hub-admin&…``;
+the code lands on the platform host's ``/auth/callback`` and answers a platform role
+(``platform_admin``, ``platform_support``), never a customer's. Without a hub the staff go to the
+SaaS admin's Hubs page (:func:`admin_hubs_url`), where they choose one.
 """
 
 import hashlib
@@ -22,6 +29,7 @@ import hmac
 import json
 import logging
 import re
+import secrets
 import time
 import urllib.error
 import urllib.request
@@ -29,6 +37,7 @@ from dataclasses import dataclass
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 
 from base.models import Membership
 
@@ -41,6 +50,12 @@ REDEEM_PATH = "/internal/auth/redeem"
 TIMESTAMP_HEADER = "X-Erplora-Timestamp"
 SIGNATURE_HEADER = "X-Erplora-Signature"
 TIMEOUT_SECONDS = 5
+
+#: The ``state`` of this browser's jump to the SaaS's login, signed; only the callback reads it.
+STATE_COOKIE = "hub_login_state"
+STATE_COOKIE_PATH = "/auth/callback"
+STATE_MAX_AGE = 600
+_STATE_SALT = "base.auth.login_state"
 
 # Error codes the SaaS's login page receives back in ``?error=``.
 INVALID_CODE = "invalid_code"
@@ -101,14 +116,63 @@ def saas_internal_url(path: str) -> str:
     return f"{settings.SAAS_INTERNAL_URL.rstrip('/')}{path}"
 
 
-def login_url(slug: str, next_path: str | None = None, error: str | None = None) -> str:
-    """The SaaS's login page for this hub; without ``next_path`` the SPA appends its own ``&next=``."""
+def login_url(
+    slug: str, next_path: str, *, state: str, error: str | None = None, audience: str = HUB_SESSION_AUDIENCE
+) -> str:
+    """The SaaS's login page for this hub, with the ``state`` the callback will ask back.
+
+    ``audience`` travels only when it is not ``hub-session``, the SaaS's default (a member's login).
+    """
+    if audience not in _ROLES_BY_AUDIENCE:
+        raise ValueError(f"Unknown audience {audience!r}.")
     params = {"hub": slug}
-    if next_path is not None:
-        params["next"] = next_path
+    if audience != HUB_SESSION_AUDIENCE:
+        params["audience"] = audience
+    params["next"] = next_path
     if error is not None:
         params["error"] = error
+    params["state"] = state
     return f"{saas_url(LOGIN_PATH)}?{urlencode(params, safe='/')}"
+
+
+def login_redirect(
+    slug: str, next_path: str, error: str | None = None, audience: str = HUB_SESSION_AUDIENCE
+) -> HttpResponseRedirect:
+    """The jump to the SaaS's login with a fresh ``state``, left in this browser's cookie for the callback."""
+    state = secrets.token_urlsafe(32)
+    response = HttpResponseRedirect(login_url(slug, next_path, state=state, error=error, audience=audience))
+    response.set_signed_cookie(
+        STATE_COOKIE,
+        state,
+        salt=_STATE_SALT,
+        max_age=STATE_MAX_AGE,
+        path=STATE_COOKIE_PATH,
+        secure=True,
+        httponly=True,
+        samesite=_state_samesite(),
+    )
+    return response
+
+
+def state_matches(request: HttpRequest, state: str | None) -> bool:
+    """Whether ``state`` is the one of this browser's jump: its cookie, signed by the Hub less than 600 s ago."""
+    expected = request.get_signed_cookie(STATE_COOKIE, default=None, salt=_STATE_SALT, max_age=STATE_MAX_AGE)
+    if not expected or not state:
+        return False
+    return secrets.compare_digest(expected.encode(), state.encode())
+
+
+def forget_state(response: HttpResponse) -> HttpResponse:
+    """``response``, deleting this browser's ``state``: it serves one login."""
+    response.delete_cookie(STATE_COOKIE, path=STATE_COOKIE_PATH, samesite=_state_samesite())
+    return response
+
+
+def _state_samesite() -> str:
+    # In production the SaaS and the hubs are one site (erplora.com, <slug>.erplora.com): its POST to
+    # the callback carries a Lax cookie. Locally they are two (localhost:8001, a.localhost:8000) and only
+    # a None cookie comes back, which must be Secure: Chrome and Firefox take it on http://*.localhost.
+    return "None" if settings.DEBUG else "Lax"
 
 
 def admin_hubs_url(error: str | None = None) -> str:

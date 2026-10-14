@@ -38,7 +38,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db import DatabaseError, connections, transaction
 from django.db.models import Max
 from django.utils import timezone, translation
-from live.markdown import render_markdown
+from live.markdown import IMAGE_EXTENSIONS, render_markdown
 from live.meta import module_configs
 from live.shared_catalog import DOC_LANGUAGES
 
@@ -53,7 +53,8 @@ WORKBOOK_EN = "WORKBOOK.en.md"
 MAINTAINERS_HEADING = "## Para quien lo mantiene"
 #: The images of a module's documentation, linked relatively from its WORKBOOK (spec decision 10).
 IMAGES_DIR = PurePosixPath("docs/img")
-IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
+#: What ``_image_files`` reports of a file under ``docs/img/`` that is not published.
+SYMLINK, OTHER_FORMAT = "symlink", "other_format"
 #: Where the finder publishes them: ``/static/catalog/<id>/img/<file>``.
 STATIC_PREFIX = "catalog"
 #: ``{"<icon>": "<svg>"}``, versioned and written by ``pnpm gen:app-icons`` (§4.6).
@@ -69,12 +70,31 @@ _HEADER_RE = re.compile(
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _HEADING_ID_RE = re.compile(r'<h[1-6][^>]*\sid="([^"]*)"')
 _ANCHOR_RE = re.compile(r'<a\s[^>]*href="#([^"]*)"')
+#: What register_apps needs on each table of ``shared`` (``bootstrap_databases`` grants it to hub_shared).
+_TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE")
 #: Two workers of a deploy in progress never write at the same time (released with the transaction).
-_REGISTER_LOCK = "SELECT pg_advisory_xact_lock(hashtext('erplora.shared.register_apps'))"
+_REGISTER_LOCK = (
+    "SELECT pg_advisory_xact_lock(hashtext('erplora.shared.register_apps'))"
+)
 
 
 class CatalogError(Exception):
     """The registry cannot be built or written; the message says what and how to fix it."""
+
+
+class SharedSchemaNotReady(CatalogError):
+    """The SaaS has not created the ``shared`` tables yet (its first ``migrate``): wait, not a contract gap.
+
+    The worker waits for them (``base.worker``); a table that exists without a column the mirror
+    writes is a ``CatalogError`` instead, fatal (spec §3.5).
+    """
+
+    def __init__(self, tables: list[str]):
+        self.tables = tables
+        super().__init__(
+            f"the SaaS has not migrated the shared schema yet: no table {', '.join(tables)} "
+            "(saas-next's migrate creates them)"
+        )
 
 
 class WorkbookError(CatalogError):
@@ -324,14 +344,40 @@ def _documents(config, problems: list[str]) -> dict[str, str]:
     return docs
 
 
-def _image_files(root: Path) -> Iterator[tuple[PurePosixPath, bool]]:
-    """``(path relative to root, allowed)`` of every file under ``root``, hidden ones left out."""
+def _image_files(app: Path) -> Iterator[tuple[PurePosixPath, str | None]]:
+    """``(path relative to the app, problem)`` of everything under its ``docs/img/``, hidden ones left out.
+
+    ``problem`` is ``None`` for an image to publish, ``OTHER_FORMAT`` for another extension and
+    ``SYMLINK`` for a symbolic link, never followed: ``docs/img/x.png -> ../../../config/settings.py``
+    would publish the settings. A linked ``docs`` or ``docs/img`` is the only entry.
+    """
+    for directory in (IMAGES_DIR.parent, IMAGES_DIR):
+        if (app / directory).is_symlink():
+            yield directory, SYMLINK
+            return
+    root = app / IMAGES_DIR
     if not root.is_dir():
         return
+    # rglob does not descend into a linked folder: the link itself is reported.
     for path in sorted(root.rglob("*")):
-        relative = PurePosixPath(path.relative_to(root).as_posix())
-        if path.is_file() and not any(part.startswith(".") for part in relative.parts):
-            yield relative, relative.suffix.lower() in IMAGE_EXTENSIONS
+        relative = PurePosixPath(path.relative_to(app).as_posix())
+        if any(part.startswith(".") for part in relative.relative_to(IMAGES_DIR).parts):
+            continue
+        if path.is_symlink():
+            yield relative, SYMLINK
+        elif path.is_file():
+            yield (
+                relative,
+                None if relative.suffix.lower() in IMAGE_EXTENSIONS else OTHER_FORMAT,
+            )
+
+
+def _through_symlink(app: Path, path: PurePosixPath) -> bool:
+    """Whether ``app / path`` or any folder between ``app`` and it is a symbolic link."""
+    return any(
+        (app / PurePosixPath(*path.parts[:end])).is_symlink()
+        for end in range(1, len(path.parts) + 1)
+    )
 
 
 def build_registry(
@@ -356,10 +402,17 @@ def build_registry(
                 "and commit the result."
             )
         docs = _documents(config, found)
+        files = list(_image_files(Path(config.path)))
+        links = [str(path) for path, problem in files if problem == SYMLINK]
+        if links:
+            found.append(
+                f"{config.label}: {IMAGES_DIR}: a symbolic link is never published (it could publish any "
+                f"file of the image): replace {', '.join(links)} with the file or folder itself."
+            )
         rejected = [
-            str(path)
-            for path, allowed in _image_files(Path(config.path) / IMAGES_DIR)
-            if not allowed
+            str(path.relative_to(IMAGES_DIR))
+            for path, problem in files
+            if problem == OTHER_FORMAT
         ]
         if rejected:
             found.append(
@@ -407,32 +460,38 @@ class AppImagesFinder(BaseFinder):
     """Publishes each module's ``docs/img/**`` as ``catalog/<id>/img/**``, nothing else.
 
     Only the extensions of spec decision 10 (``svg`` can carry script and would be served from the
-    Hub admin's origin); never a ``WORKBOOK*.md``, code, a hidden file or anything outside
-    ``docs/img/``. ``collectstatic`` copies them to ``STATIC_ROOT`` (no hash: the path is stable)
-    and ``runserver`` serves them at once.
+    Hub admin's origin); never a ``WORKBOOK*.md``, code, a hidden file, a symbolic link (nor
+    anything through one) or anything outside ``docs/img/``. ``collectstatic`` copies them to
+    ``STATIC_ROOT`` (no hash: the path is stable) and ``runserver`` serves them at once.
     """
 
     def __init__(self, configs: Iterable | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.storages: dict[str, FileSystemStorage] = {}
+        #: ``{label: the module's folder}``, for the storages above.
+        self.apps: dict[str, Path] = {}
         for config in catalog_modules(configs):
-            root = Path(config.path) / IMAGES_DIR
-            if root.is_dir():
-                storage = FileSystemStorage(location=root)
+            app = Path(config.path)
+            if (app / IMAGES_DIR).is_dir():
+                storage = FileSystemStorage(location=app / IMAGES_DIR)
                 storage.prefix = f"{STATIC_PREFIX}/{config.label}/img"
                 self.storages[config.label] = storage
+                self.apps[config.label] = app
 
     def list(self, ignore_patterns):
-        for storage in self.storages.values():
-            for path, allowed in _image_files(Path(storage.location)):
-                if allowed and not (
-                    ignore_patterns and matches_patterns(str(path), ignore_patterns)
+        for label, storage in self.storages.items():
+            for path, problem in _image_files(self.apps[label]):
+                if problem is not None:
+                    continue
+                relative = str(path.relative_to(IMAGES_DIR))
+                if not (
+                    ignore_patterns and matches_patterns(relative, ignore_patterns)
                 ):
-                    yield str(path), storage
+                    yield relative, storage
 
     def find(self, path, find_all=False, **kwargs):
         found = []
-        for storage in self.storages.values():
+        for label, storage in self.storages.items():
             relative = path.removeprefix(f"{storage.prefix}/")
             if relative == path:
                 continue
@@ -441,8 +500,13 @@ class AppImagesFinder(BaseFinder):
                 part in ("", "..") or part.startswith(".") for part in parts
             ):
                 continue
-            candidate = Path(storage.location).joinpath(*parts)
-            if candidate.suffix.lower() in IMAGE_EXTENSIONS and candidate.is_file():
+            app, published = self.apps[label], IMAGES_DIR.joinpath(*parts)
+            candidate = app / published
+            if (
+                candidate.suffix.lower() in IMAGE_EXTENSIONS
+                and candidate.is_file()
+                and not _through_symlink(app, published)
+            ):
                 if not find_all:
                     return str(candidate)
                 found.append(str(candidate))
@@ -455,7 +519,11 @@ class AppImagesFinder(BaseFinder):
 def known_verticals(configs: Iterable | None = None) -> list[str]:
     """Every vertical some module belongs to, sorted: the ones ``/internal`` accepts (PLAN §15.2)."""
     return sorted(
-        {vertical for config in catalog_modules(configs) for vertical in config.verticals}
+        {
+            vertical
+            for config in catalog_modules(configs)
+            for vertical in config.verticals
+        }
     )
 
 
@@ -508,7 +576,14 @@ def release() -> Release:
     """
     version, released_at = settings.APP_VERSION, settings.APP_RELEASED_AT
     if not settings.DEBUG:
-        missing = [name for name, value in (("APP_VERSION", version), ("APP_RELEASED_AT", released_at)) if not value]
+        missing = [
+            name
+            for name, value in (
+                ("APP_VERSION", version),
+                ("APP_RELEASED_AT", released_at),
+            )
+            if not value
+        ]
         if missing:
             raise CatalogError(
                 f"{' and '.join(missing)} not set: the image's build fixes them (--build-arg) and "
@@ -517,18 +592,25 @@ def release() -> Release:
     try:
         moment = datetime.fromisoformat(released_at) if released_at else timezone.now()
     except ValueError as error:
-        raise CatalogError(f"APP_RELEASED_AT={released_at!r} is not ISO 8601: {error}.") from error
+        raise CatalogError(
+            f"APP_RELEASED_AT={released_at!r} is not ISO 8601: {error}."
+        ) from error
     if timezone.is_naive(moment):
-        raise CatalogError(f"APP_RELEASED_AT={released_at!r} has no UTC offset: use the commit's time in ISO 8601.")
+        raise CatalogError(
+            f"APP_RELEASED_AT={released_at!r} has no UTC offset: use the commit's time in ISO 8601."
+        )
     return Release(version or "dev", moment)
 
 
-def register_apps(registry: list[AppEntry] | None = None, *, force: bool = False) -> RegisterResult:
+def register_apps(
+    registry: list[AppEntry] | None = None, *, force: bool = False
+) -> RegisterResult:
     """Write the registry (default: ``build_registry()``) into ``shared``, in one transaction.
 
     Never overwrites what a newer release registered unless ``force`` (the deliberate rollback of
     spec §4.3), never deletes (a retired app is unlisted, a retired translation left empty) and
-    leaves nothing written when anything fails: the error is logged and raised.
+    leaves nothing written when anything fails: the error is logged and raised. Tables the SaaS has
+    not created yet raise ``SharedSchemaNotReady`` without logging: the worker waits for them.
     """
     try:
         if SHARED_ALIAS not in settings.DATABASES:
@@ -541,8 +623,11 @@ def register_apps(registry: list[AppEntry] | None = None, *, force: bool = False
         with transaction.atomic(using=SHARED_ALIAS):
             with connections[SHARED_ALIAS].cursor() as cursor:
                 cursor.execute(_REGISTER_LOCK)
+                _check_tables(cursor)
                 _check_columns(cursor)
-            newest = App.objects.using(SHARED_ALIAS).aggregate(newest=Max("registered_at"))["newest"]
+            newest = App.objects.using(SHARED_ALIAS).aggregate(
+                newest=Max("registered_at")
+            )["newest"]
             if newest is not None and newest > this.released_at and not force:
                 logger.info(
                     "register_apps: a newer release (registered at %s) already registered its apps; "
@@ -551,10 +636,15 @@ def register_apps(registry: list[AppEntry] | None = None, *, force: bool = False
                     this.version,
                     this.released_at.isoformat(),
                 )
-                return RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+                return RegisterResult(
+                    written=0, retired=0, docs_changed=0, skipped=True
+                )
             _upsert_apps(registry, this)
             retired = _retire_missing(registry, this)
             docs_changed = _write_documents(registry)
+    except SharedSchemaNotReady:
+        # Not an error yet: the caller says how loud it is (the worker waits; the command fails).
+        raise
     except (CatalogError, DatabaseError) as error:
         logger.error("register_apps: nothing written: %s", error)
         raise
@@ -581,13 +671,66 @@ def _schema_and_table(db_table: str) -> tuple[str, str]:
     return schema, table
 
 
+def _check_tables(cursor) -> None:
+    """Both tables of the mirror exist and this role may use them (spec §3.3 and §4.3).
+
+    Missing, the SaaS has not migrated ``shared`` yet: ``SharedSchemaNotReady``, which the worker
+    waits for. Present without the grants of ``bootstrap_databases``: a fatal ``CatalogError``
+    naming them. Read from ``pg_catalog``, which every role sees whatever its grants:
+    ``information_schema`` hides a table the role has no privilege on, which would pass for «not
+    migrated yet» (the worker waiting for ever) or for «no column».
+    """
+    tables = [_schema_and_table(model._meta.db_table) for model in (App, AppDoc)]
+    cursor.execute(
+        "SELECT n.nspname, c.relname, has_schema_privilege(n.oid, 'USAGE'), "
+        + ", ".join(
+            f"has_table_privilege(c.oid, '{privilege}')"
+            for privilege in _TABLE_PRIVILEGES
+        )
+        + ", current_user FROM pg_catalog.pg_class c "
+        "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE c.relkind IN ('r', 'p') AND n.nspname = ANY(%s) AND c.relname = ANY(%s)",
+        [
+            sorted({schema for schema, _ in tables}),
+            sorted({table for _, table in tables}),
+        ],
+    )
+    present = {(row[0], row[1]): row for row in cursor.fetchall()}
+    missing = [
+        f"{schema}.{table}" for schema, table in tables if (schema, table) not in present
+    ]
+    if missing:
+        raise SharedSchemaNotReady(missing)
+    lacking, role = [], ""
+    for schema, table in tables:
+        _, _, usage, *granted, role = present[schema, table]
+        if not usage and f"USAGE on schema {schema}" not in lacking:
+            lacking.append(f"USAGE on schema {schema}")
+        absent = [
+            privilege
+            for privilege, has in zip(_TABLE_PRIVILEGES, granted, strict=True)
+            if not has
+        ]
+        if absent:
+            lacking.append(f"{', '.join(absent)} on {schema}.{table}")
+    if lacking:
+        raise CatalogError(
+            f"role {role} lacks {'; '.join(lacking)}: run bootstrap_databases (it grants hub_shared "
+            "USAGE on the schema and SELECT, INSERT and UPDATE on its tables, also those the SaaS's "
+            "migration creates later)."
+        )
+
+
 def _check_columns(cursor) -> None:
     """Every column of the mirror exists in the database (spec §3.5); one more there is no error."""
     tables = {model: _schema_and_table(model._meta.db_table) for model in (App, AppDoc)}
     cursor.execute(
         "SELECT table_schema, table_name, column_name FROM information_schema.columns "
         "WHERE table_schema = ANY(%s) AND table_name = ANY(%s)",
-        [sorted({schema for schema, _ in tables.values()}), sorted({table for _, table in tables.values()})],
+        [
+            sorted({schema for schema, _ in tables.values()}),
+            sorted({table for _, table in tables.values()}),
+        ],
     )
     present = {tuple(row) for row in cursor.fetchall()}
     missing = [
@@ -604,7 +747,9 @@ def _check_columns(cursor) -> None:
 
 
 def _upsert_apps(registry: list[AppEntry], this: Release) -> None:
-    columns = [field.name for field in App._meta.concrete_fields if not field.primary_key]
+    columns = [
+        field.name for field in App._meta.concrete_fields if not field.primary_key
+    ]
     App.objects.using(SHARED_ALIAS).bulk_create(
         [
             App(
@@ -635,7 +780,9 @@ def _upsert_apps(registry: list[AppEntry], this: Release) -> None:
 
 def _retire_missing(registry: list[AppEntry], this: Release) -> int:
     """Unlist the apps no longer in the code (never deleted); returns how many were listed."""
-    gone = App.objects.using(SHARED_ALIAS).exclude(id__in=[entry.id for entry in registry])
+    gone = App.objects.using(SHARED_ALIAS).exclude(
+        id__in=[entry.id for entry in registry]
+    )
     retired = gone.filter(listed=True).count()
     gone.update(listed=False, hub_version=this.version, registered_at=this.released_at)
     return retired
@@ -648,7 +795,10 @@ def _write_documents(registry: list[AppEntry]) -> int:
     which the SaaS treats as absent: never a ``DELETE``.
     """
     docs = AppDoc.objects.using(SHARED_ALIAS)
-    existing = {(doc.app_id, doc.lang): doc for doc in docs.filter(app_id__in=[entry.id for entry in registry])}
+    existing = {
+        (doc.app_id, doc.lang): doc
+        for doc in docs.filter(app_id__in=[entry.id for entry in registry])
+    }
     now = timezone.now()
     created, changed = [], []
     for entry in registry:
@@ -659,7 +809,13 @@ def _write_documents(registry: list[AppEntry]) -> int:
             if doc is None:
                 if markdown:
                     created.append(
-                        AppDoc(app_id=entry.id, lang=lang, markdown=markdown, source_hash=digest, updated_at=now)
+                        AppDoc(
+                            app_id=entry.id,
+                            lang=lang,
+                            markdown=markdown,
+                            source_hash=digest,
+                            updated_at=now,
+                        )
                     )
             elif doc.source_hash != digest:
                 doc.markdown, doc.source_hash, doc.updated_at = markdown, digest, now

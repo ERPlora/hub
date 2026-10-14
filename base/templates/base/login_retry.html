@@ -1,0 +1,19 @@
+{% load i18n %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+403 of /auth/callback when the state is not this browser's (base.auth_views). Rendered without the
+request: no context processors, no database, no scripts or styles (strict CSP).
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% translate "Sign in again" %}</title>
+</head>
+<body>
+  <main>
+    <h1>{% translate "We could not finish signing you in" %}</h1>
+    <p>{% translate "The sign-in expired or started in another browser." %}</p>
+    <p><a href="{{ retry_url }}">{% translate "Sign in again" %}</a></p>
+  </main>
+</body>
+</html>

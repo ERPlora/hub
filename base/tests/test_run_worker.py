@@ -3,7 +3,9 @@
 SIGTERM (ECS stopping the task) and SIGINT (Ctrl-C) only ask ``base.worker.run`` to stop; it exits
 with its code, 0 within the 30 s of ECS's ``stopTimeout``. In-process, the test's own handlers stand
 guard, so a command that forgot to install or restore its own never stops pytest; then a real
-process, against this suite's databases, from the start line to SIGTERM.
+process, against this suite's databases, from the start line to SIGTERM, also when it starts before
+the SaaS has migrated the ``shared`` schema (the first deploy, 2026-10-14): it waits, running, and
+registers once the tables exist.
 """
 
 import os
@@ -20,7 +22,8 @@ import pytest
 from django.core.management import CommandError, call_command
 from django.db import connections
 
-from base import worker
+from base import catalog, worker
+from base.catalog import SharedSchemaNotReady
 from shared.models import App, AppDoc
 
 HUB_DIR = Path(__file__).resolve().parent.parent.parent
@@ -87,6 +90,39 @@ def test_a_failed_worker_exits_with_its_code(monkeypatch, guard):
     assert signal.getsignal(signal.SIGTERM) is handler
 
 
+def test_a_sigterm_while_it_waits_for_the_shared_schema_exits_0(monkeypatch, guard):
+    _, received = guard
+    attempts: list[int] = []
+    # ECS stops the task while the worker waits for the SaaS's migration: a real SIGTERM, to the
+    # main thread, where the handlers run.
+    sigterm = threading.Timer(
+        0.2, signal.pthread_kill, args=(threading.main_thread().ident, signal.SIGTERM)
+    )
+
+    def register_apps():
+        attempts.append(len(attempts) + 1)
+        if len(attempts) > 1:
+            # The SIGTERM did not stop it during the 5 s wait: the worker fails (1) and so does the test.
+            raise AssertionError("register_apps retried after SIGTERM")
+        sigterm.start()
+        raise SharedSchemaNotReady(["shared.app", "shared.app_doc"])
+
+    monkeypatch.setattr(catalog, "register_apps", register_apps)
+    started = time.monotonic()
+    try:
+        out = run_worker()  # no CommandError: exit code 0
+    finally:
+        # Never a SIGTERM after the guard is gone: it would kill pytest.
+        sigterm.cancel()
+        if sigterm.is_alive():
+            sigterm.join()
+
+    assert time.monotonic() - started < 4  # the first wait (5 s) was cut short
+    assert attempts == [1]
+    assert received == []  # the command's handler took it, not the guard
+    assert "worker: stopped" in out
+
+
 def worker_env() -> dict[str, str]:
     """This suite's databases (``default`` and ``shared``), as the infra passes them to the task."""
     default, shared = (
@@ -129,10 +165,8 @@ def wait_for(lines: queue.Queue, text: str, seen: list[str]) -> None:
     pytest.fail(f"the worker never wrote {text!r}; its output:\n{''.join(seen)}")
 
 
-@pytest.mark.django_db(transaction=True, databases=["default", "shared"])
-@pytest.mark.usefixtures("shared_schema")
-def test_the_real_process_registers_the_apps_and_exits_0_on_sigterm():
-    assert not App.objects.exists()
+def start_worker() -> tuple[subprocess.Popen, queue.Queue]:
+    """``manage.py run_worker`` as the task runs it, its output (stdout and stderr) line by line."""
     process = subprocess.Popen(
         [sys.executable, "manage.py", "run_worker"],
         cwd=HUB_DIR,
@@ -145,6 +179,33 @@ def test_the_real_process_registers_the_apps_and_exits_0_on_sigterm():
     threading.Thread(
         target=read_lines, args=(process.stdout, lines), daemon=True
     ).start()
+    return process, lines
+
+
+def stop_worker(process: subprocess.Popen) -> None:
+    if process.poll() is None:
+        process.kill()
+        process.wait()
+
+
+def shared_tables_exist() -> bool:
+    with connections["shared"].cursor() as cursor:
+        cursor.execute("""SELECT to_regclass('"shared"."app"'), to_regclass('"shared"."app_doc"')""")
+        return None not in cursor.fetchone()
+
+
+def create_shared_tables() -> None:
+    """What the SaaS's migration does (as the ``shared_schema`` fixture): both tables, committed."""
+    with connections["shared"].schema_editor() as editor:
+        editor.create_model(App)
+        editor.create_model(AppDoc)
+
+
+@pytest.mark.django_db(transaction=True, databases=["default", "shared"])
+@pytest.mark.usefixtures("shared_schema")
+def test_the_real_process_registers_the_apps_and_exits_0_on_sigterm():
+    assert not App.objects.exists()
+    process, lines = start_worker()
     seen: list[str] = []
     try:
         wait_for(lines, "worker: started", seen)
@@ -158,9 +219,36 @@ def test_the_real_process_registers_the_apps_and_exits_0_on_sigterm():
         assert time.monotonic() - sent < STOP_TIMEOUT
         assert App.objects.filter(id="demo").exists()
     finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
+        stop_worker(process)
         # The process committed its rows: they go, so the next test finds the registry empty.
+        AppDoc.objects.all().delete()
+        App.objects.all().delete()
+
+
+@pytest.mark.django_db(transaction=True, databases=["default", "shared"])
+@pytest.mark.usefixtures("shared_schema")
+def test_the_real_process_waits_running_until_the_saas_migrates_then_registers():
+    # The first deploy (2026-10-14): the worker started before saas-migrate created shared's tables.
+    with connections["shared"].cursor() as cursor:
+        cursor.execute('DROP TABLE "shared"."app_doc"')
+        cursor.execute('DROP TABLE "shared"."app"')
+    process, lines = start_worker()
+    seen: list[str] = []
+    try:
+        wait_for(lines, "shared schema not migrated yet; retrying in 5 s", seen)
+        # Still running and not working: ECS sees a stable task, and nothing ran unregistered.
+        assert process.poll() is None, "".join(seen)
+        assert not any("waiting for work" in line for line in seen)
+
+        create_shared_tables()  # saas-migrate, at last
+        wait_for(lines, "worker: waiting for work", seen)
+        assert App.objects.filter(id="demo").exists()
+
+        process.send_signal(signal.SIGTERM)
+        assert process.wait(timeout=STOP_TIMEOUT) == 0, "".join(seen)
+    finally:
+        stop_worker(process)
+        if not shared_tables_exist():
+            create_shared_tables()
         AppDoc.objects.all().delete()
         App.objects.all().delete()

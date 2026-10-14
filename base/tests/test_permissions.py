@@ -6,6 +6,7 @@ Owner and admin get every permission of every app; manager and employee, what ea
 from types import SimpleNamespace
 
 import pytest
+from django.apps import apps
 from live.context import Scope
 from live.meta import all_live_app_configs
 
@@ -18,6 +19,11 @@ pytestmark = pytest.mark.django_db
 
 A = Scope("host", "a")
 B = Scope("host", "b")
+
+
+def of_apps(permissions, *labels: str) -> set[str]:
+    """The permissions that belong to the given apps (``<label>.<action>``), whatever else is installed."""
+    return {permission for permission in permissions if permission.split(".", 1)[0] in labels}
 
 
 def test_nobody_has_nothing():
@@ -42,7 +48,8 @@ def test_inactive_user_has_nothing(make_user):
 
 def test_role_permissions_on_its_host_only(make_user):
     user = make_user(host="a", role="hub_employee")
-    assert permissions_for(user, A) == {"demo.view"}
+    # demo is the reference app; the other modules' grants are pinned by their own tests.
+    assert of_apps(permissions_for(user, A), "demo") == {"demo.view"}
     assert permissions_for(user, B) == frozenset()
 
 
@@ -55,21 +62,32 @@ SHOP = SimpleNamespace(
 
 @pytest.fixture
 def with_shop(monkeypatch):
+    """Every installed app plus SHOP."""
     monkeypatch.setattr(permissions_module, "all_live_app_configs", lambda: [*all_live_app_configs(), SHOP])
+
+
+@pytest.fixture
+def only_demo_and_shop(monkeypatch):
+    """demo and SHOP alone, so a role's grants can be compared whole, whatever other modules exist."""
+    monkeypatch.setattr(permissions_module, "all_live_app_configs", lambda: [apps.get_app_config("demo"), SHOP])
 
 
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager"])
 def test_owner_admin_and_manager_get_all_of_demo(make_user, role):
-    assert permissions_for(make_user(host="a", role=role), A) == {"demo.view", "demo.manage"}
+    assert of_apps(permissions_for(make_user(host="a", role=role), A), "demo") == {"demo.view", "demo.manage"}
 
 
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin"])
 def test_owner_and_admin_get_every_permission_of_every_app_even_unlisted(make_user, with_shop, role):
+    granted = permissions_for(make_user(host="a", role=role), A)
     everything = {"demo.view", "demo.manage", "shop.view", "shop.sell", "shop.refund"}
-    assert permissions_for(make_user(host="a", role=role), A) == everything
+    assert of_apps(granted, "demo", "shop") == everything
+    # Every permission each installed app declares, and nothing else.
+    declared = {permission for config in [*all_live_app_configs(), SHOP] for permission in config.permissions}
+    assert granted == declared
 
 
-def test_manager_and_employee_get_what_each_app_declares(make_user, with_shop):
+def test_manager_and_employee_get_what_each_app_declares(make_user, only_demo_and_shop):
     manager = make_user("marta", host="a", role="hub_manager")
     employee = make_user("eva", host="a", role="hub_employee")
     assert permissions_for(manager, A) == {"demo.view", "demo.manage", "shop.view", "shop.sell"}

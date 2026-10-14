@@ -1,9 +1,11 @@
 """register_apps: the Hub writes its modules into the SaaS's ``shared`` schema (round 16, PLAN §21; spec §4.2).
 
-One transaction on the ``shared`` alias: the advisory lock, the columns of the mirror checked against
-the database, then the upsert of ``shared.app``, the retired apps unlisted (never deleted) and the
+One transaction on the ``shared`` alias: the advisory lock, the tables and the columns of the mirror
+checked against the database, then the upsert of ``shared.app``, the retired apps unlisted (never deleted) and the
 documents that changed. A newer release is never overwritten unless ``--force``; anything that fails
 leaves nothing written. ``--check`` stops after ``build_registry``, without opening a connection.
+Tables the SaaS has not created yet (``SharedSchemaNotReady``) are not a contract error: the worker
+waits for them (``test_worker.py``); a missing column is.
 
 The writing tests run against ``test_hub_next_shared``, where ``shared_schema`` builds the schema
 from the mirror. The others carry no database mark on purpose: pytest-django refuses any connection
@@ -11,6 +13,7 @@ there, on every alias, so they prove that what they check happens before the dat
 """
 
 import logging
+import uuid
 from datetime import datetime, timedelta
 
 import pytest
@@ -18,7 +21,14 @@ from django.core.management import CommandError, call_command
 from django.db import connections
 
 from base import catalog
-from base.catalog import CatalogError, RegistryError, build_registry, register_apps, source_hash
+from base.catalog import (
+    CatalogError,
+    RegistryError,
+    SharedSchemaNotReady,
+    build_registry,
+    register_apps,
+    source_hash,
+)
 from base.tests.test_catalog import ICONS, USER_PART, WORKBOOK, module, translated
 from shared.models import App, AppDoc
 
@@ -179,12 +189,77 @@ class TestWrite:
         with connections["shared"].cursor() as cursor:
             cursor.execute('ALTER TABLE "shared"."app" DROP COLUMN "verticals"')
 
-        with pytest.raises(CatalogError, match=r"shared\.app\.verticals.*migrate the SaaS first"):
+        with pytest.raises(CatalogError, match=r"shared\.app\.verticals.*migrate the SaaS first") as raised:
             register_apps(registry(modules))
 
+        # A contract gap (spec §3.5), not a schema still to come: the worker does not wait for it.
+        assert not isinstance(raised.value, SharedSchemaNotReady)
         with connections["shared"].cursor() as cursor:
             cursor.execute('SELECT count(*) FROM "shared"."app"')
             assert cursor.fetchone() == (0,)
+
+    @pytest.mark.parametrize(
+        ("missing", "tables"),
+        [
+            ('DROP TABLE "shared"."app_doc"', ["shared.app_doc"]),
+            # Its foreign key from app_doc goes with it; app_doc stays.
+            ('DROP TABLE "shared"."app" CASCADE', ["shared.app"]),
+            ('DROP SCHEMA "shared" CASCADE', ["shared.app", "shared.app_doc"]),
+        ],
+        ids=["app_doc", "app", "schema"],
+    )
+    def test_tables_the_saas_has_not_created_yet_are_not_ready_not_a_contract_error(
+        self, modules, caplog, missing, tables
+    ):
+        # The first deploy: the Hub's worker starts before saas-migrate creates the schema.
+        with connections["shared"].cursor() as cursor:
+            cursor.execute(missing)
+
+        with caplog.at_level(logging.INFO, logger="base.catalog"), pytest.raises(
+            SharedSchemaNotReady, match="not migrated the shared schema yet"
+        ) as raised:
+            register_apps(registry(modules))
+
+        assert raised.value.tables == tables
+        # The caller says how loud it is (the worker waits and warns): no error logged per attempt.
+        assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
+
+    @pytest.mark.parametrize(
+        ("grants", "lacking"),
+        [
+            ([], "USAGE on schema shared; SELECT, INSERT, UPDATE on shared.app; SELECT, INSERT, UPDATE on shared.app_doc"),
+            (
+                ["GRANT USAGE ON SCHEMA shared TO {role}", 'GRANT SELECT ON "shared"."app", "shared"."app_doc" TO {role}'],
+                "INSERT, UPDATE on shared.app; INSERT, UPDATE on shared.app_doc",
+            ),
+            (
+                ["GRANT USAGE ON SCHEMA shared TO {role}", 'GRANT SELECT, INSERT, UPDATE ON "shared"."app" TO {role}'],
+                "SELECT, INSERT, UPDATE on shared.app_doc",
+            ),
+        ],
+        ids=["nothing", "read-only", "app-only"],
+    )
+    def test_tables_the_role_may_not_write_fail_naming_the_grants_not_a_column(
+        self, modules, caplog, grants, lacking
+    ):
+        # bootstrap_databases not run (or not again): the tables exist, hub_shared has no grant on them.
+        # A real role, created and assumed inside the test's transaction, which undoes both.
+        role = f"test_hub_shared_{uuid.uuid4().hex[:8]}"
+        with connections["shared"].cursor() as cursor:
+            cursor.execute(f'CREATE ROLE "{role}" NOLOGIN')
+            for grant in grants:
+                cursor.execute(grant.format(role=f'"{role}"'))
+            cursor.execute(f'SET LOCAL ROLE "{role}"')
+
+        with caplog.at_level(logging.ERROR, logger="base.catalog"), pytest.raises(CatalogError) as raised:
+            register_apps(registry(modules))
+
+        message = str(raised.value)
+        assert f"role {role} lacks {lacking}: run bootstrap_databases" in message
+        assert "no column" not in message
+        # Fatal, never waited for: a grant does not come by itself.
+        assert not isinstance(raised.value, SharedSchemaNotReady)
+        assert f"role {role} lacks" in caplog.text
 
     def test_a_column_the_saas_has_added_already_is_no_error(self, modules):
         with connections["shared"].cursor() as cursor:

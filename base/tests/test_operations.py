@@ -96,7 +96,9 @@ def test_anonymous_request():
 @pytest.mark.django_db
 def test_authenticated_request_gets_its_role_on_that_host(make_user):
     user = make_user(host="a", role="hub_employee")
-    assert HubContextBuilder().from_request(request_for("a.localhost:8000", user)).permissions == {"demo.view"}
+    ctx_a = HubContextBuilder().from_request(request_for("a.localhost:8000", user))
+    # demo is the reference app; the other modules' grants are pinned by their own tests.
+    assert {permission for permission in ctx_a.permissions if permission.startswith("demo.")} == {"demo.view"}
     ctx_b = HubContextBuilder().from_request(request_for("b.localhost:8000", user))
     assert ctx_b.actor == user
     assert ctx_b.permissions == frozenset()

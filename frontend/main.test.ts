@@ -26,7 +26,7 @@ type Main = typeof import('./main');
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ME = { user: { id: 'u1', label: 'Ana' }, permissions: ['demo.view'], menu: [], apps: [], language: 'es' };
 const page = { template: '<div />' };
-const LOGIN_URL = 'http://localhost:8001/hub-login/?hub=a';
+const LOGIN_URL = '/auth/login';
 
 function fakeShell(isReady: () => Promise<void> = () => Promise.resolve()) {
   const app = { mount: vi.fn() };
@@ -132,7 +132,7 @@ describe('main.ts', () => {
     expect(sdk.client.api.call).not.toHaveBeenCalled();
   });
 
-  it('sends a visitor without a session to the SaaS login of this hub (spa-config.loginUrl), never the admin', async () => {
+  it("sends a visitor without a session to the Hub's jump to the SaaS login (spa-config.loginUrl), never the admin", async () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().loginPath).toBe(LOGIN_URL);

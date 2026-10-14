@@ -78,3 +78,15 @@ msgstr "membresía"
 #: models.py:47
 msgid "memberships"
 msgstr "membresías"
+
+#: templates/base/login_retry.html
+msgid "Sign in again"
+msgstr "Volver a entrar"
+
+#: templates/base/login_retry.html
+msgid "We could not finish signing you in"
+msgstr "No hemos podido terminar de iniciar tu sesión"
+
+#: templates/base/login_retry.html
+msgid "The sign-in expired or started in another browser."
+msgstr "El inicio de sesión ha caducado o empezó en otro navegador."

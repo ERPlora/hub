@@ -102,7 +102,9 @@ def write_mo(path: Path, messages: dict[str, str]) -> None:
         position_key += len(key_bytes) + 1
         position_value += len(value_bytes) + 1
     offsets = key_offset + value_offset
-    header = struct.pack("Iiiiiii", 0x950412DE, 0, len(keys), 7 * 4, 7 * 4 + len(keys) * 8, 0, 0)
+    header = struct.pack(
+        "Iiiiiii", 0x950412DE, 0, len(keys), 7 * 4, 7 * 4 + len(keys) * 8, 0, 0
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(header + array.array("i", offsets).tobytes() + ids + strs)
 
@@ -124,7 +126,10 @@ def module(
         (path / "WORKBOOK.md").write_text(workbook)
     if en is not None:
         (path / "WORKBOOK.en.md").write_text(en)
-    write_mo(path / "locale" / "es" / "LC_MESSAGES" / "django.mo", SPANISH if spanish is None else spanish)
+    write_mo(
+        path / "locale" / "es" / "LC_MESSAGES" / "django.mo",
+        SPANISH if spanish is None else spanish,
+    )
     for image in images:
         (path / image).parent.mkdir(parents=True, exist_ok=True)
         (path / image).write_bytes(b"\x89PNG")
@@ -146,7 +151,9 @@ def module(
     return SimpleNamespace(**(config | fields))
 
 
-def translated(source: str, body: str = "## What it is for\n\nKeeps **things**.\n") -> str:
+def translated(
+    source: str, body: str = "## What it is for\n\nKeeps **things**.\n"
+) -> str:
     """A ``WORKBOOK.en.md`` generated from ``source`` (the Spanish user part)."""
     return f"{en_header(source_hash(source))}\n\n{body}"
 
@@ -166,15 +173,26 @@ def test_user_part_runs_from_the_first_section_to_the_maintainers_heading():
 
 def test_user_part_drops_the_title_and_the_header():
     part = user_part(WORKBOOK)
-    for line in ("# Workbook", "Prefijo:", "Alcance MVP:", "Estado de la app:", "> Manual de usuario"):
+    for line in (
+        "# Workbook",
+        "Prefijo:",
+        "Alcance MVP:",
+        "Estado de la app:",
+        "> Manual de usuario",
+    ):
         assert line not in part
     # The flows' «Estado:» lines are published as they are: nothing else is transformed.
     assert "Estado: hecho" in part
 
 
 def test_user_part_does_not_cut_before_the_exact_heading():
-    text = WORKBOOK.replace("## Cómo se usa\n", "## Cómo se usa\n\nPara quien lo mantiene, nada.\n\n## Para quien lo mantiene la tienda\n")
-    part = user_part(text.replace("(#cómo-se-usa)", "(#para-quien-lo-mantiene-la-tienda)"))
+    text = WORKBOOK.replace(
+        "## Cómo se usa\n",
+        "## Cómo se usa\n\nPara quien lo mantiene, nada.\n\n## Para quien lo mantiene la tienda\n",
+    )
+    part = user_part(
+        text.replace("(#cómo-se-usa)", "(#para-quien-lo-mantiene-la-tienda)")
+    )
     assert "## Para quien lo mantiene la tienda" in part
     assert "Notas internas" not in part
 
@@ -190,7 +208,10 @@ def test_user_part_fails_when_nothing_is_above_the_heading():
 
 
 def test_the_heading_inside_a_code_block_does_not_cut():
-    fenced = WORKBOOK.replace("### Paso a paso\n", f"### Paso a paso\n\n```markdown\n{CUT}\n```\n\n~~~\n{CUT}\n~~~\n")
+    fenced = WORKBOOK.replace(
+        "### Paso a paso\n",
+        f"### Paso a paso\n\n```markdown\n{CUT}\n```\n\n~~~\n{CUT}\n~~~\n",
+    )
     part = user_part(fenced)
     assert part.count(CUT) == 2
     assert "Estado: hecho" in part
@@ -204,13 +225,17 @@ def test_a_dangling_anchor_fails_and_names_it():
 
 def test_an_anchor_to_a_heading_the_cut_leaves_out_fails():
     with pytest.raises(WorkbookError, match="#cambios-frente-al-producto-actual"):
-        user_part(WORKBOOK.replace("(#cómo-se-usa)", "(#cambios-frente-al-producto-actual)"))
+        user_part(
+            WORKBOOK.replace("(#cómo-se-usa)", "(#cambios-frente-al-producto-actual)")
+        )
 
 
 # ── build_registry (§4.2) ──────────────────────────────────────────────────────────────────────
 
 
-def test_a_module_becomes_one_entry_with_both_languages_its_icon_and_its_documentation(tmp_path):
+def test_a_module_becomes_one_entry_with_both_languages_its_icon_and_its_documentation(
+    tmp_path,
+):
     config = module(
         tmp_path,
         en=translated(USER_PART),
@@ -247,14 +272,19 @@ def test_without_a_translation_there_is_no_english_document(tmp_path):
 
 
 def test_a_text_without_its_spanish_msgstr_fails_naming_the_app_and_the_field(tmp_path):
-    spanish = {key: value for key, value in SPANISH.items() if key != "Keep your things."}
+    spanish = {
+        key: value for key, value in SPANISH.items() if key != "Keep your things."
+    }
     [problem] = problems([module(tmp_path, spanish=spanish)])
     assert problem.startswith("things: summary:")
     assert "msgstr" in problem and "compilemessages" in problem
 
 
 def test_a_name_that_is_the_same_in_both_languages_still_needs_its_msgstr(tmp_path):
-    assert build_registry([module(tmp_path, verbose_name="Demo", spanish={**SPANISH, "Demo": "Demo"})], icons=ICONS)
+    assert build_registry(
+        [module(tmp_path, verbose_name="Demo", spanish={**SPANISH, "Demo": "Demo"})],
+        icons=ICONS,
+    )
     [problem] = problems([module(tmp_path / "other", verbose_name="Demo")])
     assert problem.startswith("things: verbose_name:")
 
@@ -268,8 +298,14 @@ def test_a_spanish_text_longer_than_its_column_fails(tmp_path):
 def test_an_english_text_longer_than_its_column_fails_too(tmp_path):
     # live.E007 checks it in `manage.py check`; register_apps() also runs where no check ran (the worker).
     name = "N" * 81
-    [problem] = problems([module(tmp_path, verbose_name=name, spanish={**SPANISH, name: "Cosas"})])
-    assert problem.startswith("things: verbose_name:") and "English" in problem and "80" in problem
+    [problem] = problems(
+        [module(tmp_path, verbose_name=name, spanish={**SPANISH, name: "Cosas"})]
+    )
+    assert (
+        problem.startswith("things: verbose_name:")
+        and "English" in problem
+        and "80" in problem
+    )
 
 
 def test_an_icon_that_is_not_baked_fails_with_the_command_that_bakes_it(tmp_path):
@@ -307,7 +343,9 @@ def test_a_translation_with_a_dangling_anchor_fails(tmp_path):
     assert problem.startswith("things: WORKBOOK.en.md:") and "#how-to-use-it" in problem
 
 
-@pytest.mark.parametrize("image", ["docs/img/diagram.svg", "docs/img/sub/notes.txt", "docs/img/photo.bmp"])
+@pytest.mark.parametrize(
+    "image", ["docs/img/diagram.svg", "docs/img/sub/notes.txt", "docs/img/photo.bmp"]
+)
 def test_an_image_with_another_extension_fails(tmp_path, image):
     [problem] = problems([module(tmp_path, images=("docs/img/list.png", image))])
     assert problem.startswith("things: docs/img:")
@@ -315,7 +353,13 @@ def test_an_image_with_another_extension_fails(tmp_path, image):
 
 
 def test_allowed_images_hidden_files_and_files_outside_docs_img_pass(tmp_path):
-    images = ("docs/img/a.png", "docs/img/b.JPG", "docs/img/c.jpeg", "docs/img/d.webp", "docs/img/sub/e.gif")
+    images = (
+        "docs/img/a.png",
+        "docs/img/b.JPG",
+        "docs/img/c.jpeg",
+        "docs/img/d.webp",
+        "docs/img/sub/e.gif",
+    )
     others = ("docs/img/.DS_Store", "docs/notes.txt", "docs/diagram.svg")
     assert build_registry([module(tmp_path, images=images + others)], icons=ICONS)
 
@@ -328,7 +372,11 @@ def test_only_modules_are_registered(tmp_path):
 
 def test_the_order_is_by_label_whatever_the_order_of_the_apps(tmp_path):
     configs = [module(tmp_path, label) for label in ("zeta", "alpha", "mid")]
-    assert [entry.id for entry in build_registry(configs, icons=ICONS)] == ["alpha", "mid", "zeta"]
+    assert [entry.id for entry in build_registry(configs, icons=ICONS)] == [
+        "alpha",
+        "mid",
+        "zeta",
+    ]
 
 
 def test_every_problem_of_every_module_is_gathered(tmp_path):
@@ -337,14 +385,22 @@ def test_every_problem_of_every_module_is_gathered(tmp_path):
         module(tmp_path, "alpha", spanish={}),
     ]
     found = problems(broken)
-    assert [problem.split(":")[0] for problem in found] == ["alpha", "alpha", "alpha", "beta", "beta"]
+    assert [problem.split(":")[0] for problem in found] == [
+        "alpha",
+        "alpha",
+        "alpha",
+        "beta",
+        "beta",
+    ]
     assert str(RegistryError(found)).count("\n") == len(found)
 
 
 def test_the_baked_icons_are_read_from_the_generated_json(tmp_path, settings):
     settings.BASE_DIR = tmp_path
     (tmp_path / "frontend" / "generated").mkdir(parents=True)
-    (tmp_path / "frontend" / "generated" / "app-icons.json").write_text('{"ion:cube-outline": "<svg/>"}')
+    (tmp_path / "frontend" / "generated" / "app-icons.json").write_text(
+        '{"ion:cube-outline": "<svg/>"}'
+    )
     [entry] = build_registry([module(tmp_path / "apps")])
     assert entry.icon_svg == "<svg/>"
 
@@ -384,14 +440,19 @@ def test_the_finder_publishes_docs_img_under_catalog_and_nothing_else(tmp_path):
 
     listed = sorted(f"{storage.prefix}/{path}" for path, storage in finder.list(None))
 
-    assert listed == ["catalog/things/img/list.png", "catalog/things/img/sub/photo.webp"]
+    assert listed == [
+        "catalog/things/img/list.png",
+        "catalog/things/img/sub/photo.webp",
+    ]
 
 
 def test_the_finder_finds_one_image_by_its_static_path(tmp_path):
     config = module(tmp_path, images=("docs/img/list.png", "docs/img/diagram.svg"))
     finder = AppImagesFinder(configs=[config])
 
-    assert finder.find("catalog/things/img/list.png") == str(tmp_path / "things" / "docs" / "img" / "list.png")
+    assert finder.find("catalog/things/img/list.png") == str(
+        tmp_path / "things" / "docs" / "img" / "list.png"
+    )
     assert finder.find("catalog/things/img/list.png", find_all=True) == [
         str(tmp_path / "things" / "docs" / "img" / "list.png")
     ]
@@ -401,13 +462,113 @@ def test_the_finder_finds_one_image_by_its_static_path(tmp_path):
 
 
 def test_the_finder_skips_ignored_patterns(tmp_path):
-    finder = AppImagesFinder(configs=[module(tmp_path, images=("docs/img/a.png", "docs/img/b.gif"))])
+    finder = AppImagesFinder(
+        configs=[module(tmp_path, images=("docs/img/a.png", "docs/img/b.gif"))]
+    )
     assert [path for path, _ in finder.list(["*.gif"])] == ["a.png"]
 
 
 def test_the_finder_skips_platform_apps_and_modules_without_images(tmp_path):
-    configs = [module(tmp_path, "base", kind="platform", images=("docs/img/a.png",)), module(tmp_path, "things")]
+    configs = [
+        module(tmp_path, "base", kind="platform", images=("docs/img/a.png",)),
+        module(tmp_path, "things"),
+    ]
     assert list(AppImagesFinder(configs=configs).list(None)) == []
+
+
+# ── Symbolic links: never followed (review L8) ─────────────────────────────────────────────────
+
+
+def outside_files(tmp_path: Path) -> None:
+    """What lies outside a module: the settings an attacker wants and folders with an image."""
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "settings.py").write_text("SECRET_KEY = 'leaked'\n")
+    (tmp_path / "outside" / "img").mkdir(parents=True)
+    (tmp_path / "outside" / "a.png").write_bytes(b"\x89PNG")
+    (tmp_path / "outside" / "img" / "a.png").write_bytes(b"\x89PNG")
+
+
+def link(config, path: str, target: str | Path) -> Path:
+    """A symbolic link ``path`` (relative to the module) pointing at ``target``."""
+    linked = Path(config.path) / path
+    linked.parent.mkdir(parents=True, exist_ok=True)
+    linked.symlink_to(target)
+    return linked
+
+
+# (the link, where it points (relative to tmp_path unless it starts with ".."), the static path through it)
+SYMLINKS = [
+    ("docs/img/x.png", "../../../config/settings.py", "catalog/things/img/x.png"),
+    ("docs/img/sub", "outside", "catalog/things/img/sub/a.png"),
+    ("docs/img/gone.png", "nowhere.png", "catalog/things/img/gone.png"),
+    ("docs/img", "outside", "catalog/things/img/a.png"),
+    ("docs", "outside", "catalog/things/img/a.png"),
+]
+
+
+def linked_module(tmp_path, path, target):
+    outside_files(tmp_path)
+    config = module(tmp_path)
+    link(config, path, target if target.startswith("..") else tmp_path / target)
+    return config
+
+
+def test_the_attack_link_resolves_to_the_settings(tmp_path):
+    """The premise of the tests below: without the check, x.png would be the settings file."""
+    config = linked_module(tmp_path, "docs/img/x.png", "../../../config/settings.py")
+
+    assert (
+        Path(config.path) / "docs/img/x.png"
+    ).read_text() == "SECRET_KEY = 'leaked'\n"
+
+
+@pytest.mark.parametrize(("path", "target", "static"), SYMLINKS)
+def test_a_symbolic_link_fails_the_registry_naming_the_app_and_the_link(
+    tmp_path, path, target, static
+):
+    [problem] = problems([linked_module(tmp_path, path, target)])
+
+    assert problem.startswith("things: docs/img:")
+    assert "symbolic link" in problem
+    assert f"replace {path} " in problem
+
+
+@pytest.mark.parametrize(("path", "target", "static"), SYMLINKS)
+def test_the_finder_publishes_nothing_through_a_symbolic_link(
+    tmp_path, path, target, static
+):
+    finder = AppImagesFinder(configs=[linked_module(tmp_path, path, target)])
+
+    assert list(finder.list(None)) == []
+    assert finder.find(static) == []
+    assert finder.find(static, find_all=True) == []
+
+
+def test_a_real_image_next_to_a_symbolic_link_is_still_published(tmp_path):
+    outside_files(tmp_path)
+    config = module(tmp_path, images=("docs/img/list.png",))
+    link(config, "docs/img/x.png", "../../../config/settings.py")
+    finder = AppImagesFinder(configs=[config])
+
+    assert [path for path, _ in finder.list(None)] == ["list.png"]
+    assert finder.find("catalog/things/img/list.png") == str(
+        Path(config.path) / "docs" / "img" / "list.png"
+    )
+    assert finder.find("catalog/things/img/x.png") == []
+    [problem] = problems([config])
+    assert "replace docs/img/x.png " in problem
+    assert "list.png" not in problem
+
+
+def test_a_hidden_symbolic_link_is_neither_published_nor_reported(tmp_path):
+    outside_files(tmp_path)
+    config = module(tmp_path, images=("docs/img/list.png",))
+    link(config, "docs/img/.x.png", "../../../config/settings.py")
+
+    assert build_registry([config], icons=ICONS)
+    assert [path for path, _ in AppImagesFinder(configs=[config]).list(None)] == [
+        "list.png"
+    ]
 
 
 # ── Verticals (§4.7) ───────────────────────────────────────────────────────────────────────────
@@ -429,8 +590,15 @@ def test_known_verticals_are_the_union_of_the_modules_verticals(vertical_modules
     assert known_verticals(vertical_modules) == ["hair_salon", "restaurant"]
 
 
-def test_a_template_has_the_modules_of_its_vertical_closed_by_requires(vertical_modules):
-    assert template_apps("hair_salon", vertical_modules) == ["booking", "contact", "customer", "sale"]
+def test_a_template_has_the_modules_of_its_vertical_closed_by_requires(
+    vertical_modules,
+):
+    assert template_apps("hair_salon", vertical_modules) == [
+        "booking",
+        "contact",
+        "customer",
+        "sale",
+    ]
     assert template_apps("restaurant", vertical_modules) == ["sale", "table"]
 
 
@@ -449,7 +617,9 @@ def test_the_real_modules_build_their_registry():
     assert demo.listed is False
     assert demo.icon_svg.startswith("<svg")
     assert demo.docs["es"].startswith("## ")
-    assert hashlib.sha256(demo.docs["es"].encode()).hexdigest() == source_hash(demo.docs["es"])
+    assert hashlib.sha256(demo.docs["es"].encode()).hexdigest() == source_hash(
+        demo.docs["es"]
+    )
 
 
 def test_no_real_translation_is_stale():
@@ -457,8 +627,9 @@ def test_no_real_translation_is_stale():
 
 
 def test_the_real_verticals_derive_from_the_modules():
-    assert known_verticals() == sorted({v for entry in build_registry() for v in entry.verticals})
-
+    assert known_verticals() == sorted(
+        {v for entry in build_registry() for v in entry.verticals}
+    )
 
 
 def test_the_static_files_pipeline_finds_the_real_demo_image():
