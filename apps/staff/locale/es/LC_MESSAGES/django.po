@@ -1,0 +1,368 @@
+# Spanish translation of the staff app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next staff\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 01:00+0200\n"
+"PO-Revision-Date: 2026-10-14 01:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Staff"
+msgstr "Personal"
+
+msgid "Your team: records, roles, weekly schedules, time off with approval and commission rates."
+msgstr "Tu equipo: fichas, roles, horarios semanales, ausencias con aprobación y comisiones."
+
+msgid "Staff keeps who works in your business and when: each professional's record with their role, contact details, hourly rate and commission, whether they take bookings, and their weekly schedule with breaks. Employees ask for time off and a manager approves or rejects it; approved time off is taken out of their availability, and everyone sees who is away today. A record can be linked to the person's account, so they see their own record and requests."
+msgstr "Personal guarda quién trabaja en tu negocio y cuándo: la ficha de cada profesional con su rol, sus datos de contacto, su tarifa por hora y su comisión, si recibe citas y su horario semanal con descansos. Los empleados piden sus ausencias y un responsable las aprueba o las rechaza; una ausencia aprobada sale de su disponibilidad y todos ven quién falta hoy. La ficha se puede vincular a la cuenta de la persona, que así ve su propia ficha y sus solicitudes."
+
+msgid "Roles"
+msgstr "Roles"
+
+msgid "Time Off"
+msgstr "Ausencias"
+
+msgid "Schedules"
+msgstr "Horarios"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "colour"
+msgstr "color"
+
+msgid "order"
+msgstr "orden"
+
+msgid "active"
+msgstr "activo"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "role"
+msgstr "rol"
+
+msgid "roles"
+msgstr "roles"
+
+msgctxt "staff member status"
+msgid "Active"
+msgstr "Activo"
+
+msgctxt "staff member status"
+msgid "Inactive"
+msgstr "Inactivo"
+
+msgctxt "staff member status"
+msgid "On leave"
+msgstr "De baja"
+
+msgctxt "staff member status"
+msgid "Terminated"
+msgstr "Dado de baja"
+
+msgid "first name"
+msgstr "nombre"
+
+msgid "last name"
+msgstr "apellidos"
+
+msgid "email"
+msgstr "email"
+
+msgid "phone"
+msgstr "teléfono"
+
+msgid "employee number"
+msgstr "nº de empleado"
+
+msgid "user"
+msgstr "usuario"
+
+msgid "status"
+msgstr "estado"
+
+msgid "bookable"
+msgstr "reservable"
+
+msgid "minutes between appointments"
+msgstr "margen entre citas (min)"
+
+msgid "hire date"
+msgstr "fecha de alta"
+
+msgid "last day"
+msgstr "último día"
+
+msgid "reason for leaving"
+msgstr "motivo de la baja"
+
+msgid "specialties"
+msgstr "especialidades"
+
+msgid "bio"
+msgstr "bio"
+
+msgid "hourly rate (cents)"
+msgstr "tarifa por hora (céntimos)"
+
+msgid "commission (%)"
+msgstr "comisión (%)"
+
+msgid "HR notes"
+msgstr "notas de RRHH"
+
+msgid "staff member"
+msgstr "miembro del personal"
+
+msgid "staff members"
+msgstr "miembros del personal"
+
+msgid "default"
+msgstr "por defecto"
+
+msgid "valid from"
+msgstr "vigente desde"
+
+msgid "valid until"
+msgstr "vigente hasta"
+
+msgid "schedule"
+msgstr "horario"
+
+msgid "schedules"
+msgstr "horarios"
+
+msgid "weekday"
+msgstr "día de la semana"
+
+msgid "start"
+msgstr "inicio"
+
+msgid "end"
+msgstr "fin"
+
+msgid "break start"
+msgstr "inicio del descanso"
+
+msgid "break end"
+msgstr "fin del descanso"
+
+msgid "working day"
+msgstr "día de trabajo"
+
+msgid "working days"
+msgstr "días de trabajo"
+
+msgctxt "leave type"
+msgid "Vacation"
+msgstr "Vacaciones"
+
+msgctxt "leave type"
+msgid "Sick leave"
+msgstr "Baja por enfermedad"
+
+msgctxt "leave type"
+msgid "Personal"
+msgstr "Asuntos propios"
+
+msgctxt "leave type"
+msgid "Training"
+msgstr "Formación"
+
+msgctxt "leave type"
+msgid "Other"
+msgstr "Otros"
+
+msgctxt "time-off status"
+msgid "Pending"
+msgstr "Pendiente"
+
+msgctxt "time-off status"
+msgid "Approved"
+msgstr "Aprobada"
+
+msgctxt "time-off status"
+msgid "Rejected"
+msgstr "Rechazada"
+
+msgctxt "time-off status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "from"
+msgstr "desde"
+
+msgid "until"
+msgstr "hasta"
+
+msgid "full day"
+msgstr "día completo"
+
+msgid "from (time)"
+msgstr "desde (hora)"
+
+msgid "until (time)"
+msgstr "hasta (hora)"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "approved by"
+msgstr "aprobada por"
+
+msgid "approved at"
+msgstr "aprobada el"
+
+msgid "time off"
+msgstr "ausencias"
+
+msgid "slot"
+msgstr "ranura"
+
+msgid "working day starts"
+msgstr "inicio de jornada"
+
+msgid "working day ends"
+msgstr "fin de jornada"
+
+msgid "break duration (minutes)"
+msgstr "duración del descanso (minutos)"
+
+msgid "minimum booking notice (hours)"
+msgstr "antelación mínima de reserva (horas)"
+
+msgid "maximum hours per day"
+msgstr "horas máximas por día"
+
+msgid "overtime threshold (hours/week)"
+msgstr "umbral de horas extra (horas/semana)"
+
+msgid "show staff photos"
+msgstr "mostrar fotos del personal"
+
+msgid "show staff bio"
+msgstr "mostrar biografía del personal"
+
+msgid "let customers choose the professional"
+msgstr "permitir elegir profesional"
+
+msgid "notify on a new appointment"
+msgstr "avisar de nueva cita"
+
+msgid "notify on a cancellation"
+msgstr "avisar de cancelación"
+
+msgid "staff settings"
+msgstr "ajustes de personal"
+
+msgid "That staff member does not exist in this business."
+msgstr "Ese miembro del personal no existe en este negocio."
+
+#, python-format
+msgid "There are several staff members called “%(name)s”: %(matches)s. Say which one."
+msgstr "Hay varios miembros del personal que se llaman «%(name)s»: %(matches)s. Di cuál."
+
+msgid "That role does not exist in this business."
+msgstr "Ese rol no existe en este negocio."
+
+msgid "That schedule does not exist in this business."
+msgstr "Ese horario no existe en este negocio."
+
+msgid "That time-off request does not exist in this business."
+msgstr "Esa solicitud de ausencia no existe en este negocio."
+
+msgid "Enter a valid email address."
+msgstr "Introduzca una dirección de correo electrónico válida."
+
+msgid "Say which staff member: their id or their name."
+msgstr "Di de qué miembro del personal se trata: su id o su nombre."
+
+msgid "The start time must be before the end time."
+msgstr "La hora de inicio tiene que ser anterior a la de fin."
+
+msgid "The break needs a start and an end, or neither."
+msgstr "El descanso necesita inicio y fin (o ninguno)."
+
+msgid "The break must fall inside the working hours."
+msgstr "El descanso debe caer dentro del intervalo de trabajo."
+
+msgid "A schedule needs at least one working day with hours."
+msgstr "Un horario necesita al menos un día de trabajo con horas."
+
+msgid "Each weekday can appear only once."
+msgstr "Cada día de la semana solo puede aparecer una vez."
+
+msgid "The schedule's validity ends before it starts."
+msgstr "La vigencia del horario termina antes de empezar."
+
+msgid "The end date cannot be before the start date."
+msgstr "La fecha de fin no puede ser anterior a la de inicio."
+
+msgid "Ask for at most 731 days at a time."
+msgstr "Pide como mucho 731 días de una vez."
+
+msgid "A half-day absence needs a start and an end time."
+msgstr "Una ausencia de medio día necesita hora de inicio y de fin."
+
+msgid "That role is not available: it does not exist in this business, or it has been deleted or retired."
+msgstr "Ese rol no está disponible: no existe en este negocio, o se ha eliminado o retirado."
+
+msgid "A role with that name already exists."
+msgstr "Ya existe un rol con ese nombre."
+
+msgid "That Hub user has no access to this business."
+msgstr "Ese usuario del Hub no tiene acceso a este negocio."
+
+#, python-format
+msgid "That Hub user is already linked to %(name)s. A Hub user can belong to only one staff member: unlink it there first, or pick another user."
+msgstr "Ese usuario del Hub ya está vinculado a %(name)s. Un usuario del Hub solo puede pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario."
+
+msgid "That staff member is already inactive."
+msgstr "Ese miembro del personal ya está inactivo."
+
+msgid "That staff member has pending or approved time off that has not ended yet. Resolve it first."
+msgstr "Ese miembro tiene ausencias pendientes o aprobadas que aún no han terminado. Resuélvelas primero."
+
+msgid "That staff member already has pending or approved time off in those dates."
+msgstr "Ese miembro ya tiene una ausencia pendiente o aprobada en esas fechas."
+
+msgid "That staff member already has approved time off in those dates."
+msgstr "Ese miembro ya tiene una ausencia aprobada en esas fechas."
+
+msgid "That time-off request cannot change to that status from its current one."
+msgstr "Esa solicitud de ausencia no puede pasar a ese estado desde el actual."
+
+msgid "Your user is not linked to any staff member: ask a manager to link it."
+msgstr "Tu usuario no está vinculado a ningún miembro del personal: pide a un responsable que lo vincule."
+
+msgid "You can only cancel your own pending requests."
+msgstr "Solo puedes cancelar tus propias solicitudes pendientes."
+
+msgid "Regular schedule"
+msgstr "Horario habitual"
+
+#, python-format
+msgid "Permission “%(permission)s” is required."
+msgstr "Se necesita el permiso «%(permission)s»."

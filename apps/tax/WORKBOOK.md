@@ -1,0 +1,612 @@
+# Workbook — Impuestos (app)
+Prefijo: TAX
+Alcance MVP: transversal
+Estado de la app: en construcción (servidor hecho; páginas en la fase de frontend)
+
+> Manual de usuario y especificación de la app `tax`. Se escribe **antes** que el código: no se
+> programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
+> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Impuestos del producto actual
+> (`modules-workspace/modules/taxes`, `origin/main` `3755bc4`). La app hace lo mismo y se verá igual;
+> los números de flujo se conservan (`TAXES-Fnn` → `TAX-Fnn`) porque otras apps los citan.
+
+## Para qué sirve y para quién
+
+Impuestos guarda lo que dice cuánto IVA lleva cada cosa que se vende:
+
+- las **categorías fiscales** («Restauración — comida», «Servicio — general»…), a las que apuntan los
+  productos de Inventario y los servicios de Servicios;
+- las **reglas**, que fijan el tipo de cada categoría en un país o una región y entre unas fechas, con
+  su calificación fiscal (sujeta, exenta, no sujeta, con inversión del sujeto pasivo);
+- los **alias**, textos de fuera («comida», «beer», «IVA 10») que el importador de Inventario reconoce
+  como una categoría.
+
+Casi nadie lo abre a diario: se prepara al montar el negocio y se toca cuando cambia un tipo. Pero
+cada línea que cobra Ventas, cada factura de Facturación y cada producto de Inventario o Servicios
+lee de aquí. Sirve igual a la restauración y a la peluquería: lo que cambia es qué categorías vende
+cada una, no cómo funciona.
+
+Quién la usa:
+
+- El **propietario**, el **administrador** y el **responsable** crean categorías, reglas y alias, ponen
+  fecha de fin a una regla y la desactivan o reactivan.
+- El **empleado** solo consulta y calcula.
+
+No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el país del negocio.
+
+## Referencia adoptada
+
+- [Ley 37/1992 del IVA](https://www.boe.es/buscar/act.php?id=BOE-A-1992-28740): tipos general,
+  reducido y superreducido (arts. 90 y 91), exenciones (art. 20) y recargo de equivalencia. Los tipos
+  de fábrica salen de aquí; su contraste con la asesoría es de cada negocio.
+- Las listas de la AEAT (régimen `ClaveRegimen`, exención `OperacionExenta`, causas E1…E6) viajan como
+  códigos opacos: Impuestos los guarda y los devuelve, no los interpreta.
+- Odoo y Square: el impuesto se asigna al producto **por categoría**, no por un porcentaje suelto;
+  varios impuestos sobre la misma línea; precio con el impuesto incluido o añadido.
+- Cambiar un tipo = poner fecha de fin al vigente y crear el nuevo, nunca editar la regla (Oracle
+  E-Business Tax, Dynamics 365 y SAP). Ninguno deja dos tipos vigentes el mismo día para lo mismo.
+
+## Antes de empezar
+
+- Al activar Impuestos, el negocio recibe de fábrica **11 categorías**, **18 alias** y **los tipos de
+  España** (TAX-F16). Con eso un negocio español puede vender sin tocar nada.
+- Activar Inventario, Servicios, Ventas o Facturación activa Impuestos con ellos, y Impuestos no se
+  puede desactivar mientras alguna de ellas esté activa.
+- **País y región del negocio**: hoy los dice quien pregunta (la pantalla, Ventas o la API); sin país,
+  se usa España. Cuando los Ajustes del negocio guarden el país y la región, Impuestos los leerá de
+  allí.
+- Si el negocio es de Portugal o de otro país, no hay ninguna regla de fábrica: hay que crearlas
+  (TAX-F04), y la consulta de primeros pasos lo avisa hasta que exista una (TAX-F17).
+- **«Hoy» es la hora de Madrid** en la fase 1: el Hub todavía no guarda la zona horaria del negocio.
+  El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
+  hora antes de su medianoche. Cuando el negocio tenga su zona horaria, «hoy» será el suyo.
+
+Configuración inicial, paso a paso:
+
+1. Abre **Impuestos → Categorías** y revisa que están las que vendes; crea las que falten (TAX-F02).
+2. Abre **Impuestos → Reglas** y comprueba que cada categoría tiene su tipo para tu país (TAX-F03).
+   Crea las que falten (TAX-F04); si el negocio es de Canarias, Ceuta o Melilla, sigue TAX-F11.
+3. Haz una venta de prueba y comprueba el desglose del tique.
+
+## Pantallas
+
+Impuestos se abre desde el menú **Impuestos** y tiene tres pestañas en la barra de abajo:
+**Categorías**, **Reglas** y **Alias**. Las tres siguen el permiso de quien mira: con solo consulta
+sale el aviso «Puedes consultar las reglas fiscales pero no modificarlas.», desaparece el botón **+** y,
+en Reglas, las acciones de fila. La app exige el permiso en cada acción aunque la pantalla enseñe el
+botón.
+
+### Categorías
+Tabla con Clave, Nombre, Descripción, Origen («Sistema» o «Propia»), Activa y el tipo vigente en el
+país del negocio («21 %», «exenta»…). Buscador «Buscar clave o nombre…» (clave, nombre y descripción,
+guardados o traducidos), filtros por columna (Clave, Nombre, Descripción y Origen) y orden por cualquier
+columna; 50 por página, ordenadas por clave de entrada. Las de fábrica salen con su nombre en el idioma
+de la persona; las propias, con el texto que se tecleó. Botón **+** que abre el panel de alta (Clave,
+Nombre, Descripción, «Añadir»). Sin acciones de fila.
+
+### Reglas
+Tabla con Categoría, País, Región, %, Tipo, Calificación (con la causa de exención si la hay), Vigente
+desde, Vigente hasta y Activa. Un componente (el recargo) sale justo debajo de su regla raíz, como
+«↳ etiqueta». Buscador «Buscar categoría o país…» y filtros de País, Región, Categoría, Tipo,
+Calificación, Régimen, % (desde–hasta) y Estado («Activas», «Desactivadas», «Todas»; de entrada,
+«Activas»); orden por cualquier columna. Botón **+** con el
+panel de alta (País, Región, Categoría, %, Tipo, Calificación, Causa de exención —solo si es exenta—,
+Régimen, Vigente desde, Vigente hasta, «Regla raíz (componente de)», «Etiqueta componente» y
+«Añadir»). Acciones de fila: «Poner fecha de fin» y «Desactivar»; en una desactivada, «Reactivar».
+
+### Alias
+Tabla con Alias, Categoría, Origen («De fábrica» o «Aprendido») y Activa. Buscador «Buscar alias o
+categoría…», filtros de Alias, Categoría y Origen y orden por cualquier columna. Botón **+** con el
+panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añadir»).
+
+## Estados de cada pantalla
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando…» mientras llega el primer resultado. |
+| Vacío | «Sin categorías fiscales.», «Sin reglas fiscales.» o «Sin alias de categorías.» (o «Sin resultados» con búsqueda o filtro), con **+** si puede crear. |
+| Error | El aviso de la tabla con «Reintentar»; un rechazo del alta sale dentro del panel, junto a su campo. |
+| Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
+| App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
+| Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
+
+## Flujos
+
+| ID | Flujo | Estado |
+|---|---|---|
+| TAX-F01 | Ver las categorías fiscales | servidor hecho |
+| TAX-F02 | Crear una categoría fiscal propia | servidor hecho |
+| TAX-F03 | Ver y filtrar las reglas | servidor hecho |
+| TAX-F04 | Fijar el tipo de una categoría en un país o región | servidor hecho |
+| TAX-F05 | Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo | servidor hecho |
+| TAX-F06 | Añadir un recargo de equivalencia a un tipo | servidor hecho |
+| TAX-F07 | Cambiar un tipo a partir de una fecha | servidor hecho |
+| TAX-F08 | Desactivar y reactivar una regla | servidor hecho |
+| TAX-F09 | Reparar una regla que cobra un tipo donde no toca | retirado: esa regla ya no puede existir |
+| TAX-F10 | Resolver reglas que se solapan | retirado: el solape ya no puede existir |
+| TAX-F11 | Montar un negocio de Canarias, Ceuta o Melilla | servidor hecho |
+| TAX-F12 | Crear varias reglas de golpe | servidor hecho |
+| TAX-F13 | Ver los alias de categoría | servidor hecho |
+| TAX-F14 | Enseñar un alias de categoría a mano | servidor hecho |
+| TAX-F15 | Decir al importador de Inventario qué categoría es un texto | servidor hecho |
+| TAX-F16 | Sembrar el catálogo de fábrica al activar | hecho |
+| TAX-F17 | Avisar de que faltan tipos para el país del negocio | servidor hecho |
+| TAX-F18 | Calcular el impuesto de un importe | servidor hecho |
+| TAX-F19 | Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios | servidor hecho |
+
+### TAX-F01 Ver las categorías fiscales
+Estado: servidor hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Categorías
+Pasos:
+1. Abre **Impuestos → Categorías**.
+2. Busca por clave o nombre, o filtra por Origen («Sistema» o «Propia»).
+3. Lee la Clave: es lo que guardan los productos y los servicios y no cambia nunca; el Nombre es solo
+   una etiqueta. La columna del tipo dice qué se cobra hoy en el país del negocio.
+Entra: nada; lee las categorías y las reglas vigentes hoy.
+Sale: nada (solo lectura). El nombre de una categoría de fábrica sale en el idioma de quien mira; una
+propia, con su texto. La búsqueda encuentra lo que se ve: «comida» encuentra «Restauración — comida».
+Si falla: el aviso de la tabla con «Reintentar». Sin permiso de consulta, «No tienes permiso».
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F06, SALE-F01, SERVICE-F01
+
+### TAX-F02 Crear una categoría fiscal propia
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Categorías
+Pasos:
+1. En Categorías pulsa **+**.
+2. Escribe la Clave (minúsculas; empieza por letra; letras, dígitos, puntos y guiones bajos; hasta 80;
+   por ejemplo `product.books`) y el Nombre; la Descripción es opcional.
+3. Pulsa «Añadir». El panel se cierra y la categoría sale en la tabla como «Propia».
+Entra: clave, nombre y descripción que escribe la persona.
+Sale: la categoría, única por clave en el negocio; Impuestos avisa de que hay una categoría nueva
+(`tax.category.created`). No trae ninguna regla: hasta que se cree una (TAX-F04), una venta de esa
+categoría se rechaza. Inventario también la crea cuando alguien elige «Crear» al importar un fichero
+(TAX-F15).
+Si falla: una clave con otra forma o un nombre vacío salen debajo de su campo; una clave que ya existe,
+«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. No se guarda nada.
+Implicados: INVENTORY-F09
+
+### TAX-F03 Ver y filtrar las reglas
+Estado: servidor hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Reglas
+Pasos:
+1. Abre **Impuestos → Reglas**: salen las activas.
+2. Busca por categoría o país, o filtra por País, Región, Categoría, Tipo o Calificación.
+3. Elige Estado «Desactivadas» (o «Todas») para ver las desactivadas; su fila ofrece «Reactivar»
+   (TAX-F08).
+4. Reconoce un componente (recargo) porque sale justo debajo de su regla raíz.
+Entra: nada; lee las reglas del negocio.
+Sale: nada (solo lectura).
+Si falla: el aviso de la tabla con «Reintentar».
+Implicados: ninguno
+
+### TAX-F04 Fijar el tipo de una categoría en un país o región
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. En Reglas pulsa **+**.
+2. Elige el País (lista cerrada ISO 3166-1) y, solo si el tipo cambia dentro del país, la Región (por
+   ejemplo ES-CN, que tiene que ser de ese país); vacía vale para todo el país.
+3. Elige la Categoría y escribe el %, entre 0 y 100 (hasta dos decimales).
+4. Elige el Tipo («IVA» de entrada; «IGIC (Canarias)», «IPSI (Ceuta/Melilla)»…) y, si quieres, Vigente
+   desde y Vigente hasta (vacío = desde siempre / para siempre).
+5. Pulsa «Añadir»; el panel se cierra y la regla sale en la tabla.
+Entra: país, región, categoría, %, tipo y fechas que elige la persona.
+Sale: la regla activa; Impuestos avisa (`tax.rule.created`). Desde ese momento Ventas y Facturación la
+usan para las ventas nuevas: gana la regla de la región del negocio y, si no hay, la del país entero;
+una regla de otra región nunca se usa. Las ventas ya hechas no cambian (TAX-F07).
+Si falla: dos reglas activas de la misma categoría, país y región no pueden estar vigentes el mismo
+día: el rechazo sale en «Vigente desde» con «Se solapa con otra regla activa de este país, región y
+categoría…» (se resuelve con TAX-F07 o TAX-F08). Un país que no existe, una región de otro país, un %
+fuera de 0–100, un «Vigente hasta» anterior a «Vigente desde» o una categoría que no existe salen
+debajo de su campo. Una regla del mismo país, región y categoría que empieza el mismo día que otra ya
+guardada, aunque esté desactivada: «Ya hay una regla de este país, región y categoría desde ese día,
+quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». No se guarda nada.
+Implicados: INVOICE-F01, SALE-F01
+
+### TAX-F05 Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. En Reglas pulsa **+** y rellena país, categoría y tipo como en TAX-F04.
+2. En Calificación elige «Exenta», «No sujeta», «No sujeta (reglas de localización)» o «Inversión del
+   sujeto pasivo». El % se pone en 0 y se bloquea, con la nota «Esta operación no lleva impuesto, así
+   que su tipo es 0 %.».
+3. Si es «Exenta», escribe la Causa de exención (hasta 10 caracteres, por ejemplo E1); el Régimen es
+   opcional (vacío = el general, 01).
+4. Pulsa «Añadir».
+Entra: calificación, causa de exención y régimen (códigos de la AEAT, opacos para esta app).
+Sale: la regla con su calificación (`tax.rule.created`). La causa se guarda en mayúsculas y solo en una
+regla exenta. Facturación toma la calificación de la regla vigente al emitir y VeriFactu la traduce
+al registro de la AEAT.
+Si falla: una calificación que no cobra impuesto con un % mayor que 0 sale debajo del % («Esta
+operación no lleva impuesto: su tipo tiene que ser 0 %.») y no se guarda nada.
+Implicados: INVOICE-F01
+
+### TAX-F06 Añadir un recargo de equivalencia a un tipo
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. Crea antes la regla principal de la categoría (TAX-F04): es la raíz.
+2. En Reglas pulsa **+**, elige el mismo País, Región y Categoría y escribe el % del recargo (por
+   ejemplo 5,2).
+3. Elige el Tipo «Recargo»; en «Regla raíz (componente de)» elige la raíz y escribe la «Etiqueta
+   componente» (por ejemplo «Recargo de equivalencia»).
+4. Pulsa «Añadir».
+Entra: el recargo, la raíz de la que cuelga y su etiqueta.
+Sale: la regla componente (`tax.rule.created`). Las ventas de esa categoría llevan el tipo combinado
+(21 + 5,2 = 26,2) con el desglose por componente; la calificación y la familia de impuesto siguen
+siendo las de la raíz.
+Si falla: «No se ha podido crear el componente: tiene que colgar de una regla raíz con el mismo país,
+región y categoría, y una raíz que no cobra impuesto no admite componentes con tipo.», debajo de la
+regla raíz. Un componente de un componente no existe: solo hay un nivel.
+Implicados: INVOICE-F01, SALE-F01
+
+### TAX-F07 Cambiar un tipo a partir de una fecha
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. En la fila de la regla vigente pulsa «Poner fecha de fin».
+2. Escribe el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
+   fecha de fin».
+3. Crea la regla nueva (TAX-F04) con «Vigente desde» el día siguiente.
+4. La tabla enseña las dos con sus fechas; desde el día del cambio las ventas nuevas usan la nueva.
+Entra: la fecha de fin (incluida) y los datos de la regla nueva.
+Sale: la regla con su fecha de fin (`tax.rule.ended`). Una venta ya hecha conserva su tipo: la línea de
+venta guarda su copia. Una factura ya emitida no cambia. Una regla no se edita: no existe esa acción.
+Si falla: un fin anterior al inicio de la regla: «Esa regla no puede terminar antes del día en que
+empieza.»; un fin que invade otra regla activa del mismo hueco, el aviso de solape. Dos tramos
+seguidos (uno acaba el 31/12, el otro empieza el 1/1) no se solapan. Un fin en el pasado deja un hueco
+sin tipo: las ventas de esa categoría se rechazan hasta crear la siguiente.
+Implicados: INVOICE-F01, INVOICE-F04, SALE-F01
+
+### TAX-F08 Desactivar y reactivar una regla
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. En la fila pulsa «Desactivar» y confirma en «Desactivar regla fiscal» con «Desactivar regla» («La
+   regla dejará de aplicarse a operaciones nuevas. Los documentos fiscales ya emitidos no se
+   modifican.»).
+2. La regla desaparece de la tabla; para verla, elige Estado «Desactivadas».
+3. Para recuperarla, en esa vista pulsa «Reactivar» (sin confirmación).
+Entra: la regla elegida.
+Sale: la regla inactiva o activa (`tax.rule.deactivated` / `tax.rule.activated`). Su %, su país, su
+categoría, sus fechas y sus componentes no cambian. Desactivar una raíz deja de aplicar también sus
+componentes; si era la única raíz de la categoría, las ventas de esa categoría se rechazan. No existe
+borrar una regla.
+Si falla: una regla que ya no existe: «Esta regla ya no existe.»; desactivar una ya desactivada o
+reactivar una ya activa: «Esa regla ya está desactivada.» / «Esa regla ya está activa.»; reactivar
+una que ahora se solapa con otra activa, el aviso de solape.
+Implicados: SALE-F01
+
+### TAX-F09 Reparar una regla que cobra un tipo donde no toca
+Estado: retirado
+En el producto actual existía para arreglar reglas guardadas antes de que se prohibieran. Aquí ninguna
+puerta (pantalla, API, lote ni asistente) deja crear una regla que no cobra impuesto con un %, ni un
+componente con tipo bajo ella, así que no hay nada que reparar.
+
+### TAX-F10 Resolver reglas que se solapan
+Estado: retirado
+Igual que TAX-F09: aquí ninguna puerta deja que dos reglas activas del mismo país, región y categoría
+estén vigentes el mismo día, tampoco si dos personas guardan a la vez. Un solape se resuelve antes de
+guardar, con TAX-F07 o TAX-F08.
+
+### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
+Estado: servidor hecho
+Actor: propietario, administrador
+Pantalla: Reglas
+Pasos:
+1. En Reglas crea una regla por cada categoría que vendes: País «España», la Región (ES-CN Canarias,
+   ES-CE Ceuta o ES-ML Melilla), el % del territorio y el Tipo «IGIC (Canarias)» o «IPSI
+   (Ceuta/Melilla)» (TAX-F04).
+2. No borres las reglas del IVA: en un negocio con región se aplican a toda categoría que no tenga
+   regla regional. Por eso hace falta una regla regional por cada categoría que vendas.
+3. Haz una venta de prueba y comprueba el tipo cobrado.
+Entra: la región del negocio (la dice quien pregunta) y un tipo regional por categoría que fija la
+persona (no se siembra ninguno a propósito).
+Sale: reglas regionales; para una venta, la regla de la región gana a la nacional y la familia del
+impuesto (IGIC, IPSI) es la de la regla.
+Si falla: una categoría sin regla regional se cobra con la nacional, al IVA; sin región, las reglas
+regionales no se usan nunca.
+Implicados: INVOICE-F01, SALE-F01
+
+### TAX-F12 Crear varias reglas de golpe
+Estado: servidor hecho
+Actor: propietario, administrador, responsable (por la API; en la fase 2, también el asistente)
+Pantalla: ninguna (API)
+Pasos:
+1. Se envían hasta 100 reglas raíz de una vez (por ejemplo, «los tipos de IVA de España 2026»).
+2. Cada regla pasa las mismas comprobaciones que una sola (TAX-F04, TAX-F05), también el solape con las
+   demás del mismo envío.
+3. Si todas valen, se guardan todas; si alguna falla, no se guarda ninguna y la respuesta dice qué
+   regla falló y por qué.
+Entra: la lista de reglas.
+Sale: las reglas creadas; un `tax.rule.created` por cada una.
+Si falla: cada rechazo lleva la posición de la regla (`rules.3.rate_pct`…). Los componentes no van por
+lote: se crean de uno en uno (TAX-F06), porque necesitan su raíz ya guardada.
+Implicados: ninguno
+
+### TAX-F13 Ver los alias de categoría
+Estado: servidor hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Alias
+Pasos:
+1. Abre **Impuestos → Alias**.
+2. Busca por alias o categoría, o filtra por Categoría u Origen.
+Entra: nada; lee los alias del negocio.
+Sale: nada (solo lectura).
+Si falla: el aviso de la tabla con «Reintentar».
+Implicados: ninguno
+
+### TAX-F14 Enseñar un alias de categoría a mano
+Estado: servidor hecho
+Actor: propietario, administrador, responsable
+Pantalla: Alias
+Pasos:
+1. En Alias pulsa **+**.
+2. Escribe el Alias (el texto que llega de fuera, por ejemplo `comida`), elige la Categoría y el
+   Origen («Aprendido» de entrada).
+3. Pulsa «Añadir».
+Entra: el texto externo, la categoría y el origen que elige la persona.
+Sale: el alias, guardado en minúsculas y sin espacios de sobra, único en el negocio
+(`tax.alias.created`). La próxima importación de Inventario lo entiende, se escriba como se escriba.
+Si falla: un alias que ya existe: «Ese alias ya existe.» debajo del Alias; una categoría que no existe,
+debajo de la Categoría. No se guarda nada.
+Implicados: INVENTORY-F09
+
+### TAX-F15 Decir al importador de Inventario qué categoría es un texto
+Estado: servidor hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Quien importa un fichero de productos con una columna de IVA o de categoría no hace nada en
+   Impuestos.
+2. Inventario pregunta por cada texto. Impuestos lo pasa a minúsculas y sin espacios de sobra y lo
+   contrasta, por este orden, con las claves de las categorías, con sus nombres (también los
+   traducidos al español y al inglés) y con los alias.
+3. Lo que no casa lo pregunta Inventario a la persona; su respuesta se guarda como alias aprendido o
+   como categoría nueva (TAX-F02, TAX-F14).
+Entra: el texto, de Inventario.
+Sale: la clave de la categoría y por qué casó (clave, nombre o alias), o nada.
+Si falla: un texto que no casa devuelve «nada», nunca una categoría parecida.
+Implicados: INVENTORY-F09, INVENTORY-F10
+
+### TAX-F16 Sembrar el catálogo de fábrica al activar
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. La primera vez que el negocio activa Impuestos (o al nacer con un vertical que lo trae), la app
+   siembra el catálogo; no se hace nada a mano.
+2. Se comprueba en Categorías y Reglas.
+Entra: nada.
+Sale: 11 categorías de sistema (`restaurant.food`, `restaurant.drink`, `restaurant.alcohol`,
+`restaurant.delivery`, `retail.alcohol`, `service.generic`, `service.health`, `service.education`,
+`product.generic`, `product.reduced`, `product.super_reduced`), 18 alias de fábrica y 11 reglas de
+España, para todo el país y desde el 01/09/2012: 21 % (`product.generic`, `service.generic`,
+`retail.alcohol`), 10 % (`restaurant.food`, `restaurant.drink`, `restaurant.alcohol`,
+`restaurant.delivery`, `product.reduced`), 4 % (`product.super_reduced`) y exentas con causa E1 al
+0 % (`service.health`, `service.education`). Las bebidas alcohólicas servidas para consumir en el local
+son hostelería, al 10 % (art. 91.Uno.2.2º de la Ley 37/1992): `restaurant.alcohol`; las que se venden
+para llevar o a domicilio, al 21 %: `retail.alcohol` (alias `takeaway_beer` y `takeaway_wine`). No hay
+reglas de IGIC, IPSI, recargo ni de ningún otro país: un tipo inventado se declararía.
+Si falla: nunca pisa una fila que ya existe ni duplica nada.
+Implicados: ninguno
+
+### TAX-F17 Avisar de que faltan tipos para el país del negocio
+Estado: servidor hecho (la lista «Termina de configurar tu negocio» llega con los primeros pasos del Hub)
+Actor: sistema
+Pantalla: Hub: Termina de configurar tu negocio
+Pasos:
+1. En la lista «Termina de configurar tu negocio» sale el paso «Tus impuestos» («Configura los tipos de
+   IVA del país en el que vendes para que el TPV pueda calcular el precio de una venta.»), solo para
+   quien puede gestionar impuestos.
+2. Pulsa «Configurar»: lleva a la pestaña Reglas.
+3. Cuando existe una regla raíz activa y vigente hoy para el país del negocio, el paso sale hecho.
+Entra: las reglas y el país del negocio.
+Sale: cuántas reglas aplican hoy y si el paso está hecho. No bloquea vender por sí mismo.
+Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Sin país, cuenta las reglas
+de cualquier país. Una regla exenta o de IGIC también cuenta: un negocio que solo vende servicios
+exentos está bien configurado.
+Implicados: ninguno
+
+### TAX-F18 Calcular el impuesto de un importe
+Estado: servidor hecho
+Actor: empleado, responsable, administrador, propietario (por la API; en la fase 2, también el asistente)
+Pantalla: ninguna (API)
+Pasos:
+1. Se indica el importe (en céntimos), la categoría y, si hace falta, el país, la región, la fecha y si
+   el importe ya lleva el impuesto.
+2. Se obtiene la base, la cuota, el total, el tipo combinado, la calificación, la regla aplicada y el
+   desglose por componente.
+Entra: importe en céntimos, categoría, país (de entrada, España), región y fecha (de entrada, hoy; en
+la fase 1, hoy en Madrid).
+Sale: solo la respuesta; no guarda nada ni avisa. Sin el impuesto incluido, la cuota de cada componente
+es base × tipo redondeada al céntimo, la mitad hacia arriba. Con el impuesto incluido, la base es el
+importe ÷ (1 + tipo combinado) redondeada y la cuota es lo que resta, así que lo cobrado no se mueve un
+céntimo (el último componente absorbe el ajuste). Es el mismo cálculo con el que Ventas cierra el tique
+y Facturación cuadra la cuota.
+Si falla: sin regla aplicable, «Ninguna regla fiscal se aplica a esta categoría en este país.»; nunca
+se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente. Sin importe o sin categoría,
+debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin adivinar.
+Implicados: INVOICE-F01, SALE-F01
+
+### TAX-F19 Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios
+Estado: servidor hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Quien cobra un tique, emite una factura o guarda un producto no abre Impuestos.
+2. Ventas y Facturación resuelven el tipo de cada línea con el mismo cálculo de TAX-F18, dentro de su
+   propia operación: si las reglas no se pueden leer, la operación se rechaza antes de escribir nada.
+3. Inventario, Servicios y Ventas listan las categorías para elegirlas, con su tipo vigente.
+Entra: lo que ya está guardado en Reglas y Categorías.
+Sale: lo que la línea de venta congela: categoría, tipo combinado, país, región y regla. Una línea con
+categoría y sin regla se rechaza («no hay regla»): nunca cae al 0 %. Qué hacer con una línea sin
+categoría es cosa de Ventas.
+Si falla: el cajero no cobra con un tipo supuesto.
+Implicados: INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F07, SERVICE-F01
+
+## Servicios: lo que entra y lo que sale
+
+Todo se puede pedir por las pantallas, el asistente (fase 2, por voz o por texto, con la sesión de la
+propia persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: una
+categoría se nombra por su clave, por su nombre (en español o en inglés) o por un alias («Restauración
+— comida», «comida», `restaurant.food`), y una regla por su id o por su país, región y categoría
+(«la del IVA de la comida en España»: al desactivarla o ponerle fecha de fin, la vigente hoy; al
+reactivarla, la última desactivada).
+
+### Lo que ofrece: consultas (leen, no cambian nada)
+
+| Qué da | Quién puede | Flujos | Servicio |
+|---|---|---|---|
+| Las categorías, con búsqueda, filtro de origen, páginas (hasta 100) y su tipo vigente hoy en un país y región | ver | F01, F19 | `tax.category.list` |
+| Una categoría por su clave, con su nombre traducido | ver | F02, F19 | `tax.category.get` |
+| Las reglas, con búsqueda, filtros (país, región, categoría, tipo, calificación, estado) y páginas | ver | F03 | `tax.rule.list` |
+| Cuántas reglas raíz aplican hoy en el país del negocio y si los impuestos están configurados | ver | F17 | `tax.rule.status` |
+| Las reglas raíz de las que puede colgar un componente en un país, región y categoría: las mismas que acepta el alta (también una raíz que empieza en el futuro; una sin impuesto, solo para un componente al 0 %) | ver | F06 | `tax.rule.parent_candidates` |
+| Los países en los que el negocio tiene reglas (todas, activas o desactivadas), para el filtro País | ver | F03, F11 | `tax.rule.countries` |
+| Los alias, con búsqueda, filtros (categoría, origen) y páginas | ver | F13, F15 | `tax.alias.list` |
+| La categoría que corresponde a un texto de fuera, y por qué casó | ver | F15 | `tax.alias.resolve` |
+| El impuesto de un importe: base, cuota, total, tipo, calificación y desglose | ver | F18, F19 | `tax.rate.calculate` |
+
+Categorías, reglas, alias, el estado de configuración, las raíces de un componente y los países se pueden seguir en vivo.
+
+### Lo que ofrece: acciones (cambian datos)
+
+| Qué hace | Quién puede | Flujos | Servicio |
+|---|---|---|---|
+| Crea una categoría fiscal propia | gestionar | F02, F15 | `tax.category.create` |
+| Crea una regla (raíz o componente) | gestionar | F04, F05, F06, F11 | `tax.rule.create` |
+| Crea hasta 100 reglas raíz, todas o ninguna | gestionar | F12 | `tax.rule.bulk_create` |
+| Pone la fecha de fin de una regla | gestionar | F07 | `tax.rule.end` |
+| Desactiva una regla | gestionar | F08 | `tax.rule.deactivate` |
+| Reactiva una regla | gestionar | F08 | `tax.rule.activate` |
+| Crea un alias aprendido | gestionar | F14, F15 | `tax.alias.create` |
+
+### Lo que avisa
+
+| Aviso | Cuándo | Qué lleva | Servicio |
+|---|---|---|---|
+| Categoría nueva | Crear una categoría | Cuál (`id`, `key`) | `tax.category.created` |
+| Regla nueva | Crear una regla (también por lote, una por regla) | Cuál, su país, región, categoría y % | `tax.rule.created` |
+| Regla con fecha de fin | Poner la fecha de fin | Cuál y su fecha de fin | `tax.rule.ended` |
+| Regla desactivada | Desactivar | Cuál | `tax.rule.deactivated` |
+| Regla reactivada | Reactivar | Cuál | `tax.rule.activated` |
+| Alias nuevo | Crear un alias | Cuál, su texto y su categoría | `tax.alias.created` |
+
+Qué refresca cada aviso: las categorías, con «categoría nueva» y con los cuatro de reglas (el tipo
+vigente sale en la tabla); las reglas y el estado de configuración, con los cuatro de reglas; los
+alias, con «alias nuevo».
+
+### A qué reacciona y lo que necesita de otras apps
+Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
+
+### Quién la usa
+
+| App | Para qué | Servicio |
+|---|---|---|
+| Inventario | Elegir la categoría fiscal de un producto, con su tipo; comprobar que existe; reconocer la columna fiscal de un CSV y aprender textos o crear categorías al importar | `tax.category.list`, `tax.category.get`, `tax.alias.list`, `tax.alias.resolve`, `tax.category.create`, `tax.alias.create` |
+| Servicios | Elegir la categoría fiscal de un servicio | `tax.category.list` |
+| Ventas y Facturación | El tipo y la calificación de cada línea, con el cálculo de TAX-F18 | `tax.rate.calculate` (o su función, dentro de su operación) |
+
+### Quién puede qué
+
+| Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
+|---|---|---|---|---|---|
+| Ver categorías, reglas y alias, y calcular | sí | sí | sí | sí | `tax.view` |
+| Crear categorías, reglas y alias; poner fecha de fin, desactivar y reactivar reglas | sí | sí | sí | no | `tax.manage` |
+
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
+cajero del producto actual es un empleado.
+
+## Para quien lo mantiene
+
+- Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`),
+  `migrations/` (`0002` siembra el catálogo de fábrica, con reverso), `schemas.py`, `queries.py`,
+  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py`
+  por fichero. Las páginas (`frontend/`) llegan en la fase de frontend.
+- **Contrato con Inventario**: `TaxCategory` tiene clave UUIDv7 y `key` única (la `tax_category_key`
+  enlazable); Inventario pone su FK aquí. Ninguna categoría se borra.
+- **La resolución, una sola vez** (`queries.resolve_tax` y `queries.calculate_tax`): raíces activas y
+  vigentes en la fecha, del país y la categoría; la región exacta gana a la del país entero y nunca se
+  usa otra región; dentro de un nivel, la de «Vigente desde» más reciente y, a igualdad, el `id` menor.
+  Sus componentes (hijos activos y vigentes, por `id`) se suman sobre la misma base. La calificación y
+  la familia del impuesto son siempre las de la raíz. Ventas y Facturación (que requieren Impuestos)
+  llaman a esas funciones dentro de su propia operación.
+- **Dinero**: céntimos enteros; `Decimal` exacto y redondeo a mitad hacia arriba (`ROUND_HALF_UP`).
+  Los % se guardan con dos decimales. Con el impuesto incluido, el céntimo de ajuste va al último
+  componente con tipo mayor que 0: uno al 0 % nunca lleva cuota.
+- **País y región en cualquier caso**: `resolve_tax` y `calculate_tax` los pasan a mayúsculas, porque
+  Ventas y Facturación los llaman sin pasar por los esquemas.
+- **Solape**: crear, reactivar, poner fecha de fin y el lote bloquean la fila de la categoría
+  (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
+  en cola y la segunda ve la primera (tests con dos sesiones reales para crear, reactivar, poner fecha
+  de fin y el lote). Las fechas son inclusivas; vacías = abiertas.
+- **Clave natural de la raíz** (`tax_rule_root_natural_key`, la `ix_tax_rule_root_natural` del producto
+  actual): una raíz por país, región, categoría y primer día, también las desactivadas; un primer día
+  vacío es «desde siempre», así que dos vacías son la misma. Las operaciones la comprueban antes y
+  responden 409 `tax.rule_exists`; si la gemela está activa, el rechazo es el del solape.
+- **Reactivar por país, región y categoría** trae la desactivada más recientemente (`updated_at`).
+- **Comprobaciones también en la base de datos**: % entre 0 y 100, 0 % en las clases que no cobran
+  impuesto y rango de fechas hacia delante (`CheckConstraint`).
+- Los nombres de las categorías de fábrica se traducen en el código (`SYSTEM_CATEGORY_LABELS`, con su
+  `es` en `locale/`), no en la base de datos: en la fila queda el nombre en inglés.
+- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y
+  para el staff de la plataforma. Lo que guarda no pasa por las operaciones: no deja aviso ni comprueba
+  el solape ni la coherencia de un componente; la base de datos sigue rechazando el % fuera de 0–100, el
+  % en una clase sin impuesto, el rango al revés y la raíz gemela.
+- **Paridad con el producto actual**: las listas aceptan los mismos filtros, búsqueda y orden
+  (`sort`, `dir`) que sus tablas; las filas llevan las mismas columnas (también Activa, siempre «Sí»:
+  como antes, ninguna operación archiva una categoría o un alias). El alta de alias acepta Origen y la
+  de categoría, `is_system` (solo por la API), como antes. `expose_api` es el del manifiesto viejo:
+  `tax.category.list`/`get`, `tax.rule.list`, `tax.alias.list`/`resolve`, `tax.rule.end` y
+  `tax.rule.activate`.
+- **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en las de
+  reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas.py` su
+  `description` (el JSON Schema de la herramienta).
+- **País y región** salen de `pycountry` (ISO 3166-1 y 3166-2), no de una lista copiada.
+
+### Cambios frente al producto actual
+
+1. **Ninguna regla incoherente ni solapada puede nacer**, tampoco por el lote, que ahora aplica las
+   mismas comprobaciones que el alta y es todo o nada. Por eso se retiran TAX-F09 (reparar) y TAX-F10
+   (marcar solapes) y sus marcas `is_incoherent` y `overlaps`: eran salidas para filas guardadas antes
+   de las guardas, y aquí no las hay.
+2. **Los rechazos dicen el campo**: rango de fechas al revés, % en una clase sin impuesto, región de
+   otro país, categoría inexistente (422 por campo); clave o alias repetidos (409 con su campo).
+3. **Desactivar** una regla que no existe da 404 y una ya desactivada, 409 (antes respondía bien sin
+   hacer nada); reactivar una ya activa, 409.
+4. **El alias se guarda normalizado** (minúsculas, espacios juntos) en toda puerta: antes la pantalla
+   guardaba mayúsculas que nunca casaban.
+5. **Una categoría se nombra también por su nombre o un alias** (alta de regla y de alias, cálculo,
+   consulta) y **una regla por su país, región y categoría** (fecha de fin, desactivar, reactivar),
+   además de por su clave o su id: el asistente se usa por voz.
+6. **La región se comprueba contra la lista ISO 3166-2** (`pycountry`), no solo por su forma: una región
+   que no existe nunca casaría.
+7. **La fecha por defecto del cálculo es la del negocio**, no la UTC (en la fase 1, la de Madrid).
+8. **Un componente sale debajo de su raíz** en la lista de reglas.
+9. **El cajero** es un empleado: recibe `tax.view` (ver y calcular).
+10. **`restaurant.alcohol` se siembra al 10 %** (antes, 21 %): las bebidas alcohólicas servidas para
+   consumir en el local son un servicio de hostelería (art. 91.Uno.2.2º de la Ley 37/1992). El alcohol
+   para llevar o a domicilio, al 21 %, tiene su categoría: `retail.alcohol`. Un hub que ya tuviera la
+   semilla anterior recibe `retail.alcohol` (migración 0005) y conserva su regla de
+   `restaurant.alcohol`: una migración nunca reescribe un tipo; se cambia con TAX-F07.
+
+### Lo que NO hace, a propósito
+
+- No fija el precio ni decide si va con el impuesto incluido: eso es de Ventas.
+- No cierra el tique ni agrupa por tipo para la factura o el registro de la AEAT: eso es de Ventas y
+  Facturación.
+- No guarda el país ni la región del negocio.
+- No edita una regla (se cambia con fecha de fin y una regla nueva) ni borra reglas, categorías o
+  alias; no renombra ni archiva una categoría o un alias.
+- No hace depender el recargo de equivalencia del cliente: se suma a toda venta de la categoría.
+- No traduce los códigos de exención ni de régimen ni habla con la AEAT.
+- No siembra tipos de IGIC, IPSI, recargo de equivalencia ni de otros países.

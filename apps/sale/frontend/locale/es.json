@@ -1,0 +1,519 @@
+{
+  "sale": {
+    "title": "Ventas / TPV",
+    "tabs": {
+      "label": "Secciones de Ventas / TPV",
+      "pos": "Vender",
+      "sales": "Ventas",
+      "quickNotes": "Notas rápidas",
+      "departments": "Departamentos",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "retry": "Reintentar",
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio.",
+      "noPermission": "No tienes permiso."
+    },
+    "common": {},
+    "pos": {
+      "loadFailed": "Error cargando el TPV",
+      "screenMenu": "Pantalla",
+      "fullscreen": "Pantalla completa",
+      "exitFullscreen": "Salir de pantalla completa",
+      "categories": "Categorías",
+      "all": "Todos",
+      "more": "Más…",
+      "itemCountOne": "1 artículo",
+      "itemCount": "{count} artículos",
+      "search": "Buscar",
+      "searchPlaceholder": "Buscar producto…",
+      "searchClose": "Cerrar el buscador",
+      "noProducts": "Sin productos.",
+      "loadMore": "Cargar más",
+      "openPrice": "Precio libre",
+      "openPriceTag": "+ €",
+      "managerOnly": "Lo tiene que hacer un responsable",
+      "notSellableBadge": "Falta el IVA",
+      "notSellableNoTaxCategory": "No se puede vender: sin categoría fiscal. Falta configurar el IVA.",
+      "catalogBlockedOne": "1 artículo no se puede vender: le falta configurar el IVA.",
+      "catalogBlocked": "{count} artículos no se pueden vender: les falta configurar el IVA.",
+      "catalogBlockedFix": "Revisar el catálogo",
+      "catalogAppInactive": "{app} no está activa, así que no hay rejilla de productos. Puedes cobrar ventas a precio libre; actívala desde Aplicaciones para vender desde un catálogo.",
+      "catalogLoadFailed": "No se ha podido cargar el catálogo.",
+      "appInventory": "Inventario",
+      "parkCurrentSale": "Aparcar esta cuenta",
+      "parkedTickets": "Cuentas abiertas",
+      "closeAction": "Cerrar",
+      "newCheckTitle": "Cuenta nueva",
+      "checkTitleLabel": "Título de la cuenta",
+      "editCheckTitle": "Editar título de la cuenta",
+      "errorSavingTitle": "No se pudo guardar el título de la cuenta",
+      "servedBy": "Atiende {name}",
+      "staffAssigned": "el profesional asignado",
+      "staffMe": "yo",
+      "customerRequiredShort": "Falta el cliente",
+      "customerRequiredCharge": "Este negocio exige un cliente en cada venta. Elige uno para seguir con el cobro.",
+      "noCheckContext": "Cuenta sin mesa ni cliente",
+      "cartEmptyTouch": "Toca un producto para añadirlo.",
+      "checkGone": "Esa cuenta se ha cerrado en otro dispositivo: la pantalla empieza una nueva.",
+      "courseInProgress": "Pendiente de enviar",
+      "sentHeader": "Enviado",
+      "commandRound": "Comanda {n}",
+      "giftBadge": "Invitación",
+      "voidLine": "Anular este artículo",
+      "discountLine": "Descuento en la línea",
+      "lineNote": "Nota",
+      "giftAction": "Invitar / quitar invitación",
+      "giftReason": "Invitación",
+      "lineStaffPickerTitle": "De quién es esta línea",
+      "markLine": "Marcar para cobrarla aparte",
+      "quantity": "Cantidad",
+      "decrease": "Una menos",
+      "increase": "Una más",
+      "lineChangeFailed": "No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.",
+      "lineNotSaved": "No se pudo guardar ese artículo — vuelve a tocarlo",
+      "lineStaffFailed": "No se ha podido mover la línea a otro profesional. Se queda con el que tenía.",
+      "discountTicket": "Descuento del ticket",
+      "total": "Total",
+      "printPrebill": "Imprimir cuenta",
+      "charge": "Cobrar",
+      "chargeAmount": "Cobrar · {amount}",
+      "openCart": "Abrir carrito",
+      "openCartWithItemsOne": "Abrir carrito, 1 artículo, total {total}",
+      "openCartWithItems": "Abrir carrito, {count} artículos, total {total}",
+      "parkForLaterHint": "Aparca la cuenta actual para retomarla más tarde. El título es opcional.",
+      "openChecksHint": "Toca una cuenta para retomarla.",
+      "deleteCheck": "Eliminar cuenta",
+      "deleteCheckConfirm": "Toca otra vez para eliminar — anula la cuenta",
+      "deleteCheckFailed": "No se ha podido eliminar esa cuenta abierta. Sigue en la lista.",
+      "noParkedTickets": "No hay cuentas abiertas",
+      "openChecksLoadFailed": "No se han podido cargar las cuentas abiertas.",
+      "errorRetrieve": "No se pudo recuperar el ticket",
+      "parkTitle": "Aparcar cuenta",
+      "parkNameHint": "El título es opcional y solo sirve para reconocer la cuenta cuando quieras retomarla.",
+      "parkNamePlaceholder": "p. ej. Ana — terraza",
+      "parkNameLabel": "Título opcional",
+      "parkedToast": "Aparcada como «{name}»",
+      "parkCheckFailed": "No se ha podido aparcar la cuenta. Sigue en pantalla.",
+      "cancel": "Cancelar",
+      "dirtyCartTitle": "Tienes una cuenta a medias",
+      "dirtyCartBody": "¿Qué hacemos con la cuenta actual?",
+      "discardAndOpen": "Eliminarla y abrir",
+      "parkAndOpen": "Aparcarla y abrir",
+      "discardCheckFailed": "No se ha podido eliminar la cuenta. Sigue abierta, en pantalla.",
+      "staffPickerTitle": "Quién atiende esta cuenta",
+      "staffPickerHint": "A esta persona se le atribuyen la venta, la comanda de cocina y el informe por persona. Si lo dejas en «Yo», el TPV usa a quien tenga la sesión.",
+      "lineStaffPickerHint": "Solo se mueve esta línea. El cierre del día y la comisión salen de aquí, así que es la que tiene que estar bien. El chip de arriba sigue decidiendo a quién va la SIGUIENTE línea.",
+      "staffMeOption": "Yo (quien tenga la sesión)",
+      "lineStaffTicketOption": "El profesional de la cuenta",
+      "staffSearch": "Buscar en el equipo…",
+      "staffLoading": "Cargando el equipo…",
+      "staffLoadFailed": "No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.",
+      "staffPickerEmpty": "Este hub no tiene a nadie más para atender. Da de alta personal en Ajustes.",
+      "staffNoResults": "Nadie del equipo coincide con tu búsqueda.",
+      "department": "Departamento (IVA)",
+      "departmentSearch": "Buscar un departamento…",
+      "noDepartments": "Sin departamentos configurados.",
+      "departmentsLoadFailed": "No se han podido cargar los departamentos.",
+      "addAmount": "Añadir {amount}",
+      "numpadClear": "Borrar",
+      "lineNoteOf": "Nota en {name}",
+      "lineNoteQuickLoading": "Cargando notas rápidas…",
+      "lineNoteQuickError": "No se han podido cargar las notas rápidas: escribe la nota a mano.",
+      "lineNotePlaceholder": "p. ej. poco hecho, alergia al marisco, sin hielo",
+      "lineNoteHint": "Cocina lee esta nota en la comanda.",
+      "lineNoteRemove": "Quitar",
+      "lineNoteSave": "Guardar",
+      "discountLineOf": "Descuento en {name}",
+      "discountMode": "Tipo de descuento",
+      "discountRemove": "Quitar",
+      "discountApply": "Aplicar",
+      "discountApplyValue": "Aplicar −{value}",
+      "ticketDiscountFailed": "No se ha podido guardar ese descuento. La cuenta sigue con el descuento que tenía.",
+      "voidLineOf": "Anular «{name}»",
+      "voidLineHint": "Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que autorizarlo un responsable.",
+      "voidReasonMistake": "Error al pedir",
+      "voidReasonChanged": "El cliente lo cambia",
+      "voidReasonSoldOut": "Agotado",
+      "voidReasonDuplicate": "Pedido dos veces",
+      "voidLineReasonPlaceholder": "O escribe el motivo…",
+      "voidLineConfirm": "Anular artículo",
+      "voidLineFailed": "No se ha podido anular el artículo. Sigue en la cuenta.",
+      "prebillTitle": "Cuenta",
+      "print": "Imprimir",
+      "close": "Cerrar",
+      "docDefaultBusiness": "Mi negocio",
+      "docCustomer": "Cliente",
+      "docSubtotal": "Subtotal",
+      "docDiscount": "Descuento",
+      "giftSuffix": "(invitación)",
+      "prebillNotice": "Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.",
+      "prebillPrintFailed": "No se pudo imprimir la cuenta",
+      "prebillLoading": "Calculando la cuenta…",
+      "prebillLoadFailed": "No se ha podido calcular la cuenta.",
+      "taxes": {
+        "vat": "IVA",
+        "surcharge": "RE",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
+      },
+      "customerLinkFailed": "No se ha podido unir el cliente a la cuenta. Vuelve a elegirlo.",
+      "customerLoadFailed": "No se ha podido leer el cliente de la cuenta. Vuelve a elegirlo si la venta lo necesita."
+    },
+    "checkout": {
+      "title": "Cobrar",
+      "close": "Cerrar",
+      "loadingTotal": "Calculando el total…",
+      "loadingMethods": "Cargando las formas de pago…",
+      "noMethods": "Este negocio no tiene ninguna forma de pago con la que cobrar.",
+      "payingPartOne": "Cobrando 1 línea de {total}",
+      "payingPart": "Cobrando {n} líneas de {total}",
+      "remaining": "Restante",
+      "documentFormat": "Documento",
+      "docTicket": "Tique",
+      "docInvoice": "Factura",
+      "limitBlockedTitle": "Esta venta no puede ser un tique",
+      "limitBlockedBody": "Por encima de {max} la ley obliga a factura completa. Rellena los datos del cliente y cobra como siempre.",
+      "limitReadyTitle": "Esta venta sale como factura completa",
+      "limitReadyBody": "El cliente está identificado, así que el documento es una factura y no un tique.",
+      "invoiceRecipientTitle": "Una factura necesita los datos del cliente",
+      "invoiceRecipientBody": "Rellena el nombre, el NIF y la dirección. Si el cliente no necesita factura, elige Tique.",
+      "fieldName": "Nombre o razón social",
+      "fieldCountry": "País",
+      "fieldIdType": "Tipo de documento",
+      "fieldTaxId": "NIF",
+      "fieldAddress": "Domicilio",
+      "idType": {
+        "02": "NIF-IVA de la UE",
+        "04": "Identificación fiscal de su país",
+        "03": "Pasaporte",
+        "06": "Otro documento"
+      },
+      "paymentsTaken": "Cobros tomados",
+      "editLeg": "Editar {name}, {amount}",
+      "removeLeg": "Quitar {name}, {amount}",
+      "legChange": "Cambio {amount}",
+      "paymentMethod": "Forma de pago",
+      "cashLimitUnavailable": "No permitido para este importe",
+      "cashLimitReason": "La ley no permite cobrar en efectivo ventas de {amount} o más. Cóbrala con tarjeta o Bizum.",
+      "tendered": "Entregado",
+      "legAmount": "Importe de este cobro",
+      "change": "Cambio",
+      "payExact": "Importe exacto",
+      "payCardHint": "Cobra {amount} en el datáfono y confirma.",
+      "splitPayment": "Repartir el cobro",
+      "addLeg": "Añadir este cobro",
+      "keypad": "Teclado",
+      "keypadClear": "Borrar",
+      "charge": "Cobrar {amount}",
+      "chargeWithCard": "Cobrar {amount} con tarjeta",
+      "chargeWith": "Cobrar {amount} con {method}",
+      "charging": "Cobrando…",
+      "block": {
+        "customerRequired": "Falta el cliente",
+        "recipient": "Faltan los datos del cliente",
+        "cashLimit": "Efectivo no permitido",
+        "remaining": "Faltan {amount}",
+        "tenderedShort": "Lo entregado no cubre el total"
+      },
+      "reason": {
+        "customerRequired": "Este negocio exige un cliente en cada venta. Elige uno para seguir con el cobro.",
+        "remaining": "Faltan {amount} por cubrir para poder cobrar la venta.",
+        "tenderedMissing": "Marca en el teclado el importe entregado",
+        "tenderedShort": "Lo entregado no cubre el total"
+      },
+      "serverUnavailable": "El servidor no responde (puede estar reiniciándose). Inténtalo de nuevo en unos segundos y, si persiste, avisa al encargado.",
+      "checkoutUnknown": "No hemos podido confirmar si el cobro se completó. Compruébalo en Ventas antes de volver a cobrar.",
+      "checkSales": "Comprobar en Ventas"
+    },
+    "document": {
+      "title": "Documento",
+      "loading": "Cargando documento…",
+      "error": "Error cargando el documento",
+      "close": "Cerrar",
+      "print": "Imprimir",
+      "printFailed": "No se pudo imprimir",
+      "defaultBusiness": "Mi negocio",
+      "receipt": "Tiquet",
+      "customer": "Cliente",
+      "item": "Concepto",
+      "amount": "Importe",
+      "noLines": "— Sin líneas —",
+      "subtotal": "Subtotal",
+      "total": "TOTAL",
+      "change": "Cambio",
+      "duplicate": "DUPLICADO",
+      "gift": "(Invitación)",
+      "discountApplied": "Descuento de {amount}, ya aplicado en los importes de arriba.",
+      "taxes": {
+        "vat": "IVA",
+        "surcharge": "RE",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
+      }
+    },
+    "sales": {
+      "title": "Ventas",
+      "period": {
+        "label": "Periodo",
+        "today": "Hoy",
+        "week": "7 días",
+        "month": "30 días",
+        "all": "Todo"
+      },
+      "businessDayError": "No se pudo leer el día del negocio: los periodos cuentan desde el día de este dispositivo.",
+      "kpis": {
+        "label": "Cifras del periodo",
+        "tickets": "Tickets",
+        "revenue": "Ingresos",
+        "avgTicket": "Ticket medio",
+        "tax": "IVA",
+        "discounts": "Descuentos",
+        "voided": "Anuladas",
+        "error": "Error cargando métricas"
+      },
+      "columns": {
+        "date": "Fecha",
+        "number": "Número",
+        "customer": "Cliente",
+        "payment": "Pago",
+        "status": "Estado",
+        "total": "Total"
+      },
+      "status": {
+        "completed": "Completada",
+        "voided": "Anulada",
+        "refunded": "Devuelta",
+        "leftToRefund": "Por devolver {amount}"
+      },
+      "actions": {
+        "document": "Documento",
+        "reprint": "Reimprimir",
+        "void": "Anular",
+        "refund": "Devolver"
+      },
+      "search": "Buscar número o cliente…",
+      "entity": {
+        "one": "venta",
+        "many": "ventas"
+      },
+      "empty": "Aún no hay ventas.",
+      "noMatches": "Ninguna venta coincide con la búsqueda o los filtros.",
+      "loading": "Cargando…",
+      "loadError": "No se pudieron cargar las ventas",
+      "filters": {
+        "button": "Filtros",
+        "count": "Filtros: {n} en uso",
+        "title": "Filtrar ventas",
+        "any": "Cualquiera",
+        "clear": "Limpiar",
+        "done": "Hecho",
+        "dateFrom": "Fecha desde",
+        "dateTo": "Fecha hasta",
+        "totalMin": "Total desde",
+        "totalMax": "Total hasta",
+        "amountInvalid": "Escribe un importe, como 12,50"
+      },
+      "picker": {
+        "search": "Buscar…",
+        "close": "Cerrar",
+        "empty": "Ninguna forma de pago coincide con la búsqueda.",
+        "error": "No se han podido cargar las formas de pago."
+      }
+    },
+    "void": {
+      "title": "Anular la venta {number}",
+      "explain": "La venta queda registrada como anulada; caja y stock se revierten una sola vez. El motivo es obligatorio.",
+      "reason": "Motivo (obligatorio)",
+      "reasonRequired": "Hace falta un motivo para anular una venta",
+      "confirm": "Anular",
+      "cancel": "Cancelar",
+      "done": "Venta anulada"
+    },
+    "refund": {
+      "title": "Devolver la venta {number}",
+      "loading": "Cargando lo que se puede devolver…",
+      "loadError": "No se ha podido cargar la venta, así que todavía no hay nada que devolver. Vuelve a intentarlo.",
+      "nothing": "No queda nada por devolver en esta venta.",
+      "explain": "Elige cuánto vuelve por cada forma en que se pagó. El reparto de abajo es una propuesta: cambia el importe que quieras.",
+      "linesTitle": "Qué se devuelve",
+      "linesHint": "Marca lo que devuelve el cliente y el importe se propone solo. Si no marcas nada, solo se devuelve dinero.",
+      "lineAlreadyReturned": "Ya devuelta",
+      "linePartlyReturned": "{returned} de {total} ya devueltas",
+      "lineUnits": "Unidades que vuelven",
+      "charged": "Cobrado",
+      "refunded": "Ya devuelto",
+      "remaining": "Devolvible",
+      "amount": "Importe a devolver",
+      "destination": "Devolver por",
+      "reasons": {
+        "already_refunded": "Ya se devolvió entero.",
+        "method_unavailable": "Ese medio de pago ya no está disponible.",
+        "not_eligible": "No puede volver por donde se cobró."
+      },
+      "proposeAll": "Devolver todo",
+      "reason": "Motivo",
+      "reasonPlaceholder": "Por qué vuelve el dinero",
+      "total": "Se devuelve",
+      "nothingToReturn": "Escribe cuánto vuelve.",
+      "amountInvalid": "{method}: escribe un importe, como 12,50.",
+      "overCap": "{method}: {amount} es más que los {remaining} que quedan por devolver.",
+      "needsDestination": "{method}: elige por dónde vuelve este dinero.",
+      "reasonRequired": "Una devolución necesita un motivo.",
+      "confirm": "Devolver {amount}",
+      "done": "Devolución registrada.",
+      "unknown": "No hemos podido confirmar si la devolución se registró. Si vuelves a pulsar Devolver no se duplicará."
+    },
+    "quickNotes": {
+      "intro": "Las notas que el TPV ofrece de un toque en la hoja de nota de la línea. Escribir a mano sigue funcionando.",
+      "search": "Buscar una nota…",
+      "loading": "Cargando notas rápidas…",
+      "empty": "Todavía no hay notas rápidas. Añade las que tu cocina oye a diario: «sin sal», «poco hecho», «sin hielo».",
+      "noResults": "Sin resultados",
+      "noResultsMessage": "Ninguna nota rápida coincide con tu búsqueda.",
+      "loadError": "No se han podido cargar las notas rápidas.",
+      "entity": {
+        "one": "nota rápida",
+        "many": "notas rápidas"
+      },
+      "columns": {
+        "text": "Nota",
+        "sortOrder": "Posición"
+      },
+      "add": "Añadir",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "form": {
+        "createTitle": "Nueva nota rápida",
+        "editTitle": "Editar nota rápida",
+        "add": "Añadir",
+        "save": "Guardar"
+      },
+      "saveFailed": "No se ha podido guardar la nota rápida.",
+      "deleteTitle": "Eliminar nota rápida",
+      "deleteMessage": "{text} — Deja de ofrecerse en el TPV. Las notas ya escritas en cuentas y ventas conservan su texto.",
+      "deleteCancel": "Cancelar",
+      "deleteFailed": "No se ha podido eliminar la nota rápida."
+    },
+    "departments": {
+      "intro": "Las familias que el TPV ofrece al cobrar un importe que no está en el catálogo. Cada una lleva su IVA. Si dejas la lista vacía, el TPV vuelve a ofrecer las categorías fiscales tal cual.",
+      "search": "Buscar un departamento…",
+      "loading": "Cargando departamentos…",
+      "empty": "Todavía no hay departamentos. Añade las familias que cobras a mano: «Frutas y verduras», «Carnicería», «Droguería».",
+      "noResults": "Sin resultados",
+      "noResultsMessage": "Ningún departamento coincide con tu búsqueda.",
+      "loadError": "No se han podido cargar los departamentos.",
+      "entity": {
+        "one": "departamento",
+        "many": "departamentos"
+      },
+      "columns": {
+        "name": "Nombre",
+        "taxCategory": "IVA que cobra",
+        "sortOrder": "Posición"
+      },
+      "add": "Añadir",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "form": {
+        "createTitle": "Nuevo departamento",
+        "editTitle": "Editar departamento",
+        "add": "Añadir",
+        "save": "Guardar",
+        "namePlaceholder": "p. ej. Frutas y verduras",
+        "taxPlaceholder": "Elige el IVA"
+      },
+      "taxCategoryMissing": "Elige el IVA que cobra este departamento.",
+      "noTaxCategories": "No hay categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.",
+      "taxLoadFailed": "No se han podido leer las categorías de IVA.",
+      "taxRetry": "Reintentar",
+      "taxRetrying": "Reintentando…",
+      "picker": {
+        "search": "Buscar una categoría de IVA…",
+        "close": "Cerrar",
+        "noResults": "Ninguna categoría de IVA coincide con tu búsqueda.",
+        "more": "Se muestran {shown} de {total}. Escribe para acotar la lista."
+      },
+      "saveFailed": "No se ha podido guardar el departamento.",
+      "deleteTitle": "Eliminar departamento",
+      "deleteMessage": "{name} — Deja de ofrecerse en el TPV. Lo ya vendido conserva el nombre y el IVA con los que se cobró.",
+      "deleteCancel": "Cancelar",
+      "deleteFailed": "No se ha podido eliminar el departamento."
+    },
+    "settings": {
+      "heading": "TPV",
+      "loading": "Cargando ajustes…",
+      "loadError": "No se pudieron cargar los ajustes.",
+      "loadErrorBody": "Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.",
+      "noPermission": "No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.",
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "saveError": "No se pudieron guardar los ajustes.",
+      "textPlaceholder": "Escribe aquí…",
+      "documentType": {
+        "ticket": "Tique",
+        "invoice": "Factura"
+      },
+      "fields": {
+        "allow_cash": {
+          "label": "Permitir efectivo"
+        },
+        "allow_card": {
+          "label": "Permitir tarjeta"
+        },
+        "allow_transfer": {
+          "label": "Permitir transferencia"
+        },
+        "show_products": {
+          "label": "Mostrar productos en el TPV",
+          "description": "Los productos se muestran cuando la app Inventario está activa. Apágalo para vender solo servicios o líneas de precio libre."
+        },
+        "show_services": {
+          "label": "Mostrar servicios en el TPV",
+          "description": "Los servicios se muestran cuando la app Servicios está activa. Apágalo para vender solo productos."
+        },
+        "require_customer": {
+          "label": "Exigir cliente en cada venta"
+        },
+        "allow_discounts": {
+          "label": "Permitir descuentos"
+        },
+        "max_discount_percent": {
+          "label": "Descuento máximo que puede aplicar solo quien cobra, por descuento (%)",
+          "description": "Se mira cada descuento por separado: el de una línea, el del tique o un importe fijo. Por encima, solo lo puede dar un responsable y la cuenta guarda quién lo autorizó. Los descuentos se pueden sumar, así que el ahorro total del cliente puede ser mayor. 100 = sin límite."
+        },
+        "enable_parked_tickets": {
+          "label": "Permitir tiques aparcados"
+        },
+        "default_tax_included": {
+          "label": "Precios con IVA incluido"
+        },
+        "auto_invoice_with_tax_id": {
+          "label": "Emitir factura si el cliente tiene NIF"
+        },
+        "default_document_type": {
+          "label": "Documento por defecto"
+        },
+        "receipt_header": {
+          "label": "Cabecera del recibo",
+          "description": "Primera línea = nombre; resto = dirección."
+        },
+        "receipt_footer": {
+          "label": "Pie del recibo"
+        },
+        "receipt_footer_image": {
+          "label": "Imagen de pie (URL)"
+        },
+        "receipt_marketing_url": {
+          "label": "URL del QR promocional",
+          "description": "Reseñas de Google, redes sociales, web… Vacío = sin QR promocional."
+        },
+        "receipt_marketing_text": {
+          "label": "Texto del QR promocional",
+          "description": "P.ej. «Escanea y déjanos una reseña»."
+        }
+      }
+    }
+  }
+}

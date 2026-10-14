@@ -1,0 +1,370 @@
+# Spanish translation of the inventory app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next inventory\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 00:55+0200\n"
+"PO-Revision-Date: 2026-10-14 01:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Inventory"
+msgstr "Inventario"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid ""
+"Your catalog with its stock: products, categories, goods received, counts "
+"and low-stock alerts."
+msgstr "Tu catálogo con su stock: productos, categorías, recepciones, recuentos y avisos de stock bajo."
+
+msgid ""
+"Inventory keeps what you sell with stock: each product with its SKU, price, "
+"cost, tax category, unit of measure and how many are left. The till sells "
+"from this catalog and every sale lowers the stock on its own; goods "
+"received, stock counts and write-offs leave a movement that is never edited, "
+"so every balance is explained. It warns when an article runs low, imports "
+"and exports the catalog as CSV and sells by weight or measure without "
+"rounding."
+msgstr "Inventario guarda lo que vendes con existencias: cada producto con su SKU, su precio, su coste, su categoría fiscal, su unidad de medida y cuántas unidades quedan. El TPV vende desde este catálogo y cada venta baja el stock sola; las recepciones, los recuentos y las bajas dejan un movimiento que no se edita, así que cada saldo se explica. Avisa cuando un artículo se queda corto, importa y exporta el catálogo en CSV y vende al peso o por medida sin redondear."
+
+msgid "Unit (ud)"
+msgstr "Unidad (ud)"
+
+msgid "Kilogram (kg)"
+msgstr "Kilogramo (kg)"
+
+msgid "Gram (g)"
+msgstr "Gramo (g)"
+
+msgid "Tonne (t)"
+msgstr "Tonelada (t)"
+
+msgid "Litre (l)"
+msgstr "Litro (l)"
+
+msgid "Millilitre (ml)"
+msgstr "Mililitro (ml)"
+
+msgid "Minute (min)"
+msgstr "Minuto (min)"
+
+msgid "Hour (h)"
+msgstr "Hora (h)"
+
+msgid "allow selling without stock"
+msgstr "permitir vender sin stock"
+
+msgid "low stock threshold"
+msgstr "umbral de stock bajo"
+
+msgid "track stock"
+msgstr "controlar stock"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "inventory settings"
+msgstr "ajustes del inventario"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "slug"
+msgstr "slug"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "icon"
+msgstr "icono"
+
+msgid "color"
+msgstr "color"
+
+msgid "order"
+msgstr "orden"
+
+msgid "tax category"
+msgstr "categoría fiscal"
+
+msgid "deleted"
+msgstr "eliminado"
+
+msgid "deleted at"
+msgstr "eliminado el"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "category"
+msgstr "categoría"
+
+msgid "categories"
+msgstr "categorías"
+
+msgid "Physical"
+msgstr "Físico"
+
+msgid "Service"
+msgstr "Servicio"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "EAN-13"
+msgstr "EAN-13"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "price"
+msgstr "precio"
+
+msgid "cost"
+msgstr "coste"
+
+msgid "stock"
+msgstr "stock"
+
+msgid "unit of measure"
+msgstr "unidad de medida"
+
+msgid "price quantity"
+msgstr "cantidad de precio"
+
+msgid "pricing unit"
+msgstr "unidad de precio"
+
+msgid "active"
+msgstr "activo"
+
+msgid "product"
+msgstr "producto"
+
+msgid "products"
+msgstr "productos"
+
+msgid "product category"
+msgstr "categoría del producto"
+
+msgid "product categories"
+msgstr "categorías de los productos"
+
+msgid "Initial"
+msgstr "Inicial"
+
+msgid "Reception"
+msgstr "Recepción"
+
+msgid "Sale"
+msgstr "Venta"
+
+msgid "Void"
+msgstr "Anulación"
+
+msgid "Count"
+msgstr "Recuento"
+
+msgid "Write-off"
+msgstr "Descuento"
+
+msgid "quantity"
+msgstr "cantidad"
+
+msgid "balance"
+msgstr "saldo"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "reference"
+msgstr "referencia"
+
+msgid "unit cost"
+msgstr "coste unitario"
+
+msgid "by"
+msgstr "por"
+
+msgid "date"
+msgstr "fecha"
+
+msgid "stock movement"
+msgstr "movimiento de stock"
+
+msgid "stock movements"
+msgstr "movimientos de stock"
+
+msgid "Lowered the stock"
+msgstr "Bajó el stock"
+
+msgid "Moved nothing"
+msgstr "No movió nada"
+
+msgid "Voided"
+msgstr "Anulada"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "state"
+msgstr "estado"
+
+msgid "sale seen"
+msgstr "venta vista"
+
+msgid "sales seen"
+msgstr "ventas vistas"
+
+msgid "This product does not exist in this hub."
+msgstr "Este producto no existe en este hub."
+
+msgid "This category no longer exists."
+msgstr "Esta categoría ya no existe."
+
+#, python-format
+msgid "“%(said)s” matches several products: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varios productos: %(names)s. Di cuál."
+
+#, python-format
+msgid "“%(said)s” matches several categories: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias categorías: %(names)s. Di cuál."
+
+msgid "inventory-products.csv"
+msgstr "inventario-productos.csv"
+
+msgid "inventory-categories.csv"
+msgstr "inventario-categorias.csv"
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "Price"
+msgstr "Precio"
+
+msgid "Cost"
+msgstr "Coste"
+
+msgid "Stock"
+msgstr "Stock"
+
+msgid "Threshold"
+msgstr "Umbral"
+
+msgid "Description"
+msgstr "Descripción"
+
+msgid "Unit"
+msgstr "Unidad"
+
+msgid "Tax category"
+msgstr "Categoría fiscal"
+
+msgid "Active"
+msgstr "Activo"
+
+msgid "Slug"
+msgstr "Slug"
+
+msgid "Products"
+msgstr "Productos"
+
+msgid "Yes"
+msgstr "Sí"
+
+msgid "No"
+msgstr "No"
+
+msgid "Say which product: its id, or its SKU or name."
+msgstr "Di qué producto: su id, o su SKU o su nombre."
+
+msgid "Say which category: its id, or its name."
+msgstr "Di qué categoría: su id, o su nombre."
+
+msgid "That SKU already exists in the catalog."
+msgstr "Ese SKU ya existe en el catálogo"
+
+msgid "Another product of the catalog already has that EAN-13."
+msgstr "Ese EAN-13 ya lo tiene otro producto del catálogo"
+
+msgid "This tax category does not exist in Taxes."
+msgstr "Esa categoría fiscal no existe en Impuestos."
+
+msgid "This category does not exist."
+msgstr "Esa categoría no existe."
+
+#, python-format
+msgid ""
+"The quantity does not respect the step allowed for this unit: use multiples "
+"of %(step)s."
+msgstr "La cantidad no respeta el incremento permitido para esta unidad: usa múltiplos de %(step)s."
+
+msgid ""
+"The unit of a product with stock cannot be changed. Count its stock to zero "
+"and change it afterwards."
+msgstr "No se puede cambiar la unidad de un producto con stock. Cuenta su stock a cero y cámbiala después."
+
+msgid "The price must refer to a unit of the same kind as the product's unit."
+msgstr "El precio tiene que referirse a una unidad del mismo tipo que la del producto."
+
+msgid "A service has no stock."
+msgstr "Un servicio no lleva stock."
+
+msgid "There is not enough stock to complete the operation."
+msgstr "No hay stock suficiente para completar la operación."
+
+msgid "Name or SKU missing"
+msgstr "Faltan nombre o SKU"
+
+msgid "A text is longer than its column allows"
+msgstr "Un texto es más largo de lo que admite su columna"
+
+msgid "Price is not a number"
+msgstr "Precio no numérico"
+
+msgid "SKU repeated in the file"
+msgstr "SKU duplicado en el fichero"
+
+#, python-format
+msgid "Unit of measure not recognized: %(text)s"
+msgstr "Unidad de medida no reconocida: %(text)s"
+
+msgid "Quantity is not a number"
+msgstr "Cantidad no numérica"
+
+msgid "The quantity does not respect the step allowed for this unit"
+msgstr "La cantidad no respeta el incremento permitido para esta unidad"
+
+msgid "The tax category is missing"
+msgstr "Falta la categoría fiscal"
+
+#, python-format
+msgid "Tax category not recognized: %(text)s"
+msgstr "Categoría fiscal no reconocida: %(text)s"
+
+msgid "The name is missing"
+msgstr "Falta el nombre"
+
+msgid "Price or cost too large"
+msgstr "Precio o coste demasiado alto"
+
+msgid "Quantity too large"
+msgstr "Cantidad demasiado grande"
+
+msgid "This article does not track its stock: there is nothing to write off."
+msgstr "Este artículo no controla su stock: no hay nada que dar de baja."

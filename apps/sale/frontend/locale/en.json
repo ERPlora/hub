@@ -1,0 +1,519 @@
+{
+  "sale": {
+    "title": "Sales & POS",
+    "tabs": {
+      "label": "Sales & POS sections",
+      "pos": "Sell",
+      "sales": "Sales",
+      "quickNotes": "Quick notes",
+      "departments": "Departments",
+      "settings": "Settings"
+    },
+    "live": {
+      "retry": "Retry",
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business.",
+      "noPermission": "You do not have permission."
+    },
+    "common": {},
+    "pos": {
+      "loadFailed": "Error loading the till",
+      "screenMenu": "Screen",
+      "fullscreen": "Full screen",
+      "exitFullscreen": "Exit full screen",
+      "categories": "Categories",
+      "all": "All",
+      "more": "More…",
+      "itemCountOne": "1 item",
+      "itemCount": "{count} items",
+      "search": "Search",
+      "searchPlaceholder": "Search product…",
+      "searchClose": "Close the search",
+      "noProducts": "No products.",
+      "loadMore": "Load more",
+      "openPrice": "Open price",
+      "openPriceTag": "+ €",
+      "managerOnly": "A manager has to do it",
+      "notSellableBadge": "VAT missing",
+      "notSellableNoTaxCategory": "Cannot be sold: no tax category. VAT needs to be set up.",
+      "catalogBlockedOne": "1 item cannot be sold: its VAT is not set up.",
+      "catalogBlocked": "{count} items cannot be sold: their VAT is not set up.",
+      "catalogBlockedFix": "Review the catalogue",
+      "catalogAppInactive": "{app} is not active, so there is no product grid. You can still charge open-price sales; turn it on from Apps to sell from a catalogue.",
+      "catalogLoadFailed": "The catalogue could not be loaded.",
+      "appInventory": "Inventory",
+      "parkCurrentSale": "Park this check",
+      "parkedTickets": "Open checks",
+      "closeAction": "Close",
+      "newCheckTitle": "New check",
+      "checkTitleLabel": "Check title",
+      "editCheckTitle": "Edit check title",
+      "errorSavingTitle": "The check title could not be saved",
+      "servedBy": "Served by {name}",
+      "staffAssigned": "the assigned professional",
+      "staffMe": "me",
+      "customerRequiredShort": "Customer required",
+      "customerRequiredCharge": "This business requires a customer on every sale. Choose one to carry on with the charge.",
+      "noCheckContext": "Check without table or customer",
+      "cartEmptyTouch": "Tap a product to add it.",
+      "checkGone": "That check was closed on another device: the screen starts a new one.",
+      "courseInProgress": "Unsent",
+      "sentHeader": "Sent",
+      "commandRound": "Order {n}",
+      "giftBadge": "Gift",
+      "voidLine": "Void this item",
+      "discountLine": "Line discount",
+      "lineNote": "Note",
+      "giftAction": "Comp / un-comp line",
+      "giftReason": "Comp",
+      "lineStaffPickerTitle": "Whose line is this",
+      "markLine": "Mark to charge on its own",
+      "quantity": "Quantity",
+      "decrease": "One less",
+      "increase": "One more",
+      "lineChangeFailed": "That change to the line could not be saved. The line is back as it was.",
+      "lineNotSaved": "Couldn't save that item — tap again",
+      "lineStaffFailed": "The line could not be moved to another professional. It stays with the one it had.",
+      "discountTicket": "Ticket discount",
+      "total": "Total",
+      "printPrebill": "Print bill",
+      "charge": "Charge",
+      "chargeAmount": "Charge · {amount}",
+      "openCart": "Open cart",
+      "openCartWithItemsOne": "Open cart, 1 item, total {total}",
+      "openCartWithItems": "Open cart, {count} items, total {total}",
+      "parkForLaterHint": "Park the current check to resume it later. The title is optional.",
+      "openChecksHint": "Tap a check to resume it.",
+      "deleteCheck": "Delete check",
+      "deleteCheckConfirm": "Tap again to delete — this voids the check",
+      "deleteCheckFailed": "That open check could not be deleted. It is still in the list.",
+      "noParkedTickets": "No open checks",
+      "openChecksLoadFailed": "The open checks could not be loaded.",
+      "errorRetrieve": "Could not retrieve the ticket",
+      "parkTitle": "Park check",
+      "parkNameHint": "The title is optional and only helps identify the check when you resume it.",
+      "parkNamePlaceholder": "e.g. Ana — terrace",
+      "parkNameLabel": "Optional title",
+      "parkedToast": "Parked as “{name}”",
+      "parkCheckFailed": "The check could not be parked. It is still on screen.",
+      "cancel": "Cancel",
+      "dirtyCartTitle": "You have a check in progress",
+      "dirtyCartBody": "What should we do with the current check?",
+      "discardAndOpen": "Delete it and open",
+      "parkAndOpen": "Park it and open",
+      "discardCheckFailed": "The check could not be deleted. It is still open, on screen.",
+      "staffPickerTitle": "Who is serving this check",
+      "staffPickerHint": "The sale, the kitchen ticket and the per-person report are attributed to them. Leave it on «Me» and the till uses whoever is signed in.",
+      "lineStaffPickerHint": "Only this line moves. The day's close and the commission are worked out from it, so it is the one that has to be right. The chip at the top keeps deciding who the NEXT line goes to.",
+      "staffMeOption": "Me (whoever is signed in)",
+      "lineStaffTicketOption": "The check's professional",
+      "staffSearch": "Search the team…",
+      "staffLoading": "Loading the team…",
+      "staffLoadFailed": "The team could not be loaded. The sale is still attributed to whoever is signed in.",
+      "staffPickerEmpty": "This hub has nobody else to serve. Add staff from Settings.",
+      "staffNoResults": "Nobody in the team matches your search.",
+      "department": "Department (VAT)",
+      "departmentSearch": "Search a department…",
+      "noDepartments": "No departments configured.",
+      "departmentsLoadFailed": "The departments could not be loaded.",
+      "addAmount": "Add {amount}",
+      "numpadClear": "Clear",
+      "lineNoteOf": "Note on {name}",
+      "lineNoteQuickLoading": "Loading quick notes…",
+      "lineNoteQuickError": "The quick notes could not be loaded — type the note by hand.",
+      "lineNotePlaceholder": "e.g. medium rare, shellfish allergy, no ice",
+      "lineNoteHint": "The kitchen reads this note on the ticket.",
+      "lineNoteRemove": "Remove",
+      "lineNoteSave": "Save",
+      "discountLineOf": "Discount on {name}",
+      "discountMode": "Discount kind",
+      "discountRemove": "Remove",
+      "discountApply": "Apply",
+      "discountApplyValue": "Apply −{value}",
+      "ticketDiscountFailed": "That discount could not be saved. The check keeps the discount it had.",
+      "voidLineOf": "Void «{name}»",
+      "voidLineHint": "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to approve it.",
+      "voidReasonMistake": "Ordered by mistake",
+      "voidReasonChanged": "Customer changed their mind",
+      "voidReasonSoldOut": "Sold out",
+      "voidReasonDuplicate": "Entered twice",
+      "voidLineReasonPlaceholder": "Or write the reason…",
+      "voidLineConfirm": "Void item",
+      "voidLineFailed": "The item could not be voided. It is still on the check.",
+      "prebillTitle": "Bill",
+      "print": "Print",
+      "close": "Close",
+      "docDefaultBusiness": "My business",
+      "docCustomer": "Customer",
+      "docSubtotal": "Subtotal",
+      "docDiscount": "Discount",
+      "giftSuffix": "(comp)",
+      "prebillNotice": "Bill — this is not an invoice. The fiscal receipt is issued on payment.",
+      "prebillPrintFailed": "Bill could not be printed",
+      "prebillLoading": "Working out the bill…",
+      "prebillLoadFailed": "The bill could not be worked out.",
+      "taxes": {
+        "vat": "VAT",
+        "surcharge": "Surcharge",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
+      },
+      "customerLinkFailed": "The customer could not be linked to the check. Choose them again.",
+      "customerLoadFailed": "The check's customer could not be read. Choose them again if the sale needs one."
+    },
+    "checkout": {
+      "title": "Charge",
+      "close": "Close",
+      "loadingTotal": "Working out the total…",
+      "loadingMethods": "Loading the payment methods…",
+      "noMethods": "This business has no payment method to charge with.",
+      "payingPartOne": "Paying 1 line of {total}",
+      "payingPart": "Paying {n} lines of {total}",
+      "remaining": "Remaining",
+      "documentFormat": "Document",
+      "docTicket": "Receipt",
+      "docInvoice": "Invoice",
+      "limitBlockedTitle": "This sale cannot be a ticket",
+      "limitBlockedBody": "Over {max} the law requires a complete invoice. Fill in the customer's details and charge as usual.",
+      "limitReadyTitle": "This sale goes out as a complete invoice",
+      "limitReadyBody": "The customer is identified, so the document is a full invoice instead of a ticket.",
+      "invoiceRecipientTitle": "An invoice needs the customer's details",
+      "invoiceRecipientBody": "Fill in the name, tax ID and address. If the customer does not need an invoice, choose Receipt.",
+      "fieldName": "Name or company name",
+      "fieldCountry": "Country",
+      "fieldIdType": "Kind of document",
+      "fieldTaxId": "Tax ID",
+      "fieldAddress": "Address",
+      "idType": {
+        "02": "EU VAT number",
+        "04": "Tax ID of their country",
+        "03": "Passport",
+        "06": "Other document"
+      },
+      "paymentsTaken": "Payments taken",
+      "editLeg": "Edit {name}, {amount}",
+      "removeLeg": "Remove {name}, {amount}",
+      "legChange": "Change {amount}",
+      "paymentMethod": "Payment method",
+      "cashLimitUnavailable": "Not allowed for this amount",
+      "cashLimitReason": "The law does not allow cash for sales of {amount} or more. Charge it by card or Bizum.",
+      "tendered": "Tendered",
+      "legAmount": "Amount for this payment",
+      "change": "Change",
+      "payExact": "Exact amount",
+      "payCardHint": "Charge {amount} on the card terminal, then confirm.",
+      "splitPayment": "Split the payment",
+      "addLeg": "Add this payment",
+      "keypad": "Keypad",
+      "keypadClear": "Clear",
+      "charge": "Charge {amount}",
+      "chargeWithCard": "Charge {amount} by card",
+      "chargeWith": "Charge {amount} with {method}",
+      "charging": "Charging…",
+      "block": {
+        "customerRequired": "Customer required",
+        "recipient": "Enter the customer's details",
+        "cashLimit": "Cash not allowed",
+        "remaining": "{amount} still to cover",
+        "tenderedShort": "The amount tendered does not cover the total"
+      },
+      "reason": {
+        "customerRequired": "This business requires a customer on every sale. Choose one to carry on with the charge.",
+        "remaining": "{amount} still to cover before the sale can be charged.",
+        "tenderedMissing": "Enter the amount tendered on the keypad",
+        "tenderedShort": "The amount tendered does not cover the total"
+      },
+      "serverUnavailable": "The server isn't responding (it may be restarting). Try again in a few seconds and, if it keeps happening, call the manager.",
+      "checkoutUnknown": "We couldn't confirm whether this charge went through. Check it in Sales before charging again.",
+      "checkSales": "Check in Sales"
+    },
+    "document": {
+      "title": "Document",
+      "loading": "Loading document…",
+      "error": "Error loading the document",
+      "close": "Close",
+      "print": "Print",
+      "printFailed": "Could not print",
+      "defaultBusiness": "My business",
+      "receipt": "Receipt",
+      "customer": "Customer",
+      "item": "Item",
+      "amount": "Amount",
+      "noLines": "— No lines —",
+      "subtotal": "Subtotal",
+      "total": "TOTAL",
+      "change": "Change",
+      "duplicate": "DUPLICATE",
+      "gift": "(On the house)",
+      "discountApplied": "Discount of {amount}, already applied to the amounts above.",
+      "taxes": {
+        "vat": "VAT",
+        "surcharge": "Surcharge",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
+      }
+    },
+    "sales": {
+      "title": "Sales",
+      "period": {
+        "label": "Period",
+        "today": "Today",
+        "week": "7 days",
+        "month": "30 days",
+        "all": "All"
+      },
+      "businessDayError": "Could not read the business day: the periods count from this device's day.",
+      "kpis": {
+        "label": "Figures of the period",
+        "tickets": "Tickets",
+        "revenue": "Revenue",
+        "avgTicket": "Avg. ticket",
+        "tax": "VAT",
+        "discounts": "Discounts",
+        "voided": "Voided",
+        "error": "Error loading metrics"
+      },
+      "columns": {
+        "date": "Date",
+        "number": "Number",
+        "customer": "Customer",
+        "payment": "Payment",
+        "status": "Status",
+        "total": "Total"
+      },
+      "status": {
+        "completed": "Completed",
+        "voided": "Voided",
+        "refunded": "Refunded",
+        "leftToRefund": "{amount} left to refund"
+      },
+      "actions": {
+        "document": "Document",
+        "reprint": "Reprint",
+        "void": "Void",
+        "refund": "Refund"
+      },
+      "search": "Search number or customer…",
+      "entity": {
+        "one": "sale",
+        "many": "sales"
+      },
+      "empty": "No sales yet.",
+      "noMatches": "No sale matches your search or filters.",
+      "loading": "Loading…",
+      "loadError": "The sales could not be loaded",
+      "filters": {
+        "button": "Filters",
+        "count": "Filters: {n} in use",
+        "title": "Filter sales",
+        "any": "Any",
+        "clear": "Clear",
+        "done": "Done",
+        "dateFrom": "Date from",
+        "dateTo": "Date to",
+        "totalMin": "Total from",
+        "totalMax": "Total to",
+        "amountInvalid": "Type an amount, like 12.50"
+      },
+      "picker": {
+        "search": "Search…",
+        "close": "Close",
+        "empty": "No payment method matches your search.",
+        "error": "The payment methods could not be loaded."
+      }
+    },
+    "void": {
+      "title": "Void sale {number}",
+      "explain": "The sale stays on record as voided; cash and stock are reversed once. A reason is required.",
+      "reason": "Reason (required)",
+      "reasonRequired": "A reason is required to void a sale",
+      "confirm": "Void",
+      "cancel": "Cancel",
+      "done": "Sale voided"
+    },
+    "refund": {
+      "title": "Refund sale {number}",
+      "loading": "Loading what can be refunded…",
+      "loadError": "The sale could not be loaded, so there is nothing to refund yet. Try again.",
+      "nothing": "There is nothing left to refund on this sale.",
+      "explain": "Choose how much goes back to each way it was paid. The split below is a proposal — change any amount.",
+      "linesTitle": "What goes back",
+      "linesHint": "Mark what the customer returns and the amount is proposed for you. With nothing marked, only money goes back.",
+      "lineAlreadyReturned": "Already returned",
+      "linePartlyReturned": "{returned} of {total} already returned",
+      "lineUnits": "Units that go back",
+      "charged": "Charged",
+      "refunded": "Already refunded",
+      "remaining": "Refundable",
+      "amount": "Refund amount",
+      "destination": "Give it back through",
+      "reasons": {
+        "already_refunded": "Already given back in full.",
+        "method_unavailable": "That payment method is no longer available.",
+        "not_eligible": "Cannot go back the way it was paid."
+      },
+      "proposeAll": "Refund everything",
+      "reason": "Reason",
+      "reasonPlaceholder": "Why the money goes back",
+      "total": "Refunding",
+      "nothingToReturn": "Type how much goes back.",
+      "amountInvalid": "{method}: type an amount, like 12.50.",
+      "overCap": "{method}: {amount} is more than the {remaining} still refundable.",
+      "needsDestination": "{method}: choose where this money goes back.",
+      "reasonRequired": "A refund needs a reason.",
+      "confirm": "Refund {amount}",
+      "done": "Refund recorded.",
+      "unknown": "We couldn't confirm whether the refund was recorded. Tapping Refund again won't record it twice."
+    },
+    "quickNotes": {
+      "intro": "The notes the till offers with one tap on the line-note sheet. The waiter can still type anything by hand.",
+      "search": "Search a note…",
+      "loading": "Loading quick notes…",
+      "empty": "No quick notes yet. Add the ones your kitchen hears every day — “no salt”, “medium rare”, “no ice”.",
+      "noResults": "No results",
+      "noResultsMessage": "No quick note matches your search.",
+      "loadError": "The quick notes could not be loaded.",
+      "entity": {
+        "one": "quick note",
+        "many": "quick notes"
+      },
+      "columns": {
+        "text": "Note",
+        "sortOrder": "Position"
+      },
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "form": {
+        "createTitle": "New quick note",
+        "editTitle": "Edit quick note",
+        "add": "Add",
+        "save": "Save"
+      },
+      "saveFailed": "The quick note could not be saved.",
+      "deleteTitle": "Delete quick note",
+      "deleteMessage": "{text} — It stops being offered at the till. The notes already typed on checks and sales keep their text.",
+      "deleteCancel": "Cancel",
+      "deleteFailed": "The quick note could not be deleted."
+    },
+    "departments": {
+      "intro": "The families the till offers when you charge an amount that is not in the catalogue. Each one carries its own VAT. Leave the list empty and the till falls back to the plain tax categories.",
+      "search": "Search a department…",
+      "loading": "Loading departments…",
+      "empty": "No departments yet. Add the families you ring up by hand — “Fruit and veg”, “Butchery”, “Household”.",
+      "noResults": "No results",
+      "noResultsMessage": "No department matches your search.",
+      "loadError": "The departments could not be loaded.",
+      "entity": {
+        "one": "department",
+        "many": "departments"
+      },
+      "columns": {
+        "name": "Name",
+        "taxCategory": "VAT charged",
+        "sortOrder": "Position"
+      },
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "form": {
+        "createTitle": "New department",
+        "editTitle": "Edit department",
+        "add": "Add",
+        "save": "Save",
+        "namePlaceholder": "e.g. Fruit and veg",
+        "taxPlaceholder": "Choose the VAT"
+      },
+      "taxCategoryMissing": "Choose the VAT this department charges.",
+      "noTaxCategories": "There are no tax categories to choose from. Set up your VAT first, in Taxes.",
+      "taxLoadFailed": "The tax categories could not be read.",
+      "taxRetry": "Retry",
+      "taxRetrying": "Retrying…",
+      "picker": {
+        "search": "Search a tax category…",
+        "close": "Close",
+        "noResults": "No tax category matches your search.",
+        "more": "Showing {shown} of {total}. Type to narrow the list."
+      },
+      "saveFailed": "The department could not be saved.",
+      "deleteTitle": "Delete department",
+      "deleteMessage": "{name} — It stops being offered at the till. Everything already sold keeps the name and the VAT it was charged with.",
+      "deleteCancel": "Cancel",
+      "deleteFailed": "The department could not be deleted."
+    },
+    "settings": {
+      "heading": "Point of sale",
+      "loading": "Loading settings…",
+      "loadError": "Could not load settings.",
+      "loadErrorBody": "Your saved settings have not changed. Check the connection and try again.",
+      "noPermission": "You do not have permission to change these settings. Ask an administrator if you need to.",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "Could not save settings.",
+      "textPlaceholder": "Type here…",
+      "documentType": {
+        "ticket": "Ticket",
+        "invoice": "Invoice"
+      },
+      "fields": {
+        "allow_cash": {
+          "label": "Allow cash"
+        },
+        "allow_card": {
+          "label": "Allow card"
+        },
+        "allow_transfer": {
+          "label": "Allow bank transfer"
+        },
+        "show_products": {
+          "label": "Show products in the till",
+          "description": "Products show up when the Inventory app is active. Turn it off to sell only services or free-price lines."
+        },
+        "show_services": {
+          "label": "Show services in the till",
+          "description": "Services show up when the Services app is active. Turn it off to sell only products."
+        },
+        "require_customer": {
+          "label": "Require a customer on every sale"
+        },
+        "allow_discounts": {
+          "label": "Allow discounts"
+        },
+        "max_discount_percent": {
+          "label": "Largest discount a cashier may give alone, per discount (%)",
+          "description": "Each discount is checked on its own: a line's, the ticket's or a fixed amount. Above this, only a manager can give it and the check records who authorised it. Discounts can be combined, so the customer's total saving can be higher. 100 = no limit."
+        },
+        "enable_parked_tickets": {
+          "label": "Allow parked tickets"
+        },
+        "default_tax_included": {
+          "label": "Prices include VAT"
+        },
+        "auto_invoice_with_tax_id": {
+          "label": "Issue an invoice when the customer has a tax ID"
+        },
+        "default_document_type": {
+          "label": "Default document"
+        },
+        "receipt_header": {
+          "label": "Receipt header",
+          "description": "First line = name; the rest = address."
+        },
+        "receipt_footer": {
+          "label": "Receipt footer"
+        },
+        "receipt_footer_image": {
+          "label": "Footer image (URL)"
+        },
+        "receipt_marketing_url": {
+          "label": "Promotional QR URL",
+          "description": "Google reviews, social media, your website… Empty = no promotional QR."
+        },
+        "receipt_marketing_text": {
+          "label": "Promotional QR text",
+          "description": "For example «Scan and leave us a review»."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,422 @@
+{
+  "customer": {
+    "live": {
+      "reconnecting": "Reconectando…",
+      "retry": "Reintentar",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "common": {
+      "yes": "Sí",
+      "no": "No",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "close": "Cerrar",
+      "add": "Añadir",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "loading": "Cargando…",
+      "all": "Todos",
+      "noPermission": "No tienes permiso",
+      "unavailable": "Este cliente ya no está disponible."
+    },
+    "tabs": {
+      "label": "Secciones de clientes",
+      "customers": "Clientes",
+      "groups": "Grupos",
+      "tags": "Etiquetas",
+      "fields": "Campos"
+    },
+    "stage": {
+      "lead": "Contacto",
+      "prospect": "Prospecto",
+      "first_purchase": "1ª compra",
+      "active": "Activo",
+      "at_risk": "En riesgo",
+      "dormant": "Inactivo",
+      "churned": "Perdido",
+      "vip": "VIP"
+    },
+    "source": {
+      "walk_in": "En el local",
+      "website": "Web",
+      "phone": "Teléfono",
+      "referral": "Recomendación",
+      "social": "Redes sociales",
+      "whatsapp": "WhatsApp",
+      "import": "Importación",
+      "other": "Otro"
+    },
+    "channel": {
+      "none": "Ninguno",
+      "email": "Email",
+      "sms": "SMS",
+      "whatsapp": "WhatsApp",
+      "phone": "Teléfono",
+      "postal": "Correo postal"
+    },
+    "fieldType": {
+      "text": "Texto",
+      "number": "Número",
+      "date": "Fecha",
+      "boolean": "Sí/No",
+      "select": "Selección",
+      "textarea": "Texto largo"
+    },
+    "stats": {
+      "label": "Cifras",
+      "customers": "Clientes",
+      "active": "Activos",
+      "vip": "VIP",
+      "revenue": "Ingresos",
+      "loadError": "No se pudieron cargar las cifras"
+    },
+    "list": {
+      "title": "Clientes",
+      "search": "Buscar nombre, teléfono o email…",
+      "loadError": "No se pudieron cargar los clientes",
+      "empty": "Sin clientes.",
+      "emptyMessage": "Da de alta el primero con «Añadir» o trae los tuyos con «Importar CSV».",
+      "noResults": "Sin resultados",
+      "noResultsMessage": "Ningún cliente coincide con la búsqueda o los filtros.",
+      "columns": {
+        "name": "Nombre",
+        "email": "Email",
+        "phone": "Teléfono",
+        "stage": "Etapa",
+        "spent": "Gastado"
+      },
+      "filters": {
+        "stage": "Etapa",
+        "source": "Origen",
+        "active": "Activo",
+        "activeOnly": "Activos",
+        "inactiveOnly": "No activos",
+        "spentFrom": "Gastado desde (€)",
+        "spentTo": "Gastado hasta (€)"
+      },
+      "view": "Ver",
+      "entity": {
+        "one": "cliente",
+        "many": "clientes"
+      }
+    },
+    "filters": {
+      "button": "Filtros",
+      "title": "Filtros",
+      "count": "Filtros ({n} en uso)",
+      "any": "Cualquiera",
+      "clear": "Quitar filtros",
+      "done": "Hecho",
+      "amountInvalid": "Escribe un importe, como 1.000,50."
+    },
+    "create": {
+      "title": "Nuevo cliente",
+      "created": "Cliente {name} creado"
+    },
+    "form": {
+      "name": "Nombre",
+      "email": "Email",
+      "phone": "Teléfono",
+      "phoneHint": "Sin prefijo se lee como un número del país del negocio; si es de otro, escribe su prefijo (+44…).",
+      "taxId": "NIF/CIF",
+      "company": "Empresa",
+      "moreDetails": "Más datos",
+      "address": "Dirección",
+      "city": "Ciudad",
+      "postalCode": "Código postal",
+      "country": "País",
+      "countryNone": "Sin país",
+      "avatar": "Foto (su dirección)",
+      "birthday": "Cumpleaños",
+      "anniversary": "Aniversario",
+      "source": "Origen",
+      "stage": "Etapa",
+      "preferredChannel": "Canal preferido",
+      "notes": "Notas internas",
+      "customFields": "Campos personalizados",
+      "active": "Activo",
+      "required": "{name} *",
+      "countrySearch": "Busca un país…",
+      "countryNoMatch": "Ningún país coincide"
+    },
+    "importCsv": {
+      "button": "Importar CSV",
+      "importing": "Importando…",
+      "summary": "Importación: {total} filas — {created} creadas, {skipped} omitidas.",
+      "noRows": "El fichero no tiene clientes: su primera línea tiene que nombrar las columnas (nombre, email, teléfono…).",
+      "unreadable": "No se pudo leer el fichero.",
+      "row": "Fila {line}",
+      "failedBlock": "Las filas {from}–{to} no se importaron: {reason}",
+      "review": "Para revisar",
+      "close": "Cerrar"
+    },
+    "exportCsv": {
+      "button": "Exportar CSV",
+      "failed": "No se pudieron exportar los clientes: {reason}"
+    },
+    "detail": {
+      "title": "Cliente",
+      "loadError": "No se pudo cargar el cliente",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "merge": "Fusionar con…",
+      "erase": "Borrar datos personales",
+      "updated": "Cliente actualizado",
+      "facts": {
+        "email": "Email",
+        "phone": "Teléfono",
+        "taxId": "NIF/CIF",
+        "company": "Empresa",
+        "address": "Dirección",
+        "stage": "Etapa",
+        "source": "Origen",
+        "preferredChannel": "Canal preferido",
+        "purchases": "Compras",
+        "spent": "Gastado",
+        "lastPurchase": "Última compra",
+        "active": "Activo",
+        "birthday": "Cumpleaños",
+        "anniversary": "Aniversario",
+        "notes": "Notas internas",
+        "customFields": "Campos personalizados"
+      }
+    },
+    "delete": {
+      "title": "Eliminar cliente",
+      "message": "¿Eliminar {name}? Deja de salir en la lista, en el TPV y en la búsqueda por teléfono. Sus ventas se conservan.",
+      "confirm": "Eliminar",
+      "done": "Cliente {name} eliminado"
+    },
+    "membership": {
+      "groups": "Grupos",
+      "tags": "Etiquetas",
+      "noGroups": "No hay grupos.",
+      "noTags": "No hay etiquetas.",
+      "saveGroups": "Guardar grupos",
+      "saveTags": "Guardar etiquetas",
+      "groupsSaved": "Grupos asignados",
+      "tagsSaved": "Etiquetas asignadas",
+      "inactive": "{name} (no activo)"
+    },
+    "consent": {
+      "heading": "Consentimiento de marketing",
+      "intro": "Una decisión por canal, con la fecha, de dónde vino y la frase que se le enseñó al cliente. Aquí no se rellena nada editando la ficha.",
+      "neverAsked": "Nunca se le ha preguntado",
+      "granted": "Dado",
+      "withdrawn": "Retirado",
+      "record": "Registrar consentimiento",
+      "notice": "Quiero recibir ofertas y novedades de este negocio por este canal. Puedo darme de baja cuando quiera.",
+      "askHint": "Léelo en voz alta y pulsa solo si dice que sí. Esta frase exacta es la que queda guardada como prueba, junto a tu nombre y la hora.",
+      "confirm": "Ha dicho que sí",
+      "withdraw": "Retirar",
+      "recorded": "Consentimiento registrado.",
+      "withdrawnMsg": "Consentimiento retirado. Está en vigor desde ya.",
+      "historyHeading": "Todo lo que se decidió",
+      "noHistory": "Todavía no se ha registrado nada.",
+      "loadError": "No se pudo cargar el consentimiento",
+      "sources": {
+        "counter": "en el mostrador",
+        "web_form": "formulario web",
+        "phone": "por teléfono",
+        "email": "por email",
+        "import": "importado",
+        "receipt": "en el tique"
+      }
+    },
+    "notes": {
+      "heading": "Añadir nota",
+      "label": "Nota",
+      "add": "Añadir",
+      "added": "Nota añadida"
+    },
+    "activity": {
+      "heading": "Actividad",
+      "empty": "Sin actividad registrada.",
+      "loadError": "No se pudo cargar la actividad",
+      "more": "Ver más",
+      "by": "por {name}",
+      "kinds": {
+        "note_added": "Nota añadida",
+        "purchase_recorded": "Compra registrada",
+        "purchase_voided": "Compra anulada",
+        "consent_granted": "Consentimiento dado",
+        "consent_withdrawn": "Consentimiento retirado",
+        "merged": "Ficha duplicada fusionada en esta",
+        "erased": "Datos personales borrados"
+      }
+    },
+    "purchases": {
+      "heading": "Compras",
+      "empty": "Sin compras.",
+      "loadError": "No se pudieron cargar las compras",
+      "filter": "Filtrar por estado",
+      "confirmed": "Cobrada",
+      "voided": "Anulada",
+      "date": "Fecha",
+      "amount": "Importe",
+      "status": "Estado",
+      "more": "Ver más"
+    },
+    "orders": {
+      "heading": "Pedidos enlazados",
+      "empty": "Sin pedidos enlazados.",
+      "loadError": "No se pudieron cargar los pedidos",
+      "order": "Pedido {id}",
+      "more": "Ver más"
+    },
+    "merge": {
+      "title": "Fusionar una ficha duplicada",
+      "hint": "Elige la ficha duplicada de {name}. Se queda {name}; la que elijas se fusiona en ella.",
+      "search": "Buscar la ficha duplicada",
+      "noCandidates": "No hay otra ficha que coincida.",
+      "confirm": "{absorbed} se fusionará en {surviving}: sus citas, ventas, reservas, conversaciones, bonos, notas y consentimientos pasan a {surviving}, los datos que falten se completan con los suyos y {absorbed} desaparece de la lista. No se puede deshacer.",
+      "submit": "Fusionar",
+      "change": "Elegir otra",
+      "done": "{name} se ha fusionado en esta ficha."
+    },
+    "erase": {
+      "title": "Borrar datos personales (RGPD)",
+      "message": "Borra los datos personales de {name}, sus notas, su actividad y sus campos personalizados, y no se puede deshacer. Las ventas y facturas conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.",
+      "reason": "Motivo (queda en la auditoría)",
+      "submit": "Borrar datos personales",
+      "done": "Datos personales borrados."
+    },
+    "picker": {
+      "search": "Buscar por nombre, teléfono, email…",
+      "searchLabel": "Buscar clientes",
+      "noResults": "Sin resultados.",
+      "noCustomers": "No hay clientes.",
+      "loadError": "No se pudieron cargar los clientes",
+      "noPermission": "No tienes permiso para consultar clientes."
+    },
+    "pos": {
+      "assign": "Asignar cliente",
+      "choose": "Elegir cliente",
+      "remove": "Quitar cliente",
+      "quickAdd": "+ Nuevo cliente «{term}»",
+      "quickName": "Nombre",
+      "quickPhone": "Teléfono",
+      "quickCreate": "Crear y asignar",
+      "snapshotError": "No se pudieron cargar los datos fiscales de {name}. Vuelve a pulsar para reintentar.",
+      "phoneTaken": "Ya existe {name} con este teléfono. ¿Usar esa ficha o crear una nueva?",
+      "phoneTakenMany": "Estas fichas ya tienen este teléfono. ¿Usar una de ellas o crear una nueva?",
+      "useMatch": "Usar {name}",
+      "createAnyway": "Crear una nueva"
+    },
+    "playground": {
+      "title": "Buscador de cliente (vista previa)",
+      "intro": "El buscador de cliente del TPV, como lo enseñará la app Venta. Lo que entrega a la venta:",
+      "none": "Sin cliente asignado."
+    },
+    "groups": {
+      "title": "Grupos de clientes",
+      "search": "Buscar grupo…",
+      "empty": "Sin grupos.",
+      "noResults": "Ningún grupo coincide con la búsqueda o el filtro.",
+      "loadError": "No se pudieron cargar los grupos",
+      "columns": {
+        "name": "Nombre",
+        "description": "Descripción",
+        "customers": "Clientes",
+        "order": "Orden",
+        "active": "Activo"
+      },
+      "filter": "Mostrar",
+      "showActive": "Activos",
+      "showInactive": "No activos",
+      "new": "Nuevo grupo",
+      "editTitle": "Editar · {name}",
+      "name": "Nombre",
+      "description": "Descripción",
+      "color": "Color",
+      "order": "Orden",
+      "active": "Activo",
+      "created": "Grupo creado",
+      "updated": "Grupo actualizado",
+      "deleteTitle": "Eliminar grupo",
+      "deleteMessage": "¿Eliminar {name}? Las fichas que lo tienen lo pierden.",
+      "deleted": "Grupo {name} eliminado",
+      "entity": {
+        "one": "grupo",
+        "many": "grupos"
+      }
+    },
+    "tags": {
+      "title": "Etiquetas de clientes",
+      "search": "Buscar etiqueta…",
+      "empty": "Sin etiquetas.",
+      "noResults": "Ninguna etiqueta coincide con la búsqueda o el filtro.",
+      "loadError": "No se pudieron cargar las etiquetas",
+      "columns": {
+        "name": "Nombre",
+        "color": "Color",
+        "customers": "Clientes",
+        "active": "Activa"
+      },
+      "filter": "Mostrar",
+      "showActive": "Activas",
+      "showInactive": "No activas",
+      "new": "Nueva etiqueta",
+      "editTitle": "Editar · {name}",
+      "name": "Nombre",
+      "color": "Color",
+      "active": "Activa",
+      "created": "Etiqueta creada",
+      "updated": "Etiqueta actualizada",
+      "deleteTitle": "Eliminar etiqueta",
+      "deleteMessage": "¿Eliminar {name}? Las fichas que la tienen la pierden.",
+      "deleted": "Etiqueta {name} eliminada",
+      "entity": {
+        "one": "etiqueta",
+        "many": "etiquetas"
+      }
+    },
+    "fields": {
+      "title": "Campos personalizados",
+      "search": "Buscar campo…",
+      "empty": "Sin campos personalizados.",
+      "noResults": "Ningún campo coincide con la búsqueda o los filtros.",
+      "loadError": "No se pudieron cargar los campos personalizados",
+      "columns": {
+        "name": "Nombre",
+        "type": "Tipo",
+        "required": "Obligatorio",
+        "order": "Orden",
+        "active": "Activo"
+      },
+      "filterType": "Tipo",
+      "filterRequired": "Obligatorio",
+      "filterActive": "Activo",
+      "new": "Nuevo campo personalizado",
+      "editTitle": "Editar · {name}",
+      "name": "Nombre",
+      "type": "Tipo",
+      "options": "Opciones (separadas por coma)",
+      "required": "Obligatorio",
+      "order": "Orden",
+      "active": "Activo",
+      "created": "Campo creado",
+      "updated": "Campo actualizado",
+      "deleteTitle": "Eliminar campo",
+      "deleteMessage": "¿Eliminar {name}? Se borran también los valores guardados en las fichas.",
+      "deleted": "Campo {name} eliminado",
+      "entity": {
+        "one": "campo",
+        "many": "campos"
+      }
+    },
+    "colors": {
+      "primary": "Azul",
+      "secondary": "Celeste",
+      "tertiary": "Morado",
+      "success": "Verde",
+      "warning": "Amarillo",
+      "danger": "Rojo",
+      "medium": "Gris",
+      "dark": "Negro"
+    },
+    "blocks": {
+      "failed": "No se pudo mostrar este bloque."
+    }
+  }
+}

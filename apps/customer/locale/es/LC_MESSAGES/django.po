@@ -1,0 +1,475 @@
+# Spanish translation of the customer app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next customer\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 01:00+0200\n"
+"PO-Revision-Date: 2026-10-14 01:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Customers"
+msgstr "Clientes"
+
+msgid "Your customers' file: contact and tax details, notes, groups, consent and what they bought."
+msgstr "El fichero de tus clientes: contacto y datos fiscales, notas, grupos, consentimiento y lo que han comprado."
+
+msgid "Customers keeps a card for every person and company you serve: contact and tax details, groups, tags and fields of your own, notes and activity, marketing consent per channel and every purchase. Phones are saved in international format, so the till, the diary and WhatsApp recognise the same person however the number was typed. Duplicate cards are merged in one step, and a customer's personal data is erased on request while the sales keep their tax copy."
+msgstr "Clientes guarda una ficha de cada persona y empresa a la que atiendes: contacto y datos fiscales, grupos, etiquetas y campos propios, notas y actividad, consentimiento de marketing por canal y cada compra. Los teléfonos se guardan en formato internacional, así el TPV, la agenda y WhatsApp reconocen a la misma persona se escriba como se escriba el número. Las fichas duplicadas se unen en un paso, y los datos personales de un cliente se borran cuando lo pide, mientras las ventas conservan su copia fiscal."
+
+msgid "Groups"
+msgstr "Grupos"
+
+msgid "Tags"
+msgstr "Etiquetas"
+
+msgid "Fields"
+msgstr "Campos"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "color"
+msgstr "color"
+
+msgid "order"
+msgstr "orden"
+
+msgid "active"
+msgstr "activo"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "group"
+msgstr "grupo"
+
+msgid "groups"
+msgstr "grupos"
+
+msgid "tag"
+msgstr "etiqueta"
+
+msgid "tags"
+msgstr "etiquetas"
+
+msgid "Lead"
+msgstr "Contacto"
+
+msgid "Prospect"
+msgstr "Prospecto"
+
+msgid "1st purchase"
+msgstr "1ª compra"
+
+msgid "Active"
+msgstr "Activo"
+
+msgid "At risk"
+msgstr "En riesgo"
+
+msgid "Dormant"
+msgstr "Inactivo"
+
+msgid "Churned"
+msgstr "Perdido"
+
+msgid "VIP"
+msgstr "VIP"
+
+msgid "Walk-in"
+msgstr "En el local"
+
+msgid "Website"
+msgstr "Web"
+
+msgid "Phone"
+msgstr "Teléfono"
+
+msgid "Referral"
+msgstr "Recomendación"
+
+msgid "Social media"
+msgstr "Redes sociales"
+
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+msgid "Import"
+msgstr "Importación"
+
+msgid "Other"
+msgstr "Otro"
+
+msgid "None"
+msgstr "Ninguno"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "SMS"
+msgstr "SMS"
+
+msgid "email"
+msgstr "email"
+
+msgid "phone"
+msgstr "teléfono"
+
+msgid "tax ID"
+msgstr "NIF/CIF"
+
+msgid "company"
+msgstr "empresa"
+
+msgid "address"
+msgstr "dirección"
+
+msgid "city"
+msgstr "ciudad"
+
+msgid "postal code"
+msgstr "código postal"
+
+msgid "country"
+msgstr "país"
+
+msgid "avatar"
+msgstr "foto"
+
+msgid "birthday"
+msgstr "cumpleaños"
+
+msgid "anniversary"
+msgstr "aniversario"
+
+msgid "source"
+msgstr "origen"
+
+msgid "stage"
+msgstr "etapa"
+
+msgid "preferred channel"
+msgstr "canal preferido"
+
+msgid "internal notes"
+msgstr "notas internas"
+
+msgid "purchases"
+msgstr "compras"
+
+msgid "spent (cents)"
+msgstr "gastado (céntimos)"
+
+msgid "last purchase"
+msgstr "última compra"
+
+msgid "search text"
+msgstr "texto de búsqueda"
+
+msgid "deleted at"
+msgstr "eliminado el"
+
+msgid "merged into"
+msgstr "fusionado en"
+
+msgid "personal data erased at"
+msgstr "datos personales borrados el"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "customers"
+msgstr "clientes"
+
+msgid "Text"
+msgstr "Texto"
+
+msgid "Number"
+msgstr "Número"
+
+msgid "Date"
+msgstr "Fecha"
+
+msgid "Yes/No"
+msgstr "Sí/No"
+
+msgid "Select"
+msgstr "Selección"
+
+msgid "Long text"
+msgstr "Texto largo"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "options"
+msgstr "opciones"
+
+msgid "required"
+msgstr "obligatorio"
+
+msgid "custom field"
+msgstr "campo personalizado"
+
+msgid "custom fields"
+msgstr "campos personalizados"
+
+msgid "field"
+msgstr "campo"
+
+msgid "value"
+msgstr "valor"
+
+msgid "custom field value"
+msgstr "valor de campo personalizado"
+
+msgid "custom field values"
+msgstr "valores de campos personalizados"
+
+msgid "Note added"
+msgstr "Nota añadida"
+
+msgid "Purchase recorded"
+msgstr "Compra registrada"
+
+msgid "Purchase voided"
+msgstr "Compra anulada"
+
+msgid "Consent given"
+msgstr "Consentimiento dado"
+
+msgid "Consent withdrawn"
+msgstr "Consentimiento retirado"
+
+msgid "Duplicate customer merged into this one"
+msgstr "Ficha duplicada fusionada en esta"
+
+msgid "Personal data erased"
+msgstr "Datos personales borrados"
+
+msgid "kind"
+msgstr "tipo"
+
+msgid "title"
+msgstr "título"
+
+msgid "text"
+msgstr "texto"
+
+msgid "data"
+msgstr "datos"
+
+msgid "related id"
+msgstr "id relacionado"
+
+msgid "related type"
+msgstr "tipo relacionado"
+
+msgid "by"
+msgstr "por"
+
+msgid "activity"
+msgstr "actividad"
+
+msgid "Paid"
+msgstr "Cobrada"
+
+msgid "Voided"
+msgstr "Anulada"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "amount (cents)"
+msgstr "importe (céntimos)"
+
+msgid "currency"
+msgstr "moneda"
+
+msgid "status"
+msgstr "estado"
+
+msgid "purchased at"
+msgstr "comprado el"
+
+msgid "voided at"
+msgstr "anulado el"
+
+msgid "void reason"
+msgstr "motivo de la anulación"
+
+msgid "purchase"
+msgstr "compra"
+
+msgid "Post"
+msgstr "Correo postal"
+
+msgid "Given"
+msgstr "Dado"
+
+msgid "Withdrawn"
+msgstr "Retirado"
+
+msgid "At the counter"
+msgstr "En el mostrador"
+
+msgid "Web form"
+msgstr "Formulario web"
+
+msgid "By phone"
+msgstr "Por teléfono"
+
+msgid "By email"
+msgstr "Por email"
+
+msgid "Imported"
+msgstr "Importado"
+
+msgid "On the receipt"
+msgstr "En el tique"
+
+msgid "purpose"
+msgstr "finalidad"
+
+msgid "channel"
+msgstr "canal"
+
+msgid "state"
+msgstr "estado"
+
+msgid "notice"
+msgstr "texto mostrado"
+
+msgid "notice version"
+msgstr "versión del texto"
+
+msgid "evidence"
+msgstr "justificante"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "recorded by"
+msgstr "registrado por"
+
+msgid "occurred at"
+msgstr "dicho el"
+
+msgid "consent"
+msgstr "consentimiento"
+
+msgid "consents"
+msgstr "consentimientos"
+
+msgid "linked at"
+msgstr "enlazado el"
+
+msgid "order link"
+msgstr "enlace con pedido"
+
+msgid "order links"
+msgstr "enlaces con pedidos"
+
+msgid "This customer is no longer available."
+msgstr "Este cliente ya no está disponible."
+
+#, python-format
+msgid "No customer matches “%(reference)s”."
+msgstr "Ningún cliente coincide con «%(reference)s»."
+
+#, python-format
+msgid "Several customers match “%(reference)s”: give their id, phone or email."
+msgstr "Varios clientes coinciden con «%(reference)s»: indica su id, teléfono o email."
+
+msgid "That group no longer exists."
+msgstr "Ese grupo ya no existe."
+
+msgid "That tag no longer exists."
+msgstr "Esa etiqueta ya no existe."
+
+msgid "That field no longer exists."
+msgstr "Ese campo ya no existe."
+
+#, python-format
+msgid "Several match “%(reference)s”: give the id."
+msgstr "Varios coinciden con «%(reference)s»: indica el id."
+
+msgid "Enter a valid email."
+msgstr "Escribe un email válido."
+
+msgid "Choose a country from the list."
+msgstr "Elige un país de la lista."
+
+msgid "Give the customer's id, or their name, phone or email."
+msgstr "Indica el id del cliente, o su nombre, teléfono o email."
+
+msgid "Give the duplicate's id, or its name, phone or email."
+msgstr "Indica el id de la ficha duplicada, o su nombre, teléfono o email."
+
+msgid "Give the group's id or its name."
+msgstr "Indica el id del grupo o su nombre."
+
+msgid "Give the tag's id or its name."
+msgstr "Indica el id de la etiqueta o su nombre."
+
+msgid "Give the field's id or its name."
+msgstr "Indica el id del campo o su nombre."
+
+msgid "Add at least one option."
+msgstr "Añade al menos una opción."
+
+msgid "That kind is the customer app's own: use another one."
+msgstr "Ese tipo es de la app de clientes: usa otro."
+
+msgid "This is not a valid phone number of its country: check the digits or write it with its international prefix (+44…)."
+msgstr "No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…)."
+
+msgid "This field is required."
+msgstr "Este campo es obligatorio."
+
+msgid "Enter a number."
+msgstr "Escribe un número."
+
+msgid "Enter a valid date."
+msgstr "Escribe una fecha válida."
+
+msgid "Choose yes or no."
+msgstr "Elige sí o no."
+
+msgid "Choose one of the options."
+msgstr "Elige una de las opciones."
+
+msgid "This field already has values on some cards: its type cannot change."
+msgstr "Este campo ya tiene valores en algunas fichas: su tipo no se puede cambiar."
+
+msgid "There is already a group with that name. Choose another name."
+msgstr "Ya hay un grupo con ese nombre. Elige otro nombre."
+
+msgid "There is already a tag with that name. Choose another name."
+msgstr "Ya hay una etiqueta con ese nombre. Elige otro nombre."
+
+msgid "There is already a field with that name. Choose another name."
+msgstr "Ya hay un campo con ese nombre. Elige otro nombre."
+
+msgid "Pick another card: a card cannot be merged into itself."
+msgstr "Elige otra ficha: no se puede fusionar una ficha consigo misma."
+
+msgid "This date is in the future."
+msgstr "Esta fecha está en el futuro."
+
+msgid "Country not recognised: imported without country, check it on the card."
+msgstr "País no reconocido: importado sin país, revísalo en la ficha."

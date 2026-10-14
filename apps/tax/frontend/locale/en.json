@@ -1,0 +1,168 @@
+{
+  "tax": {
+    "title": "Taxes",
+    "tabs": {
+      "label": "Tax sections",
+      "categories": "Categories",
+      "rules": "Rules",
+      "aliases": "Aliases"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "retry": "Retry",
+      "appInactive": "This app is not active in this business"
+    },
+    "readOnly": "You can view the tax rules but not change them.",
+    "noPermission": "You do not have permission",
+    "yes": "Yes",
+    "no": "No",
+    "add": "Add",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches your search or filters.",
+    "filters": {
+      "button": "Filters",
+      "count": "Filters: {n}",
+      "title": "Filters",
+      "clear": "Clear",
+      "done": "Done",
+      "any": "Any",
+      "from": "From",
+      "to": "To"
+    },
+    "searchSelect": {
+      "search": "Search…",
+      "close": "Close"
+    },
+    "types": {
+      "vat": "VAT",
+      "igic": "IGIC (Canary Islands)",
+      "ipsi": "IPSI (Ceuta/Melilla)",
+      "surcharge": "Surcharge",
+      "sales_tax": "Sales tax",
+      "withholding": "Withholding",
+      "excise": "Excise",
+      "import_duty": "Import duty"
+    },
+    "classes": {
+      "subject": "Subject",
+      "subject_reverse": "Reverse charge",
+      "exempt": "Exempt",
+      "not_subject": "Not subject",
+      "not_subject_location": "Not subject (place of supply)"
+    },
+    "categories": {
+      "search": "Search key or name…",
+      "loadError": "The tax categories could not be loaded",
+      "empty": "No tax categories.",
+      "entity": {
+        "one": "category",
+        "many": "categories"
+      },
+      "columns": {
+        "key": "Key",
+        "name": "Name",
+        "description": "Description",
+        "origin": "Origin",
+        "active": "Active",
+        "rate": "Rate today"
+      },
+      "origin": {
+        "system": "System",
+        "custom": "Custom"
+      },
+      "form": {
+        "title": "New tax category",
+        "keyPlaceholder": "restaurant.food",
+        "namePlaceholder": "general VAT",
+        "descriptionPlaceholder": "optional"
+      }
+    },
+    "rules": {
+      "search": "Search category or country…",
+      "loadError": "The tax rules could not be loaded",
+      "empty": "No tax rules.",
+      "entity": {
+        "one": "rule",
+        "many": "rules"
+      },
+      "columns": {
+        "category": "Category",
+        "country": "Country",
+        "region": "Region",
+        "rate": "%",
+        "type": "Type",
+        "qualification": "Qualification",
+        "regime": "Regime",
+        "validFrom": "Valid from",
+        "validTo": "Valid to",
+        "active": "Active"
+      },
+      "status": {
+        "label": "Filter by status",
+        "active": "Active",
+        "inactive": "Deactivated",
+        "all": "All"
+      },
+      "rateRange": "%",
+      "actions": {
+        "end": "Set end date",
+        "deactivate": "Deactivate",
+        "restore": "Restore"
+      },
+      "deactivate": {
+        "title": "Deactivate tax rule",
+        "message": "The rule will no longer apply to new transactions. Previously issued fiscal documents will not change.",
+        "confirm": "Deactivate rule"
+      },
+      "end": {
+        "title": "End this tax rule",
+        "message": "Last day this rule applies. To change the rate, end it the day before the new rate starts and then add the new rule from that day. Issued documents do not change.",
+        "field": "Last day it applies",
+        "submit": "Save end date"
+      },
+      "form": {
+        "title": "New tax rule",
+        "countryPlaceholder": "Choose a country",
+        "regionPlaceholder": "Optional — ISO 3166-2, e.g. ES-CN",
+        "categoryPlaceholder": "Choose a category",
+        "ratePlaceholder": "21",
+        "rateNoTax": "This operation carries no tax, so its rate is 0 %.",
+        "exemptReason": "Exemption reason",
+        "exemptReasonPlaceholder": "e.g. E1 (jurisdiction code)",
+        "regimePlaceholder": "optional (jurisdiction code, e.g. 01)",
+        "parent": "Root rule (component of)",
+        "parentPlaceholder": "Choose a root rule",
+        "parentNone": "No compatible root rule for this country/region/category",
+        "noParent": "None (this is a root rule)",
+        "parentInactive": "deactivated",
+        "componentLabel": "Component label",
+        "componentLabelPlaceholder": "Equivalence surcharge",
+        "hint": "Each rule sets the % for a category in a country (and optionally a region). For multi-tax (e.g. equivalence surcharge), choose the root rule it hangs from in “Root rule” and give it a “Component label”."
+      }
+    },
+    "aliases": {
+      "search": "Search alias or category…",
+      "loadError": "The category aliases could not be loaded",
+      "empty": "No category aliases.",
+      "entity": {
+        "one": "alias",
+        "many": "aliases"
+      },
+      "columns": {
+        "alias": "Alias",
+        "category": "Category",
+        "source": "Source",
+        "active": "Active"
+      },
+      "source": {
+        "shipped": "Shipped",
+        "learned": "Learned"
+      },
+      "form": {
+        "title": "New category alias",
+        "aliasPlaceholder": "food",
+        "categoryPlaceholder": "Choose a category"
+      }
+    }
+  }
+}

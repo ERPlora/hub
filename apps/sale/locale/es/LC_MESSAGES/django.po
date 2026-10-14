@@ -1,0 +1,625 @@
+# Spanish translation of the sale app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next sale\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 00:00+0200\n"
+"PO-Revision-Date: 2026-10-14 00:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Sales & POS"
+msgstr "Ventas / TPV"
+
+msgid "The till: build the check, charge it in cash, by card or split, and void or refund a sale."
+msgstr "La caja: monta la cuenta, cóbrala en efectivo, con tarjeta o repartida, y anula o devuelve una venta."
+
+msgid "Sales & POS is the business's cash register. Build the check by tapping articles or typing an open price by department, add notes, discounts and comps, park it and pick it up again, charge it whole or in parts, in cash with change, by card or split between several methods, as a ticket or a full invoice. Every sale gets its number of the day and its VAT line by line, is never edited, and is corrected by voiding it or refunding it, whole or in part. Inventory lowers the stock and Customers adds the purchase on their own."
+msgstr "Ventas / TPV es la caja registradora del negocio. Monta la cuenta tocando artículos o tecleando un precio libre por departamento, añade notas, descuentos e invitaciones, apárcala y recupérala, cóbrala entera o por partes, en efectivo con cambio, con tarjeta o repartida entre varios medios, como tique o como factura completa. Cada venta lleva su número del día y su IVA línea a línea, nunca se edita y se corrige anulándola o devolviéndola, entera o en parte. Inventario baja el stock y Clientes suma la compra por su cuenta."
+
+msgid "Sell"
+msgstr "Vender"
+
+msgid "Sales"
+msgstr "Ventas"
+
+msgid "Quick notes"
+msgstr "Notas rápidas"
+
+msgid "Departments"
+msgstr "Departamentos"
+
+msgid "Settings"
+msgstr "Ajustes"
+
+msgid "Cash"
+msgstr "Efectivo"
+
+msgid "Card"
+msgstr "Tarjeta"
+
+msgid "Bank transfer"
+msgstr "Transferencia"
+
+msgid "Other"
+msgstr "Otro"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "factory"
+msgstr "de fábrica"
+
+msgid "active"
+msgstr "activo"
+
+msgid "position"
+msgstr "posición"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "payment method"
+msgstr "medio de pago"
+
+msgid "payment methods"
+msgstr "medios de pago"
+
+msgid "Ticket"
+msgstr "Tique"
+
+msgid "Invoice"
+msgstr "Factura"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "allow cash"
+msgstr "permitir efectivo"
+
+msgid "allow card"
+msgstr "permitir tarjeta"
+
+msgid "allow bank transfer"
+msgstr "permitir transferencia"
+
+msgid "show products in the till"
+msgstr "mostrar productos en el TPV"
+
+msgid "show services in the till"
+msgstr "mostrar servicios en el TPV"
+
+msgid "require a customer on every sale"
+msgstr "exigir cliente en cada venta"
+
+msgid "allow discounts"
+msgstr "permitir descuentos"
+
+msgid "maximum discount (%)"
+msgstr "descuento máximo (%)"
+
+msgid "allow parked checks"
+msgstr "permitir tiques aparcados"
+
+msgid "prices include VAT"
+msgstr "precios con IVA incluido"
+
+msgid "invoice when the customer has a tax ID"
+msgstr "factura si el cliente tiene NIF"
+
+msgid "default document"
+msgstr "documento por defecto"
+
+msgid "receipt header"
+msgstr "cabecera del recibo"
+
+msgid "receipt footer"
+msgstr "pie del recibo"
+
+msgid "receipt footer image"
+msgstr "imagen de pie del recibo"
+
+msgid "promotional QR URL"
+msgstr "URL del QR promocional"
+
+msgid "promotional QR text"
+msgstr "texto del QR promocional"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "till settings"
+msgstr "ajustes del TPV"
+
+msgid "tax category"
+msgstr "categoría fiscal"
+
+msgid "deleted"
+msgstr "eliminado"
+
+msgid "deleted at"
+msgstr "eliminado el"
+
+msgid "department"
+msgstr "departamento"
+
+msgid "departments"
+msgstr "departamentos"
+
+msgid "note"
+msgstr "nota"
+
+msgid "quick note"
+msgstr "nota rápida"
+
+msgid "quick notes"
+msgstr "notas rápidas"
+
+msgid "Open"
+msgstr "Abierta"
+
+msgid "Completed"
+msgstr "Completada"
+
+msgid "Voided"
+msgstr "Anulada"
+
+msgid "Till"
+msgstr "TPV"
+
+msgid "Counter sale"
+msgstr "Venta de mostrador"
+
+msgid "status"
+msgstr "estado"
+
+msgid "source"
+msgstr "origen"
+
+msgid "title"
+msgstr "título"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "appointment"
+msgstr "cita"
+
+msgid "discount (%)"
+msgstr "descuento (%)"
+
+msgid "discount (cents)"
+msgstr "descuento (céntimos)"
+
+msgid "discount approved by"
+msgstr "descuento autorizado por"
+
+msgid "provisional total"
+msgstr "total provisional"
+
+msgid "version"
+msgstr "versión"
+
+msgid "closed at"
+msgstr "cerrada el"
+
+msgid "voided by"
+msgstr "anulada por"
+
+msgid "open check"
+msgstr "cuenta abierta"
+
+msgid "open checks"
+msgstr "cuentas abiertas"
+
+msgid "product"
+msgstr "producto"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "service"
+msgstr "servicio"
+
+msgid "product category"
+msgstr "categoría de producto"
+
+msgid "unit"
+msgstr "unidad"
+
+msgid "step"
+msgstr "escalón"
+
+msgid "price quantity"
+msgstr "cantidad del precio"
+
+msgid "pricing unit"
+msgstr "unidad del precio"
+
+msgid "quantity"
+msgstr "cantidad"
+
+msgid "price"
+msgstr "precio"
+
+msgid "cost"
+msgstr "coste"
+
+msgid "comp"
+msgstr "invitación"
+
+msgid "comp reason"
+msgstr "motivo de la invitación"
+
+msgid "served by"
+msgstr "atendido por"
+
+msgid "line total"
+msgstr "total de la línea"
+
+msgid "round"
+msgstr "ronda"
+
+msgid "sent to the kitchen at"
+msgstr "enviada a cocina el"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "removed at"
+msgstr "quitada el"
+
+msgid "void reason"
+msgstr "motivo de la anulación"
+
+msgid "open check line"
+msgstr "línea de cuenta abierta"
+
+msgid "open check lines"
+msgstr "líneas de cuenta abierta"
+
+msgid "Refunded"
+msgstr "Devuelta"
+
+msgid "number"
+msgstr "número"
+
+msgid "business day"
+msgstr "día del negocio"
+
+msgid "number of the day"
+msgstr "número del día"
+
+msgid "document"
+msgstr "documento"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "customer name"
+msgstr "nombre del cliente"
+
+msgid "currency"
+msgstr "moneda"
+
+msgid "taxable base"
+msgstr "base imponible"
+
+msgid "tax"
+msgstr "impuesto"
+
+msgid "discounts"
+msgstr "descuentos"
+
+msgid "comps at cost"
+msgstr "invitaciones a coste"
+
+msgid "total"
+msgstr "total"
+
+msgid "tendered"
+msgstr "entregado"
+
+msgid "change"
+msgstr "cambio"
+
+msgid "refunded"
+msgstr "devuelto"
+
+msgid "tax breakdown"
+msgstr "desglose de impuestos"
+
+msgid "payment"
+msgstr "pago"
+
+msgid "attempt key"
+msgstr "clave del intento"
+
+msgid "voided at"
+msgstr "anulada el"
+
+msgid "charged at"
+msgstr "cobrada el"
+
+msgid "charged by"
+msgstr "cobrada por"
+
+msgid "sales"
+msgstr "ventas"
+
+msgid "rate (%)"
+msgstr "tipo (%)"
+
+msgid "tax country"
+msgstr "país del impuesto"
+
+msgid "tax region"
+msgstr "región del impuesto"
+
+msgid "tax rule"
+msgstr "regla fiscal"
+
+msgid "base"
+msgstr "base"
+
+msgid "tax components"
+msgstr "componentes del impuesto"
+
+msgid "sale line"
+msgstr "línea de venta"
+
+msgid "sale lines"
+msgstr "líneas de venta"
+
+msgid "method"
+msgstr "medio"
+
+msgid "method name"
+msgstr "nombre del medio"
+
+msgid "method type"
+msgstr "tipo de medio"
+
+msgid "amount"
+msgstr "importe"
+
+msgid "reference"
+msgstr "referencia"
+
+msgid "sale payment"
+msgstr "cobro de la venta"
+
+msgid "sale payments"
+msgstr "cobros de la venta"
+
+msgid "last number"
+msgstr "último número"
+
+msgid "sale counter"
+msgstr "contador de ventas"
+
+msgid "sale counters"
+msgstr "contadores de ventas"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "refunded at"
+msgstr "devuelta el"
+
+msgid "refunded by"
+msgstr "devuelta por"
+
+msgid "refund"
+msgstr "devolución"
+
+msgid "refunds"
+msgstr "devoluciones"
+
+msgid "original payment"
+msgstr "cobro original"
+
+msgid "refund payment"
+msgstr "pago de la devolución"
+
+msgid "refund payments"
+msgstr "pagos de la devolución"
+
+msgid "line"
+msgstr "línea"
+
+msgid "refunded line"
+msgstr "línea devuelta"
+
+msgid "refunded lines"
+msgstr "líneas devueltas"
+
+msgid "There is nothing to charge: the check has no lines."
+msgstr "No hay nada que cobrar: la cuenta no tiene líneas."
+
+msgid "That discount is bigger than what it comes off."
+msgstr "Ese descuento es mayor que el importe del que se descuenta."
+
+#, python-format
+msgid "«%(name)s» cannot be charged: no tax rule applies to its tax category («%(category)s») here."
+msgstr "«%(name)s» no se puede cobrar: ninguna regla fiscal se aplica aquí a su categoría fiscal («%(category)s»)."
+
+msgid "That check does not exist."
+msgstr "Esa cuenta no existe."
+
+msgid "The check changed while it was being charged: a line was added, changed, removed, voided or charged, a discount was set or removed, or the check was split, merged or closed. Nothing was charged or changed: review the lines and try again."
+msgstr "La cuenta ha cambiado mientras se cobraba: se añadió, cambió, quitó, anuló o cobró una línea, se puso o se quitó un descuento, o la cuenta se dividió, se juntó o se cerró. No se ha cobrado ni cambiado nada: revisa las líneas y vuelve a intentarlo."
+
+msgid "That sale does not exist."
+msgstr "Esa venta no existe."
+
+msgid "Inventory's catalog cannot be read right now, so no product can be sold. Try again in a moment."
+msgstr "Ahora no se puede leer el catálogo de Inventario, así que no se puede vender ningún producto. Vuelve a intentarlo en un momento."
+
+msgid "A product of the ticket is no longer in the catalog. Remove the line and add it again."
+msgstr "Un producto del tique ya no está en el catálogo. Quita la línea y vuelve a añadirla."
+
+#, python-format
+msgid "«%(name)s» cannot be sold: it has no tax category. Its VAT is missing."
+msgstr "«%(name)s» no se puede vender: no tiene categoría fiscal. Falta configurar su IVA."
+
+#, python-format
+msgid "The quantity does not fit the step of the product (%(step)s %(unit)s)."
+msgstr "La cantidad no encaja con el escalón del producto (%(step)s %(unit)s)."
+
+msgid "Only someone who may sell at an open price can add this line: ask a manager."
+msgstr "Solo puede añadir esta línea quien puede vender a precio libre: pídeselo a un responsable."
+
+msgid "That department is no longer in this business. Reload the list and try again."
+msgstr "Ese departamento ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
+
+#, python-format
+msgid "Several departments match «%(said)s»: %(names)s. Say which one."
+msgstr "Varios departamentos casan con «%(said)s»: %(names)s. Di cuál."
+
+msgid "That quick note is no longer in this business. Reload the list and try again."
+msgstr "Esa nota rápida ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
+
+#, python-format
+msgid "Several quick notes match «%(said)s»: %(names)s. Say which one."
+msgstr "Varias notas rápidas casan con «%(said)s»: %(names)s. Di cuál."
+
+msgid "That tax category does not exist in Taxes."
+msgstr "Esa categoría fiscal no existe en Impuestos."
+
+msgid "That payment method is not available in this business."
+msgstr "Esa forma de pago no está disponible en este negocio."
+
+#, python-format
+msgid "Several payment methods match «%(said)s»: %(names)s. Say which one."
+msgstr "Varias formas de pago casan con «%(said)s»: %(names)s. Di cuál."
+
+msgid "Say which product: its id, or its SKU or name."
+msgstr "Di qué producto: su id, o su SKU o su nombre."
+
+msgid "Say which department (or tax category) the open price is charged at."
+msgstr "Di con qué departamento (o categoría fiscal) se cobra el precio libre."
+
+msgid "Say which sale: its id or its number."
+msgstr "Di qué venta: su id o su número."
+
+msgid "Say which payment method: its id, its name or its type."
+msgstr "Di qué forma de pago: su id, su nombre o su tipo."
+
+msgid "Say which department: its id or its name."
+msgstr "Di qué departamento: su id o su nombre."
+
+msgid "Say which quick note: its id or its text."
+msgstr "Di qué nota rápida: su id o su texto."
+
+msgid "Charge an open check (order_id) or loose lines (lines), one of the two."
+msgstr "Cobra una cuenta abierta (order_id) o líneas sueltas (lines), una de las dos."
+
+msgid "Enter a two-letter country code, e.g. ES or FR."
+msgstr "Escribe el código de país de dos letras, p. ej. ES o FR."
+
+msgid "That check is no longer open."
+msgstr "Esa cuenta ya no está abierta."
+
+msgid "That line can no longer be changed: it was sent to the kitchen, charged or removed."
+msgstr "Esa línea ya no se puede cambiar: se envió a cocina, se cobró o se quitó."
+
+msgid "That line can no longer be removed: it was sent to the kitchen (void it with a reason), it is charged or it is no longer on an open check."
+msgstr "Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está cobrada o ya no está en una cuenta abierta."
+
+msgid "That line cannot be voided: only a line already sent to the kitchen, not charged, of an open check, with a reason."
+msgstr "Esa línea no se puede anular: solo una línea ya enviada a cocina, sin cobrar, de una cuenta abierta y con un motivo."
+
+msgid "This line cannot be split: it must be pending, not a comp, and of 2 to 50 whole units."
+msgstr "Esta línea no se puede separar: tiene que estar pendiente, no ser una invitación y tener de 2 a 50 unidades enteras."
+
+msgid "There is nothing new to send to the kitchen."
+msgstr "No hay nada nuevo que enviar a cocina."
+
+msgid "This business does not allow discounts."
+msgstr "Este negocio no permite descuentos."
+
+msgid "That discount is above what this business allows without a manager's approval."
+msgstr "Ese descuento supera lo que este negocio permite sin que lo autorice el encargado."
+
+msgid "This business requires a customer on every sale."
+msgstr "Este negocio exige un cliente en cada venta."
+
+msgid "An invoice needs the customer's name, tax ID and address. Fill them in or charge it as a ticket."
+msgstr "Una factura necesita el nombre, el NIF y la dirección del cliente. Rellénalos o cóbrala como tique."
+
+#, python-format
+msgid "Above %(limit)s this sale cannot be a ticket: charge it as an invoice with the customer's details."
+msgstr "Por encima de %(limit)s esta venta no puede ser un tique: cóbrala como factura con los datos del cliente."
+
+msgid "The payments do not add up to the total of the sale."
+msgstr "Los cobros no suman el total de la venta."
+
+msgid "What was handed over does not cover the amount."
+msgstr "Lo entregado no cubre el importe."
+
+#, python-format
+msgid "By law, a sale of %(limit)s or more cannot be paid in cash, not even in part. Charge it by card, Bizum or bank transfer."
+msgstr "Por ley, una venta de %(limit)s o más no se puede cobrar en efectivo, ni en parte. Cóbrala con tarjeta, Bizum o transferencia."
+
+msgid "This charge is already being recorded. Check it in Sales before charging again."
+msgstr "Este cobro ya se está registrando. Compruébalo en Ventas antes de volver a cobrar."
+
+msgid "This sale is already voided."
+msgstr "Esta venta ya está anulada."
+
+msgid "This sale already has refunds: refund what is left instead of voiding it."
+msgstr "Esta venta ya tiene devoluciones: devuelve el importe que queda en vez de anularla."
+
+msgid "This sale carries a full invoice: issue a credit note instead of voiding it."
+msgstr "Esta venta lleva factura completa: emite una factura rectificativa en vez de anularla."
+
+msgid "There is no money left to refund on this sale."
+msgstr "No queda dinero por devolver en esta venta."
+
+msgid "That payment is not one of this sale's."
+msgstr "Ese cobro no es de esta venta."
+
+msgid "Each payment of the sale can be named only once."
+msgstr "Cada cobro de la venta se puede nombrar una sola vez."
+
+#, python-format
+msgid "%(method)s: %(amount)s is more than the %(remaining)s left to refund."
+msgstr "%(method)s: %(amount)s es más que los %(remaining)s que quedan por devolver."
+
+#, python-format
+msgid "%(method)s: choose how this money goes back."
+msgstr "%(method)s: elige por dónde vuelve este dinero."
+
+msgid "That line is not one of this sale's."
+msgstr "Esa línea no es de esta venta."
+
+msgid "Each line of the sale can be named only once."
+msgstr "Cada línea de la venta se puede nombrar una sola vez."
+
+msgid "One of the lines marked already came back with another refund. Open the refund again to see what is left."
+msgstr "Una de las líneas marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para ver lo que queda."
+
+msgid "One of the lines marked has fewer units left to return: another refund took part of them. Open the refund again to see what is left."
+msgstr "A una de las líneas marcadas ya no le quedan tantas unidades por devolver: otra devolución se llevó parte. Vuelve a abrir la devolución para ver lo que queda."
+
+msgid "This refund is already being recorded. Check the sale before refunding again."
+msgstr "Esta devolución ya se está registrando. Comprueba la venta antes de volver a devolver."
+
+msgid "There is already a payment method with that name."
+msgstr "Ya hay una forma de pago con ese nombre."

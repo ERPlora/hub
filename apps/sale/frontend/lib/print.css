@@ -1,0 +1,20 @@
+/* The paper `printPaper` (print.ts) prints: a copy of it lives in `body > .sale-print-root` while
+   the browser prints. On screen the copy never shows; on paper it is the only thing that does. Bundled
+   with print.ts, so whoever prints a paper (the Sales list, the till's bill) carries it. */
+.sale-print-root {
+  display: none;
+}
+
+@media print {
+  body > :not(.sale-print-root) {
+    display: none !important;
+  }
+
+  .sale-print-root {
+    display: block;
+  }
+
+  @page {
+    margin: 0;
+  }
+}
