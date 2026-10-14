@@ -7,9 +7,12 @@
 #   2. runs the migration (hub-migrate) on the new revision and polls it until it is STOPPED; if it
 #      fails, never ran or outlasts MIGRATE_TIMEOUT_SECONDS (the task is left running), the deploy
 #      stops before any service changes;
-#   3. moves the services to the new revisions, waits until they are stable and checks that each
-#      one's PRIMARY deployment is the new revision, COMPLETED (with rollback = true the circuit
-#      breaker puts the old one back and the wait still succeeds);
+#   3. moves the services to the new revisions, waits until they are stable and then polls each
+#      one's PRIMARY deployment until it is the new revision, COMPLETED: ECS marks it COMPLETED
+#      seconds to a minute after services-stable returns, once the old tasks drain from the ALB.
+#      A FAILED rollout or another revision as PRIMARY (with rollback = true the circuit breaker
+#      puts the old one back and the wait still succeeds) fails at once; a rollout that outlasts
+#      ROLLOUT_TIMEOUT_SECONDS fails too;
 #   4. records the tag in /erplora/prod/hub/image_tag, so the revisions Terraform registers, and
 #      with them the scheduled tasks, keep running it (aws-next README, "Imagen").
 # Never db-bootstrap: the deploy role cannot pass its roles (aws-next deploy_role.tf).
@@ -17,7 +20,8 @@
 #   rollback workflow (ecs-rollback.sh); back to a release, the deploy workflow with that release.
 #
 # Env: AWS_REGION, REGISTRY (ECR registry host), IMAGE_TAG (image tag = commit SHA);
-#      optional CLUSTER (erplora-prod), POLL_SECONDS (15), MIGRATE_TIMEOUT_SECONDS (3600).
+#      optional CLUSTER (erplora-prod), POLL_SECONDS (15), MIGRATE_TIMEOUT_SECONDS (3600),
+#      ROLLOUT_TIMEOUT_SECONDS (600).
 set -euo pipefail
 
 for var in AWS_REGION REGISTRY IMAGE_TAG; do
@@ -29,7 +33,8 @@ done
 CLUSTER="${CLUSTER:-erplora-prod}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
 MIGRATE_TIMEOUT_SECONDS="${MIGRATE_TIMEOUT_SECONDS:-3600}"
-for var in POLL_SECONDS MIGRATE_TIMEOUT_SECONDS; do
+ROLLOUT_TIMEOUT_SECONDS="${ROLLOUT_TIMEOUT_SECONDS:-600}"
+for var in POLL_SECONDS MIGRATE_TIMEOUT_SECONDS ROLLOUT_TIMEOUT_SECONDS; do
   if ! [[ "${!var}" =~ ^[0-9]+$ ]]; then
     echo "::error::$var must be a number of seconds, not '${!var}'" >&2
     exit 1
@@ -70,6 +75,12 @@ register() {
 }
 
 arn_of() { cat "$workdir/$1.arn"; }
+
+# primary <service>: "<task definition ARN> <rollout state>" of its PRIMARY deployment.
+primary() {
+  aws ecs describe-services --cluster "$CLUSTER" --services "$1" --region "$AWS_REGION" \
+    --query "services[0].deployments[?status=='PRIMARY'] | [0].[taskDefinition, rolloutState]" --output text
+}
 
 # migrate <family>: its container has the family's name (aws-next modules/ecs-service).
 migrate() {
@@ -132,19 +143,39 @@ done
 
 aws ecs wait services-stable --cluster "$CLUSTER" --region "$AWS_REGION" --services "${services[@]}"
 
-failed=0
-for service in "${services[@]}"; do
-  primary="$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --region "$AWS_REGION" \
-    --query "services[0].deployments[?status=='PRIMARY'] | [0].[taskDefinition, rolloutState]" --output text)"
-  read -r task_definition state <<< "$primary"
-  if [ "$task_definition" != "$(arn_of "$service")" ] || [ "$state" != COMPLETED ]; then
-    echo "::error::$service runs $task_definition ($state), not $(arn_of "$service"); rolled back by the circuit breaker? See the service events" >&2
-    failed=1
+# services-stable can return while a PRIMARY deployment is still IN_PROGRESS: poll the services
+# whose rollout has not completed yet, all of them on the same clock.
+pending=("${services[@]}")
+waited=0
+while :; do
+  failed=0
+  in_progress=()
+  for service in "${pending[@]}"; do
+    out="$(primary "$service")"
+    read -r task_definition state <<< "$out"
+    if [ "$task_definition" != "$(arn_of "$service")" ] || [ "$state" = FAILED ]; then
+      echo "::error::$service runs $task_definition ($state), not $(arn_of "$service"); rolled back by the circuit breaker? See the service events" >&2
+      failed=1
+    elif [ "$state" != COMPLETED ]; then
+      in_progress+=("$service")
+    fi
+  done
+  if [ "$failed" -ne 0 ]; then
+    exit 1
   fi
+  if [ "${#in_progress[@]}" -eq 0 ]; then
+    break
+  fi
+  if [ "$waited" -ge "$ROLLOUT_TIMEOUT_SECONDS" ]; then
+    for service in "${in_progress[@]}"; do
+      echo "::error::rollout of $service did not complete in $ROLLOUT_TIMEOUT_SECONDS s; see the service events" >&2
+    done
+    exit 1
+  fi
+  sleep "$POLL_SECONDS"
+  waited=$((waited + POLL_SECONDS))
+  pending=("${in_progress[@]}")
 done
-if [ "$failed" -ne 0 ]; then
-  exit 1
-fi
 echo "services stable on the new revisions"
 
 aws ssm put-parameter --name "/erplora/prod/$PROJECT/image_tag" --value "$IMAGE_TAG" \
