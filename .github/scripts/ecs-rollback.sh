@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
 # Puts the hub's services (hub, worker) back on the ACTIVE revision right before the one their
-# PRIMARY deployment runs, waits until they are stable, checks it and records that revision's
-# image tag in /erplora/prod/hub/image_tag (aws-next README, "Imagen").
+# PRIMARY deployment runs and records that revision's image tag in /erplora/prod/hub/image_tag
+# (aws-next README, "Imagen"):
+#   1. finds each service's previous revision; nothing changes unless every service has one and
+#      they all run the same tag;
+#   2. moves the services to those revisions, waits until they are stable and then polls each
+#      one's PRIMARY deployment until it is the previous revision, COMPLETED: ECS marks it
+#      COMPLETED seconds to a minute after services-stable returns, once the old tasks drain from
+#      the ALB. A FAILED rollout or another revision as PRIMARY (the circuit breaker puts back the
+#      one the service ran and the wait still succeeds) fails at once; a rollout that outlasts
+#      ROLLOUT_TIMEOUT_SECONDS fails too;
+#   3. records the tag only then, so a failed rollback leaves /erplora/prod/hub/image_tag as it was.
 # Migrations are NOT undone: the previous code must work on the current schema (expand/contract).
-# Nothing changes unless every service has a previous revision and they all run the same tag.
 # Scheduled hub tasks run the latest ACTIVE worker revision (aws-next scheduler.tf), so they keep
 # the newer image until the next deploy; to go back everywhere, deploy the previous release.
 #
-# Env: CONFIRM (exactly ROLLBACK), AWS_REGION; optional CLUSTER (erplora-prod).
+# Env: CONFIRM (exactly ROLLBACK), AWS_REGION; optional CLUSTER (erplora-prod), POLL_SECONDS (15),
+#      ROLLOUT_TIMEOUT_SECONDS (600).
 set -euo pipefail
 
 if [ "${CONFIRM:-}" != ROLLBACK ]; then
@@ -19,6 +28,14 @@ if [ -z "${AWS_REGION:-}" ]; then
   exit 1
 fi
 CLUSTER="${CLUSTER:-erplora-prod}"
+POLL_SECONDS="${POLL_SECONDS:-15}"
+ROLLOUT_TIMEOUT_SECONDS="${ROLLOUT_TIMEOUT_SECONDS:-600}"
+for var in POLL_SECONDS ROLLOUT_TIMEOUT_SECONDS; do
+  if ! [[ "${!var}" =~ ^[0-9]+$ ]]; then
+    echo "::error::$var must be a number of seconds, not '${!var}'; nothing was changed" >&2
+    exit 1
+  fi
+done
 
 # This repo deploys the hub; the saas repo keeps its own copy of this script.
 PROJECT=hub
@@ -85,18 +102,39 @@ done
 
 aws ecs wait services-stable --cluster "$CLUSTER" --region "$AWS_REGION" --services "${services[@]}"
 
-failed=0
-for i in "${!services[@]}"; do
-  out="$(primary "${services[i]}")"
-  read -r task_definition state <<< "$out"
-  if [ "$task_definition" != "${targets[i]}" ] || [ "$state" != COMPLETED ]; then
-    echo "::error::${services[i]} runs $task_definition ($state), not ${targets[i]}; see the service events" >&2
-    failed=1
+# services-stable can return while a PRIMARY deployment is still IN_PROGRESS: poll the services
+# (by index) whose rollout has not completed yet, all of them on the same clock.
+pending=("${!services[@]}")
+waited=0
+while :; do
+  failed=0
+  in_progress=()
+  for i in "${pending[@]}"; do
+    out="$(primary "${services[i]}")"
+    read -r task_definition state <<< "$out"
+    if [ "$task_definition" != "${targets[i]}" ] || [ "$state" = FAILED ]; then
+      echo "::error::${services[i]} runs $task_definition ($state), not ${targets[i]}; rolled back by the circuit breaker? See the service events" >&2
+      failed=1
+    elif [ "$state" != COMPLETED ]; then
+      in_progress+=("$i")
+    fi
+  done
+  if [ "$failed" -ne 0 ]; then
+    exit 1
   fi
+  if [ "${#in_progress[@]}" -eq 0 ]; then
+    break
+  fi
+  if [ "$waited" -ge "$ROLLOUT_TIMEOUT_SECONDS" ]; then
+    for i in "${in_progress[@]}"; do
+      echo "::error::rollout of ${services[i]} did not complete in $ROLLOUT_TIMEOUT_SECONDS s; see the service events" >&2
+    done
+    exit 1
+  fi
+  sleep "$POLL_SECONDS"
+  waited=$((waited + POLL_SECONDS))
+  pending=("${in_progress[@]}")
 done
-if [ "$failed" -ne 0 ]; then
-  exit 1
-fi
 echo "services stable on the previous revisions"
 
 aws ssm put-parameter --name "/erplora/prod/$PROJECT/image_tag" --value "${tags[0]}" \
