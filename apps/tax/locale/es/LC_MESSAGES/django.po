@@ -1,0 +1,253 @@
+# Spanish translation of the tax app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next tax\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 00:00+0200\n"
+"PO-Revision-Date: 2026-10-14 00:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Taxes"
+msgstr "Impuestos"
+
+msgid "Tax categories and the VAT rate of each one, by country, region and date."
+msgstr "Las categorías fiscales y el tipo de IVA de cada una, por país, región y fecha."
+
+msgid "Taxes keeps the tax categories your products and services point to, and the rules that give each one its rate in your country or region and between two dates: VAT, IGIC or IPSI, exempt or not subject operations and the equivalence surcharge. It comes with the Spanish rates ready, lets you schedule a rate change ahead, never lets two rates apply on the same day, and is what the till and the invoices use to charge and declare each line."
+msgstr "Impuestos guarda las categorías fiscales a las que apuntan tus productos y servicios, y las reglas que dan a cada una su tipo en tu país o región y entre dos fechas: IVA, IGIC o IPSI, operaciones exentas o no sujetas y el recargo de equivalencia. Trae los tipos de España listos, deja programar un cambio de tipo por adelantado, nunca deja dos tipos vigentes el mismo día y es lo que usan la caja y las facturas para cobrar y declarar cada línea."
+
+msgid "Categories"
+msgstr "Categorías"
+
+msgid "Rules"
+msgstr "Reglas"
+
+msgid "Aliases"
+msgstr "Alias"
+
+msgid "Restaurant — food"
+msgstr "Restauración — comida"
+
+msgid "Restaurant — drink"
+msgstr "Restauración — bebida"
+
+msgid "Restaurant — alcohol"
+msgstr "Restauración — alcohol"
+
+msgid "Alcoholic drinks served to drink on the premises — art. 91.Uno.2.2 (ES)"
+msgstr "Bebidas alcohólicas servidas para consumir en el local — art. 91.Uno.2.2 (ES)"
+
+#| msgid "Restaurant — alcohol"
+msgid "Retail — alcohol to take away"
+msgstr "Venta — alcohol para llevar"
+
+msgid "Alcoholic drinks sold to take away or delivered — art. 90 (ES)"
+msgstr "Bebidas alcohólicas vendidas para llevar o a domicilio — art. 90 (ES)"
+
+msgid "Restaurant — delivery"
+msgstr "Restauración — reparto a domicilio"
+
+msgid "Service — generic"
+msgstr "Servicio — general"
+
+msgid "Service — healthcare (VAT exempt)"
+msgstr "Servicio — sanitario (exento de IVA)"
+
+msgid "Assistance provided by medical or health professionals — art. 20.Uno.3 (ES)"
+msgstr "Asistencia prestada por profesionales médicos o sanitarios — art. 20.Uno.3 (ES)"
+
+msgid "Service — education (VAT exempt)"
+msgstr "Servicio — enseñanza (exento de IVA)"
+
+msgid "Regulated teaching and training — art. 20.Uno.9 (ES)"
+msgstr "Enseñanza y formación regladas — art. 20.Uno.9 (ES)"
+
+msgid "Product — generic"
+msgstr "Producto — general"
+
+msgid "Product — reduced (food staples, pharmacy)"
+msgstr "Producto — reducido (alimentos básicos, farmacia)"
+
+msgid "Product — super-reduced (bread, books, basics)"
+msgstr "Producto — superreducido (pan, libros, básicos)"
+
+msgid "key"
+msgstr "clave"
+
+msgid "Use lowercase letters, digits, dots and underscores, starting with a letter."
+msgstr "Usa minúsculas, dígitos, puntos y guiones bajos, empezando por una letra."
+
+msgid "name"
+msgstr "nombre"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "system"
+msgstr "de sistema"
+
+msgid "active"
+msgstr "activa"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "tax category"
+msgstr "categoría fiscal"
+
+msgid "tax categories"
+msgstr "categorías fiscales"
+
+msgid "VAT"
+msgstr "IVA"
+
+msgid "IGIC (Canary Islands)"
+msgstr "IGIC (Canarias)"
+
+msgid "IPSI (Ceuta and Melilla)"
+msgstr "IPSI (Ceuta y Melilla)"
+
+msgid "Surcharge"
+msgstr "Recargo"
+
+msgid "Sales tax"
+msgstr "Impuesto sobre las ventas"
+
+msgid "Withholding"
+msgstr "Retención"
+
+msgid "Excise duty"
+msgstr "Impuesto especial"
+
+msgid "Import duty"
+msgstr "Arancel"
+
+msgid "Subject"
+msgstr "Sujeta"
+
+msgid "Reverse charge"
+msgstr "Inversión del sujeto pasivo"
+
+msgid "Exempt"
+msgstr "Exenta"
+
+msgid "Not subject"
+msgstr "No sujeta"
+
+msgid "Not subject (place of supply rules)"
+msgstr "No sujeta (reglas de localización)"
+
+msgid "country"
+msgstr "país"
+
+msgid "region"
+msgstr "región"
+
+msgid "rate (%)"
+msgstr "tipo (%)"
+
+msgid "tax type"
+msgstr "tipo de impuesto"
+
+msgid "qualification"
+msgstr "calificación"
+
+msgid "exemption cause"
+msgstr "causa de exención"
+
+msgid "regime"
+msgstr "régimen"
+
+msgid "root rule"
+msgstr "regla raíz"
+
+msgid "component label"
+msgstr "etiqueta del componente"
+
+msgid "valid from"
+msgstr "vigente desde"
+
+msgid "valid to"
+msgstr "vigente hasta"
+
+msgid "tax rule"
+msgstr "regla fiscal"
+
+msgid "tax rules"
+msgstr "reglas fiscales"
+
+msgid "Shipped"
+msgstr "De fábrica"
+
+msgid "Learned"
+msgstr "Aprendido"
+
+msgid "alias"
+msgstr "alias"
+
+msgid "source"
+msgstr "origen"
+
+msgid "tax category alias"
+msgstr "alias de categoría fiscal"
+
+msgid "tax category aliases"
+msgstr "alias de categorías fiscales"
+
+msgid "This tax category does not exist."
+msgstr "Esa categoría fiscal no existe."
+
+msgid "This tax rule no longer exists."
+msgstr "Esta regla ya no existe."
+
+msgid "No tax rule applies to this category in this country."
+msgstr "Ninguna regla fiscal se aplica a esta categoría en este país."
+
+msgid "Enter an ISO 3166-2 region, such as ES-CN."
+msgstr "Escribe una región ISO 3166-2, por ejemplo ES-CN."
+
+msgid "This region does not belong to the chosen country."
+msgstr "Esa región no es del país elegido."
+
+msgid "This operation charges no tax: its rate must be 0 %."
+msgstr "Esta operación no lleva impuesto: su tipo tiene que ser 0 %."
+
+msgid "The last day cannot be before the first one."
+msgstr "El último día no puede ser anterior al primero."
+
+msgid "Say which rule: its id, or its country and its category."
+msgstr "Di qué regla: su id, o su país y su categoría."
+
+msgid "There is already a tax category with that key."
+msgstr "Ya hay una categoría fiscal con esa clave."
+
+msgid "That alias already exists."
+msgstr "Ese alias ya existe."
+
+msgid "It overlaps another active rule of this country, region and category: two rates cannot apply on the same day. End that rule the day before this one starts, or deactivate it."
+msgstr "Se solapa con otra regla activa de este país, región y categoría: no puede haber dos tipos vigentes el mismo día. Pon fecha de fin a esa regla el día antes de que empiece esta, o desactívala."
+
+msgid "The component could not be created: it must hang from a root rule with the same country, region and category, and a root that charges no tax admits no component with a rate."
+msgstr "No se ha podido crear el componente: tiene que colgar de una regla raíz con el mismo país, región y categoría, y una raíz que no cobra impuesto no admite componentes con tipo."
+
+msgid "That rule cannot end before the day it starts."
+msgstr "Esa regla no puede terminar antes del día en que empieza."
+
+msgid "There is already a rule of this country, region and category from that day, perhaps deactivated: reactivate it or start this one another day."
+msgstr "Ya hay una regla de este país, región y categoría desde ese día, quizá desactivada: reactívala o empieza esta otro día."
+
+msgid "That rule is already active."
+msgstr "Esa regla ya está activa."
+
+msgid "That rule is already deactivated."
+msgstr "Esa regla ya está desactivada."

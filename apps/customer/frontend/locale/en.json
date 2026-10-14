@@ -1,0 +1,422 @@
+{
+  "customer": {
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "retry": "Retry",
+      "appInactive": "This app is not active in this business"
+    },
+    "common": {
+      "yes": "Yes",
+      "no": "No",
+      "cancel": "Cancel",
+      "save": "Save",
+      "close": "Close",
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "loading": "Loading…",
+      "all": "All",
+      "noPermission": "You do not have permission",
+      "unavailable": "This customer is no longer available."
+    },
+    "tabs": {
+      "label": "Customer sections",
+      "customers": "Customers",
+      "groups": "Groups",
+      "tags": "Tags",
+      "fields": "Fields"
+    },
+    "stage": {
+      "lead": "Lead",
+      "prospect": "Prospect",
+      "first_purchase": "1st purchase",
+      "active": "Active",
+      "at_risk": "At risk",
+      "dormant": "Dormant",
+      "churned": "Churned",
+      "vip": "VIP"
+    },
+    "source": {
+      "walk_in": "Walk-in",
+      "website": "Website",
+      "phone": "Phone",
+      "referral": "Referral",
+      "social": "Social media",
+      "whatsapp": "WhatsApp",
+      "import": "Import",
+      "other": "Other"
+    },
+    "channel": {
+      "none": "None",
+      "email": "Email",
+      "sms": "SMS",
+      "whatsapp": "WhatsApp",
+      "phone": "Phone",
+      "postal": "Post"
+    },
+    "fieldType": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "boolean": "Yes/No",
+      "select": "Select",
+      "textarea": "Long text"
+    },
+    "stats": {
+      "label": "Figures",
+      "customers": "Customers",
+      "active": "Active",
+      "vip": "VIP",
+      "revenue": "Revenue",
+      "loadError": "The figures could not be loaded"
+    },
+    "list": {
+      "title": "Customers",
+      "search": "Search name, phone or email…",
+      "loadError": "The customers could not be loaded",
+      "empty": "No customers.",
+      "emptyMessage": "Add the first one with «Add» or bring yours with «Import CSV».",
+      "noResults": "No results",
+      "noResultsMessage": "No customer matches your search or filters.",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "phone": "Phone",
+        "stage": "Stage",
+        "spent": "Spent"
+      },
+      "filters": {
+        "stage": "Stage",
+        "source": "Source",
+        "active": "Active",
+        "activeOnly": "Active",
+        "inactiveOnly": "Not active",
+        "spentFrom": "Spent from (€)",
+        "spentTo": "Spent to (€)"
+      },
+      "view": "View",
+      "entity": {
+        "one": "customer",
+        "many": "customers"
+      }
+    },
+    "filters": {
+      "button": "Filters",
+      "title": "Filters",
+      "count": "Filters ({n} in use)",
+      "any": "Any",
+      "clear": "Clear",
+      "done": "Done",
+      "amountInvalid": "Write an amount, like 1.000,50."
+    },
+    "create": {
+      "title": "New customer",
+      "created": "Customer {name} created"
+    },
+    "form": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "phoneHint": "With no prefix it is read as a number of this business's country; for another one, write its prefix (+44…).",
+      "taxId": "Tax ID",
+      "company": "Company",
+      "moreDetails": "More details",
+      "address": "Address",
+      "city": "City",
+      "postalCode": "Postal code",
+      "country": "Country",
+      "countryNone": "No country",
+      "avatar": "Photo (its address)",
+      "birthday": "Birthday",
+      "anniversary": "Anniversary",
+      "source": "Source",
+      "stage": "Stage",
+      "preferredChannel": "Preferred channel",
+      "notes": "Internal notes",
+      "customFields": "Custom fields",
+      "active": "Active",
+      "required": "{name} *",
+      "countrySearch": "Search a country…",
+      "countryNoMatch": "No country matches"
+    },
+    "importCsv": {
+      "button": "Import CSV",
+      "importing": "Importing…",
+      "summary": "Import: {total} rows — {created} created, {skipped} skipped.",
+      "noRows": "The file has no customers: its first line must name the columns (name, email, phone…).",
+      "unreadable": "The file could not be read.",
+      "row": "Row {line}",
+      "failedBlock": "Rows {from}–{to} were not imported: {reason}",
+      "review": "To review",
+      "close": "Close"
+    },
+    "exportCsv": {
+      "button": "Export CSV",
+      "failed": "The customers could not be exported: {reason}"
+    },
+    "detail": {
+      "title": "Customer",
+      "loadError": "The customer could not be loaded",
+      "edit": "Edit",
+      "delete": "Delete",
+      "merge": "Merge with…",
+      "erase": "Erase personal data",
+      "updated": "Customer updated",
+      "facts": {
+        "email": "Email",
+        "phone": "Phone",
+        "taxId": "Tax ID",
+        "company": "Company",
+        "address": "Address",
+        "stage": "Stage",
+        "source": "Source",
+        "preferredChannel": "Preferred channel",
+        "purchases": "Purchases",
+        "spent": "Spent",
+        "lastPurchase": "Last purchase",
+        "active": "Active",
+        "birthday": "Birthday",
+        "anniversary": "Anniversary",
+        "notes": "Internal notes",
+        "customFields": "Custom fields"
+      }
+    },
+    "delete": {
+      "title": "Delete customer",
+      "message": "Delete {name}? They no longer show in the list, at the till or in the search by phone. Their sales are kept.",
+      "confirm": "Delete",
+      "done": "Customer {name} deleted"
+    },
+    "membership": {
+      "groups": "Groups",
+      "tags": "Tags",
+      "noGroups": "No groups.",
+      "noTags": "No tags.",
+      "saveGroups": "Save groups",
+      "saveTags": "Save tags",
+      "groupsSaved": "Groups assigned",
+      "tagsSaved": "Tags assigned",
+      "inactive": "{name} (not active)"
+    },
+    "consent": {
+      "heading": "Marketing consent",
+      "intro": "One decision per channel, with the date, where it came from and the words the customer was shown. Nothing here is filled in by editing the card.",
+      "neverAsked": "Never asked",
+      "granted": "Given",
+      "withdrawn": "Withdrawn",
+      "record": "Record consent",
+      "notice": "I want to receive offers and news from this business through this channel. I can unsubscribe whenever I want.",
+      "askHint": "Read it out loud and only press if they say yes. This exact sentence is what gets stored as the record, together with your name and the time.",
+      "confirm": "They said yes",
+      "withdraw": "Withdraw",
+      "recorded": "Consent recorded.",
+      "withdrawnMsg": "Consent withdrawn. It is in force from now on.",
+      "historyHeading": "Everything that was decided",
+      "noHistory": "Nothing has been recorded yet.",
+      "loadError": "The consent could not be loaded",
+      "sources": {
+        "counter": "at the counter",
+        "web_form": "web form",
+        "phone": "by phone",
+        "email": "by email",
+        "import": "imported",
+        "receipt": "on the receipt"
+      }
+    },
+    "notes": {
+      "heading": "Add note",
+      "label": "Note",
+      "add": "Add",
+      "added": "Note added"
+    },
+    "activity": {
+      "heading": "Activity",
+      "empty": "No activity recorded.",
+      "loadError": "The activity could not be loaded",
+      "more": "Show more",
+      "by": "by {name}",
+      "kinds": {
+        "note_added": "Note added",
+        "purchase_recorded": "Purchase recorded",
+        "purchase_voided": "Purchase voided",
+        "consent_granted": "Consent given",
+        "consent_withdrawn": "Consent withdrawn",
+        "merged": "Duplicate customer merged into this one",
+        "erased": "Personal data erased"
+      }
+    },
+    "purchases": {
+      "heading": "Purchases",
+      "empty": "No purchases.",
+      "loadError": "The purchases could not be loaded",
+      "filter": "Filter by status",
+      "confirmed": "Paid",
+      "voided": "Voided",
+      "date": "Date",
+      "amount": "Amount",
+      "status": "Status",
+      "more": "Show more"
+    },
+    "orders": {
+      "heading": "Linked orders",
+      "empty": "No linked orders.",
+      "loadError": "The orders could not be loaded",
+      "order": "Order {id}",
+      "more": "Show more"
+    },
+    "merge": {
+      "title": "Merge a duplicate customer",
+      "hint": "Pick the duplicate of {name}. {name} stays; the one you pick is merged into it.",
+      "search": "Search the duplicate",
+      "noCandidates": "No other customer matches.",
+      "confirm": "{absorbed} will be merged into {surviving}: its appointments, sales, bookings, conversations, prepaid packages, notes and consents move to {surviving}, empty fields are filled from it, and {absorbed} disappears from the list. This cannot be undone.",
+      "submit": "Merge",
+      "change": "Pick another",
+      "done": "{name} was merged into this customer."
+    },
+    "erase": {
+      "title": "Erase personal data (GDPR)",
+      "message": "This erases {name}'s personal data, their notes, their activity and their custom fields, and cannot be undone. Sales and invoices keep their reference. An audit entry records who, when and why.",
+      "reason": "Reason (kept in the audit)",
+      "submit": "Erase personal data",
+      "done": "Personal data erased."
+    },
+    "picker": {
+      "search": "Search by name, phone, email…",
+      "searchLabel": "Search customers",
+      "noResults": "No results.",
+      "noCustomers": "No customers.",
+      "loadError": "The customers could not be loaded",
+      "noPermission": "You do not have permission to look up customers."
+    },
+    "pos": {
+      "assign": "Assign customer",
+      "choose": "Choose customer",
+      "remove": "Remove customer",
+      "quickAdd": "+ New customer «{term}»",
+      "quickName": "Name",
+      "quickPhone": "Phone",
+      "quickCreate": "Create and assign",
+      "snapshotError": "Could not load {name}'s tax details. Tap again to retry.",
+      "phoneTaken": "There is already {name} with this phone. Use that card or create a new one?",
+      "phoneTakenMany": "These customers already have this phone. Use one of them or create a new one?",
+      "useMatch": "Use {name}",
+      "createAnyway": "Create a new one"
+    },
+    "playground": {
+      "title": "Customer search (preview)",
+      "intro": "The till's customer search, as the Sales app will show it. What it hands to the sale:",
+      "none": "No customer assigned."
+    },
+    "groups": {
+      "title": "Customer groups",
+      "search": "Search group…",
+      "empty": "No groups.",
+      "noResults": "No group matches your search or filter.",
+      "loadError": "The groups could not be loaded",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "customers": "Customers",
+        "order": "Order",
+        "active": "Active"
+      },
+      "filter": "Show",
+      "showActive": "Active",
+      "showInactive": "Not active",
+      "new": "New group",
+      "editTitle": "Edit · {name}",
+      "name": "Name",
+      "description": "Description",
+      "color": "Color",
+      "order": "Order",
+      "active": "Active",
+      "created": "Group created",
+      "updated": "Group updated",
+      "deleteTitle": "Delete group",
+      "deleteMessage": "Delete {name}? The customers who have it lose it.",
+      "deleted": "Group {name} deleted",
+      "entity": {
+        "one": "group",
+        "many": "groups"
+      }
+    },
+    "tags": {
+      "title": "Customer tags",
+      "search": "Search tag…",
+      "empty": "No tags.",
+      "noResults": "No tag matches your search or filter.",
+      "loadError": "The tags could not be loaded",
+      "columns": {
+        "name": "Name",
+        "color": "Color",
+        "customers": "Customers",
+        "active": "Active"
+      },
+      "filter": "Show",
+      "showActive": "Active",
+      "showInactive": "Not active",
+      "new": "New tag",
+      "editTitle": "Edit · {name}",
+      "name": "Name",
+      "color": "Color",
+      "active": "Active",
+      "created": "Tag created",
+      "updated": "Tag updated",
+      "deleteTitle": "Delete tag",
+      "deleteMessage": "Delete {name}? The customers who have it lose it.",
+      "deleted": "Tag {name} deleted",
+      "entity": {
+        "one": "tag",
+        "many": "tags"
+      }
+    },
+    "fields": {
+      "title": "Custom fields",
+      "search": "Search field…",
+      "empty": "No custom fields.",
+      "noResults": "No field matches your search or filters.",
+      "loadError": "The custom fields could not be loaded",
+      "columns": {
+        "name": "Name",
+        "type": "Type",
+        "required": "Required",
+        "order": "Order",
+        "active": "Active"
+      },
+      "filterType": "Type",
+      "filterRequired": "Required",
+      "filterActive": "Active",
+      "new": "New custom field",
+      "editTitle": "Edit · {name}",
+      "name": "Name",
+      "type": "Type",
+      "options": "Options (comma-separated)",
+      "required": "Required",
+      "order": "Order",
+      "active": "Active",
+      "created": "Field created",
+      "updated": "Field updated",
+      "deleteTitle": "Delete field",
+      "deleteMessage": "Delete {name}? The values saved on the cards are deleted too.",
+      "deleted": "Field {name} deleted",
+      "entity": {
+        "one": "field",
+        "many": "fields"
+      }
+    },
+    "colors": {
+      "primary": "Blue",
+      "secondary": "Light blue",
+      "tertiary": "Purple",
+      "success": "Green",
+      "warning": "Yellow",
+      "danger": "Red",
+      "medium": "Grey",
+      "dark": "Black"
+    },
+    "blocks": {
+      "failed": "This block could not be shown."
+    }
+  }
+}

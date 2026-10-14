@@ -11,6 +11,9 @@ dependencies = [
     "python-decouple>=3.8",
     "redis>=8.1.0",
     "django-ses>=4.8.2",
+    "pycountry>=26.2.16",
+    "phonenumbers>=9.0.41",
+    "babel>=2.18",
 ]
 
 [dependency-groups]

@@ -1,7 +1,7 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: por construir
+Estado de la app: en construcción (servidor hecho; páginas en la fase de frontend)
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -107,7 +107,8 @@ columna; filtros por nombre, SKU, precio desde/hasta, stock desde/hasta y estado
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila: «Detalles», «Recibir stock» y «Contar stock» (con permiso de stock y
-solo en productos físicos), «Editar» y «Eliminar». Tocar la fila abre la ficha.
+solo en productos físicos), «Dar de baja stock» (además, solo en artículos con control de stock),
+«Editar» y «Eliminar». Tocar la fila abre la ficha.
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
 SKU es la identidad del producto: no se edita»), Precio, «Coste (EUR)», «Stock inicial» (solo al
@@ -122,7 +123,8 @@ rechazo del formulario sale dentro del panel; el de una acción de fila, encima 
 ### Ficha del producto
 Ventana con el nombre del producto: SKU, Precio, Stock y Estado; el código de barras del SKU en una
 placa blanca con el SKU debajo; «Imprimir código de barras» y, con permiso de stock y en un
-producto físico, «Recibir stock» y «Contar stock». Un fallo al imprimir sale dentro de la ventana.
+producto físico, «Recibir stock» y «Contar stock», y «Dar de baja stock» si el artículo controla su
+stock. Un fallo al imprimir sale dentro de la ventana.
 
 ### Recepción
 Ventana «Recepción — <producto>»: «Stock actual», «Cantidad recibida», «Coste unitario (EUR)» y
@@ -133,6 +135,11 @@ Ventana «Recuento — <producto>»: «Stock actual», «Diferencia» (en cuanto
 contado», «Motivo (obligatorio)» y «Aplicar recuento», con la nota de lo que falta («Escribe el
 stock contado para continuar.» / «Hace falta un motivo para aplicar el recuento.»). Un rechazo
 sale dentro de la ventana.
+
+### Baja
+Ventana «Baja — <producto>»: «Stock actual», «Cantidad que se da de baja», «Motivo: merma, rotura,
+consumo propio… (obligatorio)» y «Dar de baja», con la nota de lo que falta. Un rechazo sale dentro
+de la ventana.
 
 ### Importar productos
 Tres ventanas seguidas:
@@ -178,42 +185,42 @@ fueran los del negocio.
 | ID | Flujo | Estado |
 |---|---|---|
 | | **Catálogo** | |
-| INVENTORY-F01 | Dar de alta un producto | por construir |
-| INVENTORY-F02 | Editar un producto | por construir |
-| INVENTORY-F03 | Activar y desactivar un producto | por construir |
-| INVENTORY-F04 | Eliminar un producto | por construir |
-| INVENTORY-F05 | Revisar los productos que no se pueden vender por falta de IVA | por construir |
-| INVENTORY-F06 | Crear y editar una categoría | por construir |
-| INVENTORY-F07 | Eliminar una categoría | por construir |
-| INVENTORY-F08 | Agrupar productos en categorías para el TPV | por construir |
+| INVENTORY-F01 | Dar de alta un producto | servidor hecho |
+| INVENTORY-F02 | Editar un producto | servidor hecho |
+| INVENTORY-F03 | Activar y desactivar un producto | servidor hecho |
+| INVENTORY-F04 | Eliminar un producto | servidor hecho |
+| INVENTORY-F05 | Revisar los productos que no se pueden vender por falta de IVA | servidor hecho |
+| INVENTORY-F06 | Crear y editar una categoría | servidor hecho |
+| INVENTORY-F07 | Eliminar una categoría | servidor hecho |
+| INVENTORY-F08 | Agrupar productos en categorías para el TPV | servidor hecho |
 | | **Importar y exportar** | |
-| INVENTORY-F09 | Importar productos desde un CSV | por construir |
-| INVENTORY-F10 | Importar categorías desde un CSV | por construir |
-| INVENTORY-F11 | Exportar el catálogo a CSV | por construir |
-| INVENTORY-F12 | Cargar la carta de una plantilla del sector | por construir |
+| INVENTORY-F09 | Importar productos desde un CSV | servidor hecho |
+| INVENTORY-F10 | Importar categorías desde un CSV | servidor hecho |
+| INVENTORY-F11 | Exportar el catálogo a CSV | servidor hecho |
+| INVENTORY-F12 | Cargar la carta de una plantilla del sector | servidor hecho (su parte: alta en lote y enlaces); falta cargar la plantilla (núcleo) |
 | | **Stock** | |
-| INVENTORY-F13 | Recibir mercancía | por construir |
-| INVENTORY-F14 | Contar el stock de un producto | por construir |
-| INVENTORY-F15 | Dar de baja stock sin venta (merma, rotura, consumo propio) | por construir |
-| INVENTORY-F16 | Consultar el historial de movimientos | por construir |
-| INVENTORY-F17 | Ver el panel y los productos con stock bajo | por construir |
-| INVENTORY-F18 | Avisar cuando un artículo cruza su mínimo | por construir |
-| INVENTORY-F19 | Ajustar el inventario | por construir |
-| INVENTORY-F20 | Decidir qué artículos llevan control de stock | por construir |
+| INVENTORY-F13 | Recibir mercancía | servidor hecho |
+| INVENTORY-F14 | Contar el stock de un producto | servidor hecho |
+| INVENTORY-F15 | Dar de baja stock sin venta (merma, rotura, consumo propio) | servidor hecho |
+| INVENTORY-F16 | Consultar el historial de movimientos | servidor hecho |
+| INVENTORY-F17 | Ver el panel y los productos con stock bajo | servidor hecho |
+| INVENTORY-F18 | Avisar cuando un artículo cruza su mínimo | servidor hecho |
+| INVENTORY-F19 | Ajustar el inventario | servidor hecho |
+| INVENTORY-F20 | Decidir qué artículos llevan control de stock | servidor hecho |
 | | **Con otras apps** | |
-| INVENTORY-F21 | Bajar el stock al cobrarse una venta | por construir |
-| INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | por construir |
-| INVENTORY-F23 | Reponer el stock al anularse una venta | por construir |
+| INVENTORY-F21 | Bajar el stock al cobrarse una venta | servidor hecho |
+| INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | servidor hecho |
+| INVENTORY-F23 | Reponer el stock al anularse una venta | servidor hecho |
 | INVENTORY-F24 | Reponer el stock de una devolución | no hecho — pendiente de decidir (duda 2) |
-| INVENTORY-F25 | Imprimir la etiqueta del código de barras | por construir |
-| INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | por construir |
-| INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | por construir |
-| INVENTORY-F28 | Completar el primer paso «Tu catálogo» | por construir |
+| INVENTORY-F25 | Imprimir la etiqueta del código de barras | por construir — necesita la app Impresión (`printing`), que aún no existe |
+| INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | servidor hecho |
+| INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | servidor hecho |
+| INVENTORY-F28 | Completar el primer paso «Tu catálogo» | servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo) |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
 ### INVENTORY-F01 Dar de alta un producto
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -247,7 +254,7 @@ llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guar
 Implicados: SALE-F01, TAX-F01, TAX-F19
 
 ### INVENTORY-F02 Editar un producto
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -270,7 +277,7 @@ un producto con stock. Cuenta su stock a cero y cámbiala después.».
 Implicados: SALE-F01, TAX-F01, TAX-F19
 
 ### INVENTORY-F03 Activar y desactivar un producto
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -286,7 +293,7 @@ app). Sin permiso de cambio se ve «Sí»/«No» sin interruptor.
 Implicados: SALE-F01
 
 ### INVENTORY-F04 Eliminar un producto
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -303,7 +310,7 @@ Si falla: «No se pudo eliminar el producto» (o el motivo) encima de la tabla.
 Implicados: SALE-F01
 
 ### INVENTORY-F05 Revisar los productos que no se pueden vender por falta de IVA
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -320,15 +327,16 @@ Si falla: los rechazos del formulario (INVENTORY-F02).
 Implicados: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Crear y editar una categoría
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
 1. En **Categorías**, pulsa **+** (o toca una fila para editarla: «Editando categoría —
    <nombre>»).
 2. Escribe el Nombre. Si dejas vacío «Slug (opcional)», se rellena solo con el nombre en
-   minúsculas y con guiones. Elige, si quieres, «Tipo de IVA / Impuesto» («— (por defecto)» lo deja
-   vacío).
+   minúsculas y con guiones. Al editar, dejarlo vacío conserva el que tenía; por el asistente o la
+   API, un slug vacío se rehace con el nombre (nunca queda una categoría sin slug). Elige, si
+   quieres, «Tipo de IVA / Impuesto» («— (por defecto)» lo deja vacío).
 3. Pulsa «Guardar» o «Guardar cambios». La categoría sale en la tabla con su número de productos.
 Entra: las categorías fiscales y su tipo, de Impuestos.
 Sale: la categoría guardada. Editarla desde la pantalla no toca lo que la pantalla no enseña: la
@@ -340,7 +348,7 @@ guardar la categoría» o el motivo).
 Implicados: KITCHEN-F04, SALE-F01, TAX-F01
 
 ### INVENTORY-F07 Eliminar una categoría
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
@@ -355,7 +363,7 @@ Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla
 Implicados: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F08 Agrupar productos en categorías para el TPV
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -374,7 +382,7 @@ categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Importar productos desde un CSV
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Importar productos
 Pasos:
@@ -402,10 +410,13 @@ Sale: un producto activo y «Físico» por fila lista, que sigue el control de s
 lleva categorías de TPV; Inventario avisa de cada producto nuevo. El stock que trae cada fila queda
 en **Movimientos** como «Inicial». En Impuestos, los textos aprendidos y las categorías creadas
 desde la ventana fiscal. Una fila con un SKU que ya tiene un producto vivo se cuenta como omitida y
-ese producto no se toca; un SKU de un producto eliminado crea uno nuevo.
+ese producto no se toca, digan lo que digan sus otras celdas (así el propio export se vuelve a importar
+sin fallos, también con un stock negativo); un SKU de un producto eliminado crea uno nuevo.
 Si falla: motivos de fila: «Faltan nombre o SKU», «Precio no numérico» (también para el coste),
-«SKU duplicado en el fichero», «La cantidad no respeta el incremento permitido para esta unidad» y
-«Falta la categoría fiscal». Si Impuestos no puede guardar un texto aprendido o una categoría
+«Precio o coste demasiado alto», «SKU duplicado en el fichero», «Cantidad no numérica», «Cantidad
+demasiado grande», «La cantidad no respeta el incremento permitido para esta unidad», «Unidad de
+medida no reconocida», «Un texto es más largo de lo que admite su columna», «Ese EAN-13 ya lo tiene
+otro producto del catálogo» y «Falta la categoría fiscal» o «Categoría fiscal no reconocida». Si Impuestos no puede guardar un texto aprendido o una categoría
 creada, se dice en el informe y sus filas quedan como fallidas con ese motivo. «Cancelar» en la
 ventana fiscal no importa nada. «Parar» deja lo ya creado y el informe dice «La importación se
 paró a medias. Lo que ya se había creado está contado abajo; el resto del fichero se quedó como
@@ -413,7 +424,7 @@ estaba.».
 Implicados: TAX-F02, TAX-F14, TAX-F15
 
 ### INVENTORY-F10 Importar categorías desde un CSV
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
@@ -432,7 +443,7 @@ fiscal no reconocida: <texto>».
 Implicados: TAX-F15
 
 ### INVENTORY-F11 Exportar el catálogo a CSV
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -448,11 +459,12 @@ Stock, Umbral, EAN-13, Descripción, Unidad, Categoría fiscal, Activo) y las ci
 pantalla (2,20 €, 3 unidades), de modo que se puede volver a importar sin cambiar nada. No guarda
 ni avisa nada.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
-sale y la app no lo entrega por ninguna otra puerta.
+sale y la app no lo entrega por ninguna otra puerta. Un texto que una hoja de cálculo ejecutaría como
+fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la importación quita.
 Implicados: ninguno
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
-Estado: por construir
+Estado: servidor hecho (su parte: alta en lote y enlaces); falta cargar la plantilla (núcleo)
 Actor: administrador
 Pantalla: Ajustes del negocio: plantillas
 Pasos:
@@ -470,7 +482,7 @@ Implicados: ninguno
 Pendiente de enlazar: core — cargar una plantilla del sector (su WORKBOOK aún no existe)
 
 ### INVENTORY-F13 Recibir mercancía
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Recepción
 Pasos:
@@ -494,7 +506,7 @@ falla: no entra ninguna.
 Implicados: ninguno
 
 ### INVENTORY-F14 Contar el stock de un producto
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Recuento
 Pasos:
@@ -518,13 +530,15 @@ de la ventana; si no, «No se pudo aplicar el recuento».
 Implicados: ninguno
 
 ### INVENTORY-F15 Dar de baja stock sin venta (merma, rotura, consumo propio)
-Estado: por construir
-Actor: asistente
-Pantalla: asistente
+Estado: servidor hecho
+Actor: administrador, responsable (pantalla); asistente
+Pantalla: ficha y tabla de Productos (ventana «Baja»); asistente
 Pasos:
-1. Pide al asistente, por ejemplo, «da de baja 2 botellas de vino tinto por rotura».
-2. El asistente enseña la tarjeta de confirmación con el producto, la cantidad y el motivo; al
-   confirmar, descuenta esa cantidad del producto.
+1. En **Productos**, pulsa «Dar de baja stock» en la fila (menú ⋮) o en la ficha del producto: solo
+   sale en productos físicos con control de stock y con permiso de mover stock.
+2. En «Baja — <producto>» escribe la cantidad y el motivo (merma, rotura, consumo propio…) y pulsa
+   «Dar de baja». Por el asistente: «da de baja 2 botellas de vino tinto por rotura»; enseña la
+   tarjeta de confirmación con el producto, la cantidad y el motivo.
 3. En **Movimientos** sale «Descuento» con la cantidad en negativo y el motivo.
 Entra: el producto, la cantidad (en el escalón de su unidad) y el motivo. También se puede pedir
 por la API.
@@ -533,11 +547,13 @@ si cruza el umbral, del cruce (INVENTORY-F18). Lo pueden pedir el responsable y 
 Si falla: si no hay bastante y «Permitir vender sin stock» está apagado, «No hay stock suficiente
 para completar la operación.». Un producto que no existe: «Este producto no existe en este hub.».
 Una cantidad fuera del escalón: «Esa cantidad no encaja en la unidad del producto…» (no se
-redondea). Un servicio o un artículo sin control de stock: no pasa nada y no es un error.
+redondea). Un servicio se rechaza con «Un servicio no lleva stock.», y un artículo sin control de
+stock con «Este artículo no controla su stock: no hay nada que dar de baja.» (409
+`inventory.stock_not_tracked`): ni éxito en silencio ni movimiento. Todo sale dentro de la ventana.
 Implicados: ninguno
 
 ### INVENTORY-F16 Consultar el historial de movimientos
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Movimientos
 Pasos:
@@ -556,7 +572,7 @@ Referencia de una venta sale vacía. Error de carga: el aviso de la tabla con «
 Implicados: INVOICE-F20, SALE-F28
 
 ### INVENTORY-F17 Ver el panel y los productos con stock bajo
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Panel
 Pasos:
@@ -576,7 +592,7 @@ producto.
 Implicados: ninguno
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
-Estado: por construir
+Estado: servidor hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -597,7 +613,7 @@ aviso ni se pierde ni sale dos veces.
 Implicados: FLOW-F13
 
 ### INVENTORY-F19 Ajustar el inventario
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Ajustes
 Pasos:
@@ -614,14 +630,15 @@ Pasos:
 5. Pulsa «Guardar»: «Ajustes guardados.».
 Entra: los ajustes guardados del negocio (uno por negocio); si nunca se guardaron, valen los de
 fábrica.
-Sale: los ajustes, que se aplican desde el siguiente movimiento. No avisan a nadie.
+Sale: los ajustes, que se aplican desde el siguiente movimiento. Solo avisan a las pantallas abiertas
+(el Panel y las listas se refrescan); ninguna otra app reacciona.
 Si falla: «No se pudieron guardar los ajustes.». Si con la pestaña abierta entra otra persona sin
 el permiso (relevo de turno), los campos se bloquean, desaparece «Guardar» y sale «No tienes
 permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
 Implicados: SALE-F01
 
 ### INVENTORY-F20 Decidir qué artículos llevan control de stock
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -640,7 +657,7 @@ Si falla: los rechazos del formulario (INVENTORY-F01). Una vez decidido, el art�
 Implicados: SALE-F01
 
 ### INVENTORY-F21 Bajar el stock al cobrarse una venta
-Estado: por construir
+Estado: servidor hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -666,7 +683,7 @@ encendido, queda en negativo.
 Implicados: SALE-F01, SALE-F11, SALE-F15
 
 ### INVENTORY-F22 Bajar el stock de los componentes de un menú o un pack
-Estado: por construir
+Estado: servidor hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -683,7 +700,7 @@ Si falla: como INVENTORY-F21.
 Implicados: COMBO-F10, SALE-F12
 
 ### INVENTORY-F23 Reponer el stock al anularse una venta
-Estado: por construir
+Estado: servidor hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -718,7 +735,7 @@ Si falla: el stock queda por debajo de lo real hasta el siguiente recuento.
 Implicados: SALE-F31
 
 ### INVENTORY-F25 Imprimir la etiqueta del código de barras
-Estado: por construir
+Estado: por construir — necesita la app Impresión (`printing`), que aún no existe
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
 Pasos:
@@ -738,7 +755,7 @@ cola disponible se abre el diálogo de imprimir del navegador (código, SKU y no
 Implicados: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Vender al peso o por medida: unidades y escalón
-Estado: por construir
+Estado: servidor hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -761,7 +778,7 @@ Implicados: SALE-F10
 Pendiente de enlazar: core — leer la báscula y mandar el peso al TPV (no existe)
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
-Estado: por construir
+Estado: servidor hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -783,7 +800,7 @@ reparto.
 Implicados: COMBO-F06, KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
-Estado: por construir
+Estado: servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo)
 Actor: administrador, responsable
 Pantalla: Inicio: Termina de configurar tu negocio
 Pasos:
@@ -822,12 +839,17 @@ mismos permisos: sus **pantallas**, el **asistente** y la **API**. Esta sección
 completa. Las consultas se ejecutan sin preguntar; las acciones, desde el asistente, piden antes la
 tarjeta de confirmación («un clic» o «escribe para confirmar», según el riesgo).
 
+Por el asistente (también por voz) y por la API, un producto se nombra por su SKU o por su nombre, y una
+categoría por su nombre, además de por su identificador: «da de baja 2 botellas de vino tinto» basta. Si
+el nombre casa con varios, Inventario no elige: dice cuáles son y pregunta cuál. Toda lista se puede
+buscar y va por páginas de hasta 100.
+
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Los productos con su stock, con búsqueda, filtros (nombre, SKU, precio, stock, estado) y páginas | ver productos | F03, F05, F27 | `inventory.product.list` |
-| La ficha completa de un producto | ver productos | F02, F25 | `inventory.product.get` |
+| La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
 | El catálogo de venta entero: productos activos con precio, coste, categoría fiscal, unidad y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
@@ -851,7 +873,7 @@ tarjeta de confirmación («un clic» o «escribe para confirmar», según el ri
 | Crea muchas categorías de una vez, con informe por fila | crear categorías | un clic | F10 | `inventory.category.bulk_create` |
 | Cambia una categoría | cambiar categorías | un clic | F06 | `inventory.category.update` |
 | Elimina una categoría y desvincula sus productos | eliminar categorías | escribir para confirmar | F07 | `inventory.category.delete` |
-| Exporta productos o categorías a CSV | exportar productos | un clic | F11 | `inventory.product.export` |
+| Exporta productos o categorías a CSV | exportar productos | un clic | F11 | `inventory.product.export`, `inventory.category.export` |
 | Registra una recepción de mercancía (uno o varios productos, coste y albarán) | mover stock | un clic | F13 | `inventory.stock.receive` |
 | Aplica un recuento: el saldo pasa a ser lo contado, con motivo | mover stock | un clic | F14 | `inventory.stock.count` |
 | Da de baja una cantidad sin venta (merma, rotura, consumo propio), con motivo | mover stock | un clic | F15 | `inventory.stock.write_off` |
@@ -869,6 +891,8 @@ tarjeta de confirmación («un clic» o «escribe para confirmar», según el ri
 | Producto quitado de una categoría | Cambio, enlace suelto o categoría eliminada | Producto y categoría | Flujos | `inventory.product.uncategorized` |
 | Stock cambiado | Cualquier movimiento: inicial, recepción, recuento, baja, venta, anulación | Producto, cantidad, saldo y tipo de movimiento | Panel y paneles del Inicio | `inventory.stock.changed` |
 | Cruce del mínimo | Un artículo con control cruza su umbral, hacia abajo o «recuperado» | Producto (SKU y nombre), cantidad antes y después, umbral, tipo de movimiento, venta o albarán | Flujos (avisar para reponer) | `inventory.stock.threshold_crossed` |
+| Categoría nueva, cambiada o eliminada | Crear, cambiar o eliminar una categoría | Cuál (id y nombre) | Las pantallas abiertas | `inventory.category.created`, `.updated`, `.deleted` |
+| Ajustes cambiados | Guardar los ajustes con algún cambio | Nada | El Panel y las listas abiertas | `inventory.config.updated` |
 
 Los avisos llevan solo lo que dice la columna «Qué lleva»: ni la identidad fiscal del negocio ni
 datos de quien lo provocó.
@@ -919,6 +943,62 @@ API), no solo en la pantalla.
 
 ## Para quien lo mantiene
 Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
+
+## El servidor (fase de servidor, 2026-10-14)
+
+- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
+  `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
+  Las páginas (`frontend/`) llegan en la fase de frontend, iguales a las del módulo viejo.
+- **28 operaciones** (12 consultas y 16 acciones), todas con `ai` (descripción y, en las acciones,
+  riesgo: `high` para eliminar e importar) y con `expose_api` salvo las dos reacciones a Ventas. Las
+  rutas no llevan parámetros: el producto o la categoría viajan en la entrada.
+- **Requiere `tax`**: producto y categoría tienen FK a `tax.TaxCategory` (`PROTECT`, sin acceso inverso).
+  «Sin configurar» (`needs_tax_setup`) = sin categoría fiscal o con una que Impuestos desactivó. Toda
+  puerta rechaza una clave inexistente o inactiva. La importación de categorías lee el texto fiscal con
+  `tax.alias.resolve` (clave, nombre en cualquier idioma o alias aprendido).
+- **Cantidades**: `Decimal` exacto con tres decimales (el escalón más fino, el gramo en el kilo). Las
+  ocho unidades son un registro en código (`models.UNIT_SPECS`: tipo, factor como fracción exacta y
+  escalón), no una tabla: el negocio nunca crea unidades. Una cantidad fuera del escalón es 409
+  `inventory.off_grid_quantity` con su campo; nunca se redondea. Dinero en céntimos enteros.
+- **Referencias de persona**: `find_product` busca por SKU (sin mayúsculas), luego por nombre exacto y
+  luego por el único nombre que lo contiene; varios → 409 `inventory.product_ambiguous` con los
+  candidatos. Igual `find_category` por nombre o slug.
+- **Libro de movimientos**: `_move` escribe saldo y movimiento juntos con la fila del producto
+  bloqueada; varios productos se bloquean por orden de id. El cruce del mínimo se decide una vez por
+  operación sobre el total (también suelto + dentro de un menú).
+- **Ventas**: `events.REACTIONS` lleva `sale.sale.completed` → `inventory.stock.apply_sale` y
+  `sale.sale.voided` → `inventory.stock.restore_sale`; `events.react` los ejecuta como sistema, cada uno
+  en su transacción. Su permiso, `inventory.system`, no lo tiene ningún rol. La nota por venta
+  (`SaleStock`: `moved`, `unmoved`, `voided`) hace que la venta baje una vez, que la anulación reponga
+  una vez lo que dice el libro y que una anulación que llega antes deje la venta sin efecto. El relay
+  del outbox que entrega los eventos llega en la fase 2 (worker); hasta entonces se prueba con eventos
+  sintéticos. La forma del evento de Ventas (`sale_id`, `items[]` con `product_id`, `quantity`,
+  `is_service` y `components[]`) la fija el WORKBOOK de Ventas.
+- **Importar**: el servidor es la autoridad: recibe las celdas como texto ya mapeadas a nuestros
+  campos, lee importes y cantidades en formato español o inglés (con los dos separadores manda el de
+  la derecha; con solo comas, la coma es el decimal) y devuelve el informe por fila; `dry_run` es el
+  ensayo. Hasta 100 filas por llamada: el cliente parte el fichero (y con ello «Parar») y detecta los
+  SKU repetidos entre trozos. La adivinanza de cabeceras y la ventana fiscal son de la página.
+- **Exportar**: CSV con los formatos CLDR del idioma de la petición (librería `babel`), `;` donde la
+  coma es el decimal (Excel en español) y BOM UTF-8. El Hub aún no tiene moneda configurada: euros.
+- **Avisos añadidos** a la lista del producto: `inventory.category.*` e `inventory.config.updated`, solo
+  para refrescar las consultas vivas.
+- **Administrador de Django**: CRUD completo de todas las tablas para soporte (ronda 12, PLAN §17), el
+  libro incluido: es un segundo camino de escritura que avisa y no impide; ids y fechas automáticas se
+  ven pero no se editan. Las pantallas, el asistente y la API siguen sin editar el libro.
+- **Pruebas que bloquean**: dos ventas de la última unidad, la misma venta dos veces, una venta y su
+  anulación, y dos bajas del saldo entero, a la vez y en dos hilos (`test_services.py`). Con Impuestos
+  real, sin dobles (`test_integration_tax.py`): categoría de fábrica y su tipo calculado, categoría
+  desactivada rechazada por toda puerta, y textos fiscales leídos por sus alias.
+- **Categorías**: nacen con el icono `ion:cube-outline` y el color `#3880ff`, como en el módulo viejo.
+- **Roles**: el `cashier` viejo no existe; lo que tenía (ver productos, categorías y stock) es del
+  empleado (`hub_employee`).
+- **Del módulo viejo se queda fuera, a propósito**: almacenes (`inventory_location`) y variantes
+  (`inventory_product_variant`), que este WORKBOOK excluye; la foto del producto y la imagen de la
+  categoría (duda 6); el SKU autogenerado `PROD-NNN` de su alta en lote (aquí el SKU es obligatorio,
+  INVENTORY-F09); desactivar una categoría (cambio 5); `inventory.products.unit_of` y
+  `inventory.products.stock_levels`, que eran lecturas internas de los handlers (aquí la unidad sale en
+  la ficha y en `inventory.unit.list`, y el saldo se lee dentro de la transacción).
 
 ## Cambios frente al producto actual
 
@@ -984,7 +1064,7 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 | Control de stock por artículo con valor por defecto del negocio | sí | F20 |
 | Recepción de mercancía con coste | parcial: en pantalla, un producto cada vez y sin albarán (duda 10) | F13 |
 | Recuento absoluto con motivo | sí | F14 |
-| Merma, rotura o consumo propio con motivo | parcial: por el asistente o la API, sin pantalla (duda 3) | F15 |
+| Merma, rotura o consumo propio con motivo | sí: ventana «Baja» en la fila y la ficha, el asistente y la API | F15 |
 | Historial de movimientos con quién y cuándo | parcial: se guarda quién, la pantalla no lo enseña ni filtra por fecha o producto (duda 11) | F16 |
 | Alerta de stock bajo | parcial: panel, paneles del Inicio y aviso para Flujos, sin notificación (duda 13) | F17, F18 |
 | No vender lo que no hay, o vender en negativo, según el ajuste | parcial: el TPV no lo impide; apagado, la venta no baja nada (duda 1) | F19, F21 |
@@ -1073,8 +1153,9 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
    bajar a negativo igualmente y el ajuste solo gobernar el aviso?
 2. ¿Debe la devolución de una venta reponer stock, con una casilla «devolver al stock» por línea
    como Square y Toast (F24, SALE-F31)?
-3. ¿Hace falta una pantalla de baja con motivo (merma, rotura, consumo propio) o basta el recuento
-   (F15)?
+3. ~~¿Hace falta una pantalla de baja con motivo (merma, rotura, consumo propio) o basta el recuento
+   (F15)?~~ Resuelta (2026-10-14): sí, la ventana «Baja» en la fila y la ficha de Productos, como
+   Square (ajustes con motivo «dañado», «perdido»), Odoo («Desechar»), Shopify y Lightspeed.
 4. El «Tipo de IVA / Impuesto» de una categoría no lo usa nadie (F06): ¿se quita, o los productos de
    la categoría deben heredarlo?
 5. El «Umbral de stock bajo» de Ajustes solo lo hereda un producto creado por el asistente o la API

@@ -1,0 +1,168 @@
+{
+  "tax": {
+    "title": "Impuestos",
+    "tabs": {
+      "label": "Secciones de impuestos",
+      "categories": "Categorías",
+      "rules": "Reglas",
+      "aliases": "Alias"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "retry": "Reintentar",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "readOnly": "Puedes consultar las reglas fiscales pero no modificarlas.",
+    "noPermission": "No tienes permiso",
+    "yes": "Sí",
+    "no": "No",
+    "add": "Añadir",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
+    "filters": {
+      "button": "Filtros",
+      "count": "Filtros: {n}",
+      "title": "Filtros",
+      "clear": "Limpiar",
+      "done": "Hecho",
+      "any": "Cualquiera",
+      "from": "Desde",
+      "to": "Hasta"
+    },
+    "searchSelect": {
+      "search": "Buscar…",
+      "close": "Cerrar"
+    },
+    "types": {
+      "vat": "IVA",
+      "igic": "IGIC (Canarias)",
+      "ipsi": "IPSI (Ceuta/Melilla)",
+      "surcharge": "Recargo",
+      "sales_tax": "Impuesto sobre las ventas",
+      "withholding": "Retención",
+      "excise": "Especial",
+      "import_duty": "Arancel"
+    },
+    "classes": {
+      "subject": "Sujeta",
+      "subject_reverse": "Inversión del sujeto pasivo",
+      "exempt": "Exenta",
+      "not_subject": "No sujeta",
+      "not_subject_location": "No sujeta (reglas de localización)"
+    },
+    "categories": {
+      "search": "Buscar clave o nombre…",
+      "loadError": "No se han podido cargar las categorías fiscales",
+      "empty": "Sin categorías fiscales.",
+      "entity": {
+        "one": "categoría",
+        "many": "categorías"
+      },
+      "columns": {
+        "key": "Clave",
+        "name": "Nombre",
+        "description": "Descripción",
+        "origin": "Origen",
+        "active": "Activa",
+        "rate": "Tipo vigente"
+      },
+      "origin": {
+        "system": "Sistema",
+        "custom": "Propia"
+      },
+      "form": {
+        "title": "Nueva categoría fiscal",
+        "keyPlaceholder": "restaurant.food",
+        "namePlaceholder": "IVA general",
+        "descriptionPlaceholder": "opcional"
+      }
+    },
+    "rules": {
+      "search": "Buscar categoría o país…",
+      "loadError": "No se han podido cargar las reglas fiscales",
+      "empty": "Sin reglas fiscales.",
+      "entity": {
+        "one": "regla",
+        "many": "reglas"
+      },
+      "columns": {
+        "category": "Categoría",
+        "country": "País",
+        "region": "Región",
+        "rate": "%",
+        "type": "Tipo",
+        "qualification": "Calificación",
+        "regime": "Régimen",
+        "validFrom": "Vigente desde",
+        "validTo": "Vigente hasta",
+        "active": "Activa"
+      },
+      "status": {
+        "label": "Filtrar por estado",
+        "active": "Activas",
+        "inactive": "Desactivadas",
+        "all": "Todas"
+      },
+      "rateRange": "%",
+      "actions": {
+        "end": "Poner fecha de fin",
+        "deactivate": "Desactivar",
+        "restore": "Reactivar"
+      },
+      "deactivate": {
+        "title": "Desactivar regla fiscal",
+        "message": "La regla dejará de aplicarse a operaciones nuevas. Los documentos fiscales ya emitidos no se modifican.",
+        "confirm": "Desactivar regla"
+      },
+      "end": {
+        "title": "Fecha de fin de la regla",
+        "message": "Último día en que se aplica esta regla. Para cambiar el tipo, ponle fin el día antes de que empiece el nuevo y después añade la regla nueva desde ese día. Los documentos ya emitidos no cambian.",
+        "field": "Último día en que se aplica",
+        "submit": "Guardar fecha de fin"
+      },
+      "form": {
+        "title": "Nueva regla fiscal",
+        "countryPlaceholder": "Elige un país",
+        "regionPlaceholder": "Opcional — ISO 3166-2, p. ej. ES-CN",
+        "categoryPlaceholder": "Elige una categoría",
+        "ratePlaceholder": "21",
+        "rateNoTax": "Esta operación no lleva impuesto, así que su tipo es 0 %.",
+        "exemptReason": "Causa de exención",
+        "exemptReasonPlaceholder": "p. ej. E1 (código de la jurisdicción)",
+        "regimePlaceholder": "opcional (código de la jurisdicción, p. ej. 01)",
+        "parent": "Regla raíz (componente de)",
+        "parentPlaceholder": "Elige una regla raíz",
+        "parentNone": "No hay regla raíz compatible para ese país/región/categoría",
+        "noParent": "Ninguna (es una regla raíz)",
+        "parentInactive": "desactivada",
+        "componentLabel": "Etiqueta componente",
+        "componentLabelPlaceholder": "Recargo de equivalencia",
+        "hint": "Cada regla fija el % de una categoría en un país (y opcionalmente una región). Para multi-tributo (p. ej. recargo de equivalencia), elige en «Regla raíz» la regla de la que cuelga y dale una «Etiqueta componente»."
+      }
+    },
+    "aliases": {
+      "search": "Buscar alias o categoría…",
+      "loadError": "No se han podido cargar los alias de categorías",
+      "empty": "Sin alias de categorías.",
+      "entity": {
+        "one": "alias",
+        "many": "alias"
+      },
+      "columns": {
+        "alias": "Alias",
+        "category": "Categoría",
+        "source": "Origen",
+        "active": "Activo"
+      },
+      "source": {
+        "shipped": "De fábrica",
+        "learned": "Aprendido"
+      },
+      "form": {
+        "title": "Nuevo alias de categoría",
+        "aliasPlaceholder": "comida",
+        "categoryPlaceholder": "Elige una categoría"
+      }
+    }
+  }
+}

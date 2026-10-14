@@ -1,0 +1,315 @@
+{
+  "staff": {
+    "title": "Personal",
+    "tabs": {
+      "label": "Secciones de Personal",
+      "staff": "Personal",
+      "roles": "Roles",
+      "time_off": "Ausencias",
+      "schedules": "Horarios",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "retry": "Reintentar",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "noPermission": "No tienes permiso",
+    "loading": "Cargando…",
+    "yes": "Sí",
+    "no": "No",
+    "add": "Añadir",
+    "save": "Guardar",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
+    "filters": {
+      "button": "Filtros",
+      "count": "Filtros: {n}",
+      "title": "Filtros",
+      "clear": "Limpiar",
+      "done": "Hecho",
+      "any": "Cualquiera",
+      "from": "Desde",
+      "to": "Hasta"
+    },
+    "memberStatus": {
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "on_leave": "De baja"
+    },
+    "leaveType": {
+      "vacation": "Vacaciones",
+      "sick": "Baja por enfermedad",
+      "personal": "Asuntos propios",
+      "training": "Formación",
+      "other": "Otros"
+    },
+    "requestStatus": {
+      "pending": "Pendiente",
+      "approved": "Aprobada",
+      "rejected": "Rechazada",
+      "cancelled": "Cancelada"
+    },
+    "days": {
+      "long": {
+        "0": "Lunes",
+        "1": "Martes",
+        "2": "Miércoles",
+        "3": "Jueves",
+        "4": "Viernes",
+        "5": "Sábado",
+        "6": "Domingo"
+      },
+      "short": {
+        "0": "Lun",
+        "1": "Mar",
+        "2": "Mié",
+        "3": "Jue",
+        "4": "Vie",
+        "5": "Sáb",
+        "6": "Dom"
+      }
+    },
+    "members": {
+      "search": "Buscar miembro…",
+      "empty": "Sin miembros del staff.",
+      "loadError": "No se pudieron cargar los miembros del staff",
+      "entity": {
+        "one": "miembro",
+        "many": "miembros"
+      },
+      "columns": {
+        "name": "Nombre",
+        "role": "Rol",
+        "email": "Email",
+        "phone": "Teléfono",
+        "status": "Estado",
+        "hourlyRate": "Tarifa/h"
+      },
+      "filters": {
+        "firstName": "Nombre",
+        "lastName": "Apellidos",
+        "bookable": "Reservable",
+        "hireDate": "Fecha de alta",
+        "color": "Color (#RRGGBB)",
+        "user": "Usuario del Hub"
+      },
+      "actions": {
+        "edit": "Editar",
+        "deactivate": "Desactivar",
+        "terminate": "Dar de baja"
+      },
+      "form": {
+        "titleNew": "Nuevo",
+        "titleEdit": "Editar · {name}",
+        "firstName": "Nombre",
+        "lastName": "Apellidos",
+        "email": "Email",
+        "phone": "Teléfono",
+        "employeeNumber": "Nº de empleado",
+        "role": "Rol",
+        "roleNone": "Sin rol",
+        "roleRetired": "{name} (retirado)",
+        "hubUser": "Usuario del Hub",
+        "hubUserNone": "Sin acceso al Hub",
+        "hubUserHint": "Sin usuario del Hub, las ventas de mostrador se atribuyen a quien tenga la sesión y no le contarán para su comisión.",
+        "status": "Estado",
+        "bookable": "Reservable",
+        "bookingBuffer": "Margen entre citas (min)",
+        "hireDate": "Fecha de alta",
+        "color": "Color",
+        "specialties": "Especialidades",
+        "bio": "Bio",
+        "compensation": "Retribución",
+        "hourlyRate": "Tarifa por hora",
+        "commission": "Comisión (%)",
+        "notes": "Notas de RRHH",
+        "loadError": "No se pudo cargar la ficha",
+        "hubUserGone": "Sin acceso a este negocio"
+      },
+      "deactivate": {
+        "title": "Desactivar profesional",
+        "message": "¿Sacar a {name} de la agenda? Deja de ser reservable; no se borra nada.",
+        "confirm": "Desactivar"
+      },
+      "terminate": {
+        "title": "Dar de baja",
+        "message": "¿Dar de baja a {name}? Su ficha se cierra y sus horarios y ausencias futuras dejan de contar.",
+        "date": "Último día (hoy si se deja vacío)",
+        "reason": "Motivo (opcional)",
+        "confirm": "Dar de baja"
+      },
+      "mine": {
+        "button": "Mi ficha",
+        "title": "Mi ficha",
+        "close": "Cerrar"
+      }
+    },
+    "roles": {
+      "search": "Buscar rol…",
+      "empty": "Sin roles definidos.",
+      "loadError": "No se pudieron cargar los roles",
+      "entity": {
+        "one": "rol",
+        "many": "roles"
+      },
+      "columns": {
+        "name": "Rol",
+        "description": "Descripción",
+        "members": "Miembros"
+      },
+      "retired": "Retirado",
+      "filters": {
+        "state": "Estado",
+        "active": "Activo",
+        "retired": "Retirado",
+        "color": "Color (#RRGGBB)",
+        "members": "Miembros"
+      },
+      "form": {
+        "titleNew": "Nuevo",
+        "titleEdit": "Editar · {name}",
+        "name": "Nombre del rol",
+        "description": "Descripción",
+        "color": "Color",
+        "colorPlaceholder": "Color (#RRGGBB)",
+        "order": "Orden",
+        "active": "Activo",
+        "activeHint": "Un rol retirado deja de ofrecerse en las fichas; las que ya lo llevan lo conservan."
+      }
+    },
+    "timeOff": {
+      "search": "Buscar miembro…",
+      "empty": "Sin solicitudes de ausencia.",
+      "loadError": "No se pudieron cargar las ausencias",
+      "entity": {
+        "one": "solicitud",
+        "many": "solicitudes"
+      },
+      "view": {
+        "label": "De quién son las ausencias",
+        "all": "Todas",
+        "mine": "Mis ausencias"
+      },
+      "columns": {
+        "member": "Miembro",
+        "type": "Tipo",
+        "from": "Desde",
+        "to": "Hasta",
+        "status": "Estado",
+        "reason": "Motivo"
+      },
+      "filters": {
+        "member": "Miembro",
+        "fullDay": "Día completo",
+        "dates": "Fechas"
+      },
+      "actions": {
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "cancel": "Cancelar"
+      },
+      "cancel": {
+        "title": "Cancelar ausencia",
+        "message": "¿Cancelar la ausencia de {name} del {from} al {to}? No se puede deshacer.",
+        "confirm": "Cancelar ausencia",
+        "keep": "Mantenerla"
+      },
+      "form": {
+        "titleNew": "Nueva",
+        "titleRequest": "Pedir ausencia",
+        "member": "Miembro",
+        "type": "Tipo",
+        "startDate": "Desde",
+        "endDate": "Hasta",
+        "fullDay": "Día completo",
+        "startTime": "Desde (hora)",
+        "endTime": "Hasta (hora)",
+        "reason": "Motivo"
+      }
+    },
+    "schedules": {
+      "member": "Miembro",
+      "empty": "Este miembro aún no tiene horarios.",
+      "loadError": "No se pudieron cargar los horarios",
+      "entity": {
+        "one": "horario",
+        "many": "horarios"
+      },
+      "noMembers": {
+        "title": "Aún no hay miembros del staff",
+        "message": "Da de alta miembros del staff para poder asignarles horarios.",
+        "action": "Dar de alta un miembro"
+      },
+      "columns": {
+        "name": "Horario",
+        "default": "Por defecto",
+        "from": "Desde",
+        "to": "Hasta",
+        "active": "Activo",
+        "hours": "Horas"
+      },
+      "actions": {
+        "edit": "Editar",
+        "toggle": "Activar / desactivar",
+        "delete": "Eliminar"
+      },
+      "delete": {
+        "title": "Eliminar horario",
+        "message": "¿Eliminar el horario «{name}»? Sus horas dejan de contar para la disponibilidad.",
+        "confirm": "Eliminar"
+      },
+      "form": {
+        "titleNew": "Nuevo",
+        "titleEdit": "Editar · {name}",
+        "name": "Horario",
+        "namePlaceholder": "Nombre del horario",
+        "defaultName": "Horario habitual",
+        "effectiveFrom": "Vigente desde",
+        "effectiveUntil": "Vigente hasta",
+        "isDefault": "Por defecto",
+        "week": "Semana",
+        "start": "Inicio",
+        "end": "Fin",
+        "breakStart": "Inicio descanso",
+        "breakEnd": "Fin descanso",
+        "sepTo": "a",
+        "sepBreak": "descanso",
+        "notWorking": "No trabaja",
+        "create": "Crear horario"
+      }
+    },
+    "settings": {
+      "title": "Ajustes",
+      "loadError": "No se pudieron cargar los ajustes",
+      "saved": "Ajustes guardados",
+      "workday": "Jornada",
+      "visibility": "Visibilidad y avisos",
+      "fields": {
+        "default_work_start": "Inicio de jornada (HH:MM)",
+        "default_work_end": "Fin de jornada (HH:MM)",
+        "default_break_duration": "Duración del descanso (minutos)",
+        "min_advance_booking": "Antelación mínima de reserva (horas)",
+        "max_daily_hours": "Horas máximas por día",
+        "overtime_threshold": "Umbral de horas extra (horas/semana)",
+        "show_staff_photos": "Mostrar fotos del personal",
+        "show_staff_bio": "Mostrar biografía del personal",
+        "allow_staff_selection": "Permitir elegir profesional",
+        "notify_new_appointment": "Avisar de nueva cita",
+        "notify_cancellation": "Avisar de cancelación"
+      },
+      "hints": {
+        "default_work_start": "Hora de inicio de la jornada por defecto. La jornada nocturna (fin antes del inicio) es válida.",
+        "default_work_end": "Hora de fin de la jornada por defecto. Si es anterior al inicio, se entiende que el turno cruza la medianoche.",
+        "default_break_duration": "Entre 0 y 480 minutos.",
+        "min_advance_booking": "Entre 0 y 168 horas (una semana).",
+        "max_daily_hours": "Entre 1 y 24 horas.",
+        "overtime_threshold": "Entre 1 y 168 horas semanales."
+      }
+    },
+    "picker": {
+      "search": "Buscar…",
+      "cancel": "Cancelar"
+    }
+  }
+}

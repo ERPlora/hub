@@ -1,0 +1,315 @@
+{
+  "staff": {
+    "title": "Staff",
+    "tabs": {
+      "label": "Staff sections",
+      "staff": "Staff",
+      "roles": "Roles",
+      "time_off": "Time Off",
+      "schedules": "Schedules",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "retry": "Retry",
+      "appInactive": "This app is not active in this business"
+    },
+    "noPermission": "You do not have permission",
+    "loading": "Loading…",
+    "yes": "Yes",
+    "no": "No",
+    "add": "Add",
+    "save": "Save",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches your search or filters.",
+    "filters": {
+      "button": "Filters",
+      "count": "Filters: {n}",
+      "title": "Filters",
+      "clear": "Clear",
+      "done": "Done",
+      "any": "Any",
+      "from": "From",
+      "to": "To"
+    },
+    "memberStatus": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "on_leave": "On leave"
+    },
+    "leaveType": {
+      "vacation": "Vacation",
+      "sick": "Sick leave",
+      "personal": "Personal",
+      "training": "Training",
+      "other": "Other"
+    },
+    "requestStatus": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled"
+    },
+    "days": {
+      "long": {
+        "0": "Monday",
+        "1": "Tuesday",
+        "2": "Wednesday",
+        "3": "Thursday",
+        "4": "Friday",
+        "5": "Saturday",
+        "6": "Sunday"
+      },
+      "short": {
+        "0": "Mon",
+        "1": "Tue",
+        "2": "Wed",
+        "3": "Thu",
+        "4": "Fri",
+        "5": "Sat",
+        "6": "Sun"
+      }
+    },
+    "members": {
+      "search": "Search member…",
+      "empty": "No staff members.",
+      "loadError": "The staff members could not be loaded",
+      "entity": {
+        "one": "staff member",
+        "many": "staff members"
+      },
+      "columns": {
+        "name": "Name",
+        "role": "Role",
+        "email": "Email",
+        "phone": "Phone",
+        "status": "Status",
+        "hourlyRate": "Rate/h"
+      },
+      "filters": {
+        "firstName": "First name",
+        "lastName": "Last name",
+        "bookable": "Bookable",
+        "hireDate": "Hire date",
+        "color": "Color (#RRGGBB)",
+        "user": "Hub user"
+      },
+      "actions": {
+        "edit": "Edit",
+        "deactivate": "Deactivate",
+        "terminate": "Terminate"
+      },
+      "form": {
+        "titleNew": "New",
+        "titleEdit": "Edit · {name}",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "email": "Email",
+        "phone": "Phone",
+        "employeeNumber": "Employee ID",
+        "role": "Role",
+        "roleNone": "No role",
+        "roleRetired": "{name} (retired)",
+        "hubUser": "Hub user",
+        "hubUserNone": "No Hub access",
+        "hubUserHint": "Without a Hub user, counter sales go to whoever is signed in and will not count towards this person's commission.",
+        "status": "Status",
+        "bookable": "Bookable",
+        "bookingBuffer": "Buffer between appointments (min)",
+        "hireDate": "Hire date",
+        "color": "Color",
+        "specialties": "Specialties",
+        "bio": "Bio",
+        "compensation": "Pay",
+        "hourlyRate": "Hourly rate",
+        "commission": "Commission (%)",
+        "notes": "HR notes",
+        "loadError": "Could not load the member",
+        "hubUserGone": "No access to this business"
+      },
+      "deactivate": {
+        "title": "Deactivate member",
+        "message": "Take {name} off the floor? They stop being bookable; nothing is deleted.",
+        "confirm": "Deactivate"
+      },
+      "terminate": {
+        "title": "Terminate member",
+        "message": "Terminate {name}? Their record is closed and their future schedules and absences stop counting.",
+        "date": "Last day (today if empty)",
+        "reason": "Reason (optional)",
+        "confirm": "Terminate"
+      },
+      "mine": {
+        "button": "My record",
+        "title": "My record",
+        "close": "Close"
+      }
+    },
+    "roles": {
+      "search": "Search role…",
+      "empty": "No roles defined.",
+      "loadError": "The roles could not be loaded",
+      "entity": {
+        "one": "role",
+        "many": "roles"
+      },
+      "columns": {
+        "name": "Role",
+        "description": "Description",
+        "members": "Members"
+      },
+      "retired": "Retired",
+      "filters": {
+        "state": "Status",
+        "active": "Active",
+        "retired": "Retired",
+        "color": "Color (#RRGGBB)",
+        "members": "Members"
+      },
+      "form": {
+        "titleNew": "New",
+        "titleEdit": "Edit · {name}",
+        "name": "Role name",
+        "description": "Description",
+        "color": "Color",
+        "colorPlaceholder": "Color (#RRGGBB)",
+        "order": "Order",
+        "active": "Active",
+        "activeHint": "A retired role is no longer offered in the records; the ones that already have it keep it."
+      }
+    },
+    "timeOff": {
+      "search": "Search member…",
+      "empty": "No time-off requests.",
+      "loadError": "The time off could not be loaded",
+      "entity": {
+        "one": "request",
+        "many": "requests"
+      },
+      "view": {
+        "label": "Whose time off",
+        "all": "All",
+        "mine": "My time off"
+      },
+      "columns": {
+        "member": "Member",
+        "type": "Type",
+        "from": "From",
+        "to": "To",
+        "status": "Status",
+        "reason": "Reason"
+      },
+      "filters": {
+        "member": "Member",
+        "fullDay": "Full day",
+        "dates": "Dates"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "cancel": "Cancel"
+      },
+      "cancel": {
+        "title": "Cancel time off",
+        "message": "Cancel the time off of {name} from {from} to {to}? It cannot be undone.",
+        "confirm": "Cancel time off",
+        "keep": "Keep it"
+      },
+      "form": {
+        "titleNew": "New",
+        "titleRequest": "Request time off",
+        "member": "Member",
+        "type": "Type",
+        "startDate": "From",
+        "endDate": "To",
+        "fullDay": "Full day",
+        "startTime": "From (time)",
+        "endTime": "To (time)",
+        "reason": "Reason"
+      }
+    },
+    "schedules": {
+      "member": "Member",
+      "empty": "This member has no schedules yet.",
+      "loadError": "The schedules could not be loaded",
+      "entity": {
+        "one": "schedule",
+        "many": "schedules"
+      },
+      "noMembers": {
+        "title": "No staff members yet",
+        "message": "Add staff members so you can assign them schedules.",
+        "action": "Add staff member"
+      },
+      "columns": {
+        "name": "Schedule",
+        "default": "Default",
+        "from": "From",
+        "to": "To",
+        "active": "Active",
+        "hours": "Hours"
+      },
+      "actions": {
+        "edit": "Edit",
+        "toggle": "Activate / deactivate",
+        "delete": "Delete"
+      },
+      "delete": {
+        "title": "Delete schedule",
+        "message": "Delete the schedule \"{name}\"? Its hours stop counting for availability.",
+        "confirm": "Delete"
+      },
+      "form": {
+        "titleNew": "New",
+        "titleEdit": "Edit · {name}",
+        "name": "Schedule",
+        "namePlaceholder": "Schedule name",
+        "defaultName": "Regular schedule",
+        "effectiveFrom": "Effective from",
+        "effectiveUntil": "Effective until",
+        "isDefault": "Default",
+        "week": "Week",
+        "start": "Start",
+        "end": "End",
+        "breakStart": "Break start",
+        "breakEnd": "Break end",
+        "sepTo": "to",
+        "sepBreak": "break",
+        "notWorking": "Off",
+        "create": "Create schedule"
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "loadError": "The settings could not be loaded",
+      "saved": "Settings saved",
+      "workday": "Working day",
+      "visibility": "Visibility and notices",
+      "fields": {
+        "default_work_start": "Working day starts (HH:MM)",
+        "default_work_end": "Working day ends (HH:MM)",
+        "default_break_duration": "Break duration (minutes)",
+        "min_advance_booking": "Minimum booking notice (hours)",
+        "max_daily_hours": "Maximum hours per day",
+        "overtime_threshold": "Overtime threshold (hours/week)",
+        "show_staff_photos": "Show staff photos",
+        "show_staff_bio": "Show staff bio",
+        "allow_staff_selection": "Let customers choose the professional",
+        "notify_new_appointment": "Notify on a new appointment",
+        "notify_cancellation": "Notify on a cancellation"
+      },
+      "hints": {
+        "default_work_start": "Default start of the working day. A night shift (end before start) is valid.",
+        "default_work_end": "Default end of the working day. If it is earlier than the start, the shift is taken to cross midnight.",
+        "default_break_duration": "Between 0 and 480 minutes.",
+        "min_advance_booking": "Between 0 and 168 hours (one week).",
+        "max_daily_hours": "Between 1 and 24 hours.",
+        "overtime_threshold": "Between 1 and 168 hours per week."
+      }
+    },
+    "picker": {
+      "search": "Search…",
+      "cancel": "Cancel"
+    }
+  }
+}
