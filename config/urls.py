@@ -11,7 +11,7 @@ from live.live_view import live_stream
 from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
 
 from base.admin import open_hub
-from base.auth_views import auth_callback, auth_logout
+from base.auth_views import auth_callback, auth_login, auth_logout
 from base.health import readyz
 from base.spa import spa
 from config.api import api
@@ -30,6 +30,7 @@ urlpatterns = [
     path("api/", api.urls),
     path("csp-report/", csp_report, name="csp-report"),
     path("readyz", readyz, name="readyz"),
+    path("auth/login", auth_login, name="auth-login"),
     path("auth/callback", auth_callback, name="auth-callback"),
     path("auth/logout", auth_logout, name="auth-logout"),
     re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),

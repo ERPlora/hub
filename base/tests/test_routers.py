@@ -55,9 +55,11 @@ def test_other_apps_migrate_where_the_next_router_says():
 
 
 #: What register_apps may send to the `shared` alias: its two tables, its transaction lock, the
-#: check of the mirror's columns and the savepoints of its transaction.
+#: check that the tables exist (``pg_catalog``) and of the mirror's columns, and the savepoints of
+#: its transaction.
 ALLOWED_SHARED_SQL = re.compile(
-    r'"shared"\."(?:app|app_doc)"|pg_advisory_xact_lock|information_schema\.columns|^(?:RELEASE |ROLLBACK TO )?SAVEPOINT '
+    r'"shared"\."(?:app|app_doc)"|pg_advisory_xact_lock|FROM pg_catalog\.pg_class c JOIN pg_catalog\.pg_namespace n '
+    r'|information_schema\.columns|^(?:RELEASE |ROLLBACK TO )?SAVEPOINT '
 )
 
 

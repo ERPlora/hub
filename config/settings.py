@@ -66,6 +66,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "ninja",
     "apps.demo",
+    "apps.customer",
+    "apps.staff",
+    "apps.tax",
+    "apps.inventory",
 ]
 
 MIDDLEWARE = [

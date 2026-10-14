@@ -8,6 +8,7 @@ its real path, the same with the header or without it, on the platform host and 
 """
 
 import asyncio
+import re
 from urllib.parse import urlsplit
 
 import pytest
@@ -86,8 +87,12 @@ def get(host: str, path: str, root_path: str = "") -> tuple[int, dict[str, str],
 
 
 def outcome(response: tuple[int, dict[str, str], bytes]) -> tuple[int, str, str | None]:
+    """Status, type and ``Location``; without the ``state`` of a jump to the SaaS's login, fresh each time."""
     status, headers, _ = response
-    return status, headers.get("content-type", ""), headers.get("location")
+    location = headers.get("location")
+    if location is not None:
+        location = re.sub(r"&state=[^&]*", "", location)
+    return status, headers.get("content-type", ""), location
 
 
 @pytest.mark.parametrize(

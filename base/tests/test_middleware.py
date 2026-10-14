@@ -7,6 +7,8 @@ PlatformHostMiddleware: the platform host (``hubs.localhost``, ``hubs.erplora.co
 admin for the staff (round 13, PLAN §18.1); on any other host, ``/admin/`` is not found (PLAN §18.1.3).
 """
 
+from urllib.parse import parse_qs, urlsplit
+
 import pytest
 from django.urls import clear_script_prefix, set_script_prefix
 
@@ -33,6 +35,12 @@ def browse(client, path, host="a.localhost:8000", method="get"):
     return getattr(client, method)(path, HTTP_HOST=host, HTTP_ACCEPT=HTML)
 
 
+def state_of(response) -> str:
+    """The ``state`` of a jump to the SaaS's login (its ``Location``)."""
+    [state] = parse_qs(urlsplit(response["Location"]).query)["state"]
+    return state
+
+
 @pytest.mark.parametrize(
     ("path", "host", "location"),
     [
@@ -43,7 +51,21 @@ def browse(client, path, host="a.localhost:8000", method="get"):
 )
 def test_an_anonymous_browser_goes_to_the_saas_login_of_its_hub(client, path, host, location):
     response = browse(client, path, host)
-    assert (response.status_code, response["Location"]) == (302, location)
+    assert (response.status_code, response["Location"]) == (302, f"{location}&state={state_of(response)}")
+
+
+def test_the_jump_binds_its_state_to_this_browser_with_a_cookie(client):
+    # Only the callback reads it (PLAN-SAAS §3.1): /auth/callback refuses a code without this state.
+    response = browse(client, "/demo/items")
+    cookie = response.cookies["hub_login_state"]
+    assert (cookie["httponly"], cookie["samesite"], cookie["secure"], cookie["max-age"], cookie["path"]) == (
+        True,
+        "Lax",
+        True,
+        600,
+        "/auth/callback",
+    )
+    assert state_of(response) != state_of(browse(client, "/demo/items"))
 
 
 def test_head_is_a_navigation_too(client):
@@ -249,4 +271,4 @@ class TestPlatformHost:
 
     def test_a_hub_host_keeps_the_saas_login_of_its_hub(self, client):
         response = browse(client, "/demo/items")
-        assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/demo/items"
+        assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/demo/items&state={state_of(response)}"

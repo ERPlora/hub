@@ -2,8 +2,9 @@
 
 Runs ``base.worker.run`` until SIGTERM (ECS stopping the task; its ``stopTimeout`` is 30 s) or SIGINT
 (Ctrl-C). The handlers only ask the loop to stop, so the current step ends cleanly and the process
-exits 0; a failed worker exits with its code (non-zero), which the infra's ``task_failed`` rule
-reports. The previous handlers come back when it returns.
+exits 0, also while it still waits for the SaaS to migrate the ``shared`` schema; a failed worker
+exits with its code (non-zero), which the infra's ``task_failed`` rule reports. The previous
+handlers come back when it returns.
 """
 
 import signal

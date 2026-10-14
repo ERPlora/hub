@@ -27,7 +27,10 @@ def test_employee_on_its_host_and_elsewhere(client, make_user):
     client.force_login(make_user("ana", host="a", role="hub_employee"))
     on_a = client.get("/api/me", HTTP_HOST="a.localhost:8000").json()
     on_b = client.get("/api/me", HTTP_HOST="b.localhost:8000").json()
-    assert (on_a["user"]["label"], on_a["permissions"], [g["id"] for g in on_a["menu"]]) == ("ana", ["demo.view"], ["demo"])
+    # demo is the reference app; the other modules' grants and menus are pinned by their own tests.
+    demo_permissions = [permission for permission in on_a["permissions"] if permission.startswith("demo.")]
+    assert (on_a["user"]["label"], demo_permissions) == ("ana", ["demo.view"])
+    assert "demo" in [g["id"] for g in on_a["menu"]]
     assert (on_b["permissions"], on_b["menu"]) == ([], [])
 
 

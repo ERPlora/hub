@@ -18,19 +18,32 @@ pytestmark = pytest.mark.usefixtures("saas")
 
 
 class TestLoginUrl:
-    def test_carries_the_hub_and_a_readable_next(self):
-        assert auth.login_url("a", "/demo/items") == "http://localhost:8001/hub-login/?hub=a&next=/demo/items"
-
-    def test_without_next_the_spa_appends_its_own(self):
-        assert auth.login_url("a") == "http://localhost:8001/hub-login/?hub=a"
+    def test_carries_the_hub_a_readable_next_and_the_state(self):
+        url = auth.login_url("a", "/demo/items", state="s1")
+        assert url == "http://localhost:8001/hub-login/?hub=a&next=/demo/items&state=s1"
 
     def test_encodes_the_query_of_next_and_adds_the_error(self):
-        url = auth.login_url("a", "/demo/items?q=1&x=2", error="invalid_code")
-        assert url == "http://localhost:8001/hub-login/?hub=a&next=/demo/items%3Fq%3D1%26x%3D2&error=invalid_code"
+        url = auth.login_url("a", "/demo/items?q=1&x=2", state="s1", error="invalid_code")
+        assert url == "http://localhost:8001/hub-login/?hub=a&next=/demo/items%3Fq%3D1%26x%3D2&error=invalid_code&state=s1"
 
     def test_follows_the_setting_with_or_without_a_trailing_slash(self, settings):
         settings.SAAS_URL = "https://erplora.com/"
-        assert auth.login_url("bar") == "https://erplora.com/hub-login/?hub=bar"
+        assert auth.login_url("bar", "/", state="s1") == "https://erplora.com/hub-login/?hub=bar&next=/&state=s1"
+
+    def test_the_staff_s_jump_asks_for_the_hub_admin_audience(self):
+        url = auth.login_url("a", "/admin/hub/a/", state="s1", audience="hub-admin")
+        assert url == "http://localhost:8001/hub-login/?hub=a&audience=hub-admin&next=/admin/hub/a/&state=s1"
+
+    def test_an_unknown_audience_is_a_programming_error(self):
+        with pytest.raises(ValueError):
+            auth.login_url("a", "/", state="s1", audience="everything")
+
+    def test_never_leaves_without_a_next_and_a_state(self):
+        # The callback refuses a code that comes back without the state of this browser's jump.
+        with pytest.raises(TypeError):
+            auth.login_url("a", "/demo/items")
+        with pytest.raises(TypeError):
+            auth.login_url("a", state="s1")
 
 
 class TestAdminHubsUrl:
@@ -178,7 +191,7 @@ class TestInternalUrl:
 
     def test_the_browser_redirects_keep_the_public_url(self, settings):
         settings.SAAS_URL, settings.SAAS_INTERNAL_URL = PUBLIC, f"{INTERNAL}/"
-        assert auth.login_url("a", "/demo/items") == f"{PUBLIC}/hub-login/?hub=a&next=/demo/items"
+        assert auth.login_url("a", "/demo/items", state="s1") == f"{PUBLIC}/hub-login/?hub=a&next=/demo/items&state=s1"
         assert auth.admin_hubs_url("invalid_code") == f"{PUBLIC}/admin/accounts/hubs/?error=invalid_code"
         assert auth.saas_url("/accounts/logout/") == f"{PUBLIC}/accounts/logout/"
 

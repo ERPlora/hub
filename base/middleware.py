@@ -22,11 +22,12 @@ callback and the logout), static files, CSP reports, ``/readyz`` (exactly that p
 
 ``SaasLoginRequiredMiddleware``: the Hub has no login of its own; the login is the SaaS's.
 
-A browser without a session that loads a SPA route goes to the SaaS's ``/hub-login/`` for this hub
-(PLAN-SAAS §3.1 step 4), which comes back with a one-time code to ``/auth/callback``. Only page
-loads of the SPA are redirected: anything with a URL of its own in Django (``/api`` answers 401,
-``/auth``, ``/healthz``, static files…) never reaches the SPA view. A request that does not ask for
-HTML gets the shell, whose auth gate sends to the same login.
+A browser without a session that loads a SPA route jumps to the SaaS's ``/hub-login/`` for this hub
+(PLAN-SAAS §3.1 step 4) with a fresh ``state`` in its cookie (``base.auth.login_redirect``), and the
+SaaS comes back with a one-time code and that ``state`` to ``/auth/callback``. Only page loads of the
+SPA are redirected: anything with a URL of its own in Django (``/api`` answers 401, ``/auth``,
+``/healthz``, static files…) never reaches the SPA view. A request that does not ask for HTML gets
+the shell, whose auth gate sends to ``/auth/login``, the same jump.
 """
 
 from django.conf import settings
@@ -38,7 +39,7 @@ from django.utils.translation import gettext
 from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
-from base.auth import admin_hubs_url, login_url
+from base.auth import admin_hubs_url, login_redirect
 from base.health import READYZ_PATH
 from base.operations import HostScopeResolver, is_platform_host
 from base.spa import spa
@@ -108,4 +109,4 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         if request.method not in ("GET", "HEAD") or "text/html" not in request.headers.get("Accept", ""):
             return None
         slug = HostScopeResolver().resolve(request).key
-        return HttpResponseRedirect(login_url(slug, request.get_full_path()))
+        return login_redirect(slug, request.get_full_path())

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import pytest
 from django.utils.translation import gettext_lazy
 from live.context import OperationContext, Scope
-from live.meta import Nav
+from live.meta import Nav, module_configs
 from live.operations import get
 
 from base.schemas import SessionMeIn, SessionMeOut
@@ -43,10 +43,13 @@ def test_anonymous():
 
 def test_superuser_sees_every_app(superuser):
     me = session_me(superuser, {"*"})
+    modules = module_configs()
     assert me["user"] == {"id": str(superuser.pk), "label": "root"}
     assert me["permissions"] == ["*"]
-    assert me["menu"] == [DEMO_MENU]
-    assert me["apps"] == [{"label": "demo", "state": "on"}]
+    # Every installed module: a menu group for each one with navigation, an app entry for all.
+    assert DEMO_MENU in me["menu"]
+    assert [group["id"] for group in me["menu"]] == [config.label for config in modules if config.navigation]
+    assert me["apps"] == [{"label": config.label, "state": "on"} for config in modules]
 
 
 def test_employee_sees_demo(make_user):
