@@ -1216,7 +1216,9 @@ necesitan para el soporte». Por eso:
   próxima pasada»** llama a `verifactu.contingency.retry` sobre el registro más reciente que espera en esa cadena.
   `next_send_at` es el `TiempoEsperaEnvio` de la AEAT y **nunca se acorta** (las preguntas frecuentes de la AEAT, en «Referencia adoptada»):
   reprogramar hace que salga en cuanto la AEAT lo permita. El `wait_reason` de un registro tampoco se borra al
-  reprogramar: es lo que lo declara fuera de plazo (`Incidencia` S); lo reescribe la pasada siguiente.
+  reprogramar: es lo que lo declara fuera de plazo (`Incidencia` S); lo reescribe la pasada siguiente. La excepción
+  es un rechazo de la pasarela (`refused`, con su código y su mensaje en el detalle), que no sale nunca por tiempo:
+  reprogramarlo lo devuelve a la cola sin motivo, y sus intentos lo siguen declarando fuera de plazo.
 - **Configuración**: se ve entera y solo se elige la **vía de envío**, por `verifactu.config.update` (el
   formulario la ejecuta al validarse, así que su rechazo —sin certificado propio válido, sin el otorgamiento
   aprobado en producción— es el error del formulario y no se guarda nada). Nunca se teclean el entorno (va por
