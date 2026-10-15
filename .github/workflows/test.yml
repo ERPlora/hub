@@ -61,6 +61,9 @@ jobs:
       - name: Script tests
         run: for t in .github/scripts/*.test.sh; do bash "$t"; done
 
+      # WeasyPrint's libraries (apps/invoice/pdf.py), as the Dockerfile installs them.
+      - name: WeasyPrint's libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       # --locked: uv.lock must match pyproject.toml.
       - run: uv sync --locked

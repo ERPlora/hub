@@ -43,6 +43,8 @@ check "default command: daphne on 0.0.0.0:8000 behind the proxy headers" '
   [[ $cmd == *daphne* && $cmd == *--proxy-headers* && $cmd == *0.0.0.0* && $cmd == *8000* &&
      $cmd == *config.asgi:application* ]]'
 check "python and the live package" 'in_image python -c "import live, django, daphne"'
+check "WeasyPrint loads its libraries and prints a PDF" \
+  'in_image python -c "import weasyprint; assert weasyprint.HTML(string=\"<p>x</p>\").write_pdf().startswith(b\"%PDF-\")"'
 check "pgbouncer is installed" 'in_image pgbouncer --version | grep -qi pgbouncer'
 check "pg_isready is the PostgreSQL 18 client" 'in_image pg_isready --version | grep -Eq "\) 18\."'
 check "RDS CA bundle, readable by the app user" \
