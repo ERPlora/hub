@@ -5,14 +5,18 @@ deployment (prod: production; pre: testing) whatever its configuration says, so 
 ERPlora opens it on the server (``VERIFACTU_PRODUCTION_ENABLED``, working-rules §15): its own invoices skip no lock.
 """
 
+import json
+
+import httpx
 import pytest
+import respx
 from live.context import Scope, system_context
 from live.errors import OperationError
 
 from apps.verifactu import queries
 from apps.verifactu.models import Config, Environment
 
-from apps.verifactu.tests.conftest import A, ISSUER, run
+from apps.verifactu.tests.conftest import A, ISSUER, ctx_for, run
 
 PLATFORM = Scope("host", "erplora")
 
@@ -194,3 +198,33 @@ def test_no_other_business_follows_the_deployment(db, platform_slug):
         == "verifactu.platform_only"
     )
     assert not Config.objects.exists()
+
+
+@pytest.mark.parametrize("scope", [PLATFORM, A], ids=["platform", "business"])
+def test_the_gateway_is_told_the_hub_by_its_slug(db, platform_slug, settings, scope):
+    # The SaaS knows ERPlora's own hub by ``PLATFORM_HUB_SLUG`` and any other by its host's slug (saas#29).
+    settings.ERPLORA_ENVIRONMENT = "pre"
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    settings.INTERNAL_SHARED_SECRET = "test-internal-secret"
+    ctx = ctx_for(scope=scope)
+    run("invoice.issuer.update", ISSUER, ctx)
+    invoice = run(
+        "invoice.invoice.create",
+        {
+            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+            "series_code": "TICKET",
+        },
+        ctx,
+    )
+    run("verifactu.record.create", {"invoice_id": str(invoice.id)}, ctx)
+    with respx.mock:
+        door = respx.post("http://saas.internal:8001/internal/verifactu/submit").mock(
+            return_value=httpx.Response(
+                503, json={"error": {"code": "gateway_busy", "message": "Busy."}}
+            )
+        )
+        run("verifactu.contingency.process", None, ctx)
+
+    assert door.call_count == 1
+    expected = settings.PLATFORM_HUB_SLUG if scope is PLATFORM else "a"
+    assert json.loads(door.calls.last.request.content)["hub"] == expected
