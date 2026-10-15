@@ -1,0 +1,287 @@
+{
+  "reservation": {
+    "title": "Reservations",
+    "loading": "Loading…",
+    "noPermission": "You do not have permission",
+    "erasedCustomer": "Deleted customer",
+    "yes": "Yes",
+    "no": "No",
+    "retry": "Retry",
+    "cancelButton": "Cancel",
+    "tabs": {
+      "label": "Reservation sections",
+      "reservations": "Reservations",
+      "waitlist": "Waitlist",
+      "availability": "Availability",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business"
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "seated": "Seated",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
+    "source": {
+      "phone": "Phone",
+      "in_person": "In person",
+      "waitlist": "Waitlist",
+      "whatsapp": "WhatsApp",
+      "online": "Online"
+    },
+    "weekday": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "day": {
+      "previous": "Previous day",
+      "next": "Next day",
+      "today": "Today",
+      "date": "Date",
+      "covers": "covers",
+      "bookings": "bookings",
+      "nextSlot": "next slot",
+      "left": "{count} left",
+      "full": "Full",
+      "over": "No more service today",
+      "noService": "No service this day",
+      "closed": "Closed this day",
+      "figuresError": "Could not load the figures of the day"
+    },
+    "list": {
+      "columns": {
+        "date": "Date",
+        "time": "Time",
+        "guest": "Guest",
+        "phone": "Phone",
+        "party": "Party",
+        "table": "Table",
+        "status": "Status",
+        "source": "Booked through"
+      },
+      "search": "Search guest, phone or email…",
+      "new": "New reservation",
+      "entity": {
+        "one": "reservation",
+        "many": "reservations"
+      },
+      "loadError": "Could not load the reservations",
+      "emptyTitle": "No reservations this day",
+      "emptyBody": "Bookings you take by phone, online or at the door show up here, with the table held for the guest until they arrive.",
+      "emptyHint": "Set your service times in the Availability tab.",
+      "noResultsTitle": "No reservations match your search",
+      "noResultsBody": "Try another name, phone or email, or clear the filters to see the day again.",
+      "clearFilters": "Clear filters",
+      "unconfirmed": "Released: never confirmed"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "seat": "Seat",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "noShow": "No-show",
+      "edit": "Edit",
+      "delete": "Delete",
+      "failed": "Could not change the reservation"
+    },
+    "outcome": {
+      "seated": "{guest} is seated at table {table}: its check is open in Sales.",
+      "seatedNoTable": "{guest} is seated."
+    },
+    "cancel": {
+      "title": "Cancel the reservation?",
+      "message": "{guest} · {when}. Its place and its table are freed.",
+      "reason": "Reason (optional)",
+      "confirm": "Cancel reservation",
+      "keep": "Keep it"
+    },
+    "noShow": {
+      "title": "Mark as no-show?",
+      "message": "{guest} · {when}. Its place and its table are freed.",
+      "confirm": "Mark no-show"
+    },
+    "delete": {
+      "title": "Delete the reservation?",
+      "message": "{guest} · {when}. It leaves the book for good; cancelling keeps it with its reason.",
+      "confirm": "Delete for good"
+    },
+    "overbook": {
+      "title": "This slot is full",
+      "message": "{message} Book it anyway?",
+      "confirm": "Book anyway",
+      "convert": "Convert anyway"
+    },
+    "form": {
+      "titleNew": "New reservation",
+      "titleEdit": "Edit reservation",
+      "customer": "Customer",
+      "name": "Guest",
+      "phone": "Phone",
+      "email": "Email",
+      "date": "Date",
+      "time": "Time",
+      "party": "Party",
+      "duration": "Duration (min)",
+      "table": "Table",
+      "pickTable": "Pick a free table",
+      "tablesNone": "No free tables at that time",
+      "tableHint": "{capacity} seats · {zone}",
+      "tableSmall": "{capacity} seats · {zone} · too small for the party",
+      "noZone": "No zone",
+      "pickFirst": "Set the date, time and party to see the free tables.",
+      "smallTable": "Table {table} has {capacity} seats for {party} guests.",
+      "source": "Booked through",
+      "notes": "Guest notes",
+      "internalNotes": "Internal notes",
+      "submitNew": "Reserve",
+      "submitEdit": "Save",
+      "notesOnly": "This reservation is {status}: only its notes can change."
+    },
+    "waitlist": {
+      "title": "Waitlist",
+      "columns": {
+        "date": "Date",
+        "time": "Pref. time",
+        "guest": "Guest",
+        "phone": "Phone",
+        "party": "Party",
+        "contacted": "Contacted",
+        "state": "Status"
+      },
+      "states": {
+        "waiting": "Waiting",
+        "converted": "Converted"
+      },
+      "search": "Search guest, phone or email…",
+      "add": "Add guest",
+      "entity": {
+        "one": "entry",
+        "many": "entries"
+      },
+      "empty": "Waitlist is empty.",
+      "loadError": "Could not load the waitlist",
+      "actions": {
+        "contact": "Contacted",
+        "convert": "Convert",
+        "remove": "Remove",
+        "failed": "Could not update the entry"
+      },
+      "form": {
+        "title": "Add to the waitlist",
+        "submit": "Add to waitlist"
+      },
+      "remove": {
+        "title": "Remove from the waitlist?",
+        "message": "{guest} · {when}.",
+        "confirm": "Remove"
+      },
+      "converted": "{guest} now has a reservation on {when}."
+    },
+    "availability": {
+      "title": "Availability",
+      "occupancy": "Occupancy",
+      "slots": "Time slots",
+      "blocked": "Blocked dates",
+      "date": "Date",
+      "hours": "Opening hours: {spans}",
+      "closedBySchedule": "The business is closed this day (Schedules).",
+      "noHours": "No confirmed opening hours in Schedules: they do not limit the book.",
+      "blockedDay": "Blocked: {reason}",
+      "blockedHours": "Blocked {from}–{to}: {reason}",
+      "columns": {
+        "slot": "Slot",
+        "reserved": "Reserved",
+        "max": "Max",
+        "covers": "Guests",
+        "available": "Available",
+        "day": "Day",
+        "from": "From",
+        "to": "To",
+        "maxReservations": "Max",
+        "maxCovers": "Max guests",
+        "date": "Date",
+        "reason": "Reason",
+        "hours": "Full day"
+      },
+      "full": "Full",
+      "outside": "Outside opening hours",
+      "wholeDay": "Whole day",
+      "noLimit": "—",
+      "emptyOccupancy": "No service that day (no time slots).",
+      "emptySlots": "No time slots.",
+      "emptyBlocked": "No blocked dates.",
+      "addSlot": "Add slot",
+      "addBlocked": "Add blocked date",
+      "remove": "Remove",
+      "occupancyError": "Could not load the occupancy",
+      "slotsError": "Could not load the time slots",
+      "blockedError": "Could not load the blocked dates",
+      "removeFailed": "Could not remove it",
+      "slotEntity": {
+        "one": "slot",
+        "many": "slots"
+      },
+      "blockedEntity": {
+        "one": "date",
+        "many": "dates"
+      },
+      "slotForm": {
+        "title": "New time slot",
+        "day": "Day",
+        "from": "From",
+        "to": "To",
+        "max": "Max",
+        "maxCovers": "Max guests (optional)",
+        "submit": "Create slot"
+      },
+      "blockedForm": {
+        "title": "Block a date",
+        "date": "Date",
+        "reason": "Reason",
+        "wholeDay": "Whole day",
+        "from": "From",
+        "to": "Until",
+        "submit": "Block date"
+      },
+      "removeSlot": {
+        "title": "Remove the slot?",
+        "message": "{day} {from}–{to}. No more reservations are taken in it; the ones it has stay.",
+        "confirm": "Remove slot"
+      },
+      "removeBlocked": {
+        "title": "Unblock the date?",
+        "message": "{date}. Reservations are taken again.",
+        "confirm": "Unblock"
+      }
+    },
+    "settings": {
+      "title": "Booking rules",
+      "staff": "Rules for every reservation",
+      "guest": "Rules for bookings the guest makes herself (online, WhatsApp)",
+      "minParty": "Minimum guests",
+      "maxParty": "Maximum guests",
+      "minAdvance": "Minimum notice (hours)",
+      "maxAdvance": "Maximum days ahead",
+      "duration": "Default duration (minutes)",
+      "noShowWindow": "Release an unconfirmed reservation after (minutes)",
+      "autoConfirm": "Confirm new reservations automatically",
+      "autoConfirmHint": "A confirmed reservation holds its table on the floor plan.",
+      "requirePhone": "Phone required",
+      "requireEmail": "Email required",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "Could not save the settings",
+      "loadError": "Could not load the settings"
+    }
+  }
+}

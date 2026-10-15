@@ -1,0 +1,207 @@
+{
+  "pricing": {
+    "title": "Tarifas",
+    "yes": "Sí",
+    "no": "No",
+    "none": "—",
+    "deletedGroup": "Grupo borrado",
+    "loading": "Cargando…",
+    "cancel": "Cancelar",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Prueba otra búsqueda o quita los filtros.",
+    "noPermission": "No tienes permiso",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "money": {
+      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "negative": "Este importe no puede ser negativo.",
+      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
+    },
+    "state": { "active": "Activa", "inactive": "Inactiva" },
+    "status": { "active": "Activas", "inactive": "Inactivas", "all": "Todas" },
+    "taxBasis": { "business": "Según el negocio", "included": "Impuesto incluido", "excluded": "Impuesto no incluido" },
+    "validity": { "always": "Siempre", "from": "Desde {from}", "until": "Hasta {until}", "between": "{from} – {until}" },
+    "lists": {
+      "heading": "Listas de precios",
+      "search": "Buscar código o nombre…",
+      "empty": "Sin listas de precios.",
+      "new": "Nueva tarifa",
+      "entity": { "one": "tarifa", "many": "tarifas" },
+      "loadError": "No se pudieron cargar las tarifas.",
+      "rowError": "No se pudo hacer la acción",
+      "default": "General",
+      "everybody": "Todos",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "currency": "Divisa",
+        "group": "Grupo de clientes",
+        "tax": "Impuesto",
+        "validity": "Vigencia",
+        "prices": "Precios",
+        "status": "Estado"
+      },
+      "actions": {
+        "open": "Abrir",
+        "edit": "Editar",
+        "makeDefault": "Hacer general",
+        "deactivate": "Desactivar",
+        "activate": "Activar"
+      },
+      "defaultConfirm": {
+        "title": "¿Hacer general {name}?",
+        "message": "{name} pasa a ser la tarifa general: valdrá para todos los clientes y la actual dejará de serlo.",
+        "confirm": "Hacer general"
+      },
+      "deactivateConfirm": {
+        "title": "¿Desactivar {name}?",
+        "message": "{name} dejará de aplicarse a las ventas nuevas. Sus precios se guardan.",
+        "confirm": "Desactivar"
+      },
+      "form": {
+        "titleNew": "Nueva tarifa",
+        "titleEdit": "Editar tarifa — {name}",
+        "code": "Código",
+        "name": "Nombre",
+        "currency": "Divisa",
+        "tax": "Impuesto",
+        "group": "Grupo de clientes",
+        "noGroup": "Sin grupo",
+        "validFrom": "Desde",
+        "validUntil": "Hasta",
+        "isDefault": "Tarifa general",
+        "isDefaultHelper": "Para todos los clientes. Una tarifa con grupo de clientes no puede ser la general.",
+        "create": "Crear",
+        "save": "Guardar"
+      }
+    },
+    "detail": {
+      "back": "Listas de precios",
+      "backLabel": "Volver",
+      "notFound": "Esta tarifa no existe",
+      "summary": "Sobre esta tarifa",
+      "code": "Código",
+      "group": "Grupo de clientes",
+      "currency": "Divisa",
+      "tax": "Impuesto",
+      "validity": "Vigencia",
+      "state": "Estado"
+    },
+    "items": {
+      "heading": "Precios",
+      "search": "Buscar producto o servicio…",
+      "empty": "Esta tarifa aún no tiene precios.",
+      "new": "Nuevo precio",
+      "entity": { "one": "precio", "many": "precios" },
+      "loadError": "No se pudieron cargar los precios.",
+      "rowError": "No se pudo quitar el precio",
+      "kind": { "product": "Producto", "service": "Servicio" },
+      "columns": {
+        "name": "Artículo",
+        "kind": "Tipo",
+        "sku": "SKU",
+        "minQuantity": "Desde",
+        "price": "Precio",
+        "basePrice": "Precio de ficha"
+      },
+      "actions": { "edit": "Editar", "remove": "Quitar" },
+      "removeConfirm": {
+        "title": "¿Quitar el precio de {name}?",
+        "message": "Se quitará el precio de {name} desde {quantity}. Se cobrará el de otra tarifa o el de la ficha.",
+        "confirm": "Quitar precio"
+      },
+      "form": {
+        "titleNew": "Nuevo precio",
+        "titleEdit": "Editar precio — {name}",
+        "kind": "Tipo",
+        "product": "Producto",
+        "service": "Servicio",
+        "pickProduct": "Buscar por nombre o SKU",
+        "pickService": "Buscar por nombre",
+        "minQuantity": "Desde la cantidad",
+        "minQuantityHelper": "En la unidad del producto. Repite el artículo con otra cantidad para precios por volumen.",
+        "price": "Precio",
+        "add": "Añadir",
+        "save": "Guardar"
+      }
+    },
+    "rules": {
+      "heading": "Reglas de descuento",
+      "search": "Buscar código o nombre…",
+      "empty": "Sin reglas de descuento.",
+      "new": "Nueva regla de descuento",
+      "entity": { "one": "regla", "many": "reglas" },
+      "loadError": "No se pudieron cargar las reglas de descuento.",
+      "type": {
+        "percent": "Porcentaje",
+        "fixed": "Importe por unidad",
+        "buy_x_get_y": "Compra X, llévate Y",
+        "tiered": "Por tramos"
+      },
+      "scope": {
+        "all": "Todo",
+        "products": "Todos los productos",
+        "services": "Todos los servicios",
+        "category": "Una categoría",
+        "product": "Un producto",
+        "service": "Un servicio"
+      },
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo",
+        "value": "Valor",
+        "appliesTo": "Se aplica a",
+        "validity": "Vigencia",
+        "priority": "Prioridad",
+        "status": "Estado"
+      },
+      "value": {
+        "perUnit": "{amount} por unidad",
+        "buyGet": "Compra {buy}, llévate {get}",
+        "tier": "{quantity}+: {percent}"
+      },
+      "targetDeleted": "{name} (borrado)",
+      "forGroup": "{target} · {group}",
+      "actions": { "edit": "Editar", "deactivate": "Desactivar", "activate": "Activar" },
+      "deactivateConfirm": {
+        "title": "¿Desactivar {name}?",
+        "message": "{name} dejará de aplicarse a las ventas nuevas.",
+        "confirm": "Desactivar"
+      },
+      "form": {
+        "titleNew": "Nueva regla de descuento",
+        "titleEdit": "Editar regla — {name}",
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo",
+        "percent": "Porcentaje (%)",
+        "amount": "Importe por unidad",
+        "buy": "Compra",
+        "get": "Gratis",
+        "tiers": "Tramos",
+        "tierFrom": "Desde la cantidad",
+        "tierPercent": "Porcentaje (%)",
+        "addTier": "Añadir tramo",
+        "removeTier": "Quitar tramo",
+        "appliesTo": "Se aplica a",
+        "category": "Categoría",
+        "product": "Producto",
+        "service": "Servicio",
+        "group": "Grupo de clientes",
+        "everybody": "Todos los clientes",
+        "minQuantity": "Cantidad mínima",
+        "unitsHelper": "En la unidad del precio de cada artículo: kg en uno con precio por kg.",
+        "validFrom": "Desde",
+        "validUntil": "Hasta",
+        "priority": "Prioridad",
+        "priorityHelper": "A igual descuento, gana el número menor.",
+        "create": "Crear",
+        "save": "Guardar"
+      }
+    }
+  }
+}

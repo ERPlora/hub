@@ -1,0 +1,155 @@
+{
+  "combo": {
+    "title": "Menus",
+    "loading": "Loading…",
+    "noResults": "No results",
+    "noResultsMessage": "Change the search or the filters.",
+    "noPermission": "You do not have permission",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "save": "Save",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "supply": {
+      "service": "Eat in",
+      "goods": "Take away"
+    },
+    "menus": {
+      "search": "Search a menu…",
+      "empty": "No menus yet. Create the first one with the + button.",
+      "loadError": "The menus could not be loaded.",
+      "add": "New menu",
+      "entity": {
+        "one": "menu",
+        "many": "menus"
+      },
+      "columns": {
+        "name": "Name",
+        "price": "Closed price",
+        "supply": "How it is sold",
+        "active": "On sale",
+        "order": "Order"
+      },
+      "actions": {
+        "edit": "Edit details",
+        "delete": "Withdraw"
+      },
+      "delete": {
+        "title": "Withdraw this menu?",
+        "message": "«{name}» stops being on sale, together with its courses and choices. Tickets already issued keep reading it.",
+        "confirm": "Withdraw"
+      }
+    },
+    "form": {
+      "titleNew": "New menu",
+      "titleEdit": "Menu · {name}",
+      "name": "Name",
+      "kitchenName": "Kitchen name",
+      "kitchenNameHelp": "Leave it empty and the kitchen ticket uses the commercial name.",
+      "price": "Closed price",
+      "priceHelp": "What the customer pays for the whole menu, whatever they pick.",
+      "supplyLabel": "How is it sold?",
+      "supplyService": "Eaten in (hospitality service)",
+      "supplyServiceHelp": "ONE line at the menu's own rate, drinks included. This is the Spanish menu del día.",
+      "supplyGoods": "Sold as a product / to take away",
+      "supplyGoodsHelp": "The closed price is SPLIT into ONE LINE PER COMPONENT, each at its own rate.",
+      "taxCategory": "VAT category",
+      "taxCategoryHelp": "The rate the whole menu is billed at.",
+      "taxCategoryPlaceholder": "Search a VAT category…",
+      "order": "Order on the menu list",
+      "active": "On sale",
+      "noName": "The menu needs a name.",
+      "noTaxCategory": "A menu eaten in needs its own VAT category: without it, it cannot be billed."
+    },
+    "money": {
+      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
+      "negative": "A menu price cannot be below zero. To make a choice cheaper, give it a negative supplement instead.",
+      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
+    },
+    "builder": {
+      "back": "All menus",
+      "serviceWarning": "This menu is billed as a single service: one line at its VAT category, whatever the components are taxed at.",
+      "goodsWarning": "This menu is billed as goods: its price will be split across the components you add, one line each.",
+      "notOnTill": "Not on the till yet",
+      "onTill": "On the till"
+    },
+    "courses": {
+      "title": "Courses",
+      "help": "A course is a step of THIS menu — Starter, Main, Dessert, Drink. Its order is the order it is asked for.",
+      "empty": "No courses yet. Add the first one — a menu with no course has nothing to pick.",
+      "loading": "Loading courses…",
+      "loadError": "The courses of this menu could not be loaded.",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "drag": "Drag to reorder",
+      "edit": "Edit details",
+      "delete": "Withdraw",
+      "deleteTitle": "Remove this course?",
+      "deleteMessage": "Remove the course «{name}» and its choices?",
+      "deleteConfirm": "Remove the course"
+    },
+    "rule": {
+      "required": "Compulsory · pick {min}",
+      "requiredRange": "Compulsory · pick at least {min}",
+      "optional": "Optional",
+      "max": "up to {max}",
+      "noCeiling": "no limit",
+      "repeat": "may repeat",
+      "noRepeat": "no repeats"
+    },
+    "courseForm": {
+      "titleNew": "Add a course",
+      "titleEdit": "Course · {name}",
+      "name": "Course name",
+      "min": "Minimum picks",
+      "minHelp": "1 or more makes the course compulsory. 0 makes it optional. There is no separate switch.",
+      "max": "Maximum picks",
+      "maxHelp": "0 means no limit.",
+      "repeat": "The same option may be picked more than once",
+      "noName": "The course needs a name.",
+      "ceiling": "The maximum ({max}) is below the minimum ({min}): nobody could ever satisfy this course."
+    },
+    "choices": {
+      "title": "Choices",
+      "empty": "No choices yet: nobody can resolve this course.",
+      "picker": "Catalogue product",
+      "pickerPlaceholder": "Search a product…",
+      "delta": "Supplement",
+      "deltaHelp": "What substituting adds to the CLOSED price. It may be negative.",
+      "add": "Add choice",
+      "edit": "Edit this choice",
+      "delete": "Remove this choice",
+      "editing": "Editing «{article}». It keeps its position in the course.",
+      "markSoldOut": "Sold out",
+      "markAvailable": "Available",
+      "noProduct": "Pick a catalogue product first.",
+      "duplicate": "This course already offers that product. To let it be picked twice, switch on «the same option may be picked more than once».",
+      "deleteTitle": "Remove this choice?",
+      "deleteMessage": "Remove «{name}» from the course «{course}»?",
+      "deleteConfirm": "Remove the choice",
+      "status": {
+        "sold_out": "Sold out",
+        "product_inactive": "Deactivated in Inventory",
+        "product_deleted": "No longer in the catalogue",
+        "not_by_unit": "Not sold by units in Inventory",
+        "untaxed": "No VAT category to take away"
+      }
+    },
+    "bulk": {
+      "open": "Add several",
+      "title": "Add products to this course",
+      "search": "Search a product…",
+      "addCount": "Add {n} selected",
+      "already": "Already in this course",
+      "none": "Tick at least one product first.",
+      "empty": "No products in the catalogue yet.",
+      "loadError": "The product catalogue could not be loaded.",
+      "loading": "Loading…",
+      "retry": "Retry"
+    }
+  }
+}
