@@ -11,7 +11,6 @@ from functools import reduce
 from operator import and_
 from uuid import UUID
 
-import decouple
 from django.conf import settings
 from django.db.models import Case, Count, Q, QuerySet, When
 from django.utils import timezone
@@ -91,13 +90,11 @@ def issuer_configured() -> bool:
 
 
 def production_open() -> bool:
-    """Whether this server lets a business go live (VERIFACTU-F08): ERPlora opens it, under Ioan's supervision."""
-    value = getattr(settings, "VERIFACTU_PRODUCTION_ENABLED", None)
-    if value is None:
-        value = decouple.config(
-            "VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool
-        )
-    return bool(value)
+    """Whether this server lets a business go live (VERIFACTU-F08): only the ``prod`` deployment, and only once ERPlora
+    opens it there (``VERIFACTU_PRODUCTION_ENABLED``, under Ioan's supervision); ``pre`` always files in testing."""
+    return settings.ERPLORA_ENVIRONMENT == "prod" and bool(
+        settings.VERIFACTU_PRODUCTION_ENABLED
+    )
 
 
 def own_certificate() -> OwnCertificate | None:
@@ -139,15 +136,34 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
 
 
 def route_problem(config: Config, environment: str) -> str:
-    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""``."""
+    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""``: the own route needs its valid
+    certificate; in production, ERPlora's route needs the approved authorisation, and either needs the live option of
+    the plan (VERIFACTU-F08)."""
     if config.route == Config.Route.OWN:
-        return "" if certificate_valid() else "own_certificate_missing"
-    if (
+        if not certificate_valid():
+            return "own_certificate_missing"
+    elif (
         environment == Environment.PRODUCTION
         and config.representation_status != Config.Representation.APPROVED
     ):
         return "representation_not_approved"
+    if environment == Environment.PRODUCTION and not config.live_paid:
+        return "live_option_unpaid"
     return ""
+
+
+def live_problems(config: Config) -> list[str]:
+    """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can. The
+    server's own opening (``production_open``) and Invoicing's issuer are told apart."""
+    found = []
+    problem = route_problem(config, Environment.PRODUCTION)
+    if problem and problem != "live_option_unpaid":
+        found.append(problem)
+    if not config.live_paid:
+        found.append("live_option_unpaid")
+    if config.hub_status != Config.HubStatus.ACTIVE:
+        found.append("hub_not_active")
+    return found
 
 
 def system_for(config: Config, ctx: OperationContext) -> producer.SystemInfo | None:
@@ -358,6 +374,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment),
         reasons=[wait(code) for code in blockers(config, config.environment)],
+        live_blockers=[wait(code) for code in live_problems(config)],
     )
 
 

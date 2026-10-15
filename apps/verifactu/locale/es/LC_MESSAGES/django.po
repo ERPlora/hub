@@ -905,3 +905,39 @@ msgstr "El fichero no contiene un certificado con su clave privada."
 #: services.py
 msgid "The certificate does not allow client authentication, so it cannot connect to the AEAT."
 msgstr "El certificado no permite la autenticación de cliente, así que no puede conectar con la AEAT."
+
+#: models.py
+msgid "Active"
+msgstr "Activa"
+
+#: models.py
+msgid "Payment pending"
+msgstr "Pago pendiente"
+
+#: models.py
+msgid "Suspended"
+msgstr "Suspendida"
+
+#: models.py
+msgid "live option in the plan"
+msgstr "opción en vivo en el plan"
+
+#: models.py
+msgid "business status"
+msgstr "estado del negocio"
+
+#: models.py
+msgid "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
+msgstr "la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora"
+
+#: models.py
+msgid "your ERPlora account has a pending payment or is suspended"
+msgstr "tu cuenta de ERPlora tiene un pago pendiente o está suspendida"
+
+#: services.py
+msgid "The live option of VeriFactu is not in your plan: add it in your ERPlora account."
+msgstr "La opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora."
+
+#: services.py
+msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
+msgstr "Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción."

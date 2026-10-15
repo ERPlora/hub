@@ -12,6 +12,7 @@ import pytest
 from django.utils import timezone, translation
 from live.context import system_context
 
+from apps.verifactu import queries
 from apps.verifactu.models import (
     AeatRecord,
     Config,
@@ -382,6 +383,69 @@ def test_the_configuration_starts_in_testing_through_erplora(issuer, settings):
         "gateway_unavailable",
         "producer_facts_missing",
     }
+
+
+@pytest.mark.parametrize(
+    ("env", "flag", "open_"),
+    [("prod", True, True), ("prod", False, False), ("pre", True, False)],
+)
+def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_):
+    settings.ERPLORA_ENVIRONMENT = env
+    settings.VERIFACTU_PRODUCTION_ENABLED = flag
+    assert queries.production_open() is open_
+
+
+def test_erplora_route_in_production_needs_approval_and_the_paid_option():
+    config = Config(route="erplora", representation_status="approved", live_paid=False)
+    assert queries.route_problem(config, "production") == "live_option_unpaid"
+    config.live_paid = True
+    assert queries.route_problem(config, "production") == ""
+    config.representation_status = "submitted"
+    assert queries.route_problem(config, "production") == "representation_not_approved"
+    assert queries.route_problem(config, "testing") == ""
+
+
+def own_certificate(days=30):
+    return OwnCertificate.objects.create(
+        holder="ANA LOPEZ",
+        holder_tax_id="12345678Z",
+        kind="personal",
+        expires_at=timezone.now() + dt.timedelta(days=days),
+        sealed_blob=b"sealed",
+        uploaded_by="ana",
+    )
+
+
+def test_own_route_in_production_needs_its_certificate_and_the_paid_option():
+    config = Config(route="own", live_paid=False)
+    assert queries.route_problem(config, "production") == "own_certificate_missing"
+    own_certificate()
+    assert queries.route_problem(config, "production") == "live_option_unpaid"
+    assert queries.route_problem(config, "testing") == ""
+    config.live_paid = True
+    assert queries.route_problem(config, "production") == ""
+
+
+def test_the_configuration_lists_everything_that_keeps_it_from_going_live(issuer):
+    assert [reason.code for reason in run("verifactu.config.get").live_blockers] == [
+        "representation_not_approved",
+        "live_option_unpaid",
+    ]
+    run(
+        "verifactu.config.sync",
+        {
+            "version": 1,
+            "live_paid": True,
+            "hub_status": "past_due",
+            "representation": {"status": "approved"},
+        },
+        system_context(A),
+    )
+    blockers = run("verifactu.config.get").live_blockers
+    assert [reason.code for reason in blockers] == ["hub_not_active"]
+    assert blockers[0].message
+    run("verifactu.config.sync", {"version": 2, "hub_status": "active"}, system_context(A))
+    assert run("verifactu.config.get").live_blockers == []
 
 
 def test_the_certificate_says_whose_it_is_and_when_it_expires(issuer):

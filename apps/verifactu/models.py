@@ -66,6 +66,11 @@ class Config(UUIDModel):
         RETURNED = "returned", _("Returned")
         REVOKED = "revoked", _("Revoked")
 
+    class HubStatus(models.TextChoices):
+        ACTIVE = "active", _("Active")
+        PAST_DUE = "past_due", _("Payment pending")
+        SUSPENDED = "suspended", _("Suspended")
+
     singleton = models.BooleanField(_("single row"), default=True, editable=False)
     environment = models.CharField(
         _("environment"),
@@ -94,6 +99,15 @@ class Config(UUIDModel):
     )
     representation_reason = models.CharField(
         _("representation note"), max_length=500, blank=True
+    )
+    # From the ERPlora account's photo: whether its plan includes filing in production (VERIFACTU-F08) and the
+    # business's commercial status; going live needs both (``queries.live_problems``).
+    live_paid = models.BooleanField(_("live option in the plan"), default=False)
+    hub_status = models.CharField(
+        _("business status"),
+        max_length=10,
+        choices=HubStatus.choices,
+        default=HubStatus.ACTIVE,
     )
     synced_version = models.BigIntegerField(_("synced version"), null=True, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
@@ -451,7 +465,8 @@ class Record(UUIDModel):
 
 
 
-#: The reasons a record waits (VERIFACTU-F17), by code; ``%(detail)s`` and ``%(at)s`` where they apply.
+#: The reasons a record waits (VERIFACTU-F17) and those that keep a business from going live (VERIFACTU-F08), by
+#: code; ``%(detail)s`` and ``%(at)s`` where they apply.
 WAIT_REASONS = {
     "gateway_unavailable": _(
         "ERPlora's sending gateway is not configured on this server"
@@ -465,6 +480,12 @@ WAIT_REASONS = {
     ),
     "representation_not_approved": _(
         "ERPlora still has to approve your signed authorisation to file in production"
+    ),
+    "live_option_unpaid": _(
+        "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
+    ),
+    "hub_not_active": _(
+        "your ERPlora account has a pending payment or is suspended"
     ),
     "aeat_wait": _("the AEAT asked to wait until %(at)s"),
     "unreachable": _("the gateway or the AEAT could not be reached (%(detail)s)"),

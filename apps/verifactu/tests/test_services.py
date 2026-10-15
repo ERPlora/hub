@@ -1239,11 +1239,81 @@ def test_going_live_through_erplora_needs_the_approved_authorisation(issuer, set
     )
     run(
         "verifactu.config.sync",
-        {"version": 1, "representation": {"status": "approved"}},
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
         system_context(A),
     )
     config = run("verifactu.config.go_live")
     assert config.environment == "production" and config.production_since is not None
+
+
+def test_going_live_needs_the_live_option_in_the_plan(issuer, settings):
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "live_paid": False, "representation": {"status": "approved"}},
+        system_context(A),
+    )
+    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.live_option_unpaid"
+    assert Config.objects.get().environment == "testing"
+
+
+def test_going_live_with_the_own_certificate_also_needs_the_live_option(issuer, settings):
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    own_certificate()
+    run("verifactu.config.update", {"route": "own"})
+    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.live_option_unpaid"
+    run("verifactu.config.sync", {"version": 1, "live_paid": True}, system_context(A))
+    assert run("verifactu.config.go_live").environment == "production"
+
+
+@pytest.mark.parametrize("status", ["past_due", "suspended"])
+def test_going_live_needs_an_active_business(issuer, settings, status):
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    run(
+        "verifactu.config.sync",
+        {
+            "version": 1,
+            "live_paid": True,
+            "hub_status": status,
+            "representation": {"status": "approved"},
+        },
+        system_context(A),
+    )
+    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.hub_not_active"
+
+
+def test_going_live_is_never_open_in_pre(issuer, settings):
+    settings.ERPLORA_ENVIRONMENT = "pre"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        system_context(A),
+    )
+    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.production_closed"
+
+
+def test_losing_the_live_option_in_production_holds_the_queue_without_going_back(
+    issuer, producer, gateway_answers, settings
+):
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    run(
+        "verifactu.config.sync",
+        {"version": 2, "live_paid": True, "representation": {"status": "approved"}},
+        system_context(A),
+    )
+    run("verifactu.config.go_live")
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    run("verifactu.config.sync", {"version": 3, "live_paid": False}, system_context(A))
+    result = run("verifactu.contingency.process")
+    record.refresh_from_db()
+    config = Config.objects.get()
+    assert (result.sent, record.status, record.environment) == (0, "pending", "production")
+    assert config.environment == "production"
+    assert queries.blockers(config, "production") == ["live_option_unpaid"]
+    assert [reason.code for reason in run("verifactu.config.get").reasons] == [
+        "live_option_unpaid"
+    ]
 
 
 def test_going_live_needs_the_issuer(settings, db):
@@ -1257,7 +1327,7 @@ def test_back_to_testing_until_the_first_production_record(issuer, settings):
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     run(
         "verifactu.config.sync",
-        {"version": 1, "representation": {"status": "approved"}},
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
         system_context(A),
     )
     run("verifactu.config.go_live")
@@ -1276,6 +1346,34 @@ def test_the_accounts_photo_is_applied_once_per_version(db):
     assert sync({"version": 2, "multiple_taxpayers": "N"}).applied is False
     assert sync({"version": 1, "multiple_taxpayers": "N"}).applied is False
     assert Config.objects.get().multiple_taxpayers == "S"
+
+
+def test_the_photo_brings_the_live_option_the_authorisation_and_the_business_status(db):
+    sync = lambda data: run("verifactu.config.sync", data, system_context(A))  # noqa: E731
+    approved = {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}
+    answer = sync(
+        {"version": 7, "live_paid": True, "hub_status": "active", "representation": approved}
+    )
+    assert (answer.applied, answer.version) == (True, 7)
+    config = Config.objects.get()
+    assert (
+        config.live_paid,
+        config.hub_status,
+        config.representation_status,
+        config.synced_version,
+    ) == (True, "active", "approved", 7)
+    assert sync({"version": 7, "live_paid": False}).applied is False
+    assert sync({"version": 5, "hub_status": "suspended"}).applied is False
+    config.refresh_from_db()
+    assert (config.live_paid, config.hub_status) == (True, "active")
+    assert sync({"version": 8, "hub_status": "past_due"}).applied is True
+    config.refresh_from_db()
+    # What the photo leaves out stays as it was.
+    assert (config.live_paid, config.hub_status, config.representation_status) == (
+        True,
+        "past_due",
+        "approved",
+    )
 
 
 def test_nobody_but_the_system_receives_the_accounts_photo(db):

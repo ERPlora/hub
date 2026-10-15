@@ -2,7 +2,9 @@
 // VeriFactu → Settings (VERIFACTU-F04, F08–F12; the old `erp-verifactu-settings`; «Enable VeriFactu» is gone:
 // turning the app on is enabling it). «Sending»: «Use my own certificate» (owner and admin; ERPlora files for you when
 // off), with its explanation and «Open Configuration»; «AEAT environment» with its pill and «Go live» (asks first;
-// closed while the server keeps it closed) or «Back to testing» (asks first; only until the first production
+// closed while the server keeps it closed or while something is missing, listed above it: the approved signed
+// authorisation, the own certificate, the live option of the plan, an active account) or, in production, why records
+// wait (e.g. the live option left the plan) and «Back to testing» (asks first; only until the first production
 // record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
 // invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
 // declaration», its version and the identifying data every record carries (VERIFACTU-F12).
@@ -206,17 +208,47 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           >
             {{ $t('verifactu.settings.productionClosed') }}
           </p>
+          <InlineFeedback
+            v-if="config.live_blockers.length"
+            tone="warning"
+            data-testid="verifactu-settings-live-blockers"
+          >
+            {{ $t('verifactu.settings.cannotGoLive') }}
+            <ul class="verifactu-settings__reasons">
+              <li
+                v-for="reason in config.live_blockers"
+                :key="reason.code"
+              >
+                {{ reason.message }}
+              </li>
+            </ul>
+          </InlineFeedback>
           <ion-button
             v-if="canConfigure"
             color="danger"
             data-testid="verifactu-settings-go-live"
-            :disabled="busy || !config.production_open"
+            :disabled="busy || !config.production_open || config.live_blockers.length > 0"
             @click="goingLive"
           >
             {{ $t('verifactu.settings.goLive') }}
           </ion-button>
         </template>
         <template v-else>
+          <InlineFeedback
+            v-if="config.reasons.length"
+            tone="warning"
+            data-testid="verifactu-settings-waiting"
+          >
+            {{ $t('verifactu.settings.waiting') }}
+            <ul class="verifactu-settings__reasons">
+              <li
+                v-for="reason in config.reasons"
+                :key="reason.code"
+              >
+                {{ reason.message }}
+              </li>
+            </ul>
+          </InlineFeedback>
           <template v-if="config.can_go_back">
             <p class="verifactu-settings__hint">
               {{ $t('verifactu.settings.backHint') }}

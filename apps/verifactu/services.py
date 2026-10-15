@@ -146,6 +146,12 @@ PRODUCTION_CLOSED = _(
     "Going live is not open on this server yet: ERPlora opens it when the real submission is ready."
 )
 ISSUER_MISSING = _("Set up the issuer first in Invoicing → Issuer.")
+LIVE_OPTION_UNPAID = _(
+    "The live option of VeriFactu is not in your plan: add it in your ERPlora account."
+)
+HUB_NOT_ACTIVE = _(
+    "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
+)
 PRODUCTION_HAS_RECORDS = _(
     "It cannot go back to testing: this business already has records in production."
 )
@@ -1711,8 +1717,9 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     output=ConfigOut,
     ai={
         "description": "Go live: from now on every VeriFactu record goes to the real AEAT. It needs the server opened for "
-        "it by ERPlora, Invoicing's issuer and a route ready for production; it cannot go back once a production "
-        "record is sealed.",
+        "it by ERPlora, Invoicing's issuer, a route ready for production (the own valid certificate, or ERPlora's "
+        "approved signed authorisation), the live option in the plan and an active ERPlora account; it cannot go "
+        "back once a production record is sealed.",
         "risk": "high",
     },
 )
@@ -1727,6 +1734,10 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
     refusal = _route_refusal(config, config.route, Environment.PRODUCTION)
     if refusal is not None:
         raise refusal
+    if not config.live_paid:
+        raise Conflict(str(LIVE_OPTION_UNPAID), code="verifactu.live_option_unpaid")
+    if config.hub_status != Config.HubStatus.ACTIVE:
+        raise Conflict(str(HUB_NOT_ACTIVE), code="verifactu.hub_not_active")
     config.environment = Environment.PRODUCTION
     config.production_since = timezone.now()
     _changed(ctx, config, "went_live", fields=["environment"])
@@ -1863,9 +1874,9 @@ def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
     input=ConfigSyncIn,
     output=ConfigSyncOut,
     ai={
-        "description": "System only: the platform hands over the ERPlora account's VeriFactu block (whether it serves "
-        "several taxpayers, the signed authorisation's state) with its version; an equal or "
-        "older version is ignored.",
+        "description": "System only: the platform hands over the ERPlora account's VeriFactu block (the signed "
+        "authorisation's state, whether the plan includes the live option, the business's status) with its version; "
+        "an equal or older version is ignored.",
         "risk": "high",
     },
 )
@@ -1879,6 +1890,10 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
         config.representation_status = data.representation.status
         config.representation_updated_at = data.representation.updated_at
         config.representation_reason = data.representation.reason
+    if data.live_paid is not None:
+        config.live_paid = data.live_paid
+    if data.hub_status is not None:
+        config.hub_status = data.hub_status
     config.synced_version = data.version
     config.synced_at = timezone.now()
     _changed(

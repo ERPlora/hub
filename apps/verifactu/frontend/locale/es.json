@@ -317,6 +317,8 @@
       "goLiveMessage": "A partir de ahora cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.",
       "wentLive": "Tu negocio está en producción: los registros ya se remiten a la AEAT real.",
       "productionClosed": "El paso a producción todavía no está abierto en este servidor: ERPlora lo abre cuando la remisión real esté lista.",
+      "cannotGoLive": "Todavía no puede pasar a producción:",
+      "waiting": "Los registros están esperando:",
       "backToTesting": "Volver a pruebas",
       "backHint": "Todavía no se ha sellado ningún registro en producción, así que aún puedes volver a pruebas.",
       "backTitle": "¿Volver al entorno de pruebas?",

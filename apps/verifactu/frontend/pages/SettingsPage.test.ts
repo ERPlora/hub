@@ -41,7 +41,9 @@ const CONFIG: ConfigOut = {
   synced_at: null,
   route_ready: true,
   reasons: [],
+  live_blockers: [],
 };
+const UNPAID = { code: 'live_option_unpaid', message: 'the live option of VeriFactu is not in your plan: add it in your ERPlora account' };
 const DIAGNOSTIC: DiagnosticOut = {
   ran_at: '2026-10-14T10:00:00Z',
   environment: 'testing',
@@ -118,6 +120,32 @@ describe('SettingsPage', () => {
     const s = await setup({ production_open: false });
     expect(s.find('verifactu-settings-closed').text()).toContain('Going live is not open on this server yet');
     expect((s.find('verifactu-settings-go-live').element as unknown as { disabled: boolean }).disabled).toBe(true);
+  });
+
+  it('in testing it says what keeps it from going live, and «Go live» stays off', async () => {
+    const s = await setup({
+      live_blockers: [
+        { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file in production' },
+        UNPAID,
+      ],
+    });
+    const blockers = s.find('verifactu-settings-live-blockers').text();
+    expect(blockers).toContain('It cannot go live yet:');
+    expect(blockers).toContain('ERPlora still has to approve your signed authorisation');
+    expect(blockers).toContain('the live option of VeriFactu is not in your plan');
+    expect((s.find('verifactu-settings-go-live').element as unknown as { disabled: boolean }).disabled).toBe(true);
+    const ready = await setup();
+    expect(ready.find('verifactu-settings-live-blockers').exists()).toBe(false);
+  });
+
+  it('in production it says why records wait, without going back to testing', async () => {
+    const s = await setup({ environment: 'production', can_go_back: false, reasons: [UNPAID] });
+    const waiting = s.find('verifactu-settings-waiting').text();
+    expect(waiting).toContain('Records are waiting:');
+    expect(waiting).toContain('the live option of VeriFactu is not in your plan');
+    expect(s.find('verifactu-settings-environment').text()).toContain('Production');
+    const sending = await setup({ environment: 'production', can_go_back: false });
+    expect(sending.find('verifactu-settings-waiting').exists()).toBe(false);
   });
 
   it('in production it goes back to testing until the first production record, then never', async () => {

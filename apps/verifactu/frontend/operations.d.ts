@@ -244,6 +244,7 @@ export interface ConfigOut {
   synced_at: string | null;
   route_ready: boolean;
   reasons: WaitOut[];
+  live_blockers: WaitOut[];
 }
 
 export interface ChainValidationOut {

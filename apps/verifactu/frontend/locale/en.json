@@ -317,6 +317,8 @@
       "goLiveMessage": "From now on every record goes to the real AEAT. As soon as the first one is sealed you can no longer go back to testing.",
       "wentLive": "Your business is live: records now go to the real AEAT.",
       "productionClosed": "Going live is not open on this server yet: ERPlora opens it when the real submission is ready.",
+      "cannotGoLive": "It cannot go live yet:",
+      "waiting": "Records are waiting:",
       "backToTesting": "Back to testing",
       "backHint": "No record has been sealed in production yet, so you can still go back to testing.",
       "backTitle": "Go back to the test environment?",

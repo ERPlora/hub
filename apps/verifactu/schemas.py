@@ -436,6 +436,9 @@ class ConfigOut(Schema):
     )
     route_ready: bool = Field(description="The route can file in this environment.")
     reasons: list[WaitOut] = Field(description="What keeps records from leaving now.")
+    live_blockers: list[WaitOut] = Field(
+        description="What keeps the business from going live now (empty when it can)."
+    )
 
 
 class ChainValidationOut(Schema):
@@ -662,4 +665,10 @@ class ConfigSyncIn(Schema):
     )
     representation: RepresentationIn | None = Field(
         None, description="The signed authorisation's state."
+    )
+    live_paid: bool | None = Field(
+        None, description="The plan includes filing in production (the live option)."
+    )
+    hub_status: Literal["active", "past_due", "suspended"] | None = Field(
+        None, description="The business's commercial status."
     )

@@ -244,6 +244,9 @@ INTERNAL_SHARED_SECRET = (
 # certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
 # certificate is refused visibly (verifactu.certificate_storage_unavailable).
 FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
+# Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
+# supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
+VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
 # for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
 PLATFORM_HOST_LABEL = "hubs"

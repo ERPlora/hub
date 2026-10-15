@@ -43,6 +43,7 @@ const CONFIG: ConfigOut = {
   synced_at: null,
   route_ready: true,
   reasons: [],
+  live_blockers: [],
 };
 
 const LOADED: ConfigOut['own_certificate'] = {
