@@ -282,6 +282,49 @@ def answering(name: str = "desglose_mixed_2026-09-22.xml"):
     return reply
 
 
+#: One record of the AEAT's real query answer (RespuestaConsultaLR.xsd): its IDFactura, its own fingerprint (the
+#: ``tikLRRC:Huella`` directly under DatosRegistroFacturacion, never RegistroAnterior's ``tik:Huella``) and its state.
+QUERIED_RECORD = re.compile(
+    r"<tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>.*?"
+    r"</tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>",
+    re.DOTALL,
+)
+
+
+def aeat_holds(*records, state: str = "Correcto"):
+    """The AEAT's real query answer (``consulta_preproduccion_2026-08-01.xml``, four records of ERPlora's NIF) with
+    one more record for each of ``records``: the answer's first one, rewritten only to name the record of the test
+    (issuer, number, date and fingerprint) and ``state``. Without ``records``, the answer as it came."""
+    body = FIXTURES.joinpath("consulta_preproduccion_2026-08-01.xml").read_text(encoding="utf-8")
+    model = QUERIED_RECORD.search(body).group(0)
+    added = ""
+    for record in records:
+        item = re.sub(
+            r"<tikLRRC:IDFactura>.*?</tikLRRC:IDFactura>",
+            f"<tikLRRC:IDFactura><tik:IDEmisorFactura>{record.issuer_nif}</tik:IDEmisorFactura>"
+            f"<tik:NumSerieFactura>{record.invoice_number}</tik:NumSerieFactura>"
+            f"<tik:FechaExpedicionFactura>{record.issue_date:%d-%m-%Y}</tik:FechaExpedicionFactura>"
+            "</tikLRRC:IDFactura>",
+            model,
+            count=1,
+            flags=re.DOTALL,
+        )
+        item = re.sub(
+            r"<tikLRRC:Huella>[^<]*</tikLRRC:Huella>",
+            f"<tikLRRC:Huella>{record.fingerprint}</tikLRRC:Huella>",
+            item,
+            count=1,
+        )
+        item = item.replace(
+            "<tikLRRC:EstadoRegistro>Correcto</tikLRRC:EstadoRegistro>",
+            f"<tikLRRC:EstadoRegistro>{state}</tikLRRC:EstadoRegistro>",
+        )
+        added += item
+    return gateway.Reply(
+        kind=gateway.ANSWERED, aeat_status=200, aeat_body=body.replace(model, added + model, 1)
+    )
+
+
 @pytest.fixture
 def scope_b():
     return system_context(B)

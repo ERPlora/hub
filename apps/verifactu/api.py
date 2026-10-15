@@ -31,6 +31,7 @@ from apps.verifactu.schemas import (
     RecordCreateIn,
     RecordGetIn,
     RecordListIn,
+    RecordReconcileIn,
     RecordTransmitIn,
     RecoverFromAeatIn,
     RecoverManualIn,
@@ -148,6 +149,11 @@ async def record_cancel(request, data: RecordCancelIn):
 @bind(router, "verifactu.record.transmit", "/verifactu/records/transmit")
 async def record_transmit(request, data: RecordTransmitIn):
     return await run_operation(request, services.transmit_record, data)
+
+
+@bind(router, "verifactu.record.reconcile", "/verifactu/records/reconcile")
+async def record_reconcile(request, data: RecordReconcileIn):
+    return await run_operation(request, services.reconcile_record, data)
 
 
 # The queue

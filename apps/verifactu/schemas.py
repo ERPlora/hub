@@ -642,6 +642,17 @@ class ContingencyRetryIn(RecordRefIn):
     """A record of the queue to put out with the next pass."""
 
 
+class RecordReconcileIn(RecordRefIn):
+    """A record of the queue to ask the AEAT about."""
+
+
+class ReconcileOut(Schema):
+    held: bool = Field(
+        description="True when the AEAT already held this very record (same fingerprint): it left the queue."
+    )
+    record: RecordSummaryOut = Field(description="The record, with its status now.")
+
+
 class ChainValidateIn(IssuerIn):
     """The chain of an issuer in the current environment."""
 

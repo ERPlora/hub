@@ -32,6 +32,7 @@ ROUTES = {
     ("POST", "/verifactu/records/correct", "verifactu.record.correct"),
     ("POST", "/verifactu/records/cancel", "verifactu.record.cancel"),
     ("POST", "/verifactu/records/transmit", "verifactu.record.transmit"),
+    ("POST", "/verifactu/records/reconcile", "verifactu.record.reconcile"),
     ("GET", "/verifactu/contingency", "verifactu.contingency.list"),
     ("POST", "/verifactu/contingency/process", "verifactu.contingency.process"),
     ("POST", "/verifactu/contingency/retry", "verifactu.contingency.retry"),

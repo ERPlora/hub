@@ -96,8 +96,10 @@ from apps.verifactu.schemas import (
     RecordCorrectIn,
     RecordCreateIn,
     RecordCreateOut,
+    RecordReconcileIn,
     RecordSummaryOut,
     RecordTransmitIn,
+    ReconcileOut,
     RecoverFromAeatIn,
     RecoverManualIn,
     RepresentationSubmitIn,
@@ -1157,6 +1159,65 @@ def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSumma
     record_event(ctx, events.CONTINGENCY_RETRIED, {"record_id": str(record.id)})
     record.refresh_from_db()
     return summary(record)
+
+
+@operation(
+    "verifactu.record.reconcile",
+    kind="command",
+    permission=TRANSMIT,
+    input=RecordReconcileIn,
+    output=ReconcileOut,
+    ai={
+        "description": "Ask the AEAT, through ERPlora's gateway, whether it already holds a record of the VeriFactu "
+        "queue (by its id or its invoice's number; typically one sent without an answer). Only when it holds that very "
+        "record (same fingerprint) does it leave the queue as registered; otherwise nothing changes and it is sent "
+        "again. Nothing the AEAT does not hold ever leaves the queue.",
+        "risk": "high",
+    },
+)
+def reconcile_record(ctx: OperationContext, data: RecordReconcileIn) -> ReconcileOut:
+    found = find_record(data.record_id, data.invoice_number)
+    if found.status not in Record.UNSENT:
+        raise Conflict(str(NOT_IN_QUEUE), code="verifactu.not_in_queue")
+    config = _config(lock=False)
+    # The AEAT files a record under the period of its invoice's issue date; it is asked before the row is locked,
+    # so a pass of the queue never waits on the gateway.
+    held = aeat.held_as(
+        _query_aeat(
+            ctx,
+            config,
+            found.issuer_nif,
+            found.environment,
+            found.issue_date.year,
+            found.issue_date.month,
+        ),
+        found.issuer_nif,
+        found.invoice_number,
+        found.fingerprint,
+    )
+    record = find_record(found.id, None, lock=True)
+    if held is None or record.status not in Record.UNSENT:
+        return ReconcileOut(held=False, record=summary(record))
+    record.status = held
+    record.wait_reason = record.wait_detail = ""
+    record.save(update_fields=["status", "wait_reason", "wait_detail", "updated_at"])
+    notice = {
+        "record_id": str(record.id),
+        "invoice_number": record.invoice_number,
+        "status": held,
+        "environment": record.environment,
+    }
+    _event(
+        ctx,
+        held,
+        "record_reconciled",
+        notice,
+        severity="warning" if held == Record.Status.ACCEPTED_WITH_ERRORS else "info",
+        record=record,
+        environment=record.environment,
+    )
+    record_event(ctx, events.RECORD_RECONCILED, notice)
+    return ReconcileOut(held=True, record=summary(record))
 
 
 # ── The chain ───────────────────────────────────────────────────────────────────────────────────
