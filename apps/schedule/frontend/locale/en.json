@@ -1,0 +1,150 @@
+{
+  "schedule": {
+    "title": "Schedules",
+    "tabs": {
+      "label": "Schedule sections",
+      "hours": "Hours",
+      "special_days": "Special days",
+      "settings": "Settings"
+    },
+    "days": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "closed": "Closed",
+    "open": "Open",
+    "open24h": "Open 24 hours",
+    "notSet": "Not set",
+    "loading": "Loading…",
+    "noPermission": "You do not have permission",
+    "noResults": "No results",
+    "noResultsMessage": "Try another search or clear the filters.",
+    "add": "Add",
+    "save": "Save",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "hours": {
+      "columns": {
+        "day": "Day",
+        "hours": "Hours",
+        "status": "Status"
+      },
+      "entity": {
+        "one": "day",
+        "many": "days"
+      },
+      "loadError": "The opening hours could not be loaded.",
+      "defaultWeek": {
+        "message": "These are default opening hours we set up for you. Check they match your business — bookings outside them are refused.",
+        "confirm": "Yes, these are my hours"
+      },
+      "form": {
+        "title": "Edit hours — {day}",
+        "day": "Day",
+        "closed": "Closed",
+        "open24h": "Open 24 hours",
+        "submit": "Save day"
+      }
+    },
+    "intervals": {
+      "legend": "Opening intervals",
+      "open": "Opens",
+      "close": "Closes",
+      "add": "+ Add interval",
+      "remove": "Remove interval",
+      "hint": "Split shifts: one line per interval (10:00–14:00 and 17:00–20:00). A closing time earlier than the opening one runs past midnight (22:00–02:00).",
+      "incomplete": "Enter opening and closing times, or mark it as closed"
+    },
+    "specialDays": {
+      "heading": "Special days",
+      "columns": {
+        "date": "Date",
+        "name": "Name",
+        "status": "Status",
+        "yearly": "Yearly"
+      },
+      "search": "Search special day…",
+      "empty": "No special days.",
+      "entity": {
+        "one": "special day",
+        "many": "special days"
+      },
+      "loadError": "The special days could not be loaded.",
+      "add": "New special day",
+      "form": {
+        "titleNew": "New special day",
+        "titleEdit": "Edit · {name}",
+        "date": "Date",
+        "name": "Name",
+        "namePlaceholder": "Name (e.g. Christmas)",
+        "status": "Status",
+        "openWithHours": "Open (with hours)",
+        "recurring": "Repeats every year",
+        "notes": "Notes",
+        "submit": "Add day"
+      }
+    },
+    "overrides": {
+      "heading": "Overrides",
+      "columns": {
+        "from": "From",
+        "to": "To",
+        "reason": "Reason",
+        "status": "Status"
+      },
+      "search": "Search override…",
+      "empty": "No overrides.",
+      "entity": {
+        "one": "override",
+        "many": "overrides"
+      },
+      "loadError": "The overrides could not be loaded.",
+      "add": "New override",
+      "form": {
+        "titleNew": "New override",
+        "titleEdit": "Edit · {name}",
+        "from": "From",
+        "to": "To",
+        "reason": "Reason",
+        "status": "Status",
+        "submit": "Add override"
+      }
+    },
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "delete": {
+      "title": "Delete",
+      "message": "«{name}» will be deleted. This cannot be undone.",
+      "confirm": "Delete"
+    },
+    "filters": {
+      "button": "Filters",
+      "count": "Filters: {n}",
+      "title": "Filters",
+      "any": "Any",
+      "from": "From",
+      "to": "To",
+      "clear": "Clear",
+      "done": "Done"
+    },
+    "settings": {
+      "timezone": "Business timezone",
+      "timezoneNote": "It is the Hub's, and the single clock the schedule is read with.",
+      "weekStarts": "Week starts",
+      "loadError": "The settings could not be loaded.",
+      "saved": "Saved"
+    }
+  }
+}

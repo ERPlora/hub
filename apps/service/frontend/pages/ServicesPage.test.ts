@@ -1,0 +1,191 @@
+// Services → Services (WORKBOOK «Pantallas · Servicios»; SERVICE-F01 to F05): the live
+// `service.service.list` in a server-side DataTable — Name, Category, Pricing, Price, Duration (min) and
+// Status (Active, Not configured with its reason, Archived) —, «Search service…», column filters (the
+// Status filter on Archived is the archived view), list or cards, 50 a page. «New service» and a row
+// open the form; a row offers Edit and Archive (with its confirmation), and Restore in the archived view.
+import { ConfirmDialog, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
+import { AppPage } from '@erplora/ui/shell';
+import { describe, expect, it, vi } from 'vitest';
+import type { Component } from 'vue';
+
+import type { ServiceOut } from '../operations';
+import { EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page } from '../__tests__/mount-service';
+import ServiceFormModal from '../components/ServiceFormModal.vue';
+import ServicesPage from './ServicesPage.vue';
+
+vi.mock('@ionic/vue', async (importOriginal) => {
+  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
+  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
+});
+
+const OP = 'service.service.list';
+const service = (id: string, over: Partial<ServiceOut> = {}): ServiceOut => ({
+  id,
+  name: 'Haircut',
+  description: '',
+  short_description: '',
+  category_id: 'c1',
+  category_name: 'Hair',
+  pricing_type: 'fixed',
+  price: 2250,
+  min_price: null,
+  max_price: null,
+  cost: 0,
+  duration_minutes: 30,
+  buffer_before: 0,
+  buffer_after: 0,
+  max_capacity: 1,
+  is_bookable: true,
+  requires_confirmation: false,
+  allow_online_booking: true,
+  sort_order: 0,
+  is_featured: false,
+  sku: '',
+  barcode: '',
+  notes: '',
+  tax_category_id: 't1',
+  tax_category_key: 'service.generic',
+  tax_category_name: 'Service — generic',
+  needs_tax_setup: false,
+  status: 'active',
+  is_active: true,
+  archived_at: null,
+  created_at: '2026-10-01T10:00:00Z',
+  updated_at: '2026-10-01T10:00:00Z',
+  ...over,
+});
+const ROWS = [
+  service('s1'),
+  service('s2', { name: 'Beard', category_id: null, category_name: null, pricing_type: 'from', tax_category_key: null, needs_tax_setup: true, status: 'unconfigured' }),
+];
+
+async function setup(options: MountOptions = {}) {
+  const m = await mountService(ServicesPage, { path: '/service/services', ...options });
+  await m.live();
+  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
+  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
+  const rows = () => m.wrapper.findAll('[data-testid="service-services-row"]');
+  const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
+  const actions = (row: ServiceOut) =>
+    prop<Array<{ id: string; hidden?: (r: ServiceOut) => boolean }>>('actions')
+      .filter((a) => !a.hidden?.(row))
+      .map((a) => a.id);
+  return { ...m, table, prop, rows, cells, actions, list: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
+}
+
+describe('ServicesPage', () => {
+  it('follows the offered services sorted by name, 50 from the first', async () => {
+    const s = await setup();
+    expect(s.list()).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
+    await s.show(page(ROWS));
+    expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'service-services', total: 2, views: ['table', 'cards'] });
+    expect(s.prop('searchPlaceholder')).toBe('Search service…');
+    expect(s.prop<{ add: string }>('labels').add).toBe('New service');
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Services');
+  });
+
+  it('paints Name, Category, Pricing, Price, Duration and Status, with the reason of «Not configured»', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
+      ['name', 'Name'],
+      ['category_name', 'Category'],
+      ['pricing_type', 'Pricing'],
+      ['price', 'Price'],
+      ['duration_minutes', 'Duration (min)'],
+      ['status', 'Status'],
+    ]);
+    expect(s.cells(0).slice(0, 6)).toEqual(['Haircut', 'Hair', 'Fixed price', '€22.50', '30', 'Active']);
+    expect(s.cells(1).slice(1, 3)).toEqual(['—', 'From']);
+    expect(s.cells(1)[5]).toContain('Not configured');
+    expect(s.cells(1)[5]).toContain('No tax category: it cannot be charged');
+  });
+
+  it('filters by column: the price in euros as cents, the status, and Archived is the archived view', async () => {
+    const s = await setup();
+    s.table().vm.$emit('filtersChange', { name: 'cut', pricing_type: 'from', price_from: '10', price_to: '25,50', duration_minutes_to: '60' });
+    await flush();
+    expect(s.list()).toEqual([
+      { name: 'cut', pricing_type: 'from', price_min: 1000, price_max: 2550, duration_max: 60, sort: 'name', limit: 50, offset: 0 },
+    ]);
+    s.table().vm.$emit('filtersChange', { status: 'archived' });
+    await flush();
+    expect(s.list()).toEqual([{ status: 'archived', sort: 'name', limit: 50, offset: 0 }]);
+    await s.show(page([service('s3', { status: 'archived', is_active: false })]));
+    expect(s.actions(service('s3', { status: 'archived', is_active: false }))).toEqual(['restore']);
+    expect(s.prop('rowClickable')).toBe(false);
+  });
+
+  it('sorts and searches on the server; no service at all says «No services.»', async () => {
+    const s = await setup();
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No services.');
+    s.table().vm.$emit('sortChange', { sort: 'price', dir: 'desc' });
+    s.table().vm.$emit('update:search', 'cut');
+    await flush();
+    expect(s.list()).toEqual([{ search: 'cut', sort: '-price', limit: 50, offset: 0 }]);
+  });
+
+  it('«New service» and a row open the form', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const modal = () => s.wrapper.findComponent(ServiceFormModal);
+    s.table().vm.$emit('add');
+    await flush();
+    expect([modal().props('open'), modal().props('service')]).toEqual([true, null]);
+    modal().vm.$emit('update:open', false);
+    s.table().vm.$emit('rowClick', ROWS[0]);
+    await flush();
+    expect([modal().props('open'), modal().props('service'), modal().props('canChange')]).toEqual([true, ROWS[0], true]);
+    expect(s.actions(ROWS[0])).toEqual(['edit', 'archive']);
+  });
+
+  it('archives after its confirmation, naming the service', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[0] });
+    await flush();
+    const dialog = s.wrapper.findComponent(ConfirmDialog);
+    expect([dialog.props('open'), dialog.props('title'), dialog.props('message'), dialog.props('confirmLabel')]).toEqual([
+      true,
+      'Archive service',
+      'Haircut — it will no longer be offered or bookable. Its history and the appointments already booked are kept.',
+      'Archive',
+    ]);
+    s.answer(200, { ...ROWS[0], status: 'archived' });
+    dialog.vm.$emit('confirm');
+    await flush();
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/service/services/archive', query: {}, body: { id: 's1' } }]);
+  });
+
+  it('restores from the archived view and says a refusal above the table', async () => {
+    const s = await setup();
+    s.table().vm.$emit('filtersChange', { status: 'archived' });
+    await flush();
+    s.answer(404, { error: { code: 'service.service_not_found', message: 'That service does not exist in this business.' } });
+    s.table().vm.$emit('action', { actionId: 'restore', row: ROWS[0] });
+    await flush();
+    await flush();
+    expect(s.sent().map((c) => [c.path, c.body])).toEqual([['/api/service/services/restore', { id: 's1' }]]);
+    const banner = s.wrapper.findAllComponents(InlineFeedback).find((b) => b.attributes('data-testid') === 'service-services-row-error');
+    expect([banner?.props('heading'), banner?.text()]).toEqual(['Could not restore the service', expect.stringContaining('does not exist')]);
+  });
+
+  it('a manager edits but does not archive; an employee adds but neither edits nor archives', async () => {
+    const manager = await setup({ session: MANAGER });
+    await manager.show(page(ROWS));
+    expect(manager.actions(ROWS[0])).toEqual(['edit']);
+    const employee = await setup({ session: EMPLOYEE });
+    await employee.show(page(ROWS));
+    expect([employee.prop('addable'), employee.prop('rowClickable'), employee.actions(ROWS[0])]).toEqual([true, false, []]);
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show(page(ROWS));
+    expect(s.prop('searchPlaceholder')).toBe('Buscar servicio…');
+    expect(s.cells(0)[2]).toBe('Precio fijo');
+    expect(s.cells(0)[3]).toMatch(/^22,50\s€$/);
+    expect(s.cells(1)[5]).toContain('Sin configurar');
+  });
+});

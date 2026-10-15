@@ -1,0 +1,307 @@
+{
+  "service": {
+    "title": "Servicios",
+    "tabs": {
+      "label": "Secciones de Servicios",
+      "services": "Servicios",
+      "categories": "Categorías",
+      "packages": "Bonos y paquetes",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "loading": "Cargando…",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
+    "noPermission": "No tienes permiso",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "add": "Añadir",
+    "loadMore": "Cargar más",
+    "showing": "Se muestran {shown} de {total}",
+    "none": "—",
+    "minutes": "{n} min",
+    "money": {
+      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+      "negative": "Este importe no puede ser negativo."
+    },
+    "pricing": {
+      "fixed": "Precio fijo",
+      "hourly": "Por hora",
+      "from": "Desde",
+      "variable": "Variable",
+      "free": "Gratis"
+    },
+    "tax": {
+      "exempt": "exento",
+      "loadError": "No se han podido cargar las categorías fiscales."
+    },
+    "services": {
+      "search": "Buscar servicio…",
+      "empty": "Sin servicios.",
+      "loadError": "No se han podido cargar los servicios.",
+      "new": "Nuevo servicio",
+      "entity": {
+        "one": "servicio",
+        "many": "servicios"
+      },
+      "columns": {
+        "name": "Nombre",
+        "category": "Categoría",
+        "pricingType": "Tarifa",
+        "price": "Precio",
+        "duration": "Duración (min)",
+        "status": "Estado"
+      },
+      "status": {
+        "active": "Activo",
+        "unconfigured": "Sin configurar",
+        "archived": "Archivado"
+      },
+      "statusReason": "Sin categoría fiscal: no se puede cobrar",
+      "actions": {
+        "edit": "Editar",
+        "archive": "Archivar",
+        "restore": "Restaurar"
+      },
+      "archive": {
+        "title": "Archivar servicio",
+        "message": "{name} — dejará de ofrecerse y de poder reservarse. Se conservan su histórico y las citas ya reservadas.",
+        "confirm": "Archivar",
+        "error": "No se pudo archivar el servicio"
+      },
+      "restoreError": "No se pudo restaurar el servicio",
+      "form": {
+        "titleNew": "Nuevo servicio",
+        "titleEdit": "Editando servicio — {name}",
+        "name": "Nombre",
+        "pricingType": "Tarifa",
+        "price": "Precio",
+        "duration": "Duración (min)",
+        "category": "Categoría",
+        "noCategory": "Sin categoría",
+        "tax": "Categoría fiscal",
+        "taxMissing": "Todavía no hay categorías fiscales. Configúralas en Impuestos antes de añadir servicios.",
+        "create": "Crear servicio",
+        "save": "Guardar cambios"
+      }
+    },
+    "professionals": {
+      "title": "Profesionales que lo hacen",
+      "empty": "Nadie asignado todavía: lo puede hacer todo el equipo reservable.",
+      "add": "Añadir profesional…",
+      "minutes": "Minutos (opcional)",
+      "price": "Precio (opcional)",
+      "assign": "Asignar",
+      "own": "{duration} min · {price}",
+      "primary": "Servicio principal",
+      "makePrimary": "Hacerlo su servicio principal",
+      "active": "Lo hace",
+      "save": "Guardar",
+      "remove": "Quitar",
+      "error": "No se pudieron actualizar los profesionales",
+      "loadError": "No se han podido cargar los profesionales."
+    },
+    "categories": {
+      "search": "Buscar categoría…",
+      "empty": "No hay categorías.",
+      "loadError": "No se han podido cargar las categorías.",
+      "new": "Nueva categoría",
+      "entity": {
+        "one": "categoría",
+        "many": "categorías"
+      },
+      "columns": {
+        "name": "Nombre",
+        "parent": "Categoría padre",
+        "order": "Orden",
+        "services": "Servicios"
+      },
+      "actions": {
+        "edit": "Editar",
+        "delete": "Eliminar"
+      },
+      "form": {
+        "titleNew": "Nueva categoría",
+        "titleEdit": "Editando categoría — {name}",
+        "name": "Nombre",
+        "parent": "Categoría padre",
+        "noParent": "Sin padre (raíz)",
+        "order": "Orden",
+        "create": "Crear categoría",
+        "save": "Guardar cambios"
+      },
+      "delete": {
+        "title": "Eliminar categoría",
+        "message": "{name} — la categoría desaparece; los servicios que contiene se conservan, sin categoría.",
+        "impact": "{count} servicio(s) se quedarán sin categoría.",
+        "confirm": "Eliminar",
+        "error": "No se pudo eliminar la categoría"
+      }
+    },
+    "packages": {
+      "search": "Buscar paquete…",
+      "empty": "No hay paquetes.",
+      "loadError": "No se han podido cargar los paquetes.",
+      "new": "Nuevo paquete",
+      "orphans": "Bonos sin cliente",
+      "entity": {
+        "one": "paquete",
+        "many": "paquetes"
+      },
+      "columns": {
+        "name": "Nombre",
+        "discount": "Descuento",
+        "fixedPrice": "Precio cerrado",
+        "lines": "Líneas",
+        "status": "Estado"
+      },
+      "status": {
+        "active": "Activo",
+        "archived": "Archivado",
+        "deleted": "Eliminado"
+      },
+      "actions": {
+        "edit": "Editar",
+        "movements": "Movimientos",
+        "grants": "Bonos vendidos",
+        "delete": "Eliminar"
+      },
+      "form": {
+        "titleNew": "Nuevo paquete",
+        "titleEdit": "Editando paquete — {name}",
+        "name": "Nombre",
+        "discountType": "Tipo de descuento",
+        "percentage": "Porcentaje",
+        "fixed": "Importe fijo",
+        "discountPercent": "Descuento (%)",
+        "discountAmount": "Descuento (importe)",
+        "percentInvalid": "Escribe un porcentaje de 0 a 100, con dos decimales como mucho.",
+        "fixedPrice": "Precio cerrado",
+        "fixedPriceHelp": "Déjalo vacío para que valga la suma de sus líneas menos el descuento.",
+        "validity": "Vigencia (días)",
+        "validityHelp": "Días canjeable desde la COMPRA; vacío = no caduca.",
+        "uses": "Usos",
+        "usesHelp": "Usos que concede el bono; vacío = ilimitados.",
+        "lines": "Servicios incluidos",
+        "service": "Servicio",
+        "sessions": "Sesiones",
+        "addLine": "Añadir servicio",
+        "removeLine": "Quitar línea",
+        "linesFixed": "Los servicios incluidos no se cambian una vez creado: elimina este paquete y crea uno nuevo.",
+        "noLines": "Añade al menos un servicio: un paquete sin líneas no se puede canjear.",
+        "create": "Crear paquete",
+        "save": "Guardar cambios"
+      },
+      "delete": {
+        "title": "Eliminar paquete",
+        "message": "{name} — el paquete y sus {count} línea(s) salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado.",
+        "confirm": "Eliminar",
+        "error": "No se pudo eliminar el paquete"
+      }
+    },
+    "grants": {
+      "title": "Bonos vendidos",
+      "hint": "Todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad, o quitar sesiones para corregir su saldo; una venta de la que no se ha usado nada se puede anular.",
+      "empty": "Nadie ha comprado este bono todavía.",
+      "error": "No se han podido cargar los bonos vendidos",
+      "status": {
+        "active": "Activo",
+        "voided": "Anulado"
+      },
+      "customer": "Cliente: {name}",
+      "customerRef": "Referencia del cliente: {id}",
+      "sale": "Venta: {id}",
+      "uses": "{used} usadas · quedan {remaining}",
+      "usesUnlimited": "{used} usadas · sin límite",
+      "expires": "Caduca el {when}",
+      "noExpiry": "No caduca",
+      "expired": "Caducado",
+      "given": "Regalado después: +{uses} sesión(es), +{days} día(s)",
+      "corrected": "Corregido después: −{uses} sesión(es)",
+      "voidedBy": "Anulado por {who} el {when}",
+      "adjust": "Ajustar",
+      "void": "Anular"
+    },
+    "void": {
+      "title": "¿Anular este bono?",
+      "message": "El bono del cliente {customer} ({amount}) deja de poder usarse y queda en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde Ventas con una devolución.",
+      "reason": "Motivo",
+      "reasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «vendido al cliente equivocado».",
+      "confirm": "Anular"
+    },
+    "adjust": {
+      "title": "Ajustar este bono",
+      "message": "Regala al cliente {customer} sesiones extra o alarga la caducidad sin cobrar, o quítale sesiones para corregir el saldo. Queda en los movimientos del bono con quién, cuándo y por qué.",
+      "addSessions": "Añadir sesiones",
+      "removeSessions": "Quitar sesiones",
+      "usesAdd": "Sesiones que se añaden",
+      "usesAddHelp": "Quedan {remaining}. Hasta 100.",
+      "usesRemove": "Sesiones que se quitan",
+      "usesRemoveHelp": "Quedan {remaining}. Puedes quitar hasta {remaining}.",
+      "days": "Días que se alarga",
+      "daysHelp": "Ahora caduca el {when}. Hasta 366.",
+      "reason": "Motivo",
+      "reasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «cerramos en agosto».",
+      "preview": "Tras el ajuste: quedan {remaining} sesión(es) · {expiry}",
+      "previewUnlimited": "Tras el ajuste: sin límite de sesiones · {expiry}",
+      "expiresOn": "caduca el {when}",
+      "neverExpires": "no caduca",
+      "confirm": "Ajustar"
+    },
+    "movements": {
+      "title": "Movimientos del bono",
+      "hint": "Cada sesión de este bono que se ha gastado, y las cortesías regaladas y las correcciones hechas después.",
+      "empty": "Este bono aún no se ha usado.",
+      "error": "No se han podido cargar los movimientos",
+      "kind": {
+        "held": "Reservada",
+        "consumed": "Entregada",
+        "released": "Liberada",
+        "expired": "Caducada",
+        "returned": "Devuelta",
+        "adjusted": "Cortesía",
+        "corrected": "Corrección"
+      },
+      "customer": "Cliente: {name}",
+      "sale": "Venta: {id}",
+      "noService": "Sin servicio en la línea",
+      "given": "+{uses} sesión(es) · +{days} día(s)",
+      "correctedDelta": "−{uses} sesión(es) · +{days} día(s)",
+      "givenBy": "Regalado por {who}",
+      "correctedBy": "Corregido por {who}",
+      "releasedBy": "Liberada por {who}",
+      "returnedBy": "Devuelta por {who}"
+    },
+    "orphans": {
+      "title": "Bonos sin cliente",
+      "hint": "Se borró o se anonimizó su ficha de cliente. El bono conserva todo lo que se vendió: para devolver el dinero, busca la venta en Ventas; para anularlo si no se usó, ábrelo desde Bonos vendidos.",
+      "empty": "Ningún bono se ha quedado sin cliente.",
+      "error": "No se han podido cargar los bonos sin cliente.",
+      "remaining": "Quedan {remaining} sesión(es)",
+      "unlimited": "Sin límite de sesiones",
+      "noValue": "Agotado",
+      "deletedAt": "Cliente borrado el {when}",
+      "expired": "Caducado",
+      "customerRef": "Referencia del cliente: {id}",
+      "count": "{shown} de {total}"
+    },
+    "settings": {
+      "title": "Servicios",
+      "loadError": "No se pudieron cargar los ajustes.",
+      "saveError": "No se pudieron guardar los ajustes.",
+      "saved": "Ajustes guardados.",
+      "defaultDuration": "Duración por defecto (min)",
+      "defaultBuffer": "Tiempo de margen por defecto (min)",
+      "defaultTax": "Categoría fiscal por defecto",
+      "showPrices": "Mostrar precios",
+      "showDuration": "Mostrar duración",
+      "onlineBooking": "Permitir reserva online",
+      "save": "Guardar"
+    }
+  }
+}

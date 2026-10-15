@@ -1,0 +1,150 @@
+{
+  "schedule": {
+    "title": "Horarios",
+    "tabs": {
+      "label": "Secciones de Horarios",
+      "hours": "Horario",
+      "special_days": "Días especiales",
+      "settings": "Ajustes"
+    },
+    "days": {
+      "0": "Lunes",
+      "1": "Martes",
+      "2": "Miércoles",
+      "3": "Jueves",
+      "4": "Viernes",
+      "5": "Sábado",
+      "6": "Domingo"
+    },
+    "yes": "Sí",
+    "no": "No",
+    "closed": "Cerrado",
+    "open": "Abierto",
+    "open24h": "Abierto 24 horas",
+    "notSet": "Sin definir",
+    "loading": "Cargando…",
+    "noPermission": "No tienes permiso",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Prueba otra búsqueda o quita los filtros.",
+    "add": "Añadir",
+    "save": "Guardar",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "hours": {
+      "columns": {
+        "day": "Día",
+        "hours": "Horario",
+        "status": "Estado"
+      },
+      "entity": {
+        "one": "día",
+        "many": "días"
+      },
+      "loadError": "No se ha podido cargar el horario.",
+      "defaultWeek": {
+        "message": "Este es un horario por defecto que hemos puesto por ti. Comprueba que coincide con el de tu negocio: las reservas fuera de él se rechazan.",
+        "confirm": "Sí, este es mi horario"
+      },
+      "form": {
+        "title": "Editar horario — {day}",
+        "day": "Día",
+        "closed": "Cerrado",
+        "open24h": "Abierto 24 horas",
+        "submit": "Guardar día"
+      }
+    },
+    "intervals": {
+      "legend": "Tramos horarios",
+      "open": "Abre",
+      "close": "Cierra",
+      "add": "+ Añadir tramo",
+      "remove": "Quitar tramo",
+      "hint": "Jornada partida: una línea por tramo (10:00–14:00 y 17:00–20:00). Un cierre anterior a la apertura pasa de medianoche (22:00–02:00).",
+      "incomplete": "Indica la hora de apertura y cierre, o márcalo como cerrado"
+    },
+    "specialDays": {
+      "heading": "Días especiales",
+      "columns": {
+        "date": "Fecha",
+        "name": "Nombre",
+        "status": "Estado",
+        "yearly": "Anual"
+      },
+      "search": "Buscar día especial…",
+      "empty": "Sin días especiales.",
+      "entity": {
+        "one": "día especial",
+        "many": "días especiales"
+      },
+      "loadError": "No se han podido cargar los días especiales.",
+      "add": "Nuevo día especial",
+      "form": {
+        "titleNew": "Nuevo día especial",
+        "titleEdit": "Editar · {name}",
+        "date": "Fecha",
+        "name": "Nombre",
+        "namePlaceholder": "Nombre (p.ej. Navidad)",
+        "status": "Estado",
+        "openWithHours": "Abierto (con horario)",
+        "recurring": "Se repite cada año",
+        "notes": "Notas",
+        "submit": "Añadir día"
+      }
+    },
+    "overrides": {
+      "heading": "Cambios temporales",
+      "columns": {
+        "from": "Desde",
+        "to": "Hasta",
+        "reason": "Motivo",
+        "status": "Estado"
+      },
+      "search": "Buscar cambio temporal…",
+      "empty": "Sin cambios temporales.",
+      "entity": {
+        "one": "cambio temporal",
+        "many": "cambios temporales"
+      },
+      "loadError": "No se han podido cargar los cambios temporales.",
+      "add": "Nuevo cambio temporal",
+      "form": {
+        "titleNew": "Nuevo cambio temporal",
+        "titleEdit": "Editar · {name}",
+        "from": "Desde",
+        "to": "Hasta",
+        "reason": "Motivo",
+        "status": "Estado",
+        "submit": "Añadir cambio temporal"
+      }
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "delete": {
+      "title": "Eliminar",
+      "message": "Se eliminará «{name}». No se puede deshacer.",
+      "confirm": "Eliminar"
+    },
+    "filters": {
+      "button": "Filtros",
+      "count": "Filtros: {n}",
+      "title": "Filtros",
+      "any": "Cualquiera",
+      "from": "Desde",
+      "to": "Hasta",
+      "clear": "Quitar",
+      "done": "Hecho"
+    },
+    "settings": {
+      "timezone": "Zona horaria del negocio",
+      "timezoneNote": "Es la del Hub y el único reloj con el que se lee el horario.",
+      "weekStarts": "Semana empieza",
+      "loadError": "No se han podido cargar los ajustes.",
+      "saved": "Guardado"
+    }
+  }
+}

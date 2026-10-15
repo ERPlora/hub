@@ -1,0 +1,541 @@
+# Spanish translation of the service app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next service\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 12:00+0200\n"
+"PO-Revision-Date: 2026-10-14 12:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Services"
+msgstr "Servicios"
+
+msgid ""
+"Your service menu: prices, durations, who performs each service and prepaid "
+"session vouchers."
+msgstr ""
+"Tu carta de servicios: precios, duraciones, quién hace cada servicio y bonos"
+" de sesiones prepagadas."
+
+msgid ""
+"Services keeps what your salon sells when it is not an article: each service"
+" with its price, its duration, its category and its tax category, and the "
+"professionals who perform it with their own price and time. The diary books "
+"from it and the till charges from it. It also keeps the vouchers: packs of "
+"sessions a customer pays once and spends over several visits, with their "
+"balance, their expiry, courtesies and corrections, and every session spent."
+msgstr ""
+"Servicios guarda lo que vende tu salón cuando no es un artículo: cada "
+"servicio con su precio, su duración, su categoría y su categoría fiscal, y "
+"los profesionales que lo hacen con su precio y su tiempo propios. La agenda "
+"reserva desde aquí y la caja cobra desde aquí. También guarda los bonos: "
+"paquetes de sesiones que una clienta paga una vez y gasta en varias visitas,"
+" con su saldo, su caducidad, las cortesías y correcciones y cada sesión "
+"gastada."
+
+msgid "Categories"
+msgstr "Categorías"
+
+msgid "Packages"
+msgstr "Bonos y paquetes"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "default duration (min)"
+msgstr "duración por defecto (min)"
+
+msgid "default buffer time (min)"
+msgstr "tiempo de margen por defecto (min)"
+
+msgid "default tax category"
+msgstr "categoría fiscal por defecto"
+
+msgid "show prices"
+msgstr "mostrar precios"
+
+msgid "show duration"
+msgstr "mostrar duración"
+
+msgid "allow online booking"
+msgstr "permitir reserva online"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "service settings"
+msgstr "ajustes de servicios"
+
+msgid "A category cannot hang from itself or from one of its subcategories."
+msgstr ""
+"Una categoría no puede colgar de sí misma ni de una de sus subcategorías."
+
+msgid ""
+"These categories hang from each other in a loop: leave one of them without a"
+" parent and try again."
+msgstr ""
+"Estas categorías cuelgan unas de otras en bucle: deja una de ellas sin padre"
+" y vuelve a intentarlo."
+
+msgid "name"
+msgstr "nombre"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "parent category"
+msgstr "categoría padre"
+
+msgid "icon"
+msgstr "icono"
+
+msgid "colour"
+msgstr "color"
+
+msgid "order"
+msgstr "orden"
+
+msgid "deleted"
+msgstr "eliminado"
+
+msgid "deleted at"
+msgstr "eliminado el"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "service category"
+msgstr "categoría de servicio"
+
+msgid "service categories"
+msgstr "categorías de servicio"
+
+msgid "Fixed price"
+msgstr "Precio fijo"
+
+msgid "Hourly"
+msgstr "Por hora"
+
+msgid "From"
+msgstr "Desde"
+
+msgid "Variable"
+msgstr "Variable"
+
+msgid "Free"
+msgstr "Gratis"
+
+msgid "short description"
+msgstr "descripción corta"
+
+msgid "category"
+msgstr "categoría"
+
+msgid "pricing"
+msgstr "tarifa"
+
+msgid "price"
+msgstr "precio"
+
+msgid "minimum price"
+msgstr "precio mínimo"
+
+msgid "maximum price"
+msgstr "precio máximo"
+
+msgid "cost"
+msgstr "coste"
+
+msgid "duration (min)"
+msgstr "duración (min)"
+
+msgid "buffer before (min)"
+msgstr "margen antes (min)"
+
+msgid "buffer after (min)"
+msgstr "margen después (min)"
+
+msgid "capacity"
+msgstr "capacidad"
+
+msgid "bookable"
+msgstr "reservable"
+
+msgid "requires confirmation"
+msgstr "requiere confirmación"
+
+msgid "online booking"
+msgstr "reserva online"
+
+msgid "featured"
+msgstr "destacado"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "barcode"
+msgstr "código de barras"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "tax category"
+msgstr "categoría fiscal"
+
+msgid "offered"
+msgstr "en oferta"
+
+msgid "archived at"
+msgstr "archivado el"
+
+msgid "service"
+msgstr "servicio"
+
+msgid "services"
+msgstr "servicios"
+
+msgid "professional"
+msgstr "profesional"
+
+msgid "own duration (min)"
+msgstr "duración propia (min)"
+
+msgid "own price"
+msgstr "precio propio"
+
+msgid "main service"
+msgstr "servicio principal"
+
+msgid "active"
+msgstr "activo"
+
+msgid "professional of a service"
+msgstr "profesional de un servicio"
+
+msgid "professionals of the services"
+msgstr "profesionales de los servicios"
+
+msgid "Percentage"
+msgstr "Porcentaje"
+
+msgid "Fixed amount"
+msgstr "Importe fijo"
+
+msgid "discount type"
+msgstr "tipo de descuento"
+
+msgid "discount (basis points)"
+msgstr "descuento (puntos básicos)"
+
+msgid "discount (amount)"
+msgstr "descuento (importe)"
+
+msgid "closed price"
+msgstr "precio cerrado"
+
+msgid "validity (days)"
+msgstr "vigencia (días)"
+
+msgid "uses"
+msgstr "usos"
+
+msgid "package"
+msgstr "paquete"
+
+msgid "packages"
+msgstr "paquetes"
+
+msgid "sessions"
+msgstr "sesiones"
+
+msgid "package line"
+msgstr "línea de paquete"
+
+msgid "package lines"
+msgstr "líneas de paquete"
+
+msgid "Granted by hand"
+msgstr "Concedido a mano"
+
+msgid "Sold at the till"
+msgstr "Vendido en caja"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "bought at"
+msgstr "comprado el"
+
+msgid "source"
+msgstr "origen"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "amount paid"
+msgstr "importe pagado"
+
+msgid "net amount"
+msgstr "base imponible"
+
+msgid "tax amount"
+msgstr "cuota de IVA"
+
+msgid "note"
+msgstr "nota"
+
+msgid "voided at"
+msgstr "anulado el"
+
+msgid "voided by"
+msgstr "anulado por"
+
+msgid "void reason"
+msgstr "motivo de la anulación"
+
+msgid "voucher sold"
+msgstr "bono vendido"
+
+msgid "vouchers sold"
+msgstr "bonos vendidos"
+
+msgid "days"
+msgstr "días"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "by"
+msgstr "por"
+
+msgid "date"
+msgstr "fecha"
+
+msgid "voucher adjustment"
+msgstr "ajuste de bono"
+
+msgid "voucher adjustments"
+msgstr "ajustes de bonos"
+
+msgid "appointment"
+msgstr "cita"
+
+msgid "voucher session"
+msgstr "sesión de bono"
+
+msgid "voucher sessions"
+msgstr "sesiones de bono"
+
+msgid "That service does not exist in this business."
+msgstr "Ese servicio no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” matches several services: %(names)s. Say which one."
+msgstr "«%(said)s» vale para varios servicios: %(names)s. Di cuál."
+
+msgid "That category does not exist in this business."
+msgstr "Esa categoría no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” matches several categories: %(names)s. Say which one."
+msgstr "«%(said)s» vale para varias categorías: %(names)s. Di cuál."
+
+msgid "That package does not exist in this business."
+msgstr "Ese paquete no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” matches several packages: %(names)s. Say which one."
+msgstr "«%(said)s» vale para varios paquetes: %(names)s. Di cuál."
+
+msgid "That voucher sale does not exist in this business."
+msgstr "Esa venta de bono no existe en este negocio."
+
+msgid "Say which service: its id, or its name."
+msgstr "Di qué servicio: su id o su nombre."
+
+msgid "Say which category: its id, or its name."
+msgstr "Di qué categoría: su id o su nombre."
+
+msgid "Say which package: its id, or its name."
+msgstr "Di qué paquete: su id o su nombre."
+
+msgid "Say which professional: their id, or their name."
+msgstr "Di qué profesional: su id o su nombre."
+
+msgid ""
+"Pick the customer this voucher belongs to: a voucher with no owner cannot be"
+" redeemed."
+msgstr ""
+"Elige el cliente al que pertenece el bono: un bono sin dueño no lo puede "
+"canjear nadie."
+
+msgid "The minimum price cannot be above the maximum price."
+msgstr "El precio mínimo no puede ser mayor que el máximo."
+
+msgid "A service is repeated in the lines: each service goes once."
+msgstr "Hay un servicio repetido en las líneas: cada servicio va una sola vez."
+
+msgid "Say why this voucher is being voided: the reason stays on its record."
+msgstr "Indica por qué se anula este bono: el motivo queda en su registro."
+
+msgid "Say why this voucher is being adjusted: the reason stays on its record."
+msgstr "Indica por qué se ajusta este bono: el motivo queda en su registro."
+
+msgid "Add or remove at least one session, or add at least one day."
+msgstr "Añade o quita al menos una sesión, o añade al menos un día."
+
+msgid "A voucher cannot be bought in the future."
+msgstr "Un bono no se puede comprar en el futuro."
+
+msgid "Give the moment with its time zone."
+msgstr "Indica el momento con su zona horaria."
+
+msgid "Pick a tax category: without one the service cannot be charged."
+msgstr "Elige una categoría fiscal: sin ella el servicio no se puede cobrar."
+
+msgid "That tax category does not exist in Taxes or is deactivated."
+msgstr "Esa categoría fiscal no existe en Impuestos o está desactivada."
+
+msgid ""
+"That category is not available: it does not exist in this business or it has"
+" been deleted."
+msgstr ""
+"Esa categoría no está disponible: no existe en este negocio o se ha "
+"eliminado."
+
+msgid ""
+"That parent category is not available: it does not exist in this business or"
+" it has been deleted."
+msgstr ""
+"Esa categoría padre no está disponible: no existe en este negocio o se ha "
+"eliminado."
+
+msgid "There is already a category with that name. Pick another name."
+msgstr "Ya hay una categoría con ese nombre. Elige otro nombre."
+
+msgid "There is already a package with that name. Pick another name."
+msgstr "Ya hay un paquete con ese nombre. Elige otro nombre."
+
+msgid "That service is archived: it cannot go into a voucher."
+msgstr "Ese servicio está archivado: no puede ir en un bono."
+
+msgid "Some services cannot be created: nothing was created."
+msgstr "Algunos servicios no se pueden crear: no se ha creado ninguno."
+
+msgid "That assignment does not exist in this business."
+msgstr "Esa asignación no existe en este negocio."
+
+msgid "That voucher was already voided."
+msgstr "Ese bono ya estaba anulado."
+
+msgid "That voucher was already used: it cannot be voided."
+msgstr "Ese bono ya se ha usado: no se puede anular."
+
+msgid ""
+"That voucher has no session limit: there are no sessions to add or remove."
+msgstr ""
+"Ese bono no tiene límite de sesiones: no hay sesiones que añadir ni quitar."
+
+msgid "That voucher never expires: there is no expiry to extend."
+msgstr "Ese bono no caduca: no hay caducidad que alargar."
+
+msgid "You cannot take away more sessions than the customer has left."
+msgstr "No puedes quitar más sesiones de las que le quedan al cliente."
+
+msgid "That customer's card does not exist in this business."
+msgstr "Esa ficha de cliente no existe en este negocio."
+
+msgid "This voucher was voided: it can no longer be used."
+msgstr "Este bono está anulado: ya no se puede usar."
+
+msgid "This voucher has expired."
+msgstr "Este bono ha caducado."
+
+msgid "This voucher has no sessions left."
+msgstr "Este bono ya no tiene sesiones disponibles."
+
+msgid ""
+"This voucher does not cover that service. A voucher of haircuts pays for "
+"haircuts, not for the shampoo."
+msgstr ""
+"Este bono no cubre ese servicio. Un bono de cortes paga cortes, no el "
+"champú."
+
+msgid "state"
+msgstr "estado"
+
+msgid "check line"
+msgstr "línea de la cuenta"
+
+msgid "held until"
+msgstr "reservada hasta"
+
+msgid "charged at"
+msgstr "cobrada el"
+
+msgid "ended at"
+msgstr "terminada el"
+
+msgid "ended by"
+msgstr "terminada por"
+
+msgid "given back by"
+msgstr "devuelta con el documento"
+
+msgid "reason it came back"
+msgstr "motivo de la devolución"
+
+msgid "Held"
+msgstr "Reservada"
+
+msgid "Delivered"
+msgstr "Entregada"
+
+msgid "Released"
+msgstr "Liberada"
+
+msgid "Expired"
+msgstr "Caducada"
+
+msgid "Given back"
+msgstr "Devuelta"
+
+msgid "That voucher session does not exist in this business."
+msgstr "Esa sesión de bono no existe en este negocio."
+
+msgid "That line already holds a session of a voucher."
+msgstr "Esa línea ya tiene reservada una sesión de un bono."
+
+#, python-format
+msgid "The session held from «%(name)s» is no longer held (its day passed or it was released). Take the voucher off the line and apply it again."
+msgstr "La sesión reservada de «%(name)s» ya no está reservada (pasó su día o se soltó). Quita el bono de la línea y vuelve a aplicarlo."
+
+#, python-format
+msgid "The voucher «%(name)s» belongs to another customer: charge the sale to its owner or take the voucher off the line."
+msgstr "El bono «%(name)s» es de otro cliente: cobra la venta a nombre de su titular o quita el bono de la línea."
+
+msgid "That voucher session can no longer be released: the sale is charged. Giving it back is a refund."
+msgstr "Esa sesión del bono ya no se puede soltar: la venta está cobrada. Devolverla es una devolución."
+
+msgid "That session was never charged, so there is nothing to give back."
+msgstr "Esa sesión nunca se cobró, así que no hay nada que devolver."
+
+msgid "That session was already given back by another refund."
+msgstr "Esa sesión ya se devolvió en otra devolución."
+
+msgid "Say whose vouchers: the customer's id, name or phone."
+msgstr "Di de quién son los bonos: el id del cliente, su nombre o su teléfono."
