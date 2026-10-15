@@ -1071,11 +1071,30 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 
 ### Administrador de Django
 
-Configuración con CRUD; cadenas y control de envío, de solo lectura salvo `next_send_at`; registros,
-eventos y foto de la AEAT, **de solo lectura**, sin alta ni borrado: la ley obliga a conservarlos y solo las
-operaciones los crean. «Enviar ahora» y «Reintentar» son acciones del admin que llaman a
-`verifactu.record.transmit` y `verifactu.contingency.retry`. **Ronda a escribir en PLAN §17**: CLAUDE.md dice
-«CRUD completo… fiscales incluidas»; aquí, como en Facturación, la ley manda solo lectura en lo sellado.
+Solo para el staff de la plataforma (`hubs.erplora.com/admin`, con el hub elegido en `/admin/hub/<slug>/`). **Nada
+fiscal se teclea**: los siete modelos (configuración, certificado propio, cabeza de cadena, control de envío por
+`(NIF, entorno)`, registros, eventos y foto de la AEAT) se ven enteros y en solo lectura, sin alta, cambio ni
+borrado (un `POST` al formulario de un registro contesta 403).
+
+- **Registros**: las columnas de la pantalla de registros del módulo antiguo (`erp-verifactu-records`: secuencia,
+  factura, fecha, tipo, emisor, total, estado) más el entorno y el CSV de la AEAT (`VerifactuRecordAdmin` del SaaS
+  antiguo); filtros por estado, tipo de registro, tipo de factura y entorno; jerarquía por fecha de expedición;
+  búsqueda por número, NIF, nombre del emisor, huella y CSV. La ficha agrupa todos los campos en Factura, Cadena de
+  huellas, Respuesta de la AEAT, XML y Metadatos (como el admin del SaaS antiguo).
+- **Una sola acción, «Reenviar a la AEAT»** (`resend_to_aeat`, el nombre del SaaS antiguo): llama a
+  `verifactu.record.transmit` con el hub elegido y el staff como actor. Envía cada cadena una vez (el registro más
+  reciente elegido arrastra los anteriores de su cadena), respeta el tiempo de espera de la AEAT y acaba con
+  «Reenvío terminado: N aceptados, N rechazados, N aún en espera.»; lo que la operación rechaza (fuera de la cola,
+  sin pasarela) sale como aviso con su motivo. Un registro rechazado no se reenvía: se subsana con uno nuevo
+  (VERIFACTU-F24). Sin hub elegido, la acción no hace nada y lo dice.
+
+**Decisión (2026-10-15, tarea 6 del bloque fiscal, alcance mínimo de Ioan)**: el prompt de Ioan hablaba de CRUD
+sobre las tablas fiscales; aquí no hay CRUD libre, porque el riesgo fiscal manda: lo sellado no cambia nunca, y la
+ruta, el entorno, el otorgamiento, la opción en vivo y la espera de la AEAT solo se mueven por sus operaciones (o
+por la foto del SaaS), que llevan las comprobaciones de la ley. Teclear el estado del otorgamiento en el admin, por
+ejemplo, haría presentar con el sello de ERPlora sin el Anexo I aprobado. Antes, la configuración se editaba y el
+control de envío dejaba soltar `next_send_at`; ya no. Los cambios del staff son acciones que llaman a operaciones
+(y dejan su evento). **Ronda a escribir en PLAN §17**.
 
 ### Contradicciones señaladas (no resueltas aquí)
 
@@ -1095,8 +1114,10 @@ operaciones los crean. «Enviar ahora» y «Reintentar» son acciones del admin 
    SaaS; la app es `verifactu`.
 5. **Declaración responsable**: la v1 firmada no nombra una pasarela en Python dentro del SaaS (la v2, sin
    firmar, nombra el `verifactu-gateway` en Rust); el cambio de composición necesita una versión nueva firmada.
-6. **Admin del Hub**: CLAUDE.md dice «CRUD completo… fiscales incluidas»; aquí, como en Facturación, lo sellado es
-   de solo lectura (ronda a escribir en PLAN §17).
+6. **Admin del Hub**: CLAUDE.md dice «CRUD completo… fiscales incluidas», y el brief de la tarea 6 del bloque
+   fiscal, «CRUD completo con aviso»; el alcance mínimo que Ioan fijó después deja todo lo de VeriFactu en solo
+   lectura y los cambios como acciones que son operaciones (ver «Administrador de Django»). Ronda a escribir en
+   PLAN §17.
 7. **«Da servicio a varios obligados» sin origen**: el contrato del 2026-10-15 dejó de mandar `multiple_taxpayers`
    en la foto, pero `IndicadorMultiplesOT` sigue siendo obligatorio en cada registro (el Hub antiguo lo recibía del
    SaaS, calculado por cuenta). Mientras nadie lo fije, los registros esperan con `producer_facts_missing`.
