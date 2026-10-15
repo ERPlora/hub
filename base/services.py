@@ -1,4 +1,5 @@
-"""Writes of base that are not operations: opening the Hub's session for the person the SaaS vouched for.
+"""Writes of base that are not operations: opening the Hub's session for the person the SaaS vouched for, and
+the clock of the apps' scheduled tasks (``base.scheduler``).
 
 Not an ``@operation``: it runs before there is an actor, for ``/auth/callback`` only, and needs the
 request to log in. Phase 1 keeps it on ``django.contrib.auth`` + ``Membership``; phase 2 replaces
@@ -11,6 +12,10 @@ PLAN §18.1). Separate copies, so an account that is both staff and a hub member
 ``is_staff`` in the admin nor gains it on its hub when it enters by the other door.
 """
 
+import datetime as dt
+import logging
+from collections.abc import Callable, Iterable
+
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, Permission
@@ -18,7 +23,9 @@ from django.db import transaction
 from django.http import HttpRequest
 
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
-from base.models import Membership
+from base.models import Membership, TaskSchedule
+
+logger = logging.getLogger(__name__)
 
 MODEL_BACKEND = "django.contrib.auth.backends.ModelBackend"
 #: The SaaS account the session belongs to, for /internal/sessions/revoke (phase 2).
@@ -109,3 +116,70 @@ def _support_group() -> Group:
     group, _ = Group.objects.get_or_create(name=SUPPORT_GROUP)
     group.permissions.set(Permission.objects.filter(codename__startswith="view_"))
     return group
+
+
+# ── The scheduled tasks' clock (base.scheduler) ────────────────────────────────────────────────
+
+
+def sync_task_schedules(declared: Iterable[tuple[str, str, str, str, dt.datetime]]) -> None:
+    """Write the tasks the apps declare, ``(app_label, name, operation, cron, first_run)``; forget the rest.
+
+    Not an ``@operation``: the worker calls it for no hub's user when it starts. A task it already knew keeps
+    its ``next_run`` and ``last_run`` (a boot never resets the clock) and takes the declared operation and
+    cron; a new one is due at ``first_run``.
+    """
+    with transaction.atomic():
+        keep = set()
+        for app_label, name, operation, cron, first_run in declared:
+            TaskSchedule.objects.update_or_create(
+                app_label=app_label,
+                name=name,
+                defaults={"operation": operation, "cron": cron},
+                create_defaults={"operation": operation, "cron": cron, "next_run": first_run},
+            )
+            keep.add((app_label, name))
+        gone = [row.pk for row in TaskSchedule.objects.all() if (row.app_label, row.name) not in keep]
+        TaskSchedule.objects.filter(pk__in=gone).delete()
+
+
+def run_next_due_task(
+    now: dt.datetime,
+    *,
+    execute: Callable[[str], object],
+    reschedule: Callable[[str, dt.datetime], dt.datetime],
+) -> tuple[str, bool] | None:
+    """Claim one task due at ``now``, run it and move its ``next_run``, all in one transaction.
+
+    ``SELECT … FOR UPDATE SKIP LOCKED``: a second worker (a deploy overlaps the old one and the new one)
+    skips the row this one holds, and once it commits the row is no longer due. ``execute(operation)``
+    runs in a savepoint: a task that raises is logged and its writes undone, and it is rescheduled all the
+    same, so it runs again at its next time instead of on every tick; ``last_run`` is the last run that
+    finished. ``reschedule(cron, now)`` is the next time strictly after ``now``: missed times collapse into
+    this one run. Returns ``("<app>.<name>", ran)``,
+    or ``None`` when nothing is due.
+    """
+    with transaction.atomic():
+        row = (
+            TaskSchedule.objects.select_for_update(skip_locked=True)
+            .filter(next_run__lte=now)
+            .order_by("next_run", "app_label", "name")
+            .first()
+        )
+        if row is None:
+            return None
+        ran = True
+        try:
+            with transaction.atomic():
+                execute(row.operation)
+        except Exception:
+            ran = False
+            logger.exception(
+                "scheduler: %s (%s) failed; its writes were undone and it runs again at its next time.",
+                row,
+                row.operation,
+            )
+        row.next_run = reschedule(row.cron, now)
+        if ran:
+            row.last_run = now
+        row.save(update_fields=["next_run", "last_run"])
+    return str(row), ran

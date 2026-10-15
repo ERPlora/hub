@@ -14,3 +14,7 @@ class BaseConfig(LiveAppConfig):
     kind = "platform"
     verbose_name = _("Base")
     default_auto_field = "django.db.models.BigAutoField"
+
+    def ready(self) -> None:
+        # Importing the scheduler registers the check of the apps' scheduled tasks (tag "base").
+        from base import scheduler  # noqa: F401

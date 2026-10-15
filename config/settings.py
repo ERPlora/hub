@@ -252,6 +252,11 @@ FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
 # supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
+# The slug of ERPlora's own hub, which issues ERPlora's invoices (the platform hub; reserved in live.slugs).
+PLATFORM_HUB_SLUG = config("PLATFORM_HUB_SLUG", default="erplora")
+# The hub the worker runs the apps' scheduled tasks on (base.scheduler). Phase 1 has no registry of hubs, so
+# it is one fixed scope; phase 2 replaces it with the loop over the hubs whose hub_due has come.
+WORKER_SCOPE_SLUG = config("WORKER_SCOPE_SLUG", default=PLATFORM_HUB_SLUG)
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
 # for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
 PLATFORM_HOST_LABEL = "hubs"
