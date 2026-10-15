@@ -70,8 +70,8 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   gestiona en tu cuenta de ERPlora y aquí se ve su estado; el certificado se sube aquí, en «Mi certificado».
   Aquí se elige cuál usar.
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
-  responsable); el único que llega de la cuenta es «Da servicio a varios obligados». Mientras no ha llegado,
-  los registros se sellan igual y esperan para salir (VERIFACTU-F12).
+  responsable) salvo «Da servicio a varios obligados», que ya no llega en la foto de la cuenta (contradicción
+  7). Mientras no está, los registros se sellan igual y esperan para salir (VERIFACTU-F12).
 
 Configuración inicial, paso a paso:
 
@@ -162,8 +162,9 @@ Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu».
 ### Ajustes
 Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
 - **«Envío»**: «Usar mi propio certificado» (interruptor, con su explicación según la vía) y «Entorno AEAT» con
-  la pastilla «Pruebas (AEAT Test)» o «Producción» y, según el caso, «Pasar a producción» o «Volver a pruebas»
-  con su explicación y su confirmación.
+  la pastilla «Pruebas (AEAT Test)» o «Producción» y, según el caso, «Pasar a producción» (con «Todavía no puede
+  pasar a producción:» y lo que falta, si falta algo) o «Volver a pruebas» con su explicación y su confirmación; en
+  producción, «Los registros están esperando:» y por qué, si esperan.
 - **«Prueba en vivo»**: «Probar la conexión» y «Crear factura de prueba»; debajo, el resultado de la última
   prueba («Se remite», «Entorno», «Pasarela de ERPlora», «Datos del productor», «Emisor», «Puede enviar»), o
   «Aún no has ejecutado ninguna prueba.».
@@ -195,7 +196,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F05 | Firmar y subir la autorización para que remita ERPlora | en la cuenta de ERPlora; aquí, su estado (PLAN-HUB §8: falta decidir quién la revisa) |
 | VERIFACTU-F06 | Volver a enviar la autorización | en la cuenta de ERPlora; aquí, su estado |
 | VERIFACTU-F07 | Solicitar o renovar la conexión segura con ERPlora | desaparece — sin identidad por hub (ronda 5); el Hub firma cada llamada con HMAC |
-| VERIFACTU-F08 | Pasar a producción | hecho; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
+| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado válido \| vía ERPlora con otorgamiento aprobado y `live_paid`) ∧ cuenta activa; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
 | VERIFACTU-F09 | Volver a pruebas | hecho |
 | VERIFACTU-F10 | Probar la conexión con la AEAT | hecho en el Hub; la sonda de la pasarela del SaaS aún no existe |
 | VERIFACTU-F11 | Crear una factura de prueba | hecho |
@@ -336,24 +337,40 @@ Si falla: no aplica.
 Implicados: ninguno
 
 ### VERIFACTU-F08 Pasar a producción
-Estado: hecho; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan)
+Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado
+válido | vía ERPlora con otorgamiento aprobado y `live_paid`) ∧ cuenta activa (`status` de la foto); el servidor lo
+tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan). En `pre` nunca se abre: todo va a pruebas.
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, «Entorno AEAT» enseña «Pruebas (AEAT Test)» y «Tus facturas van al entorno de
-   pruebas de la AEAT. Cuando esté todo listo, pasa a producción.».
+   pruebas de la AEAT. Cuando esté todo listo, pasa a producción.». Si falta algo, debajo sale «Todavía no puede
+   pasar a producción:» con la lista (otorgamiento sin aprobar, certificado propio que falta o ha caducado, la
+   opción en vivo que no está en el plan, cuenta con un pago pendiente o suspendida) y «Pasar a producción» queda
+   desactivado.
 2. Pulsa «Pasar a producción» y confirma en «¿Enviar tus facturas a la AEAT de verdad?» («A partir de ahora
    cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.»).
 3. Sale «Tu negocio está en producción: los registros ya se remiten a la AEAT real.» y la pastilla pasa a
    «Producción».
-Entra: el emisor de Facturación; la vía y su estado, de la cuenta.
+Entra: el emisor de Facturación; la vía y su estado; de la foto de la cuenta (`verifactu.config.sync`), el
+otorgamiento, `live_paid` y el estado del negocio.
 Sale: el entorno en producción (avisa `verifactu.config.changed`): los registros nuevos nacen en la cadena
 de producción, con el QR de la sede real; los que nacieron en pruebas siguen yendo a pruebas.
 Si falla: mientras ERPlora no lo abra en el servidor, «El paso a producción todavía no está abierto en este
 servidor: ERPlora lo abre cuando la remisión real esté lista.»; sin emisor, «Configura antes el emisor en
 Facturación → Emisor.»; por la vía de ERPlora sin autorización aprobada, «Para pasar a producción por la vía
-de ERPlora falta que apruebe tu autorización firmada.»; con certificado propio que falta o ha caducado, «Tu
-certificado propio no está cargado o ha caducado.». Ya en producción, no hace nada.
+de ERPlora falta que apruebe tu autorización firmada.»; por la vía de ERPlora sin la opción en vivo en el plan,
+«La opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora.»
+(`verifactu.live_option_unpaid`); con la cuenta con un pago pendiente o suspendida, «Tu cuenta de ERPlora tiene un
+pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción.»
+(`verifactu.hub_not_active`); con certificado propio que falta o ha caducado, «Tu certificado propio no está
+cargado o ha caducado.». Todos son 409 y el entorno sigue en pruebas. Ya en producción, no hace nada.
+Si en producción la foto deja de traer la opción en vivo (vía de ERPlora), no se vuelve a pruebas (ya hay registros
+de producción): la cola espera con «la opción en vivo de VeriFactu no está en tu plan…» y Ajustes lo dice bajo
+«Los registros están esperando:»; cambiar a la vía de ERPlora en producción sin ella se rechaza igual.
+Del Hub antiguo (`fiscal_profile::go_live`): el orden (cerrado → vía → listo), el certificado propio sin
+otorgamiento y el 409 con el código de la causa. Nuevo por el modelo de Ioan del 2026-10-15: la opción de pago
+(antes VeriFactu era gratis) y el estado de la cuenta, que antes solo frenaba el token de la pasarela en el SaaS.
 Implicados: VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Volver a pruebas
@@ -1002,18 +1019,25 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
     forma.
   - `/internal/verifactu/probe` con `{"hub", "nif", "environment", "route", "certificate"?}` → `200 {"ready":
     bool, "detail"}`, sin presentar nada.
-- **La foto** (`verifactu.config.sync`, solo el sistema; la llama la plataforma con el bloque `verifactu` de
-  `PUT /internal/hubs/{id}/state`): `{"version", "multiple_taxpayers": "S"|"N", "representation": {"status":
-  "none"|"submitted"|"approved"|"returned"|"revoked", "updated_at", "reason"}}`; una `version` menor o igual que
-  la guardada se ignora. El certificado propio ya no viaja en la foto (se sube en el Hub, decisión de Ioan del
-  2026-10-15): un `own_certificate` que aún llegue se ignora.
+- **La foto** (`PUT /internal/hubs/{id}/state`, contrato acordado con el SaaS el 2026-10-15): `{"hub_id",
+  "slug", "version", "status": "active"|"past_due"|"suspended", …, "verifactu": {"representation": {"status":
+  "none"|"submitted"|"approved"|"returned"|"revoked", "updated_at": ISO|null, "reason"}, "live_paid": bool}}`.
+  La recibe `base/internal.py` (fase 1, sin registro de hubs): firma HMAC v1 o v2 (la v2, si viene, decide sola),
+  ±300 s, `INTERNAL_SHARED_SECRET` y, en una rotación, `INTERNAL_SHARED_SECRET_PREVIOUS`; sin firma, `401
+  internal.unsigned`. Nombra su hub por `slug` (`422 internal.slug_invalid`); un `hub_id` distinto del de la ruta,
+  `422 internal.hub_mismatch`; fuera de contrato, `422 internal.payload_invalid`. Aplica el bloque `verifactu` y el
+  `status` con `verifactu.config.sync` (solo el sistema) en ese hub y contesta `200 {"applied", "version"}`; sin
+  ninguno de los dos, `200 {"applied": false}`. Una `version` menor o igual que la guardada se ignora. «Validado»
+  = `representation.status == "approved"`; `live_paid` lo decide el SaaS (plan efectivo de pago, prueba incluida,
+  o ítem `verifactu` vivo). `own_certificate` y `multiple_taxpayers` ya no viajan (`null` = sin cambio): el
+  certificado propio se sube en el Hub (decisión de Ioan del 2026-10-15).
 - **Certificado propio** (VERIFACTU-F02): `OwnCertificate`, una fila como mucho en la BD del hub, con titular,
   NIF, tipo, caducidad y el `.p12` con su contraseña cifrados juntos con Fernet (`certificates.py`) bajo
   `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la
   subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
   esperan con `own_certificate_unreadable` sin llamar a la pasarela.
-- **Producción**: además de lo de VERIFACTU-F08, el servidor tiene que tener `VERIFACTU_PRODUCTION_ENABLED`
-  a verdadero. Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
+- **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
+  `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
   queda bajo la supervisión de Ioan (working-rules §15).
 
 ### La cola y el envío
@@ -1073,6 +1097,15 @@ operaciones los crean. «Enviar ahora» y «Reintentar» son acciones del admin 
    firmar, nombra el `verifactu-gateway` en Rust); el cambio de composición necesita una versión nueva firmada.
 6. **Admin del Hub**: CLAUDE.md dice «CRUD completo… fiscales incluidas»; aquí, como en Facturación, lo sellado es
    de solo lectura (ronda a escribir en PLAN §17).
+7. **«Da servicio a varios obligados» sin origen**: el contrato del 2026-10-15 dejó de mandar `multiple_taxpayers`
+   en la foto, pero `IndicadorMultiplesOT` sigue siendo obligatorio en cada registro (el Hub antiguo lo recibía del
+   SaaS, calculado por cuenta). Mientras nadie lo fije, los registros esperan con `producer_facts_missing`.
+8. **La opción en vivo y la vía propia**: el encargo de la tarea 2 pedía `live_paid` en las dos vías; el modelo de
+   Ioan («con certificado propio, como en el Hub antiguo») y el plan del bloque solo en la de ERPlora. Aquí, solo en
+   la de ERPlora; es una línea en `queries.route_problem`.
+9. **Cobrar sin ruta de envío**: working-rules §15 («en producción no se cobra sin ruta de envío») y el Hub antiguo
+   (`enforce_fiscal_road`, HUB-1935) rechazaban vender en producción sin ruta; aquí la venta se sella igual y el
+   registro espera en la cola (con `live_option_unpaid`, por ejemplo). Queda para Facturación.
 
 ### Decisiones (dudas abiertas del producto actual)
 
