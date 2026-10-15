@@ -355,10 +355,84 @@ def test_an_invoice_needs_the_customers_name_tax_id_and_address(catalog):
         lines=[{"product": "COF"}],
         document_type="invoice",
         customer_name="Bar Manolo",
-        customer_tax_id="B12345678",
+        customer_tax_id="B12345674",
         customer_address="C/ Mayor 1",
     )
     assert (sale.document_type, sale.customer_name) == ("invoice", "Bar Manolo")
+
+
+def recipient_refusal(**recipient) -> dict:
+    with pytest.raises(InvalidPayload) as refusal:
+        complete(
+            lines=[{"product": "COF"}],
+            document_type="invoice",
+            customer_name="Bar Manolo",
+            customer_address="C/ Mayor 1",
+            **recipient,
+        )
+    assert Sale.objects.count() == 0
+    return refusal.value.fields
+
+
+def test_an_invoice_to_a_spanish_tax_id_that_does_not_check_is_refused_on_its_field(catalog):
+    # SALE-F04: a NIF, NIE or CIF is read the one way Customers reads it (apps.customer.tax_ids).
+    assert recipient_refusal(customer_tax_id="B12345678") == {
+        "customer_tax_id": "That tax ID is not valid."
+    }
+
+
+def test_an_invoice_abroad_says_what_kind_of_document_its_tax_id_is(catalog):
+    # VeriFactu declares a foreign tax ID as IDOtro, which the tax agency refuses without its IDType.
+    assert recipient_refusal(customer_tax_id="AB123456", customer_country="GB") == {
+        "customer_id_type": "Say what kind of document a foreign tax ID is (EU VAT number, passport, tax ID of their "
+        "country…)."
+    }
+    # An EU VAT number (02) is checked; any other kind is taken as written.
+    assert recipient_refusal(
+        customer_tax_id="FR00000000000", customer_country="FR", customer_id_type="02"
+    ) == {"customer_tax_id": "That tax ID is not valid."}
+    sale = complete(
+        lines=[{"product": "COF"}],
+        document_type="invoice",
+        customer_name="Durand SARL",
+        customer_tax_id="40 303 265 045",
+        customer_address="1 rue de Rivoli, Paris",
+        customer_country="FR",
+        customer_id_type="02",
+    )
+    ((_, payload),) = [event for event in events() if event[0] == "sale.sale.completed"]
+    assert (payload["customer_tax_id"], payload["customer_country"], payload["customer_id_type"]) == (
+        "FR40303265045",
+        "FR",
+        "02",
+    )
+    assert sale.document_type == "invoice"
+    passport = complete(
+        key="pos-attempt-0099",
+        lines=[{"product": "COF"}],
+        document_type="invoice",
+        customer_name="John Smith",
+        customer_tax_id="P1234567",
+        customer_address="10 Downing St, London",
+        customer_country="GB",
+        customer_id_type="03",
+    )
+    assert passport.document_type == "invoice"
+
+
+def test_an_invoice_to_a_card_whose_tax_id_does_not_check_is_refused(catalog, customer):
+    ana = customer("Ana López", address="C/ Sol 2", city="Madrid")
+    from apps.customer.models import Customer
+
+    Customer.objects.filter(pk=ana.id).update(tax_id="12345678A")
+    with pytest.raises(InvalidPayload) as refusal:
+        complete(lines=[{"product": "COF"}], document_type="invoice", customer_id=str(ana.id))
+    assert refusal.value.fields == {"customer_tax_id": "That tax ID is not valid."}
+
+
+def test_a_ticket_does_not_check_a_tax_id_it_does_not_declare(catalog):
+    sale = complete(lines=[{"product": "COF"}], customer_tax_id="whatever")
+    assert sale.document_type == "ticket"
 
 
 def test_an_invoice_takes_the_cards_details_by_default(catalog, customer):
@@ -755,3 +829,68 @@ def test_a_sale_day_is_the_local_one(catalog, monkeypatch):
     assert sale.number.startswith("20260919-") and sale.business_day == dt.date(
         2026, 9, 19
     )
+
+
+# ── The attempt key belongs to one charge ───────────────────────────────────────────────────────
+
+
+def test_an_attempt_key_reused_for_another_check_is_refused(catalog):
+    first = open_order({"product": "COF"})
+    second = open_order({"product": "WAT"})
+    complete(order_id=str(first.id), payments=[{"method": "card"}])
+    with pytest.raises(Conflict) as refusal:
+        complete(order_id=str(second.id), payments=[{"method": "card"}])
+    assert refusal.value.code == "sale.idempotency_key_reused"
+    assert Order.objects.get(pk=second.id).status == "open"
+
+
+def test_an_attempt_key_reused_for_other_lines_of_the_same_check_is_refused(catalog):
+    order = open_order({"product": "COF"}, {"product": "WAT"})
+    coffee, water = order.lines
+    complete(order_id=str(order.id), line_ids=[str(coffee.id)], payments=[{"method": "card"}])
+    with pytest.raises(Conflict) as refusal:
+        complete(order_id=str(order.id), line_ids=[str(water.id)], payments=[{"method": "card"}])
+    assert refusal.value.code == "sale.idempotency_key_reused"
+    # The same lines again: the very sale.
+    again = complete(order_id=str(order.id), line_ids=[str(coffee.id)], payments=[{"method": "card"}])
+    assert again.already is True
+
+
+def test_an_attempt_key_of_a_counter_sale_is_not_one_of_a_check(catalog):
+    complete(lines=[{"product": "COF"}])
+    with pytest.raises(Conflict) as refusal:
+        complete(order_id=str(open_order({"product": "WAT"}).id))
+    assert refusal.value.code == "sale.idempotency_key_reused"
+    order = open_order({"product": "WAT"})
+    complete(key="pos-attempt-0002", order_id=str(order.id))
+    with pytest.raises(Conflict) as refusal:
+        complete(key="pos-attempt-0002", lines=[{"product": "WAT"}])
+    assert refusal.value.code == "sale.idempotency_key_reused"
+
+
+# ── The cash limit of a check charged in parts (Ley 7/2012, art. 7.Uno.1, párrafo 2) ────────────
+
+
+def test_no_cash_on_any_part_of_a_check_of_one_thousand_euros(product):
+    product("Watch", "WCH", 60000, "product.generic")
+    order = open_order({"product": "WCH"}, {"product": "WCH"})
+    first, second = order.lines
+    preview = run("sale.checkout.preview", {"order_id": str(order.id), "line_ids": [str(first.id)]})
+    # The operation is the whole check: 1,200 €, though this part is 600 €.
+    assert (preview.total, preview.operation_total) == (60000, 120000)
+    with pytest.raises(Conflict) as refusal:
+        complete(order_id=str(order.id), line_ids=[str(first.id)], payments=[cash(60000)])
+    assert refusal.value.code == "sale.cash_limit_exceeded"
+    complete(order_id=str(order.id), line_ids=[str(first.id)], payments=[{"method": "card"}])
+    # What was charged counts too: the last part cannot go in cash either.
+    with pytest.raises(Conflict) as refusal:
+        complete(key="pos-attempt-0002", order_id=str(order.id), payments=[cash(60000)])
+    assert refusal.value.code == "sale.cash_limit_exceeded"
+
+
+def test_a_check_under_one_thousand_euros_takes_cash_in_parts(product):
+    product("Ring", "RNG", 40000, "product.generic")
+    order = open_order({"product": "RNG"}, {"product": "RNG"})
+    first = order.lines[0]
+    assert complete(order_id=str(order.id), line_ids=[str(first.id)], payments=[cash(40000)]).total == 40000
+    assert complete(key="pos-attempt-0002", order_id=str(order.id), payments=[cash(40000)]).total == 40000

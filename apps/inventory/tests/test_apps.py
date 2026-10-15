@@ -86,7 +86,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     from live.operations import registry
 
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
-    assert len(operations) == 28
+    assert len(operations) == 29
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}

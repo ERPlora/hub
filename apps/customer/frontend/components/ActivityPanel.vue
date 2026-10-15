@@ -19,7 +19,16 @@ import type { ActivityRow } from '../operations';
 const props = defineProps<{ customerId: string; canAddNote: boolean }>();
 
 const STEP = 50;
-const OWN_KINDS = new Set(['note_added', 'purchase_recorded', 'purchase_voided', 'consent_granted', 'consent_withdrawn', 'merged', 'erased']);
+const OWN_KINDS = new Set([
+  'note_added',
+  'purchase_recorded',
+  'purchase_voided',
+  'purchase_refunded',
+  'consent_granted',
+  'consent_withdrawn',
+  'merged',
+  'erased',
+]);
 
 const { t, locale } = useCustomerI18n();
 

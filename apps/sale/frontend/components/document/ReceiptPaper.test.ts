@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
-import { saleOut, SETTINGS } from './__tests__/fixtures';
+import { saleOut, SETTINGS, SUBJECT_VAT } from './__tests__/fixtures';
 import ReceiptPaper from './ReceiptPaper.vue';
 import source from './ReceiptPaper.vue?raw';
 
@@ -36,6 +36,48 @@ describe('ReceiptPaper', () => {
     const s = await paper({ sale: saleOut(), settings: SETTINGS });
     expect(s.text('sale-receipt-name')).toBe('Bar Pepe');
     expect(s.all('sale-receipt-address')).toEqual(['Calle Mayor 1', 'Madrid']);
+  });
+
+  it('a sale charged as an invoice is titled «Invoice» and numbered «No.», never «Receipt»', async () => {
+    const s = await paper({ sale: saleOut({ document_type: 'invoice' }), settings: SETTINGS });
+    expect(s.text('sale-receipt-title')).toBe('Factura');
+    expect(s.text('sale-receipt-number')).toBe('Nº: 20261014-0007');
+    const en = await paper({ sale: saleOut({ document_type: 'invoice' }), settings: SETTINGS }, 'en');
+    expect([en.text('sale-receipt-title'), en.text('sale-receipt-number')]).toEqual(['Invoice', 'No.: 20261014-0007']);
+    const ticket = await paper({ sale: saleOut(), settings: SETTINGS });
+    expect(ticket.find('sale-receipt-title').exists()).toBe(false);
+    expect(ticket.text('sale-receipt-number')).toBe('Tiquet: 20261014-0007');
+  });
+
+  it('prints the number Invoicing gave it: «Invoice <series number>» or the ticket’s, never the sale’s', async () => {
+    const invoice = saleOut({ document_type: 'invoice', invoice_status: 'issued', invoice_type: 'F1', invoice_number: 'FACT-2026-000012' });
+    const s = await paper({ sale: invoice, settings: SETTINGS });
+    expect([s.text('sale-receipt-title'), s.text('sale-receipt-number')]).toEqual(['Factura', 'Factura: FACT-2026-000012']);
+    const en = await paper({ sale: invoice, settings: SETTINGS }, 'en');
+    expect(en.text('sale-receipt-number')).toBe('Invoice: FACT-2026-000012');
+    const ticket = saleOut({ invoice_status: 'issued', invoice_type: 'F2', invoice_number: 'TICKET-2026-000031' });
+    expect((await paper({ sale: ticket, settings: SETTINGS })).text('sale-receipt-number')).toBe('Tiquet: TICKET-2026-000031');
+  });
+
+  it('a ticket whose fiscal document waits says so under its number (never posing as issued)', async () => {
+    const s = await paper({ sale: saleOut({ invoice_status: 'pending', invoice_number: '', invoice_type: '' }), settings: SETTINGS });
+    expect(s.text('sale-receipt-pending')).toBe('Documento fiscal pendiente');
+    const issued = await paper({ sale: saleOut({ invoice_status: 'issued', invoice_number: 'TICKET-2026-000001' }), settings: SETTINGS });
+    expect(issued.find('sale-receipt-pending').exists()).toBe(false);
+  });
+
+  it('a VAT row per fiscal key: an exempt key names its cause and never merges with a 0 % one', async () => {
+    const s = await paper({
+      sale: saleOut({
+        breakdown: [
+          { ...SUBJECT_VAT, rate_pct: '10.00', label: 'vat', base: 273, tax: 27 },
+          { ...SUBJECT_VAT, rate_pct: '0.00', label: 'vat', base: 500, tax: 0 },
+          { ...SUBJECT_VAT, qualification: 'exempt', exempt_reason: 'E1', rate_pct: '0.00', label: 'vat', base: 4000, tax: 0 },
+        ],
+      }),
+      settings: SETTINGS,
+    });
+    expect(s.all('sale-receipt-total-row').slice(1, 4)).toEqual(['IVA 10 % 0,27 €', 'IVA 0 % 0,00 €', 'Exento (E1) 0,00 €']);
   });
 
   it('without a header the name is «My business»', async () => {
@@ -65,6 +107,13 @@ describe('ReceiptPaper', () => {
     expect(s.all('sale-receipt-head')).toEqual(['Concepto Importe']);
   });
 
+  it('a line a voucher paid says «Already paid · <voucher>» at 0,00 € (SALE-F27)', async () => {
+    const sale = saleOut();
+    const cut = { ...sale.lines[0], id: 'l9', name: 'Corte', quantity: '1.000', unit_price: 2500, notes: '', line_total: 0, paid_by_voucher: true, voucher_name: 'Bono 5 cortes' };
+    const s = await paper({ sale: { ...sale, lines: [cut] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-line')).toEqual(['Corte 1 × 25,00 € Ya pagado · Bono 5 cortes 0,00 €']);
+  });
+
   it('a sale without lines says so', async () => {
     const s = await paper({ sale: saleOut({ lines: [] }), settings: SETTINGS });
     expect(s.text('sale-receipt-no-lines')).toBe('— Sin líneas —');
@@ -74,8 +123,8 @@ describe('ReceiptPaper', () => {
     const s = await paper({
       sale: saleOut({
         breakdown: [
-          { rate_pct: '10.00', label: 'vat', base: 1136, tax: 114 },
-          { rate_pct: '1.40', label: 'surcharge', base: 1136, tax: 12 },
+          { ...SUBJECT_VAT, rate_pct: '10.00', label: 'vat', base: 1136, tax: 114 },
+          { ...SUBJECT_VAT, tax_type: 'surcharge', rate_pct: '1.40', label: 'surcharge', base: 1136, tax: 12 },
         ],
       }),
       settings: SETTINGS,
@@ -106,7 +155,7 @@ describe('ReceiptPaper', () => {
   });
 
   it('a tax it has no short name for keeps the one the rule gave it', async () => {
-    const s = await paper({ sale: saleOut({ breakdown: [{ rate_pct: '7.00', label: 'Tasa turística', base: 100, tax: 7 }] }), settings: SETTINGS });
+    const s = await paper({ sale: saleOut({ breakdown: [{ ...SUBJECT_VAT, rate_pct: '7.00', label: 'Tasa turística', base: 100, tax: 7 }] }), settings: SETTINGS });
     expect(s.all('sale-receipt-total-row')[1]).toBe('Tasa turística 7 % 0,07 €');
   });
 

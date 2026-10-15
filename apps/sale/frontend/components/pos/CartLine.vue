@@ -4,7 +4,9 @@
 // the gift's reason and the «−N %» of a line discount; the note; the professional (only when the line
 // has one; a tap re-assigns it). Right: the server's amount for the line and either the discount, note
 // and gift buttons with the quantity selector, or — sent to the kitchen — ×quantity and ⊗ «Void this
-// item». Tapping the line itself (never its buttons) marks it. Nothing here works money out.
+// item». A line a voucher pays (SALE-F27) says «Already paid · <voucher>» at 0 and offers only its note
+// and ⊗ to take it off (which gives the session back). Tapping the line itself (never its buttons) marks
+// it. Nothing here works money out.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
@@ -37,6 +39,7 @@ const t = useT();
 const locale = useLocale();
 
 const fired = computed(() => !!props.line.fired_at);
+const covered = computed(() => props.line.paid_by_voucher);
 const discounted = computed(() => Number(props.line.discount_percent) > 0);
 
 /** «1,50 €», or «12,00 € / kg» (and «/ 100 g») when it is not priced by the unit. */
@@ -91,6 +94,11 @@ function onRow(): void {
           v-if="line.is_gift"
           class="pos-line__gift"
         >{{ $t('sale.pos.giftBadge') }}</span>
+        <span
+          v-if="covered"
+          class="pos-line__voucher"
+          :data-testid="`pos-line-${line.id}-voucher`"
+        >{{ $t('sale.pos.paidWithVoucher', { name: line.voucher_name }) }}</span>
       </h3>
       <p class="pos-line__meta">
         <span class="pos-line__price">{{ price }}</span>
@@ -137,6 +145,32 @@ function onRow(): void {
             <HubIcon name="ion:close-circle-outline" />
           </button>
           <span class="pos-line__qty">×{{ quantity }}</span>
+        </span>
+      </template>
+      <template v-else-if="covered">
+        <span class="pos-line__actions">
+          <button
+            type="button"
+            class="pos-line__icon"
+            :class="{ 'pos-line__icon--primary': !!line.notes }"
+            :data-testid="`pos-line-${line.id}-note`"
+            :title="$t('sale.pos.lineNote')"
+            :aria-label="$t('sale.pos.lineNote')"
+            @click.stop="emit('note')"
+          >
+            <HubIcon name="ion:chatbubbles-outline" />
+          </button>
+          <button
+            type="button"
+            class="pos-line__icon pos-line__icon--danger"
+            :data-testid="`pos-line-${line.id}-remove`"
+            :title="$t('sale.pos.removeLine')"
+            :aria-label="$t('sale.pos.removeLine')"
+            :disabled="busy"
+            @click.stop="emit('quantity', '0')"
+          >
+            <HubIcon name="ion:close-circle-outline" />
+          </button>
         </span>
       </template>
       <template v-else>
@@ -251,6 +285,14 @@ function onRow(): void {
   font-weight: 700;
   color: var(--ion-color-success-contrast, #000);
   background: var(--ion-color-success, #2dd55b);
+  border-radius: 6px;
+}
+.pos-line__voucher {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ion-color-success-shade, #1e8e3e);
+  background: color-mix(in srgb, var(--ion-color-success, #2dd36f) 15%, transparent);
   border-radius: 6px;
 }
 .pos-line__meta {

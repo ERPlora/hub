@@ -1,0 +1,370 @@
+# Spanish translation of the table app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next table\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 12:00+0200\n"
+"PO-Revision-Date: 2026-10-14 12:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Tables"
+msgstr "Mesas"
+
+msgid "Your dining room: zones, tables on a live floor plan, and the checks seated at each table."
+msgstr "Tu sala: zonas, mesas en un plano en vivo y las cuentas sentadas en cada mesa."
+
+msgid "Tables is the floor plan of your restaurant or bar. Draw the zones of the room and place the tables by dragging them, with their seats and their shape. During service the plan is live: each table says whether it is free, taken, reserved or out of service, how many guests sit there, for how long and who serves them. Seat a party and its check opens in the till; move it to another table, join two tables' checks or split one, and the table frees itself when the check is charged."
+msgstr "Mesas es el plano de tu restaurante o bar. Dibuja las zonas del local y coloca las mesas arrastrándolas, con su aforo y su forma. Durante el servicio el plano está en vivo: cada mesa dice si está libre, ocupada, reservada o fuera de servicio, cuántos comensales hay, desde cuándo y quién los atiende. Sienta a un grupo y su cuenta se abre en el TPV; pásala a otra mesa, junta las cuentas de dos mesas o divide una, y la mesa se libera sola al cobrar la cuenta."
+
+msgid "Floor plan"
+msgstr "Plano de sala"
+
+msgid "Zones"
+msgstr "Zonas"
+
+msgid "Sessions"
+msgstr "Sesiones"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "ask the guests when seating a table"
+msgstr "preguntar los comensales al sentar una mesa"
+
+msgid "amber warning (minutes)"
+msgstr "aviso ámbar (minutos)"
+
+msgid "red warning (minutes)"
+msgstr "aviso rojo (minutos)"
+
+msgid "room settings"
+msgstr "ajustes de sala"
+
+msgid "Blue"
+msgstr "Azul"
+
+msgid "Cyan"
+msgstr "Cian"
+
+msgid "Purple"
+msgstr "Morado"
+
+msgid "Green"
+msgstr "Verde"
+
+msgid "Amber"
+msgstr "Ámbar"
+
+msgid "Red"
+msgstr "Rojo"
+
+msgid "Grey"
+msgstr "Gris"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "color"
+msgstr "color"
+
+msgid "order"
+msgstr "orden"
+
+msgctxt "table"
+msgid "active"
+msgstr "activa"
+
+msgctxt "table"
+msgid "deleted"
+msgstr "borrada"
+
+msgctxt "table"
+msgid "deleted at"
+msgstr "borrada el"
+
+msgid "zone"
+msgstr "zona"
+
+msgid "zones"
+msgstr "zonas"
+
+msgid "Square"
+msgstr "Cuadrada"
+
+msgid "Round"
+msgstr "Redonda"
+
+msgid "Rectangular"
+msgstr "Rectangular"
+
+msgid "number"
+msgstr "número"
+
+msgid "seats"
+msgstr "aforo"
+
+msgid "shape"
+msgstr "forma"
+
+msgid "x on the plan"
+msgstr "x en el plano"
+
+msgid "y on the plan"
+msgstr "y en el plano"
+
+msgid "width"
+msgstr "ancho"
+
+msgid "height"
+msgstr "alto"
+
+msgid "blocked"
+msgstr "bloqueada"
+
+msgid "table"
+msgstr "mesa"
+
+msgid "tables"
+msgstr "mesas"
+
+msgctxt "table check"
+msgid "Open"
+msgstr "Abierta"
+
+msgid "Closed"
+msgstr "Cerrada"
+
+msgid "Transferred"
+msgstr "Trasladada"
+
+msgid "Merged"
+msgstr "Fusionada"
+
+msgid "Parked"
+msgstr "Aparcada"
+
+msgid "check of Sales"
+msgstr "cuenta de Ventas"
+
+msgid "guests"
+msgstr "comensales"
+
+msgid "waiter id"
+msgstr "id del camarero"
+
+msgid "waiter"
+msgstr "camarero"
+
+msgid "status"
+msgstr "estado"
+
+msgctxt "table check"
+msgid "opened at"
+msgstr "apertura"
+
+msgctxt "table check"
+msgid "closed at"
+msgstr "cierre"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "transferred from"
+msgstr "trasladada desde"
+
+msgctxt "table check"
+msgid "merged into"
+msgstr "fusionada en"
+
+msgctxt "table check"
+msgid "split from"
+msgstr "dividida de"
+
+msgid "table check"
+msgstr "cuenta de mesa"
+
+msgid "table checks"
+msgstr "cuentas de mesa"
+
+msgid "Seated"
+msgstr "Sentada"
+
+msgid "Seated again"
+msgstr "Vuelta a sentar"
+
+msgid "Split"
+msgstr "Dividida"
+
+msgid "Still there"
+msgstr "Sigue allí"
+
+msgid "from"
+msgstr "desde"
+
+msgid "until"
+msgstr "hasta"
+
+msgid "why it started"
+msgstr "por qué empezó"
+
+msgid "why it ended"
+msgstr "por qué terminó"
+
+msgid "check's stretch at a table"
+msgstr "tramo de una cuenta en una mesa"
+
+msgid "checks' stretches at tables"
+msgstr "tramos de las cuentas en las mesas"
+
+msgid "Reservation"
+msgstr "Reserva"
+
+msgid "By hand"
+msgstr "A mano"
+
+msgctxt "table hold"
+msgid "Held"
+msgstr "Retenida"
+
+msgctxt "table hold"
+msgid "Released"
+msgstr "Soltada"
+
+msgid "Expired"
+msgstr "Caducada"
+
+msgid "source"
+msgstr "origen"
+
+msgid "reference"
+msgstr "referencia"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "hold"
+msgstr "retención"
+
+msgid "holds"
+msgstr "retenciones"
+
+msgid "That zone does not exist in this business."
+msgstr "Esa zona no existe en este negocio."
+
+msgid "“%(said)s” matches several zones: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias zonas: %(names)s. Di cuál."
+
+msgid "That table does not exist in this business."
+msgstr "Esa mesa no existe en este negocio."
+
+msgid "“%(said)s” matches several tables: %(names)s. Say which one (with its zone)."
+msgstr "«%(said)s» coincide con varias mesas: %(names)s. Di cuál (con su zona)."
+
+msgid "That table check does not exist in this business."
+msgstr "Esa cuenta de mesa no existe en este negocio."
+
+msgid "That check is not open: it does not exist in this business, or it has already been closed, transferred, merged or parked."
+msgstr "Esa cuenta no está abierta: no existe en este negocio, o ya se ha cerrado, trasladado, fusionado o aparcado."
+
+msgid "Table %(number)s has %(count)s open checks: say which one."
+msgstr "La mesa %(number)s tiene %(count)s cuentas abiertas: di cuál."
+
+msgid "%(number)s (%(zone)s)"
+msgstr "%(number)s (%(zone)s)"
+
+msgid "no zone"
+msgstr "sin zona"
+
+msgid "Say which zone: its id, or its name."
+msgstr "Di qué zona: su id o su nombre."
+
+msgid "Say which table: its id, or its number."
+msgstr "Di qué mesa: su id o su número."
+
+msgid "Say which check: its id, or the number of its table."
+msgstr "Di qué cuenta: su id o el número de su mesa."
+
+msgid "Say which table it goes to: its id, or its number."
+msgstr "Di a qué mesa va: su id o su número."
+
+msgid "Say which table or check it joins: an id, or the number of its table."
+msgstr "Di con qué mesa o cuenta se junta: un id o el número de su mesa."
+
+msgid "A hold has to end after it starts."
+msgstr "Una retención tiene que acabar después de empezar."
+
+msgid "Give the moment with its time zone."
+msgstr "Indica el momento con su zona horaria."
+
+msgid "There is already a zone with that name."
+msgstr "Ya hay una zona con ese nombre."
+
+msgid "That zone still has tables. Move them to another zone or delete them first."
+msgstr "Esta zona todavía tiene mesas. Muévelas a otra zona o bórralas antes."
+
+msgid "There is already a table with that number in this zone."
+msgstr "Ya hay una mesa con ese número en esta zona."
+
+msgid "These numbers are already taken in this zone: %(numbers)s."
+msgstr "Estos números ya están en esta zona: %(numbers)s."
+
+msgid "That table has an open check. Close it or move it before deleting the table."
+msgstr "Esa mesa tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa."
+
+msgid "That table cannot be seated right now: it is taken, out of service or no longer in use."
+msgstr "Esa mesa no se puede sentar ahora mismo: está ocupada, fuera de servicio o ya no está en uso."
+
+msgid "That check is not parked: it does not exist in this business, or it is already seated at a table."
+msgstr "Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa."
+
+msgid "That check is still open: close it before deleting it."
+msgstr "Esa cuenta sigue abierta: ciérrala antes de borrarla."
+
+msgid "This table's bill is still open in Sales: charge it, move it to another table or delete it from the till."
+msgstr "La cuenta de esta mesa sigue abierta en Ventas: cóbrala, pásala a otra mesa o elimínala desde el TPV."
+
+msgid "This table's bill has changed. Reload the list and try again."
+msgstr "La cuenta de esta mesa ha cambiado. Recarga la lista e inténtalo de nuevo."
+
+msgid "That check is no longer open in Sales."
+msgstr "Esa cuenta ya no está abierta en Ventas."
+
+msgid "That check is already at table %(table)s."
+msgstr "Esa cuenta ya está en la mesa %(table)s."
+
+msgid "That table has no other open check to merge with."
+msgstr "Esa mesa no tiene ninguna otra cuenta abierta con la que fusionar."
+
+msgid "That hold is not there any more: it was released, it expired, or that booking never held a table."
+msgstr "Esa retención ya no está: se soltó, ha vencido, o esa reserva nunca llegó a retener una mesa."
+
+msgid "Sales is not available in this business: the table's check cannot be opened or changed."
+msgstr "Ventas no está disponible en este negocio: no se puede abrir ni cambiar la cuenta de la mesa."
+
+msgid "The red warning cannot come before the amber one."
+msgstr "El aviso rojo no puede llegar antes que el ámbar."
+
+msgid "Table %(number)s"
+msgstr "Mesa %(number)s"

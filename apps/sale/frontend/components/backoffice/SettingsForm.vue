@@ -17,7 +17,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useT } from '../../composables/useT';
 import type { SettingsOut, SettingsPatchIn } from '../../operations';
-import { refusal } from './refusal';
+import { refusal } from '../../lib/refusal';
 import SettingsField from './SettingsField.vue';
 import { SETTINGS_FIELDS, type SettingsField as Field, type SettingsKey } from './settingsFields';
 

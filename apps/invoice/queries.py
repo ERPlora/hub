@@ -1,0 +1,761 @@
+"""Read operations of the invoice app (``READ ONLY``), and how a document is read.
+
+``invoice_row`` and ``invoice_detail`` are the one way a document becomes an output: the lists, the
+detail, the document of a sale and every write (services.py) answer with them, so what the screen
+shows and what the assistant reads never drift apart; the same for ``series_row`` and ``issuer_row``.
+``document_of_sale`` finds the document in force of a sale (its full invoice when its ticket was
+replaced). ``render_document`` writes the printable A4 document (``templates/invoice/invoice.html``)
+in the reader's language.
+"""
+
+from decimal import Decimal
+
+from babel.numbers import format_currency, format_decimal, format_percent
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
+from django.db.models.functions import Coalesce, Lag
+from django.template.loader import render_to_string
+from django.utils import timezone, translation
+from django.utils.formats import date_format
+from django.utils.translation import gettext
+from django.utils.translation import gettext_lazy as _
+from live.context import OperationContext
+from live.errors import NotFound
+from live.operations import operation
+
+from apps.invoice import fiscal
+from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries, Issuer
+from apps.invoice.schemas import (
+    AllocationPage,
+    AllocationsIn,
+    BySourceIn,
+    BySourceOut,
+    DocumentIn,
+    DocumentOut,
+    GapPage,
+    GapsIn,
+    InvoiceGetIn,
+    InvoiceListIn,
+    InvoiceOut,
+    InvoicePage,
+    IssuerGetIn,
+    IssuerOut,
+    NumberingStatusIn,
+    NumberingStatusOut,
+    SeriesListIn,
+    SeriesPage,
+    SeriesPeekIn,
+    SeriesPeekOut,
+)
+from apps.sale.queries import find_sale
+
+INVOICE_NOT_FOUND = _("Invoice not found.")
+SERIES_NOT_FOUND = _("This numbering series does not exist.")
+
+# Texts of the printed document (and its titles), in the reader's language.
+DOC_INVOICE = _("Invoice")
+DOC_SIMPLIFIED = _("Simplified invoice")
+DOC_RECTIFYING = _("Rectifying invoice")
+DOC_COPY = _("Copy")
+TAX_VAT = _("VAT")
+TAX_SURCHARGE = _("Equivalence surcharge")
+TAX_EXEMPT = _("Exempt")
+TAX_EXEMPT_CAUSE = _("Exempt (%(cause)s)")
+TAX_NOT_SUBJECT = _("Not subject")
+TAX_REVERSE_CHARGE = _("Reverse charge")
+RECTIFIES_NOTE = _("Rectifies invoice %(number)s. Reason: %(reason)s")
+RECTIFIES_NOTE_NO_REASON = _("Rectifies invoice %(number)s.")
+
+
+# ── Rows ────────────────────────────────────────────────────────────────────────────────────────
+
+
+def with_links(invoices):
+    """The queryset with what a row says about its links (the rectified number, a replaced ticket)."""
+    return invoices.select_related("rectifies").annotate(
+        substituted_flag=Exists(Invoice.objects.filter(substitutes=OuterRef("pk"))),
+        rectification_count=Count("rectifications", distinct=True),
+    )
+
+
+def _flags(invoice: Invoice, *, substituted: bool, rectified: bool) -> dict:
+    """What can still be done to a document: the row and the detail ask the same questions."""
+    ordinary = not invoice.is_rectification
+    return {
+        "substituted": substituted,
+        "can_mark_paid": ordinary and invoice.status == Invoice.Status.ISSUED,
+        "can_rectify": ordinary
+        and invoice.status != Invoice.Status.CANCELLED
+        and not substituted,
+        "can_substitute": invoice.invoice_type == "F2"
+        and invoice.status != Invoice.Status.CANCELLED
+        and not substituted
+        and not rectified,
+    }
+
+
+def invoice_row(invoice: Invoice) -> dict:
+    """An ``InvoiceRowOut`` (best through ``with_links``)."""
+    substituted = getattr(invoice, "substituted_flag", None)
+    if substituted is None:
+        substituted = invoice.substitutions.exists()
+    count = getattr(invoice, "rectification_count", None)
+    rectified = invoice.rectifications.exists() if count is None else count > 0
+    return {
+        "id": invoice.id,
+        "number": invoice.number,
+        "invoice_type": invoice.invoice_type,
+        "series_code": invoice.series_code,
+        "year": invoice.year,
+        "issue_date": invoice.issue_date,
+        "issued_at": invoice.issued_at,
+        "customer_name": invoice.customer_name,
+        "customer_tax_id": invoice.customer_tax_id,
+        "base_amount": invoice.base_amount,
+        "tax_amount": invoice.tax_amount,
+        "total_amount": invoice.total_amount,
+        "currency": invoice.currency,
+        "status": invoice.status,
+        "source_type": invoice.source_type,
+        "rectifies_id": invoice.rectifies_id,
+        "rectifies_number": invoice.rectifies.number if invoice.rectifies_id else "",
+        **_flags(invoice, substituted=substituted, rectified=rectified),
+    }
+
+
+def _link(invoice: Invoice | None) -> dict | None:
+    if invoice is None:
+        return None
+    return {
+        "id": invoice.id,
+        "number": invoice.number,
+        "invoice_type": invoice.invoice_type,
+        "status": invoice.status,
+        "issue_date": invoice.issue_date,
+        "total_amount": invoice.total_amount,
+    }
+
+
+def _line(line: InvoiceLine) -> dict:
+    return {
+        "id": line.id,
+        "position": line.position,
+        "description": line.description,
+        "quantity": line.quantity,
+        "unit_price": line.unit_price,
+        "discount_amount": line.discount_amount,
+        "tax_rate": line.tax_rate,
+        "surcharge_rate": line.surcharge_rate,
+        "tax_category_key": line.tax_category_key,
+        "base_amount": line.base_amount,
+        "tax_amount": line.tax_amount,
+        "total_amount": line.total_amount,
+        "product_id": line.product_id,
+    }
+
+
+def remaining_of(invoice: Invoice) -> int:
+    """What is left of a document after its rectifications (a rectification has nothing left)."""
+    if invoice.is_rectification:
+        return 0
+    taken = invoice.rectifications.aggregate(total=Coalesce(Sum("total_amount"), 0))[
+        "total"
+    ]
+    return invoice.total_amount + taken
+
+
+def _loaded(invoice: Invoice) -> Invoice:
+    return (
+        Invoice.objects.select_related("rectifies", "substitutes", "source_sale")
+        .prefetch_related(
+            Prefetch("lines", queryset=InvoiceLine.objects.order_by("position", "id")),
+            Prefetch(
+                "rectifications", queryset=Invoice.objects.order_by("issued_at", "id")
+            ),
+        )
+        .get(pk=invoice.pk)
+    )
+
+
+def invoice_detail(invoice: Invoice) -> dict:
+    """An ``InvoiceOut``: the document with its lines, its breakdown and its links."""
+    invoice = _loaded(invoice)
+    substituted_by = Invoice.objects.filter(substitutes=invoice).first()
+    rectifications = list(invoice.rectifications.all())
+    row = invoice_row(invoice)
+    row.update(
+        _flags(
+            invoice,
+            substituted=substituted_by is not None,
+            rectified=bool(rectifications),
+        )
+    )
+    return {
+        **row,
+        "series_id": invoice.series_id,
+        "sequence": invoice.sequence,
+        "operation_date": invoice.operation_date,
+        "issuer_name": invoice.issuer_name,
+        "issuer_tax_id": invoice.issuer_tax_id,
+        "issuer_address": invoice.issuer_address,
+        "issuer_country": invoice.issuer_country,
+        "customer_id": invoice.customer_id,
+        "customer_address": invoice.customer_address,
+        "customer_country": invoice.customer_country,
+        "customer_id_type": invoice.customer_id_type,
+        "description": invoice.description,
+        "notes": invoice.notes,
+        "tax_breakdown": invoice.tax_breakdown,
+        "rectification_kind": invoice.rectification_kind,
+        "sale_id": invoice.source_sale_id,
+        "sale_number": invoice.source_sale.number if invoice.source_sale_id else "",
+        "refund_id": invoice.source_refund_id,
+        "rectifies": _link(invoice.rectifies),
+        "substitutes": _link(invoice.substitutes),
+        "substituted_by": _link(substituted_by),
+        "rectifications": [_link(item) for item in rectifications],
+        "remaining": remaining_of(invoice),
+        "paid_at": invoice.paid_at,
+        "created_by": invoice.created_by,
+        "lines": [_line(line) for line in invoice.lines.all()],
+    }
+
+
+def find_invoice(invoice_id, number: str | None, *, lock: bool = False) -> Invoice:
+    """The document named by its id or its number; ``NotFound`` when there is none."""
+    invoices = Invoice.objects.select_for_update() if lock else Invoice.objects.all()
+    if invoice_id is not None:
+        invoice = invoices.filter(pk=invoice_id).first()
+    else:
+        invoice = (
+            invoices.filter(number=(number or "").strip())
+            .order_by("-issued_at", "-id")
+            .first()
+        )
+    if invoice is None:
+        raise NotFound(str(INVOICE_NOT_FOUND), code="invoice.not_found")
+    return invoice
+
+
+def document_of_sale(sale_id) -> Invoice | None:
+    """The document in force of a sale: the one it was invoiced with, or the full invoice (F3) that
+    replaced its ticket. ``None`` while it has none."""
+    born = Invoice.objects.filter(
+        source_sale_id=sale_id, source_type=Invoice.Source.SALE
+    ).first()
+    if born is None:
+        return None
+    return Invoice.objects.filter(substitutes=born).first() or born
+
+
+def series_started(series: InvoiceSeries) -> bool:
+    """The series numbered a document: its prefix, format and next number are frozen (the number is part of
+    the VeriFactu chain). A series that starts at a later number, to continue another system, has not until its
+    first document. A list annotates it as ``started``; a single series asks."""
+    started = getattr(series, "started", None)
+    if started is None:
+        started = Invoice.objects.filter(series=series).exists()
+    return started
+
+
+def series_row(series: InvoiceSeries) -> dict:
+    """A ``SeriesOut``: the series and the number its next document will carry."""
+    return {
+        "id": series.id,
+        "code": series.code,
+        "name": series.name,
+        "display_name": series.display_name,
+        "invoice_type": series.invoice_type,
+        "year": series.year,
+        "prefix": series.prefix,
+        "format": series.format,
+        "current_number": series.current_number,
+        "next_number": fiscal.render_number(
+            series.format,
+            prefix=series.prefix,
+            code=series.code,
+            year=series.year,
+            seq=series.current_number + 1,
+        ),
+        "format_locked": series_started(series),
+        "is_active": series.is_active,
+        "is_default": series.is_default,
+    }
+
+
+def issuer_row(issuer: Issuer | None) -> dict:
+    """An ``IssuerOut``; an empty one while nothing is set up."""
+    updated = issuer.updated_at if issuer is not None else None
+    issuer = issuer or Issuer(legal_name="", tax_id="", address="")
+    return {
+        "configured": issuer.configured,
+        "legal_name": issuer.legal_name,
+        "tax_id": issuer.tax_id,
+        "address": issuer.address,
+        "postal_code": issuer.postal_code,
+        "city": issuer.city,
+        "province": issuer.province,
+        "country": issuer.country,
+        "address_line": issuer.address_line,
+        "source": issuer.source,
+        "synced_version": issuer.synced_version,
+        "synced_at": issuer.synced_at,
+        "updated_at": updated,
+    }
+
+
+# ── Invoices ────────────────────────────────────────────────────────────────────────────────────
+
+
+#: A sort column → its ordering; every one ends with the newest first, then the id.
+_SORTS = {
+    "issued_at": ["issued_at"],
+    "issue_date": ["issue_date", "issued_at"],
+    "number": ["series_code", "year", "sequence"],
+    "customer_name": ["customer_name"],
+    "total_amount": ["total_amount"],
+    "status": ["status"],
+    "invoice_type": ["invoice_type"],
+    "series_code": ["series_code", "year", "sequence"],
+}
+
+
+def _ordering(sort: str, direction: str) -> list:
+    columns = [
+        F(column).desc() if direction == "desc" else F(column).asc()
+        for column in _SORTS[sort]
+    ]
+    tie = (
+        [F("issued_at").desc(), F("id").desc()]
+        if direction == "desc"
+        else [F("issued_at").asc(), F("id").asc()]
+    )
+    return [*columns, *tie]
+
+
+def _page(queryset, params, row) -> dict:
+    total = queryset.count()
+    rows = list(queryset[params.offset : params.offset + params.limit])
+    return {
+        "rows": [row(item) for item in rows],
+        "total": total,
+        "limit": params.limit,
+        "offset": params.offset,
+    }
+
+
+@operation(
+    "invoice.invoice.list",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=InvoiceListIn,
+    output=InvoicePage,
+    expose_api=True,
+    ai={
+        "description": "List the invoices, the last issued first: search by number, customer's name or tax ID; filter "
+        "by status (issued, paid, cancelled), type (F1, F2 ticket, F3, R1–R5), series, source, issue dates and total "
+        "(cents). Pages of up to 100."
+    },
+)
+def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
+    invoices = Invoice.objects.all()
+    if params.search:
+        text = params.search.strip()
+        invoices = invoices.filter(
+            Q(number__icontains=text)
+            | Q(customer_name__icontains=text)
+            | Q(customer_tax_id__icontains=text)
+        )
+    exact = {
+        "status": params.status,
+        "invoice_type": params.invoice_type,
+        "series_code": params.series_code.strip().upper()
+        if params.series_code
+        else None,
+        "source_type": params.source_type,
+        "customer_id": params.customer_id,
+        "issue_date__gte": params.issue_date_from,
+        "issue_date__lte": params.issue_date_to,
+        "total_amount__gte": params.total_amount_from,
+        "total_amount__lte": params.total_amount_to,
+    }
+    invoices = invoices.filter(
+        **{lookup: value for lookup, value in exact.items() if value is not None}
+    )
+    invoices = with_links(invoices).order_by(*_ordering(params.sort, params.dir))
+    return _page(invoices, params, invoice_row)
+
+
+@operation(
+    "invoice.invoice.get",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=InvoiceGetIn,
+    output=InvoiceOut,
+    expose_api=True,
+    ai={
+        "description": "Read one invoice by its number (or id): its issuer, recipient, lines, tax breakdown, totals, "
+        "status, and the documents it rectifies, replaces or is rectified or replaced by."
+    },
+)
+def get_invoice(ctx: OperationContext, params: InvoiceGetIn) -> dict:
+    return invoice_detail(find_invoice(params.invoice_id, params.number))
+
+
+@operation(
+    "invoice.invoice.by_source",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=BySourceIn,
+    output=BySourceOut,
+    expose_api=True,
+    ai={
+        "description": "The invoice in force of a sale (by the sale's number of the day or id): its ticket or invoice, "
+        "or the full invoice that replaced its ticket. Found false while it has none."
+    },
+)
+def by_source(ctx: OperationContext, params: BySourceIn) -> dict:
+    sale = find_sale(params.sale_id, params.sale)
+    document = document_of_sale(sale.id)
+    return {
+        "found": document is not None,
+        "invoice": invoice_detail(document) if document else None,
+    }
+
+
+# ── The printable document ──────────────────────────────────────────────────────────────────────
+
+
+def _money(cents: int, currency: str, language: str) -> str:
+    return format_currency(Decimal(cents) / 100, currency, locale=language)
+
+
+def _unit_price(cents: Decimal, currency: str, language: str) -> str:
+    """A unit price: two decimals, up to four when the price without VAT has them (0.8264 €)."""
+    euros = (Decimal(cents) / 100).normalize()
+    if -euros.as_tuple().exponent <= 2:
+        return format_currency(euros, currency, locale=language)
+    return format_currency(euros, currency, locale=language, decimal_quantization=False)
+
+
+def _percent(rate, language: str) -> str:
+    return format_percent(
+        Decimal(str(rate)) / 100, locale=language, decimal_quantization=False
+    )
+
+
+def _tax_label(item: dict, language: str) -> list[tuple[str, int, int]]:
+    """The printed rows of a breakdown entry: ``(label, base, amount)``; a surcharge is its own row."""
+    qualification = item["qualification"]
+    if qualification == "exempt":
+        cause = item.get("exempt_reason", "")
+        label = (
+            gettext(TAX_EXEMPT_CAUSE) % {"cause": cause}
+            if cause
+            else gettext(TAX_EXEMPT)
+        )
+    elif qualification in ("not_subject", "not_subject_location"):
+        label = gettext(TAX_NOT_SUBJECT)
+    elif qualification == "subject_reverse":
+        label = gettext(TAX_REVERSE_CHARGE)
+    else:
+        name = gettext(TAX_VAT) if item["tax"] == "vat" else item["tax"].upper()
+        label = f"{name} {_percent(item['rate'], language)}"
+    rows = [(label, item["base"], item["quota"])]
+    if Decimal(str(item.get("surcharge_rate", "0"))):
+        rows.append(
+            (
+                f"{gettext(TAX_SURCHARGE)} {_percent(item['surcharge_rate'], language)}",
+                item["base"],
+                item["surcharge_quota"],
+            )
+        )
+    return rows
+
+
+def document_note(invoice: Invoice) -> str:
+    """The note of a document in the reader's language: a rectifying one names the invoice it rectifies
+    and its reason (composed here: the database keeps no sentence); any other, its own notes."""
+    if invoice.rectifies_id:
+        reason = invoice.description.strip()
+        number = invoice.rectifies.number
+        if reason:
+            return gettext(RECTIFIES_NOTE) % {"number": number, "reason": reason}
+        return gettext(RECTIFIES_NOTE_NO_REASON) % {"number": number}
+    return invoice.notes
+
+
+def render_document(invoice: Invoice, *, duplicate: bool = False) -> str:
+    """The A4 document of an invoice, in the active language (``templates/invoice/invoice.html``)."""
+    invoice = _loaded(invoice)
+    language = translation.get_language() or "en"
+    if invoice.is_rectification:
+        title = DOC_RECTIFYING
+    elif invoice.invoice_type == "F2":
+        title = DOC_SIMPLIFIED
+    else:
+        title = DOC_INVOICE
+    money = lambda cents: _money(cents, invoice.currency, language)  # noqa: E731
+    lines = list(invoice.lines.all())
+    discounted = any(line.discount_amount for line in lines)
+    context = {
+        "invoice": invoice,
+        "language": language,
+        "title": title,
+        "duplicate": duplicate,
+        "copy_label": DOC_COPY,
+        "issue_date": date_format(invoice.issue_date, "SHORT_DATE_FORMAT"),
+        "operation_date": date_format(invoice.operation_date, "SHORT_DATE_FORMAT")
+        if invoice.operation_date != invoice.issue_date
+        else "",
+        # RD 1619/2012 art. 6.1.f: the unit price without VAT and the discount apart, the amount its base.
+        "discounted": discounted,
+        "lines": [
+            {
+                "description": line.description,
+                "quantity": format_decimal(line.quantity.normalize(), locale=language),
+                "unit_price": _unit_price(line.unit_price, invoice.currency, language),
+                "discount": money(line.discount_amount) if line.discount_amount else "",
+                "tax_rate": _percent(line.tax_rate, language),
+                "amount": money(line.base_amount),
+            }
+            for line in lines
+        ],
+        "taxes": [
+            {"label": label, "base": money(base), "amount": money(amount)}
+            for item in invoice.tax_breakdown
+            for label, base, amount in _tax_label(item, language)
+        ],
+        "base": money(invoice.base_amount),
+        "total": money(invoice.total_amount),
+        "note": document_note(invoice),
+    }
+    return render_to_string("invoice/invoice.html", context)
+
+
+@operation(
+    "invoice.invoice.document",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=DocumentIn,
+    output=DocumentOut,
+    expose_api=True,
+    ai={
+        "description": "The printable A4 document of an invoice (by its number), a whole HTML page in the reader's "
+        "language: issuer, recipient, lines, tax breakdown, totals and what it rectifies. duplicate marks a copy."
+    },
+)
+def document(ctx: OperationContext, params: DocumentIn) -> dict:
+    invoice = find_invoice(params.invoice_id, params.number)
+    with translation.override(ctx.language):
+        html = render_document(invoice, duplicate=params.duplicate)
+    return {"invoice_id": invoice.id, "number": invoice.number, "html": html}
+
+
+# ── Series ──────────────────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "invoice.series.list",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=SeriesListIn,
+    output=SeriesPage,
+    ai={
+        "description": "List the numbering series (this year's first): code, name, type, year, prefix, format, the "
+        "current number and the number the next document will carry. Search by code or name."
+    },
+)
+def list_series(ctx: OperationContext, params: SeriesListIn) -> dict:
+    series = InvoiceSeries.objects.annotate(
+        started=Exists(Invoice.objects.filter(series=OuterRef("pk")))
+    )
+    if params.search:
+        text = params.search.strip()
+        series = series.filter(Q(code__icontains=text) | Q(name__icontains=text))
+    exact = {
+        "code": params.code.strip().upper() if params.code else None,
+        "invoice_type": params.invoice_type,
+        "year": params.year,
+        "is_active": params.is_active,
+        "is_default": params.is_default,
+    }
+    series = series.filter(
+        **{field: value for field, value in exact.items() if value is not None}
+    )
+    column = F(params.sort).desc() if params.dir == "desc" else F(params.sort).asc()
+    series = series.order_by(column, F("year").desc(), "code", "id")
+    return _page(series, params, series_row)
+
+
+def find_series(series_id, code: str | None, year: int | None) -> InvoiceSeries:
+    if series_id is not None:
+        series = InvoiceSeries.objects.filter(pk=series_id).first()
+    else:
+        series = InvoiceSeries.objects.filter(
+            code=(code or "").strip().upper(), year=year or timezone.localdate().year
+        ).first()
+    if series is None:
+        raise NotFound(str(SERIES_NOT_FOUND), code="invoice.series_not_found")
+    return series
+
+
+@operation(
+    "invoice.series.peek_next",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=SeriesPeekIn,
+    output=SeriesPeekOut,
+    expose_api=True,
+    ai={
+        "description": "Preview the number the next document of a series (by its code, this year, or its id) will "
+        "carry, written with its own format, WITHOUT using it; and whether its format can still change."
+    },
+)
+def peek_next(ctx: OperationContext, params: SeriesPeekIn) -> dict:
+    series = find_series(params.series_id, params.code, params.year)
+    row = series_row(series)
+    return {
+        "series_id": series.id,
+        "code": series.code,
+        "year": series.year,
+        "next_sequence": series.current_number + 1,
+        "next_number": row["next_number"],
+        "format_locked": row["format_locked"],
+    }
+
+
+# ── The numbering ───────────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "invoice.numbering.status",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=NumberingStatusIn,
+    output=NumberingStatusOut,
+    ai={
+        "description": "Whether this year's invoice numbering is set up: how many ordinary series (F1, F2, F3), "
+        "rectifying series (R1–R5) and default series the business year has, and how many series in all."
+    },
+)
+def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
+    year = timezone.localdate().year
+    this_year = InvoiceSeries.objects.filter(year=year)
+    ordinary = this_year.filter(invoice_type__in=("F1", "F2", "F3")).count()
+    rectifying = this_year.filter(invoice_type__startswith="R").count()
+    return {
+        "fiscal_year": year,
+        "ordinary_series": ordinary,
+        "rectifying_series": rectifying,
+        "default_series": this_year.filter(is_default=True).count(),
+        "total_series": InvoiceSeries.objects.count(),
+        "configured": ordinary > 0 and rectifying > 0,
+    }
+
+
+@operation(
+    "invoice.numbering.gaps",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=GapsIn,
+    output=GapPage,
+    expose_api=True,
+    ai={
+        "description": "The gaps of the invoice numbering: one row per missing stretch inside a series and year (after "
+        "which number, from which, the next one recorded and how many are missing). None means it is correlative."
+    },
+)
+def numbering_gaps(ctx: OperationContext, params: GapsIn) -> dict:
+    documents = Invoice.objects.all()
+    if params.code:
+        documents = documents.filter(series_code=params.code.strip().upper())
+    if params.year:
+        documents = documents.filter(year=params.year)
+    with_previous = documents.annotate(
+        previous=Window(
+            Lag("sequence"),
+            partition_by=[F("series_code"), F("year")],
+            order_by=F("sequence").asc(),
+        )
+    )
+    gaps = (
+        with_previous.filter(previous__isnull=False, sequence__gt=F("previous") + 1)
+        .order_by("series_code", "year", "sequence")
+        .values("series_code", "year", "sequence", "previous")
+    )
+    total = len(gaps)
+    rows = [
+        {
+            "series_code": gap["series_code"],
+            "year": gap["year"],
+            "after_sequence": gap["previous"],
+            "missing_from": gap["previous"] + 1,
+            "next_recorded": gap["sequence"],
+            "missing_count": gap["sequence"] - gap["previous"] - 1,
+        }
+        for gap in list(gaps)[params.offset : params.offset + params.limit]
+    ]
+    return {
+        "rows": rows,
+        "total": total,
+        "limit": params.limit,
+        "offset": params.offset,
+    }
+
+
+def _allocation(invoice: Invoice) -> dict:
+    return {
+        "series_code": invoice.series_code,
+        "year": invoice.year,
+        "sequence": invoice.sequence,
+        "number": invoice.number,
+        "invoice_id": invoice.id,
+        "invoice_type": invoice.invoice_type,
+        "issued_at": invoice.issued_at,
+    }
+
+
+@operation(
+    "invoice.numbering.allocations",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=AllocationsIn,
+    output=AllocationPage,
+    expose_api=True,
+    ai={
+        "description": "The numbering book: one row per number handed out, by series, year and sequence, with the "
+        "number written and the document behind it. Search by number or series code."
+    },
+)
+def allocations(ctx: OperationContext, params: AllocationsIn) -> dict:
+    documents = Invoice.objects.all()
+    if params.search:
+        text = params.search.strip()
+        documents = documents.filter(
+            Q(number__icontains=text) | Q(series_code__icontains=text)
+        )
+    if params.code:
+        documents = documents.filter(series_code=params.code.strip().upper())
+    if params.year:
+        documents = documents.filter(year=params.year)
+    return _page(
+        documents.order_by("series_code", "year", "sequence", "id"), params, _allocation
+    )
+
+
+# ── The issuer ──────────────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "invoice.issuer.get",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=IssuerGetIn,
+    output=IssuerOut,
+    ai={
+        "description": "The issuer of the invoices: the business's legal name, tax ID and address, whether it is set "
+        "up (without it no document is issued) and whether it came from the ERPlora account."
+    },
+)
+def get_issuer(ctx: OperationContext, params: IssuerGetIn) -> dict:
+    return issuer_row(Issuer.objects.first())

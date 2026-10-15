@@ -1,6 +1,14 @@
 // Fixtures of the sale document's tests: a charged sale (three lines: one with a note, a gift and a
 // weighed one; paid in cash with change) and the receipt settings.
-import type { SaleOut, SettingsOut } from '../../../operations';
+import type { BreakdownOut, SaleOut, SettingsOut } from '../../../operations';
+
+/** The fiscal key of a row of the breakdown: subject VAT of the general regime. */
+export const SUBJECT_VAT: Pick<BreakdownOut, 'tax_type' | 'regime' | 'qualification' | 'exempt_reason'> = {
+  tax_type: 'vat',
+  regime: '01',
+  qualification: 'subject',
+  exempt_reason: '',
+};
 
 export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
   return {
@@ -26,12 +34,20 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
     change_total: 750,
     refunded_total: 0,
     refundable_total: 1250,
+    sessions_to_return: 0,
     payment_method_name: 'Cash',
-    breakdown: [{ rate_pct: '10.00', label: 'vat', base: 1136, tax: 114 }],
+    breakdown: [{ ...SUBJECT_VAT, rate_pct: '10.00', label: 'vat', base: 1136, tax: 114 }],
     notes: '',
     voided_at: null,
     voided_by: '',
     void_reason: '',
+    invoice_status: '',
+    invoice_id: null,
+    invoice_number: '',
+    invoice_type: '',
+    void_invoice_status: '',
+    void_invoice_number: '',
+    documents_pending: false,
     created_at: '2026-10-14T10:05:00Z',
     created_by: 'Ana',
     lines: [
@@ -63,6 +79,9 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
         tax_amount: 27,
         line_total: 300,
         returned_quantity: '0.000',
+        service_id: null,
+        paid_by_voucher: false,
+        voucher_name: '',
       },
       {
         id: 'l2',
@@ -92,6 +111,9 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
         tax_amount: 0,
         line_total: 0,
         returned_quantity: '0.000',
+        service_id: null,
+        paid_by_voucher: false,
+        voucher_name: '',
       },
       {
         id: 'l3',
@@ -121,6 +143,9 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
         tax_amount: 87,
         line_total: 950,
         returned_quantity: '0.000',
+        service_id: null,
+        paid_by_voucher: false,
+        voucher_name: '',
       },
     ],
     payments: [

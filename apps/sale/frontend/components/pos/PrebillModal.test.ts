@@ -46,7 +46,7 @@ const VALUED = preview({
   discount_amount: 300,
   ticket_discount_amount: 300,
   total: 2700,
-  breakdown: [{ rate_pct: '10.00', label: 'vat', base: 2455, tax: 245 }],
+  breakdown: [{ tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '10.00', label: 'vat', base: 2455, tax: 245 }],
 });
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
@@ -94,9 +94,9 @@ describe('PrebillModal', () => {
       'sale.checkout.preview',
       preview({
         breakdown: [
-          { rate_pct: '21.00', label: 'vat', base: 100, tax: 21 },
-          { rate_pct: '5.20', label: 'surcharge', base: 100, tax: 5 },
-          { rate_pct: '1.00', label: 'Tasa turística', base: 100, tax: 1 },
+          { tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '21.00', label: 'vat', base: 100, tax: 21 },
+          { tax_type: 'surcharge', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '5.20', label: 'surcharge', base: 100, tax: 5 },
+          { tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '1.00', label: 'Tasa turística', base: 100, tax: 1 },
         ],
       }),
     );
@@ -104,6 +104,23 @@ describe('PrebillModal', () => {
       'VAT 21%',
       'Surcharge 5.2%',
       'Tasa turística 1%',
+    ]);
+  });
+
+  it('a row per fiscal key: an exempt one names its cause, as the ticket will', async () => {
+    const m = await setup();
+    await m.result(
+      'sale.checkout.preview',
+      preview({
+        breakdown: [
+          { tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '10.00', label: 'vat', base: 273, tax: 27 },
+          { tax_type: 'vat', regime: '01', qualification: 'exempt', exempt_reason: 'E1', rate_pct: '0.00', label: 'vat', base: 4000, tax: 0 },
+        ],
+      }),
+    );
+    expect(m.find('pos-prebill-paper').findAll('.pos-bill__tax dt').map((dt) => plain(dt.text()))).toEqual([
+      'VAT 10%',
+      'Exempt (E1)',
     ]);
   });
 

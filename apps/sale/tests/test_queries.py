@@ -130,6 +130,19 @@ def test_a_partly_refunded_sale_says_what_is_left(catalog):
     )
 
 
+def test_a_row_says_whether_the_sale_has_refunds_also_one_of_no_money(catalog):
+    # A refund that gave back only a voucher's session moves no money: the row still says the sale has
+    # refunds, so the screen offers «Refund» and never «Void» (the server refuses voiding it).
+    from apps.sale.models import Refund
+
+    plain = charge("list-key-0002", payments=[{"method": "card"}])
+    session_only = charge("list-key-0003", payments=[{"method": "card"}])
+    Refund.objects.create(sale_id=session_only.id, total=0, reason="the session")
+    rows = {row.id: row for row in run("sale.sale.list", {}).rows}
+    assert (rows[plain.id].has_refunds, rows[session_only.id].has_refunds) == (False, True)
+    assert rows[session_only.id].refunded_total == 0
+
+
 def test_an_employee_reads_the_sales_but_not_the_figures(catalog):
     charge("list-key-0001")
     employee = ctx_for(EMPLOYEE)

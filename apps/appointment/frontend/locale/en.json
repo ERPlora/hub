@@ -1,0 +1,284 @@
+{
+  "appointment": {
+    "title": "Appointments",
+    "tabs": {
+      "label": "Appointment sections",
+      "agenda": "Agenda",
+      "settings": "Settings"
+    },
+    "loading": "Loading…",
+    "retry": "Retry",
+    "close": "Close",
+    "noPermission": "You do not have permission",
+    "noResults": "No results",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business"
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "in_progress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
+    "views": {
+      "label": "View",
+      "list": "List",
+      "staff": "By professional",
+      "series": "Repeating",
+      "day": "Day",
+      "week": "Week"
+    },
+    "toolbar": {
+      "prevDay": "Previous day",
+      "nextDay": "Next day",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "today": "Today",
+      "openCalendar": "Open calendar",
+      "filterStatus": "Filter by status",
+      "allStatuses": "All statuses",
+      "add": "Add appointment",
+      "toConfirm": "{n} to confirm",
+      "week": "Week of {date}",
+      "deviceZone": "This device is on a different time zone. The agenda always shows the business clock: {zone}."
+    },
+    "list": {
+      "search": "Search no., customer or service…",
+      "empty": "No appointments for this day.",
+      "emptyWeek": "No appointments this week.",
+      "loadError": "Error loading appointments",
+      "entity": {
+        "one": "appointment",
+        "many": "appointments"
+      },
+      "columns": {
+        "time": "Time",
+        "number": "No.",
+        "customer": "Customer",
+        "service": "Service",
+        "staff": "Professional",
+        "status": "Status"
+      },
+      "erasedCustomer": "Deleted customer",
+      "unassigned": "Unassigned",
+      "charged": "Charged"
+    },
+    "actions": {
+      "charge": "Charge",
+      "goToCheck": "Go to the check",
+      "edit": "Edit",
+      "confirm": "Confirm",
+      "start": "Start",
+      "complete": "Complete",
+      "no_show": "No-show",
+      "cancel": "Cancel",
+      "history": "History",
+      "delete": "Delete",
+      "error": "Could not perform the action"
+    },
+    "grid": {
+      "unassigned": "Unassigned",
+      "noStaff": "No bookable professionals yet.",
+      "staffLoading": "Loading professionals…",
+      "staffError": "The professionals could not be loaded.",
+      "keptOne": "{names} no longer takes new appointments: their appointments for the day stay on their row so you can move them to someone else.",
+      "keptMany": "{names} no longer take new appointments: their appointments for the day stay on their row so you can move them to someone else.",
+      "unassignedWarning": "{n} appointments have no professional: assign them by editing or dragging them to a row.",
+      "notLinked": "Your account is not linked to any Staff record: there is no agenda of yours to show.",
+      "slot": "Book with {staff} at {time}",
+      "moved": "Appointment moved.",
+      "moveError": "The appointment could not be moved.",
+      "notMovable": "This appointment can no longer be moved (its state is final).",
+      "label": "Agenda of {date}"
+    },
+    "form": {
+      "titleNew": "New appointment",
+      "titleEdit": "Edit appointment",
+      "customer": "Customer",
+      "services": "Services",
+      "service": "Service",
+      "addService": "Add a service",
+      "removeService": "Remove {name}",
+      "staff": "Professional",
+      "pickStaff": "Pick a professional",
+      "day": "Day",
+      "time": "Time",
+      "minutes": "Min.",
+      "notes": "Notes for the customer",
+      "internalNotes": "Internal notes",
+      "create": "Add appointment",
+      "save": "Save changes",
+      "pastNotice": "This appointment starts in the past. It will be saved at that time.",
+      "hint": "Change the slot, the services or the professional. The customer stays as it is.",
+      "staffNotForService": "The professional you had chosen does not perform these services: pick one of those who do.",
+      "servicesLoading": "Loading services…",
+      "servicesError": "The services could not be loaded.",
+      "servicesNone": "There are no bookable services yet. Add them in Services.",
+      "staffLoading": "Loading professionals…",
+      "staffError": "The professionals could not be loaded.",
+      "staffNone": "There are no bookable professionals yet. Add them in Staff.",
+      "ownOnly": "You book your own appointments.",
+      "customerRequired": "Pick the customer.",
+      "history": "History",
+      "charged": "Charged: it can no longer be changed.",
+      "total": "Total"
+    },
+    "slots": {
+      "label": "Free times",
+      "hint": "Pick the services, a professional and a day to see the free times.",
+      "loading": "Looking for free times…",
+      "empty": "No free times that day for this professional. You can still type a time.",
+      "error": "The free times could not be loaded. You can still type a time.",
+      "withinNotice": "inside the minimum notice"
+    },
+    "overlap": {
+      "title": "Overlapping appointment",
+      "confirm": "Book anyway",
+      "cancel": "Pick another time"
+    },
+    "scope": {
+      "title": "Edit repeating appointment",
+      "message": "This appointment is part of a repeating series.",
+      "thisOnly": "This appointment only",
+      "following": "This and all following appointments"
+    },
+    "cancelDialog": {
+      "title": "Cancel the appointment",
+      "message": "Cancel {customer}'s appointment ({when})? Its time becomes free.",
+      "reason": "Reason (optional)",
+      "confirm": "Cancel the appointment",
+      "keep": "Keep it"
+    },
+    "deleteDialog": {
+      "title": "Delete the appointment",
+      "message": "Delete {number}? Day to day it is better to Cancel, which keeps the record.",
+      "confirm": "Delete"
+    },
+    "history": {
+      "title": "Appointment history",
+      "empty": "No changes recorded for this appointment yet.",
+      "error": "The appointment history could not be loaded.",
+      "byCustomer": "Requested by the customer",
+      "byPlatform": "Done by the platform",
+      "newTime": "New time",
+      "reason": "Reason",
+      "professional": "Professional",
+      "service": "Service",
+      "action": {
+        "created": "Booked",
+        "confirmed": "Confirmed",
+        "started": "Service started",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "no_show": "Did not show up",
+        "rescheduled": "Time changed",
+        "staff_changed": "Professional changed",
+        "service_changed": "Service changed",
+        "unassigned": "Professional left: to be reassigned",
+        "charged": "Charged",
+        "uncharged": "Sale voided",
+        "deleted": "Deleted"
+      }
+    },
+    "series": {
+      "search": "Search by customer, service or professional",
+      "empty": "No repeating appointments yet.",
+      "loadError": "Repeating appointments could not be loaded.",
+      "add": "New repeating appointment",
+      "entity": {
+        "one": "repeating appointment",
+        "many": "repeating appointments"
+      },
+      "columns": {
+        "customer": "Customer",
+        "service": "Service",
+        "staff": "Professional",
+        "pattern": "Repeats",
+        "starts": "Starts",
+        "ends": "Ends",
+        "active": "Active"
+      },
+      "noEnd": "No end",
+      "endsAfter": "After {n} appointments",
+      "noStaff": "Nobody: edit it",
+      "actions": {
+        "edit": "Edit series",
+        "materialize": "Book appointments",
+        "delete": "Delete"
+      },
+      "toggleError": "The repeating appointment's status could not be changed.",
+      "deleteDialog": {
+        "title": "Delete {name}'s repeating appointments?",
+        "message": "Appointments already booked are kept. This series will stop booking new ones.",
+        "confirm": "Delete"
+      },
+      "form": {
+        "titleNew": "New repeating appointment",
+        "titleEdit": "Edit repeating appointment",
+        "frequency": "Repeats",
+        "weekday": "Day of the week",
+        "startDate": "Starts on",
+        "fromDate": "From",
+        "time": "Time",
+        "minutes": "Min.",
+        "endDate": "Ends on (optional)",
+        "occurrences": "Number of appointments (optional)",
+        "create": "Create repeating appointment",
+        "save": "Save from this occurrence on",
+        "scopeHint": "The change applies from {from}: it reaches {upcoming} booked appointments; {charged} already charged will not be touched. What is already past stays as it is."
+      },
+      "outcome": {
+        "booked": "{booked} appointments booked · {skipped} could not be booked",
+        "pendingFrom": "The dates from {date} on are not booked yet: tap «Book appointments» on the series to book them.",
+        "upcoming": "Nothing to book yet: the next date of this series, {date}, is further ahead than the maximum advance booking. Tap «Book appointments» on the series when it gets closer.",
+        "updated": "{moved} appointments moved · {cancelled} cancelled because they no longer fit the pattern · {locked} left alone because they are already charged"
+      },
+      "frequency": {
+        "daily": "Every day",
+        "weekly": "Every week",
+        "biweekly": "Every two weeks",
+        "monthly": "Every month"
+      }
+    },
+    "weekday": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    },
+    "settings": {
+      "title": "Appointment settings",
+      "fields": {
+        "default_duration": "Default duration (minutes)",
+        "min_booking_notice": "Minimum booking notice (minutes)",
+        "min_booking_notice_help": "Applies to the bookings customers make themselves. From the front desk you can always book for right now.",
+        "max_advance_booking": "Book at most this far ahead (days; 0 = no limit)",
+        "allow_overlapping": "Allow overlapping appointments (the front desk is warned first)",
+        "allow_customer_cancellation": "Let customers cancel their appointment",
+        "cancellation_notice_hours": "Minimum cancellation notice (hours)",
+        "calendar_start_hour": "Calendar starts at (hour)",
+        "calendar_end_hour": "Calendar ends at (hour)",
+        "slot_interval": "Slot interval (minutes)",
+        "auto_confirm_online": "Confirm bookings made by the customer automatically"
+      },
+      "save": "Save",
+      "saved": "Settings saved.",
+      "loading": "Loading settings…",
+      "loadError": "The settings could not be loaded.",
+      "saveError": "The settings could not be saved.",
+      "forbidden": "You do not have permission"
+    },
+    "visits": {
+      "title": "Visit history",
+      "empty": "No appointments yet for this customer.",
+      "error": "The visit history could not be loaded.",
+      "internal": "Internal"
+    }
+  }
+}

@@ -24,17 +24,18 @@ from live.outbox import record_event
 from apps.inventory import events
 from apps.inventory.models import (
     ACTOR_MAX_LENGTH,
-    QUANTITY,
-    UNIT_SPECS,
     Category,
+    fits_unit,
+    increment_of,
     Product,
     ProductCategory,
+    QUANTITY,
+    RefundStock,
     SaleStock,
     Settings,
     StockMovement,
     Unit,
-    fits_unit,
-    increment_of,
+    UNIT_SPECS,
 )
 from apps.inventory.queries import (
     FORMULA_STARTS,
@@ -48,7 +49,6 @@ from apps.inventory.queries import (
     tracks_stock,
 )
 from apps.inventory.schemas import (
-    MAX_CENTS,
     CategoryImportIn,
     CategoryIn,
     CategoryOut,
@@ -59,6 +59,7 @@ from apps.inventory.schemas import (
     CountIn,
     DeletedOut,
     ImportReportOut,
+    MAX_CENTS,
     ProductCategoryIn,
     ProductCategoryLinkOut,
     ProductImportIn,
@@ -68,7 +69,9 @@ from apps.inventory.schemas import (
     ProductRefIn,
     ProductsOut,
     ReceiveIn,
+    RefundStockOut,
     SaleCompletedIn,
+    SaleRefundedIn,
     SaleStockOut,
     SaleVoidedIn,
     WriteOffIn,
@@ -646,7 +649,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
         return Settings.objects.select_for_update().get()
 
 
-# Reactions to the Sales app (events.py; INVENTORY-F21, F22, F23)
+# Reactions to the Sales app (events.py; INVENTORY-F21, F22, F23, F24)
 
 
 @operation(
@@ -721,11 +724,7 @@ def restore_sale(ctx: OperationContext, data: SaleVoidedIn) -> dict:
         return _sale_result(sale, applied=False, movements=0)
     restored = 0
     if not created and sale.state == SaleStock.State.MOVED:
-        taken: dict[UUID, Decimal] = defaultdict(Decimal)
-        for product_id, qty in StockMovement.objects.filter(
-            movement_type=StockMovement.Type.SALE, reference=str(data.sale_id)
-        ).values_list("product_id", "qty"):
-            taken[product_id] -= qty
+        taken = _still_out(data.sale_id)
         products = _locked(set(taken))
         settings = current_settings()
         for product_id, product in products.items():
@@ -739,6 +738,53 @@ def restore_sale(ctx: OperationContext, data: SaleVoidedIn) -> dict:
         sale.state = SaleStock.State.VOIDED
         sale.save(update_fields=["state", "updated_at"])
     return _sale_result(sale, applied=True, movements=restored)
+
+
+@operation(
+    "inventory.stock.restore_refund",
+    kind="command",
+    permission=SYSTEM,
+    input=SaleRefundedIn,
+    output=RefundStockOut,
+    ai={
+        "description": "Put back in the stock the units a refund of Sales returns, never more than its sale took "
+        "(run by the platform when Sales reports a refund).",
+        "risk": "high",
+    },
+)
+def restore_refund(ctx: OperationContext, data: SaleRefundedIn) -> dict:
+    """Each returned line gives its article back once per refund (INVENTORY-F24).
+
+    Never more than the sale still has out according to the ledger (what it lowered minus what earlier
+    refunds gave back), so nothing it did not lower comes back: a service, a free-price line, an article
+    without stock control or one that did not reach. An article that no longer tracks its stock is left
+    as it is. A refund of a sale voided (or not seen) gives nothing back. The movement «refund» carries
+    the sale as reference, so a later void restores only what is still out.
+    """
+    note, created = _refund_stock(data.refund_id, data.sale_id)
+    if not created:
+        return _refund_result(note, applied=False, movements=0)
+    sale = SaleStock.objects.select_for_update().filter(sale_id=data.sale_id).first()
+    returned: dict[UUID, Decimal] = defaultdict(Decimal)
+    for line in data.lines:
+        if line.product_id is not None and line.quantity > 0:
+            returned[line.product_id] += line.quantity
+    moved = 0
+    if sale is not None and sale.state == SaleStock.State.MOVED and returned:
+        out = _still_out(data.sale_id)
+        settings = current_settings()
+        for product_id, product in _locked(set(returned)).items():
+            quantity = min(returned[product_id], out[product_id])
+            if quantity <= 0 or not tracks_stock(product, settings):
+                continue
+            previous = product.stock
+            _move(ctx, product, StockMovement.Type.REFUND, quantity, reason=data.reason, reference=str(data.sale_id))
+            _crossing(ctx, product, settings, previous, StockMovement.Type.REFUND, str(data.sale_id))
+            moved += 1
+    if moved:
+        note.movements = moved
+        note.save(update_fields=["movements"])
+    return _refund_result(note, applied=True, movements=moved)
 
 
 # Helpers
@@ -914,6 +960,29 @@ def _sale_stock(sale_id: UUID, state: str) -> tuple[SaleStock, bool]:
 
 def _sale_result(sale: SaleStock, *, applied: bool, movements: int) -> dict:
     return {"sale_id": sale.sale_id, "state": sale.state, "applied": applied, "movements": movements}
+
+
+def _still_out(sale_id: UUID) -> dict[UUID, Decimal]:
+    """Per article, what the sale lowered and no refund has given back yet, read from the ledger."""
+    out: dict[UUID, Decimal] = defaultdict(Decimal)
+    for product_id, qty in StockMovement.objects.filter(
+        movement_type__in=[StockMovement.Type.SALE, StockMovement.Type.REFUND], reference=str(sale_id)
+    ).values_list("product_id", "qty"):
+        out[product_id] -= qty
+    return out
+
+
+def _refund_stock(refund_id: UUID, sale_id: UUID) -> tuple[RefundStock, bool]:
+    """The refund's note, created if it is new; two deliveries at once: the second waits on the unique key."""
+    try:
+        with transaction.atomic():
+            return RefundStock.objects.create(refund_id=refund_id, sale_id=sale_id), True
+    except IntegrityError:
+        return RefundStock.objects.select_for_update().get(refund_id=refund_id), False
+
+
+def _refund_result(note: RefundStock, *, applied: bool, movements: int) -> dict:
+    return {"refund_id": note.refund_id, "sale_id": note.sale_id, "applied": applied, "movements": movements}
 
 
 # Imports

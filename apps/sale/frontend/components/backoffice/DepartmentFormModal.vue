@@ -11,10 +11,10 @@ import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
+import { refusal } from '../../lib/refusal';
+import { taxLabel } from '../../lib/taxLabel';
 import type { DepartmentOut } from '../../operations';
-import { refusal } from './refusal';
-import TaxCategoryPicker from './TaxCategoryPicker.vue';
-import { taxLabel } from './taxLabel';
+import TaxCategoryPicker from '../TaxCategoryPicker.vue';
 
 const props = defineProps<{
   /** The department to edit; `null` adds a new one. */
@@ -123,6 +123,8 @@ async function save(): Promise<void> {
         <TaxCategoryPicker
           v-model="taxKey"
           v-model:empty="noCategories"
+          :label="$t('sale.departments.columns.taxCategory')"
+          :placeholder="$t('sale.departments.form.taxPlaceholder')"
           testid="sale-department-form-tax"
           :chosen-label="currentTax"
           :error-text="taxMissing ? $t('sale.departments.taxCategoryMissing') : fieldErrors.tax_category_key"

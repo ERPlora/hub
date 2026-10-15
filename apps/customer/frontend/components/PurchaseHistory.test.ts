@@ -9,7 +9,7 @@ import { formatMoney } from '../lib/money';
 import type { PurchaseRow } from '../operations';
 import PurchaseHistory from './PurchaseHistory.vue';
 
-const purchase = (id: string, status: 'confirmed' | 'voided', amount: number): PurchaseRow => ({
+const purchase = (id: string, status: PurchaseRow['status'], amount: number): PurchaseRow => ({
   id,
   customer_id: 'c1',
   sale_id: `s-${id}`,
@@ -50,6 +50,19 @@ describe('PurchaseHistory', () => {
     expect(s.wrapper.findAllComponents(StatusPill).map((p) => [p.props('label'), p.props('tone')])).toEqual([
       ['Paid', 'success'],
       ['Voided', 'neutral'],
+    ]);
+  });
+
+  it('a refund is a line of its own, its amount negative, marked «Refund» (CUSTOMER-F22)', async () => {
+    const s = await setup();
+    await s.result(s.call, LIST, pageOf([purchase('p3', 'refunded', -1210)]));
+    expect(s.wrapper.get('.customer-purchases__amount').text()).toBe(formatMoney(-1210, 'en'));
+    expect(s.wrapper.findAllComponents(StatusPill).map((p) => [p.props('label'), p.props('tone')])).toEqual([['Refund', 'warning']]);
+    expect(s.wrapper.findAll('[data-testid="customer-purchases-filter"] ion-select-option').map((o) => o.text())).toEqual([
+      'All',
+      'Paid',
+      'Voided',
+      'Refund',
     ]);
   });
 

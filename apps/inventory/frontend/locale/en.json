@@ -203,7 +203,8 @@
         "sale": "Sale",
         "void": "Void",
         "count": "Count",
-        "write_off": "Decrease"
+        "write_off": "Decrease",
+        "refund": "Refund"
       },
       "filters": {
         "type": "Filter by type",

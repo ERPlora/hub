@@ -117,6 +117,12 @@ def test_the_customer_of_an_invoice_says_its_country_and_document_type():
     assert refused(
         s.CompleteIn, idempotency_key=key, order_id=uuid7(), customer_country="FRA"
     ) == {"customer_country"}
+    # The same ISO 3166-1 list Invoicing reads (apps.customer.tax_ids): two letters are not enough.
+    for alias in ("UK", "EL", "XX"):
+        assert refused(
+            s.CompleteIn, idempotency_key=key, order_id=uuid7(), customer_country=alias
+        ) == {"customer_country"}, alias
+    assert s.CompleteIn(idempotency_key=key, order_id=uuid7(), customer_country=" gb ").customer_country == "GB"
     assert refused(
         s.CompleteIn, idempotency_key=key, order_id=uuid7(), customer_id_type="09"
     ) == {"customer_id_type"}
@@ -132,7 +138,8 @@ def test_a_void_and_a_refund_need_their_reason():
     }
     assert s.RefundIn.model_validate(refund).lines == []
     assert refused(s.RefundIn, **(refund | {"reason": ""})) == {"reason"}
-    assert refused(s.RefundIn, **(refund | {"allocations": []})) == {"allocations"}
+    # Only the session of a voucher may come back, without money (SALE-F32): the operation decides.
+    assert s.RefundIn.model_validate(refund | {"allocations": []}).allocations == []
     assert refused(
         s.RefundIn, **(refund | {"lines": [{"line_id": uuid7(), "quantity": "0"}]})
     ) == {"lines.0.quantity"}
@@ -165,3 +172,23 @@ def test_a_new_payment_method_is_cash_unless_it_says_otherwise():
     assert s.PaymentMethodIn(name="Bizum").type == "cash"
     assert s.PaymentMethodIn(name="Bizum", type="other").type == "other"
     assert refused(s.PaymentMethodIn, name="Bizum", type="crypto") == {"type"}
+
+
+def test_a_service_line_names_its_service_and_may_carry_the_amount_typed():
+    order = uuid7()
+    line = s.OrderAddServiceLineIn(order_id=order, service="Haircut")
+    assert (line.quantity, line.unit_price, line.service_id) == (Decimal("1"), None, None)
+    assert s.OrderAddServiceLineIn(order_id=order, service_id=uuid7(), unit_price=6500).unit_price == 6500
+    assert refused(s.OrderAddServiceLineIn, order_id=order) == {""}
+    assert refused(s.OrderAddServiceLineIn, order_id=order, service="Cut", unit_price=-1) == {"unit_price"}
+    opened = s.OrderOpenIn(service_lines=[{"service": "Cut"}])
+    assert opened.service_lines[0].service == "Cut"
+    charged = s.CompleteIn(idempotency_key="pos-2026-abc", service_lines=[{"service": "Cut"}])
+    assert charged.order_id is None and len(charged.service_lines) == 1
+
+
+def test_a_voucher_names_the_line_it_pays_and_the_voucher_sold():
+    order, line, grant = uuid7(), uuid7(), uuid7()
+    assert s.OrderApplyVoucherIn(order_id=order, line_id=line, grant_id=grant).grant_id == grant
+    assert refused(s.OrderApplyVoucherIn, order_id=order, line_id=line) == {"grant_id"}
+    assert s.OrderLineRefIn(order_id=order, line_id=line).line_id == line

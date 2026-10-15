@@ -1,0 +1,49 @@
+// The shift review of the close (CASH_REGISTER-F08): «Checking what is still pending…» while it reads; the
+// open checks of Sales and their titles when there are any (with «The shift will be closed anyway. Press
+// again to confirm.» once the first press warned); «could not be checked» when the reading failed;
+// nothing at all for a clean shift.
+import { describe, expect, it } from 'vitest';
+
+import { mountCash } from '../__tests__/mount-cash-register';
+import ShiftReview from './ShiftReview.vue';
+
+const base = { checking: false, incomplete: false, openChecks: 0, labels: [] as string[], acknowledged: false };
+
+async function setup(props: Partial<typeof base>, locale: 'en' | 'es' = 'en') {
+  return mountCash(ShiftReview, { props: { ...base, ...props }, locale });
+}
+
+describe('ShiftReview', () => {
+  it('says it is checking', async () => {
+    const m = await setup({ checking: true });
+    expect(m.find('cash-register-review-checking').text()).toBe('Checking what is still pending…');
+  });
+
+  it('a clean shift says nothing', async () => {
+    const m = await setup({});
+    expect(m.wrapper.text()).toBe('');
+  });
+
+  it('names the open checks, and the confirmation once warned', async () => {
+    const m = await setup({ openChecks: 2, labels: ['Table 4', 'Bar'] });
+    const review = m.find('cash-register-review');
+    expect(review.text()).toContain('Shift review');
+    expect(review.text()).toContain('Open checks: 2');
+    expect(review.text()).toContain('Table 4 · Bar');
+    expect(m.find('cash-register-review-confirm').exists()).toBe(false);
+    await m.wrapper.setProps({ acknowledged: true });
+    expect(m.find('cash-register-review-confirm').text()).toBe('The shift will be closed anyway. Press again to confirm.');
+  });
+
+  it('a failed reading is said, alone or with what was found', async () => {
+    const m = await setup({ incomplete: true });
+    expect(m.find('cash-register-review-unavailable').text()).toContain('could not be checked');
+    await m.wrapper.setProps({ openChecks: 1, labels: [] });
+    expect(m.find('cash-register-review').text()).toContain('could not be checked');
+  });
+
+  it('speaks Spanish', async () => {
+    const m = await setup({ openChecks: 1, labels: ['Mesa 2'] }, 'es');
+    expect(m.find('cash-register-review').text()).toContain('Cuentas abiertas: 1');
+  });
+});

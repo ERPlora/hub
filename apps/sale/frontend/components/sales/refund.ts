@@ -7,7 +7,8 @@
 //   - the amount is split across the tenders by what each has left (largest remainder, ties to the
 //     earlier tender); a tender that cannot go back its own way still takes its share and asks where
 //     the money goes instead (`to_method_id`);
-//   - nothing marked proposes all that is left.
+//   - nothing marked proposes all that is left;
+//   - a line a voucher paid (SALE-F32) is worth 0: marking it gives its session back, also with no money.
 import { centsFromEuros } from '../../lib/format';
 import type { AllocationIn, LineOption, RefundLineIn, TenderOption } from '../../operations';
 
@@ -105,13 +106,29 @@ export function parseAmount(text: string): number {
   return centsFromEuros(text) ?? Number.NaN;
 }
 
-/** Why it cannot be confirmed yet, or `null`. */
-export function refundBlock(tenders: readonly TenderOption[], amounts: Amounts, destinations: Destinations, reason: string): RefundBlock | null {
+/** The lines a voucher paid that are marked: each gives its session back. */
+export function sessionsPicked(lines: readonly LineOption[], picked: Picked): number {
+  return lines.filter((line) => line.paid_by_voucher && (picked[line.line_id] ?? 0) > 0 && milli(line.left) > 0).length;
+}
+
+/** The lines a voucher paid whose session has not come back yet. */
+export function sessionsLeft(lines: readonly LineOption[]): number {
+  return lines.filter((line) => line.paid_by_voucher && milli(line.left) > 0).length;
+}
+
+/** Why it cannot be confirmed yet, or `null`. `sessions`: the voucher sessions marked to go back. */
+export function refundBlock(
+  tenders: readonly TenderOption[],
+  amounts: Amounts,
+  destinations: Destinations,
+  reason: string,
+  sessions = 0,
+): RefundBlock | null {
   const ordered = inTicketOrder(tenders);
   const amountOf = (tender: TenderOption): number => amounts[tender.payment_id] ?? 0;
   const invalid = ordered.find((tender) => Number.isNaN(amountOf(tender)));
   if (invalid) return { kind: 'invalid', tender: invalid };
-  if (ordered.reduce((sum, tender) => sum + amountOf(tender), 0) <= 0) return { kind: 'nothing' };
+  if (ordered.reduce((sum, tender) => sum + amountOf(tender), 0) <= 0 && sessions <= 0) return { kind: 'nothing' };
   const over = ordered.find((tender) => amountOf(tender) > tender.remaining);
   if (over) return { kind: 'overCap', tender: over, amount: amountOf(over) };
   const homeless = ordered.find((tender) => amountOf(tender) > 0 && !tender.refundable && !destinations[tender.payment_id]);

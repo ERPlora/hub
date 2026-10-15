@@ -21,7 +21,7 @@ export const RECOVERY_DELAY_MS = 1500;
 const LOOKUPS = 2;
 
 export type CheckoutFailure =
-  | { kind: 'refused'; code: string; message: string }
+  | { kind: 'refused'; code: string; message: string; fields?: Record<string, string> }
   | { kind: 'not_charged' }
   | { kind: 'unknown' };
 
@@ -82,7 +82,12 @@ export function useCheckout(options: UseCheckoutOptions) {
     } catch (error) {
       if (!answerLost(error)) {
         const refused = error as ApiError;
-        failure.value = { kind: 'refused', code: refused.code, message: refused.message };
+        failure.value = {
+          kind: 'refused',
+          code: refused.code,
+          message: refused.message,
+          ...(refused.fields ? { fields: { ...refused.fields } } : {}),
+        };
         key.value = newKey();
         return;
       }

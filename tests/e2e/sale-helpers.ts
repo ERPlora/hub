@@ -1,11 +1,14 @@
 // Shared steps of the Sales & POS browser specs (apps/sale/WORKBOOK.md): setup through the real apps'
 // APIs (Inventory's products, Customers' cards, the charge itself) — evidence and setup, never the check
-// itself — the three viewports' screenshots, and the cleanup every sale spec runs in its `afterAll`.
+// itself — the three viewports' screenshots, the cash register switched off for the specs that are not
+// about it (SALE-F08: with it on and no session, no cash), and the cleanup every sale spec runs in its
+// `afterAll` (the fiscal documents Invoicing issued for its sales go first: a document keeps its sale).
 // What a run creates is named `E2E-…` (products), `e2e.…` (customers) or `e2e …` (departments, quick
 // notes, check titles); its sales are found by their lines.
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { A, api, psql, shot } from './helpers';
+import { cleanInvoices, issuedIds } from './invoice-helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -26,7 +29,7 @@ export interface SaleOut {
   change_total: number;
   customer_id: string | null;
   customer_name: string;
-  lines: { id: string; name: string; tax_rate: string; net_amount: number; tax_amount: number; line_total: number }[];
+  lines: { id: string; name: string; sku: string; tax_rate: string; net_amount: number; tax_amount: number; line_total: number }[];
   payments: { id: string; method_type: string; amount: number; tendered: number; change: number }[];
 }
 
@@ -43,11 +46,15 @@ export async function saleByKey(context: BrowserContext, key: string): Promise<S
   return res.data?.sale ?? null;
 }
 
-/** The newest sale of this hub (server-side evidence of what the till charged). */
-export async function newestSale(context: BrowserContext): Promise<SaleOut> {
-  const page = await api<{ rows: { id: string }[] }>(context, A, 'GET', '/sale/sales?limit=1');
-  const res = await api<SaleOut>(context, A, 'GET', `/sale/sales/detail?sale_id=${page.data.rows[0].id}`);
-  return res.data;
+/** The newest sale that sold `sku` (server-side evidence of what the till charged). By the run's own
+ *  SKU, never «the hub's last sale»: another session may be charging on the same hub at once. */
+export async function newestSaleOf(context: BrowserContext, sku: string): Promise<SaleOut> {
+  const page = await api<{ rows: { id: string }[] }>(context, A, 'GET', '/sale/sales?limit=50');
+  for (const row of page.data.rows) {
+    const sale = (await api<SaleOut>(context, A, 'GET', `/sale/sales/detail?sale_id=${row.id}`)).data;
+    if (sale.lines.some((line) => line.sku === sku)) return sale;
+  }
+  throw new Error(`no recent sale sold ${sku}`);
 }
 
 /** Screenshots of the page in the three viewports, each once `ready` says it painted. */
@@ -60,13 +67,53 @@ export async function shots(page: Page, name: string, ready: (page: Page) => Pro
   await page.setViewportSize(restore);
 }
 
+/** Whether the cash register was on before a spec switched it off (`null`: the spec did not touch it). */
+let drawerWasOn: boolean | null = null;
+
+/** The specs that are not about the drawer sell cash without opening a session: the cash register goes
+ *  off for them (Cash register → Settings), and `restoreDrawer()` gives it back as it was. */
+export async function drawerOff(context: BrowserContext): Promise<void> {
+  const settings = await api<{ enable_cash_register: boolean }>(context, A, 'GET', '/cash_register/settings');
+  expect(settings.status).toBe(200);
+  drawerWasOn = settings.data.enable_cash_register;
+  if (drawerWasOn) {
+    const off = await api(context, A, 'POST', '/cash_register/settings', { enable_cash_register: false });
+    expect(off.status, 'cash register off for the spec').toBe(200);
+  }
+}
+
+/** The cash register back as `drawerOff()` found it. */
+export function restoreDrawer(): void {
+  if (drawerWasOn) psql('update cash_register_settings set enable_cash_register = true');
+  drawerWasOn = null;
+}
+
+/** The e2e checks: their lines name an `E2E-` product or an `e2e ` department, or their title is `e2e …`. */
+const E2E_ORDERS =
+  "select distinct order_id as id from sale_orderline where sku like 'E2E-%' or name like 'e2e %' union select id from sale_order where label like 'e2e %'";
+
+/** Deletes the fiscal documents Invoicing issued for the sales of the checks `orders` (a SELECT of their
+ *  ids) — their tickets, invoices and rectifying invoices —, with Invoicing's own cleanup. Run it before
+ *  deleting those sales. */
+export function cleanDocumentsOf(orders: string): void {
+  const sales = `select id from sale_sale where order_id in (${orders})`;
+  const documents = psql(
+    `select string_agg(id::text, ',') from invoice_invoice where source_sale_id in (${sales}) or source_refund_id in (select id from sale_refund where sale_id in (${sales}))`,
+  );
+  for (const id of documents.split(',').filter(Boolean)) issuedIds.add(id);
+  cleanInvoices();
+}
+
 /** Deletes the sales and checks a run made (their lines name an `E2E-` product, an `e2e ` department or
- *  the check's title is `e2e …`), and the `e2e ` departments and quick notes. Run it BEFORE the customer
- *  and inventory cleanups: a sale keeps its customer's card. */
+ *  the check's title is `e2e …`), the fiscal documents Invoicing issued for them in the same charge, void
+ *  or refund (with Invoicing's own cleanup, which gives the series' numbers back), and the `e2e `
+ *  departments and quick notes. Run it BEFORE the customer and inventory cleanups: a sale keeps its
+ *  customer's card. */
 export function cleanSales(): void {
+  cleanDocumentsOf(E2E_ORDERS);
   psql(
     [
-      "create temp table e2e_orders as select distinct order_id as id from sale_orderline where sku like 'E2E-%' or name like 'e2e %' union select id from sale_order where label like 'e2e %'",
+      `create temp table e2e_orders as ${E2E_ORDERS}`,
       'create temp table e2e_sales as select id from sale_sale where order_id in (select id from e2e_orders)',
       'delete from sale_refundline where refund_id in (select id from sale_refund where sale_id in (select id from e2e_sales))',
       'delete from sale_refundpayment where refund_id in (select id from sale_refund where sale_id in (select id from e2e_sales))',

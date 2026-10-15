@@ -3,7 +3,8 @@
 // «Reason (required)» and «Void» / «Cancel». Without a reason it says so and sends nothing; with one it
 // runs `sale.sale.void`, says «Sale voided» and closes (the row turns Voided and «Voided» goes up by
 // themselves, live). A refusal (a full invoice, a sale with refunds, voided elsewhere at the same time)
-// is read inside the window, in the server's words, and the window stays open.
+// is read inside the window, in the server's words (a failure it did not word: «The sale could not be
+// voided»), and the window stays open.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -11,6 +12,7 @@ import { IonTextarea } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useT } from '../../composables/useT';
+import { refusal } from '../../lib/refusal';
 import type { SaleRow } from '../../operations';
 
 const props = defineProps<{ sale: Pick<SaleRow, 'id' | 'number'> | null }>();
@@ -36,7 +38,7 @@ watch(
 );
 
 const error = computed<FormModalError | null>(() =>
-  missing.value ? { message: t('sale.void.reasonRequired') } : command.error.value,
+  missing.value ? { message: t('sale.void.reasonRequired') } : refusal(command.error.value, t('sale.void.failed')),
 );
 
 async function confirm(): Promise<void> {

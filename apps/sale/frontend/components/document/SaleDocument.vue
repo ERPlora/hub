@@ -1,14 +1,17 @@
 <script setup lang="ts">
 // The document of one sale (SALE-F29): `sale.sale.get` and the receipt settings (`sale.pos_settings.get`)
 // followed live, «Loading document…» until both answered, «Error loading the document» (with the
-// server's words and Retry) when either fails, then the paper. The host is told when the paper is
-// painted (`ready`, with its element, what `printPaper` copies) or that it could not be (`failed`).
+// server's words and Retry) when either fails, then the paper — above it, out of what prints, «Fiscal
+// document pending» with «Issue now» while a document of the sale waits. The host is told when the
+// paper is painted (`ready`, with its element, what `printPaper` copies) or that it could not be
+// (`failed`).
 // Mount it only while it is wanted: its subscriptions live as long as it does.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, useTemplateRef, watch } from 'vue';
 
+import PendingDocuments from './PendingDocuments.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
 
 const props = defineProps<{
@@ -70,13 +73,18 @@ function retry(): void {
         </ion-button>
       </template>
     </InlineFeedback>
-    <ReceiptPaper
-      v-else-if="loaded && sale.data.value"
-      ref="paper"
-      :sale="sale.data.value"
-      :settings="settings.data.value"
-      :duplicate="duplicate"
-    />
+    <template v-else-if="loaded && sale.data.value">
+      <PendingDocuments
+        v-if="sale.data.value.documents_pending"
+        :sale-id="sale.data.value.id"
+      />
+      <ReceiptPaper
+        ref="paper"
+        :sale="sale.data.value"
+        :settings="settings.data.value"
+        :duplicate="duplicate"
+      />
+    </template>
     <div
       v-else
       class="sale-document__loading"

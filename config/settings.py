@@ -81,6 +81,13 @@ INSTALLED_APPS = [
     "apps.tax",
     "apps.inventory",
     "apps.sale",
+    "apps.service",
+    "apps.schedule",
+    "apps.cash_register",
+    "apps.invoice",
+    "apps.appointment",
+    "apps.table",
+    "apps.verifactu",
 ]
 
 MIDDLEWARE = [

@@ -24,12 +24,16 @@ ROUTES = {
     ("POST", "/sale/sales/complete_over_limit", "sale.sale.complete_over_limit"),
     ("POST", "/sale/sales/void", "sale.sale.void"),
     ("POST", "/sale/sales/refund", "sale.sale.refund"),
+    ("POST", "/sale/sales/issue_documents", "sale.sale.issue_documents"),
     ("GET", "/sale/checkout/preview", "sale.checkout.preview"),
     ("GET", "/sale/orders", "sale.order.list"),
     ("GET", "/sale/orders/detail", "sale.order.get"),
     ("POST", "/sale/orders", "sale.order.open"),
     ("POST", "/sale/orders/add_line", "sale.order.add_line"),
     ("POST", "/sale/orders/add_open_line", "sale.order.add_open_line"),
+    ("POST", "/sale/orders/add_service_line", "sale.order.add_service_line"),
+    ("POST", "/sale/orders/apply_voucher", "sale.order.apply_voucher"),
+    ("POST", "/sale/orders/remove_voucher", "sale.order.remove_voucher"),
     ("POST", "/sale/orders/update_line", "sale.order.update_line"),
     ("POST", "/sale/orders/set_line_staff", "sale.order.set_line_staff"),
     ("POST", "/sale/orders/split_line", "sale.order.split_line"),
@@ -109,9 +113,10 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-def test_the_reaction_has_no_route():
-    # Only the platform runs it, when Customers merges two cards.
-    assert "sale.customer.reassign" not in {operation for _m, _p, operation in ROUTES}
+def test_the_reactions_have_no_route():
+    # Only the platform runs them: when Customers merges two cards, when Invoicing issues a document.
+    bound = {operation for _m, _p, operation in ROUTES}
+    assert {"sale.customer.reassign", "sale.sale.record_invoice"}.isdisjoint(bound)
 
 
 @pytest.mark.django_db
@@ -205,3 +210,56 @@ def test_the_settings_over_http(admin_client):
     )
     assert get(admin_client, "/sale/settings").json()["require_customer"] is True
     assert get(admin_client, "/sale/pos_settings").json()["require_customer"] is True
+
+
+@pytest.mark.django_db
+def test_an_employee_pays_a_line_with_a_voucher_over_http_and_an_exhausted_one_is_a_409(
+    employee_client, customer
+):
+    from live.context import system_context
+    from live.operations import get as operation
+
+    from apps.sale.tests.conftest import A
+
+    def svc(name, data):
+        op = operation(name)
+        return op(system_context(A), op.input.model_validate(data))
+
+    haircut = svc(
+        "service.service.create",
+        {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
+    )
+    lucia = customer("Lucía Pérez")
+    package = svc(
+        "service.package.create",
+        {"name": "Bono 1", "max_uses": 1, "items": [{"service_id": str(haircut.id)}]},
+    )
+    grant = svc(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(lucia.id)},
+    )
+    opened = post(employee_client, "/sale/orders", {"service_lines": [{"service_id": str(haircut.id)}]})
+    assert opened.status_code == 201, opened.content
+    order = opened.json()
+    line = order["lines"][0]["id"]
+    applied = post(
+        employee_client,
+        "/sale/orders/apply_voucher",
+        {"order_id": order["id"], "line_id": line, "grant_id": str(grant.id)},
+    )
+    assert applied.status_code == 200, applied.content
+    assert applied.json()["lines"][0]["paid_by_voucher"] is True
+    other = post(employee_client, "/sale/orders", {"service_lines": [{"service_id": str(haircut.id)}]}).json()
+    refused = post(
+        employee_client,
+        "/sale/orders/apply_voucher",
+        {"order_id": other["id"], "line_id": other["lines"][0]["id"], "grant_id": str(grant.id)},
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "service.grant_no_uses_left"
+    undone = post(
+        employee_client,
+        "/sale/orders/remove_voucher",
+        {"order_id": order["id"], "line_id": line},
+    )
+    assert undone.status_code == 200 and undone.json()["lines"][0]["paid_by_voucher"] is False

@@ -1,25 +1,29 @@
 // The browser's Fullscreen API, wrapped once for the till: the ⋮ screen menu offers «Full screen» /
-// «Exit full screen» only where the device allows it, on the till's own element (the product's shell
-// did it for the view; here the page asks the browser). Esc and F11 leave it too: `onChange` follows.
+// «Exit full screen» only where the device allows it. It is the WHOLE document that goes full screen,
+// as the old shell did: the till's sheets, the checkout and the toasts live in the app's root
+// (`ion-app`), and an element of the page on full screen would hide them. Esc and F11 leave it too:
+// `onChange` follows.
 
-type FullscreenTarget = Element & { requestFullscreen?: () => Promise<void> };
+type FullscreenRoot = HTMLElement & { requestFullscreen?: () => Promise<void> };
 
-/** Whether the device lets `el` go full screen (an iPhone's Safari, for one, does not). */
-export function isCapable(el: Element | null | undefined): boolean {
-  if (!el || typeof document === 'undefined' || !document.fullscreenEnabled) return false;
-  return typeof (el as FullscreenTarget).requestFullscreen === 'function';
+const root = (): FullscreenRoot | null => (typeof document === 'undefined' ? null : document.documentElement);
+
+/** Whether the device lets the page go full screen (an iPhone's Safari, for one, does not). */
+export function isCapable(): boolean {
+  const page = root();
+  return !!page && !!document.fullscreenEnabled && typeof page.requestFullscreen === 'function';
 }
 
-/** Whether `el` itself is the element on full screen now. */
-export function isActive(el: Element | null | undefined): boolean {
-  return !!el && typeof document !== 'undefined' && document.fullscreenElement === el;
+/** Whether the page is on full screen now. */
+export function isActive(): boolean {
+  return typeof document !== 'undefined' && !!document.fullscreenElement;
 }
 
-/** Puts `el` on full screen, or leaves it when `el` already is. A refusal of the browser is not an error. */
-export async function toggle(el: Element): Promise<void> {
+/** Puts the page on full screen, or leaves it. A refusal of the browser is not an error. */
+export async function toggle(): Promise<void> {
   try {
-    if (isActive(el)) await document.exitFullscreen();
-    else await (el as FullscreenTarget).requestFullscreen?.();
+    if (isActive()) await document.exitFullscreen();
+    else await root()?.requestFullscreen?.();
   } catch {
     // No user gesture or a policy said no: the screen simply stays as it was, and `onChange` says nothing.
   }

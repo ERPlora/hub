@@ -1,0 +1,319 @@
+{
+  "invoice": {
+    "title": "Invoicing",
+    "tabs": {
+      "label": "Invoicing sections",
+      "invoices": "Invoices",
+      "series": "Series",
+      "issuer": "Issuer"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "noPermission": "You do not have permission",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "types": {
+      "F1": "Invoice",
+      "F2": "Ticket",
+      "F3": "Invoice",
+      "R1": "Rectifying",
+      "R2": "Rectifying",
+      "R3": "Rectifying",
+      "R4": "Rectifying",
+      "R5": "Rectifying"
+    },
+    "typeNames": {
+      "F1": "Invoice (F1)",
+      "F2": "Ticket (F2)",
+      "F3": "Invoice replacing a ticket (F3)",
+      "R1": "Rectifying (R1)",
+      "R2": "Rectifying (R2)",
+      "R3": "Rectifying (R3)",
+      "R4": "Rectifying (R4)",
+      "R5": "Rectifying (R5)"
+    },
+    "status": {
+      "issued": "Issued",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    },
+    "sources": {
+      "sale": "POS sale",
+      "manual": "Manual",
+      "substitution": "Replaces a simplified invoice",
+      "rectification": "Rectification",
+      "refund": "Sale refund",
+      "void": "Sale void"
+    },
+    "taxes": {
+      "vat": "VAT",
+      "surcharge": "Equivalence surcharge",
+      "exempt": "Exempt",
+      "exemptCause": "Exempt ({cause})",
+      "notSubject": "Not subject",
+      "reverseCharge": "Reverse charge"
+    },
+    "list": {
+      "search": "Search invoices…",
+      "columns": {
+        "number": "Number",
+        "customer": "Customer",
+        "total": "Total",
+        "status": "Status",
+        "date": "Date",
+        "type": "Type"
+      },
+      "entity": {
+        "one": "invoice",
+        "many": "invoices"
+      },
+      "empty": "No invoices yet.",
+      "noResults": "No results",
+      "loading": "Loading…",
+      "loadError": "The invoices could not be loaded",
+      "add": "New invoice",
+      "actions": {
+        "view": "View",
+        "markPaid": "Mark as paid",
+        "rectify": "Rectify"
+      },
+      "noResultsMessage": "Nothing matches your search or filters."
+    },
+    "filters": {
+      "status": "Status",
+      "type": "Type",
+      "series": "Series",
+      "source": "Source",
+      "dateFrom": "Issued from",
+      "dateTo": "Issued until",
+      "totalFrom": "Total from (€)",
+      "totalTo": "Total up to (€)",
+      "any": "Any",
+      "clear": "Clear filters",
+      "button": "Filters",
+      "title": "Filter invoices",
+      "count": "Filters: {n} in use",
+      "done": "Done",
+      "amountInvalid": "Type an amount, like 12.50"
+    },
+    "detail": {
+      "title": "Invoice {number}",
+      "loading": "Loading…",
+      "notFound": "Invoice not found",
+      "loadError": "The invoice could not be loaded",
+      "print": "Print / PDF",
+      "printFailed": "Could not print the invoice",
+      "missingTaxId": "This invoice has no customer tax ID: the ticket printer cannot print it as a full invoice.",
+      "fields": {
+        "type": "Type",
+        "series": "Series",
+        "issueDate": "Issue date",
+        "operationDate": "Operation date",
+        "customer": "Customer",
+        "customerTaxId": "Customer tax ID",
+        "address": "Address",
+        "issuer": "Issuer",
+        "source": "Source",
+        "sale": "Sale",
+        "rectifies": "Rectifies",
+        "substitutes": "Replaces",
+        "substitutedBy": "Replaced by",
+        "rectifications": "Rectifying invoices",
+        "paidAt": "Paid on",
+        "notes": "Notes"
+      },
+      "lines": {
+        "index": "#",
+        "description": "Description",
+        "qty": "Qty",
+        "price": "Price",
+        "taxPct": "VAT %",
+        "base": "Base",
+        "tax": "Tax",
+        "total": "Total",
+        "none": "No detail lines.",
+        "discount": "Disc."
+      },
+      "totals": {
+        "base": "Base",
+        "taxes": "Taxes",
+        "total": "Total"
+      },
+      "rectifiesNote": "Rectifies invoice {number}. Reason: {reason}",
+      "rectifiesNoteNoReason": "Rectifies invoice {number}.",
+      "actions": {
+        "markPaid": "Mark as paid",
+        "rectify": "Rectify",
+        "substitute": "Full invoice"
+      }
+    },
+    "markPaid": {
+      "title": "Mark {number} as paid?",
+      "message": "The payment is recorded with the current date and time.",
+      "confirm": "Mark as paid",
+      "done": "Invoice {number} marked as paid",
+      "failed": "Could not mark it as paid"
+    },
+    "rectify": {
+      "title": "Rectify {number}",
+      "note": "A rectifying invoice (RECT series) will be issued with the amounts negated and the original invoice will be cancelled. This cannot be undone.",
+      "type": "Type of rectifying invoice",
+      "types": {
+        "R1": "R1 · Error founded in law, refunds (art. 80 One, Two and Six)",
+        "R2": "R2 · Insolvency (art. 80 Three)",
+        "R3": "R3 · Bad debts (art. 80 Four)",
+        "R4": "R4 · Other causes"
+      },
+      "simplified": "A ticket is rectified as R5 (rectifying invoice of a simplified invoice).",
+      "reason": "Reason",
+      "reasonPlaceholder": "Reason for the rectification",
+      "reasonRequired": "Write the reason of the rectification.",
+      "submit": "Issue rectifying invoice",
+      "done": "Rectifying invoice {rectification} issued. {number} is cancelled.",
+      "doneLeft": "Rectifying invoice {rectification} issued.",
+      "isRectifying": "A rectifying invoice cannot be rectified.",
+      "cancelled": "The invoice is already cancelled.",
+      "failed": "Could not rectify"
+    },
+    "substitute": {
+      "title": "Full invoice of ticket {number}",
+      "intro": "The ticket stays as it is; a full invoice (F3) with the same figures replaces it, with the customer's details.",
+      "submit": "Issue full invoice",
+      "done": "Full invoice {number} issued",
+      "failed": "Could not issue the full invoice"
+    },
+    "recipient": {
+      "name": "Name or company name",
+      "country": "Country",
+      "idType": "Document type",
+      "idTypes": {
+        "02": "EU VAT number",
+        "03": "Passport",
+        "04": "Tax ID of their country",
+        "05": "Residence certificate",
+        "06": "Other document",
+        "07": "Not registered"
+      },
+      "taxId": "Tax ID",
+      "address": "Address"
+    },
+    "create": {
+      "title": "New manual invoice",
+      "series": "Series",
+      "customer": "Customer",
+      "taxId": "Customer tax ID",
+      "address": "Address",
+      "notes": "Notes",
+      "line": {
+        "description": "Description",
+        "qty": "Qty",
+        "price": "Price",
+        "taxPct": "VAT %"
+      },
+      "addLine": "+ Line",
+      "removeLine": "Remove line",
+      "submit": "Issue invoice",
+      "done": "Invoice {number} issued",
+      "failed": "Could not create the invoice",
+      "notAnAmount": "Line {line}: the price is not an amount. Type a figure, such as 12.50."
+    },
+    "series": {
+      "title": "Numbering series",
+      "intro": "Each series sets the prefix, the format and the counter of the numbering of one invoice type and one year (PREFIX-YYYY-NNNNNN). Code, type, year and counter never change; prefix, format and next number only until the series issues its first invoice.",
+      "search": "Search code, name…",
+      "columns": {
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "year": "Year",
+        "prefix": "Prefix",
+        "format": "Format",
+        "number": "Current no.",
+        "active": "Active",
+        "default": "Default"
+      },
+      "defaultFormat": "PREFIX-YYYY-NNNNNN",
+      "entity": {
+        "one": "series",
+        "many": "series"
+      },
+      "empty": "No series yet. Create the first one to number your invoices.",
+      "noResults": "No results",
+      "loading": "Loading series…",
+      "loadError": "Could not load the series",
+      "add": "New series",
+      "actions": {
+        "edit": "Edit"
+      },
+      "form": {
+        "createTitle": "New numbering series",
+        "editTitle": "Edit series {code}",
+        "code": "Code",
+        "name": "Name",
+        "type": "Invoice type",
+        "year": "Year",
+        "prefix": "Prefix",
+        "format": "Number format",
+        "nextNumber": "Next number",
+        "active": "Active",
+        "default": "Default series",
+        "codeHint": "Internal identifier of the series (it cannot change once created). Sales number in TICKET, FACT and RECT.",
+        "prefixHint": "Text before the number (for example FAC → FAC-2026-000001); empty takes the code.",
+        "formatHint": "Placeholders: {'{prefix}'}, {'{code}'}, {'{year}'}, {'{seq}'} and {'{seq:01d}'}…{'{seq:09d}'}. The year and a sequence are required, in letters without accents or symbols such as º. Leave it empty for PREFIX-YYYY-NNNNNN. Anything else is written as it is (for example VFT{'{year}'}-A-{'{seq:04d}'}). The width is a minimum: a longer number is never cut.",
+        "lockedHint": "This series has already issued invoices, so its prefix, its format and its next number can no longer change: the number is part of the VeriFactu chain. Create a new series if you need others.",
+        "preview": "Next number",
+        "create": "Create series",
+        "save": "Save",
+        "created": "Series {code} created",
+        "saved": "Series {code} saved",
+        "failed": "Could not save the series"
+      }
+    },
+    "issuer": {
+      "title": "Issuer",
+      "intro": "The business's tax identity: it is printed as the issuer of every invoice issued from now on.",
+      "missing": "Without the issuer no invoice can be issued.",
+      "fromSaas": "Received from your ERPlora account on {date}.",
+      "readOnly": "You can look at the issuer but not change it.",
+      "fields": {
+        "legalName": "Legal name",
+        "taxId": "Tax ID",
+        "address": "Address",
+        "postalCode": "Postal code",
+        "city": "City",
+        "province": "Province",
+        "country": "Country"
+      },
+      "save": "Save",
+      "saved": "Issuer saved.",
+      "failed": "Could not save the issuer",
+      "loadError": "The issuer could not be loaded"
+    },
+    "paper": {
+      "invoice": "Invoice",
+      "simplified": "Simplified invoice",
+      "rectifying": "Rectifying invoice",
+      "copy": "Copy",
+      "number": "No.",
+      "date": "Date",
+      "operationDate": "Operation date",
+      "billTo": "Bill to",
+      "taxId": "Tax ID",
+      "description": "Description",
+      "qty": "Qty",
+      "price": "Price",
+      "tax": "Tax",
+      "amount": "Amount",
+      "noLines": "— No lines —",
+      "taxBase": "Tax base",
+      "total": "TOTAL",
+      "discount": "Disc."
+    }
+  }
+}

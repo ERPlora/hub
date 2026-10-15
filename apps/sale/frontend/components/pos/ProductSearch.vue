@@ -2,17 +2,22 @@
 // The till's product search: a floating, translucent panel over the grid (it does not push it), with
 // «Search product…» and the live answer of Inventory for what is typed — by name or SKU, across the
 // whole catalogue, 20 at a time. A row shows the name, the SKU (or why it cannot be sold) and the
-// price; a tap hands the product up, where the same rules as a tile apply. Mounted only while open.
+// price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
+// (SALE-F38, `withServices`), the services it finds come after them (`pickService`). Mounted only while
+// open.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote, IonSearchbar, IonSpinner } from '@ionic/vue';
 import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
+import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useLocale } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
+import ServiceSearchResults from './ServiceSearchResults.vue';
 
-const emit = defineEmits<{ pick: [product: ProductOut]; close: [] }>();
+withDefaults(defineProps<{ withServices?: boolean }>(), { withServices: false });
+const emit = defineEmits<{ pick: [product: ProductOut]; pickService: [service: ServiceSaleOut]; close: [] }>();
 
 const locale = useLocale();
 const term = shallowRef('');
@@ -110,6 +115,11 @@ onMounted(() => void bar.value?.$el.setFocus?.());
         </ion-note>
       </ion-item>
     </ion-list>
+    <ServiceSearchResults
+      v-if="withServices"
+      :term="term"
+      @pick="emit('pickService', $event)"
+    />
   </div>
 </template>
 

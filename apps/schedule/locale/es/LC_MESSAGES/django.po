@@ -1,0 +1,189 @@
+# Spanish translation of the schedule app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next schedule\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 12:25+0200\n"
+"PO-Revision-Date: 2026-10-14 12:30+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Schedules"
+msgstr "Horarios"
+
+msgid "Your opening hours: the usual week, holidays and temporary changes like summer hours."
+msgstr "Tu horario de apertura: la semana habitual, los festivos y los cambios temporales como el horario de verano."
+
+msgid "Schedules keeps when your business is open: the usual week with split shifts, days open 24 hours or past midnight, special days such as holidays (closed, or with other hours, once or every year) and temporary changes for a few dates, like holidays or summer hours. It starts with a usual week you confirm in one tap, and the appointment book uses it to never take a booking while you are closed."
+msgstr "Horarios guarda cuándo está abierto tu negocio: la semana habitual con jornada partida, días abiertos 24 horas o hasta pasada la medianoche, días especiales como los festivos (cerrados o con otro horario, una vez o todos los años) y cambios temporales para unas fechas, como las vacaciones o el horario de verano. Empieza con una semana habitual que confirmas de un toque, y la agenda la usa para no aceptar nunca una reserva con el negocio cerrado."
+
+msgctxt "schedule section"
+msgid "Hours"
+msgstr "Horario"
+
+msgid "Special days"
+msgstr "Días especiales"
+
+msgctxt "schedule section"
+msgid "Settings"
+msgstr "Ajustes"
+
+msgctxt "weekday"
+msgid "Monday"
+msgstr "Lunes"
+
+msgctxt "weekday"
+msgid "Tuesday"
+msgstr "Martes"
+
+msgctxt "weekday"
+msgid "Wednesday"
+msgstr "Miércoles"
+
+msgctxt "weekday"
+msgid "Thursday"
+msgstr "Jueves"
+
+msgctxt "weekday"
+msgid "Friday"
+msgstr "Viernes"
+
+msgctxt "weekday"
+msgid "Saturday"
+msgstr "Sábado"
+
+msgctxt "weekday"
+msgid "Sunday"
+msgstr "Domingo"
+
+msgid "position"
+msgstr "posición"
+
+msgid "opens"
+msgstr "abre"
+
+msgid "closes"
+msgstr "cierra"
+
+msgid "weekday"
+msgstr "día de la semana"
+
+msgid "closed"
+msgstr "cerrado"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "usual week"
+msgstr "semana habitual"
+
+msgid "opening interval"
+msgstr "tramo horario"
+
+msgid "opening intervals"
+msgstr "tramos horarios"
+
+msgid "date"
+msgstr "fecha"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "repeats every year"
+msgstr "se repite cada año"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "special day"
+msgstr "día especial"
+
+msgid "special days"
+msgstr "días especiales"
+
+msgid "from"
+msgstr "desde"
+
+msgid "to"
+msgstr "hasta"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "temporary change"
+msgstr "cambio temporal"
+
+msgid "temporary changes"
+msgstr "cambios temporales"
+
+msgid "slot"
+msgstr "ranura"
+
+msgid "week starts on"
+msgstr "la semana empieza"
+
+msgid "hours confirmed"
+msgstr "horario confirmado"
+
+msgid "schedule settings"
+msgstr "ajustes de horarios"
+
+msgid "That special day does not exist in this business."
+msgstr "Ese día especial no existe en este negocio."
+
+msgid "That temporary change does not exist in this business."
+msgstr "Ese cambio temporal no existe en este negocio."
+
+#, python-format
+msgid "There are several with “%(name)s”: %(matches)s. Say which one."
+msgstr "Hay varios con «%(name)s»: %(matches)s. Elige uno."
+
+msgid "An open day needs at least one opening interval."
+msgstr "Un día abierto necesita al menos un tramo horario."
+
+msgid "An interval cannot open and close at the same time; 00:00–00:00 is open 24 hours."
+msgstr "Un tramo no puede empezar y acabar a la misma hora; 00:00–00:00 es abierto 24 horas."
+
+msgid "Two intervals overlap (or one runs past midnight into another); adjust the times so they do not clash."
+msgstr "Dos tramos se solapan (o uno cruza la medianoche sobre otro); ajusta las horas para que no se pisen."
+
+msgid "At most 12 intervals a day."
+msgstr "Como mucho 12 tramos por día."
+
+msgid "The end date cannot be before the start date."
+msgstr "La fecha de fin no puede ser anterior a la de inicio."
+
+msgid "At most 366 days at once."
+msgstr "Como mucho 366 días de una vez."
+
+msgid "Say which special day: its id, its name or its date."
+msgstr "Di qué día especial: su id, su nombre o su fecha."
+
+msgid "Say which temporary change: its id, its reason or a date it covers."
+msgstr "Di qué cambio temporal: su id, su motivo o una fecha que cubra."
+
+msgid "That date and time are not valid."
+msgstr "Esa fecha y hora no son válidas."
+
+msgid "Choose a date between 1900 and 2200."
+msgstr "Elige una fecha entre 1900 y 2200."
+
+msgid "There is already a special day on that date."
+msgstr "Ya existe un día especial en esa fecha."
+
+#, python-format
+msgid "Those dates overlap the temporary change “%(reason)s” (%(start)s – %(end)s)."
+msgstr "Esas fechas se solapan con el cambio temporal «%(reason)s» (%(start)s – %(end)s)."
+
+msgid "There are no weekly opening hours to confirm."
+msgstr "No hay horario semanal que confirmar."

@@ -1,6 +1,6 @@
 // «Department (VAT)» of the open price (SALE-F09, F35): the business's departments, each with the rate
-// it charges today, searched on the server; without departments, Taxes' categories; with neither, «No
-// departments configured.».
+// it charges today, searched on the server; without departments, Taxes' categories through the app's one
+// tax-category picker (which says it when there is none either).
 import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
@@ -8,7 +8,7 @@ import { click, errorFrame, ionValue, mountSale } from '../../__tests__/mount-sa
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
-import TaxCategoryPicker from './TaxCategoryPicker.vue';
+import TaxCategoryPicker from '../TaxCategoryPicker.vue';
 
 const DEPARTMENTS = 'sale.department.list';
 
@@ -49,14 +49,18 @@ describe('DepartmentPicker', () => {
     expect(plain(fruit.find('.pos-choice__rate').text())).toBe('4 %');
     expect(m.find('pos-department-d2').find('.pos-choice__rate').exists()).toBe(false);
     await click(fruit.element);
-    expect(m.choice.value).toEqual({ kind: 'department', id: 'd1', name: 'Frutas' });
+    expect(m.choice.value).toEqual({ kind: 'department', id: 'd1' });
     expect(m.find('pos-department-d1').attributes('aria-pressed')).toBe('true');
   });
 
-  it('without departments it offers Taxes’ categories instead', async () => {
+  it('without departments it offers Taxes’ categories instead, through the app’s tax-category picker', async () => {
     const m = await setup();
     await m.result(DEPARTMENTS, page([]));
-    expect(m.wrapper.findComponent(TaxCategoryPicker).exists()).toBe(true);
+    const picker = m.wrapper.findComponent(TaxCategoryPicker);
+    expect(picker.props()).toMatchObject({ label: 'Department (VAT)', testid: 'pos-tax-category', modelValue: '' });
+    picker.vm.$emit('update:modelValue', 'food');
+    await m.wrapper.vm.$nextTick();
+    expect(m.choice.value).toEqual({ kind: 'tax', key: 'food' });
   });
 
   it('a search that finds no department is not the same as having none', async () => {
@@ -66,7 +70,7 @@ describe('DepartmentPicker', () => {
     await m.reopen();
     await m.result(DEPARTMENTS, page([]));
     expect(m.wrapper.findComponent(TaxCategoryPicker).exists()).toBe(false);
-    expect(m.find('pos-departments-none').text()).toBe('No departments configured.');
+    expect(m.find('pos-departments-none').text()).toBe('No department matches your search.');
   });
 
   it('says it when the departments cannot be read', async () => {

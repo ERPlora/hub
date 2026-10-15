@@ -1,5 +1,5 @@
 // The heading of the check (WORKBOOK «Vender»): the editable title («New check») and the chips of the
-// customer, «Served by …» and «Customer required» (SALE-F05, F16).
+// table (SALE-F19), the customer, «Served by …» and «Customer required» (SALE-F05, F16).
 import { describe, expect, it } from 'vitest';
 
 import { click, mountSale } from '../../__tests__/mount-sale';
@@ -64,6 +64,22 @@ describe('CartHeading: the chips', () => {
     const m = await setup({ customerName: 'Lucía' });
     expect(m.find('pos-customer-chip').text()).toBe('Lucía');
     expect(m.find('pos-check-context-empty').exists()).toBe(false);
+  });
+
+  it('shows the check’s table first, and then it is no longer a check without table', async () => {
+    const m = await setup({ tableNumber: '4', customerName: 'Lucía' }, 'es');
+    const chip = m.find('pos-table-chip');
+    expect(chip.text()).toBe('Mesa 4');
+    const chips = m.wrapper.findAll('.pos-chip').map((c) => c.attributes('data-testid'));
+    expect(chips.slice(0, 2)).toEqual(['pos-table-chip', 'pos-customer-chip']);
+    const alone = await setup({ tableNumber: '4' });
+    expect(alone.find('pos-table-chip').text()).toBe('Table 4');
+    expect(alone.find('pos-check-context-empty').exists()).toBe(false);
+  });
+
+  it('without a table there is no table chip', async () => {
+    const m = await setup();
+    expect(m.find('pos-table-chip').exists()).toBe(false);
   });
 
   it('a business that requires a customer shows «Customer required», which asks for one', async () => {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // «Purchases» of a card (CUSTOMER-F23): each sale with its date, amount and status, newest first,
-// 50 at a time, filterable by status; live (`customer.purchase.list` re-runs when a sale is paid or
-// voided). New on the card: the product only gave them through the assistant.
+// 50 at a time, filterable by status; live (`customer.purchase.list` re-runs when a sale is paid,
+// voided or refunded). A refund is a line of its own, its amount negative (F22). New on the card:
+// the product only gave them through the assistant.
 import { formatDateTime, StatusPill } from '@erplora/ui/components';
 import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
@@ -10,13 +11,23 @@ import { formatMoney } from '../lib/money';
 import { windowsOf } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
+import type { PurchaseRow } from '../operations';
 
 const props = defineProps<{ customerId: string }>();
 
 const STEP = 50;
 const { t, locale } = useCustomerI18n();
 
-const status = ref<'all' | 'confirmed' | 'voided'>('all');
+type Status = PurchaseRow['status'];
+const STATUSES: Status[] = ['confirmed', 'voided', 'refunded'];
+/** How each status reads and its tone. */
+const LOOK: Record<Status, { label: string; tone: 'success' | 'neutral' | 'warning' }> = {
+  confirmed: { label: 'customer.purchases.confirmed', tone: 'success' },
+  voided: { label: 'customer.purchases.voided', tone: 'neutral' },
+  refunded: { label: 'customer.purchases.refunded', tone: 'warning' },
+};
+
+const status = ref<'all' | Status>('all');
 const limit = ref(STEP);
 // «Show more» grows what is shown by 50; the server is asked in windows of ≤ 100 (`useLiveList`).
 const windows = computed(() => windowsOf(0, limit.value));
@@ -30,7 +41,7 @@ const more = computed(() => (live.data.value ? live.data.value.total > live.data
 
 function filterBy(event: CustomEvent<{ value?: unknown }>): void {
   const value = event.detail.value;
-  status.value = value === 'confirmed' || value === 'voided' ? value : 'all';
+  status.value = STATUSES.includes(value as Status) ? (value as Status) : 'all';
   limit.value = STEP;
 }
 </script>
@@ -52,11 +63,12 @@ function filterBy(event: CustomEvent<{ value?: unknown }>): void {
         <ion-select-option value="all">
           {{ $t('customer.common.all') }}
         </ion-select-option>
-        <ion-select-option value="confirmed">
-          {{ $t('customer.purchases.confirmed') }}
-        </ion-select-option>
-        <ion-select-option value="voided">
-          {{ $t('customer.purchases.voided') }}
+        <ion-select-option
+          v-for="option in STATUSES"
+          :key="option"
+          :value="option"
+        >
+          {{ $t(LOOK[option].label) }}
         </ion-select-option>
       </ion-select>
     </div>
@@ -82,8 +94,8 @@ function filterBy(event: CustomEvent<{ value?: unknown }>): void {
         <span class="customer-purchases__amount">{{ formatMoney(row.amount, locale) }}</span>
         <StatusPill
           size="sm"
-          :tone="row.status === 'confirmed' ? 'success' : 'neutral'"
-          :label="row.status === 'confirmed' ? t('customer.purchases.confirmed') : t('customer.purchases.voided')"
+          :tone="LOOK[row.status].tone"
+          :label="t(LOOK[row.status].label)"
         />
       </li>
     </ul>

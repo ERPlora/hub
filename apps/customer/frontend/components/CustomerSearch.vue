@@ -1,14 +1,46 @@
 <script lang="ts">
+import { countryName, countryOptions, type CountryOption } from '../lib/countries';
+import type { CustomerDetailOut } from '../operations';
+
 /** What the sale receives when a customer is assigned: a COPY of the card's tax details (F17). */
 export interface CustomerSnapshot {
   customer_id: string;
+  /** The fiscal recipient's name: the company when the card has one, else the person (an F1 to a
+   *  company carries the company's name with its CIF). */
   customer_name: string;
+  /** The person, as the screens show the customer (the till's button); `snapshotOf` always fills it,
+   *  optional so a snapshot kept before it existed still reads (its `customer_name` is shown). */
+  display_name?: string;
   customer_tax_id: string;
   /** «street, postal code city, country», as the tax document wants it. */
   customer_address: string;
   /** ISO 3166 alpha-2 code; '' when the card has none. */
   customer_country: string;
 }
+
+/** The card fields a snapshot copies. */
+export type SnapshotCard = Pick<CustomerDetailOut, 'id' | 'name' | 'tax_id' | 'address' | 'postal_code' | 'city' | 'country'> &
+  Partial<Pick<CustomerDetailOut, 'company_name'>>;
+
+/**
+ * The tax details as the sale's document wants them: a copy, frozen at the moment of the sale. Public
+ * for the sale app, which gets a resumed check's customer back from the card linked to it.
+ */
+export function snapshotOf(card: SnapshotCard, locale: string): CustomerSnapshot {
+  const place = [card.postal_code, card.city].filter((p) => p && p.trim()).join(' ');
+  const address = [card.address, place, countryName(card.country, locale)].filter((p) => p && p.trim()).join(', ');
+  return {
+    customer_id: card.id,
+    customer_name: card.company_name?.trim() || card.name,
+    display_name: card.name,
+    customer_tax_id: card.tax_id,
+    customer_address: address,
+    customer_country: card.country,
+  };
+}
+
+/** The countries a sale's recipient picks from (the sale app's invoice details): Customers' own list. */
+export { countryOptions, type CountryOption };
 </script>
 
 <script setup lang="ts">
@@ -32,9 +64,7 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonInput, IonModal, IonTi
 import { computed, ref, watch } from 'vue';
 
 import { refusalFields } from '../lib/apiErrors';
-import { countryName } from '../lib/countries';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
-import type { CustomerDetailOut } from '../operations';
 import CustomerPicker from './CustomerPicker.vue';
 
 const value = defineModel<CustomerSnapshot | null>({ default: null });
@@ -58,21 +88,8 @@ watch(open, (isOpen) => {
   quickOpen.value = false;
 });
 
-/** The tax details as the sale's document wants them: a copy, frozen at the moment of the sale. */
-function snapshotOf(card: CustomerDetailOut): CustomerSnapshot {
-  const place = [card.postal_code, card.city].filter((p) => p && p.trim()).join(' ');
-  const address = [card.address, place, countryName(card.country, locale.value)].filter((p) => p && p.trim()).join(', ');
-  return {
-    customer_id: card.id,
-    customer_name: card.name,
-    customer_tax_id: card.tax_id,
-    customer_address: address,
-    customer_country: card.country,
-  };
-}
-
 function assign(card: CustomerDetailOut): void {
-  value.value = snapshotOf(card);
+  value.value = snapshotOf(card, locale.value);
   open.value = false;
 }
 
@@ -159,7 +176,7 @@ async function useMatch(match: { id: string; name: string }): Promise<void> {
       slot="start"
       :name="value ? 'ion:person-outline' : 'ion:person-add-outline'"
     />
-    {{ value?.customer_name || $t('customer.pos.assign') }}
+    {{ value?.display_name || value?.customer_name || $t('customer.pos.assign') }}
   </ion-button>
 
   <ion-modal

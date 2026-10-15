@@ -83,7 +83,7 @@ describe('MovementsPage', () => {
 
   it('names every type as the old module did', async () => {
     const s = await setup();
-    const types = ['initial', 'reception', 'sale', 'void', 'count', 'write_off'];
+    const types = ['initial', 'reception', 'sale', 'void', 'count', 'write_off', 'refund'];
     await s.show(page(types.map((type, i) => movement(`m${i}`, type, '1.000', '1.000'))));
     expect(s.wrapper.findAll('[data-testid="inventory-movement-type"]').map((c) => c.text())).toEqual([
       'Initial',
@@ -92,6 +92,7 @@ describe('MovementsPage', () => {
       'Void',
       'Count',
       'Decrease',
+      'Refund',
     ]);
   });
 
@@ -120,6 +121,7 @@ describe('MovementsPage', () => {
       'Void',
       'Count',
       'Decrease',
+      'Refund',
     ]);
     await s.pick('inventory-movements-type-filter', 'count');
     expect(s.params('inventory.movement.list')).toEqual([{ movement_type: 'count', sort: '-created_at', limit: 50, offset: 0 }]);

@@ -20,6 +20,8 @@ const line = (id: string, over: Partial<LineOption> = {}): LineOption => ({
   left: '1.000',
   line_total: 150,
   is_gift: false,
+  paid_by_voucher: false,
+  voucher_name: '',
   ...over,
 });
 
@@ -94,5 +96,17 @@ describe('RefundLines', () => {
     expect(s.find('refund-line-amount-c').text()).toBe('Ya devuelta');
     const s2 = await setup({ b: 2000 }, 'es');
     expect(prop(s2.find('refund-line-units-b').element, 'label')).toBe('Unidades que vuelven');
+  });
+});
+
+describe('RefundLines: a line paid with a voucher (SALE-F32)', () => {
+  const covered = line('v', { name: 'Corte', line_total: 0, paid_by_voucher: true, voucher_name: 'Bono 5 cortes' });
+
+  it('says which voucher paid it instead of its amount, and marked, that the session goes back', async () => {
+    const m = await mountSale(RefundLines, { props: { lines: [covered], picked: {} }, locale: 'es' });
+    expect(m.find('refund-line-amount-v').text()).toBe('Ya pagado · Bono 5 cortes');
+    expect(m.find('refund-line-session-v').exists()).toBe(false);
+    const marked = await mountSale(RefundLines, { props: { lines: [covered], picked: { v: 1000 } }, locale: 'es' });
+    expect(marked.find('refund-line-session-v').text()).toBe('La sesión vuelve a Bono 5 cortes.');
   });
 });

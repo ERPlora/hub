@@ -19,7 +19,7 @@ import { formatQuantity, formatSignedQuantity } from '../lib/format';
 type Row = OutputOf<'inventory.movement.list'>['rows'][number];
 type MovementType = Row['movement_type'];
 
-const TYPES: MovementType[] = ['initial', 'reception', 'sale', 'void', 'count', 'write_off'];
+const TYPES: MovementType[] = ['initial', 'reception', 'sale', 'void', 'count', 'write_off', 'refund'];
 
 const { t, locale } = useT();
 const tabs = useInventoryTabs();
@@ -58,6 +58,7 @@ const TYPE_KEYS: Record<MovementType, string> = {
   void: 'inventory.movements.types.void',
   count: 'inventory.movements.types.count',
   write_off: 'inventory.movements.types.write_off',
+  refund: 'inventory.movements.types.refund',
 };
 const typeLabel = (type: MovementType): string => t(TYPE_KEYS[type]);
 

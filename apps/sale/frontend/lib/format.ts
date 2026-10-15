@@ -53,6 +53,12 @@ export function centsFromEuros(value: string | number | null | undefined): numbe
   return Math.round(Number(text.replace(',', '.')) * 100);
 }
 
+/** A day as the reader writes it («14/11/2026», «11/14/2026»); nothing to show is «—». */
+export function formatDay(iso: string | null | undefined, locale: string): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString(locale);
+}
+
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */
 export function plain(text: string): string {
   return text.replace(/[  ]/g, ' ');

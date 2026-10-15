@@ -27,13 +27,14 @@ describe('CustomerSearchPreviewPage', () => {
     const m = await mountCustomer(CustomerSearchPreviewPage, { attachTo: document.body });
     m.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
       customer_id: 'c1',
-      customer_name: 'Ana',
+      customer_name: 'ACME',
+      display_name: 'Ana',
       customer_tax_id: 'X1',
       customer_address: 'Calle 1, 28001 Madrid, Spain',
       customer_country: 'ES',
     });
     await flush();
     const snapshot = m.wrapper.get('[data-testid="customer-preview-snapshot"]');
-    expect(snapshot.findAll('dd').map((d) => d.text())).toEqual(['c1', 'Ana', 'X1', 'Calle 1, 28001 Madrid, Spain', 'ES']);
+    expect(snapshot.findAll('dd').map((d) => d.text())).toEqual(['c1', 'ACME', 'Ana', 'X1', 'Calle 1, 28001 Madrid, Spain', 'ES']);
   });
 });

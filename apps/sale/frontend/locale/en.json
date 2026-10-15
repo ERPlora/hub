@@ -15,7 +15,18 @@
       "appInactive": "This app is not active in this business.",
       "noPermission": "You do not have permission."
     },
-    "common": {},
+    "common": {
+      "taxPicker": {
+        "search": "Search a tax category…",
+        "close": "Close",
+        "noResults": "No tax category matches your search.",
+        "more": "Showing {shown} of {total}. Type to narrow the list.",
+        "none": "There are no tax categories to choose from. Set up your VAT first, in Taxes.",
+        "loadFailed": "The tax categories could not be read.",
+        "retry": "Retry",
+        "retrying": "Retrying…"
+      }
+    },
     "pos": {
       "loadFailed": "Error loading the till",
       "screenMenu": "Screen",
@@ -55,6 +66,7 @@
       "customerRequiredShort": "Customer required",
       "customerRequiredCharge": "This business requires a customer on every sale. Choose one to carry on with the charge.",
       "noCheckContext": "Check without table or customer",
+      "cartLabel": "Check",
       "cartEmptyTouch": "Tap a product to add it.",
       "checkGone": "That check was closed on another device: the screen starts a new one.",
       "courseInProgress": "Unsent",
@@ -89,7 +101,6 @@
       "deleteCheckFailed": "That open check could not be deleted. It is still in the list.",
       "noParkedTickets": "No open checks",
       "openChecksLoadFailed": "The open checks could not be loaded.",
-      "errorRetrieve": "Could not retrieve the ticket",
       "parkTitle": "Park check",
       "parkNameHint": "The title is optional and only helps identify the check when you resume it.",
       "parkNamePlaceholder": "e.g. Ana — terrace",
@@ -114,7 +125,6 @@
       "staffNoResults": "Nobody in the team matches your search.",
       "department": "Department (VAT)",
       "departmentSearch": "Search a department…",
-      "noDepartments": "No departments configured.",
       "departmentsLoadFailed": "The departments could not be loaded.",
       "addAmount": "Add {amount}",
       "numpadClear": "Clear",
@@ -159,7 +169,50 @@
         "ipsi": "IPSI"
       },
       "customerLinkFailed": "The customer could not be linked to the check. Choose them again.",
-      "customerLoadFailed": "The check's customer could not be read. Choose them again if the sale needs one."
+      "customerLoadFailed": "The check's customer could not be read. Choose them again if the sale needs one.",
+      "paidWithVoucher": "Already paid · {name}",
+      "removeLine": "Take this line off",
+      "services": "Services",
+      "serviceMinutes": "{minutes} min",
+      "servicePrice": {
+        "hourly": "{price} / hour",
+        "from": "From {price}",
+        "variable": "Variable · {price}",
+        "free": "Free"
+      },
+      "noServices": "No services.",
+      "servicesLoadFailed": "The services could not be loaded.",
+      "servicePriceTitle": "Amount of {name}",
+      "servicePriceSuggest": "Use {price}",
+      "serviceCount": "{count} services",
+      "serviceCountOne": "1 service",
+      "linkedCheckGone": "That check is not open any more (charged, voided or gone): the till carries on as it was.",
+      "table": {
+        "assign": "Assign table",
+        "assignedTo": "Assign table: {table}",
+        "chip": "Table {number}",
+        "choose": "Choose table",
+        "search": "Search a table…",
+        "loading": "Loading tables…",
+        "loadFailed": "The tables could not be loaded.",
+        "unset": "There are no tables yet. Set them up in Tables → Floor plan.",
+        "noResults": "No table matches your search.",
+        "none": "No table is in service.",
+        "pax": "{count} pax",
+        "status": {
+          "available": "Available",
+          "occupied": "Occupied",
+          "reserved": "Reserved",
+          "blocked": "Blocked"
+        },
+        "occupiedHint": "Occupied: another check is at this table.",
+        "blockedHint": "Table out of service: it cannot be seated until it is unblocked.",
+        "currentHint": "This check is at this table.",
+        "erasedCustomer": "Deleted customer",
+        "remove": "Remove from table",
+        "seatFailed": "The check could not be seated at that table.",
+        "removeFailed": "The table could not be taken off the check."
+      }
     },
     "checkout": {
       "title": "Charge",
@@ -215,7 +268,9 @@
         "recipient": "Enter the customer's details",
         "cashLimit": "Cash not allowed",
         "remaining": "{amount} still to cover",
-        "tenderedShort": "The amount tendered does not cover the total"
+        "tenderedShort": "The amount tendered does not cover the total",
+        "taxIdInvalid": "Check the tax ID",
+        "idTypeRequired": "Choose the kind of document"
       },
       "reason": {
         "customerRequired": "This business requires a customer on every sale. Choose one to carry on with the charge.",
@@ -225,7 +280,43 @@
       },
       "serverUnavailable": "The server isn't responding (it may be restarting). Try again in a few seconds and, if it keeps happening, call the manager.",
       "checkoutUnknown": "We couldn't confirm whether this charge went through. Check it in Sales before charging again.",
-      "checkSales": "Check in Sales"
+      "checkSales": "Check in Sales",
+      "openDrawer": "Open a cash session",
+      "recipientErrors": {
+        "taxIdInvalid": "That tax ID is not valid.",
+        "idTypeRequired": "Say what kind of document a foreign tax ID is (EU VAT number, passport, tax ID of their country…)."
+      }
+    },
+    "voucher": {
+      "section": "Lines paid another way",
+      "title": "Pay this line with a voucher",
+      "candidates": "{count} valid vouchers",
+      "remainingAfter": "{before} sessions left · {after} after this one",
+      "unlimited": "Unlimited sessions",
+      "expires": "Expires on {date}",
+      "none": "This customer has no voucher that covers this service.",
+      "loadFailed": "The customer's vouchers could not be loaded. Try again before charging the full price.",
+      "holdFailed": "The session of that voucher could not be held.",
+      "releaseFailed": "The session could not go back to the voucher.",
+      "held": "{name}: session spent. {after} left.",
+      "heldUnlimited": "{name}: session spent.",
+      "confirm": "Spend one session",
+      "holding": "Holding…",
+      "undo": "Undo",
+      "split": "Split into {n} lines",
+      "splitReason": "A voucher covers one line. Split it and redeem the ones it reaches.",
+      "splitFailed": "The line could not be split. The check has not changed.",
+      "notSplittable": "This line cannot be split, so no voucher can cover it.",
+      "reason": {
+        "only_option": "It is the only voucher that covers this service.",
+        "finite_before_unlimited": "Spent first because it has a limited number of sessions.",
+        "expires_first": "Spent first because it is the one that expires first.",
+        "already_started": "Spent first to finish the voucher already started.",
+        "fewest_sessions_left": "Spent first because it is the one with fewest sessions left.",
+        "oldest_voucher": "Spent first because it was bought first.",
+        "stable_order": "Both vouchers are the same; this one always goes first.",
+        "generic": "This is the voucher that will be spent."
+      }
     },
     "document": {
       "title": "Document",
@@ -236,6 +327,8 @@
       "printFailed": "Could not print",
       "defaultBusiness": "My business",
       "receipt": "Receipt",
+      "invoice": "Invoice",
+      "number": "No.",
       "customer": "Customer",
       "item": "Item",
       "amount": "Amount",
@@ -251,7 +344,21 @@
         "surcharge": "Surcharge",
         "igic": "IGIC",
         "ipsi": "IPSI"
-      }
+      },
+      "paidWithVoucher": "Already paid · {name}",
+      "qualification": {
+        "exempt": "Exempt",
+        "not_subject": "Not subject",
+        "subject_reverse": "Reverse charge"
+      },
+      "pending": {
+        "title": "Fiscal document pending",
+        "hint": "Invoicing could not issue it when charging (the issuer is missing, or a permission). Once that is fixed, issue it now.",
+        "issue": "Issue now",
+        "issued": "Fiscal documents issued.",
+        "failed": "The documents could not be issued. Try again."
+      },
+      "paperPending": "Fiscal document pending"
     },
     "sales": {
       "title": "Sales",
@@ -285,13 +392,15 @@
         "completed": "Completed",
         "voided": "Voided",
         "refunded": "Refunded",
-        "leftToRefund": "{amount} left to refund"
+        "leftToRefund": "{amount} left to refund",
+        "documentsPending": "Document pending"
       },
       "actions": {
         "document": "Document",
         "reprint": "Reprint",
         "void": "Void",
-        "refund": "Refund"
+        "refund": "Refund",
+        "issue": "Issue now"
       },
       "search": "Search number or customer…",
       "entity": {
@@ -329,7 +438,8 @@
       "reasonRequired": "A reason is required to void a sale",
       "confirm": "Void",
       "cancel": "Cancel",
-      "done": "Sale voided"
+      "done": "Sale voided",
+      "failed": "The sale could not be voided"
     },
     "refund": {
       "title": "Refund sale {number}",
@@ -363,7 +473,11 @@
       "reasonRequired": "A refund needs a reason.",
       "confirm": "Refund {amount}",
       "done": "Refund recorded.",
-      "unknown": "We couldn't confirm whether the refund was recorded. Tapping Refund again won't record it twice."
+      "unknown": "We couldn't confirm whether the refund was recorded. Tapping Refund again won't record it twice.",
+      "linePaidWithVoucher": "Already paid · {name}",
+      "sessionGoesBack": "The session goes back to {name}.",
+      "markSession": "Mark the line whose session goes back to its voucher.",
+      "confirmSession": "Give the session back"
     },
     "quickNotes": {
       "intro": "The notes the till offers with one tap on the line-note sheet. The waiter can still type anything by hand.",
@@ -425,16 +539,6 @@
         "taxPlaceholder": "Choose the VAT"
       },
       "taxCategoryMissing": "Choose the VAT this department charges.",
-      "noTaxCategories": "There are no tax categories to choose from. Set up your VAT first, in Taxes.",
-      "taxLoadFailed": "The tax categories could not be read.",
-      "taxRetry": "Retry",
-      "taxRetrying": "Retrying…",
-      "picker": {
-        "search": "Search a tax category…",
-        "close": "Close",
-        "noResults": "No tax category matches your search.",
-        "more": "Showing {shown} of {total}. Type to narrow the list."
-      },
       "saveFailed": "The department could not be saved.",
       "deleteTitle": "Delete department",
       "deleteMessage": "{name} — It stops being offered at the till. Everything already sold keeps the name and the VAT it was charged with.",

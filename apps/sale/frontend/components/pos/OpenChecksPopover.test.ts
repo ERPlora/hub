@@ -109,10 +109,26 @@ describe('OpenChecksPopover: deleting', () => {
     expect(m.find('pos-checks-error').text()).toBe('Esa cuenta ya no está abierta.');
   });
 
-  it('without the permission to void there is no bin', async () => {
+  it('without the permission to void there is no bin on a check with something on it', async () => {
     const m = await setup({}, { session: EMPLOYEE });
     await m.result(OP, page(ROWS));
     expect(m.find('pos-parked-o2-delete').exists()).toBe(false);
+  });
+
+  it('an empty check is deleted by whoever builds checks (a party that left without ordering)', async () => {
+    const m = await setup({}, { session: EMPLOYEE });
+    await m.result(OP, page([...ROWS, orderRow({ id: 'o4', label: 'Table 4', provisional_total: 0, lines_count: 0 })]));
+    expect(m.find('pos-parked-o3-delete').exists()).toBe(false);
+    m.answer(200, {});
+    await click(m.find('pos-parked-o4-delete').element);
+    await click(m.find('pos-parked-o4-delete').element);
+    expect(m.sent()).toEqual([{ method: 'POST', path: '/api/sale/orders/void', query: {}, body: { order_id: 'o4' } }]);
+  });
+
+  it('nobody who cannot build checks gets the bin, not even on an empty one', async () => {
+    const m = await setup({}, { session: { ...EMPLOYEE, permissions: ['sale.view_sale'] } });
+    await m.result(OP, page([orderRow({ id: 'o4', lines_count: 0, provisional_total: 0 })]));
+    expect(m.find('pos-parked-o4-delete').exists()).toBe(false);
   });
 });
 

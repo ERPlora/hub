@@ -3,26 +3,26 @@
 // F18). On top, a refusal (sticky); «Park this check» and its hint where parked tickets are allowed;
 // «Open checks — Tap a check to resume it.»; a row per open check of the business but the one on
 // screen, newest first, 20 at a time (title or amount, time and amount), that resumes it; and, for
-// whoever may void, its bin: a first tap arms it for 3 seconds («Tap again to delete — this voids the
-// check»), a second voids it. A voided check leaves the list with the next live result.
+// whoever may void — or, on an empty check, for whoever builds checks (a party that left without
+// ordering needs no manager) —, its bin: a first tap arms it for 3 seconds («Tap again to delete — this
+// voids the check»), a second voids it. A voided check leaves the list with the next live result.
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, onBeforeUnmount, shallowRef } from 'vue';
 
-import { useLiveWindows } from '../../composables/pos/useLiveWindows';
+import { useLiveWindows } from '../../composables/useLiveWindows';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import type { OrderRow } from '../../operations';
-import { refusal, shortTime } from './till';
+import { refusal } from '../../lib/refusal';
+import { shortTime } from './till';
 
 const props = defineProps<{
   /** The check on screen: it is not listed. */
   currentId: string | null;
   parkingEnabled: boolean;
   hasLines: boolean;
-  /** A refusal of the page (a check that could not be resumed or parked), shown on top. */
-  notice?: string | null;
 }>();
 const emit = defineEmits<{ resume: [row: OrderRow]; park: []; close: [] }>();
 
@@ -33,6 +33,9 @@ const locale = useLocale();
 const session = useSession();
 const client = useLiveClient();
 const canVoid = computed(() => session.can('sale.void_sale'));
+const canBuild = computed(() => session.can('sale.add_sale'));
+/** The server lets whoever builds checks void an empty one; one with lines is a manager's. */
+const deletable = (row: OrderRow) => canVoid.value || (canBuild.value && row.lines_count === 0);
 
 const checks = useLiveWindows<'sale.order.list', OrderRow>('sale.order.list', () => ({ status: 'open' }), 20);
 const rows = computed(() => checks.rows.value.filter((row) => row.id !== props.currentId));
@@ -43,7 +46,7 @@ const failure = shallowRef<string | null>(null);
 let disarm: (() => void) | undefined;
 onBeforeUnmount(() => disarm?.());
 
-const shownError = computed(() => failure.value ?? props.notice ?? (checks.error.value ? t('sale.pos.openChecksLoadFailed') : null));
+const shownError = computed(() => failure.value ?? (checks.error.value ? t('sale.pos.openChecksLoadFailed') : null));
 
 async function remove(row: OrderRow): Promise<void> {
   disarm?.();
@@ -57,7 +60,8 @@ async function remove(row: OrderRow): Promise<void> {
   try {
     await voiding.run({ order_id: row.id });
   } catch (error) {
-    failure.value = refusal(error, t('sale.pos.deleteCheckFailed'));
+    const fallback = t('sale.pos.deleteCheckFailed');
+    failure.value = refusal(error, fallback)?.message ?? fallback;
   }
 }
 
@@ -124,7 +128,7 @@ const meta = (row: OrderRow) => {
         <span class="pos-checks__meta">{{ meta(row) }}</span>
       </button>
       <ion-button
-        v-if="canVoid"
+        v-if="deletable(row)"
         fill="clear"
         class="pos-checks__delete"
         :data-testid="`pos-parked-${row.id}-delete`"

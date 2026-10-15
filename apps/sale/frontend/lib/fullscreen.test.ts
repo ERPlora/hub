@@ -1,84 +1,75 @@
 // The browser's Fullscreen API, wrapped once for the till (WORKBOOK «Vender»: the ⋮ menu's «Full
-// screen» / «Exit full screen», the browser's, when the device allows it): whether the device can,
-// whether the till element is the one on full screen, the toggle and the change of state (Esc, F11).
+// screen» / «Exit full screen», the browser's, when the device allows it). It is the WHOLE document that
+// goes full screen, as the old shell did: the till's sheets, the checkout and the toasts live in the
+// app's root (`ion-app`), so an element of the page on full screen would hide them all.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { isActive, isCapable, onChange, toggle } from './fullscreen';
 
-type FullscreenDoc = {
-  fullscreenEnabled?: boolean;
-  fullscreenElement?: Element | null;
-  exitFullscreen?: () => Promise<void>;
-};
-
-const doc = document as unknown as FullscreenDoc;
+const root = document.documentElement as HTMLElement & { requestFullscreen?: unknown };
 const saved = {
   enabled: Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled'),
   element: Object.getOwnPropertyDescriptor(document, 'fullscreenElement'),
   exit: Object.getOwnPropertyDescriptor(document, 'exitFullscreen'),
+  request: Object.getOwnPropertyDescriptor(root, 'requestFullscreen'),
 };
 
-function fake(enabled: boolean, element: Element | null = null): { exit: ReturnType<typeof vi.fn> } {
+/** The document as the browser shows it: allowed or not, what is on full screen, the two calls. */
+function fake(enabled: boolean, element: Element | null = null, request: boolean = true) {
   const exit = vi.fn(() => Promise.resolve());
+  const ask = vi.fn(() => Promise.resolve());
   Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, get: () => enabled });
   Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element });
   Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
-  return { exit };
-}
-
-function till(): HTMLElement & { requestFullscreen: ReturnType<typeof vi.fn> } {
-  const el = document.createElement('div') as unknown as HTMLElement & { requestFullscreen: ReturnType<typeof vi.fn> };
-  el.requestFullscreen = vi.fn(() => Promise.resolve());
-  return el;
+  Object.defineProperty(root, 'requestFullscreen', { configurable: true, value: request ? ask : undefined });
+  return { exit, ask };
 }
 
 afterEach(() => {
-  for (const [key, descriptor] of [
-    ['fullscreenEnabled', saved.enabled],
-    ['fullscreenElement', saved.element],
-    ['exitFullscreen', saved.exit],
+  for (const [target, key, descriptor] of [
+    [document, 'fullscreenEnabled', saved.enabled],
+    [document, 'fullscreenElement', saved.element],
+    [document, 'exitFullscreen', saved.exit],
+    [root, 'requestFullscreen', saved.request],
   ] as const) {
-    if (descriptor) Object.defineProperty(document, key, descriptor);
-    else delete (doc as Record<string, unknown>)[key];
+    if (descriptor) Object.defineProperty(target, key, descriptor);
+    else delete (target as unknown as Record<string, unknown>)[key];
   }
 });
 
 describe('fullscreen', () => {
-  it('is capable only when the document allows it and the element can ask for it', () => {
+  it('is capable only when the document allows it and can ask for it', () => {
     fake(true);
-    expect(isCapable(till())).toBe(true);
-    expect(isCapable(document.createElement('div'))).toBe(false);
+    expect(isCapable()).toBe(true);
     fake(false);
-    expect(isCapable(till())).toBe(false);
-    expect(isCapable(null)).toBe(false);
+    expect(isCapable()).toBe(false);
+    fake(true, null, false);
+    expect(isCapable()).toBe(false);
   });
 
-  it('is active only while that very element is the one on full screen', () => {
-    const el = till();
-    fake(true, el);
-    expect(isActive(el)).toBe(true);
-    expect(isActive(till())).toBe(false);
+  it('is active while the document is on full screen', () => {
+    fake(true, document.documentElement);
+    expect(isActive()).toBe(true);
     fake(true, null);
-    expect(isActive(el)).toBe(false);
+    expect(isActive()).toBe(false);
   });
 
-  it('toggles: asks for full screen on the element, or leaves it when the element already is', async () => {
-    const el = till();
-    const { exit } = fake(true, null);
-    await toggle(el);
-    expect(el.requestFullscreen).toHaveBeenCalledOnce();
-    expect(exit).not.toHaveBeenCalled();
-    const second = fake(true, el);
-    await toggle(el);
-    expect(second.exit).toHaveBeenCalledOnce();
-    expect(el.requestFullscreen).toHaveBeenCalledOnce();
+  it('toggles the whole document: asks for full screen on it, or leaves full screen', async () => {
+    const off = fake(true, null);
+    await toggle();
+    expect(off.ask).toHaveBeenCalledOnce();
+    expect(off.ask.mock.contexts[0]).toBe(document.documentElement);
+    expect(off.exit).not.toHaveBeenCalled();
+    const on = fake(true, document.documentElement);
+    await toggle();
+    expect(on.exit).toHaveBeenCalledOnce();
+    expect(on.ask).not.toHaveBeenCalled();
   });
 
   it('a refusal of the browser (no user gesture, policy) does not throw: the state just stays', async () => {
-    const el = till();
-    el.requestFullscreen.mockRejectedValueOnce(new TypeError('denied'));
-    fake(true, null);
-    await expect(toggle(el)).resolves.toBeUndefined();
+    const { ask } = fake(true, null);
+    ask.mockRejectedValueOnce(new TypeError('denied'));
+    await expect(toggle()).resolves.toBeUndefined();
   });
 
   it('says every change of state until it is unsubscribed', () => {

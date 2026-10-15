@@ -50,6 +50,17 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
 
 
 @pytest.fixture(autouse=True)
+def without_cash_register(monkeypatch):
+    """Sale's own tests sell as a business without Cash register: the till asks an operation nobody
+    declares, as when the app is not installed (``UnknownOperation``). Its lock on cash (SALE-F08) is
+    tested apart, with Cash register in the business (``test_integration_cash_register.py`` overrides
+    this fixture)."""
+    monkeypatch.setattr(
+        "apps.sale.services.DRAWER_CHECK", "cash_register.session.not_installed"
+    )
+
+
+@pytest.fixture(autouse=True)
 def english():
     """Each test starts in English: a request of an earlier test may have left another language."""
     with translation.override("en"):

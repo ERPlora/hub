@@ -6,7 +6,8 @@
 // bottom (the old `.pay-sheet`). Its content (CheckoutPanel) is mounted only while it is shown, and anew
 // on each opening: nothing is read while it is closed, and every opening is a new attempt with its own
 // key. The ✕, the backdrop and Escape close it, never while charging. A charge closes it and hands the
-// sale to the till (`charged`), also when it was the lookup of a lost answer that found it.
+// sale to the till (`charged`) with the lines it charged — frozen when the sheet opened; none = the
+// whole check —, also when it was the lookup of a lost answer that found it.
 import { IonModal } from '@ionic/vue';
 import { shallowRef, watch } from 'vue';
 
@@ -29,7 +30,7 @@ withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-const emit = defineEmits<{ charged: [sale: SaleOut] }>();
+const emit = defineEmits<{ charged: [sale: SaleOut, lineIds: readonly string[]] }>();
 
 /** The content stays until the sheet has finished leaving, so it does not empty while it slides away. */
 const shown = shallowRef(false);
@@ -54,8 +55,8 @@ function onDidDismiss(): void {
   open.value = false;
 }
 
-function onCharged(sale: SaleOut): void {
-  emit('charged', sale);
+function onCharged(sale: SaleOut, lineIds: readonly string[]): void {
+  emit('charged', sale, lineIds);
   open.value = false;
 }
 </script>

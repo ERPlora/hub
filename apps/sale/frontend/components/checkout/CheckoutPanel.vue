@@ -1,15 +1,16 @@
 <script setup lang="ts">
 // What the charge sheet holds (WORKBOOK «Pantallas · Cobro», the old `.pay-sheet`): the head, the
 // amount to charge, big (the server's: `sale.checkout.preview`, never the screen's arithmetic), «Paying
-// N lines of <total>» for part of a check and «Remaining» while splitting; what the sale is (CheckoutSide)
-// and how it is paid (CheckoutTender); the foot with «Charge». Mounted once per opening of the sheet:
+// N lines of <total>» for part of a check and «Remaining» while splitting; what the sale is (CheckoutSide),
+// with Services on «Lines paid another way» (VoucherLines, SALE-F27: a line paid with a voucher goes to 0
+// in the preview), and how it is paid (CheckoutTender); the foot with «Charge». Mounted once per opening of the sheet:
 // the attempt key is born here (useCheckout) and nothing is read while the sheet is closed.
 // What decides is the server's: the total, the cash limit and the ticket limit (preview), the methods
 // that may charge (`allowed`), the default document (`sale.pos_settings.get`); the client only adds up
 // what the person types, and the server re-checks it all when charging.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, toast } from '@erplora/ui/shell';
+import { HubIcon, toast, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -21,11 +22,13 @@ import { useLocale, useT } from '../../composables/useT';
 import { type ChargeBlock, chargeBlock } from '../../lib/checkout/blocks';
 import { chargeableMethods } from '../../lib/checkout/methods';
 import { recipientComplete, recipientFrom, recipientPayload } from '../../lib/checkout/recipient';
+import { recipientIssue } from '../../lib/checkout/taxId';
 import { formatMoney } from '../../lib/format';
 import type { DocumentType, PaymentMethodOut, PreviewIn, SaleOut } from '../../operations';
 import CheckoutFoot from './CheckoutFoot.vue';
 import CheckoutSide from './CheckoutSide.vue';
 import CheckoutTender from './CheckoutTender.vue';
+import VoucherLines from './VoucherLines.vue';
 
 const props = defineProps<{
   orderId: string;
@@ -36,21 +39,34 @@ const props = defineProps<{
   staffId: string | null;
 }>();
 
-const emit = defineEmits<{ charged: [sale: SaleOut]; close: []; busy: [busy: boolean] }>();
+const emit = defineEmits<{
+  /** The sale, and the lines it charged (none = the whole check). */
+  charged: [sale: SaleOut, lineIds: readonly string[]];
+  close: [];
+  busy: [busy: boolean];
+}>();
+
+// Frozen on purpose: this opening charges what it showed, whatever the till's live check does next. Only
+// a line split here to pay with a voucher adds its new lines to a part charge.
+const lineIds = shallowRef<readonly string[]>([...props.lineIds]);
+const openedVersion = props.orderVersion;
 
 /** Methods are a handful; one page holds them all. */
 const METHODS_PAGE = 100;
 const SALES_PATH = '/sale/sales';
+/** Where a cash session is opened (CASH_REGISTER-F03). */
+const DRAWER_PATH = '/cash_register/sessions';
 
 const t = useT();
 const locale = useLocale();
 const router = useRouter();
+const session = useSession();
 const money = (cents: number | null | undefined): string => formatMoney(cents, locale.value);
 
 // ── What the server says ──────────────────────────────────────────────────────────────────────
-const partial = computed(() => props.lineIds.length > 0);
+const partial = computed(() => lineIds.value.length > 0);
 const previewParams = computed<PreviewIn>(() =>
-  partial.value ? { order_id: props.orderId, line_ids: [...props.lineIds] } : { order_id: props.orderId },
+  partial.value ? { order_id: props.orderId, line_ids: [...lineIds.value] } : { order_id: props.orderId },
 );
 const preview = useLive('sale.checkout.preview', previewParams);
 /** The whole check, for «Paying N lines of <total>» (the same subscription as above when nothing is marked). */
@@ -65,6 +81,8 @@ const reconnecting = computed(() => reads.some((read) => read.status.value === '
 /** The amount to charge; `undefined` until the server has worked it out. */
 const total = computed(() => (preview.status.value === 'loading' ? undefined : preview.data.value?.total));
 const cashLimit = computed(() => preview.data.value?.cash_limit ?? null);
+/** What the cash limit looks at: the whole operation, also when this is one part of a check. */
+const operationTotal = computed(() => (total.value === undefined ? undefined : (preview.data.value?.operation_total ?? total.value)));
 const ticketLimit = computed(() => preview.data.value?.ticket_limit ?? null);
 const methodsLoaded = computed(() => methodPage.status.value !== 'loading' || methodPage.data.value !== undefined);
 const methods = computed<PaymentMethodOut[]>(() => chargeableMethods(methodPage.data.value?.rows ?? []));
@@ -72,12 +90,12 @@ const methods = computed<PaymentMethodOut[]>(() => chargeableMethods(methodPage.
 const partialText = computed(() => {
   const wholeTotal = whole.data.value?.total;
   if (!partial.value || wholeTotal === undefined || whole.status.value === 'loading') return '';
-  const n = props.lineIds.length;
+  const n = lineIds.value.length;
   return n === 1 ? t('sale.checkout.payingPartOne', { total: money(wholeTotal) }) : t('sale.checkout.payingPart', { n, total: money(wholeTotal) });
 });
 
 // ── What the person chooses and types ─────────────────────────────────────────────────────────
-const tender = useTender({ total, methods, cashLimit });
+const tender = useTender({ total, methods, cashLimit, operationTotal });
 
 const recipient = ref(recipientFrom(props.customer));
 const complete = computed(() => recipientComplete(recipient.value));
@@ -106,7 +124,9 @@ const block = computed<ChargeBlock | null>(() =>
         hasCustomer: !!props.customer,
         documentType: documentType.value,
         recipientComplete: complete.value,
+        recipientIssue: recipientIssue(recipient.value),
         total: total.value,
+        operationTotal: operationTotal.value,
         cashLimit: cashLimit.value,
         method: tender.method.value,
         typed: tender.typed.value,
@@ -119,23 +139,49 @@ const ready = computed(
 );
 
 // ── Charging ──────────────────────────────────────────────────────────────────────────────────
-const checkout = useCheckout({ onCharged: (sale) => emit('charged', sale) });
+const checkout = useCheckout({ onCharged: (sale) => emit('charged', sale, lineIds.value) });
+
+// ── Lines paid with a voucher (SALE-F27) ──────────────────────────────────────────────────────
+/** Services is on in this business and the person may spend its sessions. */
+const vouchers = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'service' && app.state === 'on') && session.can('service.redeem_package'),
+);
+const previewLines = computed(() => preview.data.value?.lines ?? []);
+
+function onSplit(newLines: readonly string[]): void {
+  if (partial.value) lineIds.value = [...lineIds.value, ...newLines];
+}
 watch(checkout.busy, (busy) => emit('busy', busy));
 
 function pick(method: PaymentMethodOut): void {
   if (!tender.pick(method)) void toast(t('sale.checkout.cashLimitReason', { amount: money(cashLimit.value) }), 'warning');
 }
 
+/** The blocks the recipient's box itself explains: the side opens on them. */
+const RECIPIENT_BLOCKS = new Set(['recipient', 'taxIdInvalid', 'idTypeRequired']);
+
 function onBlocked(reason: ChargeBlock, message: string): void {
   void toast(message, 'warning');
-  if (reason.kind === 'recipient') sideOpen.value = true;
+  if (RECIPIENT_BLOCKS.has(reason.kind)) sideOpen.value = true;
 }
+
+/** The recipient as it was sent when the server refused it: its field errors last until it is edited. */
+const refusedRecipient = shallowRef('');
+watch(checkout.failure, () => (refusedRecipient.value = JSON.stringify(recipient.value)));
+/** What the server refused on a field of the recipient (SALE-F04), said under that field. */
+const recipientErrors = computed(() => {
+  const failure = checkout.failure.value;
+  const fields = failure?.kind === 'refused' ? failure.fields : undefined;
+  if (!fields || JSON.stringify(recipient.value) !== refusedRecipient.value) return undefined;
+  return { taxId: fields.customer_tax_id, idType: fields.customer_id_type };
+});
+watch(recipientErrors, (errors) => errors && (sideOpen.value = true));
 
 function confirm(): void {
   void checkout.charge({
     order_id: props.orderId,
-    ...(partial.value ? { line_ids: [...props.lineIds] } : {}),
-    order_version: props.orderVersion,
+    ...(partial.value ? { line_ids: [...lineIds.value] } : {}),
+    order_version: preview.data.value?.order_version ?? openedVersion,
     payments: tender.payments(),
     document_type: documentType.value,
     ...(props.customer ? { customer_id: props.customer.customer_id } : {}),
@@ -146,6 +192,17 @@ function confirm(): void {
 
 function checkSales(): void {
   void router.push(SALES_PATH);
+  emit('close');
+}
+
+/** Cash register is on in this business and this person may open its session. */
+const canOpenDrawer = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'cash_register' && app.state === 'on') && session.can('cash_register.add_session'),
+);
+
+/** Cash refused with the drawer closed (SALE-F08): to the cash register; the check stays on the till. */
+function openDrawer(): void {
+  void router.push(DRAWER_PATH);
   emit('close');
 }
 </script>
@@ -247,7 +304,16 @@ function checkSales(): void {
         class="pay-side"
         :over-limit="overLimit"
         :ticket-limit="ticketLimit"
-      />
+        :recipient-errors="recipientErrors"
+      >
+        <VoucherLines
+          v-if="vouchers"
+          :order-id="orderId"
+          :lines="previewLines"
+          :customer-id="customer?.customer_id ?? null"
+          @split="onSplit"
+        />
+      </CheckoutSide>
       <div class="pay-tender">
         <p
           v-if="!methodsLoaded"
@@ -296,9 +362,11 @@ function checkSales(): void {
       :busy="checkout.busy.value"
       :ready="ready"
       :failure="checkout.failure.value"
+      :can-open-drawer="canOpenDrawer"
       @confirm="confirm"
       @blocked="onBlocked"
       @check-sales="checkSales"
+      @open-drawer="openDrawer"
     />
   </div>
 </template>

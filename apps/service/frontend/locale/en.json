@@ -1,0 +1,307 @@
+{
+  "service": {
+    "title": "Services",
+    "tabs": {
+      "label": "Services sections",
+      "services": "Services",
+      "categories": "Categories",
+      "packages": "Packages",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "loading": "Loading…",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches the search or the filters.",
+    "noPermission": "You do not have permission",
+    "cancel": "Cancel",
+    "close": "Close",
+    "add": "Add",
+    "loadMore": "Load more",
+    "showing": "Showing {shown} of {total}",
+    "none": "—",
+    "minutes": "{n} min",
+    "money": {
+      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
+      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
+      "negative": "This amount cannot be negative."
+    },
+    "pricing": {
+      "fixed": "Fixed price",
+      "hourly": "Hourly",
+      "from": "From",
+      "variable": "Variable",
+      "free": "Free"
+    },
+    "tax": {
+      "exempt": "exempt",
+      "loadError": "The tax categories could not be loaded."
+    },
+    "services": {
+      "search": "Search service…",
+      "empty": "No services.",
+      "loadError": "The services could not be loaded.",
+      "new": "New service",
+      "entity": {
+        "one": "service",
+        "many": "services"
+      },
+      "columns": {
+        "name": "Name",
+        "category": "Category",
+        "pricingType": "Pricing",
+        "price": "Price",
+        "duration": "Duration (min)",
+        "status": "Status"
+      },
+      "status": {
+        "active": "Active",
+        "unconfigured": "Not configured",
+        "archived": "Archived"
+      },
+      "statusReason": "No tax category: it cannot be charged",
+      "actions": {
+        "edit": "Edit",
+        "archive": "Archive",
+        "restore": "Restore"
+      },
+      "archive": {
+        "title": "Archive service",
+        "message": "{name} — it will no longer be offered or bookable. Its history and the appointments already booked are kept.",
+        "confirm": "Archive",
+        "error": "Could not archive the service"
+      },
+      "restoreError": "Could not restore the service",
+      "form": {
+        "titleNew": "New service",
+        "titleEdit": "Editing service — {name}",
+        "name": "Name",
+        "pricingType": "Pricing",
+        "price": "Price",
+        "duration": "Duration (min)",
+        "category": "Category",
+        "noCategory": "No category",
+        "tax": "Tax category",
+        "taxMissing": "There are no tax categories yet. Set them up in Taxes before adding services.",
+        "create": "Create service",
+        "save": "Save changes"
+      }
+    },
+    "professionals": {
+      "title": "Professionals who perform it",
+      "empty": "Nobody assigned yet: the whole bookable team may perform it.",
+      "add": "Add professional…",
+      "minutes": "Minutes (optional)",
+      "price": "Price (optional)",
+      "assign": "Assign",
+      "own": "{duration} min · {price}",
+      "primary": "Main service",
+      "makePrimary": "Make it their main service",
+      "active": "Performs it",
+      "save": "Save",
+      "remove": "Remove",
+      "error": "The professionals could not be updated",
+      "loadError": "The professionals could not be loaded."
+    },
+    "categories": {
+      "search": "Search category…",
+      "empty": "No categories.",
+      "loadError": "The categories could not be loaded.",
+      "new": "New category",
+      "entity": {
+        "one": "category",
+        "many": "categories"
+      },
+      "columns": {
+        "name": "Name",
+        "parent": "Parent category",
+        "order": "Order",
+        "services": "Services"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "form": {
+        "titleNew": "New category",
+        "titleEdit": "Editing category — {name}",
+        "name": "Name",
+        "parent": "Parent category",
+        "noParent": "No parent (root)",
+        "order": "Order",
+        "create": "Create category",
+        "save": "Save changes"
+      },
+      "delete": {
+        "title": "Delete category",
+        "message": "{name} — the category disappears; the services in it are kept, without a category.",
+        "impact": "{count} service(s) will be left without a category.",
+        "confirm": "Delete",
+        "error": "Could not delete the category"
+      }
+    },
+    "packages": {
+      "search": "Search package…",
+      "empty": "No packages.",
+      "loadError": "The packages could not be loaded.",
+      "new": "New package",
+      "orphans": "Vouchers with no customer",
+      "entity": {
+        "one": "package",
+        "many": "packages"
+      },
+      "columns": {
+        "name": "Name",
+        "discount": "Discount",
+        "fixedPrice": "Closed price",
+        "lines": "Lines",
+        "status": "Status"
+      },
+      "status": {
+        "active": "Active",
+        "archived": "Archived",
+        "deleted": "Deleted"
+      },
+      "actions": {
+        "edit": "Edit",
+        "movements": "Movements",
+        "grants": "Sold vouchers",
+        "delete": "Delete"
+      },
+      "form": {
+        "titleNew": "New package",
+        "titleEdit": "Editing package — {name}",
+        "name": "Name",
+        "discountType": "Discount type",
+        "percentage": "Percentage",
+        "fixed": "Fixed amount",
+        "discountPercent": "Discount (%)",
+        "discountAmount": "Discount (amount)",
+        "percentInvalid": "Type a percentage from 0 to 100, with at most two decimals.",
+        "fixedPrice": "Closed price",
+        "fixedPriceHelp": "Leave empty to price it as the sum of its lines minus the discount.",
+        "validity": "Validity (days)",
+        "validityHelp": "Days redeemable from the PURCHASE; empty = never expires.",
+        "uses": "Uses",
+        "usesHelp": "Uses the voucher grants; empty = unlimited.",
+        "lines": "Services included",
+        "service": "Service",
+        "sessions": "Sessions",
+        "addLine": "Add service",
+        "removeLine": "Remove line",
+        "linesFixed": "The services included cannot be changed once created: delete this package and create a new one.",
+        "noLines": "Add at least one service: a package with no lines cannot be redeemed.",
+        "create": "Create package",
+        "save": "Save changes"
+      },
+      "delete": {
+        "title": "Delete package",
+        "message": "{name} — the package and its {count} line(s) leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.",
+        "confirm": "Delete",
+        "error": "Could not delete the package"
+      }
+    },
+    "grants": {
+      "title": "Sold vouchers",
+      "hint": "Every customer who bought this voucher, with the sessions used and left. A live voucher can get extra sessions or a later expiry as a courtesy, or have sessions removed to correct its balance; a sale nothing was used from can be voided.",
+      "empty": "Nobody has bought this voucher yet.",
+      "error": "Could not load the sold vouchers",
+      "status": {
+        "active": "Active",
+        "voided": "Voided"
+      },
+      "customer": "Customer: {name}",
+      "customerRef": "Customer reference: {id}",
+      "sale": "Sale: {id}",
+      "uses": "{used} used · {remaining} left",
+      "usesUnlimited": "{used} used · no limit",
+      "expires": "Expires {when}",
+      "noExpiry": "Never expires",
+      "expired": "Expired",
+      "given": "Given afterwards: +{uses} session(s), +{days} day(s)",
+      "corrected": "Corrected afterwards: −{uses} session(s)",
+      "voidedBy": "Voided by {who} on {when}",
+      "adjust": "Adjust",
+      "void": "Void"
+    },
+    "void": {
+      "title": "Void this voucher?",
+      "message": "The voucher of customer {customer} ({amount}) stops being usable and stays in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales with a return.",
+      "reason": "Reason",
+      "reasonHelp": "Required. It stays on the voucher's record, e.g. «sold to the wrong customer».",
+      "confirm": "Void"
+    },
+    "adjust": {
+      "title": "Adjust this voucher",
+      "message": "Give customer {customer} extra sessions or a later expiry at no charge, or remove sessions to correct the balance. It is recorded in the voucher's movements with who, when and why.",
+      "addSessions": "Add sessions",
+      "removeSessions": "Remove sessions",
+      "usesAdd": "Sessions to add",
+      "usesAddHelp": "{remaining} left now. Up to 100.",
+      "usesRemove": "Sessions to remove",
+      "usesRemoveHelp": "{remaining} left now. You can remove up to {remaining}.",
+      "days": "Days to extend",
+      "daysHelp": "Expires {when} now. Up to 366.",
+      "reason": "Reason",
+      "reasonHelp": "Required. It stays on the voucher's record, e.g. «we were closed in August».",
+      "preview": "After the adjustment: {remaining} session(s) left · {expiry}",
+      "previewUnlimited": "After the adjustment: no session limit · {expiry}",
+      "expiresOn": "expires {when}",
+      "neverExpires": "never expires",
+      "confirm": "Adjust"
+    },
+    "movements": {
+      "title": "Voucher movements",
+      "hint": "Every session of this voucher spent, plus the courtesies given and the corrections made afterwards.",
+      "empty": "This voucher has not been used yet.",
+      "error": "Could not load the movements",
+      "kind": {
+        "held": "Held",
+        "consumed": "Delivered",
+        "released": "Released",
+        "expired": "Expired",
+        "returned": "Given back",
+        "adjusted": "Courtesy",
+        "corrected": "Correction"
+      },
+      "customer": "Customer: {name}",
+      "sale": "Sale: {id}",
+      "noService": "No service on the line",
+      "given": "+{uses} session(s) · +{days} day(s)",
+      "correctedDelta": "−{uses} session(s) · +{days} day(s)",
+      "givenBy": "Given by {who}",
+      "correctedBy": "Corrected by {who}",
+      "releasedBy": "Released by {who}",
+      "returnedBy": "Given back by {who}"
+    },
+    "orphans": {
+      "title": "Vouchers with no customer",
+      "hint": "Their customer card was deleted or anonymised. The voucher keeps everything it was sold with: to give the money back, find the sale in Sales; to void it if it was not used, open it from Sold vouchers.",
+      "empty": "No voucher has lost its customer.",
+      "error": "The vouchers with no customer could not be loaded.",
+      "remaining": "{remaining} session(s) left",
+      "unlimited": "No session limit",
+      "noValue": "Fully used",
+      "deletedAt": "Customer deleted on {when}",
+      "expired": "Expired",
+      "customerRef": "Customer reference: {id}",
+      "count": "{shown} of {total}"
+    },
+    "settings": {
+      "title": "Services",
+      "loadError": "The settings could not be loaded.",
+      "saveError": "The settings could not be saved.",
+      "saved": "Settings saved.",
+      "defaultDuration": "Default duration (min)",
+      "defaultBuffer": "Default buffer time (min)",
+      "defaultTax": "Default tax category",
+      "showPrices": "Show prices",
+      "showDuration": "Show duration",
+      "onlineBooking": "Allow online booking",
+      "save": "Save"
+    }
+  }
+}

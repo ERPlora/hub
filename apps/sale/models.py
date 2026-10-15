@@ -12,7 +12,8 @@
 - ``PaymentMethod``, ``Settings`` (one row), ``Department`` and ``QuickNote`` are the till's catalogues.
 
 Money is in whole cents and never negative; quantities are exact decimals with three places. Inventory
-is no requirement: a line keeps a copy of its product, whose id is a plain UUID.
+and Services are no requirement: a line keeps a copy of its product or its service, whose id is a plain
+UUID, and a line paid with a voucher keeps the id of the Services session that pays it.
 """
 
 import datetime as dt
@@ -237,6 +238,11 @@ class Order(UUIDModel):
     # Σ of the live unpaid lines' totals, before the ticket discount: what the till paints, never fiscal.
     provisional_total = models.BigIntegerField(_("provisional total"), default=0)
     version = models.PositiveIntegerField(_("version"), default=1)
+    # A counter sale's check claims its charge attempt: the same attempt at once waits on this unique
+    # key and then answers the sale the first one charged.
+    attempt_key = models.CharField(
+        _("attempt key"), max_length=128, unique=True, null=True, blank=True
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     created_by = models.CharField(
@@ -254,7 +260,15 @@ class Order(UUIDModel):
         indexes = [
             models.Index(fields=["status", "-created_at"], name="sale_order_status_idx")
         ]
-        constraints = [_percent_range("sale_order_discount_range")]
+        constraints = [
+            _percent_range("sale_order_discount_range"),
+            # An appointment has one open check at a time: two «Charge» of it never charge it twice.
+            models.UniqueConstraint(
+                fields=["appointment_id"],
+                condition=Q(status="open", source="pos", appointment_id__isnull=False),
+                name="sale_order_one_open_per_appointment",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.label or str(self.id)
@@ -318,6 +332,19 @@ class OrderLine(UUIDModel):
     gift_reason = models.CharField(_("comp reason"), max_length=200, blank=True)
     notes = models.CharField(_("note"), max_length=255, blank=True)
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
+    # A service of the Services app (an opaque id: Services is no requirement, as Inventory).
+    service_id = models.UUIDField(_("service id"), null=True, blank=True)
+    # The voucher session of the Services app that pays the line (SALE-F27): its id and its voucher's,
+    # the voucher's name and the sessions it had left when applied, and when the hold runs out.
+    voucher_session_id = models.UUIDField(_("voucher session"), null=True, blank=True)
+    voucher_grant_id = models.UUIDField(_("voucher"), null=True, blank=True)
+    voucher_name = models.CharField(_("voucher name"), max_length=200, blank=True)
+    voucher_remaining = models.IntegerField(
+        _("sessions left on the voucher"), null=True, blank=True
+    )
+    voucher_hold_until = models.DateTimeField(
+        _("voucher session held until"), null=True, blank=True
+    )
     line_total = models.BigIntegerField(_("line total"), default=0)
     round_no = models.PositiveIntegerField(_("round"), default=0)
     fired_at = models.DateTimeField(_("sent to the kitchen at"), null=True, blank=True)
@@ -367,6 +394,25 @@ class OrderLine(UUIDModel):
     def is_fired(self) -> bool:
         return self.fired_at is not None
 
+    @property
+    def paid_by_voucher(self) -> bool:
+        return self.voucher_session_id is not None
+
+
+class FiscalStatus(models.TextChoices):
+    """What Invoicing answered when the sale, its void or a refund asked for its fiscal document, in the
+    same transaction (no Invoicing app → «unavailable»; a refusal → «pending», issued later by
+    Invoicing's own reaction; nothing to declare, a refund of no money → «none»)."""
+
+    ISSUED = "issued", _("Issued")
+    PENDING = "pending", _("Pending")
+    UNAVAILABLE = "unavailable", _("Without Invoicing")
+    NONE = "none", _("Nothing to declare")
+
+
+def _fiscal_status(verbose: str):
+    return models.CharField(verbose, max_length=12, choices=FiscalStatus.choices, blank=True)
+
 
 class Sale(UUIDModel):
     """A charge: the fiscal record. Never edited; corrected by its void or its refunds."""
@@ -405,6 +451,21 @@ class Sale(UUIDModel):
         verbose_name=_("customer"),
     )
     customer_name = models.CharField(_("customer name"), max_length=200, blank=True)
+    # The recipient of an invoice as it was checked at the till (a ticket keeps them empty): what a
+    # document issued later — retrying the charge, «Issue now» — declares, the same as the charge would.
+    # ``db_default``: a process still on the previous code inserts sales without them (expand/contract).
+    customer_tax_id = models.CharField(
+        _("customer tax ID"), max_length=32, blank=True, default="", db_default=""
+    )
+    customer_address = models.CharField(
+        _("customer address"), max_length=500, blank=True, default="", db_default=""
+    )
+    customer_country = models.CharField(
+        _("customer country"), max_length=2, blank=True, default="", db_default=""
+    )
+    customer_id_type = models.CharField(
+        _("customer document type"), max_length=2, blank=True, default="", db_default=""
+    )
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)
     tax_included = models.BooleanField(_("prices include VAT"), default=True)
@@ -420,8 +481,11 @@ class Sale(UUIDModel):
     tendered_total = models.BigIntegerField(_("tendered"), default=0)
     change_total = models.BigIntegerField(_("change"), default=0)
     refunded_total = models.BigIntegerField(_("refunded"), default=0)
-    # ``[{rate_pct, label, base, tax}]`` by rate, as the document prints it.
-    tax_breakdown = models.JSONField(_("tax breakdown"), default=list, blank=True, encoder=DjangoJSONEncoder)
+    # ``[{rate_pct, label, tax_type, regime, qualification, exempt_reason, base, tax}]``: one row per
+    # fiscal key and component, as the document prints it and Invoicing declares it.
+    tax_breakdown = models.JSONField(
+        _("tax breakdown"), default=list, blank=True, encoder=DjangoJSONEncoder
+    )
     payment_method_name = models.CharField(_("payment"), max_length=60, blank=True)
     idempotency_key = models.CharField(_("attempt key"), max_length=128, unique=True)
     notes = models.TextField(_("notes"), blank=True)
@@ -430,6 +494,16 @@ class Sale(UUIDModel):
         _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
     void_reason = models.CharField(_("void reason"), max_length=500, blank=True)
+    # The fiscal document Invoicing issued for it (F2 ticket, F1 invoice) and for its void (R5, R1):
+    # ids of Invoicing without a foreign key (Invoicing is no requirement of Sales; PLAN §20.5).
+    invoice_id = models.UUIDField(_("fiscal document"), null=True, blank=True)
+    invoice_number = models.CharField(_("fiscal document number"), max_length=60, blank=True)
+    invoice_type = models.CharField(_("fiscal document type"), max_length=2, blank=True)
+    invoice_status = _fiscal_status(_("fiscal document"))
+    void_invoice_number = models.CharField(
+        _("rectifying invoice of the void"), max_length=60, blank=True
+    )
+    void_invoice_status = _fiscal_status(_("rectifying invoice of the void"))
     created_at = models.DateTimeField(_("charged at"), default=timezone.now)
     created_by = models.CharField(
         _("charged by"), max_length=ACTOR_MAX_LENGTH, blank=True
@@ -445,6 +519,12 @@ class Sale(UUIDModel):
                 fields=["status", "business_day"], name="sale_sale_status_idx"
             ),
             models.Index(fields=["-created_at", "-id"], name="sale_sale_recent_idx"),
+            # Cash register reads the voids of a shift by their time (CASH_REGISTER-F11, F17).
+            models.Index(
+                fields=["voided_at"],
+                name="sale_sale_voided_idx",
+                condition=Q(voided_at__isnull=False),
+            ),
         ]
         constraints = [
             models.CheckConstraint(
@@ -504,6 +584,10 @@ class SaleLine(UUIDModel):
     gift_reason = models.CharField(_("comp reason"), max_length=200, blank=True)
     notes = models.CharField(_("note"), max_length=255, blank=True)
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
+    service_id = models.UUIDField(_("service id"), null=True, blank=True)
+    voucher_session_id = models.UUIDField(_("voucher session"), null=True, blank=True)
+    voucher_grant_id = models.UUIDField(_("voucher"), null=True, blank=True)
+    voucher_name = models.CharField(_("voucher name"), max_length=200, blank=True)
     tax_category_key = models.CharField(_("tax category"), max_length=80)
     tax_rate = models.DecimalField(_("rate (%)"), max_digits=6, decimal_places=2)
     tax_country_code = models.CharField(_("tax country"), max_length=2)
@@ -513,7 +597,9 @@ class SaleLine(UUIDModel):
     tax_amount = models.BigIntegerField(_("tax"))
     line_total = models.BigIntegerField(_("total"))
     # ``[{rule_id, label, tax_type, rate_pct, tax}]``: the rule's components over this line's base.
-    tax_components = models.JSONField(_("tax components"), default=list, blank=True, encoder=DjangoJSONEncoder)
+    tax_components = models.JSONField(
+        _("tax components"), default=list, blank=True, encoder=DjangoJSONEncoder
+    )
 
     class Meta:
         verbose_name = _("sale line")
@@ -531,6 +617,10 @@ class SaleLine(UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.quantity} × {self.name}"
+
+    @property
+    def paid_by_voucher(self) -> bool:
+        return self.voucher_session_id is not None
 
 
 class SalePayment(UUIDModel):
@@ -589,7 +679,8 @@ class SaleCounter(UUIDModel):
 
 
 class Refund(UUIDModel):
-    """Money given back on a sale (by tender), with the lines that return."""
+    """Money given back on a sale (by tender), with the lines that return; no money when only the
+    session of a voucher comes back (SALE-F32)."""
 
     sale = models.ForeignKey(
         Sale, on_delete=models.PROTECT, related_name="refunds", verbose_name=_("sale")
@@ -604,14 +695,20 @@ class Refund(UUIDModel):
     created_by = models.CharField(
         _("refunded by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
+    # Its rectifying invoice (R1, R5), as Invoicing answered in the same transaction.
+    invoice_number = models.CharField(_("rectifying invoice"), max_length=60, blank=True)
+    invoice_type = models.CharField(_("rectifying invoice type"), max_length=2, blank=True)
+    invoice_status = _fiscal_status(_("rectifying invoice"))
 
     class Meta:
         verbose_name = _("refund")
         verbose_name_plural = _("refunds")
         ordering = ["-created_at", "-id"]
+        # Cash register reads the refunds of a shift by their time (CASH_REGISTER-F11, F17).
+        indexes = [models.Index(fields=["created_at"], name="sale_refund_created_idx")]
         constraints = [
             models.CheckConstraint(
-                condition=Q(total__gt=0), name="sale_refund_total_positive"
+                condition=Q(total__gte=0), name="sale_refund_total_not_negative"
             )
         ]
 

@@ -55,6 +55,7 @@ describe('ActivityPanel: the activity', () => {
       pageOf([
         entry('a1', 'note_added', { text: 'Prefers mornings' }),
         entry('a2', 'purchase_recorded', { data: { amount: 2550, currency: 'EUR' } }),
+        entry('a6', 'purchase_refunded', { text: 'One cup back', data: { amount: 1210, currency: 'EUR' } }),
         entry('a3', 'consent_granted', { text: 'I want offers' }),
         entry('a4', 'appointment.visit', { title: 'Visit: haircut', actor: 'Luis' }),
         entry('a5', 'note_added', { title: 'From the flow', text: 'Auto', data: { author_name: 'Bot' } }),
@@ -66,10 +67,12 @@ describe('ActivityPanel: the activity', () => {
     expect(read(0).get('.customer-activity__when').text()).toBe(`${formatDateTime('2026-10-02T10:00:00Z', 'en')} · by Ana`);
     expect(read(1).get('.customer-activity__title').text()).toBe('Purchase recorded');
     expect(read(1).get('.customer-activity__text').text()).toBe(formatMoney(2550, 'en'));
-    expect(read(2).get('.customer-activity__title').text()).toBe('Consent given');
-    expect(read(3).get('.customer-activity__title').text()).toBe('Visit: haircut');
-    expect(read(4).get('.customer-activity__title').text()).toBe('From the flow');
-    expect(read(4).get('.customer-activity__when').text()).toContain('by Bot');
+    expect(read(2).get('.customer-activity__title').text()).toBe('Purchase refunded');
+    expect(read(2).get('.customer-activity__text').text()).toBe('One cup back');
+    expect(read(3).get('.customer-activity__title').text()).toBe('Consent given');
+    expect(read(4).get('.customer-activity__title').text()).toBe('Visit: haircut');
+    expect(read(5).get('.customer-activity__title').text()).toBe('From the flow');
+    expect(read(5).get('.customer-activity__when').text()).toContain('by Bot');
   });
 
   it('«Show more» grows by 50 while there are more, never asking for more than 100 at once', async () => {

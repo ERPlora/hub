@@ -157,7 +157,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 49 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route', () => {
+  it('binds the 53 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -171,12 +171,16 @@ describe('OPERATION_ROUTES', () => {
       'sale.sale.complete_over_limit': { method: 'post', path: '/api/sale/sales/complete_over_limit' },
       'sale.sale.void': { method: 'post', path: '/api/sale/sales/void' },
       'sale.sale.refund': { method: 'post', path: '/api/sale/sales/refund' },
+      'sale.sale.issue_documents': { method: 'post', path: '/api/sale/sales/issue_documents' },
       'sale.checkout.preview': { method: 'get', path: '/api/sale/checkout/preview' },
       'sale.order.list': { method: 'get', path: '/api/sale/orders' },
       'sale.order.open': { method: 'post', path: '/api/sale/orders' },
       'sale.order.get': { method: 'get', path: '/api/sale/orders/detail' },
       'sale.order.add_line': { method: 'post', path: '/api/sale/orders/add_line' },
       'sale.order.add_open_line': { method: 'post', path: '/api/sale/orders/add_open_line' },
+      'sale.order.add_service_line': { method: 'post', path: '/api/sale/orders/add_service_line' },
+      'sale.order.apply_voucher': { method: 'post', path: '/api/sale/orders/apply_voucher' },
+      'sale.order.remove_voucher': { method: 'post', path: '/api/sale/orders/remove_voucher' },
       'sale.order.update_line': { method: 'post', path: '/api/sale/orders/update_line' },
       'sale.order.set_line_staff': { method: 'post', path: '/api/sale/orders/set_line_staff' },
       'sale.order.split_line': { method: 'post', path: '/api/sale/orders/split_line' },
@@ -212,6 +216,97 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
+  it('binds the thirty-seven routed service operations to apps/service/api.py (the reactions and the sessions of the till have no route)', () => {
+    expect(OPERATION_ROUTES).toMatchObject({
+      'service.service.list': { method: 'get', path: '/api/service/services' },
+      'service.service.create': { method: 'post', path: '/api/service/services' },
+      'service.service.get': { method: 'get', path: '/api/service/services/detail' },
+      'service.service.list_for_sale': { method: 'get', path: '/api/service/services/for_sale' },
+      'service.service.bulk_create': { method: 'post', path: '/api/service/services/bulk_create' },
+      'service.service.update': { method: 'post', path: '/api/service/services/update' },
+      'service.service.archive': { method: 'post', path: '/api/service/services/archive' },
+      'service.service.restore': { method: 'post', path: '/api/service/services/restore' },
+      'service.catalog.status': { method: 'get', path: '/api/service/catalog/status' },
+      'service.category.list': { method: 'get', path: '/api/service/categories' },
+      'service.category.create': { method: 'post', path: '/api/service/categories' },
+      'service.category.get': { method: 'get', path: '/api/service/categories/detail' },
+      'service.category.update': { method: 'post', path: '/api/service/categories/update' },
+      'service.category.delete': { method: 'post', path: '/api/service/categories/delete' },
+      'service.settings.get': { method: 'get', path: '/api/service/settings' },
+      'service.settings.update': { method: 'post', path: '/api/service/settings' },
+      'service.assignment.list': { method: 'get', path: '/api/service/assignments' },
+      'service.assignment.eligible': { method: 'get', path: '/api/service/assignments/eligible' },
+      'service.assignment.assign': { method: 'post', path: '/api/service/assignments/assign' },
+      'service.assignment.update': { method: 'post', path: '/api/service/assignments/update' },
+      'service.assignment.remove': { method: 'post', path: '/api/service/assignments/remove' },
+      'service.package.list': { method: 'get', path: '/api/service/packages' },
+      'service.package.create': { method: 'post', path: '/api/service/packages' },
+      'service.package.get': { method: 'get', path: '/api/service/packages/detail' },
+      'service.package.update': { method: 'post', path: '/api/service/packages/update' },
+      'service.package.delete': { method: 'post', path: '/api/service/packages/delete' },
+      'service.grant.list': { method: 'get', path: '/api/service/grants' },
+      'service.grant.create': { method: 'post', path: '/api/service/grants' },
+      'service.grant.list_orphans': { method: 'get', path: '/api/service/grants/orphans' },
+      'service.grant.void_check': { method: 'get', path: '/api/service/grants/void_check' },
+      'service.grant.adjust_check': { method: 'get', path: '/api/service/grants/adjust_check' },
+      'service.grant.redeem_check': { method: 'get', path: '/api/service/grants/redeem_check' },
+      'service.grant.tender_options': { method: 'get', path: '/api/service/grants/tender_options' },
+      'service.grant.void': { method: 'post', path: '/api/service/grants/void' },
+      'service.grant.adjust': { method: 'post', path: '/api/service/grants/adjust' },
+      'service.grant.redeem': { method: 'post', path: '/api/service/grants/redeem' },
+      'service.movement.list': { method: 'get', path: '/api/service/movements' },
+    });
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(37);
+  });
+
+  it('binds the sixteen cash register operations to apps/cash_register/api.py: queries by GET, commands by POST', () => {
+    expect(OPERATION_ROUTES).toMatchObject({
+      'cash_register.settings.get': { method: 'get', path: '/api/cash_register/settings' },
+      'cash_register.settings.update': { method: 'post', path: '/api/cash_register/settings' },
+      'cash_register.register.list': { method: 'get', path: '/api/cash_register/registers' },
+      'cash_register.register.create': { method: 'post', path: '/api/cash_register/registers' },
+      'cash_register.register.update': { method: 'post', path: '/api/cash_register/registers/update' },
+      'cash_register.session.list': { method: 'get', path: '/api/cash_register/sessions' },
+      'cash_register.session.current': { method: 'get', path: '/api/cash_register/sessions/current' },
+      'cash_register.session.get': { method: 'get', path: '/api/cash_register/sessions/detail' },
+      'cash_register.session.open': { method: 'post', path: '/api/cash_register/sessions/open' },
+      'cash_register.session.close': { method: 'post', path: '/api/cash_register/sessions/close' },
+      'cash_register.session.auto_close': { method: 'post', path: '/api/cash_register/sessions/auto_close' },
+      'cash_register.movement.list': { method: 'get', path: '/api/cash_register/movements' },
+      'cash_register.movement.add': { method: 'post', path: '/api/cash_register/movements' },
+      'cash_register.count.list': { method: 'get', path: '/api/cash_register/counts' },
+      'cash_register.count.add': { method: 'post', path: '/api/cash_register/counts' },
+      'cash_register.currency.get': { method: 'get', path: '/api/cash_register/currency' },
+    });
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(16);
+  });
+
+  it('binds the twenty routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
+    expect(OPERATION_ROUTES).toMatchObject({
+      'invoice.invoice.list': { method: 'get', path: '/api/invoice/invoices' },
+      'invoice.invoice.get': { method: 'get', path: '/api/invoice/invoices/detail' },
+      'invoice.invoice.by_source': { method: 'get', path: '/api/invoice/invoices/by_source' },
+      'invoice.invoice.document': { method: 'get', path: '/api/invoice/invoices/document' },
+      'invoice.invoice.create': { method: 'post', path: '/api/invoice/invoices' },
+      'invoice.invoice.create_from_sale': { method: 'post', path: '/api/invoice/invoices/from_sale' },
+      'invoice.invoice.substitute': { method: 'post', path: '/api/invoice/invoices/substitute' },
+      'invoice.invoice.mark_paid': { method: 'post', path: '/api/invoice/invoices/mark_paid' },
+      'invoice.invoice.rectify': { method: 'post', path: '/api/invoice/invoices/rectify' },
+      'invoice.invoice.rectify_from_refund': { method: 'post', path: '/api/invoice/invoices/rectify_from_refund' },
+      'invoice.invoice.rectify_from_void': { method: 'post', path: '/api/invoice/invoices/rectify_from_void' },
+      'invoice.series.list': { method: 'get', path: '/api/invoice/series' },
+      'invoice.series.peek_next': { method: 'get', path: '/api/invoice/series/peek_next' },
+      'invoice.series.create': { method: 'post', path: '/api/invoice/series' },
+      'invoice.series.update': { method: 'post', path: '/api/invoice/series/update' },
+      'invoice.numbering.status': { method: 'get', path: '/api/invoice/numbering/status' },
+      'invoice.numbering.gaps': { method: 'get', path: '/api/invoice/numbering/gaps' },
+      'invoice.numbering.allocations': { method: 'get', path: '/api/invoice/numbering/allocations' },
+      'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
+      'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
+    });
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(20);
+  });
+
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {
     for (const [op, route] of Object.entries(OPERATION_ROUTES)) {
       expect(op).toMatch(/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/);
@@ -219,5 +314,14 @@ describe('OPERATION_ROUTES', () => {
       // ninja's parity binds one parameter (the operation's input): no `{param}` next to a body.
       expect(route.path).not.toMatch(/[{}]/);
     }
+  });
+});
+
+describe('the voucher at the till (SALE-F27, SERVICE-F22)', () => {
+  it('reads the vouchers that can pay a line from apps/service/api.py and pays it through apps/sale/api.py', () => {
+    expect(OPERATION_ROUTES['service.grant.tender_options']).toEqual({ method: 'get', path: '/api/service/grants/tender_options' });
+    expect(OPERATION_ROUTES['sale.order.apply_voucher']).toEqual({ method: 'post', path: '/api/sale/orders/apply_voucher' });
+    // Services' session commands run inside Sales' writes: no route.
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.session.'))).toEqual([]);
   });
 });

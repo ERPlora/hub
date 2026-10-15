@@ -3,7 +3,7 @@
 // language with `Intl.NumberFormat`, and the euros a person types into cents: no page formats by hand.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromEuros, formatMoney, formatPercent, formatQuantity, plain } from './format';
+import { centsFromEuros, formatDay, formatMoney, formatPercent, formatQuantity, plain } from './format';
 
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
@@ -53,5 +53,13 @@ describe('centsFromEuros', () => {
     expect(centsFromEuros(null)).toBeUndefined();
     expect(centsFromEuros('12,345')).toBeUndefined();
     expect(centsFromEuros('abc')).toBeUndefined();
+  });
+});
+
+describe('formatDay', () => {
+  it('a day as the reader writes it (what «Expires on» shows)', () => {
+    expect(formatDay('2026-11-14T10:00:00Z', 'es')).toBe('14/11/2026');
+    expect(formatDay('2026-11-14T10:00:00Z', 'en')).toBe('11/14/2026');
+    expect(formatDay(null, 'es')).toBe('—');
   });
 });

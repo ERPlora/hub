@@ -7,11 +7,12 @@ import { toast } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, mountSale } from '../../__tests__/mount-sale';
-import { category, page, product } from './__tests__/fixtures';
+import { category, page, product, service } from './__tests__/fixtures';
 import CategoryStrip from './CategoryStrip.vue';
 import PosCatalog from './PosCatalog.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
+import ServiceGrid from './ServiceGrid.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
@@ -25,7 +26,7 @@ const CATEGORIES = 'inventory.category.list';
 const GRID = { is_active: true, sort: 'name' };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(PosCatalog, { props: { showProducts: true, canOpenPrice: true, target: null, ...props }, locale });
+  const m = await mountSale(PosCatalog, { props: { showProducts: true, canOpenPrice: true, ...props }, locale });
   await m.live();
   const grid = () => m.wrapper.findComponent(ProductGrid);
   const gridParams = () => m.params(PRODUCTS).filter((p) => p.sort === 'name');
@@ -154,5 +155,66 @@ describe('PosCatalog: states', () => {
     await s.result(PRODUCTS, page([product({ id: 'p1' })]), { sort: 'name' });
     expect(s.find('pos-product-p1').exists()).toBe(false);
     expect(s.find('pos-open-price-tile').exists()).toBe(true);
+  });
+});
+
+describe('PosCatalog: the services of Services (SALE-F38)', () => {
+  const SERVICES = 'service.service.list_for_sale';
+  /** `v-show`: the services' grid stays mounted (its count feeds the chip) and hides with display:none. */
+  const shownGrid = (s: Awaited<ReturnType<typeof setup>>) =>
+    !(s.wrapper.findComponent(ServiceGrid).attributes('style') ?? '').includes('display: none');
+
+  it('without services nothing of Services is asked nor shown', async () => {
+    const s = await setup();
+    expect(s.params(SERVICES)).toEqual([]);
+    expect(s.find('pos-category-services').exists()).toBe(false);
+    expect(s.wrapper.findComponent(ServiceGrid).exists()).toBe(false);
+  });
+
+  it('with services, the «Services» chip carries their count and shows their grid instead of the products', async () => {
+    const s = await setup({ showServices: true });
+    expect(s.params(SERVICES)).toEqual([{ limit: 100, offset: 0 }]);
+    await s.result(SERVICES, page([service({ id: 'sv1' }), service({ id: 'sv2', name: 'Color' })], 2));
+    const strip = s.wrapper.findComponent(CategoryStrip);
+    expect(strip.props()).toMatchObject({ withServices: true, servicesCount: 2 });
+    expect(shownGrid(s)).toBe(false);
+    expect(s.grid().exists()).toBe(true);
+    strip.vm.$emit('update:modelValue', 'services');
+    await s.reopen();
+    expect(shownGrid(s)).toBe(true);
+    expect(s.grid().exists()).toBe(false);
+    expect(s.find('pos-service-sv2').exists()).toBe(true);
+  });
+
+  it('a sellable service is handed up; one without VAT says why and adds nothing', async () => {
+    const s = await setup({ showServices: true }, 'es');
+    await s.result(SERVICES, page([service({ id: 'sv1' }), service({ id: 'sv2', needs_tax_setup: true })]));
+    s.wrapper.findComponent(CategoryStrip).vm.$emit('update:modelValue', 'services');
+    await s.reopen();
+    await click(s.find('pos-service-sv1').element);
+    expect(s.wrapper.emitted('service')).toEqual([[service({ id: 'sv1' })]]);
+    await click(s.find('pos-service-sv2').element);
+    expect(s.wrapper.emitted('service')).toHaveLength(1);
+    expect(s.find('pos-tap-notice').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
+  });
+
+  it('with products hidden, the services come first and «All» keeps the open price', async () => {
+    const s = await setup({ showProducts: false, showServices: true });
+    await s.result(SERVICES, page([service()]));
+    expect(shownGrid(s)).toBe(true);
+    expect(s.find('pos-search-trigger').exists()).toBe(false);
+    s.wrapper.findComponent(CategoryStrip).vm.$emit('update:modelValue', '');
+    await s.reopen();
+    expect(s.find('pos-open-price-tile').exists()).toBe(true);
+  });
+
+  it('the search looks for services too, and a service found is handed up', async () => {
+    const s = await setup({ showServices: true });
+    await click(s.find('pos-search-trigger').element);
+    expect(s.wrapper.findComponent(ProductSearch).props('withServices')).toBe(true);
+    s.wrapper.findComponent(ProductSearch).vm.$emit('pickService', service({ id: 'sv7' }));
+    await s.reopen();
+    expect(s.wrapper.emitted('service')).toEqual([[service({ id: 'sv7' })]]);
+    expect(s.wrapper.findComponent(ProductSearch).exists()).toBe(false);
   });
 });

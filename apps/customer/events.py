@@ -1,12 +1,20 @@
-"""Events of the customer app (``customer.<entity>.<fact>``): recorded by services.py, cited by live.py.
+"""Events of the customer app (``customer.<entity>.<fact>``) and its reactions to the Sales app's events.
 
-They carry ids only, never personal data: whoever needs the card asks ``customer.customer.detail``.
+services.py records them in the outbox, in the command's transaction; live.py names the ones that
+re-run each live query. They carry ids only, never personal data: whoever needs the card asks
+``customer.customer.detail``.
 
-Reactions to other apps' events (WORKBOOK «A qué reacciona»): ``sale.sale.completed`` will run
-``customer.purchase.record`` and ``sale.sale.voided`` ``customer.purchase.void``. Both operations are
-built and tested; the reactions are wired here once the sale app exists and the outbox relay
-delivers events between apps (phase 2).
+Reactions (WORKBOOK «A qué reacciona»): a paid sale is recorded on its customer's card, a voided one
+taken off and a refund subtracted from the spend, each through an operation of this app run as the
+system, in its own transaction. The outbox relay (phase 2, in the worker) hands each delivered event
+to ``react``; the operations are idempotent per sale and per refund, so a repeated delivery changes
+nothing. ``customer`` does not require ``sale``: this is the only link.
 """
+
+from typing import Any
+
+from live.context import Scope, system_context
+from live.operations import get
 
 CUSTOMER_CREATED = "customer.customer.created"
 CUSTOMER_UPDATED = "customer.customer.updated"
@@ -23,6 +31,7 @@ ORDER_LINKED = "customer.order.linked"
 ORDER_UNLINKED = "customer.order.unlinked"
 PURCHASE_RECORDED = "customer.purchase.recorded"
 PURCHASE_VOIDED = "customer.purchase.voided"
+PURCHASE_REFUNDED = "customer.purchase.refunded"
 GROUP_CREATED = "customer.group.created"
 GROUP_UPDATED = "customer.group.updated"
 GROUP_DELETED = "customer.group.deleted"
@@ -49,6 +58,7 @@ ALL = [
     ORDER_UNLINKED,
     PURCHASE_RECORDED,
     PURCHASE_VOIDED,
+    PURCHASE_REFUNDED,
     GROUP_CREATED,
     GROUP_UPDATED,
     GROUP_DELETED,
@@ -59,3 +69,24 @@ ALL = [
     FIELD_UPDATED,
     FIELD_DELETED,
 ]
+
+# The Sales app's events (its WORKBOOK fixes their payload).
+SALE_COMPLETED = "sale.sale.completed"
+SALE_VOIDED = "sale.sale.voided"
+SALE_REFUNDED = "sale.sale.refunded"
+
+#: Event of another app → the operation of this app that reacts to it.
+REACTIONS = {
+    SALE_COMPLETED: "customer.purchase.record",
+    SALE_VOIDED: "customer.purchase.void",
+    SALE_REFUNDED: "customer.purchase.refund",
+}
+
+
+def react(scope: Scope, name: str, payload: dict[str, Any]):
+    """Run this app's reaction to the event ``name`` of ``scope`` as the system; ``None`` if it has none."""
+    operation_name = REACTIONS.get(name)
+    if operation_name is None:
+        return None
+    reaction = get(operation_name)
+    return reaction(system_context(scope), reaction.input.model_validate(payload))

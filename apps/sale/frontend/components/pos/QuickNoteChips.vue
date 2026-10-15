@@ -5,7 +5,7 @@
 // typed by hand. Mounted only while the note sheet is open.
 import { IonButton } from '@ionic/vue';
 
-import { useLiveWindows } from '../../composables/pos/useLiveWindows';
+import { useLiveWindows } from '../../composables/useLiveWindows';
 import type { QuickNoteOut } from '../../operations';
 import { noteHasChip, toggleNoteChip } from './till';
 

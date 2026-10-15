@@ -1,0 +1,319 @@
+{
+  "invoice": {
+    "title": "Facturación",
+    "tabs": {
+      "label": "Secciones de Facturación",
+      "invoices": "Facturas",
+      "series": "Series",
+      "issuer": "Emisor"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "noPermission": "No tienes permiso",
+    "yes": "Sí",
+    "no": "No",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "back": "Volver",
+    "types": {
+      "F1": "Factura",
+      "F2": "Ticket",
+      "F3": "Factura",
+      "R1": "Rectificativa",
+      "R2": "Rectificativa",
+      "R3": "Rectificativa",
+      "R4": "Rectificativa",
+      "R5": "Rectificativa"
+    },
+    "typeNames": {
+      "F1": "Factura (F1)",
+      "F2": "Ticket (F2)",
+      "F3": "Factura en sustitución de un ticket (F3)",
+      "R1": "Rectificativa (R1)",
+      "R2": "Rectificativa (R2)",
+      "R3": "Rectificativa (R3)",
+      "R4": "Rectificativa (R4)",
+      "R5": "Rectificativa (R5)"
+    },
+    "status": {
+      "issued": "Emitida",
+      "paid": "Pagada",
+      "cancelled": "Cancelada"
+    },
+    "sources": {
+      "sale": "Venta del TPV",
+      "manual": "Alta manual",
+      "substitution": "Sustituye a una factura simplificada",
+      "rectification": "Rectificación",
+      "refund": "Devolución de la venta",
+      "void": "Anulación de la venta"
+    },
+    "taxes": {
+      "vat": "IVA",
+      "surcharge": "Recargo de equivalencia",
+      "exempt": "Exento",
+      "exemptCause": "Exento ({cause})",
+      "notSubject": "No sujeto",
+      "reverseCharge": "Inversión del sujeto pasivo"
+    },
+    "list": {
+      "search": "Buscar facturas…",
+      "columns": {
+        "number": "Número",
+        "customer": "Cliente",
+        "total": "Total",
+        "status": "Estado",
+        "date": "Fecha",
+        "type": "Tipo"
+      },
+      "entity": {
+        "one": "factura",
+        "many": "facturas"
+      },
+      "empty": "Aún no hay facturas.",
+      "noResults": "Sin resultados",
+      "loading": "Cargando…",
+      "loadError": "No se pudieron cargar las facturas",
+      "add": "Nueva factura",
+      "actions": {
+        "view": "Ver",
+        "markPaid": "Marcar pagada",
+        "rectify": "Rectificar"
+      },
+      "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros."
+    },
+    "filters": {
+      "status": "Estado",
+      "type": "Tipo",
+      "series": "Serie",
+      "source": "Origen",
+      "dateFrom": "Emitidas desde",
+      "dateTo": "Emitidas hasta",
+      "totalFrom": "Total desde (€)",
+      "totalTo": "Total hasta (€)",
+      "any": "Cualquiera",
+      "clear": "Quitar filtros",
+      "button": "Filtros",
+      "title": "Filtrar facturas",
+      "count": "Filtros: {n} en uso",
+      "done": "Hecho",
+      "amountInvalid": "Escribe un importe, como 12,50"
+    },
+    "detail": {
+      "title": "Factura {number}",
+      "loading": "Cargando…",
+      "notFound": "Factura no encontrada",
+      "loadError": "No se pudo cargar el detalle",
+      "print": "Imprimir / PDF",
+      "printFailed": "No se pudo imprimir la factura",
+      "missingTaxId": "Esta factura no tiene el NIF del cliente: la impresora de tiques no puede sacarla como factura completa.",
+      "fields": {
+        "type": "Tipo",
+        "series": "Serie",
+        "issueDate": "Fecha de emisión",
+        "operationDate": "Fecha de operación",
+        "customer": "Cliente",
+        "customerTaxId": "NIF cliente",
+        "address": "Dirección",
+        "issuer": "Emisor",
+        "source": "Origen",
+        "sale": "Venta",
+        "rectifies": "Rectifica a",
+        "substitutes": "Sustituye a",
+        "substitutedBy": "Sustituida por",
+        "rectifications": "Rectificativas",
+        "paidAt": "Pagada el",
+        "notes": "Notas"
+      },
+      "lines": {
+        "index": "#",
+        "description": "Descripción",
+        "qty": "Cant.",
+        "price": "Precio",
+        "taxPct": "IVA %",
+        "base": "Base",
+        "tax": "Impuesto",
+        "total": "Total",
+        "none": "Sin líneas de detalle.",
+        "discount": "Dto."
+      },
+      "totals": {
+        "base": "Base",
+        "taxes": "Impuestos",
+        "total": "Total"
+      },
+      "rectifiesNote": "Rectifica la factura {number}. Motivo: {reason}",
+      "rectifiesNoteNoReason": "Rectifica la factura {number}.",
+      "actions": {
+        "markPaid": "Marcar pagada",
+        "rectify": "Rectificar",
+        "substitute": "Factura completa"
+      }
+    },
+    "markPaid": {
+      "title": "¿Marcar {number} como pagada?",
+      "message": "El cobro se registra con la fecha y la hora de ahora.",
+      "confirm": "Marcar pagada",
+      "done": "Factura {number} marcada como pagada",
+      "failed": "No se pudo marcar como pagada"
+    },
+    "rectify": {
+      "title": "Rectificar {number}",
+      "note": "Se emitirá una rectificativa (serie RECT) con los importes negados y la factura original quedará cancelada. Esta operación no se puede deshacer.",
+      "type": "Tipo de rectificativa",
+      "types": {
+        "R1": "R1 · Error fundado en derecho, devoluciones (art. 80 Uno, Dos y Seis)",
+        "R2": "R2 · Concurso de acreedores (art. 80 Tres)",
+        "R3": "R3 · Créditos incobrables (art. 80 Cuatro)",
+        "R4": "R4 · Resto de causas"
+      },
+      "simplified": "Un ticket se rectifica como R5 (rectificativa de una factura simplificada).",
+      "reason": "Motivo",
+      "reasonPlaceholder": "Motivo de la rectificación",
+      "reasonRequired": "Escribe el motivo de la rectificación.",
+      "submit": "Emitir rectificativa",
+      "done": "Rectificativa {rectification} emitida. {number} queda cancelada.",
+      "doneLeft": "Rectificativa {rectification} emitida.",
+      "isRectifying": "Una rectificativa no se puede rectificar.",
+      "cancelled": "La factura ya está cancelada.",
+      "failed": "No se pudo rectificar"
+    },
+    "substitute": {
+      "title": "Factura completa del ticket {number}",
+      "intro": "El ticket se queda como está; lo sustituye una factura completa (F3) con los mismos importes y los datos del cliente.",
+      "submit": "Emitir factura completa",
+      "done": "Factura completa {number} emitida",
+      "failed": "No se pudo emitir la factura completa"
+    },
+    "recipient": {
+      "name": "Nombre o razón social",
+      "country": "País",
+      "idType": "Tipo de documento",
+      "idTypes": {
+        "02": "NIF-IVA de la UE",
+        "03": "Pasaporte",
+        "04": "Identificación fiscal de su país",
+        "05": "Certificado de residencia",
+        "06": "Otro documento",
+        "07": "No censado"
+      },
+      "taxId": "NIF",
+      "address": "Domicilio"
+    },
+    "create": {
+      "title": "Nueva factura manual",
+      "series": "Serie",
+      "customer": "Cliente",
+      "taxId": "NIF cliente",
+      "address": "Dirección",
+      "notes": "Notas",
+      "line": {
+        "description": "Descripción",
+        "qty": "Cant.",
+        "price": "Precio",
+        "taxPct": "IVA %"
+      },
+      "addLine": "+ Línea",
+      "removeLine": "Quitar línea",
+      "submit": "Emitir factura",
+      "done": "Factura {number} emitida",
+      "failed": "No se pudo crear la factura",
+      "notAnAmount": "Línea {line}: el precio no es un importe. Escribe una cifra, por ejemplo 12,50."
+    },
+    "series": {
+      "title": "Series de numeración",
+      "intro": "Cada serie define el prefijo, el formato y el contador de la numeración de un tipo de factura y un año (PREFIX-YYYY-NNNNNN). El código, el tipo, el año y el contador no cambian nunca; el prefijo, el formato y el siguiente número, solo hasta que la serie emite su primera factura.",
+      "search": "Buscar código, nombre…",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo",
+        "year": "Año",
+        "prefix": "Prefijo",
+        "format": "Formato",
+        "number": "Nº actual",
+        "active": "Activa",
+        "default": "Predet."
+      },
+      "defaultFormat": "PREFIX-YYYY-NNNNNN",
+      "entity": {
+        "one": "serie",
+        "many": "series"
+      },
+      "empty": "Aún no hay series. Crea la primera para numerar tus facturas.",
+      "noResults": "Sin resultados",
+      "loading": "Cargando series…",
+      "loadError": "No se pudieron cargar las series",
+      "add": "Nueva serie",
+      "actions": {
+        "edit": "Editar"
+      },
+      "form": {
+        "createTitle": "Nueva serie de numeración",
+        "editTitle": "Editar serie {code}",
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo de factura",
+        "year": "Año",
+        "prefix": "Prefijo",
+        "format": "Formato del número",
+        "nextNumber": "Siguiente número",
+        "active": "Activa",
+        "default": "Serie predeterminada",
+        "codeHint": "Identificador interno de la serie (no cambia tras crearla). Las ventas numeran en TICKET, FACT y RECT.",
+        "prefixHint": "Texto antepuesto al número (ej. FAC → FAC-2026-000001); vacío toma el código.",
+        "formatHint": "Marcadores: {'{prefix}'}, {'{code}'}, {'{year}'}, {'{seq}'} y {'{seq:01d}'}…{'{seq:09d}'}. El año y una secuencia son obligatorios, sin tildes ni símbolos como º. Déjalo vacío para PREFIX-AAAA-NNNNNN. Lo demás se escribe literal (p. ej. VFT{'{year}'}-A-{'{seq:04d}'}). La anchura es un mínimo: un número más largo nunca se recorta.",
+        "lockedHint": "Esta serie ya ha emitido facturas, así que su prefijo, su formato y su siguiente número ya no se pueden cambiar: el número forma parte de la cadena de VeriFactu. Crea una serie nueva si necesitas otros.",
+        "preview": "Siguiente número",
+        "create": "Crear serie",
+        "save": "Guardar",
+        "created": "Serie {code} creada",
+        "saved": "Serie {code} guardada",
+        "failed": "No se pudo guardar la serie"
+      }
+    },
+    "issuer": {
+      "title": "Emisor",
+      "intro": "La identidad fiscal del negocio: sale como emisor en cada factura que se emita desde ahora.",
+      "missing": "Sin el emisor no se puede emitir ninguna factura.",
+      "fromSaas": "Datos recibidos de tu cuenta de ERPlora el {date}.",
+      "readOnly": "Puedes consultar el emisor pero no cambiarlo.",
+      "fields": {
+        "legalName": "Razón social",
+        "taxId": "NIF",
+        "address": "Domicilio",
+        "postalCode": "Código postal",
+        "city": "Ciudad",
+        "province": "Provincia",
+        "country": "País"
+      },
+      "save": "Guardar",
+      "saved": "Emisor guardado.",
+      "failed": "No se pudo guardar el emisor",
+      "loadError": "No se pudo cargar el emisor"
+    },
+    "paper": {
+      "invoice": "Factura",
+      "simplified": "Factura simplificada",
+      "rectifying": "Factura rectificativa",
+      "copy": "Copia",
+      "number": "Nº",
+      "date": "Fecha",
+      "operationDate": "Fecha de operación",
+      "billTo": "Facturar a",
+      "taxId": "NIF",
+      "description": "Descripción",
+      "qty": "Cant.",
+      "price": "Precio",
+      "tax": "Impuesto",
+      "amount": "Importe",
+      "noLines": "— Sin líneas —",
+      "taxBase": "Base imponible",
+      "total": "TOTAL",
+      "discount": "Dto."
+    }
+  }
+}

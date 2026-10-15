@@ -2,6 +2,7 @@
 
 import datetime as dt
 from decimal import Decimal
+from uuid import uuid7
 
 import pytest
 from django.db import IntegrityError, transaction
@@ -13,6 +14,7 @@ from apps.sale.models import (
     OrderLine,
     PaymentMethod,
     QuickNote,
+    Refund,
     Sale,
     SaleCounter,
     Settings,
@@ -159,3 +161,49 @@ def test_an_order_line_is_live_until_removed_and_unpaid_until_a_sale_takes_it():
     )
     assert line.is_live and not line.is_fired and line.sale_id is None
     assert list(OrderLine.objects.live().unpaid()) == [line]
+
+
+def test_a_line_may_be_a_service_and_may_be_paid_with_a_voucher_session():
+    order = Order.objects.create()
+    line = OrderLine.objects.create(
+        order=order, position=1, name="Haircut", quantity=1, unit_price=2500, tax_category_key="service.generic"
+    )
+    assert (line.service_id, line.voucher_session_id, line.voucher_grant_id) == (None, None, None)
+    assert (line.voucher_name, line.voucher_remaining, line.voucher_hold_until) == ("", None, None)
+    assert line.paid_by_voucher is False
+    line.voucher_session_id = uuid7()
+    assert line.paid_by_voucher is True
+
+
+def test_a_refund_may_give_back_no_money_but_never_a_negative_amount():
+    sale = a_sale()
+    Refund.objects.create(sale=sale, total=0, reason="only the session")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Refund.objects.create(sale=sale, total=-1, reason="x")
+
+
+def _indexes(table: str) -> dict:
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        found = connection.introspection.get_constraints(cursor, table)
+    return {name: info for name, info in found.items() if info["index"]}
+
+
+def test_the_cash_register_reads_voids_and_refunds_by_time_through_an_index():
+    # Cash register (CASH_REGISTER-F11, F17) reads the voids and the refunds of a shift by their time:
+    # a partial index on the voided sales only, and one on when each refund was made.
+    from django.db import connection
+
+    sale_indexes = _indexes(Sale._meta.db_table)
+    assert sale_indexes["sale_sale_voided_idx"]["columns"] == ["voided_at"]
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indexrelid = %s::regclass",
+            ["sale_sale_voided_idx"],
+        )
+        (definition,) = cursor.fetchone()
+    assert "WHERE (voided_at IS NOT NULL)" in definition
+    assert _indexes(Refund._meta.db_table)["sale_refund_created_idx"]["columns"] == [
+        "created_at"
+    ]

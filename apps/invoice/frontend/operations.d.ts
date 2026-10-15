@@ -1,0 +1,391 @@
+// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas.py.
+// Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3 generates them from
+// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`.
+// One input per operation (ninja's parity): no path parameters, an invoice's id or number travels in the
+// input. Money is whole cents with a sign (a rectifying invoice is negative); decimals (`quantity`,
+// rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO `YYYY-MM-DD`.
+import type { Page } from '../../../frontend/sdk-types';
+
+export type SortDir = 'asc' | 'desc';
+
+/** F1 invoice, F2 simplified (ticket), F3 replaces a ticket, R1–R5 rectifying. */
+export type InvoiceType = 'F1' | 'F2' | 'F3' | 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
+export type InvoiceStatus = 'issued' | 'paid' | 'cancelled';
+export type InvoiceSource = 'sale' | 'manual' | 'substitution' | 'rectification' | 'refund' | 'void';
+/** The AEAT's IDType of a foreign recipient; '' = a Spanish NIF. */
+export type IdType = '' | '02' | '03' | '04' | '05' | '06' | '07';
+export type RectificationType = 'R1' | 'R2' | 'R3' | 'R4';
+
+interface PageIn {
+  limit?: number;
+  offset?: number;
+}
+
+/** An invoice by its id or its number. */
+export interface InvoiceRefIn {
+  invoice_id?: string;
+  number?: string;
+}
+
+export interface RecipientIn {
+  customer_id?: string;
+  customer?: string;
+  customer_name?: string;
+  customer_country?: string;
+  customer_id_type?: IdType;
+  customer_tax_id?: string;
+  customer_address?: string;
+}
+
+// ── Invoices ───────────────────────────────────────────────────────────────────────────────────
+
+export interface InvoiceListIn extends PageIn {
+  search?: string;
+  status?: InvoiceStatus;
+  invoice_type?: InvoiceType;
+  series_code?: string;
+  source_type?: InvoiceSource;
+  customer_id?: string;
+  issue_date_from?: string;
+  issue_date_to?: string;
+  total_amount_from?: number;
+  total_amount_to?: number;
+  sort?: 'issued_at' | 'issue_date' | 'number' | 'customer_name' | 'total_amount' | 'status' | 'invoice_type' | 'series_code';
+  dir?: SortDir;
+}
+
+export interface BreakdownOut {
+  tax: string;
+  regime: string;
+  qualification: 'subject' | 'subject_reverse' | 'exempt' | 'not_subject' | 'not_subject_location';
+  exempt_reason: string;
+  rate: string;
+  surcharge_rate: string;
+  base: number;
+  quota: number;
+  surcharge_quota: number;
+}
+
+export interface InvoiceLineOut {
+  id: string;
+  position: number;
+  description: string;
+  quantity: string;
+  /** Unit price WITHOUT VAT and before any discount, in cents with two decimals («1000.00»). */
+  unit_price: string;
+  /** The line's discount WITHOUT VAT, in cents, with its sign (0 = none). */
+  discount_amount: number;
+  tax_rate: string;
+  surcharge_rate: string;
+  tax_category_key: string;
+  base_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  product_id: string | null;
+}
+
+export interface InvoiceLinkOut {
+  id: string;
+  number: string;
+  invoice_type: InvoiceType;
+  status: InvoiceStatus;
+  issue_date: string;
+  total_amount: number;
+}
+
+export interface InvoiceRowOut {
+  id: string;
+  number: string;
+  invoice_type: InvoiceType;
+  series_code: string;
+  year: number;
+  issue_date: string;
+  issued_at: string;
+  customer_name: string;
+  customer_tax_id: string;
+  base_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
+  status: InvoiceStatus;
+  source_type: InvoiceSource;
+  rectifies_id: string | null;
+  rectifies_number: string;
+  substituted: boolean;
+  can_mark_paid: boolean;
+  can_rectify: boolean;
+  can_substitute: boolean;
+}
+
+export interface InvoiceOut extends InvoiceRowOut {
+  series_id: string;
+  sequence: number;
+  operation_date: string;
+  issuer_name: string;
+  issuer_tax_id: string;
+  issuer_address: string;
+  issuer_country: string;
+  customer_id: string | null;
+  customer_address: string;
+  customer_country: string;
+  customer_id_type: string;
+  description: string;
+  notes: string;
+  tax_breakdown: BreakdownOut[];
+  rectification_kind: string;
+  sale_id: string | null;
+  sale_number: string;
+  refund_id: string | null;
+  rectifies: InvoiceLinkOut | null;
+  substitutes: InvoiceLinkOut | null;
+  substituted_by: InvoiceLinkOut | null;
+  rectifications: InvoiceLinkOut[];
+  remaining: number;
+  paid_at: string | null;
+  created_by: string;
+  lines: InvoiceLineOut[];
+  /** What VeriFactu did with it, only in the answer of the operation that issued it. */
+  verifactu_status?: VerifactuStatus | null;
+}
+
+export type InvoiceGetIn = InvoiceRefIn;
+
+export interface DocumentIn extends InvoiceRefIn {
+  duplicate?: boolean;
+}
+
+export interface DocumentOut {
+  invoice_id: string;
+  number: string;
+  html: string;
+}
+
+export interface BySourceIn {
+  sale_id?: string;
+  sale?: string;
+}
+
+export interface BySourceOut {
+  found: boolean;
+  invoice: InvoiceOut | null;
+}
+
+export interface ManualLineIn {
+  description: string;
+  /** Up to three decimals («2», «0.5»). */
+  quantity: string | number;
+  /** Cents, VAT not included. */
+  unit_price: number;
+  tax_category_key?: string;
+  /** VAT % («21»), when the line has no tax category. */
+  tax_rate?: string | number;
+  product_id?: string;
+}
+
+export interface InvoiceCreateIn extends RecipientIn {
+  series_id?: string;
+  series_code?: string;
+  notes?: string;
+  lines: ManualLineIn[];
+}
+
+export interface FromSaleIn extends BySourceIn {
+  customer_name?: string;
+  customer_tax_id?: string;
+  customer_address?: string;
+  customer_country?: string;
+  customer_id_type?: string;
+}
+
+export interface SubstituteIn extends InvoiceRefIn, RecipientIn {}
+
+export interface RectifyIn extends InvoiceRefIn {
+  reason: string;
+  rectification_type?: RectificationType;
+  issue_date?: string;
+}
+
+export interface FromRefundIn {
+  refund_id: string;
+}
+
+export interface FromVoidIn {
+  sale_id: string;
+}
+
+export type MarkPaidIn = InvoiceRefIn;
+
+/** sealed: its VeriFactu record is sealed in the same commit; unavailable: no VeriFactu in this business;
+ *  pending: VeriFactu refused now and its reaction to `invoice.invoice.issued` seals it later. */
+export type VerifactuStatus = 'sealed' | 'unavailable' | 'pending';
+
+export interface IssueOut {
+  issued: boolean;
+  already: boolean;
+  verifactu_status?: VerifactuStatus | null;
+  invoice: InvoiceOut | null;
+}
+
+// ── Series ─────────────────────────────────────────────────────────────────────────────────────
+
+export interface SeriesListIn extends PageIn {
+  search?: string;
+  code?: string;
+  invoice_type?: InvoiceType;
+  year?: number;
+  is_active?: boolean;
+  is_default?: boolean;
+  sort?: 'code' | 'name' | 'invoice_type' | 'year' | 'current_number' | 'prefix' | 'is_active' | 'is_default';
+  dir?: SortDir;
+}
+
+export interface SeriesOut {
+  id: string;
+  code: string;
+  name: string;
+  display_name: string;
+  invoice_type: InvoiceType;
+  year: number;
+  prefix: string;
+  format: string;
+  current_number: number;
+  next_number: string;
+  format_locked: boolean;
+  is_active: boolean;
+  is_default: boolean;
+}
+
+export interface SeriesCreateIn {
+  code: string;
+  name?: string;
+  invoice_type: InvoiceType;
+  year: number;
+  prefix?: string;
+  format?: string;
+  next_number?: number;
+  is_active?: boolean;
+  is_default?: boolean;
+}
+
+export interface SeriesUpdateIn {
+  series_id: string;
+  name?: string;
+  prefix?: string;
+  format?: string;
+  next_number?: number;
+  is_active?: boolean;
+  is_default?: boolean;
+}
+
+export interface SeriesPeekIn {
+  series_id?: string;
+  code?: string;
+  year?: number;
+}
+
+export interface SeriesPeekOut {
+  series_id: string;
+  code: string;
+  year: number;
+  next_sequence: number;
+  next_number: string;
+  format_locked: boolean;
+}
+
+// ── The numbering ──────────────────────────────────────────────────────────────────────────────
+
+export type NumberingStatusIn = Record<string, never>;
+
+export interface NumberingStatusOut {
+  fiscal_year: number;
+  ordinary_series: number;
+  rectifying_series: number;
+  default_series: number;
+  total_series: number;
+  configured: boolean;
+}
+
+export interface GapsIn extends PageIn {
+  code?: string;
+  year?: number;
+}
+
+export interface GapOut {
+  series_code: string;
+  year: number;
+  after_sequence: number;
+  missing_from: number;
+  next_recorded: number;
+  missing_count: number;
+}
+
+export interface AllocationsIn extends PageIn {
+  search?: string;
+  code?: string;
+  year?: number;
+}
+
+export interface AllocationOut {
+  series_code: string;
+  year: number;
+  sequence: number;
+  number: string;
+  invoice_id: string;
+  invoice_type: InvoiceType;
+  issued_at: string;
+}
+
+// ── The issuer ─────────────────────────────────────────────────────────────────────────────────
+
+export type IssuerGetIn = Record<string, never>;
+
+export interface IssuerIn {
+  legal_name: string;
+  country?: string;
+  tax_id: string;
+  address: string;
+  postal_code?: string;
+  city?: string;
+  province?: string;
+}
+
+export interface IssuerOut {
+  configured: boolean;
+  legal_name: string;
+  tax_id: string;
+  address: string;
+  postal_code: string;
+  city: string;
+  province: string;
+  country: string;
+  address_line: string;
+  source: 'manual' | 'saas';
+  synced_version: number | null;
+  synced_at: string | null;
+  updated_at: string | null;
+}
+
+declare module '@erplora/ui/sdk' {
+  interface Operations {
+    'invoice.invoice.list': { input: InvoiceListIn; output: Page<InvoiceRowOut> };
+    'invoice.invoice.get': { input: InvoiceGetIn; output: InvoiceOut };
+    'invoice.invoice.by_source': { input: BySourceIn; output: BySourceOut };
+    'invoice.invoice.document': { input: DocumentIn; output: DocumentOut };
+    'invoice.invoice.create': { input: InvoiceCreateIn; output: InvoiceOut };
+    'invoice.invoice.create_from_sale': { input: FromSaleIn; output: IssueOut };
+    'invoice.invoice.substitute': { input: SubstituteIn; output: IssueOut };
+    'invoice.invoice.mark_paid': { input: MarkPaidIn; output: InvoiceOut };
+    'invoice.invoice.rectify': { input: RectifyIn; output: IssueOut };
+    'invoice.invoice.rectify_from_refund': { input: FromRefundIn; output: IssueOut };
+    'invoice.invoice.rectify_from_void': { input: FromVoidIn; output: IssueOut };
+    'invoice.series.list': { input: SeriesListIn; output: Page<SeriesOut> };
+    'invoice.series.peek_next': { input: SeriesPeekIn; output: SeriesPeekOut };
+    'invoice.series.create': { input: SeriesCreateIn; output: SeriesOut };
+    'invoice.series.update': { input: SeriesUpdateIn; output: SeriesOut };
+    'invoice.numbering.status': { input: NumberingStatusIn; output: NumberingStatusOut };
+    'invoice.numbering.gaps': { input: GapsIn; output: Page<GapOut> };
+    'invoice.numbering.allocations': { input: AllocationsIn; output: Page<AllocationOut> };
+    'invoice.issuer.get': { input: IssuerGetIn; output: IssuerOut };
+    'invoice.issuer.update': { input: IssuerIn; output: IssuerOut };
+  }
+}

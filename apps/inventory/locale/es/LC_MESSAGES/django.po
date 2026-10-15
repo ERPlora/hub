@@ -368,3 +368,18 @@ msgstr "Cantidad demasiado grande"
 
 msgid "This article does not track its stock: there is nothing to write off."
 msgstr "Este artículo no controla su stock: no hay nada que dar de baja."
+
+msgid "Refund"
+msgstr "Devolución"
+
+msgid "refund"
+msgstr "devolución"
+
+msgid "movements"
+msgstr "movimientos"
+
+msgid "refund seen"
+msgstr "devolución vista"
+
+msgid "refunds seen"
+msgstr "devoluciones vistas"

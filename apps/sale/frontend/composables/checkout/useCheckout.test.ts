@@ -67,6 +67,16 @@ describe('useCheckout', () => {
     expect([s.checkout.busy.value, s.checkout.failure.value]).toEqual([false, null]);
   });
 
+  it('a refusal on a field keeps which field it is (the recipient’s tax ID, SALE-F04)', async () => {
+    const s = await setup();
+    const message = 'That tax ID is not valid.';
+    s.replies({
+      [COMPLETE]: [Response.json({ error: { code: 'invalid_field', message, fields: { customer_tax_id: message } } }, { status: 422 })],
+    });
+    await s.checkout.charge(INPUT);
+    expect(s.checkout.failure.value).toEqual({ kind: 'refused', code: 'invalid_field', message, fields: { customer_tax_id: message } });
+  });
+
   it('ignores a second press while the charge is in flight', async () => {
     const s = await setup();
     s.replies({ [COMPLETE]: [Response.json(SALE)] });

@@ -1,0 +1,282 @@
+{
+  "table": {
+    "title": "Mesas",
+    "tabs": {
+      "label": "Secciones de Mesas",
+      "floor_plan": "Plano de sala",
+      "zones": "Zonas",
+      "tables": "Mesas",
+      "sessions": "Sesiones",
+      "settings": "Ajustes"
+    },
+    "loading": "Cargando…",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "back": "Atrás",
+    "none": "—",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Cambia la búsqueda o los filtros.",
+    "noPermission": "No tienes permiso",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "status": {
+      "available": "Disponible",
+      "occupied": "Ocupada",
+      "reserved": "Reservada",
+      "blocked": "Bloqueada"
+    },
+    "shape": {
+      "square": "Cuadrada",
+      "round": "Redonda",
+      "rectangle": "Rectangular"
+    },
+    "color": {
+      "primary": "Azul",
+      "secondary": "Cian",
+      "tertiary": "Morado",
+      "success": "Verde",
+      "warning": "Ámbar",
+      "danger": "Rojo",
+      "medium": "Gris"
+    },
+    "sessionStatus": {
+      "open": "Abierta",
+      "closed": "Cerrada",
+      "transferred": "Trasladada",
+      "merged": "Fusionada",
+      "parked": "Aparcada"
+    },
+    "pax": "{count} pax",
+    "guestsCount": "{count} comensales",
+    "minutes": "{minutes} min",
+    "servedBy": "Atiende {name}",
+    "reservedFor": "Reservada para {name}",
+    "erasedCustomer": "Cliente borrado",
+    "tableLabel": "Mesa {number}",
+    "inactive": "Inactiva",
+    "floor": {
+      "mode": {
+        "label": "Para qué es el plano",
+        "service": "Servicio",
+        "edit": "Editar plano"
+      },
+      "zones": "Zonas",
+      "add": "Añadir zona o mesa",
+      "editZone": "Editar zona",
+      "hint": "Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.",
+      "emptyZones": "Crea una zona para empezar a colocar mesas.",
+      "emptyTables": "Sin mesas en esta zona. Pulsa «Añadir mesa».",
+      "emptyService": "Sin mesas en servicio en esta zona.",
+      "loadError": "No se pudo cargar el plano",
+      "positionError": "No se pudo guardar la posición",
+      "tileTitle": "{status} · {count} pax",
+      "transferTitle": "Transferir {number} a…",
+      "mergeTitle": "Fusionar {number} con…",
+      "pickFree": "Elige una mesa libre",
+      "pickOccupied": "Elige una mesa ocupada",
+      "taken": "Otro dispositivo acaba de ocupar esa mesa. Se ha actualizado el plano.",
+      "transferError": "No se pudo transferir la mesa",
+      "mergeError": "No se pudieron fusionar las mesas"
+    },
+    "add": {
+      "title": "Añadir",
+      "zone": "Zona",
+      "zonePlaceholder": "Nueva zona…",
+      "addZone": "Añadir zona",
+      "number": "Número de mesa",
+      "numberPlaceholder": "Se numera sola",
+      "addTable": "Añadir mesa",
+      "zoneError": "No se pudo crear la zona",
+      "tableError": "No se pudo crear la mesa"
+    },
+    "form": {
+      "titleEdit": "Editar mesa",
+      "titleNew": "Nueva mesa",
+      "number": "Número",
+      "capacity": "Aforo",
+      "name": "Nombre (opcional)",
+      "shape": "Forma",
+      "status": "Estado",
+      "zone": "Zona",
+      "noZone": "Sin zona",
+      "active": "En uso",
+      "save": "Guardar",
+      "create": "Añadir mesa",
+      "delete": "Borrar",
+      "numberRequired": "El número de mesa es obligatorio",
+      "deleteTitle": "¿Borrar la mesa {number}?",
+      "deleteMessage": "Sale del plano y de las listas; su historial de cuentas se conserva.",
+      "deleteConfirm": "Borrar mesa"
+    },
+    "zoneForm": {
+      "titleNew": "Nueva zona",
+      "titleEdit": "Editar zona",
+      "name": "Nombre",
+      "description": "Descripción (opcional)",
+      "color": "Color",
+      "order": "Orden",
+      "active": "Activa",
+      "create": "Añadir zona",
+      "save": "Guardar cambios",
+      "saveShort": "Guardar",
+      "delete": "Borrar zona"
+    },
+    "zones": {
+      "search": "Buscar zona…",
+      "empty": "No hay zonas. Pulsa «+» para crear la primera (Salón, Terraza, Barra…).",
+      "new": "Nueva zona",
+      "entity": {
+        "one": "zona",
+        "many": "zonas"
+      },
+      "columns": {
+        "name": "Nombre",
+        "tables": "Mesas",
+        "available": "Libres",
+        "order": "Orden",
+        "status": "Estado",
+        "color": "Color"
+      },
+      "availableOfTotal": "{available} / {total}",
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "actions": {
+        "edit": "Editar",
+        "delete": "Borrar"
+      },
+      "delete": {
+        "title": "¿Borrar la zona?",
+        "impact": "{count} mesas en esta zona. Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.",
+        "confirm": "Borrar zona"
+      },
+      "loadError": "No se pudieron cargar las zonas"
+    },
+    "tables": {
+      "search": "Buscar mesa…",
+      "empty": "Sin mesas.",
+      "new": "Nueva mesa",
+      "entity": {
+        "one": "mesa",
+        "many": "mesas"
+      },
+      "columns": {
+        "number": "Número",
+        "name": "Nombre",
+        "zone": "Zona",
+        "capacity": "Aforo",
+        "status": "Estado"
+      },
+      "actions": {
+        "edit": "Editar",
+        "delete": "Borrar"
+      },
+      "loadError": "No se pudieron cargar las mesas"
+    },
+    "sessions": {
+      "segment": {
+        "label": "Qué cuentas",
+        "open": "Abiertas",
+        "closed": "Cerradas",
+        "all": "Todas"
+      },
+      "search": "Buscar mesa…",
+      "empty": "No hay sesiones. Sienta a un grupo desde el plano y aparecerá aquí.",
+      "entity": {
+        "one": "sesión",
+        "many": "sesiones"
+      },
+      "columns": {
+        "table": "Mesa",
+        "paid": "Cobrado",
+        "closedAt": "Cierre",
+        "zone": "Zona",
+        "waiter": "Camarero",
+        "guests": "Comensales",
+        "openedAt": "Apertura",
+        "duration": "Tiempo",
+        "status": "Estado"
+      },
+      "noTable": "Sin mesa (aparcada)",
+      "actions": {
+        "detail": "Detalle",
+        "close": "Cerrar sesión",
+        "restore": "Volver a sentar",
+        "delete": "Borrar"
+      },
+      "close": {
+        "title": "¿Cerrar la sesión?",
+        "impact": "Mesa {number} · {count} comensales. La mesa queda libre y la sesión pasa al histórico. Si su cuenta sigue abierta en Ventas, primero cóbrala, pásala a otra mesa o elimínala desde el TPV.",
+        "confirm": "Cerrar sesión"
+      },
+      "delete": {
+        "title": "¿Borrar esta cuenta del historial?",
+        "message": "Desaparece de Sesiones; su recorrido por las mesas se conserva.",
+        "confirm": "Borrar"
+      },
+      "detail": {
+        "title": "Sesión · {table}",
+        "customer": "Cliente",
+        "notes": "Notas"
+      },
+      "restore": {
+        "title": "Volver a sentar",
+        "table": "Mesa",
+        "confirm": "Sentar",
+        "noFree": "No hay ninguna mesa libre ahora mismo."
+      },
+      "loadError": "No se pudieron cargar las sesiones"
+    },
+    "sheet": {
+      "title": "Mesa {number}",
+      "guestsTitle": "Comensales en la mesa {number}",
+      "seat": "Sentar {count}",
+      "seatNow": "Sentar",
+      "saveGuests": "Guardar",
+      "overCapacity": "Supera el aforo de la mesa ({capacity})",
+      "fewer": "Un comensal menos",
+      "more": "Un comensal más",
+      "quick": "Sentar {count} de un toque",
+      "blocked": "Mesa fuera de servicio: no se puede sentar hasta que se desbloquee.",
+      "since": "Desde las {time} · {minutes} min",
+      "check": "Cuenta {n}",
+      "chooseCheck": "¿Qué cuenta?",
+      "customer": "Cliente",
+      "customerError": "La mesa está sentada, pero no se pudo poner el cliente en su cuenta.",
+      "reservation": "Reserva",
+      "actions": {
+        "label": "Opciones de mesa",
+        "charge": "Cobrar",
+        "transfer": "Transferir",
+        "merge": "Fusionar",
+        "split": "Dividir cuenta",
+        "guests": "Comensales",
+        "park": "Quitar mesa",
+        "close": "Cerrar mesa"
+      },
+      "error": "No se pudo hacer"
+    },
+    "split": {
+      "title": "Dividir cuenta · mesa {number}",
+      "hint": "Marca las líneas que pasan a la cuenta nueva. Sin nada marcado, nace vacía.",
+      "confirm": "Dividir",
+      "empty": "Esta cuenta aún no tiene líneas.",
+      "loadError": "No se pudieron leer las líneas de la cuenta"
+    },
+    "settings": {
+      "title": "Mesas",
+      "promptGuests": "Preguntar los comensales al sentar una mesa",
+      "promptGuestsHint": "Desactivado: sentar una mesa libre abre la cuenta con el aforo de la mesa en un solo toque.",
+      "warning": "Aviso ámbar (minutos)",
+      "warningHint": "Una cuenta abierta se pone ámbar en la vista de Sesiones a partir de estos minutos.",
+      "critical": "Aviso rojo (minutos)",
+      "criticalHint": "Una cuenta abierta se pone roja a partir de estos minutos.",
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "saveError": "No se pudieron guardar los ajustes",
+      "loadError": "No se pudieron cargar los ajustes"
+    }
+  }
+}

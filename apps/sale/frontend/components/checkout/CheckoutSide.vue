@@ -3,7 +3,8 @@
 // «Invoice» and, with an invoice, its recipient right below; over the ticket limit no «Receipt» at all
 // (the law), only the recipient, on top. Below 821 px the sheet opens on the tender, so an invoice folds
 // into one summary line («Invoice · Bar Pepe SL») that opens with a tap; folding is CSS only, nothing
-// typed is lost. Choosing «Invoice» opens it: it asks something right below.
+// typed is lost. Choosing «Invoice» opens it: it asks something right below. The default slot holds what
+// else the sale carries before its document: «Lines paid another way» (SALE-F27).
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
@@ -18,6 +19,8 @@ defineProps<{
   overLimit: boolean;
   /** The ticket limit, in cents (the preview's `ticket_limit`). */
   ticketLimit: number | null;
+  /** What the server refused on a field of the recipient. */
+  recipientErrors?: { taxId?: string; idType?: string };
 }>();
 
 const document = defineModel<DocumentType>('document', { required: true });
@@ -61,11 +64,13 @@ function choose(next: DocumentType): void {
         aria-hidden="true"
       />
     </button>
+    <slot />
     <RecipientForm
       v-if="overLimit"
       v-model="recipient"
       reason="limit"
       :max="ticketLimit"
+      :errors="recipientErrors"
     />
     <template v-else>
       <DocumentChooser
@@ -77,6 +82,7 @@ function choose(next: DocumentType): void {
         v-model="recipient"
         reason="invoice"
         :max="ticketLimit"
+        :errors="recipientErrors"
       />
     </template>
   </div>

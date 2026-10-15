@@ -4,9 +4,9 @@
 // of at most 100 rows (the server refuses `limit` > 100 with a 422: the bug of tax's first copy, which
 // asked `pageSize * pages` at once), each window its own live subscription, merged into one page.
 import { describe, expect, it } from 'vitest';
-import { defineComponent, h } from 'vue';
+import { shallowRef } from 'vue';
 
-import { errorFrame, flush, mountSale } from '../__tests__/mount-sale';
+import { errorFrame, flush, mountComposable } from '../__tests__/mount-sale';
 import type { QuickNoteOut } from '../operations';
 import { MAX_LIMIT, useServerTable } from './useServerTable';
 
@@ -17,16 +17,10 @@ const notes = (from: number, count: number) => Array.from({ length: count }, (_,
 
 let captured: ReturnType<typeof useServerTable<typeof OP>> | undefined;
 
-const Host = defineComponent({
-  props: { pageSize: { type: Number, default: undefined } },
-  setup(props) {
-    captured = useServerTable(OP, { sort: 'sort_order', maxSearch: 80, pageSize: props.pageSize });
-    return () => h('div');
-  },
-});
-
 async function setup(pageSize?: number) {
-  const m = await mountSale(Host, { props: { pageSize } });
+  const m = await mountComposable(() => {
+    captured = useServerTable(OP, { sort: 'sort_order', maxSearch: 80, pageSize });
+  });
   await m.live();
   const table = captured!;
   /** Applies a change of the table and lets the SDK reopen the stream with the new subscriptions. */
@@ -142,5 +136,68 @@ describe('useServerTable: a page emptied elsewhere', () => {
     await s.change(() => s.table.goToPage(2));
     await s.result(OP, { rows: [], total: 60, limit: 50, offset: 100 });
     expect(s.table.page.value).toBe(1);
+  });
+});
+
+// Sales filters its list by period, status, payment and total: the page's own filters travel with
+// every window, a change of them starts again from the first page (one window), and the page says
+// whether they narrow the rows (the empty state then says «No results», not «Nothing yet»).
+describe('useServerTable: the page’s own filters', () => {
+  const SALES = 'sale.sale.list';
+  let filtered: ReturnType<typeof useServerTable<typeof SALES>> | undefined;
+  const filters = shallowRef<Record<string, unknown>>({ date_from: '2026-10-14', date_to: '2026-10-14' });
+  const narrowed = shallowRef(false);
+
+  async function setupFiltered() {
+    filters.value = { date_from: '2026-10-14', date_to: '2026-10-14' };
+    narrowed.value = false;
+    const m = await mountComposable(() => {
+      filtered = useServerTable(SALES, {
+        sort: 'created_at',
+        dir: 'desc',
+        maxSearch: 200,
+        filters: () => filters.value,
+        narrowed: () => narrowed.value,
+      });
+    });
+    await m.live();
+    const table = filtered!;
+    async function change(action: () => void) {
+      action();
+      await flush();
+      await m.reopen();
+    }
+    return { ...m, table, change };
+  }
+
+  it('travel with every window', async () => {
+    const s = await setupFiltered();
+    expect(s.params(SALES)).toEqual([{ date_from: '2026-10-14', date_to: '2026-10-14', sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
+    await s.change(() => s.table.loadMore());
+    await s.change(() => s.table.loadMore());
+    expect(s.params(SALES).map((p) => [p.date_from, p.limit, p.offset])).toEqual([
+      ['2026-10-14', 100, 0],
+      ['2026-10-14', 50, 100],
+    ]);
+  });
+
+  it('a change of them starts again from the first page, in one window', async () => {
+    const s = await setupFiltered();
+    await s.change(() => s.table.goToPage(2));
+    await s.change(() => s.table.loadMore());
+    await s.change(() => (filters.value = { status: 'voided' }));
+    await s.clock.advance(2500);
+    expect(s.table.page.value).toBe(0);
+    expect(s.params(SALES)).toEqual([{ status: 'voided', sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
+  });
+
+  it('the list is filtered while the page says they narrow it, or while there is a search', async () => {
+    const s = await setupFiltered();
+    expect(s.table.filtered.value).toBe(false);
+    narrowed.value = true;
+    expect(s.table.filtered.value).toBe(true);
+    narrowed.value = false;
+    s.table.search.value = '0007';
+    expect(s.table.filtered.value).toBe(true);
   });
 });

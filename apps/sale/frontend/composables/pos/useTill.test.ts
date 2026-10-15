@@ -109,6 +109,34 @@ describe('useTill: adding products', () => {
   });
 });
 
+describe('useTill: services of Services (SALE-F38)', () => {
+  const SERVICE_CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: null, service_id: 's1', is_service: true })] });
+
+  it('opens the check with the service, adds the next one, and a second tap of a fixed-price service raises its line', async () => {
+    const s = await setup();
+    s.reply(SERVICE_CHECK);
+    expect(await s.till().addService({ id: 's1' }, null)).toEqual({ ok: true });
+    expect(await s.till().addService({ id: 's1' }, 'st1')).toEqual({ ok: true });
+    expect(await s.till().addService({ id: 's1' }, null)).toEqual({ ok: true });
+    expect(await s.till().addService({ id: 's2' }, null, 6500)).toEqual({ ok: true });
+    expect(s.calls()).toEqual([
+      ['', { service_lines: [{ service_id: 's1' }] }],
+      ['/add_service_line', { order_id: 'o1', service_id: 's1', staff_id: 'st1' }],
+      ['/update_line', { order_id: 'o1', line_id: 'l1', quantity: '2' }],
+      ['/add_service_line', { order_id: 'o1', service_id: 's2', unit_price: 6500 }],
+    ]);
+  });
+
+  it('hands a refusal back in the server’s words', async () => {
+    const s = await setup();
+    s.net.onApi(() => refused('sale.service_price_out_of_range', 'That amount is outside what the service allows (40.00 € – 90.00 €).'));
+    expect(await s.till().addService({ id: 's2' }, null, 1000)).toEqual({
+      ok: false,
+      message: 'That amount is outside what the service allows (40.00 € – 90.00 €).',
+    });
+  });
+});
+
 describe('useTill: open price', () => {
   it('opens the check with the open-price line, or adds it to the one there is', async () => {
     const s = await setup();

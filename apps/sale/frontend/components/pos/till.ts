@@ -1,11 +1,7 @@
 // The till's small rules, kept pure (the product's `pos-cart.ts`, `park-label` and quick-note helpers):
 // the tile's initials and gradient, the time a check is parked under, the quick-note chips, the line a
-// second tap on a product raises and the words a refused write shows. Money and totals are never
-// worked out here: the server's operations say them.
-import { ApiError } from '@erplora/ui/sdk';
-
-import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
-import { countryName } from '../../../../customer/frontend/lib/countries';
+// second tap on a product raises. Money and totals are never worked out here: the server's operations
+// say them; the words of a refusal are `lib/refusal.ts`'s.
 import type { OrderLineOut } from '../../operations';
 
 /** The first letters of the first two words, upper case («café con leche» → «CC»). */
@@ -78,43 +74,24 @@ export function mergeableLine(lines: readonly OrderLineOut[], productId: string,
   );
 }
 
+/** The value of the «Services» chip of the category strip (a category id is a UUID: never this). */
+export const SERVICES = 'services';
+
+/** The pending line a second tap of a service raises (SALE-F38): as a product's, never one a voucher pays. */
+export function mergeableServiceLine(lines: readonly OrderLineOut[], serviceId: string, staffId: string | null): OrderLineOut | undefined {
+  return lines.find(
+    (line) =>
+      line.service_id === serviceId &&
+      !line.paid_by_voucher &&
+      !line.fired_at &&
+      !line.notes &&
+      !line.is_gift &&
+      Number(line.discount_percent) === 0 &&
+      (line.staff_id ?? null) === staffId,
+  );
+}
+
 /** One more unit of a decimal quantity («0.532» → «1.532»), as the line's stepper sends it. */
 export function plusOne(quantity: string): string {
   return String(Math.round((Number(quantity) + 1) * 1000) / 1000);
-}
-
-/**
- * What a refused write shows: the server's own sentence when it answered with a refusal (it comes in
- * the reader's language), `fallback` when nobody answered (no network, a proxy's error page).
- */
-export function refusal(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.message) return error.message;
-  return fallback;
-}
-
-/** The card fields the sale copies (`customer.customer.detail`). */
-export interface CustomerCard {
-  id: string;
-  name: string;
-  tax_id: string;
-  address: string;
-  postal_code: string;
-  city: string;
-  country: string;
-}
-
-/**
- * The tax details a sale keeps of its customer, as the Customers app's search hands them over
- * («street, postal code city, country»): what a resumed check gets back from the card linked to it.
- */
-export function customerSnapshot(card: CustomerCard, locale: string): CustomerSnapshot {
-  const place = [card.postal_code, card.city].filter((part) => part && part.trim()).join(' ');
-  const address = [card.address, place, countryName(card.country, locale)].filter((part) => part && part.trim()).join(', ');
-  return {
-    customer_id: card.id,
-    customer_name: card.name,
-    customer_tax_id: card.tax_id,
-    customer_address: address,
-    customer_country: card.country,
-  };
 }

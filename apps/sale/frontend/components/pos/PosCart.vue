@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// The check column (WORKBOOK «Vender» — «Cuenta»; the phone's drawer): the bar (park, the customer
-// button in the `customer` slot, «Open checks» and its dropdown, «Close»), the heading (title and
-// chips), the lines (they scroll) and the foot (always in view). It paints what the page knows of the
-// check and asks for everything; the page writes (`useTill`).
+// The check column (WORKBOOK «Vender» — «Cuenta»; the phone's drawer): the bar (park, Tables' button in
+// the `table` slot and the customer's in the `customer` slot, «Open checks» and its dropdown, «Close»),
+// the heading (title and chips), the lines (they scroll) and the foot (always in view). It paints what
+// the page knows of the check and asks for everything; the page writes (`useTill`).
 import { computed, shallowRef } from 'vue';
 
 import { useT } from '../../composables/useT';
@@ -32,8 +32,8 @@ const props = defineProps<{
   drawer: boolean;
   /** Open checks besides this one. */
   openChecks: number;
-  /** A refusal for the open-checks dropdown (a check that could not be resumed). */
-  checksNotice: string | null;
+  /** The number of the check's table (SALE-F19); `null` at none or without Tables. */
+  tableNumber?: string | null;
 }>();
 const emit = defineEmits<{
   park: [];
@@ -89,6 +89,7 @@ function park(): void {
       @toggle-checks="checksOpen = !checksOpen"
       @close="emit('close')"
     >
+      <slot name="table" />
       <slot name="customer" />
     </CartToolbar>
     <OpenChecksPopover
@@ -96,7 +97,6 @@ function park(): void {
       :current-id="order?.id ?? null"
       :parking-enabled="settings.enable_parked_tickets"
       :has-lines="hasLines"
-      :notice="checksNotice"
       @resume="resume"
       @park="park"
       @close="checksOpen = false"
@@ -107,6 +107,7 @@ function park(): void {
       :staff-id="staffId"
       :staff-name="staffName"
       :needs-customer="needsCustomer"
+      :table-number="tableNumber ?? null"
       @rename="emit('rename', $event)"
       @staff="emit('staff')"
       @ask-customer="emit('askCustomer')"

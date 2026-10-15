@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // The heading of the check. The title: a borderless input («New check») that sends a changed title up
-// when it is left, and a pencil that focuses it. The context chips: the customer, «Served by …» (who
-// the next lines are sealed with; «me» = whoever is signed in; a tap opens the picker), «Customer
-// required» when the business demands one and there is none (a tap asks for it), and «Check without
-// table or customer» when there is nothing to show.
+// when it is left, and a pencil that focuses it. The context chips: the table (SALE-F19; Tables tells
+// it), the customer, «Served by …» (who the next lines are sealed with; «me» = whoever is signed in; a
+// tap opens the picker), «Customer required» when the business demands one and there is none (a tap
+// asks for it), and «Check without table or customer» when there is nothing to show.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed, useTemplateRef } from 'vue';
 
@@ -16,6 +16,8 @@ const props = defineProps<{
   staffId: string | null;
   staffName: string | null;
   needsCustomer: boolean;
+  /** The number of the check's table (SALE-F19); `null` at none or without Tables. */
+  tableNumber?: string | null;
 }>();
 const emit = defineEmits<{ rename: [label: string]; staff: []; askCustomer: [] }>();
 
@@ -66,6 +68,13 @@ function edit(): void {
     </div>
     <div class="pos-heading__context">
       <span
+        v-if="tableNumber"
+        class="pos-chip"
+        data-testid="pos-table-chip"
+      >
+        <HubIcon name="ion:grid-outline" />{{ $t('sale.pos.table.chip', { number: tableNumber }) }}
+      </span>
+      <span
         v-if="customerName"
         class="pos-chip"
         data-testid="pos-customer-chip"
@@ -94,7 +103,7 @@ function edit(): void {
         <HubIcon name="ion:person-add-outline" />{{ $t('sale.pos.customerRequiredShort') }}
       </button>
       <span
-        v-if="!customerName && !needsCustomer"
+        v-if="!tableNumber && !customerName && !needsCustomer"
         class="pos-heading__empty"
         data-testid="pos-check-context-empty"
       >{{ $t('sale.pos.noCheckContext') }}</span>

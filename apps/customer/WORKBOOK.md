@@ -1,7 +1,7 @@
 # Workbook — Clientes (app)
 Prefijo: CUSTOMER
 Alcance MVP: núcleo
-Estado de la app: hecha (servidor y páginas); fuera, con su motivo: CUSTOMER-F22 (devoluciones) y la aprobación con PIN
+Estado de la app: hecha (servidor y páginas); fuera, con su motivo: la aprobación con PIN (fase 2)
 
 > Manual de usuario y especificación de la app `customer`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -172,9 +172,9 @@ teléfono) y **Quitar cliente**. Lo pinta Clientes; el hueco lo reserva Venta.
 | CUSTOMER-F17 | Asignar un cliente a la venta en el TPV | hecho | común |
 | CUSTOMER-F18 | Crear un cliente desde el buscador del TPV | hecho | común |
 | CUSTOMER-F19 | Enlazar el cliente al pedido abierto | hecho | común |
-| CUSTOMER-F20 | Sumar la compra a la ficha al cobrar | servidor hecho | común |
-| CUSTOMER-F21 | Restar una venta anulada | servidor hecho | común |
-| CUSTOMER-F22 | Restar una devolución | no hecho | común |
+| CUSTOMER-F20 | Sumar la compra a la ficha al cobrar | hecho | común |
+| CUSTOMER-F21 | Restar una venta anulada | hecho | común |
+| CUSTOMER-F22 | Restar una devolución | hecho | común |
 | CUSTOMER-F23 | Ver el historial de compras de un cliente | hecho | común |
 | CUSTOMER-F24 | Ver en la ficha lo que otras apps saben del cliente | hecho | común |
 | CUSTOMER-F25 | Crear la clienta sin salir de la agenda | servidor hecho | peluquería |
@@ -599,7 +599,7 @@ pedido.». Un cliente que ya no está disponible no se enlaza.
 Implicados: SALES-F17
 
 ### CUSTOMER-F20 Sumar la compra a la ficha al cobrar
-Estado: servidor hecho
+Estado: hecho — la reacción está declarada (`events.REACTIONS`, `events.react`); la entrega entre apps la hace el relay del outbox (fase 2)
 Vertical: común
 Actor: sistema
 Pantalla: ninguna
@@ -617,7 +617,7 @@ una ficha eliminada, unida o con los datos borrados no suma.
 Implicados: SALES-F01
 
 ### CUSTOMER-F21 Restar una venta anulada
-Estado: servidor hecho
+Estado: hecho — la reacción está declarada (`events.REACTIONS`, `events.react`); la entrega entre apps la hace el relay del outbox (fase 2)
 Vertical: común
 Actor: sistema
 Pantalla: ninguna
@@ -635,18 +635,22 @@ hace nada.
 Implicados: SALES-F30
 
 ### CUSTOMER-F22 Restar una devolución
-Estado: no hecho — Venta todavía no existe en esta plataforma y su aviso de devolución no está
-definido; mientras, «Gastado» no baja con una devolución
+Estado: hecho — la reacción está declarada (`events.REACTIONS`, `events.react`); la entrega entre apps la hace el relay del outbox (fase 2)
 Vertical: común
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Se devuelve todo o parte de una venta que tenía cliente.
-2. En su ficha, «Gastado» baja en lo devuelto; «Compras» no cambia; la «Actividad» gana una entrada
-   de devolución con el importe.
-Entra: la devolución de la venta.
-Sale: una línea de devolución en el historial de compras, con importe negativo.
-Si falla: la misma devolución entregada dos veces cuenta una sola vez.
+2. En su ficha, «Gastado» baja en lo devuelto; «Compras», «Última compra» y la etapa no cambian; la
+   «Actividad» gana «Devolución de compra» con el importe y el motivo.
+Entra: la devolución de la venta (aviso `sale.sale.refunded` de Venta: venta, devolución, importe
+devuelto, motivo y momento).
+Sale: una línea de devolución en el historial de compras, con su importe en negativo y el estado
+«Devolución», y el aviso `customer.purchase.refunded`. El «Gastado» de la ficha es lo cobrado menos
+lo devuelto, también para la auditoría de cifras (`customer.purchase.divergences`).
+Si falla: la misma devolución entregada dos veces cuenta una sola vez; la devolución de una venta que
+no está apuntada (sin cliente) o que se anuló no hace nada; en una ficha con los datos borrados resta
+pero no deja actividad.
 Implicados: SALES-F31
 
 ### CUSTOMER-F23 Ver el historial de compras de un cliente
@@ -656,8 +660,9 @@ Actor: todos
 Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha (CUSTOMER-F03).
-2. En «Compras» sale cada venta con su fecha, su importe y su estado («Cobrada» o «Anulada»), la más
-   reciente primero, 50 por página; se puede filtrar por estado.
+2. En «Compras» sale cada venta con su fecha, su importe y su estado («Cobrada» o «Anulada»), y cada
+   devolución en su propia línea («Devolución», importe en negativo), la más reciente primero, 50 por
+   página; se puede filtrar por estado.
 Entra: el historial de compras de la ficha.
 Sale: nada; solo lectura.
 Si falla: «Sin compras.» si no hay ninguna.
@@ -864,6 +869,7 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 | Crea, cambia y elimina campos personalizados | configurar | F29 | `customer.field.create`, `.update`, `.delete` |
 | Apunta la compra de una venta cobrada (solo el sistema) | sistema | F20 | `customer.purchase.record` |
 | Resta la compra de una venta anulada (solo el sistema) | sistema | F21 | `customer.purchase.void` |
+| Apunta una devolución y la resta del gastado (solo el sistema) | sistema | F22 | `customer.purchase.refund` |
 
 ### Lo que avisa (para las apps que quieran reaccionar)
 
@@ -884,6 +890,7 @@ Los avisos llevan solo identificadores, nunca datos personales: quien necesite l
 | Consentimiento dado / retirado | Registrar / retirar | `id`, `customer_id` y `channel` | `customer.consent.granted`, `customer.consent.withdrawn` |
 | Pedido enlazado / desenlazado | Enlazar con otro cliente / soltarlo | `order_id` y `customer_id` | `customer.order.linked`, `customer.order.unlinked` |
 | Compra apuntada / anulada | Venta cobrada / anulada | `customer_id` y `sale_id` | `customer.purchase.recorded`, `customer.purchase.voided` |
+| Devolución apuntada | Venta devuelta (toda o parte) | `customer_id`, `sale_id` y `refund_id` | `customer.purchase.refunded` |
 | Grupo, etiqueta o campo creado, cambiado o eliminado | Configurar | `id` | `customer.group.*`, `customer.tag.*`, `customer.field.*` |
 
 ### A qué reacciona (avisos de otras apps)
@@ -892,9 +899,12 @@ Los avisos llevan solo identificadores, nunca datos personales: quien necesite l
 |---|---|---|---|
 | Venta cobrada (`sale.sale.completed`) | Venta | Apunta la compra (CUSTOMER-F20) | `customer.purchase.record` |
 | Venta anulada (`sale.sale.voided`) | Venta | Resta la compra (CUSTOMER-F21) | `customer.purchase.void` |
+| Venta devuelta (`sale.sale.refunded`) | Venta | Apunta la devolución y la resta del gastado (CUSTOMER-F22) | `customer.purchase.refund` |
 
-Los dos servicios están hechos y probados; la reacción se engancha cuando Venta exista y la
-plataforma reparta los avisos entre apps.
+Las tres reacciones están declaradas en `events.py` (`REACTIONS` y `react`, como las de Inventario) y
+probadas con los avisos reales de Venta; las ejecuta el sistema, cada una en su transacción, cuando
+el relay del outbox reparta los avisos entre apps (fase 2). Clientes no depende de Venta: es el
+único enlace.
 
 ### Lo que necesita de otras apps
 
@@ -942,14 +952,15 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   con los datos borrados (`erased_at`). Las lecturas solo ven las vivas.
 - La nota y su actividad son UNA fila de `Activity` (`kind = note_added`), como el «chatter» de Odoo.
   La actividad guarda claves (`kind`), nunca frases: la pantalla las traduce.
-- Compras: una fila de `Purchase` por venta (`sale_id` único); la suma se mueve solo al crear la fila
-  y al anularla, así un aviso repetido no cuenta dos veces.
+- Compras: una fila de `Purchase` por venta (`sale_id` único entre las filas cobradas) y otra por
+  devolución (`refund_id` único, importe en negativo, estado `refunded`); la suma se mueve solo al
+  crear la fila o al anularla, así un aviso repetido no cuenta dos veces.
 - Consentimiento: `Consent` es un libro de hechos, solo se añaden filas; el estado de un canal es su
   último hecho.
 - Los nombres de grupos, etiquetas y campos son únicos sin distinguir mayúsculas
   (`Lower("name")`); el esquema les quita los espacios de los extremos.
-- `customer.purchase.record` y `customer.purchase.void` no tienen ruta de API: son del sistema y los
-  llamará la reacción a los avisos de Venta.
+- `customer.purchase.record`, `customer.purchase.void` y `customer.purchase.refund` no tienen ruta
+  de API: son del sistema y los ejecuta `events.react` con los avisos de Venta.
 - El administrador de Django (solo en `hubs.erplora.com`, para el staff) tiene CRUD completo sobre
   todas las tablas (ronda 12, PLAN §17); lo que cambia ahí no deja aviso en el outbox.
 - Toda escritura sobre una ficha bloquea antes su fila (también nota, actividad, consentimiento y
@@ -1015,7 +1026,7 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 | Notas y actividad (textos, frase del consentimiento, motivos, importes) | `Activity` | F16: borradas; queda solo la auditoría del borrado |
 | Pertenencia a grupos y etiquetas | grupos y etiquetas de la ficha | F16: quitada |
 | Consentimientos (canal, dirección, frase, versión, origen, justificante, motivo, quién y cuándo) | `Consent` | F16: dirección, justificante y motivo vaciados; el hecho se queda |
-| Ventas de la persona (venta, importe, moneda, estado) | `Purchase` | se conservan (prueba comercial y fiscal) |
+| Ventas y devoluciones de la persona (venta, devolución, importe, moneda, estado) | `Purchase` | se conservan (prueba comercial y fiscal) |
 | Pedidos de la persona | `OrderLink` | se conservan |
 | Nombre y datos fiscales en la venta y la factura | Venta / Facturación | se conservan: documento fiscal |
 
@@ -1026,8 +1037,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   número válido de su país rechaza el guardado.
 - **El consentimiento no se pone editando, creando ni importando.** Solo con su acción, que exige la
   frase; cada decisión es un hecho nuevo que nada edita ni borra; quién lo apuntó sale de la sesión.
-- **Una venta cuenta una sola vez y una anulación resta una sola vez**; una venta sin cliente no toca
-  ninguna ficha.
+- **Una venta cuenta una sola vez, y una anulación y cada devolución restan una sola vez**; una venta
+  sin cliente no toca ninguna ficha.
 - **Un pedido tiene como mucho un cliente.**
 - **Unir fichas es todo o nada**: dos fichas vivas y distintas, o no cambia nada; no se deshace.
 - **Borrar datos personales no se deshace**, alcanza a las fichas unidas en la borrada; repetirlo no
@@ -1057,10 +1068,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 
 1. **Aviso de posible duplicado al crear (F12).** ¿Un aviso que no bloquea con las fichas del mismo
    teléfono o email? Hoy lo hace solo el alta rápida del TPV.
-2. **Devoluciones (F22).** «Gastado» neto de devoluciones, como Shopify y Square, cuando Venta defina
-   su aviso de devolución.
-3. **Etapas por tiempo.** «En riesgo», «Inactivo» y «Perdido» solo se ponen a mano: ¿tarea programada?
-4. **Datos de salud en campos propios.** ¿Marca de campo sensible con consentimiento explícito?
-5. **País del negocio.** Llega cuando la plataforma tenga ajustes por negocio; hasta entonces, España.
-6. **Aprobación con PIN.** El producto actual dejaba hacer con el PIN de un responsable lo que es del
+2. **Etapas por tiempo.** «En riesgo», «Inactivo» y «Perdido» solo se ponen a mano: ¿tarea programada?
+3. **Datos de salud en campos propios.** ¿Marca de campo sensible con consentimiento explícito?
+4. **País del negocio.** Llega cuando la plataforma tenga ajustes por negocio; hasta entonces, España.
+5. **Aprobación con PIN.** El producto actual dejaba hacer con el PIN de un responsable lo que es del
    responsable; llega con la elevación de la plataforma (fase 2).

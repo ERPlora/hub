@@ -80,6 +80,8 @@ from apps.customer.schemas import (
     OrderLinkIn,
     PurchaseRecordIn,
     PurchaseRecordOut,
+    PurchaseRefundIn,
+    PurchaseRefundOut,
     PurchaseVoidIn,
     PurchaseVoidOut,
     SetGroupsIn,
@@ -1046,6 +1048,61 @@ def void_purchase(ctx: OperationContext, data: PurchaseVoidIn) -> dict:
 
 #: How many times a void follows a purchase that a merge moved to another card meanwhile.
 VOID_ATTEMPTS = 3
+
+
+@operation(
+    "customer.purchase.refund",
+    kind="command",
+    permission="customer.record_purchase",
+    input=PurchaseRefundIn,
+    output=PurchaseRefundOut,
+    ai={
+        "description": "System only: when a paid sale is refunded (all or part), records the refund as a line of "
+        "its own in its customer's history and takes what came back off the spend; the purchases, the last "
+        "purchase and the stage stay. Once per refund.",
+        "risk": "high",
+    },
+)
+def refund_purchase(ctx: OperationContext, data: PurchaseRefundIn) -> dict:
+    nothing = {"sale_id": data.sale_id, "refund_id": data.refund_id, "refunded": False}
+    # The card first, then its purchase (the order a merge locks them in); then the refund, checked
+    # under that lock so a repeated delivery never counts twice.
+    locked = _locked_purchase(data.sale_id)
+    if locked is None or Purchase.objects.filter(refund_id=data.refund_id).exists():
+        return nothing
+    customer, purchase = locked
+    Purchase.objects.create(
+        customer=customer,
+        sale_id=data.sale_id,
+        refund_id=data.refund_id,
+        amount=-data.total,
+        currency=purchase.currency,
+        status=Purchase.Status.REFUNDED,
+        recorded_at=data.refunded_at or timezone.now(),
+        void_reason=data.reason,
+    )
+    customer.total_spent -= data.total
+    customer.save(update_fields=["total_spent", "updated_at"])
+    if customer.erased_at is None:  # an erased card's timeline keeps only its erasure
+        Activity.objects.create(
+            customer=customer,
+            kind=Activity.Kind.PURCHASE_REFUNDED,
+            text=data.reason,
+            related_id=str(data.refund_id),
+            related_type="refund",
+            data={"amount": data.total, "currency": purchase.currency},
+            actor=_actor(ctx),
+        )
+    record_event(
+        ctx,
+        events.PURCHASE_REFUNDED,
+        {
+            "customer_id": str(customer.id),
+            "sale_id": str(data.sale_id),
+            "refund_id": str(data.refund_id),
+        },
+    )
+    return {"sale_id": data.sale_id, "refund_id": data.refund_id, "refunded": True}
 
 
 def _locked_purchase(sale_id: UUID) -> tuple[Customer, Purchase] | None:

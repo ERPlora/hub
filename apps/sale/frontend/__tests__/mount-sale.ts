@@ -17,6 +17,7 @@ import {
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
+import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
@@ -148,6 +149,11 @@ export async function mountSale(component: Component, options: MountOptions = {}
   };
 
   return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, find, inDoc };
+}
+
+/** Mounts `use` (a composable call) inside a component of the sale app's harness. */
+export function mountComposable(use: () => void, options: Omit<MountOptions, 'props'> = {}) {
+  return mountSale(ComposableHost, { ...options, props: { use } });
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */

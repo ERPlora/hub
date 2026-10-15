@@ -268,6 +268,7 @@ class Activity(UUIDModel):
         NOTE_ADDED = "note_added", _("Note added")
         PURCHASE_RECORDED = "purchase_recorded", _("Purchase recorded")
         PURCHASE_VOIDED = "purchase_voided", _("Purchase voided")
+        PURCHASE_REFUNDED = "purchase_refunded", _("Purchase refunded")
         CONSENT_GRANTED = "consent_granted", _("Consent given")
         CONSENT_WITHDRAWN = "consent_withdrawn", _("Consent withdrawn")
         MERGED = "merged", _("Duplicate customer merged into this one")
@@ -305,11 +306,16 @@ class Activity(UUIDModel):
 
 
 class Purchase(UUIDModel):
-    """One sale of a card (CUSTOMER-F20): recorded once, voided at most once, never deleted."""
+    """One sale of a card (CUSTOMER-F20): recorded once, voided at most once, never deleted.
+
+    A refund of it (CUSTOMER-F22) is a line of its own: the same sale, its refund's id, the amount
+    returned as a negative amount and the status «refunded»; recorded once per refund.
+    """
 
     class Status(models.TextChoices):
         CONFIRMED = "confirmed", _("Paid")
         VOIDED = "voided", _("Voided")
+        REFUNDED = "refunded", _("Refund")
 
     customer = models.ForeignKey(
         Customer,
@@ -320,6 +326,8 @@ class Purchase(UUIDModel):
     # The sale's id in the sale app (an opaque reference, no foreign key between apps); empty for a
     # manual entry, which is never deduplicated (NULLs are distinct in Postgres).
     sale_id = models.UUIDField(_("sale"), null=True, blank=True)
+    # The refund's id in the sale app, on a refund line only.
+    refund_id = models.UUIDField(_("refund"), null=True, blank=True)
     amount = models.BigIntegerField(_("amount (cents)"))
     currency = models.CharField(_("currency"), max_length=3, blank=True)
     status = models.CharField(
@@ -334,9 +342,15 @@ class Purchase(UUIDModel):
         verbose_name_plural = _("purchases")
         ordering = ["-recorded_at", "-id"]
         constraints = [
+            # One paid line per sale; its refunds are lines of their own, one per refund.
             models.UniqueConstraint(
-                fields=["sale_id"], name="customer_purchase_sale_unique"
-            )
+                fields=["sale_id"],
+                condition=models.Q(refund_id__isnull=True),
+                name="customer_purchase_sale_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["refund_id"], name="customer_purchase_refund_unique"
+            ),
         ]
 
     def __str__(self) -> str:

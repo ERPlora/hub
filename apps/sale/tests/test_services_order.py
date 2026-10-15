@@ -622,6 +622,55 @@ def test_a_charged_check_cannot_be_voided_and_voiding_is_the_managers(coffee):
     assert refusal.value.code == "sale.order_unavailable"
 
 
+def test_whoever_builds_checks_voids_an_empty_one(coffee):
+    # A party that leaves without ordering does not need a manager (TABLE-F21): a check with no live
+    # line and no charge is voided with «build the check» alone, by the employee's own session.
+    waiter = ctx_for(EMPLOYEE, actor="waiter")
+    assert "sale.void_sale" not in waiter.permissions
+    empty = open_order(ctx=waiter)
+    voided = run("sale.order.void", {"order_id": str(empty.id)}, waiter)
+    assert voided.status == "voided"
+    assert Order.objects.get(pk=empty.id).voided_by == "waiter"
+    # A check whose only line was taken off is empty too.
+    emptied = open_order({"product": "COF"}, ctx=waiter)
+    run(
+        "sale.order.remove_line",
+        {"order_id": str(emptied.id), "line_id": str(line_of(emptied).id)},
+        waiter,
+    )
+    assert run("sale.order.void", {"order_id": str(emptied.id)}, waiter).status == "voided"
+
+
+def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee):
+    waiter = ctx_for(EMPLOYEE)
+    ordered = open_order({"product": "COF"}, ctx=waiter)
+    with pytest.raises(PermissionDenied) as refusal:
+        run("sale.order.void", {"order_id": str(ordered.id)}, waiter)
+    assert "sale.void_sale" in str(refusal.value)
+    assert Order.objects.get(pk=ordered.id).status == "open"
+    # Part charged, the rest taken off: nothing left to charge, but money moved on it.
+    partly = open_order({"product": "COF"}, {"product": "COF"}, ctx=waiter)
+    run(
+        "sale.sale.complete",
+        {
+            "idempotency_key": "void-empty-0001",
+            "order_id": str(partly.id),
+            "line_ids": [str(line_of(partly).id)],
+            "payments": [{"method": "card"}],
+        },
+        waiter,
+    )
+    run(
+        "sale.order.remove_line",
+        {"order_id": str(partly.id), "line_id": str(line_of(partly, 1).id)},
+        waiter,
+    )
+    with pytest.raises(PermissionDenied):
+        run("sale.order.void", {"order_id": str(partly.id)}, waiter)
+    # Who may void, voids it.
+    assert run("sale.order.void", {"order_id": str(partly.id)}).status == "voided"
+
+
 # ── Discounts ───────────────────────────────────────────────────────────────────────────────────
 
 
@@ -784,6 +833,35 @@ def test_the_title_and_the_appointment_of_a_check():
     assert refusal.value.code == "sale.order_unavailable"
 
 
+def test_a_check_of_an_appointment_opens_once(coffee):
+    # Two «Charge» of the same appointment (two taps, two devices) never open two checks of it: the
+    # second answers the open check it already has, as it is, and adds nothing to it.
+    appointment = uuid7()
+    first = open_order({"product": "COF"}, appointment_id=str(appointment), label="Ana · APT-1")
+    again = open_order({"product": "COF"}, appointment_id=str(appointment), label="Ana · APT-1")
+    assert (first.already, again.already) == (False, True)
+    assert again.id == first.id and len(again.lines) == 1
+    assert Order.objects.filter(appointment_id=appointment).count() == 1
+    assert names().count("sale.order.opened") == 1
+    # Once that check is no longer open (charged, voided), the appointment may open another.
+    run("sale.order.void", {"order_id": str(first.id)})
+    third = open_order({"product": "COF"}, appointment_id=str(appointment))
+    assert (third.already, third.id != first.id) == (False, True)
+
+
+def test_an_appointment_is_linked_to_one_open_check_at_a_time(coffee):
+    appointment = uuid7()
+    open_order({"product": "COF"}, appointment_id=str(appointment))
+    other = open_order({"product": "COF"})
+    with pytest.raises(Conflict) as refusal:
+        run(
+            "sale.order.set_appointment",
+            {"order_id": str(other.id), "appointment_id": str(appointment)},
+        )
+    assert refusal.value.code == "sale.appointment_check_open"
+    assert Order.objects.get(pk=other.id).appointment_id is None
+
+
 def test_an_employee_builds_the_check(coffee):
     employee = ctx_for(EMPLOYEE)
     order = open_order({"product": "COF"}, ctx=employee)
@@ -800,3 +878,32 @@ def test_the_settings_of_the_till_are_read_from_their_row():
     assert Settings.objects.count() == 0
     cap(25)
     assert Settings.objects.get().max_discount_percent == 25
+
+
+def test_sessions_are_released_in_the_order_of_their_voucher_like_settle_locks_them(monkeypatch):
+    # Two tills releasing the same two vouchers in opposite orders would lock each other's grant: every
+    # release goes by voucher id (then session id), the order service.session.settle locks them in.
+    from types import SimpleNamespace
+
+    from apps.sale import services
+
+    released = []
+    monkeypatch.setattr(
+        services,
+        "call_services",
+        lambda ctx, name, data: released.append((name, data["id"])),
+    )
+    low, high = sorted([uuid7(), uuid7()])
+    first, second, third = uuid7(), uuid7(), uuid7()
+    lines = [
+        SimpleNamespace(voucher_session_id=second, voucher_grant_id=high),
+        SimpleNamespace(voucher_session_id=None, voucher_grant_id=None),
+        SimpleNamespace(voucher_session_id=third, voucher_grant_id=low),
+        SimpleNamespace(voucher_session_id=first, voucher_grant_id=high),
+    ]
+    services._release_vouchers(ctx_for(), lines)
+    assert released == [
+        ("service.session.release", third),
+        ("service.session.release", min(first, second)),
+        ("service.session.release", max(first, second)),
+    ]

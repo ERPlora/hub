@@ -1,8 +1,10 @@
 """Read operations of the sale app (``READ ONLY``) and the helpers the writes share with them.
 
-The helpers that freeze a line (``freeze_product_line``, ``freeze_open_line``) read Inventory's
-product and units through Inventory's own operations, with the caller's session: Inventory is no
-requirement of the sale app (PLAN §20.5), so its tables are never read here. ``valuate`` is the one
+The helpers that freeze a line (``freeze_product_line``, ``freeze_open_line``, ``freeze_service_line``)
+read Inventory's product and units, and Services' service, through those apps' own operations, with
+the caller's session: neither is a requirement of the sale app (PLAN §20.5), so their tables are never
+read here. ``call_app`` is the one door to an app sale does not require (Services' catalog and voucher sessions,
+Invoicing's documents, Cash register's drawer, Appointments' bookings), by the name of its operation. ``valuate`` is the one
 valuation of a charge (``pricing.value`` over tax's closing), shared by the preview and the checkout.
 """
 
@@ -12,8 +14,9 @@ from decimal import Decimal
 from fractions import Fraction
 from uuid import UUID
 
+import pydantic
 from django.conf import settings as django_settings
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Exists, F, OuterRef, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -30,6 +33,7 @@ from live.operations import UnknownOperation, get, operation
 from apps.sale import pricing
 from apps.sale.models import (
     FACTORY_METHOD_NAMES,
+    FiscalStatus,
     Department,
     Order,
     OrderLine,
@@ -71,6 +75,7 @@ from apps.sale.schemas import (
     SaleOut,
     SalePage,
     SaleRefIn,
+    ServiceLineFields,
     SettingsOut,
     StatsOut,
     TodayOut,
@@ -101,6 +106,33 @@ PRODUCT_NOT_AVAILABLE = _(
 )
 TAX_CATEGORY_MISSING = _(
     "«%(name)s» cannot be sold: it has no tax category. Its VAT is missing."
+)
+SERVICES_UNAVAILABLE = _(
+    "Services is not active in this business: its services cannot be sold nor its vouchers used. Take the "
+    "voucher off the line to charge it."
+)
+INVOICE_UNAVAILABLE = _(
+    "Invoicing is not active in this business: the sale is a ticket without a fiscal document."
+)
+CASH_REGISTER_UNAVAILABLE = _("Cash register is not active in this business.")
+APPOINTMENT_UNAVAILABLE = _("Appointments is not active in this business.")
+BOOKED_PRICE_MISMATCH = _(
+    "That is not the price the appointment booked for this service: it is cancelled, it is another "
+    "customer's, it did not book this service or it booked it cheaper."
+)
+APPOINTMENT_NOT_VISIBLE = _(
+    "You cannot see that appointment: it is another professional's or it no longer exists. Charge it "
+    "from the appointment's own professional or at the catalog price."
+)
+SERVICE_NOT_AVAILABLE = _(
+    "That service is no longer offered: it is archived or it does not exist."
+)
+SERVICE_PRICE_REQUIRED = _(
+    "This service has no fixed price: type the amount that is charged."
+)
+SERVICE_PRICE_FIXED = _("This service has a fixed price: no amount is typed.")
+SERVICE_PRICE_OUT_OF_RANGE = _(
+    "That amount is outside what the service allows (%(min)s – %(max)s)."
 )
 QUANTITY_OFF_GRID = _(
     "The quantity does not fit the step of the product (%(step)s %(unit)s)."
@@ -517,6 +549,207 @@ def inventory_units(ctx: OperationContext) -> dict:
     }
 
 
+#: What a 409 of an app sale does not require says when that app is not in this business.
+UNAVAILABLE = {
+    "sale.services_unavailable": SERVICES_UNAVAILABLE,
+    "sale.invoice_unavailable": INVOICE_UNAVAILABLE,
+    "sale.cash_register_unavailable": CASH_REGISTER_UNAVAILABLE,
+    "sale.appointment_unavailable": APPOINTMENT_UNAVAILABLE,
+}
+
+
+def call_app(ctx: OperationContext, name: str, data: dict, unavailable_code: str):
+    """Runs the operation ``name`` of an app sale does not require, for the caller (its permission and
+    its active-app check apply): the app off or absent (``UnknownOperation``, ``app_inactive``) → 409
+    ``unavailable_code``. Its own refusals reach the caller as they are; nested in a write, it runs in a
+    savepoint, so a refusal caught by the caller leaves nothing of it behind."""
+    unavailable = Conflict(str(UNAVAILABLE[unavailable_code]), code=unavailable_code)
+    try:
+        op = get(name)
+    except UnknownOperation:
+        raise unavailable from None
+    try:
+        payload = op.input.model_validate(data)
+    except pydantic.ValidationError as invalid:
+        # What the other app does not accept is a 422 of the caller, as a route would answer it.
+        fields = {".".join(map(str, error["loc"])): error["msg"] for error in invalid.errors()}
+        raise InvalidPayload(
+            next(iter(fields.values()), str(invalid)), code="invalid_payload", fields=fields
+        ) from None
+    try:
+        return op(ctx, payload)
+    except AppInactive:
+        raise unavailable from None
+
+
+def call_services(ctx: OperationContext, name: str, data: dict):
+    """Services' operation ``name`` (``call_app``); off or absent → ``sale.services_unavailable``.
+
+    Its refusals (a voucher spent, a session no longer held…) reach the caller as they are."""
+    return call_app(ctx, name, data, "sale.services_unavailable")
+
+
+def _euros(cents: int | None) -> str:
+    return "—" if cents is None else f"{Decimal(cents) / 100:.2f} €"
+
+
+def _line_price(
+    ctx: OperationContext, service, data: ServiceLineFields, booking: "Booking | None"
+) -> int:
+    if data.booked_price is not None:
+        return booked_price(ctx, booking, service.id, data.booked_price)
+    price = _service_price(service, data.unit_price)
+    if service.pricing_type == "fixed":
+        return own_price(ctx, service.id, data.staff_id) or price
+    return price
+
+
+def _service_price(service, unit_price: int | None) -> int:
+    """The price a line of ``service`` is charged at: its own when fixed, the amount typed otherwise."""
+    if service.pricing_type == "fixed":
+        if unit_price is not None:
+            message = str(SERVICE_PRICE_FIXED)
+            raise Conflict(message, code="sale.service_price_fixed", fields={"unit_price": message})
+        return service.price
+    if unit_price is None:
+        message = str(SERVICE_PRICE_REQUIRED)
+        raise Conflict(message, code="sale.service_price_required", fields={"unit_price": message})
+    low, high = service.min_price, service.max_price
+    if (low is not None and unit_price < low) or (high is not None and unit_price > high):
+        message = str(SERVICE_PRICE_OUT_OF_RANGE) % {"min": _euros(low), "max": _euros(high)}
+        raise Conflict(
+            message, code="sale.service_price_out_of_range", fields={"unit_price": message}
+        )
+    return unit_price
+
+
+class Booking:
+    """The appointment a check charges (SALE-F26), asked once and by name to Appointments
+    (``appointment.appointment.get``, with the seller's session) when a line brings its ``booked_price``.
+    ``customer_id``, when the charge knows it, must be the appointment's."""
+
+    UNAVAILABLE = object()
+
+    def __init__(self, appointment_id: UUID | None, customer_id: UUID | None = None):
+        self.appointment_id = appointment_id
+        self.customer_id = customer_id
+        self._read = None
+
+    def read(self, ctx: OperationContext):
+        """The appointment; ``None`` when the seller cannot see it (it does not exist, was deleted, is
+        another's); ``UNAVAILABLE`` when Appointments cannot be asked (off, absent, not allowed)."""
+        if self._read is None:
+            try:
+                self._read = call_app(
+                    ctx,
+                    "appointment.appointment.get",
+                    {"id": self.appointment_id},
+                    "sale.appointment_unavailable",
+                )
+            except NotFound:
+                self._read = False
+            except (Conflict, PermissionDenied) as failure:
+                if isinstance(failure, Conflict) and failure.code != "sale.appointment_unavailable":
+                    raise
+                self._read = self.UNAVAILABLE
+        return self._read or None
+
+
+#: An appointment that no longer charges: its booked price is gone with it.
+_UNCHARGEABLE = {"cancelled", "no_show"}
+
+
+def booked_price(
+    ctx: OperationContext, booking: "Booking | None", service_id: UUID, price: int
+) -> int:
+    """``price`` as the line's frozen price when the check's appointment booked that service at it (lower
+    only with ``sale.sell_open_price``); without an appointment, or without Appointments to ask, an open
+    price (403 without the right). 409 ``sale.booked_price_mismatch`` otherwise."""
+    may_open = ctx.has("sale.sell_open_price")
+    appointment = (
+        booking.read(ctx) if booking and booking.appointment_id else Booking.UNAVAILABLE
+    )
+    if appointment is Booking.UNAVAILABLE:
+        if not may_open:
+            raise PermissionDenied(str(OPEN_PRICE_PERMISSION))
+        return price
+    booked = (
+        []
+        if appointment is None
+        or appointment.status in _UNCHARGEABLE
+        or appointment.sale_id is not None
+        or (booking.customer_id and appointment.customer_id != booking.customer_id)
+        else [line.price for line in appointment.services if line.service_id == service_id]
+    )
+    if price in booked or (booked and price < max(booked) and may_open):
+        return price
+    # One the seller cannot see (another professional's, deleted) is said as such: she cannot know why.
+    message = str(APPOINTMENT_NOT_VISIBLE if appointment is None else BOOKED_PRICE_MISMATCH)
+    raise Conflict(message, code="sale.booked_price_mismatch", fields={"booked_price": message})
+
+
+def own_price(ctx: OperationContext, service_id: UUID, staff_id: UUID | None) -> int | None:
+    """The professional's own price for the service (Services' assignment, SERVICE-F05), as Fresha,
+    Phorest and Timely charge it; ``None`` when she has none (or is no professional of Staff)."""
+    if staff_id is None:
+        return None
+    try:
+        page = call_services(
+            ctx,
+            "service.assignment.list",
+            {"service_id": service_id, "member_id": staff_id, "limit": 100},
+        )
+    except NotFound:
+        return None
+    return next(
+        (row.custom_price for row in page.rows if row.is_active and row.custom_price is not None),
+        None,
+    )
+
+
+def freeze_service_line(
+    ctx: OperationContext, data: ServiceLineFields, booking: Booking | None = None
+) -> OrderLine:
+    """An unsaved row for a service of Services: its name, price and tax category frozen from it. The
+    price: the one the appointment booked (``booked_price``, checked); else, of a fixed-price service,
+    the professional's own or the service's; else the amount typed, within the service's range."""
+    try:
+        service = call_services(
+            ctx, "service.service.get", {"id": data.service_id, "service": data.service}
+        )
+    except NotFound:
+        raise Conflict(
+            str(SERVICE_NOT_AVAILABLE), code="sale.service_not_available"
+        ) from None
+    if not service.is_active:
+        raise Conflict(str(SERVICE_NOT_AVAILABLE), code="sale.service_not_available")
+    if service.needs_tax_setup or not service.tax_category_key:
+        raise Conflict(
+            str(TAX_CATEGORY_MISSING) % {"name": service.name},
+            code="sale.tax_category_missing",
+        )
+    check_grid(data.quantity, GRID_FALLBACK, "ud")
+    line = OrderLine(
+        service_id=service.id,
+        name=service.name,
+        sku=service.sku,
+        is_service=True,
+        unit="ud",
+        increment=GRID_FALLBACK,
+        quantity=data.quantity,
+        unit_price=_line_price(ctx, service, data, booking),
+        cost=service.cost,
+        tax_category_key=service.tax_category_key,
+        notes=data.notes,
+        staff_id=data.staff_id,
+        is_gift=data.is_gift,
+        gift_reason=data.gift_reason if data.is_gift else "",
+        created_by=actor(ctx),
+    )
+    line.line_total = provisional_total(line)
+    return line
+
+
 def check_grid(quantity: Decimal, increment: Decimal, unit: str) -> None:
     if increment and quantity % increment != 0:
         message = str(QUANTITY_OFF_GRID) % {
@@ -529,7 +762,10 @@ def check_grid(quantity: Decimal, increment: Decimal, unit: str) -> None:
 
 
 def provisional_total(line: OrderLine) -> int:
-    """What the row paints: its frozen price by its quantity, with its own discount; a comp, 0."""
+    """What the row paints: its frozen price by its quantity, with its own discount; a comp, 0; a line a
+    voucher pays, 0."""
+    if line.voucher_session_id is not None:
+        return 0
     return pricing.line_amount(
         line.unit_price,
         ratio_of(line),
@@ -674,6 +910,13 @@ def order_line_row(line: OrderLine) -> dict:
         "gift_reason": line.gift_reason,
         "notes": line.notes,
         "staff_id": line.staff_id,
+        "service_id": line.service_id,
+        "paid_by_voucher": line.paid_by_voucher,
+        "voucher_session_id": line.voucher_session_id,
+        "voucher_grant_id": line.voucher_grant_id,
+        "voucher_name": line.voucher_name,
+        "voucher_remaining": line.voucher_remaining,
+        "voucher_hold_until": line.voucher_hold_until,
         "line_total": line.line_total,
         "round_no": line.round_no,
         "fired_at": line.fired_at,
@@ -795,7 +1038,9 @@ def valuate(
                 tax_category_key=line.tax_category_key,
                 line_percent=line.discount_percent,
                 is_gift=line.is_gift,
+                covered=line.voucher_session_id is not None,
                 cost=line.cost,
+                quantity=line.quantity,
                 name=line.name,
             )
             for index, line in enumerate(lines)
@@ -808,10 +1053,15 @@ def valuate(
 
 
 def breakdown_rows(breakdown: list[dict]) -> list[dict]:
+    """The valuation's breakdown as a sale keeps it: one row per fiscal key and component."""
     return [
         {
             "rate_pct": row["rate_pct"],
             "label": row["label"],
+            "tax_type": str(row["tax_type"]),
+            "regime": str(row["regime"]),
+            "qualification": str(row["qualification"]),
+            "exempt_reason": str(row["exempt_reason"]),
             "base": row["base"],
             "tax": row["tax"],
         }
@@ -819,14 +1069,44 @@ def breakdown_rows(breakdown: list[dict]) -> list[dict]:
     ]
 
 
+def operation_total(order: Order | None, closes: bool, valuation: pricing.Valuation, *, on: dt.date | None = None) -> int:
+    """The whole operation the cash limit looks at (Ley 7/2012, art. 7.Uno.1, second paragraph: the
+    payments a supply is split into add up). A check charged in parts is one operation: what it already
+    charged (voided sales aside) plus all it has left, valued as the charge that would close it. A
+    counter sale, or a charge that closes the check, adds its own total to what was charged before."""
+    if order is None:
+        return valuation.total
+    charged = (
+        Sale.objects.filter(order=order, status__in=[Sale.Status.COMPLETED, Sale.Status.REFUNDED])
+        .aggregate(total=Sum("total"))["total"]
+        or 0
+    )
+    if closes:
+        return charged + valuation.total
+    rest = valuate(
+        pending_lines(order),
+        discount_percent=order.discount_percent,
+        discount_amount=order.discount_amount,
+        tax_included=current_settings().default_tax_included,
+        on=on,
+    )
+    return charged + rest.total
+
+
 def loose_lines(
-    ctx: OperationContext, lines: list, open_lines: list
+    ctx: OperationContext,
+    lines: list,
+    open_lines: list,
+    service_lines: list = (),
+    booking: Booking | None = None,
 ) -> list[OrderLine]:
-    """Unsaved rows for a counter sale: catalog lines frozen from Inventory, then open-price ones."""
+    """Unsaved rows for a counter sale: catalog lines frozen from Inventory, services from Services (at the
+    price ``booking`` booked, when a line brings it), then open-price ones."""
     frozen: list[OrderLine] = []
     if lines:
         units = inventory_units(ctx)
         frozen += [freeze_product_line(ctx, line, units) for line in lines]
+    frozen += [freeze_service_line(ctx, line, booking) for line in service_lines]
     frozen += [freeze_open_line(ctx, line) for line in open_lines]
     for position, line in enumerate(frozen, start=1):
         line.position = position
@@ -846,6 +1126,8 @@ def loose_lines(
 )
 def preview(ctx: OperationContext, params: PreviewIn) -> dict:
     settings = current_settings()
+    order = None
+    closes = True
     if params.order_id is not None:
         order = find_order(params.order_id)
         if order.status != Order.Status.OPEN:
@@ -854,7 +1136,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         percent, amount = order.discount_percent, order.discount_amount if closes else 0
         version = order.version
     else:
-        lines = loose_lines(ctx, params.lines, params.open_lines)
+        lines = loose_lines(ctx, params.lines, params.open_lines, params.service_lines)
         percent, amount, version = params.discount_percent, params.discount_amount, None
     valuation = valuate(
         lines,
@@ -885,6 +1167,10 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
                 "unit_price": line.unit_price,
                 "discount_percent": line.discount_percent,
                 "is_gift": line.is_gift,
+                "service_id": line.service_id,
+                "paid_by_voucher": line.paid_by_voucher,
+                "voucher_name": line.voucher_name,
+                "voucher_remaining": line.voucher_remaining,
                 "tax_category_key": line.tax_category_key,
                 "tax_rate": out.tax_rate,
                 "net_amount": out.net_amount,
@@ -893,6 +1179,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
             }
             for line, out in zip(lines, valuation.lines, strict=True)
         ],
+        "operation_total": operation_total(order, closes, valuation),
         "cash_limit": CASH_LIMIT.get(country),
         "ticket_limit": TICKET_LIMIT.get(country),
     }
@@ -942,6 +1229,9 @@ def sale_line_row(line: SaleLine, returned: Decimal) -> dict:
         "gift_reason": line.gift_reason,
         "notes": line.notes,
         "staff_id": line.staff_id,
+        "service_id": line.service_id,
+        "paid_by_voucher": line.paid_by_voucher,
+        "voucher_name": line.voucher_name,
         "tax_category_key": line.tax_category_key,
         "tax_rate": line.tax_rate,
         "tax_country_code": line.tax_country_code,
@@ -952,6 +1242,22 @@ def sale_line_row(line: SaleLine, returned: Decimal) -> dict:
         "line_total": line.line_total,
         "returned_quantity": returned,
     }
+
+
+def sessions_to_return(sale: Sale) -> int:
+    """Lines of ``sale`` paid with a voucher whose session has not come back (a refund returns a line of
+    one unit whole)."""
+    return sale.lines.filter(
+        voucher_session_id__isnull=False, refunds__isnull=True
+    ).count()
+
+
+def documents_pending(sale: Sale) -> bool:
+    """A fiscal document of ``sale`` waits: its own, its void's or one of its refunds'."""
+    return (
+        FiscalStatus.PENDING in (sale.invoice_status, sale.void_invoice_status)
+        or sale.refunds.filter(invoice_status=FiscalStatus.PENDING).exists()
+    )
 
 
 def sale_detail(sale: Sale, *, already: bool = False) -> dict:
@@ -979,12 +1285,22 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
         "change_total": sale.change_total,
         "refunded_total": sale.refunded_total,
         "refundable_total": sale.refundable_total,
+        "sessions_to_return": sessions_to_return(sale)
+        if sale.status == Sale.Status.COMPLETED
+        else 0,
         "payment_method_name": method_display_name(sale.payment_method_name),
         "breakdown": sale.tax_breakdown,
         "notes": sale.notes,
         "voided_at": sale.voided_at,
         "voided_by": sale.voided_by,
         "void_reason": sale.void_reason,
+        "invoice_status": sale.invoice_status,
+        "invoice_id": sale.invoice_id,
+        "invoice_number": sale.invoice_number,
+        "invoice_type": sale.invoice_type,
+        "void_invoice_status": sale.void_invoice_status,
+        "void_invoice_number": sale.void_invoice_number,
+        "documents_pending": documents_pending(sale),
         "created_at": sale.created_at,
         "created_by": sale.created_by,
         "lines": [
@@ -1062,6 +1378,13 @@ def sale_row(sale: Sale) -> dict:
         "tax_total": sale.tax_total,
         "refunded_total": sale.refunded_total,
         "refundable_total": sale.refundable_total,
+        "sessions_to_return": sale.voucher_lines_left
+        if sale.status == Sale.Status.COMPLETED
+        else 0,
+        "has_refunds": sale.has_refunds,
+        "invoice_status": sale.invoice_status,
+        "documents_pending": FiscalStatus.PENDING in (sale.invoice_status, sale.void_invoice_status)
+        or sale.refunds_pending,
     }
 
 
@@ -1078,7 +1401,18 @@ def sale_row(sale: Sale) -> dict:
     },
 )
 def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
-    sales = Sale.objects.all()
+    sales = Sale.objects.annotate(
+        voucher_lines_left=Count(
+            "lines",
+            filter=Q(
+                lines__voucher_session_id__isnull=False, lines__refunds__isnull=True
+            ),
+        ),
+        has_refunds=Exists(Refund.objects.filter(sale=OuterRef("pk"))),
+        refunds_pending=Exists(
+            Refund.objects.filter(sale=OuterRef("pk"), invoice_status=FiscalStatus.PENDING)
+        ),
+    )
     if params.search:
         text = params.search.strip()
         sales = sales.filter(
@@ -1328,6 +1662,8 @@ def refund_options(ctx: OperationContext, params: SaleRefIn) -> dict:
                     "left": line.quantity - returned.get(line.id, Decimal(0)),
                     "line_total": line.line_total,
                     "is_gift": line.is_gift,
+                    "paid_by_voucher": line.paid_by_voucher,
+                    "voucher_name": line.voucher_name,
                 }
                 for line in sale.lines.order_by("position", "id")
             ],
@@ -1343,6 +1679,9 @@ def refund_row(refund: Refund) -> dict:
         "note": refund.note,
         "created_at": refund.created_at,
         "created_by": refund.created_by,
+        "invoice_status": refund.invoice_status,
+        "invoice_number": refund.invoice_number,
+        "invoice_type": refund.invoice_type,
     }
 
 

@@ -14,9 +14,12 @@ import RecipientForm from './RecipientForm.vue';
 type Control = HTMLElement & { label?: string; value?: unknown; fill?: string; labelPlacement?: string; interface?: string };
 
 const BLANK: Recipient = { name: '', taxId: '', address: '', country: 'ES', idType: '' };
-const FULL: Recipient = { name: 'Bar Pepe SL', taxId: 'B12345678', address: 'Calle Mayor 1, Madrid', country: 'ES', idType: '' };
+const FULL: Recipient = { name: 'Bar Pepe SL', taxId: 'B12345674', address: 'Calle Mayor 1, Madrid', country: 'ES', idType: '' };
 
-async function setup(props: { modelValue?: Recipient; reason?: 'limit' | 'invoice'; max?: number } = {}, locale: 'en' | 'es' = 'en') {
+async function setup(
+  props: { modelValue?: Recipient; reason?: 'limit' | 'invoice'; max?: number; errors?: Record<string, string> } = {},
+  locale: 'en' | 'es' = 'en',
+) {
   const m = await mountSale(RecipientForm, { props: { modelValue: BLANK, reason: 'invoice', max: 300000, ...props }, locale });
   await m.wrapper.setProps({ 'onUpdate:modelValue': (modelValue: Recipient) => m.wrapper.setProps({ modelValue }) });
   const field = (name: string) => m.inDoc(`sale-checkout-recipient-${name}`) as Control | null;
@@ -65,7 +68,7 @@ describe('RecipientForm', () => {
 
   it('turns green once the three are there: the sale goes out as a complete invoice', async () => {
     const s = await setup({ modelValue: { ...FULL, taxId: '' } });
-    await ionValue(s.field('tax-id'), 'B12345678', 'ionInput');
+    await ionValue(s.field('tax-id'), 'B12345674', 'ionInput');
     expect(s.value()).toEqual(FULL);
     expect(s.heading()).toEqual([
       'This sale goes out as a complete invoice',
@@ -107,6 +110,26 @@ describe('RecipientForm', () => {
     await ionValue(s.field('country'), 'ES');
     expect(s.value()).toMatchObject({ country: 'ES', idType: '' });
     expect(s.field('id-type')).toBeNull();
+  });
+
+  it('a Spanish tax ID that does not check is said under its box and the invoice is not ready', async () => {
+    const s = await setup({ modelValue: { ...FULL, taxId: 'B12345678' } });
+    expect(s.find('sale-checkout-recipient-tax-id-error').text()).toBe('That tax ID is not valid.');
+    expect(s.box().attributes('data-done')).toBeUndefined();
+    const fixed = await setup({ modelValue: FULL });
+    expect(fixed.find('sale-checkout-recipient-tax-id-error').exists()).toBe(false);
+  });
+
+  it('abroad without its kind of document, asks for it under the kind', async () => {
+    const s = await setup({ modelValue: { ...FULL, country: 'GB', taxId: 'AB123456', idType: '' } });
+    expect(plain(s.find('sale-checkout-recipient-id-type-error').text())).toBe(
+      'Say what kind of document a foreign tax ID is (EU VAT number, passport, tax ID of their country…).',
+    );
+  });
+
+  it('what the server refused on a field is said under that field', async () => {
+    const s = await setup({ modelValue: { ...FULL, country: 'FR', taxId: 'FR00000000000', idType: '02' }, errors: { taxId: 'That tax ID is not valid.' } });
+    expect(s.find('sale-checkout-recipient-tax-id-error').text()).toBe('That tax ID is not valid.');
   });
 
   it('offers every country by its name, Spain first', async () => {

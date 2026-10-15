@@ -117,6 +117,16 @@ def test_spanish_texts():
         assert (
             str(services.DISCOUNTS_NOT_ALLOWED) == "Este negocio no permite descuentos."
         )
+        # SALE-F27 and F32 (WORKBOOK).
+        assert str(services.VOUCHER_NEEDS_ONE_UNIT) == (
+            "Un bono paga una línea de una unidad: separa la línea antes."
+        )
+        assert str(services.REFUND_NOTHING) == (
+            "Una devolución tiene que devolver dinero o la sesión de un bono."
+        )
+        assert str(queries.SERVICES_UNAVAILABLE).startswith(
+            "Servicios no está activa en este negocio"
+        )
 
 
 @pytest.mark.django_db

@@ -1,0 +1,835 @@
+# Spanish translation of the invoice app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next invoice\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 08:43+0200\n"
+"PO-Revision-Date: 2026-10-14 00:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+#: apps.py:13
+msgid "Invoicing"
+msgstr "Facturación"
+
+#: apps.py:19
+msgid ""
+"Every charged sale becomes a numbered ticket or invoice, corrected only by "
+"rectifying invoices."
+msgstr ""
+"Cada venta cobrada se convierte en un tique o una factura numerada, que solo"
+" se corrige con rectificativas."
+
+#: apps.py:22
+msgid ""
+"Invoicing turns every charged sale into its fiscal document: a simplified "
+"invoice for a ticket, a full invoice when the customer gives a tax ID, the "
+"full invoice that replaces a ticket the customer already took, and the "
+"rectifying invoice of every refund and void. Each document is numbered in "
+"its series and year with no gaps, carries the business as issuer, is never "
+"edited and is printed or saved as PDF. Invoices issued by hand, marked as "
+"paid and the numbering series are managed here too, ready for VeriFactu."
+msgstr ""
+"Facturación convierte cada venta cobrada en su documento fiscal: la factura "
+"simplificada de un tique, la factura completa cuando el cliente da su NIF, "
+"la factura completa que sustituye a un tique que el cliente ya se llevó y la"
+" rectificativa de cada devolución y anulación. Cada documento se numera en "
+"su serie y su año sin huecos, lleva al negocio como emisor, nunca se edita y"
+" se imprime o se guarda en PDF. Aquí también se emiten facturas a mano, se "
+"marcan como pagadas y se llevan las series de numeración, listas para "
+"VeriFactu."
+
+#: apps.py:58 models.py:62
+msgid "Invoices"
+msgstr "Facturas"
+
+#: apps.py:59
+msgid "Series"
+msgstr "Series"
+
+#: apps.py:60
+msgid "Issuer"
+msgstr "Emisor"
+
+#: models.py:41
+msgid "Invoice (F1)"
+msgstr "Factura (F1)"
+
+#: models.py:42
+msgid "Simplified invoice (F2)"
+msgstr "Factura simplificada (F2)"
+
+#: models.py:43
+msgid "Invoice replacing a simplified one (F3)"
+msgstr "Factura en sustitución de una simplificada (F3)"
+
+#: models.py:46
+msgid ""
+"Rectifying invoice: error founded in law and art. 80 One, Two and Six (R1)"
+msgstr ""
+"Rectificativa: error fundado en derecho y art. 80 Uno, Dos y Seis (R1)"
+
+#: models.py:48
+msgid "Rectifying invoice: art. 80 Three, insolvency (R2)"
+msgstr "Rectificativa: art. 80 Tres, concurso (R2)"
+
+#: models.py:49
+msgid "Rectifying invoice: art. 80 Four, bad debts (R3)"
+msgstr "Rectificativa: art. 80 Cuatro, créditos incobrables (R3)"
+
+#: models.py:50
+msgid "Rectifying invoice: other causes (R4)"
+msgstr "Rectificativa: resto de causas (R4)"
+
+#: models.py:51
+msgid "Rectifying invoice of a simplified invoice (R5)"
+msgstr "Rectificativa de una factura simplificada (R5)"
+
+#: models.py:61
+msgid "POS tickets"
+msgstr "Tiques del TPV"
+
+#: models.py:63
+msgid "Rectifying invoices"
+msgstr "Facturas rectificativas"
+
+#: models.py:69
+msgid "code"
+msgstr "código"
+
+#: models.py:75
+msgid ""
+"Use capital letters, digits, hyphens and underscores, starting with a letter"
+" or a digit."
+msgstr ""
+"Usa mayúsculas, dígitos, guiones y guiones bajos, empezando por una letra o "
+"un dígito."
+
+#: models.py:80
+msgid "name"
+msgstr "nombre"
+
+#: models.py:82 models.py:221
+msgid "invoice type"
+msgstr "tipo de factura"
+
+#: models.py:85 models.py:230
+msgid "year"
+msgstr "año"
+
+#: models.py:87
+msgid "prefix"
+msgstr "prefijo"
+
+#: models.py:90
+msgid "number format"
+msgstr "formato del número"
+
+#: models.py:93
+msgid "current number"
+msgstr "número actual"
+
+#: models.py:94
+msgid "active"
+msgstr "activa"
+
+#: models.py:95
+msgid "default series"
+msgstr "serie predeterminada"
+
+#: models.py:96
+msgid "created at"
+msgstr "creada el"
+
+#: models.py:97 models.py:162 models.py:326
+msgid "updated at"
+msgstr "actualizada el"
+
+#: models.py:99
+msgid "created by"
+msgstr "creada por"
+
+#: models.py:102 models.py:164
+msgid "updated by"
+msgstr "actualizada por"
+
+#: models.py:106 models.py:107
+msgid "numbering series"
+msgstr "serie de numeración"
+
+#: models.py:144
+msgid "Typed in the Hub"
+msgstr "Escrito en el Hub"
+
+#: models.py:145
+msgid "From the ERPlora account"
+msgstr "De la cuenta de ERPlora"
+
+#: models.py:147
+msgid "single row"
+msgstr "fila única"
+
+#: models.py:148
+msgid "legal name"
+msgstr "razón social"
+
+#: models.py:149
+msgid "tax ID"
+msgstr "NIF"
+
+#: models.py:150
+msgid "address"
+msgstr "domicilio"
+
+#: models.py:151
+msgid "postal code"
+msgstr "código postal"
+
+#: models.py:152
+msgid "city"
+msgstr "ciudad"
+
+#: models.py:153
+msgid "province"
+msgstr "provincia"
+
+#: models.py:155
+msgid "country"
+msgstr "país"
+
+#: models.py:157 models.py:279
+msgid "source"
+msgstr "origen"
+
+#: models.py:160
+msgid "synced version"
+msgstr "versión recibida"
+
+#: models.py:161
+msgid "synced at"
+msgstr "recibido el"
+
+#: models.py:168 models.py:169
+msgid "issuer"
+msgstr "emisor"
+
+#: models.py:204
+msgctxt "invoice status"
+msgid "Issued"
+msgstr "Emitida"
+
+#: models.py:205
+msgctxt "invoice status"
+msgid "Paid"
+msgstr "Pagada"
+
+#: models.py:206
+msgctxt "invoice status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+#: models.py:209
+msgid "POS sale"
+msgstr "Venta del TPV"
+
+#: models.py:210
+msgid "Manual"
+msgstr "Alta manual"
+
+#: models.py:211
+msgid "Replaces a simplified invoice"
+msgstr "Sustituye a una factura simplificada"
+
+#: models.py:212
+msgid "Rectification"
+msgstr "Rectificación"
+
+#: models.py:213
+msgid "Sale refund"
+msgstr "Devolución de la venta"
+
+#: models.py:214
+msgid "Sale void"
+msgstr "Anulación de la venta"
+
+#: models.py:217
+msgid "By differences"
+msgstr "Por diferencias"
+
+#: models.py:218
+msgid "By substitution"
+msgstr "Por sustitución"
+
+#: models.py:227
+msgid "series"
+msgstr "serie"
+
+#: models.py:229
+msgid "series code"
+msgstr "código de serie"
+
+#: models.py:231
+msgid "sequence"
+msgstr "secuencia"
+
+#: models.py:233
+msgid "number"
+msgstr "número"
+
+#: models.py:234
+msgid "issue date"
+msgstr "fecha de emisión"
+
+#: models.py:235
+msgid "operation date"
+msgstr "fecha de operación"
+
+#: models.py:236
+msgid "issued at"
+msgstr "emitida el"
+
+#: models.py:239
+msgid "issuer name"
+msgstr "nombre del emisor"
+
+#: models.py:240
+msgid "issuer tax ID"
+msgstr "NIF del emisor"
+
+#: models.py:241
+msgid "issuer address"
+msgstr "domicilio del emisor"
+
+#: models.py:242
+msgid "issuer country"
+msgstr "país del emisor"
+
+#: models.py:250
+msgid "customer"
+msgstr "cliente"
+
+#: models.py:253
+msgid "customer name"
+msgstr "nombre del cliente"
+
+#: models.py:256
+msgid "customer tax ID"
+msgstr "NIF del cliente"
+
+#: models.py:259
+msgid "customer address"
+msgstr "domicilio del cliente"
+
+#: models.py:262
+msgid "customer country"
+msgstr "país del cliente"
+
+#: models.py:265
+msgid "customer document type"
+msgstr "tipo de documento del cliente"
+
+#: models.py:268 models.py:407
+msgid "description"
+msgstr "descripción"
+
+#: models.py:269
+msgid "notes"
+msgstr "notas"
+
+#: models.py:270
+msgid "taxable base"
+msgstr "base imponible"
+
+#: models.py:271 models.py:420
+msgid "tax"
+msgstr "impuesto"
+
+#: models.py:272 models.py:421
+msgid "total"
+msgstr "total"
+
+#: models.py:275
+msgid "tax breakdown"
+msgstr "desglose de impuestos"
+
+#: models.py:277
+msgid "currency"
+msgstr "moneda"
+
+#: models.py:287
+msgid "sale"
+msgstr "venta"
+
+#: models.py:295
+msgid "refund"
+msgstr "devolución"
+
+#: models.py:303
+msgid "rectifies"
+msgstr "rectifica a"
+
+#: models.py:311
+msgid "replaces"
+msgstr "sustituye a"
+
+#: models.py:314
+msgid "rectification kind"
+msgstr "tipo de rectificación"
+
+#: models.py:320
+msgid "status"
+msgstr "estado"
+
+#: models.py:322
+msgid "paid at"
+msgstr "pagada el"
+
+#: models.py:324
+msgid "issued by"
+msgstr "emitida por"
+
+#: models.py:329 models.py:404
+msgid "invoice"
+msgstr "factura"
+
+#: models.py:330
+msgid "invoices"
+msgstr "facturas"
+
+#: models.py:406
+msgid "position"
+msgstr "posición"
+
+#: models.py:409
+msgid "quantity"
+msgstr "cantidad"
+
+#: models.py:413
+msgid "unit price"
+msgstr "precio unitario"
+
+#: models.py:414
+msgid "discount"
+msgstr "descuento"
+
+#: models.py:416
+msgid "rate (%)"
+msgstr "tipo (%)"
+
+#: models.py:417
+msgid "surcharge (%)"
+msgstr "recargo (%)"
+
+#: models.py:418
+msgid "tax category"
+msgstr "categoría fiscal"
+
+#: models.py:419
+msgid "base"
+msgstr "base"
+
+#: models.py:422
+msgid "product"
+msgstr "producto"
+
+#: models.py:423
+msgid "sale line"
+msgstr "línea de venta"
+
+#: models.py:426
+msgid "invoice line"
+msgstr "línea de factura"
+
+#: models.py:427
+msgid "invoice lines"
+msgstr "líneas de factura"
+
+#: queries.py:51
+msgid "Invoice not found."
+msgstr "Factura no encontrada."
+
+#: queries.py:52 services.py:88
+msgid "This numbering series does not exist."
+msgstr "Esa serie de numeración no existe."
+
+#: queries.py:55
+msgid "Invoice"
+msgstr "Factura"
+
+#: queries.py:56
+msgid "Simplified invoice"
+msgstr "Factura simplificada"
+
+#: queries.py:57
+msgid "Rectifying invoice"
+msgstr "Factura rectificativa"
+
+#: queries.py:58
+msgid "Copy"
+msgstr "Copia"
+
+#: queries.py:59
+msgid "VAT"
+msgstr "IVA"
+
+#: queries.py:60
+msgid "Equivalence surcharge"
+msgstr "Recargo de equivalencia"
+
+#: queries.py:61
+msgid "Exempt"
+msgstr "Exento"
+
+#: queries.py:62
+#, python-format
+msgid "Exempt (%(cause)s)"
+msgstr "Exento (%(cause)s)"
+
+#: queries.py:63
+msgid "Not subject"
+msgstr "No sujeto"
+
+#: queries.py:64
+msgid "Reverse charge"
+msgstr "Inversión del sujeto pasivo"
+
+#: queries.py:65
+#, python-format
+msgid "Rectifies invoice %(number)s. Reason: %(reason)s"
+msgstr "Rectifica la factura %(number)s. Motivo: %(reason)s"
+
+#: queries.py:66
+#, python-format
+msgid "Rectifies invoice %(number)s."
+msgstr "Rectifica la factura %(number)s."
+
+#: schemas.py:53
+msgid "That tax ID is not valid."
+msgstr "Ese NIF no es válido."
+
+#: schemas.py:55
+msgid ""
+"Say what kind of document a foreign tax ID is (EU VAT number, passport, tax "
+"ID of their country…)."
+msgstr ""
+"Indica qué tipo de documento es un NIF extranjero (NIF-IVA europeo, "
+"pasaporte, NIF de su país…)."
+
+#: schemas.py:57
+msgid "Enter an ISO 3166-1 country code, such as ES or FR."
+msgstr "Escribe un código de país ISO 3166-1, como ES o FR."
+
+#: schemas.py:59
+#, python-brace-format
+msgid ""
+"The format needs the year ({year}) and a sequence placeholder ({seq} or "
+"{seq:01d}…{seq:09d}), and fits in one line of 60 characters without accents "
+"or symbols such as º or ª."
+msgstr ""
+"El formato necesita el año ({year}) y un marcador de secuencia ({seq} o "
+"{seq:01d}…{seq:09d}), y cabe en una línea de 60 caracteres sin tildes ni "
+"símbolos como º o ª."
+
+#: schemas.py:63
+msgid ""
+"The prefix is written without accents or symbols such as º or ª (letters, "
+"digits, spaces and - / . _)."
+msgstr ""
+"El prefijo se escribe sin tildes ni símbolos como º o ª (letras, dígitos, "
+"espacios y - / . _)."
+
+#: schemas.py:65
+msgid "Enter the VAT % of the line, or its tax category."
+msgstr "Escribe el % de IVA de la línea, o su categoría fiscal."
+
+#: schemas.py:66
+msgid "Say which invoice: its id or its number."
+msgstr "Di qué factura: su id o su número."
+
+#: schemas.py:67
+msgid "Say which sale: its id or its number."
+msgstr "Di qué venta: su id o su número."
+
+#: schemas.py:68
+msgid "Say which series: its id, or its code."
+msgstr "Di qué serie: su id o su código."
+
+#: schemas.py:69 services.py:84
+msgid "This field is required."
+msgstr "Este campo es obligatorio."
+
+#: services.py:78
+msgid ""
+"Set up the issuer (the business's legal name, tax ID and address) in "
+"Invoicing → Issuer before issuing documents."
+msgstr ""
+"Configura el emisor (la razón social, el NIF y el domicilio del negocio) en "
+"Facturación → Emisor antes de emitir documentos."
+
+#: services.py:82
+msgid "A full invoice needs the customer's name, tax ID and address."
+msgstr ""
+"Una factura completa necesita el nombre, el NIF y la dirección del cliente."
+
+#: services.py:86
+#, python-format
+msgid ""
+"VeriFactu's record holds at most %(max)s characters here: shorten it (on the"
+" customer's card)."
+msgstr ""
+"El registro de VeriFactu admite como mucho %(max)s caracteres aquí: acórtalo"
+" (en la ficha del cliente)."
+
+#: services.py:89
+msgid "This series is not active: activate it or choose another one."
+msgstr "Esta serie no está activa: actívala o elige otra."
+
+#: services.py:91
+msgid "A manual invoice is numbered in an invoice (F1) or ticket (F2) series."
+msgstr ""
+"Una factura manual se numera en una serie de facturas (F1) o de tiques (F2)."
+
+#: services.py:93
+msgid "There is already a series with that code that year."
+msgstr "Ya hay una serie con ese código ese año."
+
+#: services.py:95
+msgid ""
+"This series has already issued invoices, so its prefix, its format and its "
+"next number can no longer change: the number is part of the VeriFactu chain."
+" Create a new series if you need others."
+msgstr ""
+"Esta serie ya ha emitido facturas, así que su prefijo, su formato y su "
+"siguiente número ya no se pueden cambiar: el número forma parte de la cadena"
+" de VeriFactu. Crea una serie nueva si necesitas otros."
+
+#: services.py:99
+msgid ""
+"The numbers of this series would not fit in 60 characters (VeriFactu's "
+"limit): shorten the prefix or the format."
+msgstr ""
+"Los números de esta serie no cabrían en 60 caracteres (el límite de "
+"VeriFactu): acorta el prefijo o el formato."
+
+#: services.py:103
+msgid ""
+"That series numbers another year: a manual invoice is numbered in a series "
+"of this year."
+msgstr ""
+"Esa serie numera otro año: una factura manual se numera en una serie de este"
+" año."
+
+#: services.py:106
+#, python-format
+msgid ""
+"Above %(limit)s a ticket cannot be issued: issue an invoice (F1) with the "
+"customer's details."
+msgstr ""
+"Por encima de %(limit)s no se puede emitir un tique: emite una factura (F1) "
+"con los datos del cliente."
+
+#: services.py:109
+#, python-format
+msgid "Sale %(number)s"
+msgstr "Venta %(number)s"
+
+#: services.py:111
+#, python-format
+msgid ""
+"The number %(number)s already exists in series %(code)s: give the series a "
+"format with the year."
+msgstr ""
+"El número %(number)s ya existe en la serie %(code)s: da a la serie un "
+"formato con el año."
+
+#: services.py:114
+msgid ""
+"This invoice cannot be marked as paid: only an issued invoice that is not "
+"paid yet can be. Nothing was changed."
+msgstr ""
+"Esta factura no se puede marcar como pagada: solo se puede con una factura "
+"emitida que aún no esté pagada. No se ha cambiado nada."
+
+#: services.py:117
+msgid "A rectifying invoice cannot be rectified."
+msgstr "Una rectificativa no se puede rectificar."
+
+#: services.py:118
+msgid "The invoice is already cancelled."
+msgstr "La factura ya está cancelada."
+
+#: services.py:120
+msgid ""
+"This ticket was already replaced by a full invoice: rectify the full "
+"invoice."
+msgstr ""
+"Este tique ya se sustituyó por una factura completa: rectifica la factura "
+"completa."
+
+#: services.py:123
+msgid ""
+"A rectifying invoice is dated the day it is issued: today, and never earlier"
+" than the invoice it corrects. Nothing was issued. Send it without a date "
+"and it will be dated today."
+msgstr ""
+"Una factura rectificativa lleva la fecha del día en que se emite: hoy, y "
+"nunca anterior a la factura que corrige. No se ha emitido nada. Envíala sin "
+"fecha y quedará fechada hoy."
+
+#: services.py:126
+msgid "Nothing is left to rectify on this invoice."
+msgstr "No queda nada por rectificar en esta factura."
+
+#: services.py:128
+msgid "Only a ticket (simplified invoice) can be replaced by a full invoice."
+msgstr ""
+"Solo un tique (factura simplificada) se puede sustituir por una factura "
+"completa."
+
+#: services.py:131
+msgid ""
+"This ticket is cancelled: it can no longer be replaced by a full invoice."
+msgstr ""
+"Este tique está cancelado: ya no se puede sustituir por una factura "
+"completa."
+
+#: services.py:134
+msgid ""
+"This ticket already has rectifying invoices: it can no longer be replaced by"
+" a full invoice."
+msgstr ""
+"Este tique ya tiene rectificativas: ya no se puede sustituir por una factura"
+" completa."
+
+#: services.py:137
+#, python-format
+msgid ""
+"The sale %(number)s has no invoice yet: its rectification waits for it."
+msgstr ""
+"La venta %(number)s aún no tiene factura: su rectificativa espera a que la "
+"tenga."
+
+#: services.py:139
+#, python-format
+msgid "The sale %(number)s is not voided."
+msgstr "La venta %(number)s no está anulada."
+
+#: services.py:140
+msgid "That refund does not exist."
+msgstr "Esa devolución no existe."
+
+#: services.py:141
+#, python-format
+msgid "There is no tax category «%(category)s»."
+msgstr "No hay ninguna categoría fiscal «%(category)s»."
+
+#: services.py:142
+#, python-format
+msgid "No tax rule applies today to the tax category «%(category)s»."
+msgstr ""
+"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s»."
+
+#: services.py:144
+#, python-format
+msgid ""
+"Line %(line)s: %(quantity)s at that price comes to 0.00, so no invoice was "
+"issued."
+msgstr ""
+"Línea %(line)s: %(quantity)s a ese precio sale a 0,00, así que no se ha "
+"emitido ninguna factura."
+
+#: services.py:149
+msgid ""
+"The tax quota does not match its base and rate, so no invoice was issued. "
+"Charging one amount and declaring another breaks the tax agency's cross-"
+"check."
+msgstr ""
+"La cuota de impuesto no se corresponde con su base y su tipo, así que no se "
+"ha emitido ninguna factura. Cobrar una cosa y declarar otra rompe el cruce "
+"que hace Hacienda."
+
+#: services.py:153
+msgid ""
+"The invoice's total does not add up to its own lines, so nothing was issued."
+msgstr ""
+"El total de la factura no cuadra con sus propias líneas, así que no se ha "
+"emitido nada."
+
+#: services.py:156
+msgid ""
+"An exempt, not subject or reverse-charge line carries a tax quota, so no "
+"invoice was issued: only a subject operation may declare a quota."
+msgstr ""
+"Una línea exenta, no sujeta o con inversión del sujeto pasivo lleva cuota de"
+" impuesto, así que no se ha emitido ninguna factura: solo una operación "
+"sujeta puede declarar cuota."
+
+#: services.py:160
+msgid ""
+"An ordinary invoice cannot add up below zero. To give an amount back, issue "
+"a rectifying invoice."
+msgstr ""
+"Una factura ordinaria no puede sumar menos de cero. Para devolver un importe"
+" se emite una rectificativa."
+
+#: templates/invoice/invoice.html:63 templates/invoice/invoice.html:84
+msgid "Tax ID"
+msgstr "NIF"
+
+#: templates/invoice/invoice.html:71
+msgid "No."
+msgstr "Nº"
+
+#: templates/invoice/invoice.html:72
+msgid "Date"
+msgstr "Fecha"
+
+#: templates/invoice/invoice.html:73
+msgid "Operation date"
+msgstr "Fecha de operación"
+
+#: templates/invoice/invoice.html:79
+msgid "Bill to"
+msgstr "Facturar a"
+
+#: templates/invoice/invoice.html:91
+msgid "Description"
+msgstr "Descripción"
+
+#: templates/invoice/invoice.html:92
+msgid "Qty"
+msgstr "Cant."
+
+#: templates/invoice/invoice.html:93
+msgid "Price"
+msgstr "Precio"
+
+#: templates/invoice/invoice.html:94
+msgid "Discount"
+msgstr "Descuento"
+
+#: templates/invoice/invoice.html:95
+msgid "Tax"
+msgstr "Impuesto"
+
+#: templates/invoice/invoice.html:96
+msgid "Amount"
+msgstr "Importe"
+
+#: templates/invoice/invoice.html:110
+msgid "— No lines —"
+msgstr "— Sin líneas —"
+
+#: templates/invoice/invoice.html:116
+msgid "Tax base"
+msgstr "Base imponible"
+
+#: templates/invoice/invoice.html:120
+msgid "TOTAL"
+msgstr "TOTAL"

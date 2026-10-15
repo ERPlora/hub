@@ -3,11 +3,13 @@
 // with a checkbox and its amount. Marking one says it goes back with the money: all that is left of it
 // to begin with; with two or more whole units left, «Units that go back» narrows it (1…left). A line
 // partly returned says «<n> of <m> already returned»; one returned whole says «Already returned» and
-// cannot be marked. What is left of each line is the server's (`sale.refund.options`).
+// cannot be marked. What is left of each line is the server's (`sale.refund.options`). A line a voucher
+// paid (SALE-F32) says «Already paid · <voucher>» instead of its amount and, marked, that its session goes
+// back to that voucher.
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { useLocale } from '../../composables/useT';
+import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { LineOption } from '../../operations';
 import { milli, type Picked, wholeLeft } from './refund';
@@ -18,6 +20,7 @@ const props = defineProps<{ lines: readonly LineOption[] }>();
 const picked = defineModel<Picked>('picked', { required: true });
 
 const locale = useLocale();
+const t = useT();
 
 const rows = computed(() =>
   props.lines.map((line) => {
@@ -30,7 +33,7 @@ const rows = computed(() =>
       partly: left > 0 && returned > 0,
       returned: formatQuantity(line.returned, '', locale.value),
       total: formatQuantity(line.quantity, '', locale.value),
-      amount: formatMoney(line.line_total, locale.value),
+      amount: line.paid_by_voucher ? t('sale.refund.linePaidWithVoucher', { name: line.voucher_name }) : formatMoney(line.line_total, locale.value),
       marked: units > 0,
       whole: wholeLeft(line),
       units: String(Math.round(units / 1000)),
@@ -89,10 +92,15 @@ function setUnits(line: LineOption, typed: unknown): void {
             {{ row.line.name }}
           </ion-checkbox>
           <span
-            :class="row.done ? 'sale-refund-lines__done' : 'sale-refund-lines__amount'"
+            :class="row.done ? 'sale-refund-lines__done' : row.line.paid_by_voucher ? 'sale-refund-lines__voucher' : 'sale-refund-lines__amount'"
             :data-testid="`refund-line-amount-${row.line.line_id}`"
           >{{ row.done ? $t('sale.refund.lineAlreadyReturned') : row.amount }}</span>
         </div>
+        <span
+          v-if="row.marked && row.line.paid_by_voucher"
+          class="sale-refund-lines__session"
+          :data-testid="`refund-line-session-${row.line.line_id}`"
+        >{{ $t('sale.refund.sessionGoesBack', { name: row.line.voucher_name }) }}</span>
         <span
           v-if="row.partly"
           class="sale-refund-lines__done"
@@ -120,6 +128,10 @@ function setUnits(line: LineOption, typed: unknown): void {
 </template>
 
 <style scoped>
+.sale-refund-lines__session {
+  font-size: 0.85rem;
+  color: var(--ion-color-success-shade, #1e8e3e);
+}
 .sale-refund-lines__title {
   font-weight: 600;
 }
@@ -151,6 +163,14 @@ function setUnits(line: LineOption, typed: unknown): void {
 .sale-refund-lines__amount {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* «Already paid · <voucher>»: a long name wraps instead of widening the window. */
+.sale-refund-lines__voucher {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  color: var(--ion-color-success-shade, #1e8e3e);
+  font-size: 0.85rem;
 }
 .sale-refund-lines__done {
   color: var(--ion-color-medium-shade, #5f5f5f);

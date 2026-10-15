@@ -1,6 +1,7 @@
 // The open-price sheet (SALE-F09): the amount typed on the keypad, «Department (VAT)» and «Add
 // <amount>», which cannot be pressed without an amount and a department. It hands the line up in cents
-// with its department (or, without departments, its tax category); a refusal is read in the sheet.
+// with its department (or, without departments, its tax category): the server names the line after it.
+// A refusal is read in the sheet.
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
@@ -57,10 +58,10 @@ describe('OpenPriceSheet', () => {
     expect(m.disabled()).toBe(false);
     expect(plain(m.add().text())).toBe('Añadir 3,00 €');
     await click(m.add().element);
-    expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 300, department_id: 'd1', name: 'Fruta' }]]);
+    expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 300, department_id: 'd1' }]]);
   });
 
-  it('without departments the line goes with the tax category', async () => {
+  it('without departments the line goes with the tax category chosen in the app’s picker', async () => {
     const m = await setup();
     await m.press('5');
     await m.result('sale.department.list', page([]));
@@ -69,9 +70,10 @@ describe('OpenPriceSheet', () => {
       'tax.category.list',
       page([{ id: 'k', key: 'food', name: 'Food', description: '', display_name: 'Food', display_description: '', is_system: true, is_active: true, rate_pct: '10.00', operation_class: 'subject' }]),
     );
-    await click(m.find('pos-tax-category-food').element);
+    await click(m.find('pos-tax-category').element);
+    await click(m.find('pos-tax-category-option').element);
     await click(m.add().element);
-    expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 500, tax_category_key: 'food', name: 'Food' }]]);
+    expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 500, tax_category_key: 'food' }]]);
   });
 
   it('a refusal is read in the sheet; while the line is on its way «Add» waits', async () => {

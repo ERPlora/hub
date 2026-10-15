@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountSale } from '../../__tests__/mount-sale';
 import { saleOut, SETTINGS } from './__tests__/fixtures';
+import PendingDocuments from './PendingDocuments.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
 import SaleDocument from './SaleDocument.vue';
 
@@ -82,6 +83,17 @@ describe('SaleDocument', () => {
     s.call.push(errorFrame(s.subId('sale.pos_settings.get'), 'permission_denied'));
     await flush();
     expect(s.find('sale-document-error').exists()).toBe(true);
+  });
+
+  it('a sale whose fiscal documents wait says so above the paper, with «Issue now» (never on the printed paper)', async () => {
+    const s = await setup();
+    await s.showSale(saleOut({ invoice_status: 'pending', documents_pending: true }));
+    await s.showSettings();
+    const notice = s.wrapper.findComponent(PendingDocuments);
+    expect(notice.props('saleId')).toBe('s1');
+    expect(s.wrapper.findComponent(ReceiptPaper).element.contains(notice.element)).toBe(false);
+    await s.showSale(saleOut({ documents_pending: false }));
+    expect(s.wrapper.findComponent(PendingDocuments).exists()).toBe(false);
   });
 
   it('speaks Spanish', async () => {

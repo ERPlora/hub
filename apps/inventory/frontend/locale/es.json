@@ -203,7 +203,8 @@
         "sale": "Venta",
         "void": "Anulación",
         "count": "Recuento",
-        "write_off": "Descuento"
+        "write_off": "Descuento",
+        "refund": "Devolución"
       },
       "filters": {
         "type": "Filtrar por tipo",

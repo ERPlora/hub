@@ -5,15 +5,18 @@
 // one again with «Refund everything»; every amount can be edited. «Refund <amount>» says why it cannot
 // go yet (aria-disabled: the tap answers, never dies). `sale.sale.refund` carries the attempt key born
 // when the window opened and kept on a retry, so a lost answer never refunds twice; a refusal is read
-// inside the window, which stays open. `sale.sale.refund` decides it all again.
+// inside the window, which stays open. `sale.sale.refund` decides it all again. A line a voucher paid
+// (SALE-F32) gives its session back when it is marked, also with no money at all: a sale paid whole with a
+// voucher (0,00 €) opens with its sessions to mark.
 import { InlineFeedback } from '@erplora/ui/components';
-import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
+import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonSpinner, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
+import { refusal } from '../../lib/refusal';
 import type { RefundOptionsOut, TenderOption } from '../../operations';
 import {
   allocations,
@@ -25,6 +28,8 @@ import {
   refundableTotal,
   refundBlock,
   refundLines,
+  sessionsLeft,
+  sessionsPicked,
 } from './refund';
 import RefundLines from './RefundLines.vue';
 import RefundTenderCard from './RefundTenderCard.vue';
@@ -51,7 +56,11 @@ const reason = shallowRef('');
 const failure = shallowRef('');
 
 const tenders = computed<TenderOption[]>(() => [...(data.value?.tenders ?? [])].sort((a, b) => a.position - b.position));
-const nothingLeft = computed(() => !!data.value && (data.value.status !== 'completed' || refundableTotal(tenders.value) <= 0));
+const nothingLeft = computed(
+  () => !!data.value && (data.value.status !== 'completed' || (refundableTotal(tenders.value) <= 0 && sessionsLeft(data.value.lines) === 0)),
+);
+/** The voucher sessions marked to go back (SALE-F32). */
+const sessions = computed(() => (data.value ? sessionsPicked(data.value.lines, picked.value) : 0));
 
 function propose(options: RefundOptionsOut, marked: Picked): void {
   const split = proposal(options.tenders, options.lines, marked);
@@ -80,12 +89,12 @@ function proposeAll(): void {
 
 const amounts = computed(() => Object.fromEntries(tenders.value.map((tender) => [tender.payment_id, parseAmount(typed.value[tender.payment_id] ?? '')])));
 const total = computed(() => Object.values(amounts.value).reduce((sum, cents) => (Number.isFinite(cents) ? sum + cents : sum), 0));
-const block = computed(() => refundBlock(tenders.value, amounts.value, destinations.value, reason.value));
+const block = computed(() => refundBlock(tenders.value, amounts.value, destinations.value, reason.value, sessions.value));
 
 const blockText = computed(() => {
   const now = block.value;
   if (!now) return '';
-  if (now.kind === 'nothing') return t('sale.refund.nothingToReturn');
+  if (now.kind === 'nothing') return refundableTotal(tenders.value) > 0 ? t('sale.refund.nothingToReturn') : t('sale.refund.markSession');
   if (now.kind === 'reason') return t('sale.refund.reasonRequired');
   if (now.kind === 'invalid') return t('sale.refund.amountInvalid', { method: now.tender.method_name });
   if (now.kind === 'overCap') return t('sale.refund.overCap', { method: now.tender.method_name, amount: money(now.amount), remaining: money(now.tender.remaining) });
@@ -97,10 +106,6 @@ function cardError(tender: TenderOption): string | undefined {
   const now = block.value;
   if ((now?.kind === 'invalid' || now?.kind === 'overCap') && now.tender.payment_id === tender.payment_id) return blockText.value;
   return undefined;
-}
-
-function explain(err: ApiError): string {
-  return err.status === 0 ? t('sale.refund.unknown') : err.message;
 }
 
 async function confirm(): Promise<void> {
@@ -120,7 +125,8 @@ async function confirm(): Promise<void> {
       ...(lines.length ? { lines } : {}),
     });
   } catch (err) {
-    failure.value = explain(err as ApiError);
+    // Unworded (no network, a proxy's page): it may have gone through; the same key never repeats it.
+    failure.value = refusal(err, t('sale.refund.unknown'))?.message ?? t('sale.refund.unknown');
     return;
   }
   void toastSuccess(t('sale.refund.done'));
@@ -195,6 +201,7 @@ defineExpose({ confirm });
         />
       </div>
       <ion-button
+        v-if="tenders.length"
         class="sale-refund__propose"
         size="small"
         fill="clear"
@@ -252,7 +259,7 @@ defineExpose({ confirm });
           name="crescent"
           aria-hidden="true"
         />
-        {{ $t('sale.refund.confirm', { amount: money(total) }) }}
+        {{ total > 0 || !sessions ? $t('sale.refund.confirm', { amount: money(total) }) : $t('sale.refund.confirmSession') }}
       </ion-button>
     </template>
   </div>

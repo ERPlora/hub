@@ -1,0 +1,291 @@
+# Spanish translation of the cash register app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next cash_register\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 00:00+0200\n"
+"PO-Revision-Date: 2026-10-14 00:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Cash register"
+msgstr "Caja"
+
+msgid "Open and close the drawer by shifts, record cash in and out, count it and see the difference."
+msgstr "Abre y cierra la caja por turnos, apunta entradas y salidas de efectivo, cuenta el cajón y ve la diferencia."
+
+msgid "Cash register keeps the drawer's cash by shifts. Open a session with the float in the drawer; the cash sales, voids and refunds of the till show up by themselves, and the cash brought in or taken out is recorded with its reason. Count the drawer by notes and coins and close the shift: the expected cash, the counted one and the difference stay for good, a closed shift never changes, a forgotten one closes itself at the end of the day, and the shift report prints as an X or a Z report."
+msgstr "Caja controla el efectivo del cajón por turnos. Abre una sesión con el fondo que hay en el cajón; las ventas, anulaciones y devoluciones del TPV aparecen solas, y el efectivo que entra o sale se apunta con su motivo. Cuenta el cajón por billetes y monedas y cierra el turno: el efectivo esperado, el contado y la diferencia quedan para siempre, un turno cerrado no cambia nunca, uno olvidado se cierra solo al final del día y el informe del turno se imprime como informe X o Z."
+
+msgid "Settings"
+msgstr "Ajustes"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "cash register on"
+msgstr "caja activada"
+
+msgid "require an opening float"
+msgstr "exigir fondo de apertura"
+
+msgid "require a count to close"
+msgstr "exigir recuento al cierre"
+
+msgid "allow a negative balance"
+msgstr "permitir saldo negativo"
+
+msgid "blind count"
+msgstr "arqueo ciego"
+
+msgid "daily auto-close"
+msgstr "cierre automático diario"
+
+msgid "auto-close time"
+msgstr "hora del cierre automático"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "drawer settings"
+msgstr "ajustes de caja"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "active"
+msgstr "activo"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "drawer"
+msgstr "cajón"
+
+msgid "drawers"
+msgstr "cajones"
+
+msgid "business day"
+msgstr "día de negocio"
+
+msgid "last number"
+msgstr "último número"
+
+msgid "session counter"
+msgstr "contador de sesiones"
+
+msgid "session counters"
+msgstr "contadores de sesiones"
+
+msgid "Open"
+msgstr "Abierta"
+
+msgid "Closed"
+msgstr "Cerrada"
+
+msgid "number"
+msgstr "número"
+
+msgid "number of the day"
+msgstr "número del día"
+
+msgid "status"
+msgstr "estado"
+
+msgid "opened at"
+msgstr "abierta el"
+
+msgid "opened by"
+msgstr "abierta por"
+
+msgid "opening float"
+msgstr "fondo de apertura"
+
+msgid "opening notes"
+msgstr "notas de apertura"
+
+msgid "closed at"
+msgstr "cerrada el"
+
+msgid "closed by"
+msgstr "cerrada por"
+
+msgid "counted cash"
+msgstr "efectivo contado"
+
+msgid "expected cash"
+msgstr "efectivo esperado"
+
+msgid "difference"
+msgstr "diferencia"
+
+msgid "closing notes"
+msgstr "notas de cierre"
+
+msgid "closed by itself"
+msgstr "cerrada sola"
+
+msgid "cash session"
+msgstr "sesión de caja"
+
+msgid "cash sessions"
+msgstr "sesiones de caja"
+
+msgid "Cash in"
+msgstr "Entrada"
+
+msgid "Cash out"
+msgstr "Salida"
+
+msgid "Sale"
+msgstr "Venta"
+
+msgid "Refund"
+msgstr "Devolución"
+
+msgid "Void"
+msgstr "Anulación"
+
+msgid "session"
+msgstr "sesión"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "amount"
+msgstr "importe"
+
+msgid "payment method type"
+msgstr "tipo de forma de pago"
+
+msgid "payment method"
+msgstr "forma de pago"
+
+msgid "concept"
+msgstr "concepto"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "sale number"
+msgstr "número de venta"
+
+msgid "document"
+msgstr "documento"
+
+msgid "sale payment"
+msgstr "cobro de la venta"
+
+msgid "refund payment"
+msgstr "pago de la devolución"
+
+msgid "comps at cost"
+msgstr "invitaciones a coste"
+
+msgid "when"
+msgstr "cuándo"
+
+msgid "by"
+msgstr "quién"
+
+msgid "cash movement"
+msgstr "movimiento de caja"
+
+msgid "cash movements"
+msgstr "movimientos de caja"
+
+msgid "Opening"
+msgstr "Apertura"
+
+msgid "Closing"
+msgstr "Cierre"
+
+msgid "count type"
+msgstr "tipo de arqueo"
+
+msgid "notes and coins"
+msgstr "billetes y monedas"
+
+msgid "total counted"
+msgstr "total contado"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "counted at"
+msgstr "contado el"
+
+msgid "counted by"
+msgstr "contado por"
+
+msgid "cash count"
+msgstr "arqueo de caja"
+
+msgid "cash counts"
+msgstr "arqueos de caja"
+
+msgid "That cash session does not exist."
+msgstr "Esa sesión de caja no existe."
+
+msgid "There is no open cash session: open one first."
+msgstr "No hay ninguna sesión de caja abierta: abre una primero."
+
+msgid "That drawer is not available."
+msgstr "Ese cajón no está disponible."
+
+#, python-format
+msgid "%(value)s is not a note or coin of %(currency)s."
+msgstr "%(value)s no es un billete ni una moneda de %(currency)s."
+
+#, python-format
+msgid "There is no table of notes and coins for %(currency)s: count the drawer and give its total."
+msgstr "No hay tabla de billetes y monedas para %(currency)s: cuenta el cajón y escribe el total."
+
+msgid "Say which session: its id or its number."
+msgstr "Di qué sesión: su id o su número."
+
+msgid "Say which drawer: its id or its name."
+msgstr "Di qué cajón: su id o su nombre."
+
+msgid "Say what changes: the drawer's new name, or whether it is active."
+msgstr "Di qué cambia: el nombre nuevo del cajón, o si está activo."
+
+msgid "Ask for the lines of one session (its id or number) or for the unassigned ones, one of the two."
+msgstr "Pide las líneas de una sesión (su id o su número) o las que no cayeron en ninguna, una de las dos."
+
+msgid "Count the drawer: give its notes and coins or its total."
+msgstr "Cuenta el cajón: indica los billetes y monedas o el total."
+
+msgid "There is already an open cash session. Close it before opening another one."
+msgstr "Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra."
+
+msgid "That cash session is closed: a closed session takes no new movements."
+msgstr "Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos."
+
+msgid "This business requires an opening float: give the cash the drawer starts with."
+msgstr "Este negocio exige fondo de apertura: indica el efectivo con el que empieza la caja."
+
+msgid "Give the counted cash to close the session."
+msgstr "Escribe el efectivo contado para cerrar la sesión."
+
+msgid "This cash-out would leave the drawer below zero and a negative balance is not allowed."
+msgstr "Esta salida dejaría la caja en negativo y el saldo negativo no está permitido."
+
+msgid "There is already a drawer with that name."
+msgstr "Ya hay un cajón con ese nombre."
+
+#, python-format
+msgid "Session %(number)s was due to close by itself at %(time)s: open a new session (this one closes then)."
+msgstr "La sesión %(number)s debía cerrarse sola a las %(time)s: abre una sesión nueva (esta se cierra entonces)."

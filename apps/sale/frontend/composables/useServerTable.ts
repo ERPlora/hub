@@ -1,33 +1,23 @@
 // `useServerTable(op, options)`: a list query of the sale app followed live behind a server-side
 // DataTable (the back-office lists: quick notes, departments). Search, sort, page and page size are the
 // server's; anything that changes WHICH rows there are (a search, a sort, a page size) starts again from
-// the first page. On a phone «Load more» grows the rows from the first one: they are asked in WINDOWS of
-// at most `MAX_LIMIT` rows (the server refuses a bigger `limit`), each its own `useLive` subscription,
-// merged into one page for the table (the rows in order, the query's total, «loading» until every window
+// the first page. On a phone «Load more» grows the rows from the first one: they are asked through the
+// app's one live-windows engine (`useLiveWindows`), in WINDOWS of at most `MAX_LIMIT` rows (the server
+// refuses a bigger `limit`), each its own `useLive` subscription, merged into one page for the table (the rows in order, the query's total, «loading» until every window
 // answered, the first error). A window less releases its subscription. A page emptied by changes
-// elsewhere steps back to the last page that still has rows.
-import {
-  type ApiError,
-  type InputOf,
-  type LiveStatus,
-  type OpName,
-  type OutputOf,
-  type UseLive,
-  useLive,
-  useLiveClient,
-} from '@erplora/ui/sdk';
-import { computed, type EffectScope, effectScope, onScopeDispose, ref, shallowRef, watch } from 'vue';
+// elsewhere steps back to the last page that still has rows. A page with filters of its own (Sales: the
+// period, status, payment, total) passes them as `filters`: they travel with every window, a change of
+// them starts again from the first page, and `narrowed` says whether they narrow the rows.
+import type { OpName, OutputOf } from '@erplora/ui/sdk';
+import { computed, ref, watch } from 'vue';
 
 import type { SortDir } from '../operations';
+import { type ListWindow, MAX_WINDOW, useLiveWindows } from './useLiveWindows';
 
 /** The largest page the server serves (`schemas.PageIn.limit`). */
-export const MAX_LIMIT = 100;
+export const MAX_LIMIT = MAX_WINDOW;
 
-/** One live window of rows. */
-export interface ListWindow {
-  limit: number;
-  offset: number;
-}
+export type { ListWindow };
 
 export interface ServerTableOptions {
   /** Column the server sorts by at first. */
@@ -36,6 +26,10 @@ export interface ServerTableOptions {
   pageSize?: number;
   /** The longest search the list takes (`max_length` of its schema's `search`). */
   maxSearch: number;
+  /** The page's own filters, as the list query takes them: sent with every window. */
+  filters?: () => object;
+  /** The page's filters narrow the rows (the empty state says «No results»). */
+  narrowed?: () => boolean;
 }
 
 /** What a list query answers: a page of rows. */
@@ -86,92 +80,39 @@ export function useServerTable<Op extends OpName>(op: Op, options: ServerTableOp
     windowPages.value += 1;
   }
 
-  const filtered = computed(() => text.value.trim() !== '');
+  const filtered = computed(() => text.value.trim() !== '' || (options.narrowed?.() ?? false));
 
-  /** Search and sort, what every window shares. */
+  /** The page's filters, by content: a new object with the same filters is no change. */
+  const pageFilters = computed(() => JSON.stringify(options.filters?.() ?? {}));
+  watch(pageFilters, () => goToPage(0));
+
+  /** The page's filters, search and sort: what every window shares. */
   const query = computed(() => ({
+    ...(JSON.parse(pageFilters.value) as object),
     ...(text.value.trim() ? { search: text.value.trim().slice(0, options.maxSearch) } : {}),
     sort: sort.value,
     dir: dir.value,
   }));
 
-  /** The rows on screen as windows of at most `MAX_LIMIT`, from the page's first row. */
-  const windows = computed<ListWindow[]>(() => {
-    const start = page.value * pageSize.value;
-    const rows = pageSize.value * windowPages.value;
-    const out: ListWindow[] = [];
-    for (let from = 0; from < rows; from += MAX_LIMIT) out.push({ limit: Math.min(MAX_LIMIT, rows - from), offset: start + from });
-    return out;
+  /** The rows on screen, from the page's first row, as windows of at most `MAX_LIMIT` (the engine's). */
+  const list = useLiveWindows(op, () => query.value, MAX_LIMIT, {
+    start: () => page.value * pageSize.value,
+    rows: () => pageSize.value * windowPages.value,
   });
+  const windows = list.windows;
 
-  // ── One live subscription per window ───────────────────────────────────────────────────────────
-  /** The params of window `index`; while it is being let go, the last ones it had. */
-  function paramsOf(index: number): () => InputOf<Op> {
-    let last: ListWindow = windows.value[index] ?? { limit: 1, offset: 0 };
-    return () => {
-      last = windows.value[index] ?? last;
-      return { ...query.value, ...last } as InputOf<Op>;
-    };
-  }
-
-  // The client is taken in setup: a window added later (in the watcher) has no component to inject it
-  // from. `useLive` is typed per operation; here the operation is generic, so its params pass as such.
-  const client = useLiveClient();
-  const follow = (params: () => InputOf<Op>) =>
-    useLive(op as never, params as never, { client } as never) as unknown as UseLive<OutputOf<Op>>;
-  const first = follow(paramsOf(0));
-  const extra = shallowRef<UseLive<OutputOf<Op>>[]>([]);
-  const parent = effectScope();
-  const scopes: EffectScope[] = [];
-
-  watch(
-    () => windows.value.length,
-    (count) => {
-      while (scopes.length < count - 1) {
-        const getter = paramsOf(scopes.length + 1);
-        const scope = parent.run(() => effectScope())!;
-        const live = scope.run(() => follow(getter))!;
-        scopes.push(scope);
-        extra.value = [...extra.value, live];
-      }
-      while (scopes.length > Math.max(count - 1, 0)) {
-        scopes.pop()?.stop();
-        extra.value = extra.value.slice(0, -1);
-      }
-    },
-    { immediate: true },
-  );
-  onScopeDispose(() => parent.stop());
-
-  const all = computed(() => [first, ...extra.value]);
-
+  /** One page for the table: the rows of every window, the query's total, the span asked. */
   const data = computed(() => {
-    const pages = all.value.map((live) => live.data.value as PageOut | undefined);
-    const head = pages[0];
-    if (!head) return undefined;
-    const rows: unknown[] = [];
-    for (const one of pages) {
-      if (!one) break;
-      rows.push(...one.rows);
-    }
+    const total = list.total.value;
+    if (total === undefined) return undefined;
     const shown = windows.value;
     return {
-      rows,
-      total: head.total,
+      rows: list.rows.value,
+      total,
       limit: shown.reduce((sum, window) => sum + window.limit, 0),
-      offset: shown[0]?.offset ?? head.offset,
+      offset: shown[0]?.offset ?? 0,
     } as OutputOf<Op>;
   });
-
-  const status = computed<LiveStatus>(() => {
-    const states = all.value.map((live) => live.status.value);
-    if (states.includes('reconnecting')) return 'reconnecting';
-    if (states.includes('error')) return 'error';
-    if (states.includes('loading')) return 'loading';
-    return 'live';
-  });
-
-  const error = computed(() => all.value.map((live) => live.error.value).find((e): e is ApiError => !!e) ?? null);
 
   // A page emptied by changes elsewhere (rows deleted on another device) steps back.
   watch(data, (now) => {
@@ -194,9 +135,9 @@ export function useServerTable<Op extends OpName>(op: Op, options: ServerTableOp
     setSort,
     loadMore,
     data,
-    status,
-    error,
+    status: list.status,
+    error: list.error,
     /** Reopens the stream so the server runs every window again. */
-    refresh: () => first.refresh(),
+    refresh: list.refresh,
   };
 }

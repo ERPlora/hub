@@ -1,4 +1,4 @@
-// `useTill()`: the check on screen and every write to it (SALE-F01, F09, F13–F18; the product's «cart →
+// `useTill()`: the check on screen and every write to it (SALE-F01, F09, F13–F18, F38; the product's «cart →
 // order» mapping, server first). The first line opens the check (`sale.order.open`, with the title typed
 // before and the line sealed with the chosen professional) and the device remembers it; the next lines
 // go to it; a second tap on a product raises its pending line (same professional, no note, discount or
@@ -12,7 +12,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { toastError, useSession } from '@erplora/ui/shell';
 import { computed, type ComputedRef, type Ref, shallowRef } from 'vue';
 
-import { mergeableLine, plusOne, refusal } from '../../components/pos/till';
+import { mergeableLine, mergeableServiceLine, plusOne } from '../../components/pos/till';
+import { refusal } from '../../lib/refusal';
 import type { OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
 import { useT } from '../useT';
 import { useCurrentCheck } from './useCurrentCheck';
@@ -40,6 +41,8 @@ export interface Till {
   pendingLabel: Readonly<Ref<string>>;
   addProduct(product: { id: string }, staffId: string | null): Promise<void>;
   addOpenLine(line: OpenLine, staffId: string | null): Promise<WriteResult>;
+  /** A service of Services: its own price, or `unitPrice` (cents) when it has no fixed price. */
+  addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult>;
   setQuantity(line: OrderLineOut, quantity: string): Promise<void>;
   toggleGift(line: OrderLineOut): Promise<void>;
   setNote(line: OrderLineOut, notes: string): Promise<WriteResult>;
@@ -66,6 +69,12 @@ export function useTill(options: TillOptions): Till {
   const session = useSession();
   const check = useCurrentCheck();
 
+  /** The words of a refusal; the screen's own sentence (`fallbackKey`) when nobody worded it. */
+  const wordsOf = (error: unknown, fallbackKey: string): string => {
+    const fallback = t(fallbackKey);
+    return refusal(error, fallback)?.message ?? fallback;
+  };
+
   const order = shallowRef<OrderOut | null>(null);
   const pendingLabel = shallowRef('');
   const inFlight = shallowRef(0);
@@ -74,6 +83,7 @@ export function useTill(options: TillOptions): Till {
   const open = useCommand('sale.order.open');
   const addLine = useCommand('sale.order.add_line');
   const addOpen = useCommand('sale.order.add_open_line');
+  const addServiceLine = useCommand('sale.order.add_service_line');
   const updateLine = useCommand('sale.order.update_line');
   const removeLine = useCommand('sale.order.remove_line');
   const lineStaff = useCommand('sale.order.set_line_staff');
@@ -123,7 +133,7 @@ export function useTill(options: TillOptions): Till {
         accept(await write(id));
         return { ok: true };
       } catch (error) {
-        return { ok: false, message: refusal(error, t(fallbackKey)) };
+        return { ok: false, message: wordsOf(error, fallbackKey) };
       }
     });
   }
@@ -161,7 +171,7 @@ export function useTill(options: TillOptions): Till {
           );
           return { ok: true } as const;
         } catch (error) {
-          return { ok: false, message: refusal(error, t('sale.pos.lineNotSaved')) } as const;
+          return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') } as const;
         }
       }),
     );
@@ -175,7 +185,29 @@ export function useTill(options: TillOptions): Till {
         else accept(await addOpen.run({ order_id: id, ...line, ...staffOf(staffId) }));
         return { ok: true };
       } catch (error) {
-        return { ok: false, message: refusal(error, t('sale.pos.lineNotSaved')) };
+        return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') };
+      }
+    });
+  }
+
+  function addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult> {
+    const priced = unitPrice === undefined ? {} : { unit_price: unitPrice };
+    return serial(async () => {
+      try {
+        const id = order.value?.id ?? check.id.value;
+        if (!id) {
+          await opened(() => open.run({ ...labelOf(), service_lines: [{ service_id: service.id, ...priced, ...staffOf(staffId) }] }));
+          return { ok: true };
+        }
+        const merge = unitPrice === undefined && order.value ? mergeableServiceLine(order.value.lines, service.id, staffId) : undefined;
+        accept(
+          merge
+            ? await updateLine.run({ order_id: id, line_id: merge.id, quantity: plusOne(merge.quantity) })
+            : await addServiceLine.run({ order_id: id, service_id: service.id, ...priced, ...staffOf(staffId) }),
+        );
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') };
       }
     });
   }
@@ -300,6 +332,7 @@ export function useTill(options: TillOptions): Till {
     pendingLabel,
     addProduct,
     addOpenLine,
+    addService,
     setQuantity,
     toggleGift,
     setNote,

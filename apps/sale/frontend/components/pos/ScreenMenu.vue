@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The ⋮ SCREEN menu (not a sale menu) at the end of the category strip: its one item puts the till on
-// the browser's full screen, or takes it off. The label follows the real state (the toggle, Esc, F11),
+// The ⋮ SCREEN menu (not a sale menu) at the end of the category strip: its one item puts the page on
+// the browser's full screen, or takes it off (the whole page: the sheets live in the app's root). The label follows the real state (the toggle, Esc, F11),
 // never a local guess. Where the device cannot (an iPhone's Safari) there is no menu at all. Anchored
 // under its button; a tap anywhere else, or Escape, closes it.
 import { HubIcon } from '@erplora/ui/shell';
@@ -8,22 +8,21 @@ import { onBeforeUnmount, shallowRef } from 'vue';
 
 import { isActive, isCapable, onChange, toggle } from '../../lib/fullscreen';
 
-const props = defineProps<{ target: HTMLElement | null }>();
-
 const open = shallowRef(false);
-const active = shallowRef(isActive(props.target));
-const stop = onChange(() => (active.value = isActive(props.target)));
+const capable = isCapable();
+const active = shallowRef(isActive());
+const stop = onChange(() => (active.value = isActive()));
 onBeforeUnmount(stop);
 
 function choose(): void {
   open.value = false;
-  if (props.target) void toggle(props.target);
+  void toggle();
 }
 </script>
 
 <template>
   <div
-    v-if="isCapable(target)"
+    v-if="capable"
     class="pos-more"
   >
     <button
