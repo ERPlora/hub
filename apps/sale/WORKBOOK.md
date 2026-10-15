@@ -1338,7 +1338,11 @@ administrador y responsable, los mismos que anulan y devuelven).
   o cualquier excepción inesperada dentro de Facturación nunca se traga: deshace la escritura entera. En
   una **factura**, un `InvalidPayload` de Facturación (los datos del destinatario, que son la entrada
   de quien cobra) sale como 422 y no se cobra: nunca queda pendiente una factura que no se podría
-  emitir. La venta guarda el número de su documento y el de la rectificativa de su anulación; la
+  emitir. Un negocio que presenta en real y no puede hacer llegar sus registros a la AEAT (VeriFactu en
+  producción sin ruta: `verifactu.live_option_unpaid`, `verifactu.representation_not_approved`,
+  `verifactu.own_certificate_missing`, que Facturación deja pasar tal cual) rechaza la escritura misma con
+  ese 409 y sus palabras: no se cobra, ni se devuelve, ni se anula (reglas de trabajo §15; el
+  `enforce_fiscal_road` del Hub antiguo, HUB-1935). La venta guarda el número de su documento y el de la rectificativa de su anulación; la
   devolución, el de la suya; y una venta cobrada como factura, la **copia del destinatario** comprobada
   (`customer_tax_id`, `customer_address`, `customer_country`, `customer_id_type`, migración `0008`, con
   `db_default` por expand/contract), lo que declara un documento emitido después.

@@ -74,7 +74,7 @@ def test_there_is_one_configuration_row_and_it_starts_in_testing_through_erplora
     config = Config.objects.create()
     assert config.environment == "testing"
     assert config.route == "erplora"
-    assert config.multiple_taxpayers == ""
+    assert not hasattr(config, "multiple_taxpayers")
     assert config.representation_status == "none"
     with pytest.raises(IntegrityError), transaction.atomic():
         Config.objects.create()

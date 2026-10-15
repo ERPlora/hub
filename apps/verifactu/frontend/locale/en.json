@@ -319,6 +319,7 @@
       "productionClosed": "Going live is not open on this server yet: ERPlora opens it when the real submission is ready.",
       "cannotGoLive": "It cannot go live yet:",
       "waiting": "Records are waiting:",
+      "issueBlocked": "New sales and invoices are refused until this is fixed:",
       "backToTesting": "Back to testing",
       "backHint": "No record has been sealed in production yet, so you can still go back to testing.",
       "backTitle": "Go back to the test environment?",
@@ -335,7 +336,6 @@
       "ranAt": "Tested on",
       "route": "Filed through",
       "gateway": "ERPlora's gateway",
-      "producer": "Producer's details",
       "issuer": "Issuer",
       "routeReady": "Route ready",
       "ready": "ready",
@@ -357,7 +357,6 @@
       "onlyVerifactu": "VERI*FACTU only",
       "multiOt": "Can serve several taxpayers",
       "multipleOt": "Serves several taxpayers",
-      "pendingIndicator": "Your ERPlora account has not sent this yet: records are sealed and wait to go out.",
       "failed": "It could not be done",
       "loadError": "The settings could not be loaded"
     }

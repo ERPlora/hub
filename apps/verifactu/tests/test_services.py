@@ -169,20 +169,8 @@ def test_the_next_record_chains_to_the_previous_one(issuer):
     )
 
 
-def test_without_the_producers_details_the_record_is_sealed_and_its_xml_waits(issuer):
-    record = Record.objects.get(pk=create(ticket()).record.id)
-    assert record.xml == ""
-    assert record.fingerprint and record.qr_url
-
-
-@pytest.mark.parametrize("facts", [False, True], ids=["without_producer", "with_producer"])
-def test_a_record_the_schema_refuses_is_never_sealed_even_before_the_producers_details(
-    issuer, at_emission, request, facts
-):
-    # Always validated at sealing (a provisional SistemaInformatico only to validate, never kept): a record
-    # that could never leave would block its chain forever.
-    if facts:
-        request.getfixturevalue("producer")
+def test_a_record_the_schema_refuses_is_never_sealed(issuer, at_emission):
+    # Always validated at sealing: a record that could never leave would block its chain forever.
     at_emission(lambda row: {"tax_breakdown": [{**row.tax_breakdown[0], "regime": "99"}]})
     with pytest.raises(Conflict) as refused:
         ticket()
@@ -193,14 +181,14 @@ def test_a_record_the_schema_refuses_is_never_sealed_even_before_the_producers_d
     assert not Chain.objects.filter(sequence__gt=0).exists()
 
 
-def test_with_the_producers_details_the_xml_is_built_and_passes_the_schema(
-    issuer, producer
-):
+def test_the_xml_is_built_when_sealed_and_passes_the_schema(issuer):
+    # Nothing of it waits for the account: IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers).
     record = Record.objects.get(pk=create(ticket()).record.id)
+    assert record.fingerprint and record.qr_url
     assert record.xml.startswith("<sum1:RegistroAlta>")
     assert "<sum1:PrimerRegistro>S</sum1:PrimerRegistro>" in record.xml
     assert "<sum1:NumeroInstalacion>a</sum1:NumeroInstalacion>" in record.xml
-    assert "<sum1:IndicadorMultiplesOT>N</sum1:IndicadorMultiplesOT>" in record.xml
+    assert "<sum1:IndicadorMultiplesOT>S</sum1:IndicadorMultiplesOT>" in record.xml
     assert f"<sum1:Huella>{record.fingerprint}</sum1:Huella>" in record.xml
     xsd.validate_record(
         record.xml, obligado_name=record.issuer_name, obligado_nif=record.issuer_nif
@@ -310,7 +298,7 @@ def test_a_full_invoice_without_the_customers_tax_id_is_refused_not_downgraded(
 
 
 def test_a_rectifying_invoice_is_an_alta_by_differences_naming_what_it_rectifies(
-    issuer, producer
+    issuer
 ):
     original = manual(**RECIPIENT)
     create(original)
@@ -340,7 +328,7 @@ def test_a_rectifying_invoice_is_an_alta_by_differences_naming_what_it_rectifies
     )
 
 
-def test_a_full_invoice_replacing_a_ticket_declares_the_ticket(issuer, producer):
+def test_a_full_invoice_replacing_a_ticket_declares_the_ticket(issuer):
     small = ticket()
     create(small)
     full = run(
@@ -360,7 +348,10 @@ def test_a_full_invoice_replacing_a_ticket_declares_the_ticket(issuer, producer)
 
 def test_production_has_its_own_chain_and_the_real_sites_qr(issuer):
     create(ticket())
-    Config.objects.filter().update(environment="production")
+    # In production with its way to the AEAT (approved authorisation and the live option).
+    Config.objects.filter().update(
+        environment="production", representation_status="approved", live_paid=True
+    )
     record = Record.objects.get(pk=create(ticket(2000)).record.id)
     assert (record.environment, record.sequence, record.previous_fingerprint) == (
         "production",
@@ -374,7 +365,7 @@ def test_production_has_its_own_chain_and_the_real_sites_qr(issuer):
 
 
 def test_a_rejected_registration_is_corrected_with_a_new_one_the_aeat_does_not_hold_yet(
-    issuer, producer
+    issuer
 ):
     # §9.1.3 «alta por rechazo»: the initial alta was rejected, so the invoice is not in the AEAT: S + X.
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -398,7 +389,7 @@ def test_a_rejected_registration_is_corrected_with_a_new_one_the_aeat_does_not_h
 
 
 def test_a_rejected_correction_of_a_rejected_registration_still_says_the_aeat_does_not_hold_it(
-    issuer, producer
+    issuer
 ):
     record = Record.objects.get(pk=create(ticket()).record.id)
     Record.objects.filter(pk=record.id).update(status="rejected")
@@ -409,7 +400,7 @@ def test_a_rejected_correction_of_a_rejected_registration_still_says_the_aeat_do
 
 
 def test_a_rejected_correction_of_a_record_the_aeat_holds_says_there_was_a_rejection(
-    issuer, producer
+    issuer
 ):
     # The AEAT holds the invoice (accepted with errors); its correction was rejected: the next one says S.
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -425,7 +416,7 @@ def test_a_rejected_correction_of_a_record_the_aeat_holds_says_there_was_a_rejec
 
 
 def test_an_accepted_with_errors_record_is_corrected_without_a_previous_rejection(
-    issuer, producer
+    issuer
 ):
     record = Record.objects.get(pk=create(ticket()).record.id)
     Record.objects.filter(pk=record.id).update(status="accepted_with_errors")
@@ -473,7 +464,7 @@ def test_the_manager_may_not_correct_nor_cancel(issuer):
 
 
 def test_an_invoice_issued_by_error_is_cancelled_with_a_chained_anulacion(
-    issuer, producer
+    issuer
 ):
     alta = Record.objects.get(pk=create(ticket()).record.id)
     result = run(
@@ -514,7 +505,7 @@ def test_an_invoice_issued_by_error_is_cancelled_with_a_chained_anulacion(
     )
 
 
-def test_a_cancellation_after_a_rejected_cancellation_says_so(issuer, producer):
+def test_a_cancellation_after_a_rejected_cancellation_says_so(issuer):
     # §9.2.2 «anulación por rechazo»: the invoice is in the AEAT, its earlier anulación was rejected.
     alta = Record.objects.get(pk=create(ticket()).record.id)
     Record.objects.filter(pk=alta.id).update(status="accepted")
@@ -547,7 +538,7 @@ def test_a_rejected_registration_is_not_in_the_aeat_and_is_not_cancelled(issuer)
 
 
 def test_without_a_gateway_nothing_is_sent_and_nothing_is_accepted(
-    issuer, producer, settings
+    issuer, settings
 ):
     settings.VERIFACTU_GATEWAY_URL = ""
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -568,12 +559,12 @@ def test_without_a_gateway_nothing_is_sent_and_nothing_is_accepted(
 def test_a_record_that_stops_its_chain_is_told_once_not_at_every_pass(
     issuer, gateway_answers
 ):
-    # Sealed before the producer's details (its XML waits), then changed behind our back.
+    # A record kept without its XML (sealed before the XML was built at sealing), then changed behind our back:
+    # its XML is built when it leaves, and the schema refuses it.
     record = Record.objects.get(pk=create(ticket()).record.id)
     Record.objects.filter(pk=record.id).update(
-        tax_breakdown=[{**record.tax_breakdown[0], "regime": "99"}]
+        xml="", tax_breakdown=[{**record.tax_breakdown[0], "regime": "99"}]
     )
-    run("verifactu.config.sync", {"version": 1, "multiple_taxpayers": "N"}, system_context(A))
     gateway_answers.set(answering())
     for _ in range(3):
         result = run("verifactu.contingency.process")
@@ -585,17 +576,8 @@ def test_a_record_that_stops_its_chain_is_told_once_not_at_every_pass(
     assert (record.status, record.wait_reason) == ("pending", "xml_invalid")
 
 
-def test_without_the_producers_details_nothing_is_sent(issuer, gateway_answers):
-    record = Record.objects.get(pk=create(ticket()).record.id)
-    assert (
-        code_of(lambda: run("verifactu.record.transmit", {"record_id": str(record.id)}))
-        == "verifactu.producer_facts_missing"
-    )
-    assert gateway_answers.calls == []
-
-
 def test_a_submission_carries_the_chain_in_order_and_takes_the_aeats_acceptance(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(answering())
     first = Record.objects.get(pk=create(ticket()).record.id)
@@ -638,7 +620,7 @@ def test_a_submission_carries_the_chain_in_order_and_takes_the_aeats_acceptance(
     ]
 
 
-def test_the_aeats_waiting_time_is_respected(issuer, producer, gateway_answers):
+def test_the_aeats_waiting_time_is_respected(issuer, gateway_answers):
     gateway_answers.set(answering())
     create(ticket())
     run("verifactu.contingency.process")
@@ -659,7 +641,7 @@ def test_the_aeats_waiting_time_is_respected(issuer, producer, gateway_answers):
 
 
 def test_accepted_with_errors_is_registered_and_keeps_its_code(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(answering("alta_2007_aceptado_con_errores_2026-08-02.xml"))
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -675,7 +657,7 @@ def test_accepted_with_errors_is_registered_and_keeps_its_code(
 
 
 def test_a_duplicate_of_a_record_the_aeat_holds_is_that_record_registered(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(answering("alta_3000_duplicado_tras_rechain_2026-08-02.xml"))
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -685,7 +667,7 @@ def test_a_duplicate_of_a_record_the_aeat_holds_is_that_record_registered(
 
 
 def test_a_rejection_stays_visible_and_leaves_the_queue(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     def rejected(payload):
         reply = answering("alta_2007_aceptado_con_errores_2026-08-02.xml")(payload)
@@ -707,7 +689,7 @@ def test_a_rejection_stays_visible_and_leaves_the_queue(
     assert run("verifactu.contingency.process").sent == 0
 
 
-def test_a_fault_refuses_the_submission_not_its_records(issuer, producer, gateway_answers):
+def test_a_fault_refuses_the_submission_not_its_records(issuer, gateway_answers):
     # A SOAP fault (here 4104, permanent) refuses the SENDING: the AEAT evaluated no record, so none is
     # «rejected» (that would force corrections of records it never saw); they wait, loudly, with their attempt spent.
     body = FIXTURES.joinpath("play_reviewer_seeded_answer_2026-09-23.xml").read_text()
@@ -732,7 +714,7 @@ def test_a_fault_refuses_the_submission_not_its_records(issuer, producer, gatewa
 
 
 def test_a_gateway_that_cannot_be_reached_leaves_it_waiting_longer_each_time(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(
         gateway.Reply(kind=gateway.UNREACHABLE, message="connection refused")
@@ -769,7 +751,7 @@ def test_a_gateway_that_cannot_be_reached_leaves_it_waiting_longer_each_time(
 
 
 def test_a_request_that_left_without_answer_is_sent_and_goes_again(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(gateway.Reply(kind=gateway.UNKNOWN, message="read timeout"))
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -782,7 +764,7 @@ def test_a_request_that_left_without_answer_is_sent_and_goes_again(
     )
 
 
-def test_a_refusal_of_the_gateway_says_why(issuer, producer, gateway_answers):
+def test_a_refusal_of_the_gateway_says_why(issuer, gateway_answers):
     gateway_answers.set(
         gateway.Reply(
             kind=gateway.REFUSED,
@@ -800,7 +782,7 @@ def test_a_refusal_of_the_gateway_says_why(issuer, producer, gateway_answers):
 
 
 def test_a_record_the_answer_does_not_name_stays_sent(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(
         lambda payload: gateway.Reply(
@@ -815,7 +797,7 @@ def test_a_record_the_answer_does_not_name_stays_sent(
     assert record.status == "sent"
 
 
-def test_an_unreadable_answer_is_to_retry(issuer, producer, gateway_answers):
+def test_an_unreadable_answer_is_to_retry(issuer, gateway_answers):
     gateway_answers.set(
         gateway.Reply(
             kind=gateway.ANSWERED, aeat_status=503, aeat_body="<html>maintenance</html>"
@@ -832,9 +814,9 @@ def test_an_unreadable_answer_is_to_retry(issuer, producer, gateway_answers):
 
 
 def test_without_a_certificate_the_own_route_cannot_send(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
-    Config.objects.update(route="own")
+    Config.objects.create(route="own")
     record = Record.objects.get(pk=create(ticket()).record.id)
     assert run("verifactu.contingency.process").reason == "own_certificate_missing"
     record.refresh_from_db()
@@ -842,16 +824,21 @@ def test_without_a_certificate_the_own_route_cannot_send(
     assert gateway_answers.calls == []
 
 
-def test_in_production_erplora_needs_the_approved_authorisation(
-    issuer, producer, gateway_answers
+def test_in_production_erplora_sends_only_with_the_approved_authorisation(
+    issuer, gateway_answers
 ):
-    Config.objects.update(environment="production")
+    # Sealed while it was approved, revoked behind its back: the gateway could not present it, so it waits.
+    Config.objects.create(
+        environment="production", representation_status="approved", live_paid=True
+    )
     create(ticket())
+    Config.objects.update(representation_status="revoked")
     assert run("verifactu.contingency.process").reason == "representation_not_approved"
+    assert gateway_answers.calls == []
 
 
 def test_a_record_already_in_the_aeat_is_not_sent_again(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(answering())
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -875,7 +862,7 @@ def test_the_employee_may_not_send(issuer):
 
 
 def test_the_scheduled_pass_records_nothing_when_there_is_nothing_to_do(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     run("verifactu.contingency.process", {}, system_context(A))
     assert not Event.objects.filter(kind="queue_processed").exists()
@@ -886,7 +873,7 @@ def test_the_scheduled_pass_records_nothing_when_there_is_nothing_to_do(
 
 
 def test_retry_puts_the_record_and_its_earlier_ones_out_with_the_next_pass(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(gateway.Reply(kind=gateway.UNREACHABLE, message="down"))
     first = Record.objects.get(pk=create(ticket()).record.id)
@@ -942,7 +929,7 @@ def test_validating_an_issuer_without_records_says_so(issuer):
     assert code_of(lambda: run("verifactu.chain.validate")) == "verifactu.no_records"
 
 
-def test_a_manual_anchor_continues_the_chain_of_another_application(issuer, producer):
+def test_a_manual_anchor_continues_the_chain_of_another_application(issuer):
     result = run(
         "verifactu.chain.recover_manual",
         {
@@ -1008,7 +995,7 @@ def query_reply(name="consulta_preproduccion_2026-08-01.xml"):
 
 
 def test_the_aeats_records_are_queried_and_replace_the_last_photo(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     AeatRecord.objects.create(
         issuer_nif="B27593136", environment="testing", invoice_number="STALE"
@@ -1033,7 +1020,7 @@ def test_the_aeats_records_are_queried_and_replace_the_last_photo(
 
 
 def test_the_aeats_records_are_queried_page_by_page_to_the_last(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     # §6.4.3: at most 10,000 per answer; the next query names the last record of the previous one.
     first = FIXTURES.joinpath("consulta_preproduccion_2026-08-01.xml").read_text()
@@ -1057,7 +1044,7 @@ def test_the_aeats_records_are_queried_page_by_page_to_the_last(
 
 
 def test_an_answer_that_keeps_naming_the_same_page_stops_the_query(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     body = paged(
         FIXTURES.joinpath("consulta_preproduccion_2026-08-01.xml").read_text(),
@@ -1073,7 +1060,7 @@ def test_an_answer_that_keeps_naming_the_same_page_stops_the_query(
 
 
 def test_the_chain_is_recovered_on_the_last_record_the_aeat_holds(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(query_reply())
     result = run("verifactu.chain.recover_from_aeat", {"issuer_nif": "B27593136"})
@@ -1087,7 +1074,7 @@ def test_the_chain_is_recovered_on_the_last_record_the_aeat_holds(
 
 
 def test_a_query_refused_by_the_aeat_recovers_nothing(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     gateway_answers.set(query_reply("play_reviewer_seeded_answer_2026-09-23.xml"))
     assert (
@@ -1102,7 +1089,7 @@ def test_a_query_refused_by_the_aeat_recovers_nothing(
 
 
 def test_without_records_at_the_aeat_there_is_nothing_to_recover(
-    issuer, producer, gateway_answers
+    issuer, gateway_answers
 ):
     body = query_reply().aeat_body
     empty = re.sub(
@@ -1124,7 +1111,7 @@ def test_without_records_at_the_aeat_there_is_nothing_to_recover(
     )
 
 
-def test_without_a_gateway_the_aeat_is_not_asked(issuer, producer, settings):
+def test_without_a_gateway_the_aeat_is_not_asked(issuer, settings):
     settings.VERIFACTU_GATEWAY_URL = ""
     assert (
         code_of(lambda: run("verifactu.aeat.query")) == "verifactu.gateway_unavailable"
@@ -1143,21 +1130,18 @@ def test_the_connection_test_says_what_is_missing_and_presents_nothing(
 ):
     settings.VERIFACTU_GATEWAY_URL = ""
     result = run("verifactu.diagnostic.run")
-    assert (
-        result.can_send,
-        result.gateway_configured,
-        result.producer_ready,
-        result.issuer_ready,
-    ) == (False, False, False, True)
-    assert {reason.code for reason in result.reasons} == {
-        "gateway_unavailable",
-        "producer_facts_missing",
-    }
+    assert (result.can_send, result.gateway_configured, result.issuer_ready) == (
+        False,
+        False,
+        True,
+    )
+    assert "producer_ready" not in type(result).model_fields
+    assert {reason.code for reason in result.reasons} == {"gateway_unavailable"}
     assert run("verifactu.diagnostic.last").result.ran_at == result.ran_at
     assert not Record.objects.exists()
 
 
-def test_the_connection_test_asks_the_gateways_probe(issuer, producer, gateway_answers):
+def test_the_connection_test_asks_the_gateways_probe(issuer, gateway_answers):
     gateway_answers.set(
         gateway.Reply(kind=gateway.ANSWERED, ready=True, message="Ready.")
     )
@@ -1318,27 +1302,95 @@ def test_going_live_is_never_open_in_pre(issuer, settings):
     assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.production_closed"
 
 
-def test_losing_the_live_option_in_production_holds_the_queue_without_going_back(
-    issuer, producer, gateway_answers, settings
-):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+def live_through_erplora() -> None:
+    """In production through ERPlora with everything it needs (approved authorisation, live option)."""
     run(
         "verifactu.config.sync",
         {"version": 2, "live_paid": True, "representation": {"status": "approved"}},
         system_context(A),
     )
     run("verifactu.config.go_live")
+
+
+def close_the_way(problem: str) -> None:
+    """What takes the way to the AEAT away from a business already in production, behind its back."""
+    if problem == "live_option_unpaid":
+        run("verifactu.config.sync", {"version": 3, "live_paid": False}, system_context(A))
+    elif problem == "representation_not_approved":
+        run(
+            "verifactu.config.sync",
+            {"version": 3, "representation": {"status": "revoked"}},
+            system_context(A),
+        )
+    else:
+        OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(days=1))
+
+
+@pytest.mark.parametrize(
+    "problem",
+    ["live_option_unpaid", "representation_not_approved", "own_certificate_missing"],
+)
+def test_in_production_without_a_way_to_the_aeat_nothing_new_is_sealed(
+    issuer, settings, problem
+):
+    # Working-rules §15: in production nothing is charged that can never reach the AEAT (the old Hub's
+    # enforce_fiscal_road, HUB-1935). The refusal carries the route's own code and undoes the whole issue.
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    if problem == "own_certificate_missing":
+        own_certificate()
+        run("verifactu.config.update", {"route": "own"})
+        run("verifactu.config.go_live")
+    else:
+        live_through_erplora()
+    ticket()
+    close_the_way(problem)
+    with pytest.raises(Conflict) as refused:
+        ticket()
+    assert refused.value.code == f"verifactu.{problem}"
+    assert str(refused.value).startswith("Nothing was issued")
+    assert (Invoice.objects.count(), Record.objects.count()) == (1, 1)
+    assert Chain.objects.get(environment="production").sequence == 1
+
+
+def test_in_testing_a_missing_way_never_refuses_a_sale(issuer):
+    Config.objects.create(route="own")
     record = Record.objects.get(pk=create(ticket()).record.id)
-    run("verifactu.config.sync", {"version": 3, "live_paid": False}, system_context(A))
+    assert (record.environment, record.status) == ("testing", "pending")
+
+
+def test_the_reaction_seals_an_invoice_issued_before_the_way_closed(
+    issuer, settings, invoice_does_not_seal
+):
+    # The old Hub let the relay deliver a chain already open: the document exists, so its record is sealed
+    # and waits rather than the document going undeclared.
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    live_through_erplora()
+    invoice = ticket()
+    close_the_way("representation_not_approved")
+    result = deliver("invoice.invoice.issued")
+    assert (result.already, result.record.invoice_id) == (False, invoice.id)
+    assert Record.objects.get().environment == "production"
+
+
+def test_losing_the_live_option_in_production_refuses_new_sales_and_sends_what_was_sealed(
+    issuer, gateway_answers, settings
+):
+    # Review Focus 3: it does not go back to testing (it has production records); new sales are not sealed
+    # (409 live_option_unpaid) and Settings says so; what was sealed while it could goes out: the option is
+    # the plan's, the record is already the AEAT's (every ticket with a QR reaches it).
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    live_through_erplora()
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    close_the_way("live_option_unpaid")
+    assert code_of(ticket) == "verifactu.live_option_unpaid"
+    gateway_answers.set(answering())
     result = run("verifactu.contingency.process")
     record.refresh_from_db()
-    config = Config.objects.get()
-    assert (result.sent, record.status, record.environment) == (0, "pending", "production")
-    assert config.environment == "production"
-    assert queries.blockers(config, "production") == ["live_option_unpaid"]
-    assert [reason.code for reason in run("verifactu.config.get").reasons] == [
-        "live_option_unpaid"
-    ]
+    assert (result.sent, record.status, record.environment) == (1, "accepted", "production")
+    config = run("verifactu.config.get")
+    assert (config.environment, config.reasons) == ("production", [])
+    assert config.issue_blocker.code == "live_option_unpaid"
+    assert queries.blockers(Config.objects.get(), "production") == []
 
 
 def test_going_live_needs_the_issuer(settings, db):
@@ -1367,10 +1419,10 @@ def test_back_to_testing_until_the_first_production_record(issuer, settings):
 
 def test_the_accounts_photo_is_applied_once_per_version(db):
     sync = lambda data: run("verifactu.config.sync", data, system_context(A))  # noqa: E731
-    assert sync({"version": 2, "multiple_taxpayers": "S"}).applied is True
-    assert sync({"version": 2, "multiple_taxpayers": "N"}).applied is False
-    assert sync({"version": 1, "multiple_taxpayers": "N"}).applied is False
-    assert Config.objects.get().multiple_taxpayers == "S"
+    assert sync({"version": 2, "live_paid": True}).applied is True
+    assert sync({"version": 2, "live_paid": False}).applied is False
+    assert sync({"version": 1, "live_paid": False}).applied is False
+    assert Config.objects.get().live_paid is True
 
 
 def test_the_photo_brings_the_live_option_the_authorisation_and_the_business_status(db):
@@ -1541,7 +1593,7 @@ def test_only_who_configures_uploads_and_removes(issuer, storage):
 
 
 def test_remove_leaves_the_own_route_waiting(
-    issuer, producer, storage, gateway_answers
+    issuer, storage, gateway_answers
 ):
     own_route()
     out = run("verifactu.certificate.remove")
@@ -1560,7 +1612,7 @@ def test_removing_without_a_certificate_changes_nothing(issuer):
 
 
 def test_sending_by_own_route_hands_the_certificate_to_the_gateway(
-    issuer, producer, storage, gateway_answers
+    issuer, storage, gateway_answers
 ):
     p12 = make_p12()
     own_route(p12)
@@ -1576,7 +1628,7 @@ def test_sending_by_own_route_hands_the_certificate_to_the_gateway(
 
 
 def test_erplora_route_never_hands_a_certificate(
-    issuer, producer, storage, gateway_answers
+    issuer, storage, gateway_answers
 ):
     upload()
     gateway_answers.set(answering())
@@ -1586,7 +1638,7 @@ def test_erplora_route_never_hands_a_certificate(
 
 
 def test_an_unreadable_certificate_keeps_the_record_waiting(
-    issuer, producer, storage, gateway_answers
+    issuer, storage, gateway_answers
 ):
     own_route()
     record = Record.objects.get(pk=create(ticket()).record.id)
@@ -1605,7 +1657,7 @@ def test_an_unreadable_certificate_keeps_the_record_waiting(
 
 
 def test_the_probe_and_the_query_carry_the_certificate_on_the_own_route(
-    issuer, producer, storage, gateway_answers
+    issuer, storage, gateway_answers
 ):
     p12 = make_p12()
     own_route(p12)
@@ -1621,7 +1673,7 @@ def test_the_probe_and_the_query_carry_the_certificate_on_the_own_route(
 
 
 def test_the_connection_test_says_an_unreadable_certificate_and_asks_nothing(
-    issuer, producer, storage, gateway_answers
+    issuer, storage, gateway_answers
 ):
     own_route()
     storage.FISCAL_CERTIFICATE_KEY = ""

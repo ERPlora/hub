@@ -103,7 +103,7 @@ def test_the_configuration_is_edited_but_its_environment_only_by_the_operations(
     instance = model_admin(ConfigAdmin, Config)
     readonly = set(instance.get_readonly_fields(request_of(), Config()))
     assert {"environment", "production_since", "id", "updated_at"} <= readonly
-    assert "route" not in readonly and "multiple_taxpayers" not in readonly
+    assert "route" not in readonly
 
 
 def test_the_send_control_only_releases_the_aeats_wait(request_of):

@@ -1,8 +1,8 @@
 """Models of the verifactu app (WORKBOOK «Para quien lo mantiene»).
 
 - ``Config``: one row; the environment (testing or production), the route (ERPlora files, or the business's own
-  certificate) and what the ERPlora account sends (the authorisation's state, the producer's
-  ``IndicadorMultiplesOT``).
+  certificate) and what the ERPlora account sends (the authorisation's state, the live option, the business's
+  status).
 - ``OwnCertificate``: one row at most; the business's own certificate, uploaded here (VERIFACTU-F02): its holder,
   kind and expiry, and the .p12 with its password sealed together (``certificates.seal``). The sealed blob is
   never shown: not in ``str``, the admin, the API nor the photo.
@@ -84,10 +84,6 @@ class Config(UUIDModel):
     production_since = models.DateTimeField(
         _("in production since"), null=True, blank=True
     )
-    # From the ERPlora account (verifactu.config.sync): "" until it says, then S or N.
-    multiple_taxpayers = models.CharField(
-        _("serves several taxpayers"), max_length=1, blank=True
-    )
     representation_status = models.CharField(
         _("representation"),
         max_length=10,
@@ -125,10 +121,6 @@ class Config(UUIDModel):
             ),
             models.CheckConstraint(
                 condition=Q(singleton=True), name="verifactu_config_singleton"
-            ),
-            models.CheckConstraint(
-                condition=Q(multiple_taxpayers__in=["", "S", "N"]),
-                name="verifactu_config_multiple_taxpayers",
             ),
         ]
 
@@ -470,9 +462,6 @@ class Record(UUIDModel):
 WAIT_REASONS = {
     "gateway_unavailable": _(
         "ERPlora's sending gateway is not configured on this server"
-    ),
-    "producer_facts_missing": _(
-        "your ERPlora account has not sent one of the producer's details yet (whether it serves several taxpayers)"
     ),
     "own_certificate_missing": _("your own certificate is not loaded or has expired"),
     "own_certificate_unreadable": _(

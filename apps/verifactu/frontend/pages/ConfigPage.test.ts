@@ -34,7 +34,7 @@ const CONFIG: ConfigOut = {
   gateway_configured: false,
   issuer_nif: 'B12345674',
   issuer_name: 'Peluquería Ana SL',
-  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: '' },
+  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: 'S' },
   declaration_version: 'v1',
   declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
   account_url: 'https://erplora.com',
@@ -43,6 +43,7 @@ const CONFIG: ConfigOut = {
   synced_at: null,
   route_ready: true,
   reasons: [],
+  issue_blocker: null,
   live_blockers: [],
 };
 

@@ -319,6 +319,7 @@
       "productionClosed": "El paso a producción todavía no está abierto en este servidor: ERPlora lo abre cuando la remisión real esté lista.",
       "cannotGoLive": "Todavía no puede pasar a producción:",
       "waiting": "Los registros están esperando:",
+      "issueBlocked": "Las ventas y facturas nuevas se rechazan hasta que se resuelva:",
       "backToTesting": "Volver a pruebas",
       "backHint": "Todavía no se ha sellado ningún registro en producción, así que aún puedes volver a pruebas.",
       "backTitle": "¿Volver al entorno de pruebas?",
@@ -335,7 +336,6 @@
       "ranAt": "Probado el",
       "route": "Se remite",
       "gateway": "Pasarela de ERPlora",
-      "producer": "Datos del productor",
       "issuer": "Emisor",
       "routeReady": "Vía lista",
       "ready": "lista",
@@ -357,7 +357,6 @@
       "onlyVerifactu": "Solo VERI*FACTU",
       "multiOt": "Puede dar servicio a varios obligados",
       "multipleOt": "Da servicio a varios obligados",
-      "pendingIndicator": "Tu cuenta de ERPlora todavía no lo ha enviado: los registros se sellan y esperan para salir.",
       "failed": "No se ha podido hacer",
       "loadError": "No se han podido cargar los ajustes"
     }

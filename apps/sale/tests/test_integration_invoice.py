@@ -347,6 +347,31 @@ def test_a_refusal_of_invoicing_never_stops_the_charge_and_the_document_waits(ba
     assert system_context(A).actor  # the reaction ran as the platform
 
 
+def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(issuer, bar, settings):
+    # Working-rules §15 (the old Hub's enforce_fiscal_road, HUB-1935): a business that files for real never
+    # charges a sale whose ticket could never reach the AEAT. VeriFactu's refusal is not a document that
+    # waits: it reaches the cashier as it is and nothing is charged, numbered or sealed.
+    from live.context import system_context
+
+    from apps.sale.tests.conftest import A
+
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    system = system_context(A)
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        system,
+    )
+    run("verifactu.config.go_live")
+    run("verifactu.config.sync", {"version": 2, "live_paid": False}, system)
+    with pytest.raises(Conflict) as refused:
+        charge("chain-0099", {"product": "TAP"})
+    assert refused.value.code == "verifactu.live_option_unpaid"
+    assert not Sale.objects.exists()
+    assert not Invoice.objects.exists()
+    assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
+
+
 def test_the_seller_without_the_right_to_invoice_still_charges(issuer, bar):
     ctx = ctx_for("hub_employee")
     ctx = type(ctx)(

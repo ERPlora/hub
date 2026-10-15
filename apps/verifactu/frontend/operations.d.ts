@@ -199,7 +199,6 @@ export interface DiagnosticOut {
   environment: Environment;
   route: Route;
   issuer_ready: boolean;
-  producer_ready: boolean;
   route_ready: boolean;
   gateway_configured: boolean;
   gateway_ready: boolean | null;
@@ -226,6 +225,7 @@ export interface ConfigOut {
     installation: string;
     only_verifactu: string;
     multi_ot: string;
+    /** IndicadorMultiplesOT: always «S» (ERPlora serves several taxpayers). */
     multiple_ot: string;
   };
   declaration_version: string;
@@ -244,6 +244,8 @@ export interface ConfigOut {
   synced_at: string | null;
   route_ready: boolean;
   reasons: WaitOut[];
+  /** Why new sales and invoices are refused now (production without a way to the AEAT); null when they are not. */
+  issue_blocker: WaitOut | null;
   live_blockers: WaitOut[];
 }
 

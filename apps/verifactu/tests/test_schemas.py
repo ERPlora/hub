@@ -125,11 +125,18 @@ def test_the_photo_no_longer_carries_the_certificate():
     assert "own_certificate" not in data.model_dump()
 
 
+def test_the_photo_no_longer_carries_the_multiple_taxpayers_indicator():
+    """IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers, T2b): an older photo that still names
+    it is read without it."""
+    assert "multiple_taxpayers" not in schemas.ConfigSyncIn.model_fields
+    data = schemas.ConfigSyncIn.model_validate({"version": 1, "multiple_taxpayers": "N"})
+    assert "multiple_taxpayers" not in data.model_dump()
+
+
 def test_the_accounts_photo():
     data = schemas.ConfigSyncIn.model_validate(
         {
             "version": 7,
-            "multiple_taxpayers": "N",
             "representation": {
                 "status": "approved",
                 "updated_at": "2026-10-02T10:00:00Z",
@@ -139,8 +146,8 @@ def test_the_accounts_photo():
     )
     assert data.version == 7
     assert data.representation.status == "approved"
-    assert "multiple_taxpayers" in refused(
-        schemas.ConfigSyncIn, {"version": 1, "multiple_taxpayers": "Y"}
+    assert "live_paid" in refused(
+        schemas.ConfigSyncIn, {"version": 1, "live_paid": "maybe"}
     )
     assert "version" in refused(schemas.ConfigSyncIn, {})
 

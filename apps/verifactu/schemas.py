@@ -355,7 +355,6 @@ class DiagnosticOut(Schema):
     environment: EnvironmentCode = Field(description="The environment tested.")
     route: RouteCode = Field(description="The route tested.")
     issuer_ready: bool = Field(description="Invoicing's issuer is set.")
-    producer_ready: bool = Field(description="The producer's details are complete.")
     route_ready: bool = Field(description="The route can file in this environment.")
     gateway_configured: bool = Field(description="This server has ERPlora's gateway.")
     gateway_ready: bool | None = Field(
@@ -380,7 +379,7 @@ class ProducerOut(Schema):
     only_verifactu: str = Field(description="TipoUsoPosibleSoloVerifactu.")
     multi_ot: str = Field(description="TipoUsoPosibleMultiOT.")
     multiple_ot: str = Field(
-        description="IndicadorMultiplesOT ('' until the account says)."
+        description="IndicadorMultiplesOT (always S: ERPlora serves several taxpayers)."
     )
 
 
@@ -436,6 +435,10 @@ class ConfigOut(Schema):
     )
     route_ready: bool = Field(description="The route can file in this environment.")
     reasons: list[WaitOut] = Field(description="What keeps records from leaving now.")
+    issue_blocker: WaitOut | None = Field(
+        description="Why new sales and invoices are refused now (production without a way to the AEAT); "
+        "none when they are not."
+    )
     live_blockers: list[WaitOut] = Field(
         description="What keeps the business from going live now (empty when it can)."
     )
@@ -659,9 +662,6 @@ class ConfigSyncIn(Schema):
 
     version: int = Field(
         ge=0, description="The photo's version; an equal or older one is ignored."
-    )
-    multiple_taxpayers: Literal["S", "N"] | None = Field(
-        None, description="IndicadorMultiplesOT."
     )
     representation: RepresentationIn | None = Field(
         None, description="The signed authorisation's state."

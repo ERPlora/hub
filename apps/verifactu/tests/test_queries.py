@@ -153,11 +153,9 @@ def test_a_record_is_read_whole_by_its_invoices_number(three):
 def test_a_record_that_waits_says_why(three, settings):
     settings.VERIFACTU_GATEWAY_URL = ""
     detail = run("verifactu.record.get", {"record_id": str(three[0].id)})
-    assert {reason.code for reason in detail.waiting} == {
-        "gateway_unavailable",
-        "producer_facts_missing",
-    }
-    assert detail.envelope == ""
+    assert {reason.code for reason in detail.waiting} == {"gateway_unavailable"}
+    # Its XML was built when it was sealed: the submission it would go in can be read already.
+    assert detail.envelope.startswith("<?xml")
     with translation.override("es"):
         detail = run(
             "verifactu.record.get",
@@ -167,7 +165,7 @@ def test_a_record_that_waits_says_why(three, settings):
     assert "pasarela" in " ".join(reason.message for reason in detail.waiting)
 
 
-def test_a_record_waiting_for_the_aeat_says_until_when(producer, three, settings):
+def test_a_record_waiting_for_the_aeat_says_until_when(three, settings):
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     SendControl.objects.update(next_send_at=timezone.now() + dt.timedelta(seconds=40))
     detail = run("verifactu.record.get", {"record_id": str(three[0].id)})
@@ -376,13 +374,10 @@ def test_the_configuration_starts_in_testing_through_erplora(issuer, settings):
         "B27593136",
         "EC",
         "a",
-        "",
+        "S",
     )
     assert config.synced_at is None
-    assert {reason.code for reason in config.reasons} == {
-        "gateway_unavailable",
-        "producer_facts_missing",
-    }
+    assert {reason.code for reason in config.reasons} == {"gateway_unavailable"}
 
 
 @pytest.mark.parametrize(
@@ -403,6 +398,28 @@ def test_erplora_route_in_production_needs_approval_and_the_paid_option():
     config.representation_status = "submitted"
     assert queries.route_problem(config, "production") == "representation_not_approved"
     assert queries.route_problem(config, "testing") == ""
+
+
+def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way():
+    # The live option keeps new sales from being sealed (route_problem); what was sealed goes to the AEAT while
+    # the route can carry it (every ticket with a QR reaches the AEAT).
+    config = Config(route="erplora", representation_status="approved", live_paid=False)
+    assert queries.sending_problem(config, "production") == ""
+    config.representation_status = "revoked"
+    assert queries.sending_problem(config, "production") == "representation_not_approved"
+    assert queries.sending_problem(config, "testing") == ""
+    config.route = "own"
+    assert queries.sending_problem(config, "testing") == "own_certificate_missing"
+
+
+def test_the_configuration_says_why_new_sales_are_refused_only_in_production(issuer):
+    assert run("verifactu.config.get").issue_blocker is None
+    Config.objects.create(environment="production", representation_status="approved")
+    blocker = run("verifactu.config.get").issue_blocker
+    assert blocker.code == "live_option_unpaid"
+    assert blocker.message.startswith("the live option of VeriFactu is not in your plan")
+    Config.objects.update(live_paid=True)
+    assert run("verifactu.config.get").issue_blocker is None
 
 
 def own_certificate(days=30):

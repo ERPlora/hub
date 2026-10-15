@@ -123,10 +123,6 @@ msgstr "vía de envío"
 msgid "in production since"
 msgstr "en producción desde"
 
-#: models.py:81
-msgid "serves several taxpayers"
-msgstr "da servicio a varios obligados"
-
 #: models.py:96
 msgid "representation"
 msgstr "otorgamiento de representación"
@@ -469,10 +465,6 @@ msgstr "registros"
 #: models.py:430
 msgid "ERPlora's sending gateway is not configured on this server"
 msgstr "la pasarela de envío de ERPlora no está configurada en este servidor"
-
-#: models.py:433
-msgid "your ERPlora account has not sent one of the producer's details yet (whether it serves several taxpayers)"
-msgstr "tu cuenta de ERPlora todavía no ha enviado uno de los datos del productor (si da servicio a varios obligados)"
 
 #: models.py:435
 msgid "your own certificate is not loaded or has expired"
@@ -941,3 +933,7 @@ msgstr "La opción en vivo de VeriFactu no está en tu plan: añádela en tu cue
 #: services.py
 msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
 msgstr "Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción."
+
+#: services.py
+msgid "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in VeriFactu → Settings and try again."
+msgstr "No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: %(why)s. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo."

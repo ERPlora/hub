@@ -70,6 +70,7 @@ from apps.verifactu.queries import (
     own_certificate_material,
     production_open,
     route_problem,
+    sending_problem,
     summary,
     system_for,
     wait,
@@ -162,6 +163,10 @@ CERTIFICATE_HOLDER_MISMATCH = _(
     "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
 )
 CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one.")
+NO_WAY_TO_THE_AEAT = _(
+    "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
+    "VeriFactu → Settings and try again."
+)
 #: Why a certificate cannot present to the AEAT (``certificates.CertificateInvalid.code``), in the reader's language.
 CERTIFICATE_REFUSALS = {
     "unopenable": _(
@@ -403,13 +408,6 @@ def _build_xml(record: Record, system: producer.SystemInfo) -> None:
     record.xml_built_at = timezone.now()
 
 
-def _provisional_system(ctx: OperationContext) -> producer.SystemInfo:
-    """A ``SistemaInformatico`` only to validate a record sealed before the account's facts; never sent."""
-    return producer.system_info(
-        version=producer.running_version(), installation=ctx.scope.key, multiple_taxpayers="N"
-    )
-
-
 def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
     """Chain ``record`` (its figures set) in its chain: number, previous link, fingerprint, QR and XML."""
     head = _lock_chain(record.issuer_nif, record.environment)
@@ -453,19 +451,9 @@ def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
         total_amount=total,
         environment=record.environment,
     )
-    system = system_for(config, ctx)
     try:
-        if system is not None:
-            _build_xml(record, system)
-        else:
-            # Always validated when sealed: a record the schema refuses could never leave and would stop its
-            # chain. Until the account says IndicadorMultiplesOT, a provisional SistemaInformatico serves only
-            # to validate (its value does not change validity); nothing of it is kept: the XML waits.
-            xsd.validate_record(
-                _xml_of(record, _provisional_system(ctx)),
-                obligado_name=record.issuer_name,
-                obligado_nif=record.issuer_nif,
-            )
+        # Built and validated when sealed: a record the schema refuses could never leave and would stop its chain.
+        _build_xml(record, system_for(ctx))
     except (xsd.SchemaError, envelope.UndeclarableRecord) as error:
         raise Conflict(
             str(INVALID_RECORD) % {"detail": str(error)},
@@ -525,6 +513,20 @@ def _rechazo_previo(corrects: Record) -> str:
     return "S" if corrects.status == Record.Status.REJECTED else "N"
 
 
+def _refuse_without_a_way(config: Config, environment: str) -> None:
+    """In production nothing is sealed that can never reach the AEAT (working-rules §15; the old Hub's
+    ``enforce_fiscal_road``, HUB-1935): 409 with the route's own code, inside the transaction of the sale or
+    invoice, so the document is undone and the series gives its number back. Testing never refuses."""
+    if environment != Environment.PRODUCTION:
+        return
+    problem = route_problem(config, environment)
+    if problem:
+        raise Conflict(
+            str(NO_WAY_TO_THE_AEAT) % {"why": wait_reason_text(problem)},
+            code=f"verifactu.{problem}",
+        )
+
+
 def _seal_alta(
     ctx: OperationContext,
     config: Config,
@@ -532,8 +534,10 @@ def _seal_alta(
     *,
     environment: str,
     corrects: Record | None = None,
+    refuse_without_a_way: bool = False,
 ) -> tuple[Record, bool]:
-    """The registration of ``invoice`` (or its correction of ``corrects``); ``(record, already)``."""
+    """The registration of ``invoice`` (or its correction of ``corrects``); ``(record, already)``. With
+    ``refuse_without_a_way``, a new registration in production needs the way to the AEAT."""
     if corrects is None:
         existing = Record.objects.filter(
             invoice=invoice,
@@ -543,6 +547,8 @@ def _seal_alta(
         ).first()
         if existing is not None:
             return existing, True
+    if refuse_without_a_way:
+        _refuse_without_a_way(config, environment)
     if (
         invoice.invoice_type in ("F1", "F3", "R1", "R2", "R3", "R4")
         and not invoice.customer_tax_id.strip()
@@ -587,14 +593,24 @@ def _seal_alta(
     ai={
         "description": "Seal the VeriFactu registration record of an issued invoice (by its id or its number): it is "
         "chained with its fingerprint, gets its QR and waits in the queue to go to the AEAT. It also happens by itself "
-        "when an invoice is issued; asking again answers the same record.",
+        "when an invoice is issued; asking again answers the same record. In production it is refused while the "
+        "business has no way to the AEAT (the route's own code), so the sale or invoice is not issued.",
         "risk": "normal",
     },
 )
 def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOut:
     invoice = find_invoice(data.invoice_id, data.number)
     config = _config(lock=False)
-    record, already = _seal_alta(ctx, config, invoice, environment=config.environment)
+    # A person (or an API key) issuing now is refused without a way to the AEAT; the platform's reaction to a
+    # document already issued is not: its record is sealed and waits, as the old Hub let the relay deliver a chain
+    # already open, rather than the document going undeclared.
+    record, already = _seal_alta(
+        ctx,
+        config,
+        invoice,
+        environment=config.environment,
+        refuse_without_a_way=ctx.actor != "system",
+    )
     return RecordCreateOut(record=summary(record), already=already)
 
 
@@ -824,7 +840,7 @@ def _send_chain(
     strict: bool,
 ) -> None:
     now = timezone.now()
-    problem = route_problem(config, environment)
+    problem = sending_problem(config, environment)
     certificate = None
     if not problem:
         try:
@@ -1023,7 +1039,7 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
     strict = only is not None
     scope = _unsent(only.issuer_nif, only.environment) if strict else _unsent()
     for code in blockers(config, only.environment if strict else config.environment):
-        if code in ("gateway_unavailable", "producer_facts_missing"):
+        if code == "gateway_unavailable":
             if strict:
                 raise Conflict(
                     str(CANNOT_SEND) % {"why": wait_reason_text(code)},
@@ -1033,7 +1049,7 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
             tally.waiting = scope.count()
             _mark(ctx, scope, code, "", tally)
             return tally
-    system = system_for(config, ctx)
+    system = system_for(ctx)
     keys = list(scope.order_by().values_list("issuer_nif", "environment").distinct())
     for issuer_nif, environment in sorted(keys):
         _send_chain(
@@ -1568,7 +1584,6 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
         "environment": config.environment,
         "route": config.route,
         "issuer_ready": issuer_configured(),
-        "producer_ready": "producer_facts_missing" not in codes,
         "route_ready": not route_problem(config, config.environment),
         "gateway_configured": gateway.configured(),
         "gateway_ready": gateway_ready,
@@ -1884,8 +1899,6 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
     config = _config()
     if config.synced_version is not None and data.version <= config.synced_version:
         return ConfigSyncOut(applied=False, version=config.synced_version)
-    if data.multiple_taxpayers is not None:
-        config.multiple_taxpayers = data.multiple_taxpayers
     if data.representation is not None:
         config.representation_status = data.representation.status
         config.representation_updated_at = data.representation.updated_at

@@ -32,7 +32,7 @@ const CONFIG: ConfigOut = {
   gateway_configured: false,
   issuer_nif: 'B12345674',
   issuer_name: 'Peluquería Ana SL',
-  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: '' },
+  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: 'S' },
   declaration_version: 'v1',
   declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
   account_url: 'https://erplora.com',
@@ -41,15 +41,16 @@ const CONFIG: ConfigOut = {
   synced_at: null,
   route_ready: true,
   reasons: [],
+  issue_blocker: null,
   live_blockers: [],
 };
 const UNPAID = { code: 'live_option_unpaid', message: 'the live option of VeriFactu is not in your plan: add it in your ERPlora account' };
+const GATEWAY = { code: 'gateway_unavailable', message: "ERPlora's sending gateway is not configured on this server" };
 const DIAGNOSTIC: DiagnosticOut = {
   ran_at: '2026-10-14T10:00:00Z',
   environment: 'testing',
   route: 'erplora',
   issuer_ready: true,
-  producer_ready: false,
   route_ready: true,
   gateway_configured: false,
   gateway_ready: null,
@@ -138,14 +139,18 @@ describe('SettingsPage', () => {
     expect(ready.find('verifactu-settings-live-blockers').exists()).toBe(false);
   });
 
-  it('in production it says why records wait, without going back to testing', async () => {
-    const s = await setup({ environment: 'production', can_go_back: false, reasons: [UNPAID] });
+  it('in production it says when new sales are refused and why records wait, without going back to testing', async () => {
+    const s = await setup({ environment: 'production', can_go_back: false, route_ready: false, issue_blocker: UNPAID, reasons: [GATEWAY] });
+    const refused = s.find('verifactu-settings-issue-blocked').text();
+    expect(refused).toContain('New sales and invoices are refused until this is fixed:');
+    expect(refused).toContain('the live option of VeriFactu is not in your plan');
     const waiting = s.find('verifactu-settings-waiting').text();
     expect(waiting).toContain('Records are waiting:');
-    expect(waiting).toContain('the live option of VeriFactu is not in your plan');
+    expect(waiting).toContain("ERPlora's sending gateway is not configured on this server");
     expect(s.find('verifactu-settings-environment').text()).toContain('Production');
     const sending = await setup({ environment: 'production', can_go_back: false });
     expect(sending.find('verifactu-settings-waiting').exists()).toBe(false);
+    expect(sending.find('verifactu-settings-issue-blocked').exists()).toBe(false);
   });
 
   it('in production it goes back to testing until the first production record, then never', async () => {
@@ -163,6 +168,7 @@ describe('SettingsPage', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/verifactu/diagnostics/run', query: {}, body: {} }]);
     expect(s.find('verifactu-settings-result').text()).toContain('It cannot send yet:');
     expect(s.find('verifactu-settings-result').text()).toContain("ERPlora's sending gateway is not configured on this server");
+    expect(s.find('verifactu-settings-result').text()).not.toContain("Producer's details");
   });
 
   it('«Create test invoice» creates it in testing and says where its record is', async () => {
@@ -181,7 +187,9 @@ describe('SettingsPage', () => {
     expect([read.attributes('href'), read.attributes('target')]).toEqual([CONFIG.declaration_url, '_blank']);
     const identity = s.find('verifactu-settings-identity').text();
     for (const text of ['ERPLORA CLOUD SL', 'B27593136', 'ERPlora Hub', 'EC', 'dev', 'v1']) expect(identity).toContain(text);
-    expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(true);
+    // IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers): nothing is pending from the account.
+    expect(identity).toMatch(/Serves several taxpayers\s*IndicadorMultiplesOT\s*S/);
+    expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
   });
 
   it('the employee only reads', async () => {

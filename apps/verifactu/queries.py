@@ -135,19 +135,35 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
-def route_problem(config: Config, environment: str) -> str:
-    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08). The own route
-    needs its valid certificate, as in the old Hub; in production, ERPlora's route needs the approved signed
-    authorisation and the live option of the plan (Ioan's model, 2026-10-15)."""
+def sending_problem(config: Config, environment: str) -> str:
+    """Why the chosen route cannot carry a record to the AEAT of ``environment`` now (a wait code), or ``""``: the
+    own route needs its valid certificate, as in the old Hub; in production, ERPlora's route needs the approved
+    signed authorisation. What keeps the queue waiting; the live option never does (what was sealed reaches the
+    AEAT)."""
     if config.route == Config.Route.OWN:
         return "" if certificate_valid() else "own_certificate_missing"
     if environment != Environment.PRODUCTION:
         return ""
     if config.representation_status != Config.Representation.APPROVED:
         return "representation_not_approved"
-    if not config.live_paid:
-        return "live_option_unpaid"
     return ""
+
+
+def route_problem(config: Config, environment: str) -> str:
+    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08): what keeps
+    it from sending and, on ERPlora's route in production, the live option of the plan (Ioan's model,
+    2026-10-15). In production it refuses every new sale (``verifactu.record.create``) and going live."""
+    problem = sending_problem(config, environment)
+    if problem or config.route == Config.Route.OWN or environment != Environment.PRODUCTION:
+        return problem
+    return "" if config.live_paid else "live_option_unpaid"
+
+
+def issue_problem(config: Config) -> str:
+    """Why no new sale or invoice can be sealed now (production without a way to the AEAT), or ``""``."""
+    if config.environment != Environment.PRODUCTION:
+        return ""
+    return route_problem(config, config.environment)
 
 
 def live_problems(config: Config) -> list[str]:
@@ -167,12 +183,10 @@ def live_problems(config: Config) -> list[str]:
     return found
 
 
-def system_for(config: Config, ctx: OperationContext) -> producer.SystemInfo | None:
-    """``SistemaInformatico`` of this installation, or ``None`` while the account has not said everything."""
+def system_for(ctx: OperationContext) -> producer.SystemInfo:
+    """``SistemaInformatico`` of this installation."""
     return producer.system_info(
-        version=producer.running_version(),
-        installation=ctx.scope.key,
-        multiple_taxpayers=config.multiple_taxpayers,
+        version=producer.running_version(), installation=ctx.scope.key
     )
 
 
@@ -181,9 +195,7 @@ def blockers(config: Config, environment: str) -> list[str]:
     found = []
     if not gateway.configured():
         found.append("gateway_unavailable")
-    if config.multiple_taxpayers not in producer.YES_NO:
-        found.append("producer_facts_missing")
-    problem = route_problem(config, environment)
+    problem = sending_problem(config, environment)
     if problem:
         found.append(problem)
     elif not own_certificate_readable(config):
@@ -329,10 +341,10 @@ def can_cancel(record: Record) -> bool:
 
 def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     nif, name = issuer_identity()
-    system = system_for(config, ctx)
     now = timezone.now()
     certificate = own_certificate()
     expires = certificate.expires_at if certificate else None
+    refused = issue_problem(config)
     return ConfigOut(
         environment=config.environment,
         route=config.route,
@@ -353,7 +365,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
             "installation": ctx.scope.key,
             "only_verifactu": producer.MANUFACTURER["TipoUsoPosibleSoloVerifactu"],
             "multi_ot": producer.MANUFACTURER["TipoUsoPosibleMultiOT"],
-            "multiple_ot": system.multiple_ot if system else "",
+            "multiple_ot": producer.MULTIPLE_OT,
         },
         declaration_version=producer.DECLARATION_VERSION,
         declaration_url=producer.declaration_url(),
@@ -375,6 +387,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment),
         reasons=[wait(code) for code in blockers(config, config.environment)],
+        issue_blocker=wait(refused) if refused else None,
         live_blockers=[wait(code) for code in live_problems(config)],
     )
 

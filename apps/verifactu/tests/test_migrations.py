@@ -53,6 +53,7 @@ def test_the_first_migration_depends_on_invoicing():
         "0001_initial.py",
         "0002_own_certificate.py",
         "0003_live_paid.py",
+        "0004_multiple_taxpayers_always.py",
     ]
 
 

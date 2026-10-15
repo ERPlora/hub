@@ -201,16 +201,6 @@ def issuer(db):
     return run("invoice.issuer.update", ISSUER)
 
 
-@pytest.fixture
-def producer(db):
-    """The ERPlora account has said everything VeriFactu needs (IndicadorMultiplesOT), as its photo would."""
-    return run(
-        "verifactu.config.sync",
-        {"version": 1, "multiple_taxpayers": "N"},
-        system_context(A),
-    )
-
-
 #: Each record a submission carries: (Alta | Anulacion, its own invoice number), never its RegistroAnterior's.
 OWN_RECORD = re.compile(
     r"<sum:RegistroFactura><sum1:Registro(Alta|Anulacion)><sum1:IDVersion>1\.0</sum1:IDVersion><sum1:IDFactura>"

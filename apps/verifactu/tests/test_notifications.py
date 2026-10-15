@@ -74,9 +74,6 @@ def test_sealing_in_hub_b_notifies_the_channel_of_b_only(listen):
 
 
 def test_sending_in_hub_b_notifies_the_channel_of_b_only(listen, gateway_answers):
-    from live.context import system_context
-
-    run("verifactu.config.sync", {"version": 1, "multiple_taxpayers": "N"}, system_context(B))
     run("invoice.invoice.create", {"series_code": "TICKET", "lines": CUT}, ctx_for(scope=B))
     gateway_answers.set(answering())
     on_a, on_b = listen(A), listen(B)

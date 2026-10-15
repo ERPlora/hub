@@ -53,7 +53,7 @@ const identity = computed(() => {
     { label: t('verifactu.settings.installation'), element: 'NumeroInstalacion', value: p.installation },
     { label: t('verifactu.settings.onlyVerifactu'), element: 'TipoUsoPosibleSoloVerifactu', value: p.only_verifactu },
     { label: t('verifactu.settings.multiOt'), element: 'TipoUsoPosibleMultiOT', value: p.multi_ot },
-    { label: t('verifactu.settings.multipleOt'), element: 'IndicadorMultiplesOT', value: p.multiple_ot || '—' },
+    { label: t('verifactu.settings.multipleOt'), element: 'IndicadorMultiplesOT', value: p.multiple_ot },
   ];
 });
 
@@ -235,6 +235,16 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         </template>
         <template v-else>
           <InlineFeedback
+            v-if="config.issue_blocker"
+            tone="danger"
+            data-testid="verifactu-settings-issue-blocked"
+          >
+            {{ $t('verifactu.settings.issueBlocked') }}
+            <ul class="verifactu-settings__reasons">
+              <li>{{ config.issue_blocker.message }}</li>
+            </ul>
+          </InlineFeedback>
+          <InlineFeedback
             v-if="config.reasons.length"
             tone="warning"
             data-testid="verifactu-settings-waiting"
@@ -311,8 +321,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             <dd>{{ $t(`verifactu.env.${result.environment}`) }}</dd>
             <dt>{{ $t('verifactu.settings.gateway') }}</dt>
             <dd>{{ result.gateway_configured ? yesNo(result.gateway_ready) : $t('verifactu.settings.notConfigured') }}</dd>
-            <dt>{{ $t('verifactu.settings.producer') }}</dt>
-            <dd>{{ yesNo(result.producer_ready) }}</dd>
             <dt>{{ $t('verifactu.settings.issuer') }}</dt>
             <dd>{{ yesNo(result.issuer_ready) }}</dd>
             <dt>{{ $t('verifactu.settings.routeReady') }}</dt>
@@ -368,13 +376,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             <dd>{{ row.value }}</dd>
           </template>
         </dl>
-        <InlineFeedback
-          v-if="!config.producer.multiple_ot"
-          tone="info"
-          data-testid="verifactu-settings-pending-indicator"
-        >
-          {{ $t('verifactu.settings.pendingIndicator') }}
-        </InlineFeedback>
       </section>
     </template>
   </AppPage>
