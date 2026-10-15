@@ -1,0 +1,308 @@
+{
+  "kitchen": {
+    "title": "Kitchen",
+    "loading": "Loading…",
+    "none": "—",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "close": "Close",
+    "noPermission": "You do not have permission to see this.",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches the search or the filters.",
+    "live": {
+      "reconnecting": "Reconnecting… What you see may be out of date.",
+      "appInactive": "Kitchen is not active in this business.",
+      "retry": "Retry"
+    },
+    "tabs": {
+      "label": "Kitchen sections",
+      "display": "Display",
+      "tickets": "Tickets",
+      "stations": "Stations",
+      "history": "History",
+      "settings": "Settings"
+    },
+    "status": {
+      "pending": "To prepare",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "served": "Served",
+      "cancelled": "Cancelled"
+    },
+    "itemStatus": {
+      "pending": "To prepare",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "served": "Served",
+      "cancelled": "Cancelled",
+      "voided": "Voided"
+    },
+    "orderType": {
+      "dine_in": "Dine in",
+      "takeaway": "Takeaway",
+      "delivery": "Delivery"
+    },
+    "priority": {
+      "normal": "Normal",
+      "rush": "Rush",
+      "vip": "VIP"
+    },
+    "destination": {
+      "both": "Screen and paper",
+      "display": "Screen only",
+      "printer": "Paper only"
+    },
+    "printerUsage": {
+      "kitchen": "Kitchen",
+      "bar": "Bar"
+    },
+    "colors": {
+      "orange": "Orange",
+      "red": "Red",
+      "amber": "Amber",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "violet": "Violet",
+      "grey": "Grey",
+      "custom": "Custom ({hex})"
+    },
+    "tone": {
+      "chime": "Chime",
+      "bell": "Bell",
+      "buzzer": "Buzzer"
+    },
+    "action": {
+      "received": "Received",
+      "created": "Created",
+      "started": "Fired",
+      "ready": "Ready",
+      "item_ready": "Dish ready",
+      "item_recalled": "Dish recalled",
+      "item_voided": "Dish voided",
+      "served": "Served",
+      "recalled": "Recalled",
+      "cancelled": "Cancelled",
+      "rushed": "Rush",
+      "unrushed": "Rush removed",
+      "reprinted": "Reprinted",
+      "deleted": "Deleted"
+    },
+    "display": {
+      "views": {
+        "label": "Views of the display",
+        "tickets": "Tickets",
+        "ready": "Ready",
+        "allDay": "All-Day"
+      },
+      "stationsLabel": "Stations",
+      "stationAll": "All",
+      "stationNone": "No station",
+      "fullscreen": "Full screen",
+      "exitFullscreen": "Exit full screen",
+      "emptyTickets": "No tickets on the line.",
+      "emptyReady": "Nothing waiting to be picked up.",
+      "emptyAllDay": "Nothing left to cook.",
+      "loading": "Loading the display…",
+      "loadError": "Could not load the kitchen display",
+      "actionError": "Could not update the ticket",
+      "passPrintFailed": "The pass could not be printed. Check the printer of the station.",
+      "rushNoticeFailed": "The urgent notice could not be printed. Tell the kitchen by voice and check its printer.",
+      "truncated": "Only the first 200 tickets are shown.",
+      "colDish": "Dish",
+      "colStation": "Station",
+      "colLeft": "Left"
+    },
+    "card": {
+      "aria": "Ticket {n}",
+      "waiter": "Waiter: {name}",
+      "round": "Round {n}",
+      "ready": "Ready",
+      "bump": "Ready",
+      "bumpAll": "Mark every dish on screen ready",
+      "markRush": "Mark rush",
+      "clearRush": "Remove rush",
+      "recall": "Recall",
+      "served": "Served",
+      "voided": "Voided",
+      "paperOnly": "Paper only",
+      "tapToBump": "Tap to mark ready",
+      "tapToRecall": "Tap to recall"
+    },
+    "tickets": {
+      "search": "Search ticket or destination…",
+      "empty": "No tickets.",
+      "new": "New ticket",
+      "loadError": "Could not load the tickets",
+      "actionError": "Could not update the ticket",
+      "reprinted": "Ticket {number} sent to the printer again.",
+      "entity": {
+        "one": "ticket",
+        "many": "tickets"
+      },
+      "columns": {
+        "number": "Ticket",
+        "label": "Destination",
+        "type": "Type",
+        "priority": "Priority",
+        "status": "Status",
+        "items": "Dishes",
+        "total": "Total",
+        "received": "Sent"
+      },
+      "actions": {
+        "detail": "Details",
+        "start": "Fire",
+        "ready": "Ready",
+        "serve": "Served",
+        "recall": "Recall",
+        "reprint": "Reprint",
+        "cancel": "Cancel"
+      },
+      "cancelDialog": {
+        "title": "Cancel ticket {number}?",
+        "message": "It leaves the kitchen display. The check in the till does not change: its dishes stay on it.",
+        "reason": "Reason (optional)",
+        "confirm": "Cancel ticket"
+      }
+    },
+    "detail": {
+      "title": "Ticket {number}",
+      "dishes": "Dishes",
+      "notes": "Notes",
+      "loadError": "Could not load the ticket"
+    },
+    "form": {
+      "title": "New ticket",
+      "type": "Type",
+      "label": "Destination (optional)",
+      "labelPlaceholder": "e.g. Staff, Table 4",
+      "notes": "Notes (optional)",
+      "dishes": "Dishes",
+      "product": "Product of the catalogue",
+      "name": "Or write the dish",
+      "quantity": "Quantity",
+      "note": "Note for the cook",
+      "addDish": "Add dish",
+      "removeDish": "Remove dish",
+      "noDish": "Add at least one dish.",
+      "submit": "Create ticket",
+      "error": "Could not create the ticket"
+    },
+    "stations": {
+      "title": "Production stations",
+      "search": "Search station…",
+      "empty": "No stations.",
+      "emptyMessage": "Create the real stations of the kitchen (Grill, Bar, Desserts).",
+      "add": "Add station",
+      "loadError": "Could not load the stations",
+      "entity": {
+        "one": "station",
+        "many": "stations"
+      },
+      "columns": {
+        "name": "Station",
+        "destination": "Destination",
+        "printer": "Printer",
+        "inProgress": "In progress",
+        "active": "Active"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "delete": {
+        "title": "Delete «{name}»?",
+        "message": "The station leaves the list and stops receiving tickets. Tickets already sent keep it in their history.",
+        "confirm": "Delete station"
+      },
+      "form": {
+        "createTitle": "Add station",
+        "editTitle": "Edit station · {name}",
+        "name": "Name",
+        "namePlaceholder": "e.g. Grill",
+        "color": "Colour",
+        "destination": "Destination",
+        "printerUsage": "Printer function",
+        "printerName": "Printer (optional)",
+        "printerNameHint": "A printer of Printing by its name; empty: the printer of the function.",
+        "active": "Active",
+        "create": "Create station",
+        "save": "Save"
+      }
+    },
+    "routing": {
+      "title": "Product/category routing → station",
+      "hint": "Where each product and category goes. What has no route goes to «No station» and prints in the kitchen.",
+      "empty": "Nothing routed yet: everything goes to «No station».",
+      "search": "Search product or category…",
+      "route": "Route",
+      "remove": "Remove",
+      "loadError": "Could not load the routing",
+      "removeError": "Could not remove the routing",
+      "entity": {
+        "one": "route",
+        "many": "routes"
+      },
+      "columns": {
+        "kind": "What",
+        "target": "Product or category",
+        "station": "Station"
+      },
+      "kind": {
+        "product": "Product",
+        "category": "Category"
+      },
+      "form": {
+        "title": "Route to a station",
+        "station": "Station",
+        "kind": "What goes there",
+        "product": "Product",
+        "category": "Category"
+      },
+      "submit": "Save routing"
+    },
+    "history": {
+      "title": "Kitchen history",
+      "search": "Search ticket or notes…",
+      "empty": "No recent kitchen activity.",
+      "loadError": "Could not load the history",
+      "system": "System",
+      "entity": {
+        "one": "entry",
+        "many": "entries"
+      },
+      "columns": {
+        "action": "Action",
+        "ticket": "Ticket",
+        "dish": "Dish",
+        "who": "Who",
+        "notes": "Notes",
+        "when": "When"
+      }
+    },
+    "settings": {
+      "title": "Kitchen display",
+      "loading": "Loading settings…",
+      "loadError": "Could not load the settings.",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "Could not save the settings.",
+      "showTimer": "Show timer",
+      "warning": "Amber warning (minutes)",
+      "critical": "Red alert (minutes)",
+      "colorCoding": "Colour semaphore",
+      "soundEnabled": "Sound on a new ticket",
+      "volume": "Sound volume (0-100)",
+      "volumeHint": "How loud the chime rings; a kitchen with an extractor fan usually needs more.",
+      "tone": "Sound tone",
+      "testSound": "Test sound",
+      "printPass": "Print the pass when marked ready",
+      "printPassHint": "Every time a ticket is ready, prints its dishes on the printer of their station.",
+      "worksFromScreen": "The kitchen works from the screen",
+      "worksFromScreenHint": "Turn it off if the kitchen works only from the printed ticket and nobody marks anything on the screen: charging a check then serves all its rounds.",
+      "defaultType": "Default order type"
+    }
+  }
+}

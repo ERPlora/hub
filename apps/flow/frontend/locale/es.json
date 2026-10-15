@@ -1,0 +1,557 @@
+{
+  "flow": {
+    "title": "Automatizaciones",
+    "loading": "Cargando…",
+    "unnamed": "Automatización sin nombre",
+    "active": "Activa",
+    "paused": "En pausa",
+    "unfinished": "Sin terminar",
+    "noPermission": "No tienes permiso",
+    "error": "Algo ha fallado. No se ha guardado nada.",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "list": {
+      "new": "Nueva automatización",
+      "heading": "Tus automatizaciones",
+      "search": "Busca por nombre, por lo que la arranca o por lo que hace",
+      "count": "Se ven {shown} de {total}",
+      "noMatch": "Aquí no hay nada que encaje con eso.",
+      "clear": "Volver a verlas todas",
+      "loadError": "No se han podido cargar las automatizaciones.",
+      "entity": {
+        "one": "automatización",
+        "many": "automatizaciones"
+      },
+      "filterState": "Ver",
+      "stateActive": "Solo las encendidas",
+      "statePaused": "Solo las que están en pausa",
+      "filterTrigger": "Arranca con",
+      "triggerEvent": "Algo que pasa",
+      "triggerSchedule": "El reloj",
+      "triggerAt": "Una fecha",
+      "triggerManual": "Tú, a mano",
+      "sortLabel": "Orden",
+      "sortUpdated": "Tocadas al final",
+      "sortName": "Nombre",
+      "columns": {
+        "name": "Nombre",
+        "starts": "Arranca",
+        "lastRun": "Última vez",
+        "state": "Estado"
+      },
+      "neverRan": "No se ha ejecutado nunca",
+      "enable": "Encender o pausar «{name}»",
+      "duplicate": "Hacer una copia",
+      "delete": "Borrar",
+      "bulkEnable": "Encenderlas",
+      "bulkPause": "Ponerlas en pausa",
+      "copied": "Copiada, y la copia está en pausa. No lleva ninguno de los permisos de la original: concédele lo que necesite antes de encenderla.",
+      "deleteTitle": "¿Borrar «{name}»?",
+      "deleteMessage": "Esto no se puede deshacer. Su historial se queda.",
+      "deleteYes": "Sí, bórrala",
+      "deleteNo": "Déjala",
+      "deleted": "Borrada.",
+      "enabledMissing": "Encendida, pero aún no tiene los permisos que pide: no hará nada hasta que se los concedas en la pestaña Permisos.",
+      "stateAll": "Encendidas y en pausa",
+      "triggerAny": "Cualquier cosa"
+    },
+    "drafts": {
+      "heading": "Propuestas por el asistente",
+      "intro": "El asistente las escribió cuando le pediste una automatización. No hacen nada hasta que las revises y las actives.",
+      "badge": "Borrador",
+      "review": "Revisar",
+      "dismiss": "Descartar",
+      "dismissed": "Descartado."
+    },
+    "gallery": {
+      "heading": "Automatizaciones hechas",
+      "intro": "Elige una y pasa a ser tuya, apagada, para que la mires antes de que haga nada.",
+      "guide": "¿Cómo funciona esto?",
+      "sectors": {
+        "any": "Cualquier negocio",
+        "beauty": "Peluquería y estética",
+        "food": "Bares y restaurantes"
+      },
+      "use": "Usar esta",
+      "useHint": "Se crea en pausa. No pasa nada hasta que la enciendas.",
+      "see": "Verla",
+      "decide": "Lo que decides tú",
+      "nothingToDecide": "No hay nada que rellenar. Está lista tal cual.",
+      "asks": "Lo que te va a pedir permiso para hacer",
+      "alreadyFires": "Ojo: «{name}» ya se dispara con lo mismo.",
+      "hidden": "Hay automatizaciones ocultas: necesitan {apps}.",
+      "apps": {
+        "task": "Tareas",
+        "customer": "Clientes",
+        "sale": "Ventas",
+        "staff": "Personal",
+        "cash_register": "Caja",
+        "verifactu": "VeriFactu",
+        "appointment": "Citas",
+        "reservation": "Reservas"
+      },
+      "reasons": {
+        "task__task__create": "Para dejar la tarea en la lista.",
+        "customer__note__add": "Para escribir la nota en la ficha del cliente."
+      },
+      "author": "Automatizaciones",
+      "cards": {
+        "welcome": {
+          "name": "Dar la bienvenida a un cliente nuevo",
+          "summary": "Un día después de crear la ficha de un cliente, la tarea de darle la bienvenida.",
+          "plain": "Cuando se crea una ficha de cliente, espera un día y deja la tarea «Dar la bienvenida al cliente nuevo».",
+          "blank": "Cuánto esperar",
+          "blankHint": "Un día; cámbialo en el paso Esperar.",
+          "task": "Dar la bienvenida al cliente nuevo"
+        },
+        "bigSaleNote": {
+          "name": "Apuntar las ventas grandes en la ficha",
+          "summary": "Cuando una venta de 100,00 € o más tiene cliente, una nota en su ficha.",
+          "plain": "Cuando se cobra una venta, solo si tiene cliente y es de 100,00 € o más, escribe «Venta grande» en la ficha del cliente.",
+          "blank": "El importe",
+          "blankHint": "100,00 € son 10000: el dinero va en céntimos.",
+          "note": "Venta grande"
+        },
+        "newStaff": {
+          "name": "La lista de bienvenida de alguien nuevo en el equipo",
+          "summary": "Cuando alguien entra en el equipo, la tarea de preparar su primer día.",
+          "plain": "Cuando se da de alta a alguien en Personal, deja la tarea «Preparar el primer día de la persona nueva».",
+          "blank": "En la lista de quién cae",
+          "blankHint": "De nadie: asígnala en Tareas, o añade a quién en el paso.",
+          "task": "Preparar el primer día de la persona nueva",
+          "description": "Cuenta, uniforme, llaves y la vuelta por el negocio."
+        },
+        "cashClose": {
+          "name": "Revisar la caja al cerrarla",
+          "summary": "Cuando se cierra una caja, la tarea de revisar el cierre.",
+          "plain": "Cuando se cierra una caja, deja la tarea «Revisar el cierre de caja».",
+          "blank": "Quién la revisa",
+          "blankHint": "Nadie en concreto: asígnala en Tareas.",
+          "task": "Revisar el cierre de caja",
+          "description": "Compara el efectivo contado con el esperado y apunta cualquier diferencia."
+        },
+        "fiscalRejected": {
+          "name": "Enterarte cuando Hacienda rechaza un registro",
+          "summary": "Cuando VeriFactu marca un registro como rechazado, una tarea urgente.",
+          "plain": "Cuando Hacienda rechaza un registro (o no se pudo enviar), deja la tarea urgente «Una factura no ha quedado registrada en Hacienda».",
+          "blank": "Quién lo mira",
+          "blankHint": "Nadie en concreto: asígnala en Tareas.",
+          "task": "Una factura no ha quedado registrada en Hacienda",
+          "description": "Abre VeriFactu → Registros para ver por qué y volver a enviarla."
+        },
+        "weekReview": {
+          "name": "Repasar la semana el viernes",
+          "summary": "Todos los viernes a las 18:00, la tarea de repasar la semana.",
+          "plain": "Todos los viernes a las 18:00 deja la tarea «Repasar la semana».",
+          "blank": "Cuándo",
+          "blankHint": "Los viernes a las 18:00; cámbialo en el disparador.",
+          "task": "Repasar la semana",
+          "description": "Ventas, citas y las tareas que quedan de la semana."
+        },
+        "morning": {
+          "name": "Revisar la agenda cada mañana",
+          "summary": "Todos los días a las 09:00, la tarea de repasar la agenda de hoy.",
+          "plain": "Todos los días a las 09:00 deja la tarea «Repasar la agenda de hoy», con prioridad alta.",
+          "blank": "La hora",
+          "blankHint": "Las 09:00; cámbiala en el disparador.",
+          "task": "Repasar la agenda de hoy"
+        },
+        "noShow": {
+          "name": "Llamar a quien no vino",
+          "summary": "Cuando una cita se marca como «no vino», una tarea urgente de llamarle.",
+          "plain": "Cuando una cita se marca como «no vino», deja la tarea urgente «Llamar al cliente que no vino».",
+          "task": "Llamar al cliente que no vino"
+        },
+        "bigParty": {
+          "name": "Preparar las mesas de grupos grandes",
+          "summary": "Cuando entra una reserva de seis o más, la tarea de prepararla.",
+          "plain": "Cuando se reserva una mesa, solo si son seis o más, deja la tarea «Preparar mesa para un grupo grande».",
+          "blank": "Cuántas personas",
+          "blankHint": "Seis o más; cámbialo en «Solo sigue si…».",
+          "task": "Preparar mesa para un grupo grande",
+          "people": "Personas"
+        },
+        "bigSaleTask": {
+          "name": "Avisar de una venta grande",
+          "summary": "Cuando se cobra una venta de más de 100,00 €, una tarea para dar las gracias al cliente.",
+          "plain": "Cuando se cobra una venta, solo si es de más de 100,00 €, deja la tarea «Agradecer una venta grande» con el número de la venta.",
+          "blank": "El importe",
+          "blankHint": "Más de 100,00 € (10000 en céntimos); cámbialo en «Solo cuando…».",
+          "task": "Agradecer una venta grande"
+        }
+      }
+    },
+    "guide": {
+      "title": "Cómo funcionan las automatizaciones",
+      "back": "Volver a las automatizaciones",
+      "what": {
+        "title": "Qué es una automatización",
+        "body": "Una regla que se cumple sola: cuando pasa algo en tu negocio (se cobra una venta, se crea un cliente), a una hora (cada día a las 9) o cuando pulsas Ejecutar, hace sus pasos en orden —dejar una tarea, escribir una nota en una ficha— sin que nadie esté delante."
+      },
+      "first": {
+        "title": "Tu primera automatización, paso a paso",
+        "steps": [
+          "Elige una tarjeta de la galería y pulsa Usar esta: se crea en pausa.",
+          "Mira sus pasos y cambia lo que quieras (el importe, la hora, la espera).",
+          "En Permisos, pulsa Autorizar todo lo que necesita.",
+          "Abre Probar para ver qué haría con lo último que pasó de verdad.",
+          "Enciéndela y pulsa Guardar."
+        ]
+      },
+      "permissions": {
+        "title": "Los permisos: por qué hay que decir que sí",
+        "body": "Una automatización actúa sin nadie delante, así que nunca usa tus permisos: solo puede hacer lo que le hayas permitido, uno a uno. Hasta que permitas un paso, ese paso se rechaza cuando le toca y el historial lo dice. Si la tuya no ha hecho nunca nada, mira Permisos lo primero."
+      },
+      "worked": {
+        "title": "Cómo saber si funcionó",
+        "body": "Cada vez que se ejecuta queda una línea en su Historial: cuándo, cómo acabó y, paso a paso, qué hizo. Una condición que la paró es la automatización funcionando; un fallo dice por qué y qué hacer. Cada ejecución tiene una referencia que puedes copiar para soporte."
+      },
+      "limits": {
+        "title": "Lo que todavía no puede hacer",
+        "items": [
+          "Bifurcaciones: una automatización es una columna; «Solo sigue si…» la termina cuando no se cumple. Dos desenlaces son dos automatizaciones.",
+          "Contar hacia atrás desde una fecha del aviso («el día antes de la cita»): una espera cuenta desde el paso anterior.",
+          "Enviar mensajes, llamar a otro sistema o preguntar al asistente o a una persona: llegan en una versión posterior.",
+          "El asistente escribe borradores: nunca enciende una automatización ni le concede nada."
+        ]
+      }
+    },
+    "editor": {
+      "back": "Volver",
+      "name": "Nombre de la automatización",
+      "test": "Probar",
+      "run": "Ejecutar ahora",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Guardada.",
+      "enable": "Encender esta automatización",
+      "tabs": {
+        "steps": "Pasos",
+        "test": "Probar",
+        "permissions": "Permisos",
+        "history": "Historial",
+        "label": "Secciones de la automatización"
+      },
+      "notTested": "Todavía no la has probado: abre Probar para ver qué haría.",
+      "leaveTitle": "¿Salir sin guardar?",
+      "leaveMessage": "Se perderán los cambios que has hecho.",
+      "leaveYes": "Salir",
+      "leaveNo": "Quedarme",
+      "runTitle": "¿Ejecutarla ahora?",
+      "runMessage": "Hará de verdad lo que dicen sus pasos.",
+      "runYes": "Sí, ejecútala",
+      "runNo": "Cancelar",
+      "ran": "Ejecutada. Mírala en Historial.",
+      "draftBanner": "Esto es un borrador que escribió el asistente. Está apagado, no tiene permisos y no pasa nada hasta que lo actives tú.",
+      "draftNotes": "Lo que el asistente no ha podido decidir",
+      "draftGone": "Ese borrador ya no está esperando.",
+      "notFound": "Esa automatización no existe en este negocio.",
+      "ranFailed": "Se ejecutó y se paró por un error: {message}",
+      "ranWaiting": "Se ejecutó y está esperando: mírala en Historial.",
+      "runSaveFirst": "Guárdala primero: «Ejecutar ahora» ejecuta lo guardado."
+    },
+    "trigger": {
+      "when": "Cuando pase esto…",
+      "kind": "Arranca",
+      "kinds": {
+        "event": "Pasa algo",
+        "schedule": "Según un horario",
+        "at": "Una vez, en una fecha y hora",
+        "manual": "Solo a mano"
+      },
+      "chooseEvent": "Elige qué pasa",
+      "searchEvent": "Busca qué pasa…",
+      "onlyWhen": "Solo cuando…",
+      "onlyWhenHint": "Sin condiciones arranca con cada uno.",
+      "every": "Cada cuánto",
+      "everyDay": "Todos los días",
+      "everyWeek": "Todas las semanas",
+      "everyMonth": "Todos los meses",
+      "weekday": "Día de la semana",
+      "monthDay": "Día del mes",
+      "monthDayHint": "Un mes sin ese día se salta.",
+      "time": "Hora",
+      "at": "Fecha y hora",
+      "weekdays": [
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+        "domingo"
+      ],
+      "describe": {
+        "event": "Cuando {event}",
+        "noEvent": "Elige qué tiene que pasar para que arranque",
+        "manual": "Solo cuando pulses Ejecutar",
+        "day": "Todos los días a las {time}",
+        "week": "Todos los {weekday} a las {time}",
+        "month": "Todos los meses el día {day} a las {time}",
+        "at": "Una vez, el {date}",
+        "noDate": "Una vez, en la fecha que elijas"
+      }
+    },
+    "steps": {
+      "none": "Todavía no hay pasos. Añade lo primero que debe hacer esta automatización.",
+      "add": {
+        "command": "Hacer algo",
+        "query": "Consultar algo",
+        "condition": "Solo sigue si…",
+        "delay": "Esperar"
+      },
+      "remove": "Quitar este paso",
+      "reorder": "Arrastra para ordenar",
+      "what": "Qué hacer",
+      "whatQuery": "Qué consultar",
+      "choose": "Elige una acción…",
+      "chooseQuery": "Elige qué consultar…",
+      "noAction": "Elige qué tiene que hacer este paso",
+      "info": "Con esta información",
+      "addInfo": "Añadir información",
+      "required": "obligatorio",
+      "removeInfo": "Quitar esta información",
+      "keep": "Qué guardar",
+      "keepFirst": "La primera fila que encuentre, campo a campo",
+      "keepCount": "Solo cuántas hay",
+      "queryHint": "Si no encuentra nada, la automatización sigue; para pararla, añade después un «Solo sigue si…» sobre «Encontró algo».",
+      "guard": "Solo sigue si",
+      "guardHint": "Si no se cumplen todas, la automatización termina aquí sin error.",
+      "addCondition": "Añadir una condición",
+      "removeCondition": "Quitar esta condición",
+      "data": "Dato",
+      "is": "Es",
+      "value": "Valor",
+      "inHint": "Separa los valores con comas.",
+      "yes": "sí",
+      "no": "no",
+      "operators": {
+        "eq": "igual a",
+        "neq": "distinto de",
+        "in": "uno de",
+        "exists": "está presente",
+        "contains": "contiene",
+        "gt": "mayor que",
+        "gte": "mayor o igual que",
+        "lt": "menor que",
+        "lte": "menor o igual que"
+      },
+      "amount": "Cuánto",
+      "unit": "Unidad",
+      "units": {
+        "minutes": {
+          "one": "minuto",
+          "many": "minutos"
+        },
+        "hours": {
+          "one": "hora",
+          "many": "horas"
+        },
+        "days": {
+          "one": "día",
+          "many": "días"
+        }
+      },
+      "wait": "Esperar {amount} {unit}",
+      "insert": "Insertar un dato",
+      "removeData": "Quitar este dato",
+      "describe": {
+        "noCondition": "todavía nada",
+        "query": "Consultar: {action}",
+        "found": "Encontró algo",
+        "count": "Cuántas"
+      }
+    },
+    "picker": {
+      "title": "¿Qué dato?",
+      "input": "Lo que la arrancó",
+      "step": "Lo que dejó el paso {n}",
+      "none": "Todavía no hay datos que insertar aquí: elige primero qué pasa, o añade antes una acción.",
+      "example": "p. ej. {value}",
+      "noExample": "aún no hay ejemplo",
+      "close": "Cerrar"
+    },
+    "test": {
+      "banner": "Nada de esto es real. No se envía nada, no se cobra nada y no se apunta nada: esto es solo lo que HARÍA tu automatización.",
+      "with": "Con lo que pasó de verdad la última vez: {event} ({date}).",
+      "noSample": "Esto no ha pasado en tu negocio últimamente, así que recorre los pasos sin datos.",
+      "noEvent": "No arranca con un aviso: recorre los pasos sin datos.",
+      "notStart": "Ni siquiera arrancaría: «Solo cuando…» no se cumple.",
+      "outcomes": {
+        "would_run": "Lo haría",
+        "stops_here": "Se pararía aquí, y eso es la automatización funcionando",
+        "cannot_tell": "Esto no se puede comprobar aquí: depende de un paso que no ha corrido",
+        "waits": "Esperaría {duration}",
+        "refused": "Se lo rechazarían",
+        "not_allowed": "Se lo rechazarían: todavía no le has permitido «{action}»",
+        "unavailable": "«{action}» no está disponible en este negocio",
+        "not_reached": "No llegaría aquí",
+        "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo"
+      },
+      "empty": "Saldría vacío: {fields}",
+      "unknown": "Sale de un paso anterior que no ha corrido: {fields}",
+      "loading": "Probando…",
+      "again": "Volver a probar"
+    },
+    "permissions": {
+      "intro": "Una automatización se ejecuta con sus propios permisos, nunca con los tuyos. Nada de lo de abajo ocurre hasta que lo autorices.",
+      "missing": "Pendiente de tu permiso",
+      "granted": "Autorizado",
+      "withdraw": "Retirar",
+      "grantAll": "Autorizar todo lo que necesita",
+      "updated": "Permisos actualizados.",
+      "none": "Sus pasos no piden nada.",
+      "saveFirst": "Guárdala primero: después podrás autorizar lo que necesita.",
+      "saveChanges": "Guárdala primero: lo que autorices es lo guardado."
+    },
+    "history": {
+      "empty": "Todavía no se ha ejecutado.",
+      "attention": "Necesita a alguien",
+      "more": "Ver más",
+      "copy": "Copiar la referencia",
+      "copied": "Copiada. Pégala si nos preguntas por esta ejecución.",
+      "technical": "El texto técnico, para soporte",
+      "showSteps": "Ver sus pasos",
+      "byHand": "A mano",
+      "statuses": {
+        "running": "En marcha",
+        "waiting": "Esperando",
+        "succeeded": "Terminó bien",
+        "stopped": "Terminó: no se cumplía la condición",
+        "failed": "Se paró por un error",
+        "cancelled": "Cancelada"
+      },
+      "log": {
+        "done": "Hizo: {action}",
+        "found": "Encontró {n}",
+        "not_found": "No encontró nada, y siguió",
+        "passed": "Se cumplió la condición",
+        "stopped": "Se paró aquí porque no se cumplió esto: {clauses}. Eso es la automatización funcionando.",
+        "waiting": "Esperando hasta el {date}",
+        "waited": "Esperó {duration}",
+        "failed": "{action}: {message}"
+      },
+      "advice": {
+        "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",
+        "flow__action_unavailable": "Vuelve a encender su app, o cambia el paso.",
+        "flow__invalid_params": "Abre el paso y rellena lo que pide.",
+        "flow__loop_stopped": "Comprueba que sus pasos no la vuelven a arrancar.",
+        "flow__step_crashed": "Prueba más tarde; si vuelve a pasar, mándanos la referencia.",
+        "flow__high_risk": "Hazlo a mano, desde su app."
+      },
+      "attentionOne": "{n} ejecución se paró por un problema",
+      "attentionMany": "{n} ejecuciones se pararon por un problema"
+    },
+    "events": {
+      "customer__customer__created": "se crea una ficha de cliente",
+      "customer__customer__updated": "cambia una ficha de cliente",
+      "customer__customer__deleted": "se borra una ficha de cliente",
+      "customer__consent__withdrawn": "un cliente retira su consentimiento",
+      "customer__note__added": "se apunta una nota en un cliente",
+      "sale__sale__completed": "se cobra una venta",
+      "sale__sale__voided": "se anula una venta",
+      "sale__sale__refunded": "se devuelve una venta",
+      "sale__order__opened": "se abre una cuenta",
+      "staff__member__created": "alguien entra en el equipo",
+      "staff__member__terminated": "alguien deja el equipo",
+      "staff__time_off__created": "alguien pide vacaciones o una ausencia",
+      "task__task__created": "se crea una tarea",
+      "task__task__completed": "se completa una tarea",
+      "appointment__appointment__created": "se reserva una cita",
+      "appointment__appointment__cancelled": "se anula una cita",
+      "appointment__appointment__completed": "se completa una cita",
+      "appointment__appointment__marked_no_show": "alguien no viene a su cita",
+      "online_booking__booking__created": "alguien reserva por internet",
+      "reservation__reservation__created": "entra una reserva de mesa",
+      "cash_register__session__opened": "se abre una caja",
+      "cash_register__session__closed": "se cierra una caja",
+      "inventory__product__created": "se crea un producto",
+      "inventory__stock__threshold_crossed": "un artículo cruza su stock mínimo",
+      "verifactu__record__rejected": "Hacienda rechaza un registro",
+      "invoice__invoice__issued": "se emite una factura",
+      "kitchen__ticket__created": "entra una comanda",
+      "table__session__opened": "se abre una mesa",
+      "table__session__closed": "se cierra una mesa",
+      "printing__job__failed": "falla una impresión",
+      "payment__payment__completed": "se completa un pago",
+      "attendance__record__clocked_in": "alguien ficha la entrada"
+    },
+    "actions": {
+      "task__task__create": "Crear una tarea",
+      "task__task__complete": "Completar una tarea",
+      "task__task__assign": "Asignar una tarea",
+      "task__comment__add": "Comentar una tarea",
+      "customer__note__add": "Apuntar una nota en un cliente",
+      "customer__customer__create": "Crear un cliente",
+      "customer__customer__update": "Cambiar un cliente",
+      "customer__customer__set_tags": "Etiquetar un cliente",
+      "customer__customer__detail": "Leer un cliente",
+      "customer__customer__list": "Buscar clientes",
+      "inventory__product__list_low_stock": "Productos con poco stock",
+      "inventory__product__get": "Leer un producto"
+    },
+    "facts": {
+      "created": "alta",
+      "updated": "cambio",
+      "deleted": "borrado",
+      "completed": "completado",
+      "cancelled": "anulado",
+      "added": "añadido",
+      "removed": "quitado",
+      "opened": "abierto",
+      "closed": "cerrado",
+      "voided": "anulado",
+      "refunded": "devuelto",
+      "approved": "aprobado",
+      "rejected": "rechazado",
+      "issued": "emitido",
+      "paid": "pagado",
+      "failed": "fallido",
+      "started": "empezado",
+      "confirmed": "confirmado"
+    },
+    "verbs": {
+      "create": "Crear",
+      "update": "Cambiar",
+      "delete": "Borrar",
+      "add": "Añadir",
+      "list": "Buscar",
+      "detail": "Leer",
+      "get": "Leer",
+      "complete": "Completar",
+      "cancel": "Anular",
+      "assign": "Asignar",
+      "close": "Cerrar",
+      "open": "Abrir",
+      "send": "Enviar"
+    },
+    "fields": {
+      "title": "Título",
+      "description": "Descripción",
+      "priority": "Prioridad",
+      "due_date": "Vence",
+      "assignee": "Quién la hace",
+      "project": "Proyecto",
+      "tags": "Etiquetas",
+      "content": "Texto",
+      "name": "Nombre",
+      "phone": "Teléfono",
+      "email": "Email",
+      "customer_id": "Cliente",
+      "customer": "Cliente",
+      "author_name": "Firmado por",
+      "note": "Nota",
+      "amount": "Importe",
+      "reason": "Motivo",
+      "id": "Id",
+      "found": "Encontró algo",
+      "count": "Cuántas",
+      "total": "Total",
+      "search": "Búsqueda"
+    },
+    "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones."
+  }
+}

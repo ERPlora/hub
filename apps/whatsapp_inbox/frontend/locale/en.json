@@ -1,0 +1,191 @@
+{
+  "whatsapp_inbox": {
+    "title": "WhatsApp inbox",
+    "settingsTitle": "Channel settings",
+    "tabs": {
+      "label": "WhatsApp inbox sections",
+      "inbox": "Inbox",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "retry": "Retry",
+      "appInactive": "This app is not active in this business"
+    },
+    "noPermission": "You do not have permission",
+    "loading": "Loading…",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches your search or filters.",
+    "yesterday": "Yesterday",
+    "cancel": "Cancel",
+    "status": {
+      "open": "Open",
+      "pending": "Pending",
+      "closed": "Closed"
+    },
+    "inbox": {
+      "search": "Filter contact or phone…",
+      "empty": "No conversations.",
+      "loadError": "Could not load the conversations.",
+      "entity": {
+        "one": "conversation",
+        "many": "conversations"
+      },
+      "columns": {
+        "contact": "Contact",
+        "phone": "Phone",
+        "status": "Status",
+        "assigned": "Assigned to",
+        "unread": "Unread",
+        "lastMessage": "Last message"
+      },
+      "filters": {
+        "me": "Me",
+        "none": "Unassigned",
+        "withUnread": "With unread",
+        "allRead": "All read"
+      },
+      "open": "Open",
+      "notConnected": "WhatsApp is not connected. Connect the business's number in erplora.com to receive and send messages.",
+      "reconnectNeeded": "WhatsApp asks to reconnect the number in erplora.com: until then nothing can be sent.",
+      "goToSaas": "Go to erplora.com",
+      "capReached": "You have used all the WhatsApp messages of your plan this month. Messages keep arriving here, but nothing can be sent until next month or until you upgrade the plan.",
+      "erased": "The data of this number has been erased."
+    },
+    "conversation": {
+      "close": "Close",
+      "loadError": "Could not load the conversation",
+      "customer": "Customer",
+      "noCustomer": "Not linked to a customer card",
+      "viewCard": "View card",
+      "createCard": "Create card",
+      "unlink": "Unlink",
+      "linked": "Conversation linked to the card",
+      "assignedTo": "Assigned to",
+      "assignPlaceholder": "Choose a person…",
+      "nobody": "Nobody",
+      "noPeople": "Nobody matches",
+      "assignToMe": "Assign to me",
+      "unassign": "Remove assignment",
+      "statusLabel": "Status",
+      "erase": "Erase this number's data",
+      "eraseTitle": "Erase this number's data?",
+      "eraseMessage": "Every message, attachment and note of {phone} will be erased. This cannot be undone.",
+      "eraseConfirm": "Erase data",
+      "eraseError": "Could not erase the data of this number",
+      "actionError": "Could not save the change",
+      "windowOpenUntil": "You can write freely until {time}.",
+      "windowClosed": "More than 24 hours have passed since the customer's last message: WhatsApp only lets you write to them with an approved template."
+    },
+    "thread": {
+      "label": "Messages",
+      "empty": "No messages yet.",
+      "earlier": "View earlier",
+      "fromPhone": "From the phone",
+      "note": "Internal note",
+      "deleteNote": "Delete note",
+      "deleteNoteTitle": "Delete this note?",
+      "openAttachment": "Open the attachment",
+      "template": "Template: {name}",
+      "failedReason": "Meta's reason: {reason}",
+      "kinds": {
+        "image": "Photo",
+        "sticker": "Sticker",
+        "audio": "Voice note",
+        "video": "Video",
+        "document": "Document",
+        "location": "Location",
+        "contacts": "Contact",
+        "interactive": "Reply to a menu",
+        "button": "Button reply",
+        "reaction": "Reaction",
+        "unsupported": "A message WhatsApp does not show here",
+        "media_placeholder": "Attachment on its way",
+        "template": "Template",
+        "text": "Message",
+        "other": "Message ({kind})"
+      },
+      "messageStatus": {
+        "received": "Received",
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "read": "Read",
+        "failed": "Not delivered",
+        "queued": "Sending…",
+        "sending": "Sending…",
+        "notSent": "Not sent"
+      },
+      "retry": "Retry"
+    },
+    "composer": {
+      "label": "Write to the customer",
+      "reply": "Reply",
+      "note": "Internal note",
+      "placeholder": "Write a message…",
+      "notePlaceholder": "Write a note only the team sees…",
+      "send": "Send",
+      "template": "Template",
+      "addNote": "Add note",
+      "sent": "Message sent",
+      "noteAdded": "Note added",
+      "blocked": {
+        "not_connected": "WhatsApp is not connected: connect the number in erplora.com to send.",
+        "cap_reached": "This month's WhatsApp messages of your plan are spent: nothing can be sent until next month.",
+        "unconfigured": "This Hub cannot reach erplora.com, so nothing can be sent from it."
+      }
+    },
+    "templates": {
+      "sendTitle": "Send a template",
+      "pick": "Template",
+      "none": "There are no approved templates. Templates are created in WhatsApp Manager or in erplora.com.",
+      "variable": "Variable {n}",
+      "preview": "Preview",
+      "send": "Send",
+      "missingVariables": "Fill in every variable of the template.",
+      "search": "Search template…",
+      "empty": "No templates.",
+      "emptyHint": "Templates are created in WhatsApp Manager or in erplora.com and appear here once Meta reviews them.",
+      "loadError": "Could not load the templates.",
+      "rejectedReason": "Meta's reason: {reason}",
+      "entity": {
+        "one": "template",
+        "many": "templates"
+      },
+      "columns": {
+        "name": "Name",
+        "language": "Language",
+        "category": "Category",
+        "status": "Status in Meta",
+        "body": "Text"
+      },
+      "categories": {
+        "UTILITY": "Utility",
+        "MARKETING": "Marketing",
+        "AUTHENTICATION": "Authentication"
+      },
+      "statuses": {
+        "APPROVED": "Approved",
+        "PENDING": "In review",
+        "REJECTED": "Rejected",
+        "PAUSED": "Paused by Meta",
+        "DISABLED": "Disabled by Meta",
+        "DELETED": "Deleted in WhatsApp Manager"
+      }
+    },
+    "settings": {
+      "number": "Your number",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "reconnectNeeded": "Needs reconnecting",
+      "notConnectedHint": "Connect the business's WhatsApp number in erplora.com: messages will arrive here.",
+      "reconnectHint": "WhatsApp withdrew the permission: reconnect the number in erplora.com.",
+      "manage": "Manage in erplora.com",
+      "month": "This month",
+      "usage": "{used} of {limit} messages sent",
+      "noLimit": "No limit: {used} messages sent",
+      "capReached": "You have used all the messages of your plan this month.",
+      "templatesTitle": "Meta templates",
+      "loadError": "Could not load the channel."
+    }
+  }
+}

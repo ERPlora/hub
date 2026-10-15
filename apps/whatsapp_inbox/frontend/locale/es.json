@@ -1,0 +1,191 @@
+{
+  "whatsapp_inbox": {
+    "title": "Bandeja de WhatsApp",
+    "settingsTitle": "Ajustes del canal",
+    "tabs": {
+      "label": "Secciones de la Bandeja de WhatsApp",
+      "inbox": "Bandeja de entrada",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "retry": "Reintentar",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "noPermission": "No tienes permiso",
+    "loading": "Cargando…",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
+    "yesterday": "Ayer",
+    "cancel": "Cancelar",
+    "status": {
+      "open": "Abierta",
+      "pending": "Pendiente",
+      "closed": "Cerrada"
+    },
+    "inbox": {
+      "search": "Filtrar contacto o teléfono…",
+      "empty": "Sin conversaciones.",
+      "loadError": "No se pudieron cargar las conversaciones.",
+      "entity": {
+        "one": "conversación",
+        "many": "conversaciones"
+      },
+      "columns": {
+        "contact": "Contacto",
+        "phone": "Teléfono",
+        "status": "Estado",
+        "assigned": "Asignada a",
+        "unread": "Sin leer",
+        "lastMessage": "Último mensaje"
+      },
+      "filters": {
+        "me": "A mí",
+        "none": "Sin asignar",
+        "withUnread": "Con mensajes sin leer",
+        "allRead": "Todo leído"
+      },
+      "open": "Abrir",
+      "notConnected": "WhatsApp no está conectado. Conecta el número del negocio en erplora.com para recibir y enviar mensajes.",
+      "reconnectNeeded": "WhatsApp pide volver a conectar el número en erplora.com: hasta entonces no se puede enviar nada.",
+      "goToSaas": "Ir a erplora.com",
+      "capReached": "Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.",
+      "erased": "Se han borrado los datos de este número."
+    },
+    "conversation": {
+      "close": "Cerrar",
+      "loadError": "No se pudo cargar la conversación",
+      "customer": "Cliente",
+      "noCustomer": "Sin ficha de cliente",
+      "viewCard": "Ver ficha",
+      "createCard": "Crear ficha",
+      "unlink": "Desunir",
+      "linked": "Conversación unida a la ficha",
+      "assignedTo": "Asignada a",
+      "assignPlaceholder": "Elige a una persona…",
+      "nobody": "Nadie",
+      "noPeople": "Nadie coincide",
+      "assignToMe": "Asignármela",
+      "unassign": "Quitar asignación",
+      "statusLabel": "Estado",
+      "erase": "Borrar datos de este número",
+      "eraseTitle": "¿Borrar los datos de este número?",
+      "eraseMessage": "Se borrarán todos los mensajes, adjuntos y notas de {phone}. No se puede deshacer.",
+      "eraseConfirm": "Borrar datos",
+      "eraseError": "No se pudieron borrar los datos de este número",
+      "actionError": "No se pudo guardar el cambio",
+      "windowOpenUntil": "Puedes escribir libremente hasta el {time}.",
+      "windowClosed": "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada."
+    },
+    "thread": {
+      "label": "Mensajes",
+      "empty": "Todavía no hay mensajes.",
+      "earlier": "Ver anteriores",
+      "fromPhone": "Desde el móvil",
+      "note": "Nota interna",
+      "deleteNote": "Borrar nota",
+      "deleteNoteTitle": "¿Borrar esta nota?",
+      "openAttachment": "Abrir el adjunto",
+      "template": "Plantilla: {name}",
+      "failedReason": "Motivo de Meta: {reason}",
+      "kinds": {
+        "image": "Foto",
+        "sticker": "Sticker",
+        "audio": "Nota de voz",
+        "video": "Vídeo",
+        "document": "Documento",
+        "location": "Ubicación",
+        "contacts": "Contacto",
+        "interactive": "Respuesta a un menú",
+        "button": "Respuesta de botón",
+        "reaction": "Reacción",
+        "unsupported": "Un mensaje que WhatsApp no deja ver aquí",
+        "media_placeholder": "Adjunto en camino",
+        "template": "Plantilla",
+        "text": "Mensaje",
+        "other": "Mensaje ({kind})"
+      },
+      "messageStatus": {
+        "received": "Recibido",
+        "sent": "Enviado",
+        "delivered": "Entregado",
+        "read": "Leído",
+        "failed": "No entregado",
+        "queued": "Enviando…",
+        "sending": "Enviando…",
+        "notSent": "No enviado"
+      },
+      "retry": "Reintentar"
+    },
+    "composer": {
+      "label": "Escribir al cliente",
+      "reply": "Responder",
+      "note": "Nota interna",
+      "placeholder": "Escribe un mensaje…",
+      "notePlaceholder": "Escribe una nota que solo ve el equipo…",
+      "send": "Enviar",
+      "template": "Plantilla",
+      "addNote": "Añadir nota",
+      "sent": "Mensaje enviado",
+      "noteAdded": "Nota añadida",
+      "blocked": {
+        "not_connected": "WhatsApp no está conectado: conecta el número en erplora.com para enviar.",
+        "cap_reached": "Los mensajes de WhatsApp de tu plan de este mes están gastados: no se puede enviar nada hasta el mes que viene.",
+        "unconfigured": "Este Hub no llega a erplora.com, así que desde él no se puede enviar nada."
+      }
+    },
+    "templates": {
+      "sendTitle": "Enviar una plantilla",
+      "pick": "Plantilla",
+      "none": "No hay plantillas aprobadas. Las plantillas se crean en WhatsApp Manager o en erplora.com.",
+      "variable": "Variable {n}",
+      "preview": "Vista previa",
+      "send": "Enviar",
+      "missingVariables": "Rellena todas las variables de la plantilla.",
+      "search": "Buscar plantilla…",
+      "empty": "Sin plantillas.",
+      "emptyHint": "Las plantillas se crean en WhatsApp Manager o en erplora.com y aparecen aquí cuando Meta las revisa.",
+      "loadError": "No se pudieron cargar las plantillas.",
+      "rejectedReason": "Motivo de Meta: {reason}",
+      "entity": {
+        "one": "plantilla",
+        "many": "plantillas"
+      },
+      "columns": {
+        "name": "Nombre",
+        "language": "Idioma",
+        "category": "Categoría",
+        "status": "Estado en Meta",
+        "body": "Texto"
+      },
+      "categories": {
+        "UTILITY": "Utilidad",
+        "MARKETING": "Marketing",
+        "AUTHENTICATION": "Autenticación"
+      },
+      "statuses": {
+        "APPROVED": "Aprobada",
+        "PENDING": "En revisión",
+        "REJECTED": "Rechazada",
+        "PAUSED": "Pausada por Meta",
+        "DISABLED": "Desactivada por Meta",
+        "DELETED": "Borrada en WhatsApp Manager"
+      }
+    },
+    "settings": {
+      "number": "Tu número",
+      "connected": "Conectado",
+      "notConnected": "Sin conectar",
+      "reconnectNeeded": "Hay que reconectar",
+      "notConnectedHint": "Conecta el número de WhatsApp del negocio en erplora.com: los mensajes llegarán aquí.",
+      "reconnectHint": "WhatsApp retiró el permiso: vuelve a conectar el número en erplora.com.",
+      "manage": "Gestionar en erplora.com",
+      "month": "Este mes",
+      "usage": "{used} de {limit} mensajes enviados",
+      "noLimit": "Sin límite: {used} mensajes enviados",
+      "capReached": "Has usado todos los mensajes de tu plan este mes.",
+      "templatesTitle": "Plantillas de Meta",
+      "loadError": "No se pudo cargar el canal."
+    }
+  }
+}
