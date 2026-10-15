@@ -90,3 +90,11 @@ msgstr "No hemos podido terminar de iniciar tu sesión"
 #: templates/base/login_retry.html
 msgid "The sign-in expired or started in another browser."
 msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
+
+#: base/request_body.py
+msgid "Content-Length must be a length."
+msgstr "Content-Length tiene que ser una longitud."
+
+#: base/request_body.py
+msgid "The request may weigh %(mb)s MB at most."
+msgstr "La petición puede pesar %(mb)s MB como máximo."
