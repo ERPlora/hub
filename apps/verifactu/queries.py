@@ -109,9 +109,15 @@ def production_open() -> bool:
 
 def effective_environment(ctx: OperationContext, config: Config) -> str:
     """The AEAT environment a new record of this business files in: ERPlora's own hub (PLAN-SAAS §4), its
-    deployment's (``prod``: production; ``pre``: testing), whatever its switch says; any other, its configuration's."""
+    deployment's (``prod``: production; ``pre``: testing), whatever its switch says, but production only once ERPlora
+    opens it on the server (``production_open``, working-rules §15: its own invoices skip no lock); once live there, it
+    stays in production while the server is closed, its records waiting (``production_closed``), so its real invoices
+    never move to the test chain. Any other business, its configuration's."""
     if platform.is_platform_hub(ctx.scope):
-        if settings.ERPLORA_ENVIRONMENT == "prod":
+        if production_open() or (
+            settings.ERPLORA_ENVIRONMENT == "prod"
+            and config.environment == Environment.PRODUCTION
+        ):
             return Environment.PRODUCTION
         return Environment.TESTING
     return config.environment
@@ -155,14 +161,18 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
-def sending_problem(config: Config, environment: str) -> str:
-    """Why the chosen route cannot carry a record to the AEAT of ``environment`` now (a wait code), or ``""``: the
-    own route needs its valid certificate, as in the old Hub; in production, ERPlora's route needs the approved
-    signed authorisation, but for ERPlora's own records. What keeps the queue waiting; the live option never does (what was sealed reaches the
-    AEAT)."""
+def _route_sending_problem(config: Config, environment: str) -> str:
+    """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
+    certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
+    the approved signed authorisation, but for ERPlora's own records."""
+    production = environment == Environment.PRODUCTION
     if config.route == Config.Route.OWN:
-        return "" if certificate_valid() else "own_certificate_missing"
-    if environment != Environment.PRODUCTION:
+        if not certificate_valid():
+            return "own_certificate_missing"
+        if production and not own_certificate_readable(config):
+            return "own_certificate_unreadable"
+        return ""
+    if not production:
         return ""
     if issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID:
         # ERPlora's seal presents ERPlora's own records: it represents nobody (its own hub, PLAN-SAAS §4).
@@ -172,14 +182,39 @@ def sending_problem(config: Config, environment: str) -> str:
     return ""
 
 
+def _server_problem(environment: str) -> str:
+    """What this server lacks to carry anything to the AEAT of production: ERPlora's gateway, and the opening of real
+    filing (``production_open``, working-rules §15). Testing lacks nothing here (its waits are ``blockers``')."""
+    if environment != Environment.PRODUCTION:
+        return ""
+    if not gateway.configured():
+        return "gateway_unavailable"
+    if not production_open():
+        return "production_closed"
+    return ""
+
+
+def sending_problem(config: Config, environment: str) -> str:
+    """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""``: the route's own lack
+    first, then the server's in production (no gateway, closed). What keeps the queue waiting, before the gateway is
+    ever called; the live option never does (what was sealed reaches the AEAT)."""
+    return _route_sending_problem(config, environment) or _server_problem(environment)
+
+
 def route_problem(config: Config, environment: str) -> str:
     """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08): what keeps
     it from sending and, on ERPlora's route in production, the live option of the plan (Ioan's model,
-    2026-10-15). In production it refuses every new sale (``verifactu.record.create``) and going live."""
-    problem = sending_problem(config, environment)
-    if problem or config.route == Config.Route.OWN or environment != Environment.PRODUCTION:
-        return problem
-    return "" if config.live_paid else "live_option_unpaid"
+    2026-10-15); the route's own lack before the server's. In production it refuses every new sale
+    (``verifactu.record.create``) and going live."""
+    problem = _route_sending_problem(config, environment)
+    if (
+        not problem
+        and config.route == Config.Route.ERPLORA
+        and environment == Environment.PRODUCTION
+        and not config.live_paid
+    ):
+        problem = "live_option_unpaid"
+    return problem or _server_problem(environment)
 
 
 def issue_problem(config: Config) -> str:
@@ -190,13 +225,20 @@ def issue_problem(config: Config) -> str:
 
 
 def live_problems(config: Config, scope: Scope) -> list[str]:
-    """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can. The
-    server's own opening (``production_open``) and Invoicing's issuer are told apart. A demo never goes live, as in
-    the old Hub; whether it is one, the platform says (``base.operations.is_demo_hub``)."""
-    found = ["go_live_forbidden"] if platform.is_demo_hub(scope) else []
+    """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can, in
+    ``go_live``'s order: the server (closed, no gateway), a demo, the route, the account. Invoicing's issuer is told
+    apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
+    (``base.operations.is_demo_hub``)."""
+    found = [] if production_open() else ["production_closed"]
+    if not gateway.configured():
+        found.append("gateway_unavailable")
+    if platform.is_demo_hub(scope):
+        found.append("go_live_forbidden")
     if config.route == Config.Route.OWN:
         if not certificate_valid():
             found.append("own_certificate_missing")
+        elif not own_certificate_readable(config):
+            found.append("own_certificate_unreadable")
     else:
         if config.representation_status != Config.Representation.APPROVED:
             found.append("representation_not_approved")
@@ -220,10 +262,16 @@ def blockers(config: Config, environment: str) -> list[str]:
     if not gateway.configured():
         found.append("gateway_unavailable")
     problem = sending_problem(config, environment)
-    if problem:
+    if not problem and not own_certificate_readable(config):
+        problem = "own_certificate_unreadable"
+    if problem and problem not in found:
         found.append(problem)
-    elif not own_certificate_readable(config):
-        found.append("own_certificate_unreadable")
+    if (
+        environment == Environment.PRODUCTION
+        and not production_open()
+        and "production_closed" not in found
+    ):
+        found.append("production_closed")
     return found
 
 

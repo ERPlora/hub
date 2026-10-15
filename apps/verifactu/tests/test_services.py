@@ -47,6 +47,18 @@ pytestmark = pytest.mark.django_db
 ISSUER_NIF = "B12345674"
 
 
+@pytest.fixture(autouse=True)
+def certificate_key(settings):
+    """The key that keeps the own certificates, as on a server set up (a test without it says so)."""
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+
+
+def open_production(settings) -> None:
+    """What going live needs of the server: ERPlora opened real filing on it, and it has the gateway."""
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+
+
 def create(invoice, ctx=None):
     return run("verifactu.record.create", {"invoice_id": str(invoice.id)}, ctx)
 
@@ -346,7 +358,8 @@ def test_a_full_invoice_replacing_a_ticket_declares_the_ticket(issuer):
     assert "<sum1:FacturasSustituidas>" in record.xml
 
 
-def test_production_has_its_own_chain_and_the_real_sites_qr(issuer):
+def test_production_has_its_own_chain_and_the_real_sites_qr(issuer, settings):
+    open_production(settings)
     create(ticket())
     # In production with its way to the AEAT (approved authorisation and the live option).
     Config.objects.filter().update(
@@ -825,8 +838,9 @@ def test_without_a_certificate_the_own_route_cannot_send(
 
 
 def test_in_production_erplora_sends_only_with_the_approved_authorisation(
-    issuer, gateway_answers
+    issuer, gateway_answers, settings
 ):
+    open_production(settings)
     # Sealed while it was approved, revoked behind its back: the gateway could not present it, so it waits.
     Config.objects.create(
         environment="production", representation_status="approved", live_paid=True
@@ -1184,7 +1198,7 @@ def own_certificate(days: float = 400) -> OwnCertificate:
         holder_tax_id=ISSUER_NIF,
         kind="representative",
         expires_at=timezone.now() + dt.timedelta(days=days),
-        sealed_blob=b"sealed",
+        sealed_blob=certificates.seal(make_p12(), "secret"),
         uploaded_by="ana",
     )
 
@@ -1216,7 +1230,7 @@ def test_going_live_is_closed_until_erplora_opens_it_on_the_server(issuer, setti
 
 
 def test_going_live_through_erplora_needs_the_approved_authorisation(issuer, settings):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     assert (
         code_of(lambda: run("verifactu.config.go_live"))
         == "verifactu.representation_not_approved"
@@ -1231,7 +1245,7 @@ def test_going_live_through_erplora_needs_the_approved_authorisation(issuer, set
 
 
 def test_going_live_needs_the_live_option_in_the_plan(issuer, settings):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     run(
         "verifactu.config.sync",
         {"version": 1, "live_paid": False, "representation": {"status": "approved"}},
@@ -1244,14 +1258,14 @@ def test_going_live_needs_the_live_option_in_the_plan(issuer, settings):
 def test_going_live_with_the_own_certificate_needs_no_live_option(issuer, settings):
     # The old Hub's an_own_certificate_needs_no_grant_to_go_live: the own route goes live with its valid
     # certificate alone; the live option of the plan is ERPlora filing for the business.
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     assert run("verifactu.config.go_live").environment == "production"
 
 
 def test_in_production_erplora_takes_over_only_with_the_live_option(issuer, settings):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
@@ -1267,7 +1281,7 @@ def test_in_production_erplora_takes_over_only_with_the_live_option(issuer, sett
 
 
 def test_going_live_with_an_expired_own_certificate_is_refused(issuer, settings):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(days=1))
@@ -1277,7 +1291,7 @@ def test_going_live_with_an_expired_own_certificate_is_refused(issuer, settings)
 
 @pytest.mark.parametrize("status", ["past_due", "suspended"])
 def test_going_live_needs_an_active_business(issuer, settings, status):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     run(
         "verifactu.config.sync",
         {
@@ -1296,7 +1310,7 @@ def test_a_demo_hub_never_goes_live(issuer, settings, monkeypatch):
     # is a demo is the platform's to say (base.operations.is_demo_hub), never this app's.
     from base import operations as platform
 
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     monkeypatch.setattr(platform, "is_demo_hub", lambda scope: scope == A)
     run(
         "verifactu.config.sync",
@@ -1317,7 +1331,7 @@ def test_a_demo_hub_never_goes_live(issuer, settings, monkeypatch):
 
 def test_going_live_is_never_open_in_pre(issuer, settings):
     settings.ERPLORA_ENVIRONMENT = "pre"
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     run(
         "verifactu.config.sync",
         {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
@@ -1359,7 +1373,7 @@ def test_in_production_without_a_way_to_the_aeat_nothing_new_is_sealed(
 ):
     # Working-rules §15: in production nothing is charged that can never reach the AEAT (the old Hub's
     # enforce_fiscal_road, HUB-1935). The refusal carries the route's own code and undoes the whole issue.
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     if problem == "own_certificate_missing":
         own_certificate()
         run("verifactu.config.update", {"route": "own"})
@@ -1387,7 +1401,7 @@ def test_the_reaction_seals_an_invoice_issued_before_the_way_closed(
 ):
     # The old Hub let the relay deliver a chain already open: the document exists, so its record is sealed
     # and waits rather than the document going undeclared.
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     live_through_erplora()
     invoice = ticket()
     close_the_way("representation_not_approved")
@@ -1402,7 +1416,7 @@ def test_losing_the_live_option_in_production_refuses_new_sales_and_sends_what_w
     # Review Focus 3: it does not go back to testing (it has production records); new sales are not sealed
     # (409 live_option_unpaid) and Settings says so; what was sealed while it could goes out: the option is
     # the plan's, the record is already the AEAT's (every ticket with a QR reaches it).
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     live_through_erplora()
     record = Record.objects.get(pk=create(ticket()).record.id)
     close_the_way("live_option_unpaid")
@@ -1418,14 +1432,14 @@ def test_losing_the_live_option_in_production_refuses_new_sales_and_sends_what_w
 
 
 def test_going_live_needs_the_issuer(settings, db):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     assert (
         code_of(lambda: run("verifactu.config.go_live")) == "verifactu.issuer_missing"
     )
 
 
 def test_back_to_testing_until_the_first_production_record(issuer, settings):
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    open_production(settings)
     run(
         "verifactu.config.sync",
         {"version": 1, "live_paid": True, "representation": {"status": "approved"}},

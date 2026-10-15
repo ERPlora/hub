@@ -1,7 +1,8 @@
 """ERPlora's own hub in VeriFactu (PLAN-SAAS §4; plan 2026-10-15, task 4): it files in the AEAT environment of the
 deployment (prod: production; pre: testing) whatever its configuration says, so its switch is fixed (409
 ``verifactu.platform_fixed``); and ERPlora's seal presents ERPlora's own records without any signed authorisation
-(it represents nobody), as the old SaaS filed its invoices with its own certificate.
+(it represents nobody), as the old SaaS filed its invoices with its own certificate. Production, though, only once
+ERPlora opens it on the server (``VERIFACTU_PRODUCTION_ENABLED``, working-rules §15): its own invoices skip no lock.
 """
 
 import pytest
@@ -35,6 +36,7 @@ def test_the_platform_hub_files_where_its_deployment_does(
     db, platform_slug, settings, deployment, expected
 ):
     settings.ERPLORA_ENVIRONMENT = deployment
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
     config = Config(
         environment=Environment.TESTING
         if expected == Environment.PRODUCTION
@@ -42,6 +44,35 @@ def test_the_platform_hub_files_where_its_deployment_does(
     )
 
     assert queries.effective_environment(system_context(PLATFORM), config) == expected
+
+
+def test_the_platform_hub_skips_no_production_lock(db, platform_slug, settings):
+    # Working-rules §15: real filing opens under Ioan's supervision, for ERPlora's own invoices too.
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    assert (
+        queries.effective_environment(
+            system_context(PLATFORM), Config(environment=Environment.TESTING)
+        )
+        == Environment.TESTING
+    )
+
+
+def test_once_live_the_platform_hub_keeps_its_chain_in_production_while_closed(
+    db, platform_slug, settings
+):
+    # Closing the server after it went live never moves ERPlora's real invoices to the test chain: they are
+    # sealed in production and wait (``production_closed``) until it opens again.
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    assert (
+        queries.effective_environment(
+            system_context(PLATFORM), Config(environment=Environment.PRODUCTION)
+        )
+        == Environment.PRODUCTION
+    )
 
 
 @pytest.mark.parametrize("environment", [Environment.TESTING, Environment.PRODUCTION])
@@ -83,6 +114,9 @@ def test_another_hubs_switch_is_still_its_own(db, platform_slug):
 def test_erploras_seal_files_erploras_own_records_without_an_authorisation(
     db, settings
 ):
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     settings.PLATFORM_ISSUER_TAX_ID = ISSUER["tax_id"]
     run("invoice.issuer.update", ISSUER)
     config = Config(
@@ -106,11 +140,18 @@ def test_any_other_issuer_needs_its_approved_authorisation(db, settings):
 
 
 @pytest.mark.parametrize(
-    ("deployment", "expected"),
-    [("prod", Environment.PRODUCTION), ("pre", Environment.TESTING)],
+    ("deployment", "opened", "expected"),
+    [
+        ("prod", True, Environment.PRODUCTION),
+        ("prod", False, Environment.TESTING),
+        ("pre", True, Environment.TESTING),
+    ],
 )
-def test_the_platform_hub_takes_its_deployments_environment(db, platform_slug, settings, deployment, expected):
+def test_the_platform_hub_takes_its_deployments_environment(
+    db, platform_slug, settings, deployment, opened, expected
+):
     settings.ERPLORA_ENVIRONMENT = deployment
+    settings.VERIFACTU_PRODUCTION_ENABLED = opened
 
     answer = run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
 
@@ -119,8 +160,25 @@ def test_the_platform_hub_takes_its_deployments_environment(db, platform_slug, s
     assert (config.production_since is not None) is (expected == Environment.PRODUCTION)
 
 
+def test_closing_the_server_after_going_live_leaves_it_in_production(
+    db, platform_slug, settings
+):
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    answer = run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
+
+    assert (answer.environment, Config.objects.get().environment) == (
+        Environment.PRODUCTION,
+        Environment.PRODUCTION,
+    )
+
+
 def test_taking_it_again_changes_nothing(db, platform_slug, settings):
     settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
     run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
     first = Config.objects.get()
 

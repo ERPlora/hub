@@ -205,11 +205,24 @@ def test_in_prod_the_record_files_in_production_whatever_the_configuration_says(
     platform_hub, settings
 ):
     settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
     assert Config.objects.filter(environment=Config.Environment.PRODUCTION).count() == 0
 
     issue()
 
     assert Record.objects.get().environment == Record.Environment.PRODUCTION
+
+
+def test_in_prod_while_erplora_has_not_opened_real_filing_it_files_in_testing(
+    platform_hub, settings
+):
+    # Working-rules §15: ERPlora's own invoices skip no lock.
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    issue()
+
+    assert Record.objects.get().environment == Record.Environment.TESTING
 
 
 def test_an_invoice_without_its_record_yet_is_issuing_and_then_issued(

@@ -1508,12 +1508,15 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
 #: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT
 #: now (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal.
 #: Working-rules §15, as the old Hub's ``enforce_fiscal_road`` (HUB-1935): nothing is charged that could never be
-#: filed.
+#: filed. The route's lacks and the server's (its own certificate it cannot open, no gateway, real filing closed).
 NO_WAY_TO_THE_AEAT = frozenset(
     {
         "verifactu.live_option_unpaid",
         "verifactu.representation_not_approved",
         "verifactu.own_certificate_missing",
+        "verifactu.own_certificate_unreadable",
+        "verifactu.gateway_unavailable",
+        "verifactu.production_closed",
     }
 )
 

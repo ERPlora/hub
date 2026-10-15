@@ -2,8 +2,8 @@
 // VeriFactu → Settings (VERIFACTU-F04, F08–F12; the old `erp-verifactu-settings`; «Enable VeriFactu» is gone:
 // turning the app on is enabling it). «Sending»: «Use my own certificate» (owner and admin; ERPlora files for you when
 // off), with its explanation and «Open Configuration»; «AEAT environment» with its pill and «Go live» (asks first;
-// closed while the server keeps it closed or while something is missing, listed above it: the approved signed
-// authorisation, the own certificate, the live option of the plan, an active account) or, in production, why records
+// closed while something is missing, listed above it: the server's opening and its gateway, the approved signed
+// authorisation, the own certificate (one this server can open), the live option of the plan, an active account) or, in production, why records
 // wait (e.g. the live option left the plan) and «Back to testing» (asks first; only until the first production
 // record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
 // invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
@@ -200,13 +200,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         <template v-if="config.environment === 'testing'">
           <p class="verifactu-settings__hint">
             {{ $t('verifactu.settings.goLiveHint') }}
-          </p>
-          <p
-            v-if="!config.production_open"
-            class="verifactu-settings__hint"
-            data-testid="verifactu-settings-closed"
-          >
-            {{ $t('verifactu.settings.productionClosed') }}
           </p>
           <InlineFeedback
             v-if="config.live_blockers.length"
