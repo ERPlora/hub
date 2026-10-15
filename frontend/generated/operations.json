@@ -332,6 +332,8 @@
   "verifactu.config.back_to_testing": { "method": "post", "path": "/api/verifactu/config/back_to_testing" },
   "verifactu.certificate.upload": { "method": "post", "path": "/api/verifactu/certificate" },
   "verifactu.certificate.remove": { "method": "post", "path": "/api/verifactu/certificate/remove" },
+  "verifactu.representation.submit": { "method": "post", "path": "/api/verifactu/representation" },
+  "verifactu.representation.model": { "method": "get", "path": "/api/verifactu/representation/model" },
   "verifactu.record.list": { "method": "get", "path": "/api/verifactu/records" },
   "verifactu.record.get": { "method": "get", "path": "/api/verifactu/records/detail" },
   "verifactu.record.by_invoice": { "method": "get", "path": "/api/verifactu/records/by_invoice" },

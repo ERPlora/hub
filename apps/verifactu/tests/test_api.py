@@ -23,6 +23,8 @@ ROUTES = {
     ("POST", "/verifactu/config/back_to_testing", "verifactu.config.back_to_testing"),
     ("POST", "/verifactu/certificate", "verifactu.certificate.upload"),
     ("POST", "/verifactu/certificate/remove", "verifactu.certificate.remove"),
+    ("POST", "/verifactu/representation", "verifactu.representation.submit"),
+    ("GET", "/verifactu/representation/model", "verifactu.representation.model"),
     ("GET", "/verifactu/records", "verifactu.record.list"),
     ("GET", "/verifactu/records/detail", "verifactu.record.get"),
     ("GET", "/verifactu/records/by_invoice", "verifactu.record.by_invoice"),
@@ -228,6 +230,141 @@ def test_without_configure_the_certificate_is_a_403(manager_client, issuer, sett
     assert post(manager_client, "/verifactu/certificate", body).status_code == 403
     assert post(manager_client, "/verifactu/certificate/remove").status_code == 403
     assert not OwnCertificate.objects.exists()
+
+
+# The signed authorisation (VERIFACTU-F05, F06)
+
+SAAS = "http://saas.internal:8001"
+HUB_ID = "01920000-0000-7000-8000-000000000abc"
+
+
+def pdf_b64(size: int = 0, text: bytes = b"signed") -> str:
+    import base64
+
+    return base64.b64encode(b"%PDF-1.7 " + text + b"0" * size).decode()
+
+
+@pytest.fixture
+def linked(issuer, settings):
+    from live.context import system_context
+
+    from apps.verifactu.tests.conftest import A, run
+
+    settings.SAAS_INTERNAL_URL = SAAS
+    run("verifactu.config.sync", {"version": 1, "hub_id": HUB_ID}, system_context(A))
+
+
+@pytest.mark.django_db
+def test_the_authorisation_travels_over_http_beyond_djangos_upload_ceiling(admin_client, linked):
+    import httpx
+    import respx
+
+    # A scan of the signed model weighs more than Django's 2.5 MB for any other view.
+    signed = pdf_b64(3 * 1024 * 1024)
+    body = {
+        "signer_tax_id": "12345678Z",
+        "signer_name": "Ana Pérez",
+        "signer_document_type": "dni",
+        "signed_model_base64": signed,
+        "id_copy_base64": pdf_b64(),
+        "representation_proof_base64": pdf_b64(),
+    }
+    assert len(json.dumps(body)) > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+    with respx.mock:
+        route = respx.post(f"{SAAS}/internal/hubs/{HUB_ID}/representation").mock(
+            return_value=httpx.Response(201, json={"status": "submitted", "version": 1, "submitted_at": None})
+        )
+        response = post(admin_client, "/verifactu/representation", body)
+    assert response.status_code == 201
+    assert response.json()["representation"]["status"] == "submitted"
+    assert json.loads(route.calls.last.request.content)["documents"]["signed_model"] == signed
+    # Nothing of the documents comes back.
+    assert signed[:64] not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_a_body_beyond_the_uploads_ceiling_is_a_413_before_it_is_read(admin_client, linked):
+    response = admin_client.post(
+        "/api/verifactu/representation",
+        "{}",
+        content_type="application/json",
+        HTTP_HOST="a.localhost",
+        CONTENT_LENGTH=str(33 * 1024 * 1024),
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
+
+
+@pytest.mark.django_db
+def test_a_422_never_echoes_the_documents(admin_client, linked):
+    signed = pdf_b64(text=b"Ana's signed model")
+    response = post(
+        admin_client,
+        "/verifactu/representation",
+        {"signer_document_type": "passport", "signed_model_base64": signed, "id_copy_base64": signed},
+    )
+    assert response.status_code == 422
+    assert signed not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_the_model_is_served_as_a_pdf_to_download(admin_client, linked):
+    import httpx
+    import respx
+
+    with respx.mock:
+        respx.get(f"{SAAS}/internal/representation/model").mock(
+            return_value=httpx.Response(200, content=b"%PDF-1.4 Anexo I")
+        )
+        response = get(admin_client, "/verifactu/representation/model")
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/pdf"
+    assert response["Content-Disposition"] == (
+        'attachment; filename="anexo-i-otorgamiento-representacion-erplora.pdf"'
+    )
+    assert response.content == b"%PDF-1.4 Anexo I"
+
+
+@pytest.mark.django_db
+def test_the_spas_client_asking_json_gets_the_operations_output(admin_client, linked):
+    import base64
+
+    import httpx
+    import respx
+
+    with respx.mock:
+        respx.get(f"{SAAS}/internal/representation/model").mock(
+            return_value=httpx.Response(200, content=b"%PDF-1.4 Anexo I")
+        )
+        response = admin_client.get(
+            "/api/verifactu/representation/model", HTTP_HOST="a.localhost", HTTP_ACCEPT="application/json"
+        )
+    assert response.status_code == 200
+    model = response.json()
+    assert (model["filename"], model["content_type"]) == (
+        "anexo-i-otorgamiento-representacion-erplora.pdf",
+        "application/pdf",
+    )
+    assert base64.b64decode(model["content_base64"]) == b"%PDF-1.4 Anexo I"
+
+
+@pytest.mark.django_db
+def test_the_model_without_the_saas_is_a_503_envelope(admin_client, linked):
+    import httpx
+    import respx
+
+    with respx.mock:
+        respx.get(f"{SAAS}/internal/representation/model").mock(side_effect=httpx.ConnectError("refused"))
+        response = get(admin_client, "/verifactu/representation/model")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "verifactu.saas_unreachable"
+
+
+@pytest.mark.django_db
+def test_without_configure_the_authorisation_is_a_403(manager_client, linked):
+    body = {"signer_document_type": "dni", "signed_model_base64": pdf_b64(), "id_copy_base64": pdf_b64()}
+    assert post(manager_client, "/verifactu/representation", body).status_code == 403
+    assert get(manager_client, "/verifactu/representation/model").status_code == 403
 
 
 @pytest.mark.django_db

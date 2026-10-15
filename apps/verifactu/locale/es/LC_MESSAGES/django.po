@@ -970,3 +970,79 @@ msgstr ""
 #: services.py
 msgid "Only ERPlora's own business follows the environment of its server."
 msgstr "Solo el negocio propio de ERPlora sigue el entorno de su servidor."
+
+#: apps/verifactu/models.py
+msgid "ERPlora business id"
+msgstr "Id del negocio en ERPlora"
+
+#: apps/verifactu/models.py
+msgid "Representation authorisation no. %(version)s sent to ERPlora for review."
+msgstr "Otorgamiento de representación n.º %(version)s enviado a ERPlora para su revisión."
+
+#: apps/verifactu/models.py
+msgid "ERPlora is reviewing the representation authorisation."
+msgstr "ERPlora está revisando el otorgamiento de representación."
+
+#: apps/verifactu/models.py
+msgid "ERPlora approved the representation authorisation: it can file on your behalf."
+msgstr "ERPlora ha aprobado el otorgamiento de representación: puede remitir en tu nombre."
+
+#: apps/verifactu/models.py
+msgid "ERPlora returned the representation authorisation: %(note)s"
+msgstr "ERPlora ha devuelto el otorgamiento de representación: %(note)s"
+
+#: apps/verifactu/models.py
+msgid "The representation authorisation was revoked."
+msgstr "El otorgamiento de representación se ha revocado."
+
+#: apps/verifactu/models.py
+msgid "ERPlora holds no signed representation authorisation for this business."
+msgstr "ERPlora no tiene ningún otorgamiento de representación firmado de este negocio."
+
+#: apps/verifactu/queries.py
+msgid "ERPlora could not handle this right now. Try again in a few minutes."
+msgstr "ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos."
+
+#: apps/verifactu/services.py
+msgid "Fill in the name and ID number of the person signing."
+msgstr "Rellena el nombre y el NIF de quien firma."
+
+#: apps/verifactu/services.py
+msgid "Attach the signed form."
+msgstr "Adjunta el modelo firmado."
+
+#: apps/verifactu/services.py
+msgid "The signed form has to be a PDF: scan it or sign it with AutoFirma."
+msgstr "El modelo firmado tiene que ser un PDF: escanéalo o fírmalo con AutoFirma."
+
+#: apps/verifactu/services.py
+msgid "Attach a copy of the identity document."
+msgstr "Adjunta una copia del documento de identidad."
+
+#: apps/verifactu/services.py
+msgid "With a NIE we also need a sample of the handwritten signature."
+msgstr "Con NIE necesitamos además una muestra de la firma manuscrita."
+
+#: apps/verifactu/services.py
+msgid "Attach the document that proves you may sign for the company."
+msgstr "Adjunta el documento que acredita que puedes firmar por la sociedad."
+
+#: apps/verifactu/services.py
+msgid "Each file has to be 5 MB at most."
+msgstr "Cada fichero puede ocupar 5 MB como máximo."
+
+#: apps/verifactu/services.py
+msgid "Each file has to be a PDF."
+msgstr "Cada fichero tiene que ser un PDF."
+
+#: apps/verifactu/services.py
+msgid "The authorisation cannot be sent as it is."
+msgstr "El otorgamiento no se puede enviar tal como está."
+
+#: apps/verifactu/services.py
+msgid "ERPlora did not take the authorisation as it is."
+msgstr "ERPlora no ha admitido el otorgamiento tal como está."
+
+#: apps/verifactu/services.py
+msgid "ERPlora has not linked this business yet. Try again in a few minutes."
+msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."

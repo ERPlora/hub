@@ -1,6 +1,7 @@
 // VeriFactu → Configuration (VERIFACTU-F02–F06, F34; the old `erp-verifactu-config`): «VeriFactu configuration» with
-// its two routes as tabs, «ERPlora files for you» (the representation authorisation's state, managed in the ERPlora
-// account; the Hub shows what the account sent and says when it has sent nothing yet) first, and «My certificate»:
+// its two routes as tabs, «ERPlora files for you» (the representation authorisation: its state as the account sent it,
+// and the procedure to sign and send it from here, `RepresentationGrant`; it says when the account has sent nothing
+// yet) first, and «My certificate»:
 // loaded or not, holder, uploaded and expiry dates, the warning before it expires, and the business's .p12/.pfx
 // uploaded here with its password («Upload the certificate») or removed («Remove», asking first). Only who
 // configures VeriFactu uploads or removes it.
@@ -39,7 +40,7 @@ const CONFIG: ConfigOut = {
   declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
   account_url: 'https://erplora.com',
   own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null },
-  representation: { status: 'none', updated_at: null, reason: '' },
+  representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
   synced_at: null,
   route_ready: true,
   reasons: [],
@@ -85,14 +86,25 @@ describe('ConfigPage', () => {
     const s = await setup();
     expect(s.find('verifactu-config-erplora').exists()).toBe(true);
     expect(s.find('verifactu-config-not-synced').text()).toBe('Your ERPlora account has not sent this yet.');
-    const manage = s.find('verifactu-config-manage');
-    expect([manage.attributes('href'), manage.attributes('target')]).toEqual(['https://erplora.com', '_blank']);
+  });
+
+  it('the authorisation is signed and sent from here, not from the account', async () => {
+    const s = await setup();
+    expect(s.find('verifactu-config-manage').exists()).toBe(false);
+    expect(s.find('verifactu-grant-form').exists()).toBe(true);
+    expect(s.find('verifactu-grant-download').exists()).toBe(true);
+  });
+
+  it('who does not configure VeriFactu sees the authorisation’s state and cannot send it', async () => {
+    const s = await setup({}, { session: EMPLOYEE });
+    expect(s.find('verifactu-config-grant').exists()).toBe(true);
+    expect(s.find('verifactu-grant-form').exists()).toBe(false);
   });
 
   it('says the authorisation’s state as the account sent it', async () => {
-    const s = await setup({ synced_at: '2026-10-14T10:00:00Z', representation: { status: 'approved', updated_at: '2026-10-02T10:00:00Z', reason: '' } });
+    const s = await setup({ synced_at: '2026-10-14T10:00:00Z', representation: { ...CONFIG.representation, status: 'approved', updated_at: '2026-10-02T10:00:00Z' } });
     expect(s.find('verifactu-config-grant').text()).toContain('ERPlora can file on your behalf.');
-    const returned = await setup({ synced_at: '2026-10-14T10:00:00Z', representation: { status: 'returned', updated_at: '2026-10-02T10:00:00Z', reason: 'Unsigned page 2' } });
+    const returned = await setup({ synced_at: '2026-10-14T10:00:00Z', representation: { ...CONFIG.representation, status: 'returned', updated_at: '2026-10-02T10:00:00Z', reason: 'Unsigned page 2' } });
     expect(returned.find('verifactu-config-grant').text()).toContain('Returned on');
     expect(returned.find('verifactu-config-grant-reason').text()).toContain('Unsigned page 2');
   });
