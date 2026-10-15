@@ -177,7 +177,7 @@ teléfono) y **Quitar cliente**. Lo pinta Clientes; el hueco lo reserva Venta.
 | CUSTOMER-F22 | Restar una devolución | hecho | común |
 | CUSTOMER-F23 | Ver el historial de compras de un cliente | hecho | común |
 | CUSTOMER-F24 | Ver en la ficha lo que otras apps saben del cliente | hecho | común |
-| CUSTOMER-F25 | Crear la clienta sin salir de la agenda | servidor hecho | peluquería |
+| CUSTOMER-F25 | Crear la clienta sin salir de la agenda | hecho | peluquería |
 | CUSTOMER-F26 | Crear la ficha de quien pide cita por WhatsApp | servidor hecho | peluquería |
 | CUSTOMER-F27 | Crear, cambiar y eliminar grupos de clientes | hecho | común |
 | CUSTOMER-F28 | Crear, cambiar y eliminar etiquetas de clientes | hecho | común |
@@ -687,19 +687,28 @@ su trozo y en su marco (si falla, «No se pudo mostrar este bloque.» en su siti
 Implicados: APPOINTMENTS-F20
 
 ### CUSTOMER-F25 Crear la clienta sin salir de la agenda
-Estado: servidor hecho — el alta la admite (CUSTOMER-F01); el formulario dentro de la agenda es de
-Citas
+<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f06 old:customers/workflow/con-otros-modulos.md#customers-f25 -->
+Estado: hecho
 Vertical: peluquería
 Actor: todos los que gestionan fichas
 Pantalla: Citas: Agenda
 Pasos:
-1. En **Añadir cita**, en «Cliente», la recepcionista escribe un nombre o un teléfono que no está.
-2. La lista ofrece crear la clienta con nombre y teléfono, como el alta rápida del TPV.
-3. Al crearla queda elegida en la cita.
-Entra: nombre y teléfono.
-Sale: la ficha nueva (origen «En el local») y la cita con ella.
-Si falla: el motivo sale en el panel de la cita sin perder lo ya elegido.
-Implicados: APPOINTMENTS-F01
+1. En la agenda, pulsa «Añadir cita» y, en «Nueva cita», elige los servicios, el profesional, el día y
+   la hora en el orden que quieras.
+2. En «Cliente», pulsa «Asignar cliente» y escribe el nombre o el teléfono de la clienta. Si no tiene
+   ficha, sale «Sin resultados.» y, debajo, «+ Nuevo cliente «…»» con lo que has escrito.
+3. Púlsalo. Lo escrito pasa a «Nombre» (o a «Teléfono», si es un número); completa el otro (solo el
+   nombre es obligatorio) y pulsa «Crear y asignar».
+4. Si ese teléfono ya está en otra ficha, se enseña y eliges: «Usar» esa ficha o «Crear una nueva»
+   (una madre y su hija pueden compartir teléfono).
+5. La clienta queda elegida en «Cliente» y el resto de la cita sigue como estaba; pulsa «Añadir cita».
+Entra: el nombre y, si lo das, el teléfono.
+Sale: la ficha nueva, con origen «En el local», y la cita con ella.
+Si falla: el motivo sale dentro de «Elegir cliente», junto a lo que has escrito (un teléfono que no es
+de su país, debajo de «Teléfono»), y no se pierde nada: ni el nombre y el teléfono tecleados ni los
+servicios, el profesional, el día y la hora de la cita. Corrige y vuelve a pulsar «Crear y asignar».
+Quien no gestiona fichas no ve «+ Nuevo cliente».
+Implicados: APPOINTMENT-F01, CUSTOMER-F18
 
 ### CUSTOMER-F26 Crear la ficha de quien pide cita por WhatsApp
 Estado: servidor hecho — el alta con origen «WhatsApp» está; la respuesta automática es de la Bandeja
