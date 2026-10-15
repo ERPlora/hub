@@ -10,7 +10,7 @@ import datetime as dt
 import hashlib
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
@@ -1289,6 +1289,30 @@ def test_going_live_needs_an_active_business(issuer, settings, status):
         system_context(A),
     )
     assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.hub_not_active"
+
+
+def test_a_demo_hub_never_goes_live(issuer, settings, monkeypatch):
+    # The old Hub's go_live: «a demo cannot» (fiscal.go_live_forbidden), right after a closed server. Whether a hub
+    # is a demo is the platform's to say (base.operations.is_demo_hub), never this app's.
+    from base import operations as platform
+
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    monkeypatch.setattr(platform, "is_demo_hub", lambda scope: scope == A)
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        system_context(A),
+    )
+    with pytest.raises(Conflict) as refused:
+        run("verifactu.config.go_live")
+    assert refused.value.code == "verifactu.go_live_forbidden"
+    assert Config.objects.get().environment == "testing"
+    assert [reason.code for reason in run("verifactu.config.get").live_blockers] == [
+        "go_live_forbidden"
+    ]
+    with translation.override("es"):
+        blockers = run("verifactu.config.get", ctx=ctx_for(language="es")).live_blockers
+    assert blockers[0].message.startswith("es un negocio de demostración")
 
 
 def test_going_live_is_never_open_in_pre(issuer, settings):

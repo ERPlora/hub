@@ -937,3 +937,11 @@ msgstr "Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regular
 #: services.py
 msgid "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in VeriFactu → Settings and try again."
 msgstr "No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: %(why)s. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo."
+
+#: models.py
+msgid "this is a demo business: it always files in the AEAT's test environment"
+msgstr "es un negocio de demostración: siempre presenta en el entorno de pruebas de la AEAT"
+
+#: services.py
+msgid "A demo business cannot go live: it always files in the AEAT's test environment."
+msgstr "Un negocio de demostración no puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT."

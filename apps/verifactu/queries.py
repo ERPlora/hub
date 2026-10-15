@@ -15,11 +15,12 @@ from django.conf import settings
 from django.db.models import Case, Count, Q, QuerySet, When
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import NotFound
 from live.operations import operation
 
 from apps.invoice.models import Invoice, Issuer
+from base import operations as platform
 from apps.verifactu import certificates, chain, envelope, gateway, producer
 from apps.verifactu.models import (
     AeatRecord,
@@ -166,10 +167,11 @@ def issue_problem(config: Config) -> str:
     return route_problem(config, config.environment)
 
 
-def live_problems(config: Config) -> list[str]:
+def live_problems(config: Config, scope: Scope) -> list[str]:
     """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can. The
-    server's own opening (``production_open``) and Invoicing's issuer are told apart."""
-    found = []
+    server's own opening (``production_open``) and Invoicing's issuer are told apart. A demo never goes live, as in
+    the old Hub; whether it is one, the platform says (``base.operations.is_demo_hub``)."""
+    found = ["go_live_forbidden"] if platform.is_demo_hub(scope) else []
     if config.route == Config.Route.OWN:
         if not certificate_valid():
             found.append("own_certificate_missing")
@@ -388,7 +390,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         route_ready=not route_problem(config, config.environment),
         reasons=[wait(code) for code in blockers(config, config.environment)],
         issue_blocker=wait(refused) if refused else None,
-        live_blockers=[wait(code) for code in live_problems(config)],
+        live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
     )
 
 

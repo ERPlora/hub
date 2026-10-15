@@ -31,6 +31,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.invoice.models import Invoice
+from base import operations as platform
 from apps.verifactu import (
     aeat,
     certificates,
@@ -163,6 +164,9 @@ CERTIFICATE_HOLDER_MISMATCH = _(
     "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
 )
 CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one.")
+GO_LIVE_FORBIDDEN = _(
+    "A demo business cannot go live: it always files in the AEAT's test environment."
+)
 NO_WAY_TO_THE_AEAT = _(
     "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
     "VeriFactu → Settings and try again."
@@ -1734,7 +1738,7 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     output=ConfigOut,
     ai={
         "description": "Go live: from now on every VeriFactu record goes to the real AEAT. It needs the server opened for "
-        "it by ERPlora, Invoicing's issuer, a route ready for production (the own valid certificate, or ERPlora's "
+        "it by ERPlora, a business that is not a demo, Invoicing's issuer, a route ready for production (the own valid certificate, or ERPlora's "
         "approved signed authorisation with the live option in the plan) and an active ERPlora account; it cannot "
         "go back once a production record is sealed.",
         "risk": "high",
@@ -1746,6 +1750,8 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
         return config_out(config, ctx)
     if not production_open():
         raise Conflict(str(PRODUCTION_CLOSED), code="verifactu.production_closed")
+    if platform.is_demo_hub(ctx.scope):
+        raise Conflict(str(GO_LIVE_FORBIDDEN), code="verifactu.go_live_forbidden")
     if not issuer_configured():
         raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
     refusal = _route_refusal(config, config.route, Environment.PRODUCTION)

@@ -473,6 +473,9 @@ WAIT_REASONS = {
     "live_option_unpaid": _(
         "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
     ),
+    "go_live_forbidden": _(
+        "this is a demo business: it always files in the AEAT's test environment"
+    ),
     "hub_not_active": _(
         "your ERPlora account has a pending payment or is suspended"
     ),
