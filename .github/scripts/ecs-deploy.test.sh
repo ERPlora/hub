@@ -9,16 +9,23 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 failures=0
 
-# A task definition as `describe-task-definition --include TAGS` returns it.
-# task_definition <family> <containers JSON>
+# A task definition as `describe-task-definition --include TAGS` returns it, with the roles and the
+# Environment tag Terraform gives it (aws-next modules/ecs-service: erplora-<env>-<name>-task and
+# -execution); the tag and the roles may be overridden.
+# task_definition <family> <containers JSON> [<Environment tag, "" = none> [<task role> [<execution role>]]]
 task_definition() {
-  jq -n --arg family "$1" --argjson containers "$2" '{
+  local family="$1" environment
+  environment="$(cut -d- -f2 <<< "$family")"
+  jq -n --arg family "$family" --argjson containers "$2" --arg environment "${3-$environment}" \
+    --arg task_role "${4:-arn:aws:iam::123456789012:role/$family-task}" \
+    --arg execution_role "${5:-arn:aws:iam::123456789012:role/$family-execution}" '{
     taskDefinition: {
       family: $family, taskDefinitionArn: "arn:td/\($family):1", revision: 1, status: "ACTIVE",
       requiresAttributes: [], compatibilities: ["FARGATE"], registeredAt: "t", registeredBy: "u",
-      taskRoleArn: "arn:role/\($family)", containerDefinitions: $containers
+      taskRoleArn: $task_role, executionRoleArn: $execution_role, containerDefinitions: $containers
     },
-    tags: [{key: "Project", value: "erplora"}, {key: "ManagedBy", value: "terraform"}]
+    tags: ([{key: "Project", value: "erplora"}, {key: "ManagedBy", value: "terraform"}]
+      + (if $environment == "" then [] else [{key: "Environment", value: $environment}] end))
   }'
 }
 
@@ -45,6 +52,18 @@ setup() {
     {"name": "hub-migrate", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-prod-hub-migrate.json"
   task_definition erplora-prod-db-bootstrap '[
     {"name": "db-bootstrap", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-prod-db-bootstrap.json"
+  # pre: the same families in the same cluster, named erplora-pre-*, on its own ECR repository; its
+  # services are hub-pre and worker-pre, their containers keep the short names.
+  task_definition erplora-pre-hub '[
+    {"name": "hub", "image": "reg.example/erplora/hub-pre:bootstrap"},
+    {"name": "pgbouncer", "image": "reg.example/erplora/hub-pre:bootstrap"}]' > "$FIXTURES/erplora-pre-hub.json"
+  task_definition erplora-pre-worker '[
+    {"name": "worker", "image": "reg.example/erplora/hub-pre:bootstrap"},
+    {"name": "pgbouncer", "image": "reg.example/erplora/hub-pre:bootstrap"}]' > "$FIXTURES/erplora-pre-worker.json"
+  task_definition erplora-pre-hub-migrate '[
+    {"name": "hub-migrate", "image": "reg.example/erplora/hub-pre:bootstrap"}]' > "$FIXTURES/erplora-pre-hub-migrate.json"
+  task_definition erplora-pre-db-bootstrap '[
+    {"name": "db-bootstrap", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-pre-db-bootstrap.json"
 
   # Fails after 500 pauses: a migration loop that never times out fails its test instead of hanging.
   cat > "$work/bin/sleep" <<'FAKE'
@@ -92,6 +111,8 @@ case "$1 $2" in
       # FAKE_PRIMARY_REVISIONS and FAKE_ROLLOUT_STATES (the last one repeats); by default the new
       # revision (2), COMPLETED.
       service="$(value --services)"
+      # The family of a service: hub → erplora-prod-hub, hub-pre → erplora-pre-hub.
+      if [[ "$service" == *-pre ]]; then family="erplora-pre-${service%-pre}"; else family="erplora-prod-$service"; fi
       read -ra revisions <<< "${FAKE_PRIMARY_REVISIONS:-2}"
       read -ra states <<< "${FAKE_ROLLOUT_STATES:-COMPLETED}"
       n="$(cat "$ROLLOUT_POLLS.$service" 2> /dev/null || echo 0)"
@@ -99,7 +120,7 @@ case "$1 $2" in
       r="$n" s="$n"
       if [ "$r" -ge "${#revisions[@]}" ]; then r=$((${#revisions[@]} - 1)); fi
       if [ "$s" -ge "${#states[@]}" ]; then s=$((${#states[@]} - 1)); fi
-      printf '%s\t%s\n' "arn:td/erplora-prod-$service:${revisions[r]}" "${states[s]}"
+      printf '%s\t%s\n' "arn:td/$family:${revisions[r]}" "${states[s]}"
     else
       echo '{"awsvpcConfiguration":{"subnets":["s"],"securityGroups":["g"],"assignPublicIp":"ENABLED"}}'
     fi
@@ -131,16 +152,16 @@ FAKE
   chmod +x "$work/bin/aws" "$work/bin/sleep"
 }
 
-# run_deploy [VAR=value...]: deploys abc123 with the fakes; the arguments override the environment.
+# run_deploy [VAR=value...]: deploys abc123 to prod with the fakes; the arguments override the environment.
 run_deploy() {
   env -u CLUSTER -u PROJECT -u POLL_SECONDS -u MIGRATE_TIMEOUT_SECONDS -u ROLLOUT_TIMEOUT_SECONDS \
-    PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 "$@" \
+    PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 ENVIRONMENT=prod "$@" \
     bash "$here/ecs-deploy.sh" > "$work/out.log" 2>&1
 }
 
 # run_deploy_without <VAR>: the same with <VAR> unset.
 run_deploy_without() {
-  env PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 \
+  env PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 ENVIRONMENT=prod \
     env -u "$1" bash "$here/ecs-deploy.sh" > "$work/out.log" 2>&1
 }
 
@@ -173,11 +194,12 @@ check "every container of the hub image gets the new image: the app and its pgbo
    registered erplora-prod-hub-migrate ".containerDefinitions[0].image == \"reg.example/erplora/hub:abc123\""'
 check "containers of another image keep theirs" \
   'registered erplora-prod-hub "[.containerDefinitions[] | select(.name == \"log-router\" or .name == \"look-alike\") | .image] == [\"public.ecr.aws/aws-observability/aws-for-fluent-bit:stable\", \"reg.example/erplora/hubx:bootstrap\"]"'
-check "the rest of the definition is kept" 'registered erplora-prod-hub ".taskRoleArn == \"arn:role/erplora-prod-hub\""'
+check "the rest of the definition is kept" \
+  'registered erplora-prod-hub ".taskRoleArn == \"arn:aws:iam::123456789012:role/erplora-prod-hub-task\" and .executionRoleArn == \"arn:aws:iam::123456789012:role/erplora-prod-hub-execution\""'
 check "read-only fields are stripped before registering" \
   '! jq -e "has(\"taskDefinitionArn\") or has(\"revision\") or has(\"status\") or has(\"requiresAttributes\") or has(\"compatibilities\") or has(\"registeredAt\") or has(\"registeredBy\")" "$REGISTERED_LOG" > /dev/null'
-check "the new revision keeps the tags of the one it copies" \
-  'registered erplora-prod-worker ".tags == [{\"key\": \"Project\", \"value\": \"erplora\"}, {\"key\": \"ManagedBy\", \"value\": \"terraform\"}]"'
+check "the new revision keeps the tags of the one it copies, Environment included" \
+  'registered erplora-prod-worker ".tags == [{\"key\": \"Project\", \"value\": \"erplora\"}, {\"key\": \"ManagedBy\", \"value\": \"terraform\"}, {\"key\": \"Environment\", \"value\": \"prod\"}]"'
 check "the migration runs the new hub-migrate revision with the worker network configuration" \
   'grep -q "run-task .*--task-definition arn:td/erplora-prod-hub-migrate:2 .*--network-configuration {\"awsvpcConfiguration\"" "$CALLS_LOG"'
 check "aws ecs wait tasks-stopped is not used" '! grep -q "wait tasks-stopped" "$CALLS_LOG"'
@@ -197,6 +219,112 @@ check "the tag is recorded only after the services are checked" \
   '[ "$(line_of "ssm put-parameter")" -gt "$(last_line_of "describe-services .*deployments")" ]'
 check "every aws call names the region" '[ -s "$CALLS_LOG" ] && ! grep -qv -- "--region eu-south-2" "$CALLS_LOG"'
 check "nothing of the saas is touched" '! grep -q saas "$CALLS_LOG"'
+check "nothing of pre is touched" '! grep -Eq "erplora-pre|-pre |/erplora/pre/" "$CALLS_LOG" "$REGISTERED_LOG"'
+check "prod's services keep their desired count" '! grep -q "desired-count" "$CALLS_LOG"'
+check "every revision is read before any is registered" \
+  '[ "$(last_line_of "describe-task-definition")" -lt "$(line_of "register-task-definition")" ]'
+
+# The calls of a prod deploy before pre existed (2026-10-14): the same calls with the same arguments;
+# only the reads moved, so the three revisions are read (and checked) before any is registered.
+check "prod: the calls are exactly today's" \
+  '[ "$(sed -E "s|file://[^ ]*/|file://<workdir>/|" "$CALLS_LOG")" = "$(cat <<'"'"'CALLS'"'"'
+ecs describe-task-definition --task-definition erplora-prod-hub --include TAGS --region eu-south-2 --output json
+ecs describe-task-definition --task-definition erplora-prod-worker --include TAGS --region eu-south-2 --output json
+ecs describe-task-definition --task-definition erplora-prod-hub-migrate --include TAGS --region eu-south-2 --output json
+ecs register-task-definition --cli-input-json file://<workdir>/hub.json --region eu-south-2 --query taskDefinition.taskDefinitionArn --output text
+ecs register-task-definition --cli-input-json file://<workdir>/worker.json --region eu-south-2 --query taskDefinition.taskDefinitionArn --output text
+ecs register-task-definition --cli-input-json file://<workdir>/hub-migrate.json --region eu-south-2 --query taskDefinition.taskDefinitionArn --output text
+ecs describe-services --cluster erplora-prod --services worker --region eu-south-2 --query services[0].networkConfiguration --output json
+ecs run-task --cluster erplora-prod --launch-type FARGATE --task-definition arn:td/erplora-prod-hub-migrate:2 --network-configuration {"awsvpcConfiguration":{"subnets":["s"],"securityGroups":["g"],"assignPublicIp":"ENABLED"}} --started-by deploy-abc123 --region eu-south-2 --output json
+ecs describe-tasks --cluster erplora-prod --tasks arn:task/erplora-prod/migrate1 --region eu-south-2 --query tasks[0].lastStatus --output text
+ecs describe-tasks --cluster erplora-prod --tasks arn:task/erplora-prod/migrate1 --region eu-south-2 --query tasks[0].lastStatus --output text
+ecs describe-tasks --cluster erplora-prod --tasks arn:task/erplora-prod/migrate1 --region eu-south-2 --query tasks[0].containers[?name=='"'"'hub-migrate'"'"'].exitCode | [0] --output text
+ecs update-service --cluster erplora-prod --service hub --task-definition arn:td/erplora-prod-hub:2 --region eu-south-2
+ecs update-service --cluster erplora-prod --service worker --task-definition arn:td/erplora-prod-worker:2 --region eu-south-2
+ecs wait services-stable --cluster erplora-prod --region eu-south-2 --services hub worker
+ecs describe-services --cluster erplora-prod --services hub --region eu-south-2 --query services[0].deployments[?status=='"'"'PRIMARY'"'"'] | [0].[taskDefinition, rolloutState] --output text
+ecs describe-services --cluster erplora-prod --services worker --region eu-south-2 --query services[0].deployments[?status=='"'"'PRIMARY'"'"'] | [0].[taskDefinition, rolloutState] --output text
+ssm put-parameter --name /erplora/prod/hub/image_tag --value abc123 --type String --overwrite --region eu-south-2
+CALLS
+)" ]'
+
+# --- pre: same cluster, its own families, services, repository and tag ---------------
+setup
+run_deploy ENVIRONMENT=pre && status=0 || status=$?
+check "pre: the deploy succeeds" '[ "$status" -eq 0 ]'
+check "pre: registers only pre's families" \
+  '[ "$(jq -r .family "$REGISTERED_LOG" | sort | paste -sd " " -)" = "erplora-pre-hub erplora-pre-hub-migrate erplora-pre-worker" ]'
+check "pre: the image is pre's repository, on the app and on its pgbouncer" \
+  'registered erplora-pre-hub "[.containerDefinitions[].image] == [\"reg.example/erplora/hub-pre:abc123\", \"reg.example/erplora/hub-pre:abc123\"]" &&
+   registered erplora-pre-worker "[.containerDefinitions[].image] == [\"reg.example/erplora/hub-pre:abc123\", \"reg.example/erplora/hub-pre:abc123\"]" &&
+   registered erplora-pre-hub-migrate ".containerDefinitions[0].image == \"reg.example/erplora/hub-pre:abc123\""'
+check "pre: the new revisions keep Environment=pre" \
+  'for f in hub worker hub-migrate; do registered "erplora-pre-$f" "any(.tags[]; .key == \"Environment\" and .value == \"pre\")" || exit 1; done'
+check "pre: the migration runs pre's hub-migrate with worker-pre's network, in the shared cluster" \
+  'grep -q "^ecs describe-services --cluster erplora-prod --services worker-pre .*networkConfiguration" "$CALLS_LOG" &&
+   grep -q "run-task --cluster erplora-prod .*--task-definition arn:td/erplora-pre-hub-migrate:2 " "$CALLS_LOG" &&
+   grep -q "describe-tasks .*containers\[?name==.hub-migrate.\]\.exitCode" "$CALLS_LOG"'
+check "pre: updates only hub-pre and worker-pre, to pre's revisions" \
+  '[ "$(grep -c "update-service" "$CALLS_LOG")" -eq 2 ] &&
+   grep -q "update-service --cluster erplora-prod --service hub-pre --task-definition arn:td/erplora-pre-hub:2 " "$CALLS_LOG" &&
+   grep -q "update-service --cluster erplora-prod --service worker-pre --task-definition arn:td/erplora-pre-worker:2 " "$CALLS_LOG"'
+check "pre: a push wakes its services (desired count 1)" \
+  '[ "$(grep -c "update-service .*--desired-count 1 " "$CALLS_LOG")" -eq 2 ]'
+check "pre: waits for hub-pre and worker-pre and checks their rollouts" \
+  'grep -Eq "wait services-stable .*--services hub-pre worker-pre( |$)" "$CALLS_LOG" &&
+   for s in hub-pre worker-pre; do grep -q "describe-services .*--services $s .*deployments" "$CALLS_LOG" || exit 1; done'
+check "pre: records its own image tag" \
+  'grep -q "^ssm put-parameter --name /erplora/pre/hub/image_tag --value abc123 --type String --overwrite" "$CALLS_LOG"'
+check "pre: a pre run never names a prod family, service, parameter or repository" \
+  '! grep -Eq "erplora-prod-|/erplora/prod/|erplora/hub:|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG" "$REGISTERED_LOG"'
+check "pre: db-bootstrap is never read nor registered" '! grep -q db-bootstrap "$CALLS_LOG" "$REGISTERED_LOG"'
+setup
+run_deploy ENVIRONMENT=pre FAKE_MIGRATE_EXIT=1 && status=0 || status=$?
+check "pre: a failed migration names pre's log group" \
+  '[ "$status" -ne 0 ] && grep -q "::error::hub-migrate .*code 1.*/ecs/erplora-pre-hub-migrate" "$work/out.log"'
+
+# --- the environment ----------------------------------------------------------
+for environment in "" dev PROD staging; do
+  setup
+  run_deploy ENVIRONMENT="$environment" && status=0 || status=$?
+  check "ENVIRONMENT '$environment' fails before any aws call" \
+    '[ "$status" -ne 0 ] && [ ! -s "$CALLS_LOG" ] && grep -q "::error::ENVIRONMENT" "$work/out.log"'
+done
+
+# --- a base revision of another environment is refused, before registering anything --
+# refused_base <family>: the deploy failed naming <family>, and registered and ran nothing.
+refused_base() {
+  [ "$status" -ne 0 ] && [ ! -s "$REGISTERED_LOG" ] &&
+    ! grep -Eq "register-task-definition|run-task|update-service|put-parameter" "$CALLS_LOG" &&
+    grep -q "::error::$1 .*nothing was registered" "$work/out.log"
+}
+setup
+task_definition erplora-prod-worker '[{"name": "worker", "image": "reg.example/erplora/hub:bootstrap"}]' pre \
+  > "$FIXTURES/erplora-prod-worker.json"
+run_deploy && status=0 || status=$?
+check "prod: a base revision tagged Environment=pre is refused, nothing registered" 'refused_base erplora-prod-worker'
+setup
+task_definition erplora-prod-hub-migrate '[{"name": "hub-migrate", "image": "reg.example/erplora/hub:bootstrap"}]' "" \
+  > "$FIXTURES/erplora-prod-hub-migrate.json"
+run_deploy && status=0 || status=$?
+check "prod: a base revision without the Environment tag is refused" 'refused_base erplora-prod-hub-migrate'
+setup
+task_definition erplora-pre-hub '[{"name": "hub", "image": "reg.example/erplora/hub-pre:bootstrap"}]' pre \
+  arn:aws:iam::123456789012:role/erplora-prod-hub-task > "$FIXTURES/erplora-pre-hub.json"
+run_deploy ENVIRONMENT=pre && status=0 || status=$?
+check "pre: a base revision with a prod task role is refused" 'refused_base erplora-pre-hub'
+setup
+task_definition erplora-pre-worker '[{"name": "worker", "image": "reg.example/erplora/hub-pre:bootstrap"}]' pre "" \
+  arn:aws:iam::123456789012:role/erplora-prod-worker-execution > "$FIXTURES/erplora-pre-worker.json"
+run_deploy ENVIRONMENT=pre && status=0 || status=$?
+check "pre: a base revision with a prod execution role is refused" 'refused_base erplora-pre-worker'
+setup
+jq 'del(.taskDefinition.taskRoleArn)' "$FIXTURES/erplora-prod-hub.json" > "$work/no-role.json"
+mv "$work/no-role.json" "$FIXTURES/erplora-prod-hub.json"
+run_deploy && status=0 || status=$?
+check "a base revision without a task role is refused" 'refused_base erplora-prod-hub'
+check "the error says what the revision carries" \
+  'grep -q "::error::erplora-prod-hub .*Environment=prod.*task role none" "$work/out.log"'
 
 # --- polling the migration ----------------------------------------------------
 setup
@@ -250,8 +378,8 @@ setup
 task_definition erplora-prod-worker '[{"name": "worker", "image": "other.example/erplora/hub:bootstrap"}]' \
   > "$FIXTURES/erplora-prod-worker.json"
 run_deploy && status=0 || status=$?
-check "a family with no container of the hub image fails before the migration" \
-  '[ "$status" -ne 0 ] && ! grep -Eq "run-task|update-service|put-parameter" "$CALLS_LOG"'
+check "a family with no container of the hub image fails before registering anything" \
+  '[ "$status" -ne 0 ] && ! grep -Eq "register-task-definition|run-task|update-service|put-parameter" "$CALLS_LOG"'
 check "its error names the family" 'grep -q "::error::erplora-prod-worker " "$work/out.log"'
 
 # --- the rollout after services-stable ----------------------------------------
@@ -316,7 +444,7 @@ check "a ROLLOUT_TIMEOUT_SECONDS that is not a number fails before any aws call"
   '[ "$status" -ne 0 ] && [ ! -s "$CALLS_LOG" ] && grep -q ROLLOUT_TIMEOUT_SECONDS "$work/out.log"'
 
 # --- required environment -----------------------------------------------------
-for var in AWS_REGION REGISTRY IMAGE_TAG; do
+for var in AWS_REGION REGISTRY IMAGE_TAG ENVIRONMENT; do
   setup
   run_deploy_without "$var" && status=0 || status=$?
   check "without $var it fails before any aws call" '[ "$status" -ne 0 ] && [ ! -s "$CALLS_LOG" ]'

@@ -1,0 +1,15 @@
+name: ci
+
+# Every push to a working branch runs the tests (test.yml), with the same check as deploy.yml:
+# "test / test". main and pre run them in deploy.yml, before they deploy.
+
+on:
+  push:
+    branches-ignore: [main, pre]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml

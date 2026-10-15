@@ -25,8 +25,21 @@ setup() {
   printf '%s\t' "$td/erplora-prod-hub-migrate:14" "$td/erplora-prod-hub-migrate:11" "$td/erplora-prod-hub:13" \
     "$td/erplora-prod-hub:12" "$td/erplora-prod-hub:10" "$td/erplora-prod-hub:9" > "$FIXTURES/list-erplora-prod-hub"
   printf '%s\t' "$td/erplora-prod-worker:12" "$td/erplora-prod-worker:10" > "$FIXTURES/list-erplora-prod-worker"
-  # The app image of a revision: reg.example/erplora/hub:tag-<revision>, unless listed here.
+  # pre: services hub-pre and worker-pre on revision 7 of erplora-pre-{hub,worker}, in the same
+  # cluster; the previous one of each is 5.
+  echo "$td/erplora-pre-hub:7" > "$STATE/primary-hub-pre"
+  echo "$td/erplora-pre-worker:7" > "$STATE/primary-worker-pre"
+  printf '%s\t' "$td/erplora-pre-hub-migrate:8" "$td/erplora-pre-hub:7" "$td/erplora-pre-hub:5" \
+    > "$FIXTURES/list-erplora-pre-hub"
+  printf '%s\t' "$td/erplora-pre-worker:7" "$td/erplora-pre-worker:5" > "$FIXTURES/list-erplora-pre-worker"
+  # The app image of a revision: reg.example/erplora/hub:tag-<revision> (prod) or
+  # reg.example/erplora/hub-pre:tag-<revision> (pre), unless listed here as "<arn> <image>".
   : > "$FIXTURES/images"
+  # Its Environment tag: the environment of its family, unless listed here as "<arn> <value>"
+  # ("<arn> -" = no tag). Its task and execution roles: erplora-<env>-<name>-task and -execution,
+  # unless listed here as "<arn> <role ARN>" (both roles).
+  : > "$FIXTURES/environments"
+  : > "$FIXTURES/roles"
 
   # Fails after 500 pauses: a rollout loop that never times out fails its test instead of hanging.
   cat > "$work/bin/sleep" <<'FAKE'
@@ -80,9 +93,29 @@ case "$1 $2" in
     echo
     ;;
   "ecs describe-task-definition")
+    # As `describe-task-definition --include TAGS --output json` answers; its container is named
+    # after the family's short name (erplora-pre-hub → hub).
     arn="$(value --task-definition)"
+    family="${arn##*/}"
+    family="${family%:*}"
+    environment="$(cut -d- -f2 <<< "$family")"
+    name="$(cut -d- -f3- <<< "$family")"
+    repository=hub
+    if [ "$environment" = pre ]; then repository=hub-pre; fi
     image="$(awk -v arn="$arn" '$1 == arn { print $2 }' "$FIXTURES/images")"
-    echo "${image:-reg.example/erplora/hub:tag-${arn##*:}}"
+    tag="$(awk -v arn="$arn" '$1 == arn { print $2 }' "$FIXTURES/environments")"
+    role="$(awk -v arn="$arn" '$1 == arn { print $2 }' "$FIXTURES/roles")"
+    jq -n --arg name "$name" --arg image "${image:-reg.example/erplora/$repository:tag-${arn##*:}}" \
+      --arg environment "${tag:-$environment}" \
+      --arg task_role "${role:-arn:aws:iam::123456789012:role/$family-task}" \
+      --arg execution_role "${role:-arn:aws:iam::123456789012:role/$family-execution}" '{
+      taskDefinition: {
+        containerDefinitions: [{name: $name, image: $image}, {name: "pgbouncer", image: $image}],
+        taskRoleArn: $task_role, executionRoleArn: $execution_role
+      },
+      tags: ([{key: "Project", value: "erplora"}]
+        + (if $environment == "-" then [] else [{key: "Environment", value: $environment}] end))
+    }'
     ;;
   "ecs update-service")
     service="$(value --service)"
@@ -98,16 +131,16 @@ FAKE
   chmod +x "$work/bin/aws" "$work/bin/sleep"
 }
 
-# run_rollback [VAR=value...]: rolls back with the fake and CONFIRM=ROLLBACK; the arguments override.
+# run_rollback [VAR=value...]: rolls prod back with the fake and CONFIRM=ROLLBACK; the arguments override.
 run_rollback() {
   env -u CLUSTER -u POLL_SECONDS -u ROLLOUT_TIMEOUT_SECONDS \
-    PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK "$@" \
+    PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK ENVIRONMENT=prod "$@" \
     bash "$here/ecs-rollback.sh" > "$work/out.log" 2>&1
 }
 
 # run_rollback_without <VAR>: the same with <VAR> unset.
 run_rollback_without() {
-  env PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK \
+  env PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK ENVIRONMENT=prod \
     env -u "$1" bash "$here/ecs-rollback.sh" > "$work/out.log" 2>&1
 }
 
@@ -158,13 +191,75 @@ check "the rollback waits for both services to be stable" \
   '[ "$(line_of "wait services-stable .*--services hub worker")" -gt "$(last_line_of "update-service")" ]'
 check "after the wait, each service's PRIMARY deployment is checked" \
   'for s in hub worker; do [ "$(last_line_of "describe-services .*--services $s ")" -gt "$(line_of "wait services-stable")" ] || exit 1; done'
-check "the image tag is read from the restored revision" \
-  'grep -q "describe-task-definition --task-definition $td/erplora-prod-hub:10 " "$CALLS_LOG"'
+check "the image tag is read from the restored revision, with its tags" \
+  'grep -q "describe-task-definition --task-definition $td/erplora-prod-hub:10 --include TAGS " "$CALLS_LOG"'
 check "the restored tag is recorded in SSM" \
   'grep -q "^ssm put-parameter --name /erplora/prod/hub/image_tag --value tag-10 --type String --overwrite" "$CALLS_LOG"'
 check "the tag is recorded only after the services are checked" \
   '[ "$(line_of "ssm put-parameter")" -gt "$(last_line_of "describe-services")" ]'
 check "every aws call names the region" '[ -s "$CALLS_LOG" ] && ! grep -qv -- "--region eu-south-2" "$CALLS_LOG"'
+check "nothing of pre is touched" '! grep -Eq "erplora-pre|-pre |/erplora/pre/" "$CALLS_LOG"'
+
+# --- pre: its own services, families and tag, in the same cluster ------------------------
+setup
+run_rollback ENVIRONMENT=pre && status=0 || status=$?
+check "pre: the rollback succeeds" '[ "$status" -eq 0 ]'
+check "pre: lists only pre's families" \
+  '[ "$(grep -c "list-task-definitions" "$CALLS_LOG")" -eq 2 ] &&
+   for f in hub worker; do grep -q "list-task-definitions --family-prefix erplora-pre-$f --status ACTIVE" "$CALLS_LOG" || exit 1; done'
+check "pre: rolls back only hub-pre and worker-pre, to their previous revisions" \
+  '[ "$(grep -c "update-service" "$CALLS_LOG")" -eq 2 ] &&
+   grep -q "update-service --cluster erplora-prod --service hub-pre --task-definition $td/erplora-pre-hub:5 " "$CALLS_LOG" &&
+   grep -q "update-service --cluster erplora-prod --service worker-pre --task-definition $td/erplora-pre-worker:5 " "$CALLS_LOG"'
+check "pre: a rollback does not wake pre up" '! grep -q "desired-count" "$CALLS_LOG"'
+check "pre: waits for hub-pre and worker-pre" 'grep -Eq "wait services-stable .*--services hub-pre worker-pre( |$)" "$CALLS_LOG"'
+check "pre: records the restored tag in its own parameter" \
+  'grep -q "^ssm put-parameter --name /erplora/pre/hub/image_tag --value tag-5 --type String --overwrite" "$CALLS_LOG"'
+check "pre: never names a prod family, service or parameter" \
+  '! grep -Eq "erplora-prod-|/erplora/prod/|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG"'
+setup
+echo "$td/erplora-pre-hub:5 reg.example/erplora/hub:tag-5" > "$FIXTURES/images"
+run_rollback ENVIRONMENT=pre && status=0 || status=$?
+check "pre: a previous revision on prod's repository fails without changing anything" \
+  '[ "$status" -ne 0 ] && ! grep -Eq "update-service|put-parameter" "$CALLS_LOG" && grep -q "erplora/hub-pre" "$work/out.log"'
+setup
+echo "$td/erplora-prod-hub:12" > "$STATE/primary-hub-pre"
+run_rollback ENVIRONMENT=pre && status=0 || status=$?
+check "pre: a pre service on a prod revision fails without changing anything" \
+  '[ "$status" -ne 0 ] && ! grep -Eq "update-service|put-parameter" "$CALLS_LOG" && grep -q "::error::hub-pre .*erplora-pre-hub" "$work/out.log"'
+
+# --- a target revision of another environment is refused, before changing anything ------
+# refused_target <revision>: the rollback failed naming <revision> and changed nothing.
+refused_target() {
+  [ "$status" -ne 0 ] && ! grep -Eq "update-service|put-parameter" "$CALLS_LOG" &&
+    grep -q "::error::$1 is no revision of .*nothing was changed" "$work/out.log"
+}
+setup
+echo "$td/erplora-prod-worker:10 pre" > "$FIXTURES/environments"
+run_rollback && status=0 || status=$?
+check "prod: a previous revision tagged Environment=pre is refused" 'refused_target "$td/erplora-prod-worker:10"'
+setup
+echo "$td/erplora-prod-hub:10 -" > "$FIXTURES/environments"
+run_rollback && status=0 || status=$?
+check "prod: a previous revision without the Environment tag is refused" 'refused_target "$td/erplora-prod-hub:10"'
+setup
+echo "$td/erplora-pre-worker:5 arn:aws:iam::123456789012:role/erplora-prod-worker-task" > "$FIXTURES/roles"
+run_rollback ENVIRONMENT=pre && status=0 || status=$?
+check "pre: a previous revision with prod roles is refused" 'refused_target "$td/erplora-pre-worker:5"'
+check "the error says what the revision carries" \
+  'grep -q "Environment=pre, task role arn:aws:iam::123456789012:role/erplora-prod-worker-task" "$work/out.log"'
+
+# --- the environment ----------------------------------------------------------------
+for environment in "" dev PROD; do
+  setup
+  run_rollback ENVIRONMENT="$environment" && status=0 || status=$?
+  check "ENVIRONMENT '$environment' fails before any aws call" \
+    '[ "$status" -ne 0 ] && [ ! -s "$CALLS_LOG" ] && grep -q "::error::ENVIRONMENT" "$work/out.log"'
+done
+setup
+run_rollback_without ENVIRONMENT && status=0 || status=$?
+check "without ENVIRONMENT it fails before any aws call" \
+  '[ "$status" -ne 0 ] && [ ! -s "$CALLS_LOG" ] && grep -q "::error::ENVIRONMENT" "$work/out.log"'
 
 # --- nothing to roll back to ----------------------------------------------------------
 setup

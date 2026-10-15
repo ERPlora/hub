@@ -1,0 +1,80 @@
+name: test
+
+# The test job of every push (ci.yml on any branch but main and pre; deploy.yml on main and pre
+# before it deploys): workflow and script lints, the script tests, pytest and the SPA's lint,
+# typecheck, Vitest and build. Called as the job `test`, its check is "test / test".
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: hub
+          POSTGRES_PASSWORD: hub
+          POSTGRES_DB: hub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hub -d hub"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      # DEBUG is off unless set: the suite runs with the development settings, like a local .env.
+      DEBUG: "True"
+      # The defaults of config/settings.py, spelled out; pytest creates test_hub_next.
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_NAME: hub
+      DB_USER: hub
+      DB_PASSWORD: hub
+    steps:
+      # packages/live and packages/ui are public submodules (ERPlora/live, ERPlora/ui): no token.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Lint the workflows (actionlint)
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check --strict -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+      - name: Lint the scripts (shellcheck)
+        run: shellcheck .github/scripts/*.sh
+      - name: Script tests
+        run: for t in .github/scripts/*.test.sh; do bash "$t"; done
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      # --locked: uv.lock must match pyproject.toml.
+      - run: uv sync --locked
+      - run: uv run --locked pytest -q
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.34.7 # the Dockerfile's PNPM_VERSION and package.json's packageManager
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build

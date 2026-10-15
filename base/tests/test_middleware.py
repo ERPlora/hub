@@ -12,6 +12,8 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from django.urls import clear_script_prefix, set_script_prefix
 
+from base import health
+
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
 
 HTML = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -139,6 +141,41 @@ def test_the_login_callback_of_a_host_that_is_no_hub_is_not_found(client):
 def test_health_still_answers_on_a_reserved_host(client):
     # hub.localhost is reserved, not the platform host (hubs.localhost, PLAN §18.1).
     assert browse(client, "/healthz", "hub.localhost:8000").status_code == 200
+
+
+# HUB_BASE_DOMAIN (plan 2026-10-14-entorno-pre, H-2): prod's Hub (erplora.com) never serves a host of
+# pre (x.pre.erplora.com), which the ALB's wildcard *.erplora.com would also match; /readyz still
+# answers on every host Django accepts, the private name included.
+PROD_HOSTS = [".erplora.com", "hub.erplora.internal"]
+
+
+@pytest.fixture
+def prod_domain(settings):
+    settings.ALLOWED_HOSTS = PROD_HOSTS
+    settings.HUB_BASE_DOMAIN = "erplora.com"
+    settings.LIVE = {**settings.LIVE, "hub_slug_min_length": 3}
+
+
+@pytest.mark.usefixtures("prod_domain")
+def test_with_a_base_domain_the_pages_of_another_domain_are_not_found(client, superuser):
+    assert browse(client, "/demo/items", "acme.erplora.com")["Location"].startswith(SAAS_LOGIN)
+    for host in ("acme.pre.erplora.com", "pre.erplora.com", "erplora.com"):
+        assert browse(client, "/demo/items", host).status_code == 404
+        api = client.get("/api/me", HTTP_HOST=host)
+        assert (api.status_code, api.json()["error"]["code"]) == (404, "not_found")
+    # pre's platform host is no platform host of prod: its admin is not found, even for the staff.
+    client.force_login(superuser)
+    assert browse(client, "/admin/", "hubs.pre.erplora.com").status_code == 404
+    assert browse(client, "/admin/", "hubs.erplora.com").status_code == 200
+
+
+@pytest.mark.usefixtures("prod_domain")
+@pytest.mark.parametrize("host", ["hub.erplora.internal:8000", "hubs.erplora.com", "acme.erplora.com"])
+def test_readyz_still_answers_on_the_private_name(client, host):
+    health.forget_readiness()
+    response = client.get("/readyz", HTTP_HOST=host)
+    assert (response.status_code, response.json()) == (200, {"status": "ok"})
+    health.forget_readiness()
 
 
 # The Hub admin lives only on the platform host (PLAN §18.1.3): on a hub host and on a host that is no

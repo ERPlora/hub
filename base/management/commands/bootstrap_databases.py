@@ -5,8 +5,9 @@ Runs ``base.tenancy.bootstrap`` as the RDS master (``DB_NAME=postgres``) with th
 per step, never a password. A missing variable or a failed step exits non-zero (a
 ``CommandError``), which the infra's ``task_failed`` rule reports. In local mode (``DEBUG``) a
 template extension the server lacks (``vector`` on ``postgres:17``) is a warning; in production it
-fails. ``--prefix`` names every database and role apart (tests and rehearsals; production runs
-without it).
+fails. ``--prefix`` names every database and role apart: ``--prefix pre_`` is the pre environment
+(``pre_hub``, ``pre_saas``, ``pre_hub_app``…, in prod's cluster; plan 2026-10-14-entorno-pre), and
+any other prefix is for tests and rehearsals. Production runs without it.
 """
 
 import logging
@@ -29,7 +30,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--prefix",
             default="",
-            help="Put this prefix in front of every database and role (tests and rehearsals only).",
+            help=(
+                "Put this prefix in front of every database and role: pre_ for the pre environment, "
+                "anything else for tests and rehearsals."
+            ),
         )
 
     def handle(self, *args, prefix: str = "", **options):

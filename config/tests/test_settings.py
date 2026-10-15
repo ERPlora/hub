@@ -12,6 +12,7 @@ import decouple
 import pytest
 from django.conf import settings
 from django.core.cache import CacheHandler
+from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import mailers
 from django.test import RequestFactory, override_settings
 from live.csp import base_policy, debug_policy
@@ -55,6 +56,8 @@ ENV_KEYS = (
     "APP_RELEASED_AT",
     "WORKBOOK_TRANSLATION_MODEL",
     "TEST_DB_NAME",
+    "ERPLORA_ENVIRONMENT",
+    "HUB_BASE_DOMAIN",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -333,6 +336,47 @@ def test_the_cache_is_valkey_when_set_else_local_memory(load_settings):
             "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
         }
     }
+
+
+# ── The environment: prod or pre, the team's pre-production on the same Valkey (plan 2026-10-14) ──
+
+VALKEY_ENV = {"VALKEY_URL": "rediss://cache.example:6379"}
+
+
+def test_the_environment_defaults_to_prod_and_keeps_the_hub_cache_prefix(load_settings):
+    # A task without ERPLORA_ENVIRONMENT is prod's, with the cache keys it has always had.
+    loaded = load_settings(**PRODUCTION_ENV, **VALKEY_ENV)
+    assert loaded["ERPLORA_ENVIRONMENT"] == "prod"
+    assert loaded["CACHES"]["default"]["KEY_PREFIX"] == "hub"
+    loaded = load_settings(**PRODUCTION_ENV, **VALKEY_ENV, ERPLORA_ENVIRONMENT="prod")
+    assert loaded["CACHES"]["default"]["KEY_PREFIX"] == "hub"
+    assert load_settings(**DEVELOPMENT_ENV)["ERPLORA_ENVIRONMENT"] == "prod"
+
+
+def test_pre_prefixes_every_cache_key(load_settings):
+    # pre and prod share one Valkey: with prod's prefix, pre would read and overwrite its keys.
+    loaded = load_settings(**PRODUCTION_ENV, **VALKEY_ENV, ERPLORA_ENVIRONMENT="pre")
+    assert loaded["ERPLORA_ENVIRONMENT"] == "pre"
+    assert loaded["CACHES"]["default"]["KEY_PREFIX"] == "pre-hub"
+    cache = CacheHandler(loaded["CACHES"])["default"]
+    assert cache.make_key("throttle") == "pre-hub:1:throttle"
+
+
+@pytest.mark.parametrize("environment", ["dev", "PRE", "production", " pre", ""])
+def test_an_unknown_environment_refuses_to_start(load_settings, environment):
+    with pytest.raises(ImproperlyConfigured, match="ERPLORA_ENVIRONMENT"):
+        load_settings(**PRODUCTION_ENV, ERPLORA_ENVIRONMENT=environment)
+
+
+def test_hub_base_domain_comes_from_the_environment(load_settings):
+    # Production's hubs live under erplora.com, locally under localhost (a.localhost:8000).
+    assert load_settings(**PRODUCTION_ENV)["HUB_BASE_DOMAIN"] == "erplora.com"
+    assert load_settings(**DEVELOPMENT_ENV)["HUB_BASE_DOMAIN"] == "localhost"
+    # pre: <slug>.pre.erplora.com and hubs.pre.erplora.com; written in any case, with dots around.
+    loaded = load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN=".Pre.Erplora.com.")
+    assert loaded["HUB_BASE_DOMAIN"] == "pre.erplora.com"
+    # Empty: no base domain, the hub is the Host's first label wherever it is (before 2026-10-14).
+    assert load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN="")["HUB_BASE_DOMAIN"] == ""
 
 
 @pytest.mark.parametrize("env", [DEVELOPMENT_ENV, PRODUCTION_ENV])

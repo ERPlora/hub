@@ -26,6 +26,10 @@ passwords. Idempotent: every step checks or converges, so N runs leave the same 
 The only module that reaches the server as the master (``tests/test_guardrails.py``): plain
 ``psycopg`` with the ``default`` connection's parameters, in ``autocommit`` (``CREATE DATABASE``
 cannot run in a transaction). Every failure is a ``BootstrapError`` naming its step.
+
+The pre environment (plan 2026-10-14-entorno-pre) runs it in prod's cluster with ``Names.with_prefix
+("pre_")``: ``pre_hub``, ``pre_hub_template``, ``pre_saas`` and the roles ``pre_hub_app``…, apart from
+prod's by owner and by ``REVOKE … FROM PUBLIC``.
 """
 
 import logging
@@ -61,7 +65,7 @@ class BootstrapError(Exception):
 
 @dataclass(frozen=True)
 class Names:
-    """The databases and roles, as production names them; tests prefix them all."""
+    """The databases and roles, as production names them; pre (``pre_``) and the tests prefix them all."""
 
     control: str = "hub"
     template: str = "hub_template"

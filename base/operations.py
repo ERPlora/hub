@@ -1,10 +1,14 @@
 """Context builder of hub-next phase 1 (``settings.LIVE["context_builder"]``).
 
-Scope = first label of the Host (``a.localhost`` → ``a``) when it is a hub's slug (``live.slugs``);
-any other host (a reserved name such as ``hub`` or ``www``, an invalid label, the bare host, an IP) is
-no hub and raises ``Http404``: the SPA, the API, ``/api/live`` and ``/auth/callback`` answer 404.
-The platform host (``settings.PLATFORM_HOST_LABEL``, ``hubs``: the Hub admin, PLAN §18.1) is no hub
-either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
+Scope = the one label of the Host in front of ``settings.HUB_BASE_DOMAIN`` (``a.localhost`` → ``a``,
+``acme.erplora.com`` → ``acme``) when it is a hub's slug (``live.slugs``); any other host (a reserved
+name such as ``hub`` or ``www``, an invalid label, the bare host, an IP, a host of another domain such
+as pre's ``acme.pre.erplora.com`` on prod's Hub) is no hub and raises ``Http404``: the SPA, the API,
+``/api/live`` and ``/auth/callback`` answer 404. prod and pre share one ALB, whose wildcard
+``*.erplora.com`` also matches ``*.pre.erplora.com``: the base domain keeps each Hub on its own hosts.
+An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The platform host
+(``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin, PLAN §18.1)
+is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. This is the only piece phase 2
 replaces (scope = ``use_hub``).
 """
@@ -27,7 +31,9 @@ class HostScopeResolver:
         host = _host_name(request)
         if _is_ip_address(host):
             raise Http404("An IP address is no hub's host.")
-        slug = _first_label(host)
+        slug = _hub_label(host)
+        if slug is None:
+            raise Http404(f"{host!r} is not a host on {settings.HUB_BASE_DOMAIN!r}.")
         try:
             validate_hub_slug(slug)
         except ValueError as exc:
@@ -38,15 +44,21 @@ class HostScopeResolver:
 def is_platform_host(request: HttpRequest) -> bool:
     """Whether the Host is the platform's (``hubs.erplora.com``, locally ``hubs.localhost:8000``)."""
     host = _host_name(request)
-    return not _is_ip_address(host) and _first_label(host) == settings.PLATFORM_HOST_LABEL
+    return not _is_ip_address(host) and _hub_label(host) == settings.PLATFORM_HOST_LABEL
 
 
 def _host_name(request: HttpRequest) -> str:
     return request.get_host().split(":", 1)[0].lower()
 
 
-def _first_label(host: str) -> str:
-    return host.split(".", 1)[0]
+def _hub_label(host: str) -> str | None:
+    """The one label in front of ``HUB_BASE_DOMAIN`` (``acme`` of ``acme.erplora.com``), or ``None``
+    when the host is not exactly one label on it; the first label when there is no base domain."""
+    base_domain = settings.HUB_BASE_DOMAIN
+    if not base_domain:
+        return host.split(".", 1)[0]
+    label, dot, rest = host.partition(".")
+    return label if dot and rest == base_domain else None
 
 
 def _is_ip_address(host: str) -> bool:

@@ -149,3 +149,29 @@ def test_production_fails_when_the_template_extension_is_missing(
 
     with pytest.raises(CommandError, match="vector"):
         run_command(prefix)
+
+
+def test_the_pre_prefix_names_every_database_and_role_the_infra_expects(passwords, monkeypatch):
+    # The db-bootstrap task of pre runs `bootstrap_databases --prefix pre_` with prod's image (plan
+    # 2026-10-14-entorno-pre §1.2): these nine names are the ones its secret erplora/pre/db and the
+    # pre tasks' DB_NAME carry. A prefix, never a suffix: no `hub\_%` pattern of prod reaches them.
+    seen = {}
+
+    def record(*, names, **kwargs):
+        seen["names"] = names
+        return []
+
+    monkeypatch.setattr(bootstrap, "bootstrap", record)
+    run_command("pre_")
+
+    assert seen["names"] == bootstrap.Names(
+        control="pre_hub",
+        template="pre_hub_template",
+        saas="pre_saas",
+        hub_app="pre_hub_app",
+        hub_migrator="pre_hub_migrator",
+        hub_admin="pre_hub_admin",
+        saas_app="pre_saas_app",
+        saas_migrator="pre_saas_migrator",
+        hub_shared="pre_hub_shared",
+    )
