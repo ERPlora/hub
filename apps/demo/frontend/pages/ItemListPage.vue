@@ -9,7 +9,7 @@
 import { DataTable, EmptyState, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonBadge, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonBadge } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -51,6 +51,11 @@ function filterBy(ev: CustomEvent<{ value?: unknown }>): void {
   statusFilter.value = ev.detail.value === 'open' || ev.detail.value === 'done' ? ev.detail.value : 'all';
   goToPage(0);
 }
+/** The table's filters panel (`filterable`): its status filter is the same one. */
+const tableFilters = computed((): Record<string, string> => (statusFilter.value === 'all' ? {} : { status: statusFilter.value }));
+function onFilters(filters: Record<string, string>): void {
+  filterBy(new CustomEvent('ionChange', { detail: { value: filters.status } }));
+}
 const filtered = computed(() => search.value.trim() !== '' || statusFilter.value !== 'all');
 
 const {
@@ -83,7 +88,14 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
 </script>
 
 <template>
-  <AppPage :title="$t('demo.items.title')">
+  <AppPage
+    :title="$t('demo.items.title')"
+    content-layout="fill"
+    :tabs="[
+      { id: 'items', label: $t('demo.items.title'), icon: 'ion:list-outline', to: '/demo/items' },
+      { id: 'new', label: $t('demo.items.new'), icon: 'ion:add', to: '/demo/items/new' },
+    ]"
+  >
     <InlineFeedback
       v-if="status === 'reconnecting'"
       tone="warning"
@@ -107,6 +119,9 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         testid="demo-items"
         server-side
         searchable
+        fill
+        filterable
+        :filters="tableFilters"
         row-clickable
         :rows="result?.rows ?? []"
         :total="result?.total ?? 0"
@@ -121,7 +136,18 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         :labels="{ add: $t('demo.items.new'), loadError: $t('demo.items.loadError'), retry: $t('demo.live.retry') }"
         :columns="[
           { key: 'name', label: $t('demo.items.columns.name'), cell: 'name' },
-          { key: 'status', label: $t('demo.items.columns.status'), cell: 'status' },
+          {
+            key: 'status',
+            label: $t('demo.items.columns.status'),
+            cell: 'status',
+            filter: {
+              type: 'select',
+              options: [
+                { value: 'open', label: $t('demo.status.open') },
+                { value: 'done', label: $t('demo.status.done') },
+              ],
+            },
+          },
           { key: 'line_count', label: $t('demo.items.columns.lines'), cell: 'lines' },
           { key: 'updated_at', label: $t('demo.items.columns.updated'), cell: 'updated' },
         ]"
@@ -131,26 +157,8 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         @row-click="open"
         @add="router.push('/demo/items/new')"
         @retry="refresh()"
+        @filters-change="onFilters"
       >
-        <template #filters>
-          <ion-select
-            data-testid="demo-items-status-filter"
-            interface="popover"
-            :aria-label="$t('demo.items.filter.label')"
-            :value="statusFilter"
-            @ion-change="filterBy"
-          >
-            <ion-select-option value="all">
-              {{ $t('demo.items.filter.all') }}
-            </ion-select-option>
-            <ion-select-option value="open">
-              {{ $t('demo.status.open') }}
-            </ion-select-option>
-            <ion-select-option value="done">
-              {{ $t('demo.status.done') }}
-            </ion-select-option>
-          </ion-select>
-        </template>
         <template #name="{ row }">
           <span
             data-testid="demo-item-name"
