@@ -69,8 +69,11 @@ export async function boot(
     messages: appMessages(catalogues),
     // The hub has no login of its own: the SaaS's, for this hub (Django fills it in spa-config).
     loginPath: config.loginUrl,
-    // The apps of the hub as a grid at `/` (where the login lands without `next`), «Home» in the menu.
+    // The apps of the hub as a grid at `/` (where the login lands without `next`).
     home: true,
+    // The old hub's shell (PLAN-MIGRATIONS §13): no side menu; Back, the «My apps» sheet and the
+    // user are in the topbar.
+    nav: 'launcher',
     // Sign out is the Hub's: a form POST to `/auth/logout`, then the SaaS's logout page.
     userMenu: { logout },
   });

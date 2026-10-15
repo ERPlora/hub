@@ -138,10 +138,18 @@ describe('main.ts', () => {
     expect(shellOptions().loginPath).toBe(LOGIN_URL);
   });
 
-  it("turns the shell's Home on: the apps grid at / (where the login lands) and «Home» first in the menu", async () => {
+  it("turns the shell's Home on: the apps grid at / (where the login lands)", async () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().home).toBe(true);
+  });
+
+  // PLAN-MIGRATIONS §13: the old hub's shell. No side menu at any width; Back, the «My apps» sheet
+  // and the user are in the topbar.
+  it('moves between apps with the topbar launcher, not a side menu', async () => {
+    fakeShell();
+    await main.boot({});
+    expect(shellOptions().nav).toBe('launcher');
   });
 
   it("gives the user menu the Hub's sign out (a form POST to /auth/logout), and nothing else", async () => {
