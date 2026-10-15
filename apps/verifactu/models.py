@@ -105,6 +105,9 @@ class Config(UUIDModel):
         choices=HubStatus.choices,
         default=HubStatus.ACTIVE,
     )
+    # The business's id in ERPlora (the SaaS's ``Hub.id``), told by the photo's path: where the signed authorisation
+    # is sent (VERIFACTU-F05). Phase 2 reads it from the control registry.
+    hub_id = models.UUIDField(_("ERPlora business id"), null=True, blank=True)
     synced_version = models.BigIntegerField(_("synced version"), null=True, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
@@ -642,6 +645,22 @@ EVENT_MESSAGES = {
     "back_to_testing": _("The business went back to the AEAT's test environment."),
     "account_synced": _(
         "Data received from your ERPlora account (version %(version)s)."
+    ),
+    "representation_submitted": _(
+        "Representation authorisation no. %(version)s sent to ERPlora for review."
+    ),
+    "representation_under_review": _(
+        "ERPlora is reviewing the representation authorisation."
+    ),
+    "representation_approved": _(
+        "ERPlora approved the representation authorisation: it can file on your behalf."
+    ),
+    "representation_returned": _(
+        "ERPlora returned the representation authorisation: %(note)s"
+    ),
+    "representation_revoked": _("The representation authorisation was revoked."),
+    "representation_none": _(
+        "ERPlora holds no signed representation authorisation for this business."
     ),
     "xml_invalid": _(
         "Invoice %(invoice_number)s cannot be sent: its XML does not pass the AEAT's schema (%(detail)s)."

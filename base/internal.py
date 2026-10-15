@@ -14,8 +14,9 @@ passes: no downgrade); without v2, by v1. Each signature is checked against ever
 ``/internal``, so the door answers on any host (the SaaS reaches it by the private name, ``hub.erplora.internal``).
 
 Phase 1 has no registry of hubs (``control/``, phase 2): ``PUT /internal/hubs/{id}/state`` (the photo) names its hub
-by ``slug``, and the Hub applies what it already keeps of it, the VeriFactu block and the business's status, through
-``verifactu.config.sync`` on that hub, as the system. While the SaaS may still sign v1 only, a body that names the
+by ``slug``, and the Hub applies what it already keeps of it, the VeriFactu block, the business's status and its id
+in ERPlora (the path's, where the signed authorisation is sent), through ``verifactu.config.sync`` on that hub, as
+the system. While the SaaS may still sign v1 only, a body that names the
 hub of its path (``hub_id`` or ``id``) must name the same one.
 """
 
@@ -164,7 +165,12 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     sync = get_operation("verifactu.config.sync")
     try:
         data = sync.input.model_validate(
-            {**(block or {}), "version": version, "hub_status": status}
+            {
+                **(block or {}),
+                "version": version,
+                "hub_status": status,
+                "hub_id": hub_id,
+            }
         )
     except ValidationError as invalid:
         return _payload_invalid(f"The verifactu block is out of contract: {invalid}")

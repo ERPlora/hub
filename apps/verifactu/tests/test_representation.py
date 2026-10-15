@@ -284,3 +284,58 @@ def test_the_model_without_an_answer_is_unreachable():
     respx.get(MODEL_URL).mock(side_effect=httpx.ConnectError("refused"))
     with pytest.raises(representation.SaasUnreachable):
         representation.model_pdf()
+
+
+# The rules the Hub checks before anything crosses the network (the old Hub's ``validate``, with the contract's 5 MB).
+
+
+@pytest.mark.parametrize(
+    ("nif", "company"),
+    [
+        ("B12345674", True),
+        ("A58818501", True),
+        ("W0184081H", True),
+        ("12345678Z", False),
+        ("X1234567L", False),
+        ("Y1234567X", False),
+        ("Z1234567R", False),
+        ("", False),
+    ],
+)
+def test_a_nif_that_starts_with_an_entity_letter_is_a_legal_person(nif, company):
+    assert representation.is_legal_person_nif(nif) is company
+
+
+def test_the_nif_is_normalised_before_its_first_letter_is_read():
+    assert representation.normalise_nif(" b-12.345.674 ") == "B12345674"
+    assert representation.is_legal_person_nif(" b-12345674") is True
+
+
+def b64(data: bytes) -> str:
+    import base64
+
+    return base64.b64encode(data).decode()
+
+
+def test_a_pdf_within_the_limit_is_a_document():
+    assert representation.document_problem(b64(b"%PDF-1.7 signed")) is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [b64(b"\xff\xd8\xff\xe0 a photo of the sheet"), "not base64 at all!", b64(b"")],
+)
+def test_what_is_uploaded_has_to_be_a_pdf(value):
+    assert representation.document_problem(value) == "not_pdf"
+
+
+def test_an_oversized_document_is_refused_before_it_crosses_the_network():
+    at_limit = b"%PDF" + b"0" * (representation.MAX_DOCUMENT_BYTES - 4)
+    assert representation.document_problem(b64(at_limit)) is None
+    assert representation.document_problem(b64(at_limit + b"0")) == "too_large"
+    # Too long to be 5 MB before anything is decoded.
+    assert representation.document_problem("A" * (representation.MAX_DOCUMENT_CHARACTERS + 4)) == "too_large"
+
+
+def test_the_route_takes_four_documents_at_the_limit_and_the_fields_around_them():
+    assert representation.MAX_BODY_BYTES >= 4 * representation.MAX_DOCUMENT_CHARACTERS + 64 * 1024

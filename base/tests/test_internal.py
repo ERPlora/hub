@@ -184,6 +184,13 @@ def test_the_business_status_travels_on_its_own(client, db):
     assert Config.objects.get().hub_status == "past_due"
 
 
+def test_the_photo_tells_the_hub_its_id_in_erplora(client, db):
+    # Where the signed authorisation is sent (verifactu.representation.submit): POST /internal/hubs/{id}/representation.
+    body = {"slug": "a", "version": 5, "status": "active"}
+    assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 5}
+    assert str(Config.objects.get().hub_id) == HUB_ID
+
+
 def test_an_older_photo_is_ignored(client, db):
     signed(
         client,

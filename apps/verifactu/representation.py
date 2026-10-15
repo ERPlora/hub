@@ -23,6 +23,8 @@ contract: nothing the business can fix). ``httpx``: 5 s to connect and 60 s to r
 5 MB. No message quotes what the request carried: a signed document and the scan of an identity card.
 """
 
+import base64
+import binascii
 import datetime as dt
 import json
 import time
@@ -42,6 +44,16 @@ TIMEOUT = httpx.Timeout(60.0, connect=5.0)
 #: The statuses whose contract error is about the documents, not about this server.
 REFUSALS = (400, 413, 422)
 PDF_MAGIC = b"%PDF"
+#: At most this many bytes per document, decoded (the contract; the old Hub took 10 MB).
+MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
+#: Base64 of ``MAX_DOCUMENT_BYTES``: anything longer is too large before decoding it.
+MAX_DOCUMENT_CHARACTERS = 4 * -(-MAX_DOCUMENT_BYTES // 3)
+#: What the upload's body may weigh: four documents at the limit in base64 and the JSON around them (the SaaS's own
+#: ceiling, ``fiscal.internal.MAX_BODY_BYTES``).
+MAX_BODY_BYTES = 32 * 1024 * 1024
+#: The first letters of a Spanish NIF that belong to an entity, not a person (the AEAT's, as the SaaS's
+#: ``billing.nif``): a company signs through whoever its deeds name, so the proof of that travels too.
+LEGAL_PERSON_LETTERS = frozenset("ABCDEFGHJNPQRSUVW")
 
 
 @dataclass(frozen=True)
@@ -74,6 +86,35 @@ class RepresentationRefused(Exception):
         self.code = code
         self.message = message
         self.fields = dict(fields or {})
+
+
+def normalise_nif(value: str | None) -> str:
+    """Upper case, without the spaces, dashes and dots people type."""
+    return "".join(
+        char for char in (value or "") if not char.isspace() and char not in "-."
+    ).upper()
+
+
+def is_legal_person_nif(value: str | None) -> bool:
+    nif = normalise_nif(value)
+    return bool(nif) and nif[0] in LEGAL_PERSON_LETTERS
+
+
+def document_problem(value: str) -> str | None:
+    """Why a document sent in base64 will not do (``too_large``, ``not_pdf``), or ``None`` when it is a PDF that
+    fits. Recognised by its bytes, never by a name or a claimed type."""
+    value = value.strip()
+    if len(value) > MAX_DOCUMENT_CHARACTERS:
+        return "too_large"
+    try:
+        data = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        return "not_pdf"
+    if len(data) > MAX_DOCUMENT_BYTES:
+        return "too_large"
+    if not data.startswith(PDF_MAGIC):
+        return "not_pdf"
+    return None
 
 
 def _url(path: str) -> str:
