@@ -4,8 +4,10 @@
 // appointment» with a free time; with overlaps off, the same time is refused (server and screen); «By
 // professional» paints the block and a drag moves it one hour; the week board shows it; cancelling asks
 // first; «Charge» opens the check in the till; the series and the customer's «Visit history» show what was
-// booked. Each screen is captured in three viewports. Everything is named «E2E Apt …» and removed before
-// and after; the settings of Citas are read first and put back by API at the end.
+// booked. Each screen is captured in three viewports. CUSTOMER-F25: a customer who is not there yet is
+// created from the same «Customer» search of «New appointment», without leaving the agenda, and what was
+// chosen stays. Everything is named «E2E Apt …» and removed before and after; the settings of Citas are
+// read first and put back by API at the end.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
@@ -22,6 +24,8 @@ function aMonday(): string {
   return day.toISOString().slice(0, 10);
 }
 const DAY = aMonday();
+/** The Tuesday after: a day of its own for the test that does not use the Monday's cast. */
+const NEXT_DAY = new Date(Date.parse(`${DAY}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
 function cleanUp(): void {
   const customers = `select id from customer_customer where name like '${TAG}%'`;
@@ -78,36 +82,47 @@ test.afterAll(async ({ browser }) => {
   }
 });
 
-interface Cast {
-  customer: { id: string; name: string };
+interface Offer {
   service: { id: string; name: string };
   member: { id: string; full_name: string };
 }
 
+interface Cast extends Offer {
+  customer: { id: string; name: string };
+}
+
+/** A fresh mobile number (+34 6…), not on any other card. */
+const aPhone = (): string => `6${String(Date.now()).slice(-8)}`;
+
 /** The cast through each app's own API: a card, a service a professional performs, and an open day. */
 async function cast(context: BrowserContext): Promise<Cast> {
-  const phone = `6${String(Date.now()).slice(-8)}`;
-  const customer = await post<{ id: string; name: string }>(context, '/customer/customers', { name: named('Lucía'), phone });
-  const service = await post<{ id: string; name: string }>(context, '/service/services', {
-    name: named('Haircut'),
+  const customer = await post<{ id: string; name: string }>(context, '/customer/customers', { name: named('Lucía'), phone: aPhone() });
+  return { customer, ...(await offer(context, DAY)) };
+}
+
+/** A service that a professional performs, and `day` open from 09:00 to 18:00, through each app's API.
+ *  Each test names its own (`service`, `member`): the pickers choose by name. */
+async function offer(context: BrowserContext, day: string, service = 'Haircut', member = 'Ana'): Promise<Offer> {
+  const created = await post<{ id: string; name: string }>(context, '/service/services', {
+    name: named(service),
     price: 2000,
     duration_minutes: 30,
     tax_category_key: 'service.generic',
   });
-  const member = await post<{ id: string; full_name: string }>(context, '/staff/members', { first_name: named('Ana'), last_name: 'Stylist' });
-  await post(context, '/service/assignments/assign', { service_id: service.id, member_id: member.id }, 200);
+  const professional = await post<{ id: string; full_name: string }>(context, '/staff/members', { first_name: named(member), last_name: 'Stylist' });
+  await post(context, '/service/assignments/assign', { service_id: created.id, member_id: professional.id }, 200);
   await post(context, '/schedule/special_days', {
-    date: DAY,
+    date: day,
     name: named('Open'),
     is_closed: false,
     intervals: [{ open_time: '09:00', close_time: '18:00' }],
   });
-  return { customer, service, member };
+  return { service: created, member: professional };
 }
 
-async function goToDay(page: Page): Promise<void> {
+async function goToDay(page: Page, day = DAY): Promise<void> {
   const calendar = shown(page).locator('[data-testid=appointment-toolbar-calendar] input');
-  await calendar.fill(DAY);
+  await calendar.fill(day);
   await calendar.press('Tab');
   await expect(shown(page).locator('[data-testid=appointment-toolbar-date]')).not.toBeEmpty();
 }
@@ -119,11 +134,16 @@ async function fillBooking(page: Page, who: Cast): Promise<void> {
   await search.locator('[data-testid=customer-picker-search] input').fill(who.customer.name);
   await search.locator(`[data-testid=customer-picker-result-${who.customer.id}]`).click();
   await expect(search).toBeHidden();
-  await pick(page, 'appointment-form-service-add', who.service.name.split(' ')[2], who.service.name);
-  await pick(page, 'appointment-form-staff', who.member.full_name.split(' ')[2], who.member.full_name);
-  const day = form.locator('[data-testid=appointment-form-day] input');
-  await day.fill(DAY);
-  await day.press('Tab');
+  await chooseServiceStaffAndDay(page, who, DAY);
+}
+
+/** «Services», «Professional» and «Day» of the open «New appointment». */
+async function chooseServiceStaffAndDay(page: Page, what: Offer, day: string): Promise<void> {
+  await pick(page, 'appointment-form-service-add', what.service.name.split(' ')[2], what.service.name);
+  await pick(page, 'appointment-form-staff', what.member.full_name.split(' ')[2], what.member.full_name);
+  const input = page.locator('ion-modal[data-testid=appointment-form] [data-testid=appointment-form-day] input');
+  await input.fill(day);
+  await input.press('Tab');
 }
 
 test('Agenda: book with a free time, an overlap refused, the grid and the week, drag, cancel, charge, series and the card', async ({ browser }) => {
@@ -268,5 +288,70 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     } finally {
       await small.close();
     }
+  }
+});
+
+// flow: CUSTOMER-F25 · gh:appointments#306, #318 — the old picker only searched, so a new customer meant
+// leaving the agenda for Customers and coming back.
+test('CUSTOMER-F25: a new customer from «New appointment» without leaving the agenda; what was chosen stays', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/appointment/agenda');
+  try {
+    const what = await offer(context, NEXT_DAY, 'Colour', 'Bea');
+    await goToDay(page, NEXT_DAY);
+    const view = shown(page);
+    await view.locator('[data-testid=appointment-list-empty], [data-testid=appointment-list-row]').first().waitFor({ state: 'visible' });
+
+    // The service, the professional, the day and a free time first; the customer, last.
+    await view.locator('[data-testid=appointment-list-add]').click();
+    await chooseServiceStaffAndDay(page, what, NEXT_DAY);
+    const form = page.locator('ion-modal[data-testid=appointment-form]');
+    await form.locator('[data-testid=appointment-slots-time]', { hasText: /^10:00\s?AM$/ }).click();
+    const time = form.locator('[data-testid=appointment-form-time] input');
+    await expect(time).toHaveValue('10:00');
+
+    // «Customer»: the name is on no card, so the search offers «+ New customer «…»».
+    const name = named('Marta');
+    await form.locator('[data-testid=customer-search-trigger]').click();
+    const search = page.locator('ion-modal[data-testid=customer-search-modal]');
+    await search.locator('[data-testid=customer-picker-search] input').fill(name);
+    await expect(search.locator('[data-testid=customer-picker-empty]')).toBeVisible();
+    const quickAdd = search.locator('[data-testid=customer-search-quick-add]');
+    await expect(quickAdd).toHaveText(`+ New customer «${name}»`);
+    const sizes = [
+      ['390', { width: 390, height: 844 }],
+      ['834', { width: 834, height: 1112 }],
+      ['1440', { width: 1440, height: 900 }],
+    ] as const;
+    for (const [label, size] of sizes) {
+      await page.setViewportSize(size);
+      await expect(quickAdd).toBeInViewport({ ratio: 1 });
+      await page.screenshot({ path: shot(`CUSTOMER-F25-${label}`) });
+    }
+
+    // Name (what was typed) and phone; «Create and assign» leaves her chosen in the appointment.
+    await quickAdd.click();
+    await expect(search.locator('[data-testid=customer-search-quick-name] input')).toHaveValue(name);
+    const phone = aPhone();
+    await search.locator('[data-testid=customer-search-quick-phone] input').fill(phone);
+    await search.locator('[data-testid=customer-search-quick-submit]').click();
+    await expect(search).toBeHidden();
+    await expect(form.locator('[data-testid=customer-search-trigger]')).toHaveText(name);
+    await expect(form.locator('[data-testid=appointment-form-services] ion-chip')).toHaveText([what.service.name]);
+    await expect(form.locator('[data-testid=appointment-form-staff] input')).toHaveValue(what.member.full_name);
+    await expect(form.locator('[data-testid=appointment-form-day] input')).toHaveValue(NEXT_DAY);
+    await expect(time).toHaveValue('10:00');
+
+    // «Add appointment» books it with her; her card is a walk-in («En el local») with the phone.
+    await form.locator('[data-testid=appointment-form-submit]').click();
+    await expect(view.locator('[data-testid=appointment-list-row]', { hasText: name })).toContainText(what.member.full_name);
+    const card = JSON.parse(psql(`select row_to_json(c) from (select id, source, phone from customer_customer where name = '${name}') c`)) as {
+      id: string;
+      source: string;
+      phone: string;
+    };
+    expect([card.source, card.phone]).toEqual(['walk_in', `+34${phone}`]);
+    expect(psql(`select count(*) from appointment_appointment where customer_id = '${card.id}' and staff_id = '${what.member.id}'`)).toBe('1');
+  } finally {
+    await context.close();
   }
 });
