@@ -36,7 +36,7 @@ const CONFIG: ConfigOut = {
   declaration_version: 'v1',
   declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
   account_url: 'https://erplora.com',
-  own_certificate: { loaded: false, holder: '', uploaded_at: null, expires_at: null, expires_in_days: null },
+  own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null },
   representation: { status: 'none', updated_at: null, reason: '' },
   synced_at: null,
   route_ready: true,
@@ -78,6 +78,11 @@ describe('SettingsPage', () => {
     await ionValue(s.find('verifactu-settings-own').element, true);
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/verifactu/config', query: {}, body: { route: 'own' } }]);
     expect(toastSuccess).toHaveBeenCalledWith('Done: from now on you send with your own certificate.');
+  });
+
+  it('with the own route it says the certificate is the one uploaded in Configuration', async () => {
+    const s = await setup({ route: 'own' });
+    expect(s.find('verifactu-settings-route-hint').text()).toContain('uploaded in Configuration → My certificate');
   });
 
   it('a refused switch says why', async () => {

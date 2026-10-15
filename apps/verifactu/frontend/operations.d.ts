@@ -10,6 +10,7 @@ export type RecordStatus = 'pending' | 'sent' | 'accepted' | 'accepted_with_erro
 export type RecordType = 'alta' | 'anulacion';
 export type Environment = 'testing' | 'production';
 export type Route = 'erplora' | 'own';
+export type CertificateKind = 'seal' | 'representative' | 'personal' | 'unknown';
 export type InvoiceType = 'F1' | 'F2' | 'F3' | 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
 export type EventKind =
   | 'record_created'
@@ -233,6 +234,8 @@ export interface ConfigOut {
   own_certificate: {
     loaded: boolean;
     holder: string;
+    holder_tax_id: string;
+    kind: CertificateKind | '';
     uploaded_at: string | null;
     expires_at: string | null;
     expires_in_days: number | null;
@@ -301,6 +304,8 @@ declare module '@erplora/ui/sdk' {
     'verifactu.config.update': { input: { route: Route }; output: ConfigOut };
     'verifactu.config.go_live': { input: NoInput; output: ConfigOut };
     'verifactu.config.back_to_testing': { input: NoInput; output: ConfigOut };
+    'verifactu.certificate.upload': { input: { p12_base64: string; password: string }; output: ConfigOut };
+    'verifactu.certificate.remove': { input: NoInput; output: ConfigOut };
     'verifactu.record.list': { input: RecordListIn; output: Page<RecordRowOut> };
     'verifactu.record.get': { input: RecordRefIn; output: RecordOut };
     'verifactu.record.by_invoice': { input: { invoice_id: string }; output: { record: RecordSummaryOut | null } };
