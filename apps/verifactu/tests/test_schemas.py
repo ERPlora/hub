@@ -1,6 +1,7 @@
 """The inputs of the verifactu app's operations: what each one accepts and the 422 of what it does not (the same
 schema the route, the live subscription and the assistant validate with)."""
 
+import base64
 import datetime as dt
 import uuid
 
@@ -155,3 +156,14 @@ def test_the_accounts_photo():
 def test_an_aeat_query_month_is_one_to_twelve():
     assert "month" in refused(schemas.AeatQueryIn, {"month": 13})
     assert schemas.AeatQueryIn.model_validate({"year": 2026, "month": 8}).month == 8
+
+
+def test_a_certificate_file_is_one_mb_at_most():
+    # As the screen says (ConfigPage: 1024 × 1024 bytes): a larger file is no certificate, refused before it is read.
+    one_mb = base64.b64encode(b"\0" * (1024 * 1024)).decode()
+    larger = base64.b64encode(b"\0" * (1024 * 1024 + 1)).decode()
+
+    assert schemas.CertificateUploadIn.model_validate({"p12_base64": one_mb})
+    errors = refused(schemas.CertificateUploadIn, {"p12_base64": larger})
+    assert list(errors) == ["p12_base64"]
+    assert "1 MB" in errors["p12_base64"]

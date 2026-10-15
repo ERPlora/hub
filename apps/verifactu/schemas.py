@@ -29,6 +29,9 @@ T = TypeVar("T")
 WHICH_RECORD = _("Say which record: its id or the number of its invoice.")
 WHICH_INVOICE = _("Say which invoice: its id or its number.")
 FINGERPRINT_INVALID = _("The fingerprint must be 64 hexadecimal characters.")
+CERTIFICATE_TOO_LARGE = _("The certificate file has to be 1 MB at most.")
+#: The largest .p12/.pfx taken (as the screen says, ConfigPage): a larger file is no certificate.
+MAX_CERTIFICATE_BYTES = 1024 * 1024
 RECORD_ID = "Id of the record."
 INVOICE_NUMBER = "Number of the invoice (e.g. TICKET-2026-000012): its latest record."
 ISSUER_NIF = "Tax ID of the issuer (Invoicing's issuer when left out)."
@@ -682,6 +685,16 @@ class CertificateUploadIn(Schema):
         description="The .p12/.pfx file of the certificate, in base64 (at most 1 MB)."
     )
     password: SecretStr = Field(SecretStr(""), description="The certificate's password.")
+
+    @field_validator("p12_base64")
+    @classmethod
+    def _at_most_one_mb(cls, value: SecretStr) -> SecretStr:
+        """Measured on the base64 itself, before anything is decoded: what it would decode to."""
+        text = "".join(value.get_secret_value().split())
+        size = len(text) * 3 // 4 - (len(text) - len(text.rstrip("=")))
+        if size > MAX_CERTIFICATE_BYTES:
+            raise ValueError(str(CERTIFICATE_TOO_LARGE))
+        return value
 
 
 class ConfigUpdateIn(Schema):

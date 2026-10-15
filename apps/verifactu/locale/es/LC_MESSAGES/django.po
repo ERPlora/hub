@@ -1046,3 +1046,7 @@ msgstr "ERPlora no ha admitido el otorgamiento tal como está."
 #: apps/verifactu/services.py
 msgid "ERPlora has not linked this business yet. Try again in a few minutes."
 msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."
+
+#: apps/verifactu/schemas.py
+msgid "The certificate file has to be 1 MB at most."
+msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
