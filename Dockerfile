@@ -83,10 +83,12 @@ ARG APP_VERSION=""
 ARG APP_RELEASED_AT=""
 ENV APP_VERSION=${APP_VERSION} \
     APP_RELEASED_AT=${APP_RELEASED_AT}
+# XDG_CACHE_HOME: Fontconfig's cache (WeasyPrint) in /tmp, the only writable place.
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DJANGO_SETTINGS_MODULE=config.settings
+    DJANGO_SETTINGS_MODULE=config.settings \
+    XDG_CACHE_HOME=/tmp/.cache
 USER 10001
 EXPOSE 8000
 # The ALB idle timeout is 120 s; Twisted keeps idle connections far longer, so the ALB always
