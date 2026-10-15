@@ -194,6 +194,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
 | INVOICE-F22 | Recibir el emisor de la cuenta de ERPlora | servidor hecho; la foto del SaaS todavía no lleva el emisor |
+| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho (servidor; sin pantalla); en la fase 1 no se da de alta donde factura un negocio real |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 Estado: hecho — Ventas lo emite al cobrar, dentro de la transacción del cobro (`sale.sale.complete` → `invoice.invoice.create_from_sale`; en curso en Ventas); la reacción del outbox (`events.REACTIONS`) queda de respaldo (fase 2)
@@ -777,7 +778,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     sujeta S1 a su tipo; `oss` (régimen 17), `reverse_charge` y `not_subject` → no sujeta por
     localización (N2), y `exempt` → E1; todas sin tipo ni cuota (error 1237 de la AEAT), con el importe
     entero de la línea como base. Por eso en una venta OSS la cabecera de Facturación es base = total y
-    cuota 0 (el IVA de otro Estado no lo recauda la AEAT); la nota del documento dice «IVA 19 % (DE)».
+    cuota 0 (el IVA de otro Estado no lo recauda la AEAT); la nota del documento dice «IVA 19 % (DE)». No
+    lleva el aviso «VAT included — customer VAT number could not be verified» del PDF antiguo (queda fuera).
   - **Notas**: el aviso que imprimía la factura antigua (inversión del sujeto pasivo, OSS, no sujeta), en
     el idioma del pagador.
   - **Número**: el del SaaS tal cual; `sequence` = sus últimas cifras; la serie `ERP`/`ERPR` del año nace
@@ -798,7 +800,9 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual con la definición del servicio `hub` y el comando
   `python manage.py create_platform_hub --execute` (primero sin `--execute` para ver lo que hará). En
-  la fase 2 añade la fila del registro (`is_platform`) y su BD, como cualquier alta.
+  la fase 2 añade la fila del registro (`is_platform`) y su BD, como cualquier alta. ⚠️ **En la fase 1 hay
+  una sola BD**: el emisor que pone sería el de todos los hosts, así que no se lanza en un despliegue donde
+  factura un negocio real hasta que haya una BD por hub (PLAN-HUB §4, ronda 2026-10-15c).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,
