@@ -237,6 +237,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F32 | Impedir apagar la app con registros sin enviar | servidor listo (`verifactu.stats.compliance_summary`); el apagado de apps es de la plataforma (fase 2) |
 | VERIFACTU-F33 | Cesar la actividad | no hecho — la baja censal es del negocio, fuera de ERPlora |
 | VERIFACTU-F34 | Renovar el certificado propio | hecho — en el Hub (subir el renovado sustituye al anterior) |
+| VERIFACTU-F35 | Preguntar a la AEAT si ya tiene un registro de la cola | hecho en el admin del Hub y en la API; botón de la SPA pendiente; necesita la pasarela del SaaS |
 
 ### VERIFACTU-F01 Activar VeriFactu
 Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2)
@@ -652,10 +653,12 @@ Actor: ninguno
 Pantalla: ninguna
 Pasos:
 1. Un registro que está en la cola tiene que llegar a la AEAT (FAQ §5); uno aceptado ya no está en la cola.
+2. Lo único que sale de la cola sin un envío nuevo es lo que la AEAT **ya tiene**, preguntándoselo
+   (VERIFACTU-F35); un rechazo se subsana con un registro nuevo (VERIFACTU-F24).
 Entra: nada.
 Sale: nada.
 Si falla: no aplica.
-Implicados: ninguno
+Implicados: VERIFACTU-F24, VERIFACTU-F35
 
 ### VERIFACTU-F24 Actuar ante un registro rechazado por la AEAT
 Estado: hecho
@@ -829,6 +832,25 @@ su clave de almacenamiento y no puede abrir el guardado, esperan con «tu certif
 en este servidor: vuelve a subirlo».
 Implicados: VERIFACTU-F02
 
+### VERIFACTU-F35 Preguntar a la AEAT si ya tiene un registro de la cola
+Estado: hecho — en el admin de Django del Hub (soporte) y por la API; en la SPA, pendiente de botón
+Actor: responsable, administrador (enviar); el staff de ERPlora desde el admin
+Pantalla: admin de Django (`hubs.erplora.com/admin`, Registros → «Consultar a la AEAT (sale de la cola si ya lo
+tiene)»)
+Pasos:
+1. Un registro se quedó «enviado, sin respuesta» (o pendiente) y puede que la AEAT ya lo tenga.
+2. Se consulta a la AEAT, por la pasarela de ERPlora, el emisor del registro en el mes de su fecha de expedición
+   (como VERIFACTU-F27, que renueva la última foto).
+3. Si la AEAT devuelve **ese mismo registro** (mismo emisor, número y huella), sale de la cola como «Aceptado» o
+   «Aceptado con errores», según lo que diga la AEAT, sin perder sus intentos; queda un evento con quién lo hizo.
+4. Si no lo tiene (o tiene otro registro de la misma factura, p. ej. el original de una subsanación), no cambia
+   nada: sigue en la cola y se envía en la siguiente pasada.
+Entra: el registro (id o número de su factura).
+Sale: si la AEAT lo tenía y el registro (avisa `verifactu.record.reconciled`; la consulta, `verifactu.aeat.queried`).
+Si falla: un registro aceptado o rechazado no está en la cola: «Este registro no está en la cola.»; sin pasarela o
+si la AEAT no contesta, el motivo de la pasarela, y el registro sigue en la cola.
+Implicados: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia persona)
@@ -865,6 +887,7 @@ Todas se pueden seguir en vivo.
 | Envía ya un registro (y los anteriores de su cadena) | enviar | F25 | `verifactu.record.transmit` |
 | Hace la pasada de envío de la cola (también la tarea de cada minuto) | enviar | F20, F21 | `verifactu.contingency.process` |
 | Pone un registro a salir en la siguiente pasada | enviar | F22 | `verifactu.contingency.retry` |
+| Pregunta a la AEAT si ya tiene un registro de la cola; si lo tiene, sale de la cola como registrado | enviar | F35 | `verifactu.record.reconcile` |
 | Verifica la cadena de huellas | ver | F26 | `verifactu.chain.validate` |
 | Consulta a la AEAT los registros del mes | enviar | F27 | `verifactu.aeat.query` |
 | Recupera la cadena desde la AEAT | configurar | F28 | `verifactu.chain.recover_from_aeat` |
@@ -891,6 +914,7 @@ Todas se pueden seguir en vivo.
 | Aceptado con errores | La AEAT lo registra con un error | lo mismo | `verifactu.record.accepted_with_errors` |
 | Cola procesada | Una pasada (a mano o programada) | `sent`, `accepted`, `rejected`, `waiting` | `verifactu.contingency.processed` |
 | Registro reprogramado | «Reintentar» | `record_id` | `verifactu.contingency.retried` |
+| Registro conciliado | La AEAT ya tenía un registro de la cola (VERIFACTU-F35) | `record_id`, `invoice_number`, `status`, `environment` | `verifactu.record.reconciled` |
 | Cadena verificada | «Validar cadena» | `issuer_nif`, `environment`, `valid`, `total`, `first_invalid_sequence` | `verifactu.chain.validated` |
 | Cadena recuperada | Recuperar desde la AEAT o a mano | `issuer_nif`, `environment`, `sequence`, `source` | `verifactu.chain.recovered` |
 | Consulta a la AEAT | «Consultar AEAT» | `issuer_nif`, `count` | `verifactu.aeat.queried` |
@@ -1148,30 +1172,50 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 
 ### Administrador de Django
 
-Solo para el staff de la plataforma (`hubs.erplora.com/admin`, con el hub elegido en `/admin/hub/<slug>/`). **Nada
-fiscal se teclea**: los siete modelos (configuración, certificado propio, cabeza de cadena, control de envío por
-`(NIF, entorno)`, registros, eventos y foto de la AEAT) se ven enteros y en solo lectura, sin alta, cambio ni
-borrado (un `POST` al formulario de un registro contesta 403).
+Solo para el staff de la plataforma (`hubs.erplora.com/admin`, con el hub elegido en `/admin/hub/<slug>/`), **al
+servicio del soporte**. Criterio de Ioan (2026-10-15): «un registro no enviado no es un registro registrado; no se
+trata de borrar una venta, se trata de poder arreglar si hay un problema de envío, poder reenviar y cosas que se
+necesitan para el soporte». Por eso:
 
+- **Lo registrado en la AEAT no se toca.** Un registro aceptado o aceptado con errores, las cabezas de cadena, los
+  eventos, la foto de la AEAT y el certificado propio se ven enteros y en solo lectura, sin alta, cambio ni borrado
+  (un `POST` al formulario de un registro contesta 403). Ninguna acción cambia un registro registrado: lo dice y
+  sigue. Del certificado se ve titular, tipo y caducidad, nunca el material sellado.
+- **Lo no registrado (pendiente, enviado sin respuesta, rechazado) se arregla con acciones que son operaciones**,
+  con el hub elegido y el staff como actor (cada una deja su evento con quién la hizo y un resumen en/es al
+  terminar). Sin hub elegido, ninguna hace nada y lo dice.
+  - **«Reenviar a la AEAT»** → `verifactu.record.transmit`: envía ya cada cadena una vez (el registro más reciente
+    elegido arrastra los anteriores), respetando la espera de la AEAT. «Reenvío terminado: N aceptados, N
+    rechazados, N aún en espera.».
+  - **«Reprogramar: enviar en la próxima pasada»** → `verifactu.contingency.retry` (VERIFACTU-F22): el registro y
+    los anteriores de su cadena salen en la pasada siguiente (la tarea de cada minuto), sin perder sus intentos.
+    «Reprogramado: N registro(s) salen en la próxima pasada.».
+  - **«Consultar a la AEAT (sale de la cola si ya lo tiene)»** → `verifactu.record.reconcile` (VERIFACTU-F35): si
+    la AEAT tiene ese mismo registro (misma huella), sale de la cola como registrado; si no, sigue en la cola.
+    «Consulta a la AEAT: N ya registrados (fuera de la cola), N no están en la AEAT (siguen en la cola).».
+  - **«Subsanar el rechazo con un registro nuevo»** → `verifactu.record.correct` (VERIFACTU-F24), solo sobre un
+    registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registro(s)
+    nuevo(s) en la cola.».
+  - **Retirar de la cola**, como en el antiguo («Cancelar» solo si ya aceptado), es solo lo que la AEAT ya tiene,
+    y se hace consultándola (la acción de arriba). Nada sale de la cola sin que la AEAT lo tenga (VERIFACTU-F23); un
+    rechazo definitivo se resuelve con la subsanación, que deja el rechazado como estaba.
+- **Control de envío por `(NIF, entorno)`**: en solo lectura; su acción **«Reprogramar su cola: enviar en la
+  próxima pasada»** llama a `verifactu.contingency.retry` sobre el registro más reciente que espera en esa cadena.
+  `next_send_at` es el `TiempoEsperaEnvio` de la AEAT y **nunca se acorta** (las preguntas frecuentes de la AEAT, en «Referencia adoptada»):
+  reprogramar hace que salga en cuanto la AEAT lo permita. El `wait_reason` de un registro tampoco se borra al
+  reprogramar: es lo que lo declara fuera de plazo (`Incidencia` S); lo reescribe la pasada siguiente.
+- **Configuración**: se ve entera y solo se elige la **vía de envío**, por `verifactu.config.update` (el
+  formulario la ejecuta al validarse, así que su rechazo —sin certificado propio válido, sin el otorgamiento
+  aprobado en producción— es el error del formulario y no se guarda nada). Nunca se teclean el entorno (va por
+  «Pasar a producción» / «Volver a pruebas»), lo que manda la foto del SaaS (`representation_*`, `live_paid`,
+  `hub_status`, `hub_id`, `synced_version`) ni el certificado.
 - **Registros**: las columnas de la pantalla de registros del módulo antiguo (`erp-verifactu-records`: secuencia,
-  factura, fecha, tipo, emisor, total, estado) más el entorno y el CSV de la AEAT (`VerifactuRecordAdmin` del SaaS
-  antiguo); filtros por estado, tipo de registro, tipo de factura y entorno; jerarquía por fecha de expedición;
-  búsqueda por número, NIF, nombre del emisor, huella y CSV. La ficha agrupa todos los campos en Factura, Cadena de
-  huellas, Respuesta de la AEAT, XML y Metadatos (como el admin del SaaS antiguo).
-- **Una sola acción, «Reenviar a la AEAT»** (`resend_to_aeat`, el nombre del SaaS antiguo): llama a
-  `verifactu.record.transmit` con el hub elegido y el staff como actor. Envía cada cadena una vez (el registro más
-  reciente elegido arrastra los anteriores de su cadena), respeta el tiempo de espera de la AEAT y acaba con
-  «Reenvío terminado: N aceptados, N rechazados, N aún en espera.»; lo que la operación rechaza (fuera de la cola,
-  sin pasarela) sale como aviso con su motivo. Un registro rechazado no se reenvía: se subsana con uno nuevo
-  (VERIFACTU-F24). Sin hub elegido, la acción no hace nada y lo dice.
-
-**Decisión (2026-10-15, tarea 6 del bloque fiscal, alcance mínimo de Ioan)**: el prompt de Ioan hablaba de CRUD
-sobre las tablas fiscales; aquí no hay CRUD libre, porque el riesgo fiscal manda: lo sellado no cambia nunca, y la
-ruta, el entorno, el otorgamiento, la opción en vivo y la espera de la AEAT solo se mueven por sus operaciones (o
-por la foto del SaaS), que llevan las comprobaciones de la ley. Teclear el estado del otorgamiento en el admin, por
-ejemplo, haría presentar con el sello de ERPlora sin el Anexo I aprobado. Antes, la configuración se editaba y el
-control de envío dejaba soltar `next_send_at`; ya no. Los cambios del staff son acciones que llaman a operaciones
-(y dejan su evento). **Ronda a escribir en PLAN §17**.
+  factura, fecha, tipo, emisor, total, estado) más el entorno y el CSV de la AEAT; filtros por estado, motivo de
+  espera (solo los que tiene algún registro, en el idioma del lector), tipo de registro, tipo de factura y entorno;
+  jerarquía por fecha de expedición; búsqueda por número, NIF, nombre del emisor, huella y CSV. La ficha agrupa
+  todos los campos en Factura (con enlace a la factura en su admin), Cadena de huellas, Respuesta de la AEAT
+  (estado, **por qué aún no está en la AEAT** en frase, intentos, `wait_reason`, detalle, respuesta y código de la
+  AEAT), XML y Metadatos.
 
 ### Contradicciones señaladas (no resueltas aquí)
 
@@ -1191,10 +1235,12 @@ control de envío dejaba soltar `next_send_at`; ya no. Los cambios del staff son
    SaaS; la app es `verifactu`.
 5. **Declaración responsable**: la v1 firmada no nombra una pasarela en Python dentro del SaaS (la v2, sin
    firmar, nombra el `verifactu-gateway` en Rust); el cambio de composición necesita una versión nueva firmada.
-6. **Admin del Hub**: CLAUDE.md dice «CRUD completo… fiscales incluidas», y el brief de la tarea 6 del bloque
-   fiscal, «CRUD completo con aviso»; el alcance mínimo que Ioan fijó después deja todo lo de VeriFactu en solo
-   lectura y los cambios como acciones que son operaciones (ver «Administrador de Django»). Ronda a escribir en
-   PLAN §17.
+6. ~~**Admin del Hub**~~ — **cerrada por Ioan (2026-10-15)**: CLAUDE.md dice «CRUD completo… fiscales
+   incluidas» y el brief de la tarea 6, «CRUD completo con aviso»; Ioan fijó el criterio: «un registro no enviado
+   no es un registro registrado; no se trata de borrar una venta, se trata de poder arreglar si hay un problema de
+   envío, poder reenviar y cosas que se necesitan para el soporte». Lo registrado en la AEAT, en solo lectura; lo
+   no registrado, con acciones de soporte que son operaciones; la vía, por su operación (ver «Administrador de
+   Django»). Falta reflejarlo en PLAN §17 (CLAUDE.md sigue diciendo «CRUD completo»).
 7. ~~**«Da servicio a varios obligados» sin origen**~~ — **cerrada (T2b, 2026-10-15)**: `IndicadorMultiplesOT` es
    «S» siempre, porque ERPlora es un sistema multi-obligado por definición; no depende de la foto. Fuera
    `multiple_taxpayers` (migración 0004, reversible) y `producer_facts_missing`.
