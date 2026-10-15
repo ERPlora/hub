@@ -181,7 +181,7 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F22 | Pagar una línea con un bono | hecho (con Ventas, SALE-F27) |
 | SERVICE-F23 | Soltar la sesión si la línea o la cuenta desaparecen | hecho |
 | SERVICE-F24 | Dar por gastadas las sesiones al cobrar | hecho (conceder los bonos vendidos en el tique, no: ver «Lo que queda fuera») |
-| SERVICE-F25 | La sesión retenida que nadie cobra vuelve sola | hecho (al leer; la tarea de cada hora la corre el worker de la fase 2) |
+| SERVICE-F25 | La sesión retenida que nadie cobra vuelve sola | hecho (al leer y con la tarea de cada hora, que corre el worker: `base/scheduler.py`, 2026-10-15) |
 | SERVICE-F26 | Devolver la sesión al devolver la venta | hecho (con Ventas, SALE-F32) |
 | SERVICE-F27 | Devolver la sesión al anular la venta | hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera») |
 | SERVICE-F28 | Unir dos fichas: los bonos pasan a la que queda | servidor hecho; la entrega del aviso espera al relay del outbox (fase 2) |
@@ -592,7 +592,7 @@ solo se prueba en los tests.
 Implicados: SALE-F01, SALE-F22, SALE-F27
 
 ### SERVICE-F25 La sesión retenida que nadie cobra vuelve sola
-Estado: hecho (al leer; la tarea de cada hora la corre el worker de la fase 2)
+Estado: hecho (al leer y con la tarea de cada hora, que corre el worker: `base/scheduler.py`, 2026-10-15)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -920,8 +920,9 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la compra (`select_for_update`, en orden de id cuando son varias): dos cajas sobre el mismo bono van
   en fila y la segunda decide sobre lo que dejó la primera. Hay tests con hilos de cada carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
-  hora (`0 * * * *`, UTC, `collapse`); la corre el worker de la fase 2. Mientras, el saldo ya no cuenta
-  una reserva vencida y reservar de nuevo la misma línea marca antes la vencida.
+  hora (`0 * * * *`, UTC, `collapse`); hecho — la corre el worker (`base/scheduler.py`, 2026-10-15; en la
+  fase 1, sobre un solo hub). Además, el saldo ya no cuenta una reserva vencida y reservar de nuevo la misma
+  línea marca antes la vencida.
 - **Bonos sin cliente** se calculan desde la ficha de Clientes (eliminada o anonimizada, y no unida a
   otra): no hace falta sellar nada al eliminarla. Unir dos fichas mueve los bonos con la reacción a
   `customer.customer.merged`; hasta que llegue, `service.grant.list` de una ficha lee también los de
@@ -963,9 +964,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
   categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
   el departamento de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
-- **La tarea de cada hora que marca las reservas vencidas (F25)**: está declarada en el `AppConfig`
-  y probada; la ejecuta el worker de la fase 2. Hasta entonces el saldo ya no cuenta la reserva
-  vencida al leer, así que la sesión vuelve igual; solo tarda en salir **Caducada** en Movimientos.
 - **El aviso de citas próximas al archivar (F04)**: llega con Citas.
 - **La entrega de los avisos de otras apps** (F28, F29 al anonimizar, F32 al dar de baja): las
   reacciones están hechas y probadas con los avisos reales; las ejecuta el relay del outbox, que llega
