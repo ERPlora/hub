@@ -189,6 +189,11 @@ export interface QueueRowOut {
   created_at: string;
 }
 
+export interface ReconcileOut {
+  held: boolean;
+  record: RecordSummaryOut;
+}
+
 export interface TransmitOut {
   chains: number;
   sent: number;
@@ -358,6 +363,7 @@ declare module '@erplora/ui/sdk' {
     'verifactu.record.correct': { input: RecordRefIn; output: RecordCreateOut };
     'verifactu.record.cancel': { input: RecordRefIn & { reason: string }; output: RecordCreateOut };
     'verifactu.record.transmit': { input: RecordRefIn; output: TransmitOut };
+    'verifactu.record.reconcile': { input: RecordRefIn; output: ReconcileOut };
     'verifactu.contingency.list': { input: ContingencyListIn; output: Page<QueueRowOut> };
     'verifactu.contingency.process': { input: NoInput; output: TransmitOut };
     'verifactu.contingency.retry': { input: RecordRefIn; output: RecordSummaryOut };

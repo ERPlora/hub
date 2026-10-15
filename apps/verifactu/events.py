@@ -21,6 +21,7 @@ RECORD_REJECTED = "verifactu.record.rejected"
 RECORD_ACCEPTED_WITH_ERRORS = "verifactu.record.accepted_with_errors"
 CONTINGENCY_PROCESSED = "verifactu.contingency.processed"
 CONTINGENCY_RETRIED = "verifactu.contingency.retried"
+RECORD_RECONCILED = "verifactu.record.reconciled"
 CHAIN_VALIDATED = "verifactu.chain.validated"
 CHAIN_RECOVERED = "verifactu.chain.recovered"
 AEAT_QUERIED = "verifactu.aeat.queried"
@@ -34,6 +35,7 @@ ALL = [
     RECORD_ACCEPTED_WITH_ERRORS,
     CONTINGENCY_PROCESSED,
     CONTINGENCY_RETRIED,
+    RECORD_RECONCILED,
     CHAIN_VALIDATED,
     CHAIN_RECOVERED,
     AEAT_QUERIED,
@@ -48,6 +50,7 @@ RECORD_EVENTS = [
     RECORD_ACCEPTED_WITH_ERRORS,
     CONTINGENCY_PROCESSED,
     CONTINGENCY_RETRIED,
+    RECORD_RECONCILED,
 ]
 
 # Invoicing's notice (its WORKBOOK fixes the payload: invoice_id, number, series, invoice_type…).

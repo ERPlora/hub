@@ -13,6 +13,8 @@ with what preproduction taught it:
   (header) and 4116 (the obligado) are permanent (sending it again unchanged will not help), any other is to retry.
 - A query that the AEAT refuses is an error, never «no records» (that reading breaks the chain's recovery), and
   the latest record is the one generated last, never the first or the last of the list.
+- A record of the queue is in the AEAT when its query returns it with the same fingerprint (``held_as``): the
+  number alone could be an earlier record of the same invoice.
 - A query answers at most 10,000 records (§6.4.3): ``IndicadorPaginacion`` S says more follow, after the record
   its ``ClavePaginacion`` names.
 """
@@ -247,3 +249,28 @@ def latest(records: list[QueriedRecord]) -> QueriedRecord | None:
         if record.fingerprint and record.generated_at is not None
     ]
     return max(candidates, key=lambda record: record.generated_at, default=None)
+
+
+#: How the AEAT's query names a record it registered (``EstadoRegistro`` of RespuestaConsultaLR.xsd), as our status.
+HELD_STATES = {
+    "Correcto": ACCEPTED,
+    "AceptadoConErrores": ACCEPTED_WITH_ERRORS,
+    "Anulado": ACCEPTED,
+}
+
+
+def held_as(
+    records: list[QueriedRecord], issuer_nif: str, number: str, fingerprint: str
+) -> str | None:
+    """Our status for the record the AEAT holds with this issuer, number and fingerprint; ``None`` when it holds no
+    such record. Only the fingerprint tells that it is THIS record: another one of the same invoice (a correction
+    it has not registered yet) is not, and a state it never documented is never taken as registered."""
+    wanted = fingerprint.strip().upper()
+    for record in records:
+        if (
+            record.issuer_nif.upper() == issuer_nif.upper()
+            and record.number == number
+            and record.fingerprint.strip().upper() == wanted
+        ):
+            return HELD_STATES.get(record.state)
+    return None

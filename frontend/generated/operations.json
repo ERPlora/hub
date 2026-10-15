@@ -341,6 +341,7 @@
   "verifactu.record.correct": { "method": "post", "path": "/api/verifactu/records/correct" },
   "verifactu.record.cancel": { "method": "post", "path": "/api/verifactu/records/cancel" },
   "verifactu.record.transmit": { "method": "post", "path": "/api/verifactu/records/transmit" },
+  "verifactu.record.reconcile": { "method": "post", "path": "/api/verifactu/records/reconcile" },
   "verifactu.contingency.list": { "method": "get", "path": "/api/verifactu/contingency" },
   "verifactu.contingency.process": { "method": "post", "path": "/api/verifactu/contingency/process" },
   "verifactu.contingency.retry": { "method": "post", "path": "/api/verifactu/contingency/retry" },

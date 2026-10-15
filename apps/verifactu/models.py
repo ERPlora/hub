@@ -579,6 +579,10 @@ class Event(UUIDModel):
                     params["environment"], params["environment"]
                 )
             )
+        if "status" in params:
+            params["status_label"] = str(
+                dict(Record.Status.choices).get(params["status"], params["status"])
+            )
         if "reason" in params:
             params["why"] = wait_reason_text(
                 params["reason"], params.get("detail", ""), params.get("at", "")
@@ -620,6 +624,9 @@ EVENT_MESSAGES = {
         "Queue processed: %(sent)s sent, %(accepted)s accepted, %(rejected)s rejected, %(waiting)s waiting."
     ),
     "queue_retried": _("Invoice %(invoice_number)s goes out with the next pass."),
+    "record_reconciled": _(
+        "Invoice %(invoice_number)s was already in the AEAT (%(status_label)s): out of the queue."
+    ),
     "chain_valid": _(
         "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). "
         "Amounts are not re-audited."

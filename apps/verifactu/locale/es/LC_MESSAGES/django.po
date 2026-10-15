@@ -27,6 +27,50 @@ msgstr ""
 "Reenvío terminado: %(accepted)s aceptados, %(rejected)s rechazados, "
 "%(waiting)s aún en espera."
 
+msgid "Reschedule: send with the next pass"
+msgstr "Reprogramar: enviar en la próxima pasada"
+
+#, python-format
+msgid "Rescheduled: %(count)s record(s) go out with the next pass."
+msgstr "Reprogramado: %(count)s registro(s) salen en la próxima pasada."
+
+msgid "Reschedule its queue: send with the next pass"
+msgstr "Reprogramar su cola: enviar en la próxima pasada"
+
+#, python-format
+msgid "Rescheduled: %(count)s chain(s) go out with the next pass."
+msgstr "Reprogramado: %(count)s cadena(s) salen en la próxima pasada."
+
+msgid "nothing is waiting in its queue."
+msgstr "no hay nada esperando en su cola."
+
+msgid "Ask the AEAT (out of the queue if it already has it)"
+msgstr "Consultar a la AEAT (sale de la cola si ya lo tiene)"
+
+#, python-format
+msgid "Asked the AEAT: %(held)s already registered (out of the queue), %(missing)s not in the AEAT (still in the queue)."
+msgstr "Consulta a la AEAT: %(held)s ya registrados (fuera de la cola), %(missing)s no están en la AEAT (siguen en la cola)."
+
+msgid "Correct a rejection with a new record"
+msgstr "Subsanar el rechazo con un registro nuevo"
+
+#, python-format
+msgid "Corrected: %(count)s new record(s) in the queue."
+msgstr "Subsanado: %(count)s registro(s) nuevo(s) en la cola."
+
+msgid "only a record the AEAT rejected is corrected here; this one is registered."
+msgstr "aquí solo se subsana un registro que la AEAT rechazó; este ya está registrado."
+
+msgid "only a record the AEAT rejected is corrected here; this one is still in the queue."
+msgstr "aquí solo se subsana un registro que la AEAT rechazó; este sigue en la cola."
+
+msgid "Why it is not in the AEAT yet"
+msgstr "Por qué aún no está en la AEAT"
+
+#, python-format
+msgid "Invoice %(invoice_number)s was already in the AEAT (%(status_label)s): out of the queue."
+msgstr "La factura %(invoice_number)s ya estaba en la AEAT (%(status_label)s): fuera de la cola."
+
 #: admin.py:41
 msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."
 msgstr "Elige antes un hub (su enlace en el admin del SaaS): la acción se ejecuta en ese hub."

@@ -32,6 +32,7 @@ from apps.verifactu.tests.conftest import (
     A,
     FIXTURES,
     RECIPIENT,
+    aeat_holds,
     answering,
     b64,
     ctx_for,
@@ -1217,6 +1218,109 @@ def test_without_a_gateway_the_aeat_is_not_asked(issuer, settings):
         code_of(lambda: run("verifactu.chain.recover_from_aeat"))
         == "verifactu.gateway_unavailable"
     )
+
+
+# A record of the queue that the AEAT may already hold (VERIFACTU-F35)
+
+
+def left_without_answer(gateway_answers) -> Record:
+    """A ticket whose submission left and got no answer: «sent», in the queue."""
+    gateway_answers.set(gateway.Reply(kind=gateway.UNKNOWN, message="read timeout"))
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    run("verifactu.contingency.process")
+    record.refresh_from_db()
+    assert record.status == "sent"
+    return record
+
+
+def test_a_record_the_aeat_already_holds_leaves_the_queue_as_registered(
+    issuer, gateway_answers
+):
+    record = left_without_answer(gateway_answers)
+    gateway_answers.set(aeat_holds(record))
+    result = run("verifactu.record.reconcile", {"record_id": str(record.id)})
+    assert result.held is True
+    assert (result.record.id, result.record.status) == (record.id, "accepted")
+    record.refresh_from_db()
+    assert (record.status, record.wait_reason, record.wait_detail) == ("accepted", "", "")
+    assert record.attempts == 1  # the failed attempt is kept
+    path, payload = gateway_answers.calls[-1]
+    assert path == gateway.QUERY_PATH
+    assert (
+        f"<sum1:Ejercicio>{record.issue_date:%Y}</sum1:Ejercicio>"
+        f"<sum1:Periodo>{record.issue_date:%m}</sum1:Periodo>"
+    ) in payload["envelope"]
+    assert payload["nif"] == ISSUER_NIF
+    event = Event.objects.get(message_key="record_reconciled")
+    assert (event.kind, event.record_id, event.actor) == ("accepted", record.id, "tester")
+    assert event.message() == (
+        f"Invoice {record.invoice_number} was already in the AEAT (Accepted): out of the queue."
+    )
+    assert outbox("verifactu.record.reconciled") == [
+        {
+            "record_id": str(record.id),
+            "invoice_number": record.invoice_number,
+            "status": "accepted",
+            "environment": "testing",
+        }
+    ]
+
+
+def test_a_record_the_aeat_holds_with_errors_is_accepted_with_errors(
+    issuer, gateway_answers
+):
+    record = left_without_answer(gateway_answers)
+    gateway_answers.set(aeat_holds(record, state="AceptadoConErrores"))
+    result = run("verifactu.record.reconcile", {"invoice_number": record.invoice_number})
+    assert (result.held, result.record.status) == (True, "accepted_with_errors")
+    assert Event.objects.get(message_key="record_reconciled").kind == "accepted_with_errors"
+
+
+def test_a_record_the_aeat_does_not_hold_stays_in_the_queue_untouched(
+    issuer, gateway_answers
+):
+    record = left_without_answer(gateway_answers)
+    before = Record.objects.values().get(pk=record.pk)
+    gateway_answers.set(aeat_holds())  # the AEAT holds other records, not this one
+    result = run("verifactu.record.reconcile", {"record_id": str(record.id)})
+    assert (result.held, result.record.status) == (False, "sent")
+    after = Record.objects.values().get(pk=record.pk)
+    assert {k: v for k, v in after.items() if k != "updated_at"} == {
+        k: v for k, v in before.items() if k != "updated_at"
+    }
+    assert outbox("verifactu.record.reconciled") == []
+    assert not Event.objects.filter(message_key="record_reconciled").exists()
+
+
+def test_only_a_record_of_the_queue_is_reconciled(issuer, gateway_answers):
+    gateway_answers.set(answering())
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    run("verifactu.record.transmit", {"record_id": str(record.id)})
+    calls = len(gateway_answers.calls)
+    assert (
+        code_of(lambda: run("verifactu.record.reconcile", {"record_id": str(record.id)}))
+        == "verifactu.not_in_queue"
+    )
+    assert len(gateway_answers.calls) == calls
+
+
+def test_without_a_gateway_a_record_is_not_reconciled(issuer, settings):
+    settings.VERIFACTU_GATEWAY_URL = ""
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    assert (
+        code_of(lambda: run("verifactu.record.reconcile", {"record_id": str(record.id)}))
+        == "verifactu.gateway_unavailable"
+    )
+
+
+def test_an_employee_may_not_ask_the_aeat_about_a_record(issuer):
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    with pytest.raises(PermissionDenied):
+        run(
+            "verifactu.record.reconcile",
+            {"record_id": str(record.id)},
+            ctx_for("hub_employee"),
+        )
 
 
 # The connection test and the test invoice (VERIFACTU-F10, F11)
