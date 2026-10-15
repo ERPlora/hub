@@ -115,7 +115,7 @@
       "qr": "QR",
       "aeat": "AEAT response",
       "xml": "XML",
-      "xmlPending": "The XML is built when the producer's details arrive from your ERPlora account.",
+      "xmlPending": "The XML is built when the record is sent to the AEAT.",
       "issueDate": "Issue date",
       "operationDate": "Operation date",
       "invoiceType": "Invoice type",

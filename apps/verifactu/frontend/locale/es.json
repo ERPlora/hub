@@ -115,7 +115,7 @@
       "qr": "QR",
       "aeat": "Respuesta de la AEAT",
       "xml": "XML",
-      "xmlPending": "El XML se construye cuando lleguen los datos del productor de tu cuenta de ERPlora.",
+      "xmlPending": "El XML se construye al enviar el registro a la AEAT.",
       "issueDate": "Fecha de expedición",
       "operationDate": "Fecha de operación",
       "invoiceType": "Tipo de factura",
