@@ -25,11 +25,12 @@ import {
   viteReady,
   waitFor,
 } from './helpers';
+import { STACK } from './stack';
 
 const DOWN_MS = 10_000;
 
 test('runserver down 10 s → «Reconnecting…», one reconnection, same subscriptions, new item shows', async ({ context }) => {
-  await context.routeWebSocket(/localhost:5173/, (ws) => {
+  await context.routeWebSocket(new RegExp(`localhost:${STACK.vitePort}`), (ws) => {
     const server = ws.connectToServer();
     server.onClose(() => {
       // keep the page's side open: no "server connection lost" → no location.reload()
@@ -56,8 +57,9 @@ test('runserver down 10 s → «Reconnecting…», one reconnection, same subscr
   const subsBefore = openBefore.at(-1)!.url;
   const firstAfterKill = liveRequests.length;
 
-  // Kill the process listening on :8000 (the autoreloader's child); its parent exits and stops Vite.
-  const pids = listeningPids(8000);
+  // Kill the process listening on runserver's port (the autoreloader's child); its parent exits and
+  // stops Vite.
+  const pids = listeningPids(STACK.hubPort);
   expect(pids.length).toBeGreaterThan(0);
   const killedAt = Date.now();
   for (const pid of pids) process.kill(pid, 'SIGTERM');
@@ -67,7 +69,7 @@ test('runserver down 10 s → «Reconnecting…», one reconnection, same subscr
   await page.screenshot({ path: shot('06-reconnecting-chip') });
 
   await page.waitForTimeout(Math.max(0, DOWN_MS - (Date.now() - killedAt)));
-  await waitFor(() => listeningPids(5173).length === 0, 10_000); // the old Vite is gone
+  await waitFor(() => listeningPids(STACK.vitePort).length === 0, 10_000); // the old Vite is gone
   const restartAt = Date.now();
   startRunserver();
   const bootMs = await waitFor(healthy, 60_000);
