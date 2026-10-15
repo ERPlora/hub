@@ -266,6 +266,8 @@ def held_as(
     such record. Only the fingerprint tells that it is THIS record: another one of the same invoice (a correction
     it has not registered yet) is not, and a state it never documented is never taken as registered."""
     wanted = fingerprint.strip().upper()
+    if not wanted:
+        return None
     for record in records:
         if (
             record.issuer_nif.upper() == issuer_nif.upper()

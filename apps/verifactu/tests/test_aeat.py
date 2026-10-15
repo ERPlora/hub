@@ -239,6 +239,14 @@ def test_another_record_of_the_same_invoice_is_not_this_one():
     assert aeat.held_as(records, "B27593136", "PRU-20260801-0009", records[0].fingerprint) is None
 
 
+def test_an_empty_fingerprint_never_matches_an_answer_without_one():
+    # A record with no fingerprint is not identified by one: an answer whose «Huella» came back empty is not it.
+    records = query_records()
+    blank = aeat.QueriedRecord(**{**records[0].__dict__, "fingerprint": ""})
+    assert aeat.held_as([blank], blank.issuer_nif, blank.number, "") is None
+    assert aeat.held_as([blank], blank.issuer_nif, blank.number, "   ") is None
+
+
 def test_a_state_the_aeat_never_documented_is_not_taken_as_registered():
     records = query_records()
     odd = aeat.QueriedRecord(**{**records[0].__dict__, "state": "Pendiente"})
