@@ -1,16 +1,21 @@
 <script setup lang="ts">
-// The ticket of a sale as it prints (SALE-F29; the old `ok-receipt`, thermal paper 80 mm): the header
+// The ticket of a sale as it prints (SALE-F29; the old `ok-receipt`, thermal paper 80 mm; a sale
+// charged as a full invoice is titled «Invoice» and numbered «No.» instead of «Receipt»): the header
 // from the receipt settings (first line = the name, else «My business»; the rest = the address),
-// «DUPLICATE» on a reprint, the number with the date and time, the customer, the lines («qty × unit
-// price», a gift «(On the house)», the note), «Subtotal», a VAT row per rate from the sale's breakdown,
-// «TOTAL», the payment rows and «Change», the discount already applied and the footer. Every figure is
-// the server's; this only lays them out. No fiscal QR yet: the invoice number and the VeriFactu QR
-// arrive with Invoicing and VeriFactu. `printPaper` prints a copy of this very element.
+// «DUPLICATE» on a reprint, the number with the date and time — the number Invoicing gave its ticket or
+// invoice in the very charge («Invoice FACT-2026-000012»), the sale's own only while it has none, and
+// then «Fiscal document pending» under it, so the paper never poses as issued —, the customer, the lines
+// («qty × unit price», a gift «(On the house)», a line a voucher paid «Already paid · <voucher>»
+// (SALE-F27), the note), «Subtotal», a VAT row per fiscal key from the sale's breakdown (an
+// exempt key names its cause), «TOTAL», the payment rows and «Change», the discount already applied and
+// the footer. Every figure is the server's; this only lays them out. No fiscal QR yet: it arrives with
+// VeriFactu. `printPaper` prints a copy of this very element.
 import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatPercent, formatQuantity } from '../../lib/format';
+import { taxRow } from '../../lib/breakdown';
+import { formatMoney, formatQuantity } from '../../lib/format';
 import type { SaleOut, SettingsOut } from '../../operations';
 
 const props = withDefaults(
@@ -36,6 +41,15 @@ const header = computed(() => (props.settings?.receipt_header ?? '').split('\n')
 const businessName = computed(() => header.value[0] ?? t('sale.document.defaultBusiness'));
 const address = computed(() => header.value.slice(1));
 const when = computed(() => formatDateTime(props.sale.created_at, locale.value));
+/** A sale charged as a full invoice says so on top and is numbered «No.», never «Receipt». */
+const isInvoice = computed(() => props.sale.document_type === 'invoice');
+/** The fiscal number Invoicing gave it («FACT-2026-000012»); the sale's own while it has none. */
+const fiscalNumber = computed(() => props.sale.invoice_number || '');
+const shownNumber = computed(() => fiscalNumber.value || props.sale.number);
+const numberLabel = computed(() => {
+  if (!isInvoice.value) return t('sale.document.receipt');
+  return fiscalNumber.value ? t('sale.document.invoice') : t('sale.document.number');
+});
 
 const lines = computed(() =>
   props.sale.lines.map((line) => ({
@@ -43,16 +57,18 @@ const lines = computed(() =>
     name: line.is_gift ? `${line.name} ${t('sale.document.gift')}` : line.name,
     detail: `${formatQuantity(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,
     note: line.notes.trim(),
+    voucher: line.paid_by_voucher ? t('sale.document.paidWithVoucher', { name: line.voucher_name }) : '',
     amount: money(line.line_total),
   })),
 );
 
+const taxWords = computed(() => ({
+  locale: locale.value,
+  taxName: (label: string) => (TAX_NAMES.has(label) ? t(`sale.document.taxes.${label}`) : label),
+  qualification: (kind: string) => t(`sale.document.qualification.${kind}`),
+}));
 const taxes = computed(() =>
-  props.sale.breakdown.map((row) => ({
-    key: `${row.label}|${row.rate_pct}`,
-    label: `${TAX_NAMES.has(row.label) ? t(`sale.document.taxes.${row.label}`) : row.label} ${formatPercent(row.rate_pct, locale.value)}`,
-    amount: money(row.tax),
-  })),
+  props.sale.breakdown.map((row) => ({ ...taxRow(row, taxWords.value), amount: money(row.tax) })),
 );
 
 const payments = computed(() =>
@@ -83,6 +99,13 @@ const footer = computed(() =>
     >
       {{ $t('sale.document.duplicate') }}
     </div>
+    <div
+      v-if="isInvoice"
+      class="sale-receipt__title"
+      data-testid="sale-receipt-title"
+    >
+      {{ $t('sale.document.invoice') }}
+    </div>
     <header class="sale-receipt__center">
       <div
         class="sale-receipt__name"
@@ -101,8 +124,14 @@ const footer = computed(() =>
     </header>
     <hr class="sale-receipt__rule">
     <div class="sale-receipt__meta">
-      <span data-testid="sale-receipt-number">{{ $t('sale.document.receipt') }}: <strong>{{ sale.number }}</strong></span>
+      <span data-testid="sale-receipt-number">{{ numberLabel }}: <strong>{{ shownNumber }}</strong></span>
       <span data-testid="sale-receipt-datetime">{{ when }}</span>
+    </div>
+    <div
+      v-if="sale.invoice_status === 'pending'"
+      class="sale-receipt__meta"
+    >
+      <strong data-testid="sale-receipt-pending">{{ $t('sale.document.paperPending') }}</strong>
     </div>
     <div
       v-if="sale.customer_name"
@@ -133,6 +162,13 @@ const footer = computed(() =>
             <div>{{ line.name }}</div>
             <div class="sale-receipt__detail">
               {{ line.detail }}
+            </div>
+            <div
+              v-if="line.voucher"
+              class="sale-receipt__detail"
+              data-testid="sale-receipt-voucher"
+            >
+              {{ line.voucher }}
             </div>
             <div
               v-if="line.note"
@@ -244,6 +280,15 @@ const footer = computed(() =>
   font-weight: 700;
   letter-spacing: 0.08em;
   margin-bottom: 2mm;
+}
+/* The document's title (a full invoice), as the old paper titled what is not a plain ticket. */
+.sale-receipt__title {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 1mm;
 }
 .sale-receipt__name {
   font-size: 14px;

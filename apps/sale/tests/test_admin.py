@@ -90,3 +90,14 @@ def test_a_sale_shows_its_lines_and_payments_and_an_order_its_lines():
         sale_admin.RefundPaymentInline,
         sale_admin.RefundLineInline,
     ]
+
+
+def test_support_sees_and_repairs_the_service_and_the_voucher_of_a_line(superuser):
+    request = request_by(superuser)
+    voucher = {"service_id", "voucher_session_id", "voucher_grant_id", "voucher_name"}
+    for model in (OrderLine, SaleLine):
+        fields = set(admin.site._registry[model].get_fields(request))
+        assert voucher <= fields, model.__name__
+    assert {"voucher_remaining", "voucher_hold_until"} <= set(
+        admin.site._registry[OrderLine].get_fields(request)
+    )

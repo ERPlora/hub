@@ -1,11 +1,15 @@
 // The till's small rules, kept pure: the tile's initials and colour, the time a check is parked under,
 // the quick-note chips that add or take out a segment of the note, the line a second tap on a product
-// raises (SALE-F01 step 2) and the words a refused write shows.
-import { ApiError } from '@erplora/ui/sdk';
+// raises (SALE-F01 step 2), and the one door to the Customers app.
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
+import { countryOptions, snapshotOf } from '../../../../customer/frontend/components/CustomerSearch.vue';
 import type { OrderLineOut } from '../../operations';
-import { customerSnapshot, initials, mergeableLine, noteHasChip, plusOne, refusal, shortTime, tileGradient, toggleNoteChip } from './till';
+import { initials, mergeableLine, mergeableServiceLine, noteHasChip, plusOne, shortTime, tileGradient, toggleNoteChip } from './till';
 
 const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
   id: 'l1',
@@ -27,6 +31,13 @@ const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
   gift_reason: '',
   notes: '',
   staff_id: null,
+  service_id: null,
+  paid_by_voucher: false,
+  voucher_session_id: null,
+  voucher_grant_id: null,
+  voucher_name: '',
+  voucher_remaining: null,
+  voucher_hold_until: null,
   line_total: 150,
   round_no: 0,
   fired_at: null,
@@ -100,29 +111,65 @@ describe('plusOne', () => {
   });
 });
 
-describe('refusal', () => {
-  it('the server’s own sentence when it refused (it comes translated)', () => {
-    const refused = new ApiError(409, 'sale.quantity_off_grid', 'La cantidad no encaja con el escalón del producto');
-    expect(refusal(refused, 'fallback')).toBe('La cantidad no encaja con el escalón del producto');
-  });
-
-  it('the fallback when nobody answered (network, a proxy page)', () => {
-    expect(refusal(new ApiError(0, 'client_error', 'Failed to fetch'), 'fallback')).toBe('fallback');
-    expect(refusal(new ApiError(502, 'unexpected_response', 'Unexpected response (HTTP 502)'), 'fallback')).toBe('fallback');
-    expect(refusal(new Error('boom'), 'fallback')).toBe('fallback');
-  });
-});
-
-describe('customerSnapshot', () => {
-  it('copies the card’s tax details as the sale wants them, as the Customers search does', () => {
+describe('the Customers app, reached only through its search component', () => {
+  it('copies the card’s tax details as the sale wants them (CustomerSearch’s own `snapshotOf`)', () => {
     const card = { id: 'c1', name: 'Lucía Pérez', tax_id: '12345678Z', address: 'Calle Mayor 1', postal_code: '28001', city: 'Madrid', country: 'ES' };
-    expect(customerSnapshot(card, 'es')).toEqual({
+    expect(snapshotOf(card, 'es')).toEqual({
       customer_id: 'c1',
       customer_name: 'Lucía Pérez',
+      display_name: 'Lucía Pérez',
       customer_tax_id: '12345678Z',
       customer_address: 'Calle Mayor 1, 28001 Madrid, España',
       customer_country: 'ES',
     });
-    expect(customerSnapshot({ ...card, address: '', postal_code: '', city: '', country: '' }, 'es').customer_address).toBe('');
+    // A company's card: the fiscal name is the company's, the person stays for the screen.
+    expect(snapshotOf({ ...card, company_name: 'Estudio Ana SL' }, 'es')).toMatchObject({
+      customer_name: 'Estudio Ana SL',
+      display_name: 'Lucía Pérez',
+    });
+    expect(snapshotOf({ ...card, address: '', postal_code: '', city: '', country: '' }, 'es').customer_address).toBe('');
+  });
+
+  it('lists the countries in the reader’s language (for the invoice’s recipient)', () => {
+    expect(countryOptions('es').find((option) => option.value === 'ES')?.label).toBe('España');
+  });
+
+  it('no source of the sale app imports anything of Customers but CustomerSearch.vue', () => {
+    const FRONTEND = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return entry.name === '__tests__' ? [] : sources(path);
+        return /\.(vue|ts)$/.test(entry.name) && !/\.(test|d)\.ts$/.test(entry.name) ? [path] : [];
+      });
+    const reached = sources(FRONTEND).flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(/from '([^']*customer\/frontend\/[^']*)'/g)]
+        .map((m) => m[1])
+        .filter((path) => !path.endsWith('/components/CustomerSearch.vue'))
+        .map((path) => `${file.slice(FRONTEND.length)}: ${path}`),
+    );
+    expect(reached).toEqual([]);
+  });
+});
+
+describe('mergeableServiceLine (SALE-F38)', () => {
+  const service = (over: Partial<OrderLineOut> = {}) => line({ product_id: null, service_id: 's1', is_service: true, ...over });
+
+  it('a second tap on a service raises its pending line, as a product', () => {
+    expect(mergeableServiceLine([service({ id: 'l7' })], 's1', null)?.id).toBe('l7');
+  });
+
+  it('never a line a voucher pays, nor one of another service, professional, with a note, comp or discount', () => {
+    for (const over of [
+      { paid_by_voucher: true, voucher_session_id: 'r1' },
+      { service_id: 's2' },
+      { staff_id: 'st2' },
+      { notes: 'short' },
+      { is_gift: true },
+      { discount_percent: '5.00' },
+      { fired_at: '2026-10-14T10:00:00Z' },
+    ]) {
+      expect(mergeableServiceLine([service(over)], 's1', null), JSON.stringify(over)).toBeUndefined();
+    }
   });
 });

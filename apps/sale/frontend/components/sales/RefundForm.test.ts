@@ -51,6 +51,8 @@ const line = (id: string, over: Partial<LineOption> = {}): LineOption => ({
   left: '1.000',
   line_total: 300,
   is_gift: false,
+  paid_by_voucher: false,
+  voucher_name: '',
   ...over,
 });
 const options = (over: Partial<RefundOptionsOut> = {}): RefundOptionsOut => ({
@@ -260,6 +262,15 @@ describe('RefundForm: refunding', () => {
     expect(s.find('refund-error').text()).toContain("We couldn't confirm whether the refund was recorded. Tapping Refund again won't record it twice.");
   });
 
+  it('an answer that is not the API’s (a proxy’s error page) says it too, never the SDK’s English', async () => {
+    const s = await setup();
+    s.answer(502, 'Bad gateway');
+    await s.reason('Broken');
+    await s.confirm();
+    expect(s.find('refund-error').text()).toContain("We couldn't confirm whether the refund was recorded. Tapping Refund again won't record it twice.");
+    expect(s.find('refund-error').text()).not.toContain('HTTP 502');
+  });
+
   it('every opening is a new attempt', async () => {
     const first = await setup();
     await first.reason('x');
@@ -282,5 +293,40 @@ describe('RefundForm: the rest', () => {
     expect(s.find('refund-propose-all').text()).toBe('Devolver todo');
     expect([prop(s.find('refund-reason').element, 'label'), prop(s.find('refund-reason').element, 'placeholder')]).toEqual(['Motivo', 'Por qué vuelve el dinero']);
     expect(s.blocked()).toBe('Una devolución necesita un motivo.');
+  });
+});
+
+describe('RefundForm: the session of a voucher (SALE-F32)', () => {
+  const COVERED = line('v', { name: 'Corte', line_total: 0, paid_by_voucher: true, voucher_name: 'Bono 5 cortes' });
+
+  it('a sale paid whole with a voucher has a session to give back, with no money', async () => {
+    const s = await setup(options({ total: 0, refundable_total: 0, tenders: [], lines: [COVERED] }), 'es');
+    expect(s.find('refund-nothing').exists()).toBe(false);
+    // No money in it: nothing to «Refund everything».
+    expect(s.find('refund-propose-all').exists()).toBe(false);
+    expect(s.blocked()).toBe('Marca la línea cuya sesión vuelve al bono.');
+    await s.pick({ v: 1000 });
+    await s.reason('No vino');
+    expect(s.blocked()).toBeNull();
+    expect(plain(s.confirmButton().text())).toBe('Devolver la sesión');
+    s.answer(200, { already: false, refund_id: 'r1', sale_id: 's1', total: 0, fully_refunded: true });
+    await s.confirm();
+    expect(s.refunds().at(-1)?.body).toMatchObject({ sale_id: 's1', reason: 'No vino', allocations: [], lines: [{ line_id: 'v', quantity: '1.000' }] });
+  });
+
+  it('money and the session go back together', async () => {
+    const s = await setup(options({ lines: [line('a'), COVERED] }));
+    await s.pick({ v: 1000 });
+    await s.setAmount(0, '3.00');
+    await s.setAmount(1, '0');
+    await s.reason('wrong');
+    s.answer(200, { already: false, refund_id: 'r1', sale_id: 's1', total: 300, fully_refunded: false });
+    await s.confirm();
+    expect(s.refunds().at(-1)?.body).toMatchObject({ allocations: [{ payment_id: 'p1', amount: 300 }], lines: [{ line_id: 'v' }] });
+  });
+
+  it('nothing left is «nothing left» only when no session is left either', async () => {
+    const s = await setup(options({ total: 0, refundable_total: 0, tenders: [], lines: [{ ...COVERED, left: '0.000', returned: '1.000' }] }));
+    expect(s.find('refund-nothing').exists()).toBe(true);
   });
 });

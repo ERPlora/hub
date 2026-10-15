@@ -10,7 +10,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useT } from '../../composables/useT';
 import type { QuickNoteOut } from '../../operations';
-import { refusal } from './refusal';
+import { refusal } from '../../lib/refusal';
 
 const props = defineProps<{
   /** The note to edit; `null` adds a new one. */

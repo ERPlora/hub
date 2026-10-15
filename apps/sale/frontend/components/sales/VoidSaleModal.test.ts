@@ -76,6 +76,21 @@ describe('VoidSaleModal', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
+  it('a failure the server did not word says «The sale could not be voided», never the SDK’s English', async () => {
+    const s = await setup();
+    s.net.onApi(() => {
+      throw new TypeError('offline');
+    });
+    await s.type('Mistake');
+    await s.submit();
+    expect(s.inDoc('sale-void-error')?.textContent?.trim()).toBe('The sale could not be voided');
+    const es = await setup('es');
+    es.answer(502, 'Bad gateway');
+    await es.type('Error');
+    await es.submit();
+    expect(es.inDoc('sale-void-error')?.textContent?.trim()).toBe('No se ha podido anular la venta');
+  });
+
   it('«Cancel» closes and sends nothing; opened again it starts blank', async () => {
     const s = await setup();
     await s.submit();

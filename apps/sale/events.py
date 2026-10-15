@@ -1,12 +1,14 @@
-"""Events of the sale app (``sale.<entity>.<fact>``) and its reaction to Customers' merge.
+"""Events of the sale app (``sale.<entity>.<fact>``) and its reactions to Customers' merge and to the
+documents Invoicing issues.
 
 services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. ``sale.sale.completed`` and ``sale.sale.voided`` carry what Inventory
 (``inventory.stock.apply_sale`` / ``restore_sale``) and Customers (``customer.purchase.record`` /
 ``void``) read from them (WORKBOOK «Lo que avisa»).
 
-Reactions: two customer cards merged move the absorbed card's sales to the one that stays, through an
-operation of this app run as the system, in its own transaction. The outbox relay (phase 2, in the
+Reactions: two customer cards merged move the absorbed card's sales to the one that stays; a document
+Invoicing issued later than the charge (no issuer yet at the till, INVOICE-F06) gives the sale its
+number. Each through an operation of this app run as the system, in its own transaction. The outbox relay (phase 2, in the
 worker) hands each delivered event to ``react``; the operation is idempotent.
 """
 
@@ -20,6 +22,7 @@ SALE_CREATED_FROM_APPOINTMENT = "sale.sale.created_from_appointment"
 SALE_VOIDED = "sale.sale.voided"
 SALE_REFUNDED = "sale.sale.refunded"
 SALE_REASSIGNED = "sale.sale.reassigned"
+SALE_INVOICED = "sale.sale.invoiced"
 ORDER_OPENED = "sale.order.opened"
 ORDER_CHANGED = "sale.order.changed"
 ORDER_FIRED = "sale.order.fired"
@@ -43,6 +46,7 @@ ALL = [
     SALE_VOIDED,
     SALE_REFUNDED,
     SALE_REASSIGNED,
+    SALE_INVOICED,
     ORDER_OPENED,
     ORDER_CHANGED,
     ORDER_FIRED,
@@ -62,7 +66,7 @@ ALL = [
 ]
 
 #: The events that change what a sale says (lists, figures, documents).
-SALE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_REASSIGNED]
+SALE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_REASSIGNED, SALE_INVOICED]
 #: The events that change what an open check says.
 ORDER_EVENTS = [
     ORDER_OPENED,
@@ -78,9 +82,15 @@ ORDER_EVENTS = [
 
 # Customers' event (its WORKBOOK fixes the payload: ``{"id": survivor, "absorbed_id": absorbed}``).
 CUSTOMER_MERGED = "customer.customer.merged"
+# Invoicing's event (its WORKBOOK fixes the payload: ``invoice_id``, ``number``, ``invoice_type``,
+# ``source_type``, ``sale_id``…): a document issued later than the charge (INVOICE-F06).
+INVOICE_ISSUED = "invoice.invoice.issued"
 
 #: Event of another app → the operation of this app that reacts to it.
-REACTIONS = {CUSTOMER_MERGED: "sale.customer.reassign"}
+REACTIONS = {
+    CUSTOMER_MERGED: "sale.customer.reassign",
+    INVOICE_ISSUED: "sale.sale.record_invoice",
+}
 
 
 def react(scope: Scope, name: str, payload: dict[str, Any]):

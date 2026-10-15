@@ -33,6 +33,7 @@ const PREVIEW: PreviewOut = {
   ticket_discount_amount: 0,
   gift_total: 0,
   total: 1000,
+  operation_total: 1000,
   breakdown: [],
   lines: [],
   cash_limit: 100000,
@@ -88,12 +89,12 @@ describe('CheckoutSheet', () => {
     expect(s.subscribed()).toHaveLength(3);
   });
 
-  it('a charge hands the sale to the till and closes; then nothing is read any more', async () => {
+  it('a charge hands the sale to the till with the lines it charged (none = the whole check) and closes; then nothing is read any more', async () => {
     const s = await setup();
     await s.openReady();
     s.answer(200, SALE);
     await click(s.find('sale-checkout-confirm').element);
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE]]);
+    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
     expect(s.panel().exists()).toBe(false);
     await s.clock.advance(2000);

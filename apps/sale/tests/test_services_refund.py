@@ -122,7 +122,7 @@ def test_a_full_invoice_is_corrected_with_a_credit_note(catalog):
         [{"method": "card"}],
         document_type="invoice",
         customer_name="Bar Manolo",
-        customer_tax_id="B12345678",
+        customer_tax_id="B12345674",
         customer_address="C/ Mayor 1",
     )
     with pytest.raises(Conflict) as refusal:
@@ -340,3 +340,15 @@ def test_refunding_is_the_managers(mixed):
             {"payment_id": leg(mixed, "cash"), "amount": 100},
             ctx=ctx_for("hub_employee"),
         )
+
+
+def test_a_refund_key_reused_for_another_sale_or_other_lines_is_refused(mixed, catalog):
+    other = charge("pos-other-0001", [{"product": "COF"}], [{"method": "card"}])
+    cash_leg = leg(mixed, "cash")
+    refund(mixed, {"payment_id": cash_leg, "amount": 500}, lines=[{"line_id": str(mixed.lines[1].id), "quantity": "1"}], idempotency_key="refund-key-01")
+    with pytest.raises(Conflict) as refusal:
+        refund(other, {"payment_id": str(other.payments[0].id), "amount": 100}, idempotency_key="refund-key-01")
+    assert refusal.value.code == "sale.idempotency_key_reused"
+    with pytest.raises(Conflict) as refusal:
+        refund(mixed, {"payment_id": cash_leg, "amount": 500}, lines=[{"line_id": str(mixed.lines[0].id)}], idempotency_key="refund-key-01")
+    assert refusal.value.code == "sale.idempotency_key_reused"

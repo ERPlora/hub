@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The open-price sheet (SALE-F09): the amount typed on the keypad, big on top; «Department (VAT)» with
 // the business's departments (or Taxes' categories without any); «Add <amount>», which waits for both.
-// It hands the line up in cents with its department (or tax category) and its name; the page writes
-// it. A refusal (the permission, a department gone) is read here, over the button. Opens blank.
+// It hands the line up in cents with its department (or tax category); the server names the line after
+// it and the page writes it. A refusal (the permission, a department gone) is read here, over the button. Opens blank.
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
@@ -15,7 +15,7 @@ import PosSheet from './PosSheet.vue';
 
 defineProps<{ pending: boolean; error: string | null }>();
 const open = defineModel<boolean>('open', { default: false });
-const emit = defineEmits<{ add: [line: Pick<OpenLineIn, 'unit_price' | 'department_id' | 'tax_category_key' | 'name'>] }>();
+const emit = defineEmits<{ add: [line: Pick<OpenLineIn, 'unit_price' | 'department_id' | 'tax_category_key'>] }>();
 
 const locale = useLocale();
 const typed = shallowRef('');
@@ -35,7 +35,7 @@ function add(): void {
   const chosen = choice.value;
   if (!ready.value || !chosen) return;
   const charged = chosen.kind === 'department' ? { department_id: chosen.id } : { tax_category_key: chosen.key };
-  emit('add', { unit_price: cents.value, ...charged, name: chosen.name });
+  emit('add', { unit_price: cents.value, ...charged });
 }
 </script>
 

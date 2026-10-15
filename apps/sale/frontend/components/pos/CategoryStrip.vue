@@ -2,19 +2,25 @@
 // The till's category strip: a scrollable `ion-segment` of two-line buttons (name and number of
 // articles), «All» first. Picking one filters the grid (`v-model`, '' = All). The strip says which
 // edge hides categories (the shell's fade) and a mouse wheel scrolls it sideways. More categories than
-// the windows already asked come with «More…».
+// the windows already asked come with «More…». With the services of Services (SALE-F38), «Services»
+// follows «All» with its count (`services`).
 import { syncTabbarOverflow } from '@erplora/ui/shell';
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 
 import type { CategoryOut } from '../../../../inventory/frontend/operations';
 import { useT } from '../../composables/useT';
+import { SERVICES } from './till';
 
 defineProps<{
   categories: readonly CategoryOut[];
   /** Every active article; `undefined` until it is known. */
   allCount?: number;
   hasMore?: boolean;
+  /** Offer the «Services» chip (SALE-F38). */
+  withServices?: boolean;
+  /** Every offered service; `undefined` until it is known. */
+  servicesCount?: number;
 }>();
 const model = defineModel<string>({ required: true });
 const emit = defineEmits<{ loadMore: [] }>();
@@ -23,6 +29,7 @@ const t = useT();
 const ALL = 'all';
 
 const count = (n: number) => (n === 1 ? t('sale.pos.itemCountOne') : t('sale.pos.itemCount', { count: n }));
+const serviceCount = (n: number) => (n === 1 ? t('sale.pos.serviceCountOne') : t('sale.pos.serviceCount', { count: n }));
 
 function onChange(event: CustomEvent<{ value?: string | number }>): void {
   const value = String(event.detail.value ?? ALL);
@@ -73,6 +80,20 @@ onBeforeUnmount(() => resize?.disconnect());
           v-if="allCount !== undefined"
           class="pos-cat__count"
         >{{ count(allCount) }}</span>
+      </ion-label>
+    </ion-segment-button>
+    <ion-segment-button
+      v-if="withServices"
+      :value="SERVICES"
+      class="pos-cat"
+      data-testid="pos-category-services"
+    >
+      <ion-label class="pos-cat__label">
+        <span class="pos-cat__name">{{ $t('sale.pos.services') }}</span>
+        <span
+          v-if="servicesCount !== undefined"
+          class="pos-cat__count"
+        >{{ serviceCount(servicesCount) }}</span>
       </ion-label>
     </ion-segment-button>
     <ion-segment-button

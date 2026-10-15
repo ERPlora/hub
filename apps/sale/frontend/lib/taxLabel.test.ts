@@ -4,7 +4,7 @@
 // key the server sent.
 import { describe, expect, it } from 'vitest';
 
-import { plain } from '../../lib/format';
+import { plain } from './format';
 import { taxLabel } from './taxLabel';
 
 describe('taxLabel', () => {

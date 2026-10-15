@@ -162,12 +162,25 @@ export interface OpenLineIn extends LineFields {
   name?: string;
 }
 
+/**
+ * A service of the Services app: its id or its name; `unit_price` only when it has no fixed price. A fixed
+ * price is the professional's own (`staff_id`) or the service's. `booked_price`: what the check's
+ * appointment booked, checked against it (lower only with the open-price right).
+ */
+export interface ServiceLineIn extends LineFields {
+  service_id?: string;
+  service?: string;
+  unit_price?: number;
+  booked_price?: number;
+}
+
 export interface OrderOpenIn {
   label?: string;
   notes?: string;
   appointment_id?: string | null;
   lines?: ProductLineIn[];
   open_lines?: OpenLineIn[];
+  service_lines?: ServiceLineIn[];
 }
 
 export interface OrderRefIn {
@@ -182,9 +195,18 @@ export interface OrderAddOpenLineIn extends OpenLineIn {
   order_id: string;
 }
 
+export interface OrderAddServiceLineIn extends ServiceLineIn {
+  order_id: string;
+}
+
 export interface OrderLineRefIn {
   order_id: string;
   line_id: string;
+}
+
+/** SALE-F27: one session of the customer's voucher (Services) pays the line. */
+export interface OrderApplyVoucherIn extends OrderLineRefIn {
+  grant_id: string;
 }
 
 export interface OrderUpdateLineIn extends OrderLineRefIn {
@@ -269,6 +291,18 @@ export interface OrderLineOut {
   gift_reason: string;
   notes: string;
   staff_id: string | null;
+  /** Services' service, if it is one. */
+  service_id: string | null;
+  /** A session of a customer's voucher pays it: charged at 0. */
+  paid_by_voucher: boolean;
+  voucher_session_id: string | null;
+  voucher_grant_id: string | null;
+  /** The voucher's name, as it was applied. */
+  voucher_name: string;
+  /** Sessions the voucher had left after this one when applied; null = unlimited. */
+  voucher_remaining: number | null;
+  /** Until when the session stays held for the line. */
+  voucher_hold_until: string | null;
   /** Provisional, before the ticket discount. */
   line_total: number;
   /** Kitchen round; 0 = pending. */
@@ -293,6 +327,8 @@ export interface OrderOut {
   updated_at: string;
   /** The lines left to charge. */
   lines: OrderLineOut[];
+  /** Opening the check of an appointment that already had one answers that one (nothing added). */
+  already: boolean;
 }
 
 export interface OrderRow {
@@ -330,6 +366,7 @@ export interface ChargeLinesIn {
   line_ids?: string[];
   lines?: ProductLineIn[];
   open_lines?: OpenLineIn[];
+  service_lines?: ServiceLineIn[];
   /** Counter sale only. */
   discount_percent?: string | number;
   /** Counter sale only, cents. */
@@ -368,12 +405,23 @@ export interface CompleteIn extends ChargeLinesIn {
   notes?: string;
 }
 
+/** One row per fiscal key (tax, regime, qualification, exemption cause, rates) and component. */
 export interface BreakdownOut {
   rate_pct: string;
   label: string;
+  /** vat, surcharge, igic, ipsi… */
+  tax_type: string;
+  /** VAT regime key (01 = general). */
+  regime: string;
+  qualification: 'subject' | 'subject_reverse' | 'exempt' | 'not_subject' | 'not_subject_location' | string;
+  /** E1–E8 on an exempt key. */
+  exempt_reason: string;
   base: number;
   tax: number;
 }
+
+/** What Invoicing answered for the fiscal document of a write; empty on a sale charged before. */
+export type FiscalStatus = '' | 'issued' | 'pending' | 'unavailable' | 'none';
 
 export interface PreviewLineOut {
   order_line_id: string | null;
@@ -383,6 +431,10 @@ export interface PreviewLineOut {
   unit_price: number;
   discount_percent: string;
   is_gift: boolean;
+  service_id: string | null;
+  paid_by_voucher: boolean;
+  voucher_name: string;
+  voucher_remaining: number | null;
   tax_category_key: string;
   tax_rate: string;
   net_amount: number;
@@ -405,7 +457,10 @@ export interface PreviewOut {
   total: number;
   breakdown: BreakdownOut[];
   lines: PreviewLineOut[];
-  /** From this total on, no cash at all (Spain: 100000); null = no limit. */
+  /** The whole operation the cash limit looks at: on a check charged in parts, what it already charged
+   *  plus all it has left (Ley 7/2012, art. 7); otherwise `total`. */
+  operation_total: number;
+  /** From this operation total on, no cash at all (Spain: 100000); null = no limit. */
   cash_limit: number | null;
   /** Above this total, only an invoice (Spain: 300000); null = no limit. */
   ticket_limit: number | null;
@@ -430,6 +485,10 @@ export interface SaleLineOut {
   gift_reason: string;
   notes: string;
   staff_id: string | null;
+  service_id: string | null;
+  /** A voucher session paid it (at 0). */
+  paid_by_voucher: boolean;
+  voucher_name: string;
   tax_category_key: string;
   tax_rate: string;
   tax_country_code: string;
@@ -476,6 +535,8 @@ export interface SaleOut {
   change_total: number;
   refunded_total: number;
   refundable_total: number;
+  /** Lines paid with a voucher whose session has not come back yet. */
+  sessions_to_return: number;
   payment_method_name: string;
   breakdown: BreakdownOut[];
   notes: string;
@@ -486,6 +547,17 @@ export interface SaleOut {
   created_by: string;
   lines: SaleLineOut[];
   payments: SalePaymentOut[];
+  /** Its ticket (F2) or invoice (F1), issued by Invoicing in the same charge. */
+  invoice_status: FiscalStatus;
+  invoice_id: string | null;
+  /** TICKET-2026-000001, FACT-2026-000001; empty while it has none. The paper prints it. */
+  invoice_number: string;
+  invoice_type: string;
+  /** The rectifying invoice of its void (R5). */
+  void_invoice_status: FiscalStatus;
+  void_invoice_number: string;
+  /** A fiscal document of it waits (its own, its void's or a refund's): «Issue now» issues it. */
+  documents_pending: boolean;
   /** True: this attempt had already been charged; nothing new was recorded. */
   already: boolean;
 }
@@ -536,6 +608,14 @@ export interface SaleRow {
   tax_total: number;
   refunded_total: number;
   refundable_total: number;
+  /** Lines paid with a voucher whose session has not come back yet. */
+  sessions_to_return: number;
+  /** It has a refund, also one of no money (a voucher's session): refunded, never voided. */
+  has_refunds: boolean;
+  /** Its fiscal document (issued, pending, unavailable, none; empty before Sales asked for one). */
+  invoice_status: FiscalStatus;
+  /** A fiscal document of it waits (its own, its void's or a refund's): «Issue now» issues it. */
+  documents_pending: boolean;
 }
 
 export interface PeriodIn {
@@ -595,7 +675,8 @@ export interface RefundIn extends SaleRefIn {
   reason: string;
   note?: string;
   idempotency_key?: string;
-  allocations: AllocationIn[];
+  /** None = no money: only the session of a voucher comes back. */
+  allocations?: AllocationIn[];
   lines?: RefundLineIn[];
 }
 
@@ -605,6 +686,10 @@ export interface RefundOut {
   sale_id: string;
   total: number;
   fully_refunded: boolean;
+  /** Its rectifying invoice, issued by Invoicing in the same refund. */
+  invoice_status: FiscalStatus;
+  invoice_number: string;
+  invoice_type: string;
 }
 
 export interface TenderOption {
@@ -629,6 +714,9 @@ export interface LineOption {
   left: string;
   line_total: number;
   is_gift: boolean;
+  /** A voucher session paid it: returning it gives the session back. */
+  paid_by_voucher: boolean;
+  voucher_name: string;
 }
 
 export interface RefundOptionsOut {
@@ -650,6 +738,10 @@ export interface RefundRow {
   note: string;
   created_at: string;
   created_by: string;
+  /** Its rectifying invoice: issued, pending (waits: «Issue now»), unavailable or none. */
+  invoice_status: FiscalStatus;
+  invoice_number: string;
+  invoice_type: string;
 }
 
 export interface RefundByKeyIn {
@@ -669,12 +761,16 @@ declare module '@erplora/ui/sdk' {
     'sale.sale.complete_over_limit': { input: CompleteIn; output: SaleOut };
     'sale.sale.void': { input: VoidIn; output: SaleOut };
     'sale.sale.refund': { input: RefundIn; output: RefundOut };
+    'sale.sale.issue_documents': { input: SaleRefIn; output: SaleOut };
     'sale.checkout.preview': { input: PreviewIn; output: PreviewOut };
     'sale.order.list': { input: OrderListIn; output: Page<OrderRow> };
     'sale.order.get': { input: OrderRefIn; output: OrderOut };
     'sale.order.open': { input: OrderOpenIn; output: OrderOut };
     'sale.order.add_line': { input: OrderAddLineIn; output: OrderOut };
     'sale.order.add_open_line': { input: OrderAddOpenLineIn; output: OrderOut };
+    'sale.order.add_service_line': { input: OrderAddServiceLineIn; output: OrderOut };
+    'sale.order.apply_voucher': { input: OrderApplyVoucherIn; output: OrderOut };
+    'sale.order.remove_voucher': { input: OrderLineRefIn; output: OrderOut };
     'sale.order.update_line': { input: OrderUpdateLineIn; output: OrderOut };
     'sale.order.set_line_staff': { input: OrderSetLineStaffIn; output: OrderOut };
     'sale.order.split_line': { input: OrderLineRefIn; output: SplitLineOut };

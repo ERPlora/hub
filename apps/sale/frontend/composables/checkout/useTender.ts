@@ -26,6 +26,11 @@ export interface UseTenderOptions<M extends TenderMethod> {
   methods: MaybeRefOrGetter<readonly M[]>;
   /** From this total on, no cash (the preview's `cash_limit`). */
   cashLimit: MaybeRefOrGetter<number | null | undefined>;
+  /**
+   * What the cash limit looks at: the whole operation (the preview's `operation_total`: what a check
+   * charged in parts already charged plus all it has left; Ley 7/2012 art. 7). `total` without it.
+   */
+  operationTotal?: MaybeRefOrGetter<number | undefined>;
 }
 
 export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) {
@@ -38,7 +43,7 @@ export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) 
   let legSeq = 0;
 
   const total = computed(() => toValue(options.total) ?? 0);
-  const cashOff = computed(() => cashOverLimit(toValue(options.cashLimit), toValue(options.total)));
+  const cashOff = computed(() => cashOverLimit(toValue(options.cashLimit), toValue(options.operationTotal) ?? toValue(options.total)));
   const method = computed<M | undefined>(() => {
     const methods = toValue(options.methods);
     return methods.find((m) => m.id === pickedId.value) ?? defaultMethod(methods, cashOff.value);

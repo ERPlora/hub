@@ -2,12 +2,18 @@
 
 Pure: it reads nothing. The money of a line is ``unit_price × ratio`` (the quantity in the unit the
 price refers to, divided by its price quantity) with the line and ticket percents compounded, rounded
-once, half up. ``discount_amount`` is every discount given (line and ticket). A comp is charged at 0 and keeps its cost; a fixed ticket amount comes off after the
-percents, shared by weight (largest remainder, ties to the earlier line). Each tax category is then
-closed ONCE by ``close`` — tax's ``calculate_tax`` in production (``tax_closer``) — and its base (with
-VAT included) or its quota (without it) is shared among its lines by weight, so every line squares
-(base + tax = total), every rate of the breakdown squares, and what is charged and what is declared
-never drift apart.
+once, half up. ``discount_amount`` is every discount given (line and ticket). A comp is charged at 0 and keeps its cost;
+a line a voucher pays (``covered``, SALE-F27) is worth 0, neither a discount nor a comp: the voucher was
+taxed when it was sold. A fixed ticket amount comes off after the
+percents, shared by weight (largest remainder, ties to the earlier line).
+
+Each line's tax category is resolved to its rule by ``close`` — tax's ``calculate_tax`` in production
+(``tax_closer``) — and the lines are grouped by **fiscal key** (tax, regime, qualification, exemption
+cause and the rates of its components: what Invoicing's breakdown and VeriFactu's ``Desglose`` read).
+Each key is then closed ONCE over the money of all its lines, whatever their categories, and its base
+(with VAT included) or its quota (without it) is shared among them by weight, so every line squares
+(base + tax = total), every entry of the breakdown squares, and the ticket and its invoice declare the
+same base and quota to the cent (two categories at 10 % are one rounding, never two).
 """
 
 from collections.abc import Callable
@@ -27,6 +33,10 @@ NO_TAX_RULE = _(
 
 #: ``close(category_key, amount, tax_included)`` → a ``CalculationOut`` of tax.
 Closer = Callable[[str, int, bool], dict]
+
+DEFAULT_TAX_KIND = "vat"
+GENERAL_REGIME = "01"
+SUBJECT = "subject"
 
 _HUNDRED = Fraction(100)
 
@@ -96,7 +106,12 @@ class LineIn:
     tax_category_key: str
     line_percent: Decimal = Decimal(0)
     is_gift: bool = False
+    #: Paid with a voucher session (SALE-F27): worth 0, no discount and no comp.
+    covered: bool = False
+    #: Cost of one unit of the line's own (stock) unit, in cents.
     cost: int = 0
+    #: The quantity in the line's own unit: what a comp's cost is multiplied by.
+    quantity: Decimal = Decimal(1)
     name: str = ""
 
 
@@ -123,8 +138,22 @@ class Valuation:
     tax_total: int
     discount_amount: int
     gift_total: int
-    #: ``[{rate_pct, label, base, tax}]`` in order of appearance; one entry per rate.
+    #: ``[{rate_pct, label, tax_type, regime, qualification, exempt_reason, base, tax}]`` in order of
+    #: appearance: one entry per fiscal key and component.
     breakdown: list[dict]
+
+
+def fiscal_key(closing: dict) -> tuple:
+    """What a line is for the tax agency, from its rule (a ``CalculationOut``): tax, regime,
+    qualification, exemption cause and its components' rates. Two lines with the same key are closed
+    together and are one entry of the breakdown (Invoicing's ``FiscalKey``)."""
+    return (
+        closing.get("tax_kind") or DEFAULT_TAX_KIND,
+        closing.get("tax_regime_key") or GENERAL_REGIME,
+        closing.get("tax_operation_class") or SUBJECT,
+        closing.get("tax_exempt_reason") or "",
+        tuple(Decimal(component["rate_pct"]) for component in closing["components"]),
+    )
 
 
 def value(
@@ -138,7 +167,9 @@ def value(
     if not lines:
         raise Conflict(str(EMPTY_SALE), code="sale.empty_sale")
     amounts = [
-        line_amount(
+        0
+        if line.covered
+        else line_amount(
             line.unit_price,
             line.ratio,
             line_percent=line.line_percent,
@@ -147,11 +178,17 @@ def value(
         )
         for line in lines
     ]
-    # What the lines were worth before any discount (a comp is no discount: it is kept at cost).
+    # What the lines were worth before any discount (a comp is no discount: it is kept at cost; a line
+    # a voucher pays is worth nothing to begin with).
     undiscounted = [
-        line_amount(line.unit_price, line.ratio, is_gift=line.is_gift) for line in lines
+        0 if line.covered else line_amount(line.unit_price, line.ratio, is_gift=line.is_gift)
+        for line in lines
     ]
-    gift_total = sum(half_up(line.cost * line.ratio) for line in lines if line.is_gift)
+    gift_total = sum(
+        half_up(line.cost * Fraction(line.quantity))
+        for line in lines
+        if line.is_gift and not line.covered
+    )
 
     if ticket_amount:
         payable = sum(amounts)
@@ -170,28 +207,41 @@ def value(
     outs = [
         LineOut(key=line.key, tax_category_key=line.tax_category_key) for line in lines
     ]
-    breakdown: dict[Decimal, dict] = {}
-    subtotal = tax_total = 0
-    groups: dict[str, list[int]] = {}
+    # Each category resolved once to its rule (a closing of nothing); its lines go to the rule's key.
+    rules: dict[str, dict] = {}
+    groups: dict[tuple, list[int]] = {}
     for index, line in enumerate(lines):
-        groups.setdefault(line.tax_category_key, []).append(index)
+        category = line.tax_category_key
+        if category not in rules:
+            rules[category] = _resolve(close, line, tax_included)
+        groups.setdefault(fiscal_key(rules[category]), []).append(index)
 
-    for category, members in groups.items():
+    breakdown: list[dict] = []
+    subtotal = tax_total = 0
+    for key, members in groups.items():
         weights = [amounts[i] for i in members]
-        gross = sum(weights)
-        try:
-            closing = close(category, gross, tax_included)
-        except Conflict as refusal:
-            if refusal.code != "tax.no_rate":
-                raise
-            name = lines[members[0]].name or category
-            message = str(NO_TAX_RULE) % {"name": name, "category": category}
-            raise Conflict(message, code="sale.no_tax_rule") from None
+        # One closing for the whole key, by the rule of its first category: the money of a key only
+        # depends on its rates.
+        closing = close(lines[members[0]].tax_category_key, sum(weights), tax_included)
         components = closing["components"]
-        # Each component's quota, shared among the lines of the category by weight.
-        shares = [allocate(component["tax"], weights) for component in components]
+        if tax_included:
+            # As Invoicing closes a charge (``fiscal.close_charged``): the key's base shared by weight,
+            # each line's tax what is left of its amount; the main components' quotas by weight and the
+            # last one takes what is left of the line's tax.
+            bases = allocate(closing["base"], weights)
+            shares = [allocate(component["tax"], weights) for component in components[:-1]]
+            taxes = [amounts[i] - bases[position] for position, i in enumerate(members)]
+            shares.append(
+                [
+                    tax - sum(share[position] for share in shares)
+                    for position, tax in enumerate(taxes)
+                ]
+            )
+        else:
+            # Each component's quota, shared among the lines of the key by weight, on top.
+            shares = [allocate(component["tax"], weights) for component in components]
         for position, i in enumerate(members):
-            out = outs[i]
+            out, rule = outs[i], rules[lines[i].tax_category_key]
             line_tax = sum(share[position] for share in shares)
             if tax_included:
                 out.line_total = amounts[i]
@@ -200,10 +250,10 @@ def value(
                 out.net_amount = amounts[i]
                 out.line_total = amounts[i] + line_tax
             out.tax_amount = line_tax
-            out.tax_rate = Decimal(closing["tax_rate_pct"])
-            out.tax_rule_id = closing["tax_rule_id"]
-            out.tax_country_code = closing["tax_country_code"]
-            out.tax_region_code = closing["tax_region_code"]
+            out.tax_rate = Decimal(rule["tax_rate_pct"])
+            out.tax_rule_id = rule["tax_rule_id"]
+            out.tax_country_code = rule["tax_country_code"]
+            out.tax_region_code = rule["tax_region_code"]
             out.tax_components = [
                 {
                     "rule_id": component["rule_id"],
@@ -212,18 +262,24 @@ def value(
                     "rate_pct": Decimal(component["rate_pct"]),
                     "tax": share[position],
                 }
-                for component, share in zip(components, shares, strict=True)
+                for component, share in zip(rule["components"], shares, strict=True)
             ]
         subtotal += closing["base"]
         tax_total += closing["tax"]
-        for component in components:
-            rate = Decimal(component["rate_pct"])
-            entry = breakdown.setdefault(
-                rate,
-                {"rate_pct": rate, "label": component["label"], "base": 0, "tax": 0},
-            )
-            entry["base"] += closing["base"]
-            entry["tax"] += component["tax"]
+        tax_kind, regime, qualification, exempt_reason, _rates = key
+        breakdown.extend(
+            {
+                "rate_pct": Decimal(component["rate_pct"]),
+                "label": component["label"],
+                "tax_type": component["tax_type"] or tax_kind,
+                "regime": regime,
+                "qualification": qualification,
+                "exempt_reason": exempt_reason,
+                "base": closing["base"],
+                "tax": component["tax"],
+            }
+            for component in components
+        )
 
     total = sum(out.line_total for out in outs)
     discount_amount = sum(undiscounted) - (total if tax_included else subtotal)
@@ -234,8 +290,20 @@ def value(
         tax_total=tax_total,
         discount_amount=discount_amount,
         gift_total=gift_total,
-        breakdown=list(breakdown.values()),
+        breakdown=breakdown,
     )
+
+
+def _resolve(close: Closer, line: LineIn, tax_included: bool) -> dict:
+    """The rule of ``line``'s category (a closing of 0 cents); without one, 409 naming the line."""
+    try:
+        return close(line.tax_category_key, 0, tax_included)
+    except Conflict as refusal:
+        if refusal.code != "tax.no_rate":
+            raise
+        name = line.name or line.tax_category_key
+        message = str(NO_TAX_RULE) % {"name": name, "category": line.tax_category_key}
+        raise Conflict(message, code="sale.no_tax_rule") from None
 
 
 def tax_closer(on=None) -> Closer:

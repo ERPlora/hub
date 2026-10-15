@@ -54,3 +54,27 @@ describe('CategoryStrip', () => {
     expect(m.find('pos-category-all').find('.pos-cat__count').exists()).toBe(false);
   });
 });
+
+describe('CategoryStrip: the services of Services (SALE-F38)', () => {
+  it('with services, «Services» comes right after «All» with its count, and picking it hands «services» up', async () => {
+    const m = await setup({ withServices: true, servicesCount: 3 }, 'es');
+    const buttons = m.wrapper.findAll('ion-segment-button');
+    expect(buttons.map((b) => b.attributes('data-testid'))).toEqual(['pos-category-all', 'pos-category-services', 'pos-category-c1', 'pos-category-c2']);
+    expect(buttons[1].find('.pos-cat__name').text()).toBe('Servicios');
+    expect(buttons[1].find('.pos-cat__count').text()).toBe('3 servicios');
+    m.wrapper.find('ion-segment').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'services' } }));
+    expect(m.wrapper.emitted('update:modelValue')).toEqual([['services']]);
+  });
+
+  it('one service is «1 service»; an unknown count says nothing yet', async () => {
+    const m = await setup({ withServices: true, servicesCount: 1 });
+    expect(m.find('pos-category-services').find('.pos-cat__count').text()).toBe('1 service');
+    const unknown = await setup({ withServices: true });
+    expect(unknown.find('pos-category-services').find('.pos-cat__count').exists()).toBe(false);
+  });
+
+  it('without services there is no such chip', async () => {
+    const m = await setup();
+    expect(m.find('pos-category-services').exists()).toBe(false);
+  });
+});

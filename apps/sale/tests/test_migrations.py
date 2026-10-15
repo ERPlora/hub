@@ -59,3 +59,19 @@ def test_the_reverse_takes_out_only_the_unused_factory_methods():
     run_backward()
     assert factory() == []
     assert list(PaymentMethod.objects.values_list("name", flat=True)) == ["Bizum"]
+
+
+def test_the_reverse_keeps_a_factory_method_a_refund_gave_money_back_by(product):
+    from apps.sale.tests.conftest import run
+
+    product("Coffee", "COF", 150, "product.generic")
+    run("sale.payment_method.create", {"name": "Bizum", "type": "other"})
+    sale = run("sale.sale.complete", {"idempotency_key": "mig-key-0001", "lines": [{"product": "COF"}], "payments": [{"method": "Bizum"}]})
+    cash = PaymentMethod.objects.get(is_system=True, type="cash")
+    run(
+        "sale.sale.refund",
+        {"sale_id": str(sale.id), "reason": "x", "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 150, "to_method_id": str(cash.id)}]},
+    )
+    run_backward()
+    # Cash gave money back: it stays; Card was never used: it goes.
+    assert factory() == [("Cash", "cash", 10)]

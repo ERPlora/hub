@@ -6,7 +6,7 @@
 // document; «Document» and «Reprint» for everyone, «Void» and «Refund» by permission and only where
 // they apply. The list re-runs by itself on charges, voids and refunds: nothing here refetches.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
@@ -22,6 +22,12 @@ import { plain } from '../lib/format';
 import type { SaleRow } from '../operations';
 import SalesPage from './SalesPage.vue';
 import source from './SalesPage.vue?raw';
+
+vi.mock('@erplora/ui/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
+  toastError: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(() => Promise.resolve()),
+}));
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -57,14 +63,18 @@ const row = (id: string, over: Partial<SaleRow> = {}): SaleRow => ({
   tax_total: 114,
   refunded_total: 0,
   refundable_total: 1250,
+  sessions_to_return: 0,
+  has_refunds: false,
+  invoice_status: 'issued',
+  documents_pending: false,
   ...over,
 });
 
 const ROWS = [
   row('s1', { customer_name: 'Lucía Pérez' }),
   row('s2', { status: 'voided', refundable_total: 0, payment_method_name: 'Card' }),
-  row('s3', { status: 'refunded', refunded_total: 1250, refundable_total: 0 }),
-  row('s4', { refunded_total: 750, refundable_total: 500 }),
+  row('s3', { status: 'refunded', refunded_total: 1250, refundable_total: 0, has_refunds: true }),
+  row('s4', { refunded_total: 750, refundable_total: 500, has_refunds: true }),
   row('s5', { document_type: 'invoice' }),
 ];
 const PAGE = { rows: ROWS, total: 5, limit: 50, offset: 0 };
@@ -77,6 +87,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.mocked(toastError).mockClear();
+  vi.mocked(toastSuccess).mockClear();
 });
 
 async function setup(options: MountOptions = {}) {
@@ -297,6 +309,7 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
     expect(s.prop<Array<{ id: string; label: string; icon: string; color?: string }>>('actions').map((a) => [a.id, a.label, a.icon, a.color ?? null])).toEqual([
       ['document', 'Document', 'receipt-outline', null],
       ['reprint', 'Reprint', 'copy-outline', null],
+      ['issue', 'Issue now', 'sync-outline', 'warning'],
       ['void', 'Void', 'ban-outline', 'danger'],
       ['refund', 'Refund', 'lucide:rotate-ccw', 'warning'],
     ]);
@@ -312,10 +325,39 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
     expect(['void', 'refund'].map((a) => has('s5', a))).toEqual([false, true]);
   });
 
-  it('an employee gets only Document and Reprint, and no void or refund window', async () => {
+  it('a sale paid whole with a voucher (0,00 €) can still be refunded while a session has not come back (SALE-F32)', async () => {
+    const s = await setup();
+    await s.show({
+      ...PAGE,
+      rows: [
+        row('s6', { total: 0, refundable_total: 0, sessions_to_return: 1 }),
+        row('s7', { total: 0, refundable_total: 0, sessions_to_return: 0 }),
+        row('s8', { refunded_total: 1250, refundable_total: 0, sessions_to_return: 1, has_refunds: true }),
+      ],
+      total: 3,
+    });
+    const has = (id: string, action: string) => s.find(`sales-table-row-${id}-${action}`).exists();
+    expect(['void', 'refund'].map((a) => has('s6', a))).toEqual([true, true]);
+    expect(has('s7', 'refund')).toBe(false);
+    expect(['void', 'refund'].map((a) => has('s8', a))).toEqual([false, true]);
+  });
+
+  it('a sale with a refund of no money (a voucher’s session came back) is refunded, never voided', async () => {
+    // The server refuses voiding a sale with refunds (sale.sale_already_refunded), whatever the money.
+    const s = await setup();
+    await s.show({
+      ...PAGE,
+      rows: [row('s9', { refunded_total: 0, refundable_total: 1250, sessions_to_return: 1, has_refunds: true })],
+      total: 1,
+    });
+    const has = (action: string) => s.find(`sales-table-row-s9-${action}`).exists();
+    expect([has('void'), has('refund')]).toEqual([false, true]);
+  });
+
+  it('an employee gets Document, Reprint and «Issue now» (she charges), and no void or refund window', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(PAGE);
-    expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['document', 'reprint']);
+    expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['document', 'reprint', 'issue']);
     expect(s.wrapper.findComponent(VoidSaleModal).exists()).toBe(false);
     expect(s.wrapper.findComponent(RefundModal).exists()).toBe(false);
   });
@@ -343,6 +385,28 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
     s.wrapper.findComponent(ReprintJob).vm.$emit('done');
     await flush();
     expect(s.wrapper.findComponent(ReprintJob).exists()).toBe(false);
+  });
+
+  it('a sale whose fiscal documents wait says «Document pending» under its status, and only it offers «Issue now»', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show({ ...PAGE, rows: [row('s1'), row('s6', { invoice_status: 'pending', documents_pending: true })], total: 2 });
+    expect(s.wrapper.findAll('[data-testid="sales-documents-pending"]').map((pill) => pill.text())).toEqual(['Documento pendiente']);
+    expect(s.cells(1).join(' | ')).toContain('Documento pendiente');
+    expect([s.find('sales-table-row-s1-issue').exists(), s.find('sales-table-row-s6-issue').exists()]).toEqual([false, true]);
+  });
+
+  it('«Issue now» asks the server for the sale’s waiting documents and says how it went', async () => {
+    const s = await setup();
+    await s.show({ ...PAGE, rows: [row('s6', { documents_pending: true })], total: 1 });
+    s.answer(200, {});
+    await s.action('s6', 'issue');
+    expect(s.sent().filter((c) => c.method === 'POST')).toEqual([
+      { method: 'POST', path: '/api/sale/sales/issue_documents', query: {}, body: { sale_id: 's6' } },
+    ]);
+    expect(toastSuccess).toHaveBeenCalledExactlyOnceWith('Fiscal documents issued.');
+    s.net.onApi(() => Response.json({ error: { code: 'invoice.issuer_missing', message: 'Set up the issuer first.' } }, { status: 409 }));
+    await s.action('s6', 'issue');
+    expect(toastError).toHaveBeenCalledExactlyOnceWith('Set up the issuer first.');
   });
 
   it('«Void» opens «Void sale <number>» for that sale; «Refund» its refund window', async () => {
@@ -402,7 +466,7 @@ describe('SalesPage: the rest', () => {
     expect(['today', 'week', 'month', 'all'].map((p) => s.chip(p))).toEqual(['Hoy', '7 días', '30 días', 'Todo']);
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Fecha', 'Número', 'Cliente', 'Pago', 'Estado', 'Total']);
     expect(s.cells(3).slice(4, 6)).toEqual(['Completada Por devolver 5,00 €', '12,50 €']);
-    expect(s.prop<Array<{ label: string }>>('actions').map((a) => a.label)).toEqual(['Documento', 'Reimprimir', 'Anular', 'Devolver']);
+    expect(s.prop<Array<{ label: string }>>('actions').map((a) => a.label)).toEqual(['Documento', 'Reimprimir', 'Emitir ahora', 'Anular', 'Devolver']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar número o cliente…');
     expect(s.prop('labels')).toMatchObject({ loading: 'Cargando…', loadError: 'No se pudieron cargar las ventas', retry: 'Reintentar' });
   });

@@ -17,6 +17,8 @@ from apps.sale.schemas import (
     DepartmentUpdateIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
+    OrderAddServiceLineIn,
+    OrderApplyVoucherIn,
     OrderFireIn,
     OrderLineRefIn,
     OrderListIn,
@@ -114,6 +116,11 @@ async def sale_refund(request, data: RefundIn):
     return await run_operation(request, services.refund, data)
 
 
+@bind(router, "sale.sale.issue_documents", "/sale/sales/issue_documents")
+async def sale_issue_documents(request, data: SaleRefIn):
+    return await run_operation(request, services.issue_documents, data)
+
+
 @bind(router, "sale.checkout.preview", "/sale/checkout/preview")
 async def checkout_preview(request, params: Query[PreviewIn]):
     return await run_operation(request, queries.preview, params)
@@ -145,6 +152,21 @@ async def order_add_line(request, data: OrderAddLineIn):
 @bind(router, "sale.order.add_open_line", "/sale/orders/add_open_line")
 async def order_add_open_line(request, data: OrderAddOpenLineIn):
     return await run_operation(request, services.add_open_line, data)
+
+
+@bind(router, "sale.order.add_service_line", "/sale/orders/add_service_line")
+async def order_add_service_line(request, data: OrderAddServiceLineIn):
+    return await run_operation(request, services.add_service_line, data)
+
+
+@bind(router, "sale.order.apply_voucher", "/sale/orders/apply_voucher")
+async def order_apply_voucher(request, data: OrderApplyVoucherIn):
+    return await run_operation(request, services.apply_voucher, data)
+
+
+@bind(router, "sale.order.remove_voucher", "/sale/orders/remove_voucher")
+async def order_remove_voucher(request, data: OrderLineRefIn):
+    return await run_operation(request, services.remove_voucher, data)
 
 
 @bind(router, "sale.order.update_line", "/sale/orders/update_line")

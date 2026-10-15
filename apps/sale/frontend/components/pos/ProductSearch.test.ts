@@ -5,13 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import { click, errorFrame, ionValue, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
-import { page, product } from './__tests__/fixtures';
+import { page, product, service } from './__tests__/fixtures';
 import ProductSearch from './ProductSearch.vue';
 
 const OP = 'inventory.product.list';
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(ProductSearch, { locale });
+async function setup(locale: 'en' | 'es' = 'en', props: Record<string, unknown> = {}) {
+  const m = await mountSale(ProductSearch, { locale, props });
   await m.live();
   return m;
 }
@@ -64,5 +64,30 @@ describe('ProductSearch', () => {
     m.find('pos-search').element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(m.wrapper.emitted('close')).toHaveLength(2);
     expect(m.find('pos-search-close').attributes('aria-label')).toBe('Close the search');
+  });
+});
+
+describe('ProductSearch: the services of Services (SALE-F38)', () => {
+  const SERVICES = 'service.service.list_for_sale';
+
+  it('with services, it asks Services too with what is typed and lists them under «Services»', async () => {
+    const m = await setup('es', { withServices: true });
+    expect(m.params(SERVICES)).toEqual([{ search: '', limit: 20, offset: 0 }]);
+    await ionValue(m.wrapper.find('ion-searchbar').element, ' cor ', 'ionInput');
+    await m.reopen();
+    expect(m.params(SERVICES)).toEqual([{ search: 'cor', limit: 20, offset: 0 }]);
+    const cut = service({ id: 'sv1', name: 'Corte de pelo', price: 2500 });
+    await m.result(SERVICES, page([cut]));
+    expect(m.find('pos-search-services-title').text()).toBe('Servicios');
+    const row = m.find('pos-search-service-sv1');
+    expect(row.find('h3').text()).toBe('Corte de pelo');
+    expect(plain(row.find('.pos-search__price').text())).toBe('25,00 €');
+    await click(row.element);
+    expect(m.wrapper.emitted('pickService')).toEqual([[cut]]);
+  });
+
+  it('without services, Services is not asked', async () => {
+    const m = await setup();
+    expect(m.params(SERVICES)).toEqual([]);
   });
 });

@@ -215,6 +215,9 @@ msgstr "total provisional"
 msgid "version"
 msgstr "versión"
 
+msgid "attempt key"
+msgstr "clave del intento"
+
 msgid "closed at"
 msgstr "cerrada el"
 
@@ -314,6 +317,18 @@ msgstr "cliente"
 msgid "customer name"
 msgstr "nombre del cliente"
 
+msgid "customer tax ID"
+msgstr "NIF del cliente"
+
+msgid "customer address"
+msgstr "domicilio del cliente"
+
+msgid "customer country"
+msgstr "país del cliente"
+
+msgid "customer document type"
+msgstr "tipo de documento del cliente"
+
 msgid "currency"
 msgstr "moneda"
 
@@ -346,9 +361,6 @@ msgstr "desglose de impuestos"
 
 msgid "payment"
 msgstr "pago"
-
-msgid "attempt key"
-msgstr "clave del intento"
 
 msgid "voided at"
 msgstr "anulada el"
@@ -527,11 +539,15 @@ msgstr "Di qué departamento: su id o su nombre."
 msgid "Say which quick note: its id or its text."
 msgstr "Di qué nota rápida: su id o su texto."
 
-msgid "Charge an open check (order_id) or loose lines (lines), one of the two."
-msgstr "Cobra una cuenta abierta (order_id) o líneas sueltas (lines), una de las dos."
+msgid ""
+"Charge an open check (order_id) or loose lines (lines, service lines or open-"
+"price lines), one of the two."
+msgstr ""
+"Cobra una cuenta abierta (order_id) o líneas sueltas (lines, de servicios o de"
+" precio libre), una de las dos."
 
-msgid "Enter a two-letter country code, e.g. ES or FR."
-msgstr "Escribe el código de país de dos letras, p. ej. ES o FR."
+msgid "Enter the country's ISO code, e.g. ES, FR or GB."
+msgstr "Escribe el código ISO del país, p. ej. ES, FR o GB."
 
 msgid "That check is no longer open."
 msgstr "Esa cuenta ya no está abierta."
@@ -623,3 +639,126 @@ msgstr "Esta devolución ya se está registrando. Comprueba la venta antes de vo
 
 msgid "There is already a payment method with that name."
 msgstr "Ya hay una forma de pago con ese nombre."
+
+msgid "That attempt key was already used for another charge. Open it again to charge this one."
+msgstr "Esa clave de intento ya se usó para otro cobro. Vuelve a abrir el cobro para cobrar este."
+
+msgid "Say which service: its id, or its name."
+msgstr "Di qué servicio: su id o su nombre."
+
+msgid "Services is not active in this business: its services cannot be sold nor its vouchers used. Take the voucher off the line to charge it."
+msgstr "Servicios no está activa en este negocio: no se pueden vender sus servicios ni usar sus bonos. Quita el bono de la línea para cobrarla."
+
+msgid "That service is no longer offered: it is archived or it does not exist."
+msgstr "Ese servicio ya no se ofrece: está archivado o no existe."
+
+msgid "This service has no fixed price: type the amount that is charged."
+msgstr "Este servicio no tiene precio fijo: escribe el importe que se cobra."
+
+msgid "This service has a fixed price: no amount is typed."
+msgstr "Este servicio tiene precio fijo: no se escribe el importe."
+
+#, python-format
+msgid "That amount is outside what the service allows (%(min)s – %(max)s)."
+msgstr "Ese importe está fuera de lo que admite el servicio (%(min)s – %(max)s)."
+
+msgid "Only a line of a service of Services that is not a comp can be paid with a voucher."
+msgstr "Solo una línea de un servicio de Servicios que no sea una invitación se puede pagar con un bono."
+
+msgid "A voucher pays a line of one unit: split the line first."
+msgstr "Un bono paga una línea de una unidad: separa la línea antes."
+
+msgid "That line is already paid with a voucher."
+msgstr "Esa línea ya se paga con un bono."
+
+msgid "That line is not paid with any voucher."
+msgstr "Esa línea no se paga con ningún bono."
+
+msgid "That line is paid with a voucher: undo the voucher before changing it."
+msgstr "Esa línea se paga con un bono: deshaz el bono antes de cambiarla."
+
+msgid "A refund has to give back money or the session of a voucher."
+msgstr "Una devolución tiene que devolver dinero o la sesión de un bono."
+
+msgid "service id"
+msgstr "id del servicio"
+
+msgid "voucher session"
+msgstr "sesión del bono"
+
+msgid "voucher"
+msgstr "bono"
+
+msgid "voucher name"
+msgstr "nombre del bono"
+
+msgid "sessions left on the voucher"
+msgstr "sesiones que le quedaban al bono"
+
+msgid "voucher session held until"
+msgstr "sesión del bono reservada hasta"
+
+msgid "A line paid with a voucher goes back whole: its session is not split."
+msgstr "Una línea pagada con bono vuelve entera: su sesión no se parte."
+
+msgid "The cash register is closed: open a cash session to charge in cash."
+msgstr "La caja está cerrada: abre una sesión de caja para cobrar en efectivo."
+
+msgid "Invoicing is not active in this business: the sale is a ticket without a fiscal document."
+msgstr "Facturación no está activa en este negocio: la venta es un tique sin documento fiscal."
+
+msgid "Cash register is not active in this business."
+msgstr "Caja no está activa en este negocio."
+
+msgid "Appointments is not active in this business."
+msgstr "Citas no está activa en este negocio."
+
+msgid "That tax ID is not valid."
+msgstr "Ese NIF no es válido."
+
+msgid "Say what kind of document a foreign tax ID is (EU VAT number, passport, tax ID of their country…)."
+msgstr "Indica qué tipo de documento es un NIF extranjero (NIF-IVA europeo, pasaporte, NIF de su país…)."
+
+msgid "fiscal document"
+msgstr "documento fiscal"
+
+msgid "fiscal document number"
+msgstr "número del documento fiscal"
+
+msgid "fiscal document type"
+msgstr "tipo de documento fiscal"
+
+msgid "rectifying invoice of the void"
+msgstr "rectificativa de la anulación"
+
+msgid "rectifying invoice"
+msgstr "factura rectificativa"
+
+msgid "rectifying invoice type"
+msgstr "tipo de rectificativa"
+
+msgid "Issued"
+msgstr "Emitido"
+
+msgid "Pending"
+msgstr "Pendiente"
+
+msgid "Without Invoicing"
+msgstr "Sin Facturación"
+
+msgid "Nothing to declare"
+msgstr "Nada que declarar"
+
+msgid "That appointment already has an open check: charge that one (Open checks)."
+msgstr "Esa cita ya tiene una cuenta abierta: cobra esa (Cuentas abiertas)."
+
+msgid "That is not the price the appointment booked for this service: it is cancelled, it is another customer's, it did not book this service or it booked it cheaper."
+msgstr "Ese no es el precio que reservó la cita para este servicio: está cancelada, es de otra clienta, no reservó este servicio o lo reservó más barato."
+
+msgid ""
+"You cannot see that appointment: it is another professional's or it no "
+"longer exists. Charge it from the appointment's own professional or at the "
+"catalog price."
+msgstr ""
+"No puedes ver esa cita: es de otra profesional o ya no existe. Cóbrala desde "
+"la profesional de la cita o al precio del catálogo."

@@ -129,6 +129,7 @@ def test_the_money_and_fiscal_writes_are_high_risk():
         "sale.sale.complete_over_limit",
         "sale.sale.void",
         "sale.sale.refund",
+        "sale.sale.issue_documents",
         "sale.order.void",
         "sale.order.void_line",
         "sale.order.set_discount",

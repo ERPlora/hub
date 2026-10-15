@@ -16,6 +16,8 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
+from apps.customer.tax_ids import InvalidCountry, normalize_country
+
 T = TypeVar("T")
 
 #: Ninety-nine billion euros in cents: far above any price, inside a bigint.
@@ -25,6 +27,7 @@ MAX_LINES = 200
 MAX_PAYMENTS = 10
 
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
+SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
 SAY_WHICH_DEPARTMENT = _(
     "Say which department (or tax category) the open price is charged at."
 )
@@ -33,9 +36,9 @@ SAY_WHICH_METHOD = _("Say which payment method: its id, its name or its type.")
 SAY_WHICH_DEPARTMENT_ROW = _("Say which department: its id or its name.")
 SAY_WHICH_QUICK_NOTE = _("Say which quick note: its id or its text.")
 ONE_SOURCE = _(
-    "Charge an open check (order_id) or loose lines (lines), one of the two."
+    "Charge an open check (order_id) or loose lines (lines, service lines or open-price lines), one of the two."
 )
-COUNTRY_CODE = _("Enter a two-letter country code, e.g. ES or FR.")
+COUNTRY_CODE = _("Enter the country's ISO code, e.g. ES, FR or GB.")
 
 
 def _text(max_length: int, min_length: int = 0) -> type[str]:
@@ -418,6 +421,36 @@ class OpenLineIn(OpenLineFields):
     pass
 
 
+class ServiceLineFields(LineFields):
+    """A line of a service of the Services app: its name, price and tax category come from it."""
+
+    service_id: UUID | None = Field(None, description="The service's id (Services).")
+    service: Said | None = Field(
+        None, description="The service's name, when its id is not known."
+    )
+    unit_price: Cents | None = Field(
+        None,
+        description="Only for a service without a fixed price (from, hourly, variable, free): the amount charged "
+        "per unit, in cents, within its minimum and maximum.",
+    )
+    booked_price: Cents | None = Field(
+        None,
+        description="The price the appointment of the check booked for this service, in cents, frozen on the "
+        "line whatever the catalog says today. Checked against the appointment (its service at that price; "
+        "lower only with the open-price right); without an appointment it is an open price.",
+    )
+
+    @model_validator(mode="after")
+    def _named(self):
+        if self.service_id is None and self.service is None:
+            raise ValueError(str(SAY_WHICH_SERVICE))
+        return self
+
+
+class ServiceLineIn(ServiceLineFields):
+    pass
+
+
 class OrderOpenIn(Closed):
     label: Label = Field("", description="The check's title, e.g. Ana — terrace.")
     notes: _text(1000) = Field("", description="Notes of the check.")
@@ -433,6 +466,11 @@ class OrderOpenIn(Closed):
         default_factory=list,
         max_length=MAX_LINES,
         description="Open-price lines to start with (needs the open-price permission).",
+    )
+    service_lines: list[ServiceLineIn] = Field(
+        default_factory=list,
+        max_length=MAX_LINES,
+        description="Lines of services of the Services app to start with.",
     )
 
 
@@ -452,9 +490,22 @@ class OrderAddOpenLineIn(OpenLineFields):
     order_id: UUID = Field(description="The open check's id.")
 
 
+class OrderAddServiceLineIn(ServiceLineFields):
+    model_config = ConfigDict(extra="forbid")
+
+    order_id: UUID = Field(description="The open check's id.")
+
+
 class OrderLineRefIn(Closed):
     order_id: UUID = Field(description="The open check's id.")
     line_id: UUID = Field(description="The line's id.")
+
+
+class OrderApplyVoucherIn(OrderLineRefIn):
+    grant_id: UUID = Field(
+        description="The voucher sold (Services) whose session pays the line: one of the customer's, read with "
+        "service.grant.tender_options."
+    )
 
 
 class OrderUpdateLineIn(OrderLineRefIn):
@@ -573,6 +624,21 @@ class OrderLineOut(Schema):
     gift_reason: str = Field(description="Why it is a comp.")
     notes: str = Field(description="Note.")
     staff_id: UUID | None = Field(description="Who serves it; empty = the check's.")
+    service_id: UUID | None = Field(description="Services' service, if it is one.")
+    paid_by_voucher: bool = Field(
+        description="A session of a customer's voucher pays it: it is charged at 0."
+    )
+    voucher_session_id: UUID | None = Field(
+        description="The voucher session (Services) that pays it."
+    )
+    voucher_grant_id: UUID | None = Field(description="The voucher sold that pays it.")
+    voucher_name: str = Field(description="The voucher's name, as it was applied.")
+    voucher_remaining: int | None = Field(
+        description="Sessions the voucher had left after this one when applied; null = unlimited."
+    )
+    voucher_hold_until: datetime | None = Field(
+        description="Until when the session stays held for the line (one day)."
+    )
     line_total: int = Field(
         description="Provisional amount in cents, before the ticket discount."
     )
@@ -601,6 +667,11 @@ class OrderOut(Schema):
     created_at: datetime = Field(description="When it was opened.")
     updated_at: datetime = Field(description="When it last changed.")
     lines: list[OrderLineOut] = Field(description="The lines left to charge, in order.")
+    already: bool = Field(
+        False,
+        description="Opening a check of an appointment that already has one open answers that one: true, "
+        "nothing was added to it.",
+    )
 
 
 class OrderRow(Schema):
@@ -657,6 +728,11 @@ class ChargeLinesIn(Schema):
         max_length=MAX_LINES,
         description="Loose open-price lines (a counter sale).",
     )
+    service_lines: list[ServiceLineIn] = Field(
+        default_factory=list,
+        max_length=MAX_LINES,
+        description="Loose lines of services of the Services app (a counter sale).",
+    )
     discount_percent: Percent = Field(
         Decimal("0"), description="Counter sale only: ticket discount in %."
     )
@@ -666,7 +742,7 @@ class ChargeLinesIn(Schema):
 
     @model_validator(mode="after")
     def _one_source(self):
-        loose = bool(self.lines or self.open_lines)
+        loose = bool(self.lines or self.open_lines or self.service_lines)
         if (self.order_id is None) == (not loose) or (
             self.order_id is not None and loose
         ):
@@ -753,17 +829,33 @@ class CompleteIn(ChargeLinesIn):
     @field_validator("customer_country")
     @classmethod
     def _country(cls, value: str) -> str:
-        value = value.strip().upper()
-        if value and not (len(value) == 2 and value.isalpha()):
-            raise ValueError(str(COUNTRY_CODE))
-        return value
+        # The same ISO 3166-1 list Invoicing's recipient reads: what Sales accepts, Invoicing accepts.
+        try:
+            return normalize_country(value)
+        except InvalidCountry:
+            raise ValueError(str(COUNTRY_CODE)) from None
+
+
+#: What Invoicing answered for the fiscal document of a write (models.FiscalStatus); empty on a sale
+#: charged before Sales asked for it.
+FiscalStatus = Literal["", "issued", "pending", "unavailable", "none"]
 
 
 class BreakdownOut(Schema):
+    """One entry per fiscal key (tax, regime, qualification, exemption cause, rates) and component: the
+    shape Invoicing declares. A sale charged before the key was kept reads as subject VAT."""
+
     rate_pct: Decimal = Field(description="The rate.")
     label: str = Field(description="vat, or the component's name (surcharge…).")
-    base: int = Field(description="Taxable base at this rate, in cents.")
-    tax: int = Field(description="Tax at this rate, in cents.")
+    tax_type: str = Field("vat", description="The component's tax: vat, surcharge, igic, ipsi…")
+    regime: str = Field("01", description="The VAT regime key of the rule (01 = general).")
+    qualification: str = Field(
+        "subject",
+        description="subject, subject_reverse, exempt, not_subject or not_subject_location.",
+    )
+    exempt_reason: str = Field("", description="The exemption cause (E1–E8) of an exempt key.")
+    base: int = Field(description="Taxable base of the key, in cents.")
+    tax: int = Field(description="Tax of this component of the key, in cents.")
 
 
 class PreviewLineOut(Schema):
@@ -774,6 +866,12 @@ class PreviewLineOut(Schema):
     unit_price: int = Field(description="Frozen price in cents.")
     discount_percent: Decimal = Field(description="Line discount in %.")
     is_gift: bool = Field(description="A comp.")
+    service_id: UUID | None = Field(description="Services' service, if it is one.")
+    paid_by_voucher: bool = Field(description="A voucher session pays it (at 0).")
+    voucher_name: str = Field(description="The voucher that pays it.")
+    voucher_remaining: int | None = Field(
+        description="Sessions the voucher had left after this one when applied; null = unlimited."
+    )
     tax_category_key: str = Field(description="Tax category.")
     tax_rate: Decimal = Field(description="Rate applied.")
     net_amount: int = Field(description="Base in cents.")
@@ -797,10 +895,14 @@ class PreviewOut(Schema):
     )
     gift_total: int = Field(description="Comps at cost, in cents.")
     total: int = Field(description="What would be charged, in cents.")
-    breakdown: list[BreakdownOut] = Field(description="Base and tax by rate.")
+    breakdown: list[BreakdownOut] = Field(description="Base and tax by fiscal key.")
     lines: list[PreviewLineOut] = Field(description="Each line valued.")
+    operation_total: int = Field(
+        description="The whole operation the cash limit looks at, in cents: on a check charged in parts, what "
+        "it already charged plus all it has left (this charge included); otherwise the total."
+    )
     cash_limit: int | None = Field(
-        description="From this total on, no cash at all (Spain: 100000); empty = no limit."
+        description="From this operation total on, no cash at all (Spain: 100000); empty = no limit."
     )
     ticket_limit: int | None = Field(
         description="Above this total, only an invoice (Spain: 300000); empty = no limit."
@@ -828,6 +930,9 @@ class SaleLineOut(Schema):
     gift_reason: str = Field(description="Why.")
     notes: str = Field(description="Note.")
     staff_id: UUID | None = Field(description="Who served it.")
+    service_id: UUID | None = Field(description="Services' service, if it is one.")
+    paid_by_voucher: bool = Field(description="A voucher session paid it (at 0).")
+    voucher_name: str = Field(description="The voucher that paid it.")
     tax_category_key: str = Field(description="Tax category.")
     tax_rate: Decimal = Field(description="Rate.")
     tax_country_code: str = Field(description="Country of the rule.")
@@ -878,8 +983,11 @@ class SaleOut(Schema):
     change_total: int = Field(description="Change given, in cents.")
     refunded_total: int = Field(description="Refunded so far, in cents.")
     refundable_total: int = Field(description="What can still be refunded, in cents.")
+    sessions_to_return: int = Field(
+        description="Lines paid with a voucher whose session has not come back yet."
+    )
     payment_method_name: str = Field(description="The main tender's method.")
-    breakdown: list[BreakdownOut] = Field(description="Base and tax by rate.")
+    breakdown: list[BreakdownOut] = Field(description="Base and tax by fiscal key.")
     notes: str = Field(description="Notes.")
     voided_at: datetime | None = Field(description="When it was voided.")
     voided_by: str = Field(description="Who voided it.")
@@ -888,6 +996,24 @@ class SaleOut(Schema):
     created_by: str = Field(description="Who charged it.")
     lines: list[SaleLineOut] = Field(description="Its lines.")
     payments: list[SalePaymentOut] = Field(description="Its tenders.")
+    invoice_status: FiscalStatus = Field(
+        description="Its fiscal document, issued by Invoicing in the same charge: issued; pending (Invoicing "
+        "refused now, e.g. no issuer yet, and issues it later on its own); unavailable (no Invoicing: a "
+        "ticket without fiscal document)."
+    )
+    invoice_id: UUID | None = Field(description="Its fiscal document in Invoicing.")
+    invoice_number: str = Field(
+        description="The number of its fiscal document in its series (TICKET-2026-000001, FACT-2026-000001); "
+        "empty while it has none. The paper prints it."
+    )
+    invoice_type: str = Field(description="F2 (ticket) or F1 (invoice); empty while it has none.")
+    void_invoice_status: FiscalStatus = Field(
+        description="The rectifying invoice of its void, as Invoicing answered; empty if not voided."
+    )
+    void_invoice_number: str = Field(description="The number of the rectifying invoice of its void.")
+    documents_pending: bool = Field(
+        description="A fiscal document of it waits (its own, its void's or a refund's): «Issue now» issues it."
+    )
     already: bool = Field(
         False,
         description="True: this attempt had already been charged; nothing new was recorded.",
@@ -970,6 +1096,18 @@ class SaleRow(Schema):
     tax_total: int = Field(description="Tax in cents.")
     refunded_total: int = Field(description="Refunded in cents.")
     refundable_total: int = Field(description="Still refundable, in cents.")
+    sessions_to_return: int = Field(
+        description="Lines paid with a voucher whose session has not come back yet."
+    )
+    has_refunds: bool = Field(
+        description="It has a refund, also one of no money (a voucher's session): it is refunded, never voided."
+    )
+    invoice_status: FiscalStatus = Field(
+        description="Its fiscal document: issued, pending, unavailable or none; empty before Sales asked for it."
+    )
+    documents_pending: bool = Field(
+        description="A fiscal document of it waits (its own, its void's or a refund's): «Issue now» issues it."
+    )
 
 
 SalePage = Page[SaleRow]
@@ -1060,14 +1198,14 @@ class RefundIn(SaleRefIn):
         None, description="The attempt's key: a retry with it never refunds twice."
     )
     allocations: list[AllocationIn] = Field(
-        min_length=1,
+        default_factory=list,
         max_length=MAX_PAYMENTS,
-        description="How much goes back on each tender.",
+        description="How much goes back on each tender; none = no money (only the session of a voucher).",
     )
     lines: list[RefundLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
-        description="The lines that come back; none = only money.",
+        description="The lines that come back; none = only money. A line paid with a voucher gives its session back.",
     )
 
 
@@ -1079,6 +1217,12 @@ class RefundOut(Schema):
     fully_refunded: bool = Field(
         description="Whether the sale is now refunded in full."
     )
+    invoice_status: FiscalStatus = Field(
+        description="Its rectifying invoice, issued by Invoicing in the same refund: issued; none (no money "
+        "back, nothing to rectify); pending (Invoicing refused now and issues it later); unavailable."
+    )
+    invoice_number: str = Field(description="The number of its rectifying invoice (RECT-2026-000001).")
+    invoice_type: str = Field(description="R5 (of a ticket) or R1 (of an invoice); empty while none.")
 
 
 class TenderOption(Schema):
@@ -1107,6 +1251,10 @@ class LineOption(Schema):
     left: Decimal = Field(description="Units that can still come back.")
     line_total: int = Field(description="What the line charged, in cents.")
     is_gift: bool = Field(description="A comp.")
+    paid_by_voucher: bool = Field(
+        description="A voucher session paid it: returning it gives the session back."
+    )
+    voucher_name: str = Field(description="The voucher that paid it.")
 
 
 class RefundOptionsOut(Schema):
@@ -1128,6 +1276,11 @@ class RefundRow(Schema):
     note: str = Field(description="Note.")
     created_at: datetime = Field(description="When.")
     created_by: str = Field(description="Who.")
+    invoice_status: FiscalStatus = Field(
+        description="Its rectifying invoice: issued, pending (waits: «Issue now»), unavailable or none."
+    )
+    invoice_number: str = Field(description="The number of its rectifying invoice; empty while it has none.")
+    invoice_type: str = Field(description="R5 (of a ticket) or R1 (of an invoice); empty while none.")
 
 
 class RefundListOut(Schema):
@@ -1154,3 +1307,32 @@ class CustomerMergedIn(Schema):
 class CustomerReassignOut(Schema):
     customer_id: UUID = Field(description="The card that stays.")
     moved: int = Field(description="Sales moved to it.")
+
+
+class InvoiceSourceIn(Schema):
+    """Where a document of Invoicing comes from (its WORKBOOK «Contrato del origen con Ventas»)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    type: str = Field(max_length=20, description="sale, manual, substitution, rectification, refund or void.")
+    sale_id: UUID | None = Field(None, description="The sale it comes from (also its F3 and its rectifications).")
+    refund_id: UUID | None = Field(None, description="The refund a rectifying invoice of a refund corrects.")
+    void: bool = Field(False, description="True on the rectifying invoice of a void.")
+
+
+class InvoiceIssuedIn(Schema):
+    """Invoicing's notice of a document issued (``invoice.invoice.issued``; its other keys are ignored)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    invoice_id: UUID = Field(description="The document in Invoicing.")
+    number: str = Field(max_length=60, description="Its number in its series.")
+    invoice_type: str = Field(max_length=2, description="F1, F2, F3 or R1–R5.")
+    source: InvoiceSourceIn | None = Field(
+        None, description="Which charge, refund or void of Sales it comes from; none = not from Sales."
+    )
+
+
+class InvoiceRecordedOut(Schema):
+    sale_id: UUID | None = Field(description="The sale that now knows its document.")
+    recorded: bool = Field(description="Something was written now; false on a repeat or another document.")

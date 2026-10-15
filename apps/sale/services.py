@@ -5,25 +5,41 @@ Every write on an open check locks the check's row first (``select_for_update``)
 the check it charges, numbers the sale with its day's counter (``UPDATE … RETURNING``, in the same
 transaction: a refusal never burns a number) and marks the lines it takes. A void and a refund lock the
 sale's row: whichever comes first wins.
+
+A line of a service may be paid with a customer's voucher (SALE-F27): the voucher's session is reserved,
+released, delivered and given back by Services' own operations (``call_services``), inside the very
+transaction of the write here, and the line keeps the session that pays it. Services is no requirement:
+with it off, what needs it is refused (``sale.services_unavailable``) and taking a voucher or a line off
+still works (the session comes back on its own at its deadline).
 """
 
 import datetime as dt
+import logging
 from decimal import Decimal
 from fractions import Fraction
 from uuid import UUID
 
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import F, Max, Sum
 from django.utils import timezone, translation
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import operation
 from live.outbox import record_event
 
 from apps.customer.queries import find_customer
+from apps.customer.tax_ids import (
+    IdTypeRequired,
+    InvalidCountry,
+    InvalidTaxId,
+    normalize_country,
+    normalize_tax_id,
+)
 from apps.sale import events, pricing
 from apps.sale.models import (
+    FiscalStatus,
     Department,
     Order,
     OrderLine,
@@ -41,6 +57,7 @@ from apps.sale.models import (
 )
 from apps.sale.queries import (
     CASH_LIMIT,
+    Booking,
     CURRENCY,
     METHOD_NOT_AVAILABLE,
     ORDER_CHANGED,
@@ -50,6 +67,8 @@ from apps.sale.queries import (
     allowed_types,
     breakdown_rows,
     business_country,
+    call_app,
+    call_services,
     check_grid,
     current_settings,
     department_rates,
@@ -62,10 +81,12 @@ from apps.sale.queries import (
     find_tax_category,
     freeze_open_line,
     freeze_product_line,
+    freeze_service_line,
     inventory_units,
     lines_to_charge,
     loose_lines,
     method_display_name,
+    operation_total,
     order_detail,
     payment_method_row,
     provisional_total,
@@ -73,20 +94,26 @@ from apps.sale.queries import (
     ratio_of,
     returned_by_line,
     sale_detail,
+    sessions_to_return,
     settings_row,
     tender_options,
     valuate,
 )
 from apps.sale.schemas import (
+    COUNTRY_CODE,
     CompleteIn,
     CustomerMergedIn,
     CustomerReassignOut,
+    InvoiceIssuedIn,
+    InvoiceRecordedOut,
     DepartmentIn,
     DepartmentOut,
     DepartmentRefIn,
     DepartmentUpdateIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
+    OrderAddServiceLineIn,
+    OrderApplyVoucherIn,
     OrderFireIn,
     OrderFireOut,
     OrderLineRefIn,
@@ -112,6 +139,7 @@ from apps.sale.schemas import (
     RefundIn,
     RefundOut,
     SaleOut,
+    SaleRefIn,
     SettingsOut,
     SettingsPatchIn,
     SplitLineOut,
@@ -120,6 +148,8 @@ from apps.sale.schemas import (
 
 #: Units one line may be split into (a voucher covers one line of one unit).
 MAX_LINE_SPLIT = 50
+
+logger = logging.getLogger(__name__)
 
 ORDER_UNAVAILABLE = _("That check is no longer open.")
 LINE_NOT_AVAILABLE = _(
@@ -184,6 +214,30 @@ REFUND_IN_PROGRESS = _(
     "This refund is already being recorded. Check the sale before refunding again."
 )
 METHOD_EXISTS = _("There is already a payment method with that name.")
+LINE_NOT_COVERABLE = _(
+    "Only a line of a service of Services that is not a comp can be paid with a voucher."
+)
+VOUCHER_NEEDS_ONE_UNIT = _("A voucher pays a line of one unit: split the line first.")
+LINE_ALREADY_COVERED = _("That line is already paid with a voucher.")
+LINE_NOT_COVERED = _("That line is not paid with any voucher.")
+LINE_COVERED_BY_VOUCHER = _(
+    "That line is paid with a voucher: undo the voucher before changing it."
+)
+REFUND_NOTHING = _("A refund has to give back money or the session of a voucher.")
+REFUND_VOUCHER_LINE_WHOLE = _(
+    "A line paid with a voucher goes back whole: its session is not split."
+)
+APPOINTMENT_CHECK_OPEN = _(
+    "That appointment already has an open check: charge that one (Open checks)."
+)
+TAX_ID_INVALID = _("That tax ID is not valid.")
+ID_TYPE_REQUIRED = _(
+    "Say what kind of document a foreign tax ID is (EU VAT number, passport, tax ID of their country…)."
+)
+CASH_REGISTER_CLOSED = _(
+    "The cash register is closed: open a cash session to charge in cash."
+)
+KEY_REUSED = _("That attempt key was already used for another charge. Open it again to charge this one.")
 
 
 def _money(cents: int) -> str:
@@ -487,6 +541,13 @@ def _out(order: Order) -> dict:
 # ── Open checks: building them ───────────────────────────────────────────────────────────────────
 
 
+def _open_check_of(appointment_id) -> Order | None:
+    """The open check of an appointment (one at a time: ``sale_order_one_open_per_appointment``)."""
+    return Order.objects.filter(
+        appointment_id=appointment_id, status=Order.Status.OPEN, source=Order.Source.POS
+    ).first()
+
+
 @operation(
     "sale.order.open",
     kind="command",
@@ -495,19 +556,33 @@ def _out(order: Order) -> dict:
     output=OrderOut,
     ai={
         "description": "Open a check (an open ticket), empty or with lines: products of the catalog (by id, SKU or name, priced "
-        "by the catalog and frozen) and, with the open-price permission, open-price lines by department. A title helps "
-        "find it among the open checks.",
+        "by the catalog and frozen), services of Services (by id or name) and, with the open-price permission, "
+        "open-price lines by department. A title helps find it among the open checks. An appointment has one open "
+        "check at a time: opening it again answers that check (already) and adds nothing.",
         "risk": "normal",
     },
 )
 def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
-    lines = loose_lines(ctx, data.lines, data.open_lines)
-    order = Order.objects.create(
-        label=data.label,
-        notes=data.notes,
-        appointment_id=data.appointment_id,
-        created_by=actor(ctx),
+    # An appointment has one open check at a time: a second «Charge» answers it as it is (``already``).
+    if data.appointment_id is not None and (existing := _open_check_of(data.appointment_id)):
+        return {**order_detail(existing), "already": True}
+    lines = loose_lines(
+        ctx, data.lines, data.open_lines, data.service_lines, Booking(data.appointment_id)
     )
+    try:
+        with transaction.atomic():
+            order = Order.objects.create(
+                label=data.label,
+                notes=data.notes,
+                appointment_id=data.appointment_id,
+                created_by=actor(ctx),
+            )
+    except IntegrityError:
+        # The same appointment opened on another device at the same time: that check is the one.
+        existing = _open_check_of(data.appointment_id)
+        if existing is None:
+            raise
+        return {**order_detail(existing), "already": True}
     _save_lines(order, lines)
     _recount(order)
     order.save(update_fields=["provisional_total"])
@@ -560,6 +635,154 @@ def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
 
 
 @operation(
+    "sale.order.add_service_line",
+    kind="command",
+    permission="sale.add_sale",
+    input=OrderAddServiceLineIn,
+    output=OrderOut,
+    expose_api=True,
+    ai={
+        "description": "Add a service of Services (by id or name) to an open check. A fixed-price service takes its price; one "
+        "without a fixed price (from, hourly, variable, free) needs the amount charged, within its minimum and maximum. "
+        "Its tax category is the service's.",
+        "risk": "normal",
+    },
+)
+def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict:
+    line = freeze_service_line(
+        ctx, data, Booking(find_order(data.order_id).appointment_id)
+    )
+    order = _open_order(data.order_id)
+    _save_lines(order, [line])
+    _touch(ctx, order)
+    return _out(order)
+
+
+# ── Open checks: a line paid with a voucher (SALE-F27) ──────────────────────────────────────────
+
+
+def _guard_covered(line: OrderLine) -> None:
+    """A line a voucher pays keeps its quantity, comp and discount: the voucher is undone first."""
+    if line.voucher_session_id is not None:
+        raise Conflict(
+            str(LINE_COVERED_BY_VOUCHER), code="sale.line_covered_by_voucher"
+        )
+
+
+def _clear_voucher(line: OrderLine) -> None:
+    line.voucher_session_id = None
+    line.voucher_grant_id = None
+    line.voucher_name = ""
+    line.voucher_remaining = None
+    line.voucher_hold_until = None
+
+
+def _release_vouchers(ctx: OperationContext, lines) -> None:
+    """Gives the sessions held for ``lines`` back to their vouchers (SERVICE-F23). With Services off, the
+    write goes on: a held session stops counting on its own at its deadline (SERVICE-F25).
+
+    One release per session, by voucher id and then session id: the order ``service.session.settle``
+    locks the vouchers in, so two tills on the same vouchers queue instead of locking each other."""
+    covered = sorted(
+        (line for line in lines if line.voucher_session_id is not None),
+        key=lambda line: (line.voucher_grant_id.int, line.voucher_session_id.int),
+    )
+    for line in covered:
+        try:
+            call_services(
+                ctx, "service.session.release", {"id": line.voucher_session_id}
+            )
+        except Conflict as refusal:
+            if refusal.code != "sale.services_unavailable":
+                raise
+
+
+@operation(
+    "sale.order.apply_voucher",
+    kind="command",
+    permission="sale.add_sale",
+    input=OrderApplyVoucherIn,
+    output=OrderOut,
+    expose_api=True,
+    ai={
+        "description": "Pay a line of a service of an open check with one session of a customer's voucher (Services): the "
+        "session is held for the line and the line is charged at 0. One unit per line (split it first). Read the "
+        "customer's vouchers for that service with service.grant.tender_options. The sale must then be charged to the "
+        "voucher's owner.",
+        "risk": "normal",
+    },
+)
+def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
+    order = _open_order(data.order_id)
+    line = _pending_line(order, data.line_id, unfired=False)
+    if line.service_id is None or line.is_gift:
+        raise Conflict(str(LINE_NOT_COVERABLE), code="sale.line_not_coverable")
+    if line.voucher_session_id is not None:
+        raise Conflict(str(LINE_ALREADY_COVERED), code="sale.line_already_covered")
+    if line.quantity != 1:
+        raise Conflict(
+            str(VOUCHER_NEEDS_ONE_UNIT), code="sale.voucher_needs_one_unit"
+        )
+    session = call_services(
+        ctx,
+        "service.session.hold",
+        {
+            "grant_id": data.grant_id,
+            "service_id": line.service_id,
+            "order_line_id": line.id,
+        },
+    )
+    line.voucher_session_id = session.id
+    line.voucher_grant_id = session.grant_id
+    line.voucher_name = session.package_name
+    line.voucher_remaining = session.remaining
+    line.voucher_hold_until = session.hold_until
+    line.line_total = provisional_total(line)
+    line.save()
+    # A fixed ticket discount never comes off more than is left to pay (the hold rolls back with it).
+    if order.discount_amount:
+        left = sum(
+            pricing.half_up(
+                Fraction(other.line_total) * (1 - Fraction(order.discount_percent) / 100)
+            )
+            for other in order.lines.live().unpaid()
+            if not other.is_gift
+        )
+        if order.discount_amount > left:
+            raise Conflict(
+                str(DISCOUNT_OUT_OF_RANGE), code="sale.discount_out_of_range"
+            )
+    _touch(ctx, order)
+    return _out(order)
+
+
+@operation(
+    "sale.order.remove_voucher",
+    kind="command",
+    permission="sale.add_sale",
+    input=OrderLineRefIn,
+    output=OrderOut,
+    expose_api=True,
+    ai={
+        "description": "Undo the voucher of a line of an open check: its session goes back to the voucher and the line is "
+        "charged at its price again. Only before the sale is charged.",
+        "risk": "normal",
+    },
+)
+def remove_voucher(ctx: OperationContext, data: OrderLineRefIn) -> dict:
+    order = _open_order(data.order_id)
+    line = _pending_line(order, data.line_id, unfired=False)
+    if line.voucher_session_id is None:
+        raise Conflict(str(LINE_NOT_COVERED), code="sale.line_not_covered")
+    _release_vouchers(ctx, [line])
+    _clear_voucher(line)
+    line.line_total = provisional_total(line)
+    line.save()
+    _touch(ctx, order)
+    return _out(order)
+
+
+@operation(
     "sale.order.update_line",
     kind="command",
     permission="sale.add_sale",
@@ -574,6 +797,10 @@ def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
 def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
     order = _open_order(data.order_id)
     line = _pending_line(order, data.line_id)
+    if (data.quantity is not None and data.quantity != line.quantity) or (
+        data.is_gift is not None and data.is_gift != line.is_gift
+    ):
+        _guard_covered(line)
     if data.quantity is not None:
         check_grid(data.quantity, line.increment, line.unit)
         line.quantity = data.quantity
@@ -674,6 +901,7 @@ def remove_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
         message=LINE_NOT_REMOVABLE,
         code="sale.order_line_not_removable",
     )
+    _release_vouchers(ctx, [line])
     line.removed_at = timezone.now()
     line.save(update_fields=["removed_at", "updated_at"])
     record_event(
@@ -710,6 +938,7 @@ def void_line(ctx: OperationContext, data: OrderVoidLineIn) -> dict:
     )
     if line is None:
         raise Conflict(str(LINE_NOT_VOIDABLE), code="sale.order_line_not_voidable")
+    _release_vouchers(ctx, [line])
     line.removed_at = timezone.now()
     line.void_reason = data.reason
     line.voided_by = actor(ctx)
@@ -886,15 +1115,22 @@ def merge(ctx: OperationContext, data: OrderMergeIn) -> dict:
     return _out(target)
 
 
+#: Voiding a check with something ordered or charged on it is a manager's (SALE-F18).
+VOID_PERMISSION = "sale.void_sale"
+
+
 @operation(
     "sale.order.void",
     kind="command",
-    permission="sale.void_sale",
+    # An empty check (no live line, no charge) is voided by whoever builds checks: a party that leaves
+    # without ordering needs no manager (TABLE-F21). One with something on it asks ``VOID_PERMISSION``.
+    permission="sale.add_sale",
     input=OrderRefIn,
     output=OrderOut,
     ai={
         "description": "Void (delete) an open check before it is charged: it is kept as voided, never erased. What was already "
-        "charged from it stays in its sales.",
+        "charged from it stays in its sales. An empty check (nothing ordered, nothing charged) can be voided by whoever "
+        "builds checks; one with lines or charges needs the void permission.",
         "risk": "high",
     },
 )
@@ -904,6 +1140,14 @@ def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
         return order_detail(order)
     if order.status != Order.Status.OPEN:
         raise Conflict(str(ORDER_UNAVAILABLE), code="sale.order_unavailable")
+    if not ctx.has(VOID_PERMISSION) and (
+        order.lines.live().exists() or order.sales.exists()
+    ):
+        raise PermissionDenied(
+            gettext("Permission “%(permission)s” is required.")
+            % {"permission": VOID_PERMISSION}
+        )
+    _release_vouchers(ctx, order.lines.live().unpaid().exclude(voucher_session_id=None))
     order.status = Order.Status.VOIDED
     order.voided_by = actor(ctx)
     order.closed_at = timezone.now()
@@ -1004,6 +1248,8 @@ def _set_line_discount(
 ) -> dict:
     order = _still_open(data.order_id)
     line = _pending_line(order, data.line_id)
+    if data.discount_percent != line.discount_percent:
+        _guard_covered(line)
     settings = current_settings()
     percent = data.discount_percent
     if percent > 0 and not settings.allow_discounts:
@@ -1093,7 +1339,13 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
 def set_appointment(ctx: OperationContext, data: OrderSetAppointmentIn) -> dict:
     order = _still_open(data.order_id)
     order.appointment_id = data.appointment_id
-    order.save(update_fields=["appointment_id", "updated_at"])
+    try:
+        with transaction.atomic():
+            order.save(update_fields=["appointment_id", "updated_at"])
+    except IntegrityError:
+        raise Conflict(
+            str(APPOINTMENT_CHECK_OPEN), code="sale.appointment_check_open"
+        ) from None
     _touch(ctx, order)
     return _out(order)
 
@@ -1102,11 +1354,13 @@ def set_appointment(ctx: OperationContext, data: OrderSetAppointmentIn) -> dict:
 
 
 def _customer_details(data: CompleteIn) -> tuple:
-    """``(card, name, tax id, address, country)`` of the sale's customer: what was sent, else the card's."""
+    """``(card, name, tax id, address, country)`` of the sale's customer: what was sent, else the card's.
+    The name is the fiscal one, as Invoicing reads a card: its company when it has one (the NombreRazon
+    that goes with the company's tax ID), else the person."""
     card = None
     if data.customer_id is not None or data.customer:
         card = find_customer(data.customer_id, data.customer)
-    name = data.customer_name or (card.name if card else "")
+    name = data.customer_name or ((card.company_name or card.name) if card else "")
     tax_id = data.customer_tax_id or (card.tax_id if card else "")
     if data.customer_address:
         address = data.customer_address
@@ -1117,6 +1371,36 @@ def _customer_details(data: CompleteIn) -> tuple:
         address = ""
     country = data.customer_country or (card.country if card else "")
     return card, name, tax_id, address, country
+
+
+def _checked_country(country: str) -> str:
+    """The recipient's country of an invoice as Invoicing reads it (ISO 3166-1 alpha-2); one an old card
+    keeps that it would refuse («UK») is a 422 on its field, to fix before charging."""
+    try:
+        return normalize_country(country)
+    except InvalidCountry:
+        message = str(COUNTRY_CODE)
+        raise InvalidPayload(
+            message, code="invalid_field", fields={"customer_country": message}
+        ) from None
+
+
+def _checked_tax_id(tax_id: str, country: str, id_type: str) -> str:
+    """The recipient's tax ID of an invoice as the document keeps it (``apps.customer.tax_ids``, the one
+    reading of Customers and Invoicing): a Spanish NIF, NIE or CIF and an EU VAT number (02) must check;
+    abroad, its kind of document (02–07) is required. A refusal is a 422 on its field."""
+    try:
+        return normalize_tax_id(tax_id, country=country, id_type=id_type)
+    except IdTypeRequired:
+        message = str(ID_TYPE_REQUIRED)
+        raise InvalidPayload(
+            message, code="invalid_field", fields={"customer_id_type": message}
+        ) from None
+    except InvalidTaxId:
+        message = str(TAX_ID_INVALID)
+        raise InvalidPayload(
+            message, code="invalid_field", fields={"customer_tax_id": message}
+        ) from None
 
 
 def _check_discounts(
@@ -1141,6 +1425,7 @@ def _check_discounts(
             raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
     if approved:
         return
+    # What is left to pay: a line a voucher pays is worth nothing (SALE-F27).
     payable = sum(
         pricing.line_amount(
             line.unit_price,
@@ -1150,13 +1435,15 @@ def _check_discounts(
             is_gift=line.is_gift,
         )
         for line in lines
+        if line.voucher_session_id is None
     )
     if percent > cap or amount > payable * cap // 100:
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
 
 
-def _legs(data: CompleteIn, total: int, settings: Settings) -> list[dict]:
-    """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change."""
+def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
+    """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
+    no cash at all when the whole ``operation`` reaches the cash limit."""
     if total == 0:
         if any(leg.amount for leg in data.payments):
             raise Conflict(
@@ -1206,7 +1493,7 @@ def _legs(data: CompleteIn, total: int, settings: Settings) -> list[dict]:
     limit = CASH_LIMIT.get(business_country())
     if (
         limit is not None
-        and total >= limit
+        and operation >= limit
         and any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs)
     ):
         raise Conflict(
@@ -1215,6 +1502,144 @@ def _legs(data: CompleteIn, total: int, settings: Settings) -> list[dict]:
         )
     return legs
 
+
+# ── The fiscal document of a write: Invoicing, by name, in the same transaction ──────────────────
+
+#: The keys of ``sale.sale.completed`` that carry the recipient of an invoice (empty, never null).
+RECIPIENT_KEYS = (
+    "customer_name",
+    "customer_tax_id",
+    "customer_address",
+    "customer_country",
+    "customer_id_type",
+)
+
+
+def _fiscal_document(
+    ctx: OperationContext,
+    name: str,
+    data: dict,
+    *,
+    typed_recipient: bool = False,
+    strict: bool = False,
+) -> dict:
+    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund
+    or a void), run by name with the seller's session INSIDE this write's transaction (CLAUDE.md
+    «Fiscal»): the document and its number commit with the sale, or neither does.
+
+    ``{status, id, number, type}``: «issued» with the document; «none» when there is nothing to declare
+    (a refund of no money); «unavailable» when Invoicing is not in this business (the sale stays a ticket
+    without fiscal document); «pending» when Invoicing refused now (no issuer yet, the seller may not
+    issue…): its savepoint leaves nothing behind, the write goes on, and Invoicing's own reaction to the
+    notice issues it later (INVOICE-F06). A programming error (``LiveMisuse``) is never swallowed. With
+    ``typed_recipient`` (a full invoice, whose recipient is the cashier's input), Invoicing refusing that
+    input (``InvalidPayload``) is the caller's 422, to fix now: such a document would never be issued.
+    ``strict`` («Issue now»): every refusal reaches the caller as it is, worded by Invoicing."""
+    try:
+        answer = call_app(ctx, name, data, "sale.invoice_unavailable")
+    except InvalidPayload:
+        if typed_recipient or strict:
+            raise
+        failure = "invalid_payload"
+    except Conflict as refusal:
+        if strict:
+            raise
+        if refusal.code == "sale.invoice_unavailable":
+            return {"status": FiscalStatus.UNAVAILABLE, "id": None, "number": "", "type": ""}
+        failure = refusal.code
+    except OperationError as refusal:
+        if strict:
+            raise
+        failure = refusal.code
+    except DatabaseError as error:
+        if strict:
+            raise
+        failure = type(error).__name__
+    else:
+        document = answer.invoice
+        if document is None:
+            return {"status": FiscalStatus.NONE, "id": None, "number": "", "type": ""}
+        return {
+            "status": FiscalStatus.ISSUED,
+            "id": document.id,
+            "number": document.number,
+            "type": document.invoice_type,
+        }
+    logger.warning("sale: %s refused (%s); Invoicing issues it later from the outbox", name, failure)
+    return {"status": FiscalStatus.PENDING, "id": None, "number": "", "type": ""}
+
+
+def _recipient_of(sale: Sale) -> dict:
+    """What a document issued later declares as the recipient: an invoice's, as checked at the till; a
+    ticket's is its card, which Invoicing reads itself."""
+    if sale.document_type != Settings.DocumentType.INVOICE:
+        return {}
+    return {
+        "customer_name": sale.customer_name,
+        "customer_tax_id": sale.customer_tax_id,
+        "customer_address": sale.customer_address,
+        "customer_country": sale.customer_country,
+        "customer_id_type": sale.customer_id_type,
+    }
+
+
+def _invoiced(ctx: OperationContext, sale: Sale, document: dict, **more) -> None:
+    """Says a document of ``sale`` was issued after its write (the lists and the paper follow it)."""
+    record_event(
+        ctx,
+        events.SALE_INVOICED,
+        {
+            "sale_id": str(sale.id),
+            "invoice_id": str(document["id"]) if document["id"] else None,
+            "number": document["number"],
+            "refund_id": None,
+            "void": False,
+            **more,
+        },
+    )
+
+
+def _issue_waiting_document(ctx: OperationContext, sale: Sale, *, strict: bool = False) -> bool:
+    """The ticket or invoice of ``sale`` while it waits (``pending``), asked again by name with the
+    recipient the sale keeps: idempotent in Invoicing (one per sale). True when it is issued now."""
+    if sale.invoice_status != FiscalStatus.PENDING:
+        return False
+    document = _fiscal_document(
+        ctx,
+        "invoice.invoice.create_from_sale",
+        {"sale_id": str(sale.id), **_recipient_of(sale)},
+        strict=strict,
+    )
+    if document["status"] != FiscalStatus.ISSUED:
+        return False
+    sale.invoice_status, sale.invoice_id = document["status"], document["id"]
+    sale.invoice_number, sale.invoice_type = document["number"], document["type"]
+    sale.save(update_fields=["invoice_status", "invoice_id", "invoice_number", "invoice_type"])
+    _invoiced(ctx, sale, document)
+    return True
+
+
+#: Cash register's answer to «may the till charge cash now?» (CASH_REGISTER-F04).
+DRAWER_CHECK = "cash_register.session.current"
+
+
+def _check_drawer(ctx: OperationContext, legs: list[dict]) -> None:
+    """SALE-F08 (CASH_REGISTER-F04): cash only with the drawer open. With a cash leg, Cash register is asked
+    by name with the seller's session; «required» and no session open → 409 ``sale.cash_register_closed``.
+    Cash register off, absent or failing (a refusal, a timeout) → the till charges: the lock gives way
+    before the sales stop, and Cash register shows the charge among those of no shift (CASH_REGISTER-F17)."""
+    if not any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs):
+        return
+    try:
+        drawer = call_app(ctx, DRAWER_CHECK, {}, "sale.cash_register_unavailable")
+    except (OperationError, DatabaseError) as failure:
+        logger.info(
+            "sale: cash charged without asking Cash register (%s)",
+            getattr(failure, "code", type(failure).__name__),
+        )
+        return
+    if drawer.required and drawer.session is None:
+        raise Conflict(str(CASH_REGISTER_CLOSED), code="sale.cash_register_closed")
 
 
 def _number(day: dt.date) -> int:
@@ -1226,11 +1651,49 @@ def _number(day: dt.date) -> int:
     return counter.last
 
 
+def _replay(ctx: OperationContext, data: CompleteIn) -> dict | None:
+    """The sale this attempt already charged, if any (``already``); 409 when the key was charged for
+    something else: another check, other lines of it, or a counter sale instead of a check."""
+    sale = Sale.objects.select_related("order").filter(idempotency_key=data.idempotency_key).first()
+    if sale is None:
+        return None
+    if data.order_id is None:
+        same = sale.order is not None and sale.order.source == Order.Source.COUNTER
+    else:
+        same = sale.order_id == data.order_id and (
+            not data.line_ids or set(sale.order_lines.values_list("id", flat=True)) == set(data.line_ids)
+        )
+    if not same:
+        raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
+    # The same attempt again is the till's retry: a document that waited is asked for once more (phase 1
+    # has no relay to issue it on its own); still refused, it keeps waiting, in sight.
+    _issue_waiting_document(ctx, sale)
+    with translation.override(ctx.language):
+        return sale_detail(sale, already=True)
+
+
+def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
+    """A counter sale's check, created FIRST and holding the attempt's key (unique): the same attempt
+    sent twice at once waits here, then answers the sale the first one charged."""
+    try:
+        with transaction.atomic():
+            return Order.objects.create(
+                source=Order.Source.COUNTER,
+                attempt_key=data.idempotency_key,
+                created_by=actor(ctx),
+                appointment_id=data.appointment_id,
+            )
+    except IntegrityError:
+        answer = _replay(ctx, data)
+        if answer is None:
+            raise Conflict(str(CHECKOUT_IN_PROGRESS), code="sale.checkout_in_progress") from None
+        return answer
+
+
 def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:
-    existing = Sale.objects.filter(idempotency_key=data.idempotency_key).first()
-    if existing is not None:
-        with translation.override(ctx.language):
-            return sale_detail(existing, already=True)
+    answer = _replay(ctx, data)
+    if answer is not None:
+        return answer
     settings = current_settings()
     card, customer_name, customer_tax_id, customer_address, customer_country = (
         _customer_details(data)
@@ -1238,6 +1701,10 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
 
     if data.order_id is not None:
         order = find_order(data.order_id, lock=True)
+        # The same attempt may have charged this check while this one waited for its lock.
+        answer = _replay(ctx, data)
+        if answer is not None:
+            return answer
         if order.status != Order.Status.OPEN or (
             data.order_version is not None and data.order_version != order.version
         ):
@@ -1248,8 +1715,15 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         approved = bool(order.discount_approved_by)
         appointment_id = order.appointment_id
     else:
-        order = None
-        lines, closes = loose_lines(ctx, data.lines, data.open_lines), True
+        claimed = _claim_counter(ctx, data)
+        if isinstance(claimed, dict):
+            return claimed
+        order = claimed
+        booking = Booking(data.appointment_id, card.id if card else None)
+        lines, closes = (
+            loose_lines(ctx, data.lines, data.open_lines, data.service_lines, booking),
+            True,
+        )
         percent, amount, approved, appointment_id = (
             data.discount_percent,
             data.discount_amount,
@@ -1268,10 +1742,14 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     if settings.require_customer and card is None:
         raise Conflict(str(CUSTOMER_REQUIRED), code="sale.customer_required")
     document_type = data.document_type or settings.default_document_type
-    if document_type == Settings.DocumentType.INVOICE and not (
-        customer_name and customer_tax_id and customer_address
-    ):
+    invoice = document_type == Settings.DocumentType.INVOICE
+    if invoice and not (customer_name and customer_tax_id and customer_address):
         raise Conflict(str(INVOICE_RECIPIENT), code="sale.invoice_recipient_incomplete")
+    if invoice:
+        customer_country = _checked_country(customer_country)
+        customer_tax_id = _checked_tax_id(
+            customer_tax_id, customer_country, data.customer_id_type
+        )
 
     now = timezone.now()
     day = timezone.localdate(now)
@@ -1293,14 +1771,12 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
             str(TICKET_OVER_LIMIT) % {"limit": _money(ticket_limit)},
             code="sale.ticket_over_limit",
         )
-    legs = _legs(data, valuation.total, settings)
+    counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
+    operation = operation_total(None if counter_sale else order, closes, valuation, on=day)
+    legs = _legs(data, valuation.total, settings, operation)
+    _check_drawer(ctx, legs)
 
-    if order is None:
-        order = Order.objects.create(
-            source=Order.Source.COUNTER,
-            created_by=actor(ctx),
-            appointment_id=appointment_id,
-        )
+    if counter_sale:
         _save_lines(order, lines)
         record_event(
             ctx,
@@ -1320,6 +1796,16 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 order=order,
                 customer=card,
                 customer_name=customer_name,
+                **(
+                    {
+                        "customer_tax_id": customer_tax_id,
+                        "customer_address": customer_address,
+                        "customer_country": customer_country,
+                        "customer_id_type": data.customer_id_type,
+                    }
+                    if invoice
+                    else {}
+                ),
                 staff_id=data.staff_id,
                 appointment_id=appointment_id,
                 tax_included=settings.default_tax_included,
@@ -1343,6 +1829,18 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         raise Conflict(
             str(CHECKOUT_IN_PROGRESS), code="sale.checkout_in_progress"
         ) from None
+    # The sessions held for the lines a voucher pays are delivered with the sale, or nothing is charged.
+    covered = [line.voucher_session_id for line in lines if line.voucher_session_id]
+    if covered:
+        call_services(
+            ctx,
+            "service.session.settle",
+            {
+                "ids": covered,
+                "sale_id": sale.id,
+                "customer_id": card.id if card else None,
+            },
+        )
     sale_lines = SaleLine.objects.bulk_create(
         [
             SaleLine(
@@ -1366,6 +1864,10 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 gift_reason=line.gift_reason,
                 notes=line.notes,
                 staff_id=line.staff_id,
+                service_id=line.service_id,
+                voucher_session_id=line.voucher_session_id,
+                voucher_grant_id=line.voucher_grant_id,
+                voucher_name=line.voucher_name,
                 tax_category_key=out.tax_category_key,
                 tax_rate=out.tax_rate,
                 tax_country_code=out.tax_country_code,
@@ -1420,19 +1922,16 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         ]
     )
 
-    record_event(
-        ctx,
-        events.SALE_COMPLETED,
-        _completed_payload(
-            sale,
-            sale_lines,
-            payments,
-            customer_tax_id,
-            customer_address,
-            customer_country,
-            data.customer_id_type,
-        ),
+    completed = _completed_payload(
+        sale,
+        sale_lines,
+        payments,
+        customer_tax_id,
+        customer_address,
+        customer_country,
+        data.customer_id_type,
     )
+    record_event(ctx, events.SALE_COMPLETED, completed)
     if appointment_id is not None:
         record_event(
             ctx,
@@ -1446,6 +1945,18 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         )
     if closes:
         record_event(ctx, events.ORDER_COMPLETED, {"order_id": str(order.id)})
+    # Its ticket (F2) or its invoice (F1), numbered by Invoicing in this very transaction (INVOICE-F01, F02).
+    # A ticket's recipient is its card (Invoicing reads it); an invoice's, the one checked above.
+    recipient = {key: completed[key] or "" for key in RECIPIENT_KEYS} if invoice else {}
+    document = _fiscal_document(
+        ctx,
+        "invoice.invoice.create_from_sale",
+        {"sale_id": str(sale.id), **recipient},
+        typed_recipient=invoice,
+    )
+    sale.invoice_status, sale.invoice_id = document["status"], document["id"]
+    sale.invoice_number, sale.invoice_type = document["number"], document["type"]
+    sale.save(update_fields=["invoice_status", "invoice_id", "invoice_number", "invoice_type"])
     with translation.override(ctx.language):
         return sale_detail(sale)
 
@@ -1508,6 +2019,8 @@ def _completed_payload(
                 "line_total": line.line_total,
                 "is_gift": line.is_gift,
                 "is_service": line.is_service,
+                "service_id": str(line.service_id) if line.service_id else None,
+                "paid_by_voucher": line.paid_by_voucher,
                 "category_id": str(line.category_id) if line.category_id else None,
                 "components": [],
             }
@@ -1525,7 +2038,8 @@ def _completed_payload(
     expose_api=True,
     ai={
         "description": "Charge a sale: an open check (all its lines, or some for a partial charge) or loose lines (products by "
-        "SKU or name, open prices by department). Payments: cash with what was handed over (change), card or other "
+        "SKU or name, services by name, open prices by department). The sessions of the lines paid with a voucher are "
+        "spent with it (the sale must be charged to the voucher's owner). Payments: cash with what was handed over (change), card or other "
         "methods for the exact amount, or split. The server prices, taxes and numbers it; a ticket up to 3,000 €, above "
         "or on request an invoice with the customer's name, tax ID and address (ask for them). Send the same "
         "idempotency_key on a retry: it never charges twice.",
@@ -1563,7 +2077,8 @@ def complete_over_limit(ctx: OperationContext, data: CompleteIn) -> dict:
     output=SaleOut,
     ai={
         "description": "Void a charged sale (by its id or number) with a mandatory reason, before any money went back: it is "
-        "kept, marked voided with who, when and why, and stock and the customer's history are corrected. A sale with "
+        "kept, marked voided with who, when and why, the sessions of the vouchers it spent go back, and stock and the "
+        "customer's history are corrected. A sale with "
         "refunds is refunded instead; one charged as a full invoice is corrected with a credit note.",
         "risk": "high",
     },
@@ -1578,6 +2093,21 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
         raise Conflict(str(REQUIRES_CREDIT_NOTE), code="sale.void_requires_credit_note")
     if sale.refunded_total > 0 or sale.refunds.exists():
         raise Conflict(str(ALREADY_REFUNDED), code="sale.sale_already_refunded")
+    # A ticket that waited is issued first: its rectifying invoice needs it (INVOICE-F07). Still refused,
+    # both wait in sight and the void goes on.
+    _issue_waiting_document(ctx, sale)
+    # Every session spent in it goes back to its voucher (SERVICE-F27), or nothing is voided.
+    sessions = list(
+        sale.lines.exclude(voucher_session_id=None).values_list(
+            "voucher_session_id", flat=True
+        )
+    )
+    if sessions:
+        call_services(
+            ctx,
+            "service.session.return",
+            {"ids": sessions, "reference": sale.id, "reason": data.reason},
+        )
     sale.status = Sale.Status.VOIDED
     sale.voided_at = timezone.now()
     sale.voided_by = actor(ctx)
@@ -1601,6 +2131,53 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
             "customer_id": str(sale.customer_id) if sale.customer_id else None,
         },
     )
+    # The rectifying invoice of the whole ticket (R5), in this very transaction (INVOICE-F07).
+    document = _fiscal_document(
+        ctx, "invoice.invoice.rectify_from_void", {"sale_id": str(sale.id)}
+    )
+    sale.void_invoice_status, sale.void_invoice_number = document["status"], document["number"]
+    sale.save(update_fields=["void_invoice_status", "void_invoice_number"])
+    with translation.override(ctx.language):
+        return sale_detail(sale)
+
+
+@operation(
+    "sale.sale.issue_documents",
+    kind="command",
+    permission="sale.take_payment",
+    input=SaleRefIn,
+    output=SaleOut,
+    ai={
+        "description": "Issue now the fiscal documents of a sale (by its id or number) that wait because Invoicing could "
+        "not issue them in the charge, the void or a refund (no issuer yet, no permission…): its ticket or invoice, "
+        "the rectifying invoice of its void and those of its refunds. A refusal says why and changes nothing; with "
+        "nothing waiting, nothing happens.",
+        "risk": "high",
+    },
+)
+def issue_documents(ctx: OperationContext, data: SaleRefIn) -> dict:
+    """«Issue now» (phase 1 has no relay to issue them on its own): every document of the sale that waits,
+    in order — its own, then its void's or its refunds' rectifying invoices, which need it —, each by its
+    operation of Invoicing with the caller's session. Any refusal reaches the caller and nothing is kept."""
+    sale = find_sale(data.sale_id, data.sale, lock=True)
+    _issue_waiting_document(ctx, sale, strict=True)
+    if sale.void_invoice_status == FiscalStatus.PENDING:
+        document = _fiscal_document(
+            ctx, "invoice.invoice.rectify_from_void", {"sale_id": str(sale.id)}, strict=True
+        )
+        sale.void_invoice_status, sale.void_invoice_number = document["status"], document["number"]
+        sale.save(update_fields=["void_invoice_status", "void_invoice_number"])
+        _invoiced(ctx, sale, document, void=True)
+    for record in sale.refunds.filter(invoice_status=FiscalStatus.PENDING).order_by(
+        "created_at", "id"
+    ):
+        document = _fiscal_document(
+            ctx, "invoice.invoice.rectify_from_refund", {"refund_id": str(record.id)}, strict=True
+        )
+        record.invoice_status, record.invoice_number = document["status"], document["number"]
+        record.invoice_type = document["type"]
+        record.save(update_fields=["invoice_status", "invoice_number", "invoice_type"])
+        _invoiced(ctx, sale, document, refund_id=str(record.id))
     with translation.override(ctx.language):
         return sale_detail(sale)
 
@@ -1629,6 +2206,10 @@ def _refund_lines(sale: Sale, data: RefundIn) -> list[tuple[SaleLine, Decimal]]:
             raise Conflict(
                 str(REFUND_LINE_QUANTITY_EXCEEDED),
                 code="sale.refund_line_quantity_exceeded",
+            )
+        if line.voucher_session_id is not None and quantity != left:
+            raise Conflict(
+                str(REFUND_VOUCHER_LINE_WHOLE), code="sale.refund_voucher_line_whole"
             )
         chosen.append((line, quantity))
     return chosen
@@ -1685,6 +2266,30 @@ def _refund_legs(sale: Sale, data: RefundIn) -> list[dict]:
     return legs
 
 
+def _refund_replay(data: RefundIn) -> dict | None:
+    """The refund this attempt already recorded, if any (``already``); 409 when the key was used for
+    another sale or other lines."""
+    if not data.idempotency_key:
+        return None
+    existing = Refund.objects.select_related("sale").filter(idempotency_key=data.idempotency_key).first()
+    if existing is None:
+        return None
+    same_sale = existing.sale_id == data.sale_id if data.sale_id is not None else existing.sale.number == (data.sale or "").strip()
+    same_lines = set(existing.lines.values_list("sale_line_id", flat=True)) == {line.line_id for line in data.lines}
+    if not (same_sale and same_lines):
+        raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
+    return {
+        "already": True,
+        "refund_id": existing.id,
+        "sale_id": existing.sale_id,
+        "total": existing.total,
+        "fully_refunded": existing.sale.status == Sale.Status.REFUNDED,
+        "invoice_status": existing.invoice_status,
+        "invoice_number": existing.invoice_number,
+        "invoice_type": existing.invoice_type,
+    }
+
+
 @operation(
     "sale.sale.refund",
     kind="command",
@@ -1694,23 +2299,21 @@ def _refund_legs(sale: Sale, data: RefundIn) -> list[dict]:
     ai={
         "description": "Refund a charged sale (by its id or number), whole or in part, with a mandatory reason: how much goes "
         "back on each of its tenders (never more than each charged minus what it already returned; another method if the "
-        "original is gone) and, if the customer returns them, which lines and how many units. Read sale.refund.options "
+        "original is gone) and, if the customer returns them, which lines and how many units. A line paid with a voucher "
+        "gives its session back, also with no money at all. Read sale.refund.options "
         "first. Send an idempotency_key on a retry.",
         "risk": "high",
     },
 )
 def refund(ctx: OperationContext, data: RefundIn) -> dict:
-    if data.idempotency_key:
-        existing = Refund.objects.filter(idempotency_key=data.idempotency_key).first()
-        if existing is not None:
-            return {
-                "already": True,
-                "refund_id": existing.id,
-                "sale_id": existing.sale_id,
-                "total": existing.total,
-                "fully_refunded": existing.sale.status == Sale.Status.REFUNDED,
-            }
+    answer = _refund_replay(data)
+    if answer is not None:
+        return answer
     sale = find_sale(data.sale_id, data.sale, lock=True)
+    # The same attempt may have refunded this sale while this one waited for its lock.
+    answer = _refund_replay(data)
+    if answer is not None:
+        return answer
     if sale.status != Sale.Status.COMPLETED:
         raise Conflict(
             str(REFUND_REQUIRES_COMPLETED), code="sale.refund_requires_completed"
@@ -1718,6 +2321,9 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
     returning = _refund_lines(sale, data)
     legs = _refund_legs(sale, data)
     total = sum(leg["amount"] for leg in legs)
+    sessions = [line.voucher_session_id for line, _quantity in returning if line.voucher_session_id]
+    if not legs and not sessions:
+        raise Conflict(str(REFUND_NOTHING), code="sale.refund_nothing")
     try:
         with transaction.atomic():
             record = Refund.objects.create(
@@ -1752,8 +2358,15 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
             for line, quantity in returning
         ]
     )
+    if sessions:
+        call_services(
+            ctx,
+            "service.session.return",
+            {"ids": sessions, "reference": record.id, "reason": data.reason},
+        )
     sale.refunded_total += total
-    fully = sale.total > 0 and sale.refunded_total >= sale.total
+    # Refunded whole: all the money back and every voucher session back.
+    fully = sale.refunded_total >= sale.total and sessions_to_return(sale) == 0
     if fully:
         sale.status = Sale.Status.REFUNDED
     sale.save(update_fields=["refunded_total", "status"])
@@ -1792,12 +2405,24 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
             ],
         },
     )
+    # Its rectifying invoice, by differences or whole, in this very transaction (INVOICE-F09, F10), once
+    # the document it rectifies exists: a ticket that waited is asked for first.
+    _issue_waiting_document(ctx, sale)
+    document = _fiscal_document(
+        ctx, "invoice.invoice.rectify_from_refund", {"refund_id": str(record.id)}
+    )
+    record.invoice_status, record.invoice_number = document["status"], document["number"]
+    record.invoice_type = document["type"]
+    record.save(update_fields=["invoice_status", "invoice_number", "invoice_type"])
     return {
         "already": False,
         "refund_id": record.id,
         "sale_id": sale.id,
         "total": total,
         "fully_refunded": fully,
+        "invoice_status": record.invoice_status,
+        "invoice_number": record.invoice_number,
+        "invoice_type": record.invoice_type,
     }
 
 
@@ -1830,3 +2455,62 @@ def reassign_customer(ctx: OperationContext, data: CustomerMergedIn) -> dict:
             {"customer_id": str(data.id), "absorbed_id": str(data.absorbed_id)},
         )
     return {"customer_id": data.id, "moved": moved}
+
+
+#: The documents of a charge its paper prints: the ticket or the invoice issued from the sale.
+_SALE_DOCUMENTS = {"F1", "F2"}
+
+
+@operation(
+    "sale.sale.record_invoice",
+    kind="command",
+    # Declared by no role: only the system context (``*``) holds it, as the reactions run.
+    permission="sale.record_invoice",
+    input=InvoiceIssuedIn,
+    output=InvoiceRecordedOut,
+    ai={
+        "description": "System only: when Invoicing issues later a document it could not issue in the write itself (no "
+        "issuer yet…) — the ticket or invoice of a charge, the rectifying invoice of a void or of a refund —, the "
+        "sale or the refund keeps its number for its paper. Repeating it changes nothing.",
+        "risk": "normal",
+    },
+)
+def record_invoice(ctx: OperationContext, data: InvoiceIssuedIn) -> dict:
+    """Links a document issued later to the write it belongs to, by its ``source``: a refund's rectifying
+    invoice to that refund, a void's to the sale it voids, the ticket or invoice of a charge to its sale.
+    Anything else (a manual invoice, a substitution F3, a rectification of an invoice) is Invoicing's."""
+    source, recorded = data.source, 0
+    if source is None or source.sale_id is None:
+        return {"sale_id": None, "recorded": False}
+    issued = {"invoice_status": FiscalStatus.ISSUED, "invoice_number": data.number}
+    if source.refund_id is not None:
+        recorded = (
+            Refund.objects.filter(pk=source.refund_id, sale_id=source.sale_id)
+            .exclude(invoice_status=FiscalStatus.ISSUED)
+            .update(**issued, invoice_type=data.invoice_type)
+        )
+    elif source.void:
+        recorded = (
+            Sale.objects.filter(pk=source.sale_id)
+            .exclude(void_invoice_status=FiscalStatus.ISSUED)
+            .update(void_invoice_status=FiscalStatus.ISSUED, void_invoice_number=data.number)
+        )
+    elif source.type == "sale" and data.invoice_type in _SALE_DOCUMENTS:
+        recorded = (
+            Sale.objects.filter(pk=source.sale_id)
+            .exclude(invoice_status=FiscalStatus.ISSUED)
+            .update(**issued, invoice_id=data.invoice_id, invoice_type=data.invoice_type)
+        )
+    if recorded:
+        record_event(
+            ctx,
+            events.SALE_INVOICED,
+            {
+                "sale_id": str(source.sale_id),
+                "invoice_id": str(data.invoice_id),
+                "number": data.number,
+                "refund_id": str(source.refund_id) if source.refund_id else None,
+                "void": source.void,
+            },
+        )
+    return {"sale_id": source.sale_id, "recorded": bool(recorded)}

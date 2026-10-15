@@ -3,7 +3,8 @@
 // ONE button that says what it does and for how much. Blocked, it stays tappable (`aria-disabled`, never
 // `disabled`: that would swallow the tap) and answers with the reason (`blocked`); only «Charging…» and
 // a total still loading use the native `disabled`. A refusal is the server's own words; a lost answer is
-// said as such, and when nobody knows whether it charged, «Check in Sales» goes and looks.
+// said as such, and when nobody knows whether it charged, «Check in Sales» goes and looks. Cash with the
+// drawer closed (SALE-F08) offers «Open a cash session» to whoever may open one.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
@@ -25,6 +26,8 @@ const props = defineProps<{
   /** The total and the methods are there (nothing loading or failed). */
   ready: boolean;
   failure: CheckoutFailure | null;
+  /** Cash register is on and this person may open a cash session (absent = no). */
+  canOpenDrawer?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -32,7 +35,14 @@ const emit = defineEmits<{
   /** A tap on the blocked button, with what to say. */
   blocked: [block: ChargeBlock, message: string];
   checkSales: [];
+  /** «Open a cash session»: the cash register's sessions, to open one. */
+  openDrawer: [];
 }>();
+
+/** Cash refused with the drawer closed, and somebody here who may open it. */
+const drawerClosed = computed(
+  () => props.canOpenDrawer && props.failure?.kind === 'refused' && props.failure.code === 'sale.cash_register_closed',
+);
 
 const t = useT();
 const locale = useLocale();
@@ -49,7 +59,8 @@ const short = computed(() => {
 /** The whole reason, written above the button; the recipient's is the details box itself. */
 const reason = computed(() => {
   const block = props.block;
-  if (!block || block.kind === 'recipient') return '';
+  // The recipient's box itself says what is missing or wrong.
+  if (!block || block.kind === 'recipient' || block.kind === 'taxIdInvalid' || block.kind === 'idTypeRequired') return '';
   if (block.kind === 'cashLimit') return t('sale.checkout.cashLimitReason', { amount: money(block.limit) });
   if (block.kind === 'remaining') return t('sale.checkout.reason.remaining', { amount: money(block.amount) });
   return t(`sale.checkout.reason.${block.kind}`);
@@ -106,6 +117,21 @@ function press(): void {
           aria-hidden="true"
         />
         {{ $t('sale.checkout.checkSales') }}
+      </ion-button>
+      <ion-button
+        v-if="drawerClosed"
+        class="pay-check-sales"
+        fill="outline"
+        size="small"
+        data-testid="sale-checkout-open-drawer"
+        @click="emit('openDrawer')"
+      >
+        <HubIcon
+          slot="start"
+          name="ion:cash-outline"
+          aria-hidden="true"
+        />
+        {{ $t('sale.checkout.openDrawer') }}
       </ion-button>
     </template>
     <p

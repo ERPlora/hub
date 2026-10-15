@@ -22,6 +22,8 @@ import {
   refundableTotal,
   refundBlock,
   refundLines,
+  sessionsLeft,
+  sessionsPicked,
   splitByRemaining,
   wholeLeft,
 } from './refund';
@@ -49,6 +51,8 @@ const line = (id: string, over: Partial<LineOption> = {}): LineOption => ({
   left: '1.000',
   line_total: 1000,
   is_gift: false,
+  paid_by_voucher: false,
+  voucher_name: '',
   ...over,
 });
 
@@ -192,5 +196,46 @@ describe('what travels to sale.sale.refund', () => {
     expect(key).toMatch(/^refund-0192f0aa-0000-7000-8000-000000000001-[A-Za-z0-9-]+$/);
     expect(key.length).toBeLessThanOrEqual(128);
     expect(attemptKey('s1')).not.toBe(attemptKey('s1'));
+  });
+});
+
+describe('the session of a voucher (SALE-F32)', () => {
+  const tender = (id: string): TenderOption => ({
+    payment_id: id,
+    position: 1,
+    method_id: `m-${id}`,
+    method_name: 'Cash',
+    method_type: 'cash',
+    charged: 1000,
+    refunded: 0,
+    remaining: 1000,
+    refundable: true,
+    reason: '',
+  });
+  const covered = (id: string, over: Partial<LineOption> = {}): LineOption => ({
+    line_id: id,
+    name: 'Corte',
+    unit: 'ud',
+    quantity: '1.000',
+    returned: '0.000',
+    left: '1.000',
+    line_total: 0,
+    is_gift: false,
+    paid_by_voucher: true,
+    voucher_name: 'Bono 5 cortes',
+    ...over,
+  });
+
+  it('a session marked may go back with no money; nothing at all is still «nothing»', () => {
+    expect(refundBlock([tender('cash')], { cash: 0 }, {}, 'x', 1)).toBeNull();
+    expect(refundBlock([], {}, {}, 'x', 1)).toBeNull();
+    expect(refundBlock([], {}, {}, 'x', 0)).toEqual({ kind: 'nothing' });
+    expect(refundBlock([], {}, {}, '', 1)).toEqual({ kind: 'reason' });
+  });
+
+  it('counts the sessions marked and the ones still to go back', () => {
+    const lines = [covered('a'), covered('b', { left: '0.000', returned: '1.000' }), { ...covered('c'), paid_by_voucher: false, line_total: 300 }];
+    expect(sessionsPicked(lines, { a: 1000, c: 1000 })).toBe(1);
+    expect(sessionsLeft(lines)).toBe(1);
   });
 });

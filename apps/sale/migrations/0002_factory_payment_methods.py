@@ -26,8 +26,12 @@ def plant(apps, schema_editor):
 def uproot(apps, schema_editor):
     PaymentMethod = apps.get_model("sale", "PaymentMethod")
     SalePayment = apps.get_model("sale", "SalePayment")
-    used = SalePayment.objects.using(schema_editor.connection.alias).values_list("method_id", flat=True)
-    PaymentMethod.objects.using(schema_editor.connection.alias).filter(is_system=True).exclude(pk__in=used).delete()
+    RefundPayment = apps.get_model("sale", "RefundPayment")
+    charged = SalePayment.objects.using(schema_editor.connection.alias).values_list("method_id", flat=True)
+    refunded = RefundPayment.objects.using(schema_editor.connection.alias).values_list("method_id", flat=True)
+    PaymentMethod.objects.using(schema_editor.connection.alias).filter(is_system=True).exclude(pk__in=charged).exclude(
+        pk__in=refunded
+    ).delete()
 
 
 class Migration(migrations.Migration):

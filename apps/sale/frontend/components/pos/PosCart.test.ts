@@ -31,7 +31,6 @@ function props(over: Record<string, unknown> = {}) {
     busy: false,
     drawer: false,
     openChecks: 2,
-    checksNotice: null,
     ...over,
   };
 }
@@ -59,6 +58,21 @@ describe('PosCart', () => {
       blockedReason: null,
     });
     expect(m.find('pos-cart').attributes('id')).toBe('pos-cart-drawer');
+  });
+
+  it('the table button sits before the customer’s, and the heading names the check’s table (SALE-F19)', async () => {
+    const m = await mountSale({
+      setup: () => () =>
+        h(PosCart, props({ tableNumber: '4' }), {
+          table: () => h('button', { 'data-testid': 'slot-table' }, 'Table'),
+          customer: () => h('button', { 'data-testid': 'slot-customer' }, 'Lucía'),
+        }),
+    });
+    const slot = m.wrapper.find('.pos-toolbar__slot');
+    expect(slot.findAll('button').map((b) => b.attributes('data-testid'))).toEqual(['slot-table', 'slot-customer']);
+    expect(m.wrapper.findComponent(CartHeading).props('tableNumber')).toBe('4');
+    const bare = await setup();
+    expect(bare.wrapper.findComponent(CartHeading).props('tableNumber')).toBeNull();
   });
 
   it('without a check: no lines, nothing to charge, the total is zero', async () => {

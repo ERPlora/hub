@@ -50,6 +50,17 @@ describe('useTender: one method', () => {
     expect([tender.method.value?.id, tender.typed.value]).toEqual(['card', 0]);
   });
 
+  it('the limit looks at the whole operation: a part under it of a check over it refuses cash (Ley 7/2012 art. 7)', () => {
+    const totalRef = ref<number | undefined>(50000);
+    const scope = effectScope();
+    const tender = scope.run(() =>
+      useTender({ total: totalRef, operationTotal: () => 120000, methods: [CASH, CARD], cashLimit: 100000 }),
+    )!;
+    expect(tender.cashOff.value).toBe(true);
+    expect(tender.method.value?.id).toBe('card');
+    expect(tender.pick(CASH)).toBe(false);
+  });
+
   it('over the cash limit it starts on card and refuses cash', () => {
     const { tender } = setup(150000);
     expect(tender.cashOff.value).toBe(true);

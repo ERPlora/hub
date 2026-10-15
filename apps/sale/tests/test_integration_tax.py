@@ -56,6 +56,35 @@ def test_each_factory_rate_of_spain(product):
     )
 
 
+def test_the_breakdown_is_one_entry_per_fiscal_key_closed_once(product):
+    # A dish and a drink at 10 % with VAT included are one key: 3.00 € closes once (2.73 + 0.27), never
+    # 1.36 + 1.36 by category; an exempt service is its own key, with its cause.
+    product("Tapa", "TAP", 150, "restaurant.food")
+    product("Cane", "CAN", 150, "restaurant.drink")
+    product("Physio", "PHY", 4000, "service.health")
+    sale = charge(
+        "tax-key-0002", {"product": "TAP"}, {"product": "CAN"}, {"product": "PHY"}
+    )
+    assert (sale.subtotal, sale.tax_total, sale.total) == (4273, 27, 4300)
+    assert [
+        (row.qualification, row.exempt_reason, row.regime, row.tax_type, row.rate_pct, row.base, row.tax)
+        for row in sale.breakdown
+    ] == [
+        ("subject", "", "01", "vat", Decimal("10.00"), 273, 27),
+        ("exempt", "E1", "01", "vat", Decimal("0.00"), 4000, 0),
+    ]
+    tapa, cane, _physio = sale.lines
+    assert tapa.net_amount + cane.net_amount == 273
+    assert tapa.line_total == cane.line_total == 150
+    preview = run(
+        "sale.checkout.preview",
+        {"lines": [{"product": "TAP"}, {"product": "CAN"}]},
+    )
+    assert [(row.rate_pct, row.base, row.tax) for row in preview.breakdown] == [
+        (Decimal("10.00"), 273, 27)
+    ]
+
+
 def test_the_rule_in_force_on_the_business_day_is_the_one_charged(product):
     run("tax.category.create", {"key": "product.books", "name": "Books"})
     today = timezone.localdate()

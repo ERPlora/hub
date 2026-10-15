@@ -92,21 +92,49 @@ def test_the_counter_numbers_every_sale_once_and_leaves_no_hole(coffee):
     assert SaleCounter.objects.get(day=day).last == 6
 
 
+def answers(results) -> list:
+    """``ok`` for a sale charged now, ``already`` for the one an earlier attempt charged, else the code."""
+    return sorted(getattr(r, "code", None) or ("already" if r.already else "ok") for r in results)
+
+
 def test_the_same_attempt_twice_at_once_charges_once_and_burns_no_number(coffee):
     results = at_once(
         charge("race-same-key", lines=[{"product": "COF"}]),
         charge("race-same-key", lines=[{"product": "COF"}]),
     )
+    # Whoever waited gets the very sale the other charged: never «nothing was charged».
+    assert answers(results) == ["already", "ok"]
+    assert results[0].id == results[1].id
     assert Sale.objects.count() == 1
-    assert {
-        getattr(result, "code", None) or ("already" if result.already else "ok")
-        for result in results
-    } <= {
-        "ok",
-        "already",
-        "sale.checkout_in_progress",
-    }
     assert SaleCounter.objects.get().last == 1
+
+
+def test_the_same_attempt_on_a_check_twice_at_once_answers_the_sale_both_times(coffee):
+    order = run("sale.order.open", {"lines": [{"product": "COF", "quantity": "2"}]})
+    results = at_once(
+        charge("race-check-key", order_id=str(order.id), order_version=order.version),
+        charge("race-check-key", order_id=str(order.id), order_version=order.version),
+    )
+    assert answers(results) == ["already", "ok"]
+    assert results[0].id == results[1].id and Sale.objects.count() == 1
+    assert Order.objects.get(pk=order.id).status == "completed"
+
+
+def test_the_same_refund_attempt_twice_at_once_refunds_once(coffee):
+    sale = run(
+        "sale.sale.complete",
+        {"idempotency_key": "race-refund-001", "lines": [{"product": "COF", "quantity": "2"}], "payments": [{"method": "card"}]},
+    )
+    data = {
+        "sale_id": str(sale.id),
+        "reason": "back",
+        "idempotency_key": "race-refund-key",
+        "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 300}],
+        "lines": [{"line_id": str(sale.lines[0].id)}],
+    }
+    results = at_once(lambda: run("sale.sale.refund", data), lambda: run("sale.sale.refund", data))
+    assert answers(results) == ["already", "ok"]
+    assert Sale.objects.get(pk=sale.id).refunded_total == 300
 
 
 def test_two_charges_of_the_same_check_charge_it_once(coffee):
@@ -194,3 +222,137 @@ def test_two_refunds_of_the_last_units_of_a_line_at_once(coffee):
     results = at_once(refund, refund)
     assert codes(results) == ["ok", "sale.refund_line_already_returned"]
     assert Sale.objects.get(pk=sale.id).refunded_total == 100
+
+
+# ── Vouchers at the till (SALE-F27, F32) ────────────────────────────────────────────────────────
+
+
+def svc(name, data):
+    from live.operations import get
+
+    op = get(name)
+    return op(system_context(A), op.input.model_validate(data))
+
+
+@pytest.fixture
+def last_session():
+    """Lucía's voucher of one haircut, and the haircut, made by Services."""
+    haircut = svc(
+        "service.service.create",
+        {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
+    )
+    lucia = run("customer.customer.create", {"name": "Lucía Pérez"}, system_context(A))
+    package = svc(
+        "service.package.create",
+        {"name": "Bono 1", "max_uses": 1, "items": [{"service_id": str(haircut.id)}]},
+    )
+    grant = svc(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(lucia.id)},
+    )
+    return haircut, lucia, grant
+
+
+def apply(order, grant):
+    return lambda: run(
+        "sale.order.apply_voucher",
+        {
+            "order_id": str(order.id),
+            "line_id": str(order.lines[0].id),
+            "grant_id": str(grant.id),
+        },
+    )
+
+
+def test_two_tills_paying_with_the_last_session_one_wins_and_the_other_hears_why(
+    last_session,
+):
+    from apps.service.models import Redemption
+
+    haircut, _lucia, grant = last_session
+    first = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})
+    second = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})
+    results = at_once(apply(first, grant), apply(second, grant))
+    assert codes(results) == ["ok", "service.grant_no_uses_left"]
+    assert Redemption.objects.filter(status="held").count() == 1
+    covered = [
+        line.voucher_session_id
+        for line in Order.objects.get(pk=first.id).lines.all()
+    ] + [line.voucher_session_id for line in Order.objects.get(pk=second.id).lines.all()]
+    assert len([session for session in covered if session]) == 1
+
+
+def test_charging_a_check_and_voiding_it_at_once_spend_or_release_its_session(
+    last_session,
+):
+    from apps.service.models import Redemption
+
+    haircut, lucia, grant = last_session
+    order = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})
+    apply(order, grant)()
+    results = at_once(
+        charge("race-voucher-01", order_id=str(order.id), customer_id=str(lucia.id)),
+        lambda: run("sale.order.void", {"order_id": str(order.id)}),
+    )
+    assert codes(results) in (
+        ["ok", "sale.order_changed"],
+        ["ok", "sale.order_unavailable"],
+    )
+    [session] = Redemption.objects.all()
+    if Sale.objects.exists():
+        assert session.status == "consumed"
+        assert Order.objects.get(pk=order.id).status == "completed"
+    else:
+        assert session.status == "released"
+        assert Order.objects.get(pk=order.id).status == "voided"
+
+
+def test_voiding_and_refunding_a_sale_paid_with_a_voucher_at_once_give_the_session_back_once(
+    last_session,
+):
+    from apps.service.models import Redemption
+
+    haircut, lucia, grant = last_session
+    order = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})
+    apply(order, grant)()
+    sale = run(
+        "sale.sale.complete",
+        {"idempotency_key": "race-voucher-02", "order_id": str(order.id), "customer_id": str(lucia.id)},
+    )
+    line = sale.lines[0]
+    results = at_once(
+        lambda: run("sale.sale.void", {"sale_id": str(sale.id), "reason": "wrong"}),
+        lambda: run(
+            "sale.sale.refund",
+            {
+                "sale_id": str(sale.id),
+                "reason": "did not come",
+                "allocations": [],
+                "lines": [{"line_id": str(line.id)}],
+            },
+        ),
+    )
+    assert codes(results) in (
+        ["ok", "sale.refund_requires_completed"],
+        ["ok", "sale.sale_already_refunded"],
+    )
+    [session] = Redemption.objects.all()
+    assert session.status == "returned"
+
+
+def test_two_charges_of_one_appointment_at_once_open_one_check(coffee):
+    # «Charge» tapped on two devices for the same appointment: one check, and both answer it.
+    from uuid import uuid7
+
+    appointment = str(uuid7())
+
+    def open_check():
+        return run(
+            "sale.order.open",
+            {"appointment_id": appointment, "lines": [{"product": "COF"}]},
+        )
+
+    results = at_once(open_check, open_check)
+    assert answers(results) == ["already", "ok"]
+    assert results[0].id == results[1].id
+    assert Order.objects.filter(appointment_id=appointment).count() == 1

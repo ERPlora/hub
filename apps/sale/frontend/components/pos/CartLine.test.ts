@@ -114,3 +114,27 @@ describe('CartLine: sent to the kitchen', () => {
     expect(m.wrapper.emitted('void')).toHaveLength(1);
   });
 });
+
+describe('CartLine: a line a voucher pays (SALE-F27)', () => {
+  const covered = { service_id: 's1', is_service: true, paid_by_voucher: true, voucher_session_id: 'r1', voucher_name: 'Bono 5 cortes', line_total: 0 };
+
+  it('says it is already paid with the voucher, at 0, and only lets the note change or the line go', async () => {
+    const m = await setup(covered, {}, 'es');
+    const row = m.find('pos-line-l1');
+    expect(m.find('pos-line-l1-voucher').text()).toBe('Ya pagado · Bono 5 cortes');
+    expect(plain(row.find('.pos-line__amount').text())).toBe('0,00 €');
+    expect(m.find('pos-line-l1-discount').exists()).toBe(false);
+    expect(m.find('pos-line-l1-gift').exists()).toBe(false);
+    expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(false);
+    expect(m.find('pos-line-l1-note').exists()).toBe(true);
+    await click(m.find('pos-line-l1-remove').element);
+    expect(m.wrapper.emitted('quantity')).toEqual([['0']]);
+  });
+
+  it('a line no voucher pays keeps its buttons', async () => {
+    const m = await setup({ service_id: 's1', is_service: true });
+    expect(m.find('pos-line-l1-voucher').exists()).toBe(false);
+    expect(m.find('pos-line-l1-remove').exists()).toBe(false);
+    expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(true);
+  });
+});

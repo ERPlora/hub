@@ -15,7 +15,18 @@
       "appInactive": "Esta app no está activa en este negocio.",
       "noPermission": "No tienes permiso."
     },
-    "common": {},
+    "common": {
+      "taxPicker": {
+        "search": "Buscar una categoría de IVA…",
+        "close": "Cerrar",
+        "noResults": "Ninguna categoría de IVA coincide con tu búsqueda.",
+        "more": "Se muestran {shown} de {total}. Escribe para acotar la lista.",
+        "none": "No hay categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.",
+        "loadFailed": "No se han podido leer las categorías de IVA.",
+        "retry": "Reintentar",
+        "retrying": "Reintentando…"
+      }
+    },
     "pos": {
       "loadFailed": "Error cargando el TPV",
       "screenMenu": "Pantalla",
@@ -55,6 +66,7 @@
       "customerRequiredShort": "Falta el cliente",
       "customerRequiredCharge": "Este negocio exige un cliente en cada venta. Elige uno para seguir con el cobro.",
       "noCheckContext": "Cuenta sin mesa ni cliente",
+      "cartLabel": "Cuenta",
       "cartEmptyTouch": "Toca un producto para añadirlo.",
       "checkGone": "Esa cuenta se ha cerrado en otro dispositivo: la pantalla empieza una nueva.",
       "courseInProgress": "Pendiente de enviar",
@@ -89,7 +101,6 @@
       "deleteCheckFailed": "No se ha podido eliminar esa cuenta abierta. Sigue en la lista.",
       "noParkedTickets": "No hay cuentas abiertas",
       "openChecksLoadFailed": "No se han podido cargar las cuentas abiertas.",
-      "errorRetrieve": "No se pudo recuperar el ticket",
       "parkTitle": "Aparcar cuenta",
       "parkNameHint": "El título es opcional y solo sirve para reconocer la cuenta cuando quieras retomarla.",
       "parkNamePlaceholder": "p. ej. Ana — terraza",
@@ -114,7 +125,6 @@
       "staffNoResults": "Nadie del equipo coincide con tu búsqueda.",
       "department": "Departamento (IVA)",
       "departmentSearch": "Buscar un departamento…",
-      "noDepartments": "Sin departamentos configurados.",
       "departmentsLoadFailed": "No se han podido cargar los departamentos.",
       "addAmount": "Añadir {amount}",
       "numpadClear": "Borrar",
@@ -159,7 +169,50 @@
         "ipsi": "IPSI"
       },
       "customerLinkFailed": "No se ha podido unir el cliente a la cuenta. Vuelve a elegirlo.",
-      "customerLoadFailed": "No se ha podido leer el cliente de la cuenta. Vuelve a elegirlo si la venta lo necesita."
+      "customerLoadFailed": "No se ha podido leer el cliente de la cuenta. Vuelve a elegirlo si la venta lo necesita.",
+      "paidWithVoucher": "Ya pagado · {name}",
+      "removeLine": "Quitar esta línea",
+      "services": "Servicios",
+      "serviceMinutes": "{minutes} min",
+      "servicePrice": {
+        "hourly": "{price} / hora",
+        "from": "Desde {price}",
+        "variable": "Variable · {price}",
+        "free": "Gratis"
+      },
+      "noServices": "Sin servicios.",
+      "servicesLoadFailed": "No se han podido cargar los servicios.",
+      "servicePriceTitle": "Importe de {name}",
+      "servicePriceSuggest": "Usar {price}",
+      "serviceCount": "{count} servicios",
+      "serviceCountOne": "1 servicio",
+      "linkedCheckGone": "Esa cuenta ya no está abierta (se cobró, se anuló o no existe): el TPV sigue como estaba.",
+      "table": {
+        "assign": "Asignar mesa",
+        "assignedTo": "Asignar mesa: {table}",
+        "chip": "Mesa {number}",
+        "choose": "Elegir mesa",
+        "search": "Buscar mesa…",
+        "loading": "Cargando mesas…",
+        "loadFailed": "No se pudieron cargar las mesas.",
+        "unset": "Aún no hay mesas. Créalas en Mesas → Plano de sala.",
+        "noResults": "Ninguna mesa coincide con la búsqueda.",
+        "none": "No hay mesas en servicio.",
+        "pax": "{count} pax",
+        "status": {
+          "available": "Disponible",
+          "occupied": "Ocupada",
+          "reserved": "Reservada",
+          "blocked": "Bloqueada"
+        },
+        "occupiedHint": "Ocupada: ya hay una cuenta en esta mesa.",
+        "blockedHint": "Mesa fuera de servicio: no se puede sentar hasta que se desbloquee.",
+        "currentHint": "Esta cuenta está en esta mesa.",
+        "erasedCustomer": "Cliente borrado",
+        "remove": "Quitar de la mesa",
+        "seatFailed": "No se pudo sentar la cuenta en esa mesa.",
+        "removeFailed": "No se pudo quitar la mesa de la cuenta."
+      }
     },
     "checkout": {
       "title": "Cobrar",
@@ -215,7 +268,9 @@
         "recipient": "Faltan los datos del cliente",
         "cashLimit": "Efectivo no permitido",
         "remaining": "Faltan {amount}",
-        "tenderedShort": "Lo entregado no cubre el total"
+        "tenderedShort": "Lo entregado no cubre el total",
+        "taxIdInvalid": "Revisa el NIF",
+        "idTypeRequired": "Elige el tipo de documento"
       },
       "reason": {
         "customerRequired": "Este negocio exige un cliente en cada venta. Elige uno para seguir con el cobro.",
@@ -225,7 +280,43 @@
       },
       "serverUnavailable": "El servidor no responde (puede estar reiniciándose). Inténtalo de nuevo en unos segundos y, si persiste, avisa al encargado.",
       "checkoutUnknown": "No hemos podido confirmar si el cobro se completó. Compruébalo en Ventas antes de volver a cobrar.",
-      "checkSales": "Comprobar en Ventas"
+      "checkSales": "Comprobar en Ventas",
+      "openDrawer": "Abrir sesión de caja",
+      "recipientErrors": {
+        "taxIdInvalid": "Ese NIF no es válido.",
+        "idTypeRequired": "Indica qué tipo de documento es un NIF extranjero (NIF-IVA europeo, pasaporte, NIF de su país…)."
+      }
+    },
+    "voucher": {
+      "section": "Líneas pagadas de otra forma",
+      "title": "Pagar esta línea con un bono",
+      "candidates": "{count} bonos válidos",
+      "remainingAfter": "Quedan {before} sesiones · {after} después de esta",
+      "unlimited": "Sesiones ilimitadas",
+      "expires": "Caduca el {date}",
+      "none": "Este cliente no tiene ningún bono que cubra este servicio.",
+      "loadFailed": "No se han podido cargar los bonos del cliente. Inténtalo otra vez antes de cobrar el precio completo.",
+      "holdFailed": "No se ha podido reservar la sesión de ese bono.",
+      "releaseFailed": "No se ha podido devolver la sesión de ese bono.",
+      "held": "{name}: sesión gastada. Quedan {after}.",
+      "heldUnlimited": "{name}: sesión gastada.",
+      "confirm": "Gastar una sesión",
+      "holding": "Reservando…",
+      "undo": "Deshacer",
+      "split": "Separar en {n} líneas",
+      "splitReason": "Un bono cubre una línea. Sepárala y canjea las que alcance.",
+      "splitFailed": "No se ha podido separar la línea. La cuenta no ha cambiado.",
+      "notSplittable": "Esta línea no se puede separar, así que ningún bono puede cubrirla.",
+      "reason": {
+        "only_option": "Es el único bono que cubre este servicio.",
+        "finite_before_unlimited": "Se gasta primero porque tiene un número limitado de sesiones.",
+        "expires_first": "Se gasta primero porque es el que antes caduca.",
+        "already_started": "Se gasta primero para terminar el bono que ya estaba empezado.",
+        "fewest_sessions_left": "Se gasta primero porque es al que le quedan menos sesiones.",
+        "oldest_voucher": "Se gasta primero porque se compró antes.",
+        "stable_order": "Los dos bonos son equivalentes; este va siempre primero.",
+        "generic": "Este es el bono que se va a gastar."
+      }
     },
     "document": {
       "title": "Documento",
@@ -236,6 +327,8 @@
       "printFailed": "No se pudo imprimir",
       "defaultBusiness": "Mi negocio",
       "receipt": "Tiquet",
+      "invoice": "Factura",
+      "number": "Nº",
       "customer": "Cliente",
       "item": "Concepto",
       "amount": "Importe",
@@ -251,7 +344,21 @@
         "surcharge": "RE",
         "igic": "IGIC",
         "ipsi": "IPSI"
-      }
+      },
+      "paidWithVoucher": "Ya pagado · {name}",
+      "qualification": {
+        "exempt": "Exento",
+        "not_subject": "No sujeto",
+        "subject_reverse": "ISP"
+      },
+      "pending": {
+        "title": "Documento fiscal pendiente",
+        "hint": "Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso). Cuando esté resuelto, emítelo ahora.",
+        "issue": "Emitir ahora",
+        "issued": "Documentos fiscales emitidos.",
+        "failed": "No se han podido emitir los documentos. Inténtalo de nuevo."
+      },
+      "paperPending": "Documento fiscal pendiente"
     },
     "sales": {
       "title": "Ventas",
@@ -285,13 +392,15 @@
         "completed": "Completada",
         "voided": "Anulada",
         "refunded": "Devuelta",
-        "leftToRefund": "Por devolver {amount}"
+        "leftToRefund": "Por devolver {amount}",
+        "documentsPending": "Documento pendiente"
       },
       "actions": {
         "document": "Documento",
         "reprint": "Reimprimir",
         "void": "Anular",
-        "refund": "Devolver"
+        "refund": "Devolver",
+        "issue": "Emitir ahora"
       },
       "search": "Buscar número o cliente…",
       "entity": {
@@ -329,7 +438,8 @@
       "reasonRequired": "Hace falta un motivo para anular una venta",
       "confirm": "Anular",
       "cancel": "Cancelar",
-      "done": "Venta anulada"
+      "done": "Venta anulada",
+      "failed": "No se ha podido anular la venta"
     },
     "refund": {
       "title": "Devolver la venta {number}",
@@ -363,7 +473,11 @@
       "reasonRequired": "Una devolución necesita un motivo.",
       "confirm": "Devolver {amount}",
       "done": "Devolución registrada.",
-      "unknown": "No hemos podido confirmar si la devolución se registró. Si vuelves a pulsar Devolver no se duplicará."
+      "unknown": "No hemos podido confirmar si la devolución se registró. Si vuelves a pulsar Devolver no se duplicará.",
+      "linePaidWithVoucher": "Ya pagado · {name}",
+      "sessionGoesBack": "La sesión vuelve a {name}.",
+      "markSession": "Marca la línea cuya sesión vuelve al bono.",
+      "confirmSession": "Devolver la sesión"
     },
     "quickNotes": {
       "intro": "Las notas que el TPV ofrece de un toque en la hoja de nota de la línea. Escribir a mano sigue funcionando.",
@@ -425,16 +539,6 @@
         "taxPlaceholder": "Elige el IVA"
       },
       "taxCategoryMissing": "Elige el IVA que cobra este departamento.",
-      "noTaxCategories": "No hay categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.",
-      "taxLoadFailed": "No se han podido leer las categorías de IVA.",
-      "taxRetry": "Reintentar",
-      "taxRetrying": "Reintentando…",
-      "picker": {
-        "search": "Buscar una categoría de IVA…",
-        "close": "Cerrar",
-        "noResults": "Ninguna categoría de IVA coincide con tu búsqueda.",
-        "more": "Se muestran {shown} de {total}. Escribe para acotar la lista."
-      },
       "saveFailed": "No se ha podido guardar el departamento.",
       "deleteTitle": "Eliminar departamento",
       "deleteMessage": "{name} — Deja de ofrecerse en el TPV. Lo ya vendido conserva el nombre y el IVA con los que se cobró.",

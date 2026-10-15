@@ -1,18 +1,25 @@
 <script setup lang="ts">
-// Sales & POS → Sell (WORKBOOK «Vender»; SALE-F01, F05, F09, F13–F18, F20–F22). The till: the catalogue
+// Sales & POS → Sell (WORKBOOK «Vender»; SALE-F01, F05, F09, F13–F22, F27, F38). The till: the catalogue
 // and the check side by side (23–24.5rem on a desktop); on a phone (narrower than 821px or 500px tall or
 // less) the check is a drawer from the right that the cart button opens. The page wires the pieces:
 // the till settings, the check and its writes (`useTill`), the live check and its preview (mounted
 // only while there is one), the customer (the Customers app's search; linked to the check by
 // `customer.order.link`, read back on resuming), who serves, the sheets, the pre-bill, the checkout
-// sheet and the sale's document after a whole charge. Nothing about money is decided here.
+// sheet and the sale's document after a whole charge. With Services on (SALE-F38) the catalogue sells its
+// services: a fixed price goes straight to the check, any other asks its amount (ServicePriceSheet).
+// With Tables on (SALE-F19) the check's bar has «Choose table» and the heading the check's table, both
+// through Tables' operations only (Sales does not require Tables).
+// `/sale/pos?order=<id>` (Appointments' «Charge», APPOINTMENT-F17) puts that check on the till as
+// resuming it from «Open checks» does; one no longer open is said and the till carries on as it was.
+// Nothing about money is decided here.
 import { InlineFeedback } from '@erplora/ui/components';
-import { useCommand, useLive } from '@erplora/ui/sdk';
+import { ApiError, type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toast, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
+import CustomerSearch, { type CustomerSnapshot, snapshotOf } from '../../../customer/frontend/components/CustomerSearch.vue';
 import CheckoutSheet from '../components/checkout/CheckoutSheet.vue';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import CartFab from '../components/pos/CartFab.vue';
@@ -25,12 +32,19 @@ import ParkSheet from '../components/pos/ParkSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
 import PosCatalog from '../components/pos/PosCatalog.vue';
 import PrebillModal from '../components/pos/PrebillModal.vue';
+import ServicePriceSheet from '../components/pos/ServicePriceSheet.vue';
 import StaffPicker from '../components/pos/StaffPicker.vue';
-import { customerSnapshot, refusal, shortTime } from '../components/pos/till';
+import TableButton from '../components/pos/TableButton.vue';
+import TableFollower from '../components/pos/TableFollower.vue';
+import TablePicker from '../components/pos/TablePicker.vue';
+import { shortTime } from '../components/pos/till';
 import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
+import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
 import { useLocale, useT } from '../composables/useT';
+import type { ServiceSaleOut } from '../../../service/frontend/operations';
 import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
+import { refusal } from '../lib/refusal';
 import { saleTabs } from '../tabs';
 
 const t = useT();
@@ -73,11 +87,25 @@ watch(lines, (now) => {
   marks.value = now.length < 2 ? [] : marks.value.filter((id) => ids.has(id));
 });
 
+/** A closed check that arrived while the checkout sheet was open: applied once the sheet closes. */
+let heldWhileCharging: OrderOut | null = null;
+
 function onOrder(next: OrderOut): void {
-  // While the checkout sheet is charging it, the charge itself says how it ended.
-  if (charging.value && next.status !== 'open') return;
+  // While the checkout sheet is open the charge itself says how it ended; if it did not end it (the
+  // check was closed on another device), the screen lets it go when the sheet closes.
+  if (charging.value && next.status !== 'open') {
+    heldWhileCharging = next;
+    return;
+  }
   till.follow(next);
 }
+
+watch(charging, (now) => {
+  if (now || !heldWhileCharging) return;
+  const held = heldWhileCharging;
+  heldWhileCharging = null;
+  till.follow(held);
+});
 
 function rememberName(id: string | null, name: string | null): void {
   if (id && name) staffNames.value = { ...staffNames.value, [id]: name };
@@ -95,11 +123,17 @@ const link = useCommand('customer.order.link');
 const linkOf = useCommand('customer.order.customer');
 const cardOf = useCommand('customer.customer.detail');
 
+/** The words of a refusal; the screen's own sentence (`fallbackKey`) when nobody worded it. */
+function wordsOf(error: unknown, fallbackKey: string): string {
+  const fallback = t(fallbackKey);
+  return refusal(error, fallback)?.message ?? fallback;
+}
+
 async function linkCustomer(orderId: string, snapshot: CustomerSnapshot | null): Promise<void> {
   try {
     await link.run({ order_id: orderId, customer_id: snapshot?.customer_id ?? null });
   } catch (error) {
-    void toastError(refusal(error, t('sale.pos.customerLinkFailed')));
+    void toastError(wordsOf(error, 'sale.pos.customerLinkFailed'));
   }
 }
 
@@ -114,9 +148,9 @@ async function loadCustomer(orderId: string): Promise<void> {
     const linked = await linkOf.run({ order_id: orderId });
     if (!linked.customer_id || till.orderId.value !== orderId) return;
     const card = await cardOf.run({ id: linked.customer_id });
-    if (till.orderId.value === orderId) customer.value = customerSnapshot(card, locale.value);
+    if (till.orderId.value === orderId) customer.value = snapshotOf(card, locale.value);
   } catch (error) {
-    void toastError(refusal(error, t('sale.pos.customerLoadFailed')));
+    void toastError(wordsOf(error, 'sale.pos.customerLoadFailed'));
   }
 }
 
@@ -126,6 +160,8 @@ function askCustomer(): void {
 }
 
 const needsCustomer = computed(() => !!settings.value?.require_customer && !customer.value);
+/** Where the till shows the customer: the person; the charge keeps the fiscal recipient (`customer`). */
+const customerName = computed(() => customer.value?.display_name || customer.value?.customer_name || null);
 
 // ── Sheets: one write at a time, its refusal read inside ─────────────────────────────────────────
 const sheetError = shallowRef<string | null>(null);
@@ -167,6 +203,40 @@ const addOpenLine = (line: OpenLine) =>
     () => (pricing.value = false),
   );
 
+// ── Services of Services (SALE-F38) ─────────────────────────────────────────────────────────────
+/** The till sells Services' services: the setting, Services on in this business, and the right to read it. */
+const showServices = computed(
+  () =>
+    !!settings.value?.show_services &&
+    !!session.me.value?.apps.some((app) => app.label === 'service' && app.state === 'on') &&
+    session.can('service.view_service'),
+);
+const pricingService = shallowRef<ServiceSaleOut | null>(null);
+const servicePriceOpen = computed({
+  get: () => !!pricingService.value,
+  set: (open: boolean) => {
+    if (!open) pricingService.value = null;
+  },
+});
+
+async function pickService(service: ServiceSaleOut): Promise<void> {
+  if (service.pricing_type !== 'fixed') {
+    openSheet(() => (pricingService.value = service));
+    return;
+  }
+  const done = await till.addService(service, staff.value.id);
+  if (!done.ok) void toastError(done.message);
+}
+
+const addPricedService = (cents: number) => {
+  const service = pricingService.value;
+  if (!service) return;
+  void fromSheet(
+    () => till.addService(service, staff.value.id, cents),
+    () => (pricingService.value = null),
+  );
+};
+
 const noting = shallowRef<OrderLineOut | null>(null);
 const saveNote = (note: string) =>
   noting.value &&
@@ -194,6 +264,41 @@ const voidLine = (reason: string) =>
     () => (voiding.value = null),
   );
 
+// ── The table of the check (SALE-F19; Tables' operations only) ───────────────────────────────────
+type TableCheck = OutputOf<'table.session.by_order'>['rows'][number];
+
+/** «Choose table» is offered: Tables on in this business, and the right to see its tables and to seat. */
+const tablesOn = computed(
+  () =>
+    !!session.me.value?.apps.some((app) => app.label === 'table' && app.state === 'on') &&
+    session.can('table.view_table') &&
+    session.can('table.add_session'),
+);
+/** The check's table is followed: Tables offered, the right to see its table checks, and a check. */
+const followsTable = computed(() => tablesOn.value && session.can('table.view_session') && !!till.orderId.value);
+const tableSeat = shallowRef<TableCheck | null>(null);
+const tableParked = shallowRef<TableCheck | null>(null);
+const seatOfCheck = computed(() => (followsTable.value ? tableSeat.value : null));
+const parkedOfCheck = computed(() => (followsTable.value ? tableParked.value : null));
+const choosingTable = shallowRef(false);
+
+watch(
+  () => till.orderId.value,
+  () => {
+    tableSeat.value = null;
+    tableParked.value = null;
+  },
+);
+
+/** Seated: a check Tables opened for the table (there was none on screen) goes on the till, with the
+ *  customer already chosen; the check on screen stays, retitled by Tables. */
+function onSeated(check: { order_id: string | null }): void {
+  const id = check.order_id;
+  if (!id || id === till.orderId.value) return;
+  till.resume(id);
+  if (customer.value) void linkCustomer(id, customer.value);
+}
+
 // ── Who serves ───────────────────────────────────────────────────────────────────────────────────
 const picking = shallowRef<{ mode: 'check' } | { mode: 'line'; line: OrderLineOut } | null>(null);
 function chooseStaff(choice: { id: string | null; name: string | null }): void {
@@ -206,7 +311,6 @@ function chooseStaff(choice: { id: string | null; name: string | null }): void {
 
 // ── Parking and switching checks ─────────────────────────────────────────────────────────────────
 const parking = shallowRef(false);
-const checksNotice = shallowRef<string | null>(null);
 function park(label: string): void {
   void fromSheet(
     async () => {
@@ -221,14 +325,14 @@ function park(label: string): void {
   );
 }
 
-const switchingTo = shallowRef<OrderRow | null>(null);
-function switchTo(row: OrderRow): void {
+const switchingTo = shallowRef<Pick<OrderRow, 'id'> | null>(null);
+function switchTo(row: Pick<OrderRow, 'id'>): void {
   till.resume(row.id);
   clearScreen();
   void loadCustomer(row.id);
 }
 
-function resume(row: OrderRow): void {
+function resume(row: Pick<OrderRow, 'id'>): void {
   if (row.id === till.orderId.value) return;
   if (lines.value.length) openSheet(() => (switchingTo.value = row));
   else switchTo(row);
@@ -246,9 +350,43 @@ function leaveCurrent(choice: 'park' | 'discard'): void {
   );
 }
 
+// ── A check opened by its address (/sale/pos?order=<id>) ─────────────────────────────────────────
+const route = useRoute();
+const router = useRouter();
+const checkOf = useCommand('sale.order.get');
+
+/** Puts the check `id` on the till, as «Open checks» does; one no longer open is said. */
+async function openLinked(id: string): Promise<void> {
+  void router.replace({ path: route.path, query: {} });
+  if (id === till.orderId.value) return;
+  try {
+    const linked = await checkOf.run({ order_id: id });
+    if (linked.status === 'open') resume(linked);
+    else void toastError(t('sale.pos.linkedCheckGone'));
+  } catch (error) {
+    const gone = error instanceof ApiError && error.status === 404;
+    void toastError(gone ? t('sale.pos.linkedCheckGone') : wordsOf(error, 'sale.pos.linkedCheckGone'));
+  }
+}
+
+/** The till's own address: Ionic keeps this page alive behind others, whose `order` may mean a sort. */
+const POS_PATH = '/sale/pos';
+
+// Once the till can show it (its settings read): on arriving and whenever its address names a check.
+watch(
+  () => (settings.value && route.path === POS_PATH ? route.query.order : undefined),
+  (id) => {
+    if (typeof id === 'string' && id) void openLinked(id);
+  },
+  { immediate: true },
+);
+
 // ── Charging ─────────────────────────────────────────────────────────────────────────────────────
 const documentOpen = shallowRef(false);
 const documentSaleId = shallowRef<string | null>(null);
+
+/** The lines of the check when «Charge» opened the sheet: what a charge of all of them means. */
+let chargingLines: string[] = [];
 
 function charge(): void {
   if (!order.value || !lines.value.length) return;
@@ -256,18 +394,25 @@ function charge(): void {
     askCustomer();
     return;
   }
+  chargingLines = lines.value.map((line) => line.id);
+  heldWhileCharging = null;
   charging.value = true;
 }
 
-function onCharged(sale: SaleOut): void {
-  const whole = marks.value.length === 0 || marks.value.length >= lines.value.length;
-  if (!whole) {
+/**
+ * Charged: whole or partial is what the sheet charged (`lineIds`, frozen when it opened; none = the
+ * whole check), never the marks now — a live update may have dropped them. Whole: the screen starts
+ * afresh. Partial: the check stays with what is left. Either way the sale's document opens.
+ */
+function onCharged(sale: SaleOut, lineIds: readonly string[]): void {
+  const whole = lineIds.length === 0 || chargingLines.every((id) => lineIds.includes(id));
+  if (whole) {
+    till.release();
+    clearScreen();
+    cartOpen.value = false;
+  } else {
     marks.value = [];
-    return;
   }
-  till.release();
-  clearScreen();
-  cartOpen.value = false;
   documentSaleId.value = sale.id;
   documentOpen.value = true;
 }
@@ -282,10 +427,14 @@ const prebillOpen = shallowRef(false);
 const PHONE = '(max-width: 820px), (max-height: 500px)';
 const phone = shallowRef(false);
 const cartOpen = shallowRef(false);
+/** On a phone the open cart is a modal dialog over the till: focus inside, trapped, back to the button. */
+const drawerOpen = computed(() => phone.value && cartOpen.value);
+const drawer = useTemplateRef<HTMLElement>('drawer');
+const fab = useTemplateRef<{ $el: HTMLElement }>('fab');
+const drawerFocus = useDrawerFocus({ container: drawer, open: cartOpen, enabled: phone, returnTo: () => fab.value?.$el });
 let media: MediaQueryList | undefined;
 const onMedia = () => (phone.value = !!media?.matches);
 
-const tillEl = useTemplateRef<HTMLElement>('tillEl');
 const itemCount = computed(() =>
   Math.round(lines.value.reduce((sum, line) => sum + (line.unit === 'ud' ? Number(line.quantity) : 1), 0)),
 );
@@ -332,7 +481,6 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
     </div>
     <div
       v-else
-      ref="tillEl"
       class="pos-till"
       :class="{ 'pos-till--cart-open': cartOpen }"
       data-testid="pos-till"
@@ -342,11 +490,13 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         <PosCatalog
           :show-products="settings.show_products"
           :can-open-price="session.can('sale.sell_open_price')"
-          :target="tillEl"
+          :show-services="showServices"
           @add="till.addProduct($event, staff.id)"
+          @service="pickService"
           @open-price="openPrice"
         >
           <CartFab
+            ref="fab"
             class="pos-till__fab"
             :count="itemCount"
             :total="total"
@@ -360,7 +510,16 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
           data-testid="pos-cart-backdrop"
           @click="cartOpen = false"
         />
-        <div class="pos-till__cart">
+        <div
+          ref="drawer"
+          class="pos-till__cart"
+          data-testid="pos-cart-drawer"
+          :role="drawerOpen ? 'dialog' : undefined"
+          :aria-modal="drawerOpen ? 'true' : undefined"
+          :aria-label="drawerOpen ? $t('sale.pos.cartLabel') : undefined"
+          :tabindex="phone ? -1 : undefined"
+          @keydown="drawerFocus.onKeydown"
+        >
           <PosCart
             :order="order"
             :label="order ? order.label : till.pendingLabel.value"
@@ -369,14 +528,14 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             :marks="marks"
             :staff-names="staffNames"
             :settings="settings"
-            :customer-name="customer?.customer_name || null"
+            :customer-name="customerName"
             :staff-id="staff.id"
             :staff-name="staff.name"
             :needs-customer="needsCustomer"
             :busy="till.busy.value"
             :drawer="phone"
             :open-checks="openChecks"
-            :checks-notice="checksNotice"
+            :table-number="seatOfCheck?.table_number ?? null"
             @park="openSheet(() => (parking = true))"
             @close="cartOpen = false"
             @rename="till.rename($event)"
@@ -394,6 +553,13 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             @charge="charge"
             @resume="resume"
           >
+            <template #table>
+              <TableButton
+                v-if="tablesOn"
+                :table-number="seatOfCheck?.table_number ?? null"
+                @open="choosingTable = true"
+              />
+            </template>
             <template #customer>
               <CustomerSearch
                 v-model:open="choosingCustomer"
@@ -414,12 +580,26 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         @preview="preview = $event"
         @gone="till.gone()"
       />
+      <TableFollower
+        v-if="followsTable && till.orderId.value"
+        :key="till.orderId.value"
+        :order-id="till.orderId.value"
+        @seat="tableSeat = $event"
+        @parked="tableParked = $event"
+      />
 
       <OpenPriceSheet
         v-model:open="pricing"
         :pending="sheetPending"
         :error="sheetError"
         @add="addOpenLine"
+      />
+      <ServicePriceSheet
+        v-model:open="servicePriceOpen"
+        :service="pricingService"
+        :pending="sheetPending"
+        :error="sheetError"
+        @add="addPricedService"
       />
       <LineNoteSheet
         :open="!!noting"
@@ -470,11 +650,19 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         @update:open="(open) => !open && (picking = null)"
         @choose="chooseStaff"
       />
+      <TablePicker
+        v-if="choosingTable"
+        v-model:open="choosingTable"
+        :order-id="till.orderId.value"
+        :seat="seatOfCheck"
+        :parked="parkedOfCheck"
+        @seated="onSeated"
+      />
       <PrebillModal
         v-if="prebillOpen && order"
         v-model:open="prebillOpen"
         :order="order"
-        :customer-name="customer?.customer_name || null"
+        :customer-name="customerName"
         :header="settings.receipt_header"
       />
       <CheckoutSheet
@@ -514,9 +702,6 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
   background: var(--ion-background-color, #fff);
   border: 1px solid var(--ion-border-color, #e6e3db);
   border-radius: 16px;
-}
-.pos-till:fullscreen {
-  border-radius: 0;
 }
 /* One row pinned to the box's height, so the grid scrolls inside its column and the cart's foot stays. */
 .pos-till__body {

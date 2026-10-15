@@ -11,7 +11,7 @@ import { computed, ref } from 'vue';
 
 import ListNotices, { blockingError, type ListRefusal } from '../components/backoffice/ListNotices.vue';
 import QuickNoteFormModal from '../components/backoffice/QuickNoteFormModal.vue';
-import { refusal } from '../components/backoffice/refusal';
+import { refusal } from '../lib/refusal';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { QuickNoteOut } from '../operations';

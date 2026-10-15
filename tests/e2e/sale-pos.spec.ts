@@ -2,19 +2,24 @@
 // Inventory's products priced at Taxes' real VAT (Spain), a Customers card on the check, a quick note on
 // a line. The owner sells in cash with change and sees the ticket with its VAT row; sells by card to a
 // customer found in the till; a product without tax category is refused; on a phone the cart is the
-// drawer behind the FAB; the employee charges but never voids, refunds nor reads the figures.
+// drawer behind the FAB; the employee charges but never voids, refunds nor reads the figures. A marked
+// line is charged on its own (SALE-F22) with its ticket, and the rest closes the check; on full screen
+// the checkout sheet still opens and charges on top of the till.
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, newestSale, shots, stamp } from './sale-helpers';
+import { snapshotSeries } from './invoice-helpers';
+import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let water: Product;
 let shirt: Product;
 let untaxed: Product;
+let juice: Product;
+let cake: Product;
 let customer: { id: string; name: string };
 let methods: Record<string, string>;
 
@@ -22,14 +27,21 @@ test.afterAll(() => {
   cleanSales();
   cleanCustomers();
   cleanInventory();
+  restoreDrawer();
 });
 
 test.beforeAll(async ({ browser }) => {
+  // Card charges issue tickets (F2) when the hub has an issuer: the cleanup gives their numbers back.
+  snapshotSeries();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
+  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
+  await drawerOff(context);
   water = await createProduct(context, { name: `E2E Water ${RUN}`, sku: `E2E-POS-W-${RUN}`, price: 110, tax_category_key: 'restaurant.drink' });
   shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: `E2E-POS-S-${RUN}`, price: 1210, tax_category_key: 'product.generic' });
+  juice = await createProduct(context, { name: `E2E Juice ${RUN}`, sku: `E2E-POS-J-${RUN}`, price: 250, tax_category_key: 'restaurant.drink' });
+  cake = await createProduct(context, { name: `E2E Cake ${RUN}`, sku: `E2E-POS-C-${RUN}`, price: 400, tax_category_key: 'restaurant.drink' });
   untaxed = await createProduct(context, { name: `E2E Untaxed ${RUN}`, sku: `E2E-POS-U-${RUN}`, price: 500, tax_category_key: 'product.generic' });
   psql(`update inventory_product set tax_category_id = null where id = '${untaxed.id}'`);
   const card = await createCard(context, { name: e2eName('Ana'), phone: spanishMobile() });
@@ -88,7 +100,7 @@ test('SALE-F01: the owner sells two shirts in cash, gets the change and the tick
   await expect(receipt).toContainText(/24[.,]20/);
   await page.screenshot({ path: shot('sale-pos-ticket-1440') });
 
-  const sale = await newestSale(context);
+  const sale = await newestSaleOf(context, shirt.sku);
   expect((({ total, subtotal, tax_total, change_total }) => ({ total, subtotal, tax_total, change_total }))(sale)).toEqual({
     total: 2420,
     subtotal: 2000,
@@ -130,7 +142,7 @@ test('SALE-F05 and F13: a check with a customer found in the till and a quick no
   await sheet.locator('[data-testid=sale-checkout-confirm]').click();
   await expect(sheet).toBeHidden();
 
-  const sale = await newestSale(context);
+  const sale = await newestSaleOf(context, water.sku);
   expect((({ total, customer_id, customer_name }) => ({ total, customer_id, customer_name }))(sale)).toEqual({
     total: 110,
     customer_id: customer.id,
@@ -138,6 +150,76 @@ test('SALE-F05 and F13: a check with a customer found in the till and a quick no
   });
   expect(sale.lines[0].tax_rate).toBe('10.00');
   expect(sale.payments.map((p) => p.method_type)).toEqual(['card']);
+});
+
+test('SALE-F22: a marked line is charged on its own with its ticket, and the rest closes the check', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await login(page, A, '/sale/pos');
+  await tillReady(page);
+  await addBySearch(page, juice);
+  await expect(lineOf(page, juice.name)).toBeVisible();
+  await addBySearch(page, cake);
+  await expect(lineOf(page, cake.name)).toBeVisible();
+  await lineOf(page, juice.name).locator('[data-testid$=-mark]').click();
+
+  await shown(page).locator('[data-testid=pos-charge]').click();
+  const sheet = page.locator('[data-testid=sale-checkout-modal]');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('[data-testid=sale-checkout-partial]')).toContainText(/6[.,]50/);
+  await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/2[.,]50/);
+  await sheet.locator(`[data-testid=sale-checkout-method-${methods.card}]`).click();
+  await page.screenshot({ path: shot('sale-checkout-partial-1280') });
+  await sheet.locator('[data-testid=sale-checkout-confirm]').click();
+  await expect(sheet).toBeHidden();
+
+  // The part's own ticket opens too; behind it, the check stays open with what is left.
+  const documentModal = page.locator('[data-testid=sale-document-modal]');
+  await expect(documentModal.locator('[data-testid=sale-receipt]')).toContainText(/2[.,]50/);
+  await documentModal.locator('[data-testid=sale-document-close]').click();
+  await expect(documentModal).toBeHidden();
+  await expect(lineOf(page, cake.name)).toBeVisible();
+  await expect(lineOf(page, juice.name)).toHaveCount(0);
+  await expect(shown(page).locator('[data-testid=pos-total]')).toContainText(/4[.,]00/);
+  const part = await newestSaleOf(context, juice.sku);
+  expect([part.total, part.lines.map((line) => line.sku)]).toEqual([250, [juice.sku]]);
+
+  // The rest closes the check: its ticket, and the till starts afresh.
+  await shown(page).locator('[data-testid=pos-charge]').click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/4[.,]00/);
+  await sheet.locator(`[data-testid=sale-checkout-method-${methods.card}]`).click();
+  await sheet.locator('[data-testid=sale-checkout-confirm]').click();
+  await expect(sheet).toBeHidden();
+  await expect(documentModal.locator('[data-testid=sale-receipt]')).toContainText(/4[.,]00/);
+  await documentModal.locator('[data-testid=sale-document-close]').click();
+  await expect(shown(page).locator('[data-testid=pos-cart-empty]')).toBeVisible();
+  const rest = await newestSaleOf(context, cake.sku);
+  expect([rest.total, rest.lines.map((line) => line.sku)]).toEqual([400, [cake.sku]]);
+});
+
+test('full screen: the whole page goes full screen and the checkout sheet opens and charges on top', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await login(page, A, '/sale/pos');
+  await tillReady(page);
+  await shown(page).locator('[data-testid=pos-screen-menu]').click();
+  await shown(page).locator('[data-testid=pos-fullscreen]').click();
+  // The page itself, not a piece of it: the sheets live in the app's root, outside the till.
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement === document.documentElement)).toBe(true);
+  try {
+    await addBySearch(page, water);
+    await shown(page).locator('[data-testid=pos-charge]').click();
+    const sheet = page.locator('[data-testid=sale-checkout-modal]');
+    await expect(sheet).toBeVisible();
+    await sheet.locator(`[data-testid=sale-checkout-method-${methods.card}]`).click();
+    await page.screenshot({ path: shot('sale-pos-fullscreen-checkout') });
+    // Playwright clicks only what is on top at that point: the sheet is above the full-screen page.
+    await sheet.locator('[data-testid=sale-checkout-confirm]').click();
+    await expect(sheet).toBeHidden();
+    await expect(page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]')).toBeVisible();
+    expect((await newestSaleOf(context, water.sku)).total).toBe(110);
+  } finally {
+    await page.evaluate(() => (document.fullscreenElement ? document.exitFullscreen() : undefined));
+  }
 });
 
 test('SALE-F07: a product without tax category is marked and never enters the check', async ({ page }) => {
@@ -177,7 +259,7 @@ test('the till on a phone: the cart is the drawer behind the button with its cou
   await page.screenshot({ path: shot('sale-checkout-phone') });
   await sheet.locator('[data-testid=sale-checkout-confirm]').click();
   await expect(sheet).toBeHidden();
-  expect((await newestSale(context)).total).toBe(110);
+  expect((await newestSaleOf(context, water.sku)).total).toBe(110);
 });
 
 test('the employee charges at the till but never voids, refunds nor reads the figures', async ({ browser }) => {
@@ -203,3 +285,26 @@ test('the employee charges at the till but never voids, refunds nor reads the fi
   }
 });
 
+
+test('a check opened by its address (/sale/pos?order=<id>, as the agenda’s «Charge» does) is on the till', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await login(page, A, '/sale/pos');
+  await tillReady(page);
+  const opened = await api<{ id: string }>(context, A, 'POST', '/sale/orders', { label: `e2e link ${RUN}`, lines: [{ product_id: juice.id }] });
+  expect(opened.status).toBe(201);
+  await page.goto(`${A}/sale/pos?order=${opened.data.id}`);
+  await tillReady(page);
+  await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`e2e link ${RUN}`);
+  await expect(lineOf(page, juice.name)).toBeVisible();
+  await expect(page).toHaveURL(/\/sale\/pos$/);
+
+  // One no longer open is said, and the till carries on with the one it had.
+  const voided = await api<{ id: string }>(context, A, 'POST', '/sale/orders', { label: `e2e gone ${RUN}`, lines: [{ product_id: cake.id }] });
+  expect((await api(context, A, 'POST', '/sale/orders/void', { order_id: voided.data.id })).status).toBe(200);
+  await page.goto(`${A}/sale/pos?order=${voided.data.id}`);
+  await tillReady(page);
+  await expect(page.locator('ion-toast')).toContainText(/not open any more|ya no está abierta/);
+  await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`e2e link ${RUN}`);
+  // The check opened by its address goes, as every other this file opened (afterAll).
+  expect((await api(context, A, 'POST', '/sale/orders/void', { order_id: opened.data.id })).status).toBe(200);
+});

@@ -12,8 +12,8 @@ import { computed, ref } from 'vue';
 
 import DepartmentFormModal from '../components/backoffice/DepartmentFormModal.vue';
 import ListNotices, { blockingError, type ListRefusal } from '../components/backoffice/ListNotices.vue';
-import { refusal } from '../components/backoffice/refusal';
-import { taxLabel } from '../components/backoffice/taxLabel';
+import { refusal } from '../lib/refusal';
+import { taxLabel } from '../lib/taxLabel';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import type { DepartmentOut } from '../operations';

@@ -121,6 +121,34 @@ describe('CheckoutFoot: what happened', () => {
   });
 });
 
+describe('CheckoutFoot: the drawer is closed (SALE-F08, CASH_REGISTER-F04)', () => {
+  const CLOSED = { kind: 'refused', code: 'sale.cash_register_closed', message: 'The cash register is closed: open a cash session to charge in cash.' };
+
+  it('says why in the server’s words and offers to open a cash session, without leaving the sheet by itself', async () => {
+    const s = await setup({ failure: CLOSED, canOpenDrawer: true });
+    expect(s.error().text()).toBe('The cash register is closed: open a cash session to charge in cash.');
+    const open = s.find('sale-checkout-open-drawer');
+    expect([open.text(), (open.element as HTMLElement & { fill?: string }).fill, open.findComponent(HubIcon).props('name')]).toEqual([
+      'Open a cash session',
+      'outline',
+      'ion:cash-outline',
+    ]);
+    await click(open.element);
+    expect(s.wrapper.emitted('openDrawer')).toEqual([[]]);
+  });
+
+  it('whoever may not open a session reads the reason only; another refusal never offers it', async () => {
+    expect((await setup({ failure: CLOSED, canOpenDrawer: false })).find('sale-checkout-open-drawer').exists()).toBe(false);
+    const other = await setup({ failure: { ...CLOSED, code: 'sale.order_changed' }, canOpenDrawer: true });
+    expect(other.find('sale-checkout-open-drawer').exists()).toBe(false);
+  });
+
+  it('in Spanish', async () => {
+    const s = await setup({ failure: CLOSED, canOpenDrawer: true }, 'es');
+    expect(s.find('sale-checkout-open-drawer').text()).toBe('Abrir sesión de caja');
+  });
+});
+
 describe('CheckoutFoot: Spanish', () => {
   it('uses the old words', async () => {
     expect((await setup({}, 'es')).label()).toBe('Cobrar 42,50 €');

@@ -9,12 +9,14 @@ import { toast } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
-import { click, EMPLOYEE, errorFrame, flush, ionValue, type MountOptions, mountSale, resultFrame } from '../../__tests__/mount-sale';
+import { click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountSale, resultFrame } from '../../__tests__/mount-sale';
 import { RECOVERY_DELAY_MS } from '../../composables/checkout/useCheckout';
 import { plain } from '../../lib/format';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut, SettingsOut } from '../../operations';
 import CheckoutPanel from './CheckoutPanel.vue';
 import CheckoutSide from './CheckoutSide.vue';
+import { previewLine } from './__tests__/vouchers';
+import VoucherLines from './VoucherLines.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
@@ -43,6 +45,7 @@ const preview = (over: Partial<PreviewOut> = {}): PreviewOut => ({
   cash_limit: 100000,
   ticket_limit: 300000,
   ...over,
+  operation_total: over.operation_total ?? over.total ?? 4250,
 });
 
 const method = (id: string, type: PaymentMethodOut['type'], display_name: string, allowed = true): PaymentMethodOut => ({
@@ -83,7 +86,7 @@ const SETTINGS: SettingsOut = {
 const CUSTOMER: CustomerSnapshot = {
   customer_id: 'c1',
   customer_name: 'Bar Pepe SL',
-  customer_tax_id: 'B12345678',
+  customer_tax_id: 'B12345674',
   customer_address: 'Calle Mayor 1, 28001 Madrid, España',
   customer_country: 'ES',
 };
@@ -224,7 +227,7 @@ describe('CheckoutPanel: cash (SALE-F01)', () => {
       staff_id: 'st1',
       idempotency_key: expect.stringMatching(/^sale-/),
     });
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE]]);
+    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
   });
 
   it('says it is busy while charging, and the button says «Charging…»', async () => {
@@ -263,6 +266,51 @@ describe('CheckoutPanel: card and other methods (SALE-F02)', () => {
   });
 });
 
+describe('CheckoutPanel: the recipient’s tax ID (SALE-F04)', () => {
+  it('a tax ID the server refuses is said under its box, with the side open', async () => {
+    const s = await setup({ props: { customer: { ...CUSTOMER, customer_country: 'FR', customer_tax_id: 'FR00000000000' } } });
+    const message = 'That tax ID is not valid.';
+    s.replies({ '/api/sale/sales': [Response.json({ error: { code: 'invalid_field', message, fields: { customer_tax_id: message } } }, { status: 422 })] });
+    await click(s.find('sale-checkout-doc-invoice').element);
+    await click(s.find('sale-checkout-method-m-card').element);
+    await click(s.confirm());
+    expect(s.text('sale-checkout-recipient-tax-id-error')).toBe(message);
+    expect(s.wrapper.emitted('charged')).toBeUndefined();
+  });
+});
+
+describe('CheckoutPanel: cash with the drawer closed (SALE-F08)', () => {
+  const DRAWER = { ...MANAGER, permissions: [...MANAGER.permissions, 'cash_register.add_session'], apps: [{ label: 'cash_register', state: 'on' as const }] };
+  const closed = () =>
+    Response.json(
+      { error: { code: 'sale.cash_register_closed', message: 'The cash register is closed: open a cash session to charge in cash.' } },
+      { status: 409 },
+    );
+
+  it('the refusal stays in the sheet; «Open a cash session» goes to the cash register and closes the sheet', async () => {
+    const s = await setup({ session: DRAWER });
+    s.replies({ '/api/sale/sales': [closed()] });
+    await click(s.find('sale-checkout-method-m-card').element);
+    await click(s.confirm());
+    expect(s.text('sale-checkout-error')).toBe('The cash register is closed: open a cash session to charge in cash.');
+    expect(s.wrapper.emitted('charged')).toBeUndefined();
+    await click(s.find('sale-checkout-open-drawer').element);
+    expect(s.router.currentRoute.value.path).toBe('/cash_register/sessions');
+    expect(s.wrapper.emitted('close')).toEqual([[]]);
+  });
+
+  it('without the right to open a session, or without Cash register on, only the reason', async () => {
+    for (const session of [{ ...DRAWER, permissions: MANAGER.permissions }, { ...DRAWER, apps: [] }]) {
+      const s = await setup({ session });
+      s.replies({ '/api/sale/sales': [closed()] });
+      await click(s.find('sale-checkout-method-m-card').element);
+      await click(s.confirm());
+      expect(s.find('sale-checkout-error').exists()).toBe(true);
+      expect(s.find('sale-checkout-open-drawer').exists()).toBe(false);
+    }
+  });
+});
+
 describe('CheckoutPanel: split (SALE-F03)', () => {
   it('legs until nothing is left, the change out of cash, one payment per leg', async () => {
     const s = await setup();
@@ -289,6 +337,16 @@ describe('CheckoutPanel: split (SALE-F03)', () => {
 });
 
 describe('CheckoutPanel: the legal limits', () => {
+  it('a part under the cash limit of a check whose whole operation reaches it: no cash, and a tap on cash says why', async () => {
+    const s = await setup({ props: { lineIds: ['l1'] }, preview: null });
+    await s.push(PREVIEW_OP, preview({ total: 30000, operation_total: 120000 }), (p) => 'line_ids' in p);
+    await s.push(PREVIEW_OP, preview({ total: 120000, operation_total: 120000 }), (p) => !('line_ids' in p));
+    expect(s.find('sale-checkout-method-m-cash').attributes('aria-disabled')).toBe('true');
+    expect(s.find('sale-checkout-method-m-card').attributes('aria-pressed')).toBe('true');
+    await click(s.find('sale-checkout-method-m-cash').element);
+    expect(toast).toHaveBeenCalledWith('The law does not allow cash for sales of €1,000.00 or more. Charge it by card or Bizum.', 'warning');
+  });
+
   it('from the cash limit on, cash is unavailable: the sheet starts on card and a tap on cash says why', async () => {
     const s = await setup({ preview: preview({ total: 120000 }) });
     expect(s.find('sale-checkout-method-m-cash').attributes('aria-disabled')).toBe('true');
@@ -331,14 +389,14 @@ describe('CheckoutPanel: receipt or invoice (SALE-F04)', () => {
     await click(s.find('sale-checkout-method-m-card').element);
     await click(s.find('sale-checkout-doc-invoice').element);
     expect(s.label()).toBe("Enter the customer's details");
-    await ionValue(s.inDoc('sale-checkout-recipient-tax-id'), 'B12345678', 'ionInput');
+    await ionValue(s.inDoc('sale-checkout-recipient-tax-id'), 'B12345674', 'ionInput');
     expect(s.label()).toBe('Charge €42.50 by card');
     await click(s.confirm());
     expect(s.body()).toMatchObject({
       document_type: 'invoice',
       customer_id: 'c1',
       customer_name: 'Bar Pepe SL',
-      customer_tax_id: 'B12345678',
+      customer_tax_id: 'B12345674',
       customer_address: 'Calle Mayor 1, 28001 Madrid, España',
       customer_country: '',
       customer_id_type: '',
@@ -392,7 +450,7 @@ describe('CheckoutPanel: a lost answer (SALE-F06)', () => {
     s.replies({ '/api/sale/sales/by_key': [Response.json({ found: true, sale: SALE })] });
     await click(s.find('sale-checkout-method-m-card').element);
     await click(s.confirm());
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE]]);
+    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
   });
 });
 
@@ -418,6 +476,45 @@ describe('CheckoutPanel: part of the check (SALE-F22)', () => {
   });
 });
 
+describe('CheckoutPanel: it charges what it showed (frozen when it opens)', () => {
+  it('the check changing under the sheet: the charge keeps the lines marked at opening and the version it painted; the 409 stays in the sheet', async () => {
+    const s = await setup({ props: { lineIds: ['l1'], orderVersion: 3 }, preview: null });
+    await s.push(PREVIEW_OP, preview({ total: 900, order_version: 3 }), (p) => 'line_ids' in p);
+    await s.push(PREVIEW_OP, preview({ total: 8000, order_version: 3 }), (p) => !('line_ids' in p));
+    // The till's live check moves on under the sheet: the mark drops, the version grows.
+    await s.wrapper.setProps({ lineIds: [], orderVersion: 5 });
+    await s.reopen();
+    expect(s.params(PREVIEW_OP)).toEqual([{ order_id: 'o1', line_ids: ['l1'] }, { order_id: 'o1' }]);
+    expect(s.text('sale-checkout-partial')).toBe('Paying 1 line of €80.00');
+    const message = 'The check changed while it was being charged. Nothing was charged.';
+    s.replies({ '/api/sale/sales': [Response.json({ error: { code: 'sale.order_changed', message } }, { status: 409 })] });
+    await click(s.find('sale-checkout-method-m-card').element);
+    await click(s.confirm());
+    expect(s.body()).toMatchObject({ order_id: 'o1', line_ids: ['l1'], order_version: 3 });
+    expect(s.text('sale-checkout-error')).toBe(message);
+    expect(s.wrapper.emitted('charged')).toBeUndefined();
+  });
+
+  it('sends the version of the total it paints (the preview’s), not the till’s', async () => {
+    const s = await setup({ props: { orderVersion: 3 }, preview: preview({ order_version: 4, total: 4300 }) });
+    s.replies({ '/api/sale/sales': [Response.json(SALE)] });
+    await click(s.find('sale-checkout-method-m-card').element);
+    await click(s.confirm());
+    expect(s.body().order_version).toBe(4);
+  });
+
+  it('hands the sale up with the lines it charged (none = the whole check)', async () => {
+    const s = await setup({ props: { lineIds: ['l1', 'l2'] }, preview: null });
+    await s.push(PREVIEW_OP, preview({ total: 1800 }), (p) => 'line_ids' in p);
+    await s.push(PREVIEW_OP, preview({ total: 8000 }), (p) => !('line_ids' in p));
+    await s.wrapper.setProps({ lineIds: ['l2'] });
+    s.replies({ '/api/sale/sales': [Response.json(SALE)] });
+    await click(s.find('sale-checkout-method-m-card').element);
+    await click(s.confirm());
+    expect(s.wrapper.emitted('charged')).toEqual([[SALE, ['l1', 'l2']]]);
+  });
+});
+
 describe('CheckoutPanel: the head', () => {
   it('«Charge» and a close button that closes, not while charging', async () => {
     const s = await setup();
@@ -433,7 +530,7 @@ describe('CheckoutPanel: the head', () => {
     s.replies({ '/api/sale/sales': [Response.json(SALE)] });
     await click(s.find('sale-checkout-method-m-card').element);
     await click(s.confirm());
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE]]);
+    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
   });
 });
 
@@ -451,5 +548,61 @@ describe('CheckoutPanel: Spanish', () => {
     expect(s.text('sale-checkout-block-reason')).toBe('Marca en el teclado el importe entregado');
     await click(s.find('sale-checkout-split').element);
     expect(s.text('sale-checkout-remaining')).toBe('Restante 18,00 €');
+  });
+});
+
+describe('CheckoutPanel: lines paid with a voucher (SALE-F27)', () => {
+  /** Services on in this business, and the person may spend sessions. */
+  const WITH_SERVICES = { ...MANAGER, permissions: [...MANAGER.permissions, 'service.redeem_package'], apps: [{ label: 'service', state: 'on' as const }] };
+  const LINES = [previewLine('l1'), previewLine('l2', { service_id: null, name: 'Champú', line_total: 1750 })];
+  const ANA: CustomerSnapshot = { ...CUSTOMER, customer_id: 'c9', customer_name: 'Ana' };
+
+  it('with Services on and a customer, «Lines paid another way» gets the lines of this charge', async () => {
+    const s = await setup({ session: WITH_SERVICES, props: { customer: ANA }, preview: preview({ lines: LINES }) });
+    const section = s.wrapper.findComponent(VoucherLines);
+    expect(section.props()).toEqual({ orderId: 'o1', lines: LINES, customerId: 'c9' });
+  });
+
+  it('without Services on, or without the permission to spend sessions, there is no such section', async () => {
+    const off = await setup({ session: { ...WITH_SERVICES, apps: [] }, props: { customer: ANA }, preview: preview({ lines: LINES }) });
+    expect(off.wrapper.findComponent(VoucherLines).exists()).toBe(false);
+    const inactive = await setup({ session: { ...WITH_SERVICES, apps: [{ label: 'service', state: 'off' as const }] }, props: { customer: ANA }, preview: preview({ lines: LINES }) });
+    expect(inactive.wrapper.findComponent(VoucherLines).exists()).toBe(false);
+    const denied = await setup({ session: { ...WITH_SERVICES, permissions: MANAGER.permissions }, props: { customer: ANA }, preview: preview({ lines: LINES }) });
+    expect(denied.wrapper.findComponent(VoucherLines).exists()).toBe(false);
+  });
+
+  it('without a customer the section still gets the lines (it lists only those a voucher already pays)', async () => {
+    const s = await setup({ session: WITH_SERVICES, preview: preview({ lines: LINES }) });
+    expect(s.wrapper.findComponent(VoucherLines).props('customerId')).toBeNull();
+  });
+
+  it('a line split to pay with a voucher in a part charge takes its new lines into this charge', async () => {
+    const s = await setup({ session: WITH_SERVICES, props: { lineIds: ['l1'], customer: ANA }, preview: null });
+    await s.push(PREVIEW_OP, preview({ total: 5000, lines: [previewLine('l1', { quantity: '2.000', line_total: 5000 })] }), (p) => 'line_ids' in p);
+    await s.push(PREVIEW_OP, preview({ total: 8000 }), (p) => !('line_ids' in p));
+    s.wrapper.findComponent(VoucherLines).vm.$emit('split', ['l8']);
+    await s.reopen();
+    expect(s.params(PREVIEW_OP)).toHaveLength(2);
+    expect(s.params(PREVIEW_OP)).toEqual(expect.arrayContaining([{ order_id: 'o1', line_ids: ['l1', 'l8'] }, { order_id: 'o1' }]));
+    await s.push(PREVIEW_OP, preview({ total: 2500 }), (p) => 'line_ids' in p);
+    await s.push(PREVIEW_OP, preview({ total: 8000 }), (p) => !('line_ids' in p));
+    s.replies({ '/api/sale/sales': [Response.json(SALE)] });
+    await click(s.find('sale-checkout-method-m-card').element);
+    await click(s.confirm());
+    expect(s.body()).toMatchObject({ line_ids: ['l1', 'l8'] });
+    expect(s.wrapper.emitted('charged')).toEqual([[SALE, ['l1', 'l8']]]);
+  });
+
+  it('a check paid whole with vouchers is charged at 0 without any payment', async () => {
+    const s = await setup({
+      session: WITH_SERVICES,
+      props: { customer: ANA },
+      preview: preview({ total: 0, subtotal: 0, tax_total: 0, lines: [previewLine('l1', { paid_by_voucher: true, voucher_name: 'Bono', voucher_remaining: 3, line_total: 0 })] }),
+    });
+    expect(s.text('sale-checkout-total')).toBe('€0.00');
+    s.replies({ '/api/sale/sales': [Response.json({ ...SALE, total: 0 })] });
+    await click(s.confirm());
+    expect(s.body()).toMatchObject({ order_id: 'o1', payments: [], customer_id: 'c9' });
   });
 });

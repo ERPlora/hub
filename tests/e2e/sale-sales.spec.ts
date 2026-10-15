@@ -7,7 +7,8 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, shown } from './helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
-import { chargeByApi, cleanSales, type SaleOut, shots, stamp } from './sale-helpers';
+import { snapshotSeries } from './invoice-helpers';
+import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, shots, stamp } from './sale-helpers';
 
 const SKU = `E2E-SAL-${stamp()}`;
 let cash: SaleOut;
@@ -17,6 +18,7 @@ let toVoid: SaleOut;
 test.afterAll(() => {
   cleanSales();
   cleanInventory();
+  restoreDrawer();
 });
 
 const row = (page: Page, sale: SaleOut) => shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
@@ -30,9 +32,13 @@ async function search(page: Page, text: string): Promise<void> {
 }
 
 test.beforeAll(async ({ browser }) => {
+  // Card charges issue tickets (F2) when the hub has an issuer: the cleanup gives their numbers back.
+  snapshotSeries();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/sales');
+  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
+  await drawerOff(context);
   await createProduct(context, { name: 'E2E Shirt', sku: SKU, price: 1210, tax_category_key: 'product.generic' });
   cash = await chargeByApi(context, { lines: [{ product: SKU, quantity: '2' }], payments: [{ method: 'cash', tendered: 5000 }] });
   card = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });

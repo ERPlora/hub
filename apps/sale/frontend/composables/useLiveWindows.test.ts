@@ -1,11 +1,14 @@
-// `useLiveWindows(op, query, size)`: a list followed live in windows of at most 100 rows (the server's
-// cap: a bigger `limit` is a 422), each window its own subscription. «Load more» opens the next
-// window; a new query (another category, another search) starts again from one window.
+// `useLiveWindows(op, query, size, plan)`: THE engine of the app's live lists. A list followed live in
+// windows of at most 100 rows (the server's cap: a bigger `limit` is a 422), each window its own
+// subscription, the rows merged in order, the first window's total, the status and the first error.
+// Left to itself it grows by «Load more» and a new query (another category, another search) starts
+// again from one window; a table plans its rows instead (from its page's first row, as many as its
+// pages show), cut in windows of at most `size`.
 import { describe, expect, it } from 'vitest';
-import { defineComponent, h, shallowRef } from 'vue';
+import { shallowRef } from 'vue';
 
-import { errorFrame, mountSale } from '../../__tests__/mount-sale';
-import { useLiveWindows, type LiveWindows } from './useLiveWindows';
+import { errorFrame, mountComposable } from '../__tests__/mount-sale';
+import { type LiveWindows, useLiveWindows, windowsOf } from './useLiveWindows';
 
 const OP = 'sale.order.list';
 
@@ -14,13 +17,9 @@ const row = (id: string) => ({ id });
 async function setup(size = 2) {
   const query = shallowRef<Record<string, unknown>>({ status: 'open' });
   let list!: LiveWindows<{ id: string }>;
-  const Probe = defineComponent({
-    setup() {
-      list = useLiveWindows(OP, () => query.value, size) as unknown as LiveWindows<{ id: string }>;
-      return () => h('div');
-    },
+  const m = await mountComposable(() => {
+    list = useLiveWindows(OP, () => query.value, size) as unknown as LiveWindows<{ id: string }>;
   });
-  const m = await mountSale(Probe);
   await m.live();
   return { ...m, query, list: () => list };
 }
@@ -86,5 +85,60 @@ describe('useLiveWindows', () => {
     expect(s.list().status.value).toBe('error');
     expect(s.list().error.value?.code).toBe('app_inactive');
     expect(s.list().rows.value).toEqual([row('a'), row('b')]);
+  });
+});
+
+describe('useLiveWindows: rows planned by the caller (a table)', () => {
+  async function planned(start: () => number, rows: () => number) {
+    let list!: LiveWindows<{ id: string }>;
+    const m = await mountComposable(() => {
+      list = useLiveWindows(OP, () => ({ status: 'open' }), 100, { start, rows }) as unknown as LiveWindows<{ id: string }>;
+    });
+    await m.live();
+    return { ...m, list: () => list };
+  }
+
+  it('asks the rows from the page’s first row, cut in windows of at most 100', async () => {
+    const page = shallowRef(2);
+    const pages = shallowRef(1);
+    const s = await planned(
+      () => page.value * 50,
+      () => pages.value * 50,
+    );
+    expect(s.params(OP)).toEqual([{ status: 'open', limit: 50, offset: 100 }]);
+    pages.value = 3;
+    await s.reopen();
+    expect(s.params(OP)).toEqual([
+      { status: 'open', limit: 100, offset: 100 },
+      { status: 'open', limit: 50, offset: 200 },
+    ]);
+    expect(s.list().windows.value).toEqual([
+      { limit: 100, offset: 100 },
+      { limit: 50, offset: 200 },
+    ]);
+  });
+
+  it('has more while the rows asked end before the total', async () => {
+    const s = await planned(
+      () => 0,
+      () => 50,
+    );
+    await s.result(OP, { rows: [row('a')], total: 80, limit: 50, offset: 0 });
+    expect(s.list().hasMore.value).toBe(true);
+  });
+});
+
+describe('windowsOf', () => {
+  it('cuts the rows asked into windows of at most `size`, from the first row', () => {
+    expect(windowsOf(0, 50, 100)).toEqual([{ limit: 50, offset: 0 }]);
+    expect(windowsOf(0, 150, 100)).toEqual([
+      { limit: 100, offset: 0 },
+      { limit: 50, offset: 100 },
+    ]);
+    expect(windowsOf(40, 60, 20)).toEqual([
+      { limit: 20, offset: 40 },
+      { limit: 20, offset: 60 },
+      { limit: 20, offset: 80 },
+    ]);
   });
 });

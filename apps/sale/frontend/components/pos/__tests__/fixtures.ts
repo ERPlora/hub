@@ -1,6 +1,7 @@
 // Fixtures of the till's tests: what the server answers (a product of Inventory, an open check with its
 // lines, a preview, the till settings, a page) and the browser's localStorage the test environment lacks.
 import type { CategoryOut, ProductOut } from '../../../../../inventory/frontend/operations';
+import type { ServiceSaleOut } from '../../../../../service/frontend/operations';
 import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SettingsOut } from '../../../operations';
 
 export const product = (over: Partial<ProductOut> = {}): ProductOut => ({
@@ -26,6 +27,27 @@ export const product = (over: Partial<ProductOut> = {}): ProductOut => ({
   category_ids: [],
   created_at: '2026-10-01T10:00:00Z',
   updated_at: '2026-10-01T10:00:00Z',
+  ...over,
+});
+
+/** A service of the Services app, as `service.service.list_for_sale` answers it (SALE-F38). */
+export const service = (over: Partial<ServiceSaleOut> = {}): ServiceSaleOut => ({
+  id: 'sv1',
+  name: 'Corte de pelo',
+  pricing_type: 'fixed',
+  price: 2500,
+  min_price: null,
+  max_price: null,
+  duration_minutes: 45,
+  buffer_before: 0,
+  buffer_after: 0,
+  is_bookable: true,
+  allow_online_booking: true,
+  category_id: null,
+  category_name: null,
+  tax_category_id: 't9',
+  tax_category_key: 'service.generic',
+  needs_tax_setup: false,
   ...over,
 });
 
@@ -63,6 +85,13 @@ export const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
   gift_reason: '',
   notes: '',
   staff_id: null,
+  service_id: null,
+  paid_by_voucher: false,
+  voucher_session_id: null,
+  voucher_grant_id: null,
+  voucher_name: '',
+  voucher_remaining: null,
+  voucher_hold_until: null,
   line_total: 150,
   round_no: 0,
   fired_at: null,
@@ -85,6 +114,7 @@ export const order = (over: Partial<OrderOut> = {}): OrderOut => {
     lines_count: lines.length,
     created_at: '2026-10-14T09:05:00Z',
     updated_at: '2026-10-14T09:05:00Z',
+    already: false,
     ...over,
     lines,
   };
@@ -114,11 +144,12 @@ export const preview = (over: Partial<PreviewOut> = {}): PreviewOut => ({
   ticket_discount_amount: 0,
   gift_total: 0,
   total: 150,
-  breakdown: [{ rate_pct: '10.00', label: 'IVA', base: 136, tax: 14 }],
+  breakdown: [{ rate_pct: '10.00', label: 'IVA', tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', base: 136, tax: 14 }],
   lines: [],
   cash_limit: 100000,
   ticket_limit: 300000,
   ...over,
+  operation_total: over.operation_total ?? over.total ?? 150,
 });
 
 export const settings = (over: Partial<SettingsOut> = {}): SettingsOut => ({

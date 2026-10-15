@@ -13,7 +13,8 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonModal, IonSpinner, Ion
 import { computed, useTemplateRef } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatPercent, formatQuantity } from '../../lib/format';
+import { taxRow } from '../../lib/breakdown';
+import { formatMoney, formatQuantity } from '../../lib/format';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
 
@@ -35,6 +36,17 @@ const amount = (line: OrderLineOut) =>
 /** The kinds of tax the bill names in the reader's language; a component with its own name keeps it. */
 const TAX_KINDS = new Set(['vat', 'surcharge', 'igic', 'ipsi']);
 const taxName = (label: string) => (TAX_KINDS.has(label) ? t(`sale.pos.taxes.${label}`) : label);
+/** One row per fiscal key, read as the ticket reads it (an exempt key names its cause). */
+const taxes = computed(() =>
+  (valued.value?.breakdown ?? []).map((row) => ({
+    ...row,
+    ...taxRow(row, {
+      locale: locale.value,
+      taxName,
+      qualification: (kind: string) => t(`sale.document.qualification.${kind}`),
+    }),
+  })),
+);
 
 /** A comp says so after its name («Wine (comp)»). */
 const lineName = (line: OrderLineOut) => (line.is_gift ? `${line.name} ${t('sale.pos.giftSuffix')}` : line.name);
@@ -158,11 +170,11 @@ function print(): void {
             <dd>{{ formatMoney(valued.subtotal, locale) }}</dd>
           </div>
           <div
-            v-for="row in valued.breakdown"
-            :key="`${row.label}-${row.rate_pct}`"
+            v-for="row in taxes"
+            :key="row.key"
             class="pos-bill__row pos-bill__tax"
           >
-            <dt>{{ taxName(row.label) }} {{ formatPercent(row.rate_pct, locale) }}</dt>
+            <dt>{{ row.label }}</dt>
             <dd>
               <span>{{ formatMoney(row.base, locale) }}</span>
               <span>{{ formatMoney(row.tax, locale) }}</span>

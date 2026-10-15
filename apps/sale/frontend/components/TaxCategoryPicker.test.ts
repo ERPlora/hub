@@ -1,16 +1,17 @@
-// «VAT charged» of a department (SALE-F35): a choice among the business's tax categories — any number of
-// them — so it never loads them all: an outlined field that opens a modal with a searchbar over the live
+// THE tax-category picker of the sale app (a department's «VAT charged», SALE-F35; the till's open price
+// later): a choice among the business's tax categories — any number of them — so it never loads them all:
+// an outlined field, labelled by its host, that opens a modal with a searchbar over the live
 // `tax.category.list` (50 at a time, searched on the server). Each choice reads «Name · rate» with the
 // rate the server says it charges today. Under the field, the old notices: no category to choose («Set up
 // your VAT first, in Taxes.») and a failed read («The tax categories could not be read.» with «Retry»).
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, errorFrame, flush, ionValue, mountSale } from '../../__tests__/mount-sale';
-import { plain } from '../../lib/format';
+import { click, errorFrame, flush, ionValue, mountSale } from '../__tests__/mount-sale';
+import { plain } from '../lib/format';
 import TaxCategoryPicker from './TaxCategoryPicker.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
+  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
@@ -37,7 +38,8 @@ const PAGE = {
 };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(TaxCategoryPicker, { props: { modelValue: '', testid: 'tax', ...props }, locale });
+  const host = locale === 'es' ? { label: 'IVA que cobra', placeholder: 'Elige el IVA' } : { label: 'VAT charged', placeholder: 'Choose the VAT' };
+  const m = await mountSale(TaxCategoryPicker, { props: { modelValue: '', testid: 'tax', ...host, ...props }, locale });
   await m.wrapper.setProps({ 'onUpdate:modelValue': (value: string) => m.wrapper.setProps({ modelValue: value }) });
   await m.live();
   const field = () => m.inDoc('tax') as Control;
@@ -63,6 +65,12 @@ describe('TaxCategoryPicker: the field', () => {
       'General · 21%',
     ]);
     expect((await setup()).field().placeholder).toBe('Choose the VAT');
+  });
+
+  it('is labelled by its host: the till names it otherwise', async () => {
+    const s = await setup({ label: 'Tax', placeholder: 'Pick a tax' });
+    await s.open();
+    expect([s.field().label, s.field().placeholder, s.inDoc('tax-modal')?.getAttribute('aria-label')]).toEqual(['Tax', 'Pick a tax', 'Tax']);
   });
 
   it('says its error under it', async () => {

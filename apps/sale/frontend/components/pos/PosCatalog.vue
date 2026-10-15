@@ -5,34 +5,55 @@
 // windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too.
 // A sellable tap goes up (`add`); a blocked one says why, above the grid and in a toast, and adds
 // nothing. Inventory off: the grid explains it and the open price stays. With products hidden by the
-// till settings, only the open price is offered.
+// till settings, only the open price is offered. With the services of Services (SALE-F38,
+// `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
+// hidden; «All» keeps the open price); a sellable service goes up (`service`), the search finds them too.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, toast } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, shallowRef } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 
 import type { CategoryOut, ProductOut } from '../../../../inventory/frontend/operations';
-import { useLiveWindows } from '../../composables/pos/useLiveWindows';
+import type { ServiceSaleOut } from '../../../../service/frontend/operations';
+import { useLiveWindows } from '../../composables/useLiveWindows';
 import { useT } from '../../composables/useT';
 import CatalogNotices from './CatalogNotices.vue';
 import CategoryStrip from './CategoryStrip.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ScreenMenu from './ScreenMenu.vue';
+import ServiceGrid from './ServiceGrid.vue';
+import { SERVICES } from './till';
 
-const props = defineProps<{
-  /** The till settings' «Show products in the till». */
-  showProducts: boolean;
-  canOpenPrice: boolean;
-  /** The till element the ⋮ menu puts on full screen. */
-  target: HTMLElement | null;
-}>();
-const emit = defineEmits<{ add: [product: ProductOut]; openPrice: [] }>();
+const props = withDefaults(
+  defineProps<{
+    /** The till settings' «Show products in the till». */
+    showProducts: boolean;
+    canOpenPrice: boolean;
+    /** «Show services in the till», with Services on and readable (SALE-F38). */
+    showServices?: boolean;
+  }>(),
+  { showServices: false },
+);
+const emit = defineEmits<{ add: [product: ProductOut]; service: [service: ServiceSaleOut]; openPrice: [] }>();
 
 const t = useT();
 
 const categoryId = shallowRef('');
+const servicesCount = shallowRef<number | undefined>(undefined);
+/** With products hidden, the services come first. */
+watch(
+  () => [props.showProducts, props.showServices],
+  () => {
+    if (props.showServices && !props.showProducts) categoryId.value = SERVICES;
+    else if (!props.showServices && categoryId.value === SERVICES) categoryId.value = '';
+  },
+  { immediate: true },
+);
+const servicesMode = computed(() => props.showServices && categoryId.value === SERVICES);
+/** The product grid's category: «All» while the services are on show. */
+const productCategory = computed(() => (categoryId.value === SERVICES ? '' : categoryId.value));
 const searching = shallowRef(false);
 const tapNotice = shallowRef<string | null>(null);
 
@@ -40,7 +61,7 @@ const categories = useLiveWindows<'inventory.category.list', CategoryOut>('inven
 const allCount = useLive('inventory.product.list', { is_active: true, limit: 1, offset: 0 });
 const products = useLiveWindows<'inventory.product.list', ProductOut>(
   'inventory.product.list',
-  () => ({ is_active: true, sort: 'name', ...(categoryId.value ? { category_id: categoryId.value } : {}) }),
+  () => ({ is_active: true, sort: 'name', ...(productCategory.value ? { category_id: productCategory.value } : {}) }),
   100,
 );
 
@@ -57,31 +78,43 @@ const emptyText = computed(() => {
   return failure.value ?? undefined;
 });
 
+/** A tap on something without VAT: the reason above the grid and in a toast; nothing is added. */
+function blocked(): void {
+  const reason = t('sale.pos.notSellableNoTaxCategory');
+  tapNotice.value = reason;
+  void toast(reason, 'warning');
+}
+
 function pick(product: ProductOut): void {
   searching.value = false;
-  if (product.needs_tax_setup) {
-    const reason = t('sale.pos.notSellableNoTaxCategory');
-    tapNotice.value = reason;
-    void toast(reason, 'warning');
-    return;
-  }
+  if (product.needs_tax_setup) return blocked();
   tapNotice.value = null;
   emit('add', product);
+}
+
+function pickService(service: ServiceSaleOut): void {
+  searching.value = false;
+  if (service.needs_tax_setup) return blocked();
+  tapNotice.value = null;
+  emit('service', service);
 }
 </script>
 
 <template>
   <section class="pos-catalog">
     <div class="pos-catalog__bar">
-      <template v-if="showProducts">
+      <template v-if="showProducts || showServices">
         <CategoryStrip
           v-model="categoryId"
-          :categories="categories.rows.value"
-          :all-count="allCount.data.value?.total"
-          :has-more="categories.hasMore.value"
+          :categories="showProducts ? categories.rows.value : []"
+          :all-count="showProducts ? allCount.data.value?.total : undefined"
+          :has-more="showProducts && categories.hasMore.value"
+          :with-services="showServices"
+          :services-count="servicesCount"
           @load-more="categories.loadMore()"
         />
         <button
+          v-if="showProducts"
           type="button"
           class="pos-catalog__search"
           data-testid="pos-search-trigger"
@@ -97,16 +130,18 @@ function pick(product: ProductOut): void {
         v-else
         class="pos-catalog__spacer"
       />
-      <ScreenMenu :target="target" />
+      <ScreenMenu />
     </div>
     <ProductSearch
       v-if="searching"
+      :with-services="showServices"
       @pick="pick"
+      @pick-service="pickService"
       @close="searching = false"
     />
     <CatalogNotices :tap-notice="tapNotice" />
     <InlineFeedback
-      v-if="failure"
+      v-if="failure && !servicesMode"
       tone="danger"
       data-testid="pos-catalog-error"
     >
@@ -122,7 +157,14 @@ function pick(product: ProductOut): void {
         </ion-button>
       </template>
     </InlineFeedback>
+    <ServiceGrid
+      v-if="showServices"
+      v-show="servicesMode"
+      @pick="pickService"
+      @total="servicesCount = $event"
+    />
     <ProductGrid
+      v-if="!servicesMode"
       :products="shown"
       :loading="showProducts && products.status.value === 'loading'"
       :has-more="showProducts && products.hasMore.value"

@@ -55,9 +55,23 @@ describe('chargeBlock', () => {
     expect(chargeBlock({ ...big, cashLimit: null })).toBeNull();
   });
 
+  it('the limit looks at the whole operation: a part under it of a check over it blocks cash', () => {
+    expect(chargeBlock({ ...READY, total: 4250, operationTotal: 120000 })).toEqual({ kind: 'cashLimit', limit: 100000 });
+    expect(chargeBlock({ ...READY, total: 4250, operationTotal: 120000, method: CARD })).toBeNull();
+    expect(chargeBlock({ ...READY, total: 4250, operationTotal: 9000 })).toBeNull();
+  });
+
   it('an invoice without its three details blocks, before any tender reason', () => {
     expect(chargeBlock({ ...READY, documentType: 'invoice', typed: 0 })).toEqual({ kind: 'recipient' });
     expect(chargeBlock({ ...READY, documentType: 'invoice', recipientComplete: true })).toBeNull();
+  });
+
+  it('an invoice whose tax ID does not check, or a foreign one without its kind of document, blocks too', () => {
+    const invoice = { ...READY, documentType: 'invoice' as const, recipientComplete: true };
+    expect(chargeBlock({ ...invoice, recipientIssue: 'taxIdInvalid' })).toEqual({ kind: 'taxIdInvalid' });
+    expect(chargeBlock({ ...invoice, recipientIssue: 'idTypeRequired' })).toEqual({ kind: 'idTypeRequired' });
+    // A ticket declares no recipient: nothing to check.
+    expect(chargeBlock({ ...READY, recipientIssue: 'taxIdInvalid' })).toBeNull();
   });
 
   it('a business that requires a customer blocks without one, before anything else', () => {

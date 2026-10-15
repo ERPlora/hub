@@ -1,20 +1,21 @@
 <script lang="ts">
 /** What an open-price line is charged at: a department of the business or, without any, a tax category. */
-export type OpenPriceChoice = { kind: 'department'; id: string; name: string } | { kind: 'tax'; key: string; name: string };
+export type OpenPriceChoice = { kind: 'department'; id: string } | { kind: 'tax'; key: string };
 </script>
 
 <script setup lang="ts">
 // «Department (VAT)» of the open-price sheet (SALE-F09): the business's departments in their order, each
 // with the rate its category charges today, 20 at a time and searched on the server; a tap chooses one.
-// A business without departments gets Taxes' categories instead (`TaxCategoryPicker`); a search that
-// finds nothing is not «no departments». Mounted only while the sheet is open.
+// A business without departments gets Taxes' categories instead, through the app's one tax-category
+// picker (which says it when there is none either); a search that finds nothing is not «no
+// departments». Mounted only while the sheet is open.
 import { useLive } from '@erplora/ui/sdk';
 import { IonSearchbar, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import { useLocale } from '../../composables/useT';
 import { formatPercent } from '../../lib/format';
-import TaxCategoryPicker from './TaxCategoryPicker.vue';
+import TaxCategoryPicker from '../TaxCategoryPicker.vue';
 
 const choice = defineModel<OpenPriceChoice | null>({ required: true });
 
@@ -32,6 +33,12 @@ const rows = computed(() => data.value?.rows ?? []);
 /** No departments at all (not a search that found none): Taxes' categories stand in. */
 const none = computed(() => !term.value && data.value?.total === 0);
 
+/** The tax category chosen in the picker (the line goes with it). */
+const taxKey = computed<string>({
+  get: () => (choice.value?.kind === 'tax' ? choice.value.key : ''),
+  set: (key) => (choice.value = key ? { kind: 'tax', key } : null),
+});
+
 function onInput(event: CustomEvent<{ value?: string | null }>): void {
   term.value = (event.detail.value ?? '').trim();
 }
@@ -40,7 +47,9 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
 <template>
   <TaxCategoryPicker
     v-if="none"
-    v-model="choice"
+    v-model="taxKey"
+    :label="$t('sale.pos.department')"
+    testid="pos-tax-category"
   />
   <div
     v-else
@@ -72,7 +81,7 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
       class="pos-choices__state"
       data-testid="pos-departments-none"
     >
-      {{ $t('sale.pos.noDepartments') }}
+      {{ $t('sale.departments.noResultsMessage') }}
     </p>
     <div
       v-else
@@ -85,7 +94,7 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
         class="pos-choice"
         :data-testid="`pos-department-${row.id}`"
         :aria-pressed="choice?.kind === 'department' && choice.id === row.id ? 'true' : 'false'"
-        @click="choice = { kind: 'department', id: row.id, name: row.name }"
+        @click="choice = { kind: 'department', id: row.id }"
       >
         <span class="pos-choice__name">{{ row.name }}</span>
         <span
