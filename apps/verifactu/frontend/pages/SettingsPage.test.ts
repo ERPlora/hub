@@ -37,7 +37,7 @@ const CONFIG: ConfigOut = {
   declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
   account_url: 'https://erplora.com',
   own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null },
-  representation: { status: 'none', updated_at: null, reason: '' },
+  representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
   synced_at: null,
   route_ready: true,
   reasons: [],

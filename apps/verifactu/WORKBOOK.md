@@ -147,11 +147,24 @@ recuperación» / «Cancelar»). Al terminar: «Operación completada.».
 
 ### Configuración
 Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu». Dos pestañas, las dos vías:
-- **«Lo remite ERPlora»** (abre por defecto): «Otorgamiento de representación» con su estado («Sin firmar»,
-  «En revisión desde el {fecha}», «Aprobado el {fecha}», «Devuelto el {fecha}» con el motivo, «Revocado el
-  {fecha}») y «Gestionar en tu cuenta de ERPlora».
-  Lo que se muestra llega de la cuenta de ERPlora; si aún no ha llegado nada, «Tu cuenta de ERPlora todavía no
-  ha enviado este dato.».
+- **«Lo remite ERPlora»** (abre por defecto), como el `erp-verifactu-grant` del módulo antiguo: «Otorgamiento de
+  representación» con su estado («Sin firmar», «En revisión desde el {fecha}», «Aprobado el {fecha}», «Devuelto el
+  {fecha}» con «Nota de la revisión», «Revocado el {fecha}»); «Lo que has enviado» («Envío n.º {n}, enviado el
+  {fecha}» y los documentos: «Modelo firmado», «Copia del documento de identidad», «Muestra de firma»,
+  «Justificante de representación»); «Sus pasos» (con dos o más: cada estado que contó la cuenta, con su fecha y
+  su motivo). En revisión o aprobado, «Volver a enviar» abre el trámite con su aviso («el envío nuevo sustituye al
+  que está en revisión» / «sigues remitiendo con el actual») y «Cancelar». Sin firmar, devuelto o revocado, el
+  trámite está abierto: el texto de entrada, «Obligado tributario: {razón social} ({NIF}), el emisor de
+  Facturación.» (se lee, no se pide), «1 · Consigue el modelo oficial» con «Descargar el modelo» (el modelo en
+  blanco del SaaS) y cómo firmarlo (a mano o con AutoFirma); con una sociedad, «Representante legal» con «Nombre y
+  apellidos de quien firma» y «NIF/NIE de quien firma» (un autónomo firma él mismo y no se le pide); la
+  información básica del art. 13 RGPD **antes** de pedir ningún documento; «2 · Sube el modelo firmado» con
+  «Documento de identidad» (DNI / NIE) y los adjuntos, cada uno un PDF de 5 MB como máximo: «Adjuntar el modelo
+  firmado (PDF)», «Adjuntar copia del documento de identidad (PDF)», con NIE «Adjuntar muestra de firma (PDF)» y
+  con sociedad «Adjuntar el justificante de representación (PDF)»; «Enviar a revisión». Sin emisor en
+  Facturación o mientras la cuenta no haya vinculado el negocio, lo dice y no envía. Solo quien configura
+  VeriFactu ve el trámite. Si la cuenta aún no ha enviado nada, «Tu cuenta de ERPlora todavía no ha enviado este
+  dato.».
 - **«Mi certificado»**: «Certificado del negocio (.p12 / .pfx)» con «Cargado» / «Sin cargar», «Titular», «NIF
   del titular», «Tipo», «Subido el» y «Caduca el» (con el aviso «Caduca en {n} días: sube aquí el renovado.» a
   30 días o menos y «El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.»). Quien configura
@@ -193,8 +206,8 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
-| VERIFACTU-F05 | Firmar y subir la autorización para que remita ERPlora | en la cuenta de ERPlora; aquí, su estado (PLAN-HUB §8: falta decidir quién la revisa) |
-| VERIFACTU-F06 | Volver a enviar la autorización | en la cuenta de ERPlora; aquí, su estado |
+| VERIFACTU-F05 | Firmar y subir el otorgamiento de representación para que remita ERPlora | hecho — se sube en el Hub, lo revisa el staff en el SaaS (`fiscal/`) y el estado vuelve en la foto (ronda §25) |
+| VERIFACTU-F06 | Volver a enviar el otorgamiento | hecho — en el Hub, como VERIFACTU-F05 |
 | VERIFACTU-F07 | Solicitar o renovar la conexión segura con ERPlora | desaparece — sin identidad por hub (ronda 5); el Hub firma cada llamada con HMAC |
 | VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado válido \| vía ERPlora con otorgamiento aprobado y `live_paid`) ∧ cuenta activa; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
 | VERIFACTU-F09 | Volver a pruebas | hecho |
@@ -298,30 +311,46 @@ Configuración → Mi certificado.»; en producción y por la vía de ERPlora si
 producción falta que apruebe tu autorización firmada.». El interruptor vuelve a la vía real.
 Implicados: VERIFACTU-F02, VERIFACTU-F05
 
-### VERIFACTU-F05 Firmar y subir la autorización para que remita ERPlora
-Estado: en la cuenta de ERPlora; aquí, su estado (PLAN-HUB §8: falta decidir quién la revisa)
-Actor: administrador
+### VERIFACTU-F05 Firmar y subir el otorgamiento de representación para que remita ERPlora
+Estado: hecho — se sube en el Hub (como el módulo antiguo), lo revisa el staff en el SaaS y el estado vuelve en la
+foto (ronda §25, PLAN-SAAS §4)
+Actor: administrador (permiso «configurar»)
 Pantalla: Configuración
 Pasos:
 1. En **VeriFactu → Configuración**, pestaña «Lo remite ERPlora», el estado dice «Sin firmar».
-2. «Gestionar en tu cuenta de ERPlora» lleva a la cuenta, donde se descarga el modelo oficial (Anexo I del
-   Convenio 17), se firma y se sube con la copia del documento de identidad.
-3. Una persona de ERPlora lo revisa; la cuenta manda al Hub el estado: «En revisión», «Aprobado», «Devuelto»
+2. «Descargar el modelo» baja el modelo oficial en blanco (Anexo I del Convenio 17, el del SaaS); se rellena y se
+   firma fuera de la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma.
+3. Una sociedad escribe su representante legal (nombre y NIF/NIE); un autónomo firma él mismo.
+4. Se elige el documento de identidad (DNI o NIE) y se adjuntan los PDF: el modelo firmado, la copia del
+   documento, con NIE una muestra de la firma y, con sociedad, el justificante de representación.
+5. «Enviar a revisión»: el Hub comprueba los documentos y los reenvía tal cual al SaaS; queda «En revisión».
+6. Una persona de ERPlora lo revisa en el SaaS; la cuenta manda al Hub el estado nuevo: «Aprobado», «Devuelto»
    (con el motivo) o «Revocado».
-Entra: el estado de la autorización, de la cuenta (`verifactu.config.sync`).
-Sale: nada en el Hub, salvo mostrarlo; aprobada, abre la vía de ERPlora en producción (VERIFACTU-F08).
-Si falla: «Tu cuenta de ERPlora todavía no ha enviado este dato.».
+Entra: el emisor de Facturación (obligado tributario), el representante, el tipo de documento y los PDF en base64
+(`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`.
+Sale: `POST /internal/hubs/{id}/representation` al SaaS; «En revisión» (uno aprobado sigue vigente y remitiendo
+hasta que se apruebe el nuevo), su huella en «Lo que has enviado» y en el registro de auditoría (número, fecha,
+tipo de documento y qué documentos; nunca su contenido) y el aviso `verifactu.config.changed`. El Hub no guarda
+ningún documento. Aprobado, abre la vía de ERPlora en producción (VERIFACTU-F08).
+Si falla: antes de llamar, con los códigos del SaaS (422): falta el modelo («Adjunta el modelo firmado.»), no es un
+PDF («El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.»), falta la copia del documento,
+con NIE la muestra de firma, con sociedad el representante o el justificante, un fichero de más de 5 MB («Cada
+fichero puede ocupar 5 MB como máximo.»); el rechazo del SaaS, con su código `fiscal.*` y sus campos tal cual; sin
+emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no sabe su id en ERPlora) o un negocio
+que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
+SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
 Implicados: VERIFACTU-F08
 
-### VERIFACTU-F06 Volver a enviar la autorización
-Estado: en la cuenta de ERPlora; aquí, su estado
-Actor: administrador
+### VERIFACTU-F06 Volver a enviar el otorgamiento
+Estado: hecho — en el Hub, como VERIFACTU-F05
+Actor: administrador (permiso «configurar»)
 Pantalla: Configuración
 Pasos:
-1. Con la autorización devuelta o revocada, «Gestionar en tu cuenta de ERPlora» lleva a enviarla de nuevo.
-2. El estado nuevo llega solo al Hub.
+1. Devuelto o revocado, el trámite ya está abierto: se corrige lo que dice el motivo y se envía de nuevo.
+2. En revisión o aprobado, «Volver a enviar» lo abre y avisa: el envío nuevo sustituye al que está en revisión;
+   con uno aprobado, se sigue remitiendo con él mientras se revisa el nuevo. «Cancelar» lo cierra.
 Entra: como VERIFACTU-F05.
-Sale: como VERIFACTU-F05.
+Sale: como VERIFACTU-F05; el envío lleva el número siguiente.
 Si falla: como VERIFACTU-F05.
 Implicados: VERIFACTU-F05
 
@@ -837,6 +866,8 @@ Todas se pueden seguir en vivo.
 | Sube (o sustituye) el certificado propio | configurar | F02, F34 | `verifactu.certificate.upload` |
 | Quita el certificado propio | configurar | F03 | `verifactu.certificate.remove` |
 | Guarda lo que manda la cuenta de ERPlora (autorización, productor) | solo el sistema | F05, F12 | `verifactu.config.sync` |
+| Envía el otorgamiento de representación firmado a revisión | configurar | F05, F06 | `verifactu.representation.submit` |
+| Da el modelo oficial en blanco (PDF) | configurar | F05 | `verifactu.representation.model` |
 
 ### Lo que avisa
 
@@ -1030,7 +1061,20 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   ninguno de los dos, `200 {"applied": false}`. Una `version` menor o igual que la guardada se ignora. «Validado»
   = `representation.status == "approved"`; `live_paid` lo decide el SaaS (plan efectivo de pago, prueba incluida,
   o ítem `verifactu` vivo). `own_certificate` y `multiple_taxpayers` ya no viajan (`null` = sin cambio): el
-  certificado propio se sube en el Hub (decisión de Ioan del 2026-10-15).
+  certificado propio se sube en el Hub (decisión de Ioan del 2026-10-15). La ruta de la foto le dice al Hub su id en
+  ERPlora (`Config.hub_id`): adonde se envía el otorgamiento (en la fase 2, del registro de control). Cada cambio de
+  estado del otorgamiento deja su paso en el registro de auditoría («Sus pasos» de Configuración).
+- **Otorgamiento de representación** (VERIFACTU-F05, F06; `representation.py`): `POST
+  /internal/hubs/{id}/representation` con `{"taxpayer_tax_id", "taxpayer_name", "signer_tax_id", "signer_name",
+  "signer_document_type": "dni"|"nie", "documents": {"signed_model", "id_copy", "signature_sample",
+  "representation_proof"}}` (base64; los opcionales, `null`) → `201 {"status": "submitted", "version",
+  "submitted_at"}`; `GET /internal/representation/model` → el modelo en blanco, `application/pdf`. Firmadas v1 y v2
+  (la v2 sobre la ruta que ve el SaaS). Tiempos: 5 s para conectar y 60 s para leer (cuatro PDF de 5 MB). Rechazos:
+  400/413/422 con su código (`fiscal.*`) y `fields` → 422 tal cual; 404 → 409 `verifactu.hub_unregistered`; sin
+  conexión, 401, 5xx o fuera de contrato → 503 `verifactu.saas_unreachable`. La ruta del Hub (`POST
+  /api/verifactu/representation`) admite un cuerpo de hasta 32 MB (`base.request_body.accept_body_up_to`; el resto
+  de vistas, los 2,5 MB de Django). El Hub comprueba antes, con las reglas y los códigos del SaaS, y no guarda los
+  documentos.
 - **Certificado propio** (VERIFACTU-F02): `OwnCertificate`, una fila como mucho en la BD del hub, con titular,
   NIF, tipo, caducidad y el `.p12` con su contraseña cifrados juntos con Fernet (`certificates.py`) bajo
   `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la

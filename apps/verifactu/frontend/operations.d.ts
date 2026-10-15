@@ -29,6 +29,46 @@ export type EventKind =
 export type Severity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 export type Representation = 'none' | 'submitted' | 'approved' | 'returned' | 'revoked';
 
+/** The documents of a signed authorisation (VERIFACTU-F05). */
+export type RepresentationDocument = 'signed_model' | 'id_copy' | 'signature_sample' | 'representation_proof';
+
+/** The signed authorisation: as the account says it, what this Hub sent and the steps it was told. */
+export interface RepresentationOut {
+  status: Representation;
+  updated_at: string | null;
+  reason: string;
+  /** ERPlora's account has linked this business: the authorisation can be sent from here. */
+  linked: boolean;
+  /** Invoicing's issuer is a company: who signs for it and the proof of representation are asked. */
+  company: boolean;
+  submission: {
+    version: number;
+    submitted_at: string | null;
+    document_type: 'dni' | 'nie';
+    documents: RepresentationDocument[];
+  } | null;
+  /** Newest first. */
+  history: { status: Representation; at: string; version: number | null; reason: string }[];
+}
+
+/** The signed authorisation and its documents, each a PDF in base64 (5 MB at most). */
+export interface RepresentationSubmitIn {
+  signer_tax_id?: string;
+  signer_name?: string;
+  signer_document_type: 'dni' | 'nie';
+  signed_model_base64: string;
+  id_copy_base64: string;
+  signature_sample_base64?: string;
+  representation_proof_base64?: string;
+}
+
+/** The blank official model (Anexo I of Convenio 17), a PDF in base64. */
+export interface RepresentationModelOut {
+  filename: string;
+  content_type: string;
+  content_base64: string;
+}
+
 interface PageIn {
   limit?: number;
   offset?: number;
@@ -240,7 +280,7 @@ export interface ConfigOut {
     expires_at: string | null;
     expires_in_days: number | null;
   };
-  representation: { status: Representation; updated_at: string | null; reason: string };
+  representation: RepresentationOut;
   synced_at: string | null;
   route_ready: boolean;
   reasons: WaitOut[];
@@ -308,6 +348,8 @@ declare module '@erplora/ui/sdk' {
     'verifactu.config.go_live': { input: NoInput; output: ConfigOut };
     'verifactu.config.back_to_testing': { input: NoInput; output: ConfigOut };
     'verifactu.certificate.upload': { input: { p12_base64: string; password: string }; output: ConfigOut };
+    'verifactu.representation.submit': { input: RepresentationSubmitIn; output: ConfigOut };
+    'verifactu.representation.model': { input: NoInput; output: RepresentationModelOut };
     'verifactu.certificate.remove': { input: NoInput; output: ConfigOut };
     'verifactu.record.list': { input: RecordListIn; output: Page<RecordRowOut> };
     'verifactu.record.get': { input: RecordRefIn; output: RecordOut };

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // VeriFactu → Configuration (VERIFACTU-F02–F06, F34; the old `erp-verifactu-config`): «VeriFactu configuration» with
-// the two routes as tabs. «ERPlora files for you» (opens by default): «Representation authorisation» and its state
-// (not signed, under review, approved, returned with the review's note, revoked), managed in the ERPlora account
-// («Manage in your ERPlora account»); what the account has not sent yet is said so. «My certificate»: «Loaded» /
+// the two routes as tabs. «ERPlora files for you» (opens by default): «Representation authorisation», its state (not
+// signed, under review, approved, returned with the review's note, revoked) and the procedure to sign it and send it
+// from here (`RepresentationGrant`, the old module's `erp-verifactu-grant`); what the account has not sent yet is said
+// so. «My certificate»: «Loaded» /
 // «Not loaded», holder, its tax ID, kind, uploaded and expiry dates and the warning 30 days before it expires (or that
 // it expired); who configures VeriFactu uploads the .p12/.pfx here with its password («Upload the certificate») or
 // removes it («Remove», asking first in a card). It is kept encrypted in the hub's database and never shown again.
@@ -13,7 +14,9 @@ import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSpinner
 import { computed, shallowRef, useTemplateRef } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
+import RepresentationGrant from '../components/RepresentationGrant.vue';
 import { useLocale, useT } from '../composables/useT';
+import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
 import { verifactuTabs } from '../tabs';
 
@@ -40,11 +43,6 @@ const problem = shallowRef<string | null>(null);
 
 const date = (value: string | null | undefined) => (value ? formatDateTime(value, locale.value) : '—');
 
-const grant = computed(() => {
-  const r = config.value?.representation;
-  if (!r) return '';
-  return t(`verifactu.config.grant.${r.status}`, { date: date(r.updated_at) });
-});
 const expiry = computed(() => {
   const cert = config.value?.own_certificate;
   if (!cert?.loaded || cert.expires_in_days === null) return null;
@@ -60,16 +58,6 @@ function onPick(): void {
   if (fileInput.value) fileInput.value.value = '';
 }
 
-/** The file's bytes in base64: the .p12 travels in the body, never in a URL that a proxy would log. */
-async function toBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = '';
-  for (let at = 0; at < bytes.length; at += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
-  }
-  return btoa(binary);
-}
-
 async function uploadCertificate(): Promise<void> {
   problem.value = null;
   const file = picked.value;
@@ -83,7 +71,7 @@ async function uploadCertificate(): Promise<void> {
   }
   let p12: string;
   try {
-    p12 = await toBase64(file);
+    p12 = await fileToBase64(file);
   } catch {
     problem.value = t('verifactu.config.unreadableFile');
     return;
@@ -172,23 +160,10 @@ async function removeCertificate(): Promise<void> {
         >
           {{ $t('verifactu.config.notSynced') }}
         </InlineFeedback>
-        <h3>{{ $t('verifactu.config.grantTitle') }}</h3>
-        <p data-testid="verifactu-config-grant">
-          {{ grant }}
-        </p>
-        <p
-          v-if="config.representation.reason"
-          data-testid="verifactu-config-grant-reason"
-        >
-          {{ $t('verifactu.config.reviewNote') }}: {{ config.representation.reason }}
-        </p>
-        <a
-          class="verifactu-config__manage"
-          :href="config.account_url"
-          target="_blank"
-          rel="noopener"
-          data-testid="verifactu-config-manage"
-        >{{ $t('verifactu.config.manage') }} ↗</a>
+        <RepresentationGrant
+          :config="config"
+          :can-configure="canConfigure"
+        />
       </section>
 
       <section
@@ -327,14 +302,6 @@ async function removeCertificate(): Promise<void> {
 }
 .verifactu-config__fields dd {
   margin: 0;
-}
-.verifactu-config__manage {
-  display: inline-block;
-  padding: 0.55rem 0.9rem;
-  border: 1px solid var(--ion-color-primary, #3f6f5f);
-  border-radius: 10px;
-  color: var(--ion-color-primary, #3f6f5f);
-  text-decoration: none;
 }
 .verifactu-config__note {
   color: var(--ion-color-medium, #8a8577);
