@@ -97,7 +97,7 @@ export async function login(
   credentials: Credentials = OWNER,
 ): Promise<void> {
   const target = `${origin}${next}`;
-  const inHub = () => page.locator('ion-menu').waitFor({ state: 'attached', timeout: 30_000 });
+  const inHub = () => topbarApps(page).waitFor({ state: 'attached', timeout: 30_000 });
   await withRetry(
     async () => {
       await page.goto(target);
@@ -254,6 +254,23 @@ export async function clearItems(context: BrowserContext, origin: string): Promi
 
 /** The page shown by `IonRouterOutlet` (hidden pages stay in the DOM). */
 export const shown = (page: Page): Locator => page.locator('.ion-page:not(.ion-page-hidden)').last();
+
+/**
+ * The ⠿ «My apps» button of the hub's topbar (`nav: 'launcher'`, PLAN-MIGRATIONS §13): there once the
+ * authenticated shell is painted (every page of the stack has its own; the first one is enough).
+ */
+export const topbarApps = (page: Page): Locator => page.locator('[data-testid=topbar-apps]').first();
+
+/**
+ * Opens the «My apps» sheet from the screen on view and returns it. Ionic moves a presented modal to
+ * `ion-app`, outside the page, so it is found on the page (the presented one), not in `shown(page)`.
+ */
+export async function openApps(page: Page): Promise<Locator> {
+  await shown(page).locator('[data-testid=topbar-apps]').click();
+  const sheet = page.locator('ion-modal[data-testid=apps-launcher]:not(.overlay-hidden)');
+  await expect(sheet.locator('[data-testid=apps-launcher-app]').first()).toBeVisible();
+  return sheet;
+}
 
 /** Waits until the list painted its first result (empty state or rows). */
 export async function listReady(page: Page): Promise<void> {

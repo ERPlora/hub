@@ -17,7 +17,7 @@ import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, HUB_DIR, login, psql, shown } from './helpers';
+import { A, HUB_DIR, login, psql, shown, topbarApps } from './helpers';
 import { cleanInvoices, ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
@@ -128,7 +128,7 @@ async function spanishPage(browser: import('@playwright/test').Browser, next: st
   // The Hub's language cookie, the one the sign-in sets from the account.
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   await page.goto(`${A}${next}`);
-  await page.locator('ion-menu').waitFor({ state: 'attached' });
+  await topbarApps(page).waitFor({ state: 'visible' });
   return { context, page };
 }
 

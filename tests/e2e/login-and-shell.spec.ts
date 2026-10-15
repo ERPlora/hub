@@ -1,5 +1,6 @@
 // PoC §8.7 (CSP, zero violations), §8.11 (OpenAPI ↔ list), §8.13 (no Iconify requests) and part of
-// §8.4 (list → detail → back): the real login on `a`, the shell with its menu, the empty state.
+// §8.4 (list → detail → back): the real login on `a`, the shell with its topbar (Back, ⠿ apps, user;
+// no side menu, PLAN-MIGRATIONS §13), the empty state.
 import { expect, test } from '@playwright/test';
 
 import {
@@ -11,6 +12,7 @@ import {
   iconStates,
   listReady,
   login,
+  openApps,
   record,
   rowNames,
   rowOf,
@@ -21,7 +23,7 @@ import {
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com/;
 
-test('login on a: shell, Demo menu, empty state, CSP header and zero violations', async ({ page, context }) => {
+test('login on a: shell, topbar with Demo among the apps, empty state, CSP header and zero violations', async ({ page, context }) => {
   const problems = await collectProblems(page);
   const iconifyRequests: string[] = [];
   const iconFetches: string[] = [];
@@ -36,9 +38,12 @@ test('login on a: shell, Demo menu, empty state, CSP header and zero violations'
   const csp = response?.headers()['content-security-policy'] ?? '';
 
   await expect(page.locator('ion-app')).toHaveCount(1);
-  const menu = page.locator('ion-menu');
-  await expect(menu.locator('ion-item', { hasText: 'Demo' })).toBeVisible();
+  await expect(page.locator('ion-menu, ion-split-pane')).toHaveCount(0);
   await listReady(page);
+  const apps = await openApps(page);
+  await expect(apps.locator('[data-testid=apps-launcher-app]', { hasText: 'Demo' })).toBeVisible();
+  await apps.locator('[data-testid=apps-launcher-close]').click();
+  await expect(apps).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=demo-items-empty]')).toBeVisible();
   await page.waitForTimeout(1000); // icons load when visible
   const listIcons = await iconStates(page);

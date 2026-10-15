@@ -17,7 +17,7 @@ import { join } from 'node:path';
 
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { A, ARTIFACTS, createItem, listReady, login, rowOf, shown, uniqueName } from './helpers';
+import { A, ARTIFACTS, createItem, listReady, login, openApps, rowOf, shown, uniqueName } from './helpers';
 
 const PROD = (process.env.PROD_ORIGIN ?? 'http://a.localhost:8002').replace(/\/$/, '');
 const OUT = join(ARTIFACTS, 'prod');
@@ -229,14 +229,13 @@ test('production build: CSP with nonce, strict-dynamic and Trusted Types enforce
   await expect(page).toHaveURL(/\/demo\/items$/);
   await expect(shown(page).getByText(created, { exact: true }).first()).toBeVisible();
 
-  // Phone: the menu button and the drawer.
+  // Phone: the topbar's ⠿ button and the «My apps» sheet (no side menu in the hub).
   await page.setViewportSize({ width: 390, height: 844 });
   await listReady(page);
-  await shown(page).locator('ion-menu-button').click();
-  await expect(page.locator('ion-menu')).toHaveClass(/show-menu/);
+  await openApps(page);
   await page.waitForTimeout(400);
-  all.push(...(await icons(page, 'phone menu')));
-  await page.screenshot({ path: shotPath('06-phone-menu-390') });
+  all.push(...(await icons(page, 'phone apps')));
+  await page.screenshot({ path: shotPath('06-phone-apps-390') });
   await page.waitForTimeout(1500); // late violations, icons and requests
 
   const violations = await w.violations(page);

@@ -1,10 +1,10 @@
 // PoC §8.13, second pass: icons come from npm (`ionicons/icons` through `addIcons`, other sets baked
 // by `unplugin-icons`), so every visible `ion-icon` of the shell and the demo pages — shadow roots
-// included (ion-select, ion-menu-button…) — paints an inner SVG of non-zero size, with no request to
+// included (ion-select, the topbar buttons…) — paints an inner SVG of non-zero size, with no request to
 // any Iconify host, no icon fetched as a URL from our server and no failed request at all.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, createItem, listReady, login, record, shot, shown, uniqueName } from './helpers';
+import { A, createItem, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com|iconify/i;
 
@@ -68,7 +68,7 @@ test('every visible ion-icon paints a sized SVG; no Iconify request, no icon URL
   const item = await createItem(context, A, uniqueName('Icons'));
   const all: IconState[] = [];
 
-  // Desktop: the shell's split pane (menu icons), the list toolbar (search, choosers, segment,
+  // Desktop: the shell's topbar (back, apps, user), the list toolbar (search, choosers, segment,
   // «New item»), the pager (10 per page), the cards and the empty state of a search with no results.
   await page.goto('/demo/items');
   await listReady(page);
@@ -100,16 +100,15 @@ test('every visible ion-icon paints a sized SVG; no Iconify request, no icon URL
   await expect(shown(page).locator('[data-testid=demo-form]')).toBeVisible();
   all.push(...(await icons(page, 'create')));
 
-  // Phone: the menu button and the drawer.
+  // Phone: the topbar's ⠿ button and the «My apps» sheet (no side menu in the hub).
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/demo/items');
   await listReady(page);
   all.push(...(await icons(page, 'phone list')));
-  await shown(page).locator('ion-menu-button').click();
-  await expect(page.locator('ion-menu')).toHaveClass(/show-menu/);
+  await openApps(page);
   await page.waitForTimeout(400);
-  all.push(...(await icons(page, 'phone menu')));
-  await page.screenshot({ path: shot('icons--phone-menu-390') });
+  all.push(...(await icons(page, 'phone apps')));
+  await page.screenshot({ path: shot('icons--phone-apps-390') });
   await page.waitForTimeout(1000); // late requests
 
   const empty = all.filter((i) => !i.painted);
