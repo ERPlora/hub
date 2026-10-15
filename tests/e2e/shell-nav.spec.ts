@@ -127,13 +127,19 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
   await listReady(page);
   await page.route(/\/frontend\/pages\//, (route) => route.abort('internetdisconnected'));
   const sheet = await openApps(page);
-  const target = otherApps(sheet).first();
+  // Customers, whose root screen is known: Retry has to land there.
+  const target = otherApps(sheet).filter({ hasText: /^\s*Customers\s*$/ });
   const name = (await target.getAttribute('title'))!;
   await target.click();
   const toast = page.locator('ion-toast#apps-launcher-open');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(name);
   await expect(page).toHaveURL(`${A}/demo/items`);
-  await page.unroute(/\/frontend\/pages\//);
   await page.screenshot({ path: shot('FIX-SHELL-NAV-open-failed-390') });
+
+  // The network is back: the toast's Retry opens the app and the toast goes away.
+  await page.unroute(/\/frontend\/pages\//);
+  await toast.locator('button', { hasText: /retry|reintentar/i }).click();
+  await expect(page).toHaveURL(`${A}/customer/customers`);
+  await expect(toast).toBeHidden();
 });
