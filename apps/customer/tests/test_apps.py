@@ -62,6 +62,7 @@ OPERATIONS = {
     "customer.field.delete": "customer.configure",
     "customer.purchase.record": "customer.record_purchase",
     "customer.purchase.void": "customer.record_purchase",
+    "customer.purchase.refund": "customer.record_purchase",
 }
 #: Commands the assistant confirms before running: erasing, deleting, merging, bulk and money.
 HIGH_RISK = {
@@ -74,6 +75,7 @@ HIGH_RISK = {
     "customer.field.delete",
     "customer.purchase.record",
     "customer.purchase.void",
+    "customer.purchase.refund",
 }
 #: Open to API keys, as in the product's module.json.
 EXPOSED = {"customer.order.list", "customer.consent.state"}

@@ -92,7 +92,7 @@ def test_every_route_is_bound_to_its_operation():
 
 def test_the_purchase_commands_have_no_route():
     bound = {operation for _, _, operation in ROUTES}
-    assert {"customer.purchase.record", "customer.purchase.void"}.isdisjoint(bound)
+    assert {"customer.purchase.record", "customer.purchase.void", "customer.purchase.refund"}.isdisjoint(bound)
 
 
 def test_the_api_keeps_parity():

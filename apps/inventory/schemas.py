@@ -28,7 +28,7 @@ SAY_WHICH_CATEGORY = _("Say which category: its id, or its name.")
 
 UnitCode = Literal["ud", "kg", "g", "t", "l", "ml", "min", "h"]
 ProductType = Literal["physical", "service"]
-MovementType = Literal["initial", "reception", "sale", "void", "count", "write_off"]
+MovementType = Literal["initial", "reception", "sale", "void", "count", "write_off", "refund"]
 ProductStatus = Literal["active", "inactive", "needs_tax_setup"]
 ProductSort = Literal[
     "name",
@@ -284,7 +284,7 @@ class MovementListIn(PageIn):
         description="Part of the product's name or SKU, or of the reference.",
     )
     movement_type: MovementType | None = Field(
-        None, description="initial, reception, sale, void, count or write_off."
+        None, description="initial, reception, sale, void, count, write_off or refund."
     )
     reference: str | None = Field(
         None,
@@ -606,6 +606,22 @@ class SaleVoidedIn(Schema):
     sale_id: UUID = Field(description="The sale that was voided.")
 
 
+class SaleRefundLineIn(Schema):
+    product_id: UUID | None = Field(None, description="The returned line's product; none for a free-price line.")
+    quantity: Quantity = Field(Decimal("0"), description="How many units of it come back.")
+
+
+class SaleRefundedIn(Schema):
+    """What inventory reads of Sales' ``sale.sale.refunded``; the rest of the payload is ignored."""
+
+    sale_id: UUID = Field(description="The sale refunded.")
+    refund_id: UUID = Field(description="The refund: each one gives its units back once.")
+    reason: _text(500) = Field("", description="Why it was refunded; it goes on the movement.")
+    lines: list[SaleRefundLineIn] = Field(
+        default_factory=list, description="The lines that come back; none = only money."
+    )
+
+
 # Outputs
 
 
@@ -722,7 +738,7 @@ class MovementOut(Schema):
     product_name: str = Field(description="The product's name.")
     sku: str = Field(description="The product's SKU.")
     movement_type: MovementType = Field(
-        description="initial, reception, sale, void, count or write_off."
+        description="initial, reception, sale, void, count, write_off or refund."
     )
     qty: Decimal = Field(description="What the balance changed by (with its sign).")
     stock_after: Decimal = Field(description="The balance it left.")
@@ -812,6 +828,15 @@ class ExportOut(Schema):
 class SaleStockOut(Schema):
     sale_id: UUID = Field(description="The sale.")
     state: str = Field(description="moved, unmoved (nothing to move) or voided.")
+    applied: bool = Field(
+        description="False: it had been applied already, nothing was done this time."
+    )
+    movements: int = Field(description="Movements written this time.")
+
+
+class RefundStockOut(Schema):
+    refund_id: UUID = Field(description="The refund.")
+    sale_id: UUID = Field(description="Its sale.")
     applied: bool = Field(
         description="False: it had been applied already, nothing was done this time."
     )

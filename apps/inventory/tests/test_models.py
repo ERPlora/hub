@@ -11,6 +11,7 @@ from apps.inventory.models import (
     Category,
     Product,
     ProductCategory,
+    RefundStock,
     SaleStock,
     Settings,
     StockMovement,
@@ -244,6 +245,7 @@ def test_movement_types():
         "void",
         "count",
         "write_off",
+        "refund",
     ]
 
 
@@ -272,6 +274,17 @@ def test_a_sale_is_recorded_once():
     rejected(
         "inventory_sale_stock_sale_unique",
         lambda: SaleStock.objects.create(sale_id=sale.sale_id, state="voided"),
+    )
+
+
+def test_a_refund_is_recorded_once():
+    refund = RefundStock.objects.create(
+        refund_id="0199a6c0-0000-7000-8000-000000000002", sale_id="0199a6c0-0000-7000-8000-000000000001", movements=1
+    )
+    assert refund.pk.version == 7
+    rejected(
+        "inventory_refund_stock_refund_unique",
+        lambda: RefundStock.objects.create(refund_id=refund.refund_id, sale_id=refund.sale_id),
     )
 
 

@@ -156,7 +156,7 @@ Tres ventanas seguidas:
 
 ### Movimientos
 Tabla de solo lectura: Fecha, Nombre, SKU, Tipo («Inicial», «Recepción», «Venta», «Anulación»,
-«Recuento», «Descuento»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
+«Recuento», «Descuento», «Devolución»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
 de su tique, su factura o la propia venta). Buscador por producto, SKU, referencia o número de
 tique; filtros por Tipo y por Referencia; más recientes primero; 50 por página.
 
@@ -211,7 +211,7 @@ fueran los del negocio.
 | INVENTORY-F21 | Bajar el stock al cobrarse una venta | servidor hecho |
 | INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | servidor hecho |
 | INVENTORY-F23 | Reponer el stock al anularse una venta | servidor hecho |
-| INVENTORY-F24 | Reponer el stock de una devolución | no hecho — pendiente de decidir (duda 2) |
+| INVENTORY-F24 | Reponer el stock de una devolución | servidor hecho; la entrega entre apps espera al relay del outbox (fase 2) |
 | INVENTORY-F25 | Imprimir la etiqueta del código de barras | por construir — necesita la app Impresión (`printing`), que aún no existe |
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | servidor hecho |
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | servidor hecho |
@@ -719,19 +719,26 @@ después ya no baja nada. Un artículo eliminado después de la venta no recuper
 Implicados: SALE-F30
 
 ### INVENTORY-F24 Reponer el stock de una devolución
-Todavía no: devolver una venta, entera o en parte, no devuelve nada al stock; si el artículo vuelve
-a la estantería, se cuenta (INVENTORY-F14) o se recibe (INVENTORY-F13).
-Estado: no hecho — pendiente de decidir si la devolución repone stock (duda 2)
+Estado: servidor hecho (2026-10-14); la entrega del aviso de Ventas espera al relay del outbox (fase 2)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. El responsable devuelve una venta en Ventas (SALE-F31).
-2. En Inventario no pasa nada: el stock sigue como lo dejó la venta.
-3. Si el artículo vuelve a la estantería, el responsable lo cuenta (INVENTORY-F14) o lo recibe
-   (INVENTORY-F13).
-Entra: nada: Ventas avisa de la devolución, pero Inventario todavía no reacciona.
-Sale: nada.
-Si falla: el stock queda por debajo de lo real hasta el siguiente recuento.
+1. El responsable devuelve una venta en Ventas (SALE-F31) y marca qué líneas y cuántas unidades
+   vuelven (como el «devolver al stock» de Square y Toast).
+2. Inventario repone esas unidades a cada artículo, una sola vez por devolución.
+3. En **Movimientos** sale una línea «Devolución» por artículo, con la venta como referencia y el
+   motivo de la devolución.
+Entra: la devolución, de Ventas: su venta, su identificador, su motivo y las líneas que vuelven
+(producto y cantidad). Una devolución solo de dinero no trae líneas.
+Sale: el stock sube y queda el movimiento «Devolución»; Inventario avisa de que el stock cambió y, si
+un artículo vuelve por encima de su umbral, de «recuperado» (INVENTORY-F18). Nunca repone más de lo
+que la venta bajó y las devoluciones anteriores no repusieron (lo dice el libro), así que no vuelve
+nada que la venta no bajó: un servicio, una línea de precio libre, un artículo que no alcanzaba o
+sin control de stock. Un artículo que dejó de controlar su stock se deja como está. Una anulación
+posterior repone solo lo que aún falta.
+Si falla: la misma devolución entregada dos veces repone una vez. La devolución de una venta anulada
+(o que Inventario no llegó a ver) no repone nada. Una línea de menú no repone sus componentes: el
+aviso de la devolución no los trae; si vuelven a la estantería, se cuentan (INVENTORY-F14).
 Implicados: SALE-F31
 
 ### INVENTORY-F25 Imprimir la etiqueta del código de barras
@@ -903,7 +910,7 @@ datos de quien lo provocó.
 |---|---|---|---|
 | Ventas: venta cobrada | Baja el stock de cada línea y de los componentes de los menús | F21, F22 | `sale.sale.completed` |
 | Ventas: venta anulada | Repone exactamente lo que esa venta bajó | F23 | `sale.sale.voided` |
-| Ventas: venta devuelta | Nada, todavía (duda 2) | F24 | `sale.sale.refunded` |
+| Ventas: venta devuelta | Repone las unidades de las líneas que vuelven, una vez por devolución | F24 | `sale.sale.refunded` |
 
 ### Lo que necesita de otras apps
 
@@ -949,8 +956,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`) llegan en la fase de frontend, iguales a las del módulo viejo.
-- **28 operaciones** (12 consultas y 16 acciones), todas con `ai` (descripción y, en las acciones,
-  riesgo: `high` para eliminar e importar) y con `expose_api` salvo las dos reacciones a Ventas. Las
+- **29 operaciones** (12 consultas y 17 acciones), todas con `ai` (descripción y, en las acciones,
+  riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada.
 - **Requiere `tax`**: producto y categoría tienen FK a `tax.TaxCategory` (`PROTECT`, sin acceso inverso).
   «Sin configurar» (`needs_tax_setup`) = sin categoría fiscal o con una que Impuestos desactivó. Toda
@@ -966,9 +973,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Libro de movimientos**: `_move` escribe saldo y movimiento juntos con la fila del producto
   bloqueada; varios productos se bloquean por orden de id. El cruce del mínimo se decide una vez por
   operación sobre el total (también suelto + dentro de un menú).
-- **Ventas**: `events.REACTIONS` lleva `sale.sale.completed` → `inventory.stock.apply_sale` y
-  `sale.sale.voided` → `inventory.stock.restore_sale`; `events.react` los ejecuta como sistema, cada uno
-  en su transacción. Su permiso, `inventory.system`, no lo tiene ningún rol. La nota por venta
+- **Ventas**: `events.REACTIONS` lleva `sale.sale.completed` → `inventory.stock.apply_sale`,
+  `sale.sale.voided` → `inventory.stock.restore_sale` y `sale.sale.refunded` →
+  `inventory.stock.restore_refund`; `events.react` los ejecuta como sistema, cada uno en su transacción.
+  La nota por devolución (`RefundStock`, única por `refund_id`) hace que cada una reponga una vez; lo
+  que repone sale del libro (venta menos devoluciones anteriores), y la anulación descuenta lo ya
+  devuelto. Los tests usan el evento real de Ventas, importando `apps.sale` solo en los tests. Su permiso, `inventory.system`, no lo tiene ningún rol. La nota por venta
   (`SaleStock`: `moved`, `unmoved`, `voided`) hace que la venta baje una vez, que la anulación reponga
   una vez lo que dice el libro y que una anulación que llega antes deje la venta sin efecto. El relay
   del outbox que entrega los eventos llega en la fase 2 (worker); hasta entonces se prueba con eventos
@@ -1072,7 +1082,7 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 | La venta baja el stock, una sola vez | sí | F21 |
 | Menú o pack baja sus componentes | sí | F22 |
 | La anulación repone exactamente lo que salió | sí | F23 |
-| La devolución repone el stock | no: duda 2 | F24 |
+| La devolución repone el stock | sí: las unidades de las líneas que vuelven, una vez | F24 |
 | Etiqueta de código de barras con nombre y precio | sí | F25 |
 | Lectura del código de barras en el TPV | no: la etiqueta lleva el SKU y el TPV no busca por EAN-13 (duda 7) | F25, F27 |
 | Venta al peso con báscula | no: falta leer la báscula | F26 |
@@ -1085,7 +1095,7 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 - **Propios**: los productos (con su unidad, su umbral, su control de stock y su categoría fiscal,
   guardada como referencia a Impuestos), las categorías de producto y sus enlaces con los
   productos, el libro de movimientos, las unidades de medida, los ajustes (uno por negocio) y la
-  marca de «venta ya repuesta» o «venta sin movimientos».
+  marca de «venta ya repuesta» o «venta sin movimientos», y la de «devolución ya repuesta».
 - **Lee de otros**: las categorías fiscales, sus tipos y los textos aprendidos, de Impuestos; al
   importar también crea en Impuestos categorías y textos aprendidos, siempre por sus servicios. En
   Movimientos, el número de la venta (Ventas) y el de su tique o factura (Facturación), solo para
@@ -1123,7 +1133,8 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - **Un servicio no tiene stock**: no se recibe, no se cuenta y no baja. Un artículo sin control de
   stock no baja por una venta.
 - **La anulación repone una sola vez y solo lo que salió**, leído del propio libro, llegue antes o
-  después que la venta.
+  después que la venta. **Una devolución repone una sola vez y nunca más de lo que su venta bajó**
+  menos lo ya devuelto.
 - **Permisos**: los de «Quién puede qué», en todas las puertas.
 - **Borrado lógico**: un producto o una categoría eliminados no desaparecen de la base de datos y
   sus movimientos se conservan.
@@ -1151,8 +1162,9 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
 1. Con «Permitir vender sin stock» apagado (el de fábrica), una venta que supera el saldo se cobra y
    el stock no baja nada, sin aviso (F21). ¿Debe el TPV avisar o impedir la venta, o la venta debe
    bajar a negativo igualmente y el ajuste solo gobernar el aviso?
-2. ¿Debe la devolución de una venta reponer stock, con una casilla «devolver al stock» por línea
-   como Square y Toast (F24, SALE-F31)?
+2. ~~¿Debe la devolución de una venta reponer stock, con una casilla «devolver al stock» por línea
+   como Square y Toast (F24, SALE-F31)?~~ Resuelta (2026-10-14): sí; Ventas dice qué líneas y cuántas
+   unidades vuelven y Inventario las repone (F24).
 3. ~~¿Hace falta una pantalla de baja con motivo (merma, rotura, consumo propio) o basta el recuento
    (F15)?~~ Resuelta (2026-10-14): sí, la ventana «Baja» en la fila y la ficha de Productos, como
    Square (ajustes con motivo «dañado», «perdido»), Odoo («Desechar»), Shopify y Lightspeed.

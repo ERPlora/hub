@@ -242,7 +242,8 @@
         "consent_granted": "Consent given",
         "consent_withdrawn": "Consent withdrawn",
         "merged": "Duplicate customer merged into this one",
-        "erased": "Personal data erased"
+        "erased": "Personal data erased",
+        "purchase_refunded": "Purchase refunded"
       }
     },
     "purchases": {
@@ -255,7 +256,8 @@
       "date": "Date",
       "amount": "Amount",
       "status": "Status",
-      "more": "Show more"
+      "more": "Show more",
+      "refunded": "Refund"
     },
     "orders": {
       "heading": "Linked orders",

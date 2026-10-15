@@ -8,7 +8,7 @@ import type { Page } from '../../../frontend/sdk-types';
 
 export type UnitCode = 'ud' | 'kg' | 'g' | 't' | 'l' | 'ml' | 'min' | 'h';
 export type ProductType = 'physical' | 'service';
-export type MovementType = 'initial' | 'reception' | 'sale' | 'void' | 'count' | 'write_off';
+export type MovementType = 'initial' | 'reception' | 'sale' | 'void' | 'count' | 'write_off' | 'refund';
 export type ProductStatus = 'active' | 'inactive' | 'needs_tax_setup';
 export type ImportStatus = 'ready' | 'created' | 'skipped' | 'failed';
 

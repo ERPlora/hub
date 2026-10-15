@@ -787,6 +787,29 @@ def test_divergences_list_the_cards_whose_figures_disagree_with_their_purchases(
     ] == [("Drifted", 2, 0, 900, 0)]
 
 
+def test_a_refund_is_a_line_of_its_own_in_the_history_and_can_be_filtered(  # CUSTOMER-F22
+):
+    ana = card("Ana")
+    sale = uuid.uuid7()
+    Purchase.objects.create(customer=ana, sale_id=sale, amount=2420, recorded_at=NOW - timedelta(hours=1))
+    Purchase.objects.create(
+        customer=ana, sale_id=sale, refund_id=uuid.uuid7(), amount=-1210, status="refunded", recorded_at=NOW
+    )
+    page = run("customer.purchase.list", PurchaseListIn(customer_id=ana.id))
+    assert [(row.amount, row.status) for row in page.rows] == [(-1210, "refunded"), (2420, "confirmed")]
+    refunds = run("customer.purchase.list", PurchaseListIn(customer_id=ana.id, status="refunded"))
+    assert [row.amount for row in refunds.rows] == [-1210]
+
+
+def test_a_refunded_card_is_no_divergence():
+    # Its spend is what was paid minus what came back; its purchases count the paid ones only.
+    refunded = card("Refunded", total_purchases=1, total_spent=1210)
+    sale = uuid.uuid7()
+    Purchase.objects.create(customer=refunded, sale_id=sale, amount=2420)
+    Purchase.objects.create(customer=refunded, sale_id=sale, refund_id=uuid.uuid7(), amount=-1210, status="refunded")
+    assert run("customer.purchase.divergences", DivergencesIn()).rows == []
+
+
 def test_the_consent_state_is_the_last_fact_per_purpose_and_channel():
     ana = card("Ana")
     Consent.objects.create(

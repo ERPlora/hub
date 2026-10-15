@@ -12,8 +12,16 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
-from apps.inventory.admin import CategoryAdmin, ProductAdmin, ProductCategoryInline, SaleStockAdmin, SettingsAdmin, StockMovementAdmin
-from apps.inventory.models import Category, Product, ProductCategory, SaleStock, Settings, StockMovement
+from apps.inventory.admin import (
+    CategoryAdmin,
+    ProductAdmin,
+    ProductCategoryInline,
+    RefundStockAdmin,
+    SaleStockAdmin,
+    SettingsAdmin,
+    StockMovementAdmin,
+)
+from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement
 
 MODELS = {
     Product: ProductAdmin,
@@ -21,6 +29,7 @@ MODELS = {
     StockMovement: StockMovementAdmin,
     Settings: SettingsAdmin,
     SaleStock: SaleStockAdmin,
+    RefundStock: RefundStockAdmin,
 }
 
 
@@ -33,6 +42,12 @@ def request_by(user):
     request = RequestFactory().get("/admin/")
     request.user = user
     return request
+
+
+def test_every_admin_passes_the_django_checks():
+    # A field the model does not have (an `updated_at` copied over) is caught here, not at runserver.
+    for model in MODELS:
+        assert admin.site._registry[model].check() == [], model
 
 
 def test_every_model_is_registered_and_products_show_their_categories():

@@ -242,7 +242,8 @@
         "consent_granted": "Consentimiento dado",
         "consent_withdrawn": "Consentimiento retirado",
         "merged": "Ficha duplicada fusionada en esta",
-        "erased": "Datos personales borrados"
+        "erased": "Datos personales borrados",
+        "purchase_refunded": "Devolución de compra"
       }
     },
     "purchases": {
@@ -255,7 +256,8 @@
       "date": "Fecha",
       "amount": "Importe",
       "status": "Estado",
-      "more": "Ver más"
+      "more": "Ver más",
+      "refunded": "Devolución"
     },
     "orders": {
       "heading": "Pedidos enlazados",

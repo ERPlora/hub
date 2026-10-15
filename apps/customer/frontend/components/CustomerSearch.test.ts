@@ -9,7 +9,7 @@ import { defineComponent, h, ref } from 'vue';
 import { customerRow, DETAIL, pageOf } from '../__tests__/fixtures';
 import { EMPLOYEE, flush, json, mountCustomer, refusal, sent, VIEWER } from '../__tests__/mount-customer';
 import type { SessionMe } from '@erplora/ui/shell';
-import CustomerSearch, { type CustomerSnapshot } from './CustomerSearch.vue';
+import CustomerSearch, { type CustomerSnapshot, snapshotOf } from './CustomerSearch.vue';
 import source from './CustomerSearch.vue?raw';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -20,9 +20,11 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+// DETAIL is Ana García of ACME: the document goes to the company, the screen names the person.
 const SNAPSHOT: CustomerSnapshot = {
   customer_id: 'c1',
-  customer_name: 'Ana García',
+  customer_name: 'ACME',
+  display_name: 'Ana García',
   customer_tax_id: '12345678Z',
   customer_address: 'Calle Mayor 1, 28001 Madrid, Spain',
   customer_country: 'ES',
@@ -62,12 +64,23 @@ async function setup(initial: CustomerSnapshot | null = null, session?: SessionM
   return { ...m, value, isOpen, el, click, type, results };
 }
 
+describe('snapshotOf: the tax copy the sale keeps', () => {
+  it('names the company as the fiscal recipient when the card has one, and keeps the person to show', () => {
+    expect(snapshotOf(DETAIL, 'en')).toEqual(SNAPSHOT);
+  });
+
+  it('names the person when the card has no company', () => {
+    expect(snapshotOf({ ...DETAIL, company_name: '  ' }, 'en')).toMatchObject({ customer_name: 'Ana García', display_name: 'Ana García' });
+  });
+});
+
 describe('CustomerSearch: the button', () => {
   it('says «Assign customer» with no customer, and the customer\'s name once chosen', async () => {
     const none = await setup();
     expect(none.el('customer-search-trigger')!.textContent?.trim()).toBe('Assign customer');
     document.body.innerHTML = '';
     const chosen = await setup(SNAPSHOT);
+    // The person, not the company the document goes to.
     expect(chosen.el('customer-search-trigger')!.textContent?.trim()).toBe('Ana García');
   });
 
@@ -141,12 +154,19 @@ describe('CustomerSearch: «+ New customer» (F18)', () => {
     await s.click('customer-search-quick-add');
     await s.type('customer-search-quick-phone', '600 999 888');
     s.net.onApi((call) =>
-      sent(call).path.endsWith('/by_phone') ? json({ rows: [] }) : json({ ...DETAIL, id: 'c9', name: 'Marta', tax_id: '', address: '', city: '', postal_code: '', country: '' }, 201),
+      sent(call).path.endsWith('/by_phone') ? json({ rows: [] }) : json({ ...DETAIL, id: 'c9', name: 'Marta', company_name: '', tax_id: '', address: '', city: '', postal_code: '', country: '' }, 201),
     );
     await s.click('customer-search-quick-submit');
     expect(s.net.api.map((c) => sent(c).path)).toEqual(['/api/customer/customers/by_phone', '/api/customer/customers']);
     expect(sent(s.net.api[1]).body).toEqual({ name: 'Marta', phone: '600 999 888', source: 'walk_in' });
-    expect(s.value.value).toEqual({ customer_id: 'c9', customer_name: 'Marta', customer_tax_id: '', customer_address: '', customer_country: '' });
+    expect(s.value.value).toEqual({
+      customer_id: 'c9',
+      customer_name: 'Marta',
+      display_name: 'Marta',
+      customer_tax_id: '',
+      customer_address: '',
+      customer_country: '',
+    });
   });
 
   it('a phone that is already a live card\'s is shown and asked about: nothing is assigned until a choice (F12, F18)', async () => {

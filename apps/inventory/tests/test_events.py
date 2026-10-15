@@ -54,13 +54,13 @@ def test_all_lists_every_event_once():
     assert events.ALL == list(declared().values())
 
 
-def test_it_reacts_to_a_paid_sale_and_to_a_voided_one_and_not_yet_to_a_refund():
-    # INVENTORY-F24: a refund does not restock yet (open question 2 of the WORKBOOK).
+def test_it_reacts_to_a_paid_sale_a_voided_one_and_a_refund():
+    # INVENTORY-F24 (2026-10-14): the units a refund brings back go back to the stock.
     assert events.REACTIONS == {
         "sale.sale.completed": "inventory.stock.apply_sale",
         "sale.sale.voided": "inventory.stock.restore_sale",
+        "sale.sale.refunded": "inventory.stock.restore_refund",
     }
-    assert events.SALE_REFUNDED not in events.REACTIONS
 
 
 @pytest.mark.django_db
@@ -83,5 +83,58 @@ def test_a_paid_sale_and_its_void_reach_the_stock_as_the_system():
 
 @pytest.mark.django_db
 def test_an_event_it_does_not_react_to_does_nothing():
-    assert events.react(A, "sale.sale.refunded", {"sale_id": str(uuid.uuid7())}) is None
+    assert events.react(A, "sale.sale.reassigned", {"sale_id": str(uuid.uuid7())}) is None
     assert events.react(A, "customer.customer.created", {}) is None
+
+
+# INVENTORY-F24 with the Sales app's REAL events: the sale is paid and refunded through its own
+# operations and its outbox payload goes to ``react``, as the relay will (phase 2). The sale app is
+# imported here only, in the tests: Inventory does not depend on it.
+
+
+def _sale_run(name: str, data: dict):
+    from apps.sale.tests.conftest import run
+
+    return run(name, data)
+
+
+def _last_payload(name: str) -> dict:
+    from live.models import OutboxEvent
+
+    return OutboxEvent.objects.filter(name=name).order_by("-created_at", "-id").first().payload
+
+
+@pytest.mark.django_db
+def test_a_refund_puts_the_returned_units_back_once_as_the_system():
+    from live.context import system_context
+    from live.operations import get
+
+    create = get("inventory.product.create")
+    create(
+        system_context(A),
+        create.input.model_validate(
+            {"name": "Coffee", "sku": "COF", "price": 1210, "tax_category_key": "product.generic", "initial_stock": "10"}
+        ),
+    )
+    sale = _sale_run("sale.sale.complete", {"idempotency_key": "inv-refund-0001", "lines": [{"product": "COF", "quantity": "3"}], "payments": [{"method": "card"}]})
+    events.react(A, "sale.sale.completed", _last_payload("sale.sale.completed"))
+    assert Product.objects.get(sku="COF").stock == Decimal("7")
+
+    _sale_run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(sale.id),
+            "reason": "two cups back",
+            "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 2420}],
+            "lines": [{"line_id": str(sale.lines[0].id), "quantity": "2"}],
+        },
+    )
+    payload = _last_payload("sale.sale.refunded")
+    first = events.react(A, "sale.sale.refunded", payload)
+    again = events.react(A, "sale.sale.refunded", payload)
+
+    assert (str(first.refund_id), first.applied, first.movements) == (payload["refund_id"], True, 1)
+    assert (again.applied, again.movements) == (False, 0)
+    assert Product.objects.get(sku="COF").stock == Decimal("9")
+    movement = StockMovement.objects.get(movement_type="refund")
+    assert (movement.qty, movement.reference, movement.reason, movement.actor) == (Decimal("2"), str(sale.id), "two cups back", "system")

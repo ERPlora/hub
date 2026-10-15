@@ -260,6 +260,7 @@ def test_activity_is_newest_first():
         "note_added",
         "purchase_recorded",
         "purchase_voided",
+        "purchase_refunded",
         "consent_granted",
         "consent_withdrawn",
         "merged",
@@ -292,7 +293,7 @@ def test_a_sale_is_recorded_once():
         "customer_purchase_sale_unique",
         lambda: Purchase.objects.create(customer=customer, sale_id=SALE, amount=1250),
     )
-    assert Purchase.Status.values == ["confirmed", "voided"]
+    assert Purchase.Status.values == ["confirmed", "voided", "refunded"]
 
 
 def test_purchases_without_a_sale_do_not_collide():

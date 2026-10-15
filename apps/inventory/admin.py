@@ -7,7 +7,7 @@ prevents. What the database fills in (ids and timestamps) is shown, not edited.
 
 from django.contrib import admin
 
-from apps.inventory.models import Category, Product, ProductCategory, SaleStock, Settings, StockMovement
+from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement
 
 
 AUTOMATIC = ("id", "created_at", "updated_at")
@@ -100,3 +100,11 @@ class SaleStockAdmin(admin.ModelAdmin):
     list_filter = ("state",)
     search_fields = ("sale_id",)
     fields = ("id", "sale_id", "state", "created_at", "updated_at")
+
+
+@admin.register(RefundStock)
+class RefundStockAdmin(admin.ModelAdmin):
+    list_display = ("refund_id", "sale_id", "movements", "created_at")
+    readonly_fields = ("id", "created_at")
+    search_fields = ("refund_id", "sale_id")
+    fields = ("id", "refund_id", "sale_id", "movements", "created_at")

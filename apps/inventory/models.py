@@ -274,6 +274,7 @@ class StockMovement(UUIDModel):
         VOID = "void", _("Void")
         COUNT = "count", _("Count")
         WRITE_OFF = "write_off", _("Write-off")
+        REFUND = "refund", _("Refund")
 
     product = models.ForeignKey(
         Product,
@@ -286,7 +287,7 @@ class StockMovement(UUIDModel):
     qty = models.DecimalField(_("quantity"), **QUANTITY)
     stock_after = models.DecimalField(_("balance"), **QUANTITY)
     reason = models.CharField(_("reason"), max_length=500, blank=True)
-    # The sale (sale and void) or the delivery note (reception).
+    # The sale (sale, void and refund) or the delivery note (reception).
     reference = models.CharField(_("reference"), max_length=200, blank=True)
     unit_cost = models.PositiveBigIntegerField(_("unit cost"), null=True, blank=True)
     actor = models.CharField(_("by"), max_length=ACTOR_MAX_LENGTH, blank=True)
@@ -341,3 +342,24 @@ class SaleStock(UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.sale_id} ({self.state})"
+
+
+class RefundStock(UUIDModel):
+    """A refund of the Sales app that inventory already applied: its units go back to the stock once."""
+
+    refund_id = models.UUIDField(_("refund"))
+    sale_id = models.UUIDField(_("sale"))
+    movements = models.PositiveIntegerField(_("movements"), default=0)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("refund seen")
+        verbose_name_plural = _("refunds seen")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["refund_id"], name="inventory_refund_stock_refund_unique"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.refund_id} ({self.movements})"

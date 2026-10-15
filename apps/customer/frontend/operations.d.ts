@@ -267,9 +267,10 @@ export interface PurchaseRow {
   id: string;
   customer_id: string;
   sale_id: string | null;
+  /** In cents; negative on a refund line (CUSTOMER-F22). */
   amount: number;
   currency: string;
-  status: 'confirmed' | 'voided';
+  status: 'confirmed' | 'voided' | 'refunded';
   recorded_at: string;
   voided_at: string | null;
   void_reason: string;
@@ -409,7 +410,7 @@ export interface ConsentWithdrawIn extends CustomerOfIn {
 
 export interface PurchaseListIn extends CustomerOfIn, PageIn {
   search?: string;
-  status?: 'confirmed' | 'voided';
+  status?: 'confirmed' | 'voided' | 'refunded';
   recorded_from?: string;
   recorded_to?: string;
   sort?: 'recorded_at' | 'amount' | 'status';

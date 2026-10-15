@@ -572,8 +572,8 @@ class PurchaseListIn(CustomerOfIn, PageIn):
     search: str | None = Field(
         None, max_length=60, description="A piece of the sale's id."
     )
-    status: Literal["confirmed", "voided"] | None = Field(
-        None, description="Only paid (confirmed) or voided ones."
+    status: Literal["confirmed", "voided", "refunded"] | None = Field(
+        None, description="Only paid (confirmed), voided or refund lines."
     )
     recorded_from: date | None = Field(
         None, description="Only purchases on or after this day."
@@ -606,6 +606,14 @@ class PurchaseRecordIn(Schema):
     purchased_at: datetime | None = Field(
         None, description="When the sale was paid, if not now."
     )
+
+
+class PurchaseRefundIn(Schema):
+    sale_id: UUID = Field(description="The refunded sale's id.")
+    refund_id: UUID = Field(description="The refund's id; the same refund counts once.")
+    total: int = Field(ge=0, le=INT8_MAX, strict=True, description="What came back, in whole cents.")
+    reason: _text(500) = Field("", description="Why it was refunded.")
+    refunded_at: datetime | None = Field(None, description="When it was refunded, if not now.")
 
 
 class PurchaseVoidIn(Schema):
@@ -968,10 +976,10 @@ class PurchaseRow(Schema):
     id: UUID = Field(description="The entry's id.")
     customer_id: UUID = Field(description="The customer's id.")
     sale_id: UUID | None = Field(description="The sale's id; empty for a manual entry.")
-    amount: int = Field(description="The amount, in cents.")
+    amount: int = Field(description="The amount, in cents; negative on a refund line.")
     currency: str = Field(description="The currency.")
-    status: Literal["confirmed", "voided"] = Field(
-        description="Paid (confirmed) or voided."
+    status: Literal["confirmed", "voided", "refunded"] = Field(
+        description="Paid (confirmed), voided, or a refund of the sale (refunded)."
     )
     recorded_at: datetime = Field(description="When it was paid.")
     voided_at: datetime | None = Field(description="When it was voided.")
@@ -997,6 +1005,14 @@ class PurchaseRecordOut(Schema):
     sale_id: UUID | None = Field(description="The sale's id.")
     recorded: bool = Field(
         description="Whether it was recorded now (false: no customer, not live, or already in)."
+    )
+
+
+class PurchaseRefundOut(Schema):
+    sale_id: UUID = Field(description="The sale's id.")
+    refund_id: UUID = Field(description="The refund's id.")
+    refunded: bool = Field(
+        description="Whether it was recorded now (false: the sale is not on a card, voided, or the refund already in)."
     )
 
 

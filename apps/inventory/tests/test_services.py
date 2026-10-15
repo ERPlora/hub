@@ -1570,6 +1570,151 @@ def test_an_article_deleted_after_the_sale_gets_nothing_back():
     assert stock_of(coffee.id) == Decimal("6")
 
 
+# inventory.stock.restore_refund (INVENTORY-F24)
+
+
+def refunded(sale_id, *lines, refund_id=None, reason="returned"):
+    """What Sales records as ``sale.sale.refunded`` (apps/sale/services.py ``refund``), whole."""
+    payload = {
+        "sale_id": str(sale_id),
+        "sale_number": "20261014-0001",
+        "refund_id": str(refund_id or uuid.uuid7()),
+        "total": 100,
+        "reason": reason,
+        "refunded_by": "tester",
+        "refunded_at": "2026-10-14T10:00:00+00:00",
+        "fully_refunded": False,
+        "document_type": "ticket",
+        "order_id": None,
+        "customer_id": None,
+        "payments": [],
+        "lines": [
+            {"line_id": str(uuid.uuid7()), "product_id": str(product_id) if product_id else None, "quantity": quantity}
+            for product_id, quantity in lines
+        ],
+    }
+    op = get("inventory.stock.restore_refund")
+    return op(system_context(A), op.input.model_validate(payload))
+
+
+def test_restore_refund_is_a_reaction_of_the_platform_without_a_route():
+    op = get("inventory.stock.restore_refund")
+    assert (op.kind, op.permission, op.expose_api) == ("command", "inventory.system", False)
+    assert op.ai["risk"] == "high" and op.ai["description"]
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    with pytest.raises(PermissionDenied):
+        op(ctx_for("hub_owner"), op.input.model_validate({"sale_id": str(uuid.uuid7()), "refund_id": str(uuid.uuid7())}))
+
+
+def test_a_refund_puts_back_the_returned_units_of_its_lines_once():
+    wine = create("Wine", initial_stock="10")
+    sale = uuid.uuid7()
+    sell(sale, line(wine.id, "4"))
+    clear_outbox()
+    refund_id = uuid.uuid7()
+
+    first = refunded(sale, (wine.id, "3.000"), refund_id=refund_id, reason="corked")
+    again = refunded(sale, (wine.id, "3.000"), refund_id=refund_id, reason="corked")
+
+    assert (first.applied, first.movements, again.applied, again.movements) == (True, 1, False, 0)
+    assert stock_of(wine.id) == Decimal("9")
+    assert movements(wine.id, "refund") == [("refund", Decimal("3"), Decimal("9"))]
+    movement = StockMovement.objects.get(movement_type="refund")
+    assert (movement.reference, movement.reason) == (str(sale), "corked")
+    assert event_names() == [events.STOCK_CHANGED]
+
+
+def test_two_refunds_of_a_sale_never_give_back_more_than_it_took():
+    wine = create("Wine", initial_stock="10")
+    sale = uuid.uuid7()
+    sell(sale, line(wine.id, "4"))
+    refunded(sale, (wine.id, "3"))
+    assert refunded(sale, (wine.id, "3")).movements == 1
+    assert stock_of(wine.id) == Decimal("10")  # 4 out, 4 back: the second refund was capped at 1
+
+
+def test_a_refund_gives_back_nothing_the_sale_did_not_lower():
+    configure(allow_sell_without_stock=False)
+    untracked = create("Bag", initial_stock="5", track_stock=False)
+    short = create("Rare", initial_stock="1")
+    massage = create("Massage", product_type="service")
+    sale = uuid.uuid7()
+    sell(sale, line(untracked.id, "1"), line(short.id, "2"), line(massage.id, "1"))
+    result = refunded(sale, (untracked.id, "1"), (short.id, "2"), (massage.id, "1"), (None, "1"))
+    assert (result.applied, result.movements) == (True, 0)
+    assert (stock_of(untracked.id), stock_of(short.id)) == (Decimal("5"), Decimal("1"))
+
+
+def test_a_refund_respects_an_article_that_stopped_tracking_its_stock():
+    wine = create("Wine", initial_stock="10")
+    sale = uuid.uuid7()
+    sell(sale, line(wine.id, "2"))
+    update(wine.id, track_stock=False)
+    assert refunded(sale, (wine.id, "2")).movements == 0
+    assert stock_of(wine.id) == Decimal("8")
+
+
+def test_a_refund_that_lifts_an_article_over_its_threshold_says_it_recovered():
+    wine = create("Wine", initial_stock="6", low_stock_threshold="5")
+    sale = uuid.uuid7()
+    sell(sale, line(wine.id, "3"))  # 6 → 3: below
+    refunded(sale, (wine.id, "3"))  # 3 → 6: recovered
+    assert crossings() == [("below", "sale"), ("recovered", "refund")]
+
+
+def test_a_void_after_a_partial_refund_restores_only_what_is_still_out():
+    wine = create("Wine", initial_stock="10")
+    sale = uuid.uuid7()
+    sell(sale, line(wine.id, "4"))
+    refunded(sale, (wine.id, "1"))
+    assert void(sale).movements == 1
+    assert stock_of(wine.id) == Decimal("10")
+    assert movements(wine.id, "void") == [("void", Decimal("3"), Decimal("10"))]
+
+
+def test_a_refund_of_a_voided_or_unseen_sale_gives_back_nothing():
+    wine = create("Wine", initial_stock="10")
+    voided = uuid.uuid7()
+    sell(voided, line(wine.id, "4"))
+    void(voided)
+    assert refunded(voided, (wine.id, "4")).movements == 0
+    assert refunded(uuid.uuid7(), (wine.id, "4")).movements == 0
+    assert stock_of(wine.id) == Decimal("10")
+
+
+def test_a_money_only_refund_moves_nothing_and_is_noted_once():
+    wine = create("Wine", initial_stock="10")
+    sale = uuid.uuid7()
+    sell(sale, line(wine.id, "1"))
+    refund_id = uuid.uuid7()
+    assert refunded(sale, refund_id=refund_id).applied is True
+    assert refunded(sale, (wine.id, "1"), refund_id=refund_id).applied is False
+    assert stock_of(wine.id) == Decimal("9")
+
+
+def test_the_real_refund_of_sales_reaches_the_stock():
+    """With the payload Sales really records (its app is imported here only, in the tests)."""
+    from apps.sale.tests.conftest import run as sale_run
+
+    run("inventory.product.create", ProductIn(name="Coffee", sku="COF", price=1210, tax_category_key="product.generic", initial_stock="10"))
+    sale = sale_run("sale.sale.complete", {"idempotency_key": "inv-svc-refund-01", "lines": [{"product": "COF", "quantity": "2"}], "payments": [{"method": "card"}]})
+    events.react(A, "sale.sale.completed", OutboxEvent.objects.filter(name="sale.sale.completed").latest("created_at").payload)
+    sale_run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(sale.id),
+            "reason": "a cup back",
+            "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 1210}],
+            "lines": [{"line_id": str(sale.lines[0].id), "quantity": "1"}],
+        },
+    )
+    payload = OutboxEvent.objects.filter(name="sale.sale.refunded").latest("created_at").payload
+    op = get("inventory.stock.restore_refund")
+    result = op(system_context(A), op.input.model_validate(payload))
+    assert (str(result.refund_id), str(result.sale_id), result.movements) == (payload["refund_id"], str(sale.id), 1)
+    assert Product.objects.get(sku="COF").stock == Decimal("9")
+
+
 # Notifications: after the COMMIT, on the channel of the command's scope only
 
 

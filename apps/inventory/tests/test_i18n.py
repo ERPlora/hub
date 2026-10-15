@@ -13,7 +13,7 @@ from django.utils import translation
 from live.meta import Category as AppCategory
 
 from apps.inventory import queries, schemas, services
-from apps.inventory.models import Category, Product, ProductCategory, SaleStock, Settings, StockMovement, Unit
+from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement, Unit
 
 LOCALE = Path(apps.get_app_config("inventory").path) / "locale" / "es" / "LC_MESSAGES"
 _STRING = re.compile(r'^"(.*)"$')
@@ -72,7 +72,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("inventory")
     lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
     lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    for model in (Settings, Category, Product, ProductCategory, StockMovement, SaleStock):
+    for model in (Settings, Category, Product, ProductCategory, StockMovement, SaleStock, RefundStock):
         lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
         # The primary key comes from live.models.UUIDModel; a reverse relation has no text of this app.
         lazies += [
@@ -118,7 +118,7 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.ROW_OFF_GRID) == "La cantidad no respeta el incremento permitido para esta unidad"
         assert str(services.ROW_TAX_CATEGORY_MISSING) == "Falta la categoría fiscal"
         assert str(services.ROW_NAME_MISSING) == "Falta el nombre"
-        assert [str(label) for label in StockMovement.Type.labels] == ["Inicial", "Recepción", "Venta", "Anulación", "Recuento", "Descuento"]
+        assert [str(label) for label in StockMovement.Type.labels] == ["Inicial", "Recepción", "Venta", "Anulación", "Recuento", "Descuento", "Devolución"]
         assert str(Unit.HOUR.label) == "Hora (h)"
         assert str(AppCategory.CATALOG.label)  # the apps page's group comes from live, not from here
 

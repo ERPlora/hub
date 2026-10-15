@@ -61,6 +61,7 @@ from apps.customer.schemas import (
     OrderCustomerOut,
     OrderLinkIn,
     PurchaseRecordIn,
+    PurchaseRefundIn,
     PurchaseRecordOut,
     PurchaseVoidIn,
     PurchaseVoidOut,
@@ -1683,6 +1684,80 @@ def test_repeating_the_erasure_of_a_merged_card_announces_every_card_again_and_w
     run("customer.customer.erase", EraseIn(id=survivor.id, reason="again"))
     assert len(outbox()) == 2
     assert list(absorbed.activity.values_list("text", flat=True)) == [""]
+
+
+# customer.purchase.refund (CUSTOMER-F22)
+
+
+def refund(sale, refund_id, total, reason="returned", at=None):
+    return system(
+        "customer.purchase.refund",
+        PurchaseRefundIn(sale_id=sale, refund_id=refund_id, total=total, reason=reason, refunded_at=at),
+    )
+
+
+@pytest.mark.django_db
+def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_history():
+    ana = card("Ana")
+    sale, first, second = uuid.uuid7(), uuid.uuid7(), uuid.uuid7()
+    record(ana, sale, 2420, currency="EUR")
+    clear_outbox()
+    later = NOW + timedelta(hours=2)
+    assert refund(sale, first, 1210, "one cup back", later).refunded is True
+    # «Spent» goes down by what came back; «Purchases», the last purchase and the stage do not move.
+    assert totals(ana) == (1, 1210, "first_purchase", NOW)
+    line = Purchase.objects.get(refund_id=first)
+    assert (line.sale_id, line.amount, line.currency, line.status, line.recorded_at, line.void_reason) == (
+        sale,
+        -1210,
+        "EUR",
+        "refunded",
+        later,
+        "one cup back",
+    )
+    assert refund(sale, first, 1210).refunded is False  # redelivered
+    assert refund(sale, second, 1210).refunded is True  # a second refund of the same sale
+    assert totals(ana)[:2] == (1, 0)
+    entries = list(ana.activity.filter(kind="purchase_refunded").values_list("text", "data"))
+    assert entries == [("returned", {"amount": 1210, "currency": "EUR"}), ("one cup back", {"amount": 1210, "currency": "EUR"})]
+    assert outbox() == [
+        (events.PURCHASE_REFUNDED, {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(first)}),
+        (events.PURCHASE_REFUNDED, {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(second)}),
+    ]
+
+
+@pytest.mark.django_db
+def test_a_refund_of_a_sale_not_recorded_or_voided_changes_nothing():
+    assert refund(uuid.uuid7(), uuid.uuid7(), 100).refunded is False
+    ana = card("Ana")
+    sale = uuid.uuid7()
+    record(ana, sale, 500)
+    void(sale)
+    clear_outbox()
+    assert refund(sale, uuid.uuid7(), 500).refunded is False
+    assert totals(ana)[:2] == (0, 0) and outbox() == []
+
+
+@pytest.mark.django_db
+def test_a_refund_of_an_erased_card_counts_but_adds_nothing_to_its_timeline():
+    ana = card("Ana")
+    sale = uuid.uuid7()
+    record(ana, sale, 500)
+    run("customer.customer.erase", EraseIn(id=ana.id))
+    assert refund(sale, uuid.uuid7(), 200).refunded is True
+    assert totals(ana)[:2] == (1, 300)
+    assert list(ana.activity.values_list("kind", flat=True)) == ["erased"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+def test_only_the_system_records_refunds(role):
+    with pytest.raises(PermissionDenied):
+        run(
+            "customer.purchase.refund",
+            PurchaseRefundIn(sale_id=uuid.uuid7(), refund_id=uuid.uuid7(), total=100),
+            role,
+        )
 
 
 @pytest.mark.django_db

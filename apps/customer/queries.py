@@ -596,10 +596,12 @@ def list_purchases(ctx: OperationContext, params: PurchaseListIn) -> dict:
 )
 def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     confirmed = Q(purchases__status=Purchase.Status.CONFIRMED)
+    # The spend is what was paid minus what came back (refund lines carry a negative amount).
+    spent = confirmed | Q(purchases__status=Purchase.Status.REFUNDED)
     cards = Customer.objects.live().annotate(
         ledger_purchases=Count("purchases", filter=confirmed),
         ledger_spent=Coalesce(
-            Sum("purchases__amount", filter=confirmed),
+            Sum("purchases__amount", filter=spent),
             Value(0),
             output_field=IntegerField(),
         ),

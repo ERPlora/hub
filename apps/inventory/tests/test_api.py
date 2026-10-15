@@ -86,7 +86,7 @@ def test_every_route_is_bound_to_its_operation():
 
 def test_the_reactions_to_sales_have_no_route():
     bound = {operation for _, _, operation in ROUTES}
-    assert not bound & {"inventory.stock.apply_sale", "inventory.stock.restore_sale"}
+    assert not bound & {"inventory.stock.apply_sale", "inventory.stock.restore_sale", "inventory.stock.restore_refund"}
 
 
 def test_the_api_keeps_parity():
