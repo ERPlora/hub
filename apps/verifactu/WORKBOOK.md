@@ -837,6 +837,7 @@ Todas se pueden seguir en vivo.
 | Sube (o sustituye) el certificado propio | configurar | F02, F34 | `verifactu.certificate.upload` |
 | Quita el certificado propio | configurar | F03 | `verifactu.certificate.remove` |
 | Guarda lo que manda la cuenta de ERPlora (autorización, productor) | solo el sistema | F05, F12 | `verifactu.config.sync` |
+| Fija el hub de plataforma de ERPlora al entorno de su despliegue | solo el sistema | — | `verifactu.config.follow_deployment` |
 
 ### Lo que avisa
 
@@ -1039,6 +1040,14 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
   queda bajo la supervisión de Ioan (working-rules §15).
+- **Hub de plataforma de ERPlora** (PLAN-SAAS §4; Facturación, INVOICE-F23): el hub `PLATFORM_HUB_SLUG` emite las
+  facturas de ERPlora a sus clientes. Sus registros van al entorno de la AEAT del despliegue, diga lo que diga su
+  configuración (`queries.effective_environment`: `prod` → producción, `pre` → pruebas; lo usan `record.create` y la
+  factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
+  `manage.py create_platform_hub` alinea su configuración con `verifactu.config.follow_deployment` (409
+  `verifactu.platform_only` en cualquier otro negocio). El sello de ERPlora presenta sus propios registros sin
+  otorgamiento (`sending_problem`: el emisor de Facturación es `PLATFORM_ISSUER_TAX_ID`): ERPlora no se representa a
+  sí misma. La pasarela del SaaS tendrá que aceptar lo mismo cuando compruebe el otorgamiento (T7b).
 
 ### La cola y el envío
 
