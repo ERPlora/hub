@@ -13,6 +13,7 @@ from apps.verifactu.schemas import (
     AeatQueryIn,
     AeatRecordListIn,
     ByInvoiceIn,
+    CertificateUploadIn,
     ChainValidateIn,
     ConfigUpdateIn,
     ContingencyListIn,
@@ -54,6 +55,19 @@ async def config_go_live(request):
 @bind(router, "verifactu.config.back_to_testing", "/verifactu/config/back_to_testing")
 async def config_back_to_testing(request):
     return await run_operation(request, services.back_to_testing)
+
+
+# The own certificate (VERIFACTU-F02, F03)
+
+
+@bind(router, "verifactu.certificate.upload", "/verifactu/certificate", status=201)
+async def certificate_upload(request, data: CertificateUploadIn):
+    return await run_operation(request, services.upload_certificate, data)
+
+
+@bind(router, "verifactu.certificate.remove", "/verifactu/certificate/remove")
+async def certificate_remove(request):
+    return await run_operation(request, services.remove_certificate)
 
 
 # Records

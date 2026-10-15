@@ -10,9 +10,10 @@ import pytest
 from django.conf import settings
 from live.ninja import ensure_api_parity
 
+from apps.verifactu import certificates
 from apps.verifactu.api import router
-from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import manual
+from apps.verifactu.models import OwnCertificate, Record
+from apps.verifactu.tests.conftest import b64, make_p12, manual
 from config.api import api
 
 ROUTES = {
@@ -20,6 +21,8 @@ ROUTES = {
     ("POST", "/verifactu/config", "verifactu.config.update"),
     ("POST", "/verifactu/config/go_live", "verifactu.config.go_live"),
     ("POST", "/verifactu/config/back_to_testing", "verifactu.config.back_to_testing"),
+    ("POST", "/verifactu/certificate", "verifactu.certificate.upload"),
+    ("POST", "/verifactu/certificate/remove", "verifactu.certificate.remove"),
     ("GET", "/verifactu/records", "verifactu.record.list"),
     ("GET", "/verifactu/records/detail", "verifactu.record.get"),
     ("GET", "/verifactu/records/by_invoice", "verifactu.record.by_invoice"),
@@ -175,3 +178,64 @@ def test_another_hubs_records_are_not_seen_from_this_one(client, make_user, issu
     other = make_user("eve", host="b", role="hub_admin")
     client.force_login(other)
     assert get(client, "/verifactu/records").status_code == 403
+
+
+@pytest.fixture
+def manager_client(client, make_user):
+    client.force_login(make_user("mia", host="a", role="hub_manager"))
+    return client
+
+
+@pytest.mark.django_db
+def test_the_certificate_is_uploaded_and_removed_over_http(
+    admin_client, issuer, settings
+):
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    uploaded = post(
+        admin_client,
+        "/verifactu/certificate",
+        {"p12_base64": b64(make_p12()), "password": "secret"},
+    )
+    assert uploaded.status_code == 201
+    certificate = uploaded.json()["own_certificate"]
+    assert (certificate["loaded"], certificate["holder_tax_id"]) == (True, "B12345674")
+    assert "secret" not in uploaded.content.decode()
+    assert "sealed" not in json.dumps(get(admin_client, "/verifactu/config").json())
+    removed = post(admin_client, "/verifactu/certificate/remove")
+    assert removed.status_code == 200
+    assert removed.json()["own_certificate"]["loaded"] is False
+    assert not OwnCertificate.objects.exists()
+
+
+@pytest.mark.django_db
+def test_a_certificate_of_another_holder_is_a_409_with_its_code(
+    admin_client, issuer, settings
+):
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    response = post(
+        admin_client,
+        "/verifactu/certificate",
+        {"p12_base64": b64(make_p12(org_id="VATES-B99999999")), "password": "secret"},
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "verifactu.certificate_holder_mismatch"
+
+
+@pytest.mark.django_db
+def test_without_configure_the_certificate_is_a_403(manager_client, issuer, settings):
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    body = {"p12_base64": b64(make_p12()), "password": "secret"}
+    assert post(manager_client, "/verifactu/certificate", body).status_code == 403
+    assert post(manager_client, "/verifactu/certificate/remove").status_code == 403
+    assert not OwnCertificate.objects.exists()
+
+
+@pytest.mark.django_db
+def test_a_422_never_echoes_the_password(admin_client, issuer):
+    response = post(
+        admin_client,
+        "/verifactu/certificate",
+        {"password": "hunter2-secret"},
+    )
+    assert response.status_code == 422
+    assert "hunter2" not in response.content.decode()
