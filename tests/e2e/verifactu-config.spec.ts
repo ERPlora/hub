@@ -8,7 +8,7 @@
 //   - VERIFACTU-F08: Settings lists what keeps the business from going live, the missing paid option among it, from
 //     the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once paid.
 // The photo is the SaaS's, sent here the way the SaaS sends it. What the run changes in VeriFactu's configuration
-// is put back after it (or removed, if the run made it).
+// and the own certificate is put back after it (or removed, if the run made it), and so is the issuer.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, HUB_DIR, login, psql, shown } from './helpers';
-import { ensureIssuer } from './invoice-helpers';
+import { cleanInvoices, ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
@@ -31,8 +31,10 @@ const PASSWORD = 'e2e-secret';
 const DIR = mkdtempSync(join(tmpdir(), 'e2e-verifactu-'));
 /** Monotonic photo versions: an older one changes nothing. */
 let version = Math.floor(Date.now() / 1000);
-/** VeriFactu's configuration row before the run, as JSON (`null`: the run makes it and removes it). */
-let before: Record<string, unknown> | null = null;
+/** Whether VeriFactu's configuration row existed before the run (if not, the run makes it and removes it). */
+let hadConfig = true;
+/** The copies the run keeps of what it changes: VeriFactu's configuration and the own certificate. */
+const BACKUP = { config: 'e2e_verifactu_config_before', certificate: 'e2e_verifactu_owncertificate_before' };
 
 const CONFIG_COLUMNS = [
   'route',
@@ -130,29 +132,51 @@ async function spanishPage(browser: import('@playwright/test').Browser, next: st
   return { context, page };
 }
 
-function restoreConfig(): void {
-  if (before === null) {
-    psql('delete from verifactu_owncertificate; delete from verifactu_config');
-    return;
-  }
-  const json = JSON.stringify(before).replaceAll("'", "''");
-  const sets = CONFIG_COLUMNS.map((column) => `${column} = r.${column}`).join(', ');
+/** Copies the configuration and the own certificate aside (tables of the database, so a shell's quoting never
+ *  touches their values) and starts from no certificate. */
+function backUpConfig(): void {
+  hadConfig = psql('select count(*) from verifactu_config') !== '0';
+  // Past the version the hub already applied, or the run's photos would change nothing.
+  version = Math.max(version, Number(psql('select coalesce(max(synced_version), 0) from verifactu_config')));
   psql(
-    `delete from verifactu_owncertificate; update verifactu_config c set ${sets} from json_populate_record(null::verifactu_config, '${json}'::json) r`,
+    [
+      `drop table if exists ${BACKUP.config}`,
+      `drop table if exists ${BACKUP.certificate}`,
+      `create table ${BACKUP.config} as select * from verifactu_config`,
+      `create table ${BACKUP.certificate} as select * from verifactu_owncertificate`,
+      'delete from verifactu_owncertificate',
+    ].join('; '),
+  );
+}
+
+/** Puts back what `backUpConfig` copied: the configuration's columns the run moves and the certificate. */
+function restoreConfig(): void {
+  const sets = CONFIG_COLUMNS.map((column) => `${column} = b.${column}`).join(', ');
+  psql(
+    [
+      'delete from verifactu_owncertificate',
+      `insert into verifactu_owncertificate select * from ${BACKUP.certificate}`,
+      hadConfig
+        ? `update verifactu_config c set ${sets} from ${BACKUP.config} b where b.id = c.id`
+        : 'delete from verifactu_config where not exists (select 1 from verifactu_record)',
+      `drop table ${BACKUP.config}`,
+      `drop table ${BACKUP.certificate}`,
+    ].join('; '),
   );
 }
 
 test.beforeAll(async ({ browser }) => {
+  snapshotSeries();
+  backUpConfig();
   const { context } = await spanishPage(browser, '/verifactu/config');
   await ensureIssuer(context);
   await context.close();
-  const row = psql(`select row_to_json(c) from verifactu_config c`);
-  before = row ? (JSON.parse(row) as Record<string, unknown>) : null;
-  psql('delete from verifactu_owncertificate');
 });
 
 test.afterAll(() => {
   restoreConfig();
+  // The issuer the run set up, when the hub had none (and the numbering, untouched here).
+  cleanInvoices();
 });
 
 test('Mi certificado: upload a .p12, see its holder and expiry, remove it', async ({ browser }) => {
