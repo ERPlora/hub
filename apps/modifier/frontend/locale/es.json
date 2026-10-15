@@ -1,0 +1,138 @@
+{
+  "modifier": {
+    "title": "Suplementos",
+    "loading": "Cargando…",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
+    "noPermission": "No tienes permiso",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "loadMore": "Cargar más",
+    "showing": "Mostrando {shown} de {total}",
+    "free": "Gratis",
+    "tax": {
+      "exempt": "exenta"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "rule": {
+      "optional": "Opcional",
+      "required": "Obligatorio (mín. {min})",
+      "max": "máx. {max}",
+      "repeat": "se repite"
+    },
+    "money": {
+      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 1,50, o -0,50 para descontar.",
+      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+      "sign": "Cambiar el signo: en negativo es un descuento"
+    },
+    "groups": {
+      "search": "Buscar…",
+      "new": "Nuevo grupo",
+      "empty": "Todavía no hay grupos de suplementos.",
+      "loadError": "No se pudieron cargar los grupos.",
+      "entity": {
+        "one": "grupo",
+        "many": "grupos"
+      },
+      "columns": {
+        "name": "Nombre",
+        "kitchen": "En la comanda",
+        "choice": "Elección",
+        "options": "Opciones",
+        "links": "Se aplica a",
+        "order": "Orden"
+      },
+      "required": {
+        "yes": "Obligatorio",
+        "no": "Opcional"
+      },
+      "actions": {
+        "edit": "Editar",
+        "delete": "Borrar"
+      },
+      "form": {
+        "titleNew": "Nuevo grupo",
+        "titleEdit": "Editando grupo — {name}",
+        "name": "Nombre",
+        "kitchenName": "Nombre en la comanda",
+        "kitchenHint": "Vacío: cocina lee el nombre.",
+        "min": "Mínimo (1 o más = obligatorio)",
+        "max": "Máximo (0 = sin techo)",
+        "repeat": "Se puede repetir una opción",
+        "order": "Orden",
+        "create": "Crear",
+        "save": "Guardar",
+        "maxBelowMin": "El máximo no puede ser menor que el mínimo (0 = sin techo)."
+      },
+      "delete": {
+        "title": "Borrar grupo",
+        "message": "{name} — el grupo desaparece con sus opciones y deja de preguntarse en el TPV. Lo ya pedido lo conserva.",
+        "options": "Se borrarán {count} opción(es) con él.",
+        "links": "Dejará de aplicarse a {count} producto(s) o categoría(s).",
+        "confirm": "Borrar"
+      }
+    },
+    "sheet": {
+      "title": "Grupo — {name}",
+      "options": "Opciones",
+      "appliesTo": "Se aplica a",
+      "addOption": "Añadir opción",
+      "addLink": "Añadir producto o categoría",
+      "noOptions": "Este grupo todavía no tiene opciones.",
+      "noLinks": "Este grupo todavía no se aplica a nada: no saldrá en el TPV.",
+      "short": "Pide al menos {min} pero tiene {count} opción(es) que no se repiten: el TPV no podría completarlo.",
+      "default": "Por defecto",
+      "ownTax": "IVA propio: {name}",
+      "product": "Producto · {name} ({sku})",
+      "category": "Categoría · {name}",
+      "kitchen": "Cocina: {name}",
+      "edit": "Editar",
+      "delete": "Borrar",
+      "detach": "Dejar de aplicar",
+      "optionsError": "No se pudieron cargar las opciones.",
+      "linksError": "No se pudo cargar a qué se aplica."
+    },
+    "options": {
+      "form": {
+        "titleNew": "Nueva opción",
+        "titleEdit": "Editando opción — {name}",
+        "name": "Nombre",
+        "kitchenName": "Nombre en la comanda",
+        "price": "Suplemento (€)",
+        "priceHint": "Negativo descuenta; vacío o 0, gratis.",
+        "tax": "Categoría fiscal propia",
+        "taxHint": "Solo si tributa distinto del plato; vacía = la del plato.",
+        "noTax": "La del plato",
+        "default": "Elegida por defecto",
+        "order": "Orden",
+        "create": "Crear",
+        "save": "Guardar"
+      },
+      "delete": {
+        "title": "Borrar opción",
+        "message": "{name} — deja de ofrecerse en el TPV. Lo ya pedido la conserva.",
+        "confirm": "Borrar"
+      }
+    },
+    "links": {
+      "form": {
+        "title": "Aplicar «{group}» a…",
+        "kind": "A qué se aplica",
+        "product": "Producto",
+        "category": "Categoría",
+        "searchProduct": "Producto (nombre o SKU)",
+        "searchCategory": "Categoría",
+        "submit": "Aplicar"
+      },
+      "detach": {
+        "title": "Dejar de aplicar",
+        "message": "«{group}» dejará de preguntarse en {target}.",
+        "confirm": "Dejar de aplicar"
+      }
+    }
+  }
+}

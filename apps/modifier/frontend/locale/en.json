@@ -1,0 +1,138 @@
+{
+  "modifier": {
+    "title": "Modifiers",
+    "loading": "Loading…",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches the search or the filters.",
+    "noPermission": "You do not have permission",
+    "cancel": "Cancel",
+    "close": "Close",
+    "loadMore": "Load more",
+    "showing": "Showing {shown} of {total}",
+    "free": "Free",
+    "tax": {
+      "exempt": "exempt"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "rule": {
+      "optional": "Optional",
+      "required": "Required (min. {min})",
+      "max": "max. {max}",
+      "repeat": "repeats"
+    },
+    "money": {
+      "notAmount": "This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.",
+      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
+      "sign": "Change the sign: negative is a discount"
+    },
+    "groups": {
+      "search": "Search…",
+      "new": "New group",
+      "empty": "No modifier groups yet.",
+      "loadError": "The groups could not be loaded.",
+      "entity": {
+        "one": "group",
+        "many": "groups"
+      },
+      "columns": {
+        "name": "Name",
+        "kitchen": "On the kitchen ticket",
+        "choice": "Choice",
+        "options": "Options",
+        "links": "Applies to",
+        "order": "Order"
+      },
+      "required": {
+        "yes": "Required",
+        "no": "Optional"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "form": {
+        "titleNew": "New group",
+        "titleEdit": "Editing group — {name}",
+        "name": "Name",
+        "kitchenName": "Kitchen ticket name",
+        "kitchenHint": "Empty: the kitchen reads the name.",
+        "min": "Minimum (1 or more = required)",
+        "max": "Maximum (0 = no ceiling)",
+        "repeat": "An option can be chosen more than once",
+        "order": "Order",
+        "create": "Create",
+        "save": "Save",
+        "maxBelowMin": "The maximum cannot be below the minimum (0 = no ceiling)."
+      },
+      "delete": {
+        "title": "Delete group",
+        "message": "{name} — the group disappears with its options and stops being asked in the till. What was already ordered keeps it.",
+        "options": "{count} option(s) will be deleted with it.",
+        "links": "It will stop applying to {count} product(s) or category(ies).",
+        "confirm": "Delete"
+      }
+    },
+    "sheet": {
+      "title": "Group — {name}",
+      "options": "Options",
+      "appliesTo": "Applies to",
+      "addOption": "Add option",
+      "addLink": "Add product or category",
+      "noOptions": "This group has no options yet.",
+      "noLinks": "This group does not apply to anything yet: it will not show in the till.",
+      "short": "It asks for at least {min} but has {count} option(s) that cannot repeat: the till could not complete it.",
+      "default": "By default",
+      "ownTax": "Own tax: {name}",
+      "product": "Product · {name} ({sku})",
+      "category": "Category · {name}",
+      "kitchen": "Kitchen: {name}",
+      "edit": "Edit",
+      "delete": "Delete",
+      "detach": "Stop applying",
+      "optionsError": "The options could not be loaded.",
+      "linksError": "What it applies to could not be loaded."
+    },
+    "options": {
+      "form": {
+        "titleNew": "New option",
+        "titleEdit": "Editing option — {name}",
+        "name": "Name",
+        "kitchenName": "Kitchen ticket name",
+        "price": "Supplement (€)",
+        "priceHint": "Negative is a discount; empty or 0, free.",
+        "tax": "Own tax category",
+        "taxHint": "Only if it taxes differently from the dish; empty = the dish's.",
+        "noTax": "The dish's",
+        "default": "Chosen by default",
+        "order": "Order",
+        "create": "Create",
+        "save": "Save"
+      },
+      "delete": {
+        "title": "Delete option",
+        "message": "{name} — it is no longer offered in the till. What was already ordered keeps it.",
+        "confirm": "Delete"
+      }
+    },
+    "links": {
+      "form": {
+        "title": "Apply «{group}» to…",
+        "kind": "What it applies to",
+        "product": "Product",
+        "category": "Category",
+        "searchProduct": "Product (name or SKU)",
+        "searchCategory": "Category",
+        "submit": "Apply"
+      },
+      "detach": {
+        "title": "Stop applying",
+        "message": "«{group}» will no longer be asked for {target}.",
+        "confirm": "Stop applying"
+      }
+    }
+  }
+}

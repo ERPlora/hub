@@ -1,0 +1,170 @@
+# Spanish translation of the modifier app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next modifier\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 10:00+0200\n"
+"PO-Revision-Date: 2026-10-15 10:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Modifiers"
+msgstr "Suplementos"
+
+msgid "Supplements and choices of a dish: sauces, doneness, extras, each with its price."
+msgstr "Suplementos y elecciones de un plato: salsas, punto, extras, cada uno con su precio."
+
+msgid "Modifiers keeps the choices that go with what you sell: the doneness of the meat, an extra of cheese, the size, «no onion». Each group says how many options must be chosen and whether one can be repeated; each option carries its supplement, more, less or free, and can come chosen by default. One group serves many products and whole categories, and the till asks for it, charges the supplement at the catalog price and sends it to the kitchen with its own name."
+msgstr "Suplementos guarda las elecciones que acompañan a lo que vendes: el punto de la carne, un extra de queso, el tamaño, «sin cebolla». Cada grupo dice cuántas opciones hay que elegir y si una se puede repetir; cada opción lleva su suplemento, más, menos o gratis, y puede salir elegida por defecto. Un mismo grupo sirve a muchos productos y a categorías enteras, y el TPV lo pregunta, cobra el suplemento al precio del catálogo y lo manda a cocina con su propio nombre."
+
+msgid "name"
+msgstr "nombre"
+
+msgid "kitchen name"
+msgstr "nombre en la comanda"
+
+msgid "minimum choices"
+msgstr "mínimo de elecciones"
+
+msgid "maximum choices"
+msgstr "máximo de elecciones"
+
+msgid "allow repeat"
+msgstr "se puede repetir"
+
+msgid "order"
+msgstr "orden"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "modifier group"
+msgstr "grupo de suplementos"
+
+msgid "modifier groups"
+msgstr "grupos de suplementos"
+
+msgid "group"
+msgstr "grupo"
+
+msgid "supplement"
+msgstr "suplemento"
+
+msgid "tax category"
+msgstr "categoría fiscal"
+
+msgid "chosen by default"
+msgstr "elegida por defecto"
+
+msgid "option"
+msgstr "opción"
+
+msgid "options"
+msgstr "opciones"
+
+msgid "product"
+msgstr "producto"
+
+msgid "category"
+msgstr "categoría"
+
+msgid "link"
+msgstr "enganche"
+
+msgid "links"
+msgstr "enganches"
+
+msgid "This group does not exist."
+msgstr "Este grupo no existe."
+
+#, python-format
+msgid "«%(said)s» names several groups: %(names)s. Say which one."
+msgstr "«%(said)s» nombra varios grupos: %(names)s. Di cuál."
+
+msgid "This option does not exist."
+msgstr "Esta opción no existe."
+
+#, python-format
+msgid "«%(said)s» names several options: %(names)s. Say which one, or its group."
+msgstr "«%(said)s» nombra varias opciones: %(names)s. Di cuál, o su grupo."
+
+msgid "This option is not offered with this product."
+msgstr "Esta opción no se ofrece con este producto."
+
+#, python-format
+msgid "Choose at least %(min)s in «%(group)s»."
+msgstr "Elige al menos %(min)s en «%(group)s»."
+
+#, python-format
+msgid "Choose at most %(max)s in «%(group)s»."
+msgstr "Elige como mucho %(max)s en «%(group)s»."
+
+#, python-format
+msgid "«%(option)s» cannot be chosen more than once."
+msgstr "«%(option)s» no se puede repetir."
+
+#, python-format
+msgid "These options take the price of «%(product)s» below zero."
+msgstr "Estas opciones dejan el precio de «%(product)s» por debajo de cero."
+
+#, python-format
+msgid "«%(product)s» is sold by weight or measure: an option with a supplement cannot go with it."
+msgstr "«%(product)s» se vende a peso o por medida: no admite una opción con suplemento."
+
+msgid "Say which group: its id, or its name."
+msgstr "Di qué grupo: su id, o su nombre."
+
+msgid "Say which option: its id, or its name."
+msgstr "Di qué opción: su id, o su nombre."
+
+msgid "Say which product: its id, or its SKU or name."
+msgstr "Di qué producto: su id, o su SKU o su nombre."
+
+msgid "Say one product or one category: its id, or its name."
+msgstr "Di un producto o una categoría: su id, o su nombre."
+
+msgid "Say which link: its id, or the group and the product or category."
+msgstr "Di qué enganche: su id, o el grupo y el producto o la categoría."
+
+msgid "The maximum cannot be below the minimum (0 = no ceiling)."
+msgstr "El máximo no puede ser menor que el mínimo (0 = sin techo)."
+
+msgid "There is already a group with that name."
+msgstr "Ya hay un grupo con ese nombre."
+
+msgid "This group already has an option with that name."
+msgstr "Este grupo ya tiene una opción con ese nombre."
+
+msgid "This group has more options chosen by default than its maximum."
+msgstr "Este grupo tiene más opciones por defecto que su máximo."
+
+#, python-format
+msgid "A group holds at most %(max)s options."
+msgstr "Un grupo admite como mucho %(max)s opciones."
+
+msgid "This tax category does not exist in Taxes."
+msgstr "Esta categoría fiscal no existe en Impuestos."
+
+msgid "An option with its own tax category is billed on a line of its own: its supplement must be more than zero."
+msgstr "Una opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor que cero."
+
+msgid "This group already applies there."
+msgstr "Este grupo ya se aplica ahí."
+
+msgid "This group does not apply there."
+msgstr "Este grupo no se aplica ahí."

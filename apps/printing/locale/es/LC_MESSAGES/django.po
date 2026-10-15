@@ -1,0 +1,351 @@
+# Spanish translation of the printing app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next printing\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 00:00+0200\n"
+"PO-Revision-Date: 2026-10-15 00:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Printing"
+msgstr "Impresión"
+
+msgid "Your receipt, kitchen and label printers, and the print queue that shows whether paper is coming out."
+msgstr "Tus impresoras de tiques, cocina y etiquetas, y la cola de impresión que dice si el papel está saliendo."
+
+msgid "Printing keeps the business's printers: their name, how they are connected (network, USB, Bluetooth or the computer's own printer), their paper and what each one prints — receipts, kitchen and bar orders or barcode labels. The till, the cash register and the inventory send their papers to the print queue, and the ERPlora app on the device next to the printer prints them. Test a printer, choose whether the receipt prints and the drawer opens at checkout, and retry or cancel a job that did not come out."
+msgstr "Impresión guarda las impresoras del negocio: su nombre, cómo están conectadas (red, USB, Bluetooth o la impresora del propio ordenador), su papel y qué imprime cada una: tiques, comandas de cocina y barra o etiquetas de código de barras. El TPV, la caja y el inventario mandan sus papeles a la cola de impresión, y la app de ERPlora del dispositivo que está junto a la impresora los imprime. Prueba una impresora, decide si el tique se imprime y el cajón se abre al cobrar, y reintenta o cancela un trabajo que no salió."
+
+msgid "Printers"
+msgstr "Impresoras"
+
+msgid "Queue"
+msgstr "Cola"
+
+msgid "Settings"
+msgstr "Ajustes"
+
+msgid "58 mm"
+msgstr "58 mm"
+
+msgid "80 mm"
+msgstr "80 mm"
+
+msgid "A bill has lines to charge for: this one has none."
+msgstr "Una cuenta lleva líneas que cobrar: esta no tiene ninguna."
+
+msgid "A document is a JSON object of fields to print."
+msgstr "Un documento es un objeto JSON con los campos que se imprimen."
+
+#, python-format
+msgid "A full invoice needs “%(field)s”."
+msgstr "Una factura completa necesita «%(field)s»."
+
+msgid "A full invoice needs “tax_breakdown”: one {rate, base, tax} per VAT rate."
+msgstr "Una factura completa necesita «tax_breakdown»: un {rate, base, tax} por cada tipo de IVA."
+
+#, python-format
+msgid "A job that is printing or has printed is not cancelled; this one is %(status)s."
+msgstr "Un trabajo que se está imprimiendo o ya se imprimió no se cancela; este está %(status)s."
+
+msgid "A4"
+msgstr "A4"
+
+msgid "A4 page"
+msgstr "página A4"
+
+msgid "An A4 job carries its A4 page (html)."
+msgstr "Un trabajo A4 lleva su página A4 (html)."
+
+msgid "Bar"
+msgstr "Barra"
+
+msgid "Bluetooth"
+msgstr "Bluetooth"
+
+msgid "Cancelled"
+msgstr "Cancelado"
+
+msgid "Document"
+msgstr "Documento"
+
+msgid "Failed"
+msgstr "Fallido"
+
+msgid "Kitchen"
+msgstr "Cocina"
+
+msgid "Label"
+msgstr "Etiqueta"
+
+msgid "Network"
+msgstr "Red"
+
+msgid "No answer from the device."
+msgstr "El dispositivo no contestó."
+
+#, python-format
+msgid "Only a queued or failed job, or a sent one with no answer, goes back to the queue; this one is %(status)s."
+msgstr "Solo vuelve a la cola un trabajo pendiente o fallido, o uno enviado que no contestó; este está %(status)s."
+
+msgid "Only a network printer has a port."
+msgstr "Solo una impresora de red tiene puerto."
+
+msgid "Only an A4 job carries a page: a receipt printer prints the structured document."
+msgstr "Solo un trabajo A4 lleva página: una impresora de tiques imprime el documento estructurado."
+
+msgid "Open the drawer"
+msgstr "Abrir el cajón"
+
+msgid "Printed"
+msgstr "Impreso"
+
+msgid "Printed at"
+msgstr "Impreso el"
+
+msgid "Printer"
+msgstr "Impresora"
+
+msgid "Printer OK"
+msgstr "Impresora OK"
+
+msgid "Pending"
+msgstr "Pendiente"
+
+msgid "Receipt paper"
+msgstr "Papel de tique"
+
+msgid "Receipt"
+msgstr "Recibo"
+
+msgid "Say what changes in the printer."
+msgstr "Di qué cambia en la impresora."
+
+msgid "Say which job: its id or the number of its document."
+msgstr "Di qué trabajo: su id o el número de su documento."
+
+msgid "Say which printer: its id or its name."
+msgstr "Di qué impresora: su id o su nombre."
+
+msgid "Sent"
+msgstr "Enviado"
+
+msgid "System printer (A4)"
+msgstr "Impresora del sistema (A4)"
+
+msgid "Test page"
+msgstr "Hoja de prueba"
+
+msgid "That printer cannot print this paper: A4 pages go to the system printer and receipts to a receipt printer."
+msgstr "Esa impresora no imprime este papel: las páginas A4 van a la impresora del sistema y los tiques a una impresora de tiques."
+
+msgid "That printer does not have this role."
+msgstr "Esa impresora no tiene esta función."
+
+msgid "That printer is inactive."
+msgstr "Esa impresora está inactiva."
+
+msgid "That printer is inactive: activate it or print on another one."
+msgstr "Esa impresora está inactiva: actívala o imprime en otra."
+
+msgid "That printer is inactive: activate it to test it."
+msgstr "Esa impresora está inactiva: actívala para probarla."
+
+msgid "The A4 page cannot carry a script."
+msgstr "La página A4 no puede llevar scripts."
+
+msgid "The A4 page is larger than 2 MB."
+msgstr "La página A4 ocupa más de 2 MB."
+
+msgid "The document is larger than 512 KB."
+msgstr "El documento ocupa más de 512 KB."
+
+msgid "The port goes from 1 to 65535."
+msgstr "El puerto va de 1 a 65535."
+
+msgid "The system printer is the computer's own: it has no address."
+msgstr "La impresora del sistema es la del propio ordenador: no tiene dirección."
+
+msgid "The system printer prints A4 pages: give it the Receipt role."
+msgstr "La impresora del sistema imprime páginas A4: dale la función Recibo."
+
+msgid "There is already a printer with that name."
+msgstr "Ya hay una impresora con ese nombre."
+
+msgid "There is no print job with that id or number."
+msgstr "No hay ningún trabajo de impresión con ese id o número."
+
+msgid "There is no printer with that name."
+msgstr "No hay ninguna impresora con ese nombre."
+
+msgid "Type a valid IP or network name (for example 192.168.1.100)."
+msgstr "Escribe una IP o un nombre de red válidos (por ejemplo 192.168.1.100)."
+
+msgid "Type the MAC as AA:BB:CC:DD:EE:FF."
+msgstr "Escribe la MAC como AA:BB:CC:DD:EE:FF."
+
+msgid "Type the print queue's name as the system gives it (no spaces, slashes or #)."
+msgstr "Escribe el nombre de la cola de impresión tal como lo da el sistema (sin espacios, barras ni #)."
+
+msgid "USB"
+msgstr "USB"
+
+msgid "active"
+msgstr "activa"
+
+msgid "address"
+msgstr "dirección"
+
+msgid "answer due by"
+msgstr "respuesta antes de"
+
+msgid "asked by app"
+msgstr "pedido por la app"
+
+msgid "attempts"
+msgstr "intentos"
+
+msgid "bar printer"
+msgstr "impresora de barra"
+
+msgid "cancel reason"
+msgstr "motivo de la cancelación"
+
+msgid "cancelled at"
+msgstr "cancelado el"
+
+msgid "cancelled by"
+msgstr "cancelado por"
+
+msgid "connection"
+msgstr "conexión"
+
+msgid "copies"
+msgstr "copias"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "device"
+msgstr "dispositivo"
+
+msgid "document"
+msgstr "documento"
+
+msgid "document type"
+msgstr "tipo de documento"
+
+msgid "failed at"
+msgstr "falló el"
+
+msgid "function"
+msgstr "función"
+
+msgid "job key"
+msgstr "clave del trabajo"
+
+msgid "kind"
+msgstr "tipo"
+
+msgid "kitchen printer"
+msgstr "impresora de cocina"
+
+msgid "label printer"
+msgstr "impresora de etiquetas"
+
+msgid "last error"
+msgstr "último error"
+
+msgid "last failed at"
+msgstr "último fallo el"
+
+msgid "last printed at"
+msgstr "última impresión el"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "open the drawer"
+msgstr "abrir el cajón"
+
+msgid "open the drawer at checkout"
+msgstr "abrir el cajón al cobrar"
+
+msgid "paper"
+msgstr "papel"
+
+msgid "paper width"
+msgstr "ancho de papel"
+
+msgid "port"
+msgstr "puerto"
+
+msgid "print job"
+msgstr "trabajo de impresión"
+
+msgid "print jobs"
+msgstr "trabajos de impresión"
+
+msgid "print the receipt at checkout"
+msgstr "imprimir el tique al cobrar"
+
+msgid "printed at"
+msgstr "impreso el"
+
+msgid "printer"
+msgstr "impresora"
+
+msgid "printers"
+msgstr "impresoras"
+
+msgid "printing settings"
+msgstr "ajustes de impresión"
+
+msgid "receipt copies"
+msgstr "copias del tique"
+
+msgid "receipt printer"
+msgstr "impresora de tiques"
+
+msgid "reference"
+msgstr "referencia"
+
+msgid "retried at"
+msgstr "reenviado el"
+
+msgid "retried by"
+msgstr "reenviado por"
+
+msgid "sent at"
+msgstr "enviado el"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "status"
+msgstr "estado"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "That job is not this device's: another device or another hand-out has it now."
+msgstr "Ese trabajo no es de este dispositivo: ahora lo tiene otro dispositivo u otra entrega."
+
+msgid "A document holds JSON values only: text, numbers, true or false, lists and objects."
+msgstr "Un documento solo lleva valores JSON: texto, números, verdadero o falso, listas y objetos."
+
+msgid "An A4 page prints once: ask for another job for another copy."
+msgstr "Una página A4 se imprime una vez: pide otro trabajo para otra copia."

@@ -1,0 +1,24 @@
+{% load i18n %}<!doctype html>
+{% comment %}
+  The test page of the computer's own printer (PRINTING-F05): a whole A4 page with its styles inline and no
+  script, because the app prints it in a window that runs none (`print_document`, PRINT_DOCUMENT_CSP of
+  ERPlora/app). A receipt printer prints the app's own test sheet instead (`erplora_test_print`).
+{% endcomment %}
+<html lang="{{ language }}">
+<head>
+<meta charset="utf-8">
+<title>{% translate "Test page" %}</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 2.5cm; color: #111; }
+  h1 { font-size: 20pt; margin: 0 0 0.5cm; }
+  p { font-size: 12pt; margin: 0.2cm 0; }
+  .ok { font-size: 16pt; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>{{ business }}</h1>
+  <p class="ok">{% translate "Printer OK" %}</p>
+  <p>{% translate "Printer" %}: {{ printer }}</p>
+  <p>{% translate "Printed at" %}: {{ when }}</p>
+</body>
+</html>
