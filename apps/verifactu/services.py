@@ -171,6 +171,7 @@ GO_LIVE_FORBIDDEN = _(
 PLATFORM_FIXED = _(
     "ERPlora's own business files in the AEAT environment of its server: its environment cannot be switched."
 )
+PLATFORM_ONLY = _("Only ERPlora's own business follows the environment of its server.")
 NO_WAY_TO_THE_AEAT = _(
     "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
     "VeriFactu → Settings and try again."
@@ -1932,3 +1933,44 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
         ctx, config, "account_synced", {"version": data.version}, fields=["account"]
     )
     return ConfigSyncOut(applied=True, version=data.version)
+
+
+# ── ERPlora's own hub (PLAN-SAAS §4) ───────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "verifactu.config.follow_deployment",
+    kind="command",
+    # Declared by no role: only the system holds it (``manage.py create_platform_hub``).
+    permission="verifactu.follow_deployment",
+    input=NoInput,
+    output=ConfigOut,
+    ai={
+        "description": "System only: ERPlora's own business takes the AEAT environment of its server (prod: production; "
+        "pre: testing), the one its records file in anyway; refused for any other business.",
+        "risk": "high",
+    },
+)
+def follow_deployment(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    if not platform.is_platform_hub(ctx.scope):
+        raise Conflict(str(PLATFORM_ONLY), code="verifactu.platform_only")
+    config = _config()
+    environment = effective_environment(ctx, config)
+    if config.environment == environment:
+        return config_out(config, ctx)
+    if environment == Environment.TESTING and Record.objects.filter(
+        environment=Environment.PRODUCTION
+    ).exists():
+        raise Conflict(
+            str(PRODUCTION_HAS_RECORDS), code="verifactu.production_has_records"
+        )
+    config.environment = environment
+    went_live = environment == Environment.PRODUCTION
+    config.production_since = timezone.now() if went_live else None
+    _changed(
+        ctx,
+        config,
+        "went_live" if went_live else "back_to_testing",
+        fields=["environment"],
+    )
+    return config_out(config, ctx)

@@ -1,0 +1,119 @@
+"""``manage.py create_platform_hub [--execute]``: bring up ERPlora's own hub, repeatably (PLAN-SAAS §4).
+
+ERPlora's platform hub issues ERPlora's invoices to its customers, posted by the SaaS to
+``/internal/platform/invoices`` (``base.internal``). Ported from the old SaaS's ``ensure_platform_hub``: idempotent and a
+dry run unless ``--execute``; it names what it finds, and it refuses rather than guesses, because one hub is one
+issuer is one VeriFactu chain: it never writes over another identity.
+
+Phase 1 has neither the control registry nor hub databases (``control/``, phase 2): the platform hub is its reserved
+slug, ``PLATFORM_HUB_SLUG`` (``erplora``, in ``live.slugs``' reserved list, so no business can ever take it and the
+SaaS's normal sign-up never creates it), on the one database, and Invoicing and VeriFactu are always active. So here
+it gives that hub its issuer, ERPlora's tax identity from ``PLATFORM_ISSUER_*`` (``invoice.issuer.update``), and pins
+VeriFactu to the deployment's environment (``verifactu.config.follow_deployment``; prod: production, pre: testing),
+always through their operations, as the system on that slug. Phase 2 adds the registry row (``is_platform``) and its
+database, provisioned as any other hub.
+
+In AWS it runs once per environment as a one-off ECS task of the ``hub`` service (WORKBOOK of invoice).
+"""
+
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
+from live.context import Scope, system_context
+from live.errors import OperationError
+from live.operations import get as get_operation
+
+ISSUER_SETTINGS = {
+    "legal_name": "PLATFORM_ISSUER_LEGAL_NAME",
+    "tax_id": "PLATFORM_ISSUER_TAX_ID",
+    "address": "PLATFORM_ISSUER_ADDRESS",
+    "postal_code": "PLATFORM_ISSUER_POSTAL_CODE",
+    "city": "PLATFORM_ISSUER_CITY",
+    "province": "PLATFORM_ISSUER_PROVINCE",
+    "country": "PLATFORM_ISSUER_COUNTRY",
+}
+REQUIRED = ("legal_name", "tax_id", "address")
+
+
+class Command(BaseCommand):
+    help = (
+        "Bring up ERPlora's own hub (its issuer and VeriFactu's environment). Idempotent; a dry run unless "
+        "--execute is given."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--execute",
+            action="store_true",
+            help="Write. Without it the command only says what it would do.",
+        )
+
+    def handle(self, *args, execute: bool = False, **options):
+        ctx = system_context(Scope("host", settings.PLATFORM_HUB_SLUG))
+        wanted = {
+            field: str(getattr(settings, name, "")).strip()
+            for field, name in ISSUER_SETTINGS.items()
+        }
+        missing = [ISSUER_SETTINGS[field] for field in REQUIRED if not wanted[field]]
+        if missing:
+            raise CommandError(
+                f"Set {', '.join(missing)}: the platform hub's issuer. Nothing was written."
+            )
+        environment = (
+            "production" if settings.ERPLORA_ENVIRONMENT == "prod" else "testing"
+        )
+        self.stdout.write(
+            f"ERPlora's own hub: {settings.PLATFORM_HUB_SLUG} ({settings.ERPLORA_ENVIRONMENT})"
+        )
+        if not execute:
+            self.stdout.write("Dry run: nothing is written without --execute.")
+        current = self._call(ctx, "invoice.issuer.get", {})
+        if current.configured and current.tax_id != wanted["tax_id"]:
+            raise CommandError(
+                f"The database already has another issuer, {current.legal_name} ({current.tax_id}): one issuer is "
+                "one VeriFactu chain, so it is never overwritten. Nothing was written."
+            )
+        if current.configured:
+            self.stdout.write(
+                f"- issuer found: {current.legal_name} ({current.tax_id})"
+            )
+        elif execute:
+            self._call(ctx, "invoice.issuer.update", wanted)
+            self.stdout.write(
+                f"- issuer set: {wanted['legal_name']} ({wanted['tax_id']})"
+            )
+        else:
+            self.stdout.write(
+                f"- would set the issuer {wanted['legal_name']} ({wanted['tax_id']})"
+            )
+        if execute:
+            config = self._call(ctx, "verifactu.config.follow_deployment", {})
+            self.stdout.write(
+                f"- VeriFactu files in {config.environment}, route {config.route}"
+            )
+            health = self._call(ctx, "invoice.invoice.platform_health", {})
+            if health.ready:
+                self.stdout.write(
+                    self.style.SUCCESS("- ready to issue ERPlora's invoices")
+                )
+            else:
+                self.stdout.write(self.style.WARNING(f"- not ready: {health.detail}"))
+        else:
+            self.stdout.write(f"- would pin VeriFactu to {environment}")
+        self.stdout.write("- Invoicing and VeriFactu: always active in phase 1")
+        if environment == "production":
+            self.stdout.write(self.style.MIGRATE_HEADING("Before a single real record"))
+            self.stdout.write(
+                "  - the SaaS posts invoices only with PLATFORM_INVOICING_ENABLED=true;"
+            )
+            self.stdout.write(
+                "  - its gateway presents with ERPlora's seal (FISCAL_SEAL_CURRENT_*), under Ioan's supervision."
+            )
+
+    def _call(self, ctx, name: str, payload: dict):
+        op = get_operation(name)
+        try:
+            return op(ctx, op.input.model_validate(payload))
+        except OperationError as refused:
+            raise CommandError(
+                f"{name}: {refused.message} ({refused.code}). Nothing more was written."
+            ) from None

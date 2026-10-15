@@ -103,3 +103,36 @@ def test_any_other_issuer_needs_its_approved_authorisation(db, settings):
         queries.sending_problem(config, Environment.PRODUCTION)
         == "representation_not_approved"
     )
+
+
+@pytest.mark.parametrize(
+    ("deployment", "expected"),
+    [("prod", Environment.PRODUCTION), ("pre", Environment.TESTING)],
+)
+def test_the_platform_hub_takes_its_deployments_environment(db, platform_slug, settings, deployment, expected):
+    settings.ERPLORA_ENVIRONMENT = deployment
+
+    answer = run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
+
+    config = Config.objects.get()
+    assert (answer.environment, config.environment) == (expected, expected)
+    assert (config.production_since is not None) is (expected == Environment.PRODUCTION)
+
+
+def test_taking_it_again_changes_nothing(db, platform_slug, settings):
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
+    first = Config.objects.get()
+
+    run("verifactu.config.follow_deployment", {}, system_context(PLATFORM))
+
+    again = Config.objects.get()
+    assert (again.updated_at, again.production_since) == (first.updated_at, first.production_since)
+
+
+def test_no_other_business_follows_the_deployment(db, platform_slug):
+    assert (
+        code_of(lambda: run("verifactu.config.follow_deployment", {}, system_context(A)))
+        == "verifactu.platform_only"
+    )
+    assert not Config.objects.exists()

@@ -953,3 +953,7 @@ msgid ""
 msgstr ""
 "El negocio propio de ERPlora presenta en el entorno de la AEAT de su "
 "servidor: su entorno no se puede cambiar."
+
+#: services.py
+msgid "Only ERPlora's own business follows the environment of its server."
+msgstr "Solo el negocio propio de ERPlora sigue el entorno de su servidor."
