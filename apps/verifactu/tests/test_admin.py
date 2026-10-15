@@ -18,6 +18,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
 from django.utils import timezone, translation
+from django.utils.html import escape
 
 from apps.verifactu.admin import (
     AeatRecordAdmin,
@@ -482,6 +483,52 @@ def test_a_record_page_says_why_it_waits_and_links_its_invoice(
     html = client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
     assert wait_reason_text("unreachable", "connection refused") in html
     assert f"/admin/invoice/invoice/{sealed.invoice_id}/change/" in html
+
+
+def refused_once(gateway_answers) -> Record:
+    """A ticket ERPlora's gateway refused (409/413/422): pending, waiting for a change or a person, not a timer."""
+    gateway_answers.set(
+        gateway.Reply(
+            kind=gateway.REFUSED,
+            code="verifactu_gateway.nif_mismatch",
+            message="Not the declared NIF.",
+        )
+    )
+    sealed = record()
+    run("verifactu.contingency.process")
+    sealed.refresh_from_db()
+    assert (sealed.status, sealed.wait_reason) == ("pending", "refused")
+    assert "Not the declared NIF." in sealed.wait_detail
+    return sealed
+
+
+def test_a_record_the_gateway_refused_is_filtered_and_its_page_gives_the_gateways_words(
+    client, staff, issuer, gateway_answers
+):
+    refused = refused_once(gateway_answers)
+    fresh = record()
+    client.force_login(staff)
+    listing = client.get(RECORDS, HTTP_HOST=PLATFORM).content.decode()
+    assert escape(wait_reason_text("refused", "…", "…")) in listing
+    html = client.get(f"{RECORDS}?wait_reason=refused", HTTP_HOST=PLATFORM).content.decode()
+    assert refused.invoice_number in html
+    assert fresh.invoice_number not in html
+    page = client.get(f"{RECORDS}{refused.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+    assert escape(wait_reason_text("refused", refused.wait_detail)) in page
+
+
+def test_reschedule_of_a_record_the_gateway_refused_puts_it_back_in_the_queue(
+    issuer, gateway_answers, request_of
+):
+    refused = refused_once(gateway_answers)
+    request = request_of()
+    model_admin(RecordAdmin, Record).reschedule(request, Record.objects.filter(pk=refused.pk))
+    refused.refresh_from_db()
+    # A refusal never goes out on a timer: a person's «Reschedule» is what lets it go with the next pass.
+    assert (refused.status, refused.wait_reason, refused.wait_detail) == ("pending", "", "")
+    assert refused.next_attempt_at <= timezone.now()
+    assert refused.attempts == 1
+    assert said(request) == ["Rescheduled: 1 record(s) go out with the next pass."]
 
 
 # The configuration: only the route, through its operation
