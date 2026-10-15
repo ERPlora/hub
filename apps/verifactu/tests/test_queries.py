@@ -416,14 +416,18 @@ def own_certificate(days=30):
     )
 
 
-def test_own_route_in_production_needs_its_certificate_and_the_paid_option():
+def test_own_route_in_production_needs_only_its_valid_certificate():
+    # As in the old Hub (an_own_certificate_needs_no_grant_to_go_live): the business files with its own
+    # certificate, so neither ERPlora's approval nor the live option of the plan applies (Ioan's model,
+    # 2026-10-15: «con certificado propio, como en el Hub antiguo»).
     config = Config(route="own", live_paid=False)
     assert queries.route_problem(config, "production") == "own_certificate_missing"
+    own_certificate(days=-1)
+    assert queries.route_problem(config, "production") == "own_certificate_missing"
+    OwnCertificate.objects.all().delete()
     own_certificate()
-    assert queries.route_problem(config, "production") == "live_option_unpaid"
-    assert queries.route_problem(config, "testing") == ""
-    config.live_paid = True
     assert queries.route_problem(config, "production") == ""
+    assert queries.route_problem(config, "testing") == ""
 
 
 def test_the_configuration_lists_everything_that_keeps_it_from_going_live(issuer):
@@ -446,6 +450,14 @@ def test_the_configuration_lists_everything_that_keeps_it_from_going_live(issuer
     assert blockers[0].message
     run("verifactu.config.sync", {"version": 2, "hub_status": "active"}, system_context(A))
     assert run("verifactu.config.get").live_blockers == []
+
+
+def test_with_the_own_certificate_the_live_option_is_not_asked(issuer):
+    own_certificate()
+    run("verifactu.config.update", {"route": "own"})
+    assert run("verifactu.config.get").live_blockers == []
+    run("verifactu.config.sync", {"version": 1, "hub_status": "suspended"}, system_context(A))
+    assert [r.code for r in run("verifactu.config.get").live_blockers] == ["hub_not_active"]
 
 
 def test_the_certificate_says_whose_it_is_and_when_it_expires(issuer):

@@ -136,18 +136,16 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
 
 
 def route_problem(config: Config, environment: str) -> str:
-    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""``: the own route needs its valid
-    certificate; in production, ERPlora's route needs the approved authorisation, and either needs the live option of
-    the plan (VERIFACTU-F08)."""
+    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08). The own route
+    needs its valid certificate, as in the old Hub; in production, ERPlora's route needs the approved signed
+    authorisation and the live option of the plan (Ioan's model, 2026-10-15)."""
     if config.route == Config.Route.OWN:
-        if not certificate_valid():
-            return "own_certificate_missing"
-    elif (
-        environment == Environment.PRODUCTION
-        and config.representation_status != Config.Representation.APPROVED
-    ):
+        return "" if certificate_valid() else "own_certificate_missing"
+    if environment != Environment.PRODUCTION:
+        return ""
+    if config.representation_status != Config.Representation.APPROVED:
         return "representation_not_approved"
-    if environment == Environment.PRODUCTION and not config.live_paid:
+    if not config.live_paid:
         return "live_option_unpaid"
     return ""
 
@@ -156,11 +154,14 @@ def live_problems(config: Config) -> list[str]:
     """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can. The
     server's own opening (``production_open``) and Invoicing's issuer are told apart."""
     found = []
-    problem = route_problem(config, Environment.PRODUCTION)
-    if problem and problem != "live_option_unpaid":
-        found.append(problem)
-    if not config.live_paid:
-        found.append("live_option_unpaid")
+    if config.route == Config.Route.OWN:
+        if not certificate_valid():
+            found.append("own_certificate_missing")
+    else:
+        if config.representation_status != Config.Representation.APPROVED:
+            found.append("representation_not_approved")
+        if not config.live_paid:
+            found.append("live_option_unpaid")
     if config.hub_status != Config.HubStatus.ACTIVE:
         found.append("hub_not_active")
     return found

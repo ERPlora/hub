@@ -1257,13 +1257,38 @@ def test_going_live_needs_the_live_option_in_the_plan(issuer, settings):
     assert Config.objects.get().environment == "testing"
 
 
-def test_going_live_with_the_own_certificate_also_needs_the_live_option(issuer, settings):
+def test_going_live_with_the_own_certificate_needs_no_live_option(issuer, settings):
+    # The old Hub's an_own_certificate_needs_no_grant_to_go_live: the own route goes live with its valid
+    # certificate alone; the live option of the plan is ERPlora filing for the business.
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
-    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.live_option_unpaid"
-    run("verifactu.config.sync", {"version": 1, "live_paid": True}, system_context(A))
     assert run("verifactu.config.go_live").environment == "production"
+
+
+def test_in_production_erplora_takes_over_only_with_the_live_option(issuer, settings):
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    own_certificate()
+    run("verifactu.config.update", {"route": "own"})
+    run("verifactu.config.go_live")
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "representation": {"status": "approved"}},
+        system_context(A),
+    )
+    erplora = lambda: run("verifactu.config.update", {"route": "erplora"})  # noqa: E731
+    assert code_of(erplora) == "verifactu.live_option_unpaid"
+    run("verifactu.config.sync", {"version": 2, "live_paid": True}, system_context(A))
+    assert erplora().route == "erplora"
+
+
+def test_going_live_with_an_expired_own_certificate_is_refused(issuer, settings):
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    own_certificate()
+    run("verifactu.config.update", {"route": "own"})
+    OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(days=1))
+    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.no_own_certificate"
+    assert Config.objects.get().environment == "testing"
 
 
 @pytest.mark.parametrize("status", ["past_due", "suspended"])

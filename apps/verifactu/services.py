@@ -1677,6 +1677,8 @@ def _route_refusal(config: Config, route: str, environment: str) -> Conflict | N
             str(REPRESENTATION_NOT_APPROVED),
             code="verifactu.representation_not_approved",
         )
+    if problem == "live_option_unpaid":
+        return Conflict(str(LIVE_OPTION_UNPAID), code="verifactu.live_option_unpaid")
     return None
 
 
@@ -1718,8 +1720,8 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     ai={
         "description": "Go live: from now on every VeriFactu record goes to the real AEAT. It needs the server opened for "
         "it by ERPlora, Invoicing's issuer, a route ready for production (the own valid certificate, or ERPlora's "
-        "approved signed authorisation), the live option in the plan and an active ERPlora account; it cannot go "
-        "back once a production record is sealed.",
+        "approved signed authorisation with the live option in the plan) and an active ERPlora account; it cannot "
+        "go back once a production record is sealed.",
         "risk": "high",
     },
 )
@@ -1734,8 +1736,6 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
     refusal = _route_refusal(config, config.route, Environment.PRODUCTION)
     if refusal is not None:
         raise refusal
-    if not config.live_paid:
-        raise Conflict(str(LIVE_OPTION_UNPAID), code="verifactu.live_option_unpaid")
     if config.hub_status != Config.HubStatus.ACTIVE:
         raise Conflict(str(HUB_NOT_ACTIVE), code="verifactu.hub_not_active")
     config.environment = Environment.PRODUCTION
