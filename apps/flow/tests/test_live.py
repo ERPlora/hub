@@ -55,12 +55,25 @@ def listen(db_dsn):
         session.close()
 
 
-def heard(session, timeout=1.0, stop_after=None) -> list[str]:
+def heard(session, timeout=1.0) -> list[str]:
     return sorted(
         name
-        for note in session.notifies(timeout=timeout, stop_after=stop_after)
+        for note in session.notifies(timeout=timeout)
         for name in json.loads(note.payload)["events"]
     )
+
+
+def heard_until(session, expected: list[str], timeout=1.0) -> list[str]:
+    """The events heard up to the notification that completes ``expected``, sorted. A run and the task its
+    action creates by name (``call_app``) notify on their own after the same COMMIT, and the two
+    notifications may arrive in separate packets: stopping after the first one only sees both when they
+    happen to share a packet (pattern of ``apps/verifactu/tests/test_notifications.py``)."""
+    names: list[str] = []
+    for note in session.notifies(timeout=timeout):
+        names.extend(json.loads(note.payload)["events"])
+        if set(expected) <= set(names):
+            break
+    return sorted(names)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -68,7 +81,8 @@ def test_a_run_started_by_an_event_in_b_is_heard_in_b_only(listen):
     on_a, on_b = listen(A), listen(B)
     make_flow()
     events.react(B, "customer.customer.created", {"id": "c"}, event_id=uuid.uuid7())
-    assert heard(on_b, stop_after=1) == ["flow.run.finished", "flow.run.started", "task.task.created"]
+    expected = ["flow.run.finished", "flow.run.started", "task.task.created"]
+    assert heard_until(on_b, expected) == expected
     assert heard(on_a, timeout=0.3) == []
 
 
@@ -77,8 +91,9 @@ def test_a_run_by_hand_in_b_is_heard_in_b_only(listen):
     on_a, on_b = listen(A), listen(B)
     flow = make_flow(trigger_kind="manual")
     run("flow.flow.run", {"id": str(flow.id)}, ctx_for(scope=B))
-    assert heard(on_b, stop_after=1) == ["flow.run.finished", "flow.run.started", "task.task.created"]
+    expected = ["flow.run.finished", "flow.run.started", "task.task.created"]
+    assert heard_until(on_b, expected) == expected
     assert heard(on_a, timeout=0.3) == []
     # Positive control: the same listener of A hears a run in A.
     run("flow.flow.run", {"id": str(flow.id)}, system_context(A))
-    assert "flow.run.finished" in heard(on_a, stop_after=1)
+    assert "flow.run.finished" in heard_until(on_a, ["flow.run.finished"])
