@@ -794,6 +794,89 @@ def test_a_refusal_of_the_gateway_says_why(issuer, gateway_answers):
     assert "Not the declared NIF." in record.wait_detail
 
 
+# A refusal of the gateway (409/413/422) would be refused again as it is: it waits for a change, never on a timer.
+
+
+def refuse_once(gateway_answers) -> Record:
+    """A record the gateway refused once (it lacks the business's certificate), its backoff long gone."""
+    gateway_answers.set(
+        gateway.Reply(
+            kind=gateway.REFUSED,
+            code="no_certificate",
+            message="No certificate for this business.",
+        )
+    )
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    run("verifactu.contingency.process")
+    assert len(gateway_answers.calls) == 1
+    Record.objects.update(next_attempt_at=timezone.now() - dt.timedelta(days=1))
+    record.refresh_from_db()
+    return record
+
+
+def test_a_refusal_of_the_gateway_is_not_tried_again_by_itself(issuer, gateway_answers):
+    record = refuse_once(gateway_answers)
+    assert (record.status, record.wait_reason) == ("pending", "refused")
+    assert "no_certificate" in record.wait_detail
+
+    out = run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 1
+    assert (out.sent, out.waiting, out.reason) == (0, 1, "refused")
+    assert "is not sent again by itself" in out.message
+    detail = run("verifactu.record.get", {"record_id": str(record.id)})
+    assert detail.next_attempt_at is None
+    assert "refused" in {wait.code for wait in detail.waiting}
+
+
+@pytest.mark.parametrize("change", ["route", "certificate", "account"])
+def test_a_change_of_the_configuration_puts_a_refused_record_back_in_the_queue(
+    issuer, storage, gateway_answers, change
+):
+    upload()
+    record = refuse_once(gateway_answers)
+    if change == "route":
+        run("verifactu.config.update", {"route": "own"})
+    elif change == "certificate":
+        upload()
+    else:
+        run("verifactu.config.sync", {"version": 1, "live_paid": True}, system_context(A))
+    gateway_answers.set(answering())
+
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 2
+    record.refresh_from_db()
+    assert record.status == "accepted"
+
+
+def test_an_old_photo_of_the_account_changes_nothing_and_does_not_send_it(
+    issuer, gateway_answers
+):
+    run("verifactu.config.sync", {"version": 5}, system_context(A))
+    refuse_once(gateway_answers)
+    run("verifactu.config.sync", {"version": 4, "live_paid": True}, system_context(A))
+
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 1
+
+
+@pytest.mark.parametrize("by_hand", ["verifactu.record.transmit", "verifactu.contingency.retry"])
+def test_sending_it_again_by_hand_presents_a_refused_record(issuer, gateway_answers, by_hand):
+    # «Resend to the AEAT» of the admin and «Send now» are verifactu.record.transmit; «Retry» puts it out with the
+    # next pass.
+    record = refuse_once(gateway_answers)
+    gateway_answers.set(answering())
+
+    run(by_hand, {"record_id": str(record.id)})
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 2
+    record.refresh_from_db()
+    assert record.status == "accepted"
+
+
 def test_a_record_the_answer_does_not_name_stays_sent(
     issuer, gateway_answers
 ):

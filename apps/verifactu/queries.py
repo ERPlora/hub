@@ -592,8 +592,9 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         qr_svg=chain.qr_svg_data_uri(record.qr_url),
         envelope=single_envelope(record),
         attempts=record.attempts,
+        # A refusal of the gateway waits for a change, never on a timer (services._send_chain).
         next_attempt_at=record.next_attempt_at
-        if record.status in Record.UNSENT
+        if record.status in Record.UNSENT and record.wait_reason != "refused"
         else None,
         transmitted_at=record.transmitted_at,
         transmission_id=record.transmission_id,

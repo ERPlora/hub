@@ -496,8 +496,12 @@ msgid "the gateway or the AEAT could not be reached (%(detail)s)"
 msgstr "no se ha podido contactar con la pasarela o con la AEAT (%(detail)s)"
 
 #: models.py:441
-msgid "ERPlora's gateway could not present it (%(detail)s)"
-msgstr "la pasarela de ERPlora no ha podido presentarlo (%(detail)s)"
+msgid ""
+"ERPlora's gateway could not present it (%(detail)s); it is not sent again by "
+"itself until the configuration changes or it is sent by hand"
+msgstr ""
+"la pasarela de ERPlora no ha podido presentarlo (%(detail)s); no se vuelve a "
+"enviar por sí solo hasta que cambie la configuración o se envíe a mano"
 
 #: models.py:443
 msgid "the submission left and no answer came back; it is sent again, declared as late"

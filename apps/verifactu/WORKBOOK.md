@@ -1063,8 +1063,10 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   - Lo que no es `200`: `409 {"error": {"code", "message"}}` con `nif_mismatch` (el sobre nombra a otro
     contribuyente; se decide antes de tocar la AEAT), `no_seal`, `no_certificate`, `certificate_invalid` o
     `environment_not_allowed`; `413 payload_too_large` (más de 10 MiB); `422 invalid_payload` (con `fields`):
-    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro, y reintento
-    con espera creciente). `502 {"error": {"code": "aeat_unreachable", "sent"}}`: con `sent = true` la
+    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro): sigue
+    `pending` y no se reintenta solo, porque se rechazaría igual; vuelve a la cola al cambiar la vía, subir el
+    certificado o llegar una foto nueva de la cuenta, o a mano («Reenviar a la AEAT» del admin, «Enviar ahora»,
+    «Reintentar»). `502 {"error": {"code": "aeat_unreachable", "sent"}}`: con `sent = true` la
     petición pudo llegar a la AEAT y el registro queda `sent` (motivo `unknown`, se reenvía declarado como
     incidencia); con `sent = false` no salió nada y se reintenta (`unreachable`). `503 gateway_busy` y cualquier
     otro estado: `unreachable`, a reintentar. El SaaS no valida nada fiscal: comprueba que el NIF del sobre es
