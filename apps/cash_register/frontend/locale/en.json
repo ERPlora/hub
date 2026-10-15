@@ -1,0 +1,304 @@
+{
+  "cash_register": {
+    "title": "Cash register",
+    "tabs": {
+      "label": "Cash register sections",
+      "sessions": "Cash register",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting… the figures may be out of date.",
+      "retry": "Retry",
+      "appInactive": "Cash register is not active in this business.",
+      "noPermission": "You do not have permission to see this."
+    },
+    "money": {
+      "notAnAmount": "This is not an amount. Type a figure, for example 12.50.",
+      "negative": "A drawer amount cannot be negative. To take money out of the drawer, record a «Cash out».",
+      "ambiguous": "This amount can be read two ways: «{typed}» may be {grouped} or {decimal}. Type the decimals so there is no doubt.",
+      "zero": "Invalid amount"
+    },
+    "status": {
+      "open": "Open",
+      "closed": "Closed"
+    },
+    "types": {
+      "in": "Cash in",
+      "out": "Cash out",
+      "sale": "Sale",
+      "refund": "Refund",
+      "void": "Void"
+    },
+    "methods": {
+      "cash": "Cash",
+      "card": "Card",
+      "transfer": "Bank transfer",
+      "other": "Other"
+    },
+    "countTypes": {
+      "opening": "Opening",
+      "closing": "Closing"
+    },
+    "concept": {
+      "ticket": "Ticket {number}",
+      "invoice": "Invoice {number}",
+      "saleUnnumbered": "Sale",
+      "voidOf": "Void of {document}",
+      "refundOf": "Refund of {document}"
+    },
+    "sessions": {
+      "title": "Cash register",
+      "open": "Open session",
+      "alreadyOpen": "There is already an open cash session. Close it before opening another one.",
+      "search": "Search session…",
+      "empty": "No cash sessions.",
+      "noMatches": "No session matches.",
+      "loading": "Loading…",
+      "loadError": "Could not load the sessions.",
+      "entity": {
+        "one": "session",
+        "many": "sessions"
+      },
+      "columns": {
+        "number": "Session",
+        "openedAt": "Opened on",
+        "status": "Status",
+        "opening": "Opening",
+        "expected": "Expected",
+        "counted": "Counted",
+        "difference": "Difference"
+      },
+      "actions": {
+        "detail": "Detail",
+        "movement": "Movement",
+        "count": "Count",
+        "close": "Close"
+      },
+      "unassigned": {
+        "heading": "Sale lines in no shift",
+        "body": "{count} sale lines fell in no session · {cash} in cash.",
+        "view": "View"
+      },
+      "autoCloseDue": {
+        "heading": "Session {number} was due to close by itself at {time}",
+        "body": "It closes by itself when the next session opens."
+      }
+    },
+    "filters": {
+      "status": "Status",
+      "number": "Session number",
+      "opening": "Opening",
+      "expected": "Expected",
+      "counted": "Counted",
+      "difference": "Difference",
+      "from": "From",
+      "to": "To",
+      "any": "Any",
+      "button": "Filters",
+      "title": "Filter sessions",
+      "count": "Filters: {n}",
+      "clear": "Clear",
+      "done": "Done",
+      "amountInvalid": "This is not an amount."
+    },
+    "open": {
+      "title": "Open cash session",
+      "register": "Drawer",
+      "optional": "(optional)",
+      "noRegister": "No drawer",
+      "balance": "Opening float",
+      "notes": "Notes",
+      "submit": "Open session",
+      "cancel": "Cancel",
+      "done": "Session opened",
+      "failed": "Could not open the session",
+      "unassigned": "{cash} were charged in cash with the drawer closed: they are already in the drawer, count them in the float."
+    },
+    "movement": {
+      "title": "Cash movement · {number}",
+      "type": "Type",
+      "amount": "Amount",
+      "concept": "Concept",
+      "submit": "Register",
+      "cancel": "Cancel",
+      "doneIn": "Cash-in recorded ({amount})",
+      "doneOut": "Cash-out recorded ({amount})",
+      "failed": "Could not record the movement"
+    },
+    "count": {
+      "title": "Cash count · {number}",
+      "type": "Count type",
+      "notes": "Notes",
+      "bills": "Bills",
+      "coins": "Coins",
+      "total": "Total counted: {total}",
+      "totalInput": "Total counted",
+      "noBreakdown": "There is no breakdown of notes and coins for {currency}: count the drawer and type the total.",
+      "submit": "Register count",
+      "cancel": "Cancel",
+      "done": "Count recorded · total counted {total}",
+      "failed": "Could not record the count",
+      "loading": "Loading the notes and coins…"
+    },
+    "close": {
+      "title": "Close session · {number}",
+      "expected": "Expected in the drawer",
+      "difference": "Difference",
+      "counted": "Counted cash",
+      "notes": "Closing notes",
+      "submit": "Close session",
+      "anyway": "Close anyway",
+      "cancel": "Cancel",
+      "countedRequired": "Type the counted cash to close the session.",
+      "done": "Session {number} closed · expected {expected} · counted {counted} · difference {difference}",
+      "failed": "Could not close the session"
+    },
+    "review": {
+      "title": "Shift review",
+      "checking": "Checking what is still pending…",
+      "openChecks": "Open checks: {count}",
+      "unavailable": "What is still pending could not be checked, so this review may be incomplete.",
+      "confirm": "The shift will be closed anyway. Press again to confirm."
+    },
+    "unassignedList": {
+      "title": "Sale lines in no shift",
+      "close": "Close",
+      "empty": "Every sale line is in a shift."
+    },
+    "detail": {
+      "title": "Session detail · {number}",
+      "print": "Print",
+      "printFailed": "Could not print.",
+      "loadError": "Could not load the session detail",
+      "notFound": "That cash session does not exist.",
+      "movements": "Movements",
+      "counts": "Counts",
+      "noMovements": "No movements in this session.",
+      "noCounts": "No counts in this session.",
+      "loading": "Loading…"
+    },
+    "summary": {
+      "status": "Status",
+      "register": "Drawer",
+      "opened": "Opened",
+      "closed": "Closed",
+      "closedAuto": "Closed by itself · {when}",
+      "by": "{when} · {who}",
+      "movements": "Movements",
+      "opening": "Opening float",
+      "sales": "Sales",
+      "cashSales": "Cash sales",
+      "cardSales": "Card sales",
+      "otherSales": "Sales with other payment methods",
+      "refunds": "Refunds",
+      "cashIn": "Cash in",
+      "cashOut": "Cash out",
+      "gifts": "Comps",
+      "expected": "Expected",
+      "counted": "Counted",
+      "difference": "Difference",
+      "openingNotes": "Opening notes",
+      "closingNotes": "Closing notes"
+    },
+    "lines": {
+      "entity": {
+        "one": "movement",
+        "many": "movements"
+      },
+      "columns": {
+        "when": "When",
+        "type": "Type",
+        "amount": "Amount",
+        "method": "Method",
+        "concept": "Concept"
+      }
+    },
+    "counts": {
+      "entity": {
+        "one": "count",
+        "many": "counts"
+      },
+      "columns": {
+        "when": "When",
+        "type": "Count type",
+        "total": "Total counted",
+        "notes": "Notes"
+      }
+    },
+    "report": {
+      "x": "Partial report (X)",
+      "z": "Cash closing (Z)",
+      "session": "Session",
+      "printedAt": "Printed {when}"
+    },
+    "settings": {
+      "heading": "Cash register",
+      "loading": "Loading settings…",
+      "loadError": "Could not load the settings.",
+      "loadErrorBody": "Nothing is shown until they are read: try again.",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "Could not save the settings.",
+      "noPermission": "You do not have permission to change these settings. Ask an administrator if you need to.",
+      "fields": {
+        "enable_cash_register": {
+          "label": "Turn on the cash register",
+          "description": "Cash is charged only with a session open (Sales applies it)."
+        },
+        "require_opening_balance": {
+          "label": "Require an opening float"
+        },
+        "require_closing_balance": {
+          "label": "Require a count to close"
+        },
+        "allow_negative_balance": {
+          "label": "Allow a negative balance"
+        },
+        "require_blind_count": {
+          "label": "Blind count",
+          "description": "Whoever counts the drawer does not see the expected cash until the count is declared. Managers still see it."
+        },
+        "auto_close_enabled": {
+          "label": "Daily auto-close",
+          "description": "If nobody closed the drawer, it closes by itself at the chosen hour (business time), with the expected cash and no count."
+        },
+        "auto_close_time": {
+          "label": "Auto-close time"
+        }
+      }
+    },
+    "registers": {
+      "heading": "Drawers",
+      "add": "Add drawer",
+      "empty": "No drawers: a session opens without one.",
+      "loadError": "Could not load the drawers.",
+      "entity": {
+        "one": "drawer",
+        "many": "drawers"
+      },
+      "columns": {
+        "name": "Name",
+        "active": "Active"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "rename": "Rename",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "activated": "Drawer activated",
+      "deactivated": "Drawer deactivated",
+      "toggleFailed": "Could not change the drawer.",
+      "modal": {
+        "create": "New drawer",
+        "rename": "Rename drawer",
+        "name": "Name",
+        "save": "Save",
+        "cancel": "Cancel",
+        "required": "Type the drawer's name.",
+        "failed": "Could not save the drawer.",
+        "created": "Drawer created",
+        "renamed": "Drawer renamed"
+      }
+    }
+  }
+}

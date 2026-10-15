@@ -1,0 +1,549 @@
+# Spanish translation of the appointment app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next appointment\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 12:00+0200\n"
+"PO-Revision-Date: 2026-10-14 12:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Appointments"
+msgstr "Citas"
+
+msgid ""
+"Your diary: appointments by professional, free times, repeating bookings and "
+"charging them at the till."
+msgstr "Tu agenda: citas por profesional, horas libres, citas periódicas y cobro en el TPV."
+
+msgid ""
+"Appointments is the diary of a business that works by appointment. Each "
+"booking joins a customer, one or more services and a professional at a time "
+"that fits the opening hours, the professional's shift and time off, and no "
+"other booking of theirs. See the day or the week by professional, drag a "
+"booking to move it, confirm, start, complete or cancel it, keep repeating "
+"bookings, let customers book and cancel within your rules, and charge a "
+"booking at the till without typing it again."
+msgstr "Citas es la agenda de un negocio que trabaja con cita previa. Cada reserva une una clienta, uno o varios servicios y un profesional a una hora que cabe en el horario del negocio, en el turno y las ausencias del profesional y sin pisar otra cita suya. Mira el día o la semana por profesional, arrastra una cita para moverla, confírmala, iníciala, complétala o cancélala, guarda citas periódicas, deja que tus clientas reserven y cancelen con tus reglas y cobra la cita en el TPV sin volver a teclearla."
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "default duration (min)"
+msgstr "duración por defecto (min)"
+
+msgid "minimum booking notice (min)"
+msgstr "antelación mínima para reservar (min)"
+
+msgid "maximum advance booking (days)"
+msgstr "antelación máxima para reservar (días)"
+
+msgid "allow overlapping appointments"
+msgstr "permitir citas solapadas"
+
+msgid "customers may cancel"
+msgstr "la clienta puede cancelar"
+
+msgid "cancellation notice (hours)"
+msgstr "antelación para cancelar (horas)"
+
+msgid "calendar starts at (hour)"
+msgstr "el calendario empieza a las (hora)"
+
+msgid "calendar ends at (hour)"
+msgstr "el calendario termina a las (hora)"
+
+msgid "slot interval (min)"
+msgstr "intervalo entre huecos (min)"
+
+msgid "confirm the customer's bookings automatically"
+msgstr "confirmar automáticamente las citas que reserva la clienta"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "appointment settings"
+msgstr "ajustes de citas"
+
+msgid "Appointment settings"
+msgstr "Ajustes de citas"
+
+msgid "day"
+msgstr "día"
+
+msgid "last number"
+msgstr "último número"
+
+msgid "appointment counter"
+msgstr "contador de citas"
+
+msgid "appointment counters"
+msgstr "contadores de citas"
+
+msgid "Every day"
+msgstr "Cada día"
+
+msgid "Every week"
+msgstr "Cada semana"
+
+msgid "Every two weeks"
+msgstr "Cada dos semanas"
+
+msgid "Every month"
+msgstr "Cada mes"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "customer's name"
+msgstr "nombre del cliente"
+
+msgid "professional"
+msgstr "profesional"
+
+msgid "professional's name"
+msgstr "nombre del profesional"
+
+msgid "repeats"
+msgstr "repetición"
+
+msgid "day of the week"
+msgstr "día de la semana"
+
+msgid "time"
+msgstr "hora"
+
+msgid "duration (min)"
+msgstr "duración (min)"
+
+msgid "starts on"
+msgstr "empieza el"
+
+msgid "ends on"
+msgstr "termina el"
+
+msgid "number of appointments"
+msgstr "número de citas"
+
+msgid "active"
+msgstr "activa"
+
+msgid "split from"
+msgstr "continúa la serie"
+
+msgid "deleted at"
+msgstr "borrada el"
+
+msgid "created at"
+msgstr "creada el"
+
+msgid "created by"
+msgstr "creada por"
+
+msgid "repeating appointment"
+msgstr "cita periódica"
+
+msgid "repeating appointments"
+msgstr "citas periódicas"
+
+msgid "series"
+msgstr "serie"
+
+msgid "service"
+msgstr "servicio"
+
+msgid "position"
+msgstr "posición"
+
+msgid "service of a series"
+msgstr "servicio de una serie"
+
+msgid "services of a series"
+msgstr "servicios de una serie"
+
+msgctxt "appointment status"
+msgid "Pending"
+msgstr "Pendiente"
+
+msgctxt "appointment status"
+msgid "Confirmed"
+msgstr "Confirmada"
+
+msgctxt "appointment status"
+msgid "In progress"
+msgstr "En curso"
+
+msgctxt "appointment status"
+msgid "Completed"
+msgstr "Completada"
+
+msgctxt "appointment status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgctxt "appointment status"
+msgid "No-show"
+msgstr "No-show"
+
+msgid "Front desk"
+msgstr "Mostrador"
+
+msgid "Phone"
+msgstr "Teléfono"
+
+msgid "Online booking"
+msgstr "Reserva online"
+
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+msgid "number"
+msgstr "número"
+
+msgid "customer's phone"
+msgstr "teléfono del cliente"
+
+msgid "customer's email"
+msgstr "email del cliente"
+
+msgid "starts at"
+msgstr "empieza a las"
+
+msgid "ends at"
+msgstr "termina a las"
+
+msgid "status"
+msgstr "estado"
+
+msgid "booked through"
+msgstr "reservada por"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "internal notes"
+msgstr "notas internas"
+
+msgid "cancelled at"
+msgstr "cancelada el"
+
+msgid "cancellation reason"
+msgstr "motivo de cancelación"
+
+msgid "cancelled by the customer"
+msgstr "cancelada por la clienta"
+
+msgid "sale"
+msgstr "venta"
+
+msgid "charged at"
+msgstr "cobrada el"
+
+msgid "occurrence"
+msgstr "fecha de la serie"
+
+msgid "appointment"
+msgstr "cita"
+
+msgid "appointments"
+msgstr "citas"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "price"
+msgstr "precio"
+
+msgid "service of an appointment"
+msgstr "servicio de una cita"
+
+msgid "services of an appointment"
+msgstr "servicios de una cita"
+
+msgid "Booked"
+msgstr "Reservada"
+
+msgid "Confirmed"
+msgstr "Confirmada"
+
+msgid "Service started"
+msgstr "Servicio iniciado"
+
+msgid "Completed"
+msgstr "Completada"
+
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgid "Did not show up"
+msgstr "No se presentó"
+
+msgid "Time changed"
+msgstr "Cambio de hora"
+
+msgid "Professional changed"
+msgstr "Cambio de profesional"
+
+msgid "Service changed"
+msgstr "Cambio de servicio"
+
+msgid "Professional left: to be reassigned"
+msgstr "Profesional dado de baja: pendiente de reasignar"
+
+msgid "Charged"
+msgstr "Cobrada"
+
+msgid "Sale voided"
+msgstr "Venta anulada"
+
+msgid "Deleted"
+msgstr "Borrada"
+
+msgid "action"
+msgstr "acción"
+
+msgid "at"
+msgstr "cuándo"
+
+msgid "by"
+msgstr "quién"
+
+msgid "requested by the customer"
+msgstr "lo pidió la clienta"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "before"
+msgstr "antes"
+
+msgid "after"
+msgstr "después"
+
+msgid "appointment history line"
+msgstr "línea del historial de una cita"
+
+msgid "appointment history"
+msgstr "historial de citas"
+
+msgid "Holiday"
+msgstr "Festivo"
+
+msgid "Vacation"
+msgstr "Vacaciones"
+
+msgid "Break"
+msgstr "Descanso"
+
+msgid "Maintenance"
+msgstr "Mantenimiento"
+
+msgctxt "blocked time type"
+msgid "Other"
+msgstr "Otro"
+
+msgid "title"
+msgstr "título"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "all day"
+msgstr "todo el día"
+
+msgid "blocked time"
+msgstr "bloqueo"
+
+msgid "blocked times"
+msgstr "bloqueos"
+
+msgid "That appointment does not exist in this business."
+msgstr "Esa cita no existe en este negocio."
+
+msgid "That repeating appointment does not exist in this business."
+msgstr "Esa cita periódica no existe en este negocio."
+
+#, python-format
+msgid "“%(name)s” cannot be booked: it is archived or not bookable."
+msgstr "«%(name)s» no se puede reservar: está archivado o no es reservable."
+
+#, python-format
+msgid "%(name)s cannot take appointments: inactive or not bookable."
+msgstr "%(name)s no puede recibir citas: no está activo o no es reservable."
+
+#, python-format
+msgid "%(name)s does not perform “%(service)s”."
+msgstr "%(name)s no hace «%(service)s»."
+
+msgid ""
+"That time does not exist on the business's clock: the change of time skips "
+"it. Pick another one."
+msgstr "Esa hora no existe en el reloj del negocio: el cambio de hora se la salta. Elige otra."
+
+msgid "That start date and time is not valid."
+msgstr "Esa fecha y hora de inicio no son válidas."
+
+msgid "That time has already passed."
+msgstr "Esa hora ya ha pasado."
+
+msgid "This appointment must be booked further in advance."
+msgstr "Esta cita se tiene que reservar con más antelación."
+
+msgid "This appointment cannot be booked that far in advance."
+msgstr "Esta cita no se puede reservar con tanta antelación."
+
+msgid "That time is outside the business's opening hours."
+msgstr "Esa hora está fuera del horario del negocio."
+
+msgid ""
+"That professional does not work at that time. Pick another time or another "
+"professional."
+msgstr "Ese profesional no trabaja a esa hora. Elige otra hora u otro profesional."
+
+msgid "That time is blocked in the agenda."
+msgstr "Esa franja está bloqueada en la agenda."
+
+msgid ""
+"That professional already has an appointment at that time. Pick another time "
+"or another professional."
+msgstr "Ese profesional ya tiene una cita a esa hora. Elige otra hora u otro profesional."
+
+msgid "A service of this series can no longer be booked."
+msgstr "Un servicio de esta serie ya no se puede reservar."
+
+msgid "Say which customer: her id, or her name, phone or email."
+msgstr "Di qué cliente: su id, o su nombre, teléfono o email."
+
+msgid "Say which professional: their id, or their name."
+msgstr "Di qué profesional: su id, o su nombre."
+
+msgid "Say which service: its id, or its name."
+msgstr "Di qué servicio: su id, o su nombre."
+
+msgid "Say which appointment: its id, or its number."
+msgstr "Di qué cita: su id, o su número."
+
+msgid "Pick at least one service."
+msgstr "Elige al menos un servicio."
+
+msgid ""
+"Say what changes: the time, the length, the professional or the services."
+msgstr "Di qué cambia: la hora, la duración, el profesional o los servicios."
+
+msgid "Say what to change."
+msgstr "Di qué hay que cambiar."
+
+msgid "Say the services or how many minutes it lasts."
+msgstr "Di los servicios o cuántos minutos dura."
+
+msgid "The end cannot be before the start."
+msgstr "El final no puede ser anterior al inicio."
+
+msgid "Ask for at most 62 days at once."
+msgstr "Pide como mucho 62 días de una vez."
+
+msgid "The calendar has to end after it starts."
+msgstr "El calendario tiene que terminar después de empezar."
+
+msgid ""
+"This appointment can no longer be confirmed: it is not pending any more."
+msgstr "Esta cita ya no se puede confirmar: ya no está pendiente."
+
+msgid "This appointment cannot be started in its current state."
+msgstr "Esta cita no se puede iniciar en su estado actual."
+
+msgid "This appointment cannot be completed in its current state."
+msgstr "Esta cita no se puede completar en su estado actual."
+
+msgid "This appointment cannot be marked as a no-show in its current state."
+msgstr "Esta cita no se puede marcar como no presentada en su estado actual."
+
+msgid "This appointment can no longer be cancelled in its current state."
+msgstr "Esta cita ya no se puede cancelar en su estado actual."
+
+msgid "This appointment can no longer be moved in its current state."
+msgstr "Esta cita ya no se puede mover en su estado actual."
+
+msgid ""
+"This appointment cannot be deleted: it is in progress, completed or charged."
+msgstr "Esta cita no se puede borrar: está en curso, completada o cobrada."
+
+msgid "A cancelled or no-show appointment is not charged."
+msgstr "Una cita cancelada o no presentada no se cobra."
+
+msgid "It is not the appointment's time yet: it cannot be marked as a no-show."
+msgstr "Todavía no es la hora de esta cita: no se puede marcar como no presentada."
+
+msgid "This appointment is already charged."
+msgstr "Esta cita ya está cobrada."
+
+#, python-format
+msgid "“%(name)s” has no tax category: set it in Services before charging."
+msgstr "«%(name)s» no tiene categoría fiscal: ponla en Servicios antes de cobrar."
+
+msgid ""
+"The till (Sales) is not active in this business: the appointment cannot be "
+"charged there."
+msgstr "El TPV (Venta) no está activo en este negocio: la cita no se puede cobrar allí."
+
+#, python-format
+msgid "This time overlaps with %(conflicts)s. Book it anyway?"
+msgstr "Esta hora se solapa con %(conflicts)s. ¿Reservar igual?"
+
+msgid "You may only book your own appointments."
+msgstr "Solo puedes reservar tus propias citas."
+
+msgid "You may only change your own appointments."
+msgstr "Solo puedes cambiar tus propias citas."
+
+msgid "Online cancellation is not available. Please contact the business."
+msgstr "La cancelación online no está disponible. Ponte en contacto con el negocio."
+
+#, python-format
+msgid ""
+"This appointment can only be cancelled online %(hours)s hours ahead. Please "
+"contact the business."
+msgstr "Esta cita solo se puede cancelar online con %(hours)s horas de antelación. Ponte en contacto con el negocio."
+
+msgid ""
+"That phone is not a valid number for the business's country. Check it, or "
+"type it with its international prefix (for example +44…)."
+msgstr "Ese teléfono no es un número válido del país del negocio. Revísalo o escríbelo con su prefijo internacional (por ejemplo +44…)."
+
+msgid "The repeating appointment changed its pattern"
+msgstr "La cita periódica cambió su repetición"
+
+msgid ""
+"That repeating appointment is paused: reactivate it to book its appointments."
+msgstr "Esa cita periódica está pausada: reactívala para reservar sus citas."
+
+msgid "This repeating appointment has no dates left to book."
+msgstr "Esta cita periódica ya no tiene fechas que reservar."
+
+msgid ""
+"This repeating appointment has no professional: edit it and choose who does "
+"it."
+msgstr "Esta cita periódica no tiene profesional: edítala y elige quién la hace."
+
+#, python-format
+msgid "%(time)s: %(reason)s"
+msgstr "%(time)s: %(reason)s"
+
+msgid "That blocked period does not exist in this business."
+msgstr "Ese bloqueo no existe en este negocio."
+
+msgid "This appointment has a check open in the till: charge it or void it there first."
+msgstr "Esta cita tiene una cuenta abierta en el TPV: cóbrala o anúlala allí primero."
+
+msgid "open check"
+msgstr "cuenta abierta"

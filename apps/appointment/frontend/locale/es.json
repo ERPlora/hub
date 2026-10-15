@@ -1,0 +1,284 @@
+{
+  "appointment": {
+    "title": "Citas",
+    "tabs": {
+      "label": "Secciones de Citas",
+      "agenda": "Agenda",
+      "settings": "Ajustes"
+    },
+    "loading": "Cargando…",
+    "retry": "Reintentar",
+    "close": "Cerrar",
+    "noPermission": "No tienes permiso",
+    "noResults": "Sin resultados",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "status": {
+      "pending": "Pendiente",
+      "confirmed": "Confirmada",
+      "in_progress": "En curso",
+      "completed": "Completada",
+      "cancelled": "Cancelada",
+      "no_show": "No-show"
+    },
+    "views": {
+      "label": "Vista",
+      "list": "Lista",
+      "staff": "Por profesional",
+      "series": "Periódicas",
+      "day": "Día",
+      "week": "Semana"
+    },
+    "toolbar": {
+      "prevDay": "Día anterior",
+      "nextDay": "Día siguiente",
+      "prevWeek": "Semana anterior",
+      "nextWeek": "Semana siguiente",
+      "today": "Hoy",
+      "openCalendar": "Abrir calendario",
+      "filterStatus": "Filtrar por estado",
+      "allStatuses": "Todos los estados",
+      "add": "Añadir cita",
+      "toConfirm": "{n} por confirmar",
+      "week": "Semana del {date}",
+      "deviceZone": "Este dispositivo está en otra zona horaria. La agenda muestra siempre el reloj del negocio: {zone}."
+    },
+    "list": {
+      "search": "Buscar nº, cliente o servicio…",
+      "empty": "Sin citas para este día.",
+      "emptyWeek": "Sin citas esta semana.",
+      "loadError": "Error cargando citas",
+      "entity": {
+        "one": "cita",
+        "many": "citas"
+      },
+      "columns": {
+        "time": "Hora",
+        "number": "Nº",
+        "customer": "Cliente",
+        "service": "Servicio",
+        "staff": "Profesional",
+        "status": "Estado"
+      },
+      "erasedCustomer": "Cliente borrado",
+      "unassigned": "Sin asignar",
+      "charged": "Cobrada"
+    },
+    "actions": {
+      "charge": "Cobrar",
+      "goToCheck": "Ir a la cuenta",
+      "edit": "Editar",
+      "confirm": "Confirmar",
+      "start": "Iniciar",
+      "complete": "Completar",
+      "no_show": "No-show",
+      "cancel": "Cancelar",
+      "history": "Historial",
+      "delete": "Borrar",
+      "error": "No se ha podido hacer la acción"
+    },
+    "grid": {
+      "unassigned": "Sin asignar",
+      "noStaff": "Aún no hay profesionales reservables.",
+      "staffLoading": "Cargando profesionales…",
+      "staffError": "No se han podido cargar los profesionales.",
+      "keptOne": "{names} ya no admite citas nuevas: sus citas del día siguen en su fila para que puedas pasárselas a otra persona del equipo.",
+      "keptMany": "{names} ya no admiten citas nuevas: sus citas del día siguen en su fila para que puedas pasárselas a otra persona del equipo.",
+      "unassignedWarning": "{n} citas no tienen profesional: asígnalas editándolas o arrastrándolas a una fila.",
+      "notLinked": "Tu cuenta no está vinculada a ninguna ficha de Personal: no hay agenda tuya que enseñar.",
+      "slot": "Reservar con {staff} a las {time}",
+      "moved": "Cita movida.",
+      "moveError": "No se ha podido mover la cita.",
+      "notMovable": "Esta cita ya no se puede mover (su estado es final).",
+      "label": "Agenda del {date}"
+    },
+    "form": {
+      "titleNew": "Nueva cita",
+      "titleEdit": "Editar la cita",
+      "customer": "Cliente",
+      "services": "Servicios",
+      "service": "Servicio",
+      "addService": "Añadir un servicio",
+      "removeService": "Quitar {name}",
+      "staff": "Profesional",
+      "pickStaff": "Elige un profesional",
+      "day": "Día",
+      "time": "Hora",
+      "minutes": "Min.",
+      "notes": "Notas para la clienta",
+      "internalNotes": "Notas internas",
+      "create": "Añadir cita",
+      "save": "Guardar cambios",
+      "pastNotice": "Esta cita empieza en el pasado. Se guardará a esa hora.",
+      "hint": "Cambia la hora, los servicios o el profesional. La clienta no cambia.",
+      "staffNotForService": "El profesional que habías elegido no hace estos servicios: elige uno de los que los hacen.",
+      "servicesLoading": "Cargando servicios…",
+      "servicesError": "No se han podido cargar los servicios.",
+      "servicesNone": "Todavía no hay servicios reservables. Dalos de alta en Servicios.",
+      "staffLoading": "Cargando profesionales…",
+      "staffError": "No se han podido cargar los profesionales.",
+      "staffNone": "Todavía no hay profesionales reservables. Dalos de alta en Personal.",
+      "ownOnly": "Reservas tus propias citas.",
+      "customerRequired": "Elige la clienta.",
+      "history": "Historial",
+      "charged": "Cobrada: ya no se puede cambiar.",
+      "total": "Total"
+    },
+    "slots": {
+      "label": "Horas libres",
+      "hint": "Elige los servicios, un profesional y un día para ver las horas libres.",
+      "loading": "Buscando horas libres…",
+      "empty": "No quedan horas libres ese día para este profesional. Puedes escribir una hora igualmente.",
+      "error": "No se han podido cargar las horas libres. Puedes escribir una hora igualmente.",
+      "withinNotice": "dentro de la antelación mínima"
+    },
+    "overlap": {
+      "title": "Cita solapada",
+      "confirm": "Reservar igual",
+      "cancel": "Elegir otra hora"
+    },
+    "scope": {
+      "title": "Editar cita periódica",
+      "message": "Esta cita es de una serie periódica.",
+      "thisOnly": "Solo esta cita",
+      "following": "Esta y todas las siguientes"
+    },
+    "cancelDialog": {
+      "title": "Cancelar la cita",
+      "message": "¿Cancelar la cita de {customer} ({when})? Su hora queda libre.",
+      "reason": "Motivo (opcional)",
+      "confirm": "Cancelar la cita",
+      "keep": "No cancelar"
+    },
+    "deleteDialog": {
+      "title": "Borrar la cita",
+      "message": "¿Borrar la cita {number}? En el día a día es mejor Cancelar, que conserva el registro.",
+      "confirm": "Borrar"
+    },
+    "history": {
+      "title": "Historial de la cita",
+      "empty": "Esta cita aún no tiene cambios registrados.",
+      "error": "No se pudo cargar el historial de la cita.",
+      "byCustomer": "Lo pidió la clienta",
+      "byPlatform": "Lo hizo la plataforma",
+      "newTime": "Nueva hora",
+      "reason": "Motivo",
+      "professional": "Profesional",
+      "service": "Servicio",
+      "action": {
+        "created": "Reservada",
+        "confirmed": "Confirmada",
+        "started": "Servicio iniciado",
+        "completed": "Completada",
+        "cancelled": "Cancelada",
+        "no_show": "No se presentó",
+        "rescheduled": "Cambio de hora",
+        "staff_changed": "Cambio de profesional",
+        "service_changed": "Cambio de servicio",
+        "unassigned": "Profesional dado de baja: pendiente de reasignar",
+        "charged": "Cobrada",
+        "uncharged": "Venta anulada",
+        "deleted": "Borrada"
+      }
+    },
+    "series": {
+      "search": "Buscar por cliente, servicio o profesional",
+      "empty": "Todavía no hay citas periódicas.",
+      "loadError": "No se han podido cargar las citas periódicas.",
+      "add": "Nueva cita periódica",
+      "entity": {
+        "one": "cita periódica",
+        "many": "citas periódicas"
+      },
+      "columns": {
+        "customer": "Cliente",
+        "service": "Servicio",
+        "staff": "Profesional",
+        "pattern": "Repetición",
+        "starts": "Empieza",
+        "ends": "Termina",
+        "active": "Activa"
+      },
+      "noEnd": "Sin fin",
+      "endsAfter": "Tras {n} citas",
+      "noStaff": "Nadie: edítala",
+      "actions": {
+        "edit": "Editar serie",
+        "materialize": "Reservar citas",
+        "delete": "Borrar"
+      },
+      "toggleError": "No se ha podido cambiar el estado de la cita periódica.",
+      "deleteDialog": {
+        "title": "¿Borrar las citas periódicas de {name}?",
+        "message": "Las citas ya reservadas se conservan. Esta serie dejará de reservar citas nuevas.",
+        "confirm": "Borrar"
+      },
+      "form": {
+        "titleNew": "Nueva cita periódica",
+        "titleEdit": "Editar cita periódica",
+        "frequency": "Repetición",
+        "weekday": "Día de la semana",
+        "startDate": "Empieza el",
+        "fromDate": "Desde",
+        "time": "Hora",
+        "minutes": "Min.",
+        "endDate": "Termina el (opcional)",
+        "occurrences": "Número de citas (opcional)",
+        "create": "Crear cita periódica",
+        "save": "Guardar de esta cita en adelante",
+        "scopeHint": "El cambio se aplica desde el {from}: alcanza {upcoming} citas reservadas; {charged} ya cobradas no se tocarán. Lo que ya ha pasado se queda como está."
+      },
+      "outcome": {
+        "booked": "{booked} citas reservadas · {skipped} no se han podido reservar",
+        "pendingFrom": "Las fechas desde el {date} aún no están reservadas: pulsa «Reservar citas» en la serie para reservarlas.",
+        "upcoming": "Aún no hay nada que reservar: la próxima fecha de esta serie, el {date}, queda más lejos que la antelación máxima. Pulsa «Reservar citas» en la serie cuando se acerque.",
+        "updated": "{moved} citas movidas · {cancelled} canceladas porque ya no caen en la repetición · {locked} sin tocar porque ya están cobradas"
+      },
+      "frequency": {
+        "daily": "Cada día",
+        "weekly": "Cada semana",
+        "biweekly": "Cada dos semanas",
+        "monthly": "Cada mes"
+      }
+    },
+    "weekday": {
+      "0": "Lunes",
+      "1": "Martes",
+      "2": "Miércoles",
+      "3": "Jueves",
+      "4": "Viernes",
+      "5": "Sábado",
+      "6": "Domingo"
+    },
+    "settings": {
+      "title": "Ajustes de citas",
+      "fields": {
+        "default_duration": "Duración por defecto (minutos)",
+        "min_booking_notice": "Antelación mínima para reservar (minutos)",
+        "min_booking_notice_help": "Se aplica a las reservas que hace la clienta. Desde el mostrador siempre puedes reservar para ahora mismo.",
+        "max_advance_booking": "Reservar como máximo con esta antelación (días; 0 = sin límite)",
+        "allow_overlapping": "Permitir citas solapadas (el mostrador recibe un aviso antes)",
+        "allow_customer_cancellation": "Permitir que la clienta cancele su cita",
+        "cancellation_notice_hours": "Antelación mínima para cancelar (horas)",
+        "calendar_start_hour": "El calendario empieza a las (hora)",
+        "calendar_end_hour": "El calendario termina a las (hora)",
+        "slot_interval": "Intervalo entre huecos (minutos)",
+        "auto_confirm_online": "Confirmar automáticamente las citas que reserva la clienta"
+      },
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "loading": "Cargando ajustes…",
+      "loadError": "No se pudieron cargar los ajustes.",
+      "saveError": "No se pudieron guardar los ajustes.",
+      "forbidden": "No tienes permiso"
+    },
+    "visits": {
+      "title": "Historial de visitas",
+      "empty": "Este cliente aún no tiene citas.",
+      "error": "No se pudo cargar el historial de visitas.",
+      "internal": "Interna"
+    }
+  }
+}

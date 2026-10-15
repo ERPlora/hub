@@ -1,0 +1,282 @@
+{
+  "table": {
+    "title": "Tables",
+    "tabs": {
+      "label": "Tables sections",
+      "floor_plan": "Floor plan",
+      "zones": "Zones",
+      "tables": "Tables",
+      "sessions": "Sessions",
+      "settings": "Settings"
+    },
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "none": "—",
+    "noResults": "No results",
+    "noResultsMessage": "Change the search or the filters.",
+    "noPermission": "You do not have permission",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "status": {
+      "available": "Available",
+      "occupied": "Occupied",
+      "reserved": "Reserved",
+      "blocked": "Blocked"
+    },
+    "shape": {
+      "square": "Square",
+      "round": "Round",
+      "rectangle": "Rectangular"
+    },
+    "color": {
+      "primary": "Blue",
+      "secondary": "Cyan",
+      "tertiary": "Purple",
+      "success": "Green",
+      "warning": "Amber",
+      "danger": "Red",
+      "medium": "Grey"
+    },
+    "sessionStatus": {
+      "open": "Open",
+      "closed": "Closed",
+      "transferred": "Transferred",
+      "merged": "Merged",
+      "parked": "Parked"
+    },
+    "pax": "{count} pax",
+    "guestsCount": "{count} guests",
+    "minutes": "{minutes} min",
+    "servedBy": "Served by {name}",
+    "reservedFor": "Reserved for {name}",
+    "erasedCustomer": "Deleted customer",
+    "tableLabel": "Table {number}",
+    "inactive": "Inactive",
+    "floor": {
+      "mode": {
+        "label": "What the plan is for",
+        "service": "Service",
+        "edit": "Edit plan"
+      },
+      "zones": "Zones",
+      "add": "Add zone or table",
+      "editZone": "Edit zone",
+      "hint": "Drag to position · click a table to edit or delete it. Changes are saved instantly.",
+      "emptyZones": "Create a zone to start placing tables.",
+      "emptyTables": "No tables in this zone. Tap “Add table”.",
+      "emptyService": "No tables in service in this zone.",
+      "loadError": "Could not load the floor plan",
+      "positionError": "Could not save the position",
+      "tileTitle": "{status} · {count} pax",
+      "transferTitle": "Transfer {number} to…",
+      "mergeTitle": "Merge {number} with…",
+      "pickFree": "Pick a free table",
+      "pickOccupied": "Pick an occupied table",
+      "taken": "Another device has just taken that table. The floor plan has been refreshed.",
+      "transferError": "Could not transfer the table",
+      "mergeError": "Could not merge the tables"
+    },
+    "add": {
+      "title": "Add",
+      "zone": "Zone",
+      "zonePlaceholder": "New zone…",
+      "addZone": "Add zone",
+      "number": "Table number",
+      "numberPlaceholder": "Auto-numbered",
+      "addTable": "Add table",
+      "zoneError": "Could not create the zone",
+      "tableError": "Could not create the table"
+    },
+    "form": {
+      "titleEdit": "Edit table",
+      "titleNew": "New table",
+      "number": "Number",
+      "capacity": "Capacity",
+      "name": "Name (optional)",
+      "shape": "Shape",
+      "status": "Status",
+      "zone": "Zone",
+      "noZone": "No zone",
+      "active": "In use",
+      "save": "Save",
+      "create": "Add table",
+      "delete": "Delete",
+      "numberRequired": "The table number is required",
+      "deleteTitle": "Delete table {number}?",
+      "deleteMessage": "It leaves the plan and the lists; its history of checks stays.",
+      "deleteConfirm": "Delete table"
+    },
+    "zoneForm": {
+      "titleNew": "New zone",
+      "titleEdit": "Edit zone",
+      "name": "Name",
+      "description": "Description (optional)",
+      "color": "Colour",
+      "order": "Order",
+      "active": "Active",
+      "create": "Add zone",
+      "save": "Save changes",
+      "saveShort": "Save",
+      "delete": "Delete zone"
+    },
+    "zones": {
+      "search": "Search zone…",
+      "empty": "No zones. Tap «+» to create the first one (Dining room, Terrace, Bar…).",
+      "new": "New zone",
+      "entity": {
+        "one": "zone",
+        "many": "zones"
+      },
+      "columns": {
+        "name": "Name",
+        "tables": "Tables",
+        "available": "Free",
+        "order": "Order",
+        "status": "Status",
+        "color": "Colour"
+      },
+      "availableOfTotal": "{available} / {total}",
+      "active": "Active",
+      "inactive": "Inactive",
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "delete": {
+        "title": "Delete zone?",
+        "impact": "{count} tables in this zone. A zone with tables cannot be deleted: move or delete its tables first.",
+        "confirm": "Delete zone"
+      },
+      "loadError": "Could not load the zones"
+    },
+    "tables": {
+      "search": "Search table…",
+      "empty": "No tables.",
+      "new": "New table",
+      "entity": {
+        "one": "table",
+        "many": "tables"
+      },
+      "columns": {
+        "number": "Number",
+        "name": "Name",
+        "zone": "Zone",
+        "capacity": "Capacity",
+        "status": "Status"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "loadError": "Could not load the tables"
+    },
+    "sessions": {
+      "segment": {
+        "label": "Which checks",
+        "open": "Open",
+        "closed": "Closed",
+        "all": "All"
+      },
+      "search": "Search table…",
+      "empty": "No sessions. Seat a party from the floor plan and it will show up here.",
+      "entity": {
+        "one": "session",
+        "many": "sessions"
+      },
+      "columns": {
+        "table": "Table",
+        "paid": "Charged",
+        "closedAt": "Closed",
+        "zone": "Zone",
+        "waiter": "Server",
+        "guests": "Guests",
+        "openedAt": "Opened",
+        "duration": "Time",
+        "status": "Status"
+      },
+      "noTable": "No table (parked)",
+      "actions": {
+        "detail": "Details",
+        "close": "Close session",
+        "restore": "Seat again",
+        "delete": "Delete"
+      },
+      "close": {
+        "title": "Close the session?",
+        "impact": "Table {number} · {count} guests. The table is freed and the session moves to the history. If its bill is still open in Sales, first charge it, move it to another table or delete it from the till.",
+        "confirm": "Close session"
+      },
+      "delete": {
+        "title": "Delete this check from the history?",
+        "message": "It disappears from Sessions; its trail through the tables is kept.",
+        "confirm": "Delete"
+      },
+      "detail": {
+        "title": "Session · {table}",
+        "customer": "Customer",
+        "notes": "Notes"
+      },
+      "restore": {
+        "title": "Seat again",
+        "table": "Table",
+        "confirm": "Seat",
+        "noFree": "No free table right now."
+      },
+      "loadError": "Could not load the sessions"
+    },
+    "sheet": {
+      "title": "Table {number}",
+      "guestsTitle": "Guests at table {number}",
+      "seat": "Seat {count}",
+      "seatNow": "Seat",
+      "saveGuests": "Save",
+      "overCapacity": "Above the table capacity ({capacity})",
+      "fewer": "One guest less",
+      "more": "One guest more",
+      "quick": "Seat {count} at once",
+      "blocked": "Table out of service: it cannot be seated until it is unblocked.",
+      "since": "Since {time} · {minutes} min",
+      "check": "Check {n}",
+      "chooseCheck": "Which check?",
+      "customer": "Customer",
+      "customerError": "The table is seated, but the customer could not be put on its check.",
+      "reservation": "Reservation",
+      "actions": {
+        "label": "Table options",
+        "charge": "Charge",
+        "transfer": "Transfer",
+        "merge": "Merge",
+        "split": "Split check",
+        "guests": "Guests",
+        "park": "Remove table",
+        "close": "Close table"
+      },
+      "error": "Could not do it"
+    },
+    "split": {
+      "title": "Split check · table {number}",
+      "hint": "Mark the lines that go to the new check. With none marked, it is born empty.",
+      "confirm": "Split",
+      "empty": "This check has no lines yet.",
+      "loadError": "Could not read the check's lines"
+    },
+    "settings": {
+      "title": "Tables",
+      "promptGuests": "Ask for the guests when seating a table",
+      "promptGuestsHint": "Off: seating a free table opens the check with the table's capacity in one tap.",
+      "warning": "Amber warning (minutes)",
+      "warningHint": "An open check turns amber in Sessions after these minutes.",
+      "critical": "Red warning (minutes)",
+      "criticalHint": "An open check turns red after these minutes.",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "Could not save the settings",
+      "loadError": "Could not load the settings"
+    }
+  }
+}

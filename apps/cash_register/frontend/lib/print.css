@@ -1,0 +1,19 @@
+/* The paper `printPaper` (print.ts) prints: a copy of it lives in `body > .cash-register-print-root` while
+   the browser prints. On screen the copy never shows; on paper it is the only thing that does. */
+.cash-register-print-root {
+  display: none;
+}
+
+@media print {
+  body > :not(.cash-register-print-root) {
+    display: none !important;
+  }
+
+  .cash-register-print-root {
+    display: block;
+  }
+
+  @page {
+    margin: 0;
+  }
+}

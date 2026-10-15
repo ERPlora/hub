@@ -1,0 +1,304 @@
+{
+  "cash_register": {
+    "title": "Caja",
+    "tabs": {
+      "label": "Secciones de Caja",
+      "sessions": "Caja",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "reconnecting": "Reconectando… las cifras pueden no estar al día.",
+      "retry": "Reintentar",
+      "appInactive": "Caja no está activa en este negocio.",
+      "noPermission": "No tienes permiso para ver esto."
+    },
+    "money": {
+      "notAnAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "negative": "Un importe de caja no puede ser negativo. Para sacar dinero del cajón, registra un movimiento de «Salida».",
+      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+      "zero": "Importe inválido"
+    },
+    "status": {
+      "open": "Abierta",
+      "closed": "Cerrada"
+    },
+    "types": {
+      "in": "Entrada",
+      "out": "Salida",
+      "sale": "Venta",
+      "refund": "Devolución",
+      "void": "Anulación"
+    },
+    "methods": {
+      "cash": "Efectivo",
+      "card": "Tarjeta",
+      "transfer": "Transferencia",
+      "other": "Otro"
+    },
+    "countTypes": {
+      "opening": "Apertura",
+      "closing": "Cierre"
+    },
+    "concept": {
+      "ticket": "Tique {number}",
+      "invoice": "Factura {number}",
+      "saleUnnumbered": "Venta",
+      "voidOf": "Anulación de {document}",
+      "refundOf": "Devolución de {document}"
+    },
+    "sessions": {
+      "title": "Caja",
+      "open": "Abrir sesión",
+      "alreadyOpen": "Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra.",
+      "search": "Buscar sesión…",
+      "empty": "Sin sesiones de caja.",
+      "noMatches": "Ninguna sesión coincide.",
+      "loading": "Cargando…",
+      "loadError": "No se pudieron cargar las sesiones.",
+      "entity": {
+        "one": "sesión",
+        "many": "sesiones"
+      },
+      "columns": {
+        "number": "Sesión",
+        "openedAt": "Abierta el",
+        "status": "Estado",
+        "opening": "Apertura",
+        "expected": "Esperado",
+        "counted": "Contado",
+        "difference": "Diferencia"
+      },
+      "actions": {
+        "detail": "Detalle",
+        "movement": "Movimiento",
+        "count": "Arqueo",
+        "close": "Cerrar"
+      },
+      "unassigned": {
+        "heading": "Cobros fuera de turno",
+        "body": "{count} líneas de venta no entraron en ninguna sesión · {cash} en efectivo.",
+        "view": "Ver"
+      },
+      "autoCloseDue": {
+        "heading": "La sesión {number} debía cerrarse sola a las {time}",
+        "body": "Se cerrará sola al abrir la siguiente sesión."
+      }
+    },
+    "filters": {
+      "status": "Estado",
+      "number": "Número de sesión",
+      "opening": "Apertura",
+      "expected": "Esperado",
+      "counted": "Contado",
+      "difference": "Diferencia",
+      "from": "Desde",
+      "to": "Hasta",
+      "any": "Cualquiera",
+      "button": "Filtros",
+      "title": "Filtrar sesiones",
+      "count": "Filtros: {n}",
+      "clear": "Borrar",
+      "done": "Hecho",
+      "amountInvalid": "Esto no es un importe."
+    },
+    "open": {
+      "title": "Abrir sesión de caja",
+      "register": "Cajón",
+      "optional": "(opcional)",
+      "noRegister": "Sin cajón",
+      "balance": "Fondo de apertura",
+      "notes": "Notas",
+      "submit": "Abrir sesión",
+      "cancel": "Cancelar",
+      "done": "Sesión abierta",
+      "failed": "No se pudo abrir la sesión",
+      "unassigned": "Se cobraron {cash} en efectivo con la caja cerrada: ya están en el cajón, cuéntalos en el fondo."
+    },
+    "movement": {
+      "title": "Movimiento de caja · {number}",
+      "type": "Tipo",
+      "amount": "Importe",
+      "concept": "Concepto",
+      "submit": "Registrar",
+      "cancel": "Cancelar",
+      "doneIn": "Movimiento de entrada registrado ({amount})",
+      "doneOut": "Movimiento de salida registrado ({amount})",
+      "failed": "No se pudo registrar el movimiento"
+    },
+    "count": {
+      "title": "Arqueo de caja · {number}",
+      "type": "Tipo de arqueo",
+      "notes": "Notas",
+      "bills": "Billetes",
+      "coins": "Monedas",
+      "total": "Total contado: {total}",
+      "totalInput": "Total contado",
+      "noBreakdown": "No hay desglose de billetes y monedas para {currency}: cuenta la caja y escribe el total.",
+      "submit": "Registrar arqueo",
+      "cancel": "Cancelar",
+      "done": "Arqueo registrado · total contado {total}",
+      "failed": "No se pudo registrar el arqueo",
+      "loading": "Cargando los billetes y monedas…"
+    },
+    "close": {
+      "title": "Cerrar sesión · {number}",
+      "expected": "Esperado en el cajón",
+      "difference": "Diferencia",
+      "counted": "Efectivo contado",
+      "notes": "Notas de cierre",
+      "submit": "Cerrar sesión",
+      "anyway": "Cerrar de todos modos",
+      "cancel": "Cancelar",
+      "countedRequired": "Escribe el efectivo contado para cerrar la sesión.",
+      "done": "Sesión {number} cerrada · esperado {expected} · contado {counted} · diferencia {difference}",
+      "failed": "No se pudo cerrar la sesión"
+    },
+    "review": {
+      "title": "Revisión del turno",
+      "checking": "Comprobando lo que queda pendiente…",
+      "openChecks": "Cuentas abiertas: {count}",
+      "unavailable": "No se ha podido comprobar lo que queda pendiente, así que esta revisión puede estar incompleta.",
+      "confirm": "El turno se cerrará igualmente. Pulsa otra vez para confirmar."
+    },
+    "unassignedList": {
+      "title": "Cobros fuera de turno",
+      "close": "Cerrar",
+      "empty": "Todas las líneas de venta están en un turno."
+    },
+    "detail": {
+      "title": "Detalle de la sesión · {number}",
+      "print": "Imprimir",
+      "printFailed": "No se pudo imprimir.",
+      "loadError": "No se pudo cargar el detalle de la sesión",
+      "notFound": "Esa sesión de caja no existe.",
+      "movements": "Movimientos",
+      "counts": "Arqueos",
+      "noMovements": "Sin movimientos en esta sesión.",
+      "noCounts": "Sin arqueos en esta sesión.",
+      "loading": "Cargando…"
+    },
+    "summary": {
+      "status": "Estado",
+      "register": "Cajón",
+      "opened": "Abierta",
+      "closed": "Cerrada",
+      "closedAuto": "Cerrada sola · {when}",
+      "by": "{when} · {who}",
+      "movements": "Movimientos",
+      "opening": "Fondo de apertura",
+      "sales": "Ventas",
+      "cashSales": "Ventas en efectivo",
+      "cardSales": "Ventas con tarjeta",
+      "otherSales": "Ventas con otras formas de pago",
+      "refunds": "Devoluciones",
+      "cashIn": "Entradas",
+      "cashOut": "Salidas",
+      "gifts": "Invitaciones",
+      "expected": "Esperado",
+      "counted": "Contado",
+      "difference": "Diferencia",
+      "openingNotes": "Notas de apertura",
+      "closingNotes": "Notas de cierre"
+    },
+    "lines": {
+      "entity": {
+        "one": "movimiento",
+        "many": "movimientos"
+      },
+      "columns": {
+        "when": "Cuándo",
+        "type": "Tipo",
+        "amount": "Importe",
+        "method": "Método",
+        "concept": "Concepto"
+      }
+    },
+    "counts": {
+      "entity": {
+        "one": "arqueo",
+        "many": "arqueos"
+      },
+      "columns": {
+        "when": "Cuándo",
+        "type": "Tipo de arqueo",
+        "total": "Total contado",
+        "notes": "Notas"
+      }
+    },
+    "report": {
+      "x": "Informe parcial (X)",
+      "z": "Cierre de caja (Z)",
+      "session": "Sesión",
+      "printedAt": "Impreso {when}"
+    },
+    "settings": {
+      "heading": "Caja",
+      "loading": "Cargando ajustes…",
+      "loadError": "No se pudieron cargar los ajustes.",
+      "loadErrorBody": "No se enseña nada hasta poder leerlos: vuelve a intentarlo.",
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "saveError": "No se pudieron guardar los ajustes.",
+      "noPermission": "No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.",
+      "fields": {
+        "enable_cash_register": {
+          "label": "Activar caja",
+          "description": "Solo se cobra en efectivo con una sesión abierta (lo aplica Ventas)."
+        },
+        "require_opening_balance": {
+          "label": "Exigir fondo de apertura"
+        },
+        "require_closing_balance": {
+          "label": "Exigir recuento al cierre"
+        },
+        "allow_negative_balance": {
+          "label": "Permitir saldo negativo"
+        },
+        "require_blind_count": {
+          "label": "Arqueo ciego",
+          "description": "Quien cuenta la caja no ve el efectivo esperado hasta declarar el recuento. Los responsables siguen viéndolo."
+        },
+        "auto_close_enabled": {
+          "label": "Cierre automático diario",
+          "description": "Si nadie ha cerrado la caja, se cierra sola a la hora elegida (hora del negocio), con el efectivo esperado y sin recuento."
+        },
+        "auto_close_time": {
+          "label": "Hora del cierre automático"
+        }
+      }
+    },
+    "registers": {
+      "heading": "Cajones",
+      "add": "Añadir cajón",
+      "empty": "Sin cajones: la sesión se abre sin cajón.",
+      "loadError": "No se pudieron cargar los cajones.",
+      "entity": {
+        "one": "cajón",
+        "many": "cajones"
+      },
+      "columns": {
+        "name": "Nombre",
+        "active": "Activo"
+      },
+      "yes": "Sí",
+      "no": "No",
+      "rename": "Cambiar nombre",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "activated": "Cajón activado",
+      "deactivated": "Cajón desactivado",
+      "toggleFailed": "No se pudo cambiar el cajón.",
+      "modal": {
+        "create": "Nuevo cajón",
+        "rename": "Cambiar el nombre del cajón",
+        "name": "Nombre",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "required": "Escribe el nombre del cajón.",
+        "failed": "No se pudo guardar el cajón.",
+        "created": "Cajón creado",
+        "renamed": "Cajón renombrado"
+      }
+    }
+  }
+}
