@@ -13,6 +13,7 @@ from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
 from base.admin import open_hub
 from base.auth_views import auth_callback, auth_login, auth_logout
 from base.health import readyz
+from base.internal import hub_state
 from base.spa import spa
 from config.api import api
 
@@ -33,5 +34,6 @@ urlpatterns = [
     path("auth/login", auth_login, name="auth-login"),
     path("auth/callback", auth_callback, name="auth-callback"),
     path("auth/logout", auth_logout, name="auth-logout"),
+    path("internal/hubs/<uuid:hub_id>/state", hub_state, name="internal-hub-state"),
     re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),
 ]

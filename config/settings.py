@@ -240,6 +240,11 @@ INTERNAL_SHARED_SECRET = (
     if DEBUG
     else config("INTERNAL_SHARED_SECRET")
 )
+# During a rotation of the shared secret, the one a call of the SaaS may still be signed with (base.internal; the
+# SaaS's accounts/signing.py has the same steps); empty otherwise.
+INTERNAL_SHARED_SECRET_PREVIOUS = config("INTERNAL_SHARED_SECRET_PREVIOUS", default="")
+# How far an internal call's X-Erplora-Timestamp may be from now (both ways), as in the SaaS.
+INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
 # The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals a business's own VeriFactu
 # certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
 # certificate is refused visibly (verifactu.certificate_storage_unavailable).
