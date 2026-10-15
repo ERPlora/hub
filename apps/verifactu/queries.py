@@ -98,6 +98,16 @@ def production_open() -> bool:
     )
 
 
+def effective_environment(ctx: OperationContext, config: Config) -> str:
+    """The AEAT environment a new record of this business files in: ERPlora's own hub (PLAN-SAAS §4), its
+    deployment's (``prod``: production; ``pre``: testing), whatever its switch says; any other, its configuration's."""
+    if platform.is_platform_hub(ctx.scope):
+        if settings.ERPLORA_ENVIRONMENT == "prod":
+            return Environment.PRODUCTION
+        return Environment.TESTING
+    return config.environment
+
+
 def own_certificate() -> OwnCertificate | None:
     """The business's own certificate, its sealed material left unread; ``None`` while none is uploaded."""
     return OwnCertificate.objects.defer("sealed_blob").filter(singleton=True).first()
@@ -139,11 +149,14 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
 def sending_problem(config: Config, environment: str) -> str:
     """Why the chosen route cannot carry a record to the AEAT of ``environment`` now (a wait code), or ``""``: the
     own route needs its valid certificate, as in the old Hub; in production, ERPlora's route needs the approved
-    signed authorisation. What keeps the queue waiting; the live option never does (what was sealed reaches the
+    signed authorisation, but for ERPlora's own records. What keeps the queue waiting; the live option never does (what was sealed reaches the
     AEAT)."""
     if config.route == Config.Route.OWN:
         return "" if certificate_valid() else "own_certificate_missing"
     if environment != Environment.PRODUCTION:
+        return ""
+    if issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID:
+        # ERPlora's seal presents ERPlora's own records: it represents nobody (its own hub, PLAN-SAAS §4).
         return ""
     if config.representation_status != Config.Representation.APPROVED:
         return "representation_not_approved"

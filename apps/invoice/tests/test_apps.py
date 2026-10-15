@@ -122,6 +122,10 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.issuer.get",
         "invoice.issuer.update",
         "invoice.issuer.sync",
+        "invoice.invoice.issue_platform",
+        "invoice.invoice.platform_status",
+        "invoice.invoice.platform_document",
+        "invoice.invoice.platform_health",
     }
     high = {
         "invoice.invoice.create",
@@ -132,6 +136,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.rectify_from_void",
         "invoice.issuer.update",
         "invoice.issuer.sync",
+        "invoice.invoice.issue_platform",
     }
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
@@ -160,3 +165,19 @@ def test_the_system_alone_receives_the_issuer_from_the_saas():
 
     assert registry["invoice.issuer.sync"].permission == "invoice.sync_issuer"
     assert "invoice.sync_issuer" not in invoice().permissions
+
+
+def test_the_system_alone_issues_erploras_own_invoices():
+    # ERPlora's platform hub (PLAN-SAAS §4): `invoice.issue_platform` is declared by no role and no route serves it;
+    # only /internal/platform/invoices, signed by the SaaS, calls it as the system.
+    from live.operations import registry
+
+    for name in (
+        "invoice.invoice.issue_platform",
+        "invoice.invoice.platform_status",
+        "invoice.invoice.platform_document",
+        "invoice.invoice.platform_health",
+    ):
+        assert registry[name].permission == "invoice.issue_platform", name
+        assert registry[name].expose_api is False, name
+    assert "invoice.issue_platform" not in invoice().permissions

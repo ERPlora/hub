@@ -945,3 +945,11 @@ msgstr "es un negocio de demostración: siempre presenta en el entorno de prueba
 #: services.py
 msgid "A demo business cannot go live: it always files in the AEAT's test environment."
 msgstr "Un negocio de demostración no puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT."
+
+#: services.py
+msgid ""
+"ERPlora's own business files in the AEAT environment of its server: its "
+"environment cannot be switched."
+msgstr ""
+"El negocio propio de ERPlora presenta en el entorno de la AEAT de su "
+"servidor: su entorno no se puede cambiar."

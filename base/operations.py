@@ -9,7 +9,7 @@ as pre's ``acme.pre.erplora.com`` on prod's Hub) is no hub and raises ``Http404`
 An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The platform host
 (``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin, PLAN §18.1)
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
-Actor = the session's user; permissions from ``base.permissions``. :func:`is_demo_hub` is what the apps
+Actor = the session's user; permissions from ``base.permissions``. :func:`is_demo_hub` and :func:`is_platform_hub` are what the apps
 ask about a hub's registry (a module never reads it). This is the only piece phase 2 replaces (scope =
 ``use_hub``).
 """
@@ -52,6 +52,12 @@ def is_demo_hub(scope: Scope) -> bool:
     """Whether ``scope``'s hub is an ephemeral demo (PLAN-SAAS §3.5: ``control.Hub.is_demo``, pinned to the AEAT's
     test environment). Phase 1 has neither the control registry nor demos (block 7): no hub is one."""
     return False
+
+
+def is_platform_hub(scope: Scope) -> bool:
+    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices (PLAN-SAAS §4;
+    ``control.Hub.is_platform`` in phase 2). Phase 1 names it by its reserved slug, ``PLATFORM_HUB_SLUG``."""
+    return scope.key == settings.PLATFORM_HUB_SLUG
 
 
 def _host_name(request: HttpRequest) -> str:
