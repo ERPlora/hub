@@ -1,0 +1,126 @@
+{% load i18n %}<!doctype html>
+{% comment %}
+  The A4 document of an invoice (INVOICE-F18), the same sheet the old <ok-invoice> painted: the issuer and the
+  document block on top, «Bill to», the lines, the breakdown by rate with the totals and the note of what it
+  rectifies. Every figure comes written from queries.render_document in the reader's language. A whole page with
+  its own styles, so the Printing app, a PDF or an e-mail can take it as it is.
+{% endcomment %}
+<html lang="{{ language }}">
+<head>
+<meta charset="utf-8">
+<title>{{ title }} {{ invoice.number }}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  body { margin: 0; background: #fff; }
+  .sheet { box-sizing: border-box; width: 210mm; max-width: 100%; margin: 0 auto; padding: 16mm 14mm; background: #fff;
+    color: #1c1b18; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 12px; line-height: 1.5; }
+  .top { display: flex; justify-content: space-between; gap: 2rem; align-items: flex-start; }
+  .issuer-name { font-size: 15px; font-weight: 700; }
+  .issuer-meta, .party-meta { color: #6b6b6b; font-size: 11px; }
+  .doc { text-align: right; min-width: 48mm; }
+  .doc-title { font-size: 24px; font-weight: 800; letter-spacing: .06em; color: #0091ce; text-transform: uppercase; }
+  .doc-type, .doc-copy { font-size: 10px; color: #6b6b6b; text-transform: uppercase; letter-spacing: .08em; }
+  .doc-copy { font-weight: 700; color: #1c1b18; }
+  .doc-grid { margin-top: .6rem; display: grid; grid-template-columns: auto auto; gap: .1rem .8rem; justify-content: end; font-size: 11px; }
+  .doc-grid .k { color: #6b6b6b; text-align: right; }
+  .doc-grid .v { font-weight: 600; text-align: right; }
+  .bill-to { margin: 9mm 0 6mm; padding: 3mm 4mm; background: #ebf6fb; border-radius: 8px; }
+  .bill-to .label { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #6b6b6b; }
+  .bill-to .name { font-weight: 700; font-size: 13px; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+  table.lines thead th { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: #6b6b6b; text-align: left;
+    padding: 2mm 2mm; border-bottom: 1.5px solid #1c1b18; }
+  table.lines tbody td { padding: 2mm 2mm; border-bottom: 1px solid #d9d6cf; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  table.lines th.num { text-align: right; }
+  .desc { width: 42%; }
+  .summary { display: flex; justify-content: flex-end; margin-top: 4mm; }
+  .summary table { border-collapse: collapse; min-width: 70mm; }
+  .summary td { padding: 1mm 2mm; }
+  .summary .grand td { font-size: 15px; font-weight: 800; border-top: 1.5px solid #1c1b18; padding-top: 2mm; }
+  .summary .grand td.num { color: #0091ce; }
+  .muted { color: #6b6b6b; }
+  .empty-lines { text-align: center; padding: 6mm; }
+  .legal { margin-top: 8mm; padding-top: 3mm; border-top: 1px solid #d9d6cf; font-size: 9px; color: #6b6b6b;
+    white-space: pre-line; text-align: center; }
+  @media print {
+    .sheet { width: auto; max-width: none; padding: 0; }
+    .bill-to { background: transparent; border: 1px solid #d9d6cf; }
+    table.lines thead { display: table-header-group; }
+    table.lines tbody tr { break-inside: avoid; page-break-inside: avoid; }
+    .summary, .legal, .bill-to { break-inside: avoid; page-break-inside: avoid; }
+    .summary { break-before: avoid; page-break-before: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="top">
+    <div>
+      <div class="issuer-name">{{ invoice.issuer_name }}</div>
+      <div class="issuer-meta">
+        {% if invoice.issuer_address %}<div>{{ invoice.issuer_address }}</div>{% endif %}
+        <div>{% translate "Tax ID" %}: {{ invoice.issuer_tax_id }}</div>
+      </div>
+    </div>
+    <div class="doc">
+      <div class="doc-title">{{ title }}</div>
+      {% if duplicate %}<div class="doc-copy">{{ copy_label }}</div>{% endif %}
+      <div class="doc-type">{{ invoice.invoice_type }}</div>
+      <div class="doc-grid">
+        <span class="k">{% translate "No." %}</span><span class="v">{{ invoice.number }}</span>
+        <span class="k">{% translate "Date" %}</span><span class="v">{{ issue_date }}</span>
+        {% if operation_date %}<span class="k">{% translate "Operation date" %}</span><span class="v">{{ operation_date }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if invoice.customer_name or invoice.customer_tax_id %}
+  <div class="bill-to">
+    <div class="label">{% translate "Bill to" %}</div>
+    <div class="name">{{ invoice.customer_name }}</div>
+    <div class="party-meta">
+      {% if invoice.customer_address %}<div>{{ invoice.customer_address }}</div>{% endif %}
+      {% if invoice.customer_country %}<div>{{ invoice.customer_country }}</div>{% endif %}
+      {% if invoice.customer_tax_id %}<div>{% translate "Tax ID" %}: {{ invoice.customer_tax_id }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  <table class="lines">
+    <thead>
+      <tr>
+        <th class="desc">{% translate "Description" %}</th>
+        <th class="num">{% translate "Qty" %}</th>
+        <th class="num">{% translate "Price" %}</th>
+        {% if discounted %}<th class="num">{% translate "Discount" %}</th>{% endif %}
+        <th class="num">{% translate "Tax" %}</th>
+        <th class="num">{% translate "Amount" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td class="desc">{{ line.description }}</td>
+        <td class="num">{{ line.quantity }}</td>
+        <td class="num">{{ line.unit_price }}</td>
+        {% if discounted %}<td class="num">{{ line.discount }}</td>{% endif %}
+        <td class="num">{{ line.tax_rate }}</td>
+        <td class="num">{{ line.amount }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if discounted %}6{% else %}5{% endif %}" class="muted empty-lines">{% translate "— No lines —" %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="summary">
+    <table>
+      <tr><td class="muted">{% translate "Tax base" %}</td><td class="num">{{ base }}</td></tr>
+      {% for tax in taxes %}
+      <tr><td class="muted">{{ tax.label }} <span class="muted">({{ tax.base }})</span></td><td class="num">{{ tax.amount }}</td></tr>
+      {% endfor %}
+      <tr class="grand"><td>{% translate "TOTAL" %}</td><td class="num">{{ total }}</td></tr>
+    </table>
+  </div>
+  {% if note %}<div class="legal">{{ note }}</div>{% endif %}
+</div>
+</body>
+</html>
