@@ -117,7 +117,7 @@ ya elegido) abre un buscador por nombre, teléfono o email, con «+ Nuevo client
 teléfono) y **Quitar cliente**. Lo pinta Clientes; el hueco lo reserva Venta.
 
 ### Buscador de cliente del TPV · API
-`apps/customer/frontend/components/CustomerSearch.vue` (por su ruta: Venta lo importa de ahí).
+El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los componentes de Clientes).
 
 ```vue
 <CustomerSearch v-model="venta.cliente" v-model:open="eligiendo" />
@@ -185,8 +185,8 @@ teléfono) y **Quitar cliente**. Lo pinta Clientes; el hueco lo reserva Venta.
 | CUSTOMER-F30 | Dar la ficha de un cliente a otras apps | hecho | común |
 
 «Servidor hecho» quiere decir que la regla y su servicio están probados y que falta la pantalla o la app
-que lo usa (Venta, Citas, la Bandeja de WhatsApp). «Hecho»: servidor y páginas con sus tests (Vitest y e2e
-`tests/e2e/customer-*.spec.ts` en Chrome).
+que lo usa (Venta, Citas, la Bandeja de WhatsApp). «Hecho»: servidor y páginas con sus tests (de las
+páginas y de extremo a extremo en Chrome).
 
 ### CUSTOMER-F01 Dar de alta una ficha
 Estado: hecho
@@ -203,8 +203,8 @@ Pasos:
 3. Solo el nombre es obligatorio: hasta que no lo hay, **Guardar** no se puede pulsar.
 4. Pulsa **Guardar**: el panel se cierra y la ficha aparece en la lista; las cifras se recalculan.
 Entra: lo que se teclea. El país se guarda con su código de dos letras (`ES`, `FR`). El teléfono se
-guarda en formato internacional (`+34600111222`, CUSTOMER-F11); el email y el NIF, sin los espacios
-de los extremos.
+guarda en formato internacional (`+34` y las cifras seguidas, CUSTOMER-F11); el email y el NIF, sin los
+espacios de los extremos.
 Sale: la ficha nueva, activa y sin consentimiento de ningún tipo (CUSTOMER-F14), y el aviso de ficha
 creada (`customer.customer.created`), que escucha WhatsApp para unir a la ficha las conversaciones
 que ya tenía ese número.
@@ -222,8 +222,8 @@ Pantalla: Clientes
 Pasos:
 1. Escribe en el buscador. Busca a la vez en nombre, email, teléfono, NIF y empresa, sin distinguir
    mayúsculas ni acentos («garcia» encuentra «García»). Un término hecho solo de cifras y signos de
-   teléfono («600 111 222», «0034 600-111-222», «+44 (0)7700 900123») se busca por sus cifras, sin el
-   `00` ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
+   teléfono (con espacios, guiones o paréntesis, con `+` o `00` delante) se busca por sus cifras, sin
+   el `00` ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
 2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en euros).
 3. Ordena por nombre, email, teléfono, etapa, gastado, última compra o fecha de alta. De entrada, por
    nombre de la A a la Z, 50 por página (como mucho 100).
@@ -390,11 +390,11 @@ Pasos:
 2. El número se lee con las mismas reglas con que se guarda (CUSTOMER-F11): con el prefijo que lleve
    (`+` o el `00` del país del negocio) o, si no lleva, en el país del negocio.
 3. Unas cifras sin `+` se leen además como número internacional, que es como las da WhatsApp: en un
-   negocio de España, `447700900123` es `+447700900123`.
-4. Casan las fichas vivas cuyo teléfono es uno de esos números. En un negocio de España,
-   `600 111 222`, `+34 600-111-222`, `0034600111222` y `34600111222` son la misma persona.
-5. Las mismas cifras detrás del prefijo de otro país son otra persona: `+33 600 111 222` no es la
-   ficha `600 111 222` de un salón español.
+   negocio de España, unas cifras que empiezan por `44` son también un número del Reino Unido.
+4. Casan las fichas vivas cuyo teléfono es uno de esos números. En un negocio de España, el mismo
+   móvil escrito con espacios, con guiones o con `+34`, `0034` o `34` delante es la misma persona.
+5. Las mismas cifras detrás del prefijo de otro país son otra persona: ese móvil con el prefijo de
+   Francia (`+33`) no es la ficha del móvil español de un salón español.
 Entra: el número tal como llegue.
 Sale: las fichas que casan (nombre, email y teléfono), por nombre. Si son dos o más, decide quien
 pregunta.
@@ -409,12 +409,14 @@ Actor: quien da de alta o edita
 Pantalla: Ficha de cliente
 Pasos:
 1. Al dar de alta, editar, importar o crear en el TPV o por WhatsApp, se escribe el teléfono como se
-   tenga (`600 111 222`, `0034 600-111-222`, `+44 (0)7700 900123`).
+   tenga (con espacios o guiones, con `0034` o `+34` delante, o con el prefijo de otro país y el cero
+   nacional entre paréntesis).
 2. Al guardar se leen las reglas de libphonenumber: con el prefijo que lleve o, si no lleva, en el
    país del negocio (España mientras no haya otro); fuera espacios, guiones, puntos, barras,
    paréntesis y el cero nacional (también entre paréntesis tras el prefijo). Italia y los demás
    países que conservan el `0` tras el prefijo lo conservan. El número tiene que ser un número
-   válido de su país (su numeración, no solo su longitud). Se guarda `+34600111222`.
+   válido de su país (su numeración, no solo su longitud). Se guarda con su prefijo y las cifras
+   seguidas (`+34` y las nueve cifras, para un número español).
 3. Vaciar el teléfono está permitido: solo el nombre es obligatorio.
 Entra: el teléfono tecleado.
 Sale: el teléfono en E.164 en la ficha. Quien lo copia (Citas en la cita) lo copia ya normalizado.
@@ -669,22 +671,21 @@ Si falla: «Sin compras.» si no hay ninguna.
 Implicados: ninguno
 
 ### CUSTOMER-F24 Ver en la ficha lo que otras apps saben del cliente
-Estado: hecho — el hueco está en la ficha; hoy ninguna app ofrece bloque (Citas lo traerá)
+Estado: hecho
 Vertical: común
 Actor: todos
 Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha. Al final aparece el bloque de cada app encendida que lo ofrece (hoy, Citas con el
-   «Historial de visitas»).
+   «Historial de visitas»); si la app está apagada, su bloque no sale.
+2. Lee el bloque: en «Historial de visitas» salen sus diez últimas citas, la más reciente primero, con
+   los servicios, el profesional, el estado y las notas de la visita. Una cita nueva aparece sin
+   recargar la ficha.
 Entra: qué cliente está abierto (Clientes se lo dice al bloque; no le pasa más datos).
 Sale: nada; solo lectura.
-Si falla: cada bloque enseña su propio error.
-Contrato del bloque: una app que quiera estar en la ficha publica
-`apps/<id>/frontend/customer-card/<Bloque>.vue`, un componente con una sola prop, `customerId` (el id de
-la ficha); lee lo suyo con sus propias consultas. Clientes no depende de ninguna: los encuentra
-(`components/CustomerCardBlocks.vue`), pinta solo los de las apps encendidas en el negocio, cada uno en
-su trozo y en su marco (si falla, «No se pudo mostrar este bloque.» en su sitio y la ficha sigue).
-Implicados: APPOINTMENTS-F20
+Si falla: cada bloque enseña su propio error en su sitio («No se pudo mostrar este bloque.») y el resto
+de la ficha sigue.
+Implicados: APPOINTMENT-F20
 
 ### CUSTOMER-F25 Crear la clienta sin salir de la agenda
 <!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f06 old:customers/workflow/con-otros-modulos.md#customers-f25 -->
@@ -910,8 +911,8 @@ Los avisos llevan solo identificadores, nunca datos personales: quien necesite l
 | Venta anulada (`sale.sale.voided`) | Venta | Resta la compra (CUSTOMER-F21) | `customer.purchase.void` |
 | Venta devuelta (`sale.sale.refunded`) | Venta | Apunta la devolución y la resta del gastado (CUSTOMER-F22) | `customer.purchase.refund` |
 
-Las tres reacciones están declaradas en `events.py` (`REACTIONS` y `react`, como las de Inventario) y
-probadas con los avisos reales de Venta; las ejecuta el sistema, cada una en su transacción, cuando
+Las tres reacciones son de Clientes (como las de Inventario) y están probadas con los avisos reales de
+Venta; las ejecuta el sistema, cada una en su transacción, cuando
 el relay del outbox reparta los avisos entre apps (fase 2). Clientes no depende de Venta: es el
 único enlace.
 
@@ -969,7 +970,13 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 - Los nombres de grupos, etiquetas y campos son únicos sin distinguir mayúsculas
   (`Lower("name")`); el esquema les quita los espacios de los extremos.
 - `customer.purchase.record`, `customer.purchase.void` y `customer.purchase.refund` no tienen ruta
-  de API: son del sistema y los ejecuta `events.react` con los avisos de Venta.
+  de API: son del sistema y los ejecuta `events.react` con los avisos de Venta (declarados en
+  `events.py`, `REACTIONS`).
+- Bloques de la ficha (CUSTOMER-F24): una app que quiera estar en la ficha publica
+  `apps/<id>/frontend/customer-card/<Bloque>.vue`, un componente con una sola prop, `customerId` (el id
+  de la ficha); lee lo suyo con sus propias consultas. Clientes no depende de ninguna: los encuentra
+  (`components/CustomerCardBlocks.vue`), pinta solo los de las apps encendidas en el negocio, cada uno
+  en su trozo y en su marco (si falla, «No se pudo mostrar este bloque.» en su sitio y la ficha sigue).
 - El administrador de Django (solo en `hubs.erplora.com`, para el staff) tiene CRUD completo sobre
   todas las tablas (ronda 12, PLAN §17); lo que cambia ahí no deja aviso en el outbox.
 - Toda escritura sobre una ficha bloquea antes su fila (también nota, actividad, consentimiento y
