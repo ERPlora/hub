@@ -57,6 +57,11 @@ export const uniqueName = (prefix: string): string => `${prefix} ${Date.now().to
 
 /** The SaaS (`erplora.com` in production): the only login page a hub has. */
 export const SAAS = STACK.saas;
+/**
+ * Whether `page` is on the SaaS (its login): what its console says there is the SaaS's, judged by the SaaS's own
+ * suite. Its headless API answers 401 while nobody is signed in (allauth's protocol), and Chrome logs each one.
+ */
+export const onSaas = (page: Page): boolean => new URL(page.url()).origin === SAAS;
 /** A SaaS account: what its sign-in page asks for. */
 export interface Credentials {
   email: string;
@@ -326,6 +331,7 @@ export async function collectProblems(
   const warnings: string[] = [];
   const pageErrors: string[] = [];
   page.on('console', (msg) => {
+    if (onSaas(page)) return;
     if (msg.type() === 'error') consoleErrors.push(msg.text());
     if (msg.type() === 'warning') warnings.push(msg.text());
   });
