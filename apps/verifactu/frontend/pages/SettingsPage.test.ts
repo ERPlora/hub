@@ -117,9 +117,12 @@ describe('SettingsPage', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Your business is live: records now go to the real AEAT.');
   });
 
-  it('while the server keeps going live closed, it says so', async () => {
-    const s = await setup({ production_open: false });
-    expect(s.find('verifactu-settings-closed').text()).toContain('Going live is not open on this server yet');
+  it('while the server keeps going live closed, it says so once, among what keeps it from going live', async () => {
+    const closed = { code: 'production_closed', message: 'ERPlora has not opened real filing with the AEAT on this server yet' };
+    const s = await setup({ production_open: false, live_blockers: [closed] });
+    const blockers = s.find('verifactu-settings-live-blockers').text();
+    expect(blockers).toContain('ERPlora has not opened real filing with the AEAT on this server yet');
+    expect(s.find('verifactu-settings-closed').exists()).toBe(false);
     expect((s.find('verifactu-settings-go-live').element as unknown as { disabled: boolean }).disabled).toBe(true);
   });
 

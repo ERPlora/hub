@@ -108,6 +108,7 @@ def test_in_production_without_a_way_to_the_aeat_nothing_is_issued(issuer, setti
     # Working-rules §15: in production nothing is charged that can never reach the AEAT. VeriFactu refuses to
     # seal with its route's own code; the document is undone and the series gives its number back.
     settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     system = system_context(A)
     run(
         "verifactu.config.sync",

@@ -12,7 +12,7 @@ import pytest
 from django.utils import timezone, translation
 from live.context import system_context
 
-from apps.verifactu import queries
+from apps.verifactu import certificates, queries
 from apps.verifactu.models import (
     AeatRecord,
     Config,
@@ -21,9 +21,30 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
-from apps.verifactu.tests.conftest import A, RECIPIENT, ctx_for, manual, run
+from apps.verifactu.tests.conftest import (
+    A,
+    RECIPIENT,
+    ctx_for,
+    make_p12,
+    manual,
+    run,
+)
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def storage(settings):
+    """The key that keeps the own certificates: one uploaded here opens, as on a server set up."""
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+
+
+@pytest.fixture
+def server_ready(settings):
+    """The prod deployment opened by ERPlora, with its gateway: what the route lacks is all that is left."""
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
 
 
 def ticket(price=1000):
@@ -390,7 +411,7 @@ def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_)
     assert queries.production_open() is open_
 
 
-def test_erplora_route_in_production_needs_approval_and_the_paid_option():
+def test_erplora_route_in_production_needs_approval_and_the_paid_option(server_ready):
     config = Config(route="erplora", representation_status="approved", live_paid=False)
     assert queries.route_problem(config, "production") == "live_option_unpaid"
     config.live_paid = True
@@ -400,7 +421,9 @@ def test_erplora_route_in_production_needs_approval_and_the_paid_option():
     assert queries.route_problem(config, "testing") == ""
 
 
-def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way():
+def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
+    server_ready,
+):
     # The live option keeps new sales from being sealed (route_problem); what was sealed goes to the AEAT while
     # the route can carry it (every ticket with a QR reaches the AEAT).
     config = Config(route="erplora", representation_status="approved", live_paid=False)
@@ -412,7 +435,9 @@ def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
     assert queries.sending_problem(config, "testing") == "own_certificate_missing"
 
 
-def test_the_configuration_says_why_new_sales_are_refused_only_in_production(issuer):
+def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
+    issuer, server_ready
+):
     assert run("verifactu.config.get").issue_blocker is None
     Config.objects.create(environment="production", representation_status="approved")
     blocker = run("verifactu.config.get").issue_blocker
@@ -428,12 +453,12 @@ def own_certificate(days=30):
         holder_tax_id="12345678Z",
         kind="personal",
         expires_at=timezone.now() + dt.timedelta(days=days),
-        sealed_blob=b"sealed",
+        sealed_blob=certificates.seal(make_p12(), "secret"),
         uploaded_by="ana",
     )
 
 
-def test_own_route_in_production_needs_only_its_valid_certificate():
+def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
     # As in the old Hub (an_own_certificate_needs_no_grant_to_go_live): the business files with its own
     # certificate, so neither ERPlora's approval nor the live option of the plan applies (Ioan's model,
     # 2026-10-15: «con certificado propio, como en el Hub antiguo»).
@@ -447,7 +472,9 @@ def test_own_route_in_production_needs_only_its_valid_certificate():
     assert queries.route_problem(config, "testing") == ""
 
 
-def test_the_configuration_lists_everything_that_keeps_it_from_going_live(issuer):
+def test_the_configuration_lists_everything_that_keeps_it_from_going_live(
+    issuer, server_ready
+):
     assert [reason.code for reason in run("verifactu.config.get").live_blockers] == [
         "representation_not_approved",
         "live_option_unpaid",
@@ -469,7 +496,7 @@ def test_the_configuration_lists_everything_that_keeps_it_from_going_live(issuer
     assert run("verifactu.config.get").live_blockers == []
 
 
-def test_with_the_own_certificate_the_live_option_is_not_asked(issuer):
+def test_with_the_own_certificate_the_live_option_is_not_asked(issuer, server_ready):
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     assert run("verifactu.config.get").live_blockers == []

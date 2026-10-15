@@ -496,8 +496,12 @@ msgid "the gateway or the AEAT could not be reached (%(detail)s)"
 msgstr "no se ha podido contactar con la pasarela o con la AEAT (%(detail)s)"
 
 #: models.py:441
-msgid "ERPlora's gateway could not present it (%(detail)s)"
-msgstr "la pasarela de ERPlora no ha podido presentarlo (%(detail)s)"
+msgid ""
+"ERPlora's gateway could not present it (%(detail)s); it is not sent again by "
+"itself until the configuration changes or it is sent by hand"
+msgstr ""
+"la pasarela de ERPlora no ha podido presentarlo (%(detail)s); no se vuelve a "
+"enviar por sí solo hasta que cambie la configuración o se envíe a mano"
 
 #: models.py:443
 msgid "the submission left and no answer came back; it is sent again, declared as late"
@@ -1046,3 +1050,27 @@ msgstr "ERPlora no ha admitido el otorgamiento tal como está."
 #: apps/verifactu/services.py
 msgid "ERPlora has not linked this business yet. Try again in a few minutes."
 msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."
+
+#: apps/verifactu/schemas.py
+msgid "The certificate file has to be 1 MB at most."
+msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
+
+#: apps/verifactu/models.py
+msgid "ERPlora has not opened real filing with the AEAT on this server yet"
+msgstr "ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor"
+
+#: apps/verifactu/services.py
+msgid ""
+"Your own certificate cannot be opened on this server: upload it again in "
+"VeriFactu → Configuration → My certificate."
+msgstr ""
+"Tu certificado propio no se puede abrir en este servidor: vuelve a subirlo en "
+"VeriFactu → Configuración → Mi certificado."
+
+#: apps/verifactu/services.py
+msgid ""
+"ERPlora's sending gateway is not configured on this server: nothing could "
+"reach the AEAT."
+msgstr ""
+"La pasarela de envío de ERPlora no está configurada en este servidor: nada "
+"podría llegar a la AEAT."

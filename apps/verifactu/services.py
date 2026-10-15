@@ -168,6 +168,13 @@ CERTIFICATE_HOLDER_MISMATCH = _(
     "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
 )
 CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one.")
+OWN_CERTIFICATE_UNREADABLE = _(
+    "Your own certificate cannot be opened on this server: upload it again in VeriFactu → Configuration → My "
+    "certificate."
+)
+GATEWAY_UNAVAILABLE = _(
+    "ERPlora's sending gateway is not configured on this server: nothing could reach the AEAT."
+)
 GO_LIVE_FORBIDDEN = _(
     "A demo business cannot go live: it always files in the AEAT's test environment."
 )
@@ -193,6 +200,9 @@ CERTIFICATE_REFUSALS = {
 TEST_LINE = "Prueba VeriFactu"
 
 CONFIGURE = "verifactu.configure"
+#: The wait of a record the gateway refused (409/413/422): it would be refused again as it is, so it never goes
+#: out on a timer, only after a change (``_back_in_the_queue``) or by hand (``verifactu.record.transmit``).
+GATEWAY_REFUSAL = "refused"
 TRANSMIT = "verifactu.transmit_record"
 CORRECT = "verifactu.correct_record"
 CENT = Decimal(1)
@@ -741,6 +751,15 @@ def _unsent(issuer_nif: str | None = None, environment: str | None = None):
     return queryset
 
 
+def _back_in_the_queue(records=None) -> None:
+    """What the gateway refused goes out with the next pass: a change that may cure it (the route, the own
+    certificate, a new photo of the account) or a person's «Retry»."""
+    records = _unsent() if records is None else records
+    records.filter(wait_reason=GATEWAY_REFUSAL).update(
+        wait_reason="", wait_detail="", next_attempt_at=timezone.now()
+    )
+
+
 def _failed(
     ctx,
     batch,
@@ -893,6 +912,11 @@ def _send_chain(
         .select_for_update()
         .order_by("sequence")[: envelope.MAX_RECORDS]
     )
+    if batch and not force and batch[0].wait_reason == GATEWAY_REFUSAL:
+        # The gateway would refuse it again as it is: it waits for a change or a person, never on a timer.
+        tally.because(GATEWAY_REFUSAL, batch[0].wait_detail)
+        tally.waiting += len(batch)
+        return
     if not batch or (not force and batch[0].next_attempt_at > now):
         tally.waiting += len(batch)
         return
@@ -1000,8 +1024,8 @@ def _send_chain(
                 )
     elif reply.kind == gateway.REFUSED:
         detail = f"{reply.code}: {reply.message}"
-        _failed(ctx, batch, "refused", detail, now)
-        tally.because("refused", detail)
+        _failed(ctx, batch, GATEWAY_REFUSAL, detail, now)
+        tally.because(GATEWAY_REFUSAL, detail)
         tally.waiting += len(batch)
     elif reply.kind == gateway.UNKNOWN:
         _failed(ctx, batch, "unknown", reply.message, now, status=Record.Status.SENT)
@@ -1143,9 +1167,11 @@ def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSumma
     if record.status not in Record.UNSENT:
         raise Conflict(str(NOT_IN_QUEUE), code="verifactu.not_in_queue")
     now = timezone.now()
-    _unsent(record.issuer_nif, record.environment).filter(
+    earlier = _unsent(record.issuer_nif, record.environment).filter(
         sequence__lte=record.sequence
-    ).update(next_attempt_at=now)
+    )
+    _back_in_the_queue(earlier)
+    earlier.update(next_attempt_at=now)
     _event(
         ctx,
         Event.Kind.QUEUE_RETRIED,
@@ -1694,12 +1720,19 @@ def _changed(
 
 
 def _route_refusal(config: Config, route: str, environment: str) -> Conflict | None:
-    """Why ``route`` cannot file in ``environment`` (VERIFACTU-F04, F08), as the refusal to raise."""
+    """Why ``route`` cannot file in ``environment`` (VERIFACTU-F04, F08), as the refusal to raise. A closed server
+    is not the route's: ``go_live`` refuses it first, and choosing a route stays possible meanwhile."""
     probe = copy.copy(config)
     probe.route = route
     problem = route_problem(probe, environment)
     if problem == "own_certificate_missing":
         return Conflict(str(NO_OWN_CERTIFICATE), code="verifactu.no_own_certificate")
+    if problem == "own_certificate_unreadable":
+        return Conflict(
+            str(OWN_CERTIFICATE_UNREADABLE), code="verifactu.own_certificate_unreadable"
+        )
+    if problem == "gateway_unavailable":
+        return Conflict(str(GATEWAY_UNAVAILABLE), code="verifactu.gateway_unavailable")
     if problem == "representation_not_approved":
         return Conflict(
             str(REPRESENTATION_NOT_APPROVED),
@@ -1730,6 +1763,7 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
         raise refusal
     if config.route != data.route:
         config.route = data.route
+        _back_in_the_queue()
         _changed(
             ctx,
             config,
@@ -1881,6 +1915,7 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
             "sealed_blob": certificates.seal(p12, password),
         },
     )
+    _back_in_the_queue()
     _certificate_event(ctx, "certificate_uploaded", row)
     return config_out(config_row(), ctx)
 
@@ -1936,6 +1971,7 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
         config.hub_status = data.hub_status
     config.synced_version = data.version
     config.synced_at = timezone.now()
+    _back_in_the_queue()
     _changed(
         ctx, config, "account_synced", {"version": data.version}, fields=["account"]
     )

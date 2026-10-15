@@ -466,6 +466,9 @@ WAIT_REASONS = {
     "gateway_unavailable": _(
         "ERPlora's sending gateway is not configured on this server"
     ),
+    "production_closed": _(
+        "ERPlora has not opened real filing with the AEAT on this server yet"
+    ),
     "own_certificate_missing": _("your own certificate is not loaded or has expired"),
     "own_certificate_unreadable": _(
         "your own certificate cannot be opened on this server: upload it again"
@@ -484,7 +487,10 @@ WAIT_REASONS = {
     ),
     "aeat_wait": _("the AEAT asked to wait until %(at)s"),
     "unreachable": _("the gateway or the AEAT could not be reached (%(detail)s)"),
-    "refused": _("ERPlora's gateway could not present it (%(detail)s)"),
+    "refused": _(
+        "ERPlora's gateway could not present it (%(detail)s); it is not sent again by itself until the "
+        "configuration changes or it is sent by hand"
+    ),
     "unknown": _(
         "the submission left and no answer came back; it is sent again, declared as late"
     ),

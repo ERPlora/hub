@@ -58,8 +58,13 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Set {', '.join(missing)}: the platform hub's issuer. Nothing was written."
             )
+        # What ``verifactu.config.follow_deployment`` pins on a new hub (``queries.production_open``): production only
+        # on the prod deployment once ERPlora opens real filing there (working-rules §15).
         environment = (
-            "production" if settings.ERPLORA_ENVIRONMENT == "prod" else "testing"
+            "production"
+            if settings.ERPLORA_ENVIRONMENT == "prod"
+            and settings.VERIFACTU_PRODUCTION_ENABLED
+            else "testing"
         )
         self.stdout.write(
             f"ERPlora's own hub: {settings.PLATFORM_HUB_SLUG} ({settings.ERPLORA_ENVIRONMENT})"
@@ -100,8 +105,12 @@ class Command(BaseCommand):
         else:
             self.stdout.write(f"- would pin VeriFactu to {environment}")
         self.stdout.write("- Invoicing and VeriFactu: always active in phase 1")
-        if environment == "production":
+        if settings.ERPLORA_ENVIRONMENT == "prod":
             self.stdout.write(self.style.MIGRATE_HEADING("Before a single real record"))
+            self.stdout.write(
+                "  - VeriFactu files in production only with VERIFACTU_PRODUCTION_ENABLED=true, under Ioan's "
+                "supervision;"
+            )
             self.stdout.write(
                 "  - the SaaS posts invoices only with PLATFORM_INVOICING_ENABLED=true;"
             )

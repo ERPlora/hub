@@ -83,11 +83,19 @@ def test_it_sets_the_issuer_from_the_environment(deployment):
 
 
 @pytest.mark.parametrize(
-    ("where", "environment"),
-    [("pre", Environment.TESTING), ("prod", Environment.PRODUCTION)],
+    ("where", "opened", "environment"),
+    [
+        ("pre", True, Environment.TESTING),
+        ("prod", True, Environment.PRODUCTION),
+        # Working-rules §15: closed on the server, ERPlora's own hub files in testing like any business.
+        ("prod", False, Environment.TESTING),
+    ],
 )
-def test_verifactu_files_where_the_deployment_does(deployment, where, environment):
+def test_verifactu_files_where_the_deployment_does(
+    deployment, where, opened, environment
+):
     deployment.ERPLORA_ENVIRONMENT = where
+    deployment.VERIFACTU_PRODUCTION_ENABLED = opened
 
     command("--execute")
 
@@ -136,8 +144,20 @@ def test_without_an_issuer_in_the_environment_it_refuses(deployment):
 
 def test_it_reminds_what_real_filing_still_needs(deployment):
     deployment.ERPLORA_ENVIRONMENT = "prod"
+    deployment.VERIFACTU_PRODUCTION_ENABLED = False
 
     out = command()
 
+    assert "would pin VeriFactu to testing" in out
+    assert "VERIFACTU_PRODUCTION_ENABLED" in out
     assert "PLATFORM_INVOICING_ENABLED" in out
     assert "FISCAL_SEAL_CURRENT" in out
+
+
+def test_with_production_open_its_dry_run_pins_production(deployment):
+    deployment.ERPLORA_ENVIRONMENT = "prod"
+    deployment.VERIFACTU_PRODUCTION_ENABLED = True
+
+    out = command()
+
+    assert "would pin VeriFactu to production" in out

@@ -389,7 +389,12 @@ otorgamiento, `live_paid` y el estado del negocio.
 Sale: el entorno en producción (avisa `verifactu.config.changed`): los registros nuevos nacen en la cadena
 de producción, con el QR de la sede real; los que nacieron en pruebas siguen yendo a pruebas.
 Si falla: mientras ERPlora no lo abra en el servidor, «El paso a producción todavía no está abierto en este
-servidor: ERPlora lo abre cuando la remisión real esté lista.»; en un hub demo, «Un negocio de demostración no
+servidor: ERPlora lo abre cuando la remisión real esté lista.» (en Ajustes, en la lista de lo que falta: «ERPlora
+todavía no ha abierto la presentación real a la AEAT en este servidor», `production_closed`); sin la pasarela del
+SaaS en el servidor, «La pasarela de envío de ERPlora no está configurada en este servidor: nada podría llegar a la
+AEAT.» (`verifactu.gateway_unavailable`); con un certificado propio que este servidor no abre (la clave
+`FISCAL_CERTIFICATE_KEY` falta o se rotó), «Tu certificado propio no se puede abrir en este servidor: vuelve a
+subirlo en VeriFactu → Configuración → Mi certificado.» (`verifactu.own_certificate_unreadable`); en un hub demo, «Un negocio de demostración no
 puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT.» (`verifactu.go_live_forbidden`;
 quién es demo lo dice la plataforma, `base.operations.is_demo_hub`); sin emisor, «Configura antes el emisor en
 Facturación → Emisor.»; por la vía de ERPlora sin autorización aprobada, «Para pasar a producción por la vía
@@ -1021,7 +1026,9 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
      `verifactu.recipient_required`, 403 sin permiso) es determinista (fallaría igual): **deshace la emisión
      entera** y la serie no gasta número; un error de programación tampoco se traga;
    - en **producción sin ruta a la AEAT**, 409 con el código de la ruta (`verifactu.live_option_unpaid`,
-     `verifactu.representation_not_approved`, `verifactu.own_certificate_missing`): igual, nada se emite
+     `verifactu.representation_not_approved`, `verifactu.own_certificate_missing`,
+     `verifactu.own_certificate_unreadable`) o del servidor (`verifactu.gateway_unavailable`,
+     `verifactu.production_closed`; revisión del bloque fiscal, 2026-10-15): igual, nada se emite
      (working-rules §15; el `enforce_fiscal_road` del Hub antiguo, HUB-1935). Venta (`sale`) no lo deja pendiente:
      rechaza el cobro, la devolución o la anulación con ese 409. La reacción del sistema a un documento ya emitido
      no se rechaza: su registro se sella y espera, como el antiguo dejaba al relay entregar una cadena ya abierta.
@@ -1056,8 +1063,10 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   - Lo que no es `200`: `409 {"error": {"code", "message"}}` con `nif_mismatch` (el sobre nombra a otro
     contribuyente; se decide antes de tocar la AEAT), `no_seal`, `no_certificate`, `certificate_invalid` o
     `environment_not_allowed`; `413 payload_too_large` (más de 10 MiB); `422 invalid_payload` (con `fields`):
-    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro, y reintento
-    con espera creciente). `502 {"error": {"code": "aeat_unreachable", "sent"}}`: con `sent = true` la
+    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro): sigue
+    `pending` y no se reintenta solo, porque se rechazaría igual; vuelve a la cola al cambiar la vía, subir el
+    certificado o llegar una foto nueva de la cuenta, o a mano («Reenviar a la AEAT» del admin, «Enviar ahora»,
+    «Reintentar»). `502 {"error": {"code": "aeat_unreachable", "sent"}}`: con `sent = true` la
     petición pudo llegar a la AEAT y el registro queda `sent` (motivo `unknown`, se reenvía declarado como
     incidencia); con `sent = false` no salió nada y se reintenta (`unreachable`). `503 gateway_busy` y cualquier
     otro estado: `unreachable`, a reintentar. El SaaS no valida nada fiscal: comprueba que el NIF del sobre es
@@ -1099,12 +1108,15 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
   esperan con `own_certificate_unreadable` sin llamar a la pasarela.
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
-  `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
+  `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
+  producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
+  (`queries.sending_problem`: primero lo que le falta a la vía, después lo del servidor, pasarela y apertura). Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
   queda bajo la supervisión de Ioan (working-rules §15).
 - **Hub de plataforma de ERPlora** (PLAN-SAAS §4; Facturación, INVOICE-F23): el hub `PLATFORM_HUB_SLUG` emite las
   facturas de ERPlora a sus clientes. Sus registros van al entorno de la AEAT del despliegue, diga lo que diga su
-  configuración (`queries.effective_environment`: `prod` → producción, `pre` → pruebas; lo usan `record.create` y la
-  factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
+  configuración (`queries.effective_environment`: `prod` con la remisión real abierta → producción; si no, pruebas;
+  ya en producción, sigue en producción con el servidor cerrado y sus registros esperan, para que sus facturas reales
+  no pasen nunca a la cadena de pruebas; lo usan `record.create` y la factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
   `manage.py create_platform_hub` alinea su configuración con `verifactu.config.follow_deployment` (409
   `verifactu.platform_only` en cualquier otro negocio). El sello de ERPlora presenta sus propios registros sin
   otorgamiento (`sending_problem`: el emisor de Facturación es `PLATFORM_ISSUER_TAX_ID`): ERPlora no se representa a

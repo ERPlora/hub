@@ -9,6 +9,8 @@ here: what the AEAT answers is never invented (the answers the services read are
 import hashlib
 import hmac
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import httpx
 import pytest
@@ -293,3 +295,47 @@ def test_the_hub_waits_longer_than_the_gateway_waits_for_the_aeat():
     """The gateway connects to the AEAT in 5 s and reads for 30 s: the Hub reads for more than 40 s."""
     assert gateway.TIMEOUT.connect == 5.0
     assert gateway.TIMEOUT.read > 40.0
+
+
+@pytest.fixture
+def gateway_on_this_machine(configured):
+    """A gateway listening on the loopback that answers the contract's 200: the real transport, no stand-in."""
+
+    class Gateway(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            body = json.dumps({"aeat_status": 200, "aeat_body": "<ok/>"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Gateway)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    configured.VERIFACTU_GATEWAY_URL = f"http://127.0.0.1:{server.server_port}"
+    yield server
+    server.shutdown()
+    server.server_close()
+
+
+def test_a_proxy_of_the_process_never_carries_the_envelope(
+    gateway_on_this_machine, monkeypatch
+):
+    # The envelope (and, on the own route, the business's certificate) goes straight to the SaaS's internal
+    # address, as the signed authorisation does (representation.py): a proxy set in the environment is ignored.
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+        monkeypatch.setenv(name, "http://127.0.0.1:9")
+    for name in ("NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(name, raising=False)
+
+    reply = submit()
+
+    assert (reply.kind, reply.aeat_status, reply.aeat_body) == (
+        gateway.ANSWERED,
+        200,
+        "<ok/>",
+    )

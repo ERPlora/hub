@@ -315,7 +315,6 @@
       "goLiveTitle": "¿Enviar tus facturas a la AEAT de verdad?",
       "goLiveMessage": "A partir de ahora cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.",
       "wentLive": "Tu negocio está en producción: los registros ya se remiten a la AEAT real.",
-      "productionClosed": "El paso a producción todavía no está abierto en este servidor: ERPlora lo abre cuando la remisión real esté lista.",
       "cannotGoLive": "Todavía no puede pasar a producción:",
       "waiting": "Los registros están esperando:",
       "issueBlocked": "Las ventas y facturas nuevas se rechazan hasta que se resuelva:",
