@@ -13,7 +13,13 @@ from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
 from base.admin import open_hub
 from base.auth_views import auth_callback, auth_login, auth_logout
 from base.health import readyz
-from base.internal import hub_state
+from base.internal import (
+    hub_state,
+    platform_invoice_create,
+    platform_invoice_get,
+    platform_invoice_pdf,
+    platform_invoices_health,
+)
 from base.spa import spa
 from config.api import api
 
@@ -35,5 +41,21 @@ urlpatterns = [
     path("auth/callback", auth_callback, name="auth-callback"),
     path("auth/logout", auth_logout, name="auth-logout"),
     path("internal/hubs/<uuid:hub_id>/state", hub_state, name="internal-hub-state"),
+    path("internal/platform/invoices", platform_invoice_create, name="internal-platform-invoices"),
+    path(
+        "internal/platform/invoices/health",
+        platform_invoices_health,
+        name="internal-platform-invoices-health",
+    ),
+    path(
+        "internal/platform/invoices/<uuid:invoice_id>",
+        platform_invoice_get,
+        name="internal-platform-invoice",
+    ),
+    path(
+        "internal/platform/invoices/<uuid:invoice_id>/pdf",
+        platform_invoice_pdf,
+        name="internal-platform-invoice-pdf",
+    ),
     re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),
 ]
