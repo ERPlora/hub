@@ -833,3 +833,21 @@ msgstr "Base imponible"
 #: templates/invoice/invoice.html:120
 msgid "TOTAL"
 msgstr "TOTAL"
+
+#: platform.py
+msgid ""
+"This is a B2B transaction. VAT is payable by the customer under the reverse "
+"charge mechanism."
+msgstr ""
+"Esta es una transacción B2B. El IVA es pagadero por el cliente bajo el "
+"mecanismo de inversión del sujeto pasivo."
+
+#: platform.py
+#, python-format
+msgid "VAT %(rate)s%% (%(country)s)"
+msgstr "IVA %(rate)s %% (%(country)s)"
+
+#: platform.py
+#, python-format
+msgid "Not subject to VAT - %(country)s"
+msgstr "No sujeta a IVA - %(country)s"
