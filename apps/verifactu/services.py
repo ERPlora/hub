@@ -913,9 +913,17 @@ def _send_chain(
         .order_by("sequence")[: envelope.MAX_RECORDS]
     )
     if batch and not force and batch[0].wait_reason == GATEWAY_REFUSAL:
-        # The gateway would refuse it again as it is: it waits for a change or a person, never on a timer.
+        # The gateway would refuse it again as it is: it waits for a change or a person, never on a timer. What was
+        # sealed behind it waits for the same reason, and says so.
         tally.because(GATEWAY_REFUSAL, batch[0].wait_detail)
         tally.waiting += len(batch)
+        _mark(
+            ctx,
+            _unsent(issuer_nif, environment),
+            GATEWAY_REFUSAL,
+            batch[0].wait_detail,
+            tally,
+        )
         return
     if not batch or (not force and batch[0].next_attempt_at > now):
         tally.waiting += len(batch)

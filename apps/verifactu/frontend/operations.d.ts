@@ -184,7 +184,7 @@ export interface QueueRowOut {
   environment: Environment;
   attempts: number;
   status: RecordStatus;
-  next_attempt_at: string;
+  next_attempt_at: string | null;
   last_error: string;
   created_at: string;
 }

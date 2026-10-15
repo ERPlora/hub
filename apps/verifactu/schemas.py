@@ -248,7 +248,9 @@ class QueueRowOut(Schema):
     environment: EnvironmentCode = Field(description="testing or production.")
     attempts: int = Field(description="Failed sends so far.")
     status: StatusCode = Field(description="pending or sent.")
-    next_attempt_at: dt.datetime = Field(description="Next attempt.")
+    next_attempt_at: dt.datetime | None = Field(
+        description="Next attempt; none while a refusal of the gateway waits for a change."
+    )
     last_error: str = Field(
         description="Why the last attempt did not go, in the reader's language."
     )

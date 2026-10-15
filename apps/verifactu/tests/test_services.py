@@ -901,6 +901,46 @@ def test_a_change_of_the_configuration_puts_a_refused_record_back_in_the_queue(
     assert record.status == "accepted"
 
 
+def test_a_record_sealed_behind_a_refused_one_waits_for_the_same_reason(
+    issuer, storage, gateway_answers
+):
+    upload()
+    first = refuse_once(gateway_answers)
+    second = Record.objects.get(pk=create(ticket(2000)).record.id)
+
+    run("verifactu.contingency.process")
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 1
+    second.refresh_from_db()
+    assert (second.wait_reason, second.wait_detail) == ("refused", first.wait_detail)
+    detail = run("verifactu.record.get", {"record_id": str(second.id)})
+    assert "refused" in {wait.code for wait in detail.waiting}
+    row = {
+        row.id: row for row in run("verifactu.contingency.list").rows
+    }[second.id]
+    assert "no_certificate" in row.last_error
+    # Told once, not at every pass.
+    told = Event.objects.filter(kind=Event.Kind.DEFERRED, params__reason="refused")
+    assert told.count() == 2
+
+    run("verifactu.config.update", {"route": "own"})
+    gateway_answers.set(answering())
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 2
+    assert set(
+        Record.objects.filter(pk__in=[first.id, second.id]).values_list("status", flat=True)
+    ) == {"accepted"}
+
+
+def test_the_queue_promises_no_next_attempt_to_a_refused_record(issuer, gateway_answers):
+    record = refuse_once(gateway_answers)
+    (row,) = run("verifactu.contingency.list").rows
+    assert row.id == record.id
+    assert row.next_attempt_at is None
+
+
 def test_an_old_photo_of_the_account_changes_nothing_and_does_not_send_it(
     issuer, gateway_answers
 ):
