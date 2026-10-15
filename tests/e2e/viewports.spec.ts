@@ -1,14 +1,14 @@
 // PoC §8.6: list, detail, «New item» and «Edit item» at 390×844 (phone), 834×1194 (tablet) and
-// 1440×900 (desktop) with no horizontal scroll; the menu is an overlay below `lg` and a fixed split
-// pane from `lg` (992 px).
+// 1440×900 (desktop) with no horizontal scroll. The hub's shell has no side menu at any width
+// (PLAN-MIGRATIONS §13): «back» and the ⠿ «My apps» sheet live in the topbar.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, api, createItem, listReady, login, record, shot, shown, uniqueName } from './helpers';
+import { A, api, createItem, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
 
 const VIEWPORTS = [
-  { label: '390', width: 390, height: 844, splitPane: false },
-  { label: '834', width: 834, height: 1194, splitPane: false },
-  { label: '1440', width: 1440, height: 900, splitPane: true },
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1194 },
+  { label: '1440', width: 1440, height: 900 },
 ];
 
 async function overflow(page: Page) {
@@ -26,20 +26,16 @@ async function overflow(page: Page) {
   });
 }
 
-async function menuState(page: Page) {
-  return page.evaluate(() => {
-    const pane = document.querySelector('ion-split-pane');
-    const menu = document.querySelector('ion-menu');
-    const rect = menu?.getBoundingClientRect();
-    return {
-      splitPaneVisible: pane?.classList.contains('split-pane-visible') ?? false,
-      menuPaneVisible: menu?.classList.contains('menu-pane-visible') ?? false,
-      menuShown: !!rect && rect.width > 0 && getComputedStyle(menu!).display !== 'none' && !menu!.classList.contains('menu-hidden'),
-    };
-  });
+async function chromeState(page: Page) {
+  const bar = shown(page);
+  return {
+    sideMenus: await page.locator('ion-menu, ion-split-pane, ion-menu-button').count(),
+    back: await bar.locator('[data-testid=topbar-back]').isVisible(),
+    apps: await bar.locator('[data-testid=topbar-apps]').isVisible(),
+  };
 }
 
-test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; overlay menu on phone and tablet, split pane on desktop', async ({ page, context }) => {
+test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; no side menu, back and apps in the topbar', async ({ page, context }) => {
   await login(page, A);
   const item = await createItem(context, A, uniqueName('Viewport item with a fairly long name to test wrapping'));
   await api(context, A, 'POST', '/demo/items/add_line', { id: item.id, text: 'A line', qty: '2', client_line_id: crypto.randomUUID() });
@@ -51,18 +47,15 @@ test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; o
     await listReady(page);
     await page.waitForTimeout(600);
     const list = await overflow(page);
-    const menu = await menuState(page);
+    const chrome = await chromeState(page);
     await page.screenshot({ path: shot(`08-list-${vp.label}`) });
 
-    let overlayOpened: boolean | null = null;
-    if (!vp.splitPane) {
-      await shown(page).locator('ion-menu-button').click();
-      await expect(page.locator('ion-menu')).toHaveClass(/show-menu/);
-      overlayOpened = await page.evaluate(() => document.querySelector('ion-menu')?.classList.contains('menu-type-overlay') ?? false);
-      await page.screenshot({ path: shot(`08-menu-open-${vp.label}`) });
-      await page.locator('ion-menu ion-item', { hasText: 'Demo' }).click();
-      await expect(page.locator('ion-menu')).not.toHaveClass(/show-menu/);
-    }
+    // The way to another app is the «My apps» sheet at every width.
+    const sheet = await openApps(page);
+    await page.screenshot({ path: shot(`08-apps-open-${vp.label}`) });
+    await sheet.locator('[data-testid=apps-launcher-app]', { hasText: 'Demo' }).click();
+    await expect(page.locator('ion-modal[data-testid=apps-launcher]:not(.overlay-hidden)')).toHaveCount(0);
+    await listReady(page);
 
     await page.goto(`/demo/items/${item.id}`);
     await expect(page.locator('[data-testid=demo-detail-status]')).toBeVisible();
@@ -82,7 +75,7 @@ test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; o
     const edit = await overflow(page);
     await page.screenshot({ path: shot(`08-edit-${vp.label}`) });
 
-    results[vp.label] = { list, detail, create, edit, menu, overlayOpened };
+    results[vp.label] = { list, detail, create, edit, chrome };
     for (const [screen, measured] of Object.entries({ create, edit })) {
       expect(measured.documentScrollWidth, `${vp.label} ${screen}`).toBeLessThanOrEqual(measured.innerWidth);
       expect(measured.contentScrollWidth!, `${vp.label} ${screen} content`).toBeLessThanOrEqual(measured.contentClientWidth!);
@@ -91,9 +84,9 @@ test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; o
     expect(detail.documentScrollWidth, `${vp.label} detail`).toBeLessThanOrEqual(detail.innerWidth);
     expect(list.contentScrollWidth!, `${vp.label} list content`).toBeLessThanOrEqual(list.contentClientWidth!);
     expect(detail.contentScrollWidth!, `${vp.label} detail content`).toBeLessThanOrEqual(detail.contentClientWidth!);
-    expect(menu.splitPaneVisible, `${vp.label} split pane`).toBe(vp.splitPane);
-    if (vp.splitPane) expect(menu.menuShown).toBe(true);
-    else expect(overlayOpened).toBe(true);
+    expect(chrome.sideMenus, `${vp.label} side menu`).toBe(0);
+    expect(chrome.back, `${vp.label} back`).toBe(true);
+    expect(chrome.apps, `${vp.label} apps`).toBe(true);
   }
   record('08-viewports', results);
 });

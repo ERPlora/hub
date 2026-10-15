@@ -2,7 +2,7 @@
 // Groups, Tags and Fields move between them (the address follows, Back leaves the section); a row
 // opens the card and its Back returns; every page at 390×844 (phone), 834×1194 (tablet) and
 // 1440×900 (desktop) without horizontal scroll, with a screenshot of each for the comparison with the
-// product's screens. On the phone the list shows cards and the menu is an overlay.
+// product's screens. On the phone the list shows cards; there is no side menu at any width.
 import { expect, type Page, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile } from './customer-helpers';
@@ -87,7 +87,7 @@ test('every page at 390 / 834 / 1440 without horizontal scroll; the phone shows 
       await page.goto('/customer/customers');
       await customersReady(page);
       await expect(shown(page).locator('.data-table__cards')).toBeVisible();
-      await expect(page.locator('ion-split-pane')).not.toHaveClass(/split-pane-visible/);
+      await expect(page.locator('ion-split-pane, ion-menu')).toHaveCount(0);
     }
   }
   record('customer-viewports', results);

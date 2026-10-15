@@ -1,11 +1,11 @@
-// Staff's navigation in Chrome, as Ioan sees it (Spanish): the menu's «Personal» section with its four
-// entries (Personal, Roles, Ausencias, Horarios), the footer tabbar with those four plus «Ajustes» for
+// Staff's navigation in Chrome, as Ioan sees it (Spanish): the «Personal» tile of the «My apps» sheet, the footer tabbar with its four
+// sections (Personal, Roles, Ausencias, Horarios) plus «Ajustes» for
 // the owner, each tab replacing the address; Ajustes saves only what changed. Every page is captured in
 // the three viewports (desktop 1280×860, tablet 834×1112, phone 390×844) for the comparison with the
 // old module's screens; the page never scrolls sideways.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, login, openApps, psql, shot, shown, topbarApps } from './helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = {
@@ -44,17 +44,21 @@ async function ownerPage(browser: Browser, next: string, viewport: { width: numb
   await login(page, A, next);
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   await page.goto(`${A}${next}`);
-  await page.locator('ion-menu').waitFor({ state: 'attached' });
+  await topbarApps(page).waitFor({ state: 'visible' });
   return { context, page };
 }
 
-test('the menu and the tabbar lead to every section, and Ajustes saves only what changed', async ({ browser }) => {
+test('the «My apps» sheet leads to Personal, the tabbar to every section, and Ajustes saves only what changed', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/staff/members', VIEWPORTS.desktop);
   try {
     // A sample record, so every list has something to paint.
     expect((await api(context, A, 'POST', '/staff/members', { first_name: `${TAG} Lola`, last_name: 'Muestra' })).status).toBe(201);
-    await expect(page.locator('ion-menu').getByText('Personal', { exact: true }).first()).toBeAttached();
-    for (const label of ['Roles', 'Ausencias', 'Horarios']) await expect(page.locator('ion-menu').getByText(label, { exact: true }).first()).toBeAttached();
+    // No side menu in the hub (PLAN-MIGRATIONS §13): the app is a tile of the sheet, its sections are the tabbar.
+    await expect(page.locator('ion-menu, ion-split-pane')).toHaveCount(0);
+    const sheet = await openApps(page);
+    await expect(sheet.locator('[data-testid=apps-launcher-app]', { hasText: 'Personal' })).toBeVisible();
+    await sheet.locator('[data-testid=apps-launcher-close]').click();
+    await expect(page.locator('ion-modal[data-testid=apps-launcher]:not(.overlay-hidden)')).toHaveCount(0);
 
     const tabs = shown(page).locator('ion-footer ion-segment-button');
     await expect(tabs).toHaveText(PAGES.map(([, , label]) => new RegExp(label)));
