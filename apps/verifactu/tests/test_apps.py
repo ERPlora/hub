@@ -132,6 +132,7 @@ OPERATIONS = {
     "verifactu.certificate.upload",
     "verifactu.certificate.remove",
     "verifactu.config.sync",
+    "verifactu.config.follow_deployment",
 }
 #: High risk: sending to the AEAT, the queue, correcting and cancelling, the chain's recovery and the configuration.
 HIGH = {
@@ -150,6 +151,7 @@ HIGH = {
     "verifactu.certificate.upload",
     "verifactu.certificate.remove",
     "verifactu.config.sync",
+    "verifactu.config.follow_deployment",
 }
 
 

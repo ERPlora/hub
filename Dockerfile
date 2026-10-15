@@ -65,6 +65,11 @@ RUN . /etc/os-release \
  && apt-get update \
  && apt-get install -y --no-install-recommends pgbouncer postgresql-client-18 \
  && rm -rf /var/lib/apt/lists/*
+# WeasyPrint (apps/invoice/pdf.py, the PDF of ERPlora's invoices): Pango and HarfBuzz's subsetter, as its
+# documentation lists them for Debian; DejaVu, the fonts the A4 prints with (the image has none).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
 # CA bundle of RDS: TLS verify-full of the app (DB_SSLROOTCERT) and of PgBouncer towards Aurora.
 ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 COPY --chmod=755 docker/pgbouncer-entrypoint.sh /usr/local/bin/pgbouncer-entrypoint
@@ -78,10 +83,12 @@ ARG APP_VERSION=""
 ARG APP_RELEASED_AT=""
 ENV APP_VERSION=${APP_VERSION} \
     APP_RELEASED_AT=${APP_RELEASED_AT}
+# XDG_CACHE_HOME: Fontconfig's cache (WeasyPrint) in /tmp, the only writable place.
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DJANGO_SETTINGS_MODULE=config.settings
+    DJANGO_SETTINGS_MODULE=config.settings \
+    XDG_CACHE_HOME=/tmp/.cache
 USER 10001
 EXPOSE 8000
 # The ALB idle timeout is 120 s; Twisted keeps idle connections far longer, so the ALB always

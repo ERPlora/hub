@@ -17,6 +17,12 @@ Phase 1 has no registry of hubs (``control/``, phase 2): ``PUT /internal/hubs/{i
 by ``slug``, and the Hub applies what it already keeps of it, the VeriFactu block and the business's status, through
 ``verifactu.config.sync`` on that hub, as the system. While the SaaS may still sign v1 only, a body that names the
 hub of its path (``hub_id`` or ``id``) must name the same one.
+
+``/internal/platform/invoices`` (contract point 4, PLAN-SAAS §4) is the door to ERPlora's own hub, which issues
+ERPlora's invoices: ``GET …/health`` (200 ``{"status": "ok"}`` or 503 ``{"status": "unconfigured", "detail"}``),
+``POST …`` (the body of the SaaS's ``platform_payload()``; 201, or 200 when it was issued before), ``GET …/{id}`` (its
+status) and ``GET …/{id}/pdf`` (its PDF, printed after the read, outside any transaction). Each runs its operation of
+Invoicing as the system on ``PLATFORM_HUB_SLUG`` and answers ``{"status", "qr", "error"}``.
 """
 
 import hashlib
@@ -173,3 +179,106 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     except OperationError as failed:
         return JsonResponse(failed.envelope(), status=failed.status)
     return JsonResponse({"applied": answer.applied, "version": answer.version})
+
+
+# ── ERPlora's own invoices: the door to its platform hub (contract point 4) ──────────────────────────────────────
+
+
+def _platform_context():
+    return system_context(Scope("host", settings.PLATFORM_HUB_SLUG))
+
+
+def _fields_of(invalid: ValidationError) -> dict[str, str]:
+    return {
+        ".".join(str(part) for part in error["loc"]) or "body": error["msg"]
+        for error in invalid.errors()
+    }
+
+
+def _issue_answer(answer) -> dict:
+    """The contract's answer: ``{"status", "qr", "error"}`` (``error`` = ``{"code", "message"}`` or null)."""
+    return {
+        "status": answer.status,
+        "qr": answer.qr,
+        "error": answer.error.model_dump() if answer.error is not None else None,
+    }
+
+
+def _platform_call(name: str, payload: dict):
+    """Runs ``name`` as the system on the platform hub: its output, or the response of its refusal."""
+    op = get_operation(name)
+    try:
+        data = op.input.model_validate(payload)
+    except ValidationError as invalid:
+        return None, JsonResponse(
+            {
+                "error": {
+                    "code": "internal.payload_invalid",
+                    "message": "The body is out of contract.",
+                    "fields": _fields_of(invalid),
+                }
+            },
+            status=422,
+        )
+    try:
+        return op(_platform_context(), data), None
+    except OperationError as failed:
+        return None, JsonResponse(failed.envelope(), status=failed.status)
+
+
+@internal_view
+@require_http_methods(["GET"])
+def platform_invoices_health(request: HttpRequest) -> HttpResponse:
+    """``GET /internal/platform/invoices/health``: whether the platform hub can issue ERPlora's invoices now."""
+    answer, refused = _platform_call("invoice.invoice.platform_health", {})
+    if refused is not None:
+        detail = json.loads(refused.content)["error"]["message"]
+        return JsonResponse({"status": "unconfigured", "detail": detail}, status=503)
+    if not answer.ready:
+        return JsonResponse({"status": "unconfigured", "detail": answer.detail}, status=503)
+    return JsonResponse({"status": "ok"})
+
+
+@internal_view
+@require_http_methods(["POST"])
+def platform_invoice_create(request: HttpRequest) -> HttpResponse:
+    """``POST /internal/platform/invoices``: issue ERPlora's invoice; idempotent by its ``id``."""
+    try:
+        body = json.loads(request.body)
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _payload_invalid("The body is not a JSON object.")
+    answer, refused = _platform_call("invoice.invoice.issue_platform", body)
+    if refused is not None:
+        return refused
+    return JsonResponse(_issue_answer(answer), status=200 if answer.already else 201)
+
+
+@internal_view
+@require_http_methods(["GET"])
+def platform_invoice_get(request: HttpRequest, invoice_id: UUID) -> HttpResponse:
+    """``GET /internal/platform/invoices/{id}``: how ERPlora's invoice stands."""
+    answer, refused = _platform_call("invoice.invoice.platform_status", {"id": str(invoice_id)})
+    if refused is not None:
+        return refused
+    return JsonResponse(_issue_answer(answer))
+
+
+@internal_view
+@require_http_methods(["GET"])
+def platform_invoice_pdf(request: HttpRequest, invoice_id: UUID) -> HttpResponse:
+    """``GET /internal/platform/invoices/{id}/pdf``: its A4 as PDF, printed once the read is over."""
+    document, refused = _platform_call("invoice.invoice.platform_document", {"id": str(invoice_id)})
+    if refused is not None:
+        return refused
+    from apps.invoice.pdf import render_pdf
+
+    try:
+        printed = render_pdf(document.html)
+    except OSError as missing:
+        # WeasyPrint's libraries are missing on this server (the image installs them).
+        return refuse(503, "internal.pdf_unavailable", f"The PDF cannot be printed here: {missing}")
+    response = HttpResponse(printed, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{document.number}.pdf"'
+    return response

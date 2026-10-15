@@ -10,7 +10,7 @@ from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
 
-from apps.invoice import queries, schemas, services
+from apps.invoice import platform, queries, schemas, services
 from apps.invoice.models import (
     FACTORY_SERIES_NAMES,
     Invoice,
@@ -91,6 +91,7 @@ def visible_texts() -> set[str]:
         *messages_of(queries),
         *messages_of(schemas),
         *messages_of(services),
+        *messages_of(platform),
         *(label for _english, label in FACTORY_SERIES_NAMES.values()),
         *(
             v.message

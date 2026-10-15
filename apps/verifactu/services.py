@@ -63,6 +63,7 @@ from apps.verifactu.queries import (
     chain_out,
     config_out,
     config_row,
+    effective_environment,
     find_invoice,
     find_record,
     issuer_configured,
@@ -167,6 +168,10 @@ CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one
 GO_LIVE_FORBIDDEN = _(
     "A demo business cannot go live: it always files in the AEAT's test environment."
 )
+PLATFORM_FIXED = _(
+    "ERPlora's own business files in the AEAT environment of its server: its environment cannot be switched."
+)
+PLATFORM_ONLY = _("Only ERPlora's own business follows the environment of its server.")
 NO_WAY_TO_THE_AEAT = _(
     "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
     "VeriFactu → Settings and try again."
@@ -612,7 +617,7 @@ def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOu
         ctx,
         config,
         invoice,
-        environment=config.environment,
+        environment=effective_environment(ctx, config),
         refuse_without_a_way=ctx.actor != "system",
     )
     return RecordCreateOut(record=summary(record), already=already)
@@ -1640,7 +1645,8 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
 )
 def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
     config = _config(lock=False)
-    if config.environment != Environment.TESTING:
+    environment = effective_environment(ctx, config)
+    if environment != Environment.TESTING:
         raise Conflict(str(TESTING_ONLY), code="verifactu.testing_only")
     issue = get_operation("invoice.invoice.create")
     invoice_out = issue(
@@ -1660,7 +1666,7 @@ def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
         ),
     )
     invoice = find_invoice(invoice_out.id, None)
-    record, _already = _seal_alta(ctx, config, invoice, environment=config.environment)
+    record, _already = _seal_alta(ctx, config, invoice, environment=environment)
     return TestInvoiceOut(
         invoice_id=invoice.id, number=invoice.number, record=summary(record)
     )
@@ -1730,6 +1736,12 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     return config_out(config, ctx)
 
 
+def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
+    """ERPlora's own hub files where its deployment does (``queries.effective_environment``): no switch moves it."""
+    if platform.is_platform_hub(ctx.scope):
+        raise Conflict(str(PLATFORM_FIXED), code="verifactu.platform_fixed")
+
+
 @operation(
     "verifactu.config.go_live",
     kind="command",
@@ -1745,6 +1757,7 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     },
 )
 def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    _refuse_on_the_platform_hub(ctx)
     config = _config()
     if config.environment == Environment.PRODUCTION:
         return config_out(config, ctx)
@@ -1777,6 +1790,7 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
     },
 )
 def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    _refuse_on_the_platform_hub(ctx)
     config = _config()
     if config.environment == Environment.TESTING:
         return config_out(config, ctx)
@@ -1919,3 +1933,44 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
         ctx, config, "account_synced", {"version": data.version}, fields=["account"]
     )
     return ConfigSyncOut(applied=True, version=data.version)
+
+
+# ── ERPlora's own hub (PLAN-SAAS §4) ───────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "verifactu.config.follow_deployment",
+    kind="command",
+    # Declared by no role: only the system holds it (``manage.py create_platform_hub``).
+    permission="verifactu.follow_deployment",
+    input=NoInput,
+    output=ConfigOut,
+    ai={
+        "description": "System only: ERPlora's own business takes the AEAT environment of its server (prod: production; "
+        "pre: testing), the one its records file in anyway; refused for any other business.",
+        "risk": "high",
+    },
+)
+def follow_deployment(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    if not platform.is_platform_hub(ctx.scope):
+        raise Conflict(str(PLATFORM_ONLY), code="verifactu.platform_only")
+    config = _config()
+    environment = effective_environment(ctx, config)
+    if config.environment == environment:
+        return config_out(config, ctx)
+    if environment == Environment.TESTING and Record.objects.filter(
+        environment=Environment.PRODUCTION
+    ).exists():
+        raise Conflict(
+            str(PRODUCTION_HAS_RECORDS), code="verifactu.production_has_records"
+        )
+    config.environment = environment
+    went_live = environment == Environment.PRODUCTION
+    config.production_since = timezone.now() if went_live else None
+    _changed(
+        ctx,
+        config,
+        "went_live" if went_live else "back_to_testing",
+        fields=["environment"],
+    )
+    return config_out(config, ctx)
