@@ -2,23 +2,43 @@
 ``SistemaInformatico`` block every record carries."""
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from apps.verifactu import producer
 
-#: The signed declaration, as the SaaS publishes it (saas-next/public/declaracion/v1). When both repos sit
-#: side by side (the erplora-next checkout) the constants are checked against it; on its own the Hub keeps
-#: the values the test pins below.
-DECLARATION = (
-    Path(__file__).resolve().parents[4]
-    / "saas-next"
-    / "public"
-    / "declaracion"
-    / "v1"
-    / "declared-facts.json"
-)
+#: The SaaS checkout next to the Hub's, where its signed declaration is published
+#: (public/declaracion/<version>/declared-facts.json): ``saas/`` in the erplora-next tree and in CI, which
+#: fetches it; ``saas-next/`` before the folders were renamed.
+SAAS_CHECKOUTS = ("saas", "saas-next")
+#: The folder both repos sit in: apps/verifactu/tests/ → the Hub's checkout → its parent.
+SIDE_BY_SIDE = Path(__file__).resolve().parents[4]
+
+
+def find_declaration(root: Path, version: str) -> Path | None:
+    """The ``version`` of the declaration in the first SaaS checkout under ``root``."""
+    for checkout in SAAS_CHECKOUTS:
+        path = root / checkout / "public" / "declaracion" / version / "declared-facts.json"
+        if path.exists():
+            return path
+    return None
+
+
+def declaration_or_skip(root: Path, version: str) -> Path:
+    """The declaration to check against; without one, CI fails (the check must run there) and a lone
+    local checkout of the Hub skips it, saying why."""
+    path = find_declaration(root, version)
+    if path is None:
+        reason = (
+            f"the SaaS's declaration {version} is not checked out next to the Hub "
+            f"({' or '.join(str(root / c) for c in SAAS_CHECKOUTS)})"
+        )
+        if os.environ.get("CI"):
+            pytest.fail(reason)
+        pytest.skip(reason)
+    return path
 
 
 def test_the_manufacturer_is_erplora_as_declared():
@@ -33,13 +53,46 @@ def test_the_manufacturer_is_erplora_as_declared():
     assert producer.DECLARATION_VERSION == "v1"
 
 
-@pytest.mark.skipif(
-    not DECLARATION.exists(), reason="saas-next is not checked out next to hub-next"
-)
 def test_the_constants_are_the_signed_declarations():
-    declared = json.loads(DECLARATION.read_text())
+    declaration = declaration_or_skip(SIDE_BY_SIDE, producer.DECLARATION_VERSION)
+    declared = json.loads(declaration.read_text())
     assert declared["status"] == "signed"
     assert declared["facts"] == producer.MANUFACTURER
+
+
+def publish(root, checkout, version="v1"):
+    folder = root / checkout / "public" / "declaracion" / version
+    folder.mkdir(parents=True)
+    (folder / "declared-facts.json").write_text("{}")
+    return folder / "declared-facts.json"
+
+
+def test_the_declaration_is_found_in_the_saas_checkout_first(tmp_path):
+    saas = publish(tmp_path, "saas")
+    publish(tmp_path, "saas-next")
+    assert find_declaration(tmp_path, "v1") == saas
+
+
+def test_the_declaration_falls_back_to_the_old_saas_next_folder(tmp_path):
+    old = publish(tmp_path, "saas-next")
+    assert find_declaration(tmp_path, "v1") == old
+
+
+def test_the_declaration_is_the_hubs_declared_version(tmp_path):
+    publish(tmp_path, "saas", version="v2")
+    assert find_declaration(tmp_path, "v1") is None
+
+
+def test_a_missing_declaration_fails_in_ci(tmp_path, monkeypatch):
+    monkeypatch.setenv("CI", "true")
+    with pytest.raises(pytest.fail.Exception, match="not checked out next to the Hub"):
+        declaration_or_skip(tmp_path, "v1")
+
+
+def test_a_missing_declaration_is_skipped_locally_with_the_reason(tmp_path, monkeypatch):
+    monkeypatch.delenv("CI", raising=False)
+    with pytest.raises(pytest.skip.Exception, match="not checked out next to the Hub"):
+        declaration_or_skip(tmp_path, "v1")
 
 
 def test_the_system_block_merges_the_manufacturer_with_this_installation():
