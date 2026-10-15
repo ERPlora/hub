@@ -1,0 +1,267 @@
+# Spanish translation of the attendance app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next attendance\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 08:00+0200\n"
+"PO-Revision-Date: 2026-10-15 08:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Time clock"
+msgstr "Control horario"
+
+msgid "Clock in and out with one tap, breaks, corrections with a reason and the legal working-day record."
+msgstr "Fichar la entrada y la salida con un toque, pausas, correcciones con motivo y el registro legal de jornada."
+
+msgid "Time clock is your business's working-day record: each person clocks in and out with one tap, with breaks in between; a manager sees the whole team and who is in right now, corrects a wrong day with a mandatory reason that stays in its history, and exports the month in CSV for the accountant or a labour inspection. Days are never deleted and every worker sees their own, as Spanish law requires (art. 34.9 ET), and a personal phone can be asked to be at the workplace to clock in."
+msgstr "Control horario es el registro de jornada de tu negocio: cada persona ficha la entrada y la salida con un toque, con sus pausas en medio; el responsable ve a todo el equipo y quién está dentro ahora, corrige una jornada mal fichada con un motivo obligatorio que queda en su historial y exporta el mes en CSV para la gestoría o la Inspección de Trabajo. Las jornadas nunca se borran y cada trabajador ve las suyas, como pide la ley (art. 34.9 ET), y se puede exigir que un móvil personal esté en el local para fichar."
+
+msgctxt "attendance menu"
+msgid "Clock in"
+msgstr "Fichar"
+
+msgctxt "attendance menu"
+msgid "Records"
+msgstr "Registros"
+
+msgctxt "working day status"
+msgid "Open"
+msgstr "Abierta"
+
+msgctxt "working day status"
+msgid "Closed"
+msgstr "Cerrada"
+
+msgctxt "working day status"
+msgid "Needs review"
+msgstr "Por revisar"
+
+msgctxt "clocking device"
+msgid "Shared device"
+msgstr "Dispositivo compartido"
+
+msgctxt "clocking device"
+msgid "Personal device"
+msgstr "Dispositivo personal"
+
+msgid "staff member"
+msgstr "miembro del personal"
+
+msgid "date"
+msgstr "fecha"
+
+msgid "clock-in"
+msgstr "entrada"
+
+msgid "clock-out"
+msgstr "salida"
+
+msgid "status"
+msgstr "estado"
+
+msgid "device"
+msgstr "dispositivo"
+
+msgid "clock-in latitude"
+msgstr "latitud de la entrada"
+
+msgid "clock-in longitude"
+msgstr "longitud de la entrada"
+
+msgid "clock-in accuracy (m)"
+msgstr "precisión de la entrada (m)"
+
+msgid "clock-in distance (m)"
+msgstr "distancia de la entrada (m)"
+
+msgid "clock-in within the radius"
+msgstr "entrada dentro del radio"
+
+msgid "clock-out latitude"
+msgstr "latitud de la salida"
+
+msgid "clock-out longitude"
+msgstr "longitud de la salida"
+
+msgid "clock-out accuracy (m)"
+msgstr "precisión de la salida (m)"
+
+msgid "clock-out distance (m)"
+msgstr "distancia de la salida (m)"
+
+msgid "clock-out within the radius"
+msgstr "salida dentro del radio"
+
+msgid "internal note"
+msgstr "nota interna"
+
+msgid "clocked by"
+msgstr "fichada por"
+
+msgid "last changed by"
+msgstr "último cambio de"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "working day"
+msgstr "jornada"
+
+msgid "working days"
+msgstr "jornadas"
+
+msgid "started at"
+msgstr "empezó a las"
+
+msgid "ended at"
+msgstr "terminó a las"
+
+msgid "break"
+msgstr "pausa"
+
+msgid "breaks"
+msgstr "pausas"
+
+msgid "clock-in before"
+msgstr "entrada antes"
+
+msgid "clock-out before"
+msgstr "salida antes"
+
+msgid "status before"
+msgstr "estado antes"
+
+msgid "clock-in after"
+msgstr "entrada después"
+
+msgid "clock-out after"
+msgstr "salida después"
+
+msgid "status after"
+msgstr "estado después"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "corrected by"
+msgstr "corregida por"
+
+msgid "corrected at"
+msgstr "corregida el"
+
+msgid "correction"
+msgstr "corrección"
+
+msgid "corrections"
+msgstr "correcciones"
+
+msgid "slot"
+msgstr "hueco"
+
+msgid "require the location when clocking in from a personal device"
+msgstr "pedir la ubicación al fichar desde un dispositivo personal"
+
+msgid "allowed radius (m)"
+msgstr "radio permitido (m)"
+
+msgid "workplace latitude"
+msgstr "latitud del lugar de trabajo"
+
+msgid "workplace longitude"
+msgstr "longitud del lugar de trabajo"
+
+msgid "flag open days for review after (hours)"
+msgstr "marcar para revisar las jornadas abiertas tras (horas)"
+
+msgid "time clock settings"
+msgstr "ajustes del control horario"
+
+msgid "The clock-out must be after the clock-in."
+msgstr "La salida tiene que ser posterior a la entrada."
+
+msgid "Send both the latitude and the longitude, or neither."
+msgstr "Envía la latitud y la longitud, o ninguna de las dos."
+
+msgid "The end date cannot be before the start date."
+msgstr "La fecha de fin no puede ser anterior a la de inicio."
+
+msgid "That person does not exist in Staff."
+msgstr "Esa persona no existe en Personal."
+
+#, python-format
+msgid "Several people match “%(name)s”: %(matches)s. Say which one."
+msgstr "Hay varias personas que coinciden con «%(name)s»: %(matches)s. Di cuál."
+
+msgid "That working day does not exist in this business."
+msgstr "Esa jornada no existe en este negocio."
+
+msgid "You can only see your own working days."
+msgstr "Solo puedes ver tus propias jornadas."
+
+msgid "Day closed when the person was terminated in Staff."
+msgstr "Jornada cerrada al dar de baja a la persona en Personal."
+
+msgid "Your user is not linked to any staff record: ask a manager to link it in Staff."
+msgstr "Tu usuario no está vinculado a ninguna ficha de Personal: pide a un responsable que la vincule en Personal."
+
+msgid "You can only clock yourself in and out."
+msgstr "Solo puedes fichar tu propia entrada y salida."
+
+msgid "That staff record is not active (inactive or on leave), so it cannot clock in."
+msgstr "Esa ficha de Personal no está activa (inactiva o de baja temporal): no puede fichar la entrada."
+
+msgid "You already have an open working day: clock out before clocking in again."
+msgstr "Ya tienes una jornada abierta: ficha la salida antes de volver a entrar."
+
+#, python-format
+msgid "%(name)s already has an open working day: clock them out before clocking in again."
+msgstr "%(name)s ya tiene una jornada abierta: ficha su salida antes de volver a ficharle la entrada."
+
+msgid "There is no open working day: clock in first."
+msgstr "No hay ninguna jornada abierta: ficha la entrada primero."
+
+msgid "A break is already running."
+msgstr "Ya hay una pausa en curso."
+
+msgid "There is no running break to end."
+msgstr "No hay ninguna pausa en curso que terminar."
+
+msgid "Your location is needed to clock in from this device. Allow it, or clock in at the counter."
+msgstr "Hace falta tu ubicación para fichar desde este dispositivo. Permítela o ficha en el mostrador."
+
+msgid "The workplace location is not set yet, so this device cannot clock in. Ask a manager to set it in the time clock settings, or clock in at the counter."
+msgstr "Aún no se ha fijado la ubicación del lugar de trabajo, así que este dispositivo no puede fichar. Pide a un responsable que la fije en los ajustes del control horario o ficha en el mostrador."
+
+#, python-format
+msgid "You are %(distance)s m from the workplace, outside the allowed %(radius)s m. Move closer to clock in, or clock in at the counter."
+msgstr "Estás a %(distance)s m del lugar de trabajo, fuera de los %(radius)s m permitidos. Acércate para fichar o ficha en el mostrador."
+
+msgid "These hours overlap another working day of this person."
+msgstr "Estas horas se solapan con otra jornada de esta persona."
+
+msgid "That person already has another open working day: this one cannot be reopened."
+msgstr "Esa persona ya tiene otra jornada abierta: no se puede reabrir esta."
+
+msgid "The time cannot be in the future."
+msgstr "La hora no puede ser futura."
+
+msgid "made by the system"
+msgstr "hecha por el sistema"
+
+msgid "corrected by (name)"
+msgstr "corregida por (nombre)"
+
+#, python-format
+msgid "This working day has been open more than %(hours)s hours and is waiting for review: a manager corrects it. Clock in to start a new day."
+msgstr "Esta jornada lleva abierta más de %(hours)s horas y está por revisar: la corrige un responsable. Ficha la entrada para empezar una jornada nueva."

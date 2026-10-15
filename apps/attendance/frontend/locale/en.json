@@ -1,0 +1,162 @@
+{
+  "attendance": {
+    "title": "Time clock",
+    "tabs": {
+      "label": "Time clock sections",
+      "clock": "Clock in",
+      "records": "Records",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "retry": "Retry",
+      "appInactive": "This app is not active in this business"
+    },
+    "noPermission": "You do not have permission",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches your search or filters.",
+    "status": {
+      "open": "Open",
+      "closed": "Closed",
+      "needs_review": "Needs review"
+    },
+    "clock": {
+      "greeting": "Hello, {name}",
+      "now": "It is {time}",
+      "statusOut": "You are clocked out",
+      "statusIn": "Clocked in since {time}",
+      "statusOnBreak": "On break since {time}",
+      "elapsed": "Time since clock-in",
+      "clockIn": "Clock in",
+      "clockOut": "Clock out",
+      "breakStart": "Start break",
+      "breakEnd": "End break",
+      "locating": "Getting your location…",
+      "locationRequired": "Your location is checked when you clock in from this device.",
+      "distance": "You are {distance} m from the workplace.",
+      "workplaceNotSet": "The workplace location is not set yet, so this device cannot clock in. Ask a manager to set it in the time clock settings, or clock in at the counter.",
+      "locationDenied": "Location access is denied. Allow location for this app to clock in from this device, or clock in at the counter.",
+      "locationUnavailable": "Your position could not be determined. Move to an open area and try again.",
+      "locationTimeout": "Getting your position took too long. Try again.",
+      "locationUnsupported": "This device cannot share its location.",
+      "clockedIn": "Clocked in at {time}.",
+      "clockedOut": "Clocked out at {time}.",
+      "breakStarted": "Break started at {time}.",
+      "breakEnded": "Break ended at {time}.",
+      "today": "Today",
+      "workedToday": "Worked",
+      "breaksToday": "Breaks",
+      "recent": "Recent days",
+      "empty": "No working days yet",
+      "noClockOut": "no clock-out",
+      "loadError": "The time clock could not be loaded. Check the connection and try again.",
+      "unlinked": {
+        "title": "Your user is not linked to any staff record",
+        "message": "Ask a manager to link it in Staff to clock in."
+      },
+      "status": {
+        "open": "In progress",
+        "closed": "Closed",
+        "needs_review": "Needs review"
+      }
+    },
+    "records": {
+      "search": "Search person…",
+      "month": "Month",
+      "person": "Person",
+      "personAll": "Everyone",
+      "columns": {
+        "date": "Date",
+        "person": "Person",
+        "in": "Clock-in",
+        "out": "Clock-out",
+        "breaks": "Breaks (min)",
+        "worked": "Worked",
+        "status": "Status",
+        "location": "Location"
+      },
+      "inProgress": "In progress",
+      "radius": {
+        "inInside": "Clock-in inside the workplace radius",
+        "inOutside": "Clock-in outside the workplace radius",
+        "outInside": "Clock-out inside the workplace radius",
+        "outOutside": "Clock-out outside the workplace radius",
+        "none": "No location recorded"
+      },
+      "actions": {
+        "correct": "Correct",
+        "history": "History"
+      },
+      "exportCsv": "Export CSV",
+      "exporting": "Exporting…",
+      "exportEmpty": "There are no working days for this filter: the file only has the header.",
+      "exportFailed": "The CSV could not be exported. Try again.",
+      "loading": "Loading working days…",
+      "empty": "No working days this month.",
+      "loadError": "The working days could not be loaded.",
+      "entity": {
+        "one": "working day",
+        "many": "working days"
+      }
+    },
+    "presence": {
+      "title": "Clocked in now",
+      "count": "{n} clocked in",
+      "since": "since {time}",
+      "onBreak": "On break",
+      "empty": "Nobody is clocked in right now.",
+      "loadError": "Who is clocked in could not be loaded."
+    },
+    "correct": {
+      "title": "Correct working day",
+      "clockIn": "Clock-in",
+      "clockOut": "Clock-out (empty = still open)",
+      "reason": "Reason",
+      "reasonHelper": "Required. It stays in the history of the day with your name.",
+      "save": "Save correction",
+      "invalidClockIn": "Enter the clock-in date and time.",
+      "invalidCorrection": "The clock-out must be after the clock-in.",
+      "reasonRequired": "Write a reason of at least 3 characters.",
+      "corrected": "Working day corrected."
+    },
+    "history": {
+      "title": "Correction history",
+      "loading": "Loading history…",
+      "empty": "This working day has never been corrected.",
+      "loadError": "The history could not be loaded.",
+      "before": "Before",
+      "after": "After",
+      "reason": "Reason",
+      "system": "System",
+      "close": "Close"
+    },
+    "settings": {
+      "title": "Time clock settings",
+      "intro": "Decide whether a personal device must be at the workplace to clock in. The counter POS (shared device) is never asked for a location.",
+      "requireLocation": "Require location when clocking in from a personal device",
+      "radius": "Allowed radius",
+      "radiusOption": "{radius} m",
+      "workplace": "Workplace location",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "useMyLocation": "Use my current location",
+      "locating": "Getting your location…",
+      "accuracy": "Position read with an accuracy of ±{accuracy} m. Do this from the workplace itself.",
+      "workplaceMissing": "Set the workplace location or nobody on a personal device will be able to clock in.",
+      "autoClose": "Flag for review after (hours)",
+      "autoCloseHelp": "A working day still open after this many hours is marked for review so a manager can correct it.",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "invalidLatitude": "Latitude must be a number between -90 and 90.",
+      "invalidLongitude": "Longitude must be a number between -180 and 180.",
+      "coordinatesIncomplete": "Fill in both latitude and longitude, or leave both empty.",
+      "invalidAutoClose": "Enter a whole number of hours between 1 and 24.",
+      "locationDenied": "Location access is denied. Allow location in this browser to read the workplace position, or type the coordinates.",
+      "readOnly": "Only a manager or an administrator can change these settings.",
+      "loadError": "The settings could not be loaded.",
+      "locationPending": "Asking for the location needs to know whether a device is the counter POS or someone's own phone, which this Hub does not tell yet: until it does, every device clocks as the counter and no location is asked for."
+    }
+  }
+}

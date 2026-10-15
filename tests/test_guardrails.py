@@ -414,6 +414,17 @@ def test_alias_scanner_lets_a_migration_use_only_the_schema_editors_alias():
     ]
 
 
+ALIAS_IN_A_VARIABLE = """\
+alias = schema_editor.connection.alias
+Item.objects.using(alias)
+"""
+
+
+def test_alias_scanner_rejects_the_schema_editors_alias_through_a_variable_in_a_migration():
+    # The only exception is the inline form: a variable can be reassigned, so it is not proof.
+    assert alias_touches(ALIAS_IN_A_VARIABLE, in_migration=True) == [(2, ".using(")]
+
+
 GFK_OFFENDER = """\
 from django.contrib.contenttypes import fields
 from django.contrib.contenttypes.fields import GenericForeignKey as GFK

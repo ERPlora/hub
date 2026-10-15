@@ -1,0 +1,137 @@
+{
+  "online_booking": {
+    "title": "Online booking",
+    "tabs": {
+      "label": "Online booking sections",
+      "bookings": "Bookings",
+      "settings": "Settings"
+    },
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "noPermission": "You do not have permission",
+    "bookings": {
+      "entity": {
+        "one": "booking",
+        "many": "bookings"
+      },
+      "search": "Search no., customer, phone, service…",
+      "loadError": "The bookings could not be loaded",
+      "empty": "No online bookings yet.",
+      "noMatch": "No booking matches the search.",
+      "columns": {
+        "number": "No.",
+        "customer": "Customer",
+        "service": "Service",
+        "staff": "Professional",
+        "date": "Date",
+        "time": "Time",
+        "status": "Status",
+        "bookedAt": "Booked"
+      },
+      "status": {
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "in_progress": "In progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "no_show": "No-show"
+      },
+      "unassigned": "Unassigned",
+      "erasedCustomer": "Deleted customer",
+      "actions": {
+        "confirm": "Confirm",
+        "complete": "Complete",
+        "no_show": "No-show",
+        "cancel": "Cancel",
+        "delete": "Delete"
+      },
+      "actionError": "The booking could not be updated",
+      "cancel": {
+        "title": "Cancel the booking",
+        "message": "Cancel {customer}'s booking ({when})?",
+        "reason": "Reason (optional)",
+        "confirm": "Cancel the booking",
+        "keep": "Keep it"
+      },
+      "delete": {
+        "title": "Delete the booking",
+        "message": "Delete booking {number}? It is better to cancel it, which keeps its history.",
+        "confirm": "Delete",
+        "keep": "Keep it"
+      }
+    },
+    "settings": {
+      "title": "Booking page settings",
+      "loading": "Loading settings…",
+      "loadError": "The settings could not be loaded",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "Could not save",
+      "sections": {
+        "page": "Public page",
+        "rules": "Booking rules",
+        "rulesHelp": "They are the rules of Appointments, shared with WhatsApp.",
+        "services": "Services booked online",
+        "servicesHelp": "Each switch is saved at once, in Services."
+      },
+      "fields": {
+        "is_enabled": "Public page on",
+        "page_title": "Page title",
+        "welcome_message": "Welcome message",
+        "primary_color": "Primary colour",
+        "logo_url": "Logo URL",
+        "require_email": "Email required",
+        "max_upcoming_per_customer": "Upcoming bookings per mobile",
+        "allow_staff_selection": "Let the customer choose the professional",
+        "allow_notes": "Allow notes",
+        "confirmation_message": "Confirmation message",
+        "cancellation_policy": "Cancellation policy",
+        "min_booking_notice": "Minimum booking notice (minutes)",
+        "max_advance_booking": "Book at most this far ahead (days)",
+        "max_advance_booking_help": "0 = no limit",
+        "slot_interval": "Slot interval (minutes)",
+        "auto_confirm_online": "Confirm the customer's bookings automatically",
+        "allow_customer_cancellation": "Let the customer cancel her booking",
+        "cancellation_notice_hours": "Minimum notice to cancel (hours)"
+      },
+      "services": {
+        "search": "Search service…",
+        "empty": "No services yet. Add them in Services.",
+        "notBookable": "Not bookable in the diary",
+        "loadError": "The services could not be loaded",
+        "saveError": "The service could not be changed",
+        "more": "Showing {shown} of {total}: search to find the others."
+      }
+    },
+    "preview": {
+      "title": "Booking page preview",
+      "intro": "The customer's booking flow, with the same operations the public page will use. Development only.",
+      "loading": "Loading the page…",
+      "loadError": "The page could not be loaded",
+      "services": "Services",
+      "professional": "Professional",
+      "anyone": "No preference",
+      "day": "Day",
+      "times": "Free times",
+      "loadingTimes": "Loading free times…",
+      "noTimes": "No free times that day.",
+      "name": "Name",
+      "phone": "Mobile",
+      "email": "Email",
+      "notes": "Note for the business",
+      "book": "Book",
+      "booked": "Booking {number}",
+      "link": "Personal link",
+      "view": "See my booking",
+      "cancel": "Cancel the booking",
+      "cancelUntil": "You may cancel it until {when}.",
+      "noCancel": "It can no longer be cancelled online.",
+      "again": "Book another",
+      "policy": "Cancellation policy",
+      "minutes": "{n} min"
+    }
+  }
+}

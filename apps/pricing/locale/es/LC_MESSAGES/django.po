@@ -1,0 +1,259 @@
+# Spanish translation of the pricing app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next pricing\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 09:00+0200\n"
+"PO-Revision-Date: 2026-10-15 09:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Price Lists"
+msgstr "Tarifas"
+
+msgid "Price lists per customer group, with dates and quantity breaks, and automatic discounts."
+msgstr "Tarifas por grupo de clientes, con fechas y tramos por cantidad, y descuentos automáticos."
+
+msgid "Price Lists keeps other prices for your products and services: a list for wholesale customers, one for your VIP group, a summer list between two dates, or a lower price from ten units on. It also keeps automatic discount rules, such as 10 % on a category, an amount off each unit, buy two and get one free, or a discount by quantity. Given a product or a service, a customer, a quantity and a day, it says which price applies, from which list, which rule takes how much off and what is left: always the lowest price and the best single discount for the customer."
+msgstr "Tarifas guarda otros precios para tus productos y servicios: una tarifa para mayoristas, otra para tu grupo VIP, una de verano entre dos fechas o un precio más bajo a partir de diez unidades. También guarda reglas de descuento automáticas, como un 10 % en una categoría, un importe menos por unidad, compra dos y llévate uno gratis o un descuento por cantidad. Con un producto o un servicio, un cliente, una cantidad y un día, dice qué precio le toca, de qué tarifa sale, qué regla le quita cuánto y cuánto queda: siempre el precio más bajo y el mejor descuento para el cliente."
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "cambiado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "updated by"
+msgstr "cambiado por"
+
+msgid "code"
+msgstr "código"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "currency"
+msgstr "divisa"
+
+msgid "tax included"
+msgstr "impuesto incluido"
+
+msgid "customer group"
+msgstr "grupo de clientes"
+
+msgid "valid from"
+msgstr "desde"
+
+msgid "valid until"
+msgstr "hasta"
+
+msgid "general list"
+msgstr "tarifa general"
+
+msgid "active"
+msgstr "activa"
+
+msgid "price list"
+msgstr "tarifa"
+
+msgid "price lists"
+msgstr "tarifas"
+
+msgid "product"
+msgstr "producto"
+
+msgid "service"
+msgstr "servicio"
+
+msgid "service name"
+msgstr "nombre del servicio"
+
+msgid "price"
+msgstr "precio"
+
+msgid "from quantity"
+msgstr "desde la cantidad"
+
+msgid "prices"
+msgstr "precios"
+
+msgid "Percentage"
+msgstr "Porcentaje"
+
+msgid "Amount per unit"
+msgstr "Importe por unidad"
+
+msgid "Buy X, get Y"
+msgstr "Compra X, llévate Y"
+
+msgid "Tiered"
+msgstr "Por tramos"
+
+msgid "Everything"
+msgstr "Todo"
+
+msgid "All products"
+msgstr "Todos los productos"
+
+msgid "All services"
+msgstr "Todos los servicios"
+
+msgid "A category"
+msgstr "Una categoría"
+
+msgid "A product"
+msgstr "Un producto"
+
+msgid "A service"
+msgstr "Un servicio"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "percent"
+msgstr "porcentaje"
+
+msgid "amount per unit"
+msgstr "importe por unidad"
+
+msgid "buy"
+msgstr "compra"
+
+msgid "free"
+msgstr "gratis"
+
+msgid "tiers"
+msgstr "tramos"
+
+msgid "applies to"
+msgstr "se aplica a"
+
+msgid "category"
+msgstr "categoría"
+
+msgid "minimum quantity"
+msgstr "cantidad mínima"
+
+msgid "priority"
+msgstr "prioridad"
+
+msgid "discount rule"
+msgstr "regla de descuento"
+
+msgid "discount rules"
+msgstr "reglas de descuento"
+
+msgid "This price list does not exist."
+msgstr "Esta tarifa no existe."
+
+msgid "“%(said)s” matches several price lists: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias tarifas: %(names)s. Di cuál."
+
+msgid "The price list %(code)s does not apply on %(day)s: it is deactivated or out of its dates."
+msgstr "La tarifa %(code)s no vale el %(day)s: está desactivada o fuera de sus fechas."
+
+msgid "This discount rule does not exist."
+msgstr "Esta regla de descuento no existe."
+
+msgid "“%(said)s” matches several discount rules: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias reglas de descuento: %(names)s. Di cuál."
+
+msgid "That price no longer exists."
+msgstr "Ese precio ya no existe."
+
+msgid "Services is not active in this business."
+msgstr "Servicios no está activa en este negocio."
+
+msgid "Say which price list: its id, its code or its name."
+msgstr "Di qué tarifa: su id, su código o su nombre."
+
+msgid "Say which discount rule: its id, its code or its name."
+msgstr "Di qué regla de descuento: su id, su código o su nombre."
+
+msgid "Say which product or service: its id, its name or its SKU."
+msgstr "Di qué producto o servicio: su id, su nombre o su SKU."
+
+msgid "Say one product or one service, not both."
+msgstr "Di un producto o un servicio, no los dos."
+
+msgid "The last day cannot be before the first one."
+msgstr "El último día no puede ser anterior al primero."
+
+msgid "Enter a currency code of ISO 4217 with two decimals, such as EUR or USD."
+msgstr "Escribe un código de divisa ISO 4217 con dos decimales, como EUR o USD."
+
+msgid "The general list is for everybody: take its customer group off."
+msgstr "La tarifa general vale para todos: quítale el grupo."
+
+msgid "This field cannot be empty."
+msgstr "Este campo no puede quedar vacío."
+
+msgid "A rule of this type needs this value."
+msgstr "Una regla de este tipo necesita este valor."
+
+msgid "This value belongs to another type of rule."
+msgstr "Este valor es de otro tipo de regla."
+
+msgid "Say which one the rule applies to."
+msgstr "Di a cuál se aplica la regla."
+
+msgid "This only goes with a rule that applies to it."
+msgstr "Esto solo va con una regla que se aplique a ello."
+
+msgid "Each tier starts at a higher quantity than the one before."
+msgstr "Cada tramo empieza en una cantidad mayor que el anterior."
+
+msgid "A price list with that code already exists. Pick a different code."
+msgstr "Ya existe una tarifa con ese código. Elige otro."
+
+msgid "A discount rule with that code already exists. Pick a different code."
+msgstr "Ya existe una regla con ese código. Elige otro."
+
+msgid "A deactivated price list cannot be the general one."
+msgstr "Una tarifa desactivada no puede ser la general."
+
+msgid "This is the general price list: make another one general or take its mark off before deactivating it."
+msgstr "Esta es la tarifa general: elige otra como general o quítale la marca antes de desactivarla."
+
+msgid "That price list is already deactivated."
+msgstr "Esa tarifa ya está desactivada."
+
+msgid "That price list is already active."
+msgstr "Esa tarifa ya está activa."
+
+msgid "That price list is not available: it does not exist in this business or it is deactivated."
+msgstr "Esa tarifa no está disponible: no existe en este negocio o está desactivada."
+
+msgid "That article already has a price in this list from that quantity."
+msgstr "Ese artículo ya tiene precio en esta tarifa desde esa cantidad."
+
+msgid "This quantity does not fit the article's unit: use a multiple of %(step)s."
+msgstr "Esta cantidad no encaja en la unidad del artículo: usa un múltiplo de %(step)s."
+
+msgid "That discount rule is already deactivated."
+msgstr "Esa regla de descuento ya está desactivada."
+
+msgid "That discount rule is already active."
+msgstr "Esa regla de descuento ya está activa."
+
+msgid "This rule's customer group no longer exists: choose another group or take it off before activating it."
+msgstr "El grupo de clientes de esta regla ya no existe: elige otro grupo o quítaselo antes de activarla."
+
+msgid "Someone else is changing the general price list right now. Try again in a moment."
+msgstr "Otra persona está cambiando la tarifa general en este momento. Vuelve a intentarlo en un instante."
+
+msgid "The general list goes in the business's currency (%(currency)s), the one the till sells in."
+msgstr "La tarifa general va en la divisa del negocio (%(currency)s), la que cobra la caja."
+
+msgid "At most %(count)s tiers."
+msgstr "Como mucho %(count)s tramos."
