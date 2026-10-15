@@ -59,6 +59,7 @@ ENV_KEYS = (
     "ERPLORA_ENVIRONMENT",
     "HUB_BASE_DOMAIN",
     "FISCAL_CERTIFICATE_KEY",
+    "VITE_DEV_PORT",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -159,6 +160,21 @@ def test_development_uses_the_debug_csp_and_vite(load_settings):
     )
     assert loaded["LIVE"]["spa"]["dev_server"] == "http://localhost:5173"
     assert loaded["ALLOWED_HOSTS"] == [".localhost", "127.0.0.1", "localhost"]
+
+
+def test_the_vite_port_comes_from_the_environment(load_settings):
+    # A second checkout runs beside another session's runserver (its Vite owns 5173): the e2e of a
+    # branch sets VITE_DEV_PORT for Django and for vite.config.ts alike.
+    loaded = load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="5183")
+    assert loaded["LIVE"]["spa"]["dev_server"] == "http://localhost:5183"
+    assert loaded["SECURE_CSP"] == with_saas_form_action(
+        debug_policy("http://localhost:5183"), "http://localhost:8001"
+    )
+
+
+def test_a_vite_port_that_is_no_port_refuses_to_start(load_settings):
+    with pytest.raises(ImproperlyConfigured, match="VITE_DEV_PORT"):
+        load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="70000")
 
 
 def test_production_uses_the_base_csp_and_no_dev_server(load_settings):

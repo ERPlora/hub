@@ -56,7 +56,12 @@ SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=False, cast=bool)
 # preload list is the apex's (W005, W021).
 SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W008", "security.W021"]
 
-VITE_DEV_SERVER = "http://localhost:5173"
+# Vite's dev server (`vite.config.ts` reads the same VITE_DEV_PORT): 5173 unless a second checkout runs
+# beside another one, as the e2e of a branch does.
+VITE_DEV_PORT = config("VITE_DEV_PORT", default=5173, cast=int)
+if not 0 < VITE_DEV_PORT < 65536:
+    raise ImproperlyConfigured(f"VITE_DEV_PORT must be a TCP port, not {VITE_DEV_PORT}.")
+VITE_DEV_SERVER = f"http://localhost:{VITE_DEV_PORT}"
 
 # Application definition
 
