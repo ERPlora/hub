@@ -1,0 +1,15 @@
+{
+  "enabled": 1,
+  "environment": "testing",
+  "has_certificate": 0,
+  "id": "2ed7c40d-a06b-4136-a700-396b6e3c66f8",
+  "issuer_name": "ERPlora Demo SL",
+  "issuer_nif": "B27593136",
+  "max_retries": 10,
+  "mode": "verifactu",
+  "retry_interval_minutes": 5,
+  "software_id": "EC",
+  "software_name": "ERPlora Hub",
+  "software_nif": "",
+  "software_version": "1.0.0"
+}

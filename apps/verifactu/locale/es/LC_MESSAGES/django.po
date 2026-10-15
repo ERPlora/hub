@@ -1,0 +1,839 @@
+# Spanish translation of the verifactu app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next verifactu\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 08:00+0200\n"
+"PO-Revision-Date: 2026-10-15 08:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+#: admin.py:24
+msgid "sent to the AEAT through ERPlora's gateway."
+msgstr "enviado a la AEAT por la pasarela de ERPlora."
+
+#: admin.py:25
+msgid "goes out with the next pass."
+msgstr "sale en la próxima pasada."
+
+#: admin.py:27
+msgid "Send now"
+msgstr "Enviar ahora"
+
+#: admin.py:28
+msgid "Retry with the next pass"
+msgstr "Reintentar en la próxima pasada"
+
+#: admin.py:30
+msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."
+msgstr "Elige antes un hub (su enlace en el admin del SaaS): la acción se ejecuta en ese hub."
+
+#: apps.py:13
+msgid "VeriFactu"
+msgstr "VeriFactu"
+
+#: apps.py:19
+msgid "Every invoice and ticket becomes a chained VeriFactu record with its QR, sent to the AEAT."
+msgstr "Cada factura y cada tique se convierte en un registro VeriFactu encadenado, con su QR, que se envía a la AEAT."
+
+#: apps.py:22
+msgid "VeriFactu turns every document Invoicing issues into its billing record for the Spanish tax agency: chained to the previous one by its SHA-256 fingerprint, with the QR the customer can check, validated against the AEAT's official schemas and sent in order, respecting the waiting time the AEAT asks for. What cannot go out waits in the queue and leaves by itself; a rejected record is corrected with a new one. Records, queue, audit events and the chain's recovery are all here, in the test environment until you go live."
+msgstr "VeriFactu convierte cada documento que emite Facturación en su registro de facturación para la Agencia Tributaria: encadenado al anterior por su huella SHA-256, con el QR que el cliente puede cotejar, validado contra los esquemas oficiales de la AEAT y enviado en orden, respetando el tiempo de espera que pide la AEAT. Lo que no puede salir espera en la cola y sale solo; un registro rechazado se corrige con uno nuevo. Registros, cola, eventos de auditoría y recuperación de la cadena, todo aquí, en el entorno de pruebas hasta que pases a producción."
+
+#: apps.py:56
+msgid "Records"
+msgstr "Registros"
+
+#: apps.py:59
+msgid "Contingency"
+msgstr "Contingencia"
+
+#: apps.py:63
+msgid "Events"
+msgstr "Eventos"
+
+#: apps.py:64
+msgid "Recovery"
+msgstr "Recuperación"
+
+#: apps.py:65
+msgid "Configuration"
+msgstr "Configuración"
+
+#: apps.py:66
+msgid "Settings"
+msgstr "Ajustes"
+
+#: models.py:48
+msgid "Testing (AEAT test)"
+msgstr "Pruebas (AEAT de pruebas)"
+
+#: models.py:49
+msgid "Production"
+msgstr "Producción"
+
+#: models.py:56
+msgid "ERPlora files for you"
+msgstr "Lo remite ERPlora"
+
+#: models.py:57
+msgid "With my own certificate"
+msgstr "Con mi propio certificado"
+
+#: models.py:60
+msgid "Not signed"
+msgstr "Sin firmar"
+
+#: models.py:61
+msgid "Under review"
+msgstr "En revisión"
+
+#: models.py:62
+msgid "Approved"
+msgstr "Aprobado"
+
+#: models.py:63
+msgid "Returned"
+msgstr "Devuelto"
+
+#: models.py:64
+msgid "Revoked"
+msgstr "Revocado"
+
+#: models.py:66
+msgid "single row"
+msgstr "fila única"
+
+#: models.py:68 models.py:139 models.py:193 models.py:241 models.py:499
+#: models.py:608
+msgid "environment"
+msgstr "entorno"
+
+#: models.py:74
+msgid "sending route"
+msgstr "vía de envío"
+
+#: models.py:77
+msgid "in production since"
+msgstr "en producción desde"
+
+#: models.py:81
+msgid "serves several taxpayers"
+msgstr "da servicio a varios obligados"
+
+#: models.py:84
+msgid "own certificate loaded"
+msgstr "certificado propio cargado"
+
+#: models.py:87
+msgid "certificate holder"
+msgstr "titular del certificado"
+
+#: models.py:90
+msgid "certificate uploaded at"
+msgstr "certificado subido el"
+
+#: models.py:93
+msgid "certificate expires at"
+msgstr "el certificado caduca el"
+
+#: models.py:96
+msgid "representation"
+msgstr "otorgamiento de representación"
+
+#: models.py:102
+msgid "representation updated at"
+msgstr "otorgamiento actualizado el"
+
+#: models.py:105
+msgid "representation note"
+msgstr "nota del otorgamiento"
+
+#: models.py:107
+msgid "synced version"
+msgstr "versión recibida"
+
+#: models.py:108
+msgid "synced at"
+msgstr "recibido el"
+
+#: models.py:109 models.py:355
+msgid "updated at"
+msgstr "actualizado el"
+
+#: models.py:111
+msgid "updated by"
+msgstr "actualizado por"
+
+#: models.py:115 models.py:116
+msgid "configuration"
+msgstr "configuración"
+
+#: models.py:131
+msgid "VeriFactu configuration"
+msgstr "Configuración de VeriFactu"
+
+#: models.py:137 models.py:191 models.py:243 models.py:606
+msgid "issuer tax ID"
+msgstr "NIF del emisor"
+
+#: models.py:142
+msgid "last sequence"
+msgstr "última secuencia"
+
+#: models.py:149
+msgid "last record"
+msgstr "último registro"
+
+#: models.py:153 models.py:316
+msgid "previous issuer"
+msgstr "emisor anterior"
+
+#: models.py:156 models.py:319
+msgid "previous invoice"
+msgstr "factura anterior"
+
+#: models.py:159 models.py:322
+msgid "previous invoice date"
+msgstr "fecha de la factura anterior"
+
+#: models.py:162 models.py:325
+msgid "previous fingerprint"
+msgstr "huella anterior"
+
+#: models.py:164
+msgid "anchored at"
+msgstr "anclada el"
+
+#: models.py:165
+msgid "anchor"
+msgstr "ancla"
+
+#: models.py:166
+msgid "validated at"
+msgstr "validada el"
+
+#: models.py:167
+msgid "chain intact"
+msgstr "cadena íntegra"
+
+#: models.py:168
+msgid "records validated"
+msgstr "registros validados"
+
+#: models.py:170
+msgid "first broken sequence"
+msgstr "primera secuencia rota"
+
+#: models.py:174
+msgid "chain"
+msgstr "cadena"
+
+#: models.py:175
+msgid "chains"
+msgstr "cadenas"
+
+#: models.py:196
+msgid "next send not before"
+msgstr "próximo envío no antes de"
+
+#: models.py:199
+msgid "AEAT waiting time (s)"
+msgstr "tiempo de espera de la AEAT (s)"
+
+#: models.py:201
+msgid "last sent at"
+msgstr "último envío el"
+
+#: models.py:204
+msgid "send control"
+msgstr "control de envío"
+
+#: models.py:205
+msgid "send controls"
+msgstr "controles de envío"
+
+#: models.py:220
+msgctxt "verifactu record type"
+msgid "Registration"
+msgstr "Alta"
+
+#: models.py:221
+msgctxt "verifactu record type"
+msgid "Cancellation"
+msgstr "Anulación"
+
+#: models.py:224
+msgctxt "verifactu status"
+msgid "Pending"
+msgstr "Pendiente"
+
+#: models.py:225
+msgctxt "verifactu status"
+msgid "Sent, no answer"
+msgstr "Enviado, sin respuesta"
+
+#: models.py:226
+msgctxt "verifactu status"
+msgid "Accepted"
+msgstr "Aceptado"
+
+#: models.py:229
+msgctxt "verifactu status"
+msgid "Accepted with errors"
+msgstr "Aceptado con errores"
+
+#: models.py:231
+msgctxt "verifactu status"
+msgid "Rejected"
+msgstr "Rechazado"
+
+#: models.py:239
+msgid "record type"
+msgstr "tipo de registro"
+
+#: models.py:244
+msgid "issuer name"
+msgstr "nombre del emisor"
+
+#: models.py:245
+msgid "sequence"
+msgstr "secuencia"
+
+#: models.py:250
+msgid "invoice"
+msgstr "factura"
+
+#: models.py:253 models.py:610
+msgid "invoice number"
+msgstr "número de factura"
+
+#: models.py:254 models.py:611
+msgid "issue date"
+msgstr "fecha de expedición"
+
+#: models.py:255
+msgid "operation date"
+msgstr "fecha de operación"
+
+#: models.py:256
+msgid "invoice type"
+msgstr "tipo de factura"
+
+#: models.py:258
+msgid "rectification kind"
+msgstr "tipo de rectificativa"
+
+#: models.py:262
+msgid "rectified invoices"
+msgstr "facturas rectificadas"
+
+#: models.py:265
+msgid "replaced invoices"
+msgstr "facturas sustituidas"
+
+#: models.py:267
+msgid "description"
+msgstr "descripción"
+
+#: models.py:268
+msgid "customer name"
+msgstr "nombre del cliente"
+
+#: models.py:270
+msgid "customer tax ID"
+msgstr "NIF del cliente"
+
+#: models.py:273
+msgid "customer country"
+msgstr "país del cliente"
+
+#: models.py:276
+msgid "customer document type"
+msgstr "tipo de documento del cliente"
+
+#: models.py:279
+msgid "tax breakdown"
+msgstr "desglose"
+
+#: models.py:281
+msgid "taxable base"
+msgstr "base imponible"
+
+#: models.py:282
+msgid "tax"
+msgstr "cuota"
+
+#: models.py:283
+msgid "total"
+msgstr "total"
+
+#: models.py:285
+msgid "correction"
+msgstr "subsanación"
+
+#: models.py:287
+msgid "previous rejection"
+msgstr "rechazo previo"
+
+#: models.py:295
+msgid "corrects"
+msgstr "subsana a"
+
+#: models.py:303
+msgid "cancels"
+msgstr "anula a"
+
+#: models.py:313
+msgid "previous record"
+msgstr "registro anterior"
+
+#: models.py:328
+msgid "generated at"
+msgstr "generado el"
+
+#: models.py:329 models.py:617
+msgid "generated on"
+msgstr "generado el (fecha)"
+
+#: models.py:330 models.py:613
+msgid "fingerprint"
+msgstr "huella"
+
+#: models.py:331
+msgid "QR link"
+msgstr "enlace del QR"
+
+#: models.py:333
+msgid "XML"
+msgstr "XML"
+
+#: models.py:334
+msgid "XML built at"
+msgstr "XML construido el"
+
+#: models.py:336 models.py:615
+msgid "status"
+msgstr "estado"
+
+#: models.py:338
+msgid "attempts"
+msgstr "intentos"
+
+#: models.py:339
+msgid "next attempt"
+msgstr "próximo intento"
+
+#: models.py:340
+msgid "waiting because"
+msgstr "espera porque"
+
+#: models.py:341
+msgid "waiting detail"
+msgstr "detalle de la espera"
+
+#: models.py:342
+msgid "sent at"
+msgstr "enviado el"
+
+#: models.py:343
+msgid "transmission ID"
+msgstr "ID de transmisión"
+
+#: models.py:345
+msgid "envelope digest (SHA-256)"
+msgstr "digest del sobre (SHA-256)"
+
+#: models.py:347
+msgid "sent as late (incident)"
+msgstr "enviado como tardío (incidencia)"
+
+#: models.py:348 models.py:616
+msgid "CSV"
+msgstr "CSV"
+
+#: models.py:349
+msgid "response code"
+msgstr "código de respuesta"
+
+#: models.py:350
+msgid "response message"
+msgstr "mensaje de respuesta"
+
+#: models.py:351
+msgid "created at"
+msgstr "creado el"
+
+#: models.py:353
+msgid "created by"
+msgstr "creado por"
+
+#: models.py:358 models.py:497
+msgid "record"
+msgstr "registro"
+
+#: models.py:359
+msgid "records"
+msgstr "registros"
+
+#: models.py:430
+msgid "ERPlora's sending gateway is not configured on this server"
+msgstr "la pasarela de envío de ERPlora no está configurada en este servidor"
+
+#: models.py:433
+msgid "your ERPlora account has not sent one of the producer's details yet (whether it serves several taxpayers)"
+msgstr "tu cuenta de ERPlora todavía no ha enviado uno de los datos del productor (si da servicio a varios obligados)"
+
+#: models.py:435
+msgid "your own certificate is not loaded or has expired"
+msgstr "tu certificado propio no está cargado o ha caducado"
+
+#: models.py:437
+msgid "ERPlora still has to approve your signed authorisation to file in production"
+msgstr "falta que ERPlora apruebe tu autorización firmada para remitir en producción"
+
+#: models.py:439
+msgid "the AEAT asked to wait until %(at)s"
+msgstr "la AEAT pidió esperar hasta las %(at)s"
+
+#: models.py:440
+msgid "the gateway or the AEAT could not be reached (%(detail)s)"
+msgstr "no se ha podido contactar con la pasarela o con la AEAT (%(detail)s)"
+
+#: models.py:441
+msgid "ERPlora's gateway could not present it (%(detail)s)"
+msgstr "la pasarela de ERPlora no ha podido presentarlo (%(detail)s)"
+
+#: models.py:443
+msgid "the submission left and no answer came back; it is sent again, declared as late"
+msgstr "el envío salió y no volvió respuesta; se vuelve a enviar, declarado como tardío"
+
+#: models.py:446
+msgid "the AEAT refused the whole submission and it is tried again (%(detail)s)"
+msgstr "la AEAT rechazó el envío entero y se vuelve a intentar (%(detail)s)"
+
+#: models.py:448
+msgid "its XML does not pass the AEAT's schema (%(detail)s)"
+msgstr "su XML no pasa el esquema de la AEAT (%(detail)s)"
+
+#: models.py:462
+msgid "Record created"
+msgstr "Registro creado"
+
+#: models.py:463
+msgid "Submission postponed"
+msgstr "Envío aplazado"
+
+#: models.py:464
+msgid "Submission accepted"
+msgstr "Envío aceptado"
+
+#: models.py:465
+msgid "Accepted with errors"
+msgstr "Aceptado con errores"
+
+#: models.py:466
+msgid "Submission failed"
+msgstr "Envío fallido"
+
+#: models.py:467
+msgid "Queue processed"
+msgstr "Cola procesada"
+
+#: models.py:468
+msgid "Record rescheduled"
+msgstr "Registro reprogramado"
+
+#: models.py:469
+msgid "Chain verified"
+msgstr "Cadena verificada"
+
+#: models.py:470
+msgid "Chain broken"
+msgstr "Cadena rota"
+
+#: models.py:471
+msgid "AEAT query"
+msgstr "Consulta a la AEAT"
+
+#: models.py:472
+msgid "Chain recovered"
+msgstr "Cadena recuperada"
+
+#: models.py:473
+msgid "Connection test"
+msgstr "Prueba de conexión"
+
+#: models.py:474
+msgid "Configuration changed"
+msgstr "Configuración cambiada"
+
+#: models.py:477
+msgid "Debug"
+msgstr "Depuración"
+
+#: models.py:478
+msgid "Info"
+msgstr "Información"
+
+#: models.py:479
+msgid "Warning"
+msgstr "Aviso"
+
+#: models.py:480
+msgid "Error"
+msgstr "Error"
+
+#: models.py:481
+msgid "Critical"
+msgstr "Crítico"
+
+#: models.py:483
+msgid "type"
+msgstr "tipo"
+
+#: models.py:485
+msgid "severity"
+msgstr "severidad"
+
+#: models.py:487
+msgid "message key"
+msgstr "clave del mensaje"
+
+#: models.py:489
+msgid "parameters"
+msgstr "parámetros"
+
+#: models.py:501
+msgid "search text"
+msgstr "texto de búsqueda"
+
+#: models.py:502
+msgid "when"
+msgstr "cuándo"
+
+#: models.py:503
+msgid "actor"
+msgstr "quién"
+
+#: models.py:506
+msgid "event"
+msgstr "evento"
+
+#: models.py:507
+msgid "events"
+msgstr "eventos"
+
+#: models.py:551
+msgid "Registration record #%(sequence)s sealed for invoice %(invoice_number)s."
+msgstr "Registro de alta #%(sequence)s de la factura %(invoice_number)s sellado."
+
+#: models.py:554
+msgid "Correction record #%(sequence)s sealed for invoice %(invoice_number)s."
+msgstr "Registro de subsanación #%(sequence)s de la factura %(invoice_number)s sellado."
+
+#: models.py:557
+msgid "Cancellation record #%(sequence)s sealed for invoice %(invoice_number)s: %(reason_text)s"
+msgstr "Registro de anulación #%(sequence)s de la factura %(invoice_number)s sellado: %(reason_text)s"
+
+#: models.py:559
+msgid "Not sent to the AEAT yet (%(count)s record(s)): %(why)s."
+msgstr "Aún no se ha enviado a la AEAT (%(count)s registro(s)): %(why)s."
+
+#: models.py:560
+msgid "AEAT (%(environment)s): %(count)s record(s) accepted, CSV %(csv)s."
+msgstr "AEAT (%(environment)s): %(count)s registro(s) aceptado(s), CSV %(csv)s."
+
+#: models.py:562
+msgid "Invoice %(invoice_number)s accepted with errors by the AEAT (%(code)s): %(message)s"
+msgstr "Factura %(invoice_number)s aceptada con errores por la AEAT (%(code)s): %(message)s"
+
+#: models.py:565
+msgid "Invoice %(invoice_number)s rejected by the AEAT (%(code)s): %(message)s"
+msgstr "Factura %(invoice_number)s rechazada por la AEAT (%(code)s): %(message)s"
+
+#: models.py:568
+msgid "Queue processed: %(sent)s sent, %(accepted)s accepted, %(rejected)s rejected, %(waiting)s waiting."
+msgstr "Cola procesada: %(sent)s enviados, %(accepted)s aceptados, %(rejected)s rechazados, %(waiting)s en espera."
+
+#: models.py:570
+msgid "Invoice %(invoice_number)s goes out with the next pass."
+msgstr "La factura %(invoice_number)s sale en la próxima pasada."
+
+#: models.py:572
+msgid "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). Amounts are not re-audited."
+msgstr "Cadena de huellas íntegra: %(total)s registro(s) con su encadenado SHA-256 verificado (%(issuer_nif)s). No se re-auditan los importes."
+
+#: models.py:576
+msgid "Fingerprint chain BROKEN at sequence %(first_invalid_sequence)s (%(issuer_nif)s)."
+msgstr "Cadena de huellas ROTA en la secuencia %(first_invalid_sequence)s (%(issuer_nif)s)."
+
+#: models.py:578
+msgid "AEAT query: %(count)s record(s) retrieved for %(issuer_nif)s."
+msgstr "Consulta a la AEAT: %(count)s registro(s) recuperados para %(issuer_nif)s."
+
+#: models.py:580
+msgid "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s (%(found)s record(s) found)."
+msgstr "Cadena recuperada desde la AEAT para %(issuer_nif)s: continúa tras la factura %(invoice_number)s (%(found)s registro(s) encontrados)."
+
+#: models.py:584
+msgid "Chain continued manually for %(issuer_nif)s after invoice %(invoice_number)s."
+msgstr "Cadena continuada manualmente para %(issuer_nif)s tras la factura %(invoice_number)s."
+
+#: models.py:586
+msgid "Connection test (%(environment)s): this business can send."
+msgstr "Prueba de conexión (%(environment)s): este negocio puede enviar."
+
+#: models.py:588
+msgid "Connection test (%(environment)s): it cannot send yet: %(why)s."
+msgstr "Prueba de conexión (%(environment)s): todavía no puede enviar: %(why)s."
+
+#: models.py:590
+msgid "From now on you send with your own certificate."
+msgstr "A partir de ahora envías con tu propio certificado."
+
+#: models.py:591
+msgid "From now on ERPlora files on your behalf."
+msgstr "A partir de ahora remite ERPlora en tu nombre."
+
+#: models.py:592
+msgid "The business went live: records go to the real AEAT."
+msgstr "El negocio ha pasado a producción: los registros van a la AEAT real."
+
+#: models.py:593
+msgid "The business went back to the AEAT's test environment."
+msgstr "El negocio ha vuelto al entorno de pruebas de la AEAT."
+
+#: models.py:595
+msgid "Data received from your ERPlora account (version %(version)s)."
+msgstr "Datos recibidos de tu cuenta de ERPlora (versión %(version)s)."
+
+#: models.py:598
+msgid "Invoice %(invoice_number)s cannot be sent: its XML does not pass the AEAT's schema (%(detail)s)."
+msgstr "La factura %(invoice_number)s no se puede enviar: su XML no pasa el esquema de la AEAT (%(detail)s)."
+
+#: models.py:618
+msgid "queried at"
+msgstr "consultado el"
+
+#: models.py:621
+msgid "record at the AEAT"
+msgstr "registro en la AEAT"
+
+#: models.py:622
+msgid "records at the AEAT"
+msgstr "registros en la AEAT"
+
+#: queries.py:63
+msgid "Record not found."
+msgstr "Registro no encontrado."
+
+#: queries.py:64
+msgid "Invoice not found."
+msgstr "Factura no encontrada."
+
+#: schemas.py:28
+msgid "Say which record: its id or the number of its invoice."
+msgstr "Di qué registro: su id o el número de su factura."
+
+#: schemas.py:29
+msgid "Say which invoice: its id or its number."
+msgstr "Di qué factura: su id o su número."
+
+#: schemas.py:30
+msgid "The fingerprint must be 64 hexadecimal characters."
+msgstr "La huella debe tener 64 caracteres hexadecimales."
+
+#: services.py:89
+msgid "This invoice cannot be declared to the AEAT: its amounts do not square (%(detail)s). No record was sealed and no number of the chain was spent."
+msgstr "Esta factura no se puede declarar a la AEAT: sus importes no cuadran (%(detail)s). No se ha sellado ningún registro ni se ha gastado ningún número de la cadena."
+
+#: services.py:93
+msgid "The record does not pass the AEAT's schema (%(detail)s). No record was sealed and no number of the chain was spent."
+msgstr "El registro no pasa el esquema de la AEAT (%(detail)s). No se ha sellado ningún registro ni se ha gastado ningún número de la cadena."
+
+#: services.py:96
+msgid "A full or rectifying invoice %(type)s needs the customer's tax ID: it cannot be declared without it."
+msgstr "Una factura completa o rectificativa %(type)s necesita el NIF del cliente: sin él no se puede declarar."
+
+#: services.py:99
+msgid "This record cannot be corrected: only the last record of a registration the AEAT rejected or accepted with errors can."
+msgstr "Este registro no se puede subsanar: solo se subsana el último registro de un alta que la AEAT rechazó o aceptó con errores."
+
+#: services.py:102
+msgid "This record cannot be cancelled: only a registration that reached (or will reach) the AEAT and has no cancellation can."
+msgstr "Este registro no se puede anular: solo se anula un alta que está (o estará) en la AEAT y no tiene anulación."
+
+#: services.py:105
+msgid "This record is not in the queue: it is already in the AEAT, or the AEAT rejected it."
+msgstr "Este registro no está en la cola: ya está en la AEAT, o la AEAT lo rechazó."
+
+#: services.py:107
+msgid "This chain is being sent right now: try again in a moment."
+msgstr "Esta cadena se está enviando ahora mismo: inténtalo de nuevo en un momento."
+
+#: services.py:108
+msgid "The AEAT asked to wait: it goes out by itself at %(at)s."
+msgstr "La AEAT pidió esperar: sale solo a las %(at)s."
+
+#: services.py:110
+msgid "It cannot be sent now: %(why)s. It stays in the queue and goes out as soon as it can."
+msgstr "No se puede enviar ahora: %(why)s. Sigue en la cola y sale en cuanto se pueda."
+
+#: services.py:112
+msgid "There are no records of that issuer in this environment."
+msgstr "No hay registros de ese emisor en este entorno."
+
+#: services.py:113
+msgid "The pending records of this chain have to go out first."
+msgstr "Antes tienen que salir los registros pendientes de esta cadena."
+
+#: services.py:114
+msgid "The AEAT refused the query: %(detail)s"
+msgstr "La AEAT ha rechazado la consulta: %(detail)s"
+
+#: services.py:115
+msgid "The AEAT could not be asked: %(detail)s"
+msgstr "No se ha podido consultar a la AEAT: %(detail)s"
+
+#: services.py:116
+msgid "it named the same page of records again"
+msgstr "volvió a indicar la misma página de registros"
+
+#: services.py:117
+msgid "it has more than %(pages)s pages of records"
+msgstr "tiene más de %(pages)s páginas de registros"
+
+#: services.py:121
+msgid "The AEAT has no records of that issuer this month: there is nothing to recover."
+msgstr "La AEAT no tiene registros de ese emisor este mes: no hay nada que recuperar."
+
+#: services.py:123
+msgid "The test invoice is only for the test environment."
+msgstr "La factura de prueba es solo para el entorno de pruebas."
+
+#: services.py:125
+msgid "There is no certificate loaded: upload it in your ERPlora account to use it."
+msgstr "No hay ningún certificado cargado: súbelo en tu cuenta de ERPlora para poder usarlo."
+
+#: services.py:128
+msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
+msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."
+
+#: services.py:131
+msgid "Going live is not open on this server yet: ERPlora opens it when the real submission is ready."
+msgstr "El paso a producción todavía no está abierto en este servidor: ERPlora lo abre cuando la remisión real esté lista."
+
+#: services.py:133
+msgid "Set up the issuer first in Invoicing → Issuer."
+msgstr "Configura antes el emisor en Facturación → Emisor."
+
+#: services.py:135
+msgid "It cannot go back to testing: this business already has records in production."
+msgstr "No se puede volver a pruebas: este negocio ya tiene registros en producción."
