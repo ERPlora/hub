@@ -325,3 +325,24 @@ describe('the voucher at the till (SALE-F27, SERVICE-F22)', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.session.'))).toEqual([]);
   });
 });
+
+describe('the payment app (apps/payment/api.py)', () => {
+  it('binds its thirteen operations: queries by GET, commands by POST', () => {
+    expect(OPERATION_ROUTES).toMatchObject({
+      'payment.payment.list': { method: 'get', path: '/api/payment/payments' },
+      'payment.payment.get': { method: 'get', path: '/api/payment/payments/detail' },
+      'payment.payment.create': { method: 'post', path: '/api/payment/payments' },
+      'payment.payment.approve': { method: 'post', path: '/api/payment/payments/approve' },
+      'payment.payment.mark_sent': { method: 'post', path: '/api/payment/payments/mark_sent' },
+      'payment.payment.mark_completed': { method: 'post', path: '/api/payment/payments/mark_completed' },
+      'payment.payment.cancel': { method: 'post', path: '/api/payment/payments/cancel' },
+      'payment.method.list': { method: 'get', path: '/api/payment/methods' },
+      'payment.method.get': { method: 'get', path: '/api/payment/methods/detail' },
+      'payment.method.create': { method: 'post', path: '/api/payment/methods' },
+      'payment.method.update': { method: 'post', path: '/api/payment/methods/update' },
+      'payment.method.deactivate': { method: 'post', path: '/api/payment/methods/deactivate' },
+      'payment.method.activate': { method: 'post', path: '/api/payment/methods/activate' },
+    });
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('payment.'))).toHaveLength(13);
+  });
+});

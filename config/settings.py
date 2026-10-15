@@ -93,6 +93,10 @@ INSTALLED_APPS = [
     "apps.appointment",
     "apps.table",
     "apps.verifactu",
+    "apps.payment",
+    "apps.printing",
+    "apps.cart_checkout",
+    "apps.modifier",
 ]
 
 MIDDLEWARE = [

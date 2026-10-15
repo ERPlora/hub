@@ -1,0 +1,267 @@
+# Spanish translation of the cart_checkout app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next cart_checkout\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 10:01+0200\n"
+"PO-Revision-Date: 2026-10-15 09:10+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Erase the personal data of their customers"
+msgstr "Borrar los datos personales de sus clientes"
+
+#, python-format
+msgid "%(email)s: personal data erased from %(carts)s cart(s) and %(orders)s order(s)."
+msgstr "%(email)s: datos personales borrados de %(carts)s carrito(s) y %(orders)s pedido(s)."
+
+msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."
+msgstr "Elige primero un hub (su enlace en el admin del SaaS): la acción se ejecuta en ese hub."
+
+msgid "Cart & Checkout"
+msgstr "Carrito y pago"
+
+msgid "An internal notebook of shopping carts and the orders made from them, with a payment status you mark."
+msgstr "Una libreta interna de carritos y de los pedidos que salen de ellos, con un estado de pago que marcas tú."
+
+msgid "Cart & Checkout keeps shopping carts, of a customer or of an anonymous session code, with their lines and totals, and turns them into orders with their own number of the day, addresses and shipping and payment methods. You mark each order as paid, failed or completed after charging it some other way. It is not the till and nothing in it is fiscal: it charges nothing and creates no sale, invoice, VeriFactu record, cash movement or stock movement."
+msgstr "Carrito y pago guarda carritos, de un cliente o de un código de sesión anónimo, con sus líneas y totales, y los convierte en pedidos con su número del día, direcciones y métodos de envío y de pago. Marcas cada pedido como pagado, fallido o completado después de cobrarlo por otra vía. No es el TPV y nada en ella es fiscal: no cobra ni crea venta, factura, registro VeriFactu, movimiento de caja ni de stock."
+
+msgid "Carts"
+msgstr "Carritos"
+
+msgid "Orders"
+msgstr "Pedidos"
+
+msgctxt "cart status"
+msgid "Active"
+msgstr "Activo"
+
+msgctxt "cart status"
+msgid "Abandoned"
+msgstr "Abandonado"
+
+msgctxt "cart status"
+msgid "Converted"
+msgstr "Convertido"
+
+msgctxt "cart status"
+msgid "Expired"
+msgstr "Expirado"
+
+msgctxt "order status"
+msgid "Initiated"
+msgstr "Iniciado"
+
+msgctxt "order status"
+msgid "Paid"
+msgstr "Pagado"
+
+msgctxt "order status"
+msgid "Failed"
+msgstr "Fallido"
+
+msgctxt "order status"
+msgid "Completed"
+msgstr "Completado"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "changed by"
+msgstr "cambiado por"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "cart"
+msgid "session"
+msgstr "sesión"
+
+msgid "customer email"
+msgstr "email del cliente"
+
+msgid "customer name"
+msgstr "nombre del cliente"
+
+msgid "status"
+msgstr "estado"
+
+msgid "items"
+msgstr "ítems"
+
+msgid "total"
+msgstr "total"
+
+msgid "currency"
+msgstr "moneda"
+
+msgid "expires at"
+msgstr "caduca el"
+
+msgid "last activity"
+msgstr "última actividad"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "abandonment reason"
+msgstr "motivo del abandono"
+
+msgid "deleted at"
+msgstr "borrado el"
+
+msgid "cart"
+msgstr "carrito"
+
+msgid "carts"
+msgstr "carritos"
+
+msgid "product reference"
+msgstr "referencia del producto"
+
+msgid "product name"
+msgstr "nombre del producto"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "quantity"
+msgstr "cantidad"
+
+msgid "unit price"
+msgstr "precio unitario"
+
+msgid "line total"
+msgstr "total de la línea"
+
+msgid "variant attributes"
+msgstr "atributos de variante"
+
+msgid "cart line"
+msgstr "línea del carrito"
+
+msgid "cart lines"
+msgstr "líneas del carrito"
+
+msgid "order number"
+msgstr "número de pedido"
+
+msgid "shipping address"
+msgstr "dirección de envío"
+
+msgid "billing address"
+msgstr "dirección de facturación"
+
+msgid "shipping method"
+msgstr "método de envío"
+
+msgid "payment method"
+msgstr "método de pago"
+
+msgid "failure reason"
+msgstr "motivo del fallo"
+
+msgid "placed at"
+msgstr "iniciado el"
+
+msgid "paid at"
+msgstr "pagado el"
+
+msgid "failed at"
+msgstr "fallido el"
+
+msgid "completed at"
+msgstr "completado el"
+
+msgid "order"
+msgstr "pedido"
+
+msgid "orders"
+msgstr "pedidos"
+
+msgid "business day"
+msgstr "día del negocio"
+
+msgid "last number"
+msgstr "último número"
+
+msgid "order counter"
+msgstr "contador de pedidos"
+
+msgid "order counters"
+msgstr "contadores de pedidos"
+
+msgid "That cart does not exist in this business."
+msgstr "Ese carrito no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” matches several carts: %(codes)s. Say which one."
+msgstr "«%(said)s» encaja con varios carritos: %(codes)s. Di cuál."
+
+msgid "That cart line does not exist in this business."
+msgstr "Esa línea de carrito no existe en este negocio."
+
+msgid "That order does not exist in this business."
+msgstr "Ese pedido no existe en este negocio."
+
+msgid "Enter a valid email."
+msgstr "Introduce un email válido."
+
+msgid "That is not a currency code (ISO 4217, such as EUR)."
+msgstr "Eso no es un código de moneda (ISO 4217, como EUR)."
+
+msgid "The expiry must be in the future."
+msgstr "La caducidad tiene que ser futura."
+
+msgid "The quantity must be greater than 0."
+msgstr "La cantidad tiene que ser mayor que 0."
+
+msgid "Say why the order failed: the reason stays on the order."
+msgstr "Di por qué falló el pedido: el motivo queda en el pedido."
+
+msgid "Say which cart: its id, its session code, or its customer's email or name."
+msgstr "Di qué carrito: su id, su código de sesión, o el email o el nombre de su cliente."
+
+msgid "Say which order: its id, or its number."
+msgstr "Di qué pedido: su id o su número."
+
+msgid "There is already a cart with that session."
+msgstr "Ya hay un carrito con esa sesión."
+
+#, python-format
+msgid "This cart no longer takes changes: it is %(status)s."
+msgstr "Este carrito ya no admite cambios: está %(status)s."
+
+msgid "This cart has no lines: add a product before starting the order."
+msgstr "Este carrito no tiene líneas: añade un producto antes de iniciar el pedido."
+
+msgid "Say the customer's email: the cart has none."
+msgstr "Di el email del cliente: el carrito no tiene."
+
+#, python-format
+msgid "Only an initiated order can be marked as paid; this one is %(status)s."
+msgstr "Solo un pedido iniciado se puede marcar como pagado; este está %(status)s."
+
+#, python-format
+msgid "Only an initiated or paid order can fail; this one is %(status)s."
+msgstr "Solo un pedido iniciado o pagado puede fallar; este está %(status)s."
+
+#, python-format
+msgid "Only a paid order can be completed; this one is %(status)s."
+msgstr "Solo se completa un pedido pagado; este está %(status)s."
+
+msgid "The total of this line (quantity × price) is above what a cart can hold."
+msgstr "El total de esta línea (cantidad × precio) supera lo que cabe en un carrito."
+
+msgid "The cart's total would be above what a cart can hold."
+msgstr "El total del carrito superaría lo que cabe en un carrito."

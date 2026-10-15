@@ -1,0 +1,126 @@
+{
+  "payment": {
+    "title": "Pagos salientes",
+    "tabs": {
+      "label": "Secciones de Pagos",
+      "payments": "Pagos",
+      "methods": "Métodos"
+    },
+    "loading": "Cargando…",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
+    "noPermission": "No tienes permiso",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "money": {
+      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "negative": "Este importe no puede ser negativo.",
+      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+      "notPositive": "El importe de un pago tiene que ser mayor que 0."
+    },
+    "status": {
+      "draft": "Borrador",
+      "approved": "Aprobado",
+      "sent": "Enviado",
+      "completed": "Completado",
+      "cancelled": "Cancelado"
+    },
+    "types": {
+      "cash": "Efectivo",
+      "transfer": "Transferencia",
+      "card": "Tarjeta",
+      "sepa": "SEPA",
+      "check": "Cheque",
+      "other": "Otro"
+    },
+    "payments": {
+      "search": "Buscar referencia o beneficiario…",
+      "empty": "Sin pagos.",
+      "loadError": "No se han podido cargar los pagos.",
+      "new": "Nuevo pago",
+      "entity": {
+        "one": "pago",
+        "many": "pagos"
+      },
+      "columns": {
+        "reference": "Referencia",
+        "date": "Fecha",
+        "beneficiary": "Beneficiario",
+        "amount": "Importe",
+        "status": "Estado",
+        "method": "Método"
+      },
+      "actions": {
+        "approve": "Aprobar",
+        "markSent": "Marcar como enviado",
+        "markCompleted": "Marcar como completado",
+        "cancel": "Cancelar pago"
+      },
+      "actionError": "No se ha podido cambiar el pago",
+      "cancelReason": "Motivo: {reason}",
+      "approvedBy": "Aprobado por {name}",
+      "form": {
+        "title": "Nuevo pago",
+        "method": "Método",
+        "methodPlaceholder": "Método…",
+        "date": "Fecha",
+        "amount": "Importe",
+        "beneficiary": "Beneficiario",
+        "concept": "Concepto",
+        "iban": "IBAN del beneficiario",
+        "invoice": "Factura del proveedor",
+        "submit": "Registrar pago",
+        "noMethods": "Todavía no hay métodos de pago activos. Crea uno en Métodos antes de registrar un pago.",
+        "goToMethods": "Ir a Métodos",
+        "methodsError": "No se han podido cargar los métodos de pago."
+      },
+      "cancelForm": {
+        "title": "Cancelar pago — {reference}",
+        "reason": "Motivo de cancelación",
+        "submit": "Cancelar pago",
+        "keep": "No cancelar"
+      }
+    },
+    "methods": {
+      "search": "Buscar método…",
+      "empty": "Sin métodos de pago.",
+      "emptyMessage": "Crea la cuenta o la caja desde la que pagas a los proveedores.",
+      "loadError": "No se han podido cargar los métodos de pago.",
+      "new": "Nuevo método",
+      "entity": {
+        "one": "método",
+        "many": "métodos"
+      },
+      "columns": {
+        "name": "Nombre",
+        "type": "Tipo",
+        "account": "Cuenta",
+        "status": "Estado"
+      },
+      "state": {
+        "active": "Activo",
+        "inactive": "Desactivado"
+      },
+      "actions": {
+        "edit": "Editar",
+        "deactivate": "Desactivar",
+        "activate": "Activar"
+      },
+      "actionError": "No se ha podido cambiar el método",
+      "form": {
+        "titleNew": "Nuevo método",
+        "titleEdit": "Editando método — {name}",
+        "name": "Nombre",
+        "type": "Tipo",
+        "account": "Cuenta",
+        "accountHelper": "Una referencia de la cuenta del banco, por ejemplo los últimos dígitos de su IBAN.",
+        "loadError": "No se ha podido leer el método de pago.",
+        "create": "Crear método",
+        "save": "Guardar"
+      }
+    }
+  }
+}

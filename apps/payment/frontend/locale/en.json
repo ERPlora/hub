@@ -1,0 +1,126 @@
+{
+  "payment": {
+    "title": "Outgoing payments",
+    "tabs": {
+      "label": "Sections of Payments",
+      "payments": "Payments",
+      "methods": "Methods"
+    },
+    "loading": "Loading…",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches the search or the filters.",
+    "noPermission": "You do not have permission",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "money": {
+      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
+      "negative": "This amount cannot be negative.",
+      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
+      "notPositive": "The amount of a payment must be greater than 0."
+    },
+    "status": {
+      "draft": "Draft",
+      "approved": "Approved",
+      "sent": "Sent",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "types": {
+      "cash": "Cash",
+      "transfer": "Bank transfer",
+      "card": "Card",
+      "sepa": "SEPA",
+      "check": "Cheque",
+      "other": "Other"
+    },
+    "payments": {
+      "search": "Search reference or beneficiary…",
+      "empty": "No payments.",
+      "loadError": "The payments could not be loaded.",
+      "new": "New payment",
+      "entity": {
+        "one": "payment",
+        "many": "payments"
+      },
+      "columns": {
+        "reference": "Reference",
+        "date": "Date",
+        "beneficiary": "Beneficiary",
+        "amount": "Amount",
+        "status": "Status",
+        "method": "Method"
+      },
+      "actions": {
+        "approve": "Approve",
+        "markSent": "Mark as sent",
+        "markCompleted": "Mark as completed",
+        "cancel": "Cancel payment"
+      },
+      "actionError": "The payment could not be changed",
+      "cancelReason": "Reason: {reason}",
+      "approvedBy": "Approved by {name}",
+      "form": {
+        "title": "New payment",
+        "method": "Method",
+        "methodPlaceholder": "Method…",
+        "date": "Date",
+        "amount": "Amount",
+        "beneficiary": "Beneficiary",
+        "concept": "Concept",
+        "iban": "Beneficiary IBAN",
+        "invoice": "Supplier invoice",
+        "submit": "Record payment",
+        "noMethods": "No active payment methods yet. Create one in Methods before recording a payment.",
+        "goToMethods": "Go to Methods",
+        "methodsError": "Payment methods could not be loaded."
+      },
+      "cancelForm": {
+        "title": "Cancel payment — {reference}",
+        "reason": "Cancellation reason",
+        "submit": "Cancel payment",
+        "keep": "Keep it"
+      }
+    },
+    "methods": {
+      "search": "Search method…",
+      "empty": "No payment methods.",
+      "emptyMessage": "Create the account or the cash you pay suppliers from.",
+      "loadError": "The payment methods could not be loaded.",
+      "new": "New method",
+      "entity": {
+        "one": "method",
+        "many": "methods"
+      },
+      "columns": {
+        "name": "Name",
+        "type": "Type",
+        "account": "Account",
+        "status": "Status"
+      },
+      "state": {
+        "active": "Active",
+        "inactive": "Deactivated"
+      },
+      "actions": {
+        "edit": "Edit",
+        "deactivate": "Deactivate",
+        "activate": "Activate"
+      },
+      "actionError": "The method could not be changed",
+      "form": {
+        "titleNew": "New method",
+        "titleEdit": "Editing method — {name}",
+        "name": "Name",
+        "type": "Type",
+        "account": "Account",
+        "accountHelper": "A reference of the bank account, for example the last digits of its IBAN.",
+        "loadError": "The payment method could not be read.",
+        "create": "Create method",
+        "save": "Save"
+      }
+    }
+  }
+}

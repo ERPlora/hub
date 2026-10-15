@@ -1,0 +1,257 @@
+# Spanish translation of the payment app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next payment\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 20:07+0200\n"
+"PO-Revision-Date: 2026-10-14 20:10+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Payments"
+msgstr "Pagos"
+
+msgid ""
+"Outgoing payments to suppliers, with their reference and an approval step "
+"before they leave."
+msgstr ""
+"Pagos salientes a proveedores, con su referencia y un paso de aprobación "
+"antes de salir."
+
+msgid ""
+"Payments keeps the money that goes out of the business: what you pay a "
+"supplier, a transfer or a refund that is not a sale's. Each payment gets its "
+"own reference of the day and moves from draft to approved, sent and "
+"completed, or is cancelled with its reason, and keeps who recorded it, who "
+"approved it and when each step happened. You choose the account or the cash "
+"it is paid from. It moves no money and talks to no bank: you mark each step "
+"when it happened."
+msgstr ""
+"Pagos guarda el dinero que sale del negocio: lo que pagas a un proveedor, una "
+"transferencia o un reembolso que no es de una venta. Cada pago lleva su "
+"referencia del día y pasa de borrador a aprobado, enviado y completado, o se "
+"cancela con su motivo, y guarda quién lo apuntó, quién lo aprobó y cuándo "
+"pasó cada paso. Eliges la cuenta o la caja desde la que se paga. No mueve "
+"dinero ni habla con ningún banco: marcas cada paso cuando ha ocurrido."
+
+msgid "Methods"
+msgstr "Métodos"
+
+msgctxt "payment method type"
+msgid "Cash"
+msgstr "Efectivo"
+
+msgctxt "payment method type"
+msgid "Bank transfer"
+msgstr "Transferencia"
+
+msgctxt "payment method type"
+msgid "Card"
+msgstr "Tarjeta"
+
+msgctxt "payment method type"
+msgid "SEPA"
+msgstr "SEPA"
+
+msgctxt "payment method type"
+msgid "Cheque"
+msgstr "Cheque"
+
+msgctxt "payment method type"
+msgid "Other"
+msgstr "Otro"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "account"
+msgstr "cuenta"
+
+msgctxt "payment"
+msgid "active"
+msgstr "activo"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "changed by"
+msgstr "cambiado por"
+
+msgctxt "payment"
+msgid "payment method"
+msgstr "método de pago"
+
+msgctxt "payment"
+msgid "payment methods"
+msgstr "métodos de pago"
+
+msgctxt "payment status"
+msgid "Draft"
+msgstr "Borrador"
+
+msgctxt "payment status"
+msgid "Approved"
+msgstr "Aprobado"
+
+msgctxt "payment status"
+msgid "Sent"
+msgstr "Enviado"
+
+msgctxt "payment status"
+msgid "Completed"
+msgstr "Completado"
+
+msgctxt "payment status"
+msgid "Cancelled"
+msgstr "Cancelado"
+
+msgid "reference"
+msgstr "referencia"
+
+msgctxt "payment"
+msgid "method"
+msgstr "método"
+
+msgid "payment date"
+msgstr "fecha del pago"
+
+msgid "amount"
+msgstr "importe"
+
+msgid "currency"
+msgstr "moneda"
+
+msgid "beneficiary"
+msgstr "beneficiario"
+
+msgid "beneficiary IBAN"
+msgstr "IBAN del beneficiario"
+
+msgid "concept"
+msgstr "concepto"
+
+msgid "status"
+msgstr "estado"
+
+msgid "supplier invoice"
+msgstr "factura del proveedor"
+
+msgid "cancellation reason"
+msgstr "motivo de cancelación"
+
+msgid "payment"
+msgstr "pago"
+
+msgid "payments"
+msgstr "pagos"
+
+msgid "business day"
+msgstr "día del negocio"
+
+msgid "last number"
+msgstr "último número"
+
+msgid "payment counter"
+msgstr "contador de pagos"
+
+msgid "payment counters"
+msgstr "contadores de pagos"
+
+msgid "That payment method does not exist in this business."
+msgstr "Ese método de pago no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” matches several payment methods: %(names)s. Say which one."
+msgstr "“%(said)s” encaja con varios métodos de pago: %(names)s. Di cuál."
+
+msgid "That payment does not exist in this business."
+msgstr "Ese pago no existe en este negocio."
+
+msgid "The amount of a payment must be greater than 0."
+msgstr "El importe de un pago tiene que ser mayor que 0."
+
+msgid ""
+"That IBAN is not valid: check the country, the check digits and the length."
+msgstr ""
+"Ese IBAN no es válido: revisa el país, los dígitos de control y la longitud."
+
+msgid "That is not a currency code (ISO 4217, such as EUR)."
+msgstr "Eso no es un código de moneda (ISO 4217, como EUR)."
+
+msgid "Say which payment method: its id, or its name."
+msgstr "Di qué método de pago: su id o su nombre."
+
+msgid "Say which payment: its id, or its reference."
+msgstr "Di qué pago: su id o su referencia."
+
+msgid "Say why this payment is cancelled: the reason stays on the payment."
+msgstr "Di por qué se cancela este pago: el motivo se queda en el pago."
+
+msgid "There is already a payment method with that name. Pick another name."
+msgstr "Ya hay un método de pago con ese nombre. Elige otro nombre."
+
+msgid "That payment method is deactivated: pick an active one."
+msgstr "Ese método de pago está desactivado: elige uno activo."
+
+msgid "That payment method is already deactivated."
+msgstr "Ese método de pago ya está desactivado."
+
+msgid "That payment method is already active."
+msgstr "Ese método de pago ya está activo."
+
+#, python-format
+msgid "Only a draft payment can be approved; this one is %(status)s."
+msgstr "Solo se puede aprobar un pago en borrador; este está %(status)s."
+
+#, python-format
+msgid "Only an approved payment can be marked as sent; this one is %(status)s."
+msgstr ""
+"Solo se puede marcar como enviado un pago aprobado; este está %(status)s."
+
+#, python-format
+msgid "Only a sent payment can be marked as completed; this one is %(status)s."
+msgstr ""
+"Solo se puede marcar como completado un pago enviado; este está %(status)s."
+
+msgid "This payment can no longer be cancelled."
+msgstr "El pago ya no admite cancelación."
+
+msgctxt "payment"
+msgid "approved by"
+msgstr "aprobado por"
+
+msgctxt "payment"
+msgid "approved at"
+msgstr "aprobado el"
+
+msgctxt "payment"
+msgid "sent at"
+msgstr "enviado el"
+
+msgctxt "payment"
+msgid "completed at"
+msgstr "completado el"
+
+msgctxt "payment"
+msgid "cancelled by"
+msgstr "cancelado por"
+
+msgctxt "payment"
+msgid "cancelled at"
+msgstr "cancelado el"

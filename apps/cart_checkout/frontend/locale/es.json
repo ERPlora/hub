@@ -1,0 +1,100 @@
+{
+  "cart_checkout": {
+    "tabs": {
+      "label": "Secciones de Carrito y pago",
+      "carts": "Carritos",
+      "orders": "Pedidos"
+    },
+    "loading": "Cargando…",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
+    "noPermission": "No tienes permiso",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "cartStatus": {
+      "active": "Activo",
+      "abandoned": "Abandonado",
+      "converted": "Convertido",
+      "expired": "Expirado"
+    },
+    "orderStatus": {
+      "initiated": "Iniciado",
+      "paid": "Pagado",
+      "failed": "Fallido",
+      "completed": "Completado"
+    },
+    "carts": {
+      "title": "Carritos",
+      "search": "Buscar sesión o email…",
+      "empty": "Sin carritos.",
+      "loadError": "No se han podido cargar los carritos.",
+      "new": "Nuevo carrito",
+      "entity": {
+        "one": "carrito",
+        "many": "carritos"
+      },
+      "columns": {
+        "session": "Sesión",
+        "email": "Email",
+        "status": "Estado",
+        "items": "Ítems",
+        "total": "Total"
+      },
+      "actions": {
+        "abandon": "Abandonar",
+        "delete": "Borrar"
+      },
+      "actionError": "No se pudo completar la acción",
+      "deleteConfirm": {
+        "title": "¿Borrar el carrito {session}?",
+        "message": "Sale de la lista. Sus pedidos se quedan y su código de sesión se puede volver a usar.",
+        "confirm": "Borrar",
+        "cancel": "Cancelar"
+      },
+      "form": {
+        "title": "Nuevo carrito",
+        "session": "Sesión",
+        "sessionPlaceholder": "sess_a1b2c3",
+        "email": "Email",
+        "emailPlaceholder": "cliente{'@'}ejemplo.com",
+        "name": "Nombre",
+        "namePlaceholder": "Ana García",
+        "submit": "Guardar"
+      }
+    },
+    "orders": {
+      "title": "Pedidos",
+      "search": "Buscar pedido o email…",
+      "empty": "Sin pedidos.",
+      "emptyMessage": "Los pedidos se inician desde un carrito con el asistente o la API.",
+      "loadError": "No se han podido cargar los pedidos.",
+      "entity": {
+        "one": "pedido",
+        "many": "pedidos"
+      },
+      "columns": {
+        "order": "Pedido",
+        "email": "Email",
+        "status": "Estado",
+        "payment": "Pago",
+        "total": "Total"
+      },
+      "actions": {
+        "markPaid": "Marcar pagado",
+        "complete": "Completar",
+        "fail": "Fallar"
+      },
+      "actionError": "No se pudo completar la acción",
+      "failureReason": "Motivo: {reason}",
+      "failForm": {
+        "title": "Fallar pedido — {number}",
+        "reason": "Motivo",
+        "submit": "Fallar pedido",
+        "keep": "Mantener"
+      }
+    }
+  }
+}

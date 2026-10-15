@@ -1,0 +1,199 @@
+{
+  "printing": {
+    "title": "Printing",
+    "tabs": {
+      "label": "Printing sections",
+      "printers": "Printers",
+      "jobs": "Queue",
+      "settings": "Settings"
+    },
+    "usage": {
+      "receipt": "Receipt",
+      "kitchen": "Kitchen",
+      "bar": "Bar",
+      "label": "Label"
+    },
+    "kind": {
+      "network": "Network",
+      "usb": "USB",
+      "bluetooth": "Bluetooth",
+      "system": "System printer (A4)"
+    },
+    "state": {
+      "ready": "Ready",
+      "waiting": "Waiting",
+      "failing": "With errors",
+      "inactive": "Inactive"
+    },
+    "status": {
+      "pending": "Pending",
+      "sent": "Sent",
+      "done": "Printed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "documents": {
+      "receipt": "Receipt",
+      "kitchen_order": "Kitchen order",
+      "invoice": "Invoice",
+      "delivery_note": "Delivery note",
+      "barcode_label": "Barcode label",
+      "cash_session_report": "Cash session report",
+      "prebill": "Pre-bill",
+      "generic": "Document",
+      "test_page": "Test page",
+      "drawer": "Open the drawer"
+    },
+    "units": {
+      "s": "{n} s",
+      "min": "{n} min",
+      "h": "{n} h"
+    },
+    "live": {
+      "retry": "Retry",
+      "appInactive": "Printing is not active in this business.",
+      "noPermission": "You do not have permission to see this."
+    },
+    "printers": {
+      "heading": "Printers",
+      "intro": "Add the business's printers, say what each one prints and check that paper comes out.",
+      "appNote": "Paper comes out through the ERPlora app on the device next to the printer: a browser cannot reach printers.",
+      "add": "Add printer",
+      "empty": "No printers yet. Add the one at your till by its address.",
+      "loading": "Loading…",
+      "loadError": "Could not load the printers.",
+      "entity": {
+        "one": "printer",
+        "many": "printers"
+      },
+      "columns": {
+        "name": "Name",
+        "usage": "Role",
+        "kind": "Connection",
+        "address": "Address",
+        "paper": "Paper",
+        "state": "Status",
+        "active": "Active"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "lastError": "Last error: {error}",
+      "waitingJobs": "{n} waiting",
+      "paper": "{n} mm",
+      "a4": "A4",
+      "actions": {
+        "edit": "Edit",
+        "test": "Test",
+        "deactivate": "Deactivate",
+        "activate": "Activate"
+      },
+      "tested": "Test page sent to the queue of {name}.",
+      "testFailed": "Test print failed",
+      "deactivated": "Printer deactivated",
+      "activated": "Printer activated",
+      "toggleFailed": "Could not change the printer."
+    },
+    "modal": {
+      "create": "New printer",
+      "edit": "Edit printer",
+      "name": "Name",
+      "kind": "Connection",
+      "host": "IP address or name",
+      "port": "Port",
+      "mac": "Bluetooth MAC",
+      "queue": "USB queue name",
+      "paper": "Paper width",
+      "usage": "Role",
+      "active": "Active",
+      "ipHint": "Type the IP shown on its configuration sheet (it prints when you switch the printer on holding the feed button).",
+      "systemHint": "The computer's own printer: it prints A4 pages, such as invoices, and needs no address.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "required": "Give the printer a name.",
+      "created": "Printer added",
+      "saved": "Printer saved",
+      "failed": "Could not save the printer.",
+      "paperHint": "Kept with the printer: the ERPlora app prints 32 characters a line for now, whatever the paper."
+    },
+    "summary": {
+      "heading": "Print queue",
+      "loadError": "Could not read the print queue.",
+      "allClear": "All clear: nothing is waiting in the queue.",
+      "ready": "Ready",
+      "stalled": "Waiting, no printer",
+      "failing": "With errors",
+      "waiting": "Waiting: {n}",
+      "oldest": "the oldest has waited {age}",
+      "nothing": "Nothing waiting",
+      "failed": "Failed: {n}",
+      "printsOn": "Prints on: {name}.",
+      "printers": "{n} active printers.",
+      "alert": "{n} print jobs for {usage} have been waiting {age}.",
+      "alertOne": "1 print job for {usage} has been waiting {age}.",
+      "alertCause": "No active printer has this role: add one below or give this role to one of them."
+    },
+    "jobs": {
+      "heading": "Print queue",
+      "search": "Search document…",
+      "empty": "No print jobs.",
+      "noMatches": "No print job matches.",
+      "loading": "Loading…",
+      "loadError": "Could not read the print queue.",
+      "entity": {
+        "one": "job",
+        "many": "jobs"
+      },
+      "columns": {
+        "document": "Document",
+        "usage": "Role",
+        "printer": "Printer",
+        "status": "Status",
+        "attempts": "Attempts",
+        "created": "Asked on",
+        "detail": "Detail"
+      },
+      "noPrinter": "No printer",
+      "named": "{document} {reference}",
+      "namedAt": "{document} · {when}",
+      "lastError": "Last error: {error}",
+      "cancelledBy": "Cancelled by {who}",
+      "reason": "Reason: {reason}",
+      "retriedBy": "Sent again by {who}",
+      "stale": "No answer from the device",
+      "actions": {
+        "retry": "Try again",
+        "cancel": "Cancel"
+      },
+      "retried": "Sent back to the queue: the next device to connect will print it.",
+      "retryFailed": "Could not send the job back to the queue.",
+      "cancel": {
+        "title": "Cancel {job}?",
+        "body": "It will not be printed, and it stays in the queue with who cancelled it and why.",
+        "reason": "Reason (optional)",
+        "confirm": "Yes, cancel",
+        "back": "Back",
+        "done": "Job cancelled. It will not be printed.",
+        "failed": "Could not cancel the job."
+      }
+    },
+    "settings": {
+      "heading": "Ticket settings",
+      "printersHeading": "Printer of each role",
+      "fields": {
+        "print_receipt_on_sale": "Print receipt on checkout",
+        "open_drawer_on_sale": "Open drawer on checkout",
+        "receipt_copies": "Receipt copies"
+      },
+      "automatic": "The first active one of this role",
+      "receiptText": "The receipt header and footer are part of your till settings, where the ticket is printed from.",
+      "receiptLink": "Open the receipt settings",
+      "save": "Save settings",
+      "saved": "Settings saved.",
+      "saveError": "Could not save the settings.",
+      "loading": "Loading settings…",
+      "loadError": "Could not load the settings.",
+      "loadErrorBody": "Try again in a moment.",
+      "noPermission": "You do not have permission to change these settings."
+    }
+  }
+}
