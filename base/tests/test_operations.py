@@ -9,7 +9,7 @@ from django.test import RequestFactory
 from live.context import OperationContext, Scope, get_builder
 
 from base.models import Membership
-from base.operations import HostScopeResolver, HubContextBuilder, is_platform_host
+from base.operations import HostScopeResolver, HubContextBuilder, is_demo_hub, is_platform_host
 
 
 def request_for(host: str, user=None, language: str = "en"):
@@ -243,3 +243,10 @@ def test_refresh_of_an_anonymous_context():
     builder = HubContextBuilder()
     ctx = builder.from_request(request_for("a.localhost"))
     assert builder.refresh(ctx) == ctx
+
+
+def test_phase_one_has_no_demo_hubs():
+    # A demo (PLAN-SAAS §3.5) is an ephemeral hub the Hub creates with ``is_demo`` in its control registry
+    # (phase 2, block 7). Phase 1 has neither the registry nor demos: no hub is one. Apps ask here, never there.
+    assert is_demo_hub(Scope("host", "a")) is False
+    assert is_demo_hub(Scope("host", "demo")) is False
