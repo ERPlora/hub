@@ -640,7 +640,10 @@ def _queue_row(record: Record) -> dict:
         "environment": record.environment,
         "attempts": record.attempts,
         "status": record.status,
-        "next_attempt_at": record.next_attempt_at,
+        # As get_record: a refusal of the gateway waits for a change, never on a timer.
+        "next_attempt_at": None
+        if record.wait_reason == "refused"
+        else record.next_attempt_at,
         "last_error": wait_reason_text(record.wait_reason, record.wait_detail)
         if record.wait_reason
         else "",

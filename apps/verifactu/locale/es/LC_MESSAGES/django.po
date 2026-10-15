@@ -531,6 +531,10 @@ msgstr "tu certificado propio no está cargado o ha caducado"
 msgid "ERPlora still has to approve your signed authorisation to file in production"
 msgstr "falta que ERPlora apruebe tu autorización firmada para remitir en producción"
 
+#: models.py
+msgid "ERPlora does not recognise this business: contact ERPlora's support"
+msgstr "ERPlora no reconoce este negocio: contacta con el soporte de ERPlora"
+
 #: models.py:439
 msgid "the AEAT asked to wait until %(at)s"
 msgstr "la AEAT pidió esperar hasta las %(at)s"

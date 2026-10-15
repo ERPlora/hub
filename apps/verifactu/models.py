@@ -501,11 +501,28 @@ WAIT_REASONS = {
 }
 
 
+#: What a refusal of the gateway means, by its code (saas#29), shown in place of the SaaS's own English message.
+GATEWAY_REFUSALS = {
+    "hub_unknown": _(
+        "ERPlora does not recognise this business: contact ERPlora's support"
+    ),
+    "representation_not_approved": WAIT_REASONS["representation_not_approved"],
+}
+
+
+def gateway_refusal_text(detail: str) -> str:
+    """A refusal's ``code: message`` in the active language when its code is known; else as the gateway said it."""
+    known = GATEWAY_REFUSALS.get(detail.split(":", 1)[0].strip())
+    return detail if known is None else str(known)
+
+
 def wait_reason_text(code: str, detail: str = "", at: str = "") -> str:
     """The reason ``code`` in the active language."""
     template = WAIT_REASONS.get(code)
     if template is None:
         return code
+    if code == "refused":
+        detail = gateway_refusal_text(detail)
     return str(template) % {"detail": detail, "at": at}
 
 

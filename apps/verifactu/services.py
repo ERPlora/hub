@@ -915,9 +915,17 @@ def _send_chain(
         .order_by("sequence")[: envelope.MAX_RECORDS]
     )
     if batch and not force and batch[0].wait_reason == GATEWAY_REFUSAL:
-        # The gateway would refuse it again as it is: it waits for a change or a person, never on a timer.
+        # The gateway would refuse it again as it is: it waits for a change or a person, never on a timer. What was
+        # sealed behind it waits for the same reason, and says so.
         tally.because(GATEWAY_REFUSAL, batch[0].wait_detail)
         tally.waiting += len(batch)
+        _mark(
+            ctx,
+            _unsent(issuer_nif, environment),
+            GATEWAY_REFUSAL,
+            batch[0].wait_detail,
+            tally,
+        )
         return
     if not batch or (not force and batch[0].next_attempt_at > now):
         tally.waiting += len(batch)
@@ -1664,7 +1672,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     config = config_row()
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment)
-    gateway_ready, gateway_detail = None, ""
+    gateway_ready, gateway_detail, refusal = None, "", ""
     if gateway.configured() and "own_certificate_unreadable" not in codes:
         reply = gateway.probe(
             hub=ctx.scope.key,
@@ -1675,9 +1683,15 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
         )
         gateway_ready = reply.kind == gateway.ANSWERED and reply.ready
         gateway_detail = reply.message or reply.code
+        # A refusal is kept as a record keeps it, so a known one is told in the reader's language.
+        refusal = (
+            f"{reply.code}: {reply.message}"
+            if reply.kind == gateway.REFUSED
+            else gateway_detail
+        )
         if not gateway_ready:
             codes.append("refused")
-    details = {"refused": gateway_detail}
+    details = {"refused": refusal}
     result = {
         "ran_at": timezone.now(),
         "environment": config.environment,

@@ -9,7 +9,9 @@ stood in for (``gateway_answers``).
 import datetime as dt
 import hashlib
 
+import httpx
 import pytest
+import respx
 from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
@@ -830,6 +832,55 @@ def test_a_refusal_of_the_gateway_is_not_tried_again_by_itself(issuer, gateway_a
     assert "refused" in {wait.code for wait in detail.waiting}
 
 
+def test_a_hub_the_saas_does_not_know_waits_for_a_change_and_says_so(issuer, settings):
+    # saas#29: the gateway's 404 ``hub_unknown`` goes through the real client, not a fake reply.
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    settings.INTERNAL_SHARED_SECRET = "test-internal-secret"
+    with respx.mock:
+        door = respx.post("http://saas.internal:8001/internal/verifactu/submit").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "hub_unknown", "message": "No such hub."}}
+            )
+        )
+        record = Record.objects.get(pk=create(ticket()).record.id)
+        run("verifactu.contingency.process")
+        Record.objects.update(next_attempt_at=timezone.now() - dt.timedelta(days=1))
+        out = run("verifactu.contingency.process")
+
+    assert door.call_count == 1
+    assert (out.sent, out.waiting, out.reason) == (0, 1, "refused")
+    record.refresh_from_db()
+    assert (record.status, record.wait_reason) == ("pending", "refused")
+    assert record.wait_detail.startswith("hub_unknown")
+    detail = run("verifactu.record.get", {"record_id": str(record.id)})
+    assert detail.next_attempt_at is None
+    (refused,) = [wait for wait in detail.waiting if wait.code == "refused"]
+    assert "ERPlora does not recognise this business" in refused.message
+    with translation.override("es"):
+        detail = run("verifactu.record.get", {"record_id": str(record.id)})
+    (refused,) = [wait for wait in detail.waiting if wait.code == "refused"]
+    assert "ERPlora no reconoce este negocio" in refused.message
+
+
+def test_a_representation_the_saas_has_not_approved_says_so_in_the_language_of_the_user(
+    issuer, gateway_answers
+):
+    gateway_answers.set(
+        gateway.Reply(
+            kind=gateway.REFUSED,
+            code="representation_not_approved",
+            message="The representation grant is not approved.",
+        )
+    )
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    run("verifactu.contingency.process")
+    with translation.override("es"):
+        detail = run("verifactu.record.get", {"record_id": str(record.id)})
+    (refused,) = [wait for wait in detail.waiting if wait.code == "refused"]
+    assert "falta que ERPlora apruebe tu autorización firmada" in refused.message
+    assert "The representation grant" not in refused.message
+
+
 @pytest.mark.parametrize("change", ["route", "certificate", "account"])
 def test_a_change_of_the_configuration_puts_a_refused_record_back_in_the_queue(
     issuer, storage, gateway_answers, change
@@ -849,6 +900,46 @@ def test_a_change_of_the_configuration_puts_a_refused_record_back_in_the_queue(
     assert len(gateway_answers.calls) == 2
     record.refresh_from_db()
     assert record.status == "accepted"
+
+
+def test_a_record_sealed_behind_a_refused_one_waits_for_the_same_reason(
+    issuer, storage, gateway_answers
+):
+    upload()
+    first = refuse_once(gateway_answers)
+    second = Record.objects.get(pk=create(ticket(2000)).record.id)
+
+    run("verifactu.contingency.process")
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 1
+    second.refresh_from_db()
+    assert (second.wait_reason, second.wait_detail) == ("refused", first.wait_detail)
+    detail = run("verifactu.record.get", {"record_id": str(second.id)})
+    assert "refused" in {wait.code for wait in detail.waiting}
+    row = {
+        row.id: row for row in run("verifactu.contingency.list").rows
+    }[second.id]
+    assert "no_certificate" in row.last_error
+    # Told once, not at every pass.
+    told = Event.objects.filter(kind=Event.Kind.DEFERRED, params__reason="refused")
+    assert told.count() == 2
+
+    run("verifactu.config.update", {"route": "own"})
+    gateway_answers.set(answering())
+    run("verifactu.contingency.process")
+
+    assert len(gateway_answers.calls) == 2
+    assert set(
+        Record.objects.filter(pk__in=[first.id, second.id]).values_list("status", flat=True)
+    ) == {"accepted"}
+
+
+def test_the_queue_promises_no_next_attempt_to_a_refused_record(issuer, gateway_answers):
+    record = refuse_once(gateway_answers)
+    (row,) = run("verifactu.contingency.list").rows
+    assert row.id == record.id
+    assert row.next_attempt_at is None
 
 
 def test_an_old_photo_of_the_account_changes_nothing_and_does_not_send_it(
@@ -1353,6 +1444,22 @@ def test_the_connection_test_asks_the_gateways_probe(issuer, gateway_answers):
         "Ready.",
     )
     assert gateway_answers.calls[-1][0] == gateway.PROBE_PATH
+
+
+def test_the_connection_test_names_a_hub_the_saas_does_not_know(issuer, gateway_answers):
+    gateway_answers.set(
+        gateway.Reply(kind=gateway.REFUSED, code="hub_unknown", message="No such hub.")
+    )
+    result = run("verifactu.diagnostic.run")
+    (refused,) = [reason for reason in result.reasons if reason.code == "refused"]
+    assert "ERPlora does not recognise this business" in refused.message
+    with translation.override("es"):
+        (refused,) = [
+            reason
+            for reason in run("verifactu.diagnostic.last").result.reasons
+            if reason.code == "refused"
+        ]
+    assert "ERPlora no reconoce este negocio" in refused.message
 
 
 def test_the_test_invoice_is_a_real_ticket_and_its_record(issuer):
