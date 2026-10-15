@@ -13,7 +13,6 @@ from django.db import connection
 
 from apps.verifactu import gateway
 from apps.verifactu.models import Record
-from live.context import system_context
 
 from apps.verifactu.tests.conftest import A, answering, manual, run
 
@@ -160,7 +159,6 @@ def test_a_chain_held_too_long_leaves_the_document_pending_and_its_reaction_seal
 
 def test_two_passes_at_once_never_send_the_same_chain_twice(settings, monkeypatch):
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
-    run("verifactu.config.sync", {"version": 1, "multiple_taxpayers": "N"}, system_context(A))
     tickets(3)  # each emission seals its record
     calls = []
     accept = answering()

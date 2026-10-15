@@ -6,7 +6,7 @@
 // reports the browser would POST to `/csp-report/`.
 import { expect, test } from '@playwright/test';
 
-import { A, createItem, listReady, login, record, rowOf, shot, shown, uniqueName } from './helpers';
+import { A, createItem, listReady, login, onSaas, record, rowOf, shot, shown, uniqueName } from './helpers';
 
 test('CSP header with nonce, strict-dynamic, Trusted Types and connect-src ipc:; zero violations on every demo screen', async ({ page, context }) => {
   const cspConsole: string[] = [];
@@ -14,6 +14,8 @@ test('CSP header with nonce, strict-dynamic, Trusted Types and connect-src ipc:;
   const pageErrors: string[] = [];
   const reports: string[] = [];
   page.on('console', (msg) => {
+    // The login goes through the SaaS: its console is the SaaS's (`onSaas`).
+    if (onSaas(page)) return;
     if (/content security policy|trusted ?type|refused to/i.test(msg.text())) cspConsole.push(msg.text());
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });

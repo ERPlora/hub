@@ -10,6 +10,7 @@ export type RecordStatus = 'pending' | 'sent' | 'accepted' | 'accepted_with_erro
 export type RecordType = 'alta' | 'anulacion';
 export type Environment = 'testing' | 'production';
 export type Route = 'erplora' | 'own';
+export type CertificateKind = 'seal' | 'representative' | 'personal' | 'unknown';
 export type InvoiceType = 'F1' | 'F2' | 'F3' | 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
 export type EventKind =
   | 'record_created'
@@ -27,6 +28,46 @@ export type EventKind =
   | 'config_changed';
 export type Severity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 export type Representation = 'none' | 'submitted' | 'approved' | 'returned' | 'revoked';
+
+/** The documents of a signed authorisation (VERIFACTU-F05). */
+export type RepresentationDocument = 'signed_model' | 'id_copy' | 'signature_sample' | 'representation_proof';
+
+/** The signed authorisation: as the account says it, what this Hub sent and the steps it was told. */
+export interface RepresentationOut {
+  status: Representation;
+  updated_at: string | null;
+  reason: string;
+  /** ERPlora's account has linked this business: the authorisation can be sent from here. */
+  linked: boolean;
+  /** Invoicing's issuer is a company: who signs for it and the proof of representation are asked. */
+  company: boolean;
+  submission: {
+    version: number;
+    submitted_at: string | null;
+    document_type: 'dni' | 'nie';
+    documents: RepresentationDocument[];
+  } | null;
+  /** Newest first. */
+  history: { status: Representation; at: string; version: number | null; reason: string }[];
+}
+
+/** The signed authorisation and its documents, each a PDF in base64 (5 MB at most). */
+export interface RepresentationSubmitIn {
+  signer_tax_id?: string;
+  signer_name?: string;
+  signer_document_type: 'dni' | 'nie';
+  signed_model_base64: string;
+  id_copy_base64: string;
+  signature_sample_base64?: string;
+  representation_proof_base64?: string;
+}
+
+/** The blank official model (Anexo I of Convenio 17), a PDF in base64. */
+export interface RepresentationModelOut {
+  filename: string;
+  content_type: string;
+  content_base64: string;
+}
 
 interface PageIn {
   limit?: number;
@@ -143,9 +184,14 @@ export interface QueueRowOut {
   environment: Environment;
   attempts: number;
   status: RecordStatus;
-  next_attempt_at: string;
+  next_attempt_at: string | null;
   last_error: string;
   created_at: string;
+}
+
+export interface ReconcileOut {
+  held: boolean;
+  record: RecordSummaryOut;
 }
 
 export interface TransmitOut {
@@ -198,7 +244,6 @@ export interface DiagnosticOut {
   environment: Environment;
   route: Route;
   issuer_ready: boolean;
-  producer_ready: boolean;
   route_ready: boolean;
   gateway_configured: boolean;
   gateway_ready: boolean | null;
@@ -225,6 +270,7 @@ export interface ConfigOut {
     installation: string;
     only_verifactu: string;
     multi_ot: string;
+    /** IndicadorMultiplesOT: always «S» (ERPlora serves several taxpayers). */
     multiple_ot: string;
   };
   declaration_version: string;
@@ -233,14 +279,19 @@ export interface ConfigOut {
   own_certificate: {
     loaded: boolean;
     holder: string;
+    holder_tax_id: string;
+    kind: CertificateKind | '';
     uploaded_at: string | null;
     expires_at: string | null;
     expires_in_days: number | null;
   };
-  representation: { status: Representation; updated_at: string | null; reason: string };
+  representation: RepresentationOut;
   synced_at: string | null;
   route_ready: boolean;
   reasons: WaitOut[];
+  /** Why new sales and invoices are refused now (production without a way to the AEAT); null when they are not. */
+  issue_blocker: WaitOut | null;
+  live_blockers: WaitOut[];
 }
 
 export interface ChainValidationOut {
@@ -301,6 +352,10 @@ declare module '@erplora/ui/sdk' {
     'verifactu.config.update': { input: { route: Route }; output: ConfigOut };
     'verifactu.config.go_live': { input: NoInput; output: ConfigOut };
     'verifactu.config.back_to_testing': { input: NoInput; output: ConfigOut };
+    'verifactu.certificate.upload': { input: { p12_base64: string; password: string }; output: ConfigOut };
+    'verifactu.representation.submit': { input: RepresentationSubmitIn; output: ConfigOut };
+    'verifactu.representation.model': { input: NoInput; output: RepresentationModelOut };
+    'verifactu.certificate.remove': { input: NoInput; output: ConfigOut };
     'verifactu.record.list': { input: RecordListIn; output: Page<RecordRowOut> };
     'verifactu.record.get': { input: RecordRefIn; output: RecordOut };
     'verifactu.record.by_invoice': { input: { invoice_id: string }; output: { record: RecordSummaryOut | null } };
@@ -308,6 +363,7 @@ declare module '@erplora/ui/sdk' {
     'verifactu.record.correct': { input: RecordRefIn; output: RecordCreateOut };
     'verifactu.record.cancel': { input: RecordRefIn & { reason: string }; output: RecordCreateOut };
     'verifactu.record.transmit': { input: RecordRefIn; output: TransmitOut };
+    'verifactu.record.reconcile': { input: RecordRefIn; output: ReconcileOut };
     'verifactu.contingency.list': { input: ContingencyListIn; output: Page<QueueRowOut> };
     'verifactu.contingency.process': { input: NoInput; output: TransmitOut };
     'verifactu.contingency.retry': { input: RecordRefIn; output: RecordSummaryOut };

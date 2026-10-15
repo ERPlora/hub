@@ -14,6 +14,7 @@ RECORDS = [
     "verifactu.record.accepted_with_errors",
     "verifactu.contingency.processed",
     "verifactu.contingency.retried",
+    "verifactu.record.reconciled",
 ]
 
 

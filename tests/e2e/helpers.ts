@@ -10,16 +10,17 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page } fr
 
 import { readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
+import { STACK } from './stack';
 
-export const A = 'http://a.localhost:8000';
-export const B = 'http://b.localhost:8000';
+export const A = STACK.hub('a');
+export const B = STACK.hub('b');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const HUB_DIR = join(HERE, '..', '..');
 export const REPO_DIR = join(HUB_DIR, '..');
 export const ARTIFACTS = join(HERE, '.artifacts');
 const METRICS = join(ARTIFACTS, 'metrics');
-const RUNSERVER_LOG = '/tmp/erplora-hub-runserver.log';
+const RUNSERVER_LOG = `/tmp/erplora-hub-runserver-${STACK.hubPort}.log`;
 
 export interface Item {
   id: string;
@@ -55,7 +56,12 @@ export function record(key: string, data: unknown): void {
 export const uniqueName = (prefix: string): string => `${prefix} ${Date.now().toString(36)}`;
 
 /** The SaaS (`erplora.com` in production): the only login page a hub has. */
-export const SAAS = 'http://localhost:8001';
+export const SAAS = STACK.saas;
+/**
+ * Whether `page` is on the SaaS (its login): what its console says there is the SaaS's, judged by the SaaS's own
+ * suite. Its headless API answers 401 while nobody is signed in (allauth's protocol), and Chrome logs each one.
+ */
+export const onSaas = (page: Page): boolean => new URL(page.url()).origin === SAAS;
 /** A SaaS account: what its sign-in page asks for. */
 export interface Credentials {
   email: string;
@@ -325,6 +331,7 @@ export async function collectProblems(
   const warnings: string[] = [];
   const pageErrors: string[] = [];
   page.on('console', (msg) => {
+    if (onSaas(page)) return;
     if (msg.type() === 'error') consoleErrors.push(msg.text());
     if (msg.type() === 'warning') warnings.push(msg.text());
   });
@@ -360,7 +367,7 @@ export function listeningPids(port: number): number[] {
 
 export async function healthy(): Promise<boolean> {
   try {
-    const res = await fetch('http://127.0.0.1:8000/healthz', { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(STACK.healthz, { signal: AbortSignal.timeout(1500) });
     return res.ok;
   } catch {
     return false;
@@ -374,7 +381,7 @@ export async function healthy(): Promise<boolean> {
  */
 export async function viteReady(): Promise<boolean> {
   try {
-    const res = await fetch('http://localhost:5173/static/spa/@vite/client', { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(STACK.viteClient, { signal: AbortSignal.timeout(1500) });
     return res.ok;
   } catch {
     return false;
@@ -390,20 +397,26 @@ export async function waitFor(check: () => Promise<boolean> | boolean, timeoutMs
   }
 }
 
-/** Starts `manage.py runserver 127.0.0.1:8000` detached (it outlives the test run). */
+/**
+ * Starts `manage.py runserver 127.0.0.1:<E2E_HUB_PORT>` detached (it outlives the test run), with this
+ * run's environment (`VITE_DEV_PORT`, `SAAS_URL`, `DB_NAME`).
+ */
 export function startRunserver(): void {
   const child = spawn(
     '/bin/bash',
-    ['-c', `cd '${HUB_DIR}' && nohup uv run python manage.py runserver 127.0.0.1:8000 >> ${RUNSERVER_LOG} 2>&1 &`],
+    ['-c', `cd '${HUB_DIR}' && nohup uv run python manage.py runserver 127.0.0.1:${STACK.hubPort} >> ${RUNSERVER_LOG} 2>&1 &`],
     { detached: true, stdio: 'ignore' },
   );
   child.unref();
 }
 
-/** Rows of `pg_stat_activity` named `live-listener` (the process-level LISTEN connection). */
+/**
+ * Rows of `pg_stat_activity` named `live-listener` (the process-level LISTEN connection) on this run's
+ * database: another stack beside it (another checkout's runserver) has its own.
+ */
 export function listenerRows(): { pid: number; backend_start: string }[] {
   const out = execSync(
-    `docker compose exec -T postgres psql -U hub -d hub -At -F '|' -c "select pid, backend_start from pg_stat_activity where application_name='live-listener' order by pid"`,
+    `docker compose exec -T postgres psql -U hub -d ${STACK.database} -At -F '|' -c "select pid, backend_start from pg_stat_activity where application_name='live-listener' and datname = current_database() order by pid"`,
     { cwd: REPO_DIR, encoding: 'utf8' },
   );
   return out
@@ -416,7 +429,7 @@ export function listenerRows(): { pid: number; backend_start: string }[] {
 }
 
 export function psql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d hub -At -c "${sql}"`, {
+  return execSync(`docker compose exec -T postgres psql -U hub -d ${STACK.database} -At -c "${sql}"`, {
     cwd: REPO_DIR,
     encoding: 'utf8',
   }).trim();

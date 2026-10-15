@@ -10,18 +10,24 @@ no release, so it does no work before that. Two cases (first production deploy, 
 - any other failure, a missing column included (a contract gap, spec §3.5): fatal, 1, and ECS's
   ``task_failed`` rule reports it.
 
-Then it waits until asked to stop. Phase 1 has nothing else to do; phase 2 adds, in this loop, the
-outbox relay, the scheduled tasks, the fiscal sending, the hubs' provisioning and purge
-(``hub_due``) and the demo reaper, each claiming its work with ``SKIP LOCKED``.
+Then it schedules the apps' tasks once (``scheduler.sync``: a failure is fatal, 1) and, every tick
+(5 s), runs the ones that are due (``scheduler.run_due``): the VeriFactu queue every minute
+(VERIFACTU-F20) and every other ``scheduled_tasks`` an app declares, each claimed with ``SKIP LOCKED``.
+A tick that fails (the database went away) is logged and the next one tries again; a stop request
+ends the loop at once. Phase 1 runs them on one fixed scope (``WORKER_SCOPE_SLUG``); phase 2 adds, in
+this loop, the hubs whose ``hub_due`` has come (each under ``use_hub``), the outbox relay, the hubs'
+provisioning and purge and the demo reaper.
 """
 
+import datetime as dt
 import logging
 import threading
 from collections.abc import Callable
 
 from django.db import close_old_connections
+from django.utils import timezone
 
-from base import catalog
+from base import catalog, scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +43,13 @@ def run(
     *,
     tick_seconds: float = TICK_SECONDS,
     wait: Callable[[float], object] | None = None,
+    clock: Callable[[], dt.datetime] = timezone.now,
 ) -> int:
-    """Register the apps, then loop until ``stop`` is set; return the process's exit code.
+    """Register the apps, schedule their tasks, then run the due ones every tick until ``stop`` is set;
+    return the process's exit code.
 
     ``wait(seconds)`` sleeps until the time is up or a stop is requested: ``stop.wait`` unless a
-    test replaces it. ``stop`` alone says whether to stop.
+    test replaces it. ``stop`` alone says whether to stop. ``clock()`` is now (a test's fake clock).
     """
     wait = stop.wait if wait is None else wait
     delay = RETRY_FIRST_SECONDS
@@ -67,7 +75,12 @@ def run(
             logger.info("worker: stopped before registering its apps.")
             return 0
         delay = min(delay * 2, RETRY_MAX_SECONDS)
-    # register_apps' connection (the SaaS's database) is not kept open while the worker idles.
+    try:
+        scheduler.sync(clock())
+    except Exception:
+        logger.exception("worker: the apps' scheduled tasks could not be scheduled; the worker stops.")
+        return 1
+    # register_apps' connection (the SaaS's database) and sync's are not kept open while it idles.
     close_old_connections()
     if result.skipped:
         registered = "a newer release had already registered its apps"
@@ -75,7 +88,20 @@ def run(
         registered = f"{result.written} app(s) registered: {', '.join(result.apps)}"
     logger.info("worker: waiting for work (%s).", registered)
     while not stop.is_set():
-        # Phase 1: nothing to do yet.
+        _tick(clock())
         wait(tick_seconds)
     logger.info("worker: stopped.")
     return 0
+
+
+def _tick(now: dt.datetime) -> None:
+    """Run the scheduled tasks due at ``now``; a failure is logged and the next tick tries again."""
+    try:
+        ran = scheduler.run_due(now)
+    except Exception:
+        logger.exception("worker: the scheduled tasks could not run; the next tick tries again.")
+        # A broken connection is not taken into the next tick.
+        close_old_connections()
+        return
+    if ran:
+        logger.debug("worker: ran %s.", ", ".join(ran))

@@ -98,6 +98,20 @@ describe('useCheckout', () => {
     expect(s.sent().map((c) => c.path)).toEqual([COMPLETE]);
   });
 
+  it('a business that files for real and cannot reach the AEAT is refused in the server’s words, in its language', async () => {
+    // Working-rules §15: VeriFactu refuses the charge itself (no ticket that could never be filed); the till
+    // shows what the server says, already in the cashier's language, and charges nothing.
+    const s = await setup();
+    const message =
+      'No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: ' +
+      'la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo.';
+    s.replies({ [COMPLETE]: [refusal(409, 'verifactu.live_option_unpaid', message)] });
+    await s.checkout.charge(INPUT);
+    expect(s.checkout.failure.value).toEqual({ kind: 'refused', code: 'verifactu.live_option_unpaid', message });
+    expect(s.charged()).toEqual([]);
+    expect(s.sent().map((c) => c.path)).toEqual([COMPLETE]);
+  });
+
   it('a discount over the cap goes again through complete_over_limit, same payload and key, for a manager', async () => {
     const s = await setup(MANAGER);
     s.replies({

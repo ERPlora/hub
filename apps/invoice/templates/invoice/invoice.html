@@ -3,7 +3,8 @@
   The A4 document of an invoice (INVOICE-F18), the same sheet the old <ok-invoice> painted: the issuer and the
   document block on top, «Bill to», the lines, the breakdown by rate with the totals and the note of what it
   rectifies. Every figure comes written from queries.render_document in the reader's language. A whole page with
-  its own styles, so the Printing app, a PDF or an e-mail can take it as it is.
+  its own styles, so the Printing app, a PDF or an e-mail can take it as it is. With a QR, VeriFactu's on top, its
+  texts fixed by the AEAT in Spanish («QR tributario:», «VERI*FACTU»; Orden HAC/1177/2024, art. 21).
 {% endcomment %}
 <html lang="{{ language }}">
 <head>
@@ -41,6 +42,9 @@
   .summary .grand td.num { color: #0091ce; }
   .muted { color: #6b6b6b; }
   .empty-lines { text-align: center; padding: 6mm; }
+  .verifactu-qr { width: 40mm; margin: 0 auto 5mm; text-align: center; font-size: 9px; }
+  .verifactu-qr img { display: block; width: 32mm; height: 32mm; margin: 1mm auto; }
+  .verifactu-qr .mode { font-weight: 700; letter-spacing: .06em; }
   .legal { margin-top: 8mm; padding-top: 3mm; border-top: 1px solid #d9d6cf; font-size: 9px; color: #6b6b6b;
     white-space: pre-line; text-align: center; }
   @media print {
@@ -55,6 +59,13 @@
 </head>
 <body>
 <div class="sheet">
+  {% if qr %}
+  <div class="verifactu-qr">
+    <div>QR tributario:</div>
+    <img src="{{ qr.svg }}" alt="{{ qr.url }}">
+    <div class="mode">VERI*FACTU</div>
+  </div>
+  {% endif %}
   <div class="top">
     <div>
       <div class="issuer-name">{{ invoice.issuer_name }}</div>

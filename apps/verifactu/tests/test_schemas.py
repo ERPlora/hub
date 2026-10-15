@@ -1,6 +1,7 @@
 """The inputs of the verifactu app's operations: what each one accepts and the 422 of what it does not (the same
 schema the route, the live subscription and the assistant validate with)."""
 
+import base64
 import datetime as dt
 import uuid
 
@@ -115,17 +116,28 @@ def test_the_route_is_erplora_or_own():
     assert "route" in refused(schemas.ConfigUpdateIn, {"route": "gateway"})
 
 
+def test_the_photo_no_longer_carries_the_certificate():
+    """The certificate is uploaded in the Hub (Ioan, 2026-10-15): an older photo that still names it is read
+    without it."""
+    assert "own_certificate" not in schemas.ConfigSyncIn.model_fields
+    data = schemas.ConfigSyncIn.model_validate(
+        {"version": 1, "own_certificate": {"loaded": True, "holder": "ANA"}}
+    )
+    assert "own_certificate" not in data.model_dump()
+
+
+def test_the_photo_no_longer_carries_the_multiple_taxpayers_indicator():
+    """IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers, T2b): an older photo that still names
+    it is read without it."""
+    assert "multiple_taxpayers" not in schemas.ConfigSyncIn.model_fields
+    data = schemas.ConfigSyncIn.model_validate({"version": 1, "multiple_taxpayers": "N"})
+    assert "multiple_taxpayers" not in data.model_dump()
+
+
 def test_the_accounts_photo():
     data = schemas.ConfigSyncIn.model_validate(
         {
             "version": 7,
-            "multiple_taxpayers": "N",
-            "own_certificate": {
-                "loaded": True,
-                "holder": "ANA LOPEZ",
-                "uploaded_at": "2026-10-01T10:00:00Z",
-                "expires_at": "2028-10-01T10:00:00Z",
-            },
             "representation": {
                 "status": "approved",
                 "updated_at": "2026-10-02T10:00:00Z",
@@ -134,10 +146,9 @@ def test_the_accounts_photo():
         }
     )
     assert data.version == 7
-    assert data.own_certificate.loaded is True
     assert data.representation.status == "approved"
-    assert "multiple_taxpayers" in refused(
-        schemas.ConfigSyncIn, {"version": 1, "multiple_taxpayers": "Y"}
+    assert "live_paid" in refused(
+        schemas.ConfigSyncIn, {"version": 1, "live_paid": "maybe"}
     )
     assert "version" in refused(schemas.ConfigSyncIn, {})
 
@@ -145,3 +156,14 @@ def test_the_accounts_photo():
 def test_an_aeat_query_month_is_one_to_twelve():
     assert "month" in refused(schemas.AeatQueryIn, {"month": 13})
     assert schemas.AeatQueryIn.model_validate({"year": 2026, "month": 8}).month == 8
+
+
+def test_a_certificate_file_is_one_mb_at_most():
+    # As the screen says (ConfigPage: 1024 × 1024 bytes): a larger file is no certificate, refused before it is read.
+    one_mb = base64.b64encode(b"\0" * (1024 * 1024)).decode()
+    larger = base64.b64encode(b"\0" * (1024 * 1024 + 1)).decode()
+
+    assert schemas.CertificateUploadIn.model_validate({"p12_base64": one_mb})
+    errors = refused(schemas.CertificateUploadIn, {"p12_base64": larger})
+    assert list(errors) == ["p12_base64"]
+    assert "1 MB" in errors["p12_base64"]

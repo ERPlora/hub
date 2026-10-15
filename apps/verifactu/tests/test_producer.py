@@ -43,9 +43,7 @@ def test_the_constants_are_the_signed_declarations():
 
 
 def test_the_system_block_merges_the_manufacturer_with_this_installation():
-    system = producer.system_info(
-        version="abc123", installation="peluqueria-ana", multiple_taxpayers="N"
-    )
+    system = producer.system_info(version="abc123", installation="peluqueria-ana")
     assert system.name == "ERPLORA CLOUD SL"
     assert system.nif == "B27593136"
     assert system.system_name == "ERPlora Hub"
@@ -55,22 +53,19 @@ def test_the_system_block_merges_the_manufacturer_with_this_installation():
     assert (system.only_verifactu, system.multi_ot, system.multiple_ot) == (
         "S",
         "S",
-        "N",
+        "S",
     )
 
 
-def test_without_the_accounts_indicator_there_is_no_system_block():
-    # IndicadorMultiplesOT is computed per user of the SaaS: the Hub never invents it.
-    assert (
-        producer.system_info(version="abc", installation="a", multiple_taxpayers="")
-        is None
-    )
+def test_erplora_always_serves_several_taxpayers():
+    # IndicadorMultiplesOT: ERPlora is one platform for many businesses, a multi-taxpayer system by definition,
+    # so it is «S» on every record and owes nothing to the account's photo (decision of 2026-10-15, T2b).
+    assert producer.MULTIPLE_OT == "S"
+    assert producer.system_info(version="abc", installation="a").multiple_ot == "S"
 
 
 def test_a_version_and_an_installation_fit_the_schema():
-    system = producer.system_info(
-        version="x" * 80, installation="h" * 150, multiple_taxpayers="S"
-    )
+    system = producer.system_info(version="x" * 80, installation="h" * 150)
     assert len(system.version) == 50
     assert len(system.installation) == 100
 

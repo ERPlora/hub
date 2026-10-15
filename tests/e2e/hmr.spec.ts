@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import { A, createItem, HUB_DIR, healthy, listReady, login, record, row, shot, shown, uniqueName, waitFor } from './helpers';
+import { STACK } from './stack';
 
 const VUE = join(HUB_DIR, 'apps/demo/frontend/pages/ItemListPage.vue');
 const PY = join(HUB_DIR, 'apps/demo/queries.py');
@@ -113,7 +114,7 @@ test('.py edit → Django restarts and the page recovers by itself, without a fu
 
 test('.py edit with Vite full-reloads filtered out → the SDK alone reconnects the stream', async ({ page, context }) => {
   const dropped: string[] = [];
-  await context.routeWebSocket(/localhost:5173/, (ws) => {
+  await context.routeWebSocket(new RegExp(`localhost:${STACK.vitePort}`), (ws) => {
     const server = ws.connectToServer();
     ws.onMessage((message) => server.send(message));
     server.onMessage((message) => {

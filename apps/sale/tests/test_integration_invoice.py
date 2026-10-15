@@ -347,6 +347,70 @@ def test_a_refusal_of_invoicing_never_stops_the_charge_and_the_document_waits(ba
     assert system_context(A).actor  # the reaction ran as the platform
 
 
+def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(issuer, bar, settings):
+    # Working-rules §15 (the old Hub's enforce_fiscal_road, HUB-1935): a business that files for real never
+    # charges a sale whose ticket could never reach the AEAT. VeriFactu's refusal is not a document that
+    # waits: it reaches the cashier as it is and nothing is charged, numbered or sealed.
+    from live.context import system_context
+
+    from apps.sale.tests.conftest import A
+
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    system = system_context(A)
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        system,
+    )
+    run("verifactu.config.go_live")
+    run("verifactu.config.sync", {"version": 2, "live_paid": False}, system)
+    with pytest.raises(Conflict) as refused:
+        charge("chain-0099", {"product": "TAP"})
+    assert refused.value.code == "verifactu.live_option_unpaid"
+    assert not Sale.objects.exists()
+    assert not Invoice.objects.exists()
+    assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
+
+
+@pytest.mark.parametrize(
+    "lost", ["own_certificate_unreadable", "gateway_unavailable", "production_closed"]
+)
+def test_in_production_a_server_that_cannot_reach_the_aeat_refuses_the_charge(
+    issuer, bar, settings, lost
+):
+    # The same rule when what is missing is the server's: the key that opens the own certificate (missing or
+    # rotated), ERPlora's gateway or the opening of real filing. The charge never stays «pending».
+    from apps.verifactu import certificates
+    from apps.verifactu.tests.conftest import b64, make_p12
+
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    run(
+        "verifactu.certificate.upload",
+        {"p12_base64": b64(make_p12()), "password": "secret"},
+    )
+    run("verifactu.config.update", {"route": "own"})
+    run("verifactu.config.go_live")
+    if lost == "own_certificate_unreadable":
+        settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    elif lost == "gateway_unavailable":
+        settings.VERIFACTU_GATEWAY_URL = ""
+    else:
+        settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    with pytest.raises(Conflict) as refused:
+        charge("chain-0098", {"product": "TAP"})
+
+    assert refused.value.code == f"verifactu.{lost}"
+    assert not Sale.objects.exists()
+    assert not Invoice.objects.exists()
+    assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
+
+
 def test_the_seller_without_the_right_to_invoice_still_charges(issuer, bar):
     ctx = ctx_for("hub_employee")
     ctx = type(ctx)(

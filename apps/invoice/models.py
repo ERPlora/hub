@@ -320,6 +320,10 @@ class Invoice(UUIDModel):
         _("status"), max_length=10, choices=Status.choices, default=Status.ISSUED
     )
     paid_at = models.DateTimeField(_("paid at"), null=True, blank=True)
+    # ERPlora's own invoices (its platform hub, PLAN-SAAS §4): the SaaS's id of the invoice, which makes posting it
+    # again harmless, and the language its document is printed in (its payer's). Empty for the business's own.
+    platform_ref = models.UUIDField(_("ERPlora invoice"), null=True, blank=True, unique=True)
+    language = models.CharField(_("document language"), max_length=8, blank=True)
     created_by = models.CharField(
         _("issued by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )

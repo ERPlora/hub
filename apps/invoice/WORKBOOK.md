@@ -194,6 +194,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
 | INVOICE-F22 | Recibir el emisor de la cuenta de ERPlora | servidor hecho; la foto del SaaS todavía no lleva el emisor |
+| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho (servidor; sin pantalla); en la fase 1 no se da de alta donde factura un negocio real |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 Estado: hecho — Ventas lo emite al cobrar, dentro de la transacción del cobro (`sale.sale.complete` → `invoice.invoice.create_from_sale`; en curso en Ventas); la reacción del outbox (`events.REACTIONS`) queda de respaldo (fase 2)
@@ -631,6 +632,31 @@ Si falla: un emisor incompleto o con un NIF no válido se rechaza y queda el ant
 Pendiente: la foto del SaaS todavía no lleva la identidad fiscal; el contrato está escrito abajo.
 Implicados: ninguno
 
+### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
+Estado: hecho (servidor; sin pantalla: nadie entra en el hub de plataforma)
+Actor: sistema (la cuenta de ERPlora, el SaaS, por `/internal/platform/invoices`)
+Pantalla: ninguna
+Pasos:
+1. Un cliente paga su suscripción en Stripe; el SaaS numera su factura (`ERP-2026-00123`, abonos en
+   `ERPR`) y la manda al hub de plataforma de ERPlora con `POST /internal/platform/invoices`, firmada.
+2. Facturación la emite tal cual llega, con el número y la fecha del SaaS (ninguna serie del Hub cuenta
+   para ella), con ERPlora como emisor y el pagador de ese día como destinatario, y VeriFactu sella su
+   registro en la misma transacción. Contesta `201 {"status": "issued", "qr", "error": null}`.
+3. El SaaS pregunta después cómo va (`GET …/{id}`): `issued` mientras el registro va a la AEAT,
+   `accepted`, `accepted_with_errors` o `rejected` cuando contesta (con su código y su mensaje).
+4. El PDF (`GET …/{id}/pdf`) es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de
+   VeriFactu («QR tributario:», «VERI*FACTU») solo cuando la AEAT ya lo aceptó, como el SaaS antiguo.
+Entra: el cuerpo de `platform_payload()` del SaaS (`id`, `kind`, `series`, `number`, `issued_on`,
+`rectification`, `currency`, `language`, céntimos, `tax_treatment`, `tax_country`, `tax_rate`,
+`recipient`, `lines`, `rectifies`).
+Sale: la factura con `platform_ref` = el `id` del SaaS (avisa `invoice.invoice.issued`; un abono, además,
+`invoice.invoice.rectified`) y su registro de VeriFactu.
+Si falla: la misma factura otra vez (o dos entregas a la vez) contesta lo que ya hay, sin escribir nada
+(`200`); un abono de una factura que no llegó, 404 `invoice.platform_original_unknown`; más de 400 € sin
+NIF, 409 `invoice.platform_recipient_required`; un cuerpo fuera de contrato, 422 con su código; un
+rechazo de VeriFactu deshace la factura entera.
+Implicados: VeriFactu (`verifactu.record.create`, `verifactu.record.by_invoice`, `verifactu.record.get`)
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
@@ -652,6 +678,9 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | Los huecos de la numeración | ver | F15 | `invoice.numbering.gaps` |
 | El libro de números entregados | ver | F15 | `invoice.numbering.allocations` |
 | El emisor | ver | F21, F22 | `invoice.issuer.get` |
+| Cómo va una factura de ERPlora (por el `id` del SaaS) | solo el sistema | F23 | `invoice.invoice.platform_status` |
+| El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
+| Si el hub de plataforma puede emitir ahora | solo el sistema | F23 | `invoice.invoice.platform_health` |
 
 Todas se pueden seguir en vivo.
 
@@ -670,6 +699,7 @@ Todas se pueden seguir en vivo.
 | Cambia una serie | llevar las series | F13 | `invoice.series.update` |
 | Guarda el emisor | configurar el emisor | F21 | `invoice.issuer.update` |
 | Guarda el emisor que manda la cuenta de ERPlora | solo el sistema | F22 | `invoice.issuer.sync` |
+| Emite una factura de ERPlora con su registro de VeriFactu | solo el sistema | F23 | `invoice.invoice.issue_platform` |
 
 ### Lo que avisa
 
@@ -734,6 +764,45 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo del sistema.
 
 ## Para quien lo mantiene
+
+- **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4; plan del bloque fiscal, tarea 4): el hub propio de
+  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
+  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal.py`
+  (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
+  `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
+  `invoice.issue_platform`, sin rol ni ruta ninja). `platform.py` traduce el cuerpo del SaaS (puro):
+  - **Tipo**: F1 con NIF del pagador; sin NIF, F2 hasta 400 € (RD 1619/2012 art. 4) y 409 por encima
+    (`fiscal/invoice_type.py` del SaaS antiguo). Un abono es rectificativa por diferencias (`I`) con el
+    tipo del SaaS (R1–R4), o R5 si rectifica una F2.
+  - **Desglose** (ADR-0183 del SaaS antiguo, `fiscal/desglose.py`, validado contra la AEAT): `domestic` →
+    sujeta S1 a su tipo; `oss` (régimen 17), `reverse_charge` y `not_subject` → no sujeta por
+    localización (N2), y `exempt` → E1; todas sin tipo ni cuota (error 1237 de la AEAT), con el importe
+    entero de la línea como base. Por eso en una venta OSS la cabecera de Facturación es base = total y
+    cuota 0 (el IVA de otro Estado no lo recauda la AEAT); la nota del documento dice «IVA 19 % (DE)». No
+    lleva el aviso «VAT included — customer VAT number could not be verified» del PDF antiguo (queda fuera).
+  - **Notas**: el aviso que imprimía la factura antigua (inversión del sujeto pasivo, OSS, no sujeta), en
+    el idioma del pagador.
+  - **Número**: el del SaaS tal cual; `sequence` = sus últimas cifras; la serie `ERP`/`ERPR` del año nace
+    con el formato del SaaS (`{prefix}-{year}-{seq:05d}`) y su contador no se usa. Dos entregas a la vez
+    se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
+    `platform_ref` es único en la base de datos.
+  - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
+    producción; `pre` → pruebas; `verifactu.queries.effective_environment`), y su interruptor está fijo
+    (409 `verifactu.platform_fixed`).
+  - **PDF**: `pdf.py` (WeasyPrint ≥ 66) imprime el A4 fuera de la transacción; solo lee `data:` (nada de
+    red). La imagen lleva Pango, HarfBuzz y DejaVu, y la caché de Fontconfig en `/tmp`.
+- **Alta del hub de plataforma**: `manage.py create_platform_hub` (ensayo; con `--execute` escribe),
+  idempotente como el `ensure_platform_hub` del SaaS antiguo. En la fase 1 no hay registro de hubs ni
+  BD por hub: le pone el emisor de ERPlora desde `PLATFORM_ISSUER_LEGAL_NAME`, `PLATFORM_ISSUER_TAX_ID`,
+  `PLATFORM_ISSUER_ADDRESS`, `PLATFORM_ISSUER_POSTAL_CODE`, `PLATFORM_ISSUER_CITY`,
+  `PLATFORM_ISSUER_PROVINCE` y `PLATFORM_ISSUER_COUNTRY` (por defecto, los datos de ERPLORA CLOUD SL del
+  `seed_company_036` antiguo) y fija VeriFactu al entorno del despliegue
+  (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
+  lanza una vez por entorno como tarea ECS puntual con la definición del servicio `hub` y el comando
+  `python manage.py create_platform_hub --execute` (primero sin `--execute` para ver lo que hará). En
+  la fase 2 añade la fila del registro (`is_platform`) y su BD, como cualquier alta. ⚠️ **En la fase 1 hay
+  una sola BD**: el emisor que pone sería el de todos los hosts, así que no se lanza en un despliegue donde
+  factura un negocio real hasta que haya una BD por hub (PLAN-HUB §4, ronda 2026-10-15c).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,

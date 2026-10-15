@@ -7,7 +7,8 @@ the 404 envelope and not a 401. The platform host ``hubs.<domain>`` (``settings.
 is no hub either: it is marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The
 Hub admin lives only there (PLAN §18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404,
 never the admin's own login. Static files, CSP reports and ``/readyz`` (Route 53 and the deploy probe
-it on the platform host and on the private name) are left alone on every host.
+it on the platform host and on the private name) and ``/internal/`` (the SaaS's calls, signed: ``base.internal``)
+are left alone on every host.
 
 Every gate looks at ``request.path_info``, the path Django resolves: ``request.path`` also carries the
 script prefix, which behind Daphne comes from the client's own ``Daphne-Root-Path`` header, so a made-up
@@ -17,8 +18,8 @@ prefix would walk past a check made on it.
 §18.1). Without a session, the staff go to the SaaS admin's Hubs page, where the jump with a
 ``hub-admin`` code starts (no login of its own); with a session but no staff, 403, never the login
 (it would loop through the SaaS); staff outside ``/admin/`` go to ``/admin/``. ``/auth/*`` (the
-callback and the logout), static files, CSP reports, ``/readyz`` (exactly that path) and ``/healthz``
-(answered before any of this) are left alone. The SPA and the API never answer on this host.
+callback and the logout), static files, CSP reports, ``/internal/`` (signed), ``/readyz`` (exactly that path) and
+``/healthz`` (answered before any of this) are left alone. The SPA and the API never answer on this host.
 
 ``SaasLoginRequiredMiddleware``: the Hub has no login of its own; the login is the SaaS's.
 
@@ -49,7 +50,8 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
     """Placed after ``CommonMiddleware`` (``ALLOWED_HOSTS``) and before ``AuthenticationMiddleware``."""
 
     ADMIN_PREFIX = "/admin/"
-    OPEN_PREFIXES = ("/static/", "/csp-report/")
+    # /internal is the SaaS's: its signature is the authentication (base.internal), on any host.
+    OPEN_PREFIXES = ("/static/", "/csp-report/", "/internal/")
 
     def process_request(self, request: HttpRequest) -> HttpResponse | None:
         request.platform_host = is_platform_host(request)
@@ -76,7 +78,7 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
 class PlatformHostMiddleware(MiddlewareMixin):
     """Placed after ``AuthenticationMiddleware`` (it reads ``request.user``) and before ``SaasLoginRequiredMiddleware``."""
 
-    OPEN_PREFIXES = ("/auth/", "/static/", "/csp-report/")
+    OPEN_PREFIXES = ("/auth/", "/static/", "/csp-report/", "/internal/")
 
     def process_request(self, request: HttpRequest) -> HttpResponse | None:
         path = request.path_info

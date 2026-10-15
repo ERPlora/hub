@@ -134,10 +134,19 @@ describe('RecordDetailPage', () => {
     expect(s.find('verifactu-record-digest').text()).toContain('Not stamped yet');
   });
 
-  it('the first record of a chain says so; without the producer’s details the XML waits', async () => {
+  it('the first record of a chain says so; a record without its XML yet says it is built when it is sent', async () => {
     const s = await setup({ previous_fingerprint: '', envelope: '' });
     expect(s.find('verifactu-record-previous').text()).toContain('First record of the chain');
-    expect(s.find('verifactu-record-xml-pending').exists()).toBe(true);
+    const pending = s.find('verifactu-record-xml-pending').text();
+    expect(pending).toBe('The XML is built when the record is sent to the AEAT.');
+    expect(pending).not.toContain('producer');
+  });
+
+  it('in Spanish, the XML that is not built yet says it is built when it is sent', async () => {
+    const s = await setup({ envelope: '' }, { locale: 'es' });
+    const pending = s.find('verifactu-record-xml-pending').text();
+    expect(pending).toBe('El XML se construye al enviar el registro a la AEAT.');
+    expect(pending).not.toContain('productor');
   });
 
   it('«Send now» sends it and says what the AEAT answered', async () => {

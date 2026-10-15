@@ -1,7 +1,8 @@
 // Browser PoC of phase 1 (plan §8): Ioan's Chrome, hidden by default; `E2E_HEADED=1` shows it, slowed
 // down so it can be followed.
 // It drives the dev stack that `manage.py runserver` serves (Django on :8000 + Vite on :5173):
-// start it first. One worker: the specs share that server and some of them restart it.
+// start it first. A branch beside another session's stack runs its own on other ports and database
+// (`E2E_HUB_PORT`, `VITE_DEV_PORT`, `SAAS_URL`, `DB_NAME`: `stack.ts`). One worker: the specs share that server and some of them restart it.
 //
 // Each run writes into its own folder, `.artifacts/test-results/<PW_RUN_ID>/` (traces, failure
 // screenshots and `results.json`, the JSON report), so a run never wipes another's evidence:
@@ -16,6 +17,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from '@playwright/test';
+
+import { STACK } from './stack';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -41,7 +44,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [['list'], ['json', { outputFile: join(OUTPUT_DIR, 'results.json') }]],
   use: {
-    baseURL: 'http://a.localhost:8000',
+    baseURL: STACK.hub('a'),
     channel: 'chrome',
     headless: process.env.E2E_HEADED !== '1',
     launchOptions: { slowMo: process.env.E2E_HEADED === '1' ? 150 : 0 },

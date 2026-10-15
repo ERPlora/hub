@@ -58,6 +58,8 @@ ENV_KEYS = (
     "TEST_DB_NAME",
     "ERPLORA_ENVIRONMENT",
     "HUB_BASE_DOMAIN",
+    "FISCAL_CERTIFICATE_KEY",
+    "VITE_DEV_PORT",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -160,6 +162,21 @@ def test_development_uses_the_debug_csp_and_vite(load_settings):
     assert loaded["ALLOWED_HOSTS"] == [".localhost", "127.0.0.1", "localhost"]
 
 
+def test_the_vite_port_comes_from_the_environment(load_settings):
+    # A second checkout runs beside another session's runserver (its Vite owns 5173): the e2e of a
+    # branch sets VITE_DEV_PORT for Django and for vite.config.ts alike.
+    loaded = load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="5183")
+    assert loaded["LIVE"]["spa"]["dev_server"] == "http://localhost:5183"
+    assert loaded["SECURE_CSP"] == with_saas_form_action(
+        debug_policy("http://localhost:5183"), "http://localhost:8001"
+    )
+
+
+def test_a_vite_port_that_is_no_port_refuses_to_start(load_settings):
+    with pytest.raises(ImproperlyConfigured, match="VITE_DEV_PORT"):
+        load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="70000")
+
+
 def test_production_uses_the_base_csp_and_no_dev_server(load_settings):
     loaded = load_settings(**PRODUCTION_ENV)
     assert loaded["DEBUG"] is False
@@ -207,6 +224,17 @@ def test_the_saas_and_its_shared_secret_come_from_the_environment(load_settings)
     assert (loaded["SAAS_URL"], loaded["INTERNAL_SHARED_SECRET"]) == (
         "https://erplora.com",
         "shared-with-the-saas",
+    )
+
+
+def test_the_fiscal_certificate_key_comes_from_the_environment(load_settings):
+    """The key that seals a business's own certificate in its hub database (VeriFactu); without it the Hub
+    starts and refuses, visibly, to keep a certificate."""
+    assert load_settings(**PRODUCTION_ENV)["FISCAL_CERTIFICATE_KEY"] == ""
+    key = "Hh3cG0mN2r1n6Xl2X3oYgq1xk3s0b4b8XG0bN3J3yPQ="
+    assert (
+        load_settings(**PRODUCTION_ENV, FISCAL_CERTIFICATE_KEY=key)["FISCAL_CERTIFICATE_KEY"]
+        == key
     )
 
 

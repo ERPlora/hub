@@ -14,25 +14,82 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
 
-#: admin.py:24
-msgid "sent to the AEAT through ERPlora's gateway."
-msgstr "enviado a la AEAT por la pasarela de ERPlora."
+#: admin.py:37
+msgid "Resend to the AEAT"
+msgstr "Reenviar a la AEAT"
 
-#: admin.py:25
-msgid "goes out with the next pass."
-msgstr "sale en la próxima pasada."
+#: admin.py:38
+#, python-format
+msgid ""
+"Resend finished: %(accepted)s accepted, %(rejected)s rejected, %(waiting)s "
+"still waiting."
+msgstr ""
+"Reenvío terminado: %(accepted)s aceptados, %(rejected)s rechazados, "
+"%(waiting)s aún en espera."
 
-#: admin.py:27
-msgid "Send now"
-msgstr "Enviar ahora"
+msgid "Reschedule: send with the next pass"
+msgstr "Reprogramar: enviar en la próxima pasada"
 
-#: admin.py:28
-msgid "Retry with the next pass"
-msgstr "Reintentar en la próxima pasada"
+#, python-format
+msgid "Rescheduled: %(count)s record(s) go out with the next pass."
+msgstr "Reprogramado: %(count)s registro(s) salen en la próxima pasada."
 
-#: admin.py:30
+msgid "Reschedule its queue: send with the next pass"
+msgstr "Reprogramar su cola: enviar en la próxima pasada"
+
+#, python-format
+msgid "Rescheduled: %(count)s chain(s) go out with the next pass."
+msgstr "Reprogramado: %(count)s cadena(s) salen en la próxima pasada."
+
+msgid "nothing is waiting in its queue."
+msgstr "no hay nada esperando en su cola."
+
+msgid "Ask the AEAT (out of the queue if it already has it)"
+msgstr "Consultar a la AEAT (sale de la cola si ya lo tiene)"
+
+#, python-format
+msgid "Asked the AEAT: %(held)s already registered (out of the queue), %(missing)s not in the AEAT (still in the queue)."
+msgstr "Consulta a la AEAT: %(held)s ya registrados (fuera de la cola), %(missing)s no están en la AEAT (siguen en la cola)."
+
+msgid "Correct a rejection with a new record"
+msgstr "Subsanar el rechazo con un registro nuevo"
+
+#, python-format
+msgid "Corrected: %(count)s new record(s) in the queue."
+msgstr "Subsanado: %(count)s registro(s) nuevo(s) en la cola."
+
+msgid "only a record the AEAT rejected is corrected here; this one is registered."
+msgstr "aquí solo se subsana un registro que la AEAT rechazó; este ya está registrado."
+
+msgid "only a record the AEAT rejected is corrected here; this one is still in the queue."
+msgstr "aquí solo se subsana un registro que la AEAT rechazó; este sigue en la cola."
+
+msgid "Why it is not in the AEAT yet"
+msgstr "Por qué aún no está en la AEAT"
+
+#, python-format
+msgid "Invoice %(invoice_number)s was already in the AEAT (%(status_label)s): out of the queue."
+msgstr "La factura %(invoice_number)s ya estaba en la AEAT (%(status_label)s): fuera de la cola."
+
+#: admin.py:41
 msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."
 msgstr "Elige antes un hub (su enlace en el admin del SaaS): la acción se ejecuta en ese hub."
+
+#: admin.py:44
+msgid "Invoice"
+msgstr "Factura"
+
+#: admin.py:45
+msgid "Hash chain"
+msgstr "Cadena de huellas"
+
+#: admin.py:46
+msgid "AEAT response"
+msgstr "Respuesta de la AEAT"
+
+#: admin.py:47
+msgid "Metadata"
+msgstr "Metadatos"
 
 #: apps.py:13
 msgid "VeriFactu"
@@ -122,26 +179,6 @@ msgstr "vía de envío"
 #: models.py:77
 msgid "in production since"
 msgstr "en producción desde"
-
-#: models.py:81
-msgid "serves several taxpayers"
-msgstr "da servicio a varios obligados"
-
-#: models.py:84
-msgid "own certificate loaded"
-msgstr "certificado propio cargado"
-
-#: models.py:87
-msgid "certificate holder"
-msgstr "titular del certificado"
-
-#: models.py:90
-msgid "certificate uploaded at"
-msgstr "certificado subido el"
-
-#: models.py:93
-msgid "certificate expires at"
-msgstr "el certificado caduca el"
 
 #: models.py:96
 msgid "representation"
@@ -486,10 +523,6 @@ msgstr "registros"
 msgid "ERPlora's sending gateway is not configured on this server"
 msgstr "la pasarela de envío de ERPlora no está configurada en este servidor"
 
-#: models.py:433
-msgid "your ERPlora account has not sent one of the producer's details yet (whether it serves several taxpayers)"
-msgstr "tu cuenta de ERPlora todavía no ha enviado uno de los datos del productor (si da servicio a varios obligados)"
-
 #: models.py:435
 msgid "your own certificate is not loaded or has expired"
 msgstr "tu certificado propio no está cargado o ha caducado"
@@ -497,6 +530,10 @@ msgstr "tu certificado propio no está cargado o ha caducado"
 #: models.py:437
 msgid "ERPlora still has to approve your signed authorisation to file in production"
 msgstr "falta que ERPlora apruebe tu autorización firmada para remitir en producción"
+
+#: models.py
+msgid "ERPlora does not recognise this business: contact ERPlora's support"
+msgstr "ERPlora no reconoce este negocio: contacta con el soporte de ERPlora"
 
 #: models.py:439
 msgid "the AEAT asked to wait until %(at)s"
@@ -507,8 +544,12 @@ msgid "the gateway or the AEAT could not be reached (%(detail)s)"
 msgstr "no se ha podido contactar con la pasarela o con la AEAT (%(detail)s)"
 
 #: models.py:441
-msgid "ERPlora's gateway could not present it (%(detail)s)"
-msgstr "la pasarela de ERPlora no ha podido presentarlo (%(detail)s)"
+msgid ""
+"ERPlora's gateway could not present it (%(detail)s); it is not sent again by "
+"itself until the configuration changes or it is sent by hand"
+msgstr ""
+"la pasarela de ERPlora no ha podido presentarlo (%(detail)s); no se vuelve a "
+"enviar por sí solo hasta que cambie la configuración o se envíe a mano"
 
 #: models.py:443
 msgid "the submission left and no answer came back; it is sent again, declared as late"
@@ -818,10 +859,6 @@ msgstr "La AEAT no tiene registros de ese emisor este mes: no hay nada que recup
 msgid "The test invoice is only for the test environment."
 msgstr "La factura de prueba es solo para el entorno de pruebas."
 
-#: services.py:125
-msgid "There is no certificate loaded: upload it in your ERPlora account to use it."
-msgstr "No hay ningún certificado cargado: súbelo en tu cuenta de ERPlora para poder usarlo."
-
 #: services.py:128
 msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."
@@ -837,3 +874,251 @@ msgstr "Configura antes el emisor en Facturación → Emisor."
 #: services.py:135
 msgid "It cannot go back to testing: this business already has records in production."
 msgstr "No se puede volver a pruebas: este negocio ya tiene registros en producción."
+
+#: models.py
+msgid "Electronic seal"
+msgstr "Sello electrónico"
+
+#: models.py
+msgid "Representative of an entity"
+msgstr "Representante de entidad"
+
+#: models.py
+msgid "Personal"
+msgstr "Persona física"
+
+#: models.py
+msgid "Other"
+msgstr "Otro"
+
+#: models.py
+msgid "holder"
+msgstr "titular"
+
+#: models.py
+msgid "holder's tax ID"
+msgstr "NIF del titular"
+
+#: models.py
+msgid "kind"
+msgstr "tipo"
+
+#: models.py
+msgid "expires at"
+msgstr "caduca el"
+
+#: models.py
+msgid "uploaded at"
+msgstr "subido el"
+
+#: models.py
+msgid "uploaded by"
+msgstr "subido por"
+
+#: models.py
+msgid "sealed certificate"
+msgstr "certificado cifrado"
+
+#: models.py
+msgid "own certificate"
+msgstr "certificado propio"
+
+#: services.py
+msgid "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
+msgstr "No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado."
+
+#: models.py
+msgid "your own certificate cannot be opened on this server: upload it again"
+msgstr "tu certificado propio no se puede abrir en este servidor: vuelve a subirlo"
+
+#: models.py
+msgid "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
+msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) subido; caduca el %(expires_on)s."
+
+#: models.py
+msgid "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
+msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) quitado."
+
+#: services.py
+msgid "This server cannot keep certificates yet: ERPlora has to set its storage key."
+msgstr "Este servidor aún no puede guardar certificados: ERPlora tiene que configurar su clave de almacenamiento."
+
+#: services.py
+msgid "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
+msgstr "El certificado es de %(holder)s, no del emisor de este negocio, %(issuer)s."
+
+#: services.py
+msgid "The certificate expired on %(date)s: upload a valid one."
+msgstr "El certificado caducó el %(date)s: sube uno vigente."
+
+#: services.py
+msgid "The file is not a .p12/.pfx certificate that this password opens."
+msgstr "El fichero no es un certificado .p12/.pfx que abra esta contraseña."
+
+#: services.py
+msgid "The file does not hold a certificate and its private key."
+msgstr "El fichero no contiene un certificado con su clave privada."
+
+#: services.py
+msgid "The certificate does not allow client authentication, so it cannot connect to the AEAT."
+msgstr "El certificado no permite la autenticación de cliente, así que no puede conectar con la AEAT."
+
+#: models.py
+msgid "Active"
+msgstr "Activa"
+
+#: models.py
+msgid "Payment pending"
+msgstr "Pago pendiente"
+
+#: models.py
+msgid "Suspended"
+msgstr "Suspendida"
+
+#: models.py
+msgid "live option in the plan"
+msgstr "opción en vivo en el plan"
+
+#: models.py
+msgid "business status"
+msgstr "estado del negocio"
+
+#: models.py
+msgid "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
+msgstr "la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora"
+
+#: models.py
+msgid "your ERPlora account has a pending payment or is suspended"
+msgstr "tu cuenta de ERPlora tiene un pago pendiente o está suspendida"
+
+#: services.py
+msgid "The live option of VeriFactu is not in your plan: add it in your ERPlora account."
+msgstr "La opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora."
+
+#: services.py
+msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
+msgstr "Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción."
+
+#: services.py
+msgid "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in VeriFactu → Settings and try again."
+msgstr "No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: %(why)s. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo."
+
+#: models.py
+msgid "this is a demo business: it always files in the AEAT's test environment"
+msgstr "es un negocio de demostración: siempre presenta en el entorno de pruebas de la AEAT"
+
+#: services.py
+msgid "A demo business cannot go live: it always files in the AEAT's test environment."
+msgstr "Un negocio de demostración no puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT."
+
+#: services.py
+msgid ""
+"ERPlora's own business files in the AEAT environment of its server: its "
+"environment cannot be switched."
+msgstr ""
+"El negocio propio de ERPlora presenta en el entorno de la AEAT de su "
+"servidor: su entorno no se puede cambiar."
+
+#: services.py
+msgid "Only ERPlora's own business follows the environment of its server."
+msgstr "Solo el negocio propio de ERPlora sigue el entorno de su servidor."
+
+#: apps/verifactu/models.py
+msgid "ERPlora business id"
+msgstr "Id del negocio en ERPlora"
+
+#: apps/verifactu/models.py
+msgid "Representation authorisation no. %(version)s sent to ERPlora for review."
+msgstr "Otorgamiento de representación n.º %(version)s enviado a ERPlora para su revisión."
+
+#: apps/verifactu/models.py
+msgid "ERPlora is reviewing the representation authorisation."
+msgstr "ERPlora está revisando el otorgamiento de representación."
+
+#: apps/verifactu/models.py
+msgid "ERPlora approved the representation authorisation: it can file on your behalf."
+msgstr "ERPlora ha aprobado el otorgamiento de representación: puede remitir en tu nombre."
+
+#: apps/verifactu/models.py
+msgid "ERPlora returned the representation authorisation: %(note)s"
+msgstr "ERPlora ha devuelto el otorgamiento de representación: %(note)s"
+
+#: apps/verifactu/models.py
+msgid "The representation authorisation was revoked."
+msgstr "El otorgamiento de representación se ha revocado."
+
+#: apps/verifactu/models.py
+msgid "ERPlora holds no signed representation authorisation for this business."
+msgstr "ERPlora no tiene ningún otorgamiento de representación firmado de este negocio."
+
+#: apps/verifactu/queries.py
+msgid "ERPlora could not handle this right now. Try again in a few minutes."
+msgstr "ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos."
+
+#: apps/verifactu/services.py
+msgid "Fill in the name and ID number of the person signing."
+msgstr "Rellena el nombre y el NIF de quien firma."
+
+#: apps/verifactu/services.py
+msgid "Attach the signed form."
+msgstr "Adjunta el modelo firmado."
+
+#: apps/verifactu/services.py
+msgid "The signed form has to be a PDF: scan it or sign it with AutoFirma."
+msgstr "El modelo firmado tiene que ser un PDF: escanéalo o fírmalo con AutoFirma."
+
+#: apps/verifactu/services.py
+msgid "Attach a copy of the identity document."
+msgstr "Adjunta una copia del documento de identidad."
+
+#: apps/verifactu/services.py
+msgid "With a NIE we also need a sample of the handwritten signature."
+msgstr "Con NIE necesitamos además una muestra de la firma manuscrita."
+
+#: apps/verifactu/services.py
+msgid "Attach the document that proves you may sign for the company."
+msgstr "Adjunta el documento que acredita que puedes firmar por la sociedad."
+
+#: apps/verifactu/services.py
+msgid "Each file has to be 5 MB at most."
+msgstr "Cada fichero puede ocupar 5 MB como máximo."
+
+#: apps/verifactu/services.py
+msgid "Each file has to be a PDF."
+msgstr "Cada fichero tiene que ser un PDF."
+
+#: apps/verifactu/services.py
+msgid "The authorisation cannot be sent as it is."
+msgstr "El otorgamiento no se puede enviar tal como está."
+
+#: apps/verifactu/services.py
+msgid "ERPlora did not take the authorisation as it is."
+msgstr "ERPlora no ha admitido el otorgamiento tal como está."
+
+#: apps/verifactu/services.py
+msgid "ERPlora has not linked this business yet. Try again in a few minutes."
+msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."
+
+#: apps/verifactu/schemas.py
+msgid "The certificate file has to be 1 MB at most."
+msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
+
+#: apps/verifactu/models.py
+msgid "ERPlora has not opened real filing with the AEAT on this server yet"
+msgstr "ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor"
+
+#: apps/verifactu/services.py
+msgid ""
+"Your own certificate cannot be opened on this server: upload it again in "
+"VeriFactu → Configuration → My certificate."
+msgstr ""
+"Tu certificado propio no se puede abrir en este servidor: vuelve a subirlo en "
+"VeriFactu → Configuración → Mi certificado."
+
+#: apps/verifactu/services.py
+msgid ""
+"ERPlora's sending gateway is not configured on this server: nothing could "
+"reach the AEAT."
+msgstr ""
+"La pasarela de envío de ERPlora no está configurada en este servidor: nada "
+"podría llegar a la AEAT."

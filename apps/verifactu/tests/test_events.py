@@ -20,6 +20,7 @@ def test_the_events_it_records_are_named_app_entity_fact():
         "verifactu.record.accepted_with_errors",
         "verifactu.contingency.processed",
         "verifactu.contingency.retried",
+        "verifactu.record.reconciled",
         "verifactu.chain.validated",
         "verifactu.chain.recovered",
         "verifactu.aeat.queried",

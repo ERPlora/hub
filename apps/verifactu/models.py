@@ -1,8 +1,11 @@
 """Models of the verifactu app (WORKBOOK «Para quien lo mantiene»).
 
 - ``Config``: one row; the environment (testing or production), the route (ERPlora files, or the business's own
-  certificate) and what the ERPlora account sends (the certificate's and the authorisation's state, the
-  producer's ``IndicadorMultiplesOT``).
+  certificate) and what the ERPlora account sends (the authorisation's state, the live option, the business's
+  status).
+- ``OwnCertificate``: one row at most; the business's own certificate, uploaded here (VERIFACTU-F02): its holder,
+  kind and expiry, and the .p12 with its password sealed together (``certificates.seal``). The sealed blob is
+  never shown: not in ``str``, the admin, the API nor the photo.
 - ``Chain``: the head of a chain, one per ``(issuer NIF, environment)``: the last sequence and the last record's
   fingerprint, number and date. Sealing a record locks it.
 - ``SendControl``: the queue's control row, one per ``(issuer NIF, environment)``: ``next_send_at`` (the AEAT's
@@ -63,6 +66,11 @@ class Config(UUIDModel):
         RETURNED = "returned", _("Returned")
         REVOKED = "revoked", _("Revoked")
 
+    class HubStatus(models.TextChoices):
+        ACTIVE = "active", _("Active")
+        PAST_DUE = "past_due", _("Payment pending")
+        SUSPENDED = "suspended", _("Suspended")
+
     singleton = models.BooleanField(_("single row"), default=True, editable=False)
     environment = models.CharField(
         _("environment"),
@@ -76,22 +84,6 @@ class Config(UUIDModel):
     production_since = models.DateTimeField(
         _("in production since"), null=True, blank=True
     )
-    # From the ERPlora account (verifactu.config.sync): "" until it says, then S or N.
-    multiple_taxpayers = models.CharField(
-        _("serves several taxpayers"), max_length=1, blank=True
-    )
-    own_certificate_loaded = models.BooleanField(
-        _("own certificate loaded"), default=False
-    )
-    own_certificate_holder = models.CharField(
-        _("certificate holder"), max_length=200, blank=True
-    )
-    own_certificate_uploaded_at = models.DateTimeField(
-        _("certificate uploaded at"), null=True, blank=True
-    )
-    own_certificate_expires_at = models.DateTimeField(
-        _("certificate expires at"), null=True, blank=True
-    )
     representation_status = models.CharField(
         _("representation"),
         max_length=10,
@@ -104,6 +96,18 @@ class Config(UUIDModel):
     representation_reason = models.CharField(
         _("representation note"), max_length=500, blank=True
     )
+    # From the ERPlora account's photo: whether its plan includes filing in production (VERIFACTU-F08) and the
+    # business's commercial status; going live needs both (``queries.live_problems``).
+    live_paid = models.BooleanField(_("live option in the plan"), default=False)
+    hub_status = models.CharField(
+        _("business status"),
+        max_length=10,
+        choices=HubStatus.choices,
+        default=HubStatus.ACTIVE,
+    )
+    # The business's id in ERPlora (the SaaS's ``Hub.id``), told by the photo's path: where the signed authorisation
+    # is sent (VERIFACTU-F05). Phase 2 reads it from the control registry.
+    hub_id = models.UUIDField(_("ERPlora business id"), null=True, blank=True)
     synced_version = models.BigIntegerField(_("synced version"), null=True, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
@@ -121,14 +125,46 @@ class Config(UUIDModel):
             models.CheckConstraint(
                 condition=Q(singleton=True), name="verifactu_config_singleton"
             ),
-            models.CheckConstraint(
-                condition=Q(multiple_taxpayers__in=["", "S", "N"]),
-                name="verifactu_config_multiple_taxpayers",
-            ),
         ]
 
     def __str__(self) -> str:
         return str(_("VeriFactu configuration"))
+
+
+class OwnCertificate(UUIDModel):
+    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``)."""
+
+    class Kind(models.TextChoices):
+        SEAL = "seal", _("Electronic seal")
+        REPRESENTATIVE = "representative", _("Representative of an entity")
+        PERSONAL = "personal", _("Personal")
+        UNKNOWN = "unknown", _("Other")
+
+    singleton = models.BooleanField(_("single row"), default=True, editable=False)
+    holder = models.CharField(_("holder"), max_length=200)
+    holder_tax_id = models.CharField(_("holder's tax ID"), max_length=20)
+    kind = models.CharField(_("kind"), max_length=14, choices=Kind.choices)
+    expires_at = models.DateTimeField(_("expires at"))
+    uploaded_at = models.DateTimeField(_("uploaded at"), default=timezone.now)
+    uploaded_by = models.CharField(
+        _("uploaded by"), max_length=ACTOR_MAX_LENGTH, blank=True
+    )
+    sealed_blob = models.BinaryField(_("sealed certificate"), editable=False)
+
+    class Meta:
+        verbose_name = _("own certificate")
+        verbose_name_plural = _("own certificate")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["singleton"], name="verifactu_owncertificate_single_row"
+            ),
+            models.CheckConstraint(
+                condition=Q(singleton=True), name="verifactu_owncertificate_singleton"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.holder} ({self.holder_tax_id})"
 
 
 class Chain(UUIDModel):
@@ -424,21 +460,37 @@ class Record(UUIDModel):
 
 
 
-#: The reasons a record waits (VERIFACTU-F17), by code; ``%(detail)s`` and ``%(at)s`` where they apply.
+#: The reasons a record waits (VERIFACTU-F17) and those that keep a business from going live (VERIFACTU-F08), by
+#: code; ``%(detail)s`` and ``%(at)s`` where they apply.
 WAIT_REASONS = {
     "gateway_unavailable": _(
         "ERPlora's sending gateway is not configured on this server"
     ),
-    "producer_facts_missing": _(
-        "your ERPlora account has not sent one of the producer's details yet (whether it serves several taxpayers)"
+    "production_closed": _(
+        "ERPlora has not opened real filing with the AEAT on this server yet"
     ),
     "own_certificate_missing": _("your own certificate is not loaded or has expired"),
+    "own_certificate_unreadable": _(
+        "your own certificate cannot be opened on this server: upload it again"
+    ),
     "representation_not_approved": _(
         "ERPlora still has to approve your signed authorisation to file in production"
     ),
+    "live_option_unpaid": _(
+        "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
+    ),
+    "go_live_forbidden": _(
+        "this is a demo business: it always files in the AEAT's test environment"
+    ),
+    "hub_not_active": _(
+        "your ERPlora account has a pending payment or is suspended"
+    ),
     "aeat_wait": _("the AEAT asked to wait until %(at)s"),
     "unreachable": _("the gateway or the AEAT could not be reached (%(detail)s)"),
-    "refused": _("ERPlora's gateway could not present it (%(detail)s)"),
+    "refused": _(
+        "ERPlora's gateway could not present it (%(detail)s); it is not sent again by itself until the "
+        "configuration changes or it is sent by hand"
+    ),
     "unknown": _(
         "the submission left and no answer came back; it is sent again, declared as late"
     ),
@@ -449,11 +501,28 @@ WAIT_REASONS = {
 }
 
 
+#: What a refusal of the gateway means, by its code (saas#29), shown in place of the SaaS's own English message.
+GATEWAY_REFUSALS = {
+    "hub_unknown": _(
+        "ERPlora does not recognise this business: contact ERPlora's support"
+    ),
+    "representation_not_approved": WAIT_REASONS["representation_not_approved"],
+}
+
+
+def gateway_refusal_text(detail: str) -> str:
+    """A refusal's ``code: message`` in the active language when its code is known; else as the gateway said it."""
+    known = GATEWAY_REFUSALS.get(detail.split(":", 1)[0].strip())
+    return detail if known is None else str(known)
+
+
 def wait_reason_text(code: str, detail: str = "", at: str = "") -> str:
     """The reason ``code`` in the active language."""
     template = WAIT_REASONS.get(code)
     if template is None:
         return code
+    if code == "refused":
+        detail = gateway_refusal_text(detail)
     return str(template) % {"detail": detail, "at": at}
 
 
@@ -527,6 +596,10 @@ class Event(UUIDModel):
                     params["environment"], params["environment"]
                 )
             )
+        if "status" in params:
+            params["status_label"] = str(
+                dict(Record.Status.choices).get(params["status"], params["status"])
+            )
         if "reason" in params:
             params["why"] = wait_reason_text(
                 params["reason"], params.get("detail", ""), params.get("at", "")
@@ -568,6 +641,9 @@ EVENT_MESSAGES = {
         "Queue processed: %(sent)s sent, %(accepted)s accepted, %(rejected)s rejected, %(waiting)s waiting."
     ),
     "queue_retried": _("Invoice %(invoice_number)s goes out with the next pass."),
+    "record_reconciled": _(
+        "Invoice %(invoice_number)s was already in the AEAT (%(status_label)s): out of the queue."
+    ),
     "chain_valid": _(
         "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). "
         "Amounts are not re-audited."
@@ -587,12 +663,34 @@ EVENT_MESSAGES = {
     "connection_blocked": _(
         "Connection test (%(environment)s): it cannot send yet: %(why)s."
     ),
+    "certificate_uploaded": _(
+        "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
+    ),
+    "certificate_removed": _(
+        "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
+    ),
     "route_own": _("From now on you send with your own certificate."),
     "route_erplora": _("From now on ERPlora files on your behalf."),
     "went_live": _("The business went live: records go to the real AEAT."),
     "back_to_testing": _("The business went back to the AEAT's test environment."),
     "account_synced": _(
         "Data received from your ERPlora account (version %(version)s)."
+    ),
+    "representation_submitted": _(
+        "Representation authorisation no. %(version)s sent to ERPlora for review."
+    ),
+    "representation_under_review": _(
+        "ERPlora is reviewing the representation authorisation."
+    ),
+    "representation_approved": _(
+        "ERPlora approved the representation authorisation: it can file on your behalf."
+    ),
+    "representation_returned": _(
+        "ERPlora returned the representation authorisation: %(note)s"
+    ),
+    "representation_revoked": _("The representation authorisation was revoked."),
+    "representation_none": _(
+        "ERPlora holds no signed representation authorisation for this business."
     ),
     "xml_invalid": _(
         "Invoice %(invoice_number)s cannot be sent: its XML does not pass the AEAT's schema (%(detail)s)."

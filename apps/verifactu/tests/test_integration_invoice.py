@@ -25,7 +25,7 @@ CUT = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "
 
 
 @pytest.fixture
-def shelf(issuer, producer):
+def shelf(issuer):
     for name, sku, price, category in (
         ("Shampoo", "SHA", 1210, "product.generic"),
         ("Menu", "MNU", 1100, "restaurant.food"),
@@ -226,7 +226,7 @@ def test_a_ticket_replaced_by_a_full_invoice_is_declared_in_its_f3(shelf):
     valid(record)
 
 
-def test_a_full_invoice_to_an_eu_business_names_its_vat_number(issuer, producer):
+def test_a_full_invoice_to_an_eu_business_names_its_vat_number(issuer):
     invoice = manual(
         customer_name="Muster GmbH",
         customer_tax_id="DE129273398",

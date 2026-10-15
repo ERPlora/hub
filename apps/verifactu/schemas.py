@@ -15,19 +15,23 @@ from ninja import Field, Schema
 from pydantic import (
     BeforeValidator,
     ConfigDict,
+    SecretStr,
     StringConstraints,
     field_validator,
     model_validator,
 )
 
 from apps.verifactu import chain
-from apps.verifactu.models import Config, Event, Record
+from apps.verifactu.models import Config, Event, OwnCertificate, Record
 
 T = TypeVar("T")
 
 WHICH_RECORD = _("Say which record: its id or the number of its invoice.")
 WHICH_INVOICE = _("Say which invoice: its id or its number.")
 FINGERPRINT_INVALID = _("The fingerprint must be 64 hexadecimal characters.")
+CERTIFICATE_TOO_LARGE = _("The certificate file has to be 1 MB at most.")
+#: The largest .p12/.pfx taken (as the screen says, ConfigPage): a larger file is no certificate.
+MAX_CERTIFICATE_BYTES = 1024 * 1024
 RECORD_ID = "Id of the record."
 INVOICE_NUMBER = "Number of the invoice (e.g. TICKET-2026-000012): its latest record."
 ISSUER_NIF = "Tax ID of the issuer (Invoicing's issuer when left out)."
@@ -244,7 +248,9 @@ class QueueRowOut(Schema):
     environment: EnvironmentCode = Field(description="testing or production.")
     attempts: int = Field(description="Failed sends so far.")
     status: StatusCode = Field(description="pending or sent.")
-    next_attempt_at: dt.datetime = Field(description="Next attempt.")
+    next_attempt_at: dt.datetime | None = Field(
+        description="Next attempt; none while a refusal of the gateway waits for a change."
+    )
     last_error: str = Field(
         description="Why the last attempt did not go, in the reader's language."
     )
@@ -354,7 +360,6 @@ class DiagnosticOut(Schema):
     environment: EnvironmentCode = Field(description="The environment tested.")
     route: RouteCode = Field(description="The route tested.")
     issuer_ready: bool = Field(description="Invoicing's issuer is set.")
-    producer_ready: bool = Field(description="The producer's details are complete.")
     route_ready: bool = Field(description="The route can file in this environment.")
     gateway_configured: bool = Field(description="This server has ERPlora's gateway.")
     gateway_ready: bool | None = Field(
@@ -379,18 +384,47 @@ class ProducerOut(Schema):
     only_verifactu: str = Field(description="TipoUsoPosibleSoloVerifactu.")
     multi_ot: str = Field(description="TipoUsoPosibleMultiOT.")
     multiple_ot: str = Field(
-        description="IndicadorMultiplesOT ('' until the account says)."
+        description="IndicadorMultiplesOT (always S: ERPlora serves several taxpayers)."
     )
 
 
 class CertificateOut(Schema):
-    loaded: bool = Field(
-        description="An own certificate is loaded in the ERPlora account."
-    )
+    loaded: bool = Field(description="An own certificate is loaded in this Hub.")
     holder: str = Field(description="Its holder.")
+    holder_tax_id: str = Field(description="Its holder's tax ID.")
+    kind: Literal["", *OwnCertificate.Kind.values] = Field(
+        description="seal, representative, personal or unknown; empty without one."
+    )
     uploaded_at: dt.datetime | None = Field(description="When it was uploaded.")
     expires_at: dt.datetime | None = Field(description="When it expires.")
     expires_in_days: int | None = Field(description="Days left (negative: expired).")
+
+
+DocumentName = Literal[
+    "signed_model", "id_copy", "signature_sample", "representation_proof"
+]
+
+
+class RepresentationSubmissionOut(Schema):
+    """The last authorisation sent from this Hub: what was sent, never its content."""
+
+    version: int = Field(description="Its number at ERPlora.")
+    submitted_at: dt.datetime | None = Field(description="When ERPlora received it.")
+    document_type: Literal["dni", "nie"] = Field(
+        description="The signer's identity document: dni or nie."
+    )
+    documents: list[DocumentName] = Field(
+        description="The documents sent: signed_model, id_copy, signature_sample, representation_proof."
+    )
+
+
+class RepresentationStepOut(Schema):
+    status: RepresentationCode = Field(
+        description="none, submitted, approved, returned or revoked."
+    )
+    at: dt.datetime = Field(description="When it happened.")
+    version: int | None = Field(description="The authorisation's number, when sent from here.")
+    reason: str = Field(description="The reviewer's note.")
 
 
 class RepresentationOut(Schema):
@@ -399,6 +433,20 @@ class RepresentationOut(Schema):
     )
     updated_at: dt.datetime | None = Field(description="When it last changed.")
     reason: str = Field(description="The reviewer's note.")
+    linked: bool = Field(
+        False,
+        description="ERPlora's account has linked this business: the authorisation can be sent from here.",
+    )
+    company: bool = Field(
+        False,
+        description="Invoicing's issuer is a company: who signs for it and the proof of representation are asked.",
+    )
+    submission: RepresentationSubmissionOut | None = Field(
+        None, description="The last authorisation sent from this Hub."
+    )
+    history: list[RepresentationStepOut] = Field(
+        default_factory=list, description="Its steps, newest first."
+    )
 
 
 class ConfigOut(Schema):
@@ -420,10 +468,10 @@ class ConfigOut(Schema):
     )
     declaration_url: str = Field(description="Where to read it.")
     account_url: str = Field(
-        description="The ERPlora account, where certificates and the authorisation are managed."
+        description="The ERPlora account, where the signed authorisation is managed."
     )
     own_certificate: CertificateOut = Field(
-        description="The own certificate, as the account says."
+        description="The own certificate uploaded in this Hub (never its material)."
     )
     representation: RepresentationOut = Field(
         description="The signed authorisation, as the account says."
@@ -433,6 +481,13 @@ class ConfigOut(Schema):
     )
     route_ready: bool = Field(description="The route can file in this environment.")
     reasons: list[WaitOut] = Field(description="What keeps records from leaving now.")
+    issue_blocker: WaitOut | None = Field(
+        description="Why new sales and invoices are refused now (production without a way to the AEAT); "
+        "none when they are not."
+    )
+    live_blockers: list[WaitOut] = Field(
+        description="What keeps the business from going live now (empty when it can)."
+    )
 
 
 class ChainValidationOut(Schema):
@@ -592,6 +647,17 @@ class ContingencyRetryIn(RecordRefIn):
     """A record of the queue to put out with the next pass."""
 
 
+class RecordReconcileIn(RecordRefIn):
+    """A record of the queue to ask the AEAT about."""
+
+
+class ReconcileOut(Schema):
+    held: bool = Field(
+        description="True when the AEAT already held this very record (same fingerprint): it left the queue."
+    )
+    record: RecordSummaryOut = Field(description="The record, with its status now.")
+
+
 class ChainValidateIn(IssuerIn):
     """The chain of an issuer in the current environment."""
 
@@ -625,17 +691,29 @@ class RecoverManualIn(IssuerIn):
         return text
 
 
+class CertificateUploadIn(Schema):
+    """The business's own certificate (VERIFACTU-F02): kept sealed in the hub's database, never shown again."""
+
+    p12_base64: SecretStr = Field(
+        description="The .p12/.pfx file of the certificate, in base64 (at most 1 MB)."
+    )
+    password: SecretStr = Field(SecretStr(""), description="The certificate's password.")
+
+    @field_validator("p12_base64")
+    @classmethod
+    def _at_most_one_mb(cls, value: SecretStr) -> SecretStr:
+        """Measured on the base64 itself, before anything is decoded: what it would decode to."""
+        text = "".join(value.get_secret_value().split())
+        size = len(text) * 3 // 4 - (len(text) - len(text.rstrip("=")))
+        if size > MAX_CERTIFICATE_BYTES:
+            raise ValueError(str(CERTIFICATE_TOO_LARGE))
+        return value
+
+
 class ConfigUpdateIn(Schema):
     route: RouteCode = Field(
         description="erplora (ERPlora files for you) or own (your certificate)."
     )
-
-
-class CertificateIn(Schema):
-    loaded: bool = Field(description="An own certificate is loaded.")
-    holder: _text(200) = Field("", description="Its holder.")
-    uploaded_at: dt.datetime | None = Field(None, description="When it was uploaded.")
-    expires_at: dt.datetime | None = Field(None, description="When it expires.")
 
 
 class RepresentationIn(Schema):
@@ -652,12 +730,54 @@ class ConfigSyncIn(Schema):
     version: int = Field(
         ge=0, description="The photo's version; an equal or older one is ignored."
     )
-    multiple_taxpayers: Literal["S", "N"] | None = Field(
-        None, description="IndicadorMultiplesOT."
-    )
-    own_certificate: CertificateIn | None = Field(
-        None, description="The own certificate's state."
+    hub_id: UUID | None = Field(
+        None, description="The business's id in ERPlora (the photo's path)."
     )
     representation: RepresentationIn | None = Field(
         None, description="The signed authorisation's state."
+    )
+    live_paid: bool | None = Field(
+        None, description="The plan includes filing in production (the live option)."
+    )
+    hub_status: Literal["active", "past_due", "suspended"] | None = Field(
+        None, description="The business's commercial status."
+    )
+
+
+class RepresentationSubmitIn(Schema):
+    """The signed representation authorisation (Anexo I of Convenio 17) and its documents, each a PDF in base64 of
+    5 MB at most. Who owes the tax is Invoicing's issuer; a self-employed business signs itself."""
+
+    signer_tax_id: _text(16) = Field(
+        "",
+        description="Tax ID (DNI or NIE) of whoever signs; for a self-employed business, left empty: its own.",
+    )
+    signer_name: _text(200) = Field(
+        "",
+        description="Full name of whoever signs; for a self-employed business, left empty: its own.",
+    )
+    signer_document_type: Literal["dni", "nie"] = Field(
+        description="The signer's identity document: dni or nie."
+    )
+    signed_model_base64: SecretStr = Field(
+        description="The official model, signed by hand and scanned or with AutoFirma: a PDF in base64."
+    )
+    id_copy_base64: SecretStr = Field(
+        description="Copy of the signer's identity document: a PDF in base64."
+    )
+    signature_sample_base64: SecretStr = Field(
+        SecretStr(""),
+        description="A sheet with the signer's handwritten signature, required with a NIE: a PDF in base64.",
+    )
+    representation_proof_base64: SecretStr = Field(
+        SecretStr(""),
+        description="The document that names who may sign for a company, required for one: a PDF in base64.",
+    )
+
+
+class RepresentationModelOut(Schema):
+    filename: str = Field(description="The file's name.")
+    content_type: str = Field(description="The file's type: application/pdf.")
+    content_base64: str = Field(
+        description="The blank official model (Anexo I of Convenio 17), a PDF in base64."
     )

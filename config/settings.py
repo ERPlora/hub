@@ -56,7 +56,12 @@ SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=False, cast=bool)
 # preload list is the apex's (W005, W021).
 SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W008", "security.W021"]
 
-VITE_DEV_SERVER = "http://localhost:5173"
+# Vite's dev server (`vite.config.ts` reads the same VITE_DEV_PORT): 5173 unless a second checkout runs
+# beside another one, as the e2e of a branch does.
+VITE_DEV_PORT = config("VITE_DEV_PORT", default=5173, cast=int)
+if not 0 < VITE_DEV_PORT < 65536:
+    raise ImproperlyConfigured(f"VITE_DEV_PORT must be a TCP port, not {VITE_DEV_PORT}.")
+VITE_DEV_SERVER = f"http://localhost:{VITE_DEV_PORT}"
 
 # Application definition
 
@@ -240,6 +245,33 @@ INTERNAL_SHARED_SECRET = (
     if DEBUG
     else config("INTERNAL_SHARED_SECRET")
 )
+# During a rotation of the shared secret, the one a call of the SaaS may still be signed with (base.internal; the
+# SaaS's accounts/signing.py has the same steps); empty otherwise.
+INTERNAL_SHARED_SECRET_PREVIOUS = config("INTERNAL_SHARED_SECRET_PREVIOUS", default="")
+# How far an internal call's X-Erplora-Timestamp may be from now (both ways), as in the SaaS.
+INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
+# The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals a business's own VeriFactu
+# certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
+# certificate is refused visibly (verifactu.certificate_storage_unavailable).
+FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
+# Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
+# supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
+VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
+# ERPlora's own hub (PLAN-SAAS §4): it issues ERPlora's invoices to its customers, which the SaaS posts to
+# /internal/platform/invoices (base.internal). A reserved slug, so no business can ever take it; it files in the
+# AEAT's environment of the deployment (prod: production; pre: testing), never by its own switch.
+PLATFORM_HUB_SLUG = config("PLATFORM_HUB_SLUG", default="erplora")
+# Its issuer, set by `manage.py create_platform_hub`: ERPlora's tax identity (the old SaaS's seed_company_036).
+PLATFORM_ISSUER_LEGAL_NAME = config("PLATFORM_ISSUER_LEGAL_NAME", default="ERPLORA CLOUD SL")
+PLATFORM_ISSUER_TAX_ID = config("PLATFORM_ISSUER_TAX_ID", default="B27593136")
+PLATFORM_ISSUER_ADDRESS = config("PLATFORM_ISSUER_ADDRESS", default="Avda. de Lisboa, 17, 2º C")
+PLATFORM_ISSUER_POSTAL_CODE = config("PLATFORM_ISSUER_POSTAL_CODE", default="28822")
+PLATFORM_ISSUER_CITY = config("PLATFORM_ISSUER_CITY", default="Coslada")
+PLATFORM_ISSUER_PROVINCE = config("PLATFORM_ISSUER_PROVINCE", default="Madrid")
+PLATFORM_ISSUER_COUNTRY = config("PLATFORM_ISSUER_COUNTRY", default="ES")
+# The hub the worker runs the apps' scheduled tasks on (base.scheduler). Phase 1 has no registry of hubs, so
+# it is one fixed scope; phase 2 replaces it with the loop over the hubs whose hub_due has come.
+WORKER_SCOPE_SLUG = config("WORKER_SCOPE_SLUG", default=PLATFORM_HUB_SLUG)
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
 # for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
 PLATFORM_HOST_LABEL = "hubs"

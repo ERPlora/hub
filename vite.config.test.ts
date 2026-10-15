@@ -3,7 +3,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PluginOption } from 'vite';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import config from './vite.config';
 
@@ -42,6 +42,32 @@ describe('vite.config', () => {
       strictPort: true,
       origin: 'http://localhost:5173',
       hmr: { host: 'localhost', port: 5173 },
+    });
+  });
+
+  describe('VITE_DEV_PORT (a second checkout beside another runserver, as the e2e of a branch)', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    it('moves the dev server, its asset URLs and HMR to that port, the one Django reads too', async () => {
+      vi.stubEnv('VITE_DEV_PORT', '5183');
+      vi.resetModules();
+      const { default: moved } = await import('./vite.config');
+      expect(moved.server).toMatchObject({
+        host: 'localhost',
+        port: 5183,
+        strictPort: true,
+        origin: 'http://localhost:5183',
+        hmr: { host: 'localhost', port: 5183 },
+      });
+    });
+
+    it('refuses a value that is no TCP port', async () => {
+      vi.stubEnv('VITE_DEV_PORT', '70000');
+      vi.resetModules();
+      await expect(import('./vite.config')).rejects.toThrow(/VITE_DEV_PORT/);
     });
   });
 

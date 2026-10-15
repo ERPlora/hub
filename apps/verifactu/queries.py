@@ -6,28 +6,37 @@ its invoice (its latest record). What keeps a record from leaving is computed wh
 configuration, the gateway and the chain's AEAT wait, plus the last attempt's failure kept on the record.
 """
 
+import base64
 import datetime as dt
 from functools import reduce
 from operator import and_
 from uuid import UUID
 
-import decouple
 from django.conf import settings
 from django.db.models import Case, Count, Q, QuerySet, When
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
-from live.errors import NotFound
+from live.context import OperationContext, Scope
+from live.errors import NotFound, OperationError
 from live.operations import operation
 
 from apps.invoice.models import Invoice, Issuer
-from apps.verifactu import chain, envelope, gateway, producer
+from base import operations as platform
+from apps.verifactu import (
+    certificates,
+    chain,
+    envelope,
+    gateway,
+    producer,
+    representation,
+)
 from apps.verifactu.models import (
     AeatRecord,
     Chain,
     Config,
     Environment,
     Event,
+    OwnCertificate,
     Record,
     SendControl,
     wait_reason_text,
@@ -58,6 +67,7 @@ from apps.verifactu.schemas import (
     RecordRowOut,
     RecordsByStatusOut,
     RecordSummaryOut,
+    RepresentationModelOut,
 )
 
 RECORD_NOT_FOUND = _("Record not found.")
@@ -90,41 +100,159 @@ def issuer_configured() -> bool:
 
 
 def production_open() -> bool:
-    """Whether this server lets a business go live (VERIFACTU-F08): ERPlora opens it, under Ioan's supervision."""
-    value = getattr(settings, "VERIFACTU_PRODUCTION_ENABLED", None)
-    if value is None:
-        value = decouple.config(
-            "VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool
-        )
-    return bool(value)
-
-
-def certificate_valid(config: Config, now: dt.datetime | None = None) -> bool:
-    now = now or timezone.now()
-    return config.own_certificate_loaded and (
-        config.own_certificate_expires_at is None
-        or config.own_certificate_expires_at > now
+    """Whether this server lets a business go live (VERIFACTU-F08): only the ``prod`` deployment, and only once ERPlora
+    opens it there (``VERIFACTU_PRODUCTION_ENABLED``, under Ioan's supervision); ``pre`` always files in testing."""
+    return settings.ERPLORA_ENVIRONMENT == "prod" and bool(
+        settings.VERIFACTU_PRODUCTION_ENABLED
     )
 
 
-def route_problem(config: Config, environment: str) -> str:
-    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""``."""
+def effective_environment(ctx: OperationContext, config: Config) -> str:
+    """The AEAT environment a new record of this business files in: ERPlora's own hub (PLAN-SAAS §4), its
+    deployment's (``prod``: production; ``pre``: testing), whatever its switch says, but production only once ERPlora
+    opens it on the server (``production_open``, working-rules §15: its own invoices skip no lock); once live there, it
+    stays in production while the server is closed, its records waiting (``production_closed``), so its real invoices
+    never move to the test chain. Any other business, its configuration's."""
+    if platform.is_platform_hub(ctx.scope):
+        if production_open() or (
+            settings.ERPLORA_ENVIRONMENT == "prod"
+            and config.environment == Environment.PRODUCTION
+        ):
+            return Environment.PRODUCTION
+        return Environment.TESTING
+    return config.environment
+
+
+def own_certificate() -> OwnCertificate | None:
+    """The business's own certificate, its sealed material left unread; ``None`` while none is uploaded."""
+    return OwnCertificate.objects.defer("sealed_blob").filter(singleton=True).first()
+
+
+def own_certificate_blob() -> bytes | None:
+    """The sealed material of the own certificate (``certificates.material`` opens it); ``None`` without one."""
+    blob = (
+        OwnCertificate.objects.filter(singleton=True)
+        .values_list("sealed_blob", flat=True)
+        .first()
+    )
+    return bytes(blob) if blob is not None else None
+
+
+def own_certificate_material(config: Config) -> gateway.Certificate | None:
+    """What the gateway presents with on the «own» route (``None`` on ERPlora's, or without a certificate);
+    ``certificates.CertificateUnreadable`` when this server's key cannot open it."""
+    if config.route != Config.Route.OWN:
+        return None
+    blob = own_certificate_blob()
+    return certificates.material(blob) if blob is not None else None
+
+
+def own_certificate_readable(config: Config) -> bool:
+    try:
+        own_certificate_material(config)
+    except certificates.CertificateUnreadable:
+        return False
+    return True
+
+
+def certificate_valid(now: dt.datetime | None = None) -> bool:
+    """Whether an own certificate is uploaded and has not expired."""
+    now = now or timezone.now()
+    return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
+
+
+def _route_sending_problem(config: Config, environment: str) -> str:
+    """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
+    certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
+    the approved signed authorisation, but for ERPlora's own records."""
+    production = environment == Environment.PRODUCTION
     if config.route == Config.Route.OWN:
-        return "" if certificate_valid(config) else "own_certificate_missing"
-    if (
-        environment == Environment.PRODUCTION
-        and config.representation_status != Config.Representation.APPROVED
-    ):
+        if not certificate_valid():
+            return "own_certificate_missing"
+        if production and not own_certificate_readable(config):
+            return "own_certificate_unreadable"
+        return ""
+    if not production:
+        return ""
+    if issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID:
+        # ERPlora's seal presents ERPlora's own records: it represents nobody (its own hub, PLAN-SAAS §4).
+        return ""
+    if config.representation_status != Config.Representation.APPROVED:
         return "representation_not_approved"
     return ""
 
 
-def system_for(config: Config, ctx: OperationContext) -> producer.SystemInfo | None:
-    """``SistemaInformatico`` of this installation, or ``None`` while the account has not said everything."""
+def _server_problem(environment: str) -> str:
+    """What this server lacks to carry anything to the AEAT of production: ERPlora's gateway, and the opening of real
+    filing (``production_open``, working-rules §15). Testing lacks nothing here (its waits are ``blockers``')."""
+    if environment != Environment.PRODUCTION:
+        return ""
+    if not gateway.configured():
+        return "gateway_unavailable"
+    if not production_open():
+        return "production_closed"
+    return ""
+
+
+def sending_problem(config: Config, environment: str) -> str:
+    """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""``: the route's own lack
+    first, then the server's in production (no gateway, closed). What keeps the queue waiting, before the gateway is
+    ever called; the live option never does (what was sealed reaches the AEAT)."""
+    return _route_sending_problem(config, environment) or _server_problem(environment)
+
+
+def route_problem(config: Config, environment: str) -> str:
+    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08): what keeps
+    it from sending and, on ERPlora's route in production, the live option of the plan (Ioan's model,
+    2026-10-15); the route's own lack before the server's. In production it refuses every new sale
+    (``verifactu.record.create``) and going live."""
+    problem = _route_sending_problem(config, environment)
+    if (
+        not problem
+        and config.route == Config.Route.ERPLORA
+        and environment == Environment.PRODUCTION
+        and not config.live_paid
+    ):
+        problem = "live_option_unpaid"
+    return problem or _server_problem(environment)
+
+
+def issue_problem(config: Config) -> str:
+    """Why no new sale or invoice can be sealed now (production without a way to the AEAT), or ``""``."""
+    if config.environment != Environment.PRODUCTION:
+        return ""
+    return route_problem(config, config.environment)
+
+
+def live_problems(config: Config, scope: Scope) -> list[str]:
+    """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can, in
+    ``go_live``'s order: the server (closed, no gateway), a demo, the route, the account. Invoicing's issuer is told
+    apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
+    (``base.operations.is_demo_hub``)."""
+    found = [] if production_open() else ["production_closed"]
+    if not gateway.configured():
+        found.append("gateway_unavailable")
+    if platform.is_demo_hub(scope):
+        found.append("go_live_forbidden")
+    if config.route == Config.Route.OWN:
+        if not certificate_valid():
+            found.append("own_certificate_missing")
+        elif not own_certificate_readable(config):
+            found.append("own_certificate_unreadable")
+    else:
+        if config.representation_status != Config.Representation.APPROVED:
+            found.append("representation_not_approved")
+        if not config.live_paid:
+            found.append("live_option_unpaid")
+    if config.hub_status != Config.HubStatus.ACTIVE:
+        found.append("hub_not_active")
+    return found
+
+
+def system_for(ctx: OperationContext) -> producer.SystemInfo:
+    """``SistemaInformatico`` of this installation."""
     return producer.system_info(
-        version=producer.running_version(),
-        installation=ctx.scope.key,
-        multiple_taxpayers=config.multiple_taxpayers,
+        version=producer.running_version(), installation=ctx.scope.key
     )
 
 
@@ -133,11 +261,17 @@ def blockers(config: Config, environment: str) -> list[str]:
     found = []
     if not gateway.configured():
         found.append("gateway_unavailable")
-    if config.multiple_taxpayers not in producer.YES_NO:
-        found.append("producer_facts_missing")
-    problem = route_problem(config, environment)
-    if problem:
+    problem = sending_problem(config, environment)
+    if not problem and not own_certificate_readable(config):
+        problem = "own_certificate_unreadable"
+    if problem and problem not in found:
         found.append(problem)
+    if (
+        environment == Environment.PRODUCTION
+        and not production_open()
+        and "production_closed" not in found
+    ):
+        found.append("production_closed")
     return found
 
 
@@ -279,9 +413,10 @@ def can_cancel(record: Record) -> bool:
 
 def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     nif, name = issuer_identity()
-    system = system_for(config, ctx)
     now = timezone.now()
-    expires = config.own_certificate_expires_at
+    certificate = own_certificate()
+    expires = certificate.expires_at if certificate else None
+    refused = issue_problem(config)
     return ConfigOut(
         environment=config.environment,
         route=config.route,
@@ -302,26 +437,26 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
             "installation": ctx.scope.key,
             "only_verifactu": producer.MANUFACTURER["TipoUsoPosibleSoloVerifactu"],
             "multi_ot": producer.MANUFACTURER["TipoUsoPosibleMultiOT"],
-            "multiple_ot": system.multiple_ot if system else "",
+            "multiple_ot": producer.MULTIPLE_OT,
         },
         declaration_version=producer.DECLARATION_VERSION,
         declaration_url=producer.declaration_url(),
         account_url=settings.SAAS_URL.rstrip("/"),
         own_certificate={
-            "loaded": config.own_certificate_loaded,
-            "holder": config.own_certificate_holder,
-            "uploaded_at": config.own_certificate_uploaded_at,
+            "loaded": certificate is not None,
+            "holder": certificate.holder if certificate else "",
+            "holder_tax_id": certificate.holder_tax_id if certificate else "",
+            "kind": certificate.kind if certificate else "",
+            "uploaded_at": certificate.uploaded_at if certificate else None,
             "expires_at": expires,
             "expires_in_days": (expires - now).days if expires else None,
         },
-        representation={
-            "status": config.representation_status,
-            "updated_at": config.representation_updated_at,
-            "reason": config.representation_reason,
-        },
+        representation=representation_out(config, nif),
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment),
         reasons=[wait(code) for code in blockers(config, config.environment)],
+        issue_blocker=wait(refused) if refused else None,
+        live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
     )
 
 
@@ -349,8 +484,8 @@ def _words(text: str | None) -> list[str]:
     output=ConfigOut,
     ai={
         "description": "VeriFactu's configuration: the environment (testing or production), the sending route (ERPlora "
-        "files for the business, or its own certificate), the certificate's and the signed authorisation's state as "
-        "the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
+        "files for the business, or its own certificate), the own certificate uploaded here (holder and expiry, never "
+        "its material), the signed authorisation's state as the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
         "records from leaving now."
     },
 )
@@ -457,8 +592,9 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         qr_svg=chain.qr_svg_data_uri(record.qr_url),
         envelope=single_envelope(record),
         attempts=record.attempts,
+        # A refusal of the gateway waits for a change, never on a timer (services._send_chain).
         next_attempt_at=record.next_attempt_at
-        if record.status in Record.UNSENT
+        if record.status in Record.UNSENT and record.wait_reason != "refused"
         else None,
         transmitted_at=record.transmitted_at,
         transmission_id=record.transmission_id,
@@ -504,7 +640,10 @@ def _queue_row(record: Record) -> dict:
         "environment": record.environment,
         "attempts": record.attempts,
         "status": record.status,
-        "next_attempt_at": record.next_attempt_at,
+        # As get_record: a refusal of the gateway waits for a change, never on a timer.
+        "next_attempt_at": None
+        if record.wait_reason == "refused"
+        else record.next_attempt_at,
         "last_error": wait_reason_text(record.wait_reason, record.wait_detail)
         if record.wait_reason
         else "",
@@ -753,3 +892,92 @@ def last_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticLastOut:
     ]
     return DiagnosticLastOut(result=result)
 
+
+
+# ── The signed authorisation (VERIFACTU-F05, F06) ───────────────────────────────────────────────
+
+CONFIGURE = "verifactu.configure"
+SAAS_UNREACHABLE = _(
+    "ERPlora could not handle this right now. Try again in a few minutes."
+)
+MODEL_FILENAME = "anexo-i-otorgamiento-representacion-erplora.pdf"
+#: The audit trail's lines about the authorisation (``Event.message_key``) and the state each one tells.
+REPRESENTATION_STEPS = {
+    "representation_submitted": Config.Representation.SUBMITTED,
+    "representation_under_review": Config.Representation.SUBMITTED,
+    "representation_approved": Config.Representation.APPROVED,
+    "representation_returned": Config.Representation.RETURNED,
+    "representation_revoked": Config.Representation.REVOKED,
+    "representation_none": Config.Representation.NONE,
+}
+REPRESENTATION_HISTORY_SHOWN = 20
+
+
+def _instant(value, default: dt.datetime) -> dt.datetime:
+    try:
+        return dt.datetime.fromisoformat(value) if isinstance(value, str) else default
+    except ValueError:
+        return default
+
+
+def representation_out(config: Config, issuer_nif: str) -> dict:
+    """The authorisation as the account says it, plus what this Hub sent and the steps it has been told."""
+    steps = Event.objects.filter(message_key__in=REPRESENTATION_STEPS).order_by(
+        "-created_at", "-id"
+    )
+    last = steps.filter(message_key="representation_submitted").first()
+    submission = None
+    if last is not None:
+        submission = {
+            "version": last.params.get("version"),
+            "submitted_at": _instant(last.params.get("submitted_at"), last.created_at),
+            "document_type": last.params.get("document_type"),
+            "documents": last.params.get("documents", []),
+        }
+    return {
+        "status": config.representation_status,
+        "updated_at": config.representation_updated_at,
+        "reason": config.representation_reason,
+        "linked": config.hub_id is not None,
+        "company": representation.is_legal_person_nif(issuer_nif),
+        "submission": submission,
+        "history": [
+            {
+                "status": REPRESENTATION_STEPS[step.message_key],
+                "at": _instant(step.params.get("at"), step.created_at),
+                "version": step.params.get("version"),
+                "reason": step.params.get("note", ""),
+            }
+            for step in steps[:REPRESENTATION_HISTORY_SHOWN]
+        ],
+    }
+
+
+def saas_unreachable() -> OperationError:
+    return OperationError(
+        str(SAAS_UNREACHABLE), code="verifactu.saas_unreachable", status=503
+    )
+
+
+@operation(
+    "verifactu.representation.model",
+    kind="query",
+    permission=CONFIGURE,
+    input=NoInput,
+    output=RepresentationModelOut,
+    ai={
+        "description": "The blank official model of the representation authorisation (Anexo I of the AEAT's "
+        "Convenio 17), a PDF the business prints and signs by hand, or signs with AutoFirma, before sending it "
+        "for ERPlora to file on its behalf."
+    },
+)
+def representation_model(ctx: OperationContext, data: NoInput) -> RepresentationModelOut:
+    try:
+        content = representation.model_pdf()
+    except representation.SaasUnreachable:
+        raise saas_unreachable() from None
+    return RepresentationModelOut(
+        filename=MODEL_FILENAME,
+        content_type="application/pdf",
+        content_base64=base64.b64encode(content).decode("ascii"),
+    )

@@ -2,7 +2,9 @@
 // VeriFactu → Settings (VERIFACTU-F04, F08–F12; the old `erp-verifactu-settings`; «Enable VeriFactu» is gone:
 // turning the app on is enabling it). «Sending»: «Use my own certificate» (owner and admin; ERPlora files for you when
 // off), with its explanation and «Open Configuration»; «AEAT environment» with its pill and «Go live» (asks first;
-// closed while the server keeps it closed) or «Back to testing» (asks first; only until the first production
+// closed while something is missing, listed above it: the server's opening and its gateway, the approved signed
+// authorisation, the own certificate (one this server can open), the live option of the plan, an active account) or, in production, why records
+// wait (e.g. the live option left the plan) and «Back to testing» (asks first; only until the first production
 // record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
 // invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
 // declaration», its version and the identifying data every record carries (VERIFACTU-F12).
@@ -51,7 +53,7 @@ const identity = computed(() => {
     { label: t('verifactu.settings.installation'), element: 'NumeroInstalacion', value: p.installation },
     { label: t('verifactu.settings.onlyVerifactu'), element: 'TipoUsoPosibleSoloVerifactu', value: p.only_verifactu },
     { label: t('verifactu.settings.multiOt'), element: 'TipoUsoPosibleMultiOT', value: p.multi_ot },
-    { label: t('verifactu.settings.multipleOt'), element: 'IndicadorMultiplesOT', value: p.multiple_ot || '—' },
+    { label: t('verifactu.settings.multipleOt'), element: 'IndicadorMultiplesOT', value: p.multiple_ot },
   ];
 });
 
@@ -199,24 +201,57 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           <p class="verifactu-settings__hint">
             {{ $t('verifactu.settings.goLiveHint') }}
           </p>
-          <p
-            v-if="!config.production_open"
-            class="verifactu-settings__hint"
-            data-testid="verifactu-settings-closed"
+          <InlineFeedback
+            v-if="config.live_blockers.length"
+            tone="warning"
+            data-testid="verifactu-settings-live-blockers"
           >
-            {{ $t('verifactu.settings.productionClosed') }}
-          </p>
+            {{ $t('verifactu.settings.cannotGoLive') }}
+            <ul class="verifactu-settings__reasons">
+              <li
+                v-for="reason in config.live_blockers"
+                :key="reason.code"
+              >
+                {{ reason.message }}
+              </li>
+            </ul>
+          </InlineFeedback>
           <ion-button
             v-if="canConfigure"
             color="danger"
             data-testid="verifactu-settings-go-live"
-            :disabled="busy || !config.production_open"
+            :disabled="busy || !config.production_open || config.live_blockers.length > 0"
             @click="goingLive"
           >
             {{ $t('verifactu.settings.goLive') }}
           </ion-button>
         </template>
         <template v-else>
+          <InlineFeedback
+            v-if="config.issue_blocker"
+            tone="danger"
+            data-testid="verifactu-settings-issue-blocked"
+          >
+            {{ $t('verifactu.settings.issueBlocked') }}
+            <ul class="verifactu-settings__reasons">
+              <li>{{ config.issue_blocker.message }}</li>
+            </ul>
+          </InlineFeedback>
+          <InlineFeedback
+            v-if="config.reasons.length"
+            tone="warning"
+            data-testid="verifactu-settings-waiting"
+          >
+            {{ $t('verifactu.settings.waiting') }}
+            <ul class="verifactu-settings__reasons">
+              <li
+                v-for="reason in config.reasons"
+                :key="reason.code"
+              >
+                {{ reason.message }}
+              </li>
+            </ul>
+          </InlineFeedback>
           <template v-if="config.can_go_back">
             <p class="verifactu-settings__hint">
               {{ $t('verifactu.settings.backHint') }}
@@ -279,8 +314,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             <dd>{{ $t(`verifactu.env.${result.environment}`) }}</dd>
             <dt>{{ $t('verifactu.settings.gateway') }}</dt>
             <dd>{{ result.gateway_configured ? yesNo(result.gateway_ready) : $t('verifactu.settings.notConfigured') }}</dd>
-            <dt>{{ $t('verifactu.settings.producer') }}</dt>
-            <dd>{{ yesNo(result.producer_ready) }}</dd>
             <dt>{{ $t('verifactu.settings.issuer') }}</dt>
             <dd>{{ yesNo(result.issuer_ready) }}</dd>
             <dt>{{ $t('verifactu.settings.routeReady') }}</dt>
@@ -336,13 +369,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             <dd>{{ row.value }}</dd>
           </template>
         </dl>
-        <InlineFeedback
-          v-if="!config.producer.multiple_ot"
-          tone="info"
-          data-testid="verifactu-settings-pending-indicator"
-        >
-          {{ $t('verifactu.settings.pendingIndicator') }}
-        </InlineFeedback>
       </section>
     </template>
   </AppPage>

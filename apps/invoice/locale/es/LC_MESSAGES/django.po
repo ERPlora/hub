@@ -833,3 +833,50 @@ msgstr "Base imponible"
 #: templates/invoice/invoice.html:120
 msgid "TOTAL"
 msgstr "TOTAL"
+
+#: platform.py
+msgid ""
+"This is a B2B transaction. VAT is payable by the customer under the reverse "
+"charge mechanism."
+msgstr ""
+"Esta es una transacción B2B. El IVA es pagadero por el cliente bajo el "
+"mecanismo de inversión del sujeto pasivo."
+
+#: platform.py
+#, python-format
+msgid "VAT %(rate)s%% (%(country)s)"
+msgstr "IVA %(rate)s %% (%(country)s)"
+
+#: platform.py
+#, python-format
+msgid "Not subject to VAT - %(country)s"
+msgstr "No sujeta a IVA - %(country)s"
+
+#: models.py
+msgid "ERPlora invoice"
+msgstr "Factura de ERPlora"
+
+#: models.py
+msgid "document language"
+msgstr "idioma del documento"
+
+#: services.py
+#, python-format
+msgid ""
+"The invoice this credit note rectifies (%(number)s) was never issued here: "
+"it has to arrive first."
+msgstr ""
+"La factura que rectifica este abono (%(number)s) nunca se emitió aquí: tiene "
+"que llegar antes."
+
+#: queries.py
+msgid "This ERPlora invoice was never issued here."
+msgstr "Esta factura de ERPlora nunca se emitió aquí."
+
+#: queries.py
+msgid "The platform hub has no issuer: run create_platform_hub."
+msgstr "El hub de plataforma no tiene emisor: ejecuta create_platform_hub."
+
+#: queries.py
+msgid "VeriFactu does not answer in the platform hub."
+msgstr "VeriFactu no responde en el hub de plataforma."

@@ -14,6 +14,8 @@
 The clock is the Hub's time zone (Madrid in phase 1): ``FechaHoraHusoGenRegistro`` carries its offset.
 """
 
+import base64
+import binascii
 import copy
 import datetime as dt
 import hashlib
@@ -23,13 +25,24 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict
+from live.errors import Conflict, InvalidPayload
 from live.operations import get as get_operation
 from live.operations import operation
 from live.outbox import record_event
 
 from apps.invoice.models import Invoice
-from apps.verifactu import aeat, chain, envelope, events, gateway, producer, xsd
+from base import operations as platform
+from apps.verifactu import (
+    aeat,
+    certificates,
+    chain,
+    envelope,
+    events,
+    gateway,
+    producer,
+    representation,
+    xsd,
+)
 from apps.verifactu.envelope import AltaData, AnulacionData, ChainLink, InvoiceRef
 from apps.verifactu.models import (
     AeatRecord,
@@ -37,6 +50,7 @@ from apps.verifactu.models import (
     Config,
     Environment,
     Event,
+    OwnCertificate,
     Record,
     SendControl,
     backoff,
@@ -50,12 +64,17 @@ from apps.verifactu.queries import (
     chain_out,
     config_out,
     config_row,
+    effective_environment,
     find_invoice,
     find_record,
     issuer_configured,
     issuer_identity,
+    own_certificate,
+    own_certificate_material,
     production_open,
     route_problem,
+    saas_unreachable,
+    sending_problem,
     summary,
     system_for,
     wait,
@@ -63,6 +82,7 @@ from apps.verifactu.queries import (
 from apps.verifactu.schemas import (
     AeatQueryIn,
     AeatQueryOut,
+    CertificateUploadIn,
     ChainValidateIn,
     ChainValidationOut,
     ConfigOut,
@@ -76,10 +96,13 @@ from apps.verifactu.schemas import (
     RecordCorrectIn,
     RecordCreateIn,
     RecordCreateOut,
+    RecordReconcileIn,
     RecordSummaryOut,
     RecordTransmitIn,
+    ReconcileOut,
     RecoverFromAeatIn,
     RecoverManualIn,
+    RepresentationSubmitIn,
     RecoveryOut,
     TestInvoiceOut,
     TransmitOut,
@@ -122,7 +145,7 @@ NOTHING_TO_RECOVER = _(
 )
 TESTING_ONLY = _("The test invoice is only for the test environment.")
 NO_OWN_CERTIFICATE = _(
-    "There is no certificate loaded: upload it in your ERPlora account to use it."
+    "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
 )
 REPRESENTATION_NOT_APPROVED = _(
     "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
@@ -131,13 +154,57 @@ PRODUCTION_CLOSED = _(
     "Going live is not open on this server yet: ERPlora opens it when the real submission is ready."
 )
 ISSUER_MISSING = _("Set up the issuer first in Invoicing → Issuer.")
+LIVE_OPTION_UNPAID = _(
+    "The live option of VeriFactu is not in your plan: add it in your ERPlora account."
+)
+HUB_NOT_ACTIVE = _(
+    "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
+)
 PRODUCTION_HAS_RECORDS = _(
     "It cannot go back to testing: this business already has records in production."
 )
+CERTIFICATE_STORAGE_UNAVAILABLE = _(
+    "This server cannot keep certificates yet: ERPlora has to set its storage key."
+)
+CERTIFICATE_HOLDER_MISMATCH = _(
+    "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
+)
+CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one.")
+OWN_CERTIFICATE_UNREADABLE = _(
+    "Your own certificate cannot be opened on this server: upload it again in VeriFactu → Configuration → My "
+    "certificate."
+)
+GATEWAY_UNAVAILABLE = _(
+    "ERPlora's sending gateway is not configured on this server: nothing could reach the AEAT."
+)
+GO_LIVE_FORBIDDEN = _(
+    "A demo business cannot go live: it always files in the AEAT's test environment."
+)
+PLATFORM_FIXED = _(
+    "ERPlora's own business files in the AEAT environment of its server: its environment cannot be switched."
+)
+PLATFORM_ONLY = _("Only ERPlora's own business follows the environment of its server.")
+NO_WAY_TO_THE_AEAT = _(
+    "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
+    "VeriFactu → Settings and try again."
+)
+#: Why a certificate cannot present to the AEAT (``certificates.CertificateInvalid.code``), in the reader's language.
+CERTIFICATE_REFUSALS = {
+    "unopenable": _(
+        "The file is not a .p12/.pfx certificate that this password opens."
+    ),
+    "incomplete": _("The file does not hold a certificate and its private key."),
+    "no_client_auth": _(
+        "The certificate does not allow client authentication, so it cannot connect to the AEAT."
+    ),
+}
 #: Line of the test invoice (VERIFACTU-F11): a fiscal document's text, in the AEAT's language.
 TEST_LINE = "Prueba VeriFactu"
 
 CONFIGURE = "verifactu.configure"
+#: The wait of a record the gateway refused (409/413/422): it would be refused again as it is, so it never goes
+#: out on a timer, only after a change (``_back_in_the_queue``) or by hand (``verifactu.record.transmit``).
+GATEWAY_REFUSAL = "refused"
 TRANSMIT = "verifactu.transmit_record"
 CORRECT = "verifactu.correct_record"
 CENT = Decimal(1)
@@ -365,13 +432,6 @@ def _build_xml(record: Record, system: producer.SystemInfo) -> None:
     record.xml_built_at = timezone.now()
 
 
-def _provisional_system(ctx: OperationContext) -> producer.SystemInfo:
-    """A ``SistemaInformatico`` only to validate a record sealed before the account's facts; never sent."""
-    return producer.system_info(
-        version=producer.running_version(), installation=ctx.scope.key, multiple_taxpayers="N"
-    )
-
-
 def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
     """Chain ``record`` (its figures set) in its chain: number, previous link, fingerprint, QR and XML."""
     head = _lock_chain(record.issuer_nif, record.environment)
@@ -415,19 +475,9 @@ def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
         total_amount=total,
         environment=record.environment,
     )
-    system = system_for(config, ctx)
     try:
-        if system is not None:
-            _build_xml(record, system)
-        else:
-            # Always validated when sealed: a record the schema refuses could never leave and would stop its
-            # chain. Until the account says IndicadorMultiplesOT, a provisional SistemaInformatico serves only
-            # to validate (its value does not change validity); nothing of it is kept: the XML waits.
-            xsd.validate_record(
-                _xml_of(record, _provisional_system(ctx)),
-                obligado_name=record.issuer_name,
-                obligado_nif=record.issuer_nif,
-            )
+        # Built and validated when sealed: a record the schema refuses could never leave and would stop its chain.
+        _build_xml(record, system_for(ctx))
     except (xsd.SchemaError, envelope.UndeclarableRecord) as error:
         raise Conflict(
             str(INVALID_RECORD) % {"detail": str(error)},
@@ -487,6 +537,20 @@ def _rechazo_previo(corrects: Record) -> str:
     return "S" if corrects.status == Record.Status.REJECTED else "N"
 
 
+def _refuse_without_a_way(config: Config, environment: str) -> None:
+    """In production nothing is sealed that can never reach the AEAT (working-rules §15; the old Hub's
+    ``enforce_fiscal_road``, HUB-1935): 409 with the route's own code, inside the transaction of the sale or
+    invoice, so the document is undone and the series gives its number back. Testing never refuses."""
+    if environment != Environment.PRODUCTION:
+        return
+    problem = route_problem(config, environment)
+    if problem:
+        raise Conflict(
+            str(NO_WAY_TO_THE_AEAT) % {"why": wait_reason_text(problem)},
+            code=f"verifactu.{problem}",
+        )
+
+
 def _seal_alta(
     ctx: OperationContext,
     config: Config,
@@ -494,8 +558,10 @@ def _seal_alta(
     *,
     environment: str,
     corrects: Record | None = None,
+    refuse_without_a_way: bool = False,
 ) -> tuple[Record, bool]:
-    """The registration of ``invoice`` (or its correction of ``corrects``); ``(record, already)``."""
+    """The registration of ``invoice`` (or its correction of ``corrects``); ``(record, already)``. With
+    ``refuse_without_a_way``, a new registration in production needs the way to the AEAT."""
     if corrects is None:
         existing = Record.objects.filter(
             invoice=invoice,
@@ -505,6 +571,8 @@ def _seal_alta(
         ).first()
         if existing is not None:
             return existing, True
+    if refuse_without_a_way:
+        _refuse_without_a_way(config, environment)
     if (
         invoice.invoice_type in ("F1", "F3", "R1", "R2", "R3", "R4")
         and not invoice.customer_tax_id.strip()
@@ -549,14 +617,24 @@ def _seal_alta(
     ai={
         "description": "Seal the VeriFactu registration record of an issued invoice (by its id or its number): it is "
         "chained with its fingerprint, gets its QR and waits in the queue to go to the AEAT. It also happens by itself "
-        "when an invoice is issued; asking again answers the same record.",
+        "when an invoice is issued; asking again answers the same record. In production it is refused while the "
+        "business has no way to the AEAT (the route's own code), so the sale or invoice is not issued.",
         "risk": "normal",
     },
 )
 def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOut:
     invoice = find_invoice(data.invoice_id, data.number)
     config = _config(lock=False)
-    record, already = _seal_alta(ctx, config, invoice, environment=config.environment)
+    # A person (or an API key) issuing now is refused without a way to the AEAT; the platform's reaction to a
+    # document already issued is not: its record is sealed and waits, as the old Hub let the relay deliver a chain
+    # already open, rather than the document going undeclared.
+    record, already = _seal_alta(
+        ctx,
+        config,
+        invoice,
+        environment=effective_environment(ctx, config),
+        refuse_without_a_way=ctx.actor != "system",
+    )
     return RecordCreateOut(record=summary(record), already=already)
 
 
@@ -675,6 +753,15 @@ def _unsent(issuer_nif: str | None = None, environment: str | None = None):
     return queryset
 
 
+def _back_in_the_queue(records=None) -> None:
+    """What the gateway refused goes out with the next pass: a change that may cure it (the route, the own
+    certificate, a new photo of the account) or a person's «Retry»."""
+    records = _unsent() if records is None else records
+    records.filter(wait_reason=GATEWAY_REFUSAL).update(
+        wait_reason="", wait_detail="", next_attempt_at=timezone.now()
+    )
+
+
 def _failed(
     ctx,
     batch,
@@ -786,7 +873,13 @@ def _send_chain(
     strict: bool,
 ) -> None:
     now = timezone.now()
-    problem = route_problem(config, environment)
+    problem = sending_problem(config, environment)
+    certificate = None
+    if not problem:
+        try:
+            certificate = own_certificate_material(config)
+        except certificates.CertificateUnreadable:
+            problem = "own_certificate_unreadable"
     if problem:
         if strict:
             raise Conflict(
@@ -821,6 +914,19 @@ def _send_chain(
         .select_for_update()
         .order_by("sequence")[: envelope.MAX_RECORDS]
     )
+    if batch and not force and batch[0].wait_reason == GATEWAY_REFUSAL:
+        # The gateway would refuse it again as it is: it waits for a change or a person, never on a timer. What was
+        # sealed behind it waits for the same reason, and says so.
+        tally.because(GATEWAY_REFUSAL, batch[0].wait_detail)
+        tally.waiting += len(batch)
+        _mark(
+            ctx,
+            _unsent(issuer_nif, environment),
+            GATEWAY_REFUSAL,
+            batch[0].wait_detail,
+            tally,
+        )
+        return
     if not batch or (not force and batch[0].next_attempt_at > now):
         tally.waiting += len(batch)
         return
@@ -871,6 +977,7 @@ def _send_chain(
         environment=environment,
         route=config.route,
         envelope=whole,
+        certificate=certificate,
     )
     transmission = uuid.uuid7()
     digest = hashlib.sha256(whole.encode("utf-8")).hexdigest()
@@ -927,8 +1034,8 @@ def _send_chain(
                 )
     elif reply.kind == gateway.REFUSED:
         detail = f"{reply.code}: {reply.message}"
-        _failed(ctx, batch, "refused", detail, now)
-        tally.because("refused", detail)
+        _failed(ctx, batch, GATEWAY_REFUSAL, detail, now)
+        tally.because(GATEWAY_REFUSAL, detail)
         tally.waiting += len(batch)
     elif reply.kind == gateway.UNKNOWN:
         _failed(ctx, batch, "unknown", reply.message, now, status=Record.Status.SENT)
@@ -978,7 +1085,7 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
     strict = only is not None
     scope = _unsent(only.issuer_nif, only.environment) if strict else _unsent()
     for code in blockers(config, only.environment if strict else config.environment):
-        if code in ("gateway_unavailable", "producer_facts_missing"):
+        if code == "gateway_unavailable":
             if strict:
                 raise Conflict(
                     str(CANNOT_SEND) % {"why": wait_reason_text(code)},
@@ -988,7 +1095,7 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
             tally.waiting = scope.count()
             _mark(ctx, scope, code, "", tally)
             return tally
-    system = system_for(config, ctx)
+    system = system_for(ctx)
     keys = list(scope.order_by().values_list("issuer_nif", "environment").distinct())
     for issuer_nif, environment in sorted(keys):
         _send_chain(
@@ -1070,9 +1177,11 @@ def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSumma
     if record.status not in Record.UNSENT:
         raise Conflict(str(NOT_IN_QUEUE), code="verifactu.not_in_queue")
     now = timezone.now()
-    _unsent(record.issuer_nif, record.environment).filter(
+    earlier = _unsent(record.issuer_nif, record.environment).filter(
         sequence__lte=record.sequence
-    ).update(next_attempt_at=now)
+    )
+    _back_in_the_queue(earlier)
+    earlier.update(next_attempt_at=now)
     _event(
         ctx,
         Event.Kind.QUEUE_RETRIED,
@@ -1084,6 +1193,65 @@ def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSumma
     record_event(ctx, events.CONTINGENCY_RETRIED, {"record_id": str(record.id)})
     record.refresh_from_db()
     return summary(record)
+
+
+@operation(
+    "verifactu.record.reconcile",
+    kind="command",
+    permission=TRANSMIT,
+    input=RecordReconcileIn,
+    output=ReconcileOut,
+    ai={
+        "description": "Ask the AEAT, through ERPlora's gateway, whether it already holds a record of the VeriFactu "
+        "queue (by its id or its invoice's number; typically one sent without an answer). Only when it holds that very "
+        "record (same fingerprint) does it leave the queue as registered; otherwise nothing changes and it is sent "
+        "again. Nothing the AEAT does not hold ever leaves the queue.",
+        "risk": "high",
+    },
+)
+def reconcile_record(ctx: OperationContext, data: RecordReconcileIn) -> ReconcileOut:
+    found = find_record(data.record_id, data.invoice_number)
+    if found.status not in Record.UNSENT:
+        raise Conflict(str(NOT_IN_QUEUE), code="verifactu.not_in_queue")
+    config = _config(lock=False)
+    # The AEAT files a record under the period of its invoice's issue date; it is asked before the row is locked,
+    # so a pass of the queue never waits on the gateway.
+    held = aeat.held_as(
+        _query_aeat(
+            ctx,
+            config,
+            found.issuer_nif,
+            found.environment,
+            found.issue_date.year,
+            found.issue_date.month,
+        ),
+        found.issuer_nif,
+        found.invoice_number,
+        found.fingerprint,
+    )
+    record = find_record(found.id, None, lock=True)
+    if held is None or record.status not in Record.UNSENT:
+        return ReconcileOut(held=False, record=summary(record))
+    record.status = held
+    record.wait_reason = record.wait_detail = ""
+    record.save(update_fields=["status", "wait_reason", "wait_detail", "updated_at"])
+    notice = {
+        "record_id": str(record.id),
+        "invoice_number": record.invoice_number,
+        "status": held,
+        "environment": record.environment,
+    }
+    _event(
+        ctx,
+        held,
+        "record_reconciled",
+        notice,
+        severity="warning" if held == Record.Status.ACCEPTED_WITH_ERRORS else "info",
+        record=record,
+        environment=record.environment,
+    )
+    record_event(ctx, events.RECORD_RECONCILED, notice)
+    return ReconcileOut(held=True, record=summary(record))
 
 
 # ── The chain ───────────────────────────────────────────────────────────────────────────────────
@@ -1274,6 +1442,7 @@ def _query_page(
     month: int,
     represented: bool,
     after: InvoiceRef | None,
+    certificate: gateway.Certificate | None,
 ) -> aeat.QueryPage:
     """One page of the AEAT's records of ``nif`` in a month (after ``after``), asked through the gateway."""
     try:
@@ -1297,6 +1466,7 @@ def _query_page(
         environment=environment,
         route=config.route,
         envelope=body,
+        certificate=certificate,
     )
     if reply.kind != gateway.ANSWERED:
         raise Conflict(
@@ -1325,6 +1495,13 @@ def _query_aeat(
             str(CANNOT_SEND) % {"why": wait_reason_text("gateway_unavailable")},
             code="verifactu.gateway_unavailable",
         )
+    try:
+        certificate = own_certificate_material(config)
+    except certificates.CertificateUnreadable:
+        raise Conflict(
+            str(CANNOT_SEND) % {"why": wait_reason_text("own_certificate_unreadable")},
+            code="verifactu.own_certificate_unreadable",
+        ) from None
     latest_name = (
         Record.objects.filter(issuer_nif=nif)
         .order_by("-created_at")
@@ -1339,7 +1516,9 @@ def _query_aeat(
     records: list[aeat.QueriedRecord] = []
     after = None
     for _page in range(MAX_QUERY_PAGES):
-        page = _query_page(ctx, config, nif, name, environment, year, month, represented, after)
+        page = _query_page(
+            ctx, config, nif, name, environment, year, month, represented, after, certificate
+        )
         records.extend(page.records)
         if not page.more:
             break
@@ -1493,25 +1672,31 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     config = config_row()
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment)
-    gateway_ready, gateway_detail = None, ""
-    if gateway.configured():
+    gateway_ready, gateway_detail, refusal = None, "", ""
+    if gateway.configured() and "own_certificate_unreadable" not in codes:
         reply = gateway.probe(
             hub=ctx.scope.key,
             nif=nif,
             environment=config.environment,
             route=config.route,
+            certificate=own_certificate_material(config),
         )
         gateway_ready = reply.kind == gateway.ANSWERED and reply.ready
         gateway_detail = reply.message or reply.code
+        # A refusal is kept as a record keeps it, so a known one is told in the reader's language.
+        refusal = (
+            f"{reply.code}: {reply.message}"
+            if reply.kind == gateway.REFUSED
+            else gateway_detail
+        )
         if not gateway_ready:
             codes.append("refused")
-    details = {"refused": gateway_detail}
+    details = {"refused": refusal}
     result = {
         "ran_at": timezone.now(),
         "environment": config.environment,
         "route": config.route,
         "issuer_ready": issuer_configured(),
-        "producer_ready": "producer_facts_missing" not in codes,
         "route_ready": not route_problem(config, config.environment),
         "gateway_configured": gateway.configured(),
         "gateway_ready": gateway_ready,
@@ -1564,7 +1749,8 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
 )
 def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
     config = _config(lock=False)
-    if config.environment != Environment.TESTING:
+    environment = effective_environment(ctx, config)
+    if environment != Environment.TESTING:
         raise Conflict(str(TESTING_ONLY), code="verifactu.testing_only")
     issue = get_operation("invoice.invoice.create")
     invoice_out = issue(
@@ -1584,7 +1770,7 @@ def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
         ),
     )
     invoice = find_invoice(invoice_out.id, None)
-    record, _already = _seal_alta(ctx, config, invoice, environment=config.environment)
+    record, _already = _seal_alta(ctx, config, invoice, environment=environment)
     return TestInvoiceOut(
         invoice_id=invoice.id, number=invoice.number, record=summary(record)
     )
@@ -1609,17 +1795,26 @@ def _changed(
 
 
 def _route_refusal(config: Config, route: str, environment: str) -> Conflict | None:
-    """Why ``route`` cannot file in ``environment`` (VERIFACTU-F04, F08), as the refusal to raise."""
+    """Why ``route`` cannot file in ``environment`` (VERIFACTU-F04, F08), as the refusal to raise. A closed server
+    is not the route's: ``go_live`` refuses it first, and choosing a route stays possible meanwhile."""
     probe = copy.copy(config)
     probe.route = route
     problem = route_problem(probe, environment)
     if problem == "own_certificate_missing":
         return Conflict(str(NO_OWN_CERTIFICATE), code="verifactu.no_own_certificate")
+    if problem == "own_certificate_unreadable":
+        return Conflict(
+            str(OWN_CERTIFICATE_UNREADABLE), code="verifactu.own_certificate_unreadable"
+        )
+    if problem == "gateway_unavailable":
+        return Conflict(str(GATEWAY_UNAVAILABLE), code="verifactu.gateway_unavailable")
     if problem == "representation_not_approved":
         return Conflict(
             str(REPRESENTATION_NOT_APPROVED),
             code="verifactu.representation_not_approved",
         )
+    if problem == "live_option_unpaid":
+        return Conflict(str(LIVE_OPTION_UNPAID), code="verifactu.live_option_unpaid")
     return None
 
 
@@ -1632,7 +1827,7 @@ def _route_refusal(config: Config, route: str, environment: str) -> Conflict | N
     ai={
         "description": "Choose who files the VeriFactu records: «erplora» (ERPlora files on the business's behalf with "
         "its seal; in production it needs the approved signed authorisation) or «own» (the business's own certificate, "
-        "loaded in its ERPlora account).",
+        "uploaded in VeriFactu → Configuration).",
         "risk": "high",
     },
 )
@@ -1643,6 +1838,7 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
         raise refusal
     if config.route != data.route:
         config.route = data.route
+        _back_in_the_queue()
         _changed(
             ctx,
             config,
@@ -1650,6 +1846,12 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
             fields=["route"],
         )
     return config_out(config, ctx)
+
+
+def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
+    """ERPlora's own hub files where its deployment does (``queries.effective_environment``): no switch moves it."""
+    if platform.is_platform_hub(ctx.scope):
+        raise Conflict(str(PLATFORM_FIXED), code="verifactu.platform_fixed")
 
 
 @operation(
@@ -1660,22 +1862,28 @@ def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     output=ConfigOut,
     ai={
         "description": "Go live: from now on every VeriFactu record goes to the real AEAT. It needs the server opened for "
-        "it by ERPlora, Invoicing's issuer and a route ready for production; it cannot go back once a production "
-        "record is sealed.",
+        "it by ERPlora, a business that is not a demo, Invoicing's issuer, a route ready for production (the own valid certificate, or ERPlora's "
+        "approved signed authorisation with the live option in the plan) and an active ERPlora account; it cannot "
+        "go back once a production record is sealed.",
         "risk": "high",
     },
 )
 def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    _refuse_on_the_platform_hub(ctx)
     config = _config()
     if config.environment == Environment.PRODUCTION:
         return config_out(config, ctx)
     if not production_open():
         raise Conflict(str(PRODUCTION_CLOSED), code="verifactu.production_closed")
+    if platform.is_demo_hub(ctx.scope):
+        raise Conflict(str(GO_LIVE_FORBIDDEN), code="verifactu.go_live_forbidden")
     if not issuer_configured():
         raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
     refusal = _route_refusal(config, config.route, Environment.PRODUCTION)
     if refusal is not None:
         raise refusal
+    if config.hub_status != Config.HubStatus.ACTIVE:
+        raise Conflict(str(HUB_NOT_ACTIVE), code="verifactu.hub_not_active")
     config.environment = Environment.PRODUCTION
     config.production_since = timezone.now()
     _changed(ctx, config, "went_live", fields=["environment"])
@@ -1694,6 +1902,7 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
     },
 )
 def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    _refuse_on_the_platform_hub(ctx)
     config = _config()
     if config.environment == Environment.TESTING:
         return config_out(config, ctx)
@@ -1707,6 +1916,105 @@ def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
     return config_out(config, ctx)
 
 
+def _certificate_event(ctx, key: str, row: OwnCertificate) -> None:
+    _event(
+        ctx,
+        Event.Kind.CONFIG_CHANGED,
+        key,
+        {
+            "holder": row.holder,
+            "holder_tax_id": row.holder_tax_id,
+            "expires_on": timezone.localtime(row.expires_at).date().isoformat(),
+        },
+        environment=config_row().environment,
+    )
+    record_event(ctx, events.CONFIG_CHANGED, {"fields": ["own_certificate"]})
+
+
+@operation(
+    "verifactu.certificate.upload",
+    kind="command",
+    permission=CONFIGURE,
+    input=CertificateUploadIn,
+    output=ConfigOut,
+    ai={
+        "description": "Upload the business's own certificate (.p12/.pfx in base64, with its password) to file its "
+        "VeriFactu records with it (the «own» route). It must belong to Invoicing's issuer, allow client "
+        "authentication and be in force; it replaces the one uploaded before and is kept encrypted, never shown again.",
+        "risk": "high",
+    },
+)
+def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> ConfigOut:
+    if not certificates.storage_available():
+        raise Conflict(
+            str(CERTIFICATE_STORAGE_UNAVAILABLE),
+            code="verifactu.certificate_storage_unavailable",
+        )
+    if not issuer_configured():
+        raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
+    try:
+        p12 = base64.b64decode(
+            "".join(data.p12_base64.get_secret_value().split()), validate=True
+        )
+    except (binascii.Error, ValueError):
+        p12 = b""
+    password = data.password.get_secret_value()
+    try:
+        facts = certificates.inspect(p12, password)
+    except certificates.CertificateInvalid as invalid:
+        raise Conflict(
+            str(CERTIFICATE_REFUSALS[invalid.code]), code="verifactu.certificate_invalid"
+        ) from None
+    if facts.expires_at <= timezone.now():
+        raise Conflict(
+            str(CERTIFICATE_EXPIRED)
+            % {"date": timezone.localtime(facts.expires_at).date().isoformat()},
+            code="verifactu.certificate_invalid",
+        )
+    issuer = issuer_identity()[0].strip().upper()
+    if facts.holder_tax_id != issuer:
+        raise Conflict(
+            str(CERTIFICATE_HOLDER_MISMATCH)
+            % {"holder": facts.holder_tax_id or facts.holder, "issuer": issuer},
+            code="verifactu.certificate_holder_mismatch",
+        )
+    row, _created = OwnCertificate.objects.update_or_create(
+        singleton=True,
+        defaults={
+            "holder": facts.holder[:200],
+            "holder_tax_id": facts.holder_tax_id,
+            "kind": facts.kind,
+            "expires_at": facts.expires_at,
+            "uploaded_at": timezone.now(),
+            "uploaded_by": _actor(ctx),
+            "sealed_blob": certificates.seal(p12, password),
+        },
+    )
+    _back_in_the_queue()
+    _certificate_event(ctx, "certificate_uploaded", row)
+    return config_out(config_row(), ctx)
+
+
+@operation(
+    "verifactu.certificate.remove",
+    kind="command",
+    permission=CONFIGURE,
+    input=NoInput,
+    output=ConfigOut,
+    ai={
+        "description": "Remove the business's own certificate from this Hub. With the «own» route, records wait in the "
+        "queue until another certificate is uploaded or ERPlora files for the business.",
+        "risk": "high",
+    },
+)
+def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    row = own_certificate()
+    if row is not None:
+        OwnCertificate.objects.filter(pk=row.pk).delete()
+        _certificate_event(ctx, "certificate_removed", row)
+    return config_out(config_row(), ctx)
+
+
 @operation(
     "verifactu.config.sync",
     kind="command",
@@ -1714,9 +2022,9 @@ def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
     input=ConfigSyncIn,
     output=ConfigSyncOut,
     ai={
-        "description": "System only: the platform hands over the ERPlora account's VeriFactu block (whether it serves "
-        "several taxpayers, the own certificate's and the signed authorisation's state) with its version; an equal or "
-        "older version is ignored.",
+        "description": "System only: the platform hands over the ERPlora account's VeriFactu block (the signed "
+        "authorisation's state, whether the plan includes the live option, the business's status) with its version; "
+        "an equal or older version is ignored.",
         "risk": "high",
     },
 )
@@ -1724,20 +2032,239 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
     config = _config()
     if config.synced_version is not None and data.version <= config.synced_version:
         return ConfigSyncOut(applied=False, version=config.synced_version)
-    if data.multiple_taxpayers is not None:
-        config.multiple_taxpayers = data.multiple_taxpayers
-    if data.own_certificate is not None:
-        config.own_certificate_loaded = data.own_certificate.loaded
-        config.own_certificate_holder = data.own_certificate.holder
-        config.own_certificate_uploaded_at = data.own_certificate.uploaded_at
-        config.own_certificate_expires_at = data.own_certificate.expires_at
+    if data.hub_id is not None:
+        config.hub_id = data.hub_id
     if data.representation is not None:
+        if data.representation.status != config.representation_status:
+            _representation_step(ctx, config, data.representation)
         config.representation_status = data.representation.status
         config.representation_updated_at = data.representation.updated_at
         config.representation_reason = data.representation.reason
+    if data.live_paid is not None:
+        config.live_paid = data.live_paid
+    if data.hub_status is not None:
+        config.hub_status = data.hub_status
     config.synced_version = data.version
     config.synced_at = timezone.now()
+    _back_in_the_queue()
     _changed(
         ctx, config, "account_synced", {"version": data.version}, fields=["account"]
     )
     return ConfigSyncOut(applied=True, version=data.version)
+
+
+# ── ERPlora's own hub (PLAN-SAAS §4) ───────────────────────────────────────────────────────────────────────────
+
+
+@operation(
+    "verifactu.config.follow_deployment",
+    kind="command",
+    # Declared by no role: only the system holds it (``manage.py create_platform_hub``).
+    permission="verifactu.follow_deployment",
+    input=NoInput,
+    output=ConfigOut,
+    ai={
+        "description": "System only: ERPlora's own business takes the AEAT environment of its server (prod: production; "
+        "pre: testing), the one its records file in anyway; refused for any other business.",
+        "risk": "high",
+    },
+)
+def follow_deployment(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    if not platform.is_platform_hub(ctx.scope):
+        raise Conflict(str(PLATFORM_ONLY), code="verifactu.platform_only")
+    config = _config()
+    environment = effective_environment(ctx, config)
+    if config.environment == environment:
+        return config_out(config, ctx)
+    if environment == Environment.TESTING and Record.objects.filter(
+        environment=Environment.PRODUCTION
+    ).exists():
+        raise Conflict(
+            str(PRODUCTION_HAS_RECORDS), code="verifactu.production_has_records"
+        )
+    config.environment = environment
+    went_live = environment == Environment.PRODUCTION
+    config.production_since = timezone.now() if went_live else None
+    _changed(
+        ctx,
+        config,
+        "went_live" if went_live else "back_to_testing",
+        fields=["environment"],
+    )
+    return config_out(config, ctx)
+
+
+# ── The signed authorisation (VERIFACTU-F05, F06) ───────────────────────────────────────────────
+
+SIGNER_REQUIRED = _("Fill in the name and ID number of the person signing.")
+SIGNED_MODEL_REQUIRED = _("Attach the signed form.")
+SIGNED_MODEL_NOT_PDF = _(
+    "The signed form has to be a PDF: scan it or sign it with AutoFirma."
+)
+ID_COPY_REQUIRED = _("Attach a copy of the identity document.")
+SIGNATURE_SAMPLE_REQUIRED = _(
+    "With a NIE we also need a sample of the handwritten signature."
+)
+REPRESENTATION_PROOF_REQUIRED = _(
+    "Attach the document that proves you may sign for the company."
+)
+DOCUMENT_TOO_LARGE = _("Each file has to be 5 MB at most.")
+DOCUMENT_NOT_PDF = _("Each file has to be a PDF.")
+REPRESENTATION_INCOMPLETE = _("The authorisation cannot be sent as it is.")
+REPRESENTATION_REFUSED = _("ERPlora did not take the authorisation as it is.")
+HUB_UNREGISTERED = _(
+    "ERPlora has not linked this business yet. Try again in a few minutes."
+)
+#: The documents in the order the SaaS checks them: (this input's field, the contract's name).
+REPRESENTATION_DOCUMENTS = (
+    ("signed_model_base64", "signed_model"),
+    ("id_copy_base64", "id_copy"),
+    ("signature_sample_base64", "signature_sample"),
+    ("representation_proof_base64", "representation_proof"),
+)
+
+
+def _representation_step(ctx: OperationContext, config: Config, data) -> None:
+    """Leave in the audit trail the authorisation's new state, as the photo says it."""
+    at = data.updated_at or timezone.now()
+    key = (
+        "representation_under_review"
+        if data.status == Config.Representation.SUBMITTED
+        else f"representation_{data.status}"
+    )
+    _event(
+        ctx,
+        Event.Kind.CONFIG_CHANGED,
+        key,
+        {"at": at, "note": data.reason},
+        environment=config.environment,
+    )
+
+
+def _representation_payload(
+    data: RepresentationSubmitIn, taxpayer_tax_id: str, taxpayer_name: str
+) -> dict:
+    """The contract's body, or ``InvalidPayload`` naming every broken rule with the first one's code: the SaaS's
+    own rules and codes (the old Hub's ``validate``), checked before anything crosses the network."""
+    problems: list[tuple[str, str, str]] = []
+    company = representation.is_legal_person_nif(taxpayer_tax_id)
+    signer_tax_id = representation.normalise_nif(data.signer_tax_id)
+    signer_name = data.signer_name
+    if not company and not signer_tax_id and not signer_name:
+        # A self-employed business signs itself: its signer is the taxpayer, not a second person.
+        signer_tax_id = representation.normalise_nif(taxpayer_tax_id)
+        signer_name = taxpayer_name
+    if not signer_tax_id:
+        problems.append(("signer_tax_id", "fiscal.signer_required", SIGNER_REQUIRED))
+    if not signer_name:
+        problems.append(("signer_name", "fiscal.signer_required", SIGNER_REQUIRED))
+    required = {
+        "signed_model": ("fiscal.signed_model_required", SIGNED_MODEL_REQUIRED),
+        "id_copy": ("fiscal.id_copy_required", ID_COPY_REQUIRED),
+    }
+    if data.signer_document_type == "nie":
+        # Many foreign identity documents carry no printed signature to compare against.
+        required["signature_sample"] = (
+            "fiscal.signature_sample_required",
+            SIGNATURE_SAMPLE_REQUIRED,
+        )
+    if company:
+        # A company signs through whoever its deeds name: the model's note (2).
+        required["representation_proof"] = (
+            "fiscal.representation_proof_required",
+            REPRESENTATION_PROOF_REQUIRED,
+        )
+    documents: dict[str, str | None] = {}
+    for field, name in REPRESENTATION_DOCUMENTS:
+        value = getattr(data, field).get_secret_value().strip()
+        documents[name] = None
+        if not value:
+            if name in required:
+                problems.append((field, *required[name]))
+            continue
+        problem = representation.document_problem(value)
+        if problem == "too_large":
+            problems.append((field, "fiscal.document_too_large", DOCUMENT_TOO_LARGE))
+        elif problem == "not_pdf" and name == "signed_model":
+            problems.append((field, "fiscal.signed_model_not_pdf", SIGNED_MODEL_NOT_PDF))
+        elif problem == "not_pdf":
+            problems.append((field, "fiscal.document_not_pdf", DOCUMENT_NOT_PDF))
+        else:
+            documents[name] = value
+    if problems:
+        raise InvalidPayload(
+            str(REPRESENTATION_INCOMPLETE),
+            code=problems[0][1],
+            fields={field: str(message) for field, _code, message in problems},
+        )
+    return {
+        "taxpayer_tax_id": taxpayer_tax_id,
+        "taxpayer_name": taxpayer_name,
+        "signer_tax_id": signer_tax_id,
+        "signer_name": signer_name,
+        "signer_document_type": data.signer_document_type,
+        "documents": documents,
+    }
+
+
+@operation(
+    "verifactu.representation.submit",
+    kind="command",
+    permission=CONFIGURE,
+    input=RepresentationSubmitIn,
+    output=ConfigOut,
+    ai={
+        "description": "Send the signed representation authorisation (Anexo I of the AEAT's Convenio 17) for ERPlora "
+        "to file on the business's behalf: the signed model and a copy of the signer's identity document, plus a "
+        "signature sample with a NIE and the proof of representation for a company, each a PDF of 5 MB at most. "
+        "A person at ERPlora reviews it; until then it is under review. This Hub keeps none of the documents.",
+        "risk": "high",
+    },
+)
+def submit_representation(
+    ctx: OperationContext, data: RepresentationSubmitIn
+) -> ConfigOut:
+    hub_id = config_row().hub_id
+    if hub_id is None:
+        raise Conflict(str(HUB_UNREGISTERED), code="verifactu.hub_unregistered")
+    if not issuer_configured():
+        raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
+    payload = _representation_payload(data, *issuer_identity())
+    try:
+        result = representation.submit(
+            hub_id, payload, language=ctx.language or "en"
+        )
+    except representation.RepresentationRefused as refused:
+        raise InvalidPayload(
+            refused.message or str(REPRESENTATION_REFUSED),
+            code=refused.code,
+            fields=refused.fields or None,
+        ) from None
+    except representation.HubUnknown:
+        raise Conflict(
+            str(HUB_UNREGISTERED), code="verifactu.hub_unregistered"
+        ) from None
+    except representation.SaasUnreachable:
+        raise saas_unreachable() from None
+    # Locked only now: nothing is held while the documents travel.
+    config = _config()
+    submitted_at = result.submitted_at or timezone.now()
+    if config.representation_status != Config.Representation.APPROVED:
+        # The account's photo says it too; until then the Hub knows it is under review. An approved one stays in
+        # force (and keeps filing) until a person approves the new one.
+        config.representation_status = Config.Representation.SUBMITTED
+        config.representation_updated_at = submitted_at
+        config.representation_reason = ""
+    _changed(
+        ctx,
+        config,
+        "representation_submitted",
+        {
+            "version": result.version,
+            "submitted_at": submitted_at,
+            "document_type": data.signer_document_type,
+            "documents": [name for name, value in payload["documents"].items() if value],
+        },
+        fields=["representation"],
+    )
+    return config_out(config, ctx)

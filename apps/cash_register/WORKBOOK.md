@@ -138,7 +138,7 @@ ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar lo
 | CASH_REGISTER-F07 | Contar a ciegas: quién ve el efectivo esperado | común | hecho |
 | CASH_REGISTER-F08 | Revisar lo que queda pendiente antes de cerrar | común | parcial |
 | CASH_REGISTER-F09 | Cerrar el turno: esperado, contado y diferencia | común | hecho |
-| CASH_REGISTER-F10 | Cerrar sola la caja olvidada al final del día | común | parcial |
+| CASH_REGISTER-F10 | Cerrar sola la caja olvidada al final del día | común | hecho |
 | CASH_REGISTER-F11 | Consultar una sesión y revisar un descuadre | común | hecho |
 | CASH_REGISTER-F12 | Ver la caja en los paneles del inicio | común | no hecho: inicio del Hub |
 | CASH_REGISTER-F13 | Anotar en la caja cada cobro de una venta | común | hecho |
@@ -341,8 +341,8 @@ error: se abre otra con el efectivo real como fondo.
 Implicados: CASH_REGISTER-F06, F08
 
 ### CASH_REGISTER-F10 Cerrar sola la caja olvidada al final del día
-Estado: parcial — el cierre existe y se aplica al abrir la siguiente sesión; el pase cada 5 minutos lo
-hará el worker cuando ejecute las tareas programadas (fase 2)
+Estado: hecho — el cierre se aplica al abrir la siguiente sesión y el pase cada 5 minutos lo corre el worker
+(`base/scheduler.py`, 2026-10-15; en la fase 1, sobre un solo hub, `WORKER_SCOPE_SLUG`)
 Vertical: común
 Actor: sistema
 Pantalla: ninguna
@@ -638,7 +638,8 @@ cajero del producto actual es un empleado.
 - **Cierre automático**: `cash_register.session.auto_close` cierra, si el ajuste está encendido, cada
   sesión abierta antes del último corte (hora del ajuste en la zona del negocio), con `closed_at` = el
   corte, sin recuento, `auto_closed` y sin persona; copia solo las líneas de antes del corte. Lo
-  declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`) para el worker de la fase 2, y
+  declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
+  (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
 - **Monedas**: la del negocio es la de Ventas (`EUR` en esta fase); los decimales, de `babel`; los
   billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas del producto actual).

@@ -1,8 +1,9 @@
 # Workbook — VeriFactu (app)
 Prefijo: VERIFACTU
 Alcance MVP: núcleo
-Estado de la app: servidor y páginas hechos; el envío a la AEAT espera a la pasarela del SaaS y al worker de
-la fase 2 (lo dice cada flujo en su línea `Estado:`)
+Estado de la app: servidor, páginas, envío por el worker (`base/scheduler.py`) y pasarela del SaaS
+(`fiscal_gateway/`, saas#22) hechos (bloque fiscal, 2026-10-15); sin validar todavía en `pre` contra la AEAT de
+pruebas. Lo que depende de piezas que aún no existen lo dice cada flujo en su línea `Estado:`
 
 > Manual de usuario y especificación de la app `verifactu`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -30,8 +31,8 @@ Quién la usa:
 - El **sistema**, sin nadie delante, registra cada factura en la misma operación que la emite y envía la
   cola.
 
-No emite ni rectifica facturas (eso es Facturación), no calcula impuestos (llegan decididos en la factura) y
-no guarda certificados ni claves: los guarda la cuenta de ERPlora.
+No emite ni rectifica facturas (eso es Facturación) ni calcula impuestos (llegan decididos en la factura). El
+certificado propio del negocio, si lo usa, se sube aquí y se guarda cifrado en la base de datos del hub.
 
 ## Referencia adoptada
 
@@ -66,11 +67,11 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
 - **El entorno** empieza en **pruebas** (la AEAT de pruebas): nada de lo que se emite cuenta ante Hacienda
   hasta pasar a producción (VERIFACTU-F08).
 - **La vía de envío**: o ERPlora remite en tu nombre con su sello (para producción necesita tu autorización
-  firmada, el Anexo I, aprobada por ERPlora), o remites tú con tu propio certificado. Los dos se gestionan en
-  tu cuenta de ERPlora; aquí se ve su estado y se elige cuál usar.
+  firmada, el Anexo I, aprobada por ERPlora), o remites tú con tu propio certificado. La autorización (el
+  otorgamiento de representación) se firma y se sube aquí, en «Lo remite ERPlora», y la revisa ERPlora; el
+  certificado se sube aquí, en «Mi certificado». Aquí se elige cuál usar.
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
-  responsable); el único que llega de la cuenta es «Da servicio a varios obligados». Mientras no ha llegado,
-  los registros se sellan igual y esperan para salir (VERIFACTU-F12).
+  responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
 Configuración inicial, paso a paso:
 
@@ -146,27 +147,45 @@ recuperación» / «Cancelar»). Al terminar: «Operación completada.».
 
 ### Configuración
 Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu». Dos pestañas, las dos vías:
-- **«Lo remite ERPlora»** (abre por defecto): «Otorgamiento de representación» con su estado («Sin firmar»,
-  «En revisión desde el {fecha}», «Aprobado el {fecha}», «Devuelto el {fecha}» con el motivo, «Revocado el
-  {fecha}») y «Gestionar en tu cuenta de ERPlora».
-- **«Mi certificado»**: «Certificado del negocio» con «Cargado» / «Sin cargar», «Titular», «Subido el» y
-  «Caduca el» (con el aviso «Caduca en {n} días» a 30 días o menos y «El certificado ha caducado»), y
-  «Gestionar en tu cuenta de ERPlora».
-Lo que se muestra llega de la cuenta de ERPlora; si aún no ha llegado nada, «Tu cuenta de ERPlora todavía no
-ha enviado este dato.».
+- **«Lo remite ERPlora»** (abre por defecto), como el `erp-verifactu-grant` del módulo antiguo: «Otorgamiento de
+  representación» con su estado («Sin firmar», «En revisión desde el {fecha}», «Aprobado el {fecha}», «Devuelto el
+  {fecha}» con «Nota de la revisión», «Revocado el {fecha}»); «Lo que has enviado» («Envío n.º {n}, enviado el
+  {fecha}» y los documentos: «Modelo firmado», «Copia del documento de identidad», «Muestra de firma»,
+  «Justificante de representación»); «Sus pasos» (con dos o más: cada estado que contó la cuenta, con su fecha y
+  su motivo). En revisión o aprobado, «Volver a enviar» abre el trámite con su aviso («el envío nuevo sustituye al
+  que está en revisión» / «sigues remitiendo con el actual») y «Cancelar». Sin firmar, devuelto o revocado, el
+  trámite está abierto: el texto de entrada, «Obligado tributario: {razón social} ({NIF}), el emisor de
+  Facturación.» (se lee, no se pide), «1 · Consigue el modelo oficial» con «Descargar el modelo» (el modelo en
+  blanco del SaaS) y cómo firmarlo (a mano o con AutoFirma); con una sociedad, «Representante legal» con «Nombre y
+  apellidos de quien firma» y «NIF/NIE de quien firma» (un autónomo firma él mismo y no se le pide); la
+  información básica del art. 13 RGPD **antes** de pedir ningún documento; «2 · Sube el modelo firmado» con
+  «Documento de identidad» (DNI / NIE) y los adjuntos, cada uno un PDF de 5 MB como máximo: «Adjuntar el modelo
+  firmado (PDF)», «Adjuntar copia del documento de identidad (PDF)», con NIE «Adjuntar muestra de firma (PDF)» y
+  con sociedad «Adjuntar el justificante de representación (PDF)»; «Enviar a revisión». Sin emisor en
+  Facturación o mientras la cuenta no haya vinculado el negocio, lo dice y no envía. Solo quien configura
+  VeriFactu ve el trámite. Si la cuenta aún no ha enviado nada, «Tu cuenta de ERPlora todavía no ha enviado este
+  dato.».
+- **«Mi certificado»**: «Certificado del negocio (.p12 / .pfx)» con «Cargado» / «Sin cargar», «Titular», «NIF
+  del titular», «Tipo», «Subido el» y «Caduca el» (con el aviso «Caduca en {n} días: sube aquí el renovado.» a
+  30 días o menos y «El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.»). Quien configura
+  VeriFactu ve «Elegir el fichero .p12 / .pfx», «Contraseña del certificado», «Subir el certificado» y, con uno
+  cargado, «Quitar» (pregunta antes, en una tarjeta). Nota: «El certificado y su contraseña se guardan cifrados
+  en este Hub y solo viajan a la pasarela de ERPlora al enviar a la AEAT; no se vuelven a mostrar.».
 
 ### Ajustes
 Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
 - **«Envío»**: «Usar mi propio certificado» (interruptor, con su explicación según la vía) y «Entorno AEAT» con
-  la pastilla «Pruebas (AEAT Test)» o «Producción» y, según el caso, «Pasar a producción» o «Volver a pruebas»
-  con su explicación y su confirmación.
+  la pastilla «Pruebas (AEAT Test)» o «Producción» y, según el caso, «Pasar a producción» (con «Todavía no puede
+  pasar a producción:» y lo que falta, si falta algo) o «Volver a pruebas» con su explicación y su confirmación; en
+  producción, «Las ventas y facturas nuevas se rechazan hasta que se resuelva:» y el motivo, si no hay ruta a la
+  AEAT, y «Los registros están esperando:» y por qué, si esperan.
 - **«Prueba en vivo»**: «Probar la conexión» y «Crear factura de prueba»; debajo, el resultado de la última
-  prueba («Se remite», «Entorno», «Pasarela de ERPlora», «Datos del productor», «Emisor», «Puede enviar»), o
+  prueba («Se remite», «Entorno», «Pasarela de ERPlora», «Emisor», «Puede enviar»), o
   «Aún no has ejecutado ninguna prueba.».
 - **«Declaración responsable»**: «Leer la declaración firmada», «Versión de la declaración» y los «Datos
   identificativos de este sistema» (Productor, NIF del productor, Nombre del sistema, Código del sistema,
   Versión instalada, Número de instalación, Solo VERI\*FACTU, Puede dar servicio a varios obligados, Da
-  servicio a varios obligados).
+  servicio a varios obligados: siempre «S»).
 Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde si fue bien, roja si no).
 
 ## Estados de cada pantalla
@@ -185,39 +204,40 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | ID | Flujo | Estado |
 |---|---|---|
 | VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2) |
-| VERIFACTU-F02 | Subir el certificado propio del negocio | en la cuenta de ERPlora; aquí, su estado (la foto del SaaS aún no lo manda) |
-| VERIFACTU-F03 | Quitar el certificado propio | en la cuenta de ERPlora; aquí, su estado |
+| VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
+| VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
-| VERIFACTU-F05 | Firmar y subir la autorización para que remita ERPlora | en la cuenta de ERPlora; aquí, su estado (PLAN-HUB §8: falta decidir quién la revisa) |
-| VERIFACTU-F06 | Volver a enviar la autorización | en la cuenta de ERPlora; aquí, su estado |
+| VERIFACTU-F05 | Firmar y subir el otorgamiento de representación para que remita ERPlora | hecho — se sube en el Hub, lo revisa el staff en el SaaS (`fiscal/`) y el estado vuelve en la foto (ronda §25) |
+| VERIFACTU-F06 | Volver a enviar el otorgamiento | hecho — en el Hub, como VERIFACTU-F05 |
 | VERIFACTU-F07 | Solicitar o renovar la conexión segura con ERPlora | desaparece — sin identidad por hub (ronda 5); el Hub firma cada llamada con HMAC |
-| VERIFACTU-F08 | Pasar a producción | hecho; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
+| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado válido \| vía ERPlora con otorgamiento aprobado y `live_paid`) ∧ cuenta activa; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
 | VERIFACTU-F09 | Volver a pruebas | hecho |
-| VERIFACTU-F10 | Probar la conexión con la AEAT | hecho en el Hub; la sonda de la pasarela del SaaS aún no existe |
+| VERIFACTU-F10 | Probar la conexión con la AEAT | hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Crear una factura de prueba | hecho |
 | VERIFACTU-F12 | Consultar la declaración responsable | hecho |
 | VERIFACTU-F13 | Registrar una factura emitida | hecho — Facturación lo pide por nombre dentro de su emisión; la reacción del outbox (relay de la fase 2) queda de respaldo |
 | VERIFACTU-F14 | Registrar una factura rectificativa | hecho — igual que F13 |
-| VERIFACTU-F15 | Enviar el registro a la AEAT y recoger su respuesta | hecho en el Hub; sin la pasarela del SaaS (`VERIFACTU_GATEWAY_URL`) los registros esperan en la cola |
+| VERIFACTU-F15 | Enviar el registro a la AEAT y recoger su respuesta | hecho — lo envía el worker por la pasarela del SaaS; sin `VERIFACTU_GATEWAY_URL` los registros esperan en la cola |
 | VERIFACTU-F16 | Consultar los registros y su estado | hecho |
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
 | VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | hecho |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
-| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho en el Hub; la tarea la corre el worker de la fase 2 |
+| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto (`base/scheduler.py`; en la fase 1, sobre un solo hub) |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
 | VERIFACTU-F22 | Reintentar una entrada de la cola | hecho |
 | VERIFACTU-F23 | Descartar una entrada de la cola | desaparece — un registro generado no se descarta nunca |
 | VERIFACTU-F24 | Actuar ante un registro rechazado por la AEAT | hecho |
-| VERIFACTU-F25 | Reenviar un registro concreto | hecho (necesita la pasarela) |
+| VERIFACTU-F25 | Reenviar un registro concreto | hecho — por la pasarela del SaaS |
 | VERIFACTU-F26 | Verificar la cadena de huellas | hecho |
-| VERIFACTU-F27 | Consultar lo que tiene la AEAT | hecho en el Hub; necesita la pasarela del SaaS |
-| VERIFACTU-F28 | Recuperar la cadena desde la AEAT tras restaurar una copia | hecho en el Hub; necesita la pasarela del SaaS |
+| VERIFACTU-F27 | Consultar lo que tiene la AEAT | hecho — por la pasarela del SaaS (`/internal/verifactu/query`) |
+| VERIFACTU-F28 | Recuperar la cadena desde la AEAT tras restaurar una copia | hecho — por la pasarela del SaaS (`/internal/verifactu/query`) |
 | VERIFACTU-F29 | Continuar la cadena de otra aplicación (migración) | hecho |
 | VERIFACTU-F30 | Anular un registro enviado por error | hecho |
 | VERIFACTU-F31 | Vigilar los envíos desde las pantallas | hecho; el panel de Inicio con tarjetas es de la plataforma (aún no existe) |
 | VERIFACTU-F32 | Impedir apagar la app con registros sin enviar | servidor listo (`verifactu.stats.compliance_summary`); el apagado de apps es de la plataforma (fase 2) |
 | VERIFACTU-F33 | Cesar la actividad | no hecho — la baja censal es del negocio, fuera de ERPlora |
-| VERIFACTU-F34 | Renovar el certificado propio | en la cuenta de ERPlora; aquí, la caducidad y su aviso |
+| VERIFACTU-F34 | Renovar el certificado propio | hecho — en el Hub (subir el renovado sustituye al anterior) |
+| VERIFACTU-F35 | Preguntar a la AEAT si ya tiene un registro de la cola | hecho en el admin del Hub y en la API; botón de la SPA pendiente |
 
 ### VERIFACTU-F01 Activar VeriFactu
 Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2)
@@ -233,30 +253,45 @@ Si falla: lo dice la página de apps del Hub.
 Implicados: INVOICE-F01
 
 ### VERIFACTU-F02 Subir el certificado propio del negocio
-Estado: en la cuenta de ERPlora; aquí, su estado (la foto del SaaS aún no lo manda)
-Actor: administrador
+Estado: hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY`
+Actor: propietario y administrador (configurar)
 Pantalla: Configuración
 Pasos:
-1. En **VeriFactu → Configuración**, pestaña «Mi certificado», pulsa «Gestionar en tu cuenta de ERPlora».
-2. En tu cuenta sube el `.p12`/`.pfx` con su contraseña: la clave privada se guarda cifrada allí, nunca en
-   el Hub.
-3. La cuenta manda al Hub el estado: «Cargado», el titular, la fecha de subida y la de caducidad.
-Entra: el estado del certificado, de la cuenta de ERPlora (`verifactu.config.sync`).
-Sale: nada en el Hub, salvo mostrarlo.
-Si falla: «Tu cuenta de ERPlora todavía no ha enviado este dato.».
+1. En **VeriFactu → Configuración**, pestaña «Mi certificado», pulsa «Elegir el fichero .p12 / .pfx» y elige el
+   certificado del negocio (como mucho 1 MB).
+2. Escribe su contraseña en «Contraseña del certificado» y pulsa «Subir el certificado».
+3. El Hub lo abre con la contraseña, lee titular, NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con
+   la contraseña en la base de datos del hub. Sale «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a
+   «Cargado». Subir otro sustituye al anterior.
+Entra: el `.p12`/`.pfx` en base64 y su contraseña (`verifactu.certificate.upload`).
+Sale: el certificado guardado (`OwnCertificate`), un evento «Certificado propio de … subido» y el aviso
+`verifactu.config.changed`. El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
+ni en la foto, ni en los registros del servidor.
+Si falla (409, el certificado no se guarda):
+- sin clave de almacenamiento en el servidor, «Este servidor aún no puede guardar certificados: ERPlora tiene
+  que configurar su clave de almacenamiento.» (`verifactu.certificate_storage_unavailable`);
+- sin emisor, «Configura antes el emisor en Facturación → Emisor.» (`verifactu.issuer_missing`);
+- contraseña mala o fichero que no es un `.p12`, «El fichero no es un certificado .p12/.pfx que abra esta
+  contraseña.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
+  así que no puede conectar con la AEAT.»; caducado, «El certificado caducó el {fecha}: sube uno vigente.»
+  (todos `verifactu.certificate_invalid`);
+- titular distinto del emisor de Facturación, «El certificado es de {NIF}, no del emisor de este negocio,
+  {NIF}.» (`verifactu.certificate_holder_mismatch`): por la vía propia se presentaría en nombre de otro.
 Implicados: VERIFACTU-F04, VERIFACTU-F34
 
 ### VERIFACTU-F03 Quitar el certificado propio
-Estado: en la cuenta de ERPlora; aquí, su estado
-Actor: administrador
+Estado: hecho — en el Hub
+Actor: propietario y administrador (configurar)
 Pantalla: Configuración
 Pasos:
-1. El certificado se quita en la cuenta de ERPlora; la cuenta lo dice al Hub y la pestaña pasa a «Sin cargar».
-2. Si la vía era «mi certificado», los registros dejan de poder salir hasta elegir ERPlora (VERIFACTU-F04):
-   esperan en la cola con el motivo.
-Entra: el estado del certificado, de la cuenta.
-Sale: nada en el Hub.
-Si falla: como VERIFACTU-F02.
+1. En «Mi certificado», con uno cargado, pulsa «Quitar»; una tarjeta pregunta «¿Quitar el certificado?».
+2. Al confirmar, el certificado se borra de la base de datos del hub, sale «Certificado quitado.» y la pestaña
+   pasa a «Sin cargar».
+3. Si la vía era «mi certificado», los registros dejan de poder salir hasta subir otro o elegir ERPlora
+   (VERIFACTU-F04): esperan en la cola con el motivo «tu certificado propio no está cargado o ha caducado».
+Entra: nada (`verifactu.certificate.remove`).
+Sale: el certificado borrado, un evento «Certificado propio de … quitado» y el aviso `verifactu.config.changed`.
+Si falla: sin permiso de configurar, 403.
 Implicados: VERIFACTU-F04
 
 ### VERIFACTU-F04 Elegir quién remite: mi certificado o ERPlora
@@ -266,41 +301,58 @@ Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, el interruptor «Usar mi propio certificado» enseña la vía actual con su
    explicación: «ERPlora remite tus registros a Hacienda en tu nombre, con su propio sello. No necesitas
-   certificado.» o «Envías tú a Hacienda con el certificado de tu negocio, guardado en tu cuenta de ERPlora.».
+   certificado.» o «Envías tú directamente a Hacienda con el certificado de tu negocio, subido en Configuración
+   → Mi certificado.».
 2. Cámbialo.
 3. Sale «Listo: a partir de ahora envías con tu propio certificado.» o «Listo: a partir de ahora remite
    ERPlora en tu nombre.».
-Entra: la vía elegida; el estado del certificado y de la autorización, de la cuenta.
+Entra: la vía elegida; el certificado subido (VERIFACTU-F02) y el estado de la autorización, de la cuenta.
 Sale: la vía guardada; los registros siguientes salen por ella (avisa `verifactu.config.changed`).
-Si falla: sin certificado cargado, «No hay ningún certificado cargado: súbelo en tu cuenta de ERPlora para
-poder usarlo.»; en producción y por la vía de ERPlora sin autorización aprobada, «Para que ERPlora remita en
+Si falla: sin certificado vigente, «No hay ningún certificado válido cargado: súbelo en VeriFactu →
+Configuración → Mi certificado.»; en producción y por la vía de ERPlora sin autorización aprobada, «Para que ERPlora remita en
 producción falta que apruebe tu autorización firmada.». El interruptor vuelve a la vía real.
 Implicados: VERIFACTU-F02, VERIFACTU-F05
 
-### VERIFACTU-F05 Firmar y subir la autorización para que remita ERPlora
-Estado: en la cuenta de ERPlora; aquí, su estado (PLAN-HUB §8: falta decidir quién la revisa)
-Actor: administrador
+### VERIFACTU-F05 Firmar y subir el otorgamiento de representación para que remita ERPlora
+Estado: hecho — se sube en el Hub (como el módulo antiguo), lo revisa el staff en el SaaS y el estado vuelve en la
+foto (ronda §25, PLAN-SAAS §4)
+Actor: administrador (permiso «configurar»)
 Pantalla: Configuración
 Pasos:
 1. En **VeriFactu → Configuración**, pestaña «Lo remite ERPlora», el estado dice «Sin firmar».
-2. «Gestionar en tu cuenta de ERPlora» lleva a la cuenta, donde se descarga el modelo oficial (Anexo I del
-   Convenio 17), se firma y se sube con la copia del documento de identidad.
-3. Una persona de ERPlora lo revisa; la cuenta manda al Hub el estado: «En revisión», «Aprobado», «Devuelto»
+2. «Descargar el modelo» baja el modelo oficial en blanco (Anexo I del Convenio 17, el del SaaS); se rellena y se
+   firma fuera de la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma.
+3. Una sociedad escribe su representante legal (nombre y NIF/NIE); un autónomo firma él mismo.
+4. Se elige el documento de identidad (DNI o NIE) y se adjuntan los PDF: el modelo firmado, la copia del
+   documento, con NIE una muestra de la firma y, con sociedad, el justificante de representación.
+5. «Enviar a revisión»: el Hub comprueba los documentos y los reenvía tal cual al SaaS; queda «En revisión».
+6. Una persona de ERPlora lo revisa en el SaaS; la cuenta manda al Hub el estado nuevo: «Aprobado», «Devuelto»
    (con el motivo) o «Revocado».
-Entra: el estado de la autorización, de la cuenta (`verifactu.config.sync`).
-Sale: nada en el Hub, salvo mostrarlo; aprobada, abre la vía de ERPlora en producción (VERIFACTU-F08).
-Si falla: «Tu cuenta de ERPlora todavía no ha enviado este dato.».
+Entra: el emisor de Facturación (obligado tributario), el representante, el tipo de documento y los PDF en base64
+(`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`.
+Sale: `POST /internal/hubs/{id}/representation` al SaaS; «En revisión» (uno aprobado sigue vigente y remitiendo
+hasta que se apruebe el nuevo), su huella en «Lo que has enviado» y en el registro de auditoría (número, fecha,
+tipo de documento y qué documentos; nunca su contenido) y el aviso `verifactu.config.changed`. El Hub no guarda
+ningún documento. Aprobado, abre la vía de ERPlora en producción (VERIFACTU-F08).
+Si falla: antes de llamar, con los códigos del SaaS (422): falta el modelo («Adjunta el modelo firmado.»), no es un
+PDF («El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.»), falta la copia del documento,
+con NIE la muestra de firma, con sociedad el representante o el justificante, un fichero de más de 5 MB («Cada
+fichero puede ocupar 5 MB como máximo.»); el rechazo del SaaS, con su código `fiscal.*` y sus campos tal cual; sin
+emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no sabe su id en ERPlora) o un negocio
+que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
+SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
 Implicados: VERIFACTU-F08
 
-### VERIFACTU-F06 Volver a enviar la autorización
-Estado: en la cuenta de ERPlora; aquí, su estado
-Actor: administrador
+### VERIFACTU-F06 Volver a enviar el otorgamiento
+Estado: hecho — en el Hub, como VERIFACTU-F05
+Actor: administrador (permiso «configurar»)
 Pantalla: Configuración
 Pasos:
-1. Con la autorización devuelta o revocada, «Gestionar en tu cuenta de ERPlora» lleva a enviarla de nuevo.
-2. El estado nuevo llega solo al Hub.
+1. Devuelto o revocado, el trámite ya está abierto: se corrige lo que dice el motivo y se envía de nuevo.
+2. En revisión o aprobado, «Volver a enviar» lo abre y avisa: el envío nuevo sustituye al que está en revisión;
+   con uno aprobado, se sigue remitiendo con él mientras se revisa el nuevo. «Cancelar» lo cierra.
 Entra: como VERIFACTU-F05.
-Sale: como VERIFACTU-F05.
+Sale: como VERIFACTU-F05; el envío lleva el número siguiente.
 Si falla: como VERIFACTU-F05.
 Implicados: VERIFACTU-F05
 
@@ -316,24 +368,55 @@ Si falla: no aplica.
 Implicados: ninguno
 
 ### VERIFACTU-F08 Pasar a producción
-Estado: hecho; el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan)
+Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado
+válido | vía ERPlora con otorgamiento aprobado y `live_paid`) ∧ cuenta activa (`status` de la foto); el servidor lo
+tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan). En `pre` nunca se abre: todo va a pruebas. Un
+hub demo nunca pasa a producción (`verifactu.go_live_forbidden`).
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, «Entorno AEAT» enseña «Pruebas (AEAT Test)» y «Tus facturas van al entorno de
-   pruebas de la AEAT. Cuando esté todo listo, pasa a producción.».
+   pruebas de la AEAT. Cuando esté todo listo, pasa a producción.». Si falta algo, debajo sale «Todavía no puede
+   pasar a producción:» con la lista (negocio de demostración, otorgamiento sin aprobar, certificado propio que falta
+   o ha caducado, la opción en vivo que no está en el plan, cuenta con un pago pendiente o suspendida) y «Pasar a
+   producción» queda
+   desactivado.
 2. Pulsa «Pasar a producción» y confirma en «¿Enviar tus facturas a la AEAT de verdad?» («A partir de ahora
    cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.»).
 3. Sale «Tu negocio está en producción: los registros ya se remiten a la AEAT real.» y la pastilla pasa a
    «Producción».
-Entra: el emisor de Facturación; la vía y su estado, de la cuenta.
+Entra: el emisor de Facturación; la vía y su estado; de la foto de la cuenta (`verifactu.config.sync`), el
+otorgamiento, `live_paid` y el estado del negocio.
 Sale: el entorno en producción (avisa `verifactu.config.changed`): los registros nuevos nacen en la cadena
 de producción, con el QR de la sede real; los que nacieron en pruebas siguen yendo a pruebas.
 Si falla: mientras ERPlora no lo abra en el servidor, «El paso a producción todavía no está abierto en este
-servidor: ERPlora lo abre cuando la remisión real esté lista.»; sin emisor, «Configura antes el emisor en
+servidor: ERPlora lo abre cuando la remisión real esté lista.» (en Ajustes, en la lista de lo que falta: «ERPlora
+todavía no ha abierto la presentación real a la AEAT en este servidor», `production_closed`); sin la pasarela del
+SaaS en el servidor, «La pasarela de envío de ERPlora no está configurada en este servidor: nada podría llegar a la
+AEAT.» (`verifactu.gateway_unavailable`); con un certificado propio que este servidor no abre (la clave
+`FISCAL_CERTIFICATE_KEY` falta o se rotó), «Tu certificado propio no se puede abrir en este servidor: vuelve a
+subirlo en VeriFactu → Configuración → Mi certificado.» (`verifactu.own_certificate_unreadable`); en un hub demo, «Un negocio de demostración no
+puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT.» (`verifactu.go_live_forbidden`;
+quién es demo lo dice la plataforma, `base.operations.is_demo_hub`); sin emisor, «Configura antes el emisor en
 Facturación → Emisor.»; por la vía de ERPlora sin autorización aprobada, «Para pasar a producción por la vía
-de ERPlora falta que apruebe tu autorización firmada.»; con certificado propio que falta o ha caducado, «Tu
-certificado propio no está cargado o ha caducado.». Ya en producción, no hace nada.
+de ERPlora falta que apruebe tu autorización firmada.»; por la vía de ERPlora sin la opción en vivo en el plan,
+«La opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora.»
+(`verifactu.live_option_unpaid`); con la cuenta con un pago pendiente o suspendida, «Tu cuenta de ERPlora tiene un
+pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción.»
+(`verifactu.hub_not_active`); con certificado propio que falta o ha caducado, «Tu certificado propio no está
+cargado o ha caducado.». Todos son 409 y el entorno sigue en pruebas. Ya en producción, no hace nada.
+Si en producción se pierde la ruta (la foto deja de traer la opción en vivo o el otorgamiento aprobado, o caduca el
+certificado propio), no se vuelve a pruebas (ya hay registros de producción): **no se sella nada nuevo** —la venta o
+la factura se rechazan con 409 y el código de la ruta (`verifactu.live_option_unpaid`,
+`verifactu.representation_not_approved`, `verifactu.own_certificate_missing`) y «No se ha emitido nada: este negocio
+presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: <motivo>. Resuélvelo en VeriFactu →
+Ajustes y vuelve a intentarlo.»— y Ajustes lo dice bajo «Las ventas y facturas nuevas se rechazan hasta que se
+resuelva:» (`issue_blocker`). Lo ya sellado sigue saliendo sin la opción en vivo (es de la AEAT); sin otorgamiento
+aprobado o sin certificado válido espera, porque la pasarela no podría presentarlo. Cambiar a la vía de ERPlora en
+producción sin la opción se rechaza igual.
+Del Hub antiguo (`fiscal_profile::go_live`): el orden (cerrado → demo → vía → listo), el certificado propio sin
+otorgamiento y el 409 con el código de la causa. Nuevo por el modelo de Ioan del 2026-10-15: la opción de pago
+(antes VeriFactu era gratis) y el estado de la cuenta, que antes solo frenaba el token de la pasarela en el SaaS.
 Implicados: VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Volver a pruebas
@@ -352,7 +435,7 @@ negocio ya tiene registros en producción.» y el botón no aparece.
 Implicados: VERIFACTU-F08
 
 ### VERIFACTU-F10 Probar la conexión con la AEAT
-Estado: hecho en el Hub; la sonda de la pasarela del SaaS aún no existe
+Estado: hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`)
 Actor: responsable, administrador
 Pantalla: Ajustes
 Pasos:
@@ -391,9 +474,7 @@ Pasos:
    publicada en erplora.com; al lado, «Versión de la declaración».
 2. «Datos identificativos de este sistema» enseña los datos del productor, la versión instalada y el número de
    instalación (el identificador de este negocio en ERPlora).
-3. Si «Da servicio a varios obligados» aún no ha llegado de la cuenta: «Falta un dato de tu cuenta de ERPlora
-   (si da servicio a varios obligados): hasta que llegue, los registros se sellan y esperan para salir.».
-Entra: la declaración (fija en la versión del Hub) y el dato de la cuenta.
+Entra: la declaración (fija en la versión del Hub).
 Sale: nada; es consulta.
 Si falla: el mensaje del fallo.
 Implicados: ninguno
@@ -442,7 +523,7 @@ Si falla: como VERIFACTU-F13.
 Implicados: INVOICE-F07, INVOICE-F08, INVOICE-F09, INVOICE-F10
 
 ### VERIFACTU-F15 Enviar el registro a la AEAT y recoger su respuesta
-Estado: hecho en el Hub; sin la pasarela del SaaS (`VERIFACTU_GATEWAY_URL`) los registros esperan en la cola
+Estado: hecho — lo envía el worker por la pasarela del SaaS; sin `VERIFACTU_GATEWAY_URL` los registros esperan en la cola
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -489,7 +570,7 @@ Pasos:
 1. En **Registros**, pulsa una fila.
 2. Se abre «Registro {número}» con la factura, la cadena, el QR, la respuesta de la AEAT y el XML.
 3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («La pasarela de envío de ERPlora no está
-   configurada en este servidor», «Faltan los datos del productor de tu cuenta de ERPlora», «Sin vía de envío
+   configurada en este servidor», «Sin vía de envío
    lista», «La AEAT pidió esperar hasta las {hora}», «No se pudo contactar: {motivo}») y cuándo: «Sale solo en
    la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer nada.»
    con el «Próximo intento».
@@ -525,7 +606,7 @@ Si falla: sin VeriFactu activa o sin permiso de consulta, el documento sale sin 
 Implicados: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Enviar después lo que no pudo salir (contingencia automática)
-Estado: hecho en el Hub; la tarea la corre el worker de la fase 2
+Estado: hecho — la corre el worker cada minuto (`base/scheduler.py`; en la fase 1, sobre un solo hub)
 Actor: sistema
 Pantalla: Contingencia
 Pasos:
@@ -575,10 +656,12 @@ Actor: ninguno
 Pantalla: ninguna
 Pasos:
 1. Un registro que está en la cola tiene que llegar a la AEAT (FAQ §5); uno aceptado ya no está en la cola.
+2. Lo único que sale de la cola sin un envío nuevo es lo que la AEAT **ya tiene**, preguntándoselo
+   (VERIFACTU-F35); un rechazo se subsana con un registro nuevo (VERIFACTU-F24).
 Entra: nada.
 Sale: nada.
 Si falla: no aplica.
-Implicados: ninguno
+Implicados: VERIFACTU-F24, VERIFACTU-F35
 
 ### VERIFACTU-F24 Actuar ante un registro rechazado por la AEAT
 Estado: hecho
@@ -603,7 +686,7 @@ factura: «Este registro no se puede subsanar.».
 Implicados: INVOICE-F08
 
 ### VERIFACTU-F25 Reenviar un registro concreto
-Estado: hecho (necesita la pasarela)
+Estado: hecho — por la pasarela del SaaS
 Actor: responsable, administrador, asistente
 Pantalla: Ficha de registro
 Pasos:
@@ -635,7 +718,7 @@ Si falla: sin registros de ese NIF, «No hay registros de ese emisor en este ent
 Implicados: VERIFACTU-F28
 
 ### VERIFACTU-F27 Consultar lo que tiene la AEAT
-Estado: hecho en el Hub; necesita la pasarela del SaaS
+Estado: hecho — por la pasarela del SaaS (`/internal/verifactu/query`)
 Actor: responsable, administrador
 Pantalla: Recuperación
 Pasos:
@@ -649,7 +732,7 @@ Si falla: sin pasarela, el mensaje de la pasarela no configurada; un rechazo de 
 Implicados: VERIFACTU-F28
 
 ### VERIFACTU-F28 Recuperar la cadena desde la AEAT tras restaurar una copia
-Estado: hecho en el Hub; necesita la pasarela del SaaS
+Estado: hecho — por la pasarela del SaaS (`/internal/verifactu/query`)
 Actor: administrador
 Pantalla: Recuperación
 Pasos:
@@ -738,16 +821,38 @@ Si falla: no aplica.
 Implicados: ninguno
 
 ### VERIFACTU-F34 Renovar el certificado propio
-Estado: en la cuenta de ERPlora; aquí, la caducidad y su aviso
-Actor: administrador
+Estado: hecho — en el Hub (subir el renovado sustituye al anterior)
+Actor: propietario y administrador (configurar)
 Pantalla: Configuración
 Pasos:
-1. «Mi certificado» enseña «Caduca el {fecha}» y, a 30 días o menos, «Caduca en {n} días».
-2. El certificado nuevo se sube en la cuenta de ERPlora; la cadena no cambia.
-Entra: la caducidad, de la cuenta.
-Sale: nada en el Hub.
-Si falla: caducado y con la vía «mi certificado», los registros esperan con el motivo.
+1. «Mi certificado» enseña «Caduca el {fecha}» y, a 30 días o menos, «Caduca en {n} días: sube aquí el
+   renovado.».
+2. El certificado nuevo se sube como en VERIFACTU-F02 y sustituye al anterior; la cadena no cambia.
+Entra: el certificado renovado.
+Sale: el nuevo, en lugar del anterior.
+Si falla: caducado y con la vía «mi certificado», los registros esperan con el motivo; si el servidor cambió
+su clave de almacenamiento y no puede abrir el guardado, esperan con «tu certificado propio no se puede abrir
+en este servidor: vuelve a subirlo».
 Implicados: VERIFACTU-F02
+
+### VERIFACTU-F35 Preguntar a la AEAT si ya tiene un registro de la cola
+Estado: hecho — en el admin de Django del Hub (soporte) y por la API; en la SPA, pendiente de botón
+Actor: responsable, administrador (enviar); el staff de ERPlora desde el admin
+Pantalla: admin de Django (`hubs.erplora.com/admin`, Registros → «Consultar a la AEAT (sale de la cola si ya lo
+tiene)»)
+Pasos:
+1. Un registro se quedó «enviado, sin respuesta» (o pendiente) y puede que la AEAT ya lo tenga.
+2. Se consulta a la AEAT, por la pasarela de ERPlora, el emisor del registro en el mes de su fecha de expedición
+   (como VERIFACTU-F27, que renueva la última foto).
+3. Si la AEAT devuelve **ese mismo registro** (mismo emisor, número y huella), sale de la cola como «Aceptado» o
+   «Aceptado con errores», según lo que diga la AEAT, sin perder sus intentos; queda un evento con quién lo hizo.
+4. Si no lo tiene (o tiene otro registro de la misma factura, p. ej. el original de una subsanación), no cambia
+   nada: sigue en la cola y se envía en la siguiente pasada.
+Entra: el registro (id o número de su factura).
+Sale: si la AEAT lo tenía y el registro (avisa `verifactu.record.reconciled`; la consulta, `verifactu.aeat.queried`).
+Si falla: un registro aceptado o rechazado no está en la cola: «Este registro no está en la cola.»; sin pasarela o
+si la AEAT no contesta, el motivo de la pasarela, y el registro sigue en la cola.
+Implicados: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
 
 ## Servicios: lo que entra y lo que sale
 
@@ -759,7 +864,7 @@ factura** (`TICKET-2026-000012`) o por su secuencia; un emisor, por su NIF.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| La configuración: entorno, vía, estado del certificado y de la autorización, datos del productor, declaración | ver | F04, F08, F09, F12 | `verifactu.config.get` |
+| La configuración: entorno, vía, certificado propio (titular, NIF, tipo, caducidad; nunca su material), estado de la autorización, datos del productor, declaración | ver | F02, F04, F08, F09, F12 | `verifactu.config.get` |
 | Los registros, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `verifactu.record.list` |
 | Un registro, por su id o por el número de su factura, con su QR, su XML y por qué espera | ver | F17, F18 | `verifactu.record.get` |
 | El registro vigente de una factura (QR, CSV, estado) | ver | F19 | `verifactu.record.by_invoice` |
@@ -785,6 +890,7 @@ Todas se pueden seguir en vivo.
 | Envía ya un registro (y los anteriores de su cadena) | enviar | F25 | `verifactu.record.transmit` |
 | Hace la pasada de envío de la cola (también la tarea de cada minuto) | enviar | F20, F21 | `verifactu.contingency.process` |
 | Pone un registro a salir en la siguiente pasada | enviar | F22 | `verifactu.contingency.retry` |
+| Pregunta a la AEAT si ya tiene un registro de la cola; si lo tiene, sale de la cola como registrado | enviar | F35 | `verifactu.record.reconcile` |
 | Verifica la cadena de huellas | ver | F26 | `verifactu.chain.validate` |
 | Consulta a la AEAT los registros del mes | enviar | F27 | `verifactu.aeat.query` |
 | Recupera la cadena desde la AEAT | configurar | F28 | `verifactu.chain.recover_from_aeat` |
@@ -794,7 +900,12 @@ Todas se pueden seguir en vivo.
 | Elige la vía de envío | configurar | F04 | `verifactu.config.update` |
 | Pasa a producción | configurar | F08 | `verifactu.config.go_live` |
 | Vuelve a pruebas | configurar | F09 | `verifactu.config.back_to_testing` |
-| Guarda lo que manda la cuenta de ERPlora (certificado, autorización, productor) | solo el sistema | F02, F05, F12, F34 | `verifactu.config.sync` |
+| Sube (o sustituye) el certificado propio | configurar | F02, F34 | `verifactu.certificate.upload` |
+| Quita el certificado propio | configurar | F03 | `verifactu.certificate.remove` |
+| Guarda lo que manda la cuenta de ERPlora (estado del otorgamiento, opción en vivo, estado de la cuenta) | solo el sistema | F05, F08 | `verifactu.config.sync` |
+| Fija el hub de plataforma de ERPlora al entorno de su despliegue | solo el sistema | — | `verifactu.config.follow_deployment` |
+| Envía el otorgamiento de representación firmado a revisión | configurar | F05, F06 | `verifactu.representation.submit` |
+| Da el modelo oficial en blanco (PDF) | configurar | F05 | `verifactu.representation.model` |
 
 ### Lo que avisa
 
@@ -806,6 +917,7 @@ Todas se pueden seguir en vivo.
 | Aceptado con errores | La AEAT lo registra con un error | lo mismo | `verifactu.record.accepted_with_errors` |
 | Cola procesada | Una pasada (a mano o programada) | `sent`, `accepted`, `rejected`, `waiting` | `verifactu.contingency.processed` |
 | Registro reprogramado | «Reintentar» | `record_id` | `verifactu.contingency.retried` |
+| Registro conciliado | La AEAT ya tenía un registro de la cola (VERIFACTU-F35) | `record_id`, `invoice_number`, `status`, `environment` | `verifactu.record.reconciled` |
 | Cadena verificada | «Validar cadena» | `issuer_nif`, `environment`, `valid`, `total`, `first_invalid_sequence` | `verifactu.chain.validated` |
 | Cadena recuperada | Recuperar desde la AEAT o a mano | `issuer_nif`, `environment`, `sequence`, `source` | `verifactu.chain.recovered` |
 | Consulta a la AEAT | «Consultar AEAT» | `issuer_nif`, `count` | `verifactu.aeat.queried` |
@@ -846,7 +958,7 @@ sellado no añade nada (`already`).
 | Registrar una factura emitida (lo pide Facturación con la sesión de quien emite) | sí | sí | sí | sí | `verifactu.add_record` |
 | Enviar, procesar y reintentar la cola, consultar a la AEAT, probar la conexión | sí | sí | sí | no | `verifactu.transmit_record` |
 | Subsanar y anular registros | sí | sí | no | no | `verifactu.correct_record` |
-| Elegir la vía, pasar a producción y volver, recuperar la cadena, factura de prueba | sí | sí | no | no | `verifactu.configure` |
+| Subir y quitar el certificado propio, elegir la vía, pasar a producción y volver, recuperar la cadena, factura de prueba | sí | sí | no | no | `verifactu.configure` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`). Guardar lo
 que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del sistema.
@@ -855,11 +967,14 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 
 ### Anatomía
 
-`apps.py`, `models.py` (`Config`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`), `migrations/`,
+`apps.py`, `models.py` (`Config`, `OwnCertificate`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`),
+`migrations/`,
 `schemas.py`, `services.py`, `queries.py`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
 `frontend/` y, puros y sin ORM: `chain.py` (formatos, huella, QR), `envelope.py` (el XML: `RegistroAlta`,
 `RegistroAnulacion`, el sobre y la consulta), `xsd.py` (validación con los esquemas de `xsd/`), `aeat.py`
-(lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS) y
+(lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS),
+`certificates.py` (abre e inspecciona el certificado propio y lo cifra y descifra; la fila la leen y escriben
+`queries.py` y `services.py`) y
 `producer.py` (los datos del productor que declara la declaración responsable). Un `tests/test_<fichero>.py`
 por fichero, más `test_xsd.py` contra los esquemas reales, `test_integration_invoice.py` (Facturación real,
 sin dobles), `test_concurrency.py` (sesiones reales en hilos; también una emisión cuyo cerrojo de cadena no
@@ -905,10 +1020,9 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 - **XSD real** (`xsd.py`): `xmlschema` sobre `xsd/SuministroLR.xsd` (importa `SuministroInformacion.xsd`, que
   importa la firma `xmldsig-core-schema.xsd`), los tres en local y en modo `sandbox` (nunca red). Se valida el
   sobre de un solo registro **al sellar, siempre** (si no pasa, no hay registro ni número: uno inválido pararía
-  su cadena para siempre) y cada sobre **antes de enviarlo**. Sin los datos del productor no se puede construir
-  el `SistemaInformatico` definitivo: al sellar se valida con uno provisional (`IndicadorMultiplesOT` N, que no
-  cambia la validez) que no se guarda; el registro se sella (huella y QR no dependen de él) y su XML definitivo
-  se construye, se valida y se congela antes de su primer envío. Si aun así un sobre no pasa al enviarse, la
+  su cadena para siempre) y cada sobre **antes de enviarlo**. El XML del registro se construye, se valida y se
+  congela **al sellar** (el `SistemaInformatico` no espera a nada de la cuenta); uno guardado sin XML (sellado
+  antes de T2b) lo construye su primer envío. Si aun así un sobre no pasa al enviarse, la
   cadena espera con `xml_invalid` y el evento crítico se anota **una vez**, no en cada pasada. La consulta
   (`ConsultaFactuSistemaFacturacion`) se valida contra `xsd/ConsultaLR.xsd` antes de salir.
   Procedencia de los esquemas: `SuministroLR.xsd` y `SuministroInformacion.xsd` del motor actual (los últimos
@@ -918,8 +1032,9 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   `NombreSistemaInformatico` ERPlora Hub, `IdSistemaInformatico` EC, `TipoUsoPosibleSoloVerifactu` S y
   `TipoUsoPosibleMultiOT` S, los de la declaración responsable v1 firmada (`saas-next/public/declaracion/v1`);
   `Version` = `APP_VERSION` (el commit de la imagen; `dev` en local), `NumeroInstalacion` = el identificador
-  del negocio (el ámbito; en la fase 2, el id del hub) e `IndicadorMultiplesOT`, que llega de la cuenta por
-  `verifactu.config.sync` (la AEAT lo calcula por usuario: no se inventa).
+  del negocio (el ámbito; en la fase 2, el id del hub) e `IndicadorMultiplesOT` **S siempre** (`MULTIPLE_OT`):
+  ERPlora es una plataforma para muchos negocios, un sistema multi-obligado por definición, así que no depende de
+  la cuenta (decisión del 2026-10-15, T2b; fuera `multiple_taxpayers` y `producer_facts_missing`).
 
 ### Contrato con Facturación (lo que `invoice` tiene que hacer)
 
@@ -933,7 +1048,14 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
      llega, una conexión caída) → el documento queda emitido y la reacción al aviso lo sella después;
    - un rechazo de VeriFactu (409 `verifactu.impossible_record`, `verifactu.invalid_record`,
      `verifactu.recipient_required`, 403 sin permiso) es determinista (fallaría igual): **deshace la emisión
-     entera** y la serie no gasta número; un error de programación tampoco se traga.
+     entera** y la serie no gasta número; un error de programación tampoco se traga;
+   - en **producción sin ruta a la AEAT**, 409 con el código de la ruta (`verifactu.live_option_unpaid`,
+     `verifactu.representation_not_approved`, `verifactu.own_certificate_missing`,
+     `verifactu.own_certificate_unreadable`) o del servidor (`verifactu.gateway_unavailable`,
+     `verifactu.production_closed`; revisión del bloque fiscal, 2026-10-15): igual, nada se emite
+     (working-rules §15; el `enforce_fiscal_road` del Hub antiguo, HUB-1935). Venta (`sale`) no lo deja pendiente:
+     rechaza el cobro, la devolución o la anulación con ese 409. La reacción del sistema a un documento ya emitido
+     no se rechaza: su registro se sella y espera, como el antiguo dejaba al relay entregar una cadena ya abierta.
    La respuesta (`RecordCreateOut`) trae `record.qr_url`, `record.qr_svg`, `record.status` y `already`.
 2. **Lo que se lee de la fila** (`Invoice`, sin copiarlo a otro sitio): `number`, `issue_date`,
    `operation_date`, `issuer_tax_id`, `issuer_name`, `customer_tax_id`, `customer_name`, `customer_country`,
@@ -948,32 +1070,92 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 
 ### Contrato con el SaaS
 
-- **La pasarela** (`gateway.py`), en `VERIFACTU_GATEWAY_URL` (la URL interna del SaaS; vacía = sin pasarela:
-  nada se envía y nada se da por aceptado). Llamadas `POST` con JSON, firmadas como el resto de `/internal`
-  (`X-Erplora-Timestamp` y `X-Erplora-Signature` = HMAC-SHA256 hex de `f"{timestamp}.{cuerpo}"` con
-  `INTERNAL_SHARED_SECRET`), con 5 s para conectar y 30 s para leer:
-  - `/internal/verifactu/submit` con `{"hub", "nif", "environment", "route", "envelope"}` → `200
-    {"aeat_status": <HTTP de la AEAT>, "aeat_body": "<respuesta SOAP de la AEAT>"}`; `409 {"error": {"code",
-    "message"}}` cuando no puede presentar (sin autorización aprobada, sin certificado, un NIF que no es el
-    declarado); `5xx` si la AEAT no contesta. El SaaS no valida nada fiscal: comprueba que el NIF de cada
-    registro es `nif`, presenta los bytes con el sello (dos huecos) o con el certificado del cliente al
-    entorno pedido y devuelve la respuesta tal cual.
-  - `/internal/verifactu/query` con `{"hub", "nif", "environment", "route", "envelope"}` (la consulta
-    `ConsultaFactuSistemaFacturacion`) → la misma forma.
-  - `/internal/verifactu/probe` con `{"hub", "nif", "environment", "route"}` → `200 {"ready": bool, "detail"}`,
-    sin presentar nada.
-- **La foto** (`verifactu.config.sync`, solo el sistema; la llama la plataforma con el bloque `verifactu` de
-  `PUT /internal/hubs/{id}/state`): `{"version", "multiple_taxpayers": "S"|"N", "own_certificate": {"loaded",
-  "holder", "uploaded_at", "expires_at"}, "representation": {"status": "none"|"submitted"|"approved"|"returned"|"revoked",
-  "updated_at", "reason"}}`; una `version` menor o igual que la guardada se ignora.
-- **Producción**: además de lo de VERIFACTU-F08, el servidor tiene que tener `VERIFACTU_PRODUCTION_ENABLED`
-  a verdadero. Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
+- **La pasarela** (`gateway.py`; en el SaaS, `fiscal_gateway/`, su README «Contrato con el Hub»), en
+  `VERIFACTU_GATEWAY_URL` (la URL interna del SaaS; vacía = sin pasarela: nada se envía y nada se da por
+  aceptado). Llamadas `POST` con JSON, firmadas como el resto de `/internal` (`X-Erplora-Timestamp` y
+  `X-Erplora-Signature` = HMAC-SHA256 hex de `f"{timestamp}.{cuerpo}"` con `INTERNAL_SHARED_SECRET`, la v1; la
+  pasarela acepta v1 sola o v2, y el Hub aún no firma v2). Tiempos: **Hub → pasarela, 5 s para conectar y 45 s
+  para leer**; **pasarela → AEAT, 5 s y 30 s**: el Hub espera más que la pasarela a la AEAT.
+  - `/internal/verifactu/submit` con `{"hub", "nif", "environment": "testing"|"production", "route":
+    "erplora"|"own", "envelope", "certificate"?: {"p12_base64", "password"}}` → `200 {"aeat_status": <HTTP de
+    la AEAT>, "aeat_body": "<respuesta SOAP de la AEAT>"}`. `certificate` solo con `route = "own"`: el
+    certificado propio (VERIFACTU-F02) viaja descifrado en cada llamada y la pasarela no lo guarda; para
+    presentarlo, su clave PEM pasa unos milisegundos por disco, en dos ficheros `0600` de un directorio
+    temporal privado del SaaS que se borra en cuanto TLS los ha leído. `hub` nombra al negocio: en la fase 1, el
+    slug de su host (`ctx.scope.key`); en la fase 2, el UUID de su registro. La pasarela acepta los dos (saas#25:
+    UUID o un slug válido de `live.slugs`).
+  - Lo que no es `200`: `404 {"error": {"code": "hub_unknown"}}` (el `hub` del cuerpo no es ningún hub del SaaS;
+    saas#29; cualquier otro 404 es una puerta que aún no está y se reintenta); `409 {"error": {"code",
+    "message"}}` con `nif_mismatch` (el sobre nombra a otro contribuyente; se decide antes de tocar la AEAT),
+    `representation_not_approved`, `no_seal`, `no_certificate`, `certificate_invalid` o
+    `environment_not_allowed`; `413 payload_too_large` (más de 10 MiB); `422 invalid_payload` (con `fields`):
+    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro y en la prueba
+    de conexión; `hub_unknown` y `representation_not_approved` con texto propio en/es en vez del mensaje del SaaS): sigue
+    `pending` y no se reintenta solo, porque se rechazaría igual (lo sellado detrás espera con el mismo motivo, y la
+    cola no le pone «próximo intento»); vuelve a la cola al cambiar la vía, subir el
+    certificado o llegar una foto nueva de la cuenta, o a mano («Reenviar a la AEAT» del admin, «Enviar ahora»,
+    «Reintentar»). `502 {"error": {"code": "aeat_unreachable", "sent"}}`: con `sent = true` la
+    petición pudo llegar a la AEAT y el registro queda `sent` (motivo `unknown`, se reenvía declarado como
+    incidencia); con `sent = false` no salió nada y se reintenta (`unreachable`). `503 gateway_busy` y cualquier
+    otro estado: `unreachable`, a reintentar. El SaaS no valida nada fiscal: comprueba que el NIF del sobre es
+    `nif`, presenta los bytes con el sello (dos huecos) o con el certificado del cliente al entorno pedido y
+    devuelve la respuesta tal cual.
+  - `/internal/verifactu/query` con el mismo cuerpo (la consulta `ConsultaFactuSistemaFacturacion`) → la misma
+    forma.
+  - `/internal/verifactu/probe` con `{"hub", "nif", "environment", "route", "certificate"?}` → `200 {"ready":
+    bool, "detail"}`, sin presentar nada.
+- **La foto** (`PUT /internal/hubs/{id}/state`, contrato acordado con el SaaS el 2026-10-15): `{"hub_id",
+  "slug", "version", "status": "active"|"past_due"|"suspended", …, "verifactu": {"representation": {"status":
+  "none"|"submitted"|"approved"|"returned"|"revoked", "updated_at": ISO|null, "reason"}, "live_paid": bool}}`.
+  La recibe `base/internal.py` (fase 1, sin registro de hubs): firma HMAC v1 o v2 (la v2, si viene, decide sola),
+  ±300 s, `INTERNAL_SHARED_SECRET` y, en una rotación, `INTERNAL_SHARED_SECRET_PREVIOUS`; sin firma, `401
+  internal.unsigned`. Nombra su hub por `slug` (`422 internal.slug_invalid`); un `hub_id` distinto del de la ruta,
+  `422 internal.hub_mismatch`; fuera de contrato, `422 internal.payload_invalid`. Aplica el bloque `verifactu` y el
+  `status` con `verifactu.config.sync` (solo el sistema) en ese hub y contesta `200 {"applied", "version"}`; sin
+  ninguno de los dos, `200 {"applied": false}`. Una `version` menor o igual que la guardada se ignora. «Validado»
+  = `representation.status == "approved"`; `live_paid` lo decide el SaaS (plan efectivo de pago, prueba incluida,
+  o ítem `verifactu` vivo). `own_certificate` y `multiple_taxpayers` ya no viajan (`null` = sin cambio): el
+  certificado propio se sube en el Hub (decisión de Ioan del 2026-10-15). La ruta de la foto le dice al Hub su id en
+  ERPlora (`Config.hub_id`, sin variable de entorno `HUB_ID`): adonde se envía el otorgamiento (en la fase 2, del
+  registro de control). Cada cambio de
+  estado del otorgamiento deja su paso en el registro de auditoría («Sus pasos» de Configuración).
+- **Otorgamiento de representación** (VERIFACTU-F05, F06; `representation.py`): `POST
+  /internal/hubs/{id}/representation` con `{"taxpayer_tax_id", "taxpayer_name", "signer_tax_id", "signer_name",
+  "signer_document_type": "dni"|"nie", "documents": {"signed_model", "id_copy", "signature_sample",
+  "representation_proof"}}` (base64; los opcionales, `null`) → `201 {"status": "submitted", "version",
+  "submitted_at"}`; `GET /internal/representation/model` → el modelo en blanco, `application/pdf`. Firmadas v1 y v2
+  (la v2 sobre la ruta que ve el SaaS). Tiempos: 5 s para conectar y 60 s para leer (cuatro PDF de 5 MB). Rechazos:
+  400/413/422 con su código (`fiscal.*`) y `fields` → 422 tal cual; 404 → 409 `verifactu.hub_unregistered`; sin
+  conexión, 401, 5xx o fuera de contrato → 503 `verifactu.saas_unreachable`. La ruta del Hub (`POST
+  /api/verifactu/representation`) admite un cuerpo de hasta 32 MB (`base.request_body.accept_body_up_to`; el resto
+  de vistas, los 2,5 MB de Django). El Hub comprueba antes, con las reglas y los códigos del SaaS, y no guarda los
+  documentos.
+- **Certificado propio** (VERIFACTU-F02): `OwnCertificate`, una fila como mucho en la BD del hub, con titular,
+  NIF, tipo, caducidad y el `.p12` con su contraseña cifrados juntos con Fernet (`certificates.py`) bajo
+  `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la
+  subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
+  esperan con `own_certificate_unreadable` sin llamar a la pasarela.
+- **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
+  `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
+  producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
+  (`queries.sending_problem`: primero lo que le falta a la vía, después lo del servidor, pasarela y apertura). Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
   queda bajo la supervisión de Ioan (working-rules §15).
+- **Hub de plataforma de ERPlora** (PLAN-SAAS §4; Facturación, INVOICE-F23): el hub `PLATFORM_HUB_SLUG` emite las
+  facturas de ERPlora a sus clientes. Sus registros van al entorno de la AEAT del despliegue, diga lo que diga su
+  configuración (`queries.effective_environment`: `prod` con la remisión real abierta → producción; si no, pruebas;
+  ya en producción, sigue en producción con el servidor cerrado y sus registros esperan, para que sus facturas reales
+  no pasen nunca a la cadena de pruebas; lo usan `record.create` y la factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
+  `manage.py create_platform_hub` alinea su configuración con `verifactu.config.follow_deployment` (409
+  `verifactu.platform_only` en cualquier otro negocio). El sello de ERPlora presenta sus propios registros sin
+  otorgamiento (`sending_problem`: el emisor de Facturación es `PLATFORM_ISSUER_TAX_ID`): ERPlora no se representa a
+  sí misma. La pasarela del SaaS tendrá que aceptar lo mismo cuando compruebe el otorgamiento (T7b).
 
 ### La cola y el envío
 
 - La cola **son los registros** (`pending`, `sent`, `accepted`, `accepted_with_errors`, `rejected`): sin tabla
-  aparte. `SendControl` (una fila por `(NIF, entorno)`) guarda `next_send_at` (`TiempoEsperaEnvio` de la última
+  aparte. Espera por la ruta solo cuando no puede presentar (`queries.sending_problem`: certificado propio que falta
+  o caducó, otorgamiento sin aprobar en producción), **nunca por la opción en vivo**: sin ella no se sella nada
+  nuevo, y lo sellado sale. `SendControl` (una fila por `(NIF, entorno)`) guarda `next_send_at` (`TiempoEsperaEnvio` de la última
   respuesta) y es el cerrojo del envío: la pasada la toma con `select_for_update(skip_locked=True)`, así que dos
   pasadas nunca mandan la misma cadena y el sellado (que bloquea `Chain`) no espera a la red.
 - Un envío junta los `pending` y `sent` de una cadena en orden de secuencia (hasta 1.000) cuando su primer
@@ -997,35 +1179,106 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   y los intentos. Se corrige con uno nuevo (subsanación o anulación); una corrección de la factura es una
   rectificativa de Facturación.
 - La tarea programada `process_queue` (`verifactu.contingency.process`, cada minuto, en UTC, `collapse`) la
-  corre el worker de la fase 2 como el sistema.
+  corre el worker (`base/scheduler.py`, desde `base/worker.py`, cada tick de 5 s) como el sistema: su reloj es
+  una fila de `base.TaskSchedule` que el worker escribe al arrancar; cada pasada la toma con
+  `select_for_update(skip_locked=True)` y mueve `next_run` en la misma transacción que el envío, así que dos
+  workers a la vez (un despliegue) nunca la corren dos veces, y los minutos perdidos con el worker parado se
+  juntan en una sola pasada. Si la pasada falla, se registra en el log, se deshace lo suyo y vuelve al minuto
+  siguiente. En la fase 1 corre sobre un solo hub, `WORKER_SCOPE_SLUG` (por defecto el de plataforma,
+  `PLATFORM_HUB_SLUG`); la fase 2 recorre los hubs a los que les toca (`hub_due`), cada uno con `use_hub`.
 
 ### Administrador de Django
 
-Configuración con CRUD; cadenas y control de envío, de solo lectura salvo `next_send_at`; registros,
-eventos y foto de la AEAT, **de solo lectura**, sin alta ni borrado: la ley obliga a conservarlos y solo las
-operaciones los crean. «Enviar ahora» y «Reintentar» son acciones del admin que llaman a
-`verifactu.record.transmit` y `verifactu.contingency.retry`. **Ronda a escribir en PLAN §17**: CLAUDE.md dice
-«CRUD completo… fiscales incluidas»; aquí, como en Facturación, la ley manda solo lectura en lo sellado.
+Solo para el staff de la plataforma (`hubs.erplora.com/admin`, con el hub elegido en `/admin/hub/<slug>/`), **al
+servicio del soporte**. Criterio de Ioan (2026-10-15): «un registro no enviado no es un registro registrado; no se
+trata de borrar una venta, se trata de poder arreglar si hay un problema de envío, poder reenviar y cosas que se
+necesitan para el soporte». Por eso:
 
-### Contradicciones señaladas (no resueltas aquí)
+- **Lo registrado en la AEAT no se toca.** Un registro aceptado o aceptado con errores, las cabezas de cadena, los
+  eventos, la foto de la AEAT y el certificado propio se ven enteros y en solo lectura, sin alta, cambio ni borrado
+  (un `POST` al formulario de un registro contesta 403). Ninguna acción cambia un registro registrado: lo dice y
+  sigue. Del certificado se ve titular, tipo y caducidad, nunca el material sellado.
+- **Lo no registrado (pendiente, enviado sin respuesta, rechazado) se arregla con acciones que son operaciones**,
+  con el hub elegido y el staff como actor (cada una deja su evento con quién la hizo y un resumen en/es al
+  terminar). Sin hub elegido, ninguna hace nada y lo dice.
+  - **«Reenviar a la AEAT»** → `verifactu.record.transmit`: envía ya cada cadena una vez (el registro más reciente
+    elegido arrastra los anteriores), respetando la espera de la AEAT. «Reenvío terminado: N aceptados, N
+    rechazados, N aún en espera.».
+  - **«Reprogramar: enviar en la próxima pasada»** → `verifactu.contingency.retry` (VERIFACTU-F22): el registro y
+    los anteriores de su cadena salen en la pasada siguiente (la tarea de cada minuto), sin perder sus intentos.
+    «Reprogramado: N registro(s) salen en la próxima pasada.».
+  - **«Consultar a la AEAT (sale de la cola si ya lo tiene)»** → `verifactu.record.reconcile` (VERIFACTU-F35): si
+    la AEAT tiene ese mismo registro (misma huella), sale de la cola como registrado; si no, sigue en la cola.
+    «Consulta a la AEAT: N ya registrados (fuera de la cola), N no están en la AEAT (siguen en la cola).».
+  - **«Subsanar el rechazo con un registro nuevo»** → `verifactu.record.correct` (VERIFACTU-F24), solo sobre un
+    registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registro(s)
+    nuevo(s) en la cola.».
+  - **Retirar de la cola**, como en el antiguo («Cancelar» solo si ya aceptado), es solo lo que la AEAT ya tiene,
+    y se hace consultándola (la acción de arriba). Nada sale de la cola sin que la AEAT lo tenga (VERIFACTU-F23); un
+    rechazo definitivo se resuelve con la subsanación, que deja el rechazado como estaba.
+- **Control de envío por `(NIF, entorno)`**: en solo lectura; su acción **«Reprogramar su cola: enviar en la
+  próxima pasada»** llama a `verifactu.contingency.retry` sobre el registro más reciente que espera en esa cadena.
+  `next_send_at` es el `TiempoEsperaEnvio` de la AEAT y **nunca se acorta** (las preguntas frecuentes de la AEAT, en «Referencia adoptada»):
+  reprogramar hace que salga en cuanto la AEAT lo permita. El `wait_reason` de un registro tampoco se borra al
+  reprogramar: es lo que lo declara fuera de plazo (`Incidencia` S); lo reescribe la pasada siguiente. La excepción
+  es un rechazo de la pasarela (`refused`, con su código y su mensaje en el detalle), que no sale nunca por tiempo:
+  reprogramarlo lo devuelve a la cola sin motivo, y sus intentos lo siguen declarando fuera de plazo.
+- **Configuración**: se ve entera y solo se elige la **vía de envío**, por `verifactu.config.update` (el
+  formulario la ejecuta al validarse, así que su rechazo —sin certificado propio válido, sin el otorgamiento
+  aprobado en producción— es el error del formulario y no se guarda nada). Nunca se teclean el entorno (va por
+  «Pasar a producción» / «Volver a pruebas»), lo que manda la foto del SaaS (`representation_*`, `live_paid`,
+  `hub_status`, `hub_id`, `synced_version`) ni el certificado.
+- **Registros**: las columnas de la pantalla de registros del módulo antiguo (`erp-verifactu-records`: secuencia,
+  factura, fecha, tipo, emisor, total, estado) más el entorno y el CSV de la AEAT; filtros por estado, motivo de
+  espera (solo los que tiene algún registro, en el idioma del lector), tipo de registro, tipo de factura y entorno;
+  jerarquía por fecha de expedición; búsqueda por número, NIF, nombre del emisor, huella y CSV. La ficha agrupa
+  todos los campos en Factura (con enlace a la factura en su admin), Cadena de huellas, Respuesta de la AEAT
+  (estado, **por qué aún no está en la AEAT** en frase, intentos, `wait_reason`, detalle, respuesta y código de la
+  AEAT), XML y Metadatos.
+
+### Contradicciones señaladas
+
+Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
 
 1. **Registro de anulación al anular una venta**: el encargo de esta app pedía un registro de anulación al emitir
    la R5 de una venta anulada; Facturación (decisión 3) y la norma la declaran como un **alta R5**. Aquí se hace
    así; un registro de anulación además la restaría dos veces ante la AEAT. La anulación queda para lo emitido por
    error (VERIFACTU-F30).
-2. **Certificados y apoderamiento**: PLAN-HUB §4 y §8 (y PLAN-SAAS §4) dejan el apoderamiento y el paso a
-   producción «en el Hub», con el hueco `own` del `.p12`; PLAN §16.5 pone el certificado del cliente en la BD
-   del SaaS cifrado con KMS, y working-rules §15 deja la transmisión real y los certificados bajo la supervisión
-   de Ioan. Aquí: el Hub solo guarda el **estado** que manda la cuenta y nunca una clave; el paso a producción
-   exige `VERIFACTU_PRODUCTION_ENABLED` en el servidor.
-3. **Quién revisa el apoderamiento** (PLAN-HUB §8): sigue abierto; los documentos del Anexo I necesitan
-   ficheros (bloque 7) y su revisión, una persona.
-4. **Nombre del módulo**: PLAN-SAAS §4 llama «módulo `fiscal` de `hub-next`» al que recibe el motor VeriFactu del
-   SaaS; la app es `verifactu`.
+2. ~~**Certificados y otorgamiento de representación**~~ — **cerrada (PLAN §28 y su nota en §16.5, ronda
+   2026-10-15c)**: PLAN §16.5 ponía el certificado del cliente en la BD del SaaS cifrado con KMS; la decisión de
+   Ioan del 2026-10-15 (bloque fiscal) lo pone en la **BD del hub**, cifrado con Fernet bajo
+   `FISCAL_CERTIFICATE_KEY`, y así se hace aquí. El otorgamiento se sube en el Hub y lo revisa el SaaS
+   (VERIFACTU-F05). working-rules §15 deja la transmisión real y los certificados bajo la supervisión de Ioan: los tests
+   solo usan certificados generados por ellos y la AEAT de pruebas; el paso a producción exige
+   `VERIFACTU_PRODUCTION_ENABLED` en el servidor.
+3. ~~**Quién revisa el otorgamiento de representación**~~ (PLAN-HUB §8) — **cerrada (ronda §25 y PLAN-HUB §4,
+   2026-10-15c)**: lo revisa el staff de ERPlora en el SaaS (`fiscal/`); el Hub sube los documentos y no los
+   guarda, y el estado vuelve en la foto.
+4. ~~**Nombre del módulo**~~ — **cerrada**: PLAN-SAAS §4 llama «módulo `fiscal` de `hub-next`» al que recibe el
+   motor VeriFactu del SaaS; la app es `verifactu` (en el SaaS, `fiscal/` es la revisión del otorgamiento y
+   `fiscal_gateway/` la pasarela).
 5. **Declaración responsable**: la v1 firmada no nombra una pasarela en Python dentro del SaaS (la v2, sin
    firmar, nombra el `verifactu-gateway` en Rust); el cambio de composición necesita una versión nueva firmada.
-6. **Admin del Hub**: CLAUDE.md dice «CRUD completo… fiscales incluidas»; aquí, como en Facturación, lo sellado es
-   de solo lectura (ronda a escribir en PLAN §17).
+   **Sigue abierta**: es un trámite legal, fuera del código (PLAN-HUB §8, «Bloque fiscal: lo que queda fuera»).
+6. ~~**Admin del Hub**~~ — **cerrada por Ioan (2026-10-15)**: CLAUDE.md dice «CRUD completo… fiscales
+   incluidas» y el brief de la tarea 6, «CRUD completo con aviso»; Ioan fijó el criterio: «un registro no enviado
+   no es un registro registrado; no se trata de borrar una venta, se trata de poder arreglar si hay un problema de
+   envío, poder reenviar y cosas que se necesitan para el soporte». Lo registrado en la AEAT, en solo lectura; lo
+   no registrado, con acciones de soporte que son operaciones; la vía, por su operación (ver «Administrador de
+   Django»). Falta reflejarlo en PLAN §17 (CLAUDE.md sigue diciendo «CRUD completo»).
+7. ~~**«Da servicio a varios obligados» sin origen**~~ — **cerrada (T2b, 2026-10-15)**: `IndicadorMultiplesOT` es
+   «S» siempre, porque ERPlora es un sistema multi-obligado por definición; no depende de la foto. Fuera
+   `multiple_taxpayers` (migración 0004, reversible) y `producer_facts_missing`.
+8. ~~**La opción en vivo y la vía propia**~~ — **cerrada (aceptada en el bloque fiscal, 2026-10-15)**: el encargo de la tarea 2 pedía `live_paid` en las dos vías; el modelo de
+   Ioan («con certificado propio, como en el Hub antiguo») y el plan del bloque solo en la de ERPlora. Aquí, solo en
+   la de ERPlora; es una línea en `queries.route_problem`.
+9. ~~**Cobrar sin ruta de envío**~~ — **cerrada (T2b, 2026-10-15)**: en producción sin ruta, `verifactu.record.create`
+   rechaza con el código de la ruta y no se sella, numera ni cobra (VERIFACTU-F08; «Contrato con Facturación»). La
+   cola ya no espera por `live_option_unpaid`. Venta reconoce esos tres códigos por nombre (como ya nombra las
+   operaciones de Facturación), aunque VeriFactu no está en sus `requires`.
+10. **Hubs demo en la fase 1** — **señalada, para la fase 2**: no hay registro de control ni demos (bloque 7);
+   `base.operations.is_demo_hub` contesta `False` hasta que exista `control.Hub.is_demo`, y entonces es lo único
+   que cambia.
 
 ### Decisiones (dudas abiertas del producto actual)
 
@@ -1067,7 +1320,9 @@ operaciones los crean. «Enviar ahora» y «Reintentar» son acciones del admin 
 4. Se genera la subsanación (antes nunca).
 5. El XML se valida con el esquema real de la AEAT (antes, un validador propio «ligero»).
 6. La lista y los eventos se ponen al día solos; el buscador busca por NIF.
-7. Los certificados y la autorización viven en la cuenta de ERPlora; el Hub solo ve su estado.
+7. El otorgamiento de representación se firma y se sube en el Hub (como el módulo antiguo), lo revisa el staff
+   en el SaaS y su estado vuelve en la foto; el certificado propio se sube en el Hub y se guarda cifrado en la BD
+   del hub (antes, en el core del Hub).
 8. La subsanación lleva el `RechazoPrevio` de la Descripción del servicio web v1.0.3 (`X` / `S` / `N`; antes,
    siempre `S`), el desglose no se recorta nunca (antes, a 12 líneas en silencio), la consulta a la AEAT sigue
    todas sus páginas (antes, solo la primera) y una pasada sin conexión no se cuenta como enviada.
@@ -1113,16 +1368,36 @@ operaciones los crean. «Enviar ahora» y «Reintentar» son acciones del admin 
 | Contingencia (`erp-verifactu-contingency`) | `ContingencyPage.vue` | Sin «Prioridad» (no se usaba) ni «Cancelar» (F23); «Factura» en vez del id interno; estados traducidos |
 | Eventos (`erp-verifactu-events`) | `EventsPage.vue` | Se pone al día sola |
 | Recuperación (`erp-verifactu-recovery`) | `RecoveryPage.vue` | El ancla manual exige número y fecha (son parte del encadenado) |
-| Configuración (`erp-verifactu-config`, `erp-verifactu-grant`) | `ConfigPage.vue` | Los formularios de subida del `.p12` y del Anexo I y la «Conexión segura» pasan a la cuenta de ERPlora; aquí, su estado |
+| Configuración (`erp-verifactu-config`, `erp-verifactu-grant`) | `ConfigPage.vue` (+ `RepresentationGrant.vue`) | La subida del `.p12` sigue aquí («Mi certificado»: elegir el fichero, contraseña, «Subir el certificado», «Quitar») y el Anexo I también («Lo remite ERPlora»: modelo, firmante y PDF, «Enviar a revisión»); un botón y el nombre del fichero en vez de la zona de arrastre (falta el componente en `@erplora/ui`); la «Conexión segura» desaparece (F07) |
 | Ajustes (`erp-verifactu-settings`) | `SettingsPage.vue` | Sin «Activar VeriFactu» (duda 7) ni «Tipo de prueba» (la prueba ya no presenta ninguna muestra) |
 | Tarjetas del panel de Inicio (`erp-verifactu-events-widget` y tres más) | — | El panel de Inicio con tarjetas es de la plataforma y aún no existe; los datos están en `verifactu.stats.*` |
+
+### Qué queda fuera
+
+Del bloque fiscal del 2026-10-15 (el resto, en PLAN-HUB §8, «Bloque fiscal: lo que queda fuera»):
+
+- **Rotar `FISCAL_CERTIFICATE_KEY`**: un solo `Fernet`, sin `MultiFernet`; con la clave cambiada, el certificado
+  guardado no se abre y los registros por la vía propia esperan con `own_certificate_unreadable` hasta que se vuelva
+  a subir.
+- **Avisar por correo de la caducidad del certificado propio**: hoy el aviso es solo en pantalla, a 30 días.
+- **Subsanar y anular en producción sin ruta**: no se rechazan (no son cobros) y esperan en la cola.
+- **Arrastrar y soltar los ficheros** (certificado y otorgamiento): falta el componente de subida en
+  `@erplora/ui`; hoy, un botón y el nombre del fichero.
+- **El bucle por hubs del worker** (fase 2): en la fase 1, las tareas programadas corren sobre un solo hub,
+  `WORKER_SCOPE_SLUG`.
+- **`create_platform_hub` solo cuando haya una BD por hub** (fase 2): en la fase 1 hay una sola BD y su emisor
+  sería el de todos los hosts; el comando se niega si ya hay otro emisor.
+- **Botón «Consultar a la AEAT» en la SPA** (VERIFACTU-F35): la operación, su ruta y su tipo en `operations.d.ts`
+  existen; hoy se usa desde el admin del Hub.
+- **OSS**: la factura de plataforma no lleva el aviso «VAT included — customer VAT number could not be verified»
+  del PDF antiguo cuando el NIF-IVA del cliente no se pudo verificar.
 
 ### Lo que NO hace, a propósito
 
 - No emite, anula ni modifica facturas: eso es Facturación.
 - No calcula impuestos: los importes llegan decididos.
-- No guarda certificados, claves ni contraseñas: viven en la cuenta de ERPlora (la del cliente, cifrada con KMS;
-  el sello, en Secrets Manager).
+- No guarda el sello de ERPlora (Secrets Manager, solo en el SaaS) ni enseña nunca el material del certificado
+  propio: el `.p12` y su contraseña se guardan cifrados y solo salen hacia la pasarela.
 - No borra ni edita un registro sellado.
 - No presenta nada a la AEAT por su cuenta: lo hace la pasarela del SaaS.
 - No lleva el registro de eventos de la modalidad NO VERI\*FACTU.

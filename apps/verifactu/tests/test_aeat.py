@@ -212,3 +212,42 @@ def test_more_pages_without_the_key_to_ask_for_them_is_unreadable():
     )
     with pytest.raises(aeat.UnreadableAnswer, match="ClavePaginacion"):
         aeat.parse_query(body)
+
+
+def query_records() -> list[aeat.QueriedRecord]:
+    body = FIXTURES.joinpath("consulta_preproduccion_2026-08-01.xml").read_text(encoding="utf-8")
+    return aeat.parse_query(body).records
+
+
+def test_the_aeat_holds_a_record_when_its_issuer_number_and_fingerprint_match():
+    # PRU-20260801-0004 is «Correcto» and PRU-20260801-0002 «AceptadoConErrores» in the AEAT's answer.
+    records = query_records()
+    correct = "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696"
+    assert aeat.held_as(records, "B27593136", "PRU-20260801-0004", correct.lower()) == "accepted"
+    with_errors = next(item for item in records if item.number == "PRU-20260801-0002")
+    assert (
+        aeat.held_as(records, "B27593136", "PRU-20260801-0002", with_errors.fingerprint)
+        == "accepted_with_errors"
+    )
+
+
+def test_another_record_of_the_same_invoice_is_not_this_one():
+    # A correction the AEAT has not registered yet: the AEAT holds the invoice with the earlier fingerprint.
+    records = query_records()
+    assert aeat.held_as(records, "B27593136", "PRU-20260801-0004", "0" * 64) is None
+    assert aeat.held_as(records, "B00000000", "PRU-20260801-0004", records[0].fingerprint) is None
+    assert aeat.held_as(records, "B27593136", "PRU-20260801-0009", records[0].fingerprint) is None
+
+
+def test_an_empty_fingerprint_never_matches_an_answer_without_one():
+    # A record with no fingerprint is not identified by one: an answer whose «Huella» came back empty is not it.
+    records = query_records()
+    blank = aeat.QueriedRecord(**{**records[0].__dict__, "fingerprint": ""})
+    assert aeat.held_as([blank], blank.issuer_nif, blank.number, "") is None
+    assert aeat.held_as([blank], blank.issuer_nif, blank.number, "   ") is None
+
+
+def test_a_state_the_aeat_never_documented_is_not_taken_as_registered():
+    records = query_records()
+    odd = aeat.QueriedRecord(**{**records[0].__dict__, "state": "Pendiente"})
+    assert aeat.held_as([odd], odd.issuer_nif, odd.number, odd.fingerprint) is None

@@ -5,14 +5,20 @@ No path parameters (as ``apps.demo``): a record's id or its invoice's number tra
 platform).
 """
 
+import base64
+
+from django.http import HttpResponse
 from live.ninja import bind, run_operation
 from ninja import Query, Router
+from ninja.decorators import decorate_view
 
-from apps.verifactu import queries, services
+from apps.verifactu import queries, representation, services
+from base.request_body import accept_body_up_to
 from apps.verifactu.schemas import (
     AeatQueryIn,
     AeatRecordListIn,
     ByInvoiceIn,
+    CertificateUploadIn,
     ChainValidateIn,
     ConfigUpdateIn,
     ContingencyListIn,
@@ -25,9 +31,11 @@ from apps.verifactu.schemas import (
     RecordCreateIn,
     RecordGetIn,
     RecordListIn,
+    RecordReconcileIn,
     RecordTransmitIn,
     RecoverFromAeatIn,
     RecoverManualIn,
+    RepresentationSubmitIn,
 )
 
 router = Router(tags=["verifactu"])
@@ -54,6 +62,55 @@ async def config_go_live(request):
 @bind(router, "verifactu.config.back_to_testing", "/verifactu/config/back_to_testing")
 async def config_back_to_testing(request):
     return await run_operation(request, services.back_to_testing)
+
+
+# The own certificate (VERIFACTU-F02, F03)
+
+
+@bind(router, "verifactu.certificate.upload", "/verifactu/certificate", status=201)
+async def certificate_upload(request, data: CertificateUploadIn):
+    return await run_operation(request, services.upload_certificate, data)
+
+
+@bind(router, "verifactu.certificate.remove", "/verifactu/certificate/remove")
+async def certificate_remove(request):
+    return await run_operation(request, services.remove_certificate)
+
+
+# The signed authorisation (VERIFACTU-F05, F06): the documents in the body, four PDFs of up to 5 MB in base64, more
+# than Django's ceiling for any other view. The blank model is served as the PDF it is, or as the operation's JSON
+# to a client that asks for JSON alone (the SPA's API client), which turns it into the file.
+
+
+@bind(router, "verifactu.representation.submit", "/verifactu/representation", status=201)
+@decorate_view(accept_body_up_to(representation.MAX_BODY_BYTES))
+async def representation_submit(request, data: RepresentationSubmitIn):
+    return await run_operation(request, services.submit_representation, data)
+
+
+@bind(
+    router,
+    "verifactu.representation.model",
+    "/verifactu/representation/model",
+    openapi_extra={
+        "responses": {
+            200: {
+                "description": "The blank official model: the PDF, or the operation's JSON when only JSON is accepted.",
+                "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+            }
+        }
+    },
+)
+async def representation_model(request):
+    model = await run_operation(request, queries.representation_model)
+    accepts = request.headers.get("Accept", "")
+    if "application/json" in accepts and "application/pdf" not in accepts:
+        return model
+    return HttpResponse(
+        base64.b64decode(model.content_base64),
+        content_type=model.content_type,
+        headers={"Content-Disposition": f'attachment; filename="{model.filename}"'},
+    )
 
 
 # Records
@@ -92,6 +149,11 @@ async def record_cancel(request, data: RecordCancelIn):
 @bind(router, "verifactu.record.transmit", "/verifactu/records/transmit")
 async def record_transmit(request, data: RecordTransmitIn):
     return await run_operation(request, services.transmit_record, data)
+
+
+@bind(router, "verifactu.record.reconcile", "/verifactu/records/reconcile")
+async def record_reconcile(request, data: RecordReconcileIn):
+    return await run_operation(request, services.reconcile_record, data)
 
 
 # The queue

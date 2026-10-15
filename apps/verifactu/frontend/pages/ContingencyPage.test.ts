@@ -58,6 +58,19 @@ describe('ContingencyPage', () => {
     expect(cells.slice(0, 4)).toEqual(['TICKET-2026-000001', 'Testing (AEAT test)', '2', 'Pending']);
   });
 
+  it('a record the gateway refused promises no next attempt', async () => {
+    const s = await setup();
+    await s.result(OP, {
+      rows: [{ ...ROW, next_attempt_at: null, last_error: "ERPlora's gateway could not present it (no_certificate)" }],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    });
+    const cells = s.wrapper.findAll('[data-testid="verifactu-queue-row"]')[0].findAll('[role="cell"]').map((c) => plain(c.text().trim()));
+    expect(cells[4]).toBe('');
+    expect(cells[5]).toContain('could not present it');
+  });
+
   it('an empty queue says everything is in the AEAT', async () => {
     const s = await setup();
     await s.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });

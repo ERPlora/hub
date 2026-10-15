@@ -1505,6 +1505,21 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
 
 # ── The fiscal document of a write: Invoicing, by name, in the same transaction ──────────────────
 
+#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT
+#: now (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal.
+#: Working-rules §15, as the old Hub's ``enforce_fiscal_road`` (HUB-1935): nothing is charged that could never be
+#: filed. The route's lacks and the server's (its own certificate it cannot open, no gateway, real filing closed).
+NO_WAY_TO_THE_AEAT = frozenset(
+    {
+        "verifactu.live_option_unpaid",
+        "verifactu.representation_not_approved",
+        "verifactu.own_certificate_missing",
+        "verifactu.own_certificate_unreadable",
+        "verifactu.gateway_unavailable",
+        "verifactu.production_closed",
+    }
+)
+
 #: The keys of ``sale.sale.completed`` that carry the recipient of an invoice (empty, never null).
 RECIPIENT_KEYS = (
     "customer_name",
@@ -1533,8 +1548,10 @@ def _fiscal_document(
     issue…): its savepoint leaves nothing behind, the write goes on, and Invoicing's own reaction to the
     notice issues it later (INVOICE-F06). A programming error (``LiveMisuse``) is never swallowed. With
     ``typed_recipient`` (a full invoice, whose recipient is the cashier's input), Invoicing refusing that
-    input (``InvalidPayload``) is the caller's 422, to fix now: such a document would never be issued.
-    ``strict`` («Issue now»): every refusal reaches the caller as it is, worded by Invoicing."""
+    input (``InvalidPayload``) is the caller's 422, to fix now: such a document would never be issued. A
+    business that files for real and cannot reach the AEAT (``NO_WAY_TO_THE_AEAT``) refuses the write itself:
+    nothing is charged. ``strict`` («Issue now»): every refusal reaches the caller as it is, worded by
+    Invoicing."""
     try:
         answer = call_app(ctx, name, data, "sale.invoice_unavailable")
     except InvalidPayload:
@@ -1542,7 +1559,7 @@ def _fiscal_document(
             raise
         failure = "invalid_payload"
     except Conflict as refusal:
-        if strict:
+        if strict or refusal.code in NO_WAY_TO_THE_AEAT:
             raise
         if refusal.code == "sale.invoice_unavailable":
             return {"status": FiscalStatus.UNAVAILABLE, "id": None, "number": "", "type": ""}
