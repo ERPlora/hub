@@ -12,7 +12,14 @@ import pytest
 from django.utils import timezone, translation
 from live.context import system_context
 
-from apps.verifactu.models import AeatRecord, Config, Event, Record, SendControl
+from apps.verifactu.models import (
+    AeatRecord,
+    Config,
+    Event,
+    OwnCertificate,
+    Record,
+    SendControl,
+)
 from apps.verifactu.tests.conftest import A, RECIPIENT, ctx_for, manual, run
 
 pytestmark = pytest.mark.django_db
@@ -377,27 +384,34 @@ def test_the_configuration_starts_in_testing_through_erplora(issuer, settings):
     }
 
 
-def test_the_certificate_says_when_it_expires(issuer):
-    expires = timezone.now() + dt.timedelta(days=20, hours=1)
-    run(
-        "verifactu.config.sync",
-        {
-            "version": 1,
-            "own_certificate": {
-                "loaded": True,
-                "holder": "ANA",
-                "expires_at": expires.isoformat(),
-            },
-        },
-        system_context(A),
+def test_the_certificate_says_whose_it_is_and_when_it_expires(issuer):
+    OwnCertificate.objects.create(
+        holder="ANA LOPEZ",
+        holder_tax_id="12345678Z",
+        kind="personal",
+        expires_at=timezone.now() + dt.timedelta(days=20, hours=1),
+        sealed_blob=b"sealed",
+        uploaded_by="ana",
     )
-    config = run("verifactu.config.get")
+    certificate = run("verifactu.config.get").own_certificate
     assert (
-        config.own_certificate.loaded,
-        config.own_certificate.holder,
-        config.own_certificate.expires_in_days,
-    ) == (True, "ANA", 20)
-    assert config.synced_at is not None
+        certificate.loaded,
+        certificate.holder,
+        certificate.holder_tax_id,
+        certificate.kind,
+        certificate.expires_in_days,
+    ) == (True, "ANA LOPEZ", "12345678Z", "personal", 20)
+    assert certificate.uploaded_at is not None
+    assert "sealed" not in certificate.model_dump_json()
+
+
+def test_without_a_certificate_it_says_not_loaded(issuer):
+    certificate = run("verifactu.config.get").own_certificate
+    assert (certificate.loaded, certificate.holder, certificate.expires_at) == (
+        False,
+        "",
+        None,
+    )
 
 
 def test_with_a_production_record_it_cannot_go_back(three):

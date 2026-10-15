@@ -21,7 +21,7 @@ from pydantic import (
 )
 
 from apps.verifactu import chain
-from apps.verifactu.models import Config, Event, Record
+from apps.verifactu.models import Config, Event, OwnCertificate, Record
 
 T = TypeVar("T")
 
@@ -384,10 +384,12 @@ class ProducerOut(Schema):
 
 
 class CertificateOut(Schema):
-    loaded: bool = Field(
-        description="An own certificate is loaded in the ERPlora account."
-    )
+    loaded: bool = Field(description="An own certificate is loaded in this Hub.")
     holder: str = Field(description="Its holder.")
+    holder_tax_id: str = Field(description="Its holder's tax ID.")
+    kind: Literal["", *OwnCertificate.Kind.values] = Field(
+        description="seal, representative, personal or unknown; empty without one."
+    )
     uploaded_at: dt.datetime | None = Field(description="When it was uploaded.")
     expires_at: dt.datetime | None = Field(description="When it expires.")
     expires_in_days: int | None = Field(description="Days left (negative: expired).")
@@ -420,10 +422,10 @@ class ConfigOut(Schema):
     )
     declaration_url: str = Field(description="Where to read it.")
     account_url: str = Field(
-        description="The ERPlora account, where certificates and the authorisation are managed."
+        description="The ERPlora account, where the signed authorisation is managed."
     )
     own_certificate: CertificateOut = Field(
-        description="The own certificate, as the account says."
+        description="The own certificate uploaded in this Hub (never its material)."
     )
     representation: RepresentationOut = Field(
         description="The signed authorisation, as the account says."
@@ -631,13 +633,6 @@ class ConfigUpdateIn(Schema):
     )
 
 
-class CertificateIn(Schema):
-    loaded: bool = Field(description="An own certificate is loaded.")
-    holder: _text(200) = Field("", description="Its holder.")
-    uploaded_at: dt.datetime | None = Field(None, description="When it was uploaded.")
-    expires_at: dt.datetime | None = Field(None, description="When it expires.")
-
-
 class RepresentationIn(Schema):
     status: RepresentationCode = Field(
         description="none, submitted, approved, returned or revoked."
@@ -654,9 +649,6 @@ class ConfigSyncIn(Schema):
     )
     multiple_taxpayers: Literal["S", "N"] | None = Field(
         None, description="IndicadorMultiplesOT."
-    )
-    own_certificate: CertificateIn | None = Field(
-        None, description="The own certificate's state."
     )
     representation: RepresentationIn | None = Field(
         None, description="The signed authorisation's state."

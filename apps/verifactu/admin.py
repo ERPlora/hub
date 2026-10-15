@@ -2,6 +2,8 @@
 
 - Configuration: edited (the route and what the ERPlora account sends), except its environment, which moves
   only through ``verifactu.config.go_live`` / ``back_to_testing`` (their guards are the law's).
+- Own certificate: its holder, kind and expiry only, read-only; never its sealed material (the .p12 and its
+  password), which only ``verifactu.certificate.upload`` / ``remove`` write.
 - Chain heads, records, audit events and the AEAT's photo: shown whole and read-only, never added (only the
   operations seal, with the chain's lock) nor deleted (the records are kept: RD 1007/2023). **Round to write
   in PLAN §17**: CLAUDE.md says «full CRUD… fiscal ones included»; here, as in Invoicing, the law keeps what
@@ -17,7 +19,15 @@ from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import get
 
-from apps.verifactu.models import AeatRecord, Chain, Config, Event, Record, SendControl
+from apps.verifactu.models import (
+    AeatRecord,
+    Chain,
+    Config,
+    Event,
+    OwnCertificate,
+    Record,
+    SendControl,
+)
 from base.admin import ADMIN_HUB_SESSION_KEY
 
 DONE = {
@@ -50,7 +60,6 @@ class ConfigAdmin(admin.ModelAdmin):
         "environment",
         "route",
         "representation_status",
-        "own_certificate_loaded",
         "synced_at",
     )
     readonly_fields = (
@@ -62,6 +71,24 @@ class ConfigAdmin(admin.ModelAdmin):
         "updated_at",
         "updated_by",
     )
+
+
+@admin.register(OwnCertificate)
+class OwnCertificateAdmin(admin.ModelAdmin):
+    """Whose it is and until when; the sealed material is never a field here."""
+
+    list_display = ("holder", "holder_tax_id", "kind", "expires_at", "uploaded_at")
+    fields = ("holder", "holder_tax_id", "kind", "expires_at", "uploaded_at", "uploaded_by")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
 
 
 @admin.register(Chain)

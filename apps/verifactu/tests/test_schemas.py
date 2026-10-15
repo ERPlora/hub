@@ -115,17 +115,21 @@ def test_the_route_is_erplora_or_own():
     assert "route" in refused(schemas.ConfigUpdateIn, {"route": "gateway"})
 
 
+def test_the_photo_no_longer_carries_the_certificate():
+    """The certificate is uploaded in the Hub (Ioan, 2026-10-15): an older photo that still names it is read
+    without it."""
+    assert "own_certificate" not in schemas.ConfigSyncIn.model_fields
+    data = schemas.ConfigSyncIn.model_validate(
+        {"version": 1, "own_certificate": {"loaded": True, "holder": "ANA"}}
+    )
+    assert "own_certificate" not in data.model_dump()
+
+
 def test_the_accounts_photo():
     data = schemas.ConfigSyncIn.model_validate(
         {
             "version": 7,
             "multiple_taxpayers": "N",
-            "own_certificate": {
-                "loaded": True,
-                "holder": "ANA LOPEZ",
-                "uploaded_at": "2026-10-01T10:00:00Z",
-                "expires_at": "2028-10-01T10:00:00Z",
-            },
             "representation": {
                 "status": "approved",
                 "updated_at": "2026-10-02T10:00:00Z",
@@ -134,7 +138,6 @@ def test_the_accounts_photo():
         }
     )
     assert data.version == 7
-    assert data.own_certificate.loaded is True
     assert data.representation.status == "approved"
     assert "multiple_taxpayers" in refused(
         schemas.ConfigSyncIn, {"version": 1, "multiple_taxpayers": "Y"}

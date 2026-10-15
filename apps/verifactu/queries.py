@@ -28,6 +28,7 @@ from apps.verifactu.models import (
     Config,
     Environment,
     Event,
+    OwnCertificate,
     Record,
     SendControl,
     wait_reason_text,
@@ -99,18 +100,31 @@ def production_open() -> bool:
     return bool(value)
 
 
-def certificate_valid(config: Config, now: dt.datetime | None = None) -> bool:
-    now = now or timezone.now()
-    return config.own_certificate_loaded and (
-        config.own_certificate_expires_at is None
-        or config.own_certificate_expires_at > now
+def own_certificate() -> OwnCertificate | None:
+    """The business's own certificate, its sealed material left unread; ``None`` while none is uploaded."""
+    return OwnCertificate.objects.defer("sealed_blob").filter(singleton=True).first()
+
+
+def own_certificate_blob() -> bytes | None:
+    """The sealed material of the own certificate (``certificates.material`` opens it); ``None`` without one."""
+    blob = (
+        OwnCertificate.objects.filter(singleton=True)
+        .values_list("sealed_blob", flat=True)
+        .first()
     )
+    return bytes(blob) if blob is not None else None
+
+
+def certificate_valid(now: dt.datetime | None = None) -> bool:
+    """Whether an own certificate is uploaded and has not expired."""
+    now = now or timezone.now()
+    return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
 def route_problem(config: Config, environment: str) -> str:
     """Why the chosen route cannot file in ``environment`` (a wait code), or ``""``."""
     if config.route == Config.Route.OWN:
-        return "" if certificate_valid(config) else "own_certificate_missing"
+        return "" if certificate_valid() else "own_certificate_missing"
     if (
         environment == Environment.PRODUCTION
         and config.representation_status != Config.Representation.APPROVED
@@ -281,7 +295,8 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     nif, name = issuer_identity()
     system = system_for(config, ctx)
     now = timezone.now()
-    expires = config.own_certificate_expires_at
+    certificate = own_certificate()
+    expires = certificate.expires_at if certificate else None
     return ConfigOut(
         environment=config.environment,
         route=config.route,
@@ -308,9 +323,11 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         declaration_url=producer.declaration_url(),
         account_url=settings.SAAS_URL.rstrip("/"),
         own_certificate={
-            "loaded": config.own_certificate_loaded,
-            "holder": config.own_certificate_holder,
-            "uploaded_at": config.own_certificate_uploaded_at,
+            "loaded": certificate is not None,
+            "holder": certificate.holder if certificate else "",
+            "holder_tax_id": certificate.holder_tax_id if certificate else "",
+            "kind": certificate.kind if certificate else "",
+            "uploaded_at": certificate.uploaded_at if certificate else None,
             "expires_at": expires,
             "expires_in_days": (expires - now).days if expires else None,
         },
@@ -349,8 +366,8 @@ def _words(text: str | None) -> list[str]:
     output=ConfigOut,
     ai={
         "description": "VeriFactu's configuration: the environment (testing or production), the sending route (ERPlora "
-        "files for the business, or its own certificate), the certificate's and the signed authorisation's state as "
-        "the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
+        "files for the business, or its own certificate), the own certificate uploaded here (holder and expiry, never "
+        "its material), the signed authorisation's state as the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
         "records from leaving now."
     },
 )

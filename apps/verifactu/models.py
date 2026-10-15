@@ -1,8 +1,11 @@
 """Models of the verifactu app (WORKBOOK «Para quien lo mantiene»).
 
 - ``Config``: one row; the environment (testing or production), the route (ERPlora files, or the business's own
-  certificate) and what the ERPlora account sends (the certificate's and the authorisation's state, the
-  producer's ``IndicadorMultiplesOT``).
+  certificate) and what the ERPlora account sends (the authorisation's state, the producer's
+  ``IndicadorMultiplesOT``).
+- ``OwnCertificate``: one row at most; the business's own certificate, uploaded here (VERIFACTU-F02): its holder,
+  kind and expiry, and the .p12 with its password sealed together (``certificates.seal``). The sealed blob is
+  never shown: not in ``str``, the admin, the API nor the photo.
 - ``Chain``: the head of a chain, one per ``(issuer NIF, environment)``: the last sequence and the last record's
   fingerprint, number and date. Sealing a record locks it.
 - ``SendControl``: the queue's control row, one per ``(issuer NIF, environment)``: ``next_send_at`` (the AEAT's
@@ -80,18 +83,6 @@ class Config(UUIDModel):
     multiple_taxpayers = models.CharField(
         _("serves several taxpayers"), max_length=1, blank=True
     )
-    own_certificate_loaded = models.BooleanField(
-        _("own certificate loaded"), default=False
-    )
-    own_certificate_holder = models.CharField(
-        _("certificate holder"), max_length=200, blank=True
-    )
-    own_certificate_uploaded_at = models.DateTimeField(
-        _("certificate uploaded at"), null=True, blank=True
-    )
-    own_certificate_expires_at = models.DateTimeField(
-        _("certificate expires at"), null=True, blank=True
-    )
     representation_status = models.CharField(
         _("representation"),
         max_length=10,
@@ -129,6 +120,42 @@ class Config(UUIDModel):
 
     def __str__(self) -> str:
         return str(_("VeriFactu configuration"))
+
+
+class OwnCertificate(UUIDModel):
+    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``)."""
+
+    class Kind(models.TextChoices):
+        SEAL = "seal", _("Electronic seal")
+        REPRESENTATIVE = "representative", _("Representative of an entity")
+        PERSONAL = "personal", _("Personal")
+        UNKNOWN = "unknown", _("Other")
+
+    singleton = models.BooleanField(_("single row"), default=True, editable=False)
+    holder = models.CharField(_("holder"), max_length=200)
+    holder_tax_id = models.CharField(_("holder's tax ID"), max_length=20)
+    kind = models.CharField(_("kind"), max_length=14, choices=Kind.choices)
+    expires_at = models.DateTimeField(_("expires at"))
+    uploaded_at = models.DateTimeField(_("uploaded at"), default=timezone.now)
+    uploaded_by = models.CharField(
+        _("uploaded by"), max_length=ACTOR_MAX_LENGTH, blank=True
+    )
+    sealed_blob = models.BinaryField(_("sealed certificate"), editable=False)
+
+    class Meta:
+        verbose_name = _("own certificate")
+        verbose_name_plural = _("own certificate")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["singleton"], name="verifactu_owncertificate_single_row"
+            ),
+            models.CheckConstraint(
+                condition=Q(singleton=True), name="verifactu_owncertificate_singleton"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.holder} ({self.holder_tax_id})"
 
 
 class Chain(UUIDModel):

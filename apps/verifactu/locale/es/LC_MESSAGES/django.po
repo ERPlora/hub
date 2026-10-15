@@ -127,22 +127,6 @@ msgstr "en producción desde"
 msgid "serves several taxpayers"
 msgstr "da servicio a varios obligados"
 
-#: models.py:84
-msgid "own certificate loaded"
-msgstr "certificado propio cargado"
-
-#: models.py:87
-msgid "certificate holder"
-msgstr "titular del certificado"
-
-#: models.py:90
-msgid "certificate uploaded at"
-msgstr "certificado subido el"
-
-#: models.py:93
-msgid "certificate expires at"
-msgstr "el certificado caduca el"
-
 #: models.py:96
 msgid "representation"
 msgstr "otorgamiento de representación"
@@ -818,10 +802,6 @@ msgstr "La AEAT no tiene registros de ese emisor este mes: no hay nada que recup
 msgid "The test invoice is only for the test environment."
 msgstr "La factura de prueba es solo para el entorno de pruebas."
 
-#: services.py:125
-msgid "There is no certificate loaded: upload it in your ERPlora account to use it."
-msgstr "No hay ningún certificado cargado: súbelo en tu cuenta de ERPlora para poder usarlo."
-
 #: services.py:128
 msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."
@@ -837,3 +817,55 @@ msgstr "Configura antes el emisor en Facturación → Emisor."
 #: services.py:135
 msgid "It cannot go back to testing: this business already has records in production."
 msgstr "No se puede volver a pruebas: este negocio ya tiene registros en producción."
+
+#: models.py
+msgid "Electronic seal"
+msgstr "Sello electrónico"
+
+#: models.py
+msgid "Representative of an entity"
+msgstr "Representante de entidad"
+
+#: models.py
+msgid "Personal"
+msgstr "Persona física"
+
+#: models.py
+msgid "Other"
+msgstr "Otro"
+
+#: models.py
+msgid "holder"
+msgstr "titular"
+
+#: models.py
+msgid "holder's tax ID"
+msgstr "NIF del titular"
+
+#: models.py
+msgid "kind"
+msgstr "tipo"
+
+#: models.py
+msgid "expires at"
+msgstr "caduca el"
+
+#: models.py
+msgid "uploaded at"
+msgstr "subido el"
+
+#: models.py
+msgid "uploaded by"
+msgstr "subido por"
+
+#: models.py
+msgid "sealed certificate"
+msgstr "certificado cifrado"
+
+#: models.py
+msgid "own certificate"
+msgstr "certificado propio"
+
+#: services.py
+msgid "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
+msgstr "No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado."

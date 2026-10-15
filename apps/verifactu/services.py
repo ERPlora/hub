@@ -122,7 +122,7 @@ NOTHING_TO_RECOVER = _(
 )
 TESTING_ONLY = _("The test invoice is only for the test environment.")
 NO_OWN_CERTIFICATE = _(
-    "There is no certificate loaded: upload it in your ERPlora account to use it."
+    "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
 )
 REPRESENTATION_NOT_APPROVED = _(
     "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
@@ -1632,7 +1632,7 @@ def _route_refusal(config: Config, route: str, environment: str) -> Conflict | N
     ai={
         "description": "Choose who files the VeriFactu records: «erplora» (ERPlora files on the business's behalf with "
         "its seal; in production it needs the approved signed authorisation) or «own» (the business's own certificate, "
-        "loaded in its ERPlora account).",
+        "uploaded in VeriFactu → Configuration).",
         "risk": "high",
     },
 )
@@ -1715,7 +1715,7 @@ def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
     output=ConfigSyncOut,
     ai={
         "description": "System only: the platform hands over the ERPlora account's VeriFactu block (whether it serves "
-        "several taxpayers, the own certificate's and the signed authorisation's state) with its version; an equal or "
+        "several taxpayers, the signed authorisation's state) with its version; an equal or "
         "older version is ignored.",
         "risk": "high",
     },
@@ -1726,11 +1726,6 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
         return ConfigSyncOut(applied=False, version=config.synced_version)
     if data.multiple_taxpayers is not None:
         config.multiple_taxpayers = data.multiple_taxpayers
-    if data.own_certificate is not None:
-        config.own_certificate_loaded = data.own_certificate.loaded
-        config.own_certificate_holder = data.own_certificate.holder
-        config.own_certificate_uploaded_at = data.own_certificate.uploaded_at
-        config.own_certificate_expires_at = data.own_certificate.expires_at
     if data.representation is not None:
         config.representation_status = data.representation.status
         config.representation_updated_at = data.representation.updated_at

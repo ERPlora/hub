@@ -14,6 +14,7 @@ from apps.verifactu.models import (
     Chain,
     Config,
     Event,
+    OwnCertificate,
     Record,
     SendControl,
     backoff,
@@ -77,6 +78,34 @@ def test_there_is_one_configuration_row_and_it_starts_in_testing_through_erplora
     assert config.representation_status == "none"
     with pytest.raises(IntegrityError), transaction.atomic():
         Config.objects.create()
+
+
+def test_own_certificate_is_a_single_row_without_the_blob_in_str():
+    row = OwnCertificate.objects.create(
+        holder="ACME SL",
+        holder_tax_id="B12345674",
+        kind="representative",
+        expires_at=timezone.now() + dt.timedelta(days=30),
+        sealed_blob=b"x-sealed-material",
+        uploaded_by="u",
+    )
+    assert "sealed-material" not in str(row)
+    assert "sealed-material" not in repr(row)
+    assert "B12345674" in str(row)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        OwnCertificate.objects.create(
+            holder="B",
+            holder_tax_id="B1",
+            kind="personal",
+            expires_at=timezone.now(),
+            sealed_blob=b"y",
+            uploaded_by="u",
+        )
+
+
+def test_the_configuration_no_longer_keeps_the_certificates_state():
+    names = {field.name for field in Config._meta.get_fields()}
+    assert not {name for name in names if name.startswith("own_certificate")}
 
 
 def test_one_chain_head_and_one_send_control_per_issuer_and_environment():

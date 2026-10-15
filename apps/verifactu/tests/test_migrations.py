@@ -19,6 +19,7 @@ TABLES = {
     "verifactu_record",
     "verifactu_event",
     "verifactu_aeatrecord",
+    "verifactu_owncertificate",
 }
 
 
@@ -49,7 +50,8 @@ def test_the_first_migration_depends_on_invoicing():
     )
     assert any(app == "invoice" for app, _name in first.dependencies)
     assert sorted(path.name for path in Path(MIGRATIONS[0]).glob("0*.py")) == [
-        "0001_initial.py"
+        "0001_initial.py",
+        "0002_own_certificate.py",
     ]
 
 

@@ -17,7 +17,15 @@ from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice
 from apps.verifactu import chain, gateway, xsd
-from apps.verifactu.models import AeatRecord, Chain, Config, Event, Record, SendControl
+from apps.verifactu.models import (
+    AeatRecord,
+    Chain,
+    Config,
+    Event,
+    OwnCertificate,
+    Record,
+    SendControl,
+)
 import re
 
 from apps.verifactu.tests.conftest import (
@@ -1183,13 +1191,16 @@ def test_the_test_invoice_is_only_for_the_test_environment(issuer):
 # Configuration (VERIFACTU-F04, F08, F09) and the account's photo
 
 
-def certificate(**more):
-    return {
-        "loaded": True,
-        "holder": "ANA LOPEZ",
-        "expires_at": (timezone.now() + dt.timedelta(days=400)).isoformat(),
-        **more,
-    }
+def own_certificate(days: float = 400) -> OwnCertificate:
+    """A certificate as an upload leaves it (its material aside: the route only reads its expiry)."""
+    return OwnCertificate.objects.create(
+        holder="ACME SL",
+        holder_tax_id=ISSUER_NIF,
+        kind="representative",
+        expires_at=timezone.now() + dt.timedelta(days=days),
+        sealed_blob=b"sealed",
+        uploaded_by="ana",
+    )
 
 
 def test_the_own_route_needs_a_loaded_certificate(issuer):
@@ -1197,24 +1208,13 @@ def test_the_own_route_needs_a_loaded_certificate(issuer):
         code_of(lambda: run("verifactu.config.update", {"route": "own"}))
         == "verifactu.no_own_certificate"
     )
-    run(
-        "verifactu.config.sync",
-        {"version": 1, "own_certificate": certificate()},
-        system_context(A),
-    )
+    own_certificate()
     assert run("verifactu.config.update", {"route": "own"}).route == "own"
     assert outbox("verifactu.config.changed")
 
 
 def test_an_expired_certificate_is_no_certificate(issuer):
-    expired = certificate(
-        expires_at=(timezone.now() - dt.timedelta(days=1)).isoformat()
-    )
-    run(
-        "verifactu.config.sync",
-        {"version": 1, "own_certificate": expired},
-        system_context(A),
-    )
+    own_certificate(days=-1)
     assert (
         code_of(lambda: run("verifactu.config.update", {"route": "own"}))
         == "verifactu.no_own_certificate"

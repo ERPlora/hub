@@ -19,6 +19,7 @@ from apps.verifactu.models import (
     Config,
     Environment,
     Event,
+    OwnCertificate,
     Record,
     SendControl,
 )
@@ -62,8 +63,9 @@ def visible_texts() -> set[str]:
         *Record.Status.labels,
         *Event.Kind.labels,
         *Event.Severity.labels,
+        *OwnCertificate.Kind.labels,
     ]
-    for model in (Config, Chain, SendControl, Record, Event, AeatRecord):
+    for model in (Config, Chain, SendControl, Record, Event, AeatRecord, OwnCertificate):
         lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
         lazies += [
             field.verbose_name

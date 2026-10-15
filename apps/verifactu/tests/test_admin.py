@@ -18,10 +18,19 @@ from apps.verifactu.admin import (
     ChainAdmin,
     ConfigAdmin,
     EventAdmin,
+    OwnCertificateAdmin,
     RecordAdmin,
     SendControlAdmin,
 )
-from apps.verifactu.models import AeatRecord, Chain, Config, Event, Record, SendControl
+from apps.verifactu.models import (
+    AeatRecord,
+    Chain,
+    Config,
+    Event,
+    OwnCertificate,
+    Record,
+    SendControl,
+)
 from apps.verifactu.tests.conftest import manual, run
 from base.admin import ADMIN_HUB_SESSION_KEY
 
@@ -49,8 +58,21 @@ def model_admin(admin_class, model):
 
 
 def test_every_model_is_registered():
-    for model in (Config, Chain, SendControl, Record, Event, AeatRecord):
+    for model in (Config, Chain, SendControl, Record, Event, AeatRecord, OwnCertificate):
         assert model in admin.site._registry, model
+
+
+def test_the_own_certificate_shows_its_holder_kind_and_expiry_and_never_its_material(
+    request_of,
+):
+    request = request_of()
+    instance = model_admin(OwnCertificateAdmin, OwnCertificate)
+    shown = set(instance.get_fields(request)) | set(instance.list_display)
+    assert {"holder", "holder_tax_id", "kind", "expires_at"} <= shown
+    assert "sealed_blob" not in shown
+    assert instance.has_add_permission(request) is False
+    assert instance.has_change_permission(request) is False
+    assert instance.has_delete_permission(request) is False
 
 
 @pytest.mark.parametrize(

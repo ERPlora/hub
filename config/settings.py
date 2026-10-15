@@ -240,6 +240,10 @@ INTERNAL_SHARED_SECRET = (
     if DEBUG
     else config("INTERNAL_SHARED_SECRET")
 )
+# The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals a business's own VeriFactu
+# certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
+# certificate is refused visibly (verifactu.certificate_storage_unavailable).
+FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
 # for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
 PLATFORM_HOST_LABEL = "hubs"

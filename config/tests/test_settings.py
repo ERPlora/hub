@@ -58,6 +58,7 @@ ENV_KEYS = (
     "TEST_DB_NAME",
     "ERPLORA_ENVIRONMENT",
     "HUB_BASE_DOMAIN",
+    "FISCAL_CERTIFICATE_KEY",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -207,6 +208,17 @@ def test_the_saas_and_its_shared_secret_come_from_the_environment(load_settings)
     assert (loaded["SAAS_URL"], loaded["INTERNAL_SHARED_SECRET"]) == (
         "https://erplora.com",
         "shared-with-the-saas",
+    )
+
+
+def test_the_fiscal_certificate_key_comes_from_the_environment(load_settings):
+    """The key that seals a business's own certificate in its hub database (VeriFactu); without it the Hub
+    starts and refuses, visibly, to keep a certificate."""
+    assert load_settings(**PRODUCTION_ENV)["FISCAL_CERTIFICATE_KEY"] == ""
+    key = "Hh3cG0mN2r1n6Xl2X3oYgq1xk3s0b4b8XG0bN3J3yPQ="
+    assert (
+        load_settings(**PRODUCTION_ENV, FISCAL_CERTIFICATE_KEY=key)["FISCAL_CERTIFICATE_KEY"]
+        == key
     )
 
 
