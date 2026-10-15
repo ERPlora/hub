@@ -1603,7 +1603,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     config = config_row()
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment)
-    gateway_ready, gateway_detail = None, ""
+    gateway_ready, gateway_detail, refusal = None, "", ""
     if gateway.configured() and "own_certificate_unreadable" not in codes:
         reply = gateway.probe(
             hub=ctx.scope.key,
@@ -1614,9 +1614,15 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
         )
         gateway_ready = reply.kind == gateway.ANSWERED and reply.ready
         gateway_detail = reply.message or reply.code
+        # A refusal is kept as a record keeps it, so a known one is told in the reader's language.
+        refusal = (
+            f"{reply.code}: {reply.message}"
+            if reply.kind == gateway.REFUSED
+            else gateway_detail
+        )
         if not gateway_ready:
             codes.append("refused")
-    details = {"refused": gateway_detail}
+    details = {"refused": refusal}
     result = {
         "ran_at": timezone.now(),
         "environment": config.environment,

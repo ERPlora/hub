@@ -18,9 +18,10 @@ contributors): 5 s to connect and 45 s to read, longer than the gateway's own wa
 30 s to read). How a call ended is the reply's ``kind``:
 
 - ``answered``: the gateway answered (the AEAT's answer inside, whatever it says);
-- ``refused``: the gateway will not present it as it is (``409`` ``nif_mismatch``, ``no_seal``,
-  ``no_certificate``, ``certificate_invalid``, ``environment_not_allowed``; ``413`` ``payload_too_large``;
-  ``422`` ``invalid_payload``), its code and message kept to be shown;
+- ``refused``: the gateway will not present it as it is (``404`` ``hub_unknown``, the body's ``hub`` names no hub
+  of the SaaS; ``409`` ``nif_mismatch``, ``representation_not_approved``, ``no_seal``, ``no_certificate``,
+  ``certificate_invalid``, ``environment_not_allowed``; ``413`` ``payload_too_large``; ``422``
+  ``invalid_payload``), its code and message kept to be shown;
 - ``unreachable``: nothing reached the AEAT (no connection, ``502 aeat_unreachable`` with ``sent: false``,
   ``503 gateway_busy``, another status): to retry;
 - ``unknown``: the request left and no usable answer came back (``502 aeat_unreachable`` with ``sent: true``,
@@ -43,6 +44,8 @@ PROBE_PATH = "/internal/verifactu/probe"
 TIMEOUT = httpx.Timeout(45.0, connect=5.0)
 #: Statuses whose contract error says the gateway will never present this call as it is.
 REFUSALS = (409, 413, 422)
+#: The one 404 that is a refusal (saas#29): any other 404 is a door not there yet, tried again.
+UNKNOWN_HUB = "hub_unknown"
 
 ANSWERED = "answered"
 REFUSED = "refused"
@@ -137,6 +140,8 @@ def _reply(path: str, payload: dict) -> Reply:
         return _refusal(response, _error(response))
     if response.status_code != 200:
         error = _error(response)
+        if response.status_code == 404 and error and error["code"] == UNKNOWN_HUB:
+            return _refusal(response, error)
         said = f": {error.get('message', '')}" if error else "."
         if error and error["code"] == "aeat_unreachable" and error.get("sent") is True:
             return Reply(

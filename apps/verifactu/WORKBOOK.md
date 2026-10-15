@@ -1060,10 +1060,13 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
     certificado propio (VERIFACTU-F02) viaja descifrado en cada llamada y la pasarela no lo guarda; para
     presentarlo, su clave PEM pasa unos milisegundos por disco, en dos ficheros `0600` de un directorio
     temporal privado del SaaS que se borra en cuanto TLS los ha leído.
-  - Lo que no es `200`: `409 {"error": {"code", "message"}}` con `nif_mismatch` (el sobre nombra a otro
-    contribuyente; se decide antes de tocar la AEAT), `no_seal`, `no_certificate`, `certificate_invalid` o
+  - Lo que no es `200`: `404 {"error": {"code": "hub_unknown"}}` (el `hub` del cuerpo no es ningún hub del SaaS;
+    saas#29; cualquier otro 404 es una puerta que aún no está y se reintenta); `409 {"error": {"code",
+    "message"}}` con `nif_mismatch` (el sobre nombra a otro contribuyente; se decide antes de tocar la AEAT),
+    `representation_not_approved`, `no_seal`, `no_certificate`, `certificate_invalid` o
     `environment_not_allowed`; `413 payload_too_large` (más de 10 MiB); `422 invalid_payload` (con `fields`):
-    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro): sigue
+    el Hub los toma como **rechazo** (`refused`, con su código y mensaje a la vista en el registro y en la prueba
+    de conexión; `hub_unknown` y `representation_not_approved` con texto propio en/es en vez del mensaje del SaaS): sigue
     `pending` y no se reintenta solo, porque se rechazaría igual; vuelve a la cola al cambiar la vía, subir el
     certificado o llegar una foto nueva de la cuenta, o a mano («Reenviar a la AEAT» del admin, «Enviar ahora»,
     «Reintentar»). `502 {"error": {"code": "aeat_unreachable", "sent"}}`: con `sent = true` la

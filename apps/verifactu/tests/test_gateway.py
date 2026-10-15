@@ -260,6 +260,7 @@ def test_a_busy_gateway_is_tried_again(configured):
     ("status", "code"),
     [
         (409, "nif_mismatch"),
+        (409, "representation_not_approved"),
         (409, "no_seal"),
         (409, "no_certificate"),
         (409, "certificate_invalid"),
@@ -289,6 +290,32 @@ def test_what_the_gateway_will_never_present_is_a_refusal_with_its_code(
     assert reply.message.startswith("Not presented.")
     if status == 422:
         assert "hub" in reply.message
+
+
+@respx.mock
+def test_a_hub_the_saas_does_not_know_is_a_refusal_not_a_retry(configured):
+    # saas#29: the gateway answers 404 ``hub_unknown`` when the body's ``hub`` names no hub of the SaaS; trying it
+    # again as it is would be refused forever.
+    respx.post(f"{URL}/internal/verifactu/submit").mock(
+        return_value=httpx.Response(
+            404,
+            json={"error": {"code": "hub_unknown", "message": "No such hub."}},
+        )
+    )
+    reply = submit()
+    assert (reply.kind, reply.code) == (gateway.REFUSED, "hub_unknown")
+    assert reply.message == "No such hub."
+
+
+@respx.mock
+def test_a_door_that_is_not_there_is_still_tried_again(configured):
+    # A 404 without the contract's ``hub_unknown`` is a gateway not deployed yet or a wrong URL: it may come back.
+    respx.post(f"{URL}/internal/verifactu/submit").mock(
+        return_value=httpx.Response(
+            404, json={"error": {"code": "not_found", "message": "Not found."}}
+        )
+    )
+    assert submit().kind == gateway.UNREACHABLE
 
 
 def test_the_hub_waits_longer_than_the_gateway_waits_for_the_aeat():
