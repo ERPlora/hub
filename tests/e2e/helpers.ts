@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { withRetry } from './retry';
+import { readMailCode } from './mail';
+import { isConnectionRefused, withRetry } from './retry';
 
 export const A = 'http://a.localhost:8000';
 export const B = 'http://b.localhost:8000';
@@ -64,18 +65,24 @@ export interface Credentials {
 export const OWNER: Credentials = { email: 'owner@example.com', password: 'owner' };
 /** The PoC's employee in the SaaS (`demo_seed`): `hub_employee` of `a` and `b`, views Demo only. */
 export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 'employee' };
+/** Where the local SaaS writes its mails (Django's file backend); `E2E_MAIL_DIR` overrides it. */
+export const MAIL_DIR = process.env.E2E_MAIL_DIR ?? join(REPO_DIR, 'saas-next', '.mail');
+/** Slack between our clock and the mail file's modification time, in ms. */
+const MAIL_CLOCK_SLACK = 50;
 
 /**
  * The real login of a hub: `origin + next` → the SPA's gate sends to the SaaS (`/hub-login/?hub=…`)
- * → the SaaS asks for the account (or, signed in there already, skips it) → it POSTs a one-time code
- * to `origin/auth/callback` → the Hub opens its session and lands on `next`. Whatever sign-in page
- * the SaaS shows (allauth's template or the SPA's `/login`), it has one e-mail and one password:
- * those of `credentials` (the owner unless told otherwise).
+ * → the SaaS asks for the account at `/launch` (or, signed in there already, skips it) → every
+ * password sign-in then waits at `/verify-email` for the code the SaaS mails to the account
+ * (`ACCOUNT_LOGIN_BY_CODE_REQUIRED`), read from the local SaaS's mail folder (`MAIL_DIR`) → it
+ * follows its `next` (`/hub-login/…`), which POSTs a one-time code to `origin/auth/callback` → the Hub
+ * opens its session and lands on `next`. The account is `credentials` (the owner unless told otherwise).
  *
  * runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
  * `origin + next` again, because a POST that died leaves Chrome's error page, with no form to
- * submit; if the SaaS did sign in, the second trip skips its form. Any other failure fails at once.
+ * submit; if the SaaS did sign in, the second trip skips its form, and if it did not, signing in
+ * again mails a new code, the one read then. Any other failure fails at once, saying at which step.
  */
 export async function login(
   page: Page,
@@ -94,16 +101,13 @@ export async function login(
       ]);
       if (where === null) throw new Error(`login on ${origin}: neither the SaaS nor the hub's shell showed up`);
       if (where === 'saas') {
-        const password = page.locator('input[type=password]').first();
+        const form = page.getByTestId('login-form');
         const step = await Promise.race([
-          password.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'form' as const, () => null),
+          form.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'form' as const, () => null),
           page.waitForURL((url) => url.origin === origin, { timeout: 30_000 }).then(() => 'back' as const, () => null),
         ]);
-        if (step === 'form') {
-          await page.locator('input[type=email], input[autocomplete=username]').first().fill(credentials.email);
-          await password.fill(credentials.password);
-          await page.locator('form [type=submit]:visible').first().click();
-        }
+        if (step === null) throw new Error(`login on ${origin}: the SaaS showed neither its sign-in form nor the hub`);
+        if (step === 'form') await signInWithCode(page, origin, target, credentials);
       }
       await page.waitForURL(target, { timeout: 30_000 });
     },
@@ -113,6 +117,63 @@ export async function login(
     },
   );
   await inHub();
+}
+
+/**
+ * The SaaS's sign-in form (`/launch`) and then, when the SaaS asks for it, the code it mailed
+ * (`/verify-email`); done once the browser is on its way back to the hub. A step that does not come
+ * fails with the step's name and what the page said; a refused connection keeps its own error, so
+ * that `login` tries again.
+ */
+async function signInWithCode(page: Page, origin: string, target: string, credentials: Credentials): Promise<void> {
+  const form = page.getByTestId('login-form');
+  await form.getByTestId('login-email').locator('input').fill(credentials.email);
+  await form.getByTestId('login-password').locator('input').fill(credentials.password);
+  // Taken before the submit: the mail is written while the SaaS answers it.
+  const since = Date.now() - MAIL_CLOCK_SLACK;
+  await form.getByTestId('login-submit').click();
+
+  const codeForm = page.getByTestId('verify-email-form');
+  const backHome = (url: URL) => url.origin === origin || url.pathname.startsWith('/hub-login');
+  const step = await Promise.race([
+    codeForm.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'code' as const, () => null),
+    page.waitForURL(backHome, { timeout: 30_000 }).then(() => 'back' as const, () => null),
+  ]);
+  if (step === null) {
+    throw new Error(`login on ${origin}: sign-in form sent, but neither /verify-email nor the hub came${await saidBy(page)}`);
+  }
+  if (step === 'back') return;
+
+  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since }).catch((error: unknown) => {
+    throw new Error(`login on ${origin}: mail not found: ${error instanceof Error ? error.message : String(error)}`);
+  });
+  // `CodeField` is one input today; six one-digit inputs would take a digit each.
+  const inputs = codeForm.locator('input:not([type=hidden])');
+  const count = await inputs.count();
+  if (count >= code.length) {
+    for (const [i, digit] of [...code].entries()) await inputs.nth(i).fill(digit);
+  } else {
+    await inputs.first().fill(code);
+  }
+  await codeForm.getByTestId('verify-email-submit').click();
+  try {
+    await page.waitForURL(target, { timeout: 30_000 });
+  } catch (error) {
+    if (isConnectionRefused(error)) throw error;
+    const where = new URL(page.url()).pathname === '/verify-email' ? 'code rejected' : 'next not reached';
+    throw new Error(`login on ${origin}: ${where} (code ${code} for ${credentials.email}, at ${page.url()})${await saidBy(page)}`);
+  }
+}
+
+/** The alert the page shows, if any, as `: «…»` for an error message. */
+async function saidBy(page: Page): Promise<string> {
+  // Only decorates an error already being thrown: a page that is gone or navigating adds nothing.
+  const alerts = await page
+    .locator('[role=alert]:visible')
+    .allInnerTexts()
+    .catch(() => []);
+  const text = alerts.map((alert) => alert.trim()).filter(Boolean).join(' / ');
+  return text ? `: «${text}»` : '';
 }
 
 /** A new browser context logged in on `origin` (as the owner unless `credentials`), first page on `next`. */
