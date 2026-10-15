@@ -256,7 +256,7 @@ test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; fo
   await context.close();
 });
 
-test('Ajustes: the missing paid option keeps the business from going live until the photo says it is paid', async ({ browser }) => {
+test('Ajustes: the missing paid option keeps the business from going live until the photo says it is paid; the closed server still does', async ({ browser }) => {
   await pushPhoto('approved', false);
   const { context, page } = await spanishPage(browser, '/verifactu/settings');
   const view = shown(page);
@@ -266,11 +266,12 @@ test('Ajustes: the missing paid option keeps the business from going live until 
   await expect(blockers).not.toContainText('falta que ERPlora apruebe tu autorización firmada');
   await expect(view.locator('[data-testid=verifactu-settings-go-live]')).toHaveAttribute('aria-disabled', 'true');
 
-  // The live result follows the next photo, without reloading.
+  // The live result follows the next photo, without reloading: the plan no longer blocks it.
   await pushPhoto('approved', true);
-  await expect(blockers).toHaveCount(0);
-  // Still closed: this server has not opened production (VERIFACTU_PRODUCTION_ENABLED, prod only).
-  await expect(view.locator('[data-testid=verifactu-settings-closed]')).toBeVisible();
+  await expect(blockers).not.toContainText('la opción en vivo de VeriFactu no está en tu plan');
+  // Still closed: this server has not opened production (VERIFACTU_PRODUCTION_ENABLED, prod only), and that is one
+  // more of the reasons listed, not a notice of its own.
+  await expect(blockers).toContainText('ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor');
   await expect(view.locator('[data-testid=verifactu-settings-go-live]')).toHaveAttribute('aria-disabled', 'true');
   await context.close();
 });
