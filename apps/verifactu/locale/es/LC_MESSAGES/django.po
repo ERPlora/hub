@@ -14,25 +14,38 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
 
-#: admin.py:24
-msgid "sent to the AEAT through ERPlora's gateway."
-msgstr "enviado a la AEAT por la pasarela de ERPlora."
+#: admin.py:37
+msgid "Resend to the AEAT"
+msgstr "Reenviar a la AEAT"
 
-#: admin.py:25
-msgid "goes out with the next pass."
-msgstr "sale en la próxima pasada."
+#: admin.py:38
+#, python-format
+msgid ""
+"Resend finished: %(accepted)s accepted, %(rejected)s rejected, %(waiting)s "
+"still waiting."
+msgstr ""
+"Reenvío terminado: %(accepted)s aceptados, %(rejected)s rechazados, "
+"%(waiting)s aún en espera."
 
-#: admin.py:27
-msgid "Send now"
-msgstr "Enviar ahora"
-
-#: admin.py:28
-msgid "Retry with the next pass"
-msgstr "Reintentar en la próxima pasada"
-
-#: admin.py:30
+#: admin.py:41
 msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."
 msgstr "Elige antes un hub (su enlace en el admin del SaaS): la acción se ejecuta en ese hub."
+
+#: admin.py:44
+msgid "Invoice"
+msgstr "Factura"
+
+#: admin.py:45
+msgid "Hash chain"
+msgstr "Cadena de huellas"
+
+#: admin.py:46
+msgid "AEAT response"
+msgstr "Respuesta de la AEAT"
+
+#: admin.py:47
+msgid "Metadata"
+msgstr "Metadatos"
 
 #: apps.py:13
 msgid "VeriFactu"
