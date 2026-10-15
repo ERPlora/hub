@@ -97,7 +97,8 @@ def _post(path: str, payload: dict) -> tuple[str, httpx.Response | None, str]:
         SIGNATURE_HEADER: sign(settings.INTERNAL_SHARED_SECRET, timestamp, body),
     }
     try:
-        with httpx.Client(timeout=TIMEOUT) as client:
+        # Straight to the SaaS's internal address: a proxy of the process never sees an envelope or a certificate.
+        with httpx.Client(timeout=TIMEOUT, trust_env=False) as client:
             return "", client.post(f"{url}{path}", content=body, headers=headers), ""
     except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as error:
         return UNREACHABLE, None, f"The gateway could not be reached: {error}."
