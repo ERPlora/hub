@@ -1,0 +1,557 @@
+{
+  "flow": {
+    "title": "Automations",
+    "loading": "Loading…",
+    "unnamed": "Untitled automation",
+    "active": "Active",
+    "paused": "Paused",
+    "unfinished": "Unfinished",
+    "noPermission": "You do not have permission",
+    "error": "Something went wrong. Nothing was saved.",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "list": {
+      "new": "New automation",
+      "heading": "Your automations",
+      "search": "Search by name, by what starts it or by what it does",
+      "count": "Showing {shown} of {total}",
+      "noMatch": "Nothing here matches that.",
+      "clear": "Show them all again",
+      "loadError": "The automations could not be loaded.",
+      "entity": {
+        "one": "automation",
+        "many": "automations"
+      },
+      "filterState": "Showing",
+      "stateActive": "Only the running ones",
+      "statePaused": "Only the paused ones",
+      "filterTrigger": "Starts with",
+      "triggerEvent": "Something happening",
+      "triggerSchedule": "The clock",
+      "triggerAt": "A date",
+      "triggerManual": "You, by hand",
+      "sortLabel": "Order",
+      "sortUpdated": "Last touched",
+      "sortName": "Name",
+      "columns": {
+        "name": "Name",
+        "starts": "Starts",
+        "lastRun": "Last run",
+        "state": "State"
+      },
+      "neverRan": "Never ran",
+      "enable": "Turn «{name}» on or off",
+      "duplicate": "Make a copy",
+      "delete": "Delete",
+      "bulkEnable": "Turn them on",
+      "bulkPause": "Pause them",
+      "copied": "Copied, and the copy is paused. It has none of the original's permissions: allow what it needs before turning it on.",
+      "deleteTitle": "Delete «{name}»?",
+      "deleteMessage": "This cannot be undone. Its history stays.",
+      "deleteYes": "Yes, delete it",
+      "deleteNo": "Leave it",
+      "deleted": "Deleted.",
+      "enabledMissing": "On, but it still lacks the permissions it asks for: it will do nothing until you allow them in its Permissions tab.",
+      "stateAll": "Running and paused",
+      "triggerAny": "Anything"
+    },
+    "drafts": {
+      "heading": "Proposed by the assistant",
+      "intro": "The assistant wrote them when you asked it for an automation. They do nothing until you review and turn them on.",
+      "badge": "Draft",
+      "review": "Review",
+      "dismiss": "Discard",
+      "dismissed": "Discarded."
+    },
+    "gallery": {
+      "heading": "Ready-made automations",
+      "intro": "Pick one and it becomes yours, paused, so you can look at it before it does anything.",
+      "guide": "How does this work?",
+      "sectors": {
+        "any": "Any business",
+        "beauty": "Hair and beauty",
+        "food": "Bars and restaurants"
+      },
+      "use": "Use this one",
+      "useHint": "It is created paused. Nothing happens until you turn it on.",
+      "see": "See it",
+      "decide": "What you decide",
+      "nothingToDecide": "There is nothing to fill in. It is ready as it is.",
+      "asks": "What it will ask permission to do",
+      "alreadyFires": "Careful: «{name}» already starts with the same thing.",
+      "hidden": "Some automations are hidden: they need {apps}.",
+      "apps": {
+        "task": "Tasks",
+        "customer": "Customers",
+        "sale": "Sales",
+        "staff": "Staff",
+        "cash_register": "Cash register",
+        "verifactu": "VeriFactu",
+        "appointment": "Appointments",
+        "reservation": "Reservations"
+      },
+      "reasons": {
+        "task__task__create": "To leave the task on the list.",
+        "customer__note__add": "To write the note on the customer's card."
+      },
+      "author": "Automations",
+      "cards": {
+        "welcome": {
+          "name": "Welcome a new customer",
+          "summary": "A day after a customer card is created, the task of welcoming them.",
+          "plain": "When a customer card is created, it waits one day and leaves the task «Welcome the new customer».",
+          "blank": "How long to wait",
+          "blankHint": "One day; change it in the Wait step.",
+          "task": "Welcome the new customer"
+        },
+        "bigSaleNote": {
+          "name": "Note the big sales on the card",
+          "summary": "When a sale of 100,00 € or more has a customer, a note on their card.",
+          "plain": "When a sale is charged, only if it has a customer and is 100,00 € or more, it writes «Big sale» on the customer's card.",
+          "blank": "The amount",
+          "blankHint": "100,00 € is 10000: money is in cents.",
+          "note": "Big sale"
+        },
+        "newStaff": {
+          "name": "The checklist of someone new in the team",
+          "summary": "When somebody joins the team, the task of preparing their first day.",
+          "plain": "When somebody is added in Staff, it leaves the task «Prepare the first day of the new team member».",
+          "blank": "Whose list it falls on",
+          "blankHint": "Nobody's: assign it in Tasks, or add who in the step.",
+          "task": "Prepare the first day of the new team member",
+          "description": "Account, uniform, keys and the tour of the business."
+        },
+        "cashClose": {
+          "name": "Review the till when it closes",
+          "summary": "When a till is closed, the task of reviewing the closing.",
+          "plain": "When a till is closed, it leaves the task «Review the till closing».",
+          "blank": "Who reviews it",
+          "blankHint": "Nobody in particular: assign it in Tasks.",
+          "task": "Review the till closing",
+          "description": "Compare the counted cash with the expected one and note any difference."
+        },
+        "fiscalRejected": {
+          "name": "Find out when the tax agency rejects a record",
+          "summary": "When VeriFactu marks a record as rejected, an urgent task.",
+          "plain": "When the tax agency rejects a record (or it could not be sent), it leaves the urgent task «An invoice is not registered with the tax agency».",
+          "blank": "Who looks at it",
+          "blankHint": "Nobody in particular: assign it in Tasks.",
+          "task": "An invoice is not registered with the tax agency",
+          "description": "Open VeriFactu → Records to see why and send it again."
+        },
+        "weekReview": {
+          "name": "Review the week on Friday",
+          "summary": "Every Friday at 18:00, the task of reviewing the week.",
+          "plain": "Every Friday at 18:00 it leaves the task «Review the week».",
+          "blank": "When",
+          "blankHint": "Fridays at 18:00; change it in the trigger.",
+          "task": "Review the week",
+          "description": "Sales, appointments and the tasks still to do this week."
+        },
+        "morning": {
+          "name": "Check the agenda every morning",
+          "summary": "Every day at 09:00, the task of reviewing today's agenda.",
+          "plain": "Every day at 09:00 it leaves the task «Review today's agenda», high priority.",
+          "blank": "The time",
+          "blankHint": "09:00; change it in the trigger.",
+          "task": "Review today's agenda"
+        },
+        "noShow": {
+          "name": "Call whoever did not come",
+          "summary": "When an appointment is marked as a no-show, an urgent task to call them.",
+          "plain": "When an appointment is marked as «did not come», it leaves the urgent task «Call the customer who did not come».",
+          "task": "Call the customer who did not come"
+        },
+        "bigParty": {
+          "name": "Prepare the tables of big groups",
+          "summary": "When a reservation of six or more comes in, the task of preparing it.",
+          "plain": "When a table is reserved, only if they are six or more, it leaves the task «Prepare a table for a big group».",
+          "blank": "How many people",
+          "blankHint": "Six or more; change it in «Only continue if…».",
+          "task": "Prepare a table for a big group",
+          "people": "People"
+        },
+        "bigSaleTask": {
+          "name": "Hear about big sales",
+          "summary": "When a sale over 100,00 € is charged, a task to thank the customer.",
+          "plain": "When a sale is charged, only if it is over 100,00 €, it leaves the task «Thank the customer of a big sale» with the sale's number.",
+          "blank": "The amount",
+          "blankHint": "Over 100,00 € (10000 in cents); change it in «Only when…».",
+          "task": "Thank the customer of a big sale"
+        }
+      }
+    },
+    "guide": {
+      "title": "How automations work",
+      "back": "Back to the automations",
+      "what": {
+        "title": "What an automation is",
+        "body": "A rule that runs on its own: when something happens in your business (a sale is charged, a customer is created), at a time (every day at 9) or when you press Run, it does its steps in order — leave a task, write a note on a card — without anybody in front of it."
+      },
+      "first": {
+        "title": "Your first automation, step by step",
+        "steps": [
+          "Pick a card in the gallery and press Use this one: it is created paused.",
+          "Look at its steps and change what you want (the amount, the time, the wait).",
+          "In Permissions, press Allow everything it needs.",
+          "Open Try it to see what it would do with the last thing that really happened.",
+          "Turn it on and press Save."
+        ]
+      },
+      "permissions": {
+        "title": "Permissions: why you have to say yes",
+        "body": "An automation acts while nobody is watching, so it never borrows your permissions: it can only do what you allowed it, one by one. Until you allow a step, that step is refused when its turn comes and the history says so. If yours has never done anything, look at Permissions first."
+      },
+      "worked": {
+        "title": "How to know whether it worked",
+        "body": "Every time it runs there is a line in its History: when, how it ended and, step by step, what it did. A condition that stopped it is the automation working; a failure says why and what to do. Each run has a reference you can copy for support."
+      },
+      "limits": {
+        "title": "What it cannot do yet",
+        "items": [
+          "Branches: an automation is one column; «Only continue if…» ends it when it does not hold. Two outcomes are two automations.",
+          "Counting back from a date of the event («the day before the appointment»): a wait counts from the previous step.",
+          "Sending messages, calling another system or asking the assistant or a person: they come in a later version.",
+          "The assistant writes drafts: it never turns an automation on nor allows it anything."
+        ]
+      }
+    },
+    "editor": {
+      "back": "Back",
+      "name": "Name of the automation",
+      "test": "Try it",
+      "run": "Run now",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved.",
+      "enable": "Turn this automation on",
+      "tabs": {
+        "steps": "Steps",
+        "test": "Try it",
+        "permissions": "Permissions",
+        "history": "History",
+        "label": "Sections of the automation"
+      },
+      "notTested": "You have not tried it yet: open Try it to see what it would do.",
+      "leaveTitle": "Leave without saving?",
+      "leaveMessage": "The changes you made will be lost.",
+      "leaveYes": "Leave",
+      "leaveNo": "Stay",
+      "runTitle": "Run it now?",
+      "runMessage": "It will really do what its steps say.",
+      "runYes": "Yes, run it",
+      "runNo": "Cancel",
+      "ran": "Run. See it in History.",
+      "draftBanner": "This is a draft the assistant wrote. It is off, has no permissions and nothing happens until you turn it on.",
+      "draftNotes": "What the assistant could not decide",
+      "draftGone": "That draft is no longer waiting.",
+      "notFound": "That automation does not exist in this business.",
+      "ranFailed": "It ran and stopped by an error: {message}",
+      "ranWaiting": "It ran and is waiting: see it in History.",
+      "runSaveFirst": "Save it first: «Run now» runs what is saved."
+    },
+    "trigger": {
+      "when": "When this happens…",
+      "kind": "Starts",
+      "kinds": {
+        "event": "Something happens",
+        "schedule": "On a schedule",
+        "at": "Once, at a date and time",
+        "manual": "Only by hand"
+      },
+      "chooseEvent": "Choose what happens",
+      "searchEvent": "Search what happens…",
+      "onlyWhen": "Only when…",
+      "onlyWhenHint": "Without conditions it starts with every one.",
+      "every": "How often",
+      "everyDay": "Every day",
+      "everyWeek": "Every week",
+      "everyMonth": "Every month",
+      "weekday": "Day of the week",
+      "monthDay": "Day of the month",
+      "monthDayHint": "A month without that day is skipped.",
+      "time": "Time",
+      "at": "Date and time",
+      "weekdays": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+      ],
+      "describe": {
+        "event": "When {event}",
+        "noEvent": "Choose what has to happen for it to start",
+        "manual": "Only when you press Run",
+        "day": "Every day at {time}",
+        "week": "Every {weekday} at {time}",
+        "month": "Every month on day {day} at {time}",
+        "at": "Once, on {date}",
+        "noDate": "Once, on a date you choose"
+      }
+    },
+    "steps": {
+      "none": "No steps yet. Add the first thing this automation should do.",
+      "add": {
+        "command": "Do something",
+        "query": "Look something up",
+        "condition": "Only continue if…",
+        "delay": "Wait"
+      },
+      "remove": "Remove this step",
+      "reorder": "Drag to reorder",
+      "what": "What to do",
+      "whatQuery": "What to look up",
+      "choose": "Choose an action…",
+      "chooseQuery": "Choose what to read…",
+      "noAction": "Choose what this step does",
+      "info": "With this information",
+      "addInfo": "Add information",
+      "required": "required",
+      "removeInfo": "Remove this information",
+      "keep": "What to keep",
+      "keepFirst": "The first row it finds, field by field",
+      "keepCount": "Only how many there are",
+      "queryHint": "If it finds nothing, the automation carries on; to stop it, add «Only continue if…» on «Found something» after it.",
+      "guard": "Only continue if",
+      "guardHint": "If they do not all hold, the automation ends here without error.",
+      "addCondition": "Add a condition",
+      "removeCondition": "Remove this condition",
+      "data": "Data",
+      "is": "Is",
+      "value": "Value",
+      "inHint": "Separate the values with commas.",
+      "yes": "yes",
+      "no": "no",
+      "operators": {
+        "eq": "equal to",
+        "neq": "not equal to",
+        "in": "one of",
+        "exists": "present",
+        "contains": "contains",
+        "gt": "greater than",
+        "gte": "greater than or equal to",
+        "lt": "less than",
+        "lte": "less than or equal to"
+      },
+      "amount": "How long",
+      "unit": "Unit",
+      "units": {
+        "minutes": {
+          "one": "minute",
+          "many": "minutes"
+        },
+        "hours": {
+          "one": "hour",
+          "many": "hours"
+        },
+        "days": {
+          "one": "day",
+          "many": "days"
+        }
+      },
+      "wait": "Wait {amount} {unit}",
+      "insert": "Insert data",
+      "removeData": "Remove this data",
+      "describe": {
+        "noCondition": "nothing yet",
+        "query": "Look up: {action}",
+        "found": "Found something",
+        "count": "How many"
+      }
+    },
+    "picker": {
+      "title": "Which data?",
+      "input": "What brought it",
+      "step": "What step {n} left",
+      "none": "There is no data to insert here yet: choose what happens first, or add an action before.",
+      "example": "e.g. {value}",
+      "noExample": "no example yet",
+      "close": "Close"
+    },
+    "test": {
+      "banner": "None of this is real. Nothing is sent, nothing is charged and nothing is written down: this is only what your automation WOULD do.",
+      "with": "With what really happened the last time: {event} ({date}).",
+      "noSample": "This has not happened in your business lately, so it walks the steps with nothing in.",
+      "noEvent": "It does not start with an event: it walks the steps with nothing in.",
+      "notStart": "It would not even start: «Only when…» does not hold.",
+      "outcomes": {
+        "would_run": "Would do it",
+        "stops_here": "It would stop here, and that is the automation working",
+        "cannot_tell": "This cannot be checked here: it depends on a step that has not run",
+        "waits": "Would wait {duration}",
+        "refused": "They would refuse it",
+        "not_allowed": "They would refuse it: you have not allowed it «{action}» yet",
+        "unavailable": "«{action}» is not available in this business",
+        "not_reached": "Would not get here",
+        "high_risk": "«{action}» needs a person in front: an automation cannot do it"
+      },
+      "empty": "Would arrive empty: {fields}",
+      "unknown": "Comes from an earlier step that has not run: {fields}",
+      "loading": "Trying…",
+      "again": "Try again"
+    },
+    "permissions": {
+      "intro": "An automation runs with its own permissions, never with yours. Nothing below happens until you allow it.",
+      "missing": "Waiting for your permission",
+      "granted": "Allowed",
+      "withdraw": "Withdraw",
+      "grantAll": "Allow everything it needs",
+      "updated": "Permissions updated.",
+      "none": "Its steps ask for nothing.",
+      "saveFirst": "Save it first: then you can allow what it needs.",
+      "saveChanges": "Save it first: what you allow is what is saved."
+    },
+    "history": {
+      "empty": "It has not run yet.",
+      "attention": "Needs somebody",
+      "more": "See more",
+      "copy": "Copy the reference",
+      "copied": "Copied. Paste it if you ask us about this run.",
+      "technical": "The technical text, for support",
+      "showSteps": "Show its steps",
+      "byHand": "By hand",
+      "statuses": {
+        "running": "Running",
+        "waiting": "Waiting",
+        "succeeded": "Finished well",
+        "stopped": "Finished: a condition did not hold",
+        "failed": "Stopped by an error",
+        "cancelled": "Cancelled"
+      },
+      "log": {
+        "done": "Did: {action}",
+        "found": "Found {n}",
+        "not_found": "Found nothing, and carried on",
+        "passed": "The condition held",
+        "stopped": "It stopped here because this was not met: {clauses}. That is the automation working.",
+        "waiting": "Waiting until {date}",
+        "waited": "Waited {duration}",
+        "failed": "{action}: {message}"
+      },
+      "advice": {
+        "flow__not_allowed": "Open Permissions and allow what it needs.",
+        "flow__action_unavailable": "Turn its app on again, or change the step.",
+        "flow__invalid_params": "Open the step and fill in what it asks for.",
+        "flow__loop_stopped": "Check that its steps do not start it again.",
+        "flow__step_crashed": "Try again later; if it happens again, send us the reference.",
+        "flow__high_risk": "Do it by hand, from its app."
+      },
+      "attentionOne": "{n} run stopped by a problem",
+      "attentionMany": "{n} runs stopped by a problem"
+    },
+    "events": {
+      "customer__customer__created": "a customer card is created",
+      "customer__customer__updated": "a customer card changes",
+      "customer__customer__deleted": "a customer card is deleted",
+      "customer__consent__withdrawn": "a customer withdraws their consent",
+      "customer__note__added": "a note is written on a customer",
+      "sale__sale__completed": "a sale is charged",
+      "sale__sale__voided": "a sale is voided",
+      "sale__sale__refunded": "a sale is refunded",
+      "sale__order__opened": "a check is opened",
+      "staff__member__created": "somebody joins the team",
+      "staff__member__terminated": "somebody leaves the team",
+      "staff__time_off__created": "somebody asks for time off",
+      "task__task__created": "a task is created",
+      "task__task__completed": "a task is completed",
+      "appointment__appointment__created": "an appointment is booked",
+      "appointment__appointment__cancelled": "an appointment is cancelled",
+      "appointment__appointment__completed": "an appointment is completed",
+      "appointment__appointment__marked_no_show": "somebody does not come to their appointment",
+      "online_booking__booking__created": "somebody books online",
+      "reservation__reservation__created": "a table is reserved",
+      "cash_register__session__opened": "a till is opened",
+      "cash_register__session__closed": "a till is closed",
+      "inventory__product__created": "a product is created",
+      "inventory__stock__threshold_crossed": "an item crosses its minimum stock",
+      "verifactu__record__rejected": "the tax agency rejects a record",
+      "invoice__invoice__issued": "an invoice is issued",
+      "kitchen__ticket__created": "a kitchen order comes in",
+      "table__session__opened": "a table is opened",
+      "table__session__closed": "a table is closed",
+      "printing__job__failed": "a print fails",
+      "payment__payment__completed": "a payment is completed",
+      "attendance__record__clocked_in": "somebody clocks in"
+    },
+    "actions": {
+      "task__task__create": "Create a task",
+      "task__task__complete": "Complete a task",
+      "task__task__assign": "Assign a task",
+      "task__comment__add": "Comment on a task",
+      "customer__note__add": "Write a note on a customer",
+      "customer__customer__create": "Create a customer",
+      "customer__customer__update": "Change a customer",
+      "customer__customer__set_tags": "Tag a customer",
+      "customer__customer__detail": "Read a customer",
+      "customer__customer__list": "Look for customers",
+      "inventory__product__list_low_stock": "Products low on stock",
+      "inventory__product__get": "Read a product"
+    },
+    "facts": {
+      "created": "created",
+      "updated": "changed",
+      "deleted": "deleted",
+      "completed": "completed",
+      "cancelled": "cancelled",
+      "added": "added",
+      "removed": "removed",
+      "opened": "opened",
+      "closed": "closed",
+      "voided": "voided",
+      "refunded": "refunded",
+      "approved": "approved",
+      "rejected": "rejected",
+      "issued": "issued",
+      "paid": "paid",
+      "failed": "failed",
+      "started": "started",
+      "confirmed": "confirmed"
+    },
+    "verbs": {
+      "create": "Create",
+      "update": "Change",
+      "delete": "Delete",
+      "add": "Add",
+      "list": "Look for",
+      "detail": "Read",
+      "get": "Read",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "assign": "Assign",
+      "close": "Close",
+      "open": "Open",
+      "send": "Send"
+    },
+    "fields": {
+      "title": "Title",
+      "description": "Description",
+      "priority": "Priority",
+      "due_date": "Due",
+      "assignee": "Who does it",
+      "project": "Project",
+      "tags": "Tags",
+      "content": "Text",
+      "name": "Name",
+      "phone": "Phone",
+      "email": "Email",
+      "customer_id": "Customer",
+      "customer": "Customer",
+      "author_name": "Signed by",
+      "note": "Note",
+      "amount": "Amount",
+      "reason": "Reason",
+      "id": "Id",
+      "found": "Found something",
+      "count": "How many",
+      "total": "Total",
+      "search": "Search"
+    },
+    "catalogError": "What automations can use here could not be read."
+  }
+}

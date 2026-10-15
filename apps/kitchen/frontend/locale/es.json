@@ -1,0 +1,308 @@
+{
+  "kitchen": {
+    "title": "Cocina",
+    "loading": "Cargando…",
+    "none": "—",
+    "yes": "Sí",
+    "no": "No",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "noPermission": "No tienes permiso para ver esto.",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
+    "live": {
+      "reconnecting": "Reconectando… Lo que ves puede no estar al día.",
+      "appInactive": "Cocina no está activa en este negocio.",
+      "retry": "Reintentar"
+    },
+    "tabs": {
+      "label": "Secciones de Cocina",
+      "display": "Pantalla",
+      "tickets": "Comandas",
+      "stations": "Estaciones",
+      "history": "Historial",
+      "settings": "Ajustes"
+    },
+    "status": {
+      "pending": "Por preparar",
+      "preparing": "En preparación",
+      "ready": "Lista",
+      "served": "Servida",
+      "cancelled": "Cancelada"
+    },
+    "itemStatus": {
+      "pending": "Por preparar",
+      "preparing": "En preparación",
+      "ready": "Listo",
+      "served": "Servido",
+      "cancelled": "Cancelado",
+      "voided": "Anulado"
+    },
+    "orderType": {
+      "dine_in": "En sala",
+      "takeaway": "Para llevar",
+      "delivery": "A domicilio"
+    },
+    "priority": {
+      "normal": "Normal",
+      "rush": "Urgente",
+      "vip": "VIP"
+    },
+    "destination": {
+      "both": "Pantalla y papel",
+      "display": "Solo pantalla",
+      "printer": "Solo papel"
+    },
+    "printerUsage": {
+      "kitchen": "Cocina",
+      "bar": "Barra"
+    },
+    "colors": {
+      "orange": "Naranja",
+      "red": "Rojo",
+      "amber": "Ámbar",
+      "green": "Verde",
+      "teal": "Turquesa",
+      "blue": "Azul",
+      "violet": "Violeta",
+      "grey": "Gris",
+      "custom": "Personalizado ({hex})"
+    },
+    "tone": {
+      "chime": "Campanilla",
+      "bell": "Timbre",
+      "buzzer": "Zumbador"
+    },
+    "action": {
+      "received": "Recibida",
+      "created": "Creada",
+      "started": "Lanzada",
+      "ready": "Lista",
+      "item_ready": "Plato listo",
+      "item_recalled": "Plato recuperado",
+      "item_voided": "Plato anulado",
+      "served": "Servida",
+      "recalled": "Recuperada",
+      "cancelled": "Cancelada",
+      "rushed": "Urgente",
+      "unrushed": "Urgencia quitada",
+      "reprinted": "Reimpresa",
+      "deleted": "Borrada"
+    },
+    "display": {
+      "views": {
+        "label": "Vistas de la pantalla",
+        "tickets": "Comandas",
+        "ready": "Listas",
+        "allDay": "Resumen"
+      },
+      "stationsLabel": "Estaciones",
+      "stationAll": "Todas",
+      "stationNone": "Sin estación",
+      "fullscreen": "Pantalla completa",
+      "exitFullscreen": "Salir de pantalla completa",
+      "emptyTickets": "No hay comandas en marcha.",
+      "emptyReady": "No hay nada esperando a recoger.",
+      "emptyAllDay": "No queda nada por cocinar.",
+      "loading": "Cargando la pantalla…",
+      "loadError": "No se pudo cargar la pantalla de cocina",
+      "actionError": "No se pudo actualizar la comanda",
+      "passPrintFailed": "No se ha podido imprimir el pase. Revisa la impresora de la estación.",
+      "rushNoticeFailed": "No se ha podido imprimir el aviso de urgencia. Avisa a cocina de viva voz y revisa su impresora.",
+      "truncated": "Solo se enseñan las 200 primeras comandas.",
+      "colDish": "Plato",
+      "colStation": "Estación",
+      "colLeft": "Faltan"
+    },
+    "card": {
+      "aria": "Comanda {n}",
+      "waiter": "Camarero: {name}",
+      "round": "Ronda {n}",
+      "ready": "Lista",
+      "bump": "Listo",
+      "bumpAll": "Marcar listos todos los platos en pantalla",
+      "markRush": "Marcar urgente",
+      "clearRush": "Quitar urgente",
+      "recall": "Recuperar",
+      "served": "Servida",
+      "voided": "Anulado",
+      "paperOnly": "Solo papel",
+      "tapToBump": "Toca para marcar listo",
+      "tapToRecall": "Toca para recuperar"
+    },
+    "tickets": {
+      "search": "Buscar comanda o destino…",
+      "empty": "Sin comandas.",
+      "new": "Nueva comanda",
+      "loadError": "No se pudieron cargar las comandas",
+      "actionError": "No se pudo actualizar la comanda",
+      "reprinted": "La comanda {number} se ha mandado otra vez a la impresora.",
+      "entity": {
+        "one": "comanda",
+        "many": "comandas"
+      },
+      "columns": {
+        "number": "Comanda",
+        "label": "Destino",
+        "type": "Tipo",
+        "priority": "Prioridad",
+        "status": "Estado",
+        "items": "Platos",
+        "total": "Total",
+        "received": "Enviada"
+      },
+      "actions": {
+        "detail": "Detalle",
+        "start": "Lanzar",
+        "ready": "Lista",
+        "serve": "Servida",
+        "recall": "Recuperar",
+        "reprint": "Reimprimir",
+        "cancel": "Cancelar"
+      },
+      "cancelDialog": {
+        "title": "¿Cancelar la comanda {number}?",
+        "message": "Sale de la pantalla de cocina. La cuenta del TPV no cambia: los platos siguen en ella.",
+        "reason": "Motivo (opcional)",
+        "confirm": "Cancelar comanda"
+      }
+    },
+    "detail": {
+      "title": "Comanda {number}",
+      "dishes": "Platos",
+      "notes": "Notas",
+      "loadError": "No se pudo cargar la comanda"
+    },
+    "form": {
+      "title": "Nueva comanda",
+      "type": "Tipo",
+      "label": "Destino (opcional)",
+      "labelPlaceholder": "p. ej. Personal, Mesa 4",
+      "notes": "Notas (opcional)",
+      "dishes": "Platos",
+      "product": "Producto del catálogo",
+      "name": "O escribe el plato",
+      "quantity": "Cantidad",
+      "note": "Nota para cocina",
+      "addDish": "Añadir plato",
+      "removeDish": "Quitar plato",
+      "noDish": "Añade al menos un plato.",
+      "submit": "Crear comanda",
+      "error": "No se pudo crear la comanda"
+    },
+    "stations": {
+      "title": "Estaciones de producción",
+      "search": "Buscar estación…",
+      "empty": "Sin estaciones.",
+      "emptyMessage": "Crea las estaciones reales de la cocina (Plancha, Barra, Postres).",
+      "add": "Añadir estación",
+      "loadError": "No se pudieron cargar las estaciones",
+      "entity": {
+        "one": "estación",
+        "many": "estaciones"
+      },
+      "columns": {
+        "name": "Estación",
+        "destination": "Destino",
+        "printer": "Impresora",
+        "inProgress": "En curso",
+        "active": "Activa"
+      },
+      "actions": {
+        "edit": "Editar",
+        "delete": "Eliminar"
+      },
+      "delete": {
+        "title": "¿Eliminar «{name}»?",
+        "message": "La estación sale de la lista y deja de recibir comandas. Las comandas ya enviadas la conservan en su historial.",
+        "confirm": "Eliminar estación"
+      },
+      "form": {
+        "createTitle": "Añadir estación",
+        "editTitle": "Editar estación · {name}",
+        "name": "Nombre",
+        "namePlaceholder": "p. ej. Plancha",
+        "color": "Color",
+        "destination": "Destino",
+        "printerUsage": "Función de impresora",
+        "printerName": "Impresora (opcional)",
+        "printerNameHint": "Una impresora de Impresión por su nombre; vacío: la de la función.",
+        "active": "Activa",
+        "create": "Crear estación",
+        "save": "Guardar"
+      }
+    },
+    "routing": {
+      "title": "Enrutado producto/categoría → estación",
+      "hint": "A qué estación va cada producto y categoría. Lo que no tiene enrutado sale en «Sin estación» y por la impresora de cocina.",
+      "empty": "Nada enrutado todavía: todo sale en «Sin estación».",
+      "search": "Buscar producto o categoría…",
+      "route": "Enrutar",
+      "remove": "Quitar",
+      "loadError": "No se pudo cargar el enrutado",
+      "removeError": "No se pudo quitar el enrutado",
+      "entity": {
+        "one": "enrutado",
+        "many": "enrutados"
+      },
+      "columns": {
+        "kind": "Qué",
+        "target": "Producto o categoría",
+        "station": "Estación"
+      },
+      "kind": {
+        "product": "Producto",
+        "category": "Categoría"
+      },
+      "form": {
+        "title": "Enrutar a una estación",
+        "station": "Estación",
+        "kind": "Qué va allí",
+        "product": "Producto",
+        "category": "Categoría"
+      },
+      "submit": "Guardar enrutado"
+    },
+    "history": {
+      "title": "Historial de cocina",
+      "search": "Buscar comanda o notas…",
+      "empty": "Sin actividad reciente en cocina.",
+      "loadError": "No se pudo cargar el historial",
+      "system": "Sistema",
+      "entity": {
+        "one": "entrada",
+        "many": "entradas"
+      },
+      "columns": {
+        "action": "Acción",
+        "ticket": "Comanda",
+        "dish": "Plato",
+        "who": "Quién",
+        "notes": "Notas",
+        "when": "Cuándo"
+      }
+    },
+    "settings": {
+      "title": "Pantalla de cocina",
+      "loading": "Cargando ajustes…",
+      "loadError": "No se pudieron cargar los ajustes.",
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "saveError": "No se pudieron guardar los ajustes.",
+      "showTimer": "Mostrar cronómetro",
+      "warning": "Aviso ámbar (minutos)",
+      "critical": "Aviso rojo (minutos)",
+      "colorCoding": "Semáforo de color",
+      "soundEnabled": "Sonar al entrar una comanda",
+      "volume": "Volumen del sonido (0-100)",
+      "volumeHint": "Lo fuerte que suena el aviso; una cocina con extractor suele necesitar más.",
+      "tone": "Tono del sonido",
+      "testSound": "Probar sonido",
+      "printPass": "Imprimir el pase al marcar listo",
+      "printPassHint": "Cada vez que una comanda está lista, saca sus platos en la impresora de su estación.",
+      "worksFromScreen": "La cocina trabaja con la pantalla",
+      "worksFromScreenHint": "Apágalo si la cocina trabaja solo con la comanda en papel y nadie marca nada en la pantalla: al cobrar una cuenta se dan por servidas todas sus rondas.",
+      "defaultType": "Tipo de comanda por defecto"
+    }
+  }
+}

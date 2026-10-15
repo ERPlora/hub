@@ -1,0 +1,616 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 10:50+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: apps.py:13 models.py:37
+msgid "Kitchen"
+msgstr "Cocina"
+
+#: apps.py:20
+msgid ""
+"The kitchen display: every round the till sends, dish by dish, per station "
+"and to the pass."
+msgstr ""
+"La pantalla de cocina: cada ronda que envía el TPV, plato a plato, por "
+"estación y hasta el pase."
+
+#: apps.py:23
+msgid ""
+"Kitchen turns every round the waiter sends from the till into a ticket on a "
+"kitchen display that reads from a metre away. Each dish goes to its station "
+"— grill, bar, desserts — on the screen and on paper; the cooks tap a dish "
+"when it is done and the ticket moves to the pass by itself when nothing is "
+"left to cook. Rush a round after it was sent, see how much is left to cook, "
+"get a sound when a ticket arrives, a green-amber-red clock on every card, "
+"and the history of what happened in the kitchen."
+msgstr ""
+"Cocina convierte cada ronda que el camarero envía desde el TPV en una "
+"comanda en una pantalla de cocina que se lee a un metro. Cada plato va a su "
+"estación —plancha, barra, postres— en la pantalla y en papel; los cocineros "
+"tocan un plato cuando está hecho y la comanda pasa sola al pase cuando no "
+"queda nada por cocinar. Marca urgente una ronda ya enviada, mira cuánto "
+"queda por cocinar, oye un aviso cuando entra una comanda, un reloj verde, "
+"ámbar y rojo en cada tarjeta, y el historial de lo que pasó en la cocina."
+
+#: apps.py:65
+msgid "Display"
+msgstr "Pantalla"
+
+#: apps.py:66
+msgid "Tickets"
+msgstr "Comandas"
+
+#: apps.py:67
+msgid "Stations"
+msgstr "Estaciones"
+
+#: apps.py:68
+msgctxt "kitchen menu"
+msgid "History"
+msgstr "Historial"
+
+#: models.py:31
+msgid "Screen and paper"
+msgstr "Pantalla y papel"
+
+#: models.py:32
+msgid "Screen only"
+msgstr "Solo pantalla"
+
+#: models.py:33
+msgid "Paper only"
+msgstr "Solo papel"
+
+#: models.py:38
+msgid "Bar"
+msgstr "Barra"
+
+#: models.py:42
+msgid "Dine in"
+msgstr "En sala"
+
+#: models.py:43
+msgid "Takeaway"
+msgstr "Para llevar"
+
+#: models.py:44
+msgid "Delivery"
+msgstr "A domicilio"
+
+#: models.py:48
+msgid "Normal"
+msgstr "Normal"
+
+#: models.py:49 models.py:87
+msgid "Rush"
+msgstr "Urgente"
+
+#: models.py:50
+msgid "VIP"
+msgstr "VIP"
+
+#: models.py:54
+msgid "Chime"
+msgstr "Campanilla"
+
+#: models.py:55
+msgid "Bell"
+msgstr "Timbre"
+
+#: models.py:56
+msgid "Buzzer"
+msgstr "Zumbador"
+
+#: models.py:60 models.py:68
+msgid "To prepare"
+msgstr "Por preparar"
+
+#: models.py:61 models.py:69
+msgid "Preparing"
+msgstr "En preparación"
+
+#: models.py:62 models.py:70 models.py:80
+msgid "Ready"
+msgstr "Lista"
+
+#: models.py:63 models.py:71 models.py:84
+msgid "Served"
+msgstr "Servida"
+
+#: models.py:64 models.py:72 models.py:86
+msgid "Cancelled"
+msgstr "Cancelada"
+
+#: models.py:73
+msgid "Voided"
+msgstr "Anulado"
+
+#: models.py:77
+msgid "Received"
+msgstr "Recibida"
+
+#: models.py:78
+msgid "Created"
+msgstr "Creada"
+
+#: models.py:79
+msgid "Fired"
+msgstr "Lanzada"
+
+#: models.py:81
+msgid "Dish ready"
+msgstr "Plato listo"
+
+#: models.py:82
+msgid "Dish recalled"
+msgstr "Plato recuperado"
+
+#: models.py:83
+msgid "Dish voided"
+msgstr "Plato anulado"
+
+#: models.py:85
+msgid "Recalled"
+msgstr "Recuperada"
+
+#: models.py:88
+msgid "Rush removed"
+msgstr "Urgencia quitada"
+
+#: models.py:89
+msgid "Reprinted"
+msgstr "Reimpresa"
+
+#: models.py:90
+msgid "Deleted"
+msgstr "Borrada"
+
+#: models.py:101
+msgid "created at"
+msgstr "creado el"
+
+#: models.py:103 models.py:252
+msgid "updated at"
+msgstr "cambiado el"
+
+#: models.py:105
+msgid "created by"
+msgstr "creado por"
+
+#: models.py:108 models.py:254
+msgid "updated by"
+msgstr "cambiado por"
+
+#: models.py:118 models.py:403
+msgid "name"
+msgstr "nombre"
+
+#: models.py:119
+msgid "colour"
+msgstr "color"
+
+#: models.py:121 models.py:417
+msgid "destination"
+msgstr "destino"
+
+#: models.py:127 models.py:423
+msgid "printer function"
+msgstr "función de impresora"
+
+#: models.py:133 models.py:428
+msgid "printer"
+msgstr "impresora"
+
+#: models.py:134 models.py:400
+msgid "position"
+msgstr "posición"
+
+#: models.py:135
+msgid "active"
+msgstr "activa"
+
+#: models.py:136 models.py:349
+msgid "deleted"
+msgstr "borrado"
+
+#: models.py:137 models.py:350
+msgid "deleted at"
+msgstr "borrado el"
+
+#: models.py:140 models.py:179 models.py:203 models.py:413 models.py:486
+msgid "station"
+msgstr "estación"
+
+#: models.py:141
+msgid "stations"
+msgstr "estaciones"
+
+#: models.py:173 models.py:401
+msgid "product"
+msgstr "producto"
+
+#: models.py:183
+msgid "product route"
+msgstr "enrutado de producto"
+
+#: models.py:184
+msgid "product routes"
+msgstr "enrutados de producto"
+
+#: models.py:197 models.py:402
+msgid "category"
+msgstr "categoría"
+
+#: models.py:207
+msgid "category route"
+msgstr "enrutado de categoría"
+
+#: models.py:208
+msgid "category routes"
+msgstr "enrutados de categoría"
+
+#: models.py:217
+msgid "single row"
+msgstr "fila única"
+
+#: models.py:218
+msgid "show timer"
+msgstr "mostrar cronómetro"
+
+#: models.py:220
+msgid "amber warning (minutes)"
+msgstr "aviso ámbar (minutos)"
+
+#: models.py:223
+msgid "red alert (minutes)"
+msgstr "aviso rojo (minutos)"
+
+#: models.py:225
+msgid "colour semaphore"
+msgstr "semáforo de color"
+
+#: models.py:226
+msgid "sound on a new ticket"
+msgstr "sonar al entrar una comanda"
+
+#: models.py:227
+msgid "sound volume"
+msgstr "volumen del sonido"
+
+#: models.py:229
+msgid "sound tone"
+msgstr "tono del sonido"
+
+#: models.py:235
+msgid "print the pass when marked ready"
+msgstr "imprimir el pase al marcar listo"
+
+#: models.py:238
+msgid "the kitchen works from the screen"
+msgstr "la cocina trabaja con la pantalla"
+
+#: models.py:242
+msgid "screen mode changed at"
+msgstr "modo de pantalla cambiado el"
+
+#: models.py:245
+msgid "default order type"
+msgstr "tipo de comanda por defecto"
+
+#: models.py:251
+msgid "receiving since"
+msgstr "recibe desde"
+
+#: models.py:258 models.py:259
+msgid "kitchen settings"
+msgstr "ajustes de cocina"
+
+#: models.py:303 models.py:320
+msgid "day"
+msgstr "día"
+
+#: models.py:304
+msgid "last number"
+msgstr "último número"
+
+#: models.py:307
+msgid "day counter"
+msgstr "contador del día"
+
+#: models.py:308
+msgid "day counters"
+msgstr "contadores del día"
+
+#: models.py:319
+msgid "number"
+msgstr "número"
+
+#: models.py:321
+msgid "number of the day"
+msgstr "número del día"
+
+#: models.py:323
+msgid "check"
+msgstr "cuenta"
+
+#: models.py:324
+msgid "round"
+msgstr "ronda"
+
+#: models.py:325
+msgid "label"
+msgstr "etiqueta"
+
+#: models.py:327
+msgid "type"
+msgstr "tipo"
+
+#: models.py:330
+msgid "priority"
+msgstr "prioridad"
+
+#: models.py:333 models.py:430
+msgid "status"
+msgstr "estado"
+
+#: models.py:335 models.py:490
+msgid "notes"
+msgstr "notas"
+
+#: models.py:336
+msgid "waiter"
+msgstr "camarero"
+
+#: models.py:338
+msgid "received at"
+msgstr "recibida el"
+
+#: models.py:339
+msgid "started at"
+msgstr "empezada el"
+
+#: models.py:340 models.py:433
+msgid "ready at"
+msgstr "lista el"
+
+#: models.py:341
+msgid "served at"
+msgstr "servida el"
+
+#: models.py:342
+msgid "cancelled at"
+msgstr "cancelada el"
+
+#: models.py:344
+msgid "sent to paper at"
+msgstr "enviada a papel el"
+
+#: models.py:345
+msgid "times rushed"
+msgstr "veces urgente"
+
+#: models.py:346
+msgid "times reprinted"
+msgstr "veces reimpresa"
+
+#: models.py:348 models.py:435
+msgid "total"
+msgstr "total"
+
+#: models.py:353 models.py:394 models.py:470
+msgid "ticket"
+msgstr "comanda"
+
+#: models.py:354
+msgid "tickets"
+msgstr "comandas"
+
+#: models.py:398
+msgid "line of the check"
+msgstr "línea de la cuenta"
+
+#: models.py:404
+msgid "quantity"
+msgstr "cantidad"
+
+#: models.py:405
+msgid "unit"
+msgstr "unidad"
+
+#: models.py:406
+msgid "note"
+msgstr "nota"
+
+#: models.py:415
+msgid "station name"
+msgstr "nombre de la estación"
+
+#: models.py:432
+msgid "void reason"
+msgstr "motivo de la anulación"
+
+#: models.py:438 models.py:478
+msgid "dish"
+msgstr "plato"
+
+#: models.py:439
+msgid "dishes"
+msgstr "platos"
+
+#: models.py:488
+msgid "action"
+msgstr "acción"
+
+#: models.py:489
+msgid "who"
+msgstr "quién"
+
+#: models.py:491
+msgid "when"
+msgstr "cuándo"
+
+#: models.py:494
+msgid "history entry"
+msgstr "entrada del historial"
+
+#: models.py:495
+msgid "history"
+msgstr "historial"
+
+#: queries.py:69
+msgid "That kitchen ticket does not exist in this business."
+msgstr "Esa comanda no existe en este negocio."
+
+#: queries.py:71
+#, python-format
+msgid ""
+"“%(said)s” matches several tickets: %(names)s. Say which one by its number."
+msgstr ""
+"«%(said)s» coincide con varias comandas: %(names)s. Di cuál por su número."
+
+#: queries.py:73
+msgid "That station does not exist in this business."
+msgstr "Esa estación no existe en este negocio."
+
+#: queries.py:74
+#, python-format
+msgid "“%(said)s” matches several stations: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias estaciones: %(names)s. Di cuál."
+
+#: schemas.py:28
+msgid "Say which ticket: its id, its number or its label."
+msgstr "Di qué comanda: su id, su número o su etiqueta."
+
+#: schemas.py:29
+msgid "Say which station: its id or its name."
+msgstr "Di qué estación: su id o su nombre."
+
+#: schemas.py:30
+msgid "Say one product or one category, not both."
+msgstr "Di un producto o una categoría, no los dos."
+
+#: schemas.py:31
+msgid "Say which dish: a product of the catalogue or its name."
+msgstr "Di qué plato: un producto del catálogo o su nombre."
+
+#: schemas.py:32
+msgid "Add at least one dish."
+msgstr "Añade al menos un plato."
+
+#: services.py:102
+msgid ""
+"That kitchen ticket is no longer in the state this action requires. Refresh "
+"and try again."
+msgstr ""
+"Esa comanda ya no está en el estado que requiere esta acción. Actualiza e "
+"inténtalo de nuevo."
+
+#: services.py:104
+msgid "That ticket is no longer being cooked."
+msgstr "Esa comanda ya no se cocina."
+
+#: services.py:105
+msgid "That ticket is VIP: a rush does not change its priority."
+msgstr "Esa comanda es VIP: marcarla urgente no cambia su prioridad."
+
+#: services.py:107
+msgid ""
+"That ticket cannot be deleted: it comes from a check or it is already being "
+"cooked. Cancel it instead."
+msgstr ""
+"Esa comanda no se puede borrar: viene de una cuenta o ya se está cocinando. "
+"Cancélala."
+
+#: services.py:109
+msgid "That dish is not on this ticket."
+msgstr "Ese plato no está en esta comanda."
+
+#: services.py:111
+msgid "Nothing of this ticket goes to paper: its stations are screen only."
+msgstr ""
+"Nada de esta comanda sale en papel: sus estaciones son solo de pantalla."
+
+#: services.py:113
+msgid "Nothing on this check is cooked: services do not go to the kitchen."
+msgstr "Nada de esta cuenta se cocina: los servicios no van a cocina."
+
+#: services.py:114
+msgid "Printing is not active in this business."
+msgstr "Impresión no está activa en este negocio."
+
+#: services.py:115
+#, python-format
+msgid "The ticket could not be printed: %(reason)s"
+msgstr "No se pudo imprimir la comanda: %(reason)s"
+
+#: services.py:117
+msgid "There is already a station with that name. Choose a different name."
+msgstr "Ya hay una estación con ese nombre. Elige otro nombre."
+
+#: services.py:120
+msgid ""
+"This station cannot be deleted: products or categories are routed to it, or "
+"it has dishes to cook. Move them to another station first."
+msgstr ""
+"Esta estación no se puede eliminar: tiene productos o categorías enrutados, "
+"o platos por hacer. Pásalos antes a otra estación."
+
+#: services.py:124
+msgid "That station is switched off: switch it on or choose another one."
+msgstr "Esa estación está desactivada: actívala o elige otra."
+
+#: services.py:126
+msgid "That product does not exist in the catalogue."
+msgstr "Ese producto no existe en el catálogo."
+
+#: services.py:127
+#, python-format
+msgid "“%(said)s” matches several products: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varios productos: %(names)s. Di cuál."
+
+#: services.py:128
+msgid "That category does not exist in the catalogue."
+msgstr "Esa categoría no existe en el catálogo."
+
+#: services.py:130
+#, python-format
+msgid "“%(said)s” matches several categories: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias categorías: %(names)s. Di cuál."
+
+#: services.py:132
+msgid "Nothing is routed from that product or category."
+msgstr "Ese producto o esa categoría no van a ninguna estación."
+
+#: services.py:133
+msgid "The amber warning has to come before the red one."
+msgstr "El aviso ámbar tiene que llegar antes que el rojo."
+
+#: services.py:134
+msgid "!! URGENT !!"
+msgstr "!! URGENTE !!"
+
+#: services.py:135
+#, python-format
+msgid "VOIDED DISH · %(label)s"
+msgstr "PLATO ANULADO · %(label)s"
+
+#: services.py:136
+#, python-format
+msgid "CANCELLED · %(label)s"
+msgstr "ANULADA · %(label)s"

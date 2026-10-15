@@ -1,0 +1,458 @@
+# Spanish translation of the WhatsApp inbox app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next whatsapp_inbox\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 00:00+0200\n"
+"PO-Revision-Date: 2026-10-15 00:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "WhatsApp inbox"
+msgstr "Bandeja de WhatsApp"
+
+msgid "Your business's WhatsApp in the Hub: read, answer, assign and close every conversation."
+msgstr "El WhatsApp de tu negocio en el Hub: lee, contesta, asigna y cierra cada conversación."
+
+msgid "WhatsApp inbox brings your business's WhatsApp number into the Hub: every customer who writes has one conversation, joined to their customer card by phone. Your team reads and answers from any device, assigns each conversation, marks it open, pending or closed and leaves internal notes. After 24 hours without a message from the customer it offers your templates approved by Meta, and marketing ones only reach customers who gave their consent."
+msgstr "La Bandeja de WhatsApp trae al Hub el número de WhatsApp de tu negocio: cada cliente que escribe tiene una conversación, unida a su ficha por el teléfono. Tu equipo lee y contesta desde cualquier dispositivo, asigna cada conversación, la marca abierta, pendiente o cerrada y deja notas internas. Pasadas 24 horas sin mensaje del cliente ofrece tus plantillas aprobadas por Meta, y las de marketing solo llegan a quien dio su consentimiento."
+
+msgctxt "whatsapp menu"
+msgid "Inbox"
+msgstr "Bandeja de entrada"
+
+msgctxt "whatsapp menu"
+msgid "Settings"
+msgstr "Ajustes"
+
+msgctxt "whatsapp channel"
+msgid "Not connected"
+msgstr "Sin conectar"
+
+msgctxt "whatsapp channel"
+msgid "Connected"
+msgstr "Conectado"
+
+msgctxt "whatsapp channel"
+msgid "Needs reconnecting"
+msgstr "Hay que reconectar"
+
+msgid "slot"
+msgstr "hueco"
+
+msgid "status"
+msgstr "estado"
+
+msgid "phone number"
+msgstr "número de teléfono"
+
+msgid "display name"
+msgstr "nombre visible"
+
+msgid "monthly limit"
+msgstr "límite mensual"
+
+msgid "used this month"
+msgstr "usados este mes"
+
+msgid "month of the figure"
+msgstr "mes de la cifra"
+
+msgid "version"
+msgstr "versión"
+
+msgid "synced at"
+msgstr "sincronizado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "WhatsApp channel"
+msgstr "Canal de WhatsApp"
+
+msgctxt "whatsapp conversation"
+msgid "Open"
+msgstr "Abierta"
+
+msgctxt "whatsapp conversation"
+msgid "Pending"
+msgstr "Pendiente"
+
+msgctxt "whatsapp conversation"
+msgid "Closed"
+msgstr "Cerrada"
+
+msgid "Not erased"
+msgstr "Sin borrar"
+
+msgid "erplora.com has not confirmed the erasure yet"
+msgstr "erplora.com aún no ha confirmado el borrado"
+
+msgid "erplora.com confirmed the erasure"
+msgstr "erplora.com ha confirmado el borrado"
+
+msgid "phone"
+msgstr "teléfono"
+
+msgid "WhatsApp name"
+msgstr "nombre de WhatsApp"
+
+msgid "WhatsApp name, searchable"
+msgstr "nombre de WhatsApp, para buscar"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "assigned to"
+msgstr "asignada a"
+
+msgid "unread"
+msgstr "sin leer"
+
+msgid "last message"
+msgstr "último mensaje"
+
+msgid "last message text"
+msgstr "texto del último mensaje"
+
+msgid "last message direction"
+msgstr "dirección del último mensaje"
+
+msgid "customer's last message"
+msgstr "último mensaje del cliente"
+
+msgid "last message type"
+msgstr "tipo del último mensaje"
+
+msgid "erased at"
+msgstr "borrada el"
+
+msgid "erasure at erplora.com"
+msgstr "borrado en erplora.com"
+
+msgid "number to erase at erplora.com"
+msgstr "número que borrar en erplora.com"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "conversation"
+msgstr "conversación"
+
+msgid "conversations"
+msgstr "conversaciones"
+
+msgid "From the customer"
+msgstr "Del cliente"
+
+msgid "From the business"
+msgstr "Del negocio"
+
+msgctxt "whatsapp message"
+msgid "Customer"
+msgstr "Cliente"
+
+msgid "WhatsApp Business app"
+msgstr "App WhatsApp Business"
+
+msgctxt "whatsapp message"
+msgid "Hub"
+msgstr "Hub"
+
+msgctxt "whatsapp message"
+msgid "Live"
+msgstr "En vivo"
+
+msgctxt "whatsapp message"
+msgid "History"
+msgstr "Historial"
+
+msgctxt "whatsapp message"
+msgid "Received"
+msgstr "Recibido"
+
+msgctxt "whatsapp message"
+msgid "Queued"
+msgstr "En cola"
+
+msgctxt "whatsapp message"
+msgid "Sending"
+msgstr "Enviando"
+
+msgctxt "whatsapp message"
+msgid "Sent"
+msgstr "Enviado"
+
+msgctxt "whatsapp message"
+msgid "Delivered"
+msgstr "Entregado"
+
+msgctxt "whatsapp message"
+msgid "Read"
+msgstr "Leído"
+
+msgctxt "whatsapp message"
+msgid "Not delivered"
+msgstr "No entregado"
+
+msgid "direction"
+msgstr "dirección"
+
+msgid "origin"
+msgstr "origen"
+
+msgid "source"
+msgstr "procedencia"
+
+msgid "type"
+msgstr "tipo"
+
+msgid "text"
+msgstr "texto"
+
+msgid "attachment URL"
+msgstr "URL del adjunto"
+
+msgid "attachment type"
+msgstr "tipo del adjunto"
+
+msgid "attachment name"
+msgstr "nombre del adjunto"
+
+msgid "attachment caption"
+msgstr "texto del adjunto"
+
+msgid "template"
+msgstr "plantilla"
+
+msgid "template language"
+msgstr "idioma de la plantilla"
+
+msgid "template variables"
+msgstr "variables de la plantilla"
+
+msgid "error code"
+msgstr "código de error"
+
+msgid "error"
+msgstr "error"
+
+msgid "WhatsApp message id"
+msgstr "id del mensaje de WhatsApp"
+
+msgid "send key"
+msgstr "clave de envío"
+
+msgid "answers"
+msgstr "responde a"
+
+msgid "sent by"
+msgstr "enviado por"
+
+msgid "Meta's object"
+msgstr "objeto de Meta"
+
+msgid "said at"
+msgstr "dicho el"
+
+msgid "status at"
+msgstr "estado el"
+
+msgid "message"
+msgstr "mensaje"
+
+msgid "messages"
+msgstr "mensajes"
+
+msgid "author"
+msgstr "autor"
+
+msgid "author name"
+msgstr "nombre del autor"
+
+msgid "note"
+msgstr "nota"
+
+msgid "notes"
+msgstr "notas"
+
+msgctxt "whatsapp template"
+msgid "Utility"
+msgstr "Utilidad"
+
+msgctxt "whatsapp template"
+msgid "Marketing"
+msgstr "Marketing"
+
+msgctxt "whatsapp template"
+msgid "Authentication"
+msgstr "Autenticación"
+
+msgctxt "whatsapp template"
+msgid "Approved"
+msgstr "Aprobada"
+
+msgctxt "whatsapp template"
+msgid "In review"
+msgstr "En revisión"
+
+msgctxt "whatsapp template"
+msgid "Rejected"
+msgstr "Rechazada"
+
+msgctxt "whatsapp template"
+msgid "Paused by Meta"
+msgstr "Pausada por Meta"
+
+msgctxt "whatsapp template"
+msgid "Disabled by Meta"
+msgstr "Desactivada por Meta"
+
+msgid "Deleted in WhatsApp Manager"
+msgstr "Borrada en WhatsApp Manager"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "language"
+msgstr "idioma"
+
+msgid "category"
+msgstr "categoría"
+
+msgid "status in Meta"
+msgstr "estado en Meta"
+
+msgid "header"
+msgstr "cabecera"
+
+msgid "body"
+msgstr "cuerpo"
+
+msgid "footer"
+msgstr "pie"
+
+msgid "variables"
+msgstr "variables"
+
+msgid "Meta's reason"
+msgstr "motivo de Meta"
+
+msgid "Meta id"
+msgstr "id de Meta"
+
+msgid "templates"
+msgstr "plantillas"
+
+msgid "That conversation does not exist in this business."
+msgstr "Esa conversación no existe en este negocio."
+
+#, python-format
+msgid "No conversation matches “%(reference)s”."
+msgstr "Ninguna conversación coincide con «%(reference)s»."
+
+#, python-format
+msgid "Several conversations match “%(reference)s”: give the number."
+msgstr "Varias conversaciones coinciden con «%(reference)s»: di el número."
+
+msgid "Say which conversation: its id, its number or the customer's name."
+msgstr "Di qué conversación: su id, su número o el nombre del cliente."
+
+msgid "Write a message or choose a template."
+msgstr "Escribe un mensaje o elige una plantilla."
+
+msgid "Choose one person, yourself («me») or nobody."
+msgstr "Elige a una persona, a ti («me») o a nadie."
+
+msgid "Choose a customer card, create one or unlink it."
+msgstr "Elige una ficha de cliente, crea una o desúnela."
+
+msgid "Choose «me», «none» or a person's id."
+msgstr "Elige «me», «none» o el id de una persona."
+
+msgid "An attachment must come from erplora.com over https."
+msgstr "Un adjunto tiene que venir de erplora.com por https."
+
+msgid "This is not a phone number."
+msgstr "Esto no es un número de teléfono."
+
+msgid "More than 24 hours have passed since the customer's last message: WhatsApp only lets you write to them with an approved template."
+msgstr "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada."
+
+msgid "WhatsApp is not connected. Connect the business's number in erplora.com to receive and send messages."
+msgstr "WhatsApp no está conectado. Conecta el número del negocio en erplora.com para recibir y enviar mensajes."
+
+msgid "This server cannot reach erplora.com, so nothing can be sent from it."
+msgstr "Este servidor no llega a erplora.com, así que desde él no se puede enviar nada."
+
+msgid "You have used every WhatsApp message of your plan this month: nothing can be sent until next month or until you upgrade the plan."
+msgstr "Has usado todos los mensajes de WhatsApp de tu plan este mes: no se puede enviar nada hasta el mes que viene o hasta que mejores el plan."
+
+msgid "erplora.com did not send the message."
+msgstr "erplora.com no ha enviado el mensaje."
+
+msgid "erplora.com did not answer: the message has not left. Try again."
+msgstr "erplora.com no ha contestado: el mensaje no ha salido. Vuelve a intentarlo."
+
+msgid "erplora.com did not confirm the message. Try again: it is never sent twice."
+msgstr "erplora.com no ha confirmado el mensaje. Vuelve a intentarlo: nunca se envía dos veces."
+
+msgid "This message cannot be sent again: write a new one."
+msgstr "Este mensaje no se puede volver a enviar: escribe uno nuevo."
+
+msgid "That message no longer exists."
+msgstr "Ese mensaje ya no existe."
+
+msgid "The conversation was erased before the message left."
+msgstr "La conversación se borró antes de que saliera el mensaje."
+
+#, python-format
+msgid "There is no template called “%(name)s”."
+msgstr "No hay ninguna plantilla llamada «%(name)s»."
+
+msgid "That template exists in several languages: say which one."
+msgstr "Esa plantilla existe en varios idiomas: di cuál."
+
+#, python-format
+msgid "Meta has not approved the template “%(name)s”: it cannot be sent."
+msgstr "Meta no ha aprobado la plantilla «%(name)s»: no se puede enviar."
+
+#, python-format
+msgid "Fill in every variable of the template (%(count)d)."
+msgstr "Rellena todas las variables de la plantilla (%(count)d)."
+
+msgid "This customer has not agreed to receive marketing by WhatsApp."
+msgstr "Esta clienta no ha dado su consentimiento para recibir publicidad por WhatsApp."
+
+#, python-format
+msgid "This conversation is already with %(name)s."
+msgstr "Esta conversación ya la lleva %(name)s."
+
+msgid "You may only assign conversations to yourself."
+msgstr "Solo puedes asignarte conversaciones a ti."
+
+#, python-format
+msgid "Nobody in this business is called “%(reference)s”."
+msgstr "Nadie en este negocio se llama «%(reference)s»."
+
+#, python-format
+msgid "Several people match “%(reference)s”: choose one from the list."
+msgstr "Varias personas coinciden con «%(reference)s»: elige una de la lista."
+
+msgid "That person does not work in this business."
+msgstr "Esa persona no trabaja en este negocio."
+
+msgid "Only a person can be assigned a conversation."
+msgstr "Solo se puede asignar una conversación a una persona."
+
+msgid "That note no longer exists."
+msgstr "Esa nota ya no existe."
+
+msgid "You may only delete your own notes."
+msgstr "Solo puedes borrar tus propias notas."
