@@ -7,10 +7,17 @@ AEAT's **real** answers kept in ``fixtures/`` (accepted, accepted with errors, d
 to name the invoices of the test. Nothing the AEAT says is invented.
 """
 
+import base64
+import datetime as dt
 import re
 from pathlib import Path
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from django.utils import translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
@@ -288,3 +295,61 @@ def answering(name: str = "desglose_mixed_2026-09-22.xml"):
 @pytest.fixture
 def scope_b():
     return system_context(B)
+
+
+#: The eIDAS QcStatements extension (RFC 3739) and, inside it, a QcType statement naming the eSeal
+#: (0.4.0.1862.1.6 → 0.4.0.1862.1.6.2), DER-encoded by hand: the library writes it, it does not build it.
+QC_STATEMENTS = x509.ObjectIdentifier("1.3.6.1.5.5.7.1.3")
+QC_TYPE_ESEAL = bytes.fromhex("3015" + "3013" + "06060400" + "8e460106" + "3009" + "060704008e46010602")
+_KEYS: list = []
+
+
+def make_p12(
+    *,
+    org_id: str | None = "VATES-B12345674",
+    serial: str | None = "12345678Z",
+    client_auth: bool | None = True,
+    days: int = 365,
+    password: bytes = b"secret",
+    eseal: bool = False,
+) -> bytes:
+    """A .p12 made for the test (self-signed, never a real certificate) whose subject and usages are the
+    ones asked: ``None`` leaves an attribute (or the Extended Key Usage) out."""
+    if not _KEYS:
+        _KEYS.append(rsa.generate_private_key(public_exponent=65537, key_size=2048))
+    key = _KEYS[0]
+    attributes = [x509.NameAttribute(NameOID.COMMON_NAME, "ACME SL")]
+    if org_id:
+        attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, org_id))
+    if serial:
+        attributes.append(x509.NameAttribute(NameOID.SERIAL_NUMBER, serial))
+    name = x509.Name(attributes)
+    now = dt.datetime.now(dt.UTC)
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(1)
+        .not_valid_before(now - dt.timedelta(days=max(1, -days + 1)))
+        .not_valid_after(now + dt.timedelta(days=days))
+    )
+    if client_auth is not None:
+        usages = (
+            [ExtendedKeyUsageOID.CLIENT_AUTH]
+            if client_auth
+            else [ExtendedKeyUsageOID.EMAIL_PROTECTION]
+        )
+        builder = builder.add_extension(x509.ExtendedKeyUsage(usages), critical=False)
+    if eseal:
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(QC_STATEMENTS, QC_TYPE_ESEAL), critical=False
+        )
+    cert = builder.sign(key, hashes.SHA256())
+    return pkcs12.serialize_key_and_certificates(
+        b"test", key, cert, None, serialization.BestAvailableEncryption(password)
+    )
+
+
+def b64(data: bytes) -> str:
+    return base64.b64encode(data).decode()

@@ -19,6 +19,7 @@ dependencies = [
     "xmlschema>=4.3",
     "qrcode>=8.2",
     "httpx>=0.28",
+    "cryptography>=50.0",
 ]
 
 [dependency-groups]

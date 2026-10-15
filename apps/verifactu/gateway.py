@@ -22,7 +22,7 @@ contributors): 5 s to connect, 30 s to read. How a call ended is the reply's ``k
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import decouple
 import httpx
@@ -43,6 +43,14 @@ UNKNOWN = "unknown"
 
 class NotConfigured(Exception):
     """This server has no gateway URL: nothing can be presented to the AEAT from it."""
+
+
+@dataclass(frozen=True)
+class Certificate:
+    """The business's own certificate as the gateway takes it on the «own» route: never shown in a ``repr``."""
+
+    p12_base64: str = field(repr=False)
+    password: str = field(repr=False)
 
 
 @dataclass(frozen=True)

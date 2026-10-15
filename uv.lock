@@ -482,6 +482,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "babel" },
+    { name = "cryptography" },
     { name = "daphne" },
     { name = "django" },
     { name = "django-ses" },
@@ -511,6 +512,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "babel", specifier = ">=2.18" },
+    { name = "cryptography", specifier = ">=50.0" },
     { name = "daphne", specifier = ">=4.2" },
     { name = "django", specifier = ">=6.1" },
     { name = "django-ses", specifier = ">=4.8.2" },
