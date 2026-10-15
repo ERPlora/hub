@@ -1,10 +1,12 @@
 """The client of ERPlora's fiscal gateway, which lives in the SaaS (PLAN §16.5; WORKBOOK «Contrato con el SaaS»).
 
 The Hub validates everything fiscal (chain, fingerprint, schema, QR) and hands the gateway the exact bytes to
-present; the gateway presents them to the AEAT with ERPlora's seal or with the customer's own certificate and
-answers the AEAT's answer as it came. Three doors, ``POST`` with JSON, signed like every ``/internal`` call
-(``X-Erplora-Timestamp`` and ``X-Erplora-Signature``, HMAC-SHA256 of ``f"{timestamp}.{body}"`` with
-``INTERNAL_SHARED_SECRET``; ``base.auth.sign``):
+present; the gateway (saas-next ``fiscal_gateway/``) presents them to the AEAT with ERPlora's seal or, on the
+«own» route, with the business's own certificate, which travels in every call (``certificate``: the .p12 in
+base64 and its password; the gateway never keeps it), and answers the AEAT's answer as it came. Three doors,
+``POST`` with JSON, signed like every ``/internal`` call (``X-Erplora-Timestamp`` and ``X-Erplora-Signature``,
+HMAC-SHA256 of ``f"{timestamp}.{body}"`` with ``INTERNAL_SHARED_SECRET``; ``base.auth.sign``; the gateway
+also takes v2, which the Hub does not send yet):
 
 - ``/internal/verifactu/submit`` → ``200 {"aeat_status", "aeat_body"}``;
 - ``/internal/verifactu/query`` → the same;
@@ -12,12 +14,17 @@ answers the AEAT's answer as it came. Three doors, ``POST`` with JSON, signed li
 
 ``VERIFACTU_GATEWAY_URL`` (settings, else the environment) is the SaaS's internal URL; empty means there is no
 gateway: nothing is sent and nothing is ever taken as accepted. ``httpx`` (maintained since 2019, 100+
-contributors): 5 s to connect, 30 s to read. How a call ended is the reply's ``kind``:
+contributors): 5 s to connect and 45 s to read, longer than the gateway's own wait for the AEAT (5 s to connect,
+30 s to read). How a call ended is the reply's ``kind``:
 
 - ``answered``: the gateway answered (the AEAT's answer inside, whatever it says);
-- ``refused``: the gateway could not present (a 409 with its code: no approved grant, no certificate…);
-- ``unreachable``: nothing reached the AEAT (no connection, another status): to retry;
-- ``unknown``: the request left and no usable answer came back: it may have reached the AEAT.
+- ``refused``: the gateway will not present it as it is (``409`` ``nif_mismatch``, ``no_seal``,
+  ``no_certificate``, ``certificate_invalid``, ``environment_not_allowed``; ``413`` ``payload_too_large``;
+  ``422`` ``invalid_payload``), its code and message kept to be shown;
+- ``unreachable``: nothing reached the AEAT (no connection, ``502 aeat_unreachable`` with ``sent: false``,
+  ``503 gateway_busy``, another status): to retry;
+- ``unknown``: the request left and no usable answer came back (``502 aeat_unreachable`` with ``sent: true``,
+  a read that timed out): it may have reached the AEAT.
 """
 
 import json
@@ -33,7 +40,9 @@ from base.auth import SIGNATURE_HEADER, TIMESTAMP_HEADER, sign
 SUBMIT_PATH = "/internal/verifactu/submit"
 QUERY_PATH = "/internal/verifactu/query"
 PROBE_PATH = "/internal/verifactu/probe"
-TIMEOUT = httpx.Timeout(30.0, connect=5.0)
+TIMEOUT = httpx.Timeout(45.0, connect=5.0)
+#: Statuses whose contract error says the gateway will never present this call as it is.
+REFUSALS = (409, 413, 422)
 
 ANSWERED = "answered"
 REFUSED = "refused"
@@ -96,28 +105,46 @@ def _post(path: str, payload: dict) -> tuple[str, httpx.Response | None, str]:
         return UNKNOWN, None, f"The request left and no answer came back: {error}."
 
 
+def _error(response: httpx.Response) -> dict | None:
+    """The contract's ``{"error": {...}}`` of a non-200 answer, or ``None`` when it is not there."""
+    try:
+        error = response.json()["error"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return error if isinstance(error, dict) and error.get("code") else None
+
+
+def _refusal(response: httpx.Response, error: dict | None) -> Reply:
+    if error is None:
+        return Reply(
+            kind=REFUSED,
+            code="verifactu_gateway.refused",
+            message=f"HTTP {response.status_code}: {response.text[:300]}",
+        )
+    message = str(error.get("message", ""))
+    fields = error.get("fields")
+    if isinstance(fields, dict) and fields:
+        message = f"{message} ({', '.join(f'{name}: {why}' for name, why in fields.items())})"
+    return Reply(kind=REFUSED, code=str(error["code"]), message=message)
+
+
 def _reply(path: str, payload: dict) -> Reply:
     failure, response, message = _post(path, payload)
     if response is None:
         return Reply(kind=failure, message=message)
-    if response.status_code == 409:
-        try:
-            error = response.json()["error"]
-            return Reply(
-                kind=REFUSED,
-                code=str(error["code"]),
-                message=str(error.get("message", "")),
-            )
-        except (ValueError, KeyError, TypeError):
-            return Reply(
-                kind=REFUSED,
-                code="verifactu_gateway.refused",
-                message=response.text[:300],
-            )
+    if response.status_code in REFUSALS:
+        return _refusal(response, _error(response))
     if response.status_code != 200:
+        error = _error(response)
+        said = f": {error.get('message', '')}" if error else "."
+        if error and error["code"] == "aeat_unreachable" and error.get("sent") is True:
+            return Reply(
+                kind=UNKNOWN,
+                message=f"The request reached the gateway and the AEAT did not answer{said}",
+            )
         return Reply(
             kind=UNREACHABLE,
-            message=f"The gateway answered HTTP {response.status_code}.",
+            message=f"The gateway answered HTTP {response.status_code}{said}",
         )
     try:
         data = response.json()
@@ -144,36 +171,58 @@ def _reply(path: str, payload: dict) -> Reply:
     )
 
 
-def submit(*, hub: str, nif: str, environment: str, route: str, envelope: str) -> Reply:
+def _body(
+    hub: str,
+    nif: str,
+    environment: str,
+    route: str,
+    certificate: Certificate | None,
+    envelope: str | None = None,
+) -> dict:
+    body = {"hub": hub, "nif": nif, "environment": environment, "route": route}
+    if envelope is not None:
+        body["envelope"] = envelope
+    if certificate is not None:
+        body["certificate"] = {
+            "p12_base64": certificate.p12_base64,
+            "password": certificate.password,
+        }
+    return body
+
+
+def submit(
+    *,
+    hub: str,
+    nif: str,
+    environment: str,
+    route: str,
+    envelope: str,
+    certificate: Certificate | None = None,
+) -> Reply:
     """Hand a submission's envelope to the gateway, which presents it to the AEAT of ``environment``."""
-    return _reply(
-        SUBMIT_PATH,
-        {
-            "hub": hub,
-            "nif": nif,
-            "environment": environment,
-            "route": route,
-            "envelope": envelope,
-        },
-    )
+    return _reply(SUBMIT_PATH, _body(hub, nif, environment, route, certificate, envelope))
 
 
-def query(*, hub: str, nif: str, environment: str, route: str, envelope: str) -> Reply:
+def query(
+    *,
+    hub: str,
+    nif: str,
+    environment: str,
+    route: str,
+    envelope: str,
+    certificate: Certificate | None = None,
+) -> Reply:
     """Hand a query's envelope to the gateway."""
-    return _reply(
-        QUERY_PATH,
-        {
-            "hub": hub,
-            "nif": nif,
-            "environment": environment,
-            "route": route,
-            "envelope": envelope,
-        },
-    )
+    return _reply(QUERY_PATH, _body(hub, nif, environment, route, certificate, envelope))
 
 
-def probe(*, hub: str, nif: str, environment: str, route: str) -> Reply:
+def probe(
+    *,
+    hub: str,
+    nif: str,
+    environment: str,
+    route: str,
+    certificate: Certificate | None = None,
+) -> Reply:
     """Ask the gateway whether it can present for this business now, presenting nothing."""
-    return _reply(
-        PROBE_PATH, {"hub": hub, "nif": nif, "environment": environment, "route": route}
-    )
+    return _reply(PROBE_PATH, _body(hub, nif, environment, route, certificate))

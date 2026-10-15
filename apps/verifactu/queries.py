@@ -21,7 +21,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.invoice.models import Invoice, Issuer
-from apps.verifactu import chain, envelope, gateway, producer
+from apps.verifactu import certificates, chain, envelope, gateway, producer
 from apps.verifactu.models import (
     AeatRecord,
     Chain,
@@ -115,6 +115,23 @@ def own_certificate_blob() -> bytes | None:
     return bytes(blob) if blob is not None else None
 
 
+def own_certificate_material(config: Config) -> gateway.Certificate | None:
+    """What the gateway presents with on the «own» route (``None`` on ERPlora's, or without a certificate);
+    ``certificates.CertificateUnreadable`` when this server's key cannot open it."""
+    if config.route != Config.Route.OWN:
+        return None
+    blob = own_certificate_blob()
+    return certificates.material(blob) if blob is not None else None
+
+
+def own_certificate_readable(config: Config) -> bool:
+    try:
+        own_certificate_material(config)
+    except certificates.CertificateUnreadable:
+        return False
+    return True
+
+
 def certificate_valid(now: dt.datetime | None = None) -> bool:
     """Whether an own certificate is uploaded and has not expired."""
     now = now or timezone.now()
@@ -152,6 +169,8 @@ def blockers(config: Config, environment: str) -> list[str]:
     problem = route_problem(config, environment)
     if problem:
         found.append(problem)
+    elif not own_certificate_readable(config):
+        found.append("own_certificate_unreadable")
     return found
 
 

@@ -48,7 +48,12 @@ _PERSON_ID = re.compile(r"^(\d{8}|[XYZ]\d{7})[A-Z]$")
 
 
 class CertificateInvalid(Exception):
-    """The .p12 cannot be used to present to the AEAT. The message names the reason only."""
+    """The .p12 cannot be used to present to the AEAT. ``code`` says why (``unopenable``, ``incomplete``,
+    ``no_client_auth``); the message names the reason only."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class StorageUnavailable(Exception):
@@ -75,17 +80,19 @@ def inspect(p12: bytes, password: str) -> CertificateFacts:
         )
     except ValueError, TypeError, UnsupportedAlgorithm:
         raise CertificateInvalid(
-            "The file is not a .p12/.pfx certificate that this password opens."
+            "unopenable",
+            "The file is not a .p12/.pfx certificate that this password opens.",
         ) from None
     has_key = key is not None
     del key
     if certificate is None or not has_key:
         raise CertificateInvalid(
-            "The file does not hold a certificate and its private key."
+            "incomplete", "The file does not hold a certificate and its private key."
         )
     if _declares_eku_without_client_auth(certificate):
         raise CertificateInvalid(
-            "The certificate does not allow client authentication, so it cannot connect to the AEAT."
+            "no_client_auth",
+            "The certificate does not allow client authentication, so it cannot connect to the AEAT.",
         )
     organization_id = _attribute(certificate, NameOID.ORGANIZATION_IDENTIFIER)
     serial = _attribute(certificate, NameOID.SERIAL_NUMBER)

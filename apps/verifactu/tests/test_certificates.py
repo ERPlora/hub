@@ -44,13 +44,15 @@ def test_a_certificate_without_extended_key_usage_may_authenticate():
 
 
 def test_a_declared_eku_without_client_auth_is_refused():
-    with pytest.raises(certificates.CertificateInvalid):
+    with pytest.raises(certificates.CertificateInvalid) as refused:
         certificates.inspect(make_p12(client_auth=False), "secret")
+    assert refused.value.code == "no_client_auth"
 
 
 def test_a_wrong_password_is_refused():
-    with pytest.raises(certificates.CertificateInvalid):
+    with pytest.raises(certificates.CertificateInvalid) as refused:
         certificates.inspect(make_p12(), "nope")
+    assert refused.value.code == "unopenable"
 
 
 def test_what_is_not_a_p12_is_refused():

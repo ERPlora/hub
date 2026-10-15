@@ -15,6 +15,7 @@ from ninja import Field, Schema
 from pydantic import (
     BeforeValidator,
     ConfigDict,
+    SecretStr,
     StringConstraints,
     field_validator,
     model_validator,
@@ -625,6 +626,15 @@ class RecoverManualIn(IssuerIn):
         if not chain.is_valid_hash(text):
             raise ValueError(str(FINGERPRINT_INVALID))
         return text
+
+
+class CertificateUploadIn(Schema):
+    """The business's own certificate (VERIFACTU-F02): kept sealed in the hub's database, never shown again."""
+
+    p12_base64: SecretStr = Field(
+        description="The .p12/.pfx file of the certificate, in base64 (at most 1 MB)."
+    )
+    password: SecretStr = Field(SecretStr(""), description="The certificate's password.")
 
 
 class ConfigUpdateIn(Schema):

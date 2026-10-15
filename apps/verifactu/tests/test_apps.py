@@ -129,6 +129,8 @@ OPERATIONS = {
     "verifactu.config.update",
     "verifactu.config.go_live",
     "verifactu.config.back_to_testing",
+    "verifactu.certificate.upload",
+    "verifactu.certificate.remove",
     "verifactu.config.sync",
 }
 #: High risk: sending to the AEAT, the queue, correcting and cancelling, the chain's recovery and the configuration.
@@ -145,6 +147,8 @@ HIGH = {
     "verifactu.config.update",
     "verifactu.config.go_live",
     "verifactu.config.back_to_testing",
+    "verifactu.certificate.upload",
+    "verifactu.certificate.remove",
     "verifactu.config.sync",
 }
 

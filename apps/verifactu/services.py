@@ -14,6 +14,8 @@
 The clock is the Hub's time zone (Madrid in phase 1): ``FechaHoraHusoGenRegistro`` carries its offset.
 """
 
+import base64
+import binascii
 import copy
 import datetime as dt
 import hashlib
@@ -29,7 +31,16 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.invoice.models import Invoice
-from apps.verifactu import aeat, chain, envelope, events, gateway, producer, xsd
+from apps.verifactu import (
+    aeat,
+    certificates,
+    chain,
+    envelope,
+    events,
+    gateway,
+    producer,
+    xsd,
+)
 from apps.verifactu.envelope import AltaData, AnulacionData, ChainLink, InvoiceRef
 from apps.verifactu.models import (
     AeatRecord,
@@ -37,6 +48,7 @@ from apps.verifactu.models import (
     Config,
     Environment,
     Event,
+    OwnCertificate,
     Record,
     SendControl,
     backoff,
@@ -54,6 +66,8 @@ from apps.verifactu.queries import (
     find_record,
     issuer_configured,
     issuer_identity,
+    own_certificate,
+    own_certificate_material,
     production_open,
     route_problem,
     summary,
@@ -63,6 +77,7 @@ from apps.verifactu.queries import (
 from apps.verifactu.schemas import (
     AeatQueryIn,
     AeatQueryOut,
+    CertificateUploadIn,
     ChainValidateIn,
     ChainValidationOut,
     ConfigOut,
@@ -134,6 +149,23 @@ ISSUER_MISSING = _("Set up the issuer first in Invoicing → Issuer.")
 PRODUCTION_HAS_RECORDS = _(
     "It cannot go back to testing: this business already has records in production."
 )
+CERTIFICATE_STORAGE_UNAVAILABLE = _(
+    "This server cannot keep certificates yet: ERPlora has to set its storage key."
+)
+CERTIFICATE_HOLDER_MISMATCH = _(
+    "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
+)
+CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one.")
+#: Why a certificate cannot present to the AEAT (``certificates.CertificateInvalid.code``), in the reader's language.
+CERTIFICATE_REFUSALS = {
+    "unopenable": _(
+        "The file is not a .p12/.pfx certificate that this password opens."
+    ),
+    "incomplete": _("The file does not hold a certificate and its private key."),
+    "no_client_auth": _(
+        "The certificate does not allow client authentication, so it cannot connect to the AEAT."
+    ),
+}
 #: Line of the test invoice (VERIFACTU-F11): a fiscal document's text, in the AEAT's language.
 TEST_LINE = "Prueba VeriFactu"
 
@@ -787,6 +819,12 @@ def _send_chain(
 ) -> None:
     now = timezone.now()
     problem = route_problem(config, environment)
+    certificate = None
+    if not problem:
+        try:
+            certificate = own_certificate_material(config)
+        except certificates.CertificateUnreadable:
+            problem = "own_certificate_unreadable"
     if problem:
         if strict:
             raise Conflict(
@@ -871,6 +909,7 @@ def _send_chain(
         environment=environment,
         route=config.route,
         envelope=whole,
+        certificate=certificate,
     )
     transmission = uuid.uuid7()
     digest = hashlib.sha256(whole.encode("utf-8")).hexdigest()
@@ -1274,6 +1313,7 @@ def _query_page(
     month: int,
     represented: bool,
     after: InvoiceRef | None,
+    certificate: gateway.Certificate | None,
 ) -> aeat.QueryPage:
     """One page of the AEAT's records of ``nif`` in a month (after ``after``), asked through the gateway."""
     try:
@@ -1297,6 +1337,7 @@ def _query_page(
         environment=environment,
         route=config.route,
         envelope=body,
+        certificate=certificate,
     )
     if reply.kind != gateway.ANSWERED:
         raise Conflict(
@@ -1325,6 +1366,13 @@ def _query_aeat(
             str(CANNOT_SEND) % {"why": wait_reason_text("gateway_unavailable")},
             code="verifactu.gateway_unavailable",
         )
+    try:
+        certificate = own_certificate_material(config)
+    except certificates.CertificateUnreadable:
+        raise Conflict(
+            str(CANNOT_SEND) % {"why": wait_reason_text("own_certificate_unreadable")},
+            code="verifactu.own_certificate_unreadable",
+        ) from None
     latest_name = (
         Record.objects.filter(issuer_nif=nif)
         .order_by("-created_at")
@@ -1339,7 +1387,9 @@ def _query_aeat(
     records: list[aeat.QueriedRecord] = []
     after = None
     for _page in range(MAX_QUERY_PAGES):
-        page = _query_page(ctx, config, nif, name, environment, year, month, represented, after)
+        page = _query_page(
+            ctx, config, nif, name, environment, year, month, represented, after, certificate
+        )
         records.extend(page.records)
         if not page.more:
             break
@@ -1494,12 +1544,13 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment)
     gateway_ready, gateway_detail = None, ""
-    if gateway.configured():
+    if gateway.configured() and "own_certificate_unreadable" not in codes:
         reply = gateway.probe(
             hub=ctx.scope.key,
             nif=nif,
             environment=config.environment,
             route=config.route,
+            certificate=own_certificate_material(config),
         )
         gateway_ready = reply.kind == gateway.ANSWERED and reply.ready
         gateway_detail = reply.message or reply.code
@@ -1705,6 +1756,104 @@ def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
     config.production_since = None
     _changed(ctx, config, "back_to_testing", fields=["environment"])
     return config_out(config, ctx)
+
+
+def _certificate_event(ctx, key: str, row: OwnCertificate) -> None:
+    _event(
+        ctx,
+        Event.Kind.CONFIG_CHANGED,
+        key,
+        {
+            "holder": row.holder,
+            "holder_tax_id": row.holder_tax_id,
+            "expires_on": timezone.localtime(row.expires_at).date().isoformat(),
+        },
+        environment=config_row().environment,
+    )
+    record_event(ctx, events.CONFIG_CHANGED, {"fields": ["own_certificate"]})
+
+
+@operation(
+    "verifactu.certificate.upload",
+    kind="command",
+    permission=CONFIGURE,
+    input=CertificateUploadIn,
+    output=ConfigOut,
+    ai={
+        "description": "Upload the business's own certificate (.p12/.pfx in base64, with its password) to file its "
+        "VeriFactu records with it (the «own» route). It must belong to Invoicing's issuer, allow client "
+        "authentication and be in force; it replaces the one uploaded before and is kept encrypted, never shown again.",
+        "risk": "high",
+    },
+)
+def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> ConfigOut:
+    if not certificates.storage_available():
+        raise Conflict(
+            str(CERTIFICATE_STORAGE_UNAVAILABLE),
+            code="verifactu.certificate_storage_unavailable",
+        )
+    if not issuer_configured():
+        raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
+    try:
+        p12 = base64.b64decode(
+            "".join(data.p12_base64.get_secret_value().split()), validate=True
+        )
+    except (binascii.Error, ValueError):
+        p12 = b""
+    password = data.password.get_secret_value()
+    try:
+        facts = certificates.inspect(p12, password)
+    except certificates.CertificateInvalid as invalid:
+        raise Conflict(
+            str(CERTIFICATE_REFUSALS[invalid.code]), code="verifactu.certificate_invalid"
+        ) from None
+    if facts.expires_at <= timezone.now():
+        raise Conflict(
+            str(CERTIFICATE_EXPIRED)
+            % {"date": timezone.localtime(facts.expires_at).date().isoformat()},
+            code="verifactu.certificate_invalid",
+        )
+    issuer = issuer_identity()[0].strip().upper()
+    if facts.holder_tax_id != issuer:
+        raise Conflict(
+            str(CERTIFICATE_HOLDER_MISMATCH)
+            % {"holder": facts.holder_tax_id or facts.holder, "issuer": issuer},
+            code="verifactu.certificate_holder_mismatch",
+        )
+    row, _created = OwnCertificate.objects.update_or_create(
+        singleton=True,
+        defaults={
+            "holder": facts.holder[:200],
+            "holder_tax_id": facts.holder_tax_id,
+            "kind": facts.kind,
+            "expires_at": facts.expires_at,
+            "uploaded_at": timezone.now(),
+            "uploaded_by": _actor(ctx),
+            "sealed_blob": certificates.seal(p12, password),
+        },
+    )
+    _certificate_event(ctx, "certificate_uploaded", row)
+    return config_out(config_row(), ctx)
+
+
+@operation(
+    "verifactu.certificate.remove",
+    kind="command",
+    permission=CONFIGURE,
+    input=NoInput,
+    output=ConfigOut,
+    ai={
+        "description": "Remove the business's own certificate from this Hub. With the «own» route, records wait in the "
+        "queue until another certificate is uploaded or ERPlora files for the business.",
+        "risk": "high",
+    },
+)
+def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    row = own_certificate()
+    if row is not None:
+        OwnCertificate.objects.filter(pk=row.pk).delete()
+        _certificate_event(ctx, "certificate_removed", row)
+    return config_out(config_row(), ctx)
 
 
 @operation(

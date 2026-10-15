@@ -16,7 +16,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice
-from apps.verifactu import chain, gateway, xsd
+from apps.verifactu import certificates, chain, gateway, queries, xsd
 from apps.verifactu.models import (
     AeatRecord,
     Chain,
@@ -33,8 +33,10 @@ from apps.verifactu.tests.conftest import (
     FIXTURES,
     RECIPIENT,
     answering,
+    b64,
     ctx_for,
     deliver,
+    make_p12,
     manual,
     paged,
     run,
@@ -1310,3 +1312,201 @@ def test_another_notice_is_not_for_verifactu(issuer):
     from apps.verifactu import events
 
     assert events.react(A, "invoice.invoice.paid", {"invoice_id": "x"}) is None
+
+
+# The own certificate, uploaded and removed in the Hub (VERIFACTU-F02, F03)
+
+
+@pytest.fixture
+def storage(settings):
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    return settings
+
+
+def upload(p12: bytes | None = None, password: str = "secret", ctx=None):
+    return run(
+        "verifactu.certificate.upload",
+        {"p12_base64": b64(p12 or make_p12()), "password": password},
+        ctx,
+    )
+
+
+def own_route(p12: bytes | None = None):
+    upload(p12)
+    run("verifactu.config.update", {"route": "own"})
+
+
+def test_upload_stores_the_certificate_sealed_and_reports_its_holder(issuer, storage):
+    p12 = make_p12()
+    out = upload(p12)
+    assert (
+        out.own_certificate.loaded,
+        out.own_certificate.holder,
+        out.own_certificate.holder_tax_id,
+        out.own_certificate.kind,
+    ) == (True, "ACME SL", ISSUER_NIF, "representative")
+    row = OwnCertificate.objects.get()
+    assert bytes(row.sealed_blob) != p12 and b"secret" not in bytes(row.sealed_blob)
+    assert certificates.open(row.sealed_blob) == (p12, "secret")
+    assert row.uploaded_by == "tester"
+    assert Event.objects.filter(message_key="certificate_uploaded").exists()
+    assert outbox("verifactu.config.changed")
+    assert "secret" not in out.model_dump_json()
+
+
+def test_uploading_again_replaces_the_certificate(issuer, storage):
+    upload(make_p12(days=30))
+    upload(make_p12(days=700))
+    assert OwnCertificate.objects.count() == 1
+    assert OwnCertificate.objects.get().expires_at > timezone.now() + dt.timedelta(
+        days=600
+    )
+
+
+def test_upload_refuses_a_holder_that_is_not_the_issuer(issuer, storage):
+    with pytest.raises(Conflict) as refused:
+        upload(make_p12(org_id="VATES-B99999999"))
+    assert refused.value.code == "verifactu.certificate_holder_mismatch"
+    assert "B99999999" in str(refused.value) and ISSUER_NIF in str(refused.value)
+    assert not OwnCertificate.objects.exists()
+
+
+def test_upload_needs_the_issuer_first(db, storage):
+    assert code_of(lambda: upload()) == "verifactu.issuer_missing"
+
+
+def test_upload_without_storage_key_is_refused_visibly(issuer, settings):
+    settings.FISCAL_CERTIFICATE_KEY = ""
+    assert code_of(lambda: upload()) == "verifactu.certificate_storage_unavailable"
+    assert not OwnCertificate.objects.exists()
+
+
+@pytest.mark.parametrize(
+    ("p12", "password"),
+    [
+        (make_p12(), "wrong"),
+        (make_p12(client_auth=False), "secret"),
+        (make_p12(days=-1), "secret"),
+        (b"not a certificate", "secret"),
+    ],
+    ids=["wrong password", "no client authentication", "expired", "not a p12"],
+)
+def test_upload_refuses_what_cannot_present(issuer, storage, p12, password):
+    with pytest.raises(Conflict) as refused:
+        upload(p12, password)
+    assert refused.value.code == "verifactu.certificate_invalid"
+    assert password not in str(refused.value) or password == "secret"
+    assert not OwnCertificate.objects.exists()
+
+
+def test_upload_refuses_what_is_not_base64(issuer, storage):
+    refused = code_of(
+        lambda: run(
+            "verifactu.certificate.upload",
+            {"p12_base64": "%%% not base64 %%%", "password": "secret"},
+        )
+    )
+    assert refused == "verifactu.certificate_invalid"
+
+
+def test_only_who_configures_uploads_and_removes(issuer, storage):
+    manager = ctx_for("hub_manager")
+    with pytest.raises(PermissionDenied):
+        upload(ctx=manager)
+    with pytest.raises(PermissionDenied):
+        run("verifactu.certificate.remove", {}, manager)
+
+
+def test_remove_leaves_the_own_route_waiting(
+    issuer, producer, storage, gateway_answers
+):
+    own_route()
+    out = run("verifactu.certificate.remove")
+    assert out.own_certificate.loaded is False
+    assert not OwnCertificate.objects.exists()
+    assert queries.route_problem(queries.config_row(), "testing") == "own_certificate_missing"
+    assert Event.objects.filter(message_key="certificate_removed").exists()
+    create(ticket())
+    assert run("verifactu.contingency.process").reason == "own_certificate_missing"
+    assert gateway_answers.calls == []
+
+
+def test_removing_without_a_certificate_changes_nothing(issuer):
+    assert run("verifactu.certificate.remove").own_certificate.loaded is False
+    assert not Event.objects.filter(message_key="certificate_removed").exists()
+
+
+def test_sending_by_own_route_hands_the_certificate_to_the_gateway(
+    issuer, producer, storage, gateway_answers
+):
+    p12 = make_p12()
+    own_route(p12)
+    gateway_answers.set(answering())
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    run("verifactu.contingency.process")
+    path, sent = gateway_answers.calls[-1]
+    assert path == gateway.SUBMIT_PATH
+    assert sent["route"] == "own"
+    assert sent["certificate"] == {"p12_base64": b64(p12), "password": "secret"}
+    record.refresh_from_db()
+    assert record.status == "accepted"
+
+
+def test_erplora_route_never_hands_a_certificate(
+    issuer, producer, storage, gateway_answers
+):
+    upload()
+    gateway_answers.set(answering())
+    create(ticket())
+    run("verifactu.contingency.process")
+    assert "certificate" not in gateway_answers.calls[-1][1]
+
+
+def test_an_unreadable_certificate_keeps_the_record_waiting(
+    issuer, producer, storage, gateway_answers
+):
+    own_route()
+    record = Record.objects.get(pk=create(ticket()).record.id)
+    storage.FISCAL_CERTIFICATE_KEY = certificates.generate_key()  # rotated
+    out = run("verifactu.contingency.process")
+    assert (out.sent, out.reason) == (0, "own_certificate_unreadable")
+    record.refresh_from_db()
+    assert (record.status, record.wait_reason) == ("pending", "own_certificate_unreadable")
+    assert gateway_answers.calls == []
+    detail = run("verifactu.record.get", {"record_id": str(record.id)})
+    assert "own_certificate_unreadable" in {wait.code for wait in detail.waiting}
+    assert (
+        code_of(lambda: run("verifactu.record.transmit", {"record_id": str(record.id)}))
+        == "verifactu.own_certificate_unreadable"
+    )
+
+
+def test_the_probe_and_the_query_carry_the_certificate_on_the_own_route(
+    issuer, producer, storage, gateway_answers
+):
+    p12 = make_p12()
+    own_route(p12)
+    material = {"p12_base64": b64(p12), "password": "secret"}
+    gateway_answers.set(gateway.Reply(kind=gateway.ANSWERED, ready=True, message="Ready."))
+    assert run("verifactu.diagnostic.run").gateway_ready is True
+    assert gateway_answers.calls[-1][0] == gateway.PROBE_PATH
+    assert gateway_answers.calls[-1][1]["certificate"] == material
+    gateway_answers.set(query_reply())
+    run("verifactu.aeat.query", {"year": 2026, "month": 8})
+    assert gateway_answers.calls[-1][0] == gateway.QUERY_PATH
+    assert gateway_answers.calls[-1][1]["certificate"] == material
+
+
+def test_the_connection_test_says_an_unreadable_certificate_and_asks_nothing(
+    issuer, producer, storage, gateway_answers
+):
+    own_route()
+    storage.FISCAL_CERTIFICATE_KEY = ""
+    result = run("verifactu.diagnostic.run")
+    assert result.can_send is False
+    assert "own_certificate_unreadable" in {reason.code for reason in result.reasons}
+    assert gateway_answers.calls == []
+    assert (
+        code_of(lambda: run("verifactu.aeat.query", {"year": 2026, "month": 8}))
+        == "verifactu.own_certificate_unreadable"
+    )

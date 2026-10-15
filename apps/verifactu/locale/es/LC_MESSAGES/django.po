@@ -869,3 +869,39 @@ msgstr "certificado propio"
 #: services.py
 msgid "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
 msgstr "No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado."
+
+#: models.py
+msgid "your own certificate cannot be opened on this server: upload it again"
+msgstr "tu certificado propio no se puede abrir en este servidor: vuelve a subirlo"
+
+#: models.py
+msgid "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
+msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) subido; caduca el %(expires_on)s."
+
+#: models.py
+msgid "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
+msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) quitado."
+
+#: services.py
+msgid "This server cannot keep certificates yet: ERPlora has to set its storage key."
+msgstr "Este servidor aún no puede guardar certificados: ERPlora tiene que configurar su clave de almacenamiento."
+
+#: services.py
+msgid "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
+msgstr "El certificado es de %(holder)s, no del emisor de este negocio, %(issuer)s."
+
+#: services.py
+msgid "The certificate expired on %(date)s: upload a valid one."
+msgstr "El certificado caducó el %(date)s: sube uno vigente."
+
+#: services.py
+msgid "The file is not a .p12/.pfx certificate that this password opens."
+msgstr "El fichero no es un certificado .p12/.pfx que abra esta contraseña."
+
+#: services.py
+msgid "The file does not hold a certificate and its private key."
+msgstr "El fichero no contiene un certificado con su clave privada."
+
+#: services.py
+msgid "The certificate does not allow client authentication, so it cannot connect to the AEAT."
+msgstr "El certificado no permite la autenticación de cliente, así que no puede conectar con la AEAT."

@@ -460,6 +460,9 @@ WAIT_REASONS = {
         "your ERPlora account has not sent one of the producer's details yet (whether it serves several taxpayers)"
     ),
     "own_certificate_missing": _("your own certificate is not loaded or has expired"),
+    "own_certificate_unreadable": _(
+        "your own certificate cannot be opened on this server: upload it again"
+    ),
     "representation_not_approved": _(
         "ERPlora still has to approve your signed authorisation to file in production"
     ),
@@ -613,6 +616,12 @@ EVENT_MESSAGES = {
     "connection_ok": _("Connection test (%(environment)s): this business can send."),
     "connection_blocked": _(
         "Connection test (%(environment)s): it cannot send yet: %(why)s."
+    ),
+    "certificate_uploaded": _(
+        "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
+    ),
+    "certificate_removed": _(
+        "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
     ),
     "route_own": _("From now on you send with your own certificate."),
     "route_erplora": _("From now on ERPlora files on your behalf."),
