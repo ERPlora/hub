@@ -3,11 +3,14 @@
 It registers the Hub's modules in the SaaS first: without its apps registered there is no release
 (round 16, PLAN §21.1.1), so it does no work before that. A ``shared`` schema the SaaS has not
 migrated yet (the first deploy) is waited for, with a warning and a backoff of 5, 10, 20, 40 and
-then 60 s; any other failure stops the worker with 1. Then it waits until asked to stop, waking up
-at once: ECS gives it 30 s after SIGTERM. No database here: ``register_apps`` is replaced, and its
-own tests are ``test_register_apps.py``.
+then 60 s; any other failure stops the worker with 1. Then it schedules the apps' tasks once
+(``scheduler.sync``; a failure there is fatal too) and, on every tick, runs the ones that are due
+(``scheduler.run_due``) until asked to stop, waking up at once: ECS gives it 30 s after SIGTERM. A
+tick that fails is logged and the next one tries again. No database here: ``register_apps`` and the
+scheduler are replaced; their own tests are ``test_register_apps.py`` and ``test_scheduler.py``.
 """
 
+import datetime as dt
 import logging
 import threading
 import time
@@ -15,7 +18,7 @@ import time
 import pytest
 from django.db import DatabaseError
 
-from base import catalog, worker
+from base import catalog, scheduler, worker
 from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
 
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
@@ -23,6 +26,42 @@ SKIPPED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 NOT_READY = SharedSchemaNotReady(["shared.app", "shared.app_doc"])
 #: The loop's tick in these tests: no retry waits that long.
 TICK = 0.5
+
+
+class FakeScheduler:
+    """Stands in for ``scheduler.sync`` and ``scheduler.run_due``: records the clock each one was given."""
+
+    def __init__(self) -> None:
+        self.synced: list[dt.datetime] = []
+        self.ticks: list[dt.datetime] = []
+        self.failures: list[Exception] = []
+
+    def sync(self, now: dt.datetime) -> None:
+        self.synced.append(now)
+
+    def run_due(self, now: dt.datetime) -> list[str]:
+        self.ticks.append(now)
+        if self.failures:
+            raise self.failures.pop(0)
+        return ["verifactu.process_queue"]
+
+
+@pytest.fixture(autouse=True)
+def tasks(monkeypatch) -> FakeScheduler:
+    fake = FakeScheduler()
+    monkeypatch.setattr(scheduler, "sync", fake.sync)
+    monkeypatch.setattr(scheduler, "run_due", fake.run_due)
+    return fake
+
+
+def ten(minute: int) -> dt.datetime:
+    return dt.datetime(2026, 10, 15, 10, minute, tzinfo=dt.UTC)
+
+
+def clock(*minutes: int):
+    """A clock that answers 10:<minute> UTC, one call after another."""
+    pending = [ten(minute) for minute in minutes]
+    return lambda: pending.pop(0)
 
 
 @pytest.fixture
@@ -210,3 +249,96 @@ def test_a_failed_registration_is_fatal_and_never_retried(monkeypatch, caplog, f
     assert record.levelno == logging.ERROR
     assert "register_apps" in record.getMessage()
     assert record.exc_info[1] is failure
+
+
+# ── The scheduled tasks ────────────────────────────────────────────────────────────────────────
+
+
+def stop_after(stop: threading.Event, ticks: int):
+    """Stands in for ``stop.wait``: the ``ticks``-th wait asks to stop; returns the waits it saw."""
+    waits: list[float] = []
+
+    def wait(seconds: float) -> bool:
+        waits.append(seconds)
+        if len(waits) == ticks:
+            stop.set()
+        return stop.is_set()
+
+    return wait, waits
+
+
+def test_schedules_the_apps_tasks_once_then_runs_the_due_ones_on_every_tick(calls, tasks):
+    stop = threading.Event()
+    wait, waits = stop_after(stop, 3)
+
+    assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1, 2)) == 0
+
+    assert tasks.synced == [ten(0)]
+    assert tasks.ticks == [ten(0), ten(1), ten(2)]
+    assert waits == [TICK] * 3
+
+
+def test_the_ticks_start_once_the_apps_are_registered(monkeypatch, tasks):
+    registrations(monkeypatch, NOT_READY, WRITTEN)
+    stop = threading.Event()
+    wait, waits = recorded_waits(stop)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
+
+    # The 5 s retry runs nothing; the first tick, after it, runs the due tasks.
+    assert waits == [5, TICK]
+    assert len(tasks.synced) == len(tasks.ticks) == 1
+
+
+def test_a_stop_before_registering_schedules_nothing(monkeypatch, tasks):
+    registrations(monkeypatch, NOT_READY)
+    stop = threading.Event()
+    wait, _ = recorded_waits(stop, stop_on=5)
+
+    assert worker.run(stop, tick_seconds=TICK, wait=wait) == 0
+    assert (tasks.synced, tasks.ticks) == ([], [])
+
+
+def test_stop_ends_the_ticks(calls, tasks):
+    assert worker.run(stopped()) == 0
+
+    # Asked to stop before its first tick: the tasks are scheduled, none runs.
+    assert len(tasks.synced) == 1
+    assert tasks.ticks == []
+
+
+def test_a_failure_to_schedule_the_tasks_is_fatal(monkeypatch, caplog, calls, tasks):
+    failure = DatabaseError("relation base_taskschedule does not exist")
+
+    def sync(now):
+        raise failure
+
+    monkeypatch.setattr(scheduler, "sync", sync)
+    stop = threading.Event()
+    wait, waits = recorded_waits(stop, stop_on=None)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker.run(stop, tick_seconds=TICK, wait=wait) == 1
+
+    assert (tasks.ticks, waits) == ([], [])
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "scheduled tasks" in record.getMessage()
+    assert record.exc_info[1] is failure
+
+
+def test_a_tick_that_fails_is_logged_and_the_next_one_tries_again(monkeypatch, caplog, calls, tasks):
+    failure = DatabaseError("server closed the connection unexpectedly")
+    tasks.failures.append(failure)
+    stop = threading.Event()
+    wait, waits = stop_after(stop, 2)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1)) == 0
+
+    assert len(tasks.ticks) == 2
+    assert waits == [TICK, TICK]
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "next tick" in record.getMessage()
+    assert record.exc_info[1] is failure
+    # The broken connection is released before the next tick.
+    assert calls.count("close_old_connections") == 2

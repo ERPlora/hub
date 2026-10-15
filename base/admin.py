@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils.translation import gettext
 from live.slugs import validate_hub_slug
 
-from base.models import Membership
+from base.models import Membership, TaskSchedule
 
 #: The hub chosen for the admin (its slug), set by the deep link.
 ADMIN_HUB_SESSION_KEY = "admin_hub"
@@ -25,6 +25,22 @@ class MembershipAdmin(admin.ModelAdmin):
     list_filter = ("role", "host")
     search_fields = ("user__username", "user__email", "host")
     list_select_related = ("user",)
+
+
+@admin.register(TaskSchedule)
+class TaskScheduleAdmin(admin.ModelAdmin):
+    """The apps' scheduled tasks (``base.scheduler``): the apps declare them and the worker writes them when it
+    starts, so none is added here and the declaration is read-only; ``next_run`` can be brought forward (the
+    task runs on the worker's next tick once it has come)."""
+
+    list_display = ("app_label", "name", "operation", "cron", "next_run", "last_run")
+    list_filter = ("app_label",)
+    search_fields = ("app_label", "name", "operation")
+    fields = ("app_label", "name", "operation", "cron", "next_run", "last_run")
+    readonly_fields = ("app_label", "name", "operation", "cron", "last_run")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
 
 
 def open_hub(request: HttpRequest, slug: str) -> HttpResponseRedirect:

@@ -1,16 +1,18 @@
-"""Django admin of base: Memberships are managed there in phase 1; the deep link chooses a hub (PLAN §18.1).
+"""Django admin of base: Memberships are managed there in phase 1, and the scheduled tasks' clock can be seen
+and brought forward; the deep link chooses a hub (PLAN §18.1).
 
 The admin lives only on the platform host (``hubs.localhost``); on a hub host it is not found (PLAN §18.1.3).
 """
 
+import datetime as dt
 import re
 from pathlib import Path
 
 import pytest
 from django.contrib import admin
 
-from base.admin import ADMIN_HUB_SESSION_KEY, MembershipAdmin
-from base.models import Membership
+from base.admin import ADMIN_HUB_SESSION_KEY, MembershipAdmin, TaskScheduleAdmin
+from base.models import Membership, TaskSchedule
 
 pytestmark = pytest.mark.django_db
 HOST = "a.localhost:8000"
@@ -20,6 +22,53 @@ BANNER = 'id="admin-hub"'
 
 def test_membership_is_registered():
     assert isinstance(admin.site._registry[Membership], MembershipAdmin)
+
+
+def scheduled_task() -> TaskSchedule:
+    return TaskSchedule.objects.create(
+        app_label="verifactu",
+        name="process_queue",
+        operation="verifactu.contingency.process",
+        cron="* * * * *",
+        next_run=dt.datetime(2026, 10, 15, 10, 1, tzinfo=dt.UTC),
+    )
+
+
+def test_the_scheduled_tasks_are_registered():
+    assert isinstance(admin.site._registry[TaskSchedule], TaskScheduleAdmin)
+
+
+def test_the_scheduled_tasks_are_listed_with_their_clock(client, superuser):
+    scheduled_task()
+    client.force_login(superuser)
+
+    html = client.get("/admin/base/taskschedule/", HTTP_HOST=PLATFORM).content.decode()
+
+    assert "verifactu.contingency.process" in html and "* * * * *" in html
+
+
+def test_a_scheduled_task_is_not_added_by_hand(client, superuser):
+    # The apps declare them and the worker writes them when it starts.
+    client.force_login(superuser)
+
+    assert client.get("/admin/base/taskschedule/add/", HTTP_HOST=PLATFORM).status_code == 403
+
+
+def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(client, superuser):
+    task = scheduled_task()
+    client.force_login(superuser)
+
+    response = client.post(
+        f"/admin/base/taskschedule/{task.pk}/change/",
+        # The admin speaks the server's time (Europe/Madrid): 11:00 there is 09:00 UTC.
+        {"next_run_0": "2026-10-15", "next_run_1": "11:00:00", "cron": "0 0 * * *", "operation": "x.y.z"},
+        HTTP_HOST=PLATFORM,
+    )
+
+    assert response.status_code == 302
+    task.refresh_from_db()
+    assert task.next_run == dt.datetime(2026, 10, 15, 9, 0, tzinfo=dt.UTC)
+    assert (task.cron, task.operation) == ("* * * * *", "verifactu.contingency.process")
 
 
 def test_changelist_lists_memberships(client, superuser, make_user):

@@ -10,6 +10,7 @@ import logging
 
 import pytest
 from django.db import OperationalError, connection
+from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
 
 from base import health
@@ -71,9 +72,9 @@ class TestReadyz:
         assert "connection refused" in caplog.text
 
     def test_is_503_while_a_migration_is_pending(self, client):
-        MigrationRecorder(connection).record_unapplied(
-            "base", "0002_prefixed_membership_roles"
-        )
+        # base's newest migration: an older one unapplied under an applied child is no pending plan.
+        [newest] = MigrationLoader(connection).graph.leaf_nodes("base")
+        MigrationRecorder(connection).record_unapplied(*newest)
         response = client.get("/readyz", HTTP_HOST="a.localhost:8000")
         assert (response.status_code, response.json()) == (
             503,

@@ -90,3 +90,35 @@ msgstr "No hemos podido terminar de iniciar tu sesión"
 #: templates/base/login_retry.html
 msgid "The sign-in expired or started in another browser."
 msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
+
+#: models.py
+msgid "app"
+msgstr "app"
+
+#: models.py
+msgid "name"
+msgstr "nombre"
+
+#: models.py
+msgid "operation"
+msgstr "operación"
+
+#: models.py
+msgid "cron (UTC)"
+msgstr "cron (UTC)"
+
+#: models.py
+msgid "next run"
+msgstr "próxima ejecución"
+
+#: models.py
+msgid "last run"
+msgstr "última ejecución"
+
+#: models.py
+msgid "scheduled task"
+msgstr "tarea programada"
+
+#: models.py
+msgid "scheduled tasks"
+msgstr "tareas programadas"
