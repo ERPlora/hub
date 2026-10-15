@@ -208,7 +208,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
 | VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | hecho |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
-| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho en el Hub; la tarea la corre el worker de la fase 2 |
+| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
 | VERIFACTU-F22 | Reintentar una entrada de la cola | hecho |
 | VERIFACTU-F23 | Descartar una entrada de la cola | desaparece — un registro generado no se descarta nunca |
@@ -562,7 +562,7 @@ Si falla: sin VeriFactu activa o sin permiso de consulta, el documento sale sin 
 Implicados: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Enviar después lo que no pudo salir (contingencia automática)
-Estado: hecho en el Hub; la tarea la corre el worker de la fase 2
+Estado: hecho — la corre el worker
 Actor: sistema
 Pantalla: Contingencia
 Pasos:
@@ -1067,7 +1067,13 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   y los intentos. Se corrige con uno nuevo (subsanación o anulación); una corrección de la factura es una
   rectificativa de Facturación.
 - La tarea programada `process_queue` (`verifactu.contingency.process`, cada minuto, en UTC, `collapse`) la
-  corre el worker de la fase 2 como el sistema.
+  corre el worker (`base/scheduler.py`, desde `base/worker.py`, cada tick de 5 s) como el sistema: su reloj es
+  una fila de `base.TaskSchedule` que el worker escribe al arrancar; cada pasada la toma con
+  `select_for_update(skip_locked=True)` y mueve `next_run` en la misma transacción que el envío, así que dos
+  workers a la vez (un despliegue) nunca la corren dos veces, y los minutos perdidos con el worker parado se
+  juntan en una sola pasada. Si la pasada falla, se registra en el log, se deshace lo suyo y vuelve al minuto
+  siguiente. En la fase 1 corre sobre un solo hub, `WORKER_SCOPE_SLUG` (por defecto el de plataforma,
+  `PLATFORM_HUB_SLUG`); la fase 2 recorre los hubs a los que les toca (`hub_due`), cada uno con `use_hub`.
 
 ### Administrador de Django
 
