@@ -5,7 +5,7 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, listReady, login, openApps, record, shot, shown } from './helpers';
+import { A, listReady, login, openApps, record, shot, shown, topbarApps } from './helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -141,5 +141,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
   await page.unroute(/\/frontend\/pages\//);
   await toast.locator('button', { hasText: /retry|reintentar/i }).click();
   await expect(page).toHaveURL(`${A}/customer/customers`);
+  await customersReady(page);
+  await expect(topbarApps(page)).toBeVisible();
   await expect(toast).toBeHidden();
 });
