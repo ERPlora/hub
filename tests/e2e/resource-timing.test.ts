@@ -92,6 +92,19 @@ describe('installResponseRecorder + recordedResponses (in the page)', () => {
     ]);
   });
 
+  it('also keeps what the page loaded before it was installed (`buffered`)', () => {
+    request('/static/spa/main.js', 'script', 1, 2);
+    request('/api/demo/items', 'fetch', 3, 5);
+    installResponseRecorder();
+    request('/api/demo/items/add_line', 'fetch', 10, 30);
+
+    expect(recordedUrls(recordedResponses())).toEqual([
+      `${ORIGIN}/static/spa/main.js`,
+      `${ORIGIN}/api/demo/items`,
+      `${ORIGIN}/api/demo/items/add_line`,
+    ]);
+  });
+
   it('is still there on a second read', () => {
     installResponseRecorder();
     request('/api/demo/items/add_line', 'fetch', 10, 30);

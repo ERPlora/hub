@@ -4,11 +4,12 @@
 // ('resource')`, `performance.getEntries()` or `performance.getEntriesByName(…)` miss what came after it, in silence
 // (2026-10-16: `NaN` in delete-item, `null` in optimistic-add-line and two-tabs-live, a blind module check in
 // no-outfitkit). Reading other entry types (`'navigation'`: csp, hmr, prod-csp) is fine.
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -29,11 +30,29 @@ function resourceBufferReads(source: string): string[] {
   return reads;
 }
 
-/** The e2e's own files that run in or drive the page: specs and helpers, not the Vitest tests. */
-function e2eSources(): string[] {
-  return readdirSync(HERE)
-    .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== 'resource-timing.ts')
-    .sort();
+/** Folders that are not the e2e's own code: the runs' evidence and installed packages. */
+const SKIPPED_DIRS = new Set(['.artifacts', 'node_modules']);
+
+/**
+ * The e2e's own files under `root`, at any depth (Playwright finds specs in subfolders too), as paths relative to
+ * it: specs and helpers, not the Vitest tests, nor the recorder (`resource-timing.ts` at the top).
+ */
+function e2eSources(root = HERE): string[] {
+  const walk = (dir: string): string[] =>
+    readdirSync(join(root, dir), { withFileTypes: true }).flatMap((entry) => {
+      const path = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) return SKIPPED_DIRS.has(entry.name) ? [] : walk(path);
+      const ownCode = entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') && path !== 'resource-timing.ts';
+      return ownCode ? [path] : [];
+    });
+  return walk('').sort();
+}
+
+/** Every read of the resource buffer in the e2e's files under `root`, as `<file>:<line>: <call>`. */
+function bufferReadsIn(root = HERE): string[] {
+  return e2eSources(root).flatMap((name) =>
+    resourceBufferReads(readFileSync(join(root, name), 'utf8')).map((read) => `${name}:${read}`),
+  );
 }
 
 describe('resourceBufferReads', () => {
@@ -80,10 +99,39 @@ describe('the e2e reads requests through resource-timing.ts', () => {
   });
 
   it('no spec or helper reads the resource buffer', () => {
-    const reads = e2eSources().flatMap((name) =>
-      resourceBufferReads(readFileSync(join(HERE, name), 'utf8')).map((read) => `${name}:${read}`),
-    );
+    expect(bufferReadsIn(), 'use recordResponses + responseEnd / resourceUrls from resource-timing.ts').toEqual([]);
+  });
+});
 
-    expect(reads, 'use recordResponses + responseEnd / resourceUrls from resource-timing.ts').toEqual([]);
+describe('e2eSources + bufferReadsIn on a tree of their own', () => {
+  const READ = "const entries = performance.getEntriesByType('resource');\n";
+  let root: string;
+  const write = (path: string, source: string): void => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), source);
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'e2e-resource-reads-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('finds a read of the buffer in a spec of a subfolder (Playwright runs those too)', () => {
+    write('top.spec.ts', "performance.getEntriesByType('navigation');\n");
+    write('sales/nested/deep.spec.ts', `// a nested spec\n${READ}`);
+
+    expect(e2eSources(root)).toEqual(['sales/nested/deep.spec.ts', 'top.spec.ts']);
+    expect(bufferReadsIn(root)).toEqual(["sales/nested/deep.spec.ts:2: performance.getEntriesByType('resource')"]);
+  });
+
+  it('skips .artifacts, node_modules, the Vitest tests and the recorder itself, at any depth', () => {
+    write('.artifacts/test-results/copy.spec.ts', READ);
+    write('node_modules/some-package/index.ts', READ);
+    write('helpers.test.ts', READ);
+    write('sales/sale.test.ts', READ);
+    write('resource-timing.ts', READ);
+    write('sales/resource-timing.ts', READ);
+
+    expect(e2eSources(root)).toEqual(['sales/resource-timing.ts']);
   });
 });
