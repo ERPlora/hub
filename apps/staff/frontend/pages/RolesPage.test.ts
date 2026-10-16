@@ -97,9 +97,12 @@ describe('RolesPage', () => {
       { value: 'true', label: 'Active' },
       { value: 'false', label: 'Retired' },
     ]);
-    s.table().vm.$emit('update:filters', { is_active: 'false', member_count_min: '1' });
+    // Two different ends, so that each one is proven to reach its own parameter.
+    s.table().vm.$emit('update:filters', { is_active: 'false', member_count_min: '1', member_count_max: '5' });
     await flush();
-    expect(s.list()).toEqual([{ is_active: false, member_count_min: 1, sort: 'name', limit: 50, offset: 0 }]);
+    expect(s.list()).toEqual([
+      { is_active: false, member_count_min: 1, member_count_max: 5, sort: 'name', limit: 50, offset: 0 },
+    ]);
     expect(s.find('staff-roles-filters-count').text()).toBe('2');
   });
 
