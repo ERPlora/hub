@@ -161,7 +161,14 @@ EXPORT_GUARD = ("'=", "'+", "'-", "'@")
 
 
 def _actor(ctx: OperationContext) -> str:
-    return "" if ctx.actor is None else str(ctx.actor)[:128]
+    """Who writes, as people read it: the user's name (or email), never their account id; the
+    platform itself (``system_context``) by its own mark."""
+    actor = ctx.actor
+    if actor is None:
+        return ""
+    if not hasattr(actor, "get_username"):
+        return str(actor)[:128]
+    return (actor.get_full_name() or actor.email or actor.get_username())[:128]
 
 
 def _e164(raw: str, ctx: OperationContext, field: str = "phone") -> str:
@@ -922,7 +929,9 @@ def withdraw_consent(ctx: OperationContext, data: ConsentWithdrawIn) -> Consent:
 # erased when it is withdrawn. No ``ai`` and no ``expose_api``: never for the assistant nor an API key.
 
 
-def _health_fact(ctx: OperationContext, data, customer: Customer, state: str) -> Consent:
+def _health_fact(
+    ctx: OperationContext, data, customer: Customer, state: str
+) -> Consent:
     now = timezone.now()
     occurred_at = getattr(data, "occurred_at", None) or now
     if occurred_at > now + CLOCK_SKEW:

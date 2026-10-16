@@ -2270,3 +2270,27 @@ def test_a_merge_drops_the_health_data_when_the_last_decision_withdrew_the_permi
     run("customer.health.withdraw", HealthWithdrawIn(customer_id=survivor.id))
     run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
     assert HealthRecord.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_who_wrote_it_is_the_persons_name_never_their_account_id():
+    """CUSTOMER-F05, F14, F32: «with your name and the time», not the session's account id."""
+    from django.contrib.auth import get_user_model
+
+    users = get_user_model().objects
+    clara = users.create_user(
+        username="saas:0199-clara", first_name="Clara", last_name="Ruiz", email="clara@example.com"
+    )
+    nameless = users.create_user(username="saas:0199-luis", email="luis@example.com")
+    ana = card("Ana")
+    note = run(
+        "customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"), actor=clara
+    )
+    assert note.actor == "Clara Ruiz"
+    fact = run(
+        "customer.consent.grant",
+        ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes."),
+        actor=nameless,
+    )
+    assert fact.recorded_by == "luis@example.com"
+    assert grant_health(ana, actor=clara).consent_by == "Clara Ruiz"
