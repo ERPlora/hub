@@ -54,6 +54,10 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   privacidad de Odoo: se borra a la persona y se conserva lo que la ley obliga a guardar (las ventas).
 - **Notas y actividad en una sola línea de tiempo**, como el «chatter» de Odoo y la línea de tiempo
   de Shopify.
+- **Alergias y prueba de sensibilidad** en su propio bloque de la ficha, a la vista de quien atiende,
+  como Fresha, Phorest, Timely, Vagaro, Zenoti, Mindbody, Shortcuts y Kitomba; y, por ser datos de
+  salud, solo con el permiso expreso de la persona (RGPD art. 9.2.a), que se retira tan fácil como se
+  da y al retirarlo se borran (arts. 7.3 y 17).
 - **Permisos por acción** como los de personal de Shopify: ver, gestionar, exportar, unir, eliminar
   y borrar datos personales son permisos distintos.
 
@@ -184,6 +188,7 @@ El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los
 | CUSTOMER-F29 | Definir los campos personalizados de la ficha | hecho | común |
 | CUSTOMER-F30 | Dar la ficha de un cliente a otras apps | hecho | común |
 | CUSTOMER-F31 | Ver las cifras de los clientes | hecho | común |
+| CUSTOMER-F32 | Apuntar alergias o la prueba de sensibilidad con su permiso | hecho | peluquería |
 
 «Hecho»: servidor y páginas con sus tests (de las páginas y de extremo a extremo en Chrome). «Parcial»:
 lo que falta y por qué va en su «Estado».
@@ -865,6 +870,40 @@ Si falla: «No se pudieron cargar las cifras» en su sitio, y la tabla sigue fun
 llegan, cada cifra enseña «…». En el móvil van de dos en dos, para que la tabla se siga viendo debajo.
 Implicados: ninguno
 
+### CUSTOMER-F32 Apuntar alergias o la prueba de sensibilidad con su permiso
+<!-- origen: qa:modules/customers/profile-with-health-data-l10 -->
+Estado: hecho
+Vertical: peluquería
+Actor: todos los que gestionan fichas (verlo: todos)
+Pantalla: Ficha de cliente
+Pasos:
+1. En la ficha, el bloque «Salud y alergias» dice «Para apuntar alergias o pruebas de sensibilidad
+   hace falta su permiso expreso.» y enseña **Pedir permiso**.
+2. Púlsalo: sale la frase «Doy mi permiso para que este negocio guarde mis alergias y mis pruebas de
+   sensibilidad para atenderme con seguridad. Puedo retirarlo cuando quiera y entonces se borrarán.»
+   con la indicación «Léelo en voz alta y pulsa solo si dice que sí. Esta frase exacta es la que queda
+   guardada como prueba, junto a tu nombre y la hora.».
+3. Si dice que sí, pulsa **Ha dicho que sí**: sale «Permiso registrado.» y el bloque enseña sus datos
+   de salud (al principio, «Sin alergias apuntadas.» y «Sin prueba de sensibilidad.»).
+4. Pulsa **Editar**: «Alergias y sensibilidades», «Fecha de la prueba de sensibilidad» y «Resultado»
+   («Sin resultado», «Negativa» o «Positiva»). **Guardar** → «Datos de salud guardados.».
+5. Con alergias apuntadas, el bloque las enseña destacadas, como aviso, para que quien atienda las vea
+   antes del servicio.
+6. **Retirar permiso** pregunta «¿Retirar el permiso? Se borran sus alergias y su prueba de
+   sensibilidad.» y, al confirmar, sale «Permiso retirado y datos de salud borrados.».
+Entra: la frase exacta y su versión (quién lo apunta sale de la sesión); las alergias (hasta 2.000
+caracteres), la fecha de la prueba y su resultado.
+Sale: el permiso, como un hecho más del libro de consentimientos (finalidad «datos de salud», con su
+entrada en la «Actividad» y su aviso `customer.health.consent_granted` o
+`customer.health.consent_withdrawn`), y los datos de salud, con «Datos de salud actualizados» en la
+actividad (sin su contenido) y el aviso `customer.health.updated`. Los avisos solo llevan
+identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso.
+Si falla: sin el permiso en vigor no se guarda nada: «Registra antes su permiso para guardar datos de
+salud.». Una prueba con fecha futura: «Esta fecha está en el futuro.»; un resultado sin fecha: «Pon la
+fecha de la prueba.». «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
+fichas ve el bloque sin botones.
+Implicados: CUSTOMER-F13, CUSTOMER-F16
+
 ## Qué comparten los verticales
 
 Tocar una pieza de esta tabla afecta a la peluquería **y** al restaurante.
@@ -911,6 +950,7 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 | Todo lo que se decidió sobre el consentimiento de una ficha | ver | F14, F15 | sí | `customer.consent.history` |
 | Qué cliente tiene un pedido | ver | F17, F19 | sí | `customer.order.customer` |
 | Los pedidos de una ficha (también para las API keys) | ver | F19 | sí | `customer.order.list` |
+| Los datos de salud de una ficha y su permiso (solo en pantalla) | ver | F32 | sí | `customer.health.detail` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -929,6 +969,9 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 | Registra un consentimiento dado | gestionar | F14 | `customer.consent.grant` |
 | Registra un consentimiento retirado | gestionar | F15 | `customer.consent.withdraw` |
 | Enlaza (o desenlaza) el cliente de un pedido | gestionar | F19 | `customer.order.link` |
+| Registra el permiso para guardar datos de salud | gestionar | F32 | `customer.health.grant` |
+| Retira ese permiso y borra los datos de salud | gestionar | F32 | `customer.health.withdraw` |
+| Guarda las alergias y la prueba de sensibilidad (con el permiso en vigor) | gestionar | F32 | `customer.health.update` |
 | Crea y cambia grupos; los elimina | configurar; eliminar | F27 | `customer.group.create`, `.update`; `.delete` |
 | Crea y cambia etiquetas; las elimina | configurar; eliminar | F28 | `customer.tag.create`, `.update`; `.delete` |
 | Crea, cambia y elimina campos personalizados | configurar | F29 | `customer.field.create`, `.update`, `.delete` |
@@ -957,6 +1000,8 @@ Los avisos llevan solo identificadores, nunca datos personales: quien necesite l
 | Compra apuntada / anulada | Venta cobrada / anulada | `customer_id` y `sale_id` | `customer.purchase.recorded`, `customer.purchase.voided` |
 | Devolución apuntada | Venta devuelta (toda o parte) | `customer_id`, `sale_id` y `refund_id` | `customer.purchase.refunded` |
 | Grupo, etiqueta o campo creado, cambiado o eliminado | Configurar | `id` | `customer.group.*`, `customer.tag.*`, `customer.field.*` |
+| Permiso de datos de salud dado / retirado | Registrar / retirar | `id` (el hecho) y `customer_id` | `customer.health.consent_granted`, `customer.health.consent_withdrawn` |
+| Datos de salud guardados | Guardar con algún cambio | `id` y `customer_id` | `customer.health.updated` |
 
 ### A qué reacciona (avisos de otras apps)
 
@@ -1008,7 +1053,11 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   (`crates/guest-sdk/tests/phone_test.rs`), corregido donde ese SDK, que solo copiaba longitudes, se
   apartaba de libphonenumber. Los países se validan con `pycountry` (ISO 3166). El país del negocio
   es `ES` mientras la plataforma no tenga ajustes por negocio (`queries.business_country`).
-- Toda operación declara `ai` (descripción para el asistente y, en las escrituras, `risk`) y todo
+- Datos de salud (F32): `HealthRecord`, una fila por ficha, y su permiso en el libro `Consent` con
+  `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) no declaran `ai` ni
+  `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD art. 9,
+  minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
+- Toda operación (salvo las de salud) declara `ai` (descripción para el asistente y, en las escrituras, `risk`) y todo
   campo de `schemas.py` su descripción: son la herramienta del asistente. Las referencias humanas
   (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
@@ -1098,7 +1147,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 |---|---|---|
 | Nombre, email, teléfono, NIF, empresa, dirección, ciudad, código postal, país, notas internas, cumpleaños, aniversario y canal preferido | la ficha (`Customer`) | F16: vaciados; nombre `Deleted customer`. F07 no borra nada |
 | Origen, etapa, compras, gastado, última compra y fecha de alta | la ficha | se conservan (no identifican por sí solos) |
-| Valores de campos propios (pueden ser datos de salud: alergias, tinte) | `CustomFieldValue` | F16: borrados |
+| Valores de campos propios | `CustomFieldValue` | F16: borrados |
+| Alergias y prueba de sensibilidad (datos de salud, RGPD art. 9) | `HealthRecord` | F32: borrados al retirar el permiso; F16: borrados |
 | Notas y actividad (textos, frase del consentimiento, motivos, importes) | `Activity` | F16: borradas; queda solo la auditoría del borrado |
 | Pertenencia a grupos y etiquetas | grupos y etiquetas de la ficha | F16: quitada |
 | Consentimientos (canal, dirección, frase, versión, origen, justificante, motivo, quién y cuándo) | `Consent` | F16: dirección, justificante y motivo vaciados; el hecho se queda |
@@ -1124,6 +1174,7 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 - **La edición de la ficha se guarda entera o nada.**
 - **Un nombre por negocio** entre los grupos, entre las etiquetas y entre los campos, sin distinguir
   mayúsculas ni espacios.
+- **Un dato de salud solo se guarda con el permiso expreso en vigor**, y retirarlo lo borra.
 - **El dinero va en céntimos**; la pantalla escribe los filtros en euros.
 - **Buscar por teléfono nunca devuelve a todos.**
 - **Clientes no depende de ninguna app**: se enciende sola.
@@ -1145,7 +1196,6 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 1. **Aviso de posible duplicado al crear (F12).** ¿Un aviso que no bloquea con las fichas del mismo
    teléfono o email? Hoy lo hace solo el alta rápida del TPV.
 2. **Etapas por tiempo.** «En riesgo», «Inactivo» y «Perdido» solo se ponen a mano: ¿tarea programada?
-3. **Datos de salud en campos propios.** ¿Marca de campo sensible con consentimiento explícito?
-4. **País del negocio.** Llega cuando la plataforma tenga ajustes por negocio; hasta entonces, España.
-5. **Aprobación con PIN.** El producto actual dejaba hacer con el PIN de un responsable lo que es del
+3. **País del negocio.** Llega cuando la plataforma tenga ajustes por negocio; hasta entonces, España.
+4. **Aprobación con PIN.** El producto actual dejaba hacer con el PIN de un responsable lo que es del
    responsable; llega con la elevación de la plataforma (fase 2).
