@@ -1,6 +1,7 @@
-// FIX-DATATABLE evidence (ui mig/FIX-DATATABLE): a list page with AppPage `content-layout="fill"` and a
+// FIX-DATATABLE-HUB evidence (ui 070e74f): a list page with AppPage `content-layout="fill"` and a
 // DataTable `fill filterable` fills the space between the topbar and the tabbar at 390, 834 and 1440 px,
-// with its footer fixed and its rows scrolling inside (on a phone the list grows with the page, #218);
+// with its footer fixed and its rows scrolling inside, one scroll only (on a phone the list grows with the
+// page and only the page scrolls, #218);
 // the funnel counts the filters in use; its panel pushes the list into two columns from 834 px and is a
 // sheet strictly between the header and the tabbar below (outfitkit#75/#197).
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
@@ -24,7 +25,7 @@ async function cleanup(context: BrowserContext, prefix: string): Promise<void> {
 
 /** Boxes of the visible page: its content area, its tabbar, the table, its footer, rows and panel. */
 async function geometry(page: Page) {
-  return page.evaluate(() => {
+  return page.evaluate(async () => {
     const view = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden)') as HTMLElement;
     const box = (el: Element | null | undefined) => {
       const r = el?.getBoundingClientRect();
@@ -32,6 +33,7 @@ async function geometry(page: Page) {
     };
     const content = view.querySelector('ion-content') as HTMLElement;
     const rows = view.querySelector('.data-table__scroll, .data-table__cards') as HTMLElement | null;
+    const scroller = await (content as HTMLElement & { getScrollElement(): Promise<HTMLElement> }).getScrollElement();
     return {
       content: box(content),
       tabbar: box(view.querySelector('ion-footer.section-tabbar')),
@@ -39,12 +41,13 @@ async function geometry(page: Page) {
       pager: box(view.querySelector('.data-table__pager')),
       drawer: box(view.querySelector('.data-table__drawer')),
       rowsScrollInside: rows ? rows.scrollHeight > rows.clientHeight + 1 : null,
+      pageScrolls: scroller.scrollHeight > scroller.clientHeight + 1,
       paddingBottom: parseFloat(getComputedStyle(content).getPropertyValue('--padding-bottom')) || 0,
     };
   });
 }
 
-test('FIX-DATATABLE: fill to the tabbar, funnel with count, panel in two columns ≥834 and a sheet below', async ({ page, context }) => {
+test('FIX-DATATABLE-HUB: fill to the tabbar, funnel with count, panel in two columns ≥834 and a sheet below', async ({ page, context }) => {
   test.setTimeout(240_000);
   await login(page, A);
   const prefix = `FXDT${Date.now().toString(36)}`;
@@ -72,13 +75,13 @@ test('FIX-DATATABLE: fill to the tabbar, funnel with count, panel in two columns
       await listReady(page);
       await page.waitForTimeout(400);
       const closed = await geometry(page);
-      await page.screenshot({ path: shot(`FIX-DATATABLE-${vp.label}-list`) });
+      await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-${vp.label}-list`) });
 
       await funnel.click();
       await expect(panel).toBeVisible();
       await page.waitForTimeout(400);
       const open = await geometry(page);
-      await page.screenshot({ path: shot(`FIX-DATATABLE-${vp.label}`) });
+      await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-${vp.label}`) });
       results[vp.label] = { closed, open };
 
       const c = closed.content!;
@@ -89,9 +92,12 @@ test('FIX-DATATABLE: fill to the tabbar, funnel with count, panel in two columns
         expect(Math.abs(closed.table!.bottom - (c.bottom - closed.paddingBottom)), JSON.stringify(closed)).toBeLessThanOrEqual(2);
         expect(closed.pager!.bottom).toBeLessThanOrEqual(c.bottom);
         expect(closed.rowsScrollInside, 'the rows scroll inside the table').toBe(true);
+        expect(closed.pageScrolls, 'no double scroll: the page itself does not scroll').toBe(false);
       } else {
-        // A phone: the list grows with its rows from the page's height (one scroll, #218).
+        // A phone: the list grows with its rows from the page's height; only the page scrolls (#218).
         expect(closed.table!.bottom).toBeGreaterThanOrEqual(c.bottom - closed.paddingBottom - 2);
+        expect(closed.rowsScrollInside, 'no double scroll: the rows do not scroll inside the table').toBe(false);
+        expect(closed.pageScrolls, 'the page scrolls the grown list').toBe(true);
       }
       const d = open.drawer!;
       if (vp.width >= 834) {
