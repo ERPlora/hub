@@ -742,7 +742,22 @@ def test_what_counts_as_configured(no_seed):
     # Exempt and IGIC rules count: a physiotherapist or a Canary business is configured.
     rule(category("service.health"), "0", operation_class="exempt")
     rule(category("product.y"), "7", region="ES-CN", tax_type="igic")
-    assert status(country_code="ES").matching_rules == 3
+    spain = status(country_code="ES")
+    assert (spain.matching_rules, spain.configured) == (3, True)
+    # A country without a rule in force is not configured: the till could not price a sale there.
+    portugal = status(country_code="PT")
+    assert (portugal.matching_rules, portugal.configured) == (0, False)
+    # Without the business's country, any country's rule counts.
+    anywhere = status()
+    assert (anywhere.matching_rules, anywhere.configured) == (3, True)
+
+
+def test_nothing_in_force_is_not_configured(no_seed):
+    # TAX-F17: no rule at all, or only ones not in force today, is «missing your taxes».
+    assert (status().matching_rules, status().configured) == (0, False)
+    rule(category(), "21", is_active=False)
+    rule(category("product.x"), "21", valid_from=timezone.localdate() + timedelta(days=1))
+    assert (status().matching_rules, status().configured) == (0, False)
 
 
 # tax.alias.list (TAX-F13)

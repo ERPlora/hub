@@ -437,12 +437,12 @@ Implicados: ninguno
 ### TAX-F17 Avisar de que faltan tipos para el país del negocio
 <!-- origen: old:taxes/WORKFLOW.md#taxes-f17 wf:alta#rec_alta-f09 -->
 Estado: hecho
-Actor: sistema
+Actor: propietario, administrador, responsable
 Pantalla: Categorías, Reglas y Alias
 Pasos:
-1. Mientras ninguna regla raíz activa esté vigente hoy, arriba de Categorías, Reglas y Alias sale el aviso
-   «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular
-   el precio de una venta.»), solo para quien puede gestionar impuestos.
+1. Abre **Impuestos**: mientras ninguna regla raíz activa esté vigente hoy, arriba de Categorías, Reglas y
+   Alias sale el aviso «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el
+   TPV pueda calcular el precio de una venta.»), solo para quien puede gestionar impuestos.
 2. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
    Reglas el aviso no lleva botón.
 3. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo.
