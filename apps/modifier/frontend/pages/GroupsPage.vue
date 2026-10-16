@@ -135,7 +135,10 @@ function onAction({ actionId, row }: { actionId: string; row: GroupOut }): void 
 </script>
 
 <template>
-  <AppPage :title="$t('modifier.title')">
+  <AppPage
+    :title="$t('modifier.title')"
+    content-layout="fill"
+  >
     <PageNotices
       testid="modifier-groups"
       :status="status"
@@ -145,6 +148,7 @@ function onAction({ actionId, row }: { actionId: string; row: GroupOut }): void 
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="modifier-groups"
+      fill
       server-side
       searchable
       row-clickable

@@ -87,6 +87,7 @@ function openForm(role: RoleOut | null): void {
 <template>
   <AppPage
     :title="$t('staff.title')"
+    content-layout="fill"
     :tabs="staffTabs($t, { settings: canManage })"
     :tabs-label="$t('staff.tabs.label')"
   >
@@ -99,6 +100,7 @@ function openForm(role: RoleOut | null): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="staff-roles"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

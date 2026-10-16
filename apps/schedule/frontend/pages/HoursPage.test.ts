@@ -12,6 +12,7 @@ import type { WeekDayOut, WeekOut } from '../operations';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, settle } from '../__tests__/mount-schedule';
 import DayHoursModal from '../components/DayHoursModal.vue';
 import HoursPage from './HoursPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -159,5 +160,12 @@ describe('HoursPage', () => {
     expect(s.cells(0).slice(0, 3)).toEqual(['Lunes', '10:00–14:00 · 17:00–20:00', 'Abierto']);
     expect(s.cells(3).slice(1, 3)).toEqual(['Sin definir', '—']);
     expect(s.find('schedule-hours-confirm-week').text()).toBe('Sí, este es mi horario');
+  });
+});
+
+describe('HoursPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

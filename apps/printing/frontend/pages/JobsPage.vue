@@ -142,6 +142,7 @@ function onAction({ actionId, row }: { actionId: string; row: JobOut }): void {
 <template>
   <AppPage
     :title="$t('printing.title')"
+    content-layout="fill"
     :tabs="printingTabs($t)"
     :tabs-label="$t('printing.tabs.label')"
   >
@@ -164,6 +165,7 @@ function onAction({ actionId, row }: { actionId: string; row: JobOut }): void {
       v-model:search="table.search.value"
       v-model:filters="filters"
       testid="printing-jobs"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

@@ -12,6 +12,7 @@ import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale } from '
 import QuickNoteFormModal from '../components/backoffice/QuickNoteFormModal.vue';
 import type { QuickNoteOut } from '../operations';
 import QuickNotesPage from './QuickNotesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -224,5 +225,12 @@ describe('QuickNotesPage: Spanish', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe(
       'Todavía no hay notas rápidas. Añade las que tu cocina oye a diario: «sin sal», «poco hecho», «sin hielo».',
     );
+  });
+});
+
+describe('QuickNotesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

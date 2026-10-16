@@ -12,6 +12,7 @@ import type { ServiceOut } from '../operations';
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page } from '../__tests__/mount-service';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import ServicesPage from './ServicesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -187,5 +188,12 @@ describe('ServicesPage', () => {
     expect(s.cells(0)[2]).toBe('Precio fijo');
     expect(s.cells(0)[3]).toMatch(/^22,50\s€$/);
     expect(s.cells(1)[5]).toContain('Sin configurar');
+  });
+});
+
+describe('ServicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

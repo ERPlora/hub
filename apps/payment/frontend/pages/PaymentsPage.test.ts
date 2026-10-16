@@ -16,6 +16,7 @@ import { EMPLOYEE, flush, type MountOptions, mountPayment, page, RECORDER } from
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
 import PaymentsPage from './PaymentsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -266,5 +267,12 @@ describe('PaymentsPage', () => {
     expect(s.cells(0).slice(1, 5).map((cell) => cell.replace(/[\u00a0\u202f]/g, ' '))).toEqual(['13/07/2026', 'Proveedor Norte SL', '250,00 €', 'Borrador']);
     expect(s.cells(1)[4]).toContain('Aprobado por Boss');
     expect(s.offered(APPROVED)).toEqual(['Marcar como enviado', 'Cancelar pago']);
+  });
+});
+
+describe('PaymentsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

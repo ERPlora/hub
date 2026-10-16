@@ -1,7 +1,8 @@
-// The demo list as the WORKBOOK specifies it (DEMO-F05, «Elementos»): the status filter is the
-// server's (the live subscription is reopened with `status`, never filtered in the browser), the
-// «Updated» column paints exactly what the shared formatter of @erplora/ui gives, and the figures
-// «Open», «Done» and «Lines» follow a write made elsewhere in under a second, without reloading.
+// The demo list as the WORKBOOK specifies it (DEMO-F05, «Elementos»): the status filter, behind the
+// table's funnel, is the server's (the live subscription is reopened with `status`, never filtered in
+// the browser), the «Updated» column paints exactly what the shared formatter of @erplora/ui gives,
+// and the figures «Open», «Done» and «Lines» follow a write made elsewhere in under a second,
+// without reloading.
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import { formatDateTime } from '../../packages/ui/src/components/format/dateTime';
@@ -43,15 +44,21 @@ async function cleanup(context: BrowserContext, prefix: string): Promise<void> {
   for (const row of found.data.rows) await api(context, A, 'POST', '/demo/items/delete', { id: row.id });
 }
 
-/** Picks an option of the toolbar status filter through its Ionic popover, and waits until the
- *  popover is gone (a click while it is still dismissing lands on its backdrop and opens nothing).
- *  Only the `ion-select` popovers: the shell's user menu keeps its own `ion-popover` in the DOM. */
+/** Picks an option of the status filter behind the table's funnel (the `status` column's filter in
+ *  its panel) through its Ionic popover, waits until the popover is gone (a click while it is still
+ *  dismissing lands on its backdrop and opens nothing) and applies it: the panel closes. Only the
+ *  `ion-select` popovers: the shell's user menu keeps its own `ion-popover` in the DOM. */
 async function filterBy(page: Page, label: 'All' | 'Open' | 'Done'): Promise<void> {
   const popover = page.locator('ion-popover.select-popover');
+  const panel = shown(page).getByTestId('demo-items-filters-panel');
   await expect(popover).toHaveCount(0);
-  await shown(page).locator('[data-testid=demo-items-status-filter]').click({ timeout: 10_000 });
+  await shown(page).getByTestId('demo-items-filters-toggle').click({ timeout: 10_000 });
+  await expect(panel).toBeVisible();
+  await panel.getByTestId('demo-items-filter-status').click({ timeout: 10_000 });
   await popover.locator('ion-radio').filter({ hasText: new RegExp(`^\\s*${label}\\s*$`) }).click({ timeout: 10_000 });
   await expect(popover).toHaveCount(0);
+  await panel.getByTestId('demo-items-filters-apply').click();
+  await expect(panel).toBeHidden();
 }
 
 /** The figures the page paints (the chips' `data-value`). */

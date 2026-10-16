@@ -99,6 +99,7 @@ const cardTitle = (row: DepartmentOut): string => row.name;
 <template>
   <AppPage
     :title="$t('sale.title')"
+    content-layout="fill"
     :tabs="saleTabs($t)"
     :tabs-label="$t('sale.tabs.label')"
   >
@@ -118,6 +119,7 @@ const cardTitle = (row: DepartmentOut): string => row.name;
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="sale-departments"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

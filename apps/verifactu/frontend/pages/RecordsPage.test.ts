@@ -11,6 +11,7 @@ import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests
 import { plain } from '../lib/format';
 import type { RecordRowOut } from '../operations';
 import RecordsPage from './RecordsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -142,5 +143,12 @@ describe('RecordsPage', () => {
     await flush();
     expect(s.find('verifactu-records-inactive').exists()).toBe(true);
     expect(s.find('verifactu-records').exists()).toBe(false);
+  });
+});
+
+describe('RecordsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

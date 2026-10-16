@@ -14,6 +14,7 @@ import type { OrderOut, OrderStatus } from '../operations';
 import { CART_KEEPER, EMPLOYEE, flush, type MountOptions, mountCartCheckout, page } from '../__tests__/mount-cart-checkout';
 import FailOrderModal from '../components/FailOrderModal.vue';
 import OrdersPage from './OrdersPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -217,5 +218,12 @@ describe('OrdersPage', () => {
     expect(s.cells(0).slice(2, 5).map((cell) => cell.replace(/[  ]/g, ' '))).toEqual(['Iniciado', 'Card', '31,50 €']);
     expect(s.offered(INITIATED)).toEqual(['Marcar pagado', 'Fallar']);
     expect(s.offered(PAID)).toEqual(['Completar', 'Fallar']);
+  });
+});
+
+describe('OrdersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

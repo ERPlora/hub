@@ -10,6 +10,7 @@ import { flush, type MountOptions, mountReservation, page } from '../__tests__/m
 import { entryRow, reservationRow } from '../__tests__/rows';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import WaitlistPage from './WaitlistPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -147,5 +148,12 @@ describe('WaitlistPage', () => {
     await s.result(OP, page([WAITING]));
     expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Luis Pérez', '+34600333444', '2', 'No', 'En espera']);
     expect(s.prop<{ add: string }>('labels').add).toBe('Añadir cliente');
+  });
+});
+
+describe('WaitlistPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

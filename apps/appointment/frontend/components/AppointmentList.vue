@@ -94,6 +94,7 @@ const actions = computed<DataTableAction<AppointmentRow>[]>(() =>
 <template>
   <DataTable
     testid="appointment-list"
+    fill
     searchable
     :rows="rows"
     :columns="columns"

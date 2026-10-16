@@ -157,6 +157,7 @@ function onRowClick(row: PackageOut): void {
 <template>
   <AppPage
     :title="$t('service.title')"
+    content-layout="fill"
     :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
     :tabs-label="$t('service.tabs.label')"
   >
@@ -182,6 +183,7 @@ function onRowClick(row: PackageOut): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="service-packages"
+      fill
       server-side
       searchable
       :filters="filters"

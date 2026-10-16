@@ -203,6 +203,7 @@ async function confirmDelete(): Promise<void> {
 <template>
   <AppPage
     :title="$t('table.title')"
+    content-layout="fill"
     :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
     :tabs-label="$t('table.tabs.label')"
   >
@@ -231,6 +232,7 @@ async function confirmDelete(): Promise<void> {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="table-sessions"
+      fill
       server-side
       searchable
       :filters="filters"

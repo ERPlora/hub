@@ -146,6 +146,7 @@ function onRowClick(row: MethodOut): void {
 <template>
   <AppPage
     :title="$t('payment.title')"
+    content-layout="fill"
     :tabs="paymentTabs($t)"
     :tabs-label="$t('payment.tabs.label')"
   >
@@ -168,6 +169,7 @@ function onRowClick(row: MethodOut): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="payment-methods"
+      fill
       server-side
       searchable
       :filters="filters"

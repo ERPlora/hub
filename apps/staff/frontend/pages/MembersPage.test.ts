@@ -17,6 +17,7 @@ import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import TerminateDialog from '../components/TerminateDialog.vue';
 import MembersPage from './MembersPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -333,5 +334,12 @@ describe('MembersPage: my record (STAFF-F08)', () => {
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Personal');
     expect(s.prop('searchPlaceholder')).toBe('Buscar miembro…');
     expect(s.cells(0)[3]).toBe('Activo');
+  });
+});
+
+describe('MembersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

@@ -15,6 +15,7 @@ import { task } from '../__tests__/task';
 import TaskFormModal from '../components/TaskFormModal.vue';
 import TaskSheet from '../components/TaskSheet.vue';
 import TasksPage from './TasksPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -210,5 +211,19 @@ describe('TasksPage · Spanish', () => {
     expect(s.cells(0).slice(2, 4)).toEqual(['Por hacer', 'Urgente']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar nº o título…');
     expect(s.wrapper.find('[data-testid="task-view-mine"]').html()).toContain('Mis tareas');
+  });
+});
+
+describe('TasksPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+
+  it('«My tasks» too', async () => {
+    const s = await setup();
+    await ionValue(s.wrapper.find('[data-testid="task-views"]').element, 'mine', 'ionChange');
+    expect(s.prop('testid')).toBe('task-mine');
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

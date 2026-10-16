@@ -192,6 +192,7 @@ async function confirmCancel(): Promise<void> {
 <template>
   <AppPage
     :title="$t('kitchen.title')"
+    content-layout="fill"
     :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
     :tabs-label="$t('kitchen.tabs.label')"
   >
@@ -219,6 +220,7 @@ async function confirmCancel(): Promise<void> {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="kitchen-tickets"
+      fill
       server-side
       searchable
       row-clickable

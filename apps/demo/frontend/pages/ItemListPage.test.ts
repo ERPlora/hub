@@ -6,6 +6,7 @@
 import { DataTable, EmptyState, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { IonBadge } from '@ionic/vue';
+import type { DOMWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
@@ -13,6 +14,7 @@ import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId }
 import ItemStats from '../components/ItemStats.vue';
 import ItemListPage from './ItemListPage.vue';
 import source from './ItemListPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const row = (id: string, name: string, status: 'open' | 'done', lineCount: number) => ({
   id,
@@ -40,9 +42,21 @@ async function setup(options: MountOptions = {}) {
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
   const rows = () => m.wrapper.findAll('[data-testid="demo-items-row"]');
   const params = () => m.client.stream.subscriptions('demo.item.list').map((s) => s.params);
-  /** Picks a status in the toolbar filter, as Ionic's popover does (`ionChange` with the value). */
-  async function filterBy(value: string) {
-    m.wrapper.get('[data-testid="demo-items-status-filter"]').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
+  /** Opens the table's filters panel with its funnel. */
+  async function openFilters() {
+    await m.wrapper.get('[data-testid="demo-items-filters-toggle"]').trigger('click');
+    await flush();
+    return m.wrapper.get('[data-testid="demo-items-filters-panel"]');
+  }
+  /** Picks a status in the funnel's panel, as Ionic's popover does (`ionChange` with the value; «All»
+   *  is the empty one), and applies it. */
+  async function filterBy(value: 'open' | 'done' | 'all') {
+    const panel = await openFilters();
+    panel
+      .get('[data-testid="demo-items-filter-status"]')
+      .element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: value === 'all' ? '' : value } }));
+    await flush();
+    await panel.get('[data-testid="demo-items-filters-apply"]').trigger('click');
     await flush();
   }
   /** The SDK reopens the stream 150 ms after the subscriptions change: results come on the new one. */
@@ -50,7 +64,7 @@ async function setup(options: MountOptions = {}) {
     await m.clock.advance(150);
     await m.result(m.net.lastStream(), 'demo.item.list', page);
   }
-  return { ...m, call, testid, table, prop, rows, params, filterBy, showOnNewStream, show: (page: unknown, rev?: number) => m.result(call, 'demo.item.list', page, rev) };
+  return { ...m, call, testid, table, prop, rows, params, openFilters, filterBy, showOnNewStream, show: (page: unknown, rev?: number) => m.result(call, 'demo.item.list', page, rev) };
 }
 
 const many = (n: number, from = 1) =>
@@ -237,26 +251,29 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
   });
 });
 
-describe('ItemListPage: the status filter (WORKBOOK «Elementos»: All, Open, Done)', () => {
-  it('is an ion-select in the table toolbar, right after the search, «All» to begin with, named for screen readers', async () => {
+describe('ItemListPage: the status filter (WORKBOOK «Elementos»: All, Open, Done), behind the table funnel', () => {
+  /** Value and visible text of each option of the panel's status select. */
+  const options = (select: Pick<DOMWrapper<Element>, 'findAll'>) =>
+    select.findAll('ion-select-option').map((o) => [(o.element as HTMLElement & { value?: unknown }).value, o.text()]);
+
+  it('is the «Status» column filter of the table: the funnel opens its panel, «All» to begin with, then Open and Done', async () => {
     const s = await setup();
     await s.show(PAGE);
-    const filter = s.testid('demo-items-status-filter');
-    expect(filter.element.tagName).toBe('ION-SELECT');
-    expect(filter.element.parentElement?.classList.contains('data-table__bar-main')).toBe(true);
-    expect(filter.element.previousElementSibling?.classList.contains('data-table__search')).toBe(true);
-    const select = filter.element as HTMLElement & { value?: unknown; interface?: string };
-    expect([select.value, select.interface, filter.attributes('aria-label')]).toEqual(['all', 'popover', 'Filter by status']);
-    expect(
-      filter.findAll('ion-select-option').map((o) => [(o.element as HTMLElement & { value?: unknown }).value, o.text()]),
-    ).toEqual([
-      ['all', 'All'],
+    expect([s.prop('filterable'), s.prop('fill')]).toEqual([true, true]);
+    expect(s.testid('demo-items-filters-count').exists(), 'no filter in use: the funnel counts nothing').toBe(false);
+    const panel = await s.openFilters();
+    const select = panel.get('[data-testid="demo-items-filter-status"]');
+    expect(select.element.tagName).toBe('ION-SELECT');
+    const el = select.element as HTMLElement & { value?: unknown; label?: string; interface?: string };
+    expect([el.value, el.label ?? select.attributes('label'), el.interface ?? select.attributes('interface')]).toEqual(['', 'Status', 'popover']);
+    expect(options(select)).toEqual([
+      ['', 'All'],
       ['open', 'Open'],
       ['done', 'Done'],
     ]);
   });
 
-  it('filters on the server: «Done» asks the query again with `status`, from the first page; «All» drops it', async () => {
+  it('filters on the server: «Done» asks the query again with `status`, from the first page, and the funnel counts it; «All» drops it', async () => {
     const s = await setup();
     await s.show({ ...PAGE, total: 120 });
     await s.testid('demo-items-page-next').trigger('click');
@@ -265,9 +282,21 @@ describe('ItemListPage: the status filter (WORKBOOK «Elementos»: All, Open, Do
     await s.filterBy('done');
     expect(s.params()).toEqual([{ status: 'done', limit: 50, offset: 0 }]);
     expect(s.prop('page')).toBe(0);
-    expect((s.testid('demo-items-status-filter').element as HTMLElement & { value?: unknown }).value).toBe('done');
+    expect(s.prop('filters')).toEqual({ status: 'done' });
+    expect(s.testid('demo-items-filters-count').text()).toBe('1');
     await s.filterBy('all');
     expect(s.params()).toEqual([{ limit: 50, offset: 0 }]);
+    expect(s.prop('filters')).toEqual({});
+    expect(s.testid('demo-items-filters-count').exists()).toBe(false);
+  });
+
+  it('a value the query does not know is no filter at all', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    s.table().vm.$emit('filtersChange', { status: 'archived' });
+    await flush();
+    expect(s.params()).toEqual([{ limit: 50, offset: 0 }]);
+    expect(s.prop('filters')).toEqual({});
   });
 
   it('combines with the search', async () => {
@@ -293,9 +322,10 @@ describe('ItemListPage: the status filter (WORKBOOK «Elementos»: All, Open, Do
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(PAGE);
-    const filter = s.testid('demo-items-status-filter');
-    expect(filter.attributes('aria-label')).toBe('Filtrar por estado');
-    expect(filter.findAll('ion-select-option').map((o) => o.text())).toEqual(['Todos', 'Abierto', 'Hecho']);
+    const select = (await s.openFilters()).get('[data-testid="demo-items-filter-status"]');
+    const el = select.element as HTMLElement & { label?: string };
+    expect(el.label ?? select.attributes('label')).toBe('Estado');
+    expect(options(select).map(([, text]) => text)).toEqual(['Todos', 'Abierto', 'Hecho']);
   });
 });
 
@@ -435,5 +465,18 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.params()).toEqual([{ search: 'item', limit: 100, offset: 0 }]);
     await s.filterBy('open');
     expect(s.params()).toEqual([{ search: 'item', status: 'open', limit: 50, offset: 0 }]);
+  });
+});
+
+describe('ItemListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the bottom of the page', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+
+  it('declares no section tabs: the demo has a single list, like its create and detail pages', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(AppPage).props('tabs')).toEqual([]);
+    expect(s.wrapper.find('ion-footer.section-tabbar').exists()).toBe(false);
   });
 });

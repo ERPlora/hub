@@ -19,6 +19,7 @@ import SessionFilters from '../components/SessionFilters.vue';
 import UnassignedModal from '../components/UnassignedModal.vue';
 import type { SessionRow } from '../operations';
 import SessionsPage from './SessionsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -213,5 +214,12 @@ describe('SessionsPage: states', () => {
     await s.ready();
     expect(s.find('cash-register-new-session').text()).toBe('Abrir sesión');
     expect(s.cells(1)[2]).toBe('Cerrada');
+  });
+});
+
+describe('SessionsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

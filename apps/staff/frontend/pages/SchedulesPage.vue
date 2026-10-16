@@ -44,6 +44,7 @@ function addMember(): void {
 <template>
   <AppPage
     :title="$t('staff.title')"
+    content-layout="fill"
     :tabs="staffTabs($t, { settings: canSettings })"
     :tabs-label="$t('staff.tabs.label')"
   >

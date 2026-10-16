@@ -88,6 +88,7 @@ const cardTitle = (row: AliasOut): string => row.alias;
 <template>
   <AppPage
     :title="$t('tax.title')"
+    content-layout="fill"
     :tabs="taxTabs($t)"
     :tabs-label="$t('tax.tabs.label')"
   >
@@ -101,6 +102,7 @@ const cardTitle = (row: AliasOut): string => row.alias;
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="tax-aliases"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

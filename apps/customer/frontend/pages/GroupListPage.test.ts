@@ -15,6 +15,7 @@ import SelectFilters from '../components/SelectFilters.vue';
 import type { GroupRow } from '../operations';
 import GroupListPage from './GroupListPage.vue';
 import source from './GroupListPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -131,5 +132,12 @@ describe('GroupListPage', () => {
 
   it('has no OutfitKit tag', () => {
     expect(source).not.toMatch(/<ok[-]/);
+  });
+});
+
+describe('GroupListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

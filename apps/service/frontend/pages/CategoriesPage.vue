@@ -83,6 +83,7 @@ function onAction({ actionId, row }: { actionId: string; row: CategoryOut }): vo
 <template>
   <AppPage
     :title="$t('service.title')"
+    content-layout="fill"
     :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
     :tabs-label="$t('service.tabs.label')"
   >
@@ -95,6 +96,7 @@ function onAction({ actionId, row }: { actionId: string; row: CategoryOut }): vo
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="service-categories"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

@@ -24,10 +24,6 @@
         "lines": "Líneas",
         "status": "Estado",
         "updated": "Actualizado"
-      },
-      "filter": {
-        "label": "Filtrar por estado",
-        "all": "Todos"
       }
     },
     "stats": {

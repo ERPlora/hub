@@ -94,6 +94,7 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
 <template>
   <AppPage
     :title="$t('tax.title')"
+    content-layout="fill"
     :tabs="taxTabs($t)"
     :tabs-label="$t('tax.tabs.label')"
   >
@@ -107,6 +108,7 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="tax-categories"
+      fill
       server-side
       searchable
       row-key="key"

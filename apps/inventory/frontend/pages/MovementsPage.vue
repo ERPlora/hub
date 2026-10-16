@@ -97,6 +97,7 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
 <template>
   <AppPage
     :title="$t('inventory.title')"
+    content-layout="fill"
     :tabs="tabs"
     :tabs-label="$t('inventory.tabs.label')"
   >
@@ -119,6 +120,7 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
       v-else
       v-model:search="table.search.value"
       testid="inventory-movements"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

@@ -210,6 +210,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
 <template>
   <AppPage
     :title="$t('task.title')"
+    content-layout="fill"
     :tabs="taskTabs($t)"
     :tabs-label="$t('task.tabs.label')"
   >
@@ -254,6 +255,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       v-if="!blocked && view === 'all'"
       v-model:search="table.search.value"
       testid="task-tasks"
+      fill
       server-side
       searchable
       :filters="filters"
@@ -321,6 +323,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       v-if="!blocked && view === 'mine'"
       v-model:search="mineTable.search.value"
       testid="task-mine"
+      fill
       server-side
       searchable
       :rows="mineRows"

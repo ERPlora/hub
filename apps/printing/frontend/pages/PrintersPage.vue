@@ -123,10 +123,11 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
 <template>
   <AppPage
     :title="$t('printing.title')"
+    content-layout="fill"
     :tabs="printingTabs($t)"
     :tabs-label="$t('printing.tabs.label')"
   >
-    <div class="printing-printers">
+    <div class="printing-printers page-fill">
       <p
         class="printing-printers__intro"
         data-testid="printing-printers-intro"
@@ -136,7 +137,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
 
       <QueueSummary />
 
-      <section class="printing-printers__list">
+      <section class="printing-printers__list page-fill">
         <h2
           class="printing-printers__heading"
           data-testid="printing-printers-heading"
@@ -159,6 +160,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
         <DataTable
           v-else
           testid="printing-printers"
+          fill
           :rows="rows"
           :page-size="100"
           :page-size-options="[]"
@@ -214,8 +216,8 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
 </template>
 
 <style scoped>
+/* Both boxes are `.page-fill` stacks (polish.css): the list fills the page between the topbar and the tabbar. */
 .printing-printers {
-  display: grid;
   gap: 1.5rem;
 }
 .printing-printers__intro {
@@ -224,7 +226,6 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
   color: var(--ion-color-medium-shade, var(--ion-color-medium));
 }
 .printing-printers__list {
-  display: grid;
   gap: 8px;
 }
 .printing-printers__heading {

@@ -181,6 +181,7 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
 <template>
   <AppPage
     :title="$t('sale.title')"
+    content-layout="fill"
     :tabs="saleTabs($t)"
     :tabs-label="$t('sale.tabs.label')"
   >
@@ -238,6 +239,7 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
       v-else
       v-model:search="table.search.value"
       testid="sales-table"
+      fill
       server-side
       searchable
       row-clickable

@@ -124,6 +124,7 @@ function onAction({ actionId, row }: { actionId: string; row: TableOut }): void 
 <template>
   <AppPage
     :title="$t('table.title')"
+    content-layout="fill"
     :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
     :tabs-label="$t('table.tabs.label')"
   >
@@ -136,6 +137,7 @@ function onAction({ actionId, row }: { actionId: string; row: TableOut }): void 
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="table-tables"
+      fill
       server-side
       searchable
       :filters="filters"

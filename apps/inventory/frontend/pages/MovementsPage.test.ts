@@ -12,6 +12,7 @@ import type { Component } from 'vue';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
 import MovementsPage from './MovementsPage.vue';
 import source from './MovementsPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const movement = (id: string, type: string, qty: string, after: string, overrides: Record<string, unknown> = {}) => ({
   id,
@@ -204,5 +205,12 @@ describe('MovementsPage', () => {
       'Referencia',
     ]);
     expect(s.rows()[0].text()).toMatch(/Recuento.*-1,5.*8,5/);
+  });
+});
+
+describe('MovementsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

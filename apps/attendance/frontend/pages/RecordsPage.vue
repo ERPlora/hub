@@ -183,6 +183,7 @@ const cardTitle = (row: RecordOut): string => {
 <template>
   <AppPage
     :title="$t('attendance.title')"
+    content-layout="fill"
     :tabs="attendanceTabs($t)"
     :tabs-label="$t('attendance.tabs.label')"
   >
@@ -214,6 +215,7 @@ const cardTitle = (row: RecordOut): string => {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="attendance-records"
+      fill
       server-side
       :searchable="team"
       :filters="filters"

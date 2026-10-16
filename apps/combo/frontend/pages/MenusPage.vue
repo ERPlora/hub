@@ -128,7 +128,10 @@ function onRowClick(row: ComboOut): void {
 </script>
 
 <template>
-  <AppPage :title="$t('combo.title')">
+  <AppPage
+    :title="$t('combo.title')"
+    content-layout="fill"
+  >
     <PageNotices
       testid="combo-menus"
       :status="status"
@@ -138,6 +141,7 @@ function onRowClick(row: ComboOut): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="combo-menus"
+      fill
       server-side
       searchable
       row-clickable

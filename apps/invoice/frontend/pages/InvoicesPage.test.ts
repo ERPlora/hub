@@ -16,6 +16,7 @@ import { plain } from '../lib/format';
 import type { InvoiceRowOut } from '../operations';
 import InvoicesPage from './InvoicesPage.vue';
 import source from './InvoicesPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -264,5 +265,12 @@ describe('InvoicesPage: the rest', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Número', 'Cliente', 'Total', 'Estado', 'Fecha', 'Tipo']);
     expect(s.rows()[0].findAll('[role="cell"]').slice(2, 5).map((c) => plain(c.text().trim()))).toEqual(['12,10 €', 'Emitida', '14/10/2026']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar facturas…');
+  });
+});
+
+describe('InvoicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

@@ -15,6 +15,7 @@ import type { CartOut, CartStatus } from '../operations';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCartCheckout, page } from '../__tests__/mount-cart-checkout';
 import CartFormModal from '../components/CartFormModal.vue';
 import CartsPage from './CartsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -269,5 +270,12 @@ describe('CartsPage', () => {
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Buscar sesión o email…', 'Nuevo carrito']);
     expect(s.cells(0).slice(2, 5).map((cell) => cell.replace(/[  ]/g, ' '))).toEqual(['Activo', '2', '31,50 €']);
     expect(s.offered(ACTIVE)).toEqual(['Abandonar', 'Borrar']);
+  });
+});
+
+describe('CartsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

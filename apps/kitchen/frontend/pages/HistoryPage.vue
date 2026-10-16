@@ -77,6 +77,7 @@ const columns = computed<DataTableColumn<LogOut>[]>(() => [
 <template>
   <AppPage
     :title="$t('kitchen.title')"
+    content-layout="fill"
     :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
     :tabs-label="$t('kitchen.tabs.label')"
   >
@@ -95,6 +96,7 @@ const columns = computed<DataTableColumn<LogOut>[]>(() => [
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="kitchen-history"
+      fill
       server-side
       searchable
       :filters="filters"

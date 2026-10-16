@@ -97,6 +97,7 @@ const swatch = (row: unknown) => (row as ProjectOut).color;
 <template>
   <AppPage
     :title="$t('task.title')"
+    content-layout="fill"
     :tabs="taskTabs($t)"
     :tabs-label="$t('task.tabs.label')"
   >
@@ -109,6 +110,7 @@ const swatch = (row: unknown) => (row as ProjectOut).color;
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="task-projects"
+      fill
       server-side
       searchable
       :filters="filters"

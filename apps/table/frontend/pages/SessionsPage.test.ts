@@ -12,6 +12,7 @@ import { NOW, sessionRow, SETTINGS, zoneRow } from '../__tests__/tables';
 import RestoreModal from '../components/RestoreModal.vue';
 import SessionDetailModal from '../components/SessionDetailModal.vue';
 import SessionsPage from './SessionsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -133,5 +134,12 @@ describe('SessionsPage', () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show([OPEN]);
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['detail', 'close', 'restore']);
+  });
+});
+
+describe('SessionsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

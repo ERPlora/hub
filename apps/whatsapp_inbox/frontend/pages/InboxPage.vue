@@ -153,10 +153,11 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
 <template>
   <AppPage
     :title="$t('whatsapp_inbox.title')"
+    content-layout="fill"
     :tabs="inboxTabs($t)"
     :tabs-label="$t('whatsapp_inbox.tabs.label')"
   >
-    <div class="wa-inbox">
+    <div class="wa-inbox page-fill">
       <PageNotices
         testid="whatsapp-inbox"
         :status="status"
@@ -214,6 +215,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
         v-if="!blocked"
         v-model:search="table.search.value"
         testid="whatsapp-inbox"
+        fill
         server-side
         searchable
         row-clickable
@@ -277,9 +279,8 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
 </template>
 
 <style scoped>
+/* A `.page-fill` stack (polish.css): the list fills the page between the topbar and the tabbar. */
 .wa-inbox {
-  display: flex;
-  flex-direction: column;
   gap: 0.75rem;
 }
 .wa-inbox__link {

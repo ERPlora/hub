@@ -12,6 +12,7 @@ import { project } from '../__tests__/project';
 import ProjectFormModal from '../components/ProjectFormModal.vue';
 import ProjectSheet from '../components/ProjectSheet.vue';
 import ProjectsPage from './ProjectsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -101,5 +102,12 @@ describe('ProjectsPage', () => {
     await s.show(page(ROWS));
     expect(s.cells(0)[3]).toBe('Sí');
     expect(s.prop('searchPlaceholder')).toBe('Buscar código o nombre…');
+  });
+});
+
+describe('ProjectsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

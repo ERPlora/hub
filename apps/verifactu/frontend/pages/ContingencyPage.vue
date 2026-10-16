@@ -89,6 +89,7 @@ async function onAction({ actionId, row }: { actionId: string; row: QueueRowOut 
 <template>
   <AppPage
     :title="$t('verifactu.contingency.title')"
+    content-layout="fill"
     :tabs="verifactuTabs($t)"
     :tabs-label="$t('verifactu.tabs.label')"
   >
@@ -120,6 +121,7 @@ async function onAction({ actionId, row }: { actionId: string; row: QueueRowOut 
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="verifactu-queue"
+      fill
       server-side
       searchable
       row-clickable

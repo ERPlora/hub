@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Demo items (DEMO-F01, F05, F06): the live list of `demo.item.list` in a server-side DataTable —
-// search, status filter, page and page size are the server's — with every state of the screen, the
-// «Updated» column (shared formatter) and, for whoever can manage, the live figures above it.
+// search, status filter (behind the table's funnel), page and page size are the server's — with
+// every state of the screen, the «Updated» column (shared formatter) and, for whoever can manage,
+// the live figures above it.
 // Nothing here refetches: a write anywhere in this business re-runs the queries on the server and
 // the new results arrive through the stream. On a phone «Load more» grows ONE live window from the
 // first row (a bigger `limit`, `offset` 0), so every row on screen stays live; a desk pages one
@@ -9,7 +10,7 @@
 import { DataTable, EmptyState, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonBadge, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonBadge } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -46,9 +47,11 @@ const query = computed({
     goToPage(0);
   },
 });
-/** The status filter of the toolbar: a new one starts from the first page, as a search does. */
-function filterBy(ev: CustomEvent<{ value?: unknown }>): void {
-  statusFilter.value = ev.detail.value === 'open' || ev.detail.value === 'done' ? ev.detail.value : 'all';
+/** The status filter lives behind the table's funnel (`filterable`, the `status` column's filter). */
+const tableFilters = computed((): Record<string, string> => (statusFilter.value === 'all' ? {} : { status: statusFilter.value }));
+/** A new filter starts from the first page, as a search does; a status the query does not know is «All». */
+function onFilters(filters: Record<string, string>): void {
+  statusFilter.value = filters.status === 'open' || filters.status === 'done' ? filters.status : 'all';
   goToPage(0);
 }
 const filtered = computed(() => search.value.trim() !== '' || statusFilter.value !== 'all');
@@ -83,7 +86,10 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
 </script>
 
 <template>
-  <AppPage :title="$t('demo.items.title')">
+  <AppPage
+    :title="$t('demo.items.title')"
+    content-layout="fill"
+  >
     <InlineFeedback
       v-if="status === 'reconnecting'"
       tone="warning"
@@ -107,6 +113,9 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         testid="demo-items"
         server-side
         searchable
+        fill
+        filterable
+        :filters="tableFilters"
         row-clickable
         :rows="result?.rows ?? []"
         :total="result?.total ?? 0"
@@ -121,7 +130,18 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         :labels="{ add: $t('demo.items.new'), loadError: $t('demo.items.loadError'), retry: $t('demo.live.retry') }"
         :columns="[
           { key: 'name', label: $t('demo.items.columns.name'), cell: 'name' },
-          { key: 'status', label: $t('demo.items.columns.status'), cell: 'status' },
+          {
+            key: 'status',
+            label: $t('demo.items.columns.status'),
+            cell: 'status',
+            filter: {
+              type: 'select',
+              options: [
+                { value: 'open', label: $t('demo.status.open') },
+                { value: 'done', label: $t('demo.status.done') },
+              ],
+            },
+          },
           { key: 'line_count', label: $t('demo.items.columns.lines'), cell: 'lines' },
           { key: 'updated_at', label: $t('demo.items.columns.updated'), cell: 'updated' },
         ]"
@@ -131,26 +151,8 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         @row-click="open"
         @add="router.push('/demo/items/new')"
         @retry="refresh()"
+        @filters-change="onFilters"
       >
-        <template #filters>
-          <ion-select
-            data-testid="demo-items-status-filter"
-            interface="popover"
-            :aria-label="$t('demo.items.filter.label')"
-            :value="statusFilter"
-            @ion-change="filterBy"
-          >
-            <ion-select-option value="all">
-              {{ $t('demo.items.filter.all') }}
-            </ion-select-option>
-            <ion-select-option value="open">
-              {{ $t('demo.status.open') }}
-            </ion-select-option>
-            <ion-select-option value="done">
-              {{ $t('demo.status.done') }}
-            </ion-select-option>
-          </ion-select>
-        </template>
         <template #name="{ row }">
           <span
             data-testid="demo-item-name"
