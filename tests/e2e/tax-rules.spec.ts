@@ -56,14 +56,13 @@ async function rulesOf(context: BrowserContext, key: string, status = 'all'): Pr
   return res.data.rows;
 }
 
-/** Opens a searchable field (SearchSelect), searches `text` and picks the option `value`. */
+/** Types `text` in a searchable field (a Combo) and picks the option `value` from its list. */
 async function choose(page: Page, field: Locator, testid: string, text: string, value: string): Promise<void> {
-  await field.click();
-  const list = page.locator(`ion-modal[data-testid="${testid}-modal"]`);
-  await expect(list).toBeVisible();
-  await list.locator(`[data-testid="${testid}-search"] input`).fill(text);
-  await list.locator(`[data-testid="${testid}-option"][data-value="${value}"]`).click();
-  await expect(list).toBeHidden();
+  const input = field.locator('input').first();
+  await input.click();
+  await input.fill(text);
+  await page.locator(`[data-testid="${testid}-option-${value}"]`).click();
+  await expect(page.locator(`[data-testid="${testid}-option-${value}"]`)).toHaveCount(0);
 }
 
 /** Opens an `ion-select` and picks the option whose text is `text` (popover interface). */
@@ -88,7 +87,7 @@ async function searchFor(page: Page, key: string): Promise<void> {
 }
 
 async function fillRule(page: Page, dialog: Locator, key: string, rate: string, from: string): Promise<void> {
-  await choose(page, dialog.locator('[data-testid=tax-rule-form-country_code]'), 'tax-rule-form-country_code', 'ES', 'ES');
+  await choose(page, dialog.locator('[data-testid=tax-rule-form-country_code]'), 'tax-rule-form-country_code', 'Spain', 'ES');
   await choose(page, dialog.locator('[data-testid=tax-rule-form-tax_category_key]'), 'tax-rule-form-tax_category_key', key, key);
   await dialog.locator('[data-testid=tax-rule-form-rate_pct] input').fill(rate);
   await dialog.locator('[data-testid=tax-rule-form-valid_from] input').fill(from);
