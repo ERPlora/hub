@@ -100,6 +100,40 @@ describe('CustomerDetailPage: the card, live', () => {
     expect(s.wrapper.findComponent(HealthPanel).props()).toMatchObject({ customerId: 'c1', editable: true });
   });
 
+  it('opens one stream: the blocks follow the card id from the start, hidden until the card arrives', async () => {
+    const s = await setup();
+    // Mounted only after the first result, the blocks made the SDK abort that stream and open another.
+    const blocks = [
+      'customer.health.detail',
+      'customer.group.list',
+      'customer.tag.list',
+      'customer.consent.history',
+      'customer.activity.list',
+      'customer.purchase.list',
+      'customer.order.list',
+    ] as const;
+    expect(blocks.filter((op) => s.params(op).length === 0)).toEqual([]);
+    expect((s.testid('customer-detail-blocks').element as HTMLElement).style.display).toBe('none');
+    await s.show(DETAIL);
+    await s.clock.advance(150);
+    expect(s.net.streams).toHaveLength(1);
+    expect(s.call.aborted()).toBe(false);
+    expect((s.testid('customer-detail-blocks').element as HTMLElement).style.display).toBe('');
+  });
+
+  it('a card that is gone, or an app that is off, follows none of its blocks', async () => {
+    const s = await setup();
+    await s.show(DETAIL);
+    s.call.push(errorFrame(subId(s.client, CARD), 'customer.customer_unavailable'));
+    await flush();
+    expect(s.testid('customer-detail-blocks').exists()).toBe(false);
+    expect(s.wrapper.findComponent(HealthPanel).exists()).toBe(false);
+    const off = await setup();
+    off.call.push(errorFrame(subId(off.client, CARD), 'app_inactive'));
+    await flush();
+    expect(off.testid('customer-detail-blocks').exists()).toBe(false);
+  });
+
   it('a change made elsewhere shows without reloading', async () => {
     const s = await setup();
     await s.show(DETAIL);
