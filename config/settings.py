@@ -91,8 +91,21 @@ INSTALLED_APPS = [
     "apps.cash_register",
     "apps.invoice",
     "apps.appointment",
+    "apps.online_booking",
+    "apps.reservation",
+    "apps.pricing",
+    "apps.combo",
+    "apps.attendance",
     "apps.table",
+    "apps.kitchen",
+    "apps.task",
+    "apps.whatsapp_inbox",
+    "apps.flow",
     "apps.verifactu",
+    "apps.payment",
+    "apps.printing",
+    "apps.cart_checkout",
+    "apps.modifier",
 ]
 
 MIDDLEWARE = [

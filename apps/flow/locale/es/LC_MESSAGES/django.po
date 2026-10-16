@@ -1,0 +1,308 @@
+# Spanish translation of the flow app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next flow\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 12:00+0200\n"
+"PO-Revision-Date: 2026-10-15 12:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Automations"
+msgstr "Automatizaciones"
+
+msgid "Rules that run on their own: when something happens in your business, do something else."
+msgstr "Reglas que se cumplen solas: cuando pasa algo en tu negocio, haz otra cosa."
+
+msgid "Automations runs the repetitive work for you: when a sale is charged, a customer is created or a till is closed, or every day at a time, it does what you told it, such as leaving a task or a note on a customer's card. Start from a ready-made card, allow it only what it needs, try it without effects against something that really happened, turn it on and read in plain words what it did each time. The assistant can draft one for you, and it waits for you to review it."
+msgstr "Automatizaciones hace por ti el trabajo repetitivo: cuando se cobra una venta, se crea un cliente o se cierra una caja, o cada día a una hora, hace lo que le dijiste, como dejar una tarea o una nota en la ficha de un cliente. Empieza por una tarjeta hecha, permítele solo lo que necesita, pruébala sin efectos con algo que pasó de verdad, enciéndela y lee en palabras qué hizo cada vez. El asistente puede escribirte una, y espera a que la revises."
+
+msgid "Something happens"
+msgstr "Pasa algo"
+
+msgid "On a schedule"
+msgstr "Según un horario"
+
+msgid "Once, at a date and time"
+msgstr "Una vez, en una fecha y hora"
+
+msgid "Only by hand"
+msgstr "Solo a mano"
+
+msgid "name"
+msgstr "nombre"
+
+msgctxt "automation"
+msgid "on"
+msgstr "encendida"
+
+msgid "starts with"
+msgstr "arranca con"
+
+msgid "event"
+msgstr "aviso"
+
+msgid "only when"
+msgstr "solo cuando"
+
+msgid "schedule"
+msgstr "horario"
+
+msgid "date and time"
+msgstr "fecha y hora"
+
+msgid "next start"
+msgstr "próximo arranque"
+
+msgid "steps"
+msgstr "pasos"
+
+msgid "permissions"
+msgstr "permisos"
+
+msgid "version"
+msgstr "versión"
+
+msgid "language"
+msgstr "idioma"
+
+msgid "search text"
+msgstr "texto de búsqueda"
+
+msgid "created by"
+msgstr "creada por"
+
+msgid "updated by"
+msgstr "cambiada por"
+
+msgid "created at"
+msgstr "creada el"
+
+msgid "updated at"
+msgstr "cambiada el"
+
+msgid "deleted at"
+msgstr "borrada el"
+
+msgid "automation"
+msgstr "automatización"
+
+msgid "automations"
+msgstr "automatizaciones"
+
+msgctxt "run status"
+msgid "Running"
+msgstr "En marcha"
+
+msgctxt "run status"
+msgid "Waiting"
+msgstr "Esperando"
+
+msgctxt "run status"
+msgid "Finished well"
+msgstr "Terminó bien"
+
+msgctxt "run status"
+msgid "Stopped by a condition"
+msgstr "Terminó por una condición"
+
+msgctxt "run status"
+msgid "Stopped by an error"
+msgstr "Se paró por un error"
+
+msgctxt "run status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgid "steps it runs"
+msgstr "pasos que ejecuta"
+
+msgid "started by"
+msgstr "arrancada por"
+
+msgid "trigger reference"
+msgstr "referencia del arranque"
+
+msgid "input"
+msgstr "entrada"
+
+msgid "status"
+msgstr "estado"
+
+msgid "next step"
+msgstr "paso siguiente"
+
+msgid "log"
+msgstr "registro"
+
+msgid "outputs"
+msgstr "resultados"
+
+msgid "error code"
+msgstr "código de error"
+
+msgid "error"
+msgstr "error"
+
+msgid "resumes at"
+msgstr "sigue el"
+
+msgid "chain"
+msgstr "cadena"
+
+msgid "started at"
+msgstr "empezó el"
+
+msgid "finished at"
+msgstr "terminó el"
+
+msgid "run"
+msgstr "ejecución"
+
+msgid "runs"
+msgstr "ejecuciones"
+
+msgctxt "draft status"
+msgid "Pending"
+msgstr "Pendiente"
+
+msgctxt "draft status"
+msgid "Used"
+msgstr "Usado"
+
+msgctxt "draft status"
+msgid "Dismissed"
+msgstr "Descartado"
+
+msgid "definition"
+msgstr "definición"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "decided by"
+msgstr "decidido por"
+
+msgid "decided at"
+msgstr "decidido el"
+
+msgid "draft"
+msgstr "borrador"
+
+msgid "drafts"
+msgstr "borradores"
+
+msgid "That automation does not exist in this business."
+msgstr "Esa automatización no existe en este negocio."
+
+msgid "Several automations fit «%(text)s»: %(names)s. Say which one."
+msgstr "Varias automatizaciones encajan con «%(text)s»: %(names)s. Di cuál."
+
+msgid "That does not happen in this business: «%(name)s»."
+msgstr "Eso no pasa en este negocio: «%(name)s»."
+
+msgid "That action does not exist in this business: «%(name)s»."
+msgstr "Esa acción no existe en este negocio: «%(name)s»."
+
+msgid "«%(name)s» only reads: use «Look something up»."
+msgstr "«%(name)s» solo consulta: usa «Consultar algo»."
+
+msgid "«%(name)s» changes data: use «Do something»."
+msgstr "«%(name)s» cambia datos: usa «Hacer algo»."
+
+msgid "«%(name)s» needs a person in front: an automation cannot do it."
+msgstr "«%(name)s» necesita a una persona delante: una automatización no puede hacerlo."
+
+msgid "Say which automation: its id or its name."
+msgstr "Di qué automatización: su id o su nombre."
+
+msgid "Choose what has to happen for it to start."
+msgstr "Elige qué tiene que pasar para que arranque."
+
+msgid "That is no event name."
+msgstr "Eso no es el nombre de un aviso."
+
+msgid "Choose what this step does."
+msgstr "Elige qué tiene que hacer este paso."
+
+msgid "That is no action name."
+msgstr "Eso no es el nombre de una acción."
+
+msgid "Choose the day of the week."
+msgstr "Elige el día de la semana."
+
+msgid "Choose the day of the month."
+msgstr "Elige el día del mes."
+
+msgid "«%(path)s» is no data of this automation."
+msgstr "«%(path)s» no es un dato de esta automatización."
+
+msgid "«%(op)s» is no way of comparing."
+msgstr "«%(op)s» no es una forma de comparar."
+
+msgid "Add at least one comparison."
+msgstr "Añade al menos una condición."
+
+msgid "«Only when…» reads only what the event brings (input.…)."
+msgstr "«Solo cuando…» solo lee lo que trae el aviso (input.…)."
+
+msgid "Two steps have the id «%(id)s»."
+msgstr "Dos pasos tienen el id «%(id)s»."
+
+msgid "Step %(n)s reads «%(path)s», which is no data of this automation."
+msgstr "El paso %(n)s lee «%(path)s», que no es un dato de esta automatización."
+
+msgid "Step %(n)s reads «%(path)s», which no earlier step leaves."
+msgstr "El paso %(n)s lee «%(path)s», que no deja ningún paso anterior."
+
+msgid "Untitled automation"
+msgstr "Automatización sin nombre"
+
+msgid "Copy of %(name)s"
+msgstr "Copia de %(name)s"
+
+msgid "That date and time has already passed."
+msgstr "Esa fecha y hora ya ha pasado."
+
+msgid "This automation is paused: turn it on to run it."
+msgstr "Esta automatización está en pausa: enciéndela para ejecutarla."
+
+msgid "That draft was already decided."
+msgstr "Ese borrador ya se decidió."
+
+msgid "You cannot allow what you may not do yourself: «%(name)s»."
+msgstr "No puedes permitir lo que tú no puedes hacer: «%(name)s»."
+
+msgid "That draft does not exist in this business."
+msgstr "Ese borrador no existe en este negocio."
+
+msgid "It tried to do something you have not allowed it to do («%(name)s»), so it stopped. Open Permissions and allow what it needs."
+msgstr "Ha intentado hacer algo que no le has permitido («%(name)s»), así que ha parado. Abre Permisos y concédele lo que necesita."
+
+msgid "«%(name)s» is not available in this business any more (its app is off), so it stopped."
+msgstr "«%(name)s» ya no está disponible en este negocio (su app está apagada), así que ha parado."
+
+msgid "«%(name)s» did not accept the data it was given, so it stopped."
+msgstr "«%(name)s» no ha aceptado los datos que le ha dado, así que ha parado."
+
+msgid "Something went wrong while doing «%(name)s», so it stopped. Nothing of that step was kept."
+msgstr "Algo ha fallado al hacer «%(name)s», así que ha parado. No se ha guardado nada de ese paso."
+
+msgid "It was started by something its own steps did, so it stopped before doing anything."
+msgstr "La arrancó algo que hicieron sus propios pasos, así que ha parado antes de hacer nada."
+
+msgid "A chain of %(count)s automations started it, more than the %(max)s allowed, so it stopped before doing anything."
+msgstr "La arrancó una cadena de %(count)s automatizaciones, más de las %(max)s permitidas, así que ha parado antes de hacer nada."
+
+msgid "Cancelled: the automation was paused while it waited."
+msgstr "Cancelada: la automatización se puso en pausa mientras esperaba."
+
+msgid "Cancelled: the automation was deleted."
+msgstr "Cancelada: la automatización se borró."

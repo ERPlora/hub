@@ -1,0 +1,722 @@
+"""Read operations of the flow app (``READ ONLY``) and the helpers the writes and the engine share.
+
+- **The catalog** (``catalog_events``, ``catalog_operations``): what the active apps declare, never a
+  name made up here. Events are each app's ``events.ALL``; actions and reads are its registered
+  operations whose permission the app declares (a person can be granted it: platform-only reactions
+  are left out). ``active_apps`` is the phase-1 seam: every installed module but this one, as
+  ``base.session.me``; phase 2 reads the SaaS's picture there.
+- **Values** (``map_params``): a step's params for what the run knows (``document.resolve``), leaving out
+  what came out empty, so an optional field keeps its default.
+- **«Try it»** (``flow.flow.test``) walks the steps against the last real event of this business and
+  executes nothing: it validates each action's data against the action's own schema.
+"""
+
+import importlib
+from importlib.util import find_spec
+from typing import Any
+
+import pydantic
+from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
+from django.db.models.functions import Lower
+from django.utils import translation
+from django.utils.translation import gettext_lazy as _
+from live.context import OperationContext
+from live.errors import Conflict, InvalidPayload, NotFound
+from live.meta import LiveAppConfig, module_configs
+from live.models import OutboxEvent
+from live.operations import Operation, operation, registry
+
+from apps.flow import document
+from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow.schemas import (
+    CatalogIn,
+    CatalogOut,
+    DraftListIn,
+    DraftOut,
+    FlowListIn,
+    FlowOut,
+    FlowRefIn,
+    Page,
+    RunListIn,
+    RunPageOut,
+    SampleIn,
+    SampleOut,
+    StatusIn,
+    StatusOut,
+    TestDocumentIn,
+    TestIn,
+    TestOut,
+)
+
+VIEW = "flow.view"
+MANAGE = "flow.manage"
+#: Run only by the platform (events.py and the scheduled tasks): no role holds it.
+SYSTEM = "flow.system"
+
+FLOW_NOT_FOUND = _("That automation does not exist in this business.")
+AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
+UNKNOWN_EVENT = _("That does not happen in this business: «%(name)s».")
+UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
+NOT_AN_ACTION = _("«%(name)s» only reads: use «Look something up».")
+NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
+HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
+#: The code of a refusal of an action that needs a person, when it is saved, granted or run.
+HIGH_RISK_CODE = "flow.high_risk"
+
+#: How many names an ambiguous reference lists.
+AMBIGUOUS_SHOWN = 5
+
+
+# --- The catalog ------------------------------------------------------------------------------------
+
+
+def active_apps() -> dict[str, LiveAppConfig]:
+    """The modules active in this business, but this one (phase 1: every installed module)."""
+    return {
+        config.label: config for config in module_configs() if config.label != "flow"
+    }
+
+
+def catalog_events() -> dict[str, LiveAppConfig]:
+    """``{event name: its app}``: the ``events.ALL`` of every active app."""
+    found: dict[str, LiveAppConfig] = {}
+    for label, config in active_apps().items():
+        module_name = f"{config.name}.events"
+        if find_spec(module_name) is None:
+            continue
+        for name in getattr(importlib.import_module(module_name), "ALL", []):
+            if name.startswith(f"{label}."):
+                found[name] = config
+    return found
+
+
+def grantable_operations() -> dict[str, Operation]:
+    """``{operation name: operation}`` of the active apps whose permission the app declares: what a
+    person can be granted (the platform-only reactions are left out)."""
+    apps = active_apps()
+    granted: dict[str, Operation] = {}
+    for name, op in registry.items():
+        config = apps.get(op.app_label)
+        if config is not None and op.permission in config.permissions:
+            granted[name] = op
+    return granted
+
+
+def needs_a_person(op: Operation) -> bool:
+    """An action the assistant confirms before running (``ai.risk == "high"``: voiding, refunding,
+    erasing, sending to the tax agency…): never for an automation, which acts with nobody in front."""
+    return (op.ai or {}).get("risk") == "high"
+
+
+def catalog_operations() -> dict[str, Operation]:
+    """What an automation may be granted and run: the grantable operations that do not need a person."""
+    return {name: op for name, op in grantable_operations().items() if not needs_a_person(op)}
+
+
+def read_permissions(op: Operation) -> frozenset[str]:
+    """The reads of ``op``'s app (its declared ``<app>.view…`` permissions): what a step may also need to
+    answer with what it did, never to change anything else."""
+    config = active_apps().get(op.app_label)
+    declared = config.permissions if config is not None else []
+    return frozenset(permission for permission in declared if permission.split(".", 1)[-1].startswith("view"))
+
+
+def _resolve_ref(schema: dict, defs: dict) -> dict:
+    ref = schema.get("$ref")
+    return defs.get(ref.rsplit("/", 1)[-1], {}) if ref else schema
+
+
+def _field_type(prop: dict, defs: dict) -> tuple[str, list[str]]:
+    for branch in prop.get("anyOf", []):
+        if branch.get("type") != "null":
+            return _field_type(branch, defs)
+    prop = _resolve_ref(prop, defs)
+    if "enum" in prop:
+        return "choice", [str(value) for value in prop["enum"]]
+    if "const" in prop:
+        return "choice", [str(prop["const"])]
+    kind = (
+        prop.get("format")
+        if prop.get("format") in ("uuid", "date", "date-time", "time")
+        else None
+    )
+    return kind or str(prop.get("type", "object")), []
+
+
+def action_fields(op: Operation) -> list[dict]:
+    """What an operation asks for: one field each, with its type, whether it is required and its words."""
+    schema = op.input.model_json_schema()
+    defs = schema.get("$defs", {})
+    required = set(schema.get("required", []))
+    fields = []
+    for name, prop in schema.get("properties", {}).items():
+        declared = op.input.model_fields.get(name)
+        kind, choices = _field_type(prop, defs)
+        fields.append(
+            {
+                "name": name,
+                "type": kind,
+                "required": name in required,
+                "description": (declared.description if declared else None)
+                or prop.get("description", ""),
+                "choices": choices,
+            }
+        )
+    return fields
+
+
+def action_outputs(op: Operation) -> list[str]:
+    """What a step of ``op`` leaves for the next ones: its output's fields (a list's first row's), and
+    ``found`` and ``count`` for a read."""
+    schema = op.output.model_json_schema()
+    defs = schema.get("$defs", {})
+    properties = schema.get("properties", {})
+    if op.kind == "query" and "rows" in properties:
+        properties = _resolve_ref(properties["rows"].get("items", {}), defs).get(
+            "properties", {}
+        )
+    names = list(properties)
+    if op.kind == "query":
+        names += [name for name in ("found", "count") if name not in names]
+    return names
+
+
+@operation(
+    "flow.catalog.read",
+    kind="query",
+    permission=VIEW,
+    input=CatalogIn,
+    output=CatalogOut,
+    ai={
+        "description": "What an automation can start on and do in this business: the events of the active apps "
+        "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for."
+    },
+)
+def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
+    with translation.override(ctx.language):
+        events = [
+            {"name": name, "app": config.label, "app_name": str(config.verbose_name)}
+            for name, config in catalog_events().items()
+        ]
+        apps = active_apps()
+        actions = [
+            {
+                "name": name,
+                "kind": op.kind,
+                "app": op.app_label,
+                "app_name": str(apps[op.app_label].verbose_name),
+                "description": str((op.ai or {}).get("description", "")),
+                "fields": action_fields(op),
+                "outputs": action_outputs(op),
+            }
+            for name, op in catalog_operations().items()
+        ]
+    return {
+        "events": sorted(events, key=lambda event: (event["app"], event["name"])),
+        "actions": sorted(actions, key=lambda action: (action["app"], action["name"])),
+    }
+
+
+def operation_problem(name: str, kind: str | None = None) -> tuple[str, str] | None:
+    """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
+    ``kind``, when given), or ``None`` when it may."""
+    op = grantable_operations().get(name)
+    if op is None:
+        return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
+    if needs_a_person(op):
+        return HIGH_RISK_CODE, str(HIGH_RISK) % {"name": name}
+    if kind == "command" and op.kind != "command":
+        return "invalid_payload", str(NOT_AN_ACTION) % {"name": name}
+    if kind == "query" and op.kind != "query":
+        return "invalid_payload", str(NOT_A_READ) % {"name": name}
+    return None
+
+
+def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
+    """What a document names that this business does not have, by field (``trigger.event``,
+    ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
+    person in front, ``invalid_payload`` otherwise."""
+    problems: dict[str, str] = {}
+    code = "invalid_payload"
+    if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events():
+        problems["trigger.event"] = str(UNKNOWN_EVENT) % {"name": trigger.event}
+    for index, step in enumerate(steps):
+        if step.kind not in ("command", "query"):
+            continue
+        problem = operation_problem(step.operation, step.kind)
+        if problem is not None:
+            problem_code, problems[f"steps.{index}.operation"] = problem
+            if problem_code == HIGH_RISK_CODE:
+                code = HIGH_RISK_CODE
+    return problems, code
+
+
+# --- Automations ------------------------------------------------------------------------------------
+
+
+def live_flows() -> QuerySet[Flow]:
+    """The automations that are not deleted."""
+    return Flow.objects.filter(deleted_at__isnull=True)
+
+
+def resolve_flow(flow_id, text: str | None, *, lock: bool = False) -> Flow:
+    """The automation of ``flow_id``, or the one whose name is or contains ``text``.
+
+    ``NotFound`` when none (a deleted one included); ``Conflict`` ``flow.ambiguous_flow`` naming the
+    candidates when a text fits several. ``lock`` holds its row until the COMMIT.
+    """
+    flows = live_flows()
+    if flow_id is not None:
+        candidates = list(flows.filter(pk=flow_id).values_list("pk", flat=True))
+    else:
+        exact = list(flows.filter(name__iexact=text).values_list("pk", "name"))
+        matches = exact or list(
+            flows.filter(name__icontains=text)
+            .order_by(Lower("name"), "id")
+            .values_list("pk", "name")
+        )
+        if len(matches) > 1:
+            names = ", ".join(f"«{name}»" for _, name in matches[:AMBIGUOUS_SHOWN])
+            raise Conflict(
+                str(AMBIGUOUS_FLOW) % {"text": text, "names": names},
+                code="flow.ambiguous_flow",
+            )
+        candidates = [pk for pk, _ in matches]
+    if not candidates:
+        raise NotFound(str(FLOW_NOT_FOUND))
+    found = Flow.objects.filter(pk=candidates[0])
+    if lock:
+        found = found.select_for_update()
+    return found.get()
+
+
+def trigger_of(flow: Flow) -> dict[str, Any]:
+    """The trigger of ``flow`` as the document writes it."""
+    if flow.trigger_kind == Flow.Trigger.EVENT:
+        return {
+            "kind": "event",
+            "event": flow.trigger_event,
+            "filter": flow.trigger_filter,
+        }
+    if flow.trigger_kind == Flow.Trigger.SCHEDULE:
+        schedule = flow.schedule
+        return {
+            "kind": "schedule",
+            "every": schedule.get("every"),
+            "weekday": schedule.get("weekday"),
+            "day": schedule.get("day"),
+            "time": schedule.get("time"),
+        }
+    if flow.trigger_kind == Flow.Trigger.AT:
+        return {"kind": "at", "at": flow.run_at.isoformat() if flow.run_at else None}
+    return {"kind": "manual"}
+
+
+def with_last_run(flows: QuerySet[Flow]) -> QuerySet[Flow]:
+    last = FlowRun.objects.filter(flow=OuterRef("pk")).order_by("-started_at", "-id")
+    return flows.annotate(
+        last_run_id=Subquery(last.values("id")[:1]),
+        last_run_status=Subquery(last.values("status")[:1]),
+        last_run_started_at=Subquery(last.values("started_at")[:1]),
+    )
+
+
+def flow_row(flow: Flow) -> dict[str, Any]:
+    """What ``FlowOut`` shows of an automation (annotated with ``with_last_run`` or not)."""
+    required = document.required_grants(flow.steps)
+    if not hasattr(flow, "last_run_id"):
+        flow = with_last_run(Flow.objects.filter(pk=flow.pk)).get()
+    return {
+        "id": flow.id,
+        "name": flow.name,
+        "enabled": flow.enabled,
+        "trigger": trigger_of(flow),
+        "steps": flow.steps,
+        "grants": flow.grants,
+        "required_grants": required,
+        "missing_grants": [name for name in required if name not in flow.grants],
+        "version": flow.version,
+        "next_fire_at": flow.next_fire_at,
+        "created_at": flow.created_at,
+        "updated_at": flow.updated_at,
+        "created_by": flow.created_by,
+        "updated_by": flow.updated_by,
+        "last_run": (
+            {
+                "id": flow.last_run_id,
+                "status": flow.last_run_status,
+                "started_at": flow.last_run_started_at,
+            }
+            if flow.last_run_id
+            else None
+        ),
+    }
+
+
+_FLOW_SORTS = {
+    "-updated_at": ("-updated_at", "id"),
+    "updated_at": ("updated_at", "id"),
+    "name": (Lower("name"), "id"),
+    "-name": (Lower("name").desc(), "-id"),
+}
+
+
+@operation(
+    "flow.flow.list",
+    kind="query",
+    permission=VIEW,
+    input=FlowListIn,
+    output=Page[FlowOut],
+    ai={
+        "description": "The automations of this business («what automations do I have?»), each with what starts it, "
+        "whether it is on, the permissions it still lacks and how its last run ended; search by name, event "
+        "or action."
+    },
+)
+def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
+    flows = live_flows()
+    if data.search:
+        flows = flows.filter(
+            Q(search_text__icontains=data.search) | Q(name__icontains=data.search)
+        )
+    if data.enabled is not None:
+        flows = flows.filter(enabled=data.enabled)
+    if data.trigger_kind is not None:
+        flows = flows.filter(trigger_kind=data.trigger_kind)
+    total = flows.count()
+    page = with_last_run(flows.order_by(*_FLOW_SORTS[data.sort]))[
+        data.offset : data.offset + data.limit
+    ]
+    return {
+        "rows": [flow_row(flow) for flow in page],
+        "total": total,
+        "limit": data.limit,
+        "offset": data.offset,
+    }
+
+
+@operation(
+    "flow.flow.detail",
+    kind="query",
+    permission=VIEW,
+    input=FlowRefIn,
+    output=FlowOut,
+    ai={
+        "description": "One automation by its id or its name («the welcome automation»): its trigger, its steps, "
+        "the permissions it needs and the ones it lacks, and its last run."
+    },
+)
+def flow_detail(ctx: OperationContext, data: FlowRefIn) -> dict:
+    return flow_row(resolve_flow(data.id, data.flow))
+
+
+@operation(
+    "flow.flow.status",
+    kind="query",
+    permission=VIEW,
+    input=StatusIn,
+    output=StatusOut,
+    ai={
+        "description": "Is it already set up here? For one event and one action: how many automations start with "
+        "the event and may run the action, how many of those are on, and how many listen to the event with "
+        "no permission granted yet. Three numbers, no names."
+    },
+)
+def flow_status(ctx: OperationContext, data: StatusIn) -> dict:
+    listening = live_flows().filter(
+        trigger_kind=Flow.Trigger.EVENT, trigger_event=data.event
+    )
+    granted = listening.filter(grants__contains=[data.operation])
+    return {
+        "total": granted.count(),
+        "enabled": granted.filter(enabled=True).count(),
+        "unfinished": listening.filter(grants=[]).count(),
+    }
+
+
+# --- Runs and drafts --------------------------------------------------------------------------------
+
+
+def run_row(run: FlowRun) -> dict[str, Any]:
+    return {
+        "id": run.id,
+        "flow_id": run.flow_id,
+        "flow_version": run.flow_version,
+        "status": run.status,
+        "trigger_kind": run.trigger_kind,
+        "event_name": run.event_name,
+        "input": run.input,
+        "step_index": run.step_index,
+        "steps_total": len(run.definition.get("steps", [])),
+        "log": run.log,
+        "error_code": run.error_code,
+        "error_message": run.error_message,
+        "resume_at": run.resume_at,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "started_by": run.started_by,
+    }
+
+
+@operation(
+    "flow.run.list",
+    kind="query",
+    permission=VIEW,
+    input=RunListIn,
+    output=RunPageOut,
+    ai={
+        "description": "What an automation did, the newest first: each run's status (finished well, stopped by a "
+        "condition, stopped by an error, waiting, cancelled), each step and the reason of a failure; and how "
+        "many runs failed («why did the welcome automation fail?»)."
+    },
+)
+def list_runs(ctx: OperationContext, data: RunListIn) -> dict:
+    runs = FlowRun.objects.filter(flow_id=data.flow_id)
+    failed = runs.aggregate(failed=Count("id", filter=Q(status=FlowRun.Status.FAILED)))[
+        "failed"
+    ]
+    if data.status is not None:
+        runs = runs.filter(status=data.status)
+    total = runs.count()
+    page = runs.order_by("-started_at", "-id")[data.offset : data.offset + data.limit]
+    return {
+        "rows": [run_row(run) for run in page],
+        "total": total,
+        "limit": data.limit,
+        "offset": data.offset,
+        "failed": failed,
+    }
+
+
+def draft_row(draft: Draft) -> dict[str, Any]:
+    return {
+        "id": draft.id,
+        "name": draft.name,
+        "definition": draft.definition,
+        "notes": draft.notes,
+        "status": draft.status,
+        "flow_id": draft.flow_id,
+        "created_at": draft.created_at,
+        "created_by": draft.created_by,
+    }
+
+
+@operation(
+    "flow.draft.list",
+    kind="query",
+    permission=VIEW,
+    input=DraftListIn,
+    output=Page[DraftOut],
+    ai={
+        "description": "The automations the assistant proposed that are waiting for a person, the newest first."
+    },
+)
+def list_drafts(ctx: OperationContext, data: DraftListIn) -> dict:
+    drafts = Draft.objects.filter(status=Draft.Status.PENDING)
+    total = drafts.count()
+    page = drafts.order_by("-created_at", "-id")[data.offset : data.offset + data.limit]
+    return {
+        "rows": [draft_row(draft) for draft in page],
+        "total": total,
+        "limit": data.limit,
+        "offset": data.offset,
+    }
+
+
+# --- The last real event and «Try it» ---------------------------------------------------------------
+
+
+def last_event(ctx: OperationContext, name: str) -> OutboxEvent | None:
+    return (
+        OutboxEvent.objects.filter(
+            scope_kind=ctx.scope.kind, scope_key=ctx.scope.key, name=name
+        )
+        .order_by("-created_at", "-id")
+        .first()
+    )
+
+
+def sample_of(ctx: OperationContext, name: str) -> dict[str, Any]:
+    event = last_event(ctx, name)
+    if event is None:
+        return {"found": False, "event": name, "at": None, "payload": {}}
+    return {
+        "found": True,
+        "event": name,
+        "at": event.created_at,
+        "payload": event.payload,
+    }
+
+
+@operation(
+    "flow.event.sample",
+    kind="query",
+    permission=MANAGE,
+    input=SampleIn,
+    output=SampleOut,
+    ai={
+        "description": "The last time an event really happened in this business, with what it brought."
+    },
+)
+def event_sample(ctx: OperationContext, data: SampleIn) -> dict:
+    return sample_of(ctx, data.event)
+
+
+def map_params(
+    params: dict[str, Any], data: dict, unknown_steps: set[str] = frozenset()
+) -> tuple[dict, list, list]:
+    """``(values, empty, unknown)`` of a step's ``params`` for ``data``.
+
+    A value read from a path that is missing (or null) is left out and named in ``empty``; a template
+    with a missing field keeps its text and is named in ``empty`` too. A value that reads the output of
+    a step in ``unknown_steps`` (one that has not run) is left out and named in ``unknown``.
+    """
+    values: dict[str, Any] = {}
+    empty: list[str] = []
+    unknown: list[str] = []
+    for key, raw in params.items():
+        reads = document.references(raw)
+        if any(
+            path.startswith("steps.") and path.split(".")[1] in unknown_steps
+            for path in reads
+        ):
+            unknown.append(key)
+            continue
+        if document.is_path(raw):
+            found, value = document.lookup(raw, data)
+            if not found or value is None:
+                empty.append(key)
+                continue
+            values[key] = value
+            continue
+        values[key] = document.resolve(raw, data)
+        if any(
+            document.lookup(path, data)[1] is None
+            for path in reads
+            if document.is_path(path)
+        ):
+            empty.append(key)
+    return values, empty, unknown
+
+
+def prepared(op: Operation, step_kind: str, result: str, values: dict) -> dict:
+    """The input of a read that keeps the first row: one row is enough (unless the step asks for more)."""
+    if (
+        step_kind == "query"
+        and result == "first"
+        and "limit" in op.input.model_fields
+        and "limit" not in values
+    ):
+        return {**values, "limit": 1}
+    return values
+
+
+def validation_fields(error: pydantic.ValidationError) -> dict[str, str]:
+    return {
+        ".".join(map(str, item["loc"])) or "__all__": item["msg"]
+        for item in error.errors()
+    }
+
+
+def _clauses(failed: list[dict]) -> list[dict]:
+    return [
+        {"path": clause["path"], "op": clause["op"], "value": clause["value"]}
+        for clause in failed
+    ]
+
+
+@operation(
+    "flow.flow.test",
+    kind="query",
+    permission=MANAGE,
+    input=TestIn,
+    output=TestOut,
+    ai={
+        "description": "Try an automation without effects: walk its steps against the last time its event really "
+        "happened here and say, step by step, what it would do, what would come out empty, what the action "
+        "would refuse, where a condition would stop it and what it is not allowed yet. Executes nothing."
+    },
+)
+def try_flow(ctx: OperationContext, data: TestIn) -> dict:
+    grants = resolve_flow(data.id, None).grants if data.id is not None else []
+    try:
+        tried = TestDocumentIn.model_validate_json(data.document)
+    except pydantic.ValidationError as invalid:
+        fields = {f"document.{key}": message for key, message in validation_fields(invalid).items()}
+        raise InvalidPayload(next(iter(fields.values())), fields=fields) from None
+    trigger = tried.trigger
+    sample = (
+        sample_of(ctx, trigger.event)
+        if trigger.kind == "event"
+        else {"found": False, "event": "", "at": None, "payload": {}}
+    )
+    values = {"input": sample["payload"], "steps": {}}
+    trigger_failed = (
+        document.failed_clauses(trigger.filter, values)
+        if trigger.kind == "event" and sample["found"]
+        else []
+    )
+    stopped = bool(trigger_failed)
+    operations = catalog_operations()
+    unknown_steps: set[str] = set()
+    steps = []
+    for step in tried.steps:
+        out: dict[str, Any] = {
+            "id": step.id,
+            "kind": step.kind,
+            "operation": getattr(step, "operation", ""),
+        }
+        if stopped:
+            steps.append(out | {"outcome": "not_reached"})
+            continue
+        if step.kind == "delay":
+            steps.append(out | {"outcome": "waits", "seconds": step.seconds})
+            continue
+        if step.kind == "condition":
+            reads = list(step.when)
+            if any(
+                path.startswith("steps.") and path.split(".")[1] in unknown_steps
+                for path in reads
+            ):
+                steps.append(out | {"outcome": "cannot_tell"})
+                continue
+            failed = document.failed_clauses(step.when, values)
+            stopped = bool(failed)
+            steps.append(
+                out
+                | {
+                    "outcome": "stops_here" if failed else "would_run",
+                    "failed": _clauses(failed),
+                }
+            )
+            continue
+        unknown_steps.add(step.id)
+        op = operations.get(step.operation)
+        mapped, empty, unknown = map_params(step.params, values, unknown_steps)
+        out |= {"params": mapped, "empty": empty, "unknown": unknown}
+        grantable = grantable_operations().get(step.operation)
+        if grantable is not None and needs_a_person(grantable):
+            steps.append(out | {"outcome": "high_risk"})
+        elif op is None or op.kind != step.kind:
+            steps.append(out | {"outcome": "unavailable"})
+        elif step.operation not in grants:
+            steps.append(out | {"outcome": "not_allowed"})
+        elif unknown:
+            steps.append(out | {"outcome": "cannot_tell"})
+        else:
+            try:
+                op.input.model_validate(
+                    prepared(op, step.kind, getattr(step, "result", "first"), mapped)
+                )
+            except pydantic.ValidationError as invalid:
+                steps.append(
+                    out | {"outcome": "refused", "errors": validation_fields(invalid)}
+                )
+            else:
+                steps.append(out | {"outcome": "would_run"})
+    return {
+        "sample": sample,
+        "starts": not trigger_failed,
+        "trigger_failed": _clauses(trigger_failed),
+        "steps": steps,
+    }

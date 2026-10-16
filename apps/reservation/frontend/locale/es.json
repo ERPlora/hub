@@ -1,0 +1,287 @@
+{
+  "reservation": {
+    "title": "Reservas",
+    "loading": "Cargando…",
+    "noPermission": "No tienes permiso",
+    "erasedCustomer": "Cliente borrado",
+    "yes": "Sí",
+    "no": "No",
+    "retry": "Reintentar",
+    "cancelButton": "Cancelar",
+    "tabs": {
+      "label": "Secciones de reservas",
+      "reservations": "Reservas",
+      "waitlist": "Lista de espera",
+      "availability": "Disponibilidad",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio"
+    },
+    "status": {
+      "pending": "Pendiente",
+      "confirmed": "Confirmada",
+      "seated": "Sentada",
+      "completed": "Completada",
+      "cancelled": "Cancelada",
+      "no_show": "No presentada"
+    },
+    "source": {
+      "phone": "Teléfono",
+      "in_person": "En el local",
+      "waitlist": "Lista de espera",
+      "whatsapp": "WhatsApp",
+      "online": "Internet"
+    },
+    "weekday": {
+      "monday": "Lunes",
+      "tuesday": "Martes",
+      "wednesday": "Miércoles",
+      "thursday": "Jueves",
+      "friday": "Viernes",
+      "saturday": "Sábado",
+      "sunday": "Domingo"
+    },
+    "day": {
+      "previous": "Día anterior",
+      "next": "Día siguiente",
+      "today": "Hoy",
+      "date": "Fecha",
+      "covers": "cubiertos",
+      "bookings": "reservas",
+      "nextSlot": "próxima franja",
+      "left": "{count} libres",
+      "full": "Lleno",
+      "over": "No queda servicio hoy",
+      "noService": "Sin servicio este día",
+      "closed": "Cerrado este día",
+      "figuresError": "No se han podido cargar las cifras del día"
+    },
+    "list": {
+      "columns": {
+        "date": "Fecha",
+        "time": "Hora",
+        "guest": "Cliente",
+        "phone": "Teléfono",
+        "party": "Pax",
+        "table": "Mesa",
+        "status": "Estado",
+        "source": "Origen"
+      },
+      "search": "Buscar cliente, teléfono o correo…",
+      "new": "Nueva reserva",
+      "entity": {
+        "one": "reserva",
+        "many": "reservas"
+      },
+      "loadError": "No se han podido cargar las reservas",
+      "emptyTitle": "No hay reservas este día",
+      "emptyBody": "Las reservas que tomes por teléfono, por internet o en la puerta aparecen aquí, con la mesa guardada para el cliente hasta que llegue.",
+      "emptyHint": "Configura los turnos en la pestaña Disponibilidad.",
+      "noResultsTitle": "Ninguna reserva coincide con la búsqueda",
+      "noResultsBody": "Prueba con otro nombre, teléfono o correo, o limpia los filtros para volver al día.",
+      "clearFilters": "Limpiar filtros",
+      "unconfirmed": "Liberada: nunca se confirmó"
+    },
+    "actions": {
+      "confirm": "Confirmar",
+      "seat": "Sentar",
+      "complete": "Completar",
+      "cancel": "Cancelar",
+      "noShow": "No presentado",
+      "edit": "Editar",
+      "delete": "Borrar",
+      "failed": "No se ha podido cambiar la reserva"
+    },
+    "outcome": {
+      "seated": "{guest} está sentado en la mesa {table}: su cuenta está abierta en Ventas.",
+      "seatedNoTable": "{guest} está sentado."
+    },
+    "cancel": {
+      "title": "¿Cancelar la reserva?",
+      "message": "{guest} · {when}. Su hueco y su mesa quedan libres.",
+      "reason": "Motivo (opcional)",
+      "confirm": "Cancelar reserva",
+      "keep": "Mantenerla"
+    },
+    "noShow": {
+      "title": "¿Marcar como no presentada?",
+      "message": "{guest} · {when}. Su hueco y su mesa quedan libres.",
+      "confirm": "Marcar no presentada"
+    },
+    "delete": {
+      "title": "¿Borrar la reserva?",
+      "message": "{guest} · {when}. Sale del libro para siempre; cancelarla la conserva con su motivo.",
+      "confirm": "Borrar para siempre"
+    },
+    "overbook": {
+      "title": "Esta franja está llena",
+      "message": "{message} ¿Reservar igualmente?",
+      "confirm": "Reservar igualmente",
+      "convert": "Convertir igualmente"
+    },
+    "form": {
+      "titleNew": "Nueva reserva",
+      "titleEdit": "Editar reserva",
+      "customer": "Cliente",
+      "name": "Cliente",
+      "phone": "Teléfono",
+      "email": "Correo",
+      "date": "Fecha",
+      "time": "Hora",
+      "party": "Pax",
+      "duration": "Duración (min)",
+      "table": "Mesa",
+      "pickTable": "Elige una mesa libre",
+      "tablesNone": "No hay mesas libres a esa hora",
+      "tableHint": "{capacity} plazas · {zone}",
+      "tableSmall": "{capacity} plazas · {zone} · pequeña para el grupo",
+      "noZone": "Sin zona",
+      "pickFirst": "Pon la fecha, la hora y los comensales para ver las mesas libres.",
+      "smallTable": "La mesa {table} tiene {capacity} plazas para {party} comensales.",
+      "source": "Origen",
+      "notes": "Notas del cliente",
+      "internalNotes": "Notas internas",
+      "submitNew": "Reservar",
+      "submitEdit": "Guardar",
+      "notesOnly": "Esta reserva está {status}: solo se pueden cambiar sus notas."
+    },
+    "waitlist": {
+      "title": "Lista de espera",
+      "columns": {
+        "date": "Fecha",
+        "time": "Hora pref.",
+        "guest": "Cliente",
+        "phone": "Teléfono",
+        "party": "Pax",
+        "contacted": "Contactado",
+        "state": "Estado"
+      },
+      "states": {
+        "waiting": "En espera",
+        "converted": "Convertida"
+      },
+      "search": "Buscar cliente, teléfono o correo…",
+      "add": "Añadir cliente",
+      "entity": {
+        "one": "entrada",
+        "many": "entradas"
+      },
+      "empty": "Lista de espera vacía.",
+      "loadError": "No se ha podido cargar la lista de espera",
+      "actions": {
+        "contact": "Contactado",
+        "convert": "Convertir",
+        "remove": "Quitar",
+        "failed": "No se pudo actualizar la entrada"
+      },
+      "form": {
+        "title": "Añadir a la lista de espera",
+        "submit": "Añadir a la lista de espera"
+      },
+      "remove": {
+        "title": "¿Quitar de la lista de espera?",
+        "message": "{guest} · {when}.",
+        "confirm": "Quitar"
+      },
+      "converted": "{guest} ya tiene reserva el {when}."
+    },
+    "availability": {
+      "title": "Disponibilidad",
+      "occupancy": "Ocupación",
+      "slots": "Franjas horarias",
+      "blocked": "Fechas bloqueadas",
+      "date": "Fecha",
+      "hours": "Horario: {spans}",
+      "closedBySchedule": "El negocio cierra este día (Horarios).",
+      "noHours": "Sin horario confirmado en Horarios: no limita las reservas.",
+      "blockedDay": "Bloqueado: {reason}",
+      "blockedHours": "Bloqueado de {from} a {to}: {reason}",
+      "columns": {
+        "slot": "Franja",
+        "reserved": "Reservadas",
+        "max": "Máx",
+        "covers": "Comensales",
+        "available": "Disponibles",
+        "day": "Día",
+        "from": "Desde",
+        "to": "Hasta",
+        "maxReservations": "Máx",
+        "maxCovers": "Máx comensales",
+        "date": "Fecha",
+        "reason": "Motivo",
+        "hours": "Día completo"
+      },
+      "full": "Lleno",
+      "outside": "Fuera de horario",
+      "wholeDay": "Todo el día",
+      "noLimit": "—",
+      "emptyOccupancy": "Sin servicio ese día (sin franjas).",
+      "emptySlots": "Sin franjas horarias.",
+      "emptyBlocked": "Sin fechas bloqueadas.",
+      "addSlot": "Añadir franja",
+      "addBlocked": "Añadir fecha bloqueada",
+      "remove": "Quitar",
+      "occupancyError": "No se pudo cargar la ocupación",
+      "slotsError": "No se han podido cargar las franjas",
+      "blockedError": "No se han podido cargar las fechas bloqueadas",
+      "removeFailed": "No se ha podido quitar",
+      "slotEntity": {
+        "one": "franja",
+        "many": "franjas"
+      },
+      "blockedEntity": {
+        "one": "fecha",
+        "many": "fechas"
+      },
+      "slotForm": {
+        "title": "Nueva franja horaria",
+        "day": "Día",
+        "from": "Desde",
+        "to": "Hasta",
+        "max": "Máx",
+        "maxCovers": "Máx comensales (opcional)",
+        "submit": "Crear franja"
+      },
+      "blockedForm": {
+        "title": "Bloquear una fecha",
+        "date": "Fecha",
+        "reason": "Motivo",
+        "wholeDay": "Todo el día",
+        "from": "Desde",
+        "to": "Hasta",
+        "submit": "Bloquear fecha"
+      },
+      "removeSlot": {
+        "title": "¿Quitar la franja?",
+        "message": "{day} {from}–{to}. No se aceptan más reservas en ella; las que tiene se quedan.",
+        "confirm": "Quitar franja"
+      },
+      "removeBlocked": {
+        "title": "¿Desbloquear la fecha?",
+        "message": "{date}. Se vuelven a aceptar reservas.",
+        "confirm": "Desbloquear"
+      }
+    },
+    "settings": {
+      "title": "Reglas de reserva",
+      "staff": "Reglas para toda reserva",
+      "guest": "Reglas para las reservas que hace el propio cliente (internet, WhatsApp)",
+      "minParty": "Comensales mínimos",
+      "maxParty": "Comensales máximos",
+      "minAdvance": "Antelación mínima (horas)",
+      "maxAdvance": "Días máximos de antelación",
+      "duration": "Duración por defecto (minutos)",
+      "noShowWindow": "Liberar una reserva sin confirmar tras (minutos)",
+      "autoConfirm": "Confirmar solas las reservas nuevas",
+      "autoConfirmHint": "Una reserva confirmada aparta su mesa en el plano de sala.",
+      "requirePhone": "Teléfono obligatorio",
+      "requireEmail": "Correo obligatorio",
+      "save": "Guardar",
+      "saved": "Ajustes guardados.",
+      "saveError": "No se han podido guardar los ajustes",
+      "loadError": "No se han podido cargar los ajustes"
+    }
+  }
+}

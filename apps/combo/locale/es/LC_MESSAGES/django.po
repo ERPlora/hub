@@ -1,0 +1,362 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 10:14+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: apps.py:12
+msgid "Menus and combos"
+msgstr "Menús y combos"
+
+#: apps.py:19
+msgid ""
+"Set menus and combos at a closed price, with courses, supplements and the "
+"right VAT."
+msgstr "Menús y combos a precio cerrado, con platos, suplementos y el IVA correcto."
+
+#: apps.py:22
+msgid ""
+"Menus and combos sells the menu of the day, the kids' menu or a sandwich "
+"with a drink at one closed price: each menu has its courses, each course the "
+"products the customer picks from, with a supplement when a choice costs "
+"more. Mark a dish as sold out, reorder courses and choices, and the till "
+"charges the menu with the right VAT: one line when it is eaten in, split per "
+"dish when it is sold to take away, while the stock of every dish goes down."
+msgstr "Menús y combos vende el menú del día, el menú infantil o el bocadillo con bebida a un precio cerrado: cada menú tiene sus platos y cada plato los productos entre los que elige el cliente, con un suplemento cuando una elección cuesta más. Marca un plato como agotado, ordena platos y elecciones, y el TPV cobra el menú con el IVA correcto: una línea si se consume en el local, repartido por plato si se vende para llevar, mientras baja el stock de cada plato."
+
+#: apps.py:42
+msgid "Menus"
+msgstr "Menús"
+
+#: models.py:30
+msgid "Eaten in"
+msgstr "En el local"
+
+#: models.py:31
+msgid "Take away"
+msgstr "Para llevar"
+
+#: models.py:33 models.py:96
+msgid "name"
+msgstr "nombre"
+
+#: models.py:36
+msgid "kitchen name"
+msgstr "nombre de cocina"
+
+#: models.py:38
+msgid "closed price"
+msgstr "precio cerrado"
+
+#: models.py:40
+msgid "how it is sold"
+msgstr "cómo se vende"
+
+#: models.py:52
+msgid "tax category"
+msgstr "categoría fiscal"
+
+#: models.py:54 models.py:102 models.py:148
+msgid "order"
+msgstr "orden"
+
+#: models.py:55
+msgid "on sale"
+msgstr "a la venta"
+
+#: models.py:56 models.py:103 models.py:149
+msgid "created at"
+msgstr "creado el"
+
+#: models.py:57 models.py:104 models.py:150
+msgid "updated at"
+msgstr "actualizado el"
+
+#: models.py:59
+msgid "created by"
+msgstr "creado por"
+
+#: models.py:62
+msgid "updated by"
+msgstr "actualizado por"
+
+#: models.py:66 models.py:94
+msgid "menu"
+msgstr "menú"
+
+#: models.py:67
+msgid "menus"
+msgstr "menús"
+
+#: models.py:98
+msgid "minimum picks"
+msgstr "elecciones mínimas"
+
+#: models.py:100
+msgid "maximum picks"
+msgstr "elecciones máximas"
+
+#: models.py:101
+msgid "may repeat"
+msgstr "se puede repetir"
+
+#: models.py:107 models.py:136
+msgid "course"
+msgstr "plato"
+
+#: models.py:108
+msgid "courses"
+msgstr "platos"
+
+#: models.py:143
+msgid "product"
+msgstr "producto"
+
+#: models.py:145
+msgid "supplement"
+msgstr "suplemento"
+
+#: models.py:147
+msgid "available"
+msgstr "disponible"
+
+#: models.py:153
+msgid "choice"
+msgstr "elección"
+
+#: models.py:154
+msgid "choices"
+msgstr "elecciones"
+
+#: queries.py:40
+msgid "That menu does not exist in this business."
+msgstr "Ese menú no existe en este negocio."
+
+#: queries.py:41
+msgid "That course does not exist in this menu."
+msgstr "Ese plato no existe en este menú."
+
+#: queries.py:42
+msgid "That choice does not exist in this menu."
+msgstr "Esa elección no existe en este menú."
+
+#: queries.py:44
+#, python-format
+msgid "There are several menus called “%(said)s”: %(names)s. Say which one."
+msgstr "Hay varios menús que se llaman «%(said)s»: %(names)s. Di cuál."
+
+#: queries.py:47
+#, python-format
+msgid "There are several courses called “%(said)s”: %(names)s. Say which one."
+msgstr "Hay varios platos que se llaman «%(said)s»: %(names)s. Di cuál."
+
+#: queries.py:50
+#, python-format
+msgid "“%(said)s” is a choice of several courses: %(names)s. Say which course."
+msgstr "«%(said)s» es una elección de varios platos: %(names)s. Di de cuál."
+
+#: queries.py:52
+msgid "That menu is no longer on sale."
+msgstr "Ese menú ya no está a la venta."
+
+#: queries.py:53
+msgid "Pick something from the menu before adding it."
+msgstr "Elige algo del menú antes de añadirlo."
+
+#: queries.py:54
+#, python-format
+msgid "The menu still needs a pick in “%(group)s”: pick %(min)s."
+msgstr "Al menú le falta elegir en «%(group)s»: elige %(min)s."
+
+#: queries.py:55
+#, python-format
+msgid "The course “%(group)s” takes %(max)s at most."
+msgstr "El plato «%(group)s» admite como mucho %(max)s."
+
+#: queries.py:56
+#, python-format
+msgid "The course “%(group)s” does not take the same choice twice."
+msgstr "El plato «%(group)s» no admite elegir dos veces lo mismo."
+
+#: queries.py:57
+#, python-format
+msgid "“%(product)s” is not a choice of this menu."
+msgstr "«%(product)s» no es una elección de este menú."
+
+#: queries.py:58
+msgid "That choice is not part of this menu."
+msgstr "Esa elección no es de este menú."
+
+#: queries.py:59
+#, python-format
+msgid "“%(product)s” is sold out."
+msgstr "«%(product)s» está agotado."
+
+#: queries.py:61
+#, python-format
+msgid ""
+"“%(product)s” can no longer be sold: it is deactivated or deleted in "
+"Inventory."
+msgstr "«%(product)s» ya no se puede vender: está desactivado o eliminado en Inventario."
+
+#: queries.py:63
+msgid "The menu's amount cannot be negative."
+msgstr "El importe del menú no puede quedar en negativo."
+
+#: queries.py:65
+#, python-format
+msgid ""
+"“%(product)s” has no tax category in Inventory, so this menu cannot be "
+"charged."
+msgstr "«%(product)s» no tiene categoría fiscal en Inventario, así que este menú no se puede cobrar."
+
+#: queries.py:68
+msgid ""
+"The tax category of this menu is not active in Taxes, so it cannot be "
+"charged."
+msgstr "La categoría fiscal de este menú no está activa en Impuestos, así que no se puede cobrar."
+
+#: queries.py:71
+#, python-format
+msgid ""
+"“%(product)s” is billed at %(category)s, which has no equivalent to take "
+"away in Taxes, so this menu cannot be sold to take away."
+msgstr "«%(product)s» se factura en %(category)s, que no tiene equivalente para llevar en Impuestos, así que este menú no se puede vender para llevar."
+
+#: queries.py:75
+#, python-format
+msgid ""
+"“%(product)s” is no longer sold by units in Inventory, so it cannot be "
+"charged as a menu choice."
+msgstr "«%(product)s» ya no se vende por unidades en Inventario, así que no se puede cobrar como elección de menú."
+
+#: queries.py:78
+msgid ""
+"The products of this menu have no catalogue price, so its VAT cannot be "
+"split."
+msgstr "Los productos de este menú no tienen precio de catálogo, así que no se puede repartir su IVA."
+
+#: queries.py:81
+msgid "It is not on sale."
+msgstr "No está a la venta."
+
+#: queries.py:82
+msgid "Its tax category is not active in Taxes."
+msgstr "Su categoría fiscal no está activa en Impuestos."
+
+#: queries.py:83
+msgid "No course has a choice on offer."
+msgstr "Ningún plato tiene una elección disponible."
+
+#: queries.py:85
+msgid ""
+"Its choices cost nothing in the catalogue and are billed at different rates, "
+"so its VAT cannot be split."
+msgstr "Sus elecciones no tienen precio en el catálogo y van a tipos distintos, así que no se puede repartir su IVA."
+
+#: queries.py:88
+#, python-format
+msgid "The course “%(group)s” has fewer choices on offer than it asks for."
+msgstr "El plato «%(group)s» tiene menos elecciones disponibles de las que pide."
+
+#: schemas.py:33
+msgid "Say which menu: its id or its name."
+msgstr "Di qué menú: su id o su nombre."
+
+#: schemas.py:34
+msgid "Say which course: its id, or its name and its menu."
+msgstr "Di qué plato: su id, o su nombre y su menú."
+
+#: schemas.py:35
+msgid "Say which choice: its id, or its product and its menu."
+msgstr "Di qué elección: su id, o su producto y su menú."
+
+#: schemas.py:36
+msgid "Choose a product of the catalogue first."
+msgstr "Elige antes un producto del catálogo."
+
+#: schemas.py:37
+msgid "Say which choice: its id or its product."
+msgstr "Di qué elección: su id o su producto."
+
+#: schemas.py:38
+msgid "A pick is an object with its choice or its product."
+msgstr "Cada elección es un objeto con su elección o su producto."
+
+#: schemas.py:40
+#, python-format
+msgid ""
+"The maximum (%(max)s) is below the minimum (%(min)s): nobody could ever "
+"satisfy this course."
+msgstr "El máximo (%(max)s) queda por debajo del mínimo (%(min)s): nadie podría satisfacer nunca este plato."
+
+#: schemas.py:42
+msgid "Each one goes once in the list."
+msgstr "Cada uno va una sola vez en la lista."
+
+#: services.py:60
+msgid ""
+"A menu eaten in needs its own VAT category: without it, it cannot be billed."
+msgstr "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar."
+
+#: services.py:62
+msgid "That tax category does not exist in Taxes."
+msgstr "Ese tipo de IVA no existe en Impuestos."
+
+#: services.py:63
+#, python-format
+msgid "That menu already has a course “%(name)s”."
+msgstr "Ese menú ya tiene un plato «%(name)s»."
+
+#: services.py:64
+#, python-format
+msgid "A menu holds %(max)s courses at most."
+msgstr "Un menú admite como mucho %(max)s platos."
+
+#: services.py:66
+msgid ""
+"This course already offers that product. To let it be picked twice, switch "
+"on «the same choice may be picked more than once»."
+msgstr "Este plato ya ofrece ese producto. Para que se pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez»."
+
+#: services.py:69
+#, python-format
+msgid "This course already offers %(names)s."
+msgstr "Este plato ya ofrece %(names)s."
+
+#: services.py:70
+#, python-format
+msgid "A course holds %(max)s choices at most."
+msgstr "Un plato admite como mucho %(max)s elecciones."
+
+#: services.py:72
+#, python-format
+msgid ""
+"“%(product)s” is deactivated in Inventory: activate it before putting it in "
+"a menu."
+msgstr "«%(product)s» está desactivado en Inventario: actívalo antes de ponerlo en un menú."
+
+#: services.py:75
+#, python-format
+msgid ""
+"Only a product sold and priced by the unit can be a menu choice; "
+"“%(product)s” is sold by %(unit)s."
+msgstr "Solo un producto que se vende y se cobra por unidades puede ser una elección de menú; «%(product)s» se vende por %(unit)s."
+
+#: services.py:78
+msgid "The new order has to list every one of them, once, and nothing else."
+msgstr "El orden nuevo tiene que nombrarlos a todos, una vez cada uno, y nada más."

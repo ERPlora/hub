@@ -1,0 +1,100 @@
+{
+  "cart_checkout": {
+    "tabs": {
+      "label": "Sections of Cart & Checkout",
+      "carts": "Carts",
+      "orders": "Orders"
+    },
+    "loading": "Loading…",
+    "noResults": "No results",
+    "noResultsMessage": "Nothing matches the search or the filters.",
+    "noPermission": "You do not have permission",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "cartStatus": {
+      "active": "Active",
+      "abandoned": "Abandoned",
+      "converted": "Converted",
+      "expired": "Expired"
+    },
+    "orderStatus": {
+      "initiated": "Initiated",
+      "paid": "Paid",
+      "failed": "Failed",
+      "completed": "Completed"
+    },
+    "carts": {
+      "title": "Carts",
+      "search": "Search session or email…",
+      "empty": "No carts.",
+      "loadError": "The carts could not be loaded.",
+      "new": "New cart",
+      "entity": {
+        "one": "cart",
+        "many": "carts"
+      },
+      "columns": {
+        "session": "Session",
+        "email": "Email",
+        "status": "Status",
+        "items": "Items",
+        "total": "Total"
+      },
+      "actions": {
+        "abandon": "Abandon",
+        "delete": "Delete"
+      },
+      "actionError": "Could not complete the action",
+      "deleteConfirm": {
+        "title": "Delete the cart {session}?",
+        "message": "It leaves the list. Its orders stay, and its session code can be used again.",
+        "confirm": "Delete",
+        "cancel": "Cancel"
+      },
+      "form": {
+        "title": "New cart",
+        "session": "Session",
+        "sessionPlaceholder": "sess_a1b2c3",
+        "email": "Email",
+        "emailPlaceholder": "customer{'@'}example.com",
+        "name": "Name",
+        "namePlaceholder": "John Doe",
+        "submit": "Save"
+      }
+    },
+    "orders": {
+      "title": "Orders",
+      "search": "Search order or email…",
+      "empty": "No orders.",
+      "emptyMessage": "Orders are started from a cart with the assistant or the API.",
+      "loadError": "The orders could not be loaded.",
+      "entity": {
+        "one": "order",
+        "many": "orders"
+      },
+      "columns": {
+        "order": "Order",
+        "email": "Email",
+        "status": "Status",
+        "payment": "Payment",
+        "total": "Total"
+      },
+      "actions": {
+        "markPaid": "Mark paid",
+        "complete": "Complete",
+        "fail": "Fail"
+      },
+      "actionError": "Could not complete the action",
+      "failureReason": "Reason: {reason}",
+      "failForm": {
+        "title": "Fail order — {number}",
+        "reason": "Reason",
+        "submit": "Fail order",
+        "keep": "Keep it"
+      }
+    }
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "pricing": {
+    "title": "Price Lists",
+    "yes": "Yes",
+    "no": "No",
+    "none": "—",
+    "deletedGroup": "Deleted group",
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "noResults": "No results",
+    "noResultsMessage": "Try another search or clear the filters.",
+    "noPermission": "You do not have permission",
+    "live": {
+      "reconnecting": "Reconnecting…",
+      "appInactive": "This app is not active in this business",
+      "retry": "Retry"
+    },
+    "money": {
+      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
+      "negative": "This amount cannot be negative.",
+      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
+    },
+    "state": { "active": "Active", "inactive": "Inactive" },
+    "status": { "active": "Active", "inactive": "Inactive", "all": "All" },
+    "taxBasis": { "business": "Business default", "included": "Tax included", "excluded": "Tax excluded" },
+    "validity": { "always": "Always", "from": "From {from}", "until": "Until {until}", "between": "{from} – {until}" },
+    "lists": {
+      "heading": "Price lists",
+      "search": "Search code or name…",
+      "empty": "No price lists.",
+      "new": "New price list",
+      "entity": { "one": "price list", "many": "price lists" },
+      "loadError": "The price lists could not be loaded.",
+      "rowError": "Could not run the action",
+      "default": "General",
+      "everybody": "Everybody",
+      "columns": {
+        "code": "Code",
+        "name": "Name",
+        "currency": "Currency",
+        "group": "Customer group",
+        "tax": "Tax",
+        "validity": "Validity",
+        "prices": "Prices",
+        "status": "Status"
+      },
+      "actions": {
+        "open": "Open",
+        "edit": "Edit",
+        "makeDefault": "Make general",
+        "deactivate": "Deactivate",
+        "activate": "Activate"
+      },
+      "defaultConfirm": {
+        "title": "Make {name} the general list?",
+        "message": "{name} becomes the general price list: it will apply to every customer, and the current one will stop being general.",
+        "confirm": "Make general"
+      },
+      "deactivateConfirm": {
+        "title": "Deactivate {name}?",
+        "message": "{name} will stop applying to new sales. Its prices are kept.",
+        "confirm": "Deactivate"
+      },
+      "form": {
+        "titleNew": "New price list",
+        "titleEdit": "Editing price list — {name}",
+        "code": "Code",
+        "name": "Name",
+        "currency": "Currency",
+        "tax": "Tax",
+        "group": "Customer group",
+        "noGroup": "No group",
+        "validFrom": "From",
+        "validUntil": "Until",
+        "isDefault": "General list",
+        "isDefaultHelper": "For every customer. A list with a customer group cannot be general.",
+        "create": "Create",
+        "save": "Save"
+      }
+    },
+    "detail": {
+      "back": "Price lists",
+      "backLabel": "Back",
+      "notFound": "This price list does not exist",
+      "summary": "About this price list",
+      "code": "Code",
+      "group": "Customer group",
+      "currency": "Currency",
+      "tax": "Tax",
+      "validity": "Validity",
+      "state": "Status"
+    },
+    "items": {
+      "heading": "Prices",
+      "search": "Search product or service…",
+      "empty": "This price list has no prices yet.",
+      "new": "New price",
+      "entity": { "one": "price", "many": "prices" },
+      "loadError": "The prices could not be loaded.",
+      "rowError": "Could not remove the price",
+      "kind": { "product": "Product", "service": "Service" },
+      "columns": {
+        "name": "Item",
+        "kind": "Type",
+        "sku": "SKU",
+        "minQuantity": "From",
+        "price": "Price",
+        "basePrice": "Catalog price"
+      },
+      "actions": { "edit": "Edit", "remove": "Remove" },
+      "removeConfirm": {
+        "title": "Remove the price of {name}?",
+        "message": "The price of {name} from {quantity} will be removed. It will be charged at another list's price or the catalog's.",
+        "confirm": "Remove price"
+      },
+      "form": {
+        "titleNew": "New price",
+        "titleEdit": "Editing price — {name}",
+        "kind": "Type",
+        "product": "Product",
+        "service": "Service",
+        "pickProduct": "Search by name or SKU",
+        "pickService": "Search by name",
+        "minQuantity": "From quantity",
+        "minQuantityHelper": "In the product's unit. Repeat the item with another quantity for volume prices.",
+        "price": "Price",
+        "add": "Add",
+        "save": "Save"
+      }
+    },
+    "rules": {
+      "heading": "Discount rules",
+      "search": "Search code or name…",
+      "empty": "No discount rules.",
+      "new": "New discount rule",
+      "entity": { "one": "rule", "many": "rules" },
+      "loadError": "The discount rules could not be loaded.",
+      "type": {
+        "percent": "Percentage",
+        "fixed": "Amount per unit",
+        "buy_x_get_y": "Buy X, get Y",
+        "tiered": "Tiered"
+      },
+      "scope": {
+        "all": "Everything",
+        "products": "All products",
+        "services": "All services",
+        "category": "A category",
+        "product": "A product",
+        "service": "A service"
+      },
+      "columns": {
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "value": "Value",
+        "appliesTo": "Applies to",
+        "validity": "Validity",
+        "priority": "Priority",
+        "status": "Status"
+      },
+      "value": {
+        "perUnit": "{amount} per unit",
+        "buyGet": "Buy {buy}, get {get}",
+        "tier": "{quantity}+: {percent}"
+      },
+      "targetDeleted": "{name} (deleted)",
+      "forGroup": "{target} · {group}",
+      "actions": { "edit": "Edit", "deactivate": "Deactivate", "activate": "Activate" },
+      "deactivateConfirm": {
+        "title": "Deactivate {name}?",
+        "message": "{name} will stop applying to new sales.",
+        "confirm": "Deactivate"
+      },
+      "form": {
+        "titleNew": "New discount rule",
+        "titleEdit": "Editing rule — {name}",
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "percent": "Percent (%)",
+        "amount": "Amount per unit",
+        "buy": "Buy",
+        "get": "Free",
+        "tiers": "Tiers",
+        "tierFrom": "From quantity",
+        "tierPercent": "Percent (%)",
+        "addTier": "Add tier",
+        "removeTier": "Remove tier",
+        "appliesTo": "Applies to",
+        "category": "Category",
+        "product": "Product",
+        "service": "Service",
+        "group": "Customer group",
+        "everybody": "Every customer",
+        "minQuantity": "Minimum quantity",
+        "unitsHelper": "Counted in the unit of each item's price: kg for one priced per kg.",
+        "validFrom": "From",
+        "validUntil": "Until",
+        "priority": "Priority",
+        "priorityHelper": "With equal discounts, the lower number wins.",
+        "create": "Create",
+        "save": "Save"
+      }
+    }
+  }
+}

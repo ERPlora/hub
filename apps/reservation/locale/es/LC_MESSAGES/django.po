@@ -1,0 +1,390 @@
+# Spanish translation of the reservation app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next reservation\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 08:16+0200\n"
+"PO-Revision-Date: 2026-10-15 08:16+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+msgid "Reservations"
+msgstr "Reservas"
+
+msgid "Your book of table reservations: slots, covers, the table held for each guest and a waitlist."
+msgstr "Tu libro de reservas de mesa: franjas, cubiertos, la mesa guardada para cada cliente y una lista de espera."
+
+msgid "Reservations is the book of your restaurant or bar. Decide when you take bookings and how many fit in each slot, block the days you do not, and note every reservation by phone or at the door, linked to the guest's customer card. Follow each one from pending to confirmed, seated and completed: a confirmed reservation holds its table on the floor plan from an hour before, and seating it opens the table's check. Who could not get a table waits on the waitlist, ready to become a reservation in one tap."
+msgstr "Reservas es el libro de tu restaurante o bar. Decide cuándo aceptas reservas y cuántas caben en cada franja, bloquea los días que no, y apunta cada reserva por teléfono o en la puerta, ligada a la ficha del cliente. Sigue cada una de pendiente a confirmada, sentada y completada: una reserva confirmada aparta su mesa en el plano desde una hora antes, y al sentarla se abre la cuenta de la mesa. Quien no consiguió mesa espera en la lista de espera, lista para convertirse en reserva con un toque."
+
+msgid "Waitlist"
+msgstr "Lista de espera"
+
+msgid "Availability"
+msgstr "Disponibilidad"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "created by"
+msgstr "creado por"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "minimum guests"
+msgstr "comensales mínimos"
+
+msgid "maximum guests"
+msgstr "comensales máximos"
+
+msgid "minimum notice (hours)"
+msgstr "antelación mínima (horas)"
+
+msgid "maximum days ahead"
+msgstr "días máximos de antelación"
+
+msgid "default duration (minutes)"
+msgstr "duración por defecto (minutos)"
+
+msgid "confirm new reservations automatically"
+msgstr "confirmar solas las reservas nuevas"
+
+msgid "phone required"
+msgstr "teléfono obligatorio"
+
+msgid "email required"
+msgstr "correo obligatorio"
+
+msgid "release an unconfirmed reservation after (minutes)"
+msgstr "liberar una reserva sin confirmar tras (minutos)"
+
+msgid "reservation settings"
+msgstr "ajustes de reservas"
+
+msgid "Reservation settings"
+msgstr "Ajustes de reservas"
+
+msgid "day of the week"
+msgstr "día de la semana"
+
+msgid "from"
+msgstr "desde"
+
+msgid "to"
+msgstr "hasta"
+
+msgid "maximum reservations"
+msgstr "máximo de reservas"
+
+msgctxt "reservation"
+msgid "deleted"
+msgstr "borrada"
+
+msgctxt "reservation"
+msgid "deleted at"
+msgstr "borrada el"
+
+msgid "time slot"
+msgstr "franja horaria"
+
+msgid "time slots"
+msgstr "franjas horarias"
+
+msgid "date"
+msgstr "fecha"
+
+msgid "reason"
+msgstr "motivo"
+
+msgid "whole day"
+msgstr "todo el día"
+
+msgid "until"
+msgstr "hasta"
+
+msgid "blocked date"
+msgstr "fecha bloqueada"
+
+msgid "blocked dates"
+msgstr "fechas bloqueadas"
+
+msgctxt "reservation status"
+msgid "Pending"
+msgstr "Pendiente"
+
+msgctxt "reservation status"
+msgid "Confirmed"
+msgstr "Confirmada"
+
+msgctxt "reservation status"
+msgid "Seated"
+msgstr "Sentada"
+
+msgctxt "reservation status"
+msgid "Completed"
+msgstr "Completada"
+
+msgctxt "reservation status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgctxt "reservation status"
+msgid "No-show"
+msgstr "No presentada"
+
+msgctxt "reservation source"
+msgid "Phone"
+msgstr "Teléfono"
+
+msgctxt "reservation source"
+msgid "In person"
+msgstr "En el local"
+
+msgctxt "reservation source"
+msgid "Waitlist"
+msgstr "Lista de espera"
+
+msgctxt "reservation source"
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+msgctxt "reservation source"
+msgid "Online"
+msgstr "Internet"
+
+msgid "customer"
+msgstr "cliente"
+
+msgid "guest's name"
+msgstr "nombre del cliente"
+
+msgid "guest's phone"
+msgstr "teléfono del cliente"
+
+msgid "guest's email"
+msgstr "correo del cliente"
+
+msgid "time"
+msgstr "hora"
+
+msgid "guests"
+msgstr "comensales"
+
+msgid "duration (minutes)"
+msgstr "duración (minutos)"
+
+msgid "table"
+msgstr "mesa"
+
+msgid "status"
+msgstr "estado"
+
+msgid "booked through"
+msgstr "origen"
+
+msgid "notes"
+msgstr "notas"
+
+msgid "internal notes"
+msgstr "notas internas"
+
+msgid "confirmed at"
+msgstr "confirmada el"
+
+msgid "seated at"
+msgstr "sentada el"
+
+msgid "completed at"
+msgstr "completada el"
+
+msgid "cancelled at"
+msgstr "cancelada el"
+
+msgid "marked no-show at"
+msgstr "marcada no presentada el"
+
+msgid "cancellation reason"
+msgstr "motivo de cancelación"
+
+msgid "table check"
+msgstr "cuenta de mesa"
+
+msgid "reservation"
+msgstr "reserva"
+
+msgid "reservations"
+msgstr "reservas"
+
+msgid "preferred time"
+msgstr "hora preferida"
+
+msgid "contacted"
+msgstr "contactado"
+
+msgid "contacted at"
+msgstr "contactado el"
+
+msgid "waitlist entry"
+msgstr "entrada de la lista de espera"
+
+msgid "waitlist"
+msgstr "lista de espera"
+
+msgid "That reservation does not exist in this business."
+msgstr "Esa reserva no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” has several reservations: %(matches)s. Say which day."
+msgstr "«%(said)s» tiene varias reservas: %(matches)s. Di qué día."
+
+msgid "That waitlist entry does not exist in this business."
+msgstr "Esa entrada de la lista de espera no existe en este negocio."
+
+#, python-format
+msgid "“%(said)s” is on the waitlist several times: %(matches)s. Say which day."
+msgstr "«%(said)s» está varias veces en la lista de espera: %(matches)s. Di qué día."
+
+msgid "Say who the reservation is for: a customer, or the guest's name."
+msgstr "Di para quién es la reserva: un cliente, o el nombre de quien reserva."
+
+msgid "Say which reservation: its id, or its guest's name or phone."
+msgstr "Di qué reserva: su id, o el nombre o el teléfono del cliente."
+
+msgid "Say which slot: its id, or its day of the week and start time."
+msgstr "Di qué franja: su id, o su día de la semana y su hora de inicio."
+
+msgid "Say which blocked date: its id, or its date."
+msgstr "Di qué fecha bloqueada: su id, o su fecha."
+
+msgid "Say which waitlist entry: its id, or its guest's name or phone."
+msgstr "Di qué entrada de la lista de espera: su id, o el nombre o el teléfono del cliente."
+
+msgid "A slot has to end after it starts."
+msgstr "La franja tiene que terminar después de empezar."
+
+msgid "Give the hours it blocks, or block the whole day."
+msgstr "Pon las horas que bloquea, o bloquea el día entero."
+
+msgid "The blocked hours have to end after they start."
+msgstr "Las horas bloqueadas tienen que terminar después de empezar."
+
+msgid "This business requires a phone number for every reservation."
+msgstr "Este negocio pide un teléfono en cada reserva."
+
+msgid "This business requires an email address for every reservation."
+msgstr "Este negocio pide un correo en cada reserva."
+
+#, python-format
+msgid "That party size is outside the limits of this business (%(min)s–%(max)s guests)."
+msgstr "Ese número de comensales está fuera de los límites del negocio (%(min)s–%(max)s comensales)."
+
+msgid "That time has already passed."
+msgstr "Esa hora ya ha pasado."
+
+#, python-format
+msgid "Reservations have to be made at least %(hours)s h in advance."
+msgstr "Hay que reservar con al menos %(hours)s h de antelación."
+
+#, python-format
+msgid "Reservations are taken up to %(days)s days ahead."
+msgstr "Solo se reserva hasta %(days)s días vista."
+
+msgid "That date is blocked (holiday or closure): no reservations are taken then."
+msgstr "Esa fecha está bloqueada (festivo o cierre): ese día no se aceptan reservas."
+
+msgid "The business is closed at that time."
+msgstr "A esa hora el negocio está cerrado."
+
+msgid "There is no service at that time: no time slot covers it."
+msgstr "No hay servicio a esa hora: ninguna franja la cubre."
+
+msgid "That time slot is fully booked for that date."
+msgstr "Esa franja ya está completa para ese día."
+
+#, python-format
+msgid "Table %(table)s cannot be booked: it is blocked or out of service."
+msgstr "La mesa %(table)s no se puede reservar: está bloqueada o fuera de servicio."
+
+#, python-format
+msgid "Table %(table)s already has a reservation from %(start)s to %(end)s."
+msgstr "La mesa %(table)s ya tiene una reserva de %(start)s a %(end)s."
+
+#, python-format
+msgid "This reservation is %(status)s: its status can no longer change."
+msgstr "Esta reserva está %(status)s: su estado ya no puede cambiar."
+
+#, python-format
+msgid "This reservation is %(status)s: it cannot be completed before it is seated."
+msgstr "Esta reserva está %(status)s: no se puede completar sin sentarla antes."
+
+#, python-format
+msgid "This reservation is %(status)s: it cannot be %(target)s."
+msgstr "Esta reserva está %(status)s: no se puede %(target)s."
+
+msgctxt "reservation step"
+msgid "confirmed"
+msgstr "confirmar"
+
+msgctxt "reservation step"
+msgid "seated"
+msgstr "sentar"
+
+msgctxt "reservation step"
+msgid "completed"
+msgstr "completar"
+
+msgctxt "reservation step"
+msgid "cancelled"
+msgstr "cancelar"
+
+msgctxt "reservation step"
+msgid "marked a no-show"
+msgstr "marcar como no presentada"
+
+msgid "This reservation can no longer change: only its notes."
+msgstr "Esta reserva ya no se puede cambiar: solo sus notas."
+
+msgid "This entry was already converted into a reservation."
+msgstr "Esta entrada ya se convirtió en reserva."
+
+#, python-format
+msgid "That slot overlaps another one of the same day (%(start)s–%(end)s)."
+msgstr "Esa franja se pisa con otra del mismo día (%(start)s–%(end)s)."
+
+msgid "That time slot does not exist in this business."
+msgstr "Esa franja horaria no existe en este negocio."
+
+msgid "That date is already blocked at that time."
+msgstr "Esa fecha ya está bloqueada a esa hora."
+
+msgid "That blocked date does not exist in this business."
+msgstr "Esa fecha bloqueada no existe en este negocio."
+
+msgid "That date is blocked at several times: say which one by its id."
+msgstr "Esa fecha está bloqueada a varias horas: di cuál por su id."
+
+msgid "The minimum guests cannot be more than the maximum."
+msgstr "Los comensales mínimos no pueden ser más que los máximos."
+
+#, python-format
+msgid "Table %(table)s is taken right now: free it, or move the reservation to another table before seating it."
+msgstr "La mesa %(table)s está ocupada ahora mismo: libérala, o pasa la reserva a otra mesa antes de sentarla."
+
+msgid "Tables is not available in this business: the reservation's table cannot be held or seated."
+msgstr "Mesas no está disponible en este negocio: la mesa de la reserva no se puede apartar ni sentar."
+
+msgid "Send overbook as true to book this full slot anyway."
+msgstr "Envía overbook como true para reservar igualmente esta franja llena."

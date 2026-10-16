@@ -1,0 +1,155 @@
+{
+  "combo": {
+    "title": "Menús",
+    "loading": "Cargando…",
+    "noResults": "Sin resultados",
+    "noResultsMessage": "Cambia la búsqueda o los filtros.",
+    "noPermission": "No tienes permiso",
+    "yes": "Sí",
+    "no": "No",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "supply": {
+      "service": "En el local",
+      "goods": "Para llevar"
+    },
+    "menus": {
+      "search": "Buscar un menú…",
+      "empty": "Aún no hay menús. Crea el primero con el botón +.",
+      "loadError": "No se han podido cargar los menús.",
+      "add": "Menú nuevo",
+      "entity": {
+        "one": "menú",
+        "many": "menús"
+      },
+      "columns": {
+        "name": "Nombre",
+        "price": "Precio cerrado",
+        "supply": "Cómo se vende",
+        "active": "A la venta",
+        "order": "Orden"
+      },
+      "actions": {
+        "edit": "Editar datos",
+        "delete": "Retirar"
+      },
+      "delete": {
+        "title": "¿Retirar este menú?",
+        "message": "«{name}» deja de estar a la venta, junto con sus platos y sus elecciones. Los tiques ya emitidos se siguen leyendo.",
+        "confirm": "Retirar"
+      }
+    },
+    "form": {
+      "titleNew": "Menú nuevo",
+      "titleEdit": "Menú · {name}",
+      "name": "Nombre",
+      "kitchenName": "Nombre de cocina",
+      "kitchenNameHelp": "Déjalo vacío y la comanda usa el nombre comercial.",
+      "price": "Precio cerrado",
+      "priceHelp": "Lo que paga el cliente por el menú entero, elija lo que elija.",
+      "supplyLabel": "¿Cómo se vende?",
+      "supplyService": "Se consume en el local (servicio de restauración)",
+      "supplyServiceHelp": "UNA línea al tipo del propio menú, bebida incluida. Es el menú del día español.",
+      "supplyGoods": "Se vende como producto / para llevar",
+      "supplyGoodsHelp": "El precio cerrado se REPARTE en UNA LÍNEA POR COMPONENTE, cada una a su tipo.",
+      "taxCategory": "Tipo de IVA",
+      "taxCategoryHelp": "El tipo al que se factura el menú entero.",
+      "taxCategoryPlaceholder": "Busca un tipo de IVA…",
+      "order": "Orden en la lista de menús",
+      "active": "A la venta",
+      "noName": "El menú necesita un nombre.",
+      "noTaxCategory": "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar."
+    },
+    "money": {
+      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "negative": "El precio de un menú no puede ser negativo. Para abaratar una opción, ponle un suplemento negativo.",
+      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
+    },
+    "builder": {
+      "back": "Todos los menús",
+      "serviceWarning": "Este menú se factura como un único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.",
+      "goodsWarning": "Este menú se factura como entrega de bienes: su precio se repartirá entre los componentes que añadas, una línea por cada uno.",
+      "notOnTill": "Todavía no sale en el TPV",
+      "onTill": "Sale en el TPV"
+    },
+    "courses": {
+      "title": "Platos",
+      "help": "Un plato es un paso de ESTE menú: Primero, Segundo, Postre, Bebida. Su orden es el orden en que se pregunta.",
+      "empty": "Aún no hay platos. Añade el primero: un menú sin platos no tiene nada que elegir.",
+      "loading": "Cargando los platos…",
+      "loadError": "No se han podido cargar los platos de este menú.",
+      "moveUp": "Subir",
+      "moveDown": "Bajar",
+      "drag": "Arrastra para reordenar",
+      "edit": "Editar datos",
+      "delete": "Retirar",
+      "deleteTitle": "¿Quitar este plato?",
+      "deleteMessage": "¿Quitar el plato «{name}» y sus elecciones?",
+      "deleteConfirm": "Quitar el plato"
+    },
+    "rule": {
+      "required": "Obligatorio · elige {min}",
+      "requiredRange": "Obligatorio · elige al menos {min}",
+      "optional": "Opcional",
+      "max": "hasta {max}",
+      "noCeiling": "sin límite",
+      "repeat": "se puede repetir",
+      "noRepeat": "sin repetir"
+    },
+    "courseForm": {
+      "titleNew": "Añadir un plato",
+      "titleEdit": "Plato · {name}",
+      "name": "Nombre del plato",
+      "min": "Elecciones mínimas",
+      "minHelp": "1 o más hace el plato obligatorio. 0 lo hace opcional. No hay ninguna casilla aparte.",
+      "max": "Elecciones máximas",
+      "maxHelp": "0 significa sin límite.",
+      "repeat": "Se puede elegir la misma opción más de una vez",
+      "noName": "El plato necesita un nombre.",
+      "ceiling": "El máximo ({max}) queda por debajo del mínimo ({min}): nadie podría satisfacer nunca este plato."
+    },
+    "choices": {
+      "title": "Elecciones",
+      "empty": "Aún no hay elecciones: nadie puede resolver este plato.",
+      "picker": "Producto del catálogo",
+      "pickerPlaceholder": "Busca un producto…",
+      "delta": "Suplemento",
+      "deltaHelp": "Lo que la sustitución suma al precio CERRADO. Puede ser negativo.",
+      "add": "Añadir elección",
+      "edit": "Editar esta elección",
+      "delete": "Quitar esta elección",
+      "editing": "Editando «{article}». Conserva su posición en el plato.",
+      "markSoldOut": "Agotado",
+      "markAvailable": "Disponible",
+      "noProduct": "Elige antes un producto del catálogo.",
+      "duplicate": "Este plato ya ofrece ese producto. Para que se pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez».",
+      "deleteTitle": "¿Quitar esta elección?",
+      "deleteMessage": "¿Quitar «{name}» del plato «{course}»?",
+      "deleteConfirm": "Quitar la elección",
+      "status": {
+        "sold_out": "Agotado",
+        "product_inactive": "Desactivado en Inventario",
+        "product_deleted": "Ya no está en el catálogo",
+        "not_by_unit": "No se vende por unidades en Inventario",
+        "untaxed": "Sin tipo de IVA para llevar"
+      }
+    },
+    "bulk": {
+      "open": "Añadir varios",
+      "title": "Añadir productos a este plato",
+      "search": "Busca un producto…",
+      "addCount": "Añadir {n} seleccionados",
+      "already": "Ya está en este plato",
+      "none": "Marca al menos un producto.",
+      "empty": "Aún no hay productos en el catálogo.",
+      "loadError": "No se ha podido cargar el catálogo de productos.",
+      "loading": "Cargando…",
+      "retry": "Reintentar"
+    }
+  }
+}

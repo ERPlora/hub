@@ -1,0 +1,195 @@
+# Spanish translation of the task app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next task\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 01:00+0200\n"
+"PO-Revision-Date: 2026-10-15 01:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgid "Tasks"
+msgstr "Tareas"
+
+msgid "Your team's to-do list: tasks with who does them, priority and due date, projects and comments."
+msgstr "La lista de cosas por hacer de tu equipo: tareas con responsable, prioridad, fecha límite, proyectos y comentarios."
+
+msgid "Tasks is the to-do list of your team: each task has a title, a priority, a due date and the person who takes care of it, and can be grouped in projects, split into subtasks and discussed in a comment thread. Everyone sees the tasks they have to do, overdue ones stand out in red, and managers see and assign the whole team's work."
+msgstr "Tareas es la lista de cosas por hacer de tu equipo: cada tarea tiene un título, una prioridad, una fecha límite y la persona que se encarga de ella, y se puede agrupar en proyectos, partir en subtareas y comentar en un hilo. Cada uno ve las tareas que tiene que hacer, las vencidas salen en rojo y los responsables ven y reparten el trabajo de todo el equipo."
+
+msgid "Projects"
+msgstr "Proyectos"
+
+msgid "code"
+msgstr "código"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "colour"
+msgstr "color"
+
+msgid "active"
+msgstr "activo"
+
+msgid "owner"
+msgstr "dueño"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgid "project"
+msgstr "proyecto"
+
+msgid "projects"
+msgstr "proyectos"
+
+msgctxt "task status"
+msgid "To Do"
+msgstr "Por hacer"
+
+msgctxt "task status"
+msgid "In Progress"
+msgstr "En curso"
+
+msgctxt "task status"
+msgid "Blocked"
+msgstr "Bloqueada"
+
+msgctxt "task status"
+msgid "Done"
+msgstr "Hecha"
+
+msgctxt "task status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgctxt "task priority"
+msgid "Low"
+msgstr "Baja"
+
+msgctxt "task priority"
+msgid "Medium"
+msgstr "Media"
+
+msgctxt "task priority"
+msgid "High"
+msgstr "Alta"
+
+msgctxt "task priority"
+msgid "Urgent"
+msgstr "Urgente"
+
+msgid "number"
+msgstr "número"
+
+msgid "title"
+msgstr "título"
+
+msgid "description"
+msgstr "descripción"
+
+msgid "parent task"
+msgstr "tarea madre"
+
+msgid "status"
+msgstr "estado"
+
+msgid "priority"
+msgstr "prioridad"
+
+msgid "assigned to"
+msgstr "asignada a"
+
+msgid "created by"
+msgstr "creada por"
+
+msgid "due date"
+msgstr "vence"
+
+msgid "completed at"
+msgstr "completada el"
+
+msgid "tags"
+msgstr "etiquetas"
+
+msgid "task"
+msgstr "tarea"
+
+msgid "tasks"
+msgstr "tareas"
+
+msgid "author"
+msgstr "autor"
+
+msgid "comment"
+msgstr "comentario"
+
+msgid "comments"
+msgstr "comentarios"
+
+msgid "day"
+msgstr "día"
+
+msgid "last number"
+msgstr "último número"
+
+msgid "task counter"
+msgstr "contador de tareas"
+
+msgid "task counters"
+msgstr "contadores de tareas"
+
+msgid "That task does not exist in this business."
+msgstr "Esa tarea no existe en este negocio."
+
+msgid "That project does not exist in this business."
+msgstr "Ese proyecto no existe en este negocio."
+
+#, python-format
+msgid "There are several tasks called “%(text)s”: %(matches)s. Say which one."
+msgstr "Hay varias tareas que se llaman «%(text)s»: %(matches)s. Di cuál."
+
+#, python-format
+msgid "There are several projects called “%(text)s”: %(matches)s. Say which one."
+msgstr "Hay varios proyectos que se llaman «%(text)s»: %(matches)s. Di cuál."
+
+msgid "Say which task: its id, its number or its title."
+msgstr "Di qué tarea: su id, su número o su título."
+
+msgid "Say which project: its id, its code or its name."
+msgstr "Di qué proyecto: su id, su código o su nombre."
+
+msgid "Choose one person: an id, a name or yourself."
+msgstr "Elige una sola persona: un id, un nombre o tú."
+
+msgid "Choose a date between 1900 and 2200."
+msgstr "Elige una fecha entre 1900 y 2200."
+
+msgid "A task takes at most 20 tags."
+msgstr "Una tarea admite como mucho 20 etiquetas."
+
+msgid "That task is already closed, so it was left as it was."
+msgstr "Esa tarea ya está cerrada, así que se ha dejado como estaba."
+
+msgid "That person is not active in the team."
+msgstr "Esa persona no está activa en el equipo."
+
+msgid "You have no staff record: you cannot be assigned tasks."
+msgstr "No tienes ficha en Personal: no se te puede asignar."
+
+msgid "There is already a project with that code."
+msgstr "Ya hay un proyecto con ese código."
+
+msgid "You can only change your own tasks."
+msgstr "Solo puedes cambiar tus propias tareas."

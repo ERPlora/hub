@@ -1,0 +1,137 @@
+{
+  "online_booking": {
+    "title": "Reservas online",
+    "tabs": {
+      "label": "Secciones de Reservas online",
+      "bookings": "Reservas",
+      "settings": "Ajustes"
+    },
+    "live": {
+      "reconnecting": "Reconectando…",
+      "appInactive": "Esta app no está activa en este negocio",
+      "retry": "Reintentar"
+    },
+    "noPermission": "No tienes permiso",
+    "bookings": {
+      "entity": {
+        "one": "reserva",
+        "many": "reservas"
+      },
+      "search": "Buscar nº, cliente, teléfono, servicio…",
+      "loadError": "No se pudieron cargar las reservas",
+      "empty": "Aún no hay reservas online.",
+      "noMatch": "Ninguna reserva coincide con la búsqueda.",
+      "columns": {
+        "number": "Nº",
+        "customer": "Cliente",
+        "service": "Servicio",
+        "staff": "Profesional",
+        "date": "Fecha",
+        "time": "Hora",
+        "status": "Estado",
+        "bookedAt": "Reservada"
+      },
+      "status": {
+        "pending": "Pendiente",
+        "confirmed": "Confirmada",
+        "in_progress": "En curso",
+        "completed": "Completada",
+        "cancelled": "Cancelada",
+        "no_show": "No-show"
+      },
+      "unassigned": "Sin asignar",
+      "erasedCustomer": "Cliente borrado",
+      "actions": {
+        "confirm": "Confirmar",
+        "complete": "Completar",
+        "no_show": "No-show",
+        "cancel": "Cancelar",
+        "delete": "Borrar"
+      },
+      "actionError": "No se pudo actualizar la reserva",
+      "cancel": {
+        "title": "Cancelar la reserva",
+        "message": "¿Cancelar la reserva de {customer} ({when})?",
+        "reason": "Motivo (opcional)",
+        "confirm": "Cancelar la reserva",
+        "keep": "Mantenerla"
+      },
+      "delete": {
+        "title": "Borrar la reserva",
+        "message": "¿Borrar la reserva {number}? Es mejor cancelarla, que conserva su historial.",
+        "confirm": "Borrar",
+        "keep": "Mantenerla"
+      }
+    },
+    "settings": {
+      "title": "Configuración de la página de reservas",
+      "loading": "Cargando la configuración…",
+      "loadError": "Error cargando la configuración",
+      "save": "Guardar",
+      "saved": "Configuración guardada.",
+      "saveError": "No se pudo guardar",
+      "sections": {
+        "page": "Página pública",
+        "rules": "Reglas de reserva",
+        "rulesHelp": "Son las reglas de Citas, compartidas con WhatsApp.",
+        "services": "Servicios reservables online",
+        "servicesHelp": "Cada interruptor se guarda al momento, en Servicios."
+      },
+      "fields": {
+        "is_enabled": "Página pública activada",
+        "page_title": "Título de la página",
+        "welcome_message": "Mensaje de bienvenida",
+        "primary_color": "Color primario",
+        "logo_url": "URL del logo",
+        "require_email": "Email obligatorio",
+        "max_upcoming_per_customer": "Reservas próximas por móvil",
+        "allow_staff_selection": "Permitir elegir profesional",
+        "allow_notes": "Permitir notas",
+        "confirmation_message": "Mensaje de confirmación",
+        "cancellation_policy": "Política de cancelación",
+        "min_booking_notice": "Antelación mínima para reservar (minutos)",
+        "max_advance_booking": "Reservar como máximo con esta antelación (días)",
+        "max_advance_booking_help": "0 = sin límite",
+        "slot_interval": "Intervalo entre huecos (minutos)",
+        "auto_confirm_online": "Confirmar automáticamente las reservas de la clienta",
+        "allow_customer_cancellation": "Permitir que la clienta cancele su cita",
+        "cancellation_notice_hours": "Antelación mínima para cancelar (horas)"
+      },
+      "services": {
+        "search": "Buscar servicio…",
+        "empty": "Todavía no hay servicios. Dalos de alta en Servicios.",
+        "notBookable": "No se puede reservar en la agenda",
+        "loadError": "No se pudieron cargar los servicios",
+        "saveError": "No se pudo cambiar el servicio",
+        "more": "Se ven {shown} de {total}: busca para encontrar los demás."
+      }
+    },
+    "preview": {
+      "title": "Vista previa de la página de reservas",
+      "intro": "El recorrido de reserva de la clienta, con las mismas operaciones que usará la página pública. Solo en desarrollo.",
+      "loading": "Cargando la página…",
+      "loadError": "No se pudo cargar la página",
+      "services": "Servicios",
+      "professional": "Profesional",
+      "anyone": "Sin preferencia",
+      "day": "Día",
+      "times": "Horas libres",
+      "loadingTimes": "Cargando horas libres…",
+      "noTimes": "No quedan horas libres ese día.",
+      "name": "Nombre",
+      "phone": "Móvil",
+      "email": "Email",
+      "notes": "Nota para el negocio",
+      "book": "Reservar",
+      "booked": "Reserva {number}",
+      "link": "Enlace personal",
+      "view": "Ver mi reserva",
+      "cancel": "Cancelar la reserva",
+      "cancelUntil": "Puedes cancelarla hasta el {when}.",
+      "noCancel": "Ya no se puede cancelar online.",
+      "again": "Reservar otra",
+      "policy": "Política de cancelación",
+      "minutes": "{n} min"
+    }
+  }
+}

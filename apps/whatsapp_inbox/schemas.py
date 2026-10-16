@@ -1,0 +1,717 @@
+"""Input and output schemas of the WhatsApp inbox's operations (OpenAPI, live params, 422 per field).
+
+Every field has a description: these schemas are also the JSON Schema of the assistant's tools and the
+contract of erplora.com's doors (WORKBOOK «Contrato con el SaaS»). A conversation can be named by its
+``id`` or, when the id is not known (by voice, by text), by its number or by the customer's name
+(``conversation``); a person of the team by their id or their name, username or email.
+"""
+
+import re
+from datetime import datetime
+from urllib.parse import urlsplit
+from typing import Annotated, Any, Generic, Literal, TypeVar
+from uuid import UUID
+
+from django.conf import settings
+from django.utils.translation import gettext_lazy as _
+from ninja import Field, Schema
+from pydantic import StringConstraints, ValidationInfo, field_validator
+
+T = TypeVar("T")
+
+WHICH_CONVERSATION = _(
+    "Say which conversation: its id, its number or the customer's name."
+)
+TEXT_OR_TEMPLATE = _("Write a message or choose a template.")
+ONE_ASSIGNEE = _("Choose one person, yourself («me») or nobody.")
+ONE_CUSTOMER = _("Choose a customer card, create one or unlink it.")
+UNKNOWN_ASSIGNED = _("Choose «me», «none» or a person's id.")
+NOT_ERPLORA = _("An attachment must come from erplora.com over https.")
+
+#: An international number as WhatsApp gives it (``34600111222``) or E.164 (``+34600111222``).
+INTERNATIONAL = r"^\+?[1-9]\d{6,14}$"
+#: E.164 or nothing (the business's own number before it is connected).
+E164_OR_EMPTY = r"^(\+[1-9]\d{6,14})?$"
+
+
+def _text(max_length: int, min_length: int = 0) -> Any:
+    return Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True, min_length=min_length, max_length=max_length
+        ),
+    ]
+
+
+def _blank(value: object) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+Reference = _text(200)
+ConversationStatus = Literal["open", "pending", "closed"]
+TemplateCategory = Literal["UTILITY", "MARKETING", "AUTHENTICATION"]
+TemplateStatus = Literal[
+    "APPROVED", "PENDING", "REJECTED", "PAUSED", "DISABLED", "DELETED"
+]
+SortDir = Literal["asc", "desc"]
+
+CONVERSATION_REFERENCE = (
+    "The conversation's number (any format: +34 600 111 222, 600111222) or the name of the customer or "
+    "of their WhatsApp profile, when the id is not known."
+)
+
+
+# ── Pages: every list is paginated, limit ≤ 100 ─────────────────────────────────────────────────
+
+
+class PageIn(Schema):
+    limit: int = Field(
+        50, ge=1, le=100, description="How many rows to return, at most 100."
+    )
+    offset: int = Field(
+        0, ge=0, description="How many rows to skip, to read the next pages."
+    )
+
+
+class Page(Schema, Generic[T]):
+    rows: list[T] = Field(description="The rows of this page.")
+    total: int = Field(description="How many rows match, across every page.")
+    limit: int = Field(description="The page size asked for.")
+    offset: int = Field(description="The rows skipped.")
+
+
+# ── References ──────────────────────────────────────────────────────────────────────────────────
+
+
+class ConversationRefIn(Schema):
+    """A conversation by its ``id`` or by its number or customer's name (``conversation``); the id wins."""
+
+    id: UUID | None = Field(None, description="The conversation's id.")
+    conversation: Reference | None = Field(
+        None, validate_default=True, description=CONVERSATION_REFERENCE
+    )
+
+    @field_validator("conversation")
+    @classmethod
+    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("id") is None and _blank(value):
+            raise ValueError(WHICH_CONVERSATION)
+        return value
+
+
+class ConversationPageIn(ConversationRefIn, PageIn):
+    pass
+
+
+# ── Conversations ───────────────────────────────────────────────────────────────────────────────
+
+
+class ConversationListIn(PageIn):
+    search: _text(120) | None = Field(
+        None,
+        description="Part of the contact's or customer's name, or of the number written in any format "
+        "(600 111, +34 600 111 222, 0034600111222).",
+    )
+    status: ConversationStatus | None = Field(
+        None, description="Only open, pending or closed conversations."
+    )
+    assigned: _text(40) | None = Field(
+        None,
+        description="«me» (assigned to the caller), «none» (nobody) or a person's id.",
+    )
+    unread: bool | None = Field(
+        None, description="True: only those with unread messages."
+    )
+    customer_id: UUID | None = Field(
+        None, description="Only the conversations of this customer card."
+    )
+    sort: Literal[
+        "last_message_at", "contact", "phone", "status", "unread_count", "assigned_to"
+    ] = Field(
+        "last_message_at",
+        description="Column to sort by; the latest activity by default.",
+    )
+    dir: SortDir = Field("desc", description="Sort direction.")
+
+    @field_validator("assigned")
+    @classmethod
+    def _assigned(cls, value: str | None) -> str | None:
+        if value is None or value in ("me", "none") or re.fullmatch(r"\d{1,18}", value):
+            return value
+        raise ValueError(UNKNOWN_ASSIGNED)
+
+
+class ConversationOut(Schema):
+    id: UUID = Field(description="The conversation's id.")
+    phone: str = Field(
+        description="The customer's number, international format (empty once erased)."
+    )
+    contact_name: str = Field(
+        description="The name of the customer's WhatsApp profile."
+    )
+    display_name: str = Field(
+        description="What the inbox calls it: the card's name, the profile's or the number."
+    )
+    customer_id: UUID | None = Field(description="The customer card it is joined to.")
+    customer_name: str = Field(description="That card's name.")
+    assigned_to_id: int | None = Field(description="The person it is assigned to.")
+    assigned_to_name: str = Field(description="That person's name.")
+    status: ConversationStatus = Field(
+        description="open, pending (waiting for the customer) or closed."
+    )
+    unread_count: int = Field(
+        description="Messages from the customer nobody has read yet."
+    )
+    last_message_at: datetime | None = Field(
+        description="When the last message was said."
+    )
+    last_message_preview: str = Field(description="The start of the last message.")
+    last_message_direction: str = Field(
+        description="inbound (customer) or outbound (business)."
+    )
+    last_message_kind: str = Field(description="Meta's type of the last message (text, image, location…).")
+    last_inbound_at: datetime | None = Field(
+        description="The customer's last message: the 24-hour window runs from it."
+    )
+    created_at: datetime = Field(description="When the customer first wrote.")
+
+
+class ConversationPage(Page[ConversationOut]):
+    pass
+
+
+class ConversationDetailOut(ConversationOut):
+    window_open: bool = Field(
+        description="Whether free text may be sent now (24 hours from the customer's last message)."
+    )
+    window_expires_at: datetime | None = Field(
+        description="When the 24-hour window closes."
+    )
+    can_send: bool = Field(
+        description="Whether the business can send now (number connected, allowance left)."
+    )
+    send_blocked: Literal["not_connected", "cap_reached", "unconfigured"] | None = (
+        Field(description="Why nothing can be sent now, if so.")
+    )
+
+
+class ByPhoneIn(Schema):
+    phone: _text(32, 1) = Field(
+        description="The exact number, international format (+34600111222)."
+    )
+
+
+class ByPhoneOut(Schema):
+    phone_is_international: bool = Field(
+        description="Whether the number was in international format."
+    )
+    phone: str = Field(
+        description="The number as compared (E.164), empty when it was not one."
+    )
+    conversation_id: UUID | None = Field(
+        description="Its live conversation in this business, if any."
+    )
+
+
+class SummaryIn(Schema):
+    pass
+
+
+class SummaryOut(Schema):
+    open: int = Field(description="Open conversations.")
+    unread_conversations: int = Field(description="Conversations with unread messages.")
+    awaiting_reply: int = Field(
+        description="Open conversations whose last message is the customer's."
+    )
+    cap_reached: bool = Field(
+        description="Whether this month's messages of the plan are spent."
+    )
+
+
+class AssignIn(ConversationRefIn):
+    assignee_id: int | None = Field(
+        None, description="The id of the person to assign it to."
+    )
+    unassign: bool = Field(False, description="True: assign it to nobody.")
+    assignee: Reference | None = Field(
+        None,
+        validate_default=True,
+        description="The person's name, username or email, or «me» for the caller, when the id is not known.",
+    )
+    only_if_unassigned: bool = Field(
+        False,
+        description="True («Assign to me»): refuse instead of taking it from somebody else.",
+    )
+
+    @field_validator("assignee")
+    @classmethod
+    def _one(cls, value: str | None, info: ValidationInfo) -> str | None:
+        given = [
+            info.data.get("assignee_id") is not None,
+            bool(info.data.get("unassign")),
+            not _blank(value),
+        ]
+        if sum(given) != 1:
+            raise ValueError(ONE_ASSIGNEE)
+        return value
+
+
+class SetStatusIn(ConversationRefIn):
+    status: ConversationStatus = Field(
+        description="open, pending (waiting for the customer) or closed (done)."
+    )
+
+
+class LinkCustomerIn(ConversationRefIn):
+    customer_id: UUID | None = Field(
+        None, description="The id of the customer card to join it to."
+    )
+    create: bool = Field(
+        False,
+        description="True: create a card with the WhatsApp name and number, and join it.",
+    )
+    unlink: bool = Field(False, description="True: take the card off the conversation.")
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description="The card's exact name, phone or email, when its id is not known.",
+    )
+
+    @field_validator("customer")
+    @classmethod
+    def _one(cls, value: str | None, info: ValidationInfo) -> str | None:
+        given = [
+            info.data.get("customer_id") is not None,
+            bool(info.data.get("create")),
+            bool(info.data.get("unlink")),
+            not _blank(value),
+        ]
+        if sum(given) != 1:
+            raise ValueError(ONE_CUSTOMER)
+        return value
+
+
+class ErasedOut(Schema):
+    id: UUID = Field(description="The erased conversation.")
+
+
+# ── Messages ────────────────────────────────────────────────────────────────────────────────────
+
+
+class MessageListIn(ConversationPageIn):
+    pass
+
+
+class MessageOut(Schema):
+    id: UUID = Field(description="The message's id.")
+    conversation_id: UUID = Field(description="Its conversation.")
+    direction: Literal["inbound", "outbound"] = Field(
+        description="inbound (customer) or outbound (business)."
+    )
+    origin: Literal["customer", "phone_app", "hub"] = Field(
+        description="customer, phone_app (the owner's WhatsApp Business app) or hub (sent from here)."
+    )
+    source: Literal["live", "history"] = Field(
+        description="live, or history brought by connecting the number."
+    )
+    kind: str = Field(
+        description="Meta's type: text, image, audio, video, document, sticker, location, template…"
+    )
+    body: str = Field(description="The text.")
+    media_url: str = Field(description="The attachment, at erplora.com.")
+    media_mime_type: str = Field(description="The attachment's type.")
+    media_filename: str = Field(description="The attachment's file name.")
+    media_caption: str = Field(description="The attachment's caption.")
+    template_name: str = Field(description="The template used, for a template message.")
+    status: Literal["received", "queued", "sending", "sent", "delivered", "read", "failed"] = Field(
+        description="Where it is."
+    )
+    error_code: str = Field(description="Meta's error code when it was not delivered.")
+    error_message: str = Field(description="Meta's reason when it was not delivered.")
+    wa_message_id: str | None = Field(description="WhatsApp's id of the message; none while it has not left.")
+    reply_to: str = Field(description="WhatsApp's id of the message it answers.")
+    sent_by_name: str = Field(description="Who sent it from the Hub.")
+    sent_at: datetime = Field(description="When it was said.")
+    status_at: datetime | None = Field(description="When its status last changed.")
+
+
+class MessagePage(Page[MessageOut]):
+    pass
+
+
+class TemplateSendIn(Schema):
+    name: _text(512, 1) = Field(
+        description="The template's name, as Meta has it (recordatorio_cita)."
+    )
+    language: _text(15) | None = Field(
+        None, description="Its language (es, en); needed when it exists in several."
+    )
+    variables: list[_text(1024)] = Field(
+        default_factory=list,
+        max_length=20,
+        description="The values of {{1}}, {{2}}… in order.",
+    )
+
+
+class SendIn(Schema):
+    id: UUID | None = Field(None, description="The conversation's id.")
+    to: _text(32) | None = Field(
+        None,
+        description="A number to write to (a template to somebody who has not written yet).",
+    )
+    conversation: Reference | None = Field(
+        None, validate_default=True, description=CONVERSATION_REFERENCE
+    )
+    template: TemplateSendIn | None = Field(
+        None,
+        description="An approved template; the only way to write after the 24-hour window.",
+    )
+    text: _text(4096) | None = Field(
+        None,
+        validate_default=True,
+        description="The message, within 24 hours of the customer's last message.",
+    )
+    client_message_id: UUID = Field(
+        description="A key of the caller's own for THIS message (a new UUID per message, the same on a retry): "
+        "sending again with it never sends twice."
+    )
+
+    @field_validator("conversation")
+    @classmethod
+    def _target(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if (
+            info.data.get("id") is None
+            and _blank(info.data.get("to"))
+            and _blank(value)
+        ):
+            raise ValueError(WHICH_CONVERSATION)
+        return value
+
+    @field_validator("text")
+    @classmethod
+    def _one(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if _blank(value) == (info.data.get("template") is None):
+            raise ValueError(TEXT_OR_TEMPLATE)
+        return value or None
+
+
+def _from_erplora(url: str) -> str:
+    """An attachment's URL is erplora.com's own, over https (the local SaaS's origin in development)."""
+    saas = urlsplit(str(getattr(settings, "SAAS_URL", "") or ""))
+    given = urlsplit(url)
+    secure = given.scheme == "https" or (settings.DEBUG and given.scheme == saas.scheme)
+    if not secure or not saas.netloc or (given.scheme, given.netloc) != (saas.scheme, saas.netloc):
+        raise ValueError(NOT_ERPLORA)
+    return url
+
+
+class ReceiveMediaIn(Schema):
+    url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000, pattern=r"^https?://\S+$")] = Field(
+        description="Where erplora.com serves the attachment: its own origin, over https."
+    )
+    mime_type: _text(120) = Field("", description="Its MIME type.")
+    filename: _text(255) = Field("", description="Its file name (documents).")
+    caption: _text(4096) = Field(
+        "", description="The caption the customer wrote with it."
+    )
+
+    @field_validator("url")
+    @classmethod
+    def _erplora(cls, value: str) -> str:
+        return _from_erplora(value)
+
+
+class ReceiveIn(Schema):
+    wa_message_id: _text(255, 1) = Field(
+        description="WhatsApp's id of the message (wamid…)."
+    )
+    from_: Annotated[str, StringConstraints(strip_whitespace=True, pattern=INTERNATIONAL)] = Field(
+        alias="from", description="The customer's international number as WhatsApp gives it (34600111222), with or without +."
+    )
+    contact_name: _text(200) = Field(
+        "", description="The name of the customer's WhatsApp profile."
+    )
+    direction: Literal["inbound", "outbound"] = Field(
+        "inbound",
+        description="inbound (the customer) or outbound (the owner's reply from the phone app).",
+    )
+    source: Literal["live", "history"] = Field(
+        "live", description="live, or history brought by connecting the number."
+    )
+    type: _text(32) = Field("text", description="Meta's message type.")
+    text: _text(65536) = Field(
+        "", description="The text, or the caption lifted out of Meta's object."
+    )
+    media: ReceiveMediaIn | None = Field(
+        None, description="The attachment, kept by erplora.com."
+    )
+    reply_to: _text(255) = Field(
+        "", description="WhatsApp's id of the message this one answers."
+    )
+    sent_at: datetime | None = Field(
+        None, description="When it was said (Meta's time); now when missing."
+    )
+    payload: dict = Field(
+        default_factory=dict, description="Meta's own message object, verbatim."
+    )
+
+
+class ReceiveOut(Schema):
+    id: UUID = Field(description="The message's id.")
+    conversation_id: UUID = Field(description="Its conversation.")
+    created: bool = Field(
+        description="False when this message was already here (a repeated delivery)."
+    )
+
+
+class StatusErrorIn(Schema):
+    code: _text(64) = Field("", description="Meta's error code (131047…).")
+    message: _text(500) = Field("", description="Meta's reason.")
+
+
+class StatusIn(Schema):
+    wa_message_id: _text(255, 1) = Field(
+        description="WhatsApp's id of a message the Hub sent."
+    )
+    client_message_id: UUID | None = Field(
+        None, description="The Hub's key of the message (the Idempotency-Key it was sent with): matches a status that arrives before erplora.com's answer."
+    )
+    status: Literal["sent", "delivered", "read", "failed"] = Field(
+        description="What Meta reported."
+    )
+    error: StatusErrorIn | None = Field(
+        None, description="Why it was not delivered, for failed."
+    )
+    status_at: datetime | None = Field(None, description="When Meta reported it.")
+
+
+class StatusOut(Schema):
+    updated: bool = Field(
+        description="Whether the message changed (an unknown id or an older status changes nothing)."
+    )
+    status: str | None = Field(description="The message's status now.")
+
+
+class MessageRefIn(Schema):
+    id: UUID = Field(description="The message's id.")
+
+
+class ClaimDeliveryOut(Schema):
+    claimed: bool = Field(description="Whether this delivery may go now (queued or sending, nobody else on it).")
+    to: str = Field("", description="The number it goes to.")
+    text: str | None = Field(None, description="The text, for a text message.")
+    template: dict | None = Field(None, description="name, language and variables, for a template.")
+    client_message_id: UUID | None = Field(None, description="Its Idempotency-Key.")
+
+
+class RecordDeliveryIn(Schema):
+    id: UUID = Field(description="The message handed to erplora.com.")
+    kind: Literal["sent", "refused", "unreachable", "unknown"] = Field(description="How erplora.com answered.")
+    wa_message_id: str = Field("", description="Meta's id, when it was sent.")
+    code: str = Field("", description="erplora.com's code, when it refused.")
+    message: str = Field("", description="erplora.com's reason, or what went wrong.")
+
+
+class RecordOut(Schema):
+    status: str | None = Field(description="The status now.")
+
+
+class ClaimErasureOut(Schema):
+    claimed: bool = Field(description="Whether erplora.com still has to forget it (and nobody else is asking).")
+    phone: str = Field("", description="The number erplora.com has to forget.")
+    wa_message_ids: list[str] = Field(default_factory=list, description="The WhatsApp ids of its messages.")
+
+
+class RecordErasureIn(Schema):
+    id: UUID = Field(description="The erased conversation.")
+    confirmed: bool = Field(description="Whether erplora.com confirmed it forgot the number.")
+
+
+class ResumeIn(Schema):
+    pass
+
+
+class ResumeOut(Schema):
+    messages: int = Field(description="Messages handed to erplora.com again.")
+    erasures: int = Field(description="Erasures asked to erplora.com again.")
+
+
+# ── Notes ───────────────────────────────────────────────────────────────────────────────────────
+
+
+class NoteListIn(ConversationPageIn):
+    pass
+
+
+class NoteAddIn(ConversationRefIn):
+    text: _text(5000, 1) = Field(description="The note; the customer never sees it.")
+
+
+class NoteRefIn(Schema):
+    id: UUID = Field(description="The note's id.")
+
+
+class NoteOut(Schema):
+    id: UUID = Field(description="The note's id.")
+    conversation_id: UUID = Field(description="Its conversation.")
+    text: str = Field(description="The note.")
+    author_id: int | None = Field(description="Who wrote it.")
+    author_name: str = Field(description="Their name when they wrote it.")
+    created_at: datetime = Field(description="When.")
+    can_delete: bool = Field(description="Whether the caller may delete it.")
+
+
+class NotePage(Page[NoteOut]):
+    pass
+
+
+class NoteDeletedOut(Schema):
+    id: UUID = Field(description="The deleted note.")
+
+
+# ── Templates and channel ───────────────────────────────────────────────────────────────────────
+
+
+class TemplateListIn(PageIn):
+    search: _text(120) | None = Field(None, description="Part of the template's name.")
+    status: TemplateStatus | None = Field(
+        None, description="Only templates in this state at Meta (APPROVED to send)."
+    )
+    category: TemplateCategory | None = Field(
+        None, description="Only UTILITY, MARKETING or AUTHENTICATION templates."
+    )
+    language: _text(15) | None = Field(
+        None, description="Only templates in this language."
+    )
+
+
+class TemplateOut(Schema):
+    id: UUID = Field(description="The template's id in the Hub.")
+    name: str = Field(description="Its name at Meta.")
+    language: str = Field(description="Its language.")
+    category: TemplateCategory = Field(
+        description="UTILITY, MARKETING or AUTHENTICATION."
+    )
+    status: TemplateStatus = Field(description="What Meta says of it.")
+    header: str = Field(description="Its header text.")
+    body: str = Field(description="Its text, with {{1}}… where the variables go.")
+    footer: str = Field(description="Its footer.")
+    variables: int = Field(description="How many variables it takes.")
+    rejected_reason: str = Field(description="Meta's reason when it rejected it.")
+    synced_at: datetime | None = Field(description="When erplora.com last reported it.")
+
+
+class TemplatePage(Page[TemplateOut]):
+    pass
+
+
+class SyncTemplateIn(Schema):
+    name: _text(512, 1) = Field(description="The template's name at Meta.")
+    language: _text(15, 1) = Field(description="Its language code.")
+    category: TemplateCategory = Field(
+        "UTILITY", description="UTILITY, MARKETING or AUTHENTICATION."
+    )
+    status: TemplateStatus = Field("APPROVED", description="Meta's verdict.")
+    header: _text(200) = Field("", description="Its header text.")
+    body: _text(4096) = Field("", description="Its body with {{n}} placeholders.")
+    footer: _text(200) = Field("", description="Its footer.")
+    variables: int = Field(
+        0, ge=0, le=100, description="How many variables the body takes."
+    )
+    rejected_reason: _text(500) = Field(
+        "", description="Meta's reason for a rejection."
+    )
+    meta_id: _text(64) = Field("", description="Meta's id of the template.")
+
+
+class ChannelSyncIn(Schema):
+    version: int = Field(
+        ge=0,
+        description="erplora.com's version of this state; an older one is ignored.",
+    )
+    status: Literal["not_connected", "connected", "reconnect_needed"] = Field(
+        description="The number's state."
+    )
+    phone_number: Annotated[str, StringConstraints(strip_whitespace=True, pattern=E164_OR_EMPTY)] = Field(
+        "", description="The business's number, E.164 (+34910000000), empty while not connected."
+    )
+    display_name: _text(200) = Field("", description="The name WhatsApp shows for it.")
+    monthly_limit: int = Field(
+        0, ge=0, description="Messages the plan includes each month; 0 = no cap."
+    )
+    monthly_usage: int = Field(
+        0, ge=0, description="Messages sent this month, as erplora.com counts them."
+    )
+    usage_month: Annotated[
+        str, StringConstraints(pattern=r"^(\d{4}-(0[1-9]|1[0-2]))?$")
+    ] = Field("", description="The month that figure counts, YYYY-MM.")
+    templates: list[SyncTemplateIn] | None = Field(
+        None,
+        max_length=1000,
+        description="Every template of the account; null leaves them as they are.",
+    )
+
+
+class ChannelSyncOut(Schema):
+    applied: bool = Field(
+        description="False when an equal or newer version was already here."
+    )
+    version: int = Field(description="The version the Hub holds now.")
+
+
+class ChannelGetIn(Schema):
+    pass
+
+
+class ChannelOut(Schema):
+    status: Literal["not_connected", "connected", "reconnect_needed"] = Field(
+        description="The number's state."
+    )
+    phone_number: str = Field(description="The business's number.")
+    display_name: str = Field(description="The name WhatsApp shows for it.")
+    monthly_limit: int = Field(
+        description="Messages the plan includes each month; 0 = no cap."
+    )
+    monthly_usage: int = Field(
+        description="Messages sent this month (0 when erplora.com has not counted this month yet)."
+    )
+    cap_reached: bool = Field(description="Whether this month's messages are spent.")
+    synced_at: datetime | None = Field(description="When erplora.com last reported.")
+    manage_url: str = Field(
+        description="Where the number is connected and managed: erplora.com."
+    )
+
+
+# ── People of the team ──────────────────────────────────────────────────────────────────────────
+
+
+class AgentListIn(PageIn):
+    search: _text(120) | None = Field(
+        None, description="Part of the person's name, username or email."
+    )
+
+
+class AgentOut(Schema):
+    id: int = Field(description="The person's id.")
+    name: str = Field(description="Their name.")
+    role: str = Field(description="Their role in the business.")
+
+
+class AgentPage(Page[AgentOut]):
+    pass
+
+
+# ── Reactions to Customers ──────────────────────────────────────────────────────────────────────
+
+
+class CustomerEventIn(Schema):
+    id: UUID = Field(description="The customer card the event is about.")
+
+
+class MergedEventIn(Schema):
+    id: UUID = Field(description="The card that stays.")
+    absorbed_id: UUID = Field(description="The duplicate merged into it.")
+
+
+class ReactionOut(Schema):
+    count: int = Field(description="How many conversations changed.")

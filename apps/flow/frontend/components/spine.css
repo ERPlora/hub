@@ -1,0 +1,160 @@
+/* The column of an automation (the old module's `erp-flows-editor` spine): one card per step on a line
+   with a dot, the trigger's dot in the primary colour; a condition is a dashed chip that narrows the
+   line and a wait is a label on it, never a diamond nor a box. Shared by TriggerCard and StepNode. */
+.flow-node {
+  position: relative;
+  padding-left: 1.6rem;
+}
+.flow-node::before {
+  content: '';
+  position: absolute;
+  left: 0.42rem;
+  top: 0;
+  bottom: -0.1rem;
+  width: 2px;
+  background: var(--ep-border-soft, rgba(0, 0, 0, 0.12));
+}
+.flow-node::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.95rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--ep-border, #d7d5cc);
+  box-shadow: 0 0 0 3px var(--ion-background-color, #fff);
+}
+.flow-node--trigger::after {
+  background: var(--ion-color-primary);
+}
+.flow-card {
+  background: var(--ep-surface, var(--ion-card-background, #fff));
+  border: 1px solid var(--ep-border, var(--ion-border-color, #d7d5cc));
+  border-radius: 14px;
+  margin: 0.35rem 0;
+  overflow: hidden;
+}
+.flow-card--gap {
+  border-color: var(--ion-color-danger);
+}
+.flow-card__row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.flow-card__open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.flow-card__eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ep-muted, var(--ion-color-medium));
+}
+.flow-card__title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.flow-card__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.7rem;
+  border-top: 1px solid var(--ep-border-soft, rgba(0, 0, 0, 0.08));
+  background: var(--ep-surface-muted, rgba(0, 0, 0, 0.02));
+}
+.flow-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.flow-card__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.flow-card__hint {
+  font-size: 0.78rem;
+  color: var(--ep-muted, var(--ion-color-medium));
+}
+.flow-card__error {
+  font-size: 0.82rem;
+  color: var(--ion-color-danger);
+}
+.flow-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.flow-icon-btn:hover {
+  background: var(--ep-hover, rgba(0, 0, 0, 0.06));
+}
+.flow-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  min-height: 2.6rem;
+  color: var(--ep-muted, var(--ion-color-medium));
+  cursor: grab;
+}
+/* A guard is a chip that narrows the spine. */
+.flow-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  width: calc(100% - 1.5rem);
+  margin: 0.15rem 0 0.15rem 0.75rem;
+  box-sizing: border-box;
+  background: var(--ep-surface-2, rgba(0, 0, 0, 0.04));
+  border: 1px dashed var(--ep-border, #d7d5cc);
+  border-radius: 999px;
+}
+.flow-chip .flow-card__open {
+  min-height: 2.4rem;
+  padding: 0.3rem 0.4rem;
+}
+/* A wait is a label on the line. */
+.flow-segment {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--ep-muted, var(--ion-color-medium));
+  font-size: 0.88rem;
+  font-style: italic;
+}
+.flow-segment .flow-card__open {
+  min-height: 2.4rem;
+  padding: 0.2rem 0.3rem;
+}
+.flow-detached-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.7rem;
+  margin: 0.3rem 0;
+  border: 1px solid var(--ep-border, #d7d5cc);
+  border-radius: 10px;
+  background: var(--ep-surface, #fff);
+}
