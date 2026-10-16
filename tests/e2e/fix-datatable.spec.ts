@@ -5,7 +5,9 @@
 // and only the page scrolls, #218);
 // the demo's funnel (`filterable`) counts the filters in use; its panel pushes the list into two columns
 // from 834 px and is a sheet strictly between the header and that bottom edge (outfitkit#75/#197).
-import { type BrowserContext, type Page, expect, test } from '@playwright/test';
+// flow: ui:DataTable — FIX-UI-DATATABLE-CLIP: nothing of the table is cut off — a date range fits its
+// 360px panel (both ends whole, outline included) and a card title wraps instead of ending in «…».
+import { type BrowserContext, type Locator, type Page, expect, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, searchList, spanishMobile } from './customer-helpers';
 import { A, api, createItem, listReady, login, shot, shown } from './helpers';
@@ -167,4 +169,102 @@ test('FIX-DATATABLE-HUB: a list with section tabs (Customers) fills down to its 
     console.log(JSON.stringify(results));
     cleanUp();
   }
+});
+
+/** How far a date range in the open filter panel reaches past the panel's content box, in px (0 = it
+ *  fits): every box of both ends counts, the outline of «To» included; and whether the panel's body
+ *  scrolls sideways. */
+async function rangeOverflow(panel: Locator, ends: [string, string]) {
+  return panel.evaluate((el, testIds) => {
+    const body = el.querySelector('.data-table__drawer-body') as HTMLElement;
+    const r = body.getBoundingClientRect();
+    const style = getComputedStyle(body);
+    const left = r.left + parseFloat(style.paddingLeft);
+    const right = r.right - parseFloat(style.paddingRight);
+    let past = 0;
+    for (const id of testIds) {
+      const end = el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+      for (const box of [end, ...end.querySelectorAll<HTMLElement>('*')]) {
+        const b = box.getBoundingClientRect();
+        if (!b.width) continue;
+        past = Math.max(past, b.right - right, left - b.left);
+      }
+    }
+    return { past: Math.round(past * 10) / 10, scrollsSideways: body.scrollWidth > body.clientWidth };
+  }, ends);
+}
+
+const RANGE_PAGES = [
+  { path: '/staff/members', table: 'staff-members', ends: ['hire_date_from', 'hire_date_to'] as [string, string] },
+  { path: '/schedule/special-days', table: 'schedule-special-days', ends: ['date_from', 'date_to'] as [string, string] },
+];
+
+test('FIX-UI-DATATABLE-CLIP: a date range fits the 360px filter panel at 1440 and 834 (Staff «Hire date», Special days «Date»)', async ({ page }) => {
+  test.setTimeout(180_000);
+  await login(page, A, RANGE_PAGES[0].path);
+  const results: Record<string, unknown> = {};
+  for (const vp of VIEWPORTS.filter((v) => v.width >= 834)) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    for (const target of RANGE_PAGES) {
+      await page.goto(`${A}${target.path}`);
+      const view = shown(page);
+      await view.locator(`[data-testid=${target.table}-row], [data-testid=${target.table}-empty]`).first().waitFor({ state: 'visible' });
+      await view.locator(`[data-testid=${target.table}-filters-toggle]`).click();
+      const panel = view.locator(`[data-testid=${target.table}-filters-panel]`);
+      await expect(panel).toBeVisible();
+      const ends = target.ends.map((name) => `${target.table}-filter-${name}`) as [string, string];
+      for (const id of ends) await expect(panel.locator(`[data-testid=${id}] input[type=date]`)).toBeVisible();
+      await page.waitForTimeout(400);
+      const measured = await rangeOverflow(panel, ends);
+      results[`${target.table}-${vp.label}`] = measured;
+      if (target.table === 'staff-members') await page.screenshot({ path: shot(`FIX-UI-DATATABLE-CLIP-drawer-${vp.label}`) });
+      expect(measured.past, `${target.path} at ${vp.label}: the range reaches past the panel`).toBeLessThanOrEqual(0.5);
+      expect(measured.scrollsSideways, `${target.path} at ${vp.label}: the panel scrolls sideways`).toBe(false);
+      await panel.locator(`[data-testid=${target.table}-filters-close]`).click();
+      await expect(panel).toBeHidden();
+    }
+  }
+  console.log(JSON.stringify(results));
+});
+
+/** Card titles on screen that cut their text (a «…» on one line, or more lines than their box shows). */
+async function cutTitles(page: Page) {
+  return shown(page)
+    .locator('.data-table__card-title')
+    .evaluateAll((titles) =>
+      titles
+        .filter((t) => t.getClientRects().length > 0)
+        .map((t) => ({ text: (t.textContent ?? '').trim(), sw: t.scrollWidth, cw: t.clientWidth, sh: t.scrollHeight, ch: t.clientHeight }))
+        .filter((t) => t.sw > t.cw || t.sh > t.ch),
+    );
+}
+
+const CARD_VIEWPORTS = [
+  { label: '375', width: 375, height: 667 },
+  { label: '820', width: 820, height: 1180 },
+];
+
+test('FIX-UI-DATATABLE-CLIP: card titles wrap whole at 375 and 820, never «…» on one line (Taxes → Categories, Rules)', async ({ page }) => {
+  test.setTimeout(180_000);
+  await login(page, A, '/tax/categories');
+  const results: Record<string, unknown> = {};
+  for (const vp of CARD_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    for (const [path, table] of [['/tax/categories', 'tax-categories'], ['/tax/rules', 'tax-rules']]) {
+      await page.goto(`${A}${path}`);
+      const view = shown(page);
+      await view.locator('.data-table__cards, .data-table__row--data').first().waitFor({ state: 'visible' });
+      // A tablet may show the list: the person picks «View as cards» (the cards are what a tablet clipped).
+      if (!(await view.locator('.data-table__cards').isVisible())) await view.locator(`[data-testid=${table}-view-cards]`).click();
+      const cards = view.locator('.data-table__cards');
+      await expect(cards).toBeVisible();
+      await expect(cards.locator('.data-table__card-title').first()).toBeVisible();
+      await page.waitForTimeout(400);
+      const cut = await cutTitles(page);
+      results[`${path}-${vp.label}`] = { titles: await cards.locator('.data-table__card-title').count(), cut };
+      if (path === '/tax/categories') await page.screenshot({ path: shot(`FIX-UI-DATATABLE-CLIP-cards-${vp.label}`) });
+      expect(cut, `${path} at ${vp.label}: card titles cut`).toEqual([]);
+    }
+  }
+  console.log(JSON.stringify(results));
 });
