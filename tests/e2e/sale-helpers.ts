@@ -106,15 +106,17 @@ export function cleanDocumentsOf(orders: string): void {
 
 /** Deletes the sales and checks a run made (their lines name an `E2E-` product, an `e2e ` department or
  *  the check's title is `e2e …`), the fiscal documents Invoicing issued for them in the same charge, void
- *  or refund (with Invoicing's own cleanup, which gives the series' numbers back), and the `e2e `
- *  departments and quick notes. Run it BEFORE the customer and inventory cleanups: a sale keeps its
- *  customer's card. */
+ *  or refund (with Invoicing's own cleanup, which gives the series' numbers back), the cash drawer's
+ *  movements of those sales (a sale charged in cash while a session was open, from any spec: the movement
+ *  keeps its sale and payment), and the `e2e ` departments and quick notes. Run it BEFORE the customer and
+ *  inventory cleanups: a sale keeps its customer's card. */
 export function cleanSales(): void {
   cleanDocumentsOf(E2E_ORDERS);
   psql(
     [
       `create temp table e2e_orders as ${E2E_ORDERS}`,
       'create temp table e2e_sales as select id from sale_sale where order_id in (select id from e2e_orders)',
+      'delete from cash_register_movement where sale_id in (select id from e2e_sales) or sale_payment_id in (select id from sale_salepayment where sale_id in (select id from e2e_sales)) or refund_payment_id in (select id from sale_refundpayment where refund_id in (select id from sale_refund where sale_id in (select id from e2e_sales)))',
       'delete from sale_refundline where refund_id in (select id from sale_refund where sale_id in (select id from e2e_sales))',
       'delete from sale_refundpayment where refund_id in (select id from sale_refund where sale_id in (select id from e2e_sales))',
       'delete from sale_refund where sale_id in (select id from e2e_sales)',
