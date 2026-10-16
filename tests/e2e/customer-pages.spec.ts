@@ -2,7 +2,8 @@
 // Groups, Tags and Fields move between them (the address follows, Back leaves the section); a row
 // opens the card and its Back returns; every page at 390×844 (phone), 834×1194 (tablet) and
 // 1440×900 (desktop) without horizontal scroll, with a screenshot of each for the comparison with the
-// product's screens. On the phone the list shows cards; there is no side menu at any width.
+// product's screens. On the phone the list shows cards; there is no side menu at any width. The list
+// filters behind the table's funnel, with its count, at every width.
 import { expect, type Page, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile } from './customer-helpers';
@@ -13,6 +14,14 @@ test.afterAll(() => cleanUp());
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1194 },
+  { label: '1440', width: 1440, height: 900 },
+];
+
+/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
+ *  (two columns), as the SaaS panel's `VIEWPORTS`. */
+const FILTER_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
 
@@ -91,4 +100,40 @@ test('every page at 390 / 834 / 1440 without horizontal scroll; the phone shows 
     }
   }
   record('customer-viewports', results);
+});
+
+// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+test('FIX-DATATABLE-HUB-FILTERS-1: Customers filter by Stage behind the funnel, with its count, the panel open at every width', async ({ page, context }) => {
+  await login(page, A, '/customer/customers');
+  const stamp = `FIL${Date.now().toString(36)}`;
+  const vip = await createCard(context, { name: e2eName(`${stamp} vip`), phone: spanishMobile(), lifecycle_stage: 'vip' });
+  const lead = await createCard(context, { name: e2eName(`${stamp} lead`), phone: spanishMobile() });
+  for (const vp of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto('/customer/customers');
+    await customersReady(page);
+    await searchList(page, 'customer-list', stamp);
+    await expect(rowNamed(page, 'customer-list', lead.name)).toBeVisible();
+    const panel = shown(page).locator('[data-testid=customer-list-filters-panel]');
+    const toggle = shown(page).locator('[data-testid=customer-list-filters-toggle]');
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await panel.locator('[data-testid=customer-list-filter-lifecycle_stage]').click();
+    const popover = page.locator('ion-popover.select-popover');
+    await popover.locator('ion-radio').filter({ hasText: /^\s*VIP\s*$/ }).click();
+    await expect(popover).toHaveCount(0);
+    await panel.locator('[data-testid=customer-list-filters-apply]').click();
+    await expect(panel).toBeHidden();
+    await expect(shown(page).locator('[data-testid=customer-list-filters-count]')).toHaveText('1');
+    await expect(rowNamed(page, 'customer-list', vip.name)).toBeVisible();
+    await expect(rowNamed(page, 'customer-list', lead.name)).toHaveCount(0);
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-1-customer-${vp.label}`) });
+    await panel.locator('[data-testid=customer-list-filters-clear]').click();
+    await expect(shown(page).locator('[data-testid=customer-list-filters-count]')).toHaveCount(0);
+    await panel.locator('[data-testid=customer-list-filters-close]').click();
+    await expect(panel).toBeHidden();
+  }
 });

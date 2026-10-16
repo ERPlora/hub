@@ -2,7 +2,7 @@
 // hub `a` adds a closed special day, sees the same date refused (409 under the form), corrects it into an
 // open day with hours, and deletes it after confirming; then adds an override, sees a second one over the
 // same dates refused, and deletes it. «is it open?» answers from what the screen saved. Screenshots in the
-// three viewports. Everything it creates is named «E2E …» on dates of 2099 and removed after the file.
+// three viewports. Each list filters behind its own funnel, named after the list, with its count. Everything it creates is named «E2E …» on dates of 2099 and removed after the file.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
@@ -26,6 +26,14 @@ test.afterAll(cleanup);
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1194 },
+  { label: '1440', width: 1440, height: 900 },
+];
+
+/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
+ *  (two columns), as the SaaS panel's `VIEWPORTS`. */
+const FILTER_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
 
@@ -142,5 +150,46 @@ test('Special days in the three viewports: no horizontal scroll; cards on a phon
     await listsReady(page);
     await noHorizontalScroll(page, vp.label);
     await page.screenshot({ path: shot(`schedule-special-days-${vp.label}`), fullPage: true });
+  }
+});
+
+// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+test('FIX-DATATABLE-HUB-FILTERS-1: Special days filter by Name behind their own funnel, with its count, the panel open at every width', async ({ page, context }) => {
+  const stamp = Date.now().toString(36);
+  const kept = `${TAG} Fil${stamp} One`;
+  const other = `${TAG} Fil${stamp} Two`;
+  await login(page, A, '/schedule/special-days');
+  for (const [date, name] of [['2099-11-02', kept], ['2099-11-03', other]]) {
+    const res = await api(context, A, 'POST', '/schedule/special_days', { date, name });
+    expect(res.status, JSON.stringify(res.data)).toBe(201);
+  }
+  const days = (name: string) => shown(page).locator('[data-testid=schedule-special-days-row]', { hasText: name });
+  for (const vp of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/schedule/special-days`);
+    await listsReady(page);
+    await expect(days(other)).toBeVisible();
+    // Two lists, two funnels: each is named after its own list (schedules#58).
+    await expect(shown(page).getByRole('button', { name: /^(Special day filters|Filtros de días especiales)$/ })).toHaveCount(1);
+    await expect(shown(page).getByRole('button', { name: /^(Override filters|Filtros de cambios temporales)$/ })).toHaveCount(1);
+    const panel = shown(page).locator('[data-testid=schedule-special-days-filters-panel]');
+    const toggle = shown(page).locator('[data-testid=schedule-special-days-filters-toggle]');
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await panel.locator('[data-testid=schedule-special-days-filter-name] input').fill(kept);
+    await panel.locator('[data-testid=schedule-special-days-filters-apply]').click();
+    await expect(panel).toBeHidden();
+    await expect(shown(page).locator('[data-testid=schedule-special-days-filters-count]')).toHaveText('1');
+    await expect(shown(page).getByRole('button', { name: /^(Special day filters|Filtros de días especiales) \(1 (active|activo)\)$/ })).toHaveCount(1);
+    await expect(days(kept)).toBeVisible();
+    await expect(days(other)).toHaveCount(0);
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-1-schedule-${vp.label}`) });
+    await panel.locator('[data-testid=schedule-special-days-filters-clear]').click();
+    await expect(shown(page).locator('[data-testid=schedule-special-days-filters-count]')).toHaveCount(0);
+    await panel.locator('[data-testid=schedule-special-days-filters-close]').click();
+    await expect(panel).toBeHidden();
   }
 });
