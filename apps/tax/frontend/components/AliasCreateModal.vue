@@ -1,16 +1,15 @@
 <script setup lang="ts">
 // TAX-F14 (teach a category alias by hand): the Alias (an outside text the inventory importer will
-// meet), the Category searched on the server among all the business's and the Origin («Learned» to
+// meet), the Category in a Combo searching the server among all the business's and the Origin («Learned» to
 // begin with), in a dialog (the old table's create panel). The server keeps the alias lowercase with
 // single spaces and refuses a repeated one under Alias; the dialog closes when it is saved.
-import { FormModal } from '@erplora/ui/components';
-import { useCommand, useLive } from '@erplora/ui/sdk';
+import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { categoryOptionLabel } from '../lib/rules';
+import { categoryCombo } from '../lib/pickers';
 import type { AliasSource } from '../operations';
-import SearchSelect from './SearchSelect.vue';
 
 const open = defineModel<boolean>('open', { default: false });
 
@@ -21,16 +20,8 @@ const form = ref(blank());
 const { run, error, pending } = useCommand('tax.alias.create');
 
 /** The category picker searches the server: all the business's categories, not a first page. */
-const categoryQuery = ref('');
-const categories = useLive('tax.category.list', () => ({
-  search: categoryQuery.value || undefined,
-  sort: 'display_name' as const,
-  dir: 'asc' as const,
-  limit: 50,
-}));
-const categoryOptions = computed(() =>
-  (categories.data.value?.rows ?? []).map((category) => ({ value: category.key, label: categoryOptionLabel(category) })),
-);
+const category = ref<ComboOption | null>(null);
+const searchCategories = categoryCombo(useLiveClient());
 
 const complete = computed(() => form.value.alias.trim() !== '' && form.value.category !== '');
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
@@ -39,22 +30,29 @@ function set<K extends keyof ReturnType<typeof blank>>(field: K, value: unknown)
   form.value = { ...form.value, [field]: value == null ? '' : String(value) };
 }
 
+function chooseCategory(option: ComboOption | null): void {
+  category.value = option;
+  set('category', option?.id);
+}
+
+function reset(): void {
+  form.value = blank();
+  category.value = null;
+  error.value = null;
+}
+
 async function save(): Promise<void> {
   try {
     await run({ alias: form.value.alias.trim(), tax_category_key: form.value.category, source: form.value.source });
   } catch {
     return; // `error` holds it and the dialog paints it.
   }
-  form.value = blank();
-  categoryQuery.value = '';
-  error.value = null;
+  reset();
   open.value = false;
 }
 
 function cancel(): void {
-  form.value = blank();
-  categoryQuery.value = '';
-  error.value = null;
+  reset();
 }
 </script>
 
@@ -85,16 +83,14 @@ function cancel(): void {
           :class="invalid(fieldErrors.alias)"
           @ion-input="set('alias', $event.detail.value)"
         />
-        <SearchSelect
-          v-model:query="categoryQuery"
+        <Combo
           testid="tax-alias-form-category"
-          :model-value="form.category"
-          :options="categoryOptions"
-          :loading="categories.status.value === 'loading' && !categoryOptions.length"
+          :model-value="category"
+          :search="searchCategories"
           :label="$t('tax.aliases.columns.category')"
           :placeholder="$t('tax.aliases.form.categoryPlaceholder')"
           :error-text="fieldErrors.tax_category_key"
-          @update:model-value="set('category', $event)"
+          @update:model-value="chooseCategory"
         />
         <ion-select
           data-testid="tax-alias-form-source"

@@ -742,7 +742,22 @@ def test_what_counts_as_configured(no_seed):
     # Exempt and IGIC rules count: a physiotherapist or a Canary business is configured.
     rule(category("service.health"), "0", operation_class="exempt")
     rule(category("product.y"), "7", region="ES-CN", tax_type="igic")
-    assert status(country_code="ES").matching_rules == 3
+    spain = status(country_code="ES")
+    assert (spain.matching_rules, spain.configured) == (3, True)
+    # A country without a rule in force is not configured: the till could not price a sale there.
+    portugal = status(country_code="PT")
+    assert (portugal.matching_rules, portugal.configured) == (0, False)
+    # Without the business's country, any country's rule counts.
+    anywhere = status()
+    assert (anywhere.matching_rules, anywhere.configured) == (3, True)
+
+
+def test_nothing_in_force_is_not_configured(no_seed):
+    # TAX-F17: no rule at all, or only ones not in force today, is «missing your taxes».
+    assert (status().matching_rules, status().configured) == (0, False)
+    rule(category(), "21", is_active=False)
+    rule(category("product.x"), "21", valid_from=timezone.localdate() + timedelta(days=1))
+    assert (status().matching_rules, status().configured) == (0, False)
 
 
 # tax.alias.list (TAX-F13)
@@ -966,3 +981,22 @@ def test_the_countries_of_the_business_rules_once_each_sorted(no_seed):
 def test_the_seeded_business_sells_in_spain():
     assert run("tax.rule.countries", RuleCountriesIn(), role="hub_employee").countries == ["ES"]
 
+
+
+def test_only_tax_resolves_a_rule():
+    # hub#295: the rule of a line was resolved in three places and one charged what another declared.
+    # Sales and Invoicing call resolve_tax / calculate_tax; no other app looks rules up by itself (a
+    # frozen rule read back by its id is not a lookup).
+    import re
+    from pathlib import Path
+
+    apps_dir = Path(__file__).resolve().parents[2]
+    lookup = re.compile(r"TaxRule\.objects\.(?!in_bulk\b)\w+")
+    offenders = [
+        f"{path.relative_to(apps_dir)}:{number}"
+        for path in sorted(apps_dir.glob("*/**/*.py"))
+        if path.parts[len(apps_dir.parts)] != "tax" and "tests" not in path.parts
+        for number, line in enumerate(path.read_text().splitlines(), 1)
+        if lookup.search(line)
+    ]
+    assert offenders == []

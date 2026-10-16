@@ -314,3 +314,37 @@ def test_a_calculation_without_a_rule_is_a_409(admin_client):
         409,
         "tax.no_rate",
     )
+
+
+@pytest.mark.django_db
+def test_rules_that_cannot_be_read_are_an_internal_error_never_a_missing_app(
+    admin_client,
+):
+    # hub#1102, hub#2410: an outage reading the rules stops the calculation with the plain «Internal
+    # error» of every route (in the reader's language), never «this app is not active» nor the
+    # internal text of the failure, and never a guessed rate.
+    from django.db import connection
+    from django.utils import translation
+    from django.utils.translation import gettext
+
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE tax_taxrule RENAME TO tax_taxrule_hidden")
+    try:
+        response = admin_client.get(
+            "/api/tax/rates/calculate",
+            {
+                "amount": 100,
+                "tax_category_key": "product.generic",
+                "allow_missing_rate": "true",
+            },
+            HTTP_HOST="a.localhost",
+            HTTP_ACCEPT_LANGUAGE="es",
+        )
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE tax_taxrule_hidden RENAME TO tax_taxrule")
+    error = response.json()["error"]
+    assert (response.status_code, error["code"]) == (500, "internal_error")
+    assert "tax_taxrule" not in error["message"]
+    with translation.override("es"):
+        assert error["message"] == gettext("Internal error")

@@ -9,6 +9,7 @@ import { computed, ref, watch } from 'vue';
 
 import CategoryCreateModal from '../components/CategoryCreateModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import SetupNotice from '../components/SetupNotice.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -108,6 +109,7 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
       :error="error"
       :read-only="!canManage"
     />
+    <SetupNotice v-if="canManage" />
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
@@ -158,7 +160,7 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
       <template #empty>
         <EmptyState
           data-testid="tax-categories-empty"
-          icon="file-tray-outline"
+          icon="pricetags-outline"
           :heading="table.filtered.value ? $t('tax.noResults') : $t('tax.categories.empty')"
           :message="table.filtered.value ? $t('tax.noResultsMessage') : undefined"
         />

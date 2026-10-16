@@ -153,6 +153,11 @@
         "aliasPlaceholder": "food",
         "categoryPlaceholder": "Choose a category"
       }
+    },
+    "setup": {
+      "heading": "Your taxes",
+      "message": "Set up the VAT rates of the country you sell in so the till can price a sale.",
+      "action": "Set up"
     }
   }
 }

@@ -10,6 +10,7 @@ import { computed, ref, watch } from 'vue';
 
 import AliasCreateModal from '../components/AliasCreateModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import SetupNotice from '../components/SetupNotice.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
@@ -82,6 +83,7 @@ const cardTitle = (row: AliasOut): string => row.alias;
       :error="error"
       :read-only="!canManage"
     />
+    <SetupNotice v-if="canManage" />
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
@@ -117,7 +119,7 @@ const cardTitle = (row: AliasOut): string => row.alias;
       <template #empty>
         <EmptyState
           data-testid="tax-aliases-empty"
-          icon="swap-vertical-outline"
+          icon="swap-horizontal-outline"
           :heading="table.filtered.value ? $t('tax.noResults') : $t('tax.aliases.empty')"
           :message="table.filtered.value ? $t('tax.noResultsMessage') : undefined"
         />

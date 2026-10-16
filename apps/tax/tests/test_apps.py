@@ -60,17 +60,17 @@ def test_roles():
 
 
 def test_navigation_is_the_three_tabs_with_iconify_icons():
-    # The icons are the frontend tabbar's (apps/tax/frontend/tabs.ts), all registered in the shell:
-    # an unregistered one paints nothing (and HubIcon throws in development). The old `pricetags`
-    # and `swap-horizontal-outline` wait in apps/tax/UI-REQUESTS.md.
+    # The icons are the frontend tabbar's (apps/tax/frontend/tabs.ts) and the old menu's
+    # (`pricetags`, `receipt`, `swap-horizontal`), all registered in the shell: an unregistered one
+    # paints nothing (and HubIcon throws in development).
     entries = tax().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [
         (entry.id, str(entry.label), entry.path, entry.icon) for entry in entries
     ] == [
-        ("categories", "Categories", "/tax/categories", "ion:list-outline"),
+        ("categories", "Categories", "/tax/categories", "ion:pricetags-outline"),
         ("rules", "Rules", "/tax/rules", "ion:receipt-outline"),
-        ("aliases", "Aliases", "/tax/aliases", "ion:swap-vertical-outline"),
+        ("aliases", "Aliases", "/tax/aliases", "ion:swap-horizontal-outline"),
     ]
 
 

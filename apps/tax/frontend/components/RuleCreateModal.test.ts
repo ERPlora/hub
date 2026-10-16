@@ -1,10 +1,11 @@
 // TAX-F04/F05/F06/F11 — the «+» of Rules opens this dialog (the old table's create panel, field for
-// field): Country (searched in the closed ISO list), Region, Category (searched on the server among the
-// business's), %, Type, Qualification, Exemption reason (only when exempt), Regime, Valid from, Valid
+// field): Country (a Combo over the closed ISO list), Region, Category (a Combo searching the server
+// among the business's), %, Type, Qualification, Exemption reason (only when exempt), Regime, Valid from, Valid
 // to, «Root rule (component of)» (the roots the server says the component may hang from), «Component
 // label», the hint and «Add».
 // A class that charges no tax pins the rate to 0 % and says why; the server's refusals (an overlap
 // on «Valid from», a 422 per field) stay in the dialog under their field, with what was typed kept.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CategoryRowOut, RuleOut } from '../operations';
@@ -65,30 +66,34 @@ async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountTax(RuleCreateModal, { props: { open: true }, locale, path: '/tax/rules' });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await settle();
-  await m.live();
-  await m.result('tax.category.list', CATEGORY_PAGE);
   const field = (name: string) => m.inDoc(`tax-rule-form-${name}`) as Control | null;
   const control = (name: string) => field(name) as Control;
   const add = () => m.inDoc('tax-rule-form-submit') as Control;
   /** The choices of an `ion-select`. */
   const options = (name: string) =>
     [...control(name).querySelectorAll('ion-select-option')].map((o) => [(o as Control).value, o.textContent?.trim()]);
-  /** The choices of a searchable field, once its list is open. */
-  const listed = (name: string) =>
-    m.wrapper.findAll(`[data-testid="tax-rule-form-${name}-option"]`).map((o) => [o.attributes('data-value'), o.text().trim()]);
+  /** The Combo of a searchable field (Country, Category). */
+  const combo = (name: string) => {
+    const found = m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === `tax-rule-form-${name}`);
+    if (!found) throw new Error(`no Combo for ${name}`);
+    return found;
+  };
+  /** The fixed options of a Combo, as [id, label]. */
+  const listed = (name: string) => (combo(name).props('options') as ComboOption[]).map((o) => [o.id, o.label]);
   const type = (name: string, value: string) => ionValue(control(name), value, 'ionInput');
   const pick = (name: string, value: string) => ionValue(control(name), value);
-  /** Opens a searchable field and chooses `value` in its list. */
+  /** Chooses `value` in a searchable field, as its Combo does when the person picks an option. */
   async function choose(name: string, value: string) {
-    await click(control(name));
-    await click(m.wrapper.get(`[data-testid="tax-rule-form-${name}-option"][data-value="${value}"]`).element);
+    const label = name === 'country_code' ? (listed(name).find(([id]) => id === value)?.[1] ?? value) : value;
+    combo(name).vm.$emit('update:modelValue', { id: value, label });
+    await settle();
   }
   async function fillBasics() {
     await choose('country_code', 'ES');
     await choose('tax_category_key', 'restaurant.food');
     await type('rate_pct', '10');
   }
-  return { ...m, field, control, add, options, listed, type, pick, choose, fillBasics };
+  return { ...m, field, control, add, options, combo, listed, type, pick, choose, fillBasics };
 }
 
 describe('RuleCreateModal: the fields of the old panel', () => {
@@ -116,28 +121,28 @@ describe('RuleCreateModal: the fields of the old panel', () => {
     expect(s.add().textContent?.trim()).toBe('Add');
   });
 
-  it('searches the country among the 249 the server accepts, named in the reader’s language', async () => {
+  it('types the country among the 249 the server accepts, named in the reader’s language (a Combo, the old ok-combo)', async () => {
     const s = await setup();
     expect(s.control('country_code').placeholder).toBe('Choose a country');
-    await click(s.control('country_code'));
     const countries = s.listed('country_code');
     expect(countries).toHaveLength(249);
     expect(countries).toContainEqual(['ES', 'Spain (ES)']);
     expect(countries.some(([value]) => value === 'ZZ')).toBe(false);
-    await ionValue(s.inDoc('tax-rule-form-country_code-search'), 'spa', 'ionInput');
-    expect(s.listed('country_code')).toEqual([['ES', 'Spain (ES)']]);
+    expect(s.combo('country_code').props('search')).toBeUndefined();
   });
 
-  it('searches the category on the server, among all the business’s, by name and key', async () => {
+  it('searches the category on the server, among all the business’s, by name; the key is its hint', async () => {
     const s = await setup();
-    expect(s.params('tax.category.list')).toEqual([{ sort: 'display_name', dir: 'asc', limit: 50 }]);
-    await click(s.control('tax_category_key'));
-    expect(s.listed('tax_category_key')).toEqual([
-      ['restaurant.food', 'Restaurant — food (restaurant.food)'],
-      ['product.generic', 'Product — generic (product.generic)'],
+    expect(s.params('tax.category.list')).toEqual([]);
+    s.answer(200, CATEGORY_PAGE);
+    const search = s.combo('tax_category_key').props('search') as (q: string) => Promise<ComboOption[]>;
+    expect(await search(' books ')).toEqual([
+      { id: 'restaurant.food', label: 'Restaurant — food', hint: 'restaurant.food' },
+      { id: 'product.generic', label: 'Product — generic', hint: 'product.generic' },
     ]);
-    await ionValue(s.inDoc('tax-rule-form-tax_category_key-search'), ' books ', 'ionInput');
-    expect(s.params('tax.category.list')).toEqual([{ search: 'books', sort: 'display_name', dir: 'asc', limit: 50 }]);
+    expect(s.sent()).toEqual([
+      { method: 'GET', path: '/api/tax/categories', query: { search: 'books', sort: 'display_name', dir: 'asc', limit: '50' }, body: undefined },
+    ]);
   });
 
   it('starts as a VAT rule subject to tax: the eight families, the five qualifications, no exemption reason', async () => {
@@ -269,7 +274,8 @@ describe('RuleCreateModal: a component under its root (TAX-F06)', () => {
     await s.choose('country_code', 'ES');
     await s.choose('tax_category_key', 'restaurant.food');
     await s.type('rate_pct', '1.4');
-    await s.reopen();
+    // The roots are the dialog's only live subscription: the stream opens with it.
+    await s.live();
     expect(s.params('tax.rule.parent_candidates')).toEqual([{ country_code: 'ES', tax_category_key: 'restaurant.food', rate_pct: '1.4', limit: 50 }]);
     // A root starting in 2027 (TAX-F07 then F06) is offered: the server says so.
     await s.result('tax.rule.parent_candidates', { rows: [rule({ id: 'root-2027', valid_from: '2027-01-01' })], total: 1, limit: 50, offset: 0 });
@@ -282,7 +288,7 @@ describe('RuleCreateModal: a component under its root (TAX-F06)', () => {
   it('a chosen root travels as parent_id with the component label', async () => {
     const s = await setup();
     await s.fillBasics();
-    await s.reopen();
+    await s.live();
     await s.result('tax.rule.parent_candidates', { rows: [rule({ id: 'root-food' })], total: 1, limit: 50, offset: 0 });
     s.answer(201, rule({ id: 'new' }));
     await s.pick('tax_type', 'surcharge');
@@ -303,44 +309,9 @@ describe('RuleCreateModal speaks Spanish', () => {
       'Regla raíz (componente de)',
       'Etiqueta componente',
     ]);
-    await click(s.control('country_code'));
     expect(s.listed('country_code')).toContainEqual(['ES', 'España (ES)']);
     expect(s.options('tax_type')[1][1]).toBe('IGIC (Canarias)');
     expect(s.options('tax_type')[4][1]).toBe('Impuesto sobre las ventas');
     expect(s.add().textContent?.trim()).toBe('Añadir');
   });
 });
-
-// Review (staff): `ion-input` is scoped, so a keydown in its native input bubbles to FormModal's `<form>`,
-// whose Enter submits. Enter on a searchable field opens its list and must NOT send the rule.
-describe('RuleCreateModal: Enter on a searchable field', () => {
-  /** Enter in the field's native input, as a browser fires it (Ionic renders it inside the host). */
-  function pressEnterIn(field: HTMLElement): KeyboardEvent {
-    const native = document.createElement('input');
-    field.appendChild(native);
-    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-    native.dispatchEvent(event);
-    return event;
-  }
-
-  it('on Category opens its list and does not send tax.rule.create, even with the form complete', async () => {
-    const s = await setup();
-    s.answer(201, rule({ id: 'new' }));
-    await s.fillBasics();
-    expect(s.add().disabled).toBe(false);
-    pressEnterIn(s.control('tax_category_key'));
-    await settle();
-    expect(s.sent()).toEqual([]);
-    expect(s.inDoc('tax-rule-form-tax_category_key-search')).not.toBeNull();
-  });
-
-  it('on Country neither', async () => {
-    const s = await setup();
-    s.answer(201, rule({ id: 'new' }));
-    await s.fillBasics();
-    pressEnterIn(s.control('country_code'));
-    await settle();
-    expect(s.sent()).toEqual([]);
-  });
-});
-

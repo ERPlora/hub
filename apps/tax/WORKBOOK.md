@@ -1,7 +1,7 @@
 # Workbook — Impuestos (app)
 Prefijo: TAX
 Alcance MVP: transversal
-Estado de la app: en construcción (servidor hecho; páginas en la fase de frontend)
+Estado de la app: hecha (servidor y páginas); fuera, con su motivo: la región del negocio en Ventas (TAX-F11)
 
 > Manual de usuario y especificación de la app `tax`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -70,7 +70,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Impuestos se abre desde el menú **Impuestos** y tiene tres pestañas en la barra de abajo:
-**Categorías**, **Reglas** y **Alias**. Las tres siguen el permiso de quien mira: con solo consulta
+**Categorías**, **Reglas** y **Alias**. Mientras ningún tipo esté vigente, las tres llevan arriba el
+aviso «Tus impuestos» para quien puede gestionarlos (TAX-F17). Las tres siguen el permiso de quien mira: con solo consulta
 sale el aviso «Puedes consultar las reglas fiscales pero no modificarlas.», desaparece el botón **+** y,
 en Reglas, las acciones de fila. La app exige el permiso en cada acción aunque la pantalla enseñe el
 botón.
@@ -106,6 +107,7 @@ panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añad
 | Vacío | «Sin categorías fiscales.», «Sin reglas fiscales.» o «Sin alias de categorías.» (o «Sin resultados» con búsqueda o filtro), con **+** si puede crear. |
 | Error | El aviso de la tabla con «Reintentar»; un rechazo del alta sale dentro del panel, junto a su campo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
+| Sin tipos vigentes | Para quien puede gestionar, el aviso «Tus impuestos» con «Configurar» (TAX-F17). |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
@@ -113,28 +115,29 @@ panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añad
 
 | ID | Flujo | Estado |
 |---|---|---|
-| TAX-F01 | Ver las categorías fiscales | servidor hecho |
-| TAX-F02 | Crear una categoría fiscal propia | servidor hecho |
-| TAX-F03 | Ver y filtrar las reglas | servidor hecho |
-| TAX-F04 | Fijar el tipo de una categoría en un país o región | servidor hecho |
-| TAX-F05 | Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo | servidor hecho |
-| TAX-F06 | Añadir un recargo de equivalencia a un tipo | servidor hecho |
-| TAX-F07 | Cambiar un tipo a partir de una fecha | servidor hecho |
-| TAX-F08 | Desactivar y reactivar una regla | servidor hecho |
-| TAX-F09 | Reparar una regla que cobra un tipo donde no toca | retirado: esa regla ya no puede existir |
-| TAX-F10 | Resolver reglas que se solapan | retirado: el solape ya no puede existir |
-| TAX-F11 | Montar un negocio de Canarias, Ceuta o Melilla | servidor hecho |
-| TAX-F12 | Crear varias reglas de golpe | servidor hecho |
-| TAX-F13 | Ver los alias de categoría | servidor hecho |
-| TAX-F14 | Enseñar un alias de categoría a mano | servidor hecho |
-| TAX-F15 | Decir al importador de Inventario qué categoría es un texto | servidor hecho |
+| TAX-F01 | Ver las categorías fiscales | hecho |
+| TAX-F02 | Crear una categoría fiscal propia | hecho |
+| TAX-F03 | Ver y filtrar las reglas | hecho |
+| TAX-F04 | Fijar el tipo de una categoría en un país o región | hecho |
+| TAX-F05 | Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo | hecho |
+| TAX-F06 | Añadir un recargo de equivalencia a un tipo | hecho |
+| TAX-F07 | Cambiar un tipo a partir de una fecha | hecho |
+| TAX-F08 | Desactivar y reactivar una regla | hecho |
+| TAX-F09 | Reparar una regla que cobra un tipo donde no toca | descartado |
+| TAX-F10 | Resolver reglas que se solapan | descartado |
+| TAX-F11 | Montar un negocio de Canarias, Ceuta o Melilla | parcial — la región del negocio no llega a Ventas |
+| TAX-F12 | Crear varias reglas de golpe | hecho |
+| TAX-F13 | Ver los alias de categoría | hecho |
+| TAX-F14 | Enseñar un alias de categoría a mano | hecho |
+| TAX-F15 | Decir al importador de Inventario qué categoría es un texto | hecho |
 | TAX-F16 | Sembrar el catálogo de fábrica al activar | hecho |
-| TAX-F17 | Avisar de que faltan tipos para el país del negocio | servidor hecho |
-| TAX-F18 | Calcular el impuesto de un importe | servidor hecho |
-| TAX-F19 | Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios | servidor hecho |
+| TAX-F17 | Avisar de que faltan tipos para el país del negocio | hecho |
+| TAX-F18 | Calcular el impuesto de un importe | hecho |
+| TAX-F19 | Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios | hecho |
 
 ### TAX-F01 Ver las categorías fiscales
-Estado: servidor hecho
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/taxes#permission-role_permissions fi:modules/taxes#query-taxes-categories-list old:taxes/WORKFLOW.md#taxes-f01 -->
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Categorías
 Pasos:
@@ -149,7 +152,8 @@ Si falla: el aviso de la tabla con «Reintentar». Sin permiso de consulta, «No
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F06, SALE-F01, SERVICE-F01
 
 ### TAX-F02 Crear una categoría fiscal propia
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#command-taxes-categories-create old:taxes/WORKFLOW.md#taxes-f02 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Categorías
 Pasos:
@@ -167,7 +171,8 @@ Si falla: una clave con otra forma o un nombre vacío salen debajo de su campo; 
 Implicados: INVENTORY-F09
 
 ### TAX-F03 Ver y filtrar las reglas
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#query-taxes-rules-by_country fi:modules/taxes#query-taxes-rules-list old:taxes/WORKFLOW.md#taxes-f03 -->
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Reglas
 Pasos:
@@ -182,14 +187,17 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: ninguno
 
 ### TAX-F04 Fijar el tipo de una categoría en un país o región
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#command-taxes-rules-create old:taxes/WORKFLOW.md#taxes-f04 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
 1. En Reglas pulsa **+**.
-2. Elige el País (lista cerrada ISO 3166-1) y, solo si el tipo cambia dentro del país, la Región (por
-   ejemplo ES-CN, que tiene que ser de ese país); vacía vale para todo el país.
-3. Elige la Categoría y escribe el %, entre 0 y 100 (hasta dos decimales).
+2. Escribe el País y elígelo de la lista que sale debajo (lista cerrada ISO 3166-1) y, solo si el tipo
+   cambia dentro del país, la Región (por ejemplo ES-CN, que tiene que ser de ese país); vacía vale para
+   todo el país.
+3. Escribe parte del nombre de la Categoría, elígela de la lista y escribe el %, entre 0 y 100 (hasta
+   dos decimales).
 4. Elige el Tipo («IVA» de entrada; «IGIC (Canarias)», «IPSI (Ceuta/Melilla)»…) y, si quieres, Vigente
    desde y Vigente hasta (vacío = desde siempre / para siempre).
 5. Pulsa «Añadir»; el panel se cierra y la regla sale en la tabla.
@@ -207,7 +215,8 @@ quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde�
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo
-Estado: servidor hecho
+<!-- origen: old:taxes/WORKFLOW.md#taxes-f05 wf:cadena-fiscal#rec_fiscal-f04 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
@@ -227,7 +236,8 @@ operación no lleva impuesto: su tipo tiene que ser 0 %.») y no se guarda nada.
 Implicados: INVOICE-F01
 
 ### TAX-F06 Añadir un recargo de equivalencia a un tipo
-Estado: servidor hecho
+<!-- origen: old:taxes/WORKFLOW.md#taxes-f06 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
@@ -247,7 +257,8 @@ regla raíz. Un componente de un componente no existe: solo hay un nivel.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F07 Cambiar un tipo a partir de una fecha
-Estado: servidor hecho
+<!-- origen: wf:cadena-fiscal#rec_fiscal-f02 wf:cadena-fiscal#rec_fiscal-f10 old:taxes/WORKFLOW.md#taxes-f07 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
@@ -266,7 +277,8 @@ sin tipo: las ventas de esa categoría se rechazan hasta crear la siguiente.
 Implicados: INVOICE-F01, INVOICE-F04, SALE-F01
 
 ### TAX-F08 Desactivar y reactivar una regla
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#command-taxes-rules-deactivate old:taxes/WORKFLOW.md#taxes-f08 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
@@ -286,19 +298,37 @@ una que ahora se solapa con otra activa, el aviso de solape.
 Implicados: SALE-F01
 
 ### TAX-F09 Reparar una regla que cobra un tipo donde no toca
-Estado: retirado
-En el producto actual existía para arreglar reglas guardadas antes de que se prohibieran. Aquí ninguna
-puerta (pantalla, API, lote ni asistente) deja crear una regla que no cobra impuesto con un %, ni un
-componente con tipo bajo ella, así que no hay nada que reparar.
+<!-- origen: wf:cadena-fiscal#rec_fiscal-f09 old:taxes/WORKFLOW.md#taxes-f09 -->
+Estado: descartado — en el producto actual servía para arreglar reglas guardadas antes de que se prohibieran; aquí ninguna puerta (pantalla, API, lote ni asistente) deja crear una regla que no cobra impuesto con un %, ni un componente con tipo bajo ella, así que no hay nada que reparar
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. Quien guarda una regla exenta, no sujeta o con inversión del sujeto pasivo con un % mayor que 0 ve el
+   rechazo debajo del % (TAX-F05).
+2. Quien cuelga un componente con tipo de una raíz que no cobra impuesto ve el rechazo debajo de la regla
+   raíz (TAX-F06).
+Entra: nada.
+Sale: nada: la regla incoherente no llega a guardarse.
+Si falla: no aplica.
+Implicados: ninguno
 
 ### TAX-F10 Resolver reglas que se solapan
-Estado: retirado
-Igual que TAX-F09: aquí ninguna puerta deja que dos reglas activas del mismo país, región y categoría
-estén vigentes el mismo día, tampoco si dos personas guardan a la vez. Un solape se resuelve antes de
-guardar, con TAX-F07 o TAX-F08.
+<!-- origen: old:taxes/WORKFLOW.md#taxes-f10 -->
+Estado: descartado — aquí ninguna puerta deja que dos reglas activas del mismo país, región y categoría estén vigentes el mismo día, tampoco si dos personas guardan a la vez: el solape se resuelve antes de guardar, con TAX-F07 o TAX-F08
+Actor: propietario, administrador, responsable
+Pantalla: Reglas
+Pasos:
+1. Quien guarda una regla que se solaparía con otra activa del mismo país, región y categoría ve el
+   rechazo en «Vigente desde» (TAX-F04).
+2. Pone fecha de fin a la vigente (TAX-F07) o la desactiva (TAX-F08) y vuelve a guardar la nueva.
+Entra: nada.
+Sale: nada: el solape no llega a guardarse.
+Si falla: no aplica.
+Implicados: ninguno
 
 ### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
-Estado: servidor hecho
+<!-- origen: wf:cadena-fiscal#rec_fiscal-f04 old:taxes/WORKFLOW.md#taxes-f11 -->
+Estado: parcial — las reglas regionales se crean y ganan a la nacional cuando se pregunta con la región (pantalla, cálculo y API), pero el Hub no guarda la región del negocio y Ventas cobra sin ella: un negocio de Canarias, Ceuta o Melilla cobra el IVA nacional
 Actor: propietario, administrador
 Pantalla: Reglas
 Pasos:
@@ -317,7 +347,8 @@ regionales no se usan nunca.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F12 Crear varias reglas de golpe
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#command-handler-wasm-taxes-rules-bulk_create-bulk_create_rules old:taxes/WORKFLOW.md#taxes-f12 -->
+Estado: hecho
 Actor: propietario, administrador, responsable (por la API; en la fase 2, también el asistente)
 Pantalla: ninguna (API)
 Pasos:
@@ -333,7 +364,8 @@ lote: se crean de uno en uno (TAX-F06), porque necesitan su raíz ya guardada.
 Implicados: ninguno
 
 ### TAX-F13 Ver los alias de categoría
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#query-taxes-aliases-list old:taxes/WORKFLOW.md#taxes-f13 -->
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Alias
 Pasos:
@@ -345,13 +377,14 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: ninguno
 
 ### TAX-F14 Enseñar un alias de categoría a mano
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#command-taxes-aliases-create old:taxes/WORKFLOW.md#taxes-f14 -->
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Alias
 Pasos:
 1. En Alias pulsa **+**.
-2. Escribe el Alias (el texto que llega de fuera, por ejemplo `comida`), elige la Categoría y el
-   Origen («Aprendido» de entrada).
+2. Escribe el Alias (el texto que llega de fuera, por ejemplo `comida`), escribe parte del nombre de
+   la Categoría y elígela de la lista, y elige el Origen («Aprendido» de entrada).
 3. Pulsa «Añadir».
 Entra: el texto externo, la categoría y el origen que elige la persona.
 Sale: el alias, guardado en minúsculas y sin espacios de sobra, único en el negocio
@@ -361,7 +394,8 @@ debajo de la Categoría. No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F15 Decir al importador de Inventario qué categoría es un texto
-Estado: servidor hecho
+<!-- origen: fi:modules/taxes#query-taxes-aliases-resolve old:taxes/WORKFLOW.md#taxes-f15 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -378,6 +412,7 @@ Si falla: un texto que no casa devuelve «nada», nunca una categoría parecida.
 Implicados: INVENTORY-F09, INVENTORY-F10
 
 ### TAX-F16 Sembrar el catálogo de fábrica al activar
+<!-- origen: qa:verticals/beauty/00-signup-and-blueprint-beauty qa:verticals/restaurant/00-signup-and-blueprint wf:alta#rec_alta-f08 old-hub:HUB-F22 fi:modules/taxes#seed-bloque old:taxes/WORKFLOW.md#taxes-f16 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -400,24 +435,27 @@ Si falla: nunca pisa una fila que ya existe ni duplica nada.
 Implicados: ninguno
 
 ### TAX-F17 Avisar de que faltan tipos para el país del negocio
-Estado: servidor hecho (la lista «Termina de configurar tu negocio» llega con los primeros pasos del Hub)
-Actor: sistema
-Pantalla: Hub: Termina de configurar tu negocio
+<!-- origen: old:taxes/WORKFLOW.md#taxes-f17 wf:alta#rec_alta-f09 -->
+Estado: hecho
+Actor: propietario, administrador, responsable
+Pantalla: Categorías, Reglas y Alias
 Pasos:
-1. En la lista «Termina de configurar tu negocio» sale el paso «Tus impuestos» («Configura los tipos de
-   IVA del país en el que vendes para que el TPV pueda calcular el precio de una venta.»), solo para
-   quien puede gestionar impuestos.
-2. Pulsa «Configurar»: lleva a la pestaña Reglas.
-3. Cuando existe una regla raíz activa y vigente hoy para el país del negocio, el paso sale hecho.
+1. Abre **Impuestos**: mientras ninguna regla raíz activa esté vigente hoy, arriba de Categorías, Reglas y
+   Alias sale el aviso «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el
+   TPV pueda calcular el precio de una venta.»), solo para quien puede gestionar impuestos.
+2. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
+   Reglas el aviso no lleva botón.
+3. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo.
 Entra: las reglas y el país del negocio.
-Sale: cuántas reglas aplican hoy y si el paso está hecho. No bloquea vender por sí mismo.
-Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Sin país, cuenta las reglas
-de cualquier país. Una regla exenta o de IGIC también cuenta: un negocio que solo vende servicios
-exentos está bien configurado.
+Sale: cuántas reglas aplican hoy y si los impuestos están configurados. No bloquea vender por sí mismo.
+Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Sin país (el Hub aún no lo
+guarda), cuenta las reglas de cualquier país. Una regla exenta o de IGIC también cuenta: un negocio que
+solo vende servicios exentos está bien configurado.
 Implicados: ninguno
 
 ### TAX-F18 Calcular el impuesto de un importe
-Estado: servidor hecho
+<!-- origen: wf:cadena-fiscal#rec_fiscal-f04 fi:modules/taxes#command-handler-wasm-taxes-calculate-calculate_tax old-hub:HUB-F18 old:taxes/WORKFLOW.md#taxes-f18 qa:modules/taxes/vat-rates-and-breakdown -->
+Estado: hecho
 Actor: empleado, responsable, administrador, propietario (por la API; en la fase 2, también el asistente)
 Pantalla: ninguna (API)
 Pasos:
@@ -438,7 +476,8 @@ debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin 
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F19 Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios
-Estado: servidor hecho
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal wf:cadena-fiscal#rec_fiscal-f01 fi:modules/taxes#event-emit-taxes-category-created-taxes-rule-created-taxes-rule-deactivated-taxes-alias-created-declarados-taxes-rule-created-taxes-rules-bulk_create-report-emitidos-por-el-wasm-bulk fi:modules/taxes#query-taxes-categories-get old:taxes/WORKFLOW.md#taxes-f19 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -531,7 +570,10 @@ cajero del producto actual es un empleado.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso), `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py`
-  por fichero. Las páginas (`frontend/`) llegan en la fase de frontend.
+  por fichero, y las páginas (`frontend/`: Categorías, Reglas y Alias, con sus diálogos) con su Vitest y
+  su e2e por flujo en tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules` y
+  `tax-employee`). País y Categoría de las altas son el `Combo` de `@erplora/ui` (el `ok-combo` de
+  antes): la categoría se busca en el servidor (`tax.category.list` por nombre), nunca se carga entera.
 - **Contrato con Inventario**: `TaxCategory` tiene clave UUIDv7 y `key` única (la `tax_category_key`
   enlazable); Inventario pone su FK aquí. Ninguna categoría se borra.
 - **La resolución, una sola vez** (`queries.resolve_tax` y `queries.calculate_tax`): raíces activas y
@@ -598,6 +640,18 @@ cajero del producto actual es un empleado.
    para llevar o a domicilio, al 21 %, tiene su categoría: `retail.alcohol`. Un hub que ya tuviera la
    semilla anterior recibe `retail.alcohol` (migración 0005) y conserva su regla de
    `restaurant.alcohol`: una migración nunca reescribe un tipo; se cambia con TAX-F07.
+11. **«Tus impuestos» sale en las pantallas de Impuestos** (TAX-F17), no en una lista de primeros pasos
+   del Hub, que todavía no existe.
+
+- **«Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de los tipos que faltan
+  en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business Central) y en la propia
+  pantalla de impuestos (WooCommerce, Shopify, Toast). El Hub no tiene esa lista (sería de `base`), así
+  que el aviso va en las tres pantallas, con `tax.rule.status` sin país (el Hub no guarda el del
+  negocio). Cuando exista la lista de primeros pasos, su paso «Tus impuestos» lee la misma consulta.
+- **Región del negocio en Ventas (TAX-F11)**: `resolve_tax` y `calculate_tax` usan la región que se les
+  da, pero Ventas cierra el tique sin región (`apps/sale/pricing.py`, `tax_closer`) porque el negocio no
+  la guarda: un negocio de Canarias, Ceuta o Melilla cobra el IVA nacional (pm#629, VF-17). Se arregla
+  cuando los Ajustes del negocio guarden país y región y Ventas los pase al cálculo.
 
 ### Lo que NO hace, a propósito
 
