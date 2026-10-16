@@ -371,3 +371,10 @@ def test_a_card_has_at_most_one_health_record_and_it_never_names_its_data():
 
 def test_a_health_permission_has_no_channel():
     assert Consent._meta.get_field("channel").blank is True
+
+
+def test_a_health_permission_names_its_purpose_where_a_channel_would_go():
+    # The admin and the logs read «health: Given», never «: Given» (a channel-less fact, CUSTOMER-F32).
+    fact = Consent(purpose="health", channel="", state="granted")
+    assert str(fact) == "health: Given"
+    assert str(Consent(purpose="marketing", channel="email", state="granted")) == "Email: Given"

@@ -428,7 +428,8 @@ class Consent(UUIDModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.get_channel_display()}: {self.get_state_display()}"
+        # A fact without channel (health data, CUSTOMER-F32) reads by its purpose.
+        return f"{self.get_channel_display() or self.purpose}: {self.get_state_display()}"
 
 
 class HealthRecord(UUIDModel):
