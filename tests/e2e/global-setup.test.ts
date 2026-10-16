@@ -151,6 +151,10 @@ describe('assertMigrationsApplied', () => {
     expect(() => assertMigrationsApplied(manage.run, 'hub_e2e_8030')).not.toThrow('unapplied migrations');
     expect(manage.calls.every((args) => args.includes('--check'))).toBe(true);
 
+    // An e2e database that exists but cannot be checked (Postgres down) is the generic failure too.
+    const down = fakeManagePy({ migrate: UNREACHABLE });
+    expect(() => assertMigrationsApplied(down.run, 'hub_e2e_8030')).toThrow(/^Could not check the migrations[^\n]*\n[^\n]*Connection refused$/);
+
     // database.ts prepares only e2e databases: a missing `hub` is the generic failure, with what Postgres said.
     const shared = fakeManagePy({ migrate: { ...missing, stderr: 'FATAL:  database "hub" does not exist\n' } });
     expect(() => assertMigrationsApplied(shared.run, 'hub')).toThrow(/^Could not check the migrations[^\n]*\nFATAL: {2}database "hub" does not exist$/);

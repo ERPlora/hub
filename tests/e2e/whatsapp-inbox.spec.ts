@@ -11,7 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanUpCards } from './customer-helpers';
-import { A, EMPLOYEE, hostPage, login, shot, shown } from './helpers';
+import { A, EMPLOYEE, hostPage, login, SAAS, shot, shown } from './helpers';
 import { cleanUp, e2ePhone, PREFIX, pushChannel, receive, template } from './whatsapp-helpers';
 
 test.afterAll(() => {
@@ -39,7 +39,9 @@ test('the owner reads, organises and erases a WhatsApp conversation; the compose
 
   await login(page, A, '/whatsapp_inbox/inbox');
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-not-connected]')).toContainText('WhatsApp is not connected');
-  await expect(shown(page).locator('[data-testid=whatsapp-inbox-go-to-saas]')).toHaveAttribute('href', /localhost:8001|erplora\.com/);
+  // The run's SaaS (`SAAS_URL`: :8001 on the shared stack, its own beside it; erplora.com in production).
+  const saas = new RegExp(`^${SAAS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`);
+  await expect(shown(page).locator('[data-testid=whatsapp-inbox-go-to-saas]')).toHaveAttribute('href', saas);
   await searchInbox(page, phone.slice(3));
 
   // F03: the customer writes; her conversation arrives live, unread.
