@@ -85,20 +85,6 @@
       }
     },
     "filters": {
-      "status": "Status",
-      "number": "Session number",
-      "opening": "Opening",
-      "expected": "Expected",
-      "counted": "Counted",
-      "difference": "Difference",
-      "from": "From",
-      "to": "To",
-      "any": "Any",
-      "button": "Filters",
-      "title": "Filter sessions",
-      "count": "Filters: {n}",
-      "clear": "Clear",
-      "done": "Done",
       "amountInvalid": "This is not an amount."
     },
     "open": {

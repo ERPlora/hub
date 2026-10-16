@@ -58,25 +58,10 @@
       "config_changed": "Configuración cambiada"
     },
     "filters": {
-      "button": "Filtros",
-      "count": "Filtros: {n} en uso",
-      "title": "Filtrar",
-      "any": "Cualquiera",
-      "status": "Estado",
-      "type": "Tipo",
       "invoiceType": "Tipo de factura",
       "environment": "Entorno",
-      "kind": "Tipo",
-      "severity": "Severidad",
-      "issuedFrom": "Emitida desde",
-      "issuedTo": "Emitida hasta",
-      "from": "Desde",
-      "to": "Hasta",
-      "totalFrom": "Total desde (€)",
-      "totalTo": "Total hasta (€)",
       "amountInvalid": "Escribe un importe en euros, como 12,50.",
-      "clear": "Quitar filtros",
-      "done": "Listo"
+      "dateOrder": "La fecha final no puede ser anterior a la inicial."
     },
     "records": {
       "title": "Registros VeriFactu",
