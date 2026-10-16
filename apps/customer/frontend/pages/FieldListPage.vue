@@ -130,6 +130,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       :sort-dir="list.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: FieldRow) => row.name"
+      card-title-column="name"
       :card-icon="() => 'ion:layers-outline'"
       :entity-label="{ one: $t('customer.fields.entity.one'), many: $t('customer.fields.entity.many') }"
       :loading="status === 'loading'"
