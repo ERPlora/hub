@@ -221,13 +221,13 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F16 | Atribuir la cuenta o una línea a quien atiende | común | hecho |
 | SALE-F17 | Aparcar una cuenta y recuperarla | común | hecho |
 | SALE-F18 | Eliminar una cuenta abierta | común | hecho |
-| SALE-F19 | Abrir la cuenta de una mesa y dejarla en la mesa | restaurante | no hecho: Mesas |
+| SALE-F19 | Abrir la cuenta de una mesa y dejarla en la mesa | restaurante | hecho |
 | SALE-F20 | Enviar la comanda a cocina y anular una línea enviada | restaurante | parcial |
 | SALE-F21 | Imprimir la cuenta para la mesa (precuenta) | restaurante | hecho |
 | SALE-F22 | Cobrar solo una parte de la cuenta | restaurante | hecho |
-| SALE-F23 | Dividir la cuenta de una mesa | restaurante | servidor hecho |
-| SALE-F24 | Juntar las cuentas de dos mesas | restaurante | servidor hecho |
-| SALE-F25 | Pasar la cuenta a otra mesa | restaurante | no hecho: Mesas |
+| SALE-F23 | Dividir la cuenta de una mesa | restaurante | hecho |
+| SALE-F24 | Juntar las cuentas de dos mesas | restaurante | hecho |
+| SALE-F25 | Pasar la cuenta a otra mesa | restaurante | hecho |
 | SALE-F26 | Cobrar una cita desde la agenda | peluquería | hecho |
 | SALE-F27 | Pagar una línea con un bono | peluquería | hecho |
 | SALE-F28 | Consultar el historial y las cifras de ventas | común | hecho |
@@ -239,7 +239,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F34 | Ajustar el TPV | común | hecho |
 | SALE-F35 | Dar de alta y ordenar los departamentos del precio libre | común | hecho |
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
-| SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
+| SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | parcial |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
@@ -729,7 +729,7 @@ Entra: la cuenta y las líneas que se mueven.
 Sale: dos cuentas abiertas que suman lo mismo que la original al céntimo (avisa: cuenta abierta).
 Si falla: si otro dispositivo está cobrando esa cuenta, la división espera y, si la cobró, se rechaza
 («La cuenta ha cambiado…») sin mover nada.
-Implicados: TABLES-F17
+Implicados: TABLE-F17
 
 ### SALE-F24 Juntar las cuentas de dos mesas
 Estado: hecho — el botón «Fusionar» es del control de mesa de Mesas (TABLE-F16)
@@ -744,7 +744,7 @@ Sale: una sola cuenta; las líneas se mueven sin volver a crearlas, así que lo 
 se envía otra vez. Repetirlo no cambia nada (avisa: cuentas juntadas, con la absorbida y la que
 queda).
 Si falla: si una de las dos ya no está abierta, se rechaza sin mover nada.
-Implicados: TABLES-F16, KITCHEN-F28
+Implicados: TABLE-F16, KITCHEN-F28
 
 ### SALE-F25 Pasar la cuenta a otra mesa
 Estado: hecho en Mesas (TABLE-F15): la cuenta no cambia
@@ -752,11 +752,12 @@ Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: ninguna
 Pasos:
-1. En el control de mesa (de Mesas), «Transferir» y elegir la mesa libre.
+1. En el control de mesa (de Mesas), pulsa «Transferir».
+2. Elige la mesa libre.
 Entra: la mesa de destino, de Mesas.
 Sale: nada en Ventas.
 Si falla: lo dirá Mesas.
-Implicados: TABLES-F15
+Implicados: TABLE-F15
 
 ### SALE-F26 Cobrar una cita desde la agenda
 Estado: hecho — el botón «Cobrar» de la agenda es de Citas (APPOINTMENT-F17)
@@ -810,7 +811,7 @@ antes.»); un descuento de importe fijo de la cuenta mayor que lo que quedaría 
 no está reservada (pasó un día, SERVICE-F25) o si la venta no es de la titular del bono: se lee el
 motivo en la hoja y se deshace el bono. El descuento máximo sin responsable se mide sobre lo que queda
 por pagar: una línea pagada con bono no cuenta. Sin permiso para gastar sesiones, el hueco no
-aparece. Pendiente de fase 2 (activación por hub): sin Servicios activa el hueco tampoco aparece y, si
+aparece. Queda fuera hasta la fase 2 (activación por hub): sin Servicios activa el hueco tampoco aparece y, si
 se apaga con líneas pagadas con bono, cobrarlas se rechaza («Servicios no está activa en este
 negocio…»); hoy la plataforma no apaga apps por hub y ese camino solo se prueba en los tests.
 Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
@@ -948,7 +949,7 @@ Sale: la devolución (avisa: venta devuelta) y la sesión de vuelta en su bono e
 (SERVICE-F26, SERVICE-F27). La venta pasa a Devuelta cuando vuelven todo el dinero y todas sus
 sesiones.
 Si falla: «Una devolución tiene que devolver dinero o la sesión de un bono.»; una sesión ya devuelta,
-«Una de las líneas marcadas ya se devolvió…». Pendiente de fase 2 (activación por hub): si Servicios
+«Una de las líneas marcadas ya se devolvió…». Queda fuera hasta la fase 2 (activación por hub): si Servicios
 no está activa, la devolución o la anulación de una venta con sesiones se rechaza («Servicios no está
 activa en este negocio…»); hoy la plataforma no apaga apps por hub y ese camino solo se prueba en los
 tests.
