@@ -291,7 +291,8 @@ export const row = (page: Page, name: string): Locator =>
 export const rowOf = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=demo-items-row][data-id="${id}"]`);
 
 /** From the list: «New item» → `/demo/items/new`, types the name and arms a click-time probe on
- *  «Save» (not clicked yet). */
+ *  «Save» (not clicked yet): `__saveClickedAt` (`Date.now()`) and `__saveClickedPageMs` (`performance.now()`, the
+ *  page's clock, which Resource Timing uses). */
 export async function fillNewItem(page: Page, name: string): Promise<Locator> {
   await shown(page).locator('[data-testid=demo-items-add]').click();
   await page.waitForURL(/\/demo\/items\/new$/);
@@ -299,10 +300,15 @@ export async function fillNewItem(page: Page, name: string): Promise<Locator> {
   await form.locator('[data-testid=demo-form-name] input').fill(name);
   const save = form.locator('[data-testid=demo-form-save]');
   await save.evaluate((el) => {
-    el.addEventListener('click', () => ((window as unknown as Record<string, number>).__saveClickedAt = Date.now()), {
-      capture: true,
-      once: true,
-    });
+    const w = window as unknown as Record<string, number>;
+    el.addEventListener(
+      'click',
+      () => {
+        w.__saveClickedAt = Date.now();
+        w.__saveClickedPageMs = performance.now();
+      },
+      { capture: true, once: true },
+    );
   });
   return save;
 }

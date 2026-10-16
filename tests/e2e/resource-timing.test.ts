@@ -6,7 +6,7 @@
 // the page here: the recorder, installed before the page loads, keeps the requests that came after it filled.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { installResponseRecorder, lastResponseEnd, recordedResponses } from './resource-timing';
+import { installResponseRecorder, lastResponseEnd, recordedResponses, recordedUrls } from './resource-timing';
 
 /** Node's `performance.markResourceTiming`: how its own fetch adds an entry (`perf_hooks`). */
 type MarkResourceTiming = (
@@ -78,23 +78,18 @@ describe('installResponseRecorder + recordedResponses (in the page)', () => {
     expect(end).toEqual({ pageMs: 120, epochMs: performance.timeOrigin + 120 });
   });
 
-  it('keeps only the fetch and XHR requests, not the module loads', () => {
+  it('keeps every resource the page loads, module loads included', () => {
     installResponseRecorder();
-    loadViteModules(10);
-    request('/api/demo/items', 'fetch', 5, 9);
+    loadViteModules(2);
+    request('/api/demo/items?limit=100', 'fetch', 5, 9);
     request('/api/demo/items/upload', 'xmlhttprequest', 10, 14);
 
-    expect(recordedResponses()?.entries.map((e) => [e.path, e.initiatorType])).toEqual([
-      ['/api/demo/items', 'fetch'],
-      ['/api/demo/items/upload', 'xmlhttprequest'],
+    expect(recordedResponses()?.entries.map((e) => [e.url, e.initiatorType])).toEqual([
+      [`${ORIGIN}/static/spa/@fs/module-0.js`, 'script'],
+      [`${ORIGIN}/static/spa/@fs/module-1.js`, 'script'],
+      [`${ORIGIN}/api/demo/items?limit=100`, 'fetch'],
+      [`${ORIGIN}/api/demo/items/upload`, 'xmlhttprequest'],
     ]);
-  });
-
-  it('keeps the path of a request without its query', () => {
-    installResponseRecorder();
-    request('/api/demo/items/detail?id=01a1', 'fetch', 5, 9);
-
-    expect(recordedResponses()?.entries.map((e) => e.path)).toEqual(['/api/demo/items/detail']);
   });
 
   it('is still there on a second read', () => {
@@ -113,9 +108,9 @@ describe('installResponseRecorder + recordedResponses (in the page)', () => {
 });
 
 describe('lastResponseEnd', () => {
-  const recorded = (...entries: { path: string; startTime: number; responseEnd: number }[]) => ({
+  const recorded = (...entries: { path: string; startTime: number; responseEnd: number; initiatorType?: string }[]) => ({
     timeOrigin: 1_000_000,
-    entries: entries.map((e) => ({ ...e, initiatorType: 'fetch' })),
+    entries: entries.map(({ path, initiatorType = 'fetch', ...times }) => ({ url: `${ORIGIN}${path}`, initiatorType, ...times })),
   });
 
   it('takes the last request to the path, on both clocks', () => {
@@ -141,6 +136,25 @@ describe('lastResponseEnd', () => {
     expect(lastResponseEnd(entries, '/api/demo/items').pageMs).toBe(60);
   });
 
+  it('counts the query: a GET with one is not the POST to the bare path', () => {
+    const entries = recorded(
+      { path: '/api/demo/items', startTime: 10, responseEnd: 20 },
+      { path: '/api/demo/items?limit=100', startTime: 30, responseEnd: 40 },
+    );
+
+    expect(lastResponseEnd(entries, '/api/demo/items').pageMs).toBe(20);
+    expect(lastResponseEnd(entries, '/api/demo/items?limit=100').pageMs).toBe(40);
+  });
+
+  it('counts only fetch and XHR requests, not a module at that path', () => {
+    const fetched = { path: '/api/demo/items/add_line', startTime: 10, responseEnd: 20 };
+    const module = { path: '/api/demo/items/add_line', startTime: 30, responseEnd: 40, initiatorType: 'script' };
+    const xhr = { path: '/api/demo/items/add_line', startTime: 50, responseEnd: 60, initiatorType: 'xmlhttprequest' };
+
+    expect(lastResponseEnd(recorded(fetched, module), '/api/demo/items/add_line').pageMs).toBe(20);
+    expect(lastResponseEnd(recorded(fetched, module, xhr), '/api/demo/items/add_line').pageMs).toBe(60);
+  });
+
   it('with `since`, only a request that started at or after it', () => {
     const entries = recorded(
       { path: '/api/demo/items/add_line', startTime: 10, responseEnd: 50 },
@@ -164,5 +178,24 @@ describe('lastResponseEnd', () => {
 
   it('fails, naming the missing recorder, on a page without it', () => {
     expect(() => lastResponseEnd(null, '/api/demo/items/delete')).toThrow(/recordResponses/);
+  });
+});
+
+describe('recordedUrls', () => {
+  it('lists every resource, also the ones loaded after the modules filled the buffer', () => {
+    installResponseRecorder();
+    loadViteModules();
+    request('/static/spa/@fs/outfitkit/index.js', 'script', 100, 110);
+
+    // The way no-outfitkit read it until now: past the buffer, the module is not there.
+    expect(performance.getEntriesByType('resource').some((e) => e.name.includes('outfitkit'))).toBe(false);
+
+    const urls = recordedUrls(recordedResponses());
+    expect(urls).toHaveLength(BUFFER_SIZE + 51);
+    expect(urls.at(-1)).toBe(`${ORIGIN}/static/spa/@fs/outfitkit/index.js`);
+  });
+
+  it('fails, naming the missing recorder and the page, on a page without it', () => {
+    expect(() => recordedUrls(null, { where: `${ORIGIN}/demo/items` })).toThrow(/http:\/\/a\.localhost:8040\/demo\/items.*recordResponses/);
   });
 });
