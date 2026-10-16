@@ -56,8 +56,9 @@ Lo que piden Ventas, el documento de venta, Anular y Devolver (`pages/SalesPage.
   admite filtros propios (periodo, estado, pago, total) ni reiniciar en la primera página al cambiarlos;
   Ventas lleva la suya en `components/sales/useServerTable.ts` + `useLiveList.ts` (ventanas de 100 como
   máximo). Se unen cuando llegue la de `@erplora/ui`.
-- **Selector con búsqueda en el servidor**: el filtro «Pago» y «Devolver por» usan
-  `components/sales/PaymentMethodPicker.vue` (busca en `sale.payment_method.list`, 20 por página).
+- **Selector con búsqueda en el servidor**: «Devolver por» usa `components/sales/PaymentMethodPicker.vue`
+  (busca en `sale.payment_method.list`, 20 por página). El filtro «Pago» de Ventas ya es el `lookup` del
+  embudo de `DataTable`.
 - **Impresora de red** (app Impresión): hoy el documento, «Reimprimir» y la cuenta del TPV se imprimen
   con el diálogo del navegador (`lib/print.ts`, `printPaper`).
 

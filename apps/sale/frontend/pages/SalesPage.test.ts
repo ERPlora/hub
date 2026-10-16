@@ -2,7 +2,7 @@
 // begin with, 7 days, 30 days, All) counted from the hub's business day, the six figures of the period
 // (only for whoever may see the reports), and the live `sale.sale.list` in a server-side DataTable —
 // Date, Number, Customer, Payment, Status («<amount> left to refund» under a sale partly refunded),
-// Total —, search «Search number or customer…», the filters, table or cards, 50 a page. A row opens its
+// Total —, search «Search number or customer…», the filters behind the table's funnel, table or cards, 50 a page. A row opens its
 // document; «Document» and «Reprint» for everyone, «Void» and «Refund» by permission and only where
 // they apply. The list re-runs by itself on charges, voids and refunds: nothing here refetches.
 import { DataTable, EmptyState } from '@erplora/ui/components';
@@ -14,7 +14,6 @@ import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale } from '
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import RefundModal from '../components/sales/RefundModal.vue';
-import SalesFilters from '../components/sales/SalesFilters.vue';
 import SalesKpis from '../components/sales/SalesKpis.vue';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
 import { formatDateTime } from '@erplora/ui/components';
@@ -116,8 +115,9 @@ async function setup(options: MountOptions = {}) {
     await flush();
     await m.reopen();
   }
+  /** What the table's funnel applies (`v-model:filters`): the filters by name, as typed. */
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(SalesFilters).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
     await flush();
     await m.reopen();
   }
@@ -268,7 +268,73 @@ describe('SalesPage: search, filters, sort and pages', () => {
     expect((s.find('sales-range').element as HTMLElement & { value?: unknown }).value ?? '').toBe('');
     await s.period('today');
     expect(s.list()[0]).toMatchObject(TODAY);
-    expect(s.wrapper.findComponent(SalesFilters).props('modelValue')).toEqual({});
+    expect(s.prop('filters')).toEqual({});
+  });
+
+  it('picking a period drops only the date range: the other filters stay', async () => {
+    const s = await setup();
+    await s.filter({ status: 'voided', date_from: '2026-10-01' });
+    await s.period('week');
+    expect(s.prop('filters')).toEqual({ status: 'voided' });
+    // 7 days back from this device's day (no business day answered here): the period rules again.
+    expect(s.list()[0]).toMatchObject({ status: 'voided', date_from: '2026-10-08', date_to: '2026-10-14' });
+  });
+
+  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+  it('filters behind the table funnel, on their columns: date, payment (searched), status and total (as typed)', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; keys?: string[]; amount?: boolean; options?: Array<{ value: string; label: string }>; load?: (q: string) => Promise<unknown> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.label, c.filter?.type, c.filter?.keys, c.filter?.amount])).toEqual([
+      ['Date', 'daterange', ['date_from', 'date_to'], undefined],
+      ['Payment', 'lookup', undefined, undefined],
+      ['Status', 'select', undefined, undefined],
+      ['Total', 'range', ['total_min', 'total_max'], true],
+    ]);
+    expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
+      { value: 'completed', label: 'Completed' },
+      { value: 'voided', label: 'Voided' },
+      { value: 'refunded', label: 'Refunded' },
+    ]);
+    // «Payment» asks the server for the business's methods (never a box of free text): the name read, the stored one sent.
+    s.answer(200, { rows: [{ id: 'm1', name: 'Cash', display_name: 'Efectivo' }], total: 1, limit: 20, offset: 0 });
+    const payment = columns.find((c) => c.key === 'payment_method_name')?.filter;
+    expect(await payment?.load?.('efe')).toEqual([{ value: 'Cash', label: 'Efectivo' }]);
+    expect(s.sent().at(-1)).toMatchObject({ path: '/api/sale/payment_methods', query: { search: 'efe', limit: '20' } });
+  });
+
+  it('the funnel panel applies on «Apply» and counts the filtered columns', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    await s.find('sales-table-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('sales-table-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="sales-table-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('status', 'ionChange', 'refunded');
+    set('total_min', 'ionInput', '5');
+    set('total_max', 'ionInput', '20,5');
+    await flush();
+    expect(s.list(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ ...TODAY, sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="sales-table-filters-apply"]').trigger('click');
+    await flush();
+    await s.reopen();
+    expect(s.list()).toEqual([{ status: 'refunded', total_min: 500, total_max: 2050, ...TODAY, sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.find('sales-table-filters-count').text()).toBe('2');
+  });
+
+  it('an amount it cannot read, or a «to» day before its «from», is said under it, does not filter and leaves the period', async () => {
+    const s = await setup();
+    await s.show(EMPTY);
+    expect(s.prop('filterErrors')).toEqual({});
+    await s.filter({ total_max: 'doce', date_from: '2026-10-14', date_to: '2026-10-01' });
+    expect(s.prop('filterErrors')).toEqual({ total_max: 'Type an amount, like 12.50', date_to: 'The end date is before the start date.' });
+    expect(s.list()).toEqual([{ ...TODAY, sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect((s.find('sales-range').element as HTMLElement & { value?: unknown }).value).toBe('today');
+    await s.show(EMPTY);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No sales yet.');
   });
 
   it('a filter the server refused is said under it, and the rows stay', async () => {
@@ -276,7 +342,7 @@ describe('SalesPage: search, filters, sort and pages', () => {
     await s.show(PAGE);
     s.call.push(`event: error\ndata: ${JSON.stringify({ id: s.subId(OP), error: { code: 'invalid_field', message: 'Invalid', fields: { total_min: 'Too big.' } } })}\n\n`);
     await flush();
-    expect(s.wrapper.findComponent(SalesFilters).props('fieldErrors')).toEqual({ total_min: 'Too big.' });
+    expect(s.prop('filterErrors')).toEqual({ total_min: 'Too big.' });
     expect(s.prop('error')).toBeUndefined();
   });
 
@@ -470,6 +536,10 @@ describe('SalesPage: the rest', () => {
     expect(s.prop<Array<{ label: string }>>('actions').map((a) => a.label)).toEqual(['Documento', 'Reimprimir', 'Emitir ahora', 'Anular', 'Devolver']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar número o cliente…');
     expect(s.prop('labels')).toMatchObject({ loading: 'Cargando…', loadError: 'No se pudieron cargar las ventas', retry: 'Reintentar' });
+    type Column = { key: string; filter?: { options?: Array<{ label: string }> } };
+    expect(s.prop<Column[]>('columns').find((c) => c.key === 'status')?.filter?.options?.map((o) => o.label)).toEqual(['Completada', 'Anulada', 'Devuelta']);
+    await s.filter({ total_min: 'mil', date_from: '2026-10-14', date_to: '2026-10-01' });
+    expect(s.prop('filterErrors')).toEqual({ total_min: 'Escribe un importe, como 12,50', date_to: 'La fecha final es anterior a la inicial.' });
   });
 });
 
