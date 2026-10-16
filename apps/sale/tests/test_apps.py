@@ -94,7 +94,7 @@ def test_navigation_is_the_old_four_tabs_and_the_settings():
         ("pos", "Sell", "/sale/pos", "ion:storefront-outline"),
         ("sales", "Sales", "/sale/sales", "ion:cart-outline"),
         ("quick_notes", "Quick notes", "/sale/quick-notes", "ion:chatbubbles-outline"),
-        ("departments", "Departments", "/sale/departments", "ion:grid-outline"),
+        ("departments", "Sections", "/sale/departments", "ion:grid-outline"),
         ("settings", "Settings", "/sale/settings", "ion:settings-outline"),
     ]
 

@@ -17,10 +17,10 @@ erplora-next). `.env` nunca se sube al repo.
 
 ## Despliegue: `main` → prod, `pre` → pre
 
-`pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): mismo cluster
-y misma Aurora que prod, con sus propios servicios (`hub-pre`, `worker-pre`), BD `pre_*` y repositorio
-de ECR (`erplora/hub-pre`). Se apaga sola cada tarde (plan `docs/plans/2026-10-14-entorno-pre.md` de
-erplora-next).
+`pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
+que prod, con su propio clúster de ECS (`erplora-pre`; prod corre en `erplora-prod`), sus propios
+servicios (`hub-pre`, `worker-pre`), BD `pre_*` y repositorio de ECR (`erplora/hub-pre`). Se apaga
+sola cada tarde (plan `docs/plans/2026-10-14-entorno-pre.md` de erplora-next).
 
 1. Cada push a una rama de trabajo corre `test / test` (`ci.yml`).
 2. Si `pre` avanzó, se integra `origin/pre` en la rama y se vuelve a empujar.

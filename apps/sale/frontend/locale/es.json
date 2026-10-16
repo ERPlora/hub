@@ -6,7 +6,7 @@
       "pos": "Vender",
       "sales": "Ventas",
       "quickNotes": "Notas rápidas",
-      "departments": "Departamentos",
+      "departments": "Secciones",
       "settings": "Ajustes"
     },
     "live": {
@@ -123,9 +123,9 @@
       "staffLoadFailed": "No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.",
       "staffPickerEmpty": "Este hub no tiene a nadie más para atender. Da de alta personal en Ajustes.",
       "staffNoResults": "Nadie del equipo coincide con tu búsqueda.",
-      "department": "Departamento (IVA)",
-      "departmentSearch": "Buscar un departamento…",
-      "departmentsLoadFailed": "No se han podido cargar los departamentos.",
+      "department": "Sección (IVA)",
+      "departmentSearch": "Buscar una sección…",
+      "departmentsLoadFailed": "No se han podido cargar las secciones.",
       "addAmount": "Añadir {amount}",
       "numpadClear": "Borrar",
       "lineNoteOf": "Nota en {name}",
@@ -502,16 +502,16 @@
       "deleteFailed": "No se ha podido eliminar la nota rápida."
     },
     "departments": {
-      "intro": "Las familias que el TPV ofrece al cobrar un importe que no está en el catálogo. Cada una lleva su IVA. Si dejas la lista vacía, el TPV vuelve a ofrecer las categorías fiscales tal cual.",
-      "search": "Buscar un departamento…",
-      "loading": "Cargando departamentos…",
-      "empty": "Todavía no hay departamentos. Añade las familias que cobras a mano: «Frutas y verduras», «Carnicería», «Droguería».",
+      "intro": "Las secciones que el TPV ofrece al cobrar un importe que no está en el catálogo. Cada una lleva su IVA. Si dejas la lista vacía, el TPV vuelve a ofrecer las categorías fiscales tal cual.",
+      "search": "Buscar una sección…",
+      "loading": "Cargando secciones…",
+      "empty": "Todavía no hay secciones. Añade las que cobras a mano: «Frutas y verduras», «Carnicería», «Droguería».",
       "noResults": "Sin resultados",
-      "noResultsMessage": "Ningún departamento coincide con tu búsqueda.",
-      "loadError": "No se han podido cargar los departamentos.",
+      "noResultsMessage": "Ninguna sección coincide con tu búsqueda.",
+      "loadError": "No se han podido cargar las secciones.",
       "entity": {
-        "one": "departamento",
-        "many": "departamentos"
+        "one": "sección",
+        "many": "secciones"
       },
       "columns": {
         "name": "Nombre",
@@ -522,19 +522,19 @@
       "edit": "Editar",
       "delete": "Eliminar",
       "form": {
-        "createTitle": "Nuevo departamento",
-        "editTitle": "Editar departamento",
+        "createTitle": "Nueva sección",
+        "editTitle": "Editar sección",
         "add": "Añadir",
         "save": "Guardar",
         "namePlaceholder": "p. ej. Frutas y verduras",
         "taxPlaceholder": "Elige el IVA"
       },
-      "taxCategoryMissing": "Elige el IVA que cobra este departamento.",
-      "saveFailed": "No se ha podido guardar el departamento.",
-      "deleteTitle": "Eliminar departamento",
+      "taxCategoryMissing": "Elige el IVA que cobra esta sección.",
+      "saveFailed": "No se ha podido guardar la sección.",
+      "deleteTitle": "Eliminar sección",
       "deleteMessage": "{name} — Deja de ofrecerse en el TPV. Lo ya vendido conserva el nombre y el IVA con los que se cobró.",
       "deleteCancel": "Cancelar",
-      "deleteFailed": "No se ha podido eliminar el departamento."
+      "deleteFailed": "No se ha podido eliminar la sección."
     },
     "settings": {
       "heading": "TPV",

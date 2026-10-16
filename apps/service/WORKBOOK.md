@@ -963,7 +963,7 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   devolver su venta (F27)**: el TPV del producto actual tampoco lo ofrecía (solo el asistente o la API,
   con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
   categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
-  el departamento de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
+  la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **El aviso de citas próximas al archivar (F04)**: llega con Citas.
 - **La entrega de los avisos de otras apps** (F28, F29 al anonimizar, F32 al dar de baja): las
   reacciones están hechas y probadas con los avisos reales; las ejecuta el relay del outbox, que llega

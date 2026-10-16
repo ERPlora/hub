@@ -4,11 +4,19 @@
 // any Iconify host, no icon fetched as a URL from our server and no failed request at all.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, createItem, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
+import { A, createItem, type Item, listReady, login, openApps, psql, record, shot, shown, uniqueName } from './helpers';
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com|iconify/i;
 
 type IconState = { where: string; name: string; host: string; painted: boolean; width: number; height: number };
+
+/** The items this file made: deleted after it, whatever the run left. */
+const mine: Item[] = [];
+
+test.afterAll(() => {
+  const ids = mine.map((item) => `'${item.id}'`).join(',');
+  if (ids) psql(`delete from demo_itemline where item_id in (${ids}); delete from demo_item where id in (${ids})`);
+});
 
 /** Every visible `ion-icon` (light DOM and shadow roots) and whether it painted a sized `<svg>`. */
 async function icons(page: Page, where: string): Promise<IconState[]> {
@@ -65,7 +73,11 @@ test('every visible ion-icon paints a sized SVG; no Iconify request, no icon URL
     if (/ionicons|could not load icon/i.test(msg.text())) ionWarnings.push(msg.text());
   });
 
-  const item = await createItem(context, A, uniqueName('Icons'));
+  // Eleven of its own, so that the pager at 10 per page has a second page on any database: a run's own e2e
+  // database starts empty (tests/e2e/README.md), and other runs' leftovers are no fixture.
+  const name = uniqueName('Icons');
+  for (let n = 1; n <= 11; n += 1) mine.push(await createItem(context, A, `${name} ${n}`));
+  const item = mine[0];
   const all: IconState[] = [];
 
   // Desktop: the shell's topbar (back, apps, user), the list toolbar (search, choosers, segment,

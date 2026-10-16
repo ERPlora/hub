@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Deploys an image tag of the hub to one environment of the ECS cluster erplora-prod (PLAN-AWS §6),
-# touching only that environment's hub task families and services:
-#   prod: families erplora-prod-{hub,worker,hub-migrate}, services hub and worker, image erplora/hub;
-#   pre:  families erplora-pre-{hub,worker,hub-migrate}, services hub-pre and worker-pre (the
-#         team's pre-production, in the same cluster), image erplora/hub-pre.
+# Deploys an image tag of the hub to one environment, in that environment's ECS cluster
+# (erplora-<environment>; PLAN-AWS §6), touching only its hub task families and services:
+#   prod: cluster erplora-prod, families erplora-prod-{hub,worker,hub-migrate}, services hub and
+#         worker, image erplora/hub;
+#   pre:  cluster erplora-pre, families erplora-pre-{hub,worker,hub-migrate}, services hub-pre and
+#         worker-pre (the team's pre-production), image erplora/hub-pre.
 #   0. reads the latest ACTIVE revision of each family and refuses, before registering anything, one
 #      that is not of this environment: tag Environment=<environment> and task and execution roles
 #      erplora-<environment>-* (the deploy roles can register any family: ECS takes no resource
@@ -28,7 +29,7 @@
 #   rollback workflow (ecs-rollback.sh); back to a release, the deploy workflow with that release.
 #
 # Env: AWS_REGION, REGISTRY (ECR registry host), IMAGE_TAG (image tag = commit SHA), ENVIRONMENT
-#      (prod | pre); optional CLUSTER (erplora-prod, also pre's), POLL_SECONDS (15),
+#      (prod | pre); optional CLUSTER (erplora-<environment>), POLL_SECONDS (15),
 #      MIGRATE_TIMEOUT_SECONDS (3600), ROLLOUT_TIMEOUT_SECONDS (600).
 set -euo pipefail
 
@@ -47,7 +48,7 @@ case "$ENVIRONMENT" in
     exit 1
     ;;
 esac
-CLUSTER="${CLUSTER:-erplora-prod}"
+CLUSTER="${CLUSTER:-erplora-$ENVIRONMENT}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
 MIGRATE_TIMEOUT_SECONDS="${MIGRATE_TIMEOUT_SECONDS:-3600}"
 ROLLOUT_TIMEOUT_SECONDS="${ROLLOUT_TIMEOUT_SECONDS:-600}"

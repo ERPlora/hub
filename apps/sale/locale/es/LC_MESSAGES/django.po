@@ -20,8 +20,8 @@ msgstr "Ventas / TPV"
 msgid "The till: build the check, charge it in cash, by card or split, and void or refund a sale."
 msgstr "La caja: monta la cuenta, cóbrala en efectivo, con tarjeta o repartida, y anula o devuelve una venta."
 
-msgid "Sales & POS is the business's cash register. Build the check by tapping articles or typing an open price by department, add notes, discounts and comps, park it and pick it up again, charge it whole or in parts, in cash with change, by card or split between several methods, as a ticket or a full invoice. Every sale gets its number of the day and its VAT line by line, is never edited, and is corrected by voiding it or refunding it, whole or in part. Inventory lowers the stock and Customers adds the purchase on their own."
-msgstr "Ventas / TPV es la caja registradora del negocio. Monta la cuenta tocando artículos o tecleando un precio libre por departamento, añade notas, descuentos e invitaciones, apárcala y recupérala, cóbrala entera o por partes, en efectivo con cambio, con tarjeta o repartida entre varios medios, como tique o como factura completa. Cada venta lleva su número del día y su IVA línea a línea, nunca se edita y se corrige anulándola o devolviéndola, entera o en parte. Inventario baja el stock y Clientes suma la compra por su cuenta."
+msgid "Sales & POS is the business's cash register. Build the check by tapping articles or typing an open price by section, add notes, discounts and comps, park it and pick it up again, charge it whole or in parts, in cash with change, by card or split between several methods, as a ticket or a full invoice. Every sale gets its number of the day and its VAT line by line, is never edited, and is corrected by voiding it or refunding it, whole or in part. Inventory lowers the stock and Customers adds the purchase on their own."
+msgstr "Ventas / TPV es la caja registradora del negocio. Monta la cuenta tocando artículos o tecleando un precio libre por sección, añade notas, descuentos e invitaciones, apárcala y recupérala, cóbrala entera o por partes, en efectivo con cambio, con tarjeta o repartida entre varios medios, como tique o como factura completa. Cada venta lleva su número del día y su IVA línea a línea, nunca se edita y se corrige anulándola o devolviéndola, entera o en parte. Inventario baja el stock y Clientes suma la compra por su cuenta."
 
 msgid "Sell"
 msgstr "Vender"
@@ -32,8 +32,8 @@ msgstr "Ventas"
 msgid "Quick notes"
 msgstr "Notas rápidas"
 
-msgid "Departments"
-msgstr "Departamentos"
+msgid "Sections"
+msgstr "Secciones"
 
 msgid "Settings"
 msgstr "Ajustes"
@@ -497,12 +497,12 @@ msgstr "La cantidad no encaja con el escalón del producto (%(step)s %(unit)s)."
 msgid "Only someone who may sell at an open price can add this line: ask a manager."
 msgstr "Solo puede añadir esta línea quien puede vender a precio libre: pídeselo a un responsable."
 
-msgid "That department is no longer in this business. Reload the list and try again."
-msgstr "Ese departamento ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
+msgid "That section is no longer in this business. Reload the list and try again."
+msgstr "Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
 
 #, python-format
-msgid "Several departments match «%(said)s»: %(names)s. Say which one."
-msgstr "Varios departamentos casan con «%(said)s»: %(names)s. Di cuál."
+msgid "Several sections match «%(said)s»: %(names)s. Say which one."
+msgstr "Varias secciones casan con «%(said)s»: %(names)s. Di cuál."
 
 msgid "That quick note is no longer in this business. Reload the list and try again."
 msgstr "Esa nota rápida ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
@@ -524,8 +524,8 @@ msgstr "Varias formas de pago casan con «%(said)s»: %(names)s. Di cuál."
 msgid "Say which product: its id, or its SKU or name."
 msgstr "Di qué producto: su id, o su SKU o su nombre."
 
-msgid "Say which department (or tax category) the open price is charged at."
-msgstr "Di con qué departamento (o categoría fiscal) se cobra el precio libre."
+msgid "Say which section (or tax category) the open price is charged at."
+msgstr "Di con qué sección (o categoría fiscal) se cobra el precio libre."
 
 msgid "Say which sale: its id or its number."
 msgstr "Di qué venta: su id o su número."
@@ -533,8 +533,8 @@ msgstr "Di qué venta: su id o su número."
 msgid "Say which payment method: its id, its name or its type."
 msgstr "Di qué forma de pago: su id, su nombre o su tipo."
 
-msgid "Say which department: its id or its name."
-msgstr "Di qué departamento: su id o su nombre."
+msgid "Say which section: its id or its name."
+msgstr "Di qué sección: su id o su nombre."
 
 msgid "Say which quick note: its id or its text."
 msgstr "Di qué nota rápida: su id o su texto."

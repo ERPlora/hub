@@ -25,8 +25,8 @@ setup() {
   printf '%s\t' "$td/erplora-prod-hub-migrate:14" "$td/erplora-prod-hub-migrate:11" "$td/erplora-prod-hub:13" \
     "$td/erplora-prod-hub:12" "$td/erplora-prod-hub:10" "$td/erplora-prod-hub:9" > "$FIXTURES/list-erplora-prod-hub"
   printf '%s\t' "$td/erplora-prod-worker:12" "$td/erplora-prod-worker:10" > "$FIXTURES/list-erplora-prod-worker"
-  # pre: services hub-pre and worker-pre on revision 7 of erplora-pre-{hub,worker}, in the same
-  # cluster; the previous one of each is 5.
+  # pre: services hub-pre and worker-pre on revision 7 of erplora-pre-{hub,worker}, in pre's own
+  # cluster (erplora-pre); the previous one of each is 5.
   echo "$td/erplora-pre-hub:7" > "$STATE/primary-hub-pre"
   echo "$td/erplora-pre-worker:7" > "$STATE/primary-worker-pre"
   printf '%s\t' "$td/erplora-pre-hub-migrate:8" "$td/erplora-pre-hub:7" "$td/erplora-pre-hub:5" \
@@ -156,6 +156,12 @@ check() {
 
 line_of() { grep -n -- "$1" "$CALLS_LOG" | head -1 | cut -d: -f1; }
 last_line_of() { grep -n -- "$1" "$CALLS_LOG" | tail -1 | cut -d: -f1; }
+# clusters_named: the clusters the cluster-scoped ECS calls named, one per line, without repeats
+# ("-" for such a call without --cluster); nothing when there was no such call.
+clusters_named() {
+  grep -E "^ecs (describe-services|update-service|wait) " "$CALLS_LOG" |
+    awk '{ c = "-"; for (i = 1; i < NF; i++) if ($i == "--cluster") c = $(i + 1); print c }' | sort -u
+}
 # reads_of <service>: how many times its PRIMARY deployment was read after the wait.
 reads_of() {
   local from
@@ -199,24 +205,26 @@ check "the tag is recorded only after the services are checked" \
   '[ "$(line_of "ssm put-parameter")" -gt "$(last_line_of "describe-services")" ]'
 check "every aws call names the region" '[ -s "$CALLS_LOG" ] && ! grep -qv -- "--region eu-south-2" "$CALLS_LOG"'
 check "nothing of pre is touched" '! grep -Eq "erplora-pre|-pre |/erplora/pre/" "$CALLS_LOG"'
+check "every cluster-scoped call names prod's cluster, erplora-prod" '[ "$(clusters_named)" = erplora-prod ]'
 
-# --- pre: its own services, families and tag, in the same cluster ------------------------
+# --- pre: its own cluster, services, families and tag ------------------------------------
 setup
 run_rollback ENVIRONMENT=pre && status=0 || status=$?
 check "pre: the rollback succeeds" '[ "$status" -eq 0 ]'
+check "pre: every cluster-scoped call names pre's cluster, erplora-pre" '[ "$(clusters_named)" = erplora-pre ]'
 check "pre: lists only pre's families" \
   '[ "$(grep -c "list-task-definitions" "$CALLS_LOG")" -eq 2 ] &&
    for f in hub worker; do grep -q "list-task-definitions --family-prefix erplora-pre-$f --status ACTIVE" "$CALLS_LOG" || exit 1; done'
 check "pre: rolls back only hub-pre and worker-pre, to their previous revisions" \
   '[ "$(grep -c "update-service" "$CALLS_LOG")" -eq 2 ] &&
-   grep -q "update-service --cluster erplora-prod --service hub-pre --task-definition $td/erplora-pre-hub:5 " "$CALLS_LOG" &&
-   grep -q "update-service --cluster erplora-prod --service worker-pre --task-definition $td/erplora-pre-worker:5 " "$CALLS_LOG"'
+   grep -q "update-service --cluster erplora-pre --service hub-pre --task-definition $td/erplora-pre-hub:5 " "$CALLS_LOG" &&
+   grep -q "update-service --cluster erplora-pre --service worker-pre --task-definition $td/erplora-pre-worker:5 " "$CALLS_LOG"'
 check "pre: a rollback does not wake pre up" '! grep -q "desired-count" "$CALLS_LOG"'
 check "pre: waits for hub-pre and worker-pre" 'grep -Eq "wait services-stable .*--services hub-pre worker-pre( |$)" "$CALLS_LOG"'
 check "pre: records the restored tag in its own parameter" \
   'grep -q "^ssm put-parameter --name /erplora/pre/hub/image_tag --value tag-5 --type String --overwrite" "$CALLS_LOG"'
-check "pre: never names a prod family, service or parameter" \
-  '! grep -Eq "erplora-prod-|/erplora/prod/|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG"'
+check "pre: never names a prod cluster, family, service or parameter" \
+  '! grep -Eq "erplora-prod|/erplora/prod/|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG"'
 setup
 echo "$td/erplora-pre-hub:5 reg.example/erplora/hub:tag-5" > "$FIXTURES/images"
 run_rollback ENVIRONMENT=pre && status=0 || status=$?
@@ -227,6 +235,14 @@ echo "$td/erplora-prod-hub:12" > "$STATE/primary-hub-pre"
 run_rollback ENVIRONMENT=pre && status=0 || status=$?
 check "pre: a pre service on a prod revision fails without changing anything" \
   '[ "$status" -ne 0 ] && ! grep -Eq "update-service|put-parameter" "$CALLS_LOG" && grep -q "::error::hub-pre .*erplora-pre-hub" "$work/out.log"'
+
+# --- an explicit CLUSTER wins over the environment's own --------------------------------
+for environment in prod pre; do
+  setup
+  run_rollback ENVIRONMENT="$environment" CLUSTER=custom-cluster && status=0 || status=$?
+  check "$environment: an explicit CLUSTER is used in every cluster-scoped call" \
+    '[ "$status" -eq 0 ] && [ "$(clusters_named)" = custom-cluster ]'
+done
 
 # --- a target revision of another environment is refused, before changing anything ------
 # refused_target <revision>: the rollback failed naming <revision> and changed nothing.

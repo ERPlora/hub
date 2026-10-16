@@ -31,7 +31,7 @@ Quién la usa:
   ventas.
 - El **responsable**: además vende a precio libre, aplica descuentos por encima del máximo, anula una
   cuenta abierta o una línea ya enviada a cocina, anula y devuelve ventas, ve las cifras y prepara las
-  notas rápidas, los departamentos, los medios de pago y los ajustes del TPV.
+  notas rápidas, las secciones, los medios de pago y los ajustes del TPV.
 - El **propietario** y el **administrador**: todo.
 
 Ventas no guarda mesas ni clientes en la cuenta (son de Mesas y de Clientes), no numera facturas ni
@@ -71,7 +71,7 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   encendida: sin las reglas de IVA no se cierra ninguna venta, y la venta guarda la ficha de su
   cliente.
 - **Inventario** es opcional. Con él, el TPV vende su catálogo y la venta baja el stock; sin él, el
-  TPV vende a precio libre por departamento y lo dice en la rejilla.
+  TPV vende a precio libre por sección y lo dice en la rejilla.
 - **Servicios** es opcional (peluquería). Con él, el TPV vende sus servicios (SALE-F38), al precio
   propio de la profesional si lo tiene, y una línea de servicio se puede pagar con un bono de la
   clienta (SALE-F27).
@@ -91,14 +91,15 @@ Configuración inicial, paso a paso:
 
 1. **Ajustes** del TPV: medios permitidos, descuentos y descuento máximo, cliente obligatorio,
    documento por defecto, cabecera y pie del tique (SALE-F34).
-2. **Departamentos**, si se cobra a precio libre (frutería, varios) (SALE-F35).
+2. **Secciones**, si se cobra a precio libre (frutería, varios) (SALE-F35).
 3. **Notas rápidas**, si la cocina recibe instrucciones repetidas (SALE-F36).
 4. Haz una venta de prueba con cada medio y comprueba el tique (SALE-F01, SALE-F02, SALE-F29).
 
 ## Pantallas
 
 Ventas / TPV se abre desde el menú **Ventas / TPV** y tiene cinco entradas: **Vender**, **Ventas**,
-**Notas rápidas**, **Departamentos** y **Ajustes**.
+**Notas rápidas**, **Secciones** y **Ajustes**. «Secciones» es lo que el producto actual llamaba
+«Departamentos»: la palabra corta cabe en la barra de pestañas de un móvil con las cinco a la vista.
 
 ### Vender
 Se abre a pantalla completa de la aplicación; el menú ⋮ de la tira de categorías tiene «Pantalla
@@ -178,9 +179,9 @@ Explicación, tabla (Nota, Posición) con buscador, **+** para añadir y, por fi
 «Eliminar». Vacía: «Todavía no hay notas rápidas…»; cargando: «Cargando notas rápidas…». Quien no
 tiene el permiso de ajustes la ve sin **+** ni acciones.
 
-### Departamentos
+### Secciones
 Explicación, tabla (Nombre, IVA que cobra, Posición), **+** y, por fila, «Editar» y «Eliminar». Vacía:
-«Todavía no hay departamentos…»; cargando: «Cargando departamentos…». Quien no tiene el permiso de
+«Todavía no hay secciones…»; cargando: «Cargando secciones…». Quien no tiene el permiso de
 ajustes la ve sin **+** ni acciones.
 
 ### Ajustes
@@ -211,7 +212,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F06 | Recuperar un cobro que se quedó sin respuesta | común | hecho |
 | SALE-F07 | El TPV avisa de lo que hoy no se puede vender | común | parcial |
 | SALE-F08 | Cobrar sin la caja abierta | común | hecho |
-| SALE-F09 | Vender a precio libre por departamento | común | hecho |
+| SALE-F09 | Vender a precio libre por sección | común | hecho |
 | SALE-F10 | Vender por peso, tecleando la cantidad | común | hecho |
 | SALE-F11 | Elegir los suplementos de un artículo | común | no hecho: Suplementos |
 | SALE-F12 | Componer un menú | restaurante | no hecho: Menús |
@@ -237,7 +238,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F32 | Devolver la sesión de un bono | peluquería | hecho |
 | SALE-F33 | Unir las ventas de dos fichas de cliente | común | hecho |
 | SALE-F34 | Ajustar el TPV | común | hecho |
-| SALE-F35 | Dar de alta y ordenar los departamentos del precio libre | común | hecho |
+| SALE-F35 | Dar de alta y ordenar las secciones del precio libre | común | hecho |
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | parcial |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
@@ -438,22 +439,22 @@ el bloqueo cede antes que parar las ventas, y Caja enseña ese cobro entre los d
 (CASH_REGISTER-F17).
 Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
 
-### SALE-F09 Vender a precio libre por departamento
+### SALE-F09 Vender a precio libre por sección
 Estado: hecho
 Vertical: común
 Actor: responsable (empleado con el permiso de precio libre)
 Pantalla: Vender
 Pasos:
 1. Toca la baldosa «Precio libre», al final de la rejilla.
-2. Marca el importe en el teclado y elige el departamento en «Departamento (IVA)»; cada botón enseña su
+2. Marca el importe en el teclado y elige la sección en «Sección (IVA)»; cada botón enseña su
    tipo de IVA.
-3. Pulsa «Añadir <importe>»: entra una línea con el nombre del departamento y ese importe. Nunca se
+3. Pulsa «Añadir <importe>»: entra una línea con el nombre de la sección y ese importe. Nunca se
    suma a otra línea.
-Entra: los departamentos del negocio (SALE-F35) o, si no hay, las categorías de IVA de Impuestos.
+Entra: las secciones del negocio (SALE-F35) o, si no hay, las categorías de IVA de Impuestos.
 Sale: una línea sin artículo de catálogo, con su importe y su categoría de IVA, que se cobra como
 cualquier otra.
-Si falla: «Añadir» no se puede pulsar sin importe y departamento; sin departamentos ni categorías,
-«Sin departamentos configurados.». Sin el permiso de precio libre la baldosa dice «Lo tiene que hacer
+Si falla: «Añadir» no se puede pulsar sin importe y sección; sin secciones ni categorías, «No hay
+categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.». Sin el permiso de precio libre la baldosa dice «Lo tiene que hacer
 un responsable» y el servidor rechaza la línea por cualquier vía (también al cobrar directamente).
 Implicados: TAX-F18
 
@@ -992,23 +993,23 @@ necesitas.». Si se apagan todos los medios de pago que existen, el TPV y el ser
 aceptar todos los medios activos.
 Implicados: ninguno
 
-### SALE-F35 Dar de alta y ordenar los departamentos del precio libre
+### SALE-F35 Dar de alta y ordenar las secciones del precio libre
 Estado: hecho
 Vertical: común
 Actor: responsable
-Pantalla: Departamentos
+Pantalla: Secciones
 Pasos:
-1. Abre **Ventas / TPV → Departamentos**.
+1. Abre **Ventas / TPV → Secciones**.
 2. Pulsa **+**, escribe el Nombre («p. ej. Frutas y verduras»), elige «IVA que cobra» y la Posición.
 3. Pulsa «Añadir». Para cambiarlo, toca «Editar», corrige y pulsa «Guardar»; para quitarlo,
    «Eliminar» y confirma.
-4. En **Vender**, la baldosa «Precio libre» ofrece estos departamentos en ese orden, con su IVA al
+4. En **Vender**, la baldosa «Precio libre» ofrece estas secciones en ese orden, con su IVA al
    lado. Con la lista vacía ofrece las categorías de IVA tal cual.
 Entra: las categorías de IVA de Impuestos.
-Sale: el departamento (nombre, categoría de IVA, posición). Lo ya vendido conserva el nombre y el IVA
+Sale: la sección (nombre, categoría de IVA, posición). Lo ya vendido conserva el nombre y el IVA
 con que se cobró.
-Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Un departamento que otro ya
-borró: «Ese departamento ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
+Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Una sección que otro ya
+borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
 Implicados: TAX-F01
 
 ### SALE-F36 Preparar las notas rápidas
@@ -1095,7 +1096,7 @@ Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F05, APPOINTMENT-F17
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
 persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: un producto se
 nombra por su id, su SKU o su nombre; un cliente por su id, su nombre, su teléfono o su email; una
-venta por su id o su número; un departamento o una nota rápida por su id o su nombre; un medio de
+venta por su id o su número; una sección o una nota rápida por su id o su nombre; un medio de
 pago por su id, su nombre o su tipo («efectivo», «tarjeta»). Si un nombre casa con varios, se rechaza
 diciendo cuáles (409 `*_ambiguous`).
 
@@ -1116,15 +1117,15 @@ diciendo cuáles (409 `*_ambiguous`).
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
 | Los ajustes del TPV (para editarlos) | ajustes | F34 | `sale.settings.get` |
 | Los ajustes que el TPV necesita para vender | ver ventas | F01–F05 | `sale.pos_settings.get` |
-| Los departamentos, en su orden, con su IVA de hoy | ver ventas | F09, F35 | `sale.department.list` |
+| Las secciones, en su orden, con su IVA de hoy | ver ventas | F09, F35 | `sale.department.list` |
 | Las notas rápidas, en su orden | ver ventas | F13, F36 | `sale.quick_note.list` |
 | El día del negocio de hoy | ver ventas | F28 | `sale.business_day.get` |
 | Por cada cobro de una venta, lo devuelto y lo que queda, y por cada línea lo que ya volvió | ver ventas | F31 | `sale.refund.options` |
 | Las devoluciones de una venta, con el estado y el número de su rectificativa | ver ventas | F31 | `sale.refund.list` |
 | La devolución grabada con una clave | ver ventas | F31 | `sale.refund.by_idempotency_key` |
 
-Las ventas, las cifras, las cuentas, la previsión del cobro, los medios de pago, los ajustes, los
-departamentos, las notas rápidas y lo devolvible se pueden seguir en vivo.
+Las ventas, las cifras, las cuentas, la previsión del cobro, los medios de pago, los ajustes, las
+secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1156,7 +1157,7 @@ departamentos, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Enlaza una cuenta a su cita | montar la cuenta | F26 | `sale.order.set_appointment` |
 | Crea un medio de pago | crear medios de pago | F37 | `sale.payment_method.create` |
 | Guarda los ajustes del TPV | ajustes | F34 | `sale.settings.update` |
-| Crea, cambia y elimina departamentos | ajustes | F35 | `sale.department.create`, `.update`, `.delete` |
+| Crea, cambia y elimina secciones | ajustes | F35 | `sale.department.create`, `.update`, `.delete` |
 | Crea, cambia y elimina notas rápidas | ajustes | F36 | `sale.quick_note.create`, `.update`, `.delete` |
 
 ### Lo que avisa
@@ -1177,7 +1178,7 @@ departamentos, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
 | Línea quitada | Quitar o anular una línea | La cuenta y la línea | `sale.order.line_removed` |
 | Línea anulada | Anular una línea enviada | La cuenta, la línea y el motivo | `sale.order.line_voided` |
-| Medio de pago, ajustes, departamento, nota rápida | Crearlos o cambiarlos | Cuál | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |
+| Medio de pago, ajustes, sección, nota rápida | Crearlos o cambiarlos | Cuál | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |
 
 ### A qué reacciona
 
@@ -1230,7 +1231,7 @@ departamentos, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver ventas, cuentas, ajustes del TPV, departamentos y notas rápidas | sí | sí | sí | sí | `sale.view_sale` |
+| Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas | sí | sí | sí | sí | `sale.view_sale` |
 | Montar la cuenta (abrir, añadir, cambiar, quitar, dividir, juntar, enviar a cocina, descuento hasta el máximo) | sí | sí | sí | sí | `sale.add_sale` |
 | Cobrar | sí | sí | sí | sí | `sale.take_payment` |
 | Vender a precio libre | sí | sí | sí | no | `sale.sell_open_price` |
@@ -1240,7 +1241,7 @@ departamentos, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Ver los medios de pago | sí | sí | sí | sí | `sale.view_paymentmethod` |
 | Crear medios de pago | sí | sí | sí | no | `sale.add_paymentmethod` |
 | Ver las cifras | sí | sí | sí | no | `sale.view_reports` |
-| Ajustes, departamentos y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
+| Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
 cajero del producto actual es un empleado.
@@ -1293,7 +1294,7 @@ administrador y responsable, los mismos que anulan y devuelven).
   añadirla; la cantidad tiene que encajar en el escalón de su unidad (`sale.quantity_off_grid`, nunca
   se redondea). El precio es por `price_quantity` de `pricing_unit`: importe = precio × (cantidad en la
   unidad del precio) ÷ `price_quantity`, una sola vez a mitad hacia arriba. Una línea libre lleva el
-  importe que se teclea y la categoría de su departamento (o una categoría de Impuestos) y exige
+  importe que se teclea y la categoría de su sección (`Department`; o una categoría de Impuestos) y exige
   `sale.sell_open_price` por cualquier vía.
 - **La valoración** (`pricing.py`, la misma para la previsión y el cobro) es la del producto actual:
   descuento efectivo de línea y de cuenta, `exacto = precio × (1 − ef) × cantidad`, importe a mitad
@@ -1436,7 +1437,7 @@ administrador y responsable, los mismos que anulan y devuelven).
 9. **Un nombre repetido de medio de pago se rechaza** (antes nacían dos «Bizum»).
 10. **Cada línea cobrada queda atada a su venta**, también en el cobro que cierra la cuenta.
 11. **Referencias humanas**: producto por SKU o nombre, cliente por nombre o teléfono, venta por número,
-    medio de pago por nombre o tipo, departamento y nota por nombre (409 `*_ambiguous` si casan
+    medio de pago por nombre o tipo, sección y nota por nombre (409 `*_ambiguous` si casan
     varios).
 12. **El cajero** es un empleado: monta la cuenta y cobra.
 13. **Las cifras del panel de inicio** (los widgets «Ventas hoy», «Tickets hoy», «Ventas últimos 7
