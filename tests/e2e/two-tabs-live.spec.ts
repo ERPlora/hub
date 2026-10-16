@@ -3,11 +3,13 @@
 import { expect, test } from '@playwright/test';
 
 import { A, appearedAt, createViaPage, listReady, login, record, row, shot, shown, uniqueName, watchForRow } from './helpers';
+import { recordResponses, responseEnd } from './resource-timing';
 
 const ROUNDS = 3;
 
 test('create in tab 1 → tab 2 paints the row in < 1 s, no reload, focus kept', async ({ context }) => {
   const tab1 = await context.newPage();
+  await recordResponses(tab1);
   await login(tab1, A);
   const tab2 = await context.newPage();
   await tab2.goto('/demo/items');
@@ -26,21 +28,22 @@ test('create in tab 1 → tab 2 paints the row in < 1 s, no reload, focus kept',
     await expect(row(tab2, name)).toBeVisible({ timeout: 5000 });
     await expect(row(tab1, name)).toBeVisible();
 
-    const clickedAt = await tab1.evaluate(() => (window as unknown as { __saveClickedAt: number }).__saveClickedAt);
-    const createdAt = await tab1.evaluate(() => {
-      const entry = performance
-        .getEntriesByType('resource')
-        .filter((e) => e.name.endsWith('/api/demo/items') && (e as PerformanceResourceTiming).initiatorType === 'fetch')
-        .at(-1) as PerformanceResourceTiming | undefined;
-      return entry ? performance.timeOrigin + entry.responseEnd : NaN;
+    const clicked = await tab1.evaluate(() => {
+      const w = window as unknown as { __saveClickedAt?: number; __saveClickedPageMs?: number };
+      return { at: w.__saveClickedAt, pageMs: w.__saveClickedPageMs };
     });
-    const tab2At = (await appearedAt(tab2, name)) ?? NaN;
-    const tab1At = (await appearedAt(tab1, name)) ?? NaN;
+    const tab2At = await appearedAt(tab2, name);
+    const tab1At = await appearedAt(tab1, name);
+    expect(clicked.at, `${name}: tab 1 timed the click on «Save»`).toBeDefined();
+    expect(tab2At, `${name}: tab 2 timed its row`).toBeDefined();
+    expect(tab1At, `${name}: tab 1 timed its row`).toBeDefined();
+    // The POST that click sent, from the recorder: Vite's dev modules fill the page's resource timing buffer.
+    const createdAt = (await responseEnd(tab1, '/api/demo/items', { since: clicked.pageMs })).epochMs;
     rounds.push({
       name,
-      clickToTab2Ms: tab2At - clickedAt,
-      responseToTab2Ms: Math.round(tab2At - createdAt),
-      clickToTab1Ms: tab1At - clickedAt,
+      clickToTab2Ms: tab2At! - clicked.at!,
+      responseToTab2Ms: Math.round(tab2At! - createdAt),
+      clickToTab1Ms: tab1At! - clicked.at!,
     });
   }
   await tab1.screenshot({ path: shot('02-tab1-after-create') });

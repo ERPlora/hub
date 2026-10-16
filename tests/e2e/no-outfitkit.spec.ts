@@ -5,10 +5,14 @@
 import { type Page, expect, test } from '@playwright/test';
 
 import { A, createItem, listReady, login, record, shot, shown, uniqueName } from './helpers';
+import { recordResponses, resourceUrls } from './resource-timing';
 
-/** What is left of OutfitKit on the current screen. */
+/**
+ * What is left of OutfitKit on the current screen. Its modules come from the recorder (`recordResponses`): Vite's
+ * dev modules fill the page's resource timing buffer, and one loaded past it would not be seen.
+ */
 async function outfitkitTraces(page: Page) {
-  return page.evaluate(() => {
+  const traces = await page.evaluate(() => {
     const all: Element[] = [];
     const walk = (root: Document | ShadowRoot) => {
       for (const el of root.querySelectorAll('*')) {
@@ -24,10 +28,6 @@ async function outfitkitTraces(page: Page) {
     const defined = ['ok-data-table', 'ok-empty-state', 'ok-inline-feedback', 'ok-button', 'ok-icon', 'ok-widget-board'].filter(
       (tag) => customElements.get(tag) !== undefined,
     );
-    const modules = performance
-      .getEntriesByType('resource')
-      .map((e) => e.name)
-      .filter((url) => /outfitkit/i.test(url));
     const tableRoot = document.querySelector('.ion-page:not(.ion-page-hidden) .data-table');
     const okProps = new Set<string>();
     if (tableRoot) {
@@ -36,11 +36,14 @@ async function outfitkitTraces(page: Page) {
         for (let i = 0; i < style.length; i += 1) if (style[i].startsWith('--ok-')) okProps.add(style[i]);
       }
     }
-    return { elements: all.length, tags, attributes, defined, modules, dataTableOkProps: [...okProps], dataTableFound: !!tableRoot };
+    return { elements: all.length, tags, attributes, defined, dataTableOkProps: [...okProps], dataTableFound: !!tableRoot };
   });
+  const modules = (await resourceUrls(page)).filter((url) => /outfitkit/i.test(url));
+  return { ...traces, modules };
 }
 
 test('no ok-* element, attribute, definition, module or --ok-* token on list, cards, detail, create and edit', async ({ page, context }) => {
+  await recordResponses(page);
   await login(page, A);
   const item = await createItem(context, A, uniqueName('No OutfitKit'));
   const screens: Record<string, Awaited<ReturnType<typeof outfitkitTraces>>> = {};
@@ -83,6 +86,11 @@ test('no ok-* element, attribute, definition, module or --ok-* token on list, ca
   await page.goto(`/demo/items/${item.id}/edit`);
   await expect(shown(page).locator('[data-testid=demo-form-name] input')).toHaveValue(item.name);
   screens.edit = await outfitkitTraces(page);
+  // The module check catches the positive too, after Vite's modules filled the buffer: a request to an OutfitKit
+  // URL on this screen is reported.
+  await page.evaluate(() => fetch('/healthz?probe=outfitkit').then((res) => res.text()));
+  const moduleProbe = await outfitkitTraces(page);
+  expect(moduleProbe.modules).toEqual([expect.stringContaining('/healthz?probe=outfitkit')]);
 
   record('no-outfitkit', screens);
   expect(screens.list.dataTableFound).toBe(true);

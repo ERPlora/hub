@@ -4,9 +4,11 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, createItem, listReady, login, record, rowOf, shot, shown, uniqueName } from './helpers';
+import { recordResponses, responseEnd } from './resource-timing';
 
 test('delete asks first; cancel keeps it; confirm removes it here and the other tab says it no longer exists', async ({ context }) => {
   const tab1 = await context.newPage();
+  await recordResponses(tab1);
   await login(tab1, A);
   const item = await createItem(context, A, uniqueName('To delete'));
   const tab2 = await context.newPage();
@@ -52,19 +54,14 @@ test('delete asks first; cancel keeps it; confirm removes it here and the other 
   await expect(rowOf(tab1, item.id)).toHaveCount(0);
   const gone = shown(tab2).locator('[data-testid=demo-detail-error]');
   await expect(gone).toContainText('This item no longer exists.', { timeout: 5000 });
-  const toldAt = await tab2.evaluate(() => (window as unknown as { __toldAt?: number }).__toldAt ?? NaN);
-  const { clickedAt, deletedAt } = await tab1.evaluate(() => {
-    const entry = performance
-      .getEntriesByType('resource')
-      .filter((e) => e.name.endsWith('/api/demo/items/delete'))
-      .at(-1) as PerformanceResourceTiming | undefined;
-    return {
-      clickedAt: (window as unknown as { __clickedAt?: number }).__clickedAt ?? NaN,
-      deletedAt: entry ? performance.timeOrigin + entry.responseEnd : NaN,
-    };
-  });
-  const otherTabToldMs = toldAt - clickedAt;
-  const responseToOtherTabMs = Math.round(toldAt - deletedAt);
+  const toldAt = await tab2.evaluate(() => (window as unknown as { __toldAt?: number }).__toldAt);
+  const clickedAt = await tab1.evaluate(() => (window as unknown as { __clickedAt?: number }).__clickedAt);
+  expect(toldAt, 'tab 2 timed «This item no longer exists.»').toBeDefined();
+  expect(clickedAt, 'tab 1 timed the click on «Delete»').toBeDefined();
+  // Read from the recorder: Vite's dev modules fill the page's resource timing buffer before the click.
+  const deletedAt = (await responseEnd(tab1, '/api/demo/items/delete')).epochMs;
+  const otherTabToldMs = toldAt! - clickedAt!;
+  const responseToOtherTabMs = Math.round(toldAt! - deletedAt);
   await tab1.screenshot({ path: shot('delete-item--list-after') });
   await tab2.screenshot({ path: shot('delete-item--other-tab') });
   const afterDelete = await api(context, A, 'GET', `/demo/items/detail?id=${item.id}`);
