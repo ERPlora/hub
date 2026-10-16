@@ -2,17 +2,26 @@
 // Taxes → Rules (TAX-F03–F08, F11): the live `tax.rule.list` in a server-side DataTable — Category (a
 // component as «↳ label» right under its root), Country, Region, %, Type, Qualification, Valid from,
 // Valid to and Active —, search, Status (Active to begin with · Deactivated · All), the column filters
-// (Country among the business's, Region, Category, Type, Qualification, Regime, % from–to) and sort by
+// behind the table's funnel (Category, Country among the business's, Region, % from–to, Type,
+// Qualification, Regime) and sort by
 // any column. For whoever can manage: «+» («New tax rule») and the row actions «Set end date» and
 // «Deactivate» (confirmed), «Restore» on a deactivated rule (no confirmation: it undoes). A rule is
 // never edited (TAX-F07). Every change comes back through the stream; nothing here refetches.
-import { ConfirmDialog, type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
-import { useCommand, useLive } from '@erplora/ui/sdk';
+import {
+  ConfirmDialog,
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilterField,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+} from '@erplora/ui/components';
+import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import FilterPanel, { type FilterSpec, type FilterValues } from '../components/FilterPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RuleCreateModal from '../components/RuleCreateModal.vue';
 import RuleEndModal from '../components/RuleEndModal.vue';
@@ -21,7 +30,8 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { countryChoices } from '../lib/countries';
 import { formatDate, formatPercent } from '../lib/format';
-import { categoryOptionLabel, OPERATION_CLASSES, ruleCardTitle, ruleCategoryText, TAX_TYPES } from '../lib/rules';
+import { categorySearch } from '../lib/pickers';
+import { OPERATION_CLASSES, ruleCardTitle, ruleCategoryText, TAX_TYPES } from '../lib/rules';
 import type { RuleListIn, RuleOut, RuleStatusFilter } from '../operations';
 import { taxTabs } from '../tabs';
 
@@ -31,11 +41,13 @@ const session = useSession();
 const canManage = computed(() => session.can('tax.manage'));
 const t = useT();
 const locale = useLocale();
+const client = useLiveClient();
 
 // ── The list ───────────────────────────────────────────────────────────────────────────────────
 const table = useServerTable({ sort: 'tax_category_key' });
 const ruleStatus = ref<RuleStatusFilter>('active');
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel; Status is apart): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch([filters, ruleStatus], ([now, state]) => table.restart({ narrowed: Object.keys(now).length > 0 || state !== 'active' }));
 
 function setStatus(event: CustomEvent<{ value?: unknown }>): void {
@@ -54,13 +66,7 @@ table.followResult(result);
 /** The countries the business has rules for (a filter only narrows what is there): the server's. */
 const { data: countriesInUse } = useLive('tax.rule.countries', {});
 /** The Category filter searches the server: all the business's categories, not a first page. */
-const categoryQuery = ref('');
-const { data: categories } = useLive('tax.category.list', () => ({
-  search: categoryQuery.value || undefined,
-  sort: 'display_name' as const,
-  dir: 'asc' as const,
-  limit: 50,
-}));
+const findCategories = categorySearch(client);
 
 const blocked = computed(() => blockingError(error.value));
 /** A filter the server refused (a 422 of the list): said under the filter, the rows stay. */
@@ -75,27 +81,8 @@ const countries = computed(() => {
   return countryChoices(codes, locale.value);
 });
 
-const filterSpecs = computed<FilterSpec[]>(() => [
-  // Bounded as RuleListIn takes them: a longer region or regime, or a % off 0–100, is a 422.
-  { kind: 'select', key: 'country_code', label: t('tax.rules.columns.country'), options: countries.value },
-  { kind: 'text', key: 'region_code', label: t('tax.rules.columns.region'), maxlength: 6 },
-  {
-    kind: 'search',
-    key: 'tax_category_key',
-    label: t('tax.rules.columns.category'),
-    options: (categories.value?.rows ?? []).map((category) => ({ value: category.key, label: categoryOptionLabel(category) })),
-    search: (text: string) => (categoryQuery.value = text),
-  },
-  { kind: 'select', key: 'tax_type', label: t('tax.rules.columns.type'), options: TAX_TYPES.map((value) => ({ value, label: t(`tax.types.${value}`) })) },
-  {
-    kind: 'select',
-    key: 'operation_class',
-    label: t('tax.rules.columns.qualification'),
-    options: OPERATION_CLASSES.map((value) => ({ value, label: t(`tax.classes.${value}`) })),
-  },
-  { kind: 'text', key: 'regime_key', label: t('tax.rules.columns.regime'), maxlength: 10 },
-  { kind: 'range', key: 'rate', label: t('tax.rules.rateRange'), keys: ['rate_min', 'rate_max'], min: 0, max: 100 },
-]);
+/** The filters with no column of their own, after the columns' (bounded as RuleListIn takes it). */
+const filterFields = computed<DataTableFilterField[]>(() => [{ type: 'text', key: 'regime_key', label: t('tax.rules.columns.regime'), maxlength: 10 }]);
 
 // ── Columns and cards ──────────────────────────────────────────────────────────────────────────
 const dash = (value: unknown): string => (value === null || value === undefined || value === '' ? '—' : String(value));
@@ -105,13 +92,54 @@ const day = (value: unknown): string => (typeof value === 'string' && value ? fo
 const qualification = (row: RuleOut): string =>
   [t(`tax.classes.${row.operation_class}`), row.operation_class === 'exempt' ? row.exempt_reason : null].filter(Boolean).join(' · ');
 
+// The filters bounded as RuleListIn takes them: a longer region or regime, or a % off 0–100, is a 422.
 const columns = computed<DataTableColumn<RuleOut>[]>(() => [
-  { key: 'tax_category_key', label: t('tax.rules.columns.category'), sortable: true, priority: 'high', format: (_, row) => ruleCategoryText(row) },
-  { key: 'country_code', label: t('tax.rules.columns.country'), sortable: true, width: 'minmax(4.5rem,0.6fr)' },
-  { key: 'region_code', label: t('tax.rules.columns.region'), sortable: true, width: 'minmax(4.5rem,0.6fr)', format: dash },
-  { key: 'rate_pct', label: t('tax.rules.columns.rate'), sortable: true, align: 'right', width: 'minmax(4.5rem,0.6fr)', format: (_, row) => formatPercent(row.rate_pct, locale.value) },
-  { key: 'tax_type', label: t('tax.rules.columns.type'), sortable: true, format: (_, row) => t(`tax.types.${row.tax_type}`) },
-  { key: 'operation_class', label: t('tax.rules.columns.qualification'), sortable: true, format: (_, row) => qualification(row) },
+  {
+    key: 'tax_category_key',
+    label: t('tax.rules.columns.category'),
+    sortable: true,
+    priority: 'high',
+    format: (_, row) => ruleCategoryText(row),
+    filter: { type: 'lookup', load: findCategories },
+  },
+  {
+    key: 'country_code',
+    label: t('tax.rules.columns.country'),
+    sortable: true,
+    width: 'minmax(4.5rem,0.6fr)',
+    filter: { type: 'select', options: countries.value },
+  },
+  {
+    key: 'region_code',
+    label: t('tax.rules.columns.region'),
+    sortable: true,
+    width: 'minmax(4.5rem,0.6fr)',
+    format: dash,
+    filter: { type: 'text', maxlength: 6 },
+  },
+  {
+    key: 'rate_pct',
+    label: t('tax.rules.columns.rate'),
+    sortable: true,
+    align: 'right',
+    width: 'minmax(4.5rem,0.6fr)',
+    format: (_, row) => formatPercent(row.rate_pct, locale.value),
+    filter: { type: 'range', keys: ['rate_min', 'rate_max'], min: 0, max: 100 },
+  },
+  {
+    key: 'tax_type',
+    label: t('tax.rules.columns.type'),
+    sortable: true,
+    format: (_, row) => t(`tax.types.${row.tax_type}`),
+    filter: { type: 'select', options: TAX_TYPES.map((value) => ({ value, label: t(`tax.types.${value}`) })) },
+  },
+  {
+    key: 'operation_class',
+    label: t('tax.rules.columns.qualification'),
+    sortable: true,
+    format: (_, row) => qualification(row),
+    filter: { type: 'select', options: OPERATION_CLASSES.map((value) => ({ value, label: t(`tax.classes.${value}`) })) },
+  },
   { key: 'valid_from', label: t('tax.rules.columns.validFrom'), sortable: true, format: day },
   { key: 'valid_to', label: t('tax.rules.columns.validTo'), sortable: true, priority: 'low', format: day },
   { key: 'is_active', label: t('tax.rules.columns.active'), sortable: true, priority: 'low', format: (value) => (value ? t('tax.yes') : t('tax.no')) },
@@ -228,10 +256,14 @@ function create(): void {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="tax-rules"
       fill
       server-side
       searchable
+      filterable
+      :filter-fields="filterFields"
+      :filter-errors="filterErrors"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -274,12 +306,6 @@ function create(): void {
             {{ $t(`tax.rules.status.${value}`) }}
           </ion-select-option>
         </ion-select>
-        <FilterPanel
-          v-model="filters"
-          testid="tax-rules"
-          :filters="filterSpecs"
-          :field-errors="filterErrors"
-        />
       </template>
       <template #card="{ row }">
         <div

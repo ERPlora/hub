@@ -1,16 +1,22 @@
 <script setup lang="ts">
 // Customers → Groups (WORKBOOK «Pantallas · Grupos»; CUSTOMER-F27): the live `customer.group.list`
 // in a server-side DataTable — Name, Description, Customers (live cards in it), Order, Active —,
-// «Search group…» and the active filter (a group not active stays in the list and is reactivated
+// «Search group…» and the active filter behind the table's funnel (a group not active stays in the list and is reactivated
 // from its edit). «Add» and «Edit» (also a tap on the row) to whoever configures; «Delete» to the
 // owner and the admin.
-import { type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
+import {
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+} from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import GroupFormModal from '../components/GroupFormModal.vue';
-import SelectFilters, { type SelectFilterSpec } from '../components/SelectFilters.vue';
 import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { type SortDir, useListState } from '../lib/useListState';
@@ -23,7 +29,8 @@ const canDelete = computed(() => session.can('customer.delete'));
 const { t } = useCustomerI18n();
 
 const list = useListState({ sort: 'name' });
-const filters = ref<Record<string, string>>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => list.restart({ narrowed: Object.keys(now).length > 0 }));
 const query = computed(
   () =>
@@ -36,23 +43,24 @@ const { data: result, status, error, refresh } = useLiveList('customer.group.lis
 list.followResult(result);
 const inactive = computed(() => error.value?.code === 'app_inactive');
 
-const filterSpecs = computed<SelectFilterSpec[]>(() => [
-  {
-    key: 'is_active',
-    label: t('customer.groups.columns.active'),
-    options: [
-      { value: 'true', label: t('customer.groups.showActive') },
-      { value: 'false', label: t('customer.groups.showInactive') },
-    ],
-  },
-]);
-
 const columns = computed<DataTableColumn<GroupRow>[]>(() => [
   { key: 'name', label: t('customer.groups.columns.name'), sortable: true, priority: 'high' },
   { key: 'description', label: t('customer.groups.columns.description'), sortable: true, priority: 'low' },
   { key: 'customer_count', label: t('customer.groups.columns.customers'), sortable: true, align: 'right' },
   { key: 'sort_order', label: t('customer.groups.columns.order'), sortable: true, align: 'right', priority: 'low' },
-  { key: 'is_active', label: t('customer.groups.columns.active'), sortable: true, cell: 'active' },
+  {
+    key: 'is_active',
+    label: t('customer.groups.columns.active'),
+    sortable: true,
+    cell: 'active',
+    filter: {
+      type: 'select',
+      options: [
+        { value: 'true', label: t('customer.groups.showActive') },
+        { value: 'false', label: t('customer.groups.showInactive') },
+      ],
+    },
+  },
 ]);
 
 const actions = computed<DataTableAction<GroupRow>[]>(() => [
@@ -104,10 +112,12 @@ function onSort(next: { sort: string; dir: SortDir }): void {
     <DataTable
       v-else
       v-model:search="list.search.value"
+      v-model:filters="filters"
       testid="customer-groups"
       fill
       server-side
       searchable
+      filterable
       :row-clickable="canConfigure"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
@@ -135,13 +145,6 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       @add="edit(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <SelectFilters
-          v-model="filters"
-          testid="customer-groups"
-          :filters="filterSpecs"
-        />
-      </template>
       <template #active="{ row }">
         <span data-testid="customer-groups-active">{{ row.is_active ? $t('customer.common.yes') : $t('customer.common.no') }}</span>
       </template>

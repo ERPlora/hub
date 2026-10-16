@@ -1,6 +1,6 @@
 // Customers → Fields (WORKBOOK «Pantallas · Campos»; CUSTOMER-F29): the live `customer.field.list` in
 // a server-side DataTable — Name, Type, Required (Yes/No), Order, Active —, «Search field…», filters
-// by type, required and active; «Add», «Edit» and «Delete» to whoever configures.
+// behind the table's funnel by type, required and active; «Add», «Edit» and «Delete» to whoever configures.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +10,6 @@ import { pageOf } from '../__tests__/fixtures';
 import { EMPLOYEE, flush, type MountOptions, mountCustomer } from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import FieldFormModal from '../components/FieldFormModal.vue';
-import SelectFilters from '../components/SelectFilters.vue';
 import type { FieldRow } from '../operations';
 import FieldListPage from './FieldListPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -41,7 +40,8 @@ async function setup(options: MountOptions = {}) {
   const call = await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  return { ...m, call, table, prop, show: (page: unknown) => m.result(call, LIST, page) };
+  const find = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
+  return { ...m, call, table, prop, find, show: (page: unknown) => m.result(call, LIST, page) };
 }
 
 describe('FieldListPage', () => {
@@ -65,12 +65,41 @@ describe('FieldListPage', () => {
     expect(s.wrapper.findAll('[data-testid="customer-fields-required"]').map((c) => c.text())).toEqual(['Yes', 'No']);
   });
 
+  it('filters behind the table funnel: type, required and active (yes/no) on their columns', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.key, c.label, c.filter?.type])).toEqual([
+      ['field_type', 'Type', 'select'],
+      ['is_required', 'Required', 'boolean'],
+      ['is_active', 'Active', 'boolean'],
+    ]);
+    expect(columns[1].filter?.options?.map((o) => [o.value, o.label])).toEqual([
+      ['text', 'Text'],
+      ['number', 'Number'],
+      ['date', 'Date'],
+      ['boolean', 'Yes/No'],
+      ['select', 'Select'],
+      ['textarea', 'Long text'],
+    ]);
+    await s.find('customer-fields-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('customer-fields-filters-panel');
+    panel.get('[data-testid="customer-fields-filter-is_required"]').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'true' } }));
+    await flush();
+    await panel.get('[data-testid="customer-fields-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.params(LIST)).toEqual([{ is_required: true, sort: 'sort_order', descending: false, limit: 50, offset: 0 }]);
+    expect(s.find('customer-fields-filters-count').text()).toBe('1');
+  });
+
   it('filters by type, required and active on the server', async () => {
     const s = await setup();
     await s.show(PAGE);
-    const filters = s.wrapper.findComponent(SelectFilters);
-    expect((filters.props('filters') as unknown as { key: string }[]).map((f) => f.key)).toEqual(['field_type', 'is_required', 'is_active']);
-    filters.vm.$emit('update:modelValue', { field_type: 'select', is_required: 'true', is_active: 'false' });
+    s.table().vm.$emit('update:filters', { field_type: 'select', is_required: 'true', is_active: 'false' });
     await flush();
     expect(s.params(LIST)).toEqual([
       { field_type: 'select', is_required: true, is_active: false, sort: 'sort_order', descending: false, limit: 50, offset: 0 },

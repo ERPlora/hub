@@ -164,14 +164,16 @@ test('TAX-F11/F03: the jurisdiction filter narrows to the Canary Islands rule; d
   await searchFor(page, key);
   await expect(rows(page)).toHaveCount(2);
 
-  // Filters → Country Spain, Region «CN»: only the Canary Islands rule.
-  await shown(page).locator('[data-testid=tax-rules-filters]').click();
-  const panel = page.locator('ion-modal[data-testid=tax-rules-filters-panel]');
+  // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+  // The table's funnel → Country Spain, Region «CN», «Apply»: only the Canary Islands rule.
+  await shown(page).locator('[data-testid=tax-rules-filters-toggle]').click();
+  const panel = shown(page).locator('[data-testid=tax-rules-filters-panel]');
   await expect(panel).toBeVisible();
   await pick(page, panel.locator('[data-testid=tax-rules-filter-country_code]'), /^(Spain|España) \(ES\)$/);
   await panel.locator('[data-testid=tax-rules-filter-region_code] input').fill('CN');
   await page.screenshot({ path: shot('tax-rules-filters-1280') });
-  await panel.locator('[data-testid=tax-rules-filters-done]').click();
+  await panel.locator('[data-testid=tax-rules-filters-apply]').click();
+  await expect(panel).toBeHidden();
   await expect(shown(page).locator('[data-testid=tax-rules-filters-count]')).toHaveText('2');
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText('ES-CN');

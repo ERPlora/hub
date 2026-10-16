@@ -1,5 +1,5 @@
 // Customers → Tags (WORKBOOK «Pantallas · Etiquetas»; CUSTOMER-F28): the live `customer.tag.list` in
-// a server-side DataTable — Name, Color, Customers, Active —, «Search tag…» and the active filter;
+// a server-side DataTable — Name, Color, Customers, Active —, «Search tag…» and the active filter behind the table's funnel;
 // the same actions as Groups.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
@@ -31,7 +31,8 @@ async function setup(options: MountOptions = {}) {
   const call = await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  return { ...m, call, table, prop, show: (page: unknown) => m.result(call, LIST, page) };
+  const find = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
+  return { ...m, call, table, prop, find, show: (page: unknown) => m.result(call, LIST, page) };
 }
 
 describe('TagListPage', () => {
@@ -52,6 +53,29 @@ describe('TagListPage', () => {
     ]);
     expect(s.wrapper.findAll('[data-testid="customer-tags-color"]').map((c) => c.text())).toEqual(['Green', '#ff00aa']);
     expect(s.wrapper.findAll('[data-testid="customer-tags-active"]').map((c) => c.text())).toEqual(['Yes', 'No']);
+  });
+
+  it('filters by active behind the table funnel, on its column', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.key, c.filter?.type])).toEqual([['is_active', 'select']]);
+    expect(columns.find((c) => c.key === 'is_active')?.filter?.options).toEqual([
+      { value: 'true', label: 'Active' },
+      { value: 'false', label: 'Not active' },
+    ]);
+    await s.find('customer-tags-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('customer-tags-filters-panel');
+    panel.get('[data-testid="customer-tags-filter-is_active"]').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'false' } }));
+    await flush();
+    await panel.get('[data-testid="customer-tags-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.params(LIST)).toEqual([{ is_active: false, sort: 'name', descending: false, limit: 50, offset: 0 }]);
+    expect(s.find('customer-tags-filters-count').text()).toBe('1');
   });
 
   it('«Add», «Edit» and the row open the tag\'s dialog; «Delete» asks in its own', async () => {

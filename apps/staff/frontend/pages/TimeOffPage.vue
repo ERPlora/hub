@@ -1,18 +1,28 @@
 <script setup lang="ts">
 // Staff → Time Off (WORKBOOK «Pantallas · Ausencias»; STAFF-F08, F17–F20, F24): the live
 // `staff.time_off.list` — Member, Type, From, To (a part day with its hours) and Status, never the
-// reason —, «Search member…», sort by any column (newest first), filters, 50 a page. Row actions where
+// reason —, «Search member…», sort by any column (newest first), filters behind the table's funnel, 50 a page. Row actions where
 // they apply: «Approve» and «Reject» a pending request and «Cancel» (confirmed) a pending or approved
 // one for whoever manages time off; an employee cancels only their own pending request. «+» registers
 // anyone's (managers) or asks for one's own. «My time off» (`staff.time_off.mine`, with the reason) for
 // whoever has a linked record. Every change comes back through the stream: nothing here refetches.
-import { ConfirmDialog, type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import {
+  ConfirmDialog,
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableColumnFilter,
+  type DataTableFilterField,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+  StatusPill,
+} from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import FilterPanel, { type FilterSpec, type FilterValues } from '../components/FilterPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -38,11 +48,12 @@ const canSettings = computed(() => session.can('staff.manage_settings'));
 // ── The lists ──────────────────────────────────────────────────────────────────────────────────
 const view = ref<View>('all');
 const table = useServerTable({ sort: '-start_date' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel, «All» only): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch([filters, view], ([now, which]) => table.restart({ narrowed: which === 'all' && Object.keys(now).length > 0 }));
 
 /** The filters as the query takes them: Full day is a yes/no. */
-function filterParams(values: FilterValues): Partial<TimeOffListIn> {
+function filterParams(values: DataTableFilters): Partial<TimeOffListIn> {
   const { is_full_day: fullDay, ...rest } = values;
   return { ...rest, ...(fullDay ? { is_full_day: fullDay === 'true' } : {}) } as Partial<TimeOffListIn>;
 }
@@ -76,26 +87,20 @@ function setView(event: CustomEvent<{ value?: unknown }>): void {
 /** Only «All» sorts on the server (`staff.time_off.mine` gives one's own in its own order). */
 const sortable = computed(() => view.value === 'all');
 
-const filterSpecs = computed<FilterSpec[]>(() => [
-  { kind: 'search', key: 'member_id', label: t('staff.timeOff.filters.member'), load: memberSearch(client) },
-  { kind: 'select', key: 'leave_type', label: t('staff.timeOff.columns.type'), options: LEAVE_TYPES.map((value) => ({ value, label: t(`staff.leaveType.${value}`) })) },
-  {
-    kind: 'select',
-    key: 'status',
-    label: t('staff.timeOff.columns.status'),
-    options: REQUEST_STATUSES.map((value) => ({ value, label: t(`staff.requestStatus.${value}`) })),
-  },
-  {
-    kind: 'select',
-    key: 'is_full_day',
-    label: t('staff.timeOff.filters.fullDay'),
-    options: [
-      { value: 'true', label: t('staff.yes') },
-      { value: 'false', label: t('staff.no') },
-    ],
-  },
-  { kind: 'range', key: 'dates', label: t('staff.timeOff.filters.dates'), keys: ['date_from', 'date_to'], type: 'date' },
-]);
+/** Only «All» filters (`staff.time_off.mine` takes none): a column's filter, or none at all. */
+const filtering = computed(() => view.value === 'all');
+const findMembers = memberSearch(client);
+const byColumn = (filter: DataTableColumnFilter): { filter?: DataTableColumnFilter } => (filtering.value ? { filter } : {});
+
+/** The filters with no column of their own, after the columns' (Member, Type, Status). */
+const filterFields = computed<DataTableFilterField[]>(() =>
+  filtering.value
+    ? [
+        { type: 'boolean', key: 'is_full_day', label: t('staff.timeOff.filters.fullDay') },
+        { type: 'daterange', key: 'dates', label: t('staff.timeOff.filters.dates'), keys: ['date_from', 'date_to'] },
+      ]
+    : [],
+);
 
 /** A day, with the hour of a part-day absence («10/11/2026 09:00»). */
 function when(date: string, time: string | null, row: TimeOffOut): string {
@@ -104,8 +109,20 @@ function when(date: string, time: string | null, row: TimeOffOut): string {
 }
 
 const columns = computed<DataTableColumn<TimeOffOut>[]>(() => [
-  { key: 'member_name', label: t('staff.timeOff.columns.member'), sortable: sortable.value, priority: 'high' },
-  { key: 'leave_type', label: t('staff.timeOff.columns.type'), sortable: sortable.value, format: (_, row) => t(`staff.leaveType.${row.leave_type}`) },
+  {
+    key: 'member_name',
+    label: t('staff.timeOff.columns.member'),
+    sortable: sortable.value,
+    priority: 'high',
+    ...byColumn({ type: 'lookup', key: 'member_id', load: findMembers }),
+  },
+  {
+    key: 'leave_type',
+    label: t('staff.timeOff.columns.type'),
+    sortable: sortable.value,
+    format: (_, row) => t(`staff.leaveType.${row.leave_type}`),
+    ...byColumn({ type: 'select', options: LEAVE_TYPES.map((value) => ({ value, label: t(`staff.leaveType.${value}`) })) }),
+  },
   { key: 'start_date', label: t('staff.timeOff.columns.from'), sortable: sortable.value, format: (_, row) => when(row.start_date, row.start_time, row) },
   { key: 'end_date', label: t('staff.timeOff.columns.to'), sortable: sortable.value, format: (_, row) => when(row.end_date, row.end_time, row) },
   {
@@ -114,6 +131,7 @@ const columns = computed<DataTableColumn<TimeOffOut>[]>(() => [
     sortable: sortable.value,
     cell: 'status',
     format: (_, row) => t(`staff.requestStatus.${row.status}`),
+    ...byColumn({ type: 'select', options: REQUEST_STATUSES.map((value) => ({ value, label: t(`staff.requestStatus.${value}`) })) }),
   },
   ...(view.value === 'mine'
     ? [
@@ -243,10 +261,13 @@ function add(): void {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="staff-time-off"
       fill
       server-side
       :searchable="view === 'all'"
+      :filterable="filtering"
+      :filter-fields="filterFields"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -288,12 +309,6 @@ function add(): void {
             {{ $t('staff.timeOff.view.mine') }}
           </ion-select-option>
         </ion-select>
-        <FilterPanel
-          v-if="view === 'all'"
-          v-model="filters"
-          testid="staff-time-off"
-          :filters="filterSpecs"
-        />
       </template>
       <template #status="{ row }">
         <StatusPill

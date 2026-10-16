@@ -22,16 +22,6 @@
     "save": "Save",
     "noResults": "No results",
     "noResultsMessage": "Nothing matches your search or filters.",
-    "filters": {
-      "button": "Filters",
-      "count": "Filters: {n}",
-      "title": "Filters",
-      "clear": "Clear",
-      "done": "Done",
-      "any": "Any",
-      "from": "From",
-      "to": "To"
-    },
     "memberStatus": {
       "active": "Active",
       "inactive": "Inactive",

@@ -1,10 +1,20 @@
 <script setup lang="ts">
 // «Overrides» (temporary changes; SCHEDULE-F05, F06, F13; WORKBOOK «Pantallas», second table): the
 // live `schedule.override.list` in a server-side DataTable — From, To, Reason and Status («Closed» or its
-// hours) —, «Search override…», filters by its from and to dates, reason and status, sort by any column,
+// hours) —, «Search override…», filters behind the table's funnel by its from and to dates, reason and
+// status, sort by any column,
 // 50 a page by start. «+» opens «New override» for whoever can add; a row or «Edit» opens «Edit ·
 // {reason}» for whoever can change; «Delete» asks first. A refused action is said above the table.
-import { ConfirmDialog, type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
+import {
+  ConfirmDialog,
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilters,
+  type DataTableLabels,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+} from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
@@ -15,7 +25,6 @@ import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/format';
 import { hoursSummary } from '../lib/intervals';
 import type { OverrideListIn, OverrideOut } from '../operations';
-import FilterPanel, { type FilterSpec, type FilterValues } from './FilterPanel.vue';
 import OverrideFormModal from './OverrideFormModal.vue';
 import PageNotices, { blockingError } from './PageNotices.vue';
 
@@ -27,11 +36,12 @@ const canChange = computed(() => session.can('schedule.change'));
 const canDelete = computed(() => session.can('schedule.delete'));
 
 const table = useServerTable({ sort: 'start_date' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
 /** The filters as the query takes them: the status is a yes/no. */
-function filterParams(values: FilterValues): Partial<OverrideListIn> {
+function filterParams(values: DataTableFilters): Partial<OverrideListIn> {
   const { is_closed: closed, ...rest } = values;
   return { ...rest, ...(closed ? { is_closed: closed === 'true' } : {}) };
 }
@@ -47,33 +57,50 @@ table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 const tableError = computed(() => (status.value === 'error' && !blocked.value ? error.value?.message : undefined));
 
-const filterSpecs = computed<FilterSpec[]>(() => [
-  { kind: 'range', key: 'start', label: t('schedule.overrides.columns.from'), keys: ['start_from', 'start_to'] },
-  { kind: 'range', key: 'end', label: t('schedule.overrides.columns.to'), keys: ['end_from', 'end_to'] },
-  { kind: 'text', key: 'reason', label: t('schedule.overrides.columns.reason') },
-  {
-    kind: 'select',
-    key: 'is_closed',
-    label: t('schedule.overrides.columns.status'),
-    options: [
-      { value: 'true', label: t('schedule.closed') },
-      { value: 'false', label: t('schedule.open') },
-    ],
-  },
-]);
-
 const columns = computed<DataTableColumn<OverrideOut>[]>(() => [
-  { key: 'start_date', label: t('schedule.overrides.columns.from'), sortable: true, format: (_, row) => formatDate(row.start_date, locale.value) },
-  { key: 'end_date', label: t('schedule.overrides.columns.to'), sortable: true, format: (_, row) => formatDate(row.end_date, locale.value) },
-  { key: 'reason', label: t('schedule.overrides.columns.reason'), sortable: true, priority: 'high' },
+  {
+    key: 'start_date',
+    label: t('schedule.overrides.columns.from'),
+    sortable: true,
+    format: (_, row) => formatDate(row.start_date, locale.value),
+    filter: { type: 'daterange', keys: ['start_from', 'start_to'] },
+  },
+  {
+    key: 'end_date',
+    label: t('schedule.overrides.columns.to'),
+    sortable: true,
+    format: (_, row) => formatDate(row.end_date, locale.value),
+    filter: { type: 'daterange', keys: ['end_from', 'end_to'] },
+  },
+  { key: 'reason', label: t('schedule.overrides.columns.reason'), sortable: true, priority: 'high', filter: { type: 'text' } },
   {
     key: 'is_closed',
     label: t('schedule.overrides.columns.status'),
     sortable: true,
     width: 'minmax(10rem,2fr)',
     format: (_, row) => hoursSummary(row, t, locale.value),
+    filter: {
+      type: 'select',
+      options: [
+        { value: 'true', label: t('schedule.closed') },
+        { value: 'false', label: t('schedule.open') },
+      ],
+    },
   },
 ]);
+
+/** The screen has two lists (schedules#58): its funnel and view buttons say they are the overrides'.
+ *  DataTable fills the `{n}` of the count itself. */
+const tableLabels = computed<Partial<DataTableLabels>>(() => ({
+  add: t('schedule.overrides.add'),
+  loadError: t('schedule.overrides.loadError'),
+  retry: t('schedule.live.retry'),
+  filters: t('schedule.overrides.table.filters'),
+  filtersActiveOne: t('schedule.overrides.table.filtersActiveOne', { n: '{n}' }),
+  filtersActiveMany: t('schedule.overrides.table.filtersActiveMany', { n: '{n}' }),
+  viewList: t('schedule.overrides.table.viewList'),
+  viewCards: t('schedule.overrides.table.viewCards'),
+}));
 
 const actions = computed<DataTableAction<OverrideOut>[]>(() => [
   ...(canChange.value ? [{ id: 'edit', label: t('schedule.actions.edit'), icon: 'create-outline' }] : []),
@@ -141,9 +168,11 @@ async function remove(): Promise<void> {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="schedule-overrides"
       server-side
       searchable
+      filterable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -160,7 +189,7 @@ async function remove(): Promise<void> {
       :row-clickable="canChange"
       :actions="actions"
       :search-placeholder="$t('schedule.overrides.search')"
-      :labels="{ add: $t('schedule.overrides.add'), loadError: $t('schedule.overrides.loadError'), retry: $t('schedule.live.retry') }"
+      :labels="tableLabels"
       :columns="columns"
       @page-change="table.goToPage"
       @load-more="table.loadMore"
@@ -171,13 +200,6 @@ async function remove(): Promise<void> {
       @add="openForm(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <FilterPanel
-          v-model="filters"
-          testid="schedule-overrides"
-          :filters="filterSpecs"
-        />
-      </template>
       <template #empty>
         <EmptyState
           data-testid="schedule-overrides-empty"

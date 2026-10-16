@@ -1,11 +1,20 @@
 <script setup lang="ts">
 // «Special days» (SCHEDULE-F04, F06, F13; WORKBOOK «Pantallas · Días especiales»): the live
 // `schedule.special_day.list` in a server-side DataTable — Date, Name, Status («Closed» or its hours,
-// interval by interval) and Yearly —, «Search special day…», filters by date (from–to), name, status and
-// yearly, sort by any column, 50 a page by date. «+» opens «New special day» for whoever can add; a row
+// interval by interval) and Yearly —, «Search special day…», filters behind the table's funnel by date
+// (from–to), name, status and yearly, sort by any column, 50 a page by date. «+» opens «New special day» for whoever can add; a row
 // or «Edit» opens «Edit · {name}» for whoever can change; «Delete» asks first. A refused action is said
 // above the table; a new or changed row arrives through the stream.
-import { ConfirmDialog, type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
+import {
+  ConfirmDialog,
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilters,
+  type DataTableLabels,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+} from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
@@ -16,7 +25,6 @@ import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/format';
 import { hoursSummary } from '../lib/intervals';
 import type { SpecialDayListIn, SpecialDayOut } from '../operations';
-import FilterPanel, { type FilterSpec, type FilterValues } from './FilterPanel.vue';
 import PageNotices, { blockingError } from './PageNotices.vue';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
 
@@ -28,11 +36,12 @@ const canChange = computed(() => session.can('schedule.change'));
 const canDelete = computed(() => session.can('schedule.delete'));
 
 const table = useServerTable({ sort: 'date' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
 /** The filters as the query takes them: status and yearly are yes/no. */
-function filterParams(values: FilterValues): Partial<SpecialDayListIn> {
+function filterParams(values: DataTableFilters): Partial<SpecialDayListIn> {
   const { is_closed: closed, recurring_yearly: yearly, ...rest } = values;
   return {
     ...rest,
@@ -52,46 +61,50 @@ table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 const tableError = computed(() => (status.value === 'error' && !blocked.value ? error.value?.message : undefined));
 
-const filterSpecs = computed<FilterSpec[]>(() => [
-  { kind: 'range', key: 'date', label: t('schedule.specialDays.columns.date'), keys: ['date_from', 'date_to'] },
-  { kind: 'text', key: 'name', label: t('schedule.specialDays.columns.name') },
-  {
-    kind: 'select',
-    key: 'is_closed',
-    label: t('schedule.specialDays.columns.status'),
-    options: [
-      { value: 'true', label: t('schedule.closed') },
-      { value: 'false', label: t('schedule.open') },
-    ],
-  },
-  {
-    kind: 'select',
-    key: 'recurring_yearly',
-    label: t('schedule.specialDays.columns.yearly'),
-    options: [
-      { value: 'true', label: t('schedule.yes') },
-      { value: 'false', label: t('schedule.no') },
-    ],
-  },
-]);
-
 const columns = computed<DataTableColumn<SpecialDayOut>[]>(() => [
-  { key: 'date', label: t('schedule.specialDays.columns.date'), sortable: true, format: (_, row) => formatDate(row.date, locale.value) },
-  { key: 'name', label: t('schedule.specialDays.columns.name'), sortable: true, priority: 'high' },
+  {
+    key: 'date',
+    label: t('schedule.specialDays.columns.date'),
+    sortable: true,
+    format: (_, row) => formatDate(row.date, locale.value),
+    filter: { type: 'daterange', keys: ['date_from', 'date_to'] },
+  },
+  { key: 'name', label: t('schedule.specialDays.columns.name'), sortable: true, priority: 'high', filter: { type: 'text' } },
   {
     key: 'is_closed',
     label: t('schedule.specialDays.columns.status'),
     sortable: true,
     width: 'minmax(10rem,2fr)',
     format: (_, row) => hoursSummary(row, t, locale.value),
+    filter: {
+      type: 'select',
+      options: [
+        { value: 'true', label: t('schedule.closed') },
+        { value: 'false', label: t('schedule.open') },
+      ],
+    },
   },
   {
     key: 'recurring_yearly',
     label: t('schedule.specialDays.columns.yearly'),
     sortable: true,
     format: (_, row) => (row.recurring_yearly ? t('schedule.yes') : t('schedule.no')),
+    filter: { type: 'boolean' },
   },
 ]);
+
+/** The screen has two lists (schedules#58): its funnel and view buttons say they are the special
+ *  days'. DataTable fills the `{n}` of the count itself. */
+const tableLabels = computed<Partial<DataTableLabels>>(() => ({
+  add: t('schedule.specialDays.add'),
+  loadError: t('schedule.specialDays.loadError'),
+  retry: t('schedule.live.retry'),
+  filters: t('schedule.specialDays.table.filters'),
+  filtersActiveOne: t('schedule.specialDays.table.filtersActiveOne', { n: '{n}' }),
+  filtersActiveMany: t('schedule.specialDays.table.filtersActiveMany', { n: '{n}' }),
+  viewList: t('schedule.specialDays.table.viewList'),
+  viewCards: t('schedule.specialDays.table.viewCards'),
+}));
 
 const actions = computed<DataTableAction<SpecialDayOut>[]>(() => [
   ...(canChange.value ? [{ id: 'edit', label: t('schedule.actions.edit'), icon: 'create-outline' }] : []),
@@ -159,9 +172,11 @@ async function remove(): Promise<void> {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="schedule-special-days"
       server-side
       searchable
+      filterable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -178,7 +193,7 @@ async function remove(): Promise<void> {
       :row-clickable="canChange"
       :actions="actions"
       :search-placeholder="$t('schedule.specialDays.search')"
-      :labels="{ add: $t('schedule.specialDays.add'), loadError: $t('schedule.specialDays.loadError'), retry: $t('schedule.live.retry') }"
+      :labels="tableLabels"
       :columns="columns"
       @page-change="table.goToPage"
       @load-more="table.loadMore"
@@ -189,13 +204,6 @@ async function remove(): Promise<void> {
       @add="openForm(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <FilterPanel
-          v-model="filters"
-          testid="schedule-special-days"
-          :filters="filterSpecs"
-        />
-      </template>
       <template #empty>
         <EmptyState
           data-testid="schedule-special-days-empty"

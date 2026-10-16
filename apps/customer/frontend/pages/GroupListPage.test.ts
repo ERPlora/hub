@@ -1,6 +1,6 @@
 // Customers → Groups (WORKBOOK «Pantallas · Grupos»; CUSTOMER-F27): the live `customer.group.list`
 // in a server-side DataTable — Name, Description, Customers (live cards in it), Order, Active —,
-// «Search group…», the active filter; «Add» and «Edit» (also a tap on the row) to whoever
+// «Search group…», the active filter behind the table's funnel; «Add» and «Edit» (also a tap on the row) to whoever
 // configures, «Delete» to the owner and the admin.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
@@ -11,7 +11,6 @@ import { pageOf } from '../__tests__/fixtures';
 import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountCustomer, subId } from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import GroupFormModal from '../components/GroupFormModal.vue';
-import SelectFilters from '../components/SelectFilters.vue';
 import type { GroupRow } from '../operations';
 import GroupListPage from './GroupListPage.vue';
 import source from './GroupListPage.vue?raw';
@@ -43,7 +42,8 @@ async function setup(options: MountOptions = {}) {
   const call = await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  return { ...m, call, table, prop, show: (page: unknown) => m.result(call, LIST, page) };
+  const find = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
+  return { ...m, call, table, prop, find, show: (page: unknown) => m.result(call, LIST, page) };
 }
 
 describe('GroupListPage', () => {
@@ -70,12 +70,27 @@ describe('GroupListPage', () => {
     expect(s.prop('searchPlaceholder')).toBe('Search group…');
   });
 
-  it('filters by active on the server', async () => {
+  it('filters by active behind the table funnel, on its column', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
-    s.wrapper.findComponent(SelectFilters).vm.$emit('update:modelValue', { is_active: 'false' });
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.key, c.filter?.type])).toEqual([['is_active', 'select']]);
+    expect(columns.find((c) => c.key === 'is_active')?.filter?.options).toEqual([
+      { value: 'true', label: 'Active' },
+      { value: 'false', label: 'Not active' },
+    ]);
+    await s.find('customer-groups-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('customer-groups-filters-panel');
+    panel.get('[data-testid="customer-groups-filter-is_active"]').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'false' } }));
+    await flush();
+    await panel.get('[data-testid="customer-groups-filters-apply"]').trigger('click');
     await flush();
     expect(s.params(LIST)).toEqual([{ is_active: false, sort: 'name', descending: false, limit: 50, offset: 0 }]);
+    expect(s.find('customer-groups-filters-count').text()).toBe('1');
   });
 
   it('«Add» opens «New group»; «Edit» and a tap on the row open «Edit · {name}»', async () => {

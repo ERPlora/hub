@@ -17,16 +17,16 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('schedule.title')} · ${t('schedule.filters.count', { n: 2 })}`);
+          const text = computed(() => `${t('schedule.title')} · ${t('schedule.delete.message', { name: 'Christmas' })}`);
           return () => h('p', text.value);
         },
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('Schedules · Filters: 2');
+    expect(wrapper.text()).toBe('Schedules · «Christmas» will be deleted. This cannot be undone.');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toBe('Horarios · Filtros: 2');
+    expect(wrapper.text()).toBe('Horarios · Se eliminará «Christmas». No se puede deshacer.');
   });
 
   it('only works inside a component, which is where the app’s translator lives', () => {

@@ -17,19 +17,6 @@ Al registrarlos, cambiar a la vez `frontend/tabs.ts`, `apps.py` (`navigation`) y
 (`tests/test_apps.py`), y las acciones de `frontend/pages/RulesPage.vue`; `tabs.test.ts` exige que
 menú y pestañas lleven el mismo icono.
 
-## Filtros por columna en `DataTable`
-
-- **Qué**: el cajón de filtros de `ok-data-table` (columnas `filterable` con `filterType`
-  `text` | `select` | `range`, evento `filterChange`, botón con embudo y contador). El port de
-  `DataTable` lo dejó fuera («column filters … not ported», `DataTable.lit-parity.test.ts`).
-- **API propuesta**: en `DataTableColumn`, `filter?: { kind: 'text' } | { kind: 'select'; options } |
-  { kind: 'range'; keys: [from, to] }`; `v-model:filters` (`Record<string, string>`); hooks
-  `<testid>-filters`, `-filters-count`, `-filter-<key>`.
-- **Uso**: Categorías (Clave, Nombre, Descripción, Origen), Reglas (País, Región, Categoría, Tipo,
-  Calificación, Régimen, % desde–hasta), Alias (Alias, Categoría, Origen).
-- **Hoy**: `frontend/components/FilterPanel.vue` en el slot `filters` (botón «Filtros» con contador que
-  abre un `FormModal` con un control por filtro). Se borra cuando el `DataTable` lo traiga.
-
 ## `SearchSelect`: un selector con buscador (modal + barra de búsqueda + lista)
 
 - **Qué**: el `ok-combo` del producto actual, con el patrón que Ionic recomienda para listas largas (un
@@ -37,11 +24,11 @@ menú y pestañas lleven el mismo icono.
   lista. Filtra en el cliente o, con `v-model:query`, pide al servidor lo que se escribe.
 - **API (la de `apps/tax/frontend/components/SearchSelect.vue`)**: `v-model` (valor), `v-model:query`
   (opcional: búsqueda en el servidor), `options: { value, label }[]`, `label`, `placeholder`,
-  `anyLabel` (un «Cualquiera» al principio, para filtros), `errorText`, `disabled`, `loading`, `testid`
+  `errorText`, `disabled`, `loading`, `testid`
   (`<testid>`, `-modal`, `-search`, `-option` con `data-value`, `-empty`). Conserva el nombre de la opción
   elegida aunque la siguiente respuesta ya no la traiga.
-- **Uso**: el País (249) y la Categoría (búsqueda en el servidor) de las altas de regla y de alias, y el
-  filtro Categoría de Reglas y Alias.
+- **Uso**: el País (249) y la Categoría (búsqueda en el servidor) de las altas de regla y de alias. El
+  filtro Categoría de Reglas y Alias es el `lookup` del embudo de `DataTable`.
 - **Hoy**: vive en `apps/tax/frontend/components/SearchSelect.vue`. Al pasar a `@erplora/ui` se borra de
   aquí.
 

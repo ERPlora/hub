@@ -2,8 +2,9 @@
 // Taxes from its address and finds the Spanish factory catalogue (the 11 «System» categories with
 // their rate in force today), the tabbar of the three sections that walks to Rules and Aliases, and
 // «+» → «New tax category»: a malformed key is refused under Key (422), a good one closes the dialog
-// and the row arrives live as «Custom». Screenshots of the page in the three viewports. What it creates
-// is deleted after the file (`afterAll`).
+// and the row arrives live as «Custom». Screenshots of the page in the three viewports, and of the
+// table's filter panel open in each (two columns from 834 px, a sheet below). What it creates is
+// deleted after the file (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
@@ -48,6 +49,14 @@ const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
+/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
+ *  (two columns), as the SaaS panel's `VIEWPORTS`. */
+const FILTER_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+];
+
 /** Waits for the categories list to paint its first result (rows or the empty state). */
 async function listReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=tax-categories-row], [data-testid=tax-categories-empty]').first().waitFor({ state: 'visible' });
@@ -60,12 +69,17 @@ test('TAX-F01: the owner sees the Spanish factory categories, filters them by Or
   await listReady(page);
   await expect(shown(page).locator('ion-title, .app-topbar__title').first()).toBeVisible();
 
-  // Origin «System»: exactly the eleven categories of the factory catalogue, with their rate.
-  await shown(page).locator('[data-testid=tax-categories-filters]').click();
-  const origin = page.locator('[data-testid=tax-categories-filter-is_system]');
-  await origin.click();
-  await page.locator('ion-popover ion-item, ion-popover .select-interface-option').filter({ hasText: /^(System|Sistema)$/ }).first().click();
-  await page.locator('[data-testid=tax-categories-filters-done]').click();
+  // Origin «System» behind the table's funnel: exactly the eleven categories of the factory catalogue,
+  // with their rate; the funnel counts 1.
+  await shown(page).locator('[data-testid=tax-categories-filters-toggle]').click();
+  const panel = shown(page).locator('[data-testid=tax-categories-filters-panel]');
+  await expect(panel).toBeVisible();
+  await panel.locator('[data-testid=tax-categories-filter-is_system]').click();
+  const popover = page.locator('ion-popover.select-popover');
+  await popover.locator('ion-radio').filter({ hasText: /^\s*(System|Sistema)\s*$/ }).click();
+  await expect(popover).toHaveCount(0);
+  await panel.locator('[data-testid=tax-categories-filters-apply]').click();
+  await expect(panel).toBeHidden();
   await expect(shown(page).locator('[data-testid=tax-categories-filters-count]')).toHaveText('1');
   await expect.poll(async () => (await rowIds(page)).sort()).toEqual(SEED);
   const food = shown(page).locator('[data-testid=tax-categories-row][data-id="restaurant.food"]');
@@ -125,6 +139,33 @@ test('TAX-F02: a malformed key is refused under Key; a good category closes the 
   // Server-side evidence: one category with that key.
   const res = await api<{ total: number }>(context, A, 'GET', `/tax/categories?key=${key}`);
   expect(res.data.total).toBe(1);
+});
+
+// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+test('FIX-DATATABLE-HUB-FILTERS-1: Categories filter by Key behind the funnel, with its count, the panel open at every width', async ({ page }) => {
+  await login(page, A, '/tax/categories');
+  for (const vp of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/tax/categories`);
+    await listReady(page);
+    const table = shown(page).locator('.data-table');
+    const panel = table.locator('[data-testid=tax-categories-filters-panel]');
+    await table.locator('[data-testid=tax-categories-filters-toggle]').click();
+    await expect(panel).toBeVisible();
+    await panel.locator('[data-testid=tax-categories-filter-key] input').fill('restaurant.food');
+    await panel.locator('[data-testid=tax-categories-filters-apply]').click();
+    await expect(panel).toBeHidden();
+    await expect(table.locator('[data-testid=tax-categories-filters-count]')).toHaveText('1');
+    await expect.poll(() => rowIds(page)).toEqual(['restaurant.food']);
+    await table.locator('[data-testid=tax-categories-filters-toggle]').click();
+    await expect(panel).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-1-tax-${vp.label}`) });
+    await panel.locator('[data-testid=tax-categories-filters-clear]').click();
+    await expect(table.locator('[data-testid=tax-categories-filters-count]')).toHaveCount(0);
+    await panel.locator('[data-testid=tax-categories-filters-close]').click();
+    await expect(panel).toBeHidden();
+  }
 });
 
 test('Categories in the three viewports: no horizontal scroll; cards on a phone', async ({ page }) => {

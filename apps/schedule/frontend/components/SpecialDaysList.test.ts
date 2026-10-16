@@ -1,6 +1,7 @@
 // «Special days» of Schedules → Special days (SCHEDULE-F04, F06, F13; WORKBOOK «Pantallas»): the live
 // `schedule.special_day.list` in a server-side DataTable — Date, Name, Status (closed or its hours) and
-// Yearly —, «Search special day…», filters by date (from–to), name, status and yearly, sort by column,
+// Yearly —, «Search special day…», filters behind the table's funnel by date (from–to), name, status and
+// yearly, sort by column,
 // 50 a page by date. «+» opens «New special day» for whoever can add; a row or «Edit» opens «Edit ·
 // {name}» for whoever can change; «Delete» asks ««{name}» will be deleted…» first. An employee only
 // reads.
@@ -10,7 +11,6 @@ import type { Component } from 'vue';
 
 import type { SpecialDayOut } from '../operations';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
-import FilterPanel from './FilterPanel.vue';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
 import SpecialDaysList from './SpecialDaysList.vue';
 
@@ -50,7 +50,7 @@ async function setup(options: MountOptions = {}) {
     await settle();
   }
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
     await flush();
   }
   return { ...m, table, prop, rows, cells, action, filter, show: (data: unknown) => m.result(OP, data) };
@@ -77,6 +77,57 @@ describe('SpecialDaysList', () => {
     ]);
     expect(s.cells(0).slice(0, 4)).toEqual(['12/24/2026', 'Christmas Eve', '10:00 AM–01:00 PM · 05:00 PM–07:00 PM', 'No']);
     expect(s.cells(1).slice(0, 4)).toEqual(['12/25/2026', 'Christmas', 'Closed', 'Yes']);
+  });
+
+  it('filters behind the table funnel: date (from–to), name, status and yearly on their columns', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.map((c) => [c.label, c.filter?.key ?? c.key, c.filter?.type, c.filter?.keys])).toEqual([
+      ['Date', 'date', 'daterange', ['date_from', 'date_to']],
+      ['Name', 'name', 'text', undefined],
+      ['Status', 'is_closed', 'select', undefined],
+      ['Yearly', 'recurring_yearly', 'boolean', undefined],
+    ]);
+    expect(columns[2].filter?.options).toEqual([
+      { value: 'true', label: 'Closed' },
+      { value: 'false', label: 'Open' },
+    ]);
+  });
+
+  it('the funnel panel applies on «Apply» and counts the filters in use', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    await s.find('schedule-special-days-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('schedule-special-days-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="schedule-special-days-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('date_from', 'ionChange', '2026-12-01');
+    set('name', 'ionInput', 'eve');
+    set('recurring_yearly', 'ionChange', 'false');
+    await flush();
+    await panel.get('[data-testid="schedule-special-days-filters-apply"]').trigger('click');
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ date_from: '2026-12-01', name: 'eve', recurring_yearly: false, sort: 'date', dir: 'asc', limit: 50, offset: 0 }]);
+    expect(s.find('schedule-special-days-filters-count').text()).toBe('3');
+  });
+
+  it('its funnel and view buttons say they are the special days’ (the screen has two lists; schedules#58)', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const name = (hook: string) => s.find(`schedule-special-days-${hook}`).attributes('aria-label');
+    expect([name('filters-toggle'), name('view-table'), name('view-cards')]).toEqual([
+      'Special day filters',
+      'View special days as list',
+      'View special days as cards',
+    ]);
+    await s.filter({ name: 'eve' });
+    expect(name('filters-toggle')).toBe('Special day filters (1 active)');
   });
 
   it('the filters and the search ask the server again from the first page', async () => {
@@ -158,5 +209,13 @@ describe('SpecialDaysList', () => {
     expect(s.cells(0).slice(0, 4)).toEqual(['24/12/2026', 'Christmas Eve', '10:00–13:00 · 17:00–19:00', 'No']);
     expect(s.cells(1)[2]).toBe('Cerrado');
     expect(s.prop('searchPlaceholder')).toBe('Buscar día especial…');
+    const name = (hook: string) => s.find(`schedule-special-days-${hook}`).attributes('aria-label');
+    expect([name('filters-toggle'), name('view-table'), name('view-cards')]).toEqual([
+      'Filtros de días especiales',
+      'Ver días especiales como lista',
+      'Ver días especiales como tarjetas',
+    ]);
+    await s.filter({ name: 'eve', is_closed: 'true' });
+    expect(name('filters-toggle')).toBe('Filtros de días especiales (2 activos)');
   });
 });

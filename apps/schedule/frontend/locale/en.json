@@ -92,6 +92,13 @@
         "recurring": "Repeats every year",
         "notes": "Notes",
         "submit": "Add day"
+      },
+      "table": {
+        "filters": "Special day filters",
+        "filtersActiveOne": "Special day filters ({n} active)",
+        "filtersActiveMany": "Special day filters ({n} active)",
+        "viewList": "View special days as list",
+        "viewCards": "View special days as cards"
       }
     },
     "overrides": {
@@ -118,6 +125,13 @@
         "reason": "Reason",
         "status": "Status",
         "submit": "Add override"
+      },
+      "table": {
+        "filters": "Override filters",
+        "filtersActiveOne": "Override filters ({n} active)",
+        "filtersActiveMany": "Override filters ({n} active)",
+        "viewList": "View overrides as list",
+        "viewCards": "View overrides as cards"
       }
     },
     "actions": {
@@ -128,16 +142,6 @@
       "title": "Delete",
       "message": "«{name}» will be deleted. This cannot be undone.",
       "confirm": "Delete"
-    },
-    "filters": {
-      "button": "Filters",
-      "count": "Filters: {n}",
-      "title": "Filters",
-      "any": "Any",
-      "from": "From",
-      "to": "To",
-      "clear": "Clear",
-      "done": "Done"
     },
     "settings": {
       "timezone": "Business timezone",

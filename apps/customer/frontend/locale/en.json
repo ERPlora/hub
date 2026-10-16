@@ -86,13 +86,10 @@
         "spent": "Spent"
       },
       "filters": {
-        "stage": "Stage",
         "source": "Source",
         "active": "Active",
         "activeOnly": "Active",
-        "inactiveOnly": "Not active",
-        "spentFrom": "Spent from (€)",
-        "spentTo": "Spent to (€)"
+        "inactiveOnly": "Not active"
       },
       "view": "View",
       "entity": {
@@ -101,12 +98,6 @@
       }
     },
     "filters": {
-      "button": "Filters",
-      "title": "Filters",
-      "count": "Filters ({n} in use)",
-      "any": "Any",
-      "clear": "Clear",
-      "done": "Done",
       "amountInvalid": "Write an amount, like 1.000,50."
     },
     "create": {
@@ -323,7 +314,6 @@
         "order": "Order",
         "active": "Active"
       },
-      "filter": "Show",
       "showActive": "Active",
       "showInactive": "Not active",
       "new": "New group",
@@ -355,7 +345,6 @@
         "customers": "Customers",
         "active": "Active"
       },
-      "filter": "Show",
       "showActive": "Active",
       "showInactive": "Not active",
       "new": "New tag",
@@ -386,9 +375,6 @@
         "order": "Order",
         "active": "Active"
       },
-      "filterType": "Type",
-      "filterRequired": "Required",
-      "filterActive": "Active",
       "new": "New custom field",
       "editTitle": "Edit · {name}",
       "name": "Name",

@@ -2,16 +2,25 @@
 // Staff → Staff (WORKBOOK «Pantallas · Personal»; STAFF-F01–F06, F08, F21): the live
 // `staff.member.list` in a server-side DataTable — Name, Role, Email, Status and, for whoever may see
 // the pay, Rate/h (`staff.member.compensation`, the same rows page by page); Phone starts hidden —, «Search
-// member…», sort by any column, the old column filters, 50 a page. «+» opens «New»; a row or «Edit»
+// member…», sort by any column, the old column filters behind the table's funnel, 50 a page. «+» opens «New»; a row or «Edit»
 // opens «Edit · {name}»; «Deactivate» (confirmed) and «Terminate» (its dialog) for the owner and the
 // admin. «My record» opens one's own record. Nothing here refetches: changes come through the stream.
-import { ConfirmDialog, type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import {
+  ConfirmDialog,
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilterField,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+  StatusPill,
+} from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import FilterPanel, { type FilterSpec, type FilterValues } from '../components/FilterPanel.vue';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -39,11 +48,12 @@ const canSettings = computed(() => session.can('staff.manage_settings'));
 
 // ── The list ───────────────────────────────────────────────────────────────────────────────────
 const table = useServerTable({ sort: 'name' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
 /** The filters as the query takes them: Bookable is a yes/no and the Hub user a number. */
-function filterParams(values: FilterValues): Partial<MemberListIn> {
+function filterParams(values: DataTableFilters): Partial<MemberListIn> {
   const { is_bookable: bookable, user_id: user, ...rest } = values;
   return {
     ...rest,
@@ -78,40 +88,31 @@ const { data: mine } = useLive('staff.member.mine', {});
 const findRoles = roleSearch(client, { activeOnly: false, by: 'name' });
 const findAccounts = accountSearch(client);
 
-const filterSpecs = computed<FilterSpec[]>(() => [
-  { kind: 'text', key: 'first_name', label: t('staff.members.filters.firstName') },
-  { kind: 'text', key: 'last_name', label: t('staff.members.filters.lastName') },
-  { kind: 'text', key: 'email', label: t('staff.members.columns.email') },
-  { kind: 'text', key: 'phone', label: t('staff.members.columns.phone') },
-  { kind: 'search', key: 'role_name', label: t('staff.members.columns.role'), load: findRoles },
-  {
-    kind: 'select',
-    key: 'status',
-    label: t('staff.members.columns.status'),
-    options: MEMBER_STATUSES.map((value) => ({ value, label: t(`staff.memberStatus.${value}`) })),
-  },
-  {
-    kind: 'select',
-    key: 'is_bookable',
-    label: t('staff.members.filters.bookable'),
-    options: [
-      { value: 'true', label: t('staff.yes') },
-      { value: 'false', label: t('staff.no') },
-    ],
-  },
-  { kind: 'range', key: 'hire_date', label: t('staff.members.filters.hireDate'), keys: ['hire_date_from', 'hire_date_to'], type: 'date' },
-  { kind: 'text', key: 'color', label: t('staff.members.filters.color') },
-  ...(canLink.value ? [{ kind: 'search' as const, key: 'user_id', label: t('staff.members.filters.user'), load: findAccounts }] : []),
+/** The filters with no column of their own, after the columns' (the old table's order otherwise). */
+const filterFields = computed<DataTableFilterField[]>(() => [
+  { type: 'text', key: 'first_name', label: t('staff.members.filters.firstName') },
+  { type: 'text', key: 'last_name', label: t('staff.members.filters.lastName') },
+  { type: 'boolean', key: 'is_bookable', label: t('staff.members.filters.bookable') },
+  { type: 'daterange', key: 'hire_date', label: t('staff.members.filters.hireDate'), keys: ['hire_date_from', 'hire_date_to'] },
+  { type: 'text', key: 'color', label: t('staff.members.filters.color') },
+  ...(canLink.value ? [{ type: 'lookup' as const, key: 'user_id', label: t('staff.members.filters.user'), load: findAccounts }] : []),
 ]);
 
 const dash = (value: unknown): string => (value === null || value === undefined || value === '' ? '—' : String(value));
 
 const columns = computed<DataTableColumn<MemberOut>[]>(() => [
   { key: 'name', label: t('staff.members.columns.name'), sortable: true, priority: 'high', format: (_, row) => row.full_name },
-  { key: 'role_name', label: t('staff.members.columns.role'), sortable: true, format: dash },
-  { key: 'email', label: t('staff.members.columns.email'), sortable: true, priority: 'low', format: dash },
-  { key: 'phone', label: t('staff.members.columns.phone'), sortable: true, hidden: true, format: dash },
-  { key: 'status', label: t('staff.members.columns.status'), sortable: true, cell: 'status', format: (_, row) => t(`staff.memberStatus.${row.status}`) },
+  { key: 'role_name', label: t('staff.members.columns.role'), sortable: true, format: dash, filter: { type: 'lookup', load: findRoles } },
+  { key: 'email', label: t('staff.members.columns.email'), sortable: true, priority: 'low', format: dash, filter: { type: 'text' } },
+  { key: 'phone', label: t('staff.members.columns.phone'), sortable: true, hidden: true, format: dash, filter: { type: 'text' } },
+  {
+    key: 'status',
+    label: t('staff.members.columns.status'),
+    sortable: true,
+    cell: 'status',
+    format: (_, row) => t(`staff.memberStatus.${row.status}`),
+    filter: { type: 'select', options: MEMBER_STATUSES.map((value) => ({ value, label: t(`staff.memberStatus.${value}`) })) },
+  },
   ...(canPay
     ? [
         {
@@ -212,10 +213,13 @@ async function deactivate(): Promise<void> {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="staff-members"
       fill
       server-side
       searchable
+      filterable
+      :filter-fields="filterFields"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -243,13 +247,6 @@ async function deactivate(): Promise<void> {
       @add="openForm(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <FilterPanel
-          v-model="filters"
-          testid="staff-members"
-          :filters="filterSpecs"
-        />
-      </template>
       <template #toolbar>
         <ion-button
           v-if="mine?.member"

@@ -1,20 +1,19 @@
 <script setup lang="ts">
 // Taxes → Aliases (TAX-F13, F14): the live `tax.alias.list` in a server-side DataTable — Alias,
-// Category, Origin («Shipped» or «Learned») and Active —, search, column filters (Alias, Category,
-// Origin) and sort by any column, 50 a page sorted by alias. «+» opens «New category alias» for whoever
+// Category, Origin («Shipped» or «Learned») and Active —, search, column filters behind the table's
+// funnel (Alias, Category, Origin) and sort by any column, 50 a page sorted by alias. «+» opens «New category alias» for whoever
 // can manage; the new row arrives through the stream.
-import { type DataTableColumn, DataTable, EmptyState } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
+import { type DataTableColumn, type DataTableFilters, DataTable, EmptyState } from '@erplora/ui/components';
+import { useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
 import AliasCreateModal from '../components/AliasCreateModal.vue';
-import FilterPanel, { type FilterSpec, type FilterValues } from '../components/FilterPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
-import { categoryOptionLabel } from '../lib/rules';
+import { categorySearch } from '../lib/pickers';
 import type { AliasListIn, AliasOut, AliasSource } from '../operations';
 import { taxTabs } from '../tabs';
 
@@ -23,9 +22,11 @@ const SOURCES: readonly AliasSource[] = ['shipped', 'learned'];
 const session = useSession();
 const canManage = computed(() => session.can('tax.manage'));
 const t = useT();
+const client = useLiveClient();
 
 const table = useServerTable({ sort: 'alias' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
 const {
@@ -37,13 +38,7 @@ const {
 table.followResult(result);
 
 /** The Category filter searches the server: all the business's categories, not a first page. */
-const categoryQuery = ref('');
-const { data: categories } = useLive('tax.category.list', () => ({
-  search: categoryQuery.value || undefined,
-  sort: 'display_name' as const,
-  dir: 'asc' as const,
-  limit: 50,
-}));
+const findCategories = categorySearch(client);
 
 const blocked = computed(() => blockingError(error.value));
 /** A filter the server refused (a 422 of the list): said under the filter, the rows stay. */
@@ -51,28 +46,17 @@ const filterErrors = computed(() => error.value?.fields ?? {});
 const tableError = computed(() => (status.value === 'error' && !Object.keys(filterErrors.value).length ? error.value?.message : undefined));
 const creating = ref(false);
 
-const filterSpecs = computed<FilterSpec[]>(() => [
+const columns = computed<DataTableColumn<AliasOut>[]>(() => [
   // As long as AliasListIn takes it.
-  { kind: 'text', key: 'alias', label: t('tax.aliases.columns.alias'), maxlength: 200 },
+  { key: 'alias', label: t('tax.aliases.columns.alias'), sortable: true, priority: 'high', filter: { type: 'text', maxlength: 200 } },
+  { key: 'tax_category_key', label: t('tax.aliases.columns.category'), sortable: true, filter: { type: 'lookup', load: findCategories } },
   {
-    kind: 'search',
-    key: 'tax_category_key',
-    label: t('tax.aliases.columns.category'),
-    options: (categories.value?.rows ?? []).map((category) => ({ value: category.key, label: categoryOptionLabel(category) })),
-    search: (text: string) => (categoryQuery.value = text),
-  },
-  {
-    kind: 'select',
     key: 'source',
     label: t('tax.aliases.columns.source'),
-    options: SOURCES.map((value) => ({ value, label: t(`tax.aliases.source.${value}`) })),
+    sortable: true,
+    format: (_, row) => t(`tax.aliases.source.${row.source}`),
+    filter: { type: 'select', options: SOURCES.map((value) => ({ value, label: t(`tax.aliases.source.${value}`) })) },
   },
-]);
-
-const columns = computed<DataTableColumn<AliasOut>[]>(() => [
-  { key: 'alias', label: t('tax.aliases.columns.alias'), sortable: true, priority: 'high' },
-  { key: 'tax_category_key', label: t('tax.aliases.columns.category'), sortable: true },
-  { key: 'source', label: t('tax.aliases.columns.source'), sortable: true, format: (_, row) => t(`tax.aliases.source.${row.source}`) },
   {
     key: 'is_active',
     label: t('tax.aliases.columns.active'),
@@ -101,10 +85,13 @@ const cardTitle = (row: AliasOut): string => row.alias;
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="tax-aliases"
       fill
       server-side
       searchable
+      filterable
+      :filter-errors="filterErrors"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -127,14 +114,6 @@ const cardTitle = (row: AliasOut): string => row.alias;
       @add="creating = true"
       @retry="refresh()"
     >
-      <template #filters>
-        <FilterPanel
-          v-model="filters"
-          testid="tax-aliases"
-          :filters="filterSpecs"
-          :field-errors="filterErrors"
-        />
-      </template>
       <template #empty>
         <EmptyState
           data-testid="tax-aliases-empty"

@@ -37,8 +37,6 @@ const props = withDefaults(
     options: readonly SearchOption[];
     label: string;
     placeholder?: string;
-    /** «Any» as the first option (a filter): its value is ''. */
-    anyLabel?: string;
     errorText?: string;
     disabled?: boolean;
     /** The server is answering a search. */
@@ -46,7 +44,7 @@ const props = withDefaults(
     /** Hooks: `<testid>` (the field), `-modal`, `-search`, `-option` (`data-value`), `-empty`. */
     testid: string;
   }>(),
-  { placeholder: undefined, anyLabel: undefined, errorText: undefined, disabled: false, loading: false },
+  { placeholder: undefined, errorText: undefined, disabled: false, loading: false },
 );
 
 const value = defineModel<string>({ required: true });
@@ -61,10 +59,9 @@ const chosenLabel = ref<string>();
 const serverSearch = computed(() => query.value !== undefined);
 
 const listed = computed<SearchOption[]>(() => {
-  const all = props.anyLabel === undefined ? [...props.options] : [{ value: '', label: props.anyLabel }, ...props.options];
   const text = typed.value.trim().toLowerCase();
-  if (serverSearch.value || !text) return all;
-  return all.filter((option) => option.label.toLowerCase().includes(text));
+  if (serverSearch.value || !text) return [...props.options];
+  return props.options.filter((option) => option.label.toLowerCase().includes(text));
 });
 
 const shown = computed(() => {

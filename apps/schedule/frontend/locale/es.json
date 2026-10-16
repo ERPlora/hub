@@ -92,6 +92,13 @@
         "recurring": "Se repite cada año",
         "notes": "Notas",
         "submit": "Añadir día"
+      },
+      "table": {
+        "filters": "Filtros de días especiales",
+        "filtersActiveOne": "Filtros de días especiales ({n} activo)",
+        "filtersActiveMany": "Filtros de días especiales ({n} activos)",
+        "viewList": "Ver días especiales como lista",
+        "viewCards": "Ver días especiales como tarjetas"
       }
     },
     "overrides": {
@@ -118,6 +125,13 @@
         "reason": "Motivo",
         "status": "Estado",
         "submit": "Añadir cambio temporal"
+      },
+      "table": {
+        "filters": "Filtros de cambios temporales",
+        "filtersActiveOne": "Filtros de cambios temporales ({n} activo)",
+        "filtersActiveMany": "Filtros de cambios temporales ({n} activos)",
+        "viewList": "Ver cambios temporales como lista",
+        "viewCards": "Ver cambios temporales como tarjetas"
       }
     },
     "actions": {
@@ -128,16 +142,6 @@
       "title": "Eliminar",
       "message": "Se eliminará «{name}». No se puede deshacer.",
       "confirm": "Eliminar"
-    },
-    "filters": {
-      "button": "Filtros",
-      "count": "Filtros: {n}",
-      "title": "Filtros",
-      "any": "Cualquiera",
-      "from": "Desde",
-      "to": "Hasta",
-      "clear": "Quitar",
-      "done": "Hecho"
     },
     "settings": {
       "timezone": "Zona horaria del negocio",
