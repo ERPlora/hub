@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Demo items (DEMO-F01, F05, F06): the live list of `demo.item.list` in a server-side DataTable —
-// search, status filter, page and page size are the server's — with every state of the screen, the
-// «Updated» column (shared formatter) and, for whoever can manage, the live figures above it.
+// search, status filter (behind the table's funnel), page and page size are the server's — with
+// every state of the screen, the «Updated» column (shared formatter) and, for whoever can manage,
+// the live figures above it.
 // Nothing here refetches: a write anywhere in this business re-runs the queries on the server and
 // the new results arrive through the stream. On a phone «Load more» grows ONE live window from the
 // first row (a bigger `limit`, `offset` 0), so every row on screen stays live; a desk pages one
@@ -46,15 +47,12 @@ const query = computed({
     goToPage(0);
   },
 });
-/** The status filter of the toolbar: a new one starts from the first page, as a search does. */
-function filterBy(ev: CustomEvent<{ value?: unknown }>): void {
-  statusFilter.value = ev.detail.value === 'open' || ev.detail.value === 'done' ? ev.detail.value : 'all';
-  goToPage(0);
-}
-/** The table's filters panel (`filterable`): its status filter is the same one. */
+/** The status filter lives behind the table's funnel (`filterable`, the `status` column's filter). */
 const tableFilters = computed((): Record<string, string> => (statusFilter.value === 'all' ? {} : { status: statusFilter.value }));
+/** A new filter starts from the first page, as a search does; a status the query does not know is «All». */
 function onFilters(filters: Record<string, string>): void {
-  filterBy(new CustomEvent('ionChange', { detail: { value: filters.status } }));
+  statusFilter.value = filters.status === 'open' || filters.status === 'done' ? filters.status : 'all';
+  goToPage(0);
 }
 const filtered = computed(() => search.value.trim() !== '' || statusFilter.value !== 'all');
 

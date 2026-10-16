@@ -24,10 +24,6 @@
         "lines": "Lines",
         "status": "Status",
         "updated": "Updated"
-      },
-      "filter": {
-        "label": "Filter by status",
-        "all": "All"
       }
     },
     "stats": {
