@@ -2,13 +2,15 @@
 
 Whoever comes first wins; the other one is refused with the real reason (the same 409 as the check
 before writing), never with a duplicated name, a duplicated link or two defaults in a group of one.
+A read that a deletion lands in the middle of answers what it read or 404, never a 500.
 """
 
 import threading
+from contextlib import contextmanager
 
 import pytest
 from django.db import connection
-from live.errors import OperationError
+from live.errors import NotFound, OperationError
 
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.tax.models import TaxCategory
@@ -135,3 +137,42 @@ def test_deleting_a_group_while_it_is_applied_never_breaks_the_commit():
         assert codes(results) in (["ok", "ok"], ["not_found", "ok"]), results
         assert ModifierGroup.objects.count() == 0
         assert ModifierLink.objects.count() == 0
+
+
+@contextmanager
+def deleted_after_the_first_read_of(name):
+    """Commits ``modifier.group.delete`` of ``name`` in another session right after the first statement of
+    this one that reads the groups: a deletion landing in the middle of a read, every time."""
+    table = f'"{ModifierGroup._meta.db_table}"'
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            deletions.extend(at_once(lambda: run("modifier.group.delete", {"group": name})))
+        return result
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+def test_a_group_deleted_while_its_detail_is_read_is_never_a_server_error():
+    # hub#34: the detail found the group and then loaded it by its id in a second read; a deletion
+    # committed between the two raised DoesNotExist (a 500). In one read it is the group as it was read.
+    sauces = run("modifier.group.create", {"name": "Sauces"})
+    run("modifier.option.create", {"group": "Sauces", "name": "Mayo"})
+    with deleted_after_the_first_read_of("Sauces") as deletions:
+        detail = run("modifier.group.get", {"id": str(sauces.id)})
+    assert codes(deletions) == ["ok"]
+    assert (detail.id, detail.name, detail.option_count) == (sauces.id, "Sauces", 1)
+    # What the deletion's event runs next: not found, and the open sheet closes.
+    with pytest.raises(NotFound):
+        run("modifier.group.get", {"id": str(sauces.id)})
+
+
+def test_a_group_deleted_between_its_name_and_its_detail_is_not_found():
+    run("modifier.group.create", {"name": "Sauces"})
+    with deleted_after_the_first_read_of("Sauces") as deletions:
+        with pytest.raises(NotFound) as error:
+            run("modifier.group.get", {"group": "sauces"})
+    assert (codes(deletions), error.value.code, error.value.status) == (["ok"], "not_found", 404)
