@@ -127,6 +127,13 @@ def test_spanish_texts():
         assert str(queries.SERVICES_UNAVAILABLE).startswith(
             "Servicios no está activa en este negocio"
         )
+        # FIX-SALE-TABBAR-LABEL: the open price's families are «secciones» everywhere the user reads.
+        assert str(queries.DEPARTMENT_NOT_FOUND) == (
+            "Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
+        )
+        assert str(schemas.SAY_WHICH_DEPARTMENT_ROW) == (
+            "Di qué sección: su id o su nombre."
+        )
 
 
 @pytest.mark.django_db
@@ -144,3 +151,29 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
         "code": "sale.sale_not_found",
         "message": "Esa venta no existe.",
     }
+
+
+# The menu entry's key in apps.py → its tab's key in the frontend catalogues (`sale.tabs.*`).
+TAB_KEYS = {
+    "pos": "pos",
+    "sales": "sales",
+    "quick_notes": "quickNotes",
+    "departments": "departments",
+    "settings": "settings",
+}
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_the_menu_and_the_tabbar_name_each_section_alike(language):
+    # FIX-SALE-TABBAR-LABEL: a menu entry and its footer tab say the same word. «Sections» took the
+    # place of «Departments», one word wider than a fifth of a phone's tabbar.
+    frontend = Path(apps.get_app_config("sale").path) / "frontend" / "locale"
+    catalogue = json.loads((frontend / f"{language}.json").read_text(encoding="utf-8"))
+    tabs = catalogue["sale"]["tabs"]
+    with translation.override(language):
+        menu = {
+            entry.id: str(entry.label)
+            for entry in apps.get_app_config("sale").navigation
+        }
+    assert menu == {entry: tabs[key] for entry, key in TAB_KEYS.items()}
+    assert menu["departments"] == {"en": "Sections", "es": "Secciones"}[language]

@@ -141,10 +141,10 @@ OPEN_PRICE_PERMISSION = _(
     "Only someone who may sell at an open price can add this line: ask a manager."
 )
 DEPARTMENT_NOT_FOUND = _(
-    "That department is no longer in this business. Reload the list and try again."
+    "That section is no longer in this business. Reload the list and try again."
 )
 DEPARTMENT_AMBIGUOUS = _(
-    "Several departments match «%(said)s»: %(names)s. Say which one."
+    "Several sections match «%(said)s»: %(names)s. Say which one."
 )
 QUICK_NOTE_NOT_FOUND = _(
     "That quick note is no longer in this business. Reload the list and try again."

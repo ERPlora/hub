@@ -80,7 +80,8 @@ describe('sale catalogues (en source + es)', () => {
     expect(ES.get('sale.tabs.pos')).toBe('Vender');
     expect(ES.get('sale.tabs.sales')).toBe('Ventas');
     expect(ES.get('sale.tabs.quickNotes')).toBe('Notas rápidas');
-    expect(ES.get('sale.tabs.departments')).toBe('Departamentos');
+    // FIX-SALE-TABBAR-LABEL: the old «Departamentos» did not fit a fifth of a phone's tabbar.
+    expect(ES.get('sale.tabs.departments')).toBe('Secciones');
     expect(ES.get('sale.tabs.settings')).toBe('Ajustes');
   });
 });

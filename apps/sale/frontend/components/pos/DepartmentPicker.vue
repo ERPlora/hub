@@ -4,7 +4,7 @@ export type OpenPriceChoice = { kind: 'department'; id: string } | { kind: 'tax'
 </script>
 
 <script setup lang="ts">
-// «Department (VAT)» of the open-price sheet (SALE-F09): the business's departments in their order, each
+// «Section (VAT)» of the open-price sheet (SALE-F09): the business's departments in their order, each
 // with the rate its category charges today, 20 at a time and searched on the server; a tap chooses one.
 // A business without departments gets Taxes' categories instead, through the app's one tax-category
 // picker (which says it when there is none either); a search that finds nothing is not «no

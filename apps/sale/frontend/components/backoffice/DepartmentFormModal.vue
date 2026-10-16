@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// SALE-F35: «New department» (the «+» of Departments) or «Edit department» (a row's «Edit»), as the old
+// SALE-F35: «New section» (the «+» of Sections) or «Edit section» (a row's «Edit»), as the old
 // table's create panel: Name, «VAT charged» (TaxCategoryPicker, searched on the server) and Position,
-// «Add» or «Save». No VAT chosen: «Choose the VAT this department charges.» under it, and nothing is sent.
+// «Add» or «Save». No VAT chosen: «Choose the VAT this section charges.» under it, and nothing is sent.
 // An edit sends only what changed (nothing changed: it just closes). It closes once the server saved it
 // — the live list paints the department with the rate its category charges —; a refusal keeps it open
 // with what was typed (`refusal`).

@@ -6,6 +6,9 @@
 // five; both in Spanish, as Ioan sees them, and in English, the source. The screenshots of Customers at
 // 375, 390, 834 and 1440 are the evidence for the comparison with the old hub. More tabs than fit (six,
 // or a word wider than a fifth of the strip) keep scrolling with the next tab peeking (`tabbar-peek.ts`).
+// flow: ninguno — FIX de la barra de pestañas de Ventas a 375 px (sigue a FIX-UI-TABBAR-375):
+// FIX-SALE-TABBAR-LABEL adds Sales & POS, five tabs whose fourth label was one word wider than a fifth
+// of a phone's strip, with its screenshots at 375, 390, 834 and 1440.
 import { type Browser, type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, topbarApps } from './helpers';
@@ -20,6 +23,7 @@ const PHONES = [
 const PAGES = [
   { app: 'customer', path: '/customer/customers', tabs: 4 },
   { app: 'staff', path: '/staff/members', tabs: 5 },
+  { app: 'sale', path: '/sale/sales', tabs: 5 },
 ];
 
 const LOCALES = ['es', 'en'] as const;
@@ -134,22 +138,31 @@ for (const language of LOCALES) {
   });
 }
 
-test('ui:shell — Customers with its tabbar at 375, 390, 834 and 1440, every tab whole (evidence for the old hub)', async ({ browser }) => {
-  test.setTimeout(240_000);
-  const { context, page } = await ownerPage(browser, 'es');
-  try {
-    for (const viewport of [
-      { label: '375', width: 375, height: 667 },
-      { label: '390', width: 390, height: 844 },
-      { label: '834', width: 834, height: 1112 },
-      { label: '1440', width: 1440, height: 900 },
-    ]) {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await openTabbar(page, PAGES[0].path, PAGES[0].tabs);
-      await page.screenshot({ path: shot(`FIX-UI-TABBAR-375-${viewport.label}`) });
-      expectAllTabsWhole(await tabbarGeometry(page), `es-customer-${viewport.label}`);
+/** The screenshots that go beside the old hub's: a phone, a big phone, a tablet and a desktop. */
+const EVIDENCE_VIEWPORTS = [
+  { label: '375', width: 375, height: 667 },
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+];
+
+for (const { app, title, evidence } of [
+  { app: 'customer', title: 'Customers', evidence: 'FIX-UI-TABBAR-375' },
+  { app: 'sale', title: 'Sales & POS', evidence: 'FIX-SALE-TABBAR-LABEL' },
+]) {
+  const { path, tabs } = PAGES.find((page) => page.app === app)!;
+  test(`ui:shell — ${title} with its tabbar at 375, 390, 834 and 1440, every tab whole (evidence for the old hub)`, async ({ browser }) => {
+    test.setTimeout(240_000);
+    const { context, page } = await ownerPage(browser, 'es');
+    try {
+      for (const viewport of EVIDENCE_VIEWPORTS) {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await openTabbar(page, path, tabs);
+        await page.screenshot({ path: shot(`${evidence}-${viewport.label}`) });
+        expectAllTabsWhole(await tabbarGeometry(page), `es-${app}-${viewport.label}`);
+      }
+    } finally {
+      await context.close();
     }
-  } finally {
-    await context.close();
-  }
-});
+  });
+}

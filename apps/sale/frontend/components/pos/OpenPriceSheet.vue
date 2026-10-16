@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The open-price sheet (SALE-F09): the amount typed on the keypad, big on top; «Department (VAT)» with
+// The open-price sheet (SALE-F09): the amount typed on the keypad, big on top; «Section (VAT)» with
 // the business's departments (or Taxes' categories without any); «Add <amount>», which waits for both.
 // It hands the line up in cents with its department (or tax category); the server names the line after
 // it and the page writes it. A refusal (the permission, a department gone) is read here, over the button. Opens blank.

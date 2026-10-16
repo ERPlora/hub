@@ -1,8 +1,8 @@
-// Sales & POS → Departments (SALE-F35; WORKBOOK «Pantallas · Departamentos»): the old intro, then the live
+// Sales & POS → Sections (SALE-F35; WORKBOOK «Pantallas · Secciones»): the old intro, then the live
 // `sale.department.list` in a server-side DataTable — Name, «VAT charged» («Name · rate», the rate the
 // server says the category charges today, never one the page works out) and Position —, «Search a
-// department…», 50 a page sorted by position. Whoever may change the till settings gets «+», «Edit» (also a
-// tap on the row) and «Delete» (confirmed with the old «Delete department»); anyone else sees it read-only.
+// section…», 50 a page sorted by position. Whoever may change the till settings gets «+», «Edit» (also a
+// tap on the row) and «Delete» (confirmed with «Delete section»); anyone else sees it read-only.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,7 +47,7 @@ const PAGE = {
   offset: 0,
 };
 const EMPTY = { rows: [], total: 0, limit: 50, offset: 0 };
-const GONE = 'That department is no longer in this business. Reload the list and try again.';
+const GONE = 'That section is no longer in this business. Reload the list and try again.';
 
 async function setup(options: MountOptions = {}) {
   const m = await mountSale(DepartmentsPage, { path: '/sale/departments', ...options });
@@ -72,17 +72,17 @@ describe('DepartmentsPage: the live list', () => {
     const page = s.wrapper.findComponent(AppPage);
     expect([page.props('title'), page.props('tabsLabel')]).toEqual(['Sales & POS', 'Sales & POS sections']);
     expect(s.find('sale-departments-intro').text()).toBe(
-      'The families the till offers when you charge an amount that is not in the catalogue. Each one carries its own VAT. Leave the list empty and the till falls back to the plain tax categories.',
+      'The sections the till offers when you charge an amount that is not in the catalogue. Each one carries its own VAT. Leave the list empty and the till falls back to the plain tax categories.',
     );
   });
 
-  it('follows sale.department.list, 50 sorted by position, «Loading departments…» until the first result', async () => {
+  it('follows sale.department.list, 50 sorted by position, «Loading sections…» until the first result', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ sort: 'sort_order', dir: 'asc', limit: 50, offset: 0 }]);
-    expect(s.find('sale-departments-loading').text()).toContain('Loading departments…');
+    expect(s.find('sale-departments-loading').text()).toContain('Loading sections…');
     await s.show(PAGE);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'sale-departments', pageSize: 50, total: 3, views: ['table', 'cards'] });
-    expect([s.prop('searchPlaceholder'), s.prop('entityLabel')]).toEqual(['Search a department…', { one: 'department', many: 'departments' }]);
+    expect([s.prop('searchPlaceholder'), s.prop('entityLabel')]).toEqual(['Search a section…', { one: 'section', many: 'sections' }]);
   });
 
   it('paints Name, VAT charged («Name · rate» as the server says) and Position; Name and Position sort', async () => {
@@ -117,14 +117,14 @@ describe('DepartmentsPage: the live list', () => {
     expect(s.params(OP)).toHaveLength(2);
   });
 
-  it('with no department, the old empty text; a search with no match says «No results»', async () => {
+  it('with no section, the empty text; a search with no match says «No results»', async () => {
     const s = await setup();
     await s.show(EMPTY);
     const empty = () => s.wrapper.findComponent(EmptyState);
-    expect(empty().props('heading')).toBe('No departments yet. Add the families you ring up by hand — “Fruit and veg”, “Butchery”, “Household”.');
+    expect(empty().props('heading')).toBe('No sections yet. Add the ones you ring up by hand — “Fruit and veg”, “Butchery”, “Household”.');
     await s.emit('update:search', 'zzz');
     await s.show(EMPTY);
-    expect([empty().props('heading'), empty().props('message')]).toEqual(['No results', 'No department matches your search.']);
+    expect([empty().props('heading'), empty().props('message')]).toEqual(['No results', 'No section matches your search.']);
   });
 
   it('a failed read is the table’s error with «Retry»; the app off replaces the list; «Reconnecting…» keeps it', async () => {
@@ -136,7 +136,7 @@ describe('DepartmentsPage: the live list', () => {
     const t = await setup();
     t.net.lastStream().push(errorFrame(t.subId(OP), 'server_error'));
     await flush();
-    expect([t.prop('error'), t.prop<Record<string, string>>('labels').loadError]).toEqual(['msg server_error', 'The departments could not be loaded.']);
+    expect([t.prop('error'), t.prop<Record<string, string>>('labels').loadError]).toEqual(['msg server_error', 'The sections could not be loaded.']);
     const u = await setup();
     u.net.lastStream().push(errorFrame(u.subId(OP), 'app_inactive'));
     await flush();
@@ -146,7 +146,7 @@ describe('DepartmentsPage: the live list', () => {
 });
 
 describe('DepartmentsPage: whoever may change the till settings', () => {
-  it('«+» opens «New department»; «Edit» and a tap on the row open the department', async () => {
+  it('«+» opens «New section»; «Edit» and a tap on the row open the section', async () => {
     const s = await setup();
     await s.show(PAGE);
     expect([s.prop('addable'), s.prop('rowClickable')]).toEqual([true, true]);
@@ -164,14 +164,14 @@ describe('DepartmentsPage: whoever may change the till settings', () => {
     expect([s.form().props('open'), s.form().props('department')]).toEqual([true, PAGE.rows[1]]);
   });
 
-  it('«Delete» asks with the old words and, confirmed, deletes it by its id', async () => {
+  it('«Delete» asks first and, confirmed, deletes it by its id', async () => {
     const s = await setup();
     await s.show(PAGE);
     mocks.confirm.mockResolvedValue(true);
     s.answer(200, PAGE.rows[1]);
     await s.emit('action', { actionId: 'delete', row: PAGE.rows[1] });
     expect(mocks.confirm).toHaveBeenCalledWith({
-      title: 'Delete department',
+      title: 'Delete section',
       message: 'Butchery — It stops being offered at the till. Everything already sold keeps the name and the VAT it was charged with.',
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
@@ -181,14 +181,14 @@ describe('DepartmentsPage: whoever may change the till settings', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/sale/departments/delete', query: {}, body: { id: 'd2' } }]);
   });
 
-  it('a department another device deleted: «The department could not be deleted.» and the server’s words', async () => {
+  it('a section another device deleted: «The section could not be deleted.» and the server’s words', async () => {
     const s = await setup();
     await s.show(PAGE);
     mocks.confirm.mockResolvedValue(true);
     s.answer(404, { error: { code: 'sale.department_not_found', message: GONE } });
     await s.emit('action', { actionId: 'delete', row: PAGE.rows[0] });
     const notice = s.find('sale-departments-error').text();
-    expect(notice).toContain('The department could not be deleted.');
+    expect(notice).toContain('The section could not be deleted.');
     expect(notice).toContain(GONE);
   });
 });
@@ -205,9 +205,9 @@ describe('DepartmentsPage: anyone else', () => {
 describe('DepartmentsPage: Spanish', () => {
   it('speaks the old screen’s words, with the rate as Spain writes it', async () => {
     const s = await setup({ locale: 'es' });
-    expect(s.find('sale-departments-loading').text()).toContain('Cargando departamentos…');
+    expect(s.find('sale-departments-loading').text()).toContain('Cargando secciones…');
     await s.show(PAGE);
-    expect(s.prop('searchPlaceholder')).toBe('Buscar un departamento…');
+    expect(s.prop('searchPlaceholder')).toBe('Buscar una sección…');
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'IVA que cobra', 'Posición']);
     expect(s.cells(1)).toEqual(['Butchery', 'Reduced food · 10 %', '1']);
   });

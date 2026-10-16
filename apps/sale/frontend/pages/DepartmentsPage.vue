@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// Sales & POS → Departments (SALE-F35; WORKBOOK «Pantallas · Departamentos»): the old intro, then the live
+// Sales & POS → Sections (SALE-F35; WORKBOOK «Pantallas · Secciones»): the old intro, then the live
 // `sale.department.list` in a server-side DataTable — Name, «VAT charged» and Position —, «Search a
-// department…», 50 a page sorted by position. «VAT charged» reads «Name · rate» with the rate the server
+// section…», 50 a page sorted by position. «VAT charged» reads «Name · rate» with the rate the server
 // says the category charges today (`tax_rate_pct`). Whoever may change the till settings gets «+», «Edit»
-// (also a tap on the row) and «Delete» (confirmed with the old «Delete department»); anyone else sees the
+// (also a tap on the row) and «Delete» (confirmed with «Delete section»); anyone else sees the
 // list read-only. Changes arrive through the stream (no refetch).
 import { type DataTableAction, type DataTableColumn, DataTable, EmptyState, useConfirm } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';

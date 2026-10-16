@@ -29,11 +29,11 @@ MAX_PAYMENTS = 10
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
 SAY_WHICH_DEPARTMENT = _(
-    "Say which department (or tax category) the open price is charged at."
+    "Say which section (or tax category) the open price is charged at."
 )
 SAY_WHICH_SALE = _("Say which sale: its id or its number.")
 SAY_WHICH_METHOD = _("Say which payment method: its id, its name or its type.")
-SAY_WHICH_DEPARTMENT_ROW = _("Say which department: its id or its name.")
+SAY_WHICH_DEPARTMENT_ROW = _("Say which section: its id or its name.")
 SAY_WHICH_QUICK_NOTE = _("Say which quick note: its id or its text.")
 ONE_SOURCE = _(
     "Charge an open check (order_id) or loose lines (lines, service lines or open-price lines), one of the two."

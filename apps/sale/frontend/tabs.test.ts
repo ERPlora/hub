@@ -1,6 +1,7 @@
 // The sections of Sales & POS (the WORKBOOK's screens; the old manifest's `navigation` and the settings
-// tab the old hub added): Sell, Sales, Quick notes, Departments and Settings, as the footer tabbar of
-// every sale page. Each tab follows its route, has a registered icon and its label in the reader's
+// tab the old hub added): Sell, Sales, Quick notes, Sections and Settings, as the footer tabbar of
+// every sale page. The old «Departments» is «Sections» (FIX-SALE-TABBAR-LABEL): its one word was wider
+// than a fifth of a phone's strip, so the five tabs did not fit whole. Each tab follows its route, has a registered icon and its label in the reader's
 // language, and wears the same icon and path as its menu entry in apps.py.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -20,18 +21,18 @@ function tabsIn(locale: 'en' | 'es') {
 }
 
 describe('the sale tabbar', () => {
-  it('is Sell, Sales, Quick notes, Departments and Settings, each on its own route, the order of the menu', () => {
+  it('is Sell, Sales, Quick notes, Sections and Settings, each on its own route, the order of the menu', () => {
     expect(tabsIn('en').map((t) => [t.id, t.label, t.to])).toEqual([
       ['pos', 'Sell', '/sale/pos'],
       ['sales', 'Sales', '/sale/sales'],
       ['quick_notes', 'Quick notes', '/sale/quick-notes'],
-      ['departments', 'Departments', '/sale/departments'],
+      ['departments', 'Sections', '/sale/departments'],
       ['settings', 'Settings', '/sale/settings'],
     ]);
   });
 
   it('speaks Spanish', () => {
-    expect(tabsIn('es').map((t) => t.label)).toEqual(['Vender', 'Ventas', 'Notas rápidas', 'Departamentos', 'Ajustes']);
+    expect(tabsIn('es').map((t) => t.label)).toEqual(['Vender', 'Ventas', 'Notas rápidas', 'Secciones', 'Ajustes']);
   });
 
   it('gives every tab a registered icon', () => {

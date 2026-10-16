@@ -1,4 +1,4 @@
-// The open-price sheet (SALE-F09): the amount typed on the keypad, «Department (VAT)» and «Add
+// The open-price sheet (SALE-F09): the amount typed on the keypad, «Section (VAT)» and «Add
 // <amount>», which cannot be pressed without an amount and a department. It hands the line up in cents
 // with its department (or, without departments, its tax category): the server names the line after it.
 // A refusal is read in the sheet.
@@ -45,7 +45,7 @@ describe('OpenPriceSheet', () => {
     expect(plain(m.find('pos-open-price-amount').text())).toBe('0,00 €');
     await m.press('1', '2', 'dot', '5');
     expect(plain(m.find('pos-open-price-amount').text())).toBe('12,50 €');
-    expect(m.find('pos-open-price-department-label').text()).toBe('Departamento (IVA)');
+    expect(m.find('pos-open-price-department-label').text()).toBe('Sección (IVA)');
   });
 
   it('«Add» waits for an amount and a department, then hands the line up in cents', async () => {

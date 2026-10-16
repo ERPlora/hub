@@ -12,8 +12,8 @@ Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cam
 ## Plataforma
 
 - **Permiso por entrada de menú** (`Nav.permission`): el producto actual escondía «Notas rápidas»,
-  «Departamentos» y «Ajustes» a quien no tiene `sale.manage_settings`. Hoy salen en el menú y la página
-  se abre en solo lectura (o con el aviso «No tienes permiso…» en Ajustes).
+  «Departamentos» (aquí «Secciones») y «Ajustes» a quien no tiene `sale.manage_settings`. Hoy salen
+  en el menú y la página se abre en solo lectura (o con el aviso «No tienes permiso…» en Ajustes).
 - **Elevación por PIN del responsable** (`X-Elevation-Token`, `requires_elevation`): precio libre,
   descuento por encima del máximo, anular una cuenta o una línea enviada, anular y devolver ventas. Hoy
   el empleado ve «Lo tiene que hacer un responsable» y el servidor responde 403.
@@ -25,7 +25,7 @@ Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cam
 
 ## Back office
 
-Lo que piden Notas rápidas, Departamentos y Ajustes (`frontend/components/backoffice/`).
+Lo que piden Notas rápidas, Secciones y Ajustes (`frontend/components/backoffice/`).
 
 - `ion:save-outline` — botón **Guardar** de Ajustes, el icono del producto actual. Hoy: `lucide:save`
   (el mismo disquete, de otro juego).

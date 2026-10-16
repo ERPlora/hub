@@ -1,7 +1,7 @@
-// SALE-F35 (the open-price departments): the «+» of Departments opens «New department» — Name («e.g.
+// SALE-F35 (the open-price departments): the «+» of Sections opens «New section» — Name («e.g.
 // Fruit and veg», 60 characters at most), «VAT charged» (searched on the server among the business's tax
-// categories) and Position — with «Add»; a row's «Edit» opens «Edit department» from that department, with
-// «Save», and sends only what changed. No VAT chosen: «Choose the VAT this department charges.» under it.
+// categories) and Position — with «Add»; a row's «Edit» opens «Edit section» from that department, with
+// «Save», and sends only what changed. No VAT chosen: «Choose the VAT this section charges.» under it.
 // It closes once the server saved it; a refusal keeps it open with what was typed (a category the server
 // does not know under «VAT charged», a department another device deleted on top).
 import { describe, expect, it, vi } from 'vitest';
@@ -45,7 +45,7 @@ const CATEGORIES = {
   limit: 50,
   offset: 0,
 };
-const GONE = 'That department is no longer in this business. Reload the list and try again.';
+const GONE = 'That section is no longer in this business. Reload the list and try again.';
 const UNKNOWN = 'That tax category does not exist in Taxes.';
 
 async function setup(department: DepartmentOut | null = null, locale: 'en' | 'es' = 'en') {
@@ -66,10 +66,10 @@ async function setup(department: DepartmentOut | null = null, locale: 'en' | 'es
   return { ...m, field, submit, title, type, chooseTax, closed };
 }
 
-describe('DepartmentFormModal: «New department»', () => {
+describe('DepartmentFormModal: «New section»', () => {
   it('asks Name, VAT charged and Position in outlined md boxes, with «Add»', async () => {
     const s = await setup();
-    expect(s.title()).toBe('New department');
+    expect(s.title()).toBe('New section');
     const name = s.field('name');
     expect([name.label, name.placeholder, name.fill, name.getAttribute('mode'), name.maxlength]).toEqual(['Name', 'e.g. Fruit and veg', 'outline', 'md', 60]);
     expect([s.field('tax').label, s.field('tax').fill, s.field('tax').getAttribute('mode')]).toEqual(['VAT charged', 'outline', 'md']);
@@ -95,11 +95,11 @@ describe('DepartmentFormModal: «New department»', () => {
     );
   });
 
-  it('no VAT chosen: says «Choose the VAT this department charges.» under it and sends nothing', async () => {
+  it('no VAT chosen: says «Choose the VAT this section charges.» under it and sends nothing', async () => {
     const s = await setup();
     await s.type('name', 'Butchery');
     await click(s.submit());
-    expect(s.field('tax').errorText).toBe('Choose the VAT this department charges.');
+    expect(s.field('tax').errorText).toBe('Choose the VAT this section charges.');
     expect(s.sent()).toEqual([]);
     expect(s.closed()).toBe(false);
     await s.chooseTax('general');
@@ -120,10 +120,10 @@ describe('DepartmentFormModal: «New department»', () => {
   });
 });
 
-describe('DepartmentFormModal: «Edit department»', () => {
-  it('starts from the department: its name, its VAT as its row reads it and its position, with «Save»', async () => {
+describe('DepartmentFormModal: «Edit section»', () => {
+  it('starts from the section: its name, its VAT as its row reads it and its position, with «Save»', async () => {
     const s = await setup(FRUIT);
-    expect(s.title()).toBe('Edit department');
+    expect(s.title()).toBe('Edit section');
     expect([s.field('name').value, plain(String(s.field('tax').value)), s.field('order').value]).toEqual(['Fruit and veg', 'Basic food · 4%', '1']);
     expect(s.submit().textContent?.trim()).toBe('Save');
   });
@@ -166,19 +166,19 @@ describe('DepartmentFormModal: refusals keep it open', () => {
     expect(s.inDoc('sale-department-form-error')?.textContent).toContain(GONE);
   });
 
-  it('a failure without words says «The department could not be saved.»', async () => {
+  it('a failure without words says «The section could not be saved.»', async () => {
     const s = await setup(FRUIT);
     s.net.onApi(() => new Response('<html>502</html>', { status: 502 }));
     await s.type('name', 'Fruit');
     await click(s.submit());
-    expect(s.inDoc('sale-department-form-error')?.textContent).toContain('The department could not be saved.');
+    expect(s.inDoc('sale-department-form-error')?.textContent).toContain('The section could not be saved.');
   });
 });
 
 describe('DepartmentFormModal: Spanish', () => {
-  it('speaks the old screen’s words', async () => {
+  it('speaks the old screen’s words, «sección» for «departamento»', async () => {
     const s = await setup(null, 'es');
-    expect(s.title()).toBe('Nuevo departamento');
+    expect(s.title()).toBe('Nueva sección');
     expect([s.field('name').label, s.field('name').placeholder, s.field('tax').label, s.field('order').label, s.submit().textContent?.trim()]).toEqual([
       'Nombre',
       'p. ej. Frutas y verduras',
@@ -188,6 +188,6 @@ describe('DepartmentFormModal: Spanish', () => {
     ]);
     await s.type('name', 'Carnicería');
     await click(s.submit());
-    expect(s.field('tax').errorText).toBe('Elige el IVA que cobra este departamento.');
+    expect(s.field('tax').errorText).toBe('Elige el IVA que cobra esta sección.');
   });
 });
