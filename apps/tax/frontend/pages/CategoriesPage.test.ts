@@ -12,7 +12,6 @@ import type { Component } from 'vue';
 import type { CategoryRowOut } from '../operations';
 import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax } from '../__tests__/mount-tax';
 import CategoryCreateModal from '../components/CategoryCreateModal.vue';
-import FilterPanel from '../components/FilterPanel.vue';
 import CategoriesPage from './CategoriesPage.vue';
 import source from './CategoriesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -63,8 +62,9 @@ async function setup(options: MountOptions = {}) {
     await m.reopen();
     await m.result(OP, page);
   }
+  /** The table's funnel applies its filters (`v-model:filters`): what the panel's «Apply» emits. */
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
     await flush();
   }
   return { ...m, call, table, prop, rows, params, show, showOnNewStream, filter };
@@ -161,18 +161,18 @@ describe('CategoriesPage: the live list', () => {
 });
 
 describe('CategoriesPage: the filters (Key, Name, Description, Origin)', () => {
-  it('offers them in the filters dialog, Origin as System or Custom', async () => {
+  it('are the filters of their columns behind the table funnel, Origin as System or Custom', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
-    const panel = s.wrapper.findComponent(FilterPanel);
-    expect(panel.props('testid')).toBe('tax-categories');
+    expect(s.prop('filterable')).toBe(true);
+    expect(s.prop('filterFields') ?? []).toEqual([]);
+    type Column = { key: string; label: string; filter?: { type: string; options?: unknown; maxlength?: number } };
     expect(
-      (panel.props('filters') as Array<{ key: string; label: string; kind: string; options?: unknown; maxlength?: number }>).map((f) => [
-        f.key,
-        f.label,
-        f.kind,
-        f.options ?? f.maxlength ?? null,
-      ]),
+      s
+        .prop<Column[]>('columns')
+        .filter((c) => c.filter)
+        .map((c) => [c.key, c.label, c.filter?.type, c.filter?.options ?? c.filter?.maxlength ?? null]),
     ).toEqual([
       // As long as the schema takes each one (CategoryListIn): a longer text would be a 422.
       ['key', 'Key', 'text', 80],
@@ -188,6 +188,22 @@ describe('CategoriesPage: the filters (Key, Name, Description, Origin)', () => {
         ],
       ],
     ]);
+  });
+
+  it('the funnel panel applies on «Apply» and counts the filters in use', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    await s.find('tax-categories-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('tax-categories-filters-panel');
+    panel.get('[data-testid="tax-categories-filter-key"]').element.dispatchEvent(new CustomEvent('ionInput', { detail: { value: 'resta' } }));
+    panel.get('[data-testid="tax-categories-filter-is_system"]').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'true' } }));
+    await flush();
+    expect(s.params(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'key', dir: 'asc', limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="tax-categories-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.params()).toEqual([{ key: 'resta', is_system: true, sort: 'key', dir: 'asc', limit: 50, offset: 0 }]);
+    expect(s.find('tax-categories-filters-count').text()).toBe('2');
   });
 
   it('filters on the server from the first page, Origin as a yes/no; no filter left, back to all', async () => {
@@ -215,7 +231,7 @@ describe('CategoriesPage: a filter the server refuses (422)', () => {
     const refused = { code: 'invalid_payload', message: 'Some fields are not valid.', fields: { key: 'String should have at most 80 characters' } };
     s.net.lastStream().push(`event: error\ndata: ${JSON.stringify({ id: s.subId(OP), error: refused })}\n\n`);
     await flush();
-    expect(s.wrapper.findComponent(FilterPanel).props('fieldErrors')).toEqual({ key: 'String should have at most 80 characters' });
+    expect(s.prop('filterErrors')).toEqual({ key: 'String should have at most 80 characters' });
     expect(s.prop('error')).toBeUndefined();
     expect(s.wrapper.find('[data-role="load-error"]').exists()).toBe(false);
     expect(s.rows()).toHaveLength(3);

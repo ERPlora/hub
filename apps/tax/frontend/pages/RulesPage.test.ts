@@ -12,7 +12,6 @@ import type { Component } from 'vue';
 
 import type { CategoryRowOut, RuleOut } from '../operations';
 import { BYE, click, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax, settle } from '../__tests__/mount-tax';
-import FilterPanel from '../components/FilterPanel.vue';
 import RuleCreateModal from '../components/RuleCreateModal.vue';
 import RuleEndModal from '../components/RuleEndModal.vue';
 import RulesPage from './RulesPage.vue';
@@ -105,8 +104,9 @@ async function setup(options: MountOptions = {}) {
     m.find('tax-rules-status').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
     await flush();
   }
+  /** The table's funnel applies its filters (`v-model:filters`): what the panel's «Apply» emits. */
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
     await flush();
   }
   async function action(id: string, actionId: string) {
@@ -129,10 +129,9 @@ describe('RulesPage: the live list', () => {
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Taxes');
   });
 
-  it('asks the server the countries of the business’s rules and searches the categories there (no list cut at 100)', async () => {
+  it('asks the server the countries of the business’s rules (the Country filter offers those)', async () => {
     const s = await setup();
     expect(s.paramsOf('tax.rule.countries')).toEqual([{}]);
-    expect(s.paramsOf('tax.category.list')).toEqual([{ sort: 'display_name', dir: 'asc', limit: 50 }]);
   });
 
   it('paints Category, Country, Region, %, Type, Qualification, Valid from, Valid to and Active', async () => {
@@ -248,37 +247,58 @@ describe('RulesPage: Status (TAX-F03, F08)', () => {
 });
 
 describe('RulesPage: the filters (TAX-F03; the jurisdiction, TAX-F11)', () => {
-  it('offers Country (the countries of the business’s rules), Region, Category, Type, Qualification, Regime and %', async () => {
+  it('offers Category (searched), Country (the business’s), Region, %, Type and Qualification on their columns, then Regime', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     await s.showCountries(['ES', 'PT']);
-    await s.showCategories();
-    type Spec = { key: string; label: string; kind: string; options?: Array<{ value: string; label: string }>; maxlength?: number; min?: number; max?: number; search?: (text: string) => void };
-    const specs = () => s.wrapper.findComponent(FilterPanel).props('filters') as Spec[];
-    expect(specs().map((f) => [f.key, f.label, f.kind])).toEqual([
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = {
+      type: string;
+      keys?: string[];
+      options?: Array<{ value: string; label: string }>;
+      maxlength?: number;
+      min?: number;
+      max?: number;
+      load?: (query: string) => Promise<unknown>;
+    };
+    const columns = () => s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns').filter((c) => c.filter);
+    expect(columns().map((c) => [c.key, c.label, c.filter?.type])).toEqual([
+      ['tax_category_key', 'Category', 'lookup'],
       ['country_code', 'Country', 'select'],
       ['region_code', 'Region', 'text'],
-      ['tax_category_key', 'Category', 'search'],
+      ['rate_pct', '%', 'range'],
       ['tax_type', 'Type', 'select'],
       ['operation_class', 'Qualification', 'select'],
-      ['regime_key', 'Regime', 'text'],
-      ['rate', '%', 'range'],
     ]);
+    const fields = s.prop<Array<Filter & { key: string; label: string }>>('filterFields');
+    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([['regime_key', 'Regime', 'text']]);
+    const byKey = (key: string) => columns().find((c) => c.key === key)?.filter;
     // Bounded as RuleListIn takes them: a longer region or regime, or a % off 0–100, would be a 422.
-    expect([specs()[1].maxlength, specs()[5].maxlength, specs()[6].min, specs()[6].max]).toEqual([6, 10, 0, 100]);
-    // The category is searched on the server.
-    specs()[2].search?.('food');
-    await flush();
-    // (The «New tax rule» dialog keeps its own, unsearched.)
-    expect(s.paramsOf('tax.category.list')).toContainEqual({ search: 'food', sort: 'display_name', dir: 'asc', limit: 50 });
-    const specs0 = specs();
-    expect(specs0[0].options).toEqual([
+    expect([byKey('region_code')?.maxlength, fields[0].maxlength, byKey('rate_pct')?.min, byKey('rate_pct')?.max]).toEqual([6, 10, 0, 100]);
+    expect(byKey('rate_pct')?.keys).toEqual(['rate_min', 'rate_max']);
+    expect(byKey('country_code')?.options).toEqual([
       { value: 'PT', label: 'Portugal (PT)' },
       { value: 'ES', label: 'Spain (ES)' },
     ]);
-    expect(specs0[2].options?.map((o) => o.value)).toEqual(['restaurant.food', 'service.health']);
-    expect(specs0[3].options?.[1]).toEqual({ value: 'igic', label: 'IGIC (Canary Islands)' });
-    expect(specs0[4].options?.map((o) => o.value)).toEqual(['subject', 'subject_reverse', 'exempt', 'not_subject', 'not_subject_location']);
+    expect(byKey('tax_type')?.options?.[1]).toEqual({ value: 'igic', label: 'IGIC (Canary Islands)' });
+    expect(byKey('operation_class')?.options?.map((o) => o.value)).toEqual(['subject', 'subject_reverse', 'exempt', 'not_subject', 'not_subject_location']);
+    // The category is searched on the server: every category of the business, not a first page.
+    s.answer(200, CATEGORIES);
+    expect(await byKey('tax_category_key')?.load?.('food')).toEqual([
+      { value: 'restaurant.food', label: 'Restauración — comida (restaurant.food)' },
+      { value: 'service.health', label: 'Servicio — sanitario (service.health)' },
+    ]);
+    expect(s.sent().map((c) => [c.path, c.query])).toEqual([['/api/tax/categories', { search: 'food', sort: 'display_name', dir: 'asc', limit: '50' }]]);
+  });
+
+  it('the Status select stays out of the funnel, beside it', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.find('tax-rules-status').exists()).toBe(true);
+    await s.find('tax-rules-filters-toggle').trigger('click');
+    await flush();
+    expect(s.find('tax-rules-filters-panel').find('[data-testid="tax-rules-status"]').exists()).toBe(false);
   });
 
   it('filters by country and region on the server, from the first page, with the % as a range', async () => {
@@ -290,6 +310,7 @@ describe('RulesPage: the filters (TAX-F03; the jurisdiction, TAX-F11)', () => {
     expect(s.params()).toEqual([
       { country_code: 'ES', region_code: 'CN', rate_min: '5', rate_max: '10', status: 'active', sort: 'tax_category_key', dir: 'asc', limit: 50, offset: 0 },
     ]);
+    expect(s.find('tax-rules-filters-count').text(), 'the % from–to counts once').toBe('3');
     await s.showOnNewStream(EMPTY);
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
   });

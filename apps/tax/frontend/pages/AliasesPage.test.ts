@@ -10,7 +10,6 @@ import type { Component } from 'vue';
 import type { AliasOut, CategoryRowOut } from '../operations';
 import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax } from '../__tests__/mount-tax';
 import AliasCreateModal from '../components/AliasCreateModal.vue';
-import FilterPanel from '../components/FilterPanel.vue';
 import AliasesPage from './AliasesPage.vue';
 import source from './AliasesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -58,8 +57,9 @@ async function setup(options: MountOptions = {}) {
     await m.reopen();
     await m.result(OP, page);
   }
+  /** The table's funnel applies its filters (`v-model:filters`): what the panel's «Apply» emits. */
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
     await flush();
   }
   return { ...m, call, table, prop, rows, listParams, show, showOnNewStream, filter };
@@ -110,15 +110,16 @@ describe('AliasesPage: the live list', () => {
 });
 
 describe('AliasesPage: the filters (Alias, Category, Origin)', () => {
-  it('offers the alias as text (as long as the schema takes it), the category searched on the server and the origin', async () => {
+  it('offers, behind the table funnel, the alias as text (as long as the schema takes it), the category searched on the server and the origin', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
-    await s.result('tax.category.list', CATEGORIES);
-    type Spec = { key: string; label: string; kind: string; options?: unknown; maxlength?: number; search?: (text: string) => void };
-    const specs = s.wrapper.findComponent(FilterPanel).props('filters') as Spec[];
-    expect(specs.map((f) => [f.key, f.label, f.kind, f.options ?? f.maxlength ?? null])).toEqual([
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; options?: unknown; maxlength?: number; load?: (query: string) => Promise<unknown> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns').filter((c) => c.filter);
+    expect(columns.map((c) => [c.key, c.label, c.filter?.type, c.filter?.options ?? c.filter?.maxlength ?? null])).toEqual([
       ['alias', 'Alias', 'text', 200],
-      ['tax_category_key', 'Category', 'search', [{ value: 'restaurant.food', label: 'Restauración — comida (restaurant.food)' }]],
+      ['tax_category_key', 'Category', 'lookup', null],
       [
         'source',
         'Source',
@@ -129,9 +130,9 @@ describe('AliasesPage: the filters (Alias, Category, Origin)', () => {
         ],
       ],
     ]);
-    specs[1].search?.('comida');
-    await flush();
-    expect(s.params('tax.category.list')).toContainEqual({ search: 'comida', sort: 'display_name', dir: 'asc', limit: 50 });
+    s.answer(200, CATEGORIES);
+    expect(await columns[1].filter?.load?.('comida')).toEqual([{ value: 'restaurant.food', label: 'Restauración — comida (restaurant.food)' }]);
+    expect(s.sent().map((c) => [c.path, c.query])).toEqual([['/api/tax/categories', { search: 'comida', sort: 'display_name', dir: 'asc', limit: '50' }]]);
   });
 
   it('filters on the server from the first page', async () => {
@@ -141,6 +142,7 @@ describe('AliasesPage: the filters (Alias, Category, Origin)', () => {
     await flush();
     await s.filter({ tax_category_key: 'restaurant.food', source: 'learned' });
     expect(s.listParams()).toEqual([{ tax_category_key: 'restaurant.food', source: 'learned', sort: 'alias', dir: 'asc', limit: 50, offset: 0 }]);
+    expect(s.find('tax-aliases-filters-count').text()).toBe('2');
   });
 });
 

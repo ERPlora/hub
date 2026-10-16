@@ -1,14 +1,13 @@
 <script setup lang="ts">
 // Taxes → Categories (TAX-F01, F02): the live `tax.category.list` in a server-side DataTable — Key,
 // Name, Description, Origin («System» or «Custom»), Active and the rate in force today in the
-// business's country —, search, column filters, sort by any column, 50 a page sorted by key. «+» opens
+// business's country —, search, column filters behind the table's funnel, sort by any column, 50 a page sorted by key. «+» opens
 // «New tax category» for whoever can manage; the new row arrives through the stream (no refetch).
-import { type DataTableColumn, DataTable, EmptyState } from '@erplora/ui/components';
+import { type DataTableColumn, type DataTableFilters, DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
 import CategoryCreateModal from '../components/CategoryCreateModal.vue';
-import FilterPanel, { type FilterSpec, type FilterValues } from '../components/FilterPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
@@ -24,11 +23,12 @@ const t = useT();
 const locale = useLocale();
 
 const table = useServerTable({ sort: 'key' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
 /** The filters as the query takes them: Origin is a yes/no. */
-function filterParams(values: FilterValues): Partial<CategoryListIn> {
+function filterParams(values: DataTableFilters): Partial<CategoryListIn> {
   const { is_system: origin, ...text } = values;
   return { ...text, ...(origin ? { is_system: origin === 'true' } : {}) };
 }
@@ -47,22 +47,6 @@ const filterErrors = computed(() => error.value?.fields ?? {});
 const tableError = computed(() => (status.value === 'error' && !Object.keys(filterErrors.value).length ? error.value?.message : undefined));
 const creating = ref(false);
 
-const filterSpecs = computed<FilterSpec[]>(() => [
-  // As long as CategoryListIn takes each one.
-  { kind: 'text', key: 'key', label: t('tax.categories.columns.key'), maxlength: 80 },
-  { kind: 'text', key: 'display_name', label: t('tax.categories.columns.name'), maxlength: 255 },
-  { kind: 'text', key: 'display_description', label: t('tax.categories.columns.description'), maxlength: 1000 },
-  {
-    kind: 'select',
-    key: 'is_system',
-    label: t('tax.categories.columns.origin'),
-    options: [
-      { value: 'true', label: t('tax.categories.origin.system') },
-      { value: 'false', label: t('tax.categories.origin.custom') },
-    ],
-  },
-]);
-
 /** «21.00%» («21,00 %») in force today; a class without tax says its class; no rule, «—». */
 function rateToday(row: CategoryRowOut): string {
   if (row.rate_pct === null) return '—';
@@ -70,16 +54,36 @@ function rateToday(row: CategoryRowOut): string {
 }
 
 const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
-  { key: 'key', label: t('tax.categories.columns.key'), sortable: true, priority: 'high' },
-  { key: 'display_name', label: t('tax.categories.columns.name'), sortable: true, format: (_, row) => categoryDisplayName(row) },
+  // Each text filter as long as CategoryListIn takes it.
+  { key: 'key', label: t('tax.categories.columns.key'), sortable: true, priority: 'high', filter: { type: 'text', maxlength: 80 } },
+  {
+    key: 'display_name',
+    label: t('tax.categories.columns.name'),
+    sortable: true,
+    format: (_, row) => categoryDisplayName(row),
+    filter: { type: 'text', maxlength: 255 },
+  },
   {
     key: 'display_description',
     label: t('tax.categories.columns.description'),
     sortable: true,
     priority: 'low',
     format: (_, row) => row.display_description.trim() || row.description.trim() || '—',
+    filter: { type: 'text', maxlength: 1000 },
   },
-  { key: 'is_system', label: t('tax.categories.columns.origin'), sortable: true, cell: 'origin' },
+  {
+    key: 'is_system',
+    label: t('tax.categories.columns.origin'),
+    sortable: true,
+    cell: 'origin',
+    filter: {
+      type: 'select',
+      options: [
+        { value: 'true', label: t('tax.categories.origin.system') },
+        { value: 'false', label: t('tax.categories.origin.custom') },
+      ],
+    },
+  },
   {
     key: 'is_active',
     label: t('tax.categories.columns.active'),
@@ -107,10 +111,13 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="tax-categories"
       fill
       server-side
       searchable
+      filterable
+      :filter-errors="filterErrors"
       row-key="key"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
@@ -134,14 +141,6 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
       @add="creating = true"
       @retry="refresh()"
     >
-      <template #filters>
-        <FilterPanel
-          v-model="filters"
-          testid="tax-categories"
-          :filters="filterSpecs"
-          :field-errors="filterErrors"
-        />
-      </template>
       <template #origin="{ row }">
         <span
           v-if="row.is_system"
