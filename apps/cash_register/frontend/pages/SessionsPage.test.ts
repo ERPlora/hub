@@ -1,7 +1,8 @@
 // Cash register → the sessions (WORKBOOK «Pantallas · Caja»; the old `erp-cashregister-dashboard`): the title
 // «Cash register» and «Open session» (off while a session is open, saying why), the live
 // `cash_register.session.list` newest first in a server-side DataTable — Session, Opened on, Status,
-// Opening, Expected, Counted, Difference — with search, filters, table or cards and 50 a page. «Detail»
+// Opening, Expected, Counted, Difference — with search, the filters behind the table's funnel, table or
+// cards and 50 a page. «Detail»
 // on every row (the row opens it too) and, on the open session, «Movement», «Count» and «Close», each by
 // its permission. A closing count opens the close. The drawer charged with no session open is said, and
 // so is a forgotten session past its cut-off. Nothing here refetches: it all re-runs by itself.
@@ -15,7 +16,6 @@ import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
 import MovementModal from '../components/MovementModal.vue';
 import OpenSessionModal from '../components/OpenSessionModal.vue';
-import SessionFilters from '../components/SessionFilters.vue';
 import UnassignedModal from '../components/UnassignedModal.vue';
 import type { SessionRow } from '../operations';
 import SessionsPage from './SessionsPage.vue';
@@ -126,14 +126,112 @@ describe('SessionsPage: the screen', () => {
     expect(s.wrapper.findComponent(UnassignedModal).props('open')).toBe(true);
     expect(s.wrapper.findComponent(OpenSessionModal).props('unassignedCash')).toBe(300);
   });
+});
 
-  it('the filters travel with the list; a refused one is said under it', async () => {
+describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {
+  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+  type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; maxlength?: number; options?: Array<{ value: string; label: string }> };
+  const prop = <T,>(s: Awaited<ReturnType<typeof setup>>, name: string) => (s.table().props() as Record<string, unknown>)[name] as T;
+
+  it('Session, Status and the four amounts filter on their own columns, the amounts typed in euros', async () => {
     const s = await setup();
     await s.ready();
-    s.wrapper.findComponent(SessionFilters).vm.$emit('update:modelValue', { status: 'closed', difference_max: '-0,01' });
+    expect(prop(s, 'filterable')).toBe(true);
+    const columns = prop<Array<{ key: string; label: string; filter?: Filter }>>(s, 'columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.label, c.filter?.key ?? c.key, c.filter?.type, c.filter?.keys, c.filter?.amount, c.filter?.maxlength])).toEqual([
+      ['Session', 'number', 'text', undefined, undefined, 24],
+      ['Status', 'status', 'select', undefined, undefined, undefined],
+      ['Opening', 'opening_balance', 'range', ['opening_min', 'opening_max'], true, undefined],
+      ['Expected', 'expected_balance', 'range', ['expected_min', 'expected_max'], true, undefined],
+      ['Counted', 'closing_balance', 'range', ['counted_min', 'counted_max'], true, undefined],
+      ['Difference', 'difference', 'range', ['difference_min', 'difference_max'], true, undefined],
+    ]);
+    expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
+      { value: 'open', label: 'Open' },
+      { value: 'closed', label: 'Closed' },
+    ]);
+    expect(prop(s, 'filterFields') ?? []).toEqual([]);
+  });
+
+  it('the funnel panel applies on «Apply»: every filter, euros into cents, a short difference, and counts them', async () => {
+    const s = await setup();
+    await s.ready();
+    await s.find('cash-register-sessions-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('cash-register-sessions-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="cash-register-sessions-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('number', 'ionInput', 'S-261014-0001');
+    set('status', 'ionChange', 'closed');
+    set('opening_min', 'ionInput', '100');
+    set('opening_max', 'ionInput', '200');
+    set('expected_min', 'ionInput', '50');
+    set('expected_max', 'ionInput', '1.250,50');
+    set('counted_min', 'ionInput', '0,5');
+    set('counted_max', 'ionInput', '300');
+    set('difference_min', 'ionInput', '-5');
+    set('difference_max', 'ionInput', '-0,01');
     await flush();
     await s.reopen();
-    expect(s.params(LIST)).toEqual([{ status: 'closed', difference_max: -1, sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.params(LIST), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="cash-register-sessions-filters-apply"]').trigger('click');
+    await flush();
+    await s.reopen();
+    expect(s.params(LIST)).toEqual([
+      {
+        number: 'S-261014-0001',
+        status: 'closed',
+        opening_min: 10000,
+        opening_max: 20000,
+        expected_min: 5000,
+        expected_max: 125050,
+        counted_min: 50,
+        counted_max: 30000,
+        difference_min: -500,
+        difference_max: -1,
+        sort: 'opened_at',
+        dir: 'desc',
+        limit: 50,
+        offset: 0,
+      },
+    ]);
+    expect(s.find('cash-register-sessions-filters-count').text()).toBe('6');
+  });
+
+  it('an amount it cannot read is said under its field, in both languages, and neither filters nor narrows the list', async () => {
+    const s = await setup();
+    await s.ready();
+    expect(prop(s, 'filterErrors')).toEqual({});
+    s.table().vm.$emit('update:filters', { status: 'open', counted_min: 'abc' });
+    await flush();
+    await s.reopen();
+    expect(prop(s, 'filterErrors')).toEqual({ counted_min: 'This is not an amount.' });
+    expect(s.params(LIST)).toEqual([{ status: 'open', sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+    s.table().vm.$emit('update:filters', { counted_min: 'abc' });
+    await flush();
+    await s.reopen();
+    await s.result(LIST, { rows: [], total: 0, limit: 50, offset: 0 });
+    expect(s.find('cash-register-sessions-empty').text()).toContain('No cash sessions.');
+    const es = await setup({ locale: 'es' });
+    await es.ready();
+    es.table().vm.$emit('update:filters', { difference_max: 'x' });
+    await flush();
+    expect(prop(es, 'filterErrors')).toEqual({ difference_max: 'Esto no es un importe.' });
+  });
+
+  it('a filter the server refuses (422) goes under its filter; the rows stay and no error replaces them', async () => {
+    const s = await setup();
+    await s.ready();
+    s.table().vm.$emit('update:filters', { opening_max: '99999999' });
+    await flush();
+    await s.reopen();
+    await s.result(LIST, PAGE, { opening_max: 9999999900 });
+    const refused = { code: 'invalid_payload', message: 'Some fields are not valid.', fields: { opening_max: 'Ensure this value is less than or equal to 9999999999.' } };
+    s.net.lastStream().push(`event: error\ndata: ${JSON.stringify({ id: s.subId(LIST), error: refused })}\n\n`);
+    await flush();
+    expect(prop(s, 'filterErrors')).toEqual({ opening_max: 'Ensure this value is less than or equal to 9999999999.' });
+    expect(prop(s, 'error')).toBeUndefined();
+    expect(s.rows()).toHaveLength(2);
   });
 });
 

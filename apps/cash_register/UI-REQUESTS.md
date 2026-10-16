@@ -23,13 +23,6 @@ Al registrarlos, cambiar `frontend/pages/SessionsPage.vue` (acciones), `frontend
   `moneyRefusal`). Ventas tiene el suyo en `apps/sale/frontend/lib/format.ts`: los dos se borran cuando
   llegue el compartido.
 
-## Filtros por columna en `DataTable`
-
-- **Qué**: el cajón de filtros por columna (texto, desplegable, rango) de `ok-data-table`, el mismo que
-  pide `apps/tax/UI-REQUESTS.md`.
-- **Hoy**: `frontend/components/SessionFilters.vue` en el slot `filters` (botón «Filtros» con contador que
-  abre un `FormModal`: Estado, Número de sesión y los rangos de Apertura, Esperado, Contado y Diferencia).
-
 ## Lista de detalle (`ok-detail-list`)
 
 - **Qué**: la lista de etiqueta/valor en dos columnas del producto actual (resumen de la sesión).
