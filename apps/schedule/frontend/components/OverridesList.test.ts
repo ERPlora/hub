@@ -1,6 +1,6 @@
 // «Overrides» of Schedules → Special days (SCHEDULE-F05, F06, F13; WORKBOOK «Pantallas»): the live
 // `schedule.override.list` in a server-side DataTable — From, To, Reason and Status —, «Search
-// override…», filters by its dates, reason and status, 50 a page by start. «+» opens «New override»; a
+// override…», filters behind the table's funnel by its dates, reason and status, 50 a page by start. «+» opens «New override»; a
 // row or «Edit» opens «Edit · {reason}»; «Delete» asks first. An employee only reads.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
@@ -8,7 +8,6 @@ import type { Component } from 'vue';
 
 import type { OverrideOut } from '../operations';
 import { EMPLOYEE, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
-import FilterPanel from './FilterPanel.vue';
 import OverrideFormModal from './OverrideFormModal.vue';
 import OverridesList from './OverridesList.vue';
 
@@ -42,7 +41,7 @@ async function setup(options: MountOptions = {}) {
     await settle();
   }
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
     await flush();
   }
   return { ...m, table, prop, rows, cells, action, filter, show: (data: unknown) => m.result(OP, data) };
@@ -68,6 +67,57 @@ describe('OverridesList', () => {
     ]);
     expect(s.cells(0).slice(0, 4)).toEqual(['04/01/2026', '04/05/2026', 'Easter', 'Closed']);
     expect(s.cells(1).slice(0, 4)).toEqual(['07/01/2026', '08/31/2026', 'Summer hours', '08:00 AM–03:00 PM']);
+  });
+
+  it('filters behind the table funnel: from and to (each a range of days), reason and status on their columns', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.map((c) => [c.label, c.filter?.key ?? c.key, c.filter?.type, c.filter?.keys])).toEqual([
+      ['From', 'start_date', 'daterange', ['start_from', 'start_to']],
+      ['To', 'end_date', 'daterange', ['end_from', 'end_to']],
+      ['Reason', 'reason', 'text', undefined],
+      ['Status', 'is_closed', 'select', undefined],
+    ]);
+    expect(columns[3].filter?.options).toEqual([
+      { value: 'true', label: 'Closed' },
+      { value: 'false', label: 'Open' },
+    ]);
+  });
+
+  it('the funnel panel applies on «Apply» and counts the filters in use', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    await s.find('schedule-overrides-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('schedule-overrides-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="schedule-overrides-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('end_to', 'ionChange', '2026-09-30');
+    set('reason', 'ionInput', 'sum');
+    set('is_closed', 'ionChange', 'true');
+    await flush();
+    await panel.get('[data-testid="schedule-overrides-filters-apply"]').trigger('click');
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ end_to: '2026-09-30', reason: 'sum', is_closed: true, sort: 'start_date', dir: 'asc', limit: 50, offset: 0 }]);
+    expect(s.find('schedule-overrides-filters-count').text()).toBe('3');
+  });
+
+  it('its funnel and view buttons say they are the overrides’ (the screen has two lists; schedules#58)', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const name = (hook: string) => s.find(`schedule-overrides-${hook}`).attributes('aria-label');
+    expect([name('filters-toggle'), name('view-table'), name('view-cards')]).toEqual([
+      'Override filters',
+      'View overrides as list',
+      'View overrides as cards',
+    ]);
+    await s.filter({ reason: 'sum', is_closed: 'false' });
+    expect(name('filters-toggle')).toBe('Override filters (2 active)');
   });
 
   it('the filters ask the server again', async () => {
@@ -115,5 +165,13 @@ describe('OverridesList', () => {
     await s.show(page(ROWS));
     expect(s.find('schedule-overrides-heading').text()).toBe('Cambios temporales');
     expect(s.cells(1).slice(0, 4)).toEqual(['01/07/2026', '31/08/2026', 'Summer hours', '08:00–15:00']);
+    const name = (hook: string) => s.find(`schedule-overrides-${hook}`).attributes('aria-label');
+    expect([name('filters-toggle'), name('view-table'), name('view-cards')]).toEqual([
+      'Filtros de cambios temporales',
+      'Ver cambios temporales como lista',
+      'Ver cambios temporales como tarjetas',
+    ]);
+    await s.filter({ reason: 'sum' });
+    expect(name('filters-toggle')).toBe('Filtros de cambios temporales (1 activo)');
   });
 });

@@ -25,13 +25,3 @@ parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 - **Y dos formateadores** en `@erplora/ui/components/format`, junto a `formatDateTime`: `formatTime(HH:MM,
   locale)` (el reloj del idioma, sin zona) y `formatDate(YYYY-MM-DD, locale)` (en UTC, sin mover un día).
   Horarios los tiene en `frontend/lib/format.ts`.
-
-### Filtro de rango de fechas en `DataTable`
-
-- **Para qué:** el `ok-data-table` viejo filtraba Días especiales por fecha y Cambios temporales por sus
-  dos fechas con un rango (`daterange`). Los filtros que ya trae `DataTable` toman un solo día (`date`) o
-  un rango de números (`range`).
-- **API propuesta:** `filter: { type: 'daterange' }` en la columna, con `<key>_from` y `<key>_to` como el
-  `range` numérico.
-- **Hoy:** `frontend/components/FilterPanel.vue` en el slot `filters` (botón «Filtros» con contador y un
-  `FormModal` con un control por filtro), como en Personal e Impuestos. Se borra cuando llegue.
