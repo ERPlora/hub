@@ -13,6 +13,7 @@ import AliasCreateModal from '../components/AliasCreateModal.vue';
 import FilterPanel from '../components/FilterPanel.vue';
 import AliasesPage from './AliasesPage.vue';
 import source from './AliasesPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -189,5 +190,12 @@ describe('AliasesPage: who may create, and the states of the screen', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Alias', 'Categoría', 'Origen', 'Activo']);
     expect(s.rows()[0].findAll('[role="cell"]').map((c) => c.text().trim())).toEqual(['beer', 'restaurant.alcohol', 'De fábrica', 'Sí']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar alias o categoría…');
+  });
+});
+
+describe('AliasesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

@@ -13,6 +13,7 @@ import DepartmentFormModal from '../components/backoffice/DepartmentFormModal.vu
 import { plain } from '../lib/format';
 import type { DepartmentOut } from '../operations';
 import DepartmentsPage from './DepartmentsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -209,5 +210,12 @@ describe('DepartmentsPage: Spanish', () => {
     expect(s.prop('searchPlaceholder')).toBe('Buscar un departamento…');
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'IVA que cobra', 'Posición']);
     expect(s.cells(1)).toEqual(['Butchery', 'Reduced food · 10 %', '1']);
+  });
+});
+
+describe('DepartmentsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

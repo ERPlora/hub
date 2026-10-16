@@ -13,6 +13,7 @@ import FieldFormModal from '../components/FieldFormModal.vue';
 import SelectFilters from '../components/SelectFilters.vue';
 import type { FieldRow } from '../operations';
 import FieldListPage from './FieldListPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -98,5 +99,12 @@ describe('FieldListPage', () => {
     const s = await setup({ locale: 'es' });
     await s.show(pageOf([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('Sin campos personalizados.');
+  });
+});
+
+describe('FieldListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

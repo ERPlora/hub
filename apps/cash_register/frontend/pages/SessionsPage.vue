@@ -129,6 +129,7 @@ function onCounted(count: { type: CountType; total: number }): void {
 <template>
   <AppPage
     :title="$t('cash_register.title')"
+    content-layout="fill"
     :tabs="cashRegisterTabs($t)"
     :tabs-label="$t('cash_register.tabs.label')"
   >
@@ -198,6 +199,7 @@ function onCounted(count: { type: CountType; total: number }): void {
       v-else
       v-model:search="table.search.value"
       testid="cash-register-sessions"
+      fill
       server-side
       searchable
       row-clickable

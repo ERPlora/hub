@@ -8,6 +8,7 @@ import type { Component } from 'vue';
 import { entry, NOW, SETTINGS } from '../__tests__/kitchen';
 import { errorFrame, flush, type MountOptions, mountKitchen, page, VIEWER } from '../__tests__/mount-kitchen';
 import HistoryPage from './HistoryPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 /** A prop of a mounted component, whatever its type (a generic component's props read as `never`). */
 const prop = (wrapper: { props: () => unknown }, name: string): unknown => (wrapper.props() as Record<string, unknown>)[name];
@@ -72,5 +73,12 @@ describe('HistoryPage', () => {
     await s.show([entry('l1')]);
     expect(s.find('kitchen-history-title').text()).toBe('Historial de cocina');
     expect(s.wrapper.text()).toContain('Recibida');
+  });
+});
+
+describe('HistoryPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

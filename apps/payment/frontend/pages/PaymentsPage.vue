@@ -177,6 +177,7 @@ function onCreated(): void {
 <template>
   <AppPage
     :title="$t('payment.title')"
+    content-layout="fill"
     :tabs="paymentTabs($t)"
     :tabs-label="$t('payment.tabs.label')"
   >
@@ -199,6 +200,7 @@ function onCreated(): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="payment-payments"
+      fill
       server-side
       searchable
       :filters="filters"

@@ -208,6 +208,7 @@ function create(): void {
 <template>
   <AppPage
     :title="$t('tax.title')"
+    content-layout="fill"
     :tabs="taxTabs($t)"
     :tabs-label="$t('tax.tabs.label')"
   >
@@ -228,6 +229,7 @@ function create(): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="tax-rules"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

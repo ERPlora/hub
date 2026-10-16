@@ -124,6 +124,7 @@ async function remove(): Promise<void> {
   <DataTable
     v-if="!blocked"
     testid="staff-schedules"
+    fill
     :rows="result?.rows ?? []"
     :views="['table', 'cards']"
     :card-title="(row: ScheduleOut) => row.name"

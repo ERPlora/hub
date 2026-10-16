@@ -155,6 +155,7 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
 <template>
   <AppPage
     :title="$t('cart_checkout.orders.title')"
+    content-layout="fill"
     :tabs="cartCheckoutTabs($t)"
     :tabs-label="$t('cart_checkout.tabs.label')"
   >
@@ -177,6 +178,7 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="cart-checkout-orders"
+      fill
       server-side
       searchable
       :filters="filters"

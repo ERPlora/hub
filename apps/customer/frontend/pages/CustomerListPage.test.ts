@@ -28,6 +28,7 @@ import ImportReport from '../components/ImportReport.vue';
 import { formatMoney } from '../lib/money';
 import CustomerListPage from './CustomerListPage.vue';
 import source from './CustomerListPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -358,5 +359,12 @@ describe('CustomerListPage: language and markup', () => {
   it('has no OutfitKit tag and formats nothing by hand', () => {
     expect(source).not.toMatch(/<ok[-]/);
     expect(source).not.toMatch(/Intl\.|toLocale|toFixed|new Date\(/);
+  });
+});
+
+describe('CustomerListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

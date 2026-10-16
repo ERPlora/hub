@@ -173,6 +173,7 @@ function onCreated(): void {
 <template>
   <AppPage
     :title="$t('cart_checkout.carts.title')"
+    content-layout="fill"
     :tabs="cartCheckoutTabs($t)"
     :tabs-label="$t('cart_checkout.tabs.label')"
   >

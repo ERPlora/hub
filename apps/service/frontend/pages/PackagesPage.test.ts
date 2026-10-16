@@ -14,6 +14,7 @@ import MovementsSheet from '../components/MovementsSheet.vue';
 import OrphansSheet from '../components/OrphansSheet.vue';
 import PackageFormModal from '../components/PackageFormModal.vue';
 import PackagesPage from './PackagesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -121,5 +122,12 @@ describe('PackagesPage', () => {
     await s.show(page(ROWS));
     expect([s.prop('searchPlaceholder'), s.cells(1)[4]]).toEqual(['Buscar paquete…', 'Archivado']);
     expect(s.inDoc('service-packages-orphans-open')?.textContent).toContain('Bonos sin cliente');
+  });
+});
+
+describe('PackagesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

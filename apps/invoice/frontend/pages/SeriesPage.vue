@@ -69,6 +69,7 @@ function onAction({ actionId, row }: { actionId: string; row: SeriesOut }): void
 <template>
   <AppPage
     :title="$t('invoice.title')"
+    content-layout="fill"
     :tabs="invoiceTabs($t)"
     :tabs-label="$t('invoice.tabs.label')"
   >
@@ -87,6 +88,7 @@ function onAction({ actionId, row }: { actionId: string; row: SeriesOut }): void
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="invoice-series"
+      fill
       server-side
       searchable
       :row-clickable="canManage"

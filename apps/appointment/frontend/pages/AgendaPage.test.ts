@@ -16,6 +16,7 @@ import DayGrid from '../components/DayGrid.vue';
 import SeriesList from '../components/SeriesList.vue';
 import WeekBoard from '../components/WeekBoard.vue';
 import AgendaPage from './AgendaPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -179,5 +180,21 @@ describe('AgendaPage', () => {
       ((await setup(session)).wrapper.findComponent(AppPage).props('tabs') as Array<{ id: string }>).map((tab) => tab.id);
     expect(await tabs(OWNER)).toEqual(['agenda', 'settings']);
     expect(await tabs(EMPLOYEE)).toEqual(['agenda']);
+  });
+});
+
+describe('AgendaPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('the appointments list, the default view: AppPage `fill` and its DataTable `fill`, only stacks between them', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(AppointmentList).exists()).toBe(true);
+    expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+
+  it('the series list fills the page the same way', async () => {
+    const s = await setup();
+    s.toolbar().vm.$emit('update:view', 'series');
+    await settle();
+    expect(s.wrapper.findComponent(SeriesList).exists()).toBe(true);
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

@@ -135,6 +135,7 @@ async function exportFile(): Promise<void> {
 <template>
   <AppPage
     :title="$t('inventory.title')"
+    content-layout="fill"
     :tabs="tabs"
     :tabs-label="$t('inventory.tabs.label')"
   >
@@ -164,6 +165,7 @@ async function exportFile(): Promise<void> {
       v-else
       v-model:search="table.search.value"
       testid="inventory-categories"
+      fill
       server-side
       searchable
       :row-clickable="canChange"

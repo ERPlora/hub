@@ -134,6 +134,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
 <template>
   <AppPage
     :title="$t('kitchen.title')"
+    content-layout="fill"
     :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
     :tabs-label="$t('kitchen.tabs.label')"
   >
@@ -146,6 +147,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="kitchen-stations"
+      fill
       server-side
       searchable
       :row-clickable="canManage"

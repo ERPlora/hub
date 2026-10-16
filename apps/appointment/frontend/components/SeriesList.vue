@@ -159,7 +159,7 @@ function onUpdated(outcome: RecurringUpdatedOut): void {
 </script>
 
 <template>
-  <div class="series-list">
+  <div class="series-list page-fill">
     <InlineFeedback
       v-if="said"
       tone="info"
@@ -195,6 +195,7 @@ function onUpdated(outcome: RecurringUpdatedOut): void {
     </InlineFeedback>
     <DataTable
       testid="appointment-series"
+      fill
       searchable
       :rows="list.rows.value"
       :columns="columns"
@@ -256,8 +257,8 @@ function onUpdated(outcome: RecurringUpdatedOut): void {
 </template>
 
 <style scoped>
+/* A `.page-fill` stack (polish.css): in AgendaPage's `fill` layout the series list takes the page's height. */
 .series-list {
-  display: grid;
   gap: 12px;
 }
 .series-list__skipped {

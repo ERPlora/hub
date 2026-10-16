@@ -12,6 +12,7 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice } from '..
 import SeriesFormModal from '../components/SeriesFormModal.vue';
 import type { SeriesOut } from '../operations';
 import SeriesPage from './SeriesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -127,5 +128,12 @@ describe('SeriesPage', () => {
     await s.show(PAGE);
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Código', 'Nombre', 'Tipo', 'Año', 'Prefijo', 'Formato', 'Nº actual', 'Activa', 'Predet.']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar código, nombre…');
+  });
+});
+
+describe('SeriesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

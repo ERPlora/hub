@@ -12,6 +12,7 @@ import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
 import type { PrinterOut } from '../operations';
 import PrintersPage from './PrintersPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -158,5 +159,12 @@ describe('PrintersPage by the clock', () => {
     vi.advanceTimersByTime(60_000);
     await flush();
     expect(words(s.find('printing-printers-state-p1').element)).toBe('Waiting');
+  });
+});
+
+describe('PrintersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

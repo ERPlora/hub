@@ -21,6 +21,7 @@ import StockModal from '../components/StockModal.vue';
 import { formatMoney } from '../lib/format';
 import ProductsPage from './ProductsPage.vue';
 import source from './ProductsPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), save: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -357,5 +358,12 @@ describe('ProductsPage', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'SKU', 'Precio', 'Stock', 'Estado']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar producto…');
     expect(s.testid('inventory-products-unconfigured-p3').find('span').text()).toBe('Sin configurar · Falta la categoría fiscal');
+  });
+});
+
+describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

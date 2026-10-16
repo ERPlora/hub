@@ -81,6 +81,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
 <template>
   <AppPage
     :title="$t('customer.list.title')"
+    content-layout="fill"
     :tabs="customerTabs($t)"
     :tabs-label="$t('customer.tabs.label')"
   >
@@ -127,6 +128,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       <DataTable
         v-model:search="list.search.value"
         testid="customer-list"
+        fill
         server-side
         searchable
         row-clickable

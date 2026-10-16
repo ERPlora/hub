@@ -91,6 +91,7 @@ const cardTitle = (row: QuickNoteOut): string => row.text;
 <template>
   <AppPage
     :title="$t('sale.title')"
+    content-layout="fill"
     :tabs="saleTabs($t)"
     :tabs-label="$t('sale.tabs.label')"
   >
@@ -110,6 +111,7 @@ const cardTitle = (row: QuickNoteOut): string => row.text;
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="sale-quick-notes"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

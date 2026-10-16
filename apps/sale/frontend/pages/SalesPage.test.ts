@@ -22,6 +22,7 @@ import { plain } from '../lib/format';
 import type { SaleRow } from '../operations';
 import SalesPage from './SalesPage.vue';
 import source from './SalesPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
@@ -469,5 +470,12 @@ describe('SalesPage: the rest', () => {
     expect(s.prop<Array<{ label: string }>>('actions').map((a) => a.label)).toEqual(['Documento', 'Reimprimir', 'Emitir ahora', 'Anular', 'Devolver']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar número o cliente…');
     expect(s.prop('labels')).toMatchObject({ loading: 'Cargando…', loadError: 'No se pudieron cargar las ventas', retry: 'Reintentar' });
+  });
+});
+
+describe('SalesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

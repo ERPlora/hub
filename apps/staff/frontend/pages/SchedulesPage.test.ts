@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { click, flush, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
 import MemberSchedules from '../components/MemberSchedules.vue';
 import SchedulesPage from './SchedulesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -65,5 +66,14 @@ describe('SchedulesPage', () => {
     await s.result('staff.member.list', { rows: [], total: 0, limit: 1, offset: 0 });
     expect(s.find('staff-schedules-no-members').text()).toContain('Aún no hay miembros del staff');
     expect(s.find('staff-schedules-add-member').text()).toContain('Dar de alta un miembro');
+  });
+});
+
+describe('SchedulesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('the chosen member\'s schedules: AppPage `fill` and its DataTable `fill`, only stacks between them', async () => {
+    const s = await setup();
+    await s.result('staff.member.list', FIRST);
+    expect(s.wrapper.findComponent(MemberSchedules).exists()).toBe(true);
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

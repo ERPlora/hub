@@ -13,6 +13,7 @@ import type { BookingRow } from '../operations';
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountOnlineBooking, page, settle } from '../__tests__/mount-online-booking';
 import CancelDialog from '../components/CancelDialog.vue';
 import BookingsPage from './BookingsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -205,5 +206,12 @@ describe('BookingsPage', () => {
       'Reservada',
     ]);
     expect(s.cells(0)[6]).toBe('Pendiente');
+  });
+});
+
+describe('BookingsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

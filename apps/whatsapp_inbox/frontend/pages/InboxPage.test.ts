@@ -13,6 +13,7 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInbox } from '../_
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
 import InboxPage from './InboxPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -198,5 +199,12 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(s.find('whatsapp-inbox-not-connected').text()).toContain('WhatsApp no está conectado.');
     await s.result(LIST, PAGE);
     expect(s.prop('searchPlaceholder')).toBe('Filtrar contacto o teléfono…');
+  });
+});
+
+describe('InboxPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

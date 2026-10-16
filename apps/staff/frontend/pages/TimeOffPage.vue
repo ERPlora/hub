@@ -224,6 +224,7 @@ function add(): void {
 <template>
   <AppPage
     :title="$t('staff.title')"
+    content-layout="fill"
     :tabs="staffTabs($t, { settings: canSettings })"
     :tabs-label="$t('staff.tabs.label')"
   >
@@ -243,6 +244,7 @@ function add(): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="staff-time-off"
+      fill
       server-side
       :searchable="view === 'all'"
       :rows="result?.rows ?? []"

@@ -48,6 +48,7 @@ function open(row: EventOut): void {
 <template>
   <AppPage
     :title="$t('verifactu.events.title')"
+    content-layout="fill"
     :tabs="verifactuTabs($t)"
     :tabs-label="$t('verifactu.tabs.label')"
   >
@@ -60,6 +61,7 @@ function open(row: EventOut): void {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="verifactu-events"
+      fill
       server-side
       searchable
       :rows="result?.rows ?? []"

@@ -155,6 +155,7 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
 <template>
   <AppPage
     :title="$t('appointment.title')"
+    content-layout="fill"
     :tabs="tabs"
     :tabs-label="$t('appointment.tabs.label')"
   >

@@ -214,6 +214,7 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
 <template>
   <AppPage
     :title="$t('reservation.title')"
+    content-layout="fill"
     :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
     :tabs-label="$t('reservation.tabs.label')"
   >

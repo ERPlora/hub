@@ -82,6 +82,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
 <template>
   <AppPage
     :title="$t('customer.groups.title')"
+    content-layout="fill"
     :tabs="customerTabs($t)"
     :tabs-label="$t('customer.tabs.label')"
   >
@@ -104,6 +105,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       v-else
       v-model:search="list.search.value"
       testid="customer-groups"
+      fill
       server-side
       searchable
       :row-clickable="canConfigure"

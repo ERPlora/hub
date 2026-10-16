@@ -185,6 +185,7 @@ async function confirmDelete(): Promise<void> {
 <template>
   <AppPage
     :title="$t('online_booking.title')"
+    content-layout="fill"
     :tabs="onlineBookingTabs(t, { settings: session.can('online_booking.manage_settings') })"
     :tabs-label="$t('online_booking.tabs.label')"
   >
@@ -207,6 +208,7 @@ async function confirmDelete(): Promise<void> {
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="ob-bookings"
+      fill
       server-side
       searchable
       row-key="id"

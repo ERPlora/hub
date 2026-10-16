@@ -9,6 +9,7 @@ import { flush, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { EventOut } from '../operations';
 import EventsPage from './EventsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -60,5 +61,12 @@ describe('EventsPage', () => {
     const s = await setup();
     await s.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No events.');
+  });
+});
+
+describe('EventsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

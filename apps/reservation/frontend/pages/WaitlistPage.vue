@@ -201,6 +201,7 @@ async function confirmRemove(): Promise<void> {
 <template>
   <AppPage
     :title="$t('reservation.title')"
+    content-layout="fill"
     :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
     :tabs-label="$t('reservation.tabs.label')"
   >

@@ -10,6 +10,7 @@ import { EMPLOYEE, flush, MANAGER, type MountOptions, mountTable, page } from '.
 import { occupied, tableRow, zoneRow } from '../__tests__/tables';
 import TableFormModal from '../components/TableFormModal.vue';
 import TablesPage from './TablesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -114,5 +115,12 @@ describe('TablesPage', () => {
     await s.show(page(ROWS));
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Buscar mesa…', 'Nueva mesa']);
     expect(s.cells(1)[4]).toBe('Ocupada');
+  });
+});
+
+describe('TablesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

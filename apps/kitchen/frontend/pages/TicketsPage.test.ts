@@ -13,6 +13,7 @@ import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
 import type { TicketRowOut } from '../operations';
 import TicketsPage from './TicketsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -149,5 +150,12 @@ describe('TicketsPage', () => {
     await s.show([PENDING]);
     expect(s.prop('searchPlaceholder')).toBe('Buscar comanda o destino…');
     expect(s.wrapper.text()).toContain('Por preparar');
+  });
+});
+
+describe('TicketsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

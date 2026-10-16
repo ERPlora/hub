@@ -13,6 +13,7 @@ import CategoryFormModal from '../components/CategoryFormModal.vue';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportReportModal from '../components/ImportReportModal.vue';
 import CategoriesPage from './CategoriesPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), save: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -230,5 +231,12 @@ describe('CategoriesPage: import and export', () => {
     await s.show(LIST);
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'Slug', 'Productos']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar categoría…');
+  });
+});
+
+describe('CategoriesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

@@ -14,6 +14,7 @@ import { EMPLOYEE, flush, type MountOptions, mountStaff, page, settle } from '..
 import FilterPanel from '../components/FilterPanel.vue';
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -213,5 +214,12 @@ describe('TimeOffPage: «+» and «My time off» (STAFF-F08, F17, F24)', () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
     expect(s.cells(0).slice(1, 5)).toEqual(['Vacaciones', '02/11/2026', '06/11/2026', 'Pendiente']);
+  });
+});
+
+describe('TimeOffPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

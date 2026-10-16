@@ -14,6 +14,7 @@ import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId }
 import ItemStats from '../components/ItemStats.vue';
 import ItemListPage from './ItemListPage.vue';
 import source from './ItemListPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const row = (id: string, name: string, status: 'open' | 'done', lineCount: number) => ({
   id,
@@ -464,5 +465,12 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.params()).toEqual([{ search: 'item', limit: 100, offset: 0 }]);
     await s.filterBy('open');
     expect(s.params()).toEqual([{ search: 'item', status: 'open', limit: 50, offset: 0 }]);
+  });
+});
+
+describe('ItemListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

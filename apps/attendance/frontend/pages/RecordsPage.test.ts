@@ -13,6 +13,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import PresenceCard from '../components/PresenceCard.vue';
 import type { RecordOut } from '../operations';
 import RecordsPage from './RecordsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const download = vi.hoisted(() => ({ saveCsv: vi.fn() }));
 vi.mock('../lib/download', () => ({ saveCsv: download.saveCsv }));
@@ -231,5 +232,12 @@ describe('RecordsPage for an employee (ATTENDANCE-F06)', () => {
     await s.show(page([ROWS[1]]));
     expect(s.cells(0).slice(0, 6)).toEqual(['lun, 5 oct', '09:02', '17:05', '30', '7:32', 'Cerrada']);
     expect(s.find('attendance-export-csv').text()).toContain('Exportar CSV');
+  });
+});
+
+describe('RecordsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

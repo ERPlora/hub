@@ -11,6 +11,7 @@ import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, words } fro
 import CancelJobModal from '../components/CancelJobModal.vue';
 import type { JobOut } from '../operations';
 import JobsPage from './JobsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -169,5 +170,12 @@ describe('JobsPage by the clock', () => {
     expect(s.actions(SENT)).toEqual(['retry', 'cancel']);
     const later = s.prop<DataTableColumn<JobOut>[]>('columns').find((c) => c.key === 'detail')!;
     expect(later.format!(undefined, SENT)).toBe('No answer from the device');
+  });
+});
+
+describe('JobsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

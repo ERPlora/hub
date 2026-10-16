@@ -17,6 +17,7 @@ import RuleCreateModal from '../components/RuleCreateModal.vue';
 import RuleEndModal from '../components/RuleEndModal.vue';
 import RulesPage from './RulesPage.vue';
 import source from './RulesPage.vue?raw';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -445,5 +446,12 @@ describe('RulesPage: the rest', () => {
     expect(s.find('tax-rules-status').findAll('ion-select-option').map((o) => o.text())).toEqual(['Activas', 'Desactivadas', 'Todas']);
     expect(s.prop<Array<{ label: string }>>('actions').map((a) => a.label)).toEqual(['Poner fecha de fin', 'Desactivar', 'Reactivar']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar categoría o país…');
+  });
+});
+
+describe('RulesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

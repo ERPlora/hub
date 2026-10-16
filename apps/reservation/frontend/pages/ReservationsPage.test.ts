@@ -14,6 +14,7 @@ import DayBar from '../components/DayBar.vue';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -177,5 +178,12 @@ describe('ReservationsPage', () => {
     await s.show([PENDING]);
     expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Ana García', '+34600111222', '4', '5 (Terrace)', 'Pendiente']);
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Buscar cliente, teléfono o correo…', 'Nueva reserva']);
+  });
+});
+
+describe('ReservationsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });

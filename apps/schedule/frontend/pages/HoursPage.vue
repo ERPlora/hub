@@ -68,6 +68,7 @@ async function confirmWeek(): Promise<void> {
 <template>
   <AppPage
     :title="$t('schedule.title')"
+    content-layout="fill"
     :tabs="scheduleTabs($t)"
     :tabs-label="$t('schedule.tabs.label')"
   >
@@ -106,6 +107,7 @@ async function confirmWeek(): Promise<void> {
     <DataTable
       v-if="!blocked"
       testid="schedule-hours"
+      fill
       :row-key="(row: WeekDayOut) => String(row.weekday)"
       :rows="week?.days ?? []"
       :page-size="7"

@@ -67,6 +67,7 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
 <template>
   <AppPage
     :title="$t('verifactu.records.title')"
+    content-layout="fill"
     :tabs="verifactuTabs($t)"
     :tabs-label="$t('verifactu.tabs.label')"
   >
@@ -79,6 +80,7 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="verifactu-records"
+      fill
       server-side
       searchable
       row-clickable

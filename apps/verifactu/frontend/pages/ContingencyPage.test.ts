@@ -10,6 +10,7 @@ import { click, EMPLOYEE, flush, type MountOptions, mountVerifactu } from '../__
 import { plain } from '../lib/format';
 import type { QueueRowOut } from '../operations';
 import ContingencyPage from './ContingencyPage.vue';
+import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
@@ -116,5 +117,12 @@ describe('ContingencyPage', () => {
     await s.result(OP, { rows: [ROW], total: 1, limit: 50, offset: 0 });
     expect(s.find('verifactu-queue-process').exists()).toBe(false);
     expect(((s.table().props() as Record<string, unknown>).actions as Array<{ id: string }>).map((a) => a.id)).toEqual(['view']);
+  });
+});
+
+describe('ContingencyPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+    const s = await setup();
+    expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
