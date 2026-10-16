@@ -199,6 +199,8 @@ describe('ProductsPage: the list', () => {
     const panel = s.testid('inventory-products-filters-panel');
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="inventory-products-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    // A closed list opens as a popover: no «CANCEL»/«OK» of an alert in English (hub#1736).
+    expect((panel.get('[data-testid="inventory-products-filter-status"]').element as HTMLElement & { interface?: string }).interface).toBe('popover');
     set('sku', 'ionInput', 'CAF');
     set('price_min', 'ionInput', '2,20');
     set('status', 'ionChange', 'inactive');
