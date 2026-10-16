@@ -1,6 +1,7 @@
 // Customers → Customers (WORKBOOK «Pantallas · Clientes»; CUSTOMER-F01, F02, F07, F08, F09): the four
 // figures, then the live `customer.customer.list` in a server-side DataTable — Name, Email, Phone,
-// Stage, Spent —, search on the server (name, phone, email, tax id, company), filters, sort by any
+// Stage, Spent —, search on the server (name, phone, email, tax id, company), filters behind the table's
+// funnel, sort by any
 // column, 50 a page; «Add» and «Import CSV» to whoever manages cards, «Export CSV» to whoever exports;
 // a row opens the card; «Delete» on a row (owner, admin) asks first. Every state of the screen.
 import { DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
@@ -22,7 +23,7 @@ import {
   VIEWER,
 } from '../__tests__/mount-customer';
 import CustomerCreateModal from '../components/CustomerCreateModal.vue';
-import CustomerFilters from '../components/CustomerFilters.vue';
+import CustomerExportButton from '../components/CustomerExportButton.vue';
 import CustomerStats from '../components/CustomerStats.vue';
 import ImportReport from '../components/ImportReport.vue';
 import { formatMoney } from '../lib/money';
@@ -81,7 +82,11 @@ async function setup(options: MountOptions = {}) {
     bar.dispatchEvent(new CustomEvent('ionInput', { detail: { value: text } }));
     await flush();
   }
-  return { ...m, call, testid, table, prop, rows, show, showOnNewStream, search };
+  async function filter(values: Record<string, string>) {
+    table().vm.$emit('update:filters', values);
+    await flush();
+  }
+  return { ...m, call, testid, table, prop, rows, show, showOnNewStream, search, filter };
 }
 
 describe('CustomerListPage: the screen', () => {
@@ -165,16 +170,83 @@ describe('CustomerListPage: the screen', () => {
     expect([empty.props('heading'), empty.props('message')]).toEqual(['No results', 'No customer matches your search or filters.']);
   });
 
+  it('filters behind the table funnel: stage and spent (euros, as typed) on their columns, then source and active', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; label?: string; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.label, c.filter?.key ?? c.key, c.filter?.type, c.filter?.keys, c.filter?.amount])).toEqual([
+      ['Stage', 'lifecycle_stage', 'select', undefined, undefined],
+      ['Spent', 'total_spent', 'range', ['spent_from', 'spent_to'], true],
+    ]);
+    expect(columns.find((c) => c.key === 'lifecycle_stage')?.filter?.options?.map((o) => o.label)).toEqual([
+      'Lead',
+      'Prospect',
+      '1st purchase',
+      'Active',
+      'At risk',
+      'Dormant',
+      'Churned',
+      'VIP',
+    ]);
+    const fields = s.prop<Filter[]>('filterFields');
+    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([
+      ['source', 'Source', 'select'],
+      ['is_active', 'Active', 'select'],
+    ]);
+    expect(fields[0].options?.map((o) => o.value)).toEqual(['walk_in', 'phone', 'whatsapp', 'website', 'social', 'referral', 'import', 'other']);
+    expect(fields[1].options).toEqual([
+      { value: 'true', label: 'Active' },
+      { value: 'false', label: 'Not active' },
+    ]);
+  });
+
+  it('the funnel panel applies on «Apply», reads «1.000» as a thousand euros and counts the filters in use', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    await s.testid('customer-list-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.testid('customer-list-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="customer-list-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('lifecycle_stage', 'ionChange', 'vip');
+    set('spent_from', 'ionInput', '1.000');
+    set('is_active', 'ionChange', 'false');
+    await flush();
+    expect(s.params(LIST), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'name', descending: false, limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="customer-list-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.params(LIST)).toEqual([
+      { lifecycle_stage: 'vip', is_active: false, spent_min: 100000, sort: 'name', descending: false, limit: 50, offset: 0 },
+    ]);
+    expect(s.testid('customer-list-filters-count').text()).toBe('3');
+  });
+
   it('filters by stage, source, active and spent (euros → cents), from the first page', async () => {
     const s = await setup();
     await s.show({ ...PAGE, total: 200 });
     s.table().vm.$emit('pageChange', 2);
     await flush();
-    s.wrapper.findComponent(CustomerFilters).vm.$emit('update:modelValue', { lifecycle_stage: 'vip', spent_from: '10' });
-    await flush();
+    await s.filter({ lifecycle_stage: 'vip', source: 'import', spent_from: '10', spent_to: '10,5' });
     expect(s.params(LIST)).toEqual([
-      { lifecycle_stage: 'vip', spent_min: 1000, sort: 'name', descending: false, limit: 50, offset: 0 },
+      { lifecycle_stage: 'vip', source: 'import', spent_min: 1000, spent_max: 1050, sort: 'name', descending: false, limit: 50, offset: 0 },
     ]);
+  });
+
+  it('«Export CSV» exports with the search and the filters in use', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    await s.search('ana');
+    await s.filter({ is_active: 'true', spent_to: '20' });
+    expect(s.wrapper.findComponent(CustomerExportButton).props('filters')).toEqual({
+      search: 'ana',
+      is_active: true,
+      spent_max: 2000,
+      sort: 'name',
+      descending: false,
+    });
   });
 
   it('on a phone, «Load more» grows the list without any query asking for more than 100 rows', async () => {
@@ -190,11 +262,12 @@ describe('CustomerListPage: the screen', () => {
     ]);
   });
 
-  it('an amount it cannot read neither filters nor makes the list look filtered', async () => {
+  it('an amount it cannot read is said under its field, and neither filters nor makes the list look filtered', async () => {
     const s = await setup();
     await s.show(PAGE);
-    s.wrapper.findComponent(CustomerFilters).vm.$emit('update:modelValue', { spent_from: 'mil' });
-    await flush();
+    expect(s.prop('filterErrors')).toEqual({});
+    await s.filter({ spent_from: 'mil' });
+    expect(s.prop('filterErrors')).toEqual({ spent_from: 'Write an amount, like 1.000,50.' });
     expect(s.params(LIST)).toEqual([{ sort: 'name', descending: false, limit: 50, offset: 0 }]);
     await s.show(EMPTY, 2);
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No customers.');
@@ -354,6 +427,11 @@ describe('CustomerListPage: language and markup', () => {
     expect(s.prop<{ label: string }[]>('columns').map((c) => c.label)).toEqual(['Nombre', 'Email', 'Teléfono', 'Etapa', 'Gastado']);
     expect(s.testid('customer-list-add').text()).toBe('Añadir');
     expect(s.wrapper.get('[data-testid="customer-list-stage"]').text()).toBe('Activo');
+    const fields = s.prop<Array<{ label: string; options?: Array<{ label: string }> }>>('filterFields');
+    expect(fields.map((f) => f.label)).toEqual(['Origen', 'Activo']);
+    expect(fields[1].options?.map((o) => o.label)).toEqual(['Activos', 'No activos']);
+    await s.filter({ spent_to: 'mil' });
+    expect(s.prop('filterErrors')).toEqual({ spent_to: 'Escribe un importe, como 1.000,50.' });
   });
 
   it('has no OutfitKit tag and formats nothing by hand', () => {
