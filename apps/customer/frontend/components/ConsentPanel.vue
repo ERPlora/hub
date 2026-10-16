@@ -29,7 +29,10 @@ const PURPOSE = 'marketing';
 
 const { t, locale } = useCustomerI18n();
 
-const marketing = computed(() => props.consent.filter((row) => row.purpose === PURPOSE));
+/** The marketing decisions, one per channel (a permission for health data has none, CUSTOMER-F32). */
+const marketing = computed(() =>
+  props.consent.filter((row): row is ConsentStateRow & { channel: ConsentChannel } => row.purpose === PURPOSE && row.channel !== ''),
+);
 const lines = computed(() => {
   const byChannel = new Map(marketing.value.map((row) => [row.channel, row]));
   const channels = [...new Set<ConsentChannel>([...ALWAYS, ...marketing.value.map((row) => row.channel)])];
@@ -189,7 +192,7 @@ const when = (occurredAt: string, extra: string): string =>
       >
         <div class="customer-consent__title">
           {{ fact.state === 'granted' ? $t('customer.consent.granted') : $t('customer.consent.withdrawn') }} —
-          {{ $t(`customer.channel.${fact.channel}`) }}
+          {{ fact.channel ? $t(`customer.channel.${fact.channel}`) : $t('customer.health.purpose') }}
           <small>({{ $t(`customer.consent.sources.${fact.source}`) }})</small>
         </div>
         <div

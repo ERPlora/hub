@@ -137,6 +137,14 @@ describe('ConsentPanel: everything that was decided', () => {
     expect(fact.text()).toContain(`${formatDateTime('2026-10-01T10:00:00Z', 'en')} · Ana`);
   });
 
+  it('a health permission (CUSTOMER-F32) has no channel: the history names its purpose', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.consent.history', pageOf([{ ...FACT, id: 'k2', purpose: 'health', channel: '' }]));
+    expect(s.wrapper.get('[data-testid="customer-consent-fact-k2"]').text()).toContain('Given — Health data (at the counter)');
+    // It is no marketing channel: no line for it above.
+    expect(s.wrapper.findAll('[data-consent]').map((l) => l.attributes('data-consent'))).toEqual(['email', 'whatsapp', 'sms', 'postal']);
+  });
+
   it('with nothing recorded says so; a failed load says so', async () => {
     const s = await setup({ consent: [] });
     await s.result(s.call, 'customer.consent.history', pageOf([]));

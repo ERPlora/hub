@@ -2,7 +2,7 @@
 // The customer card (WORKBOOK «Ficha de cliente»; CUSTOMER-F03–F07, F13–F16, F19, F23, F24), as the
 // product's sheet: the buttons the profile allows (Edit, Delete, Merge with…, Erase personal data),
 // the data — or, editing, the card's form with the custom fields and «Active», saved in one call —,
-// Groups and Tags, Marketing consent, Add note and Activity, Purchases, Linked orders and, last, the
+// Health and allergies (F32), Groups and Tags, Marketing consent, Add note and Activity, Purchases, Linked orders and, last, the
 // other apps' blocks. Everything is live: what someone else changes shows without reloading; a card
 // deleted, merged or erased meanwhile says «This customer is no longer available.».
 import { InlineFeedback } from '@erplora/ui/components';
@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router';
 
 import ActivityPanel from '../components/ActivityPanel.vue';
 import ConsentPanel from '../components/ConsentPanel.vue';
+import HealthPanel from '../components/HealthPanel.vue';
 import CustomerCardBlocks from '../components/CustomerCardBlocks.vue';
 import CustomerDeleteDialog from '../components/CustomerDeleteDialog.vue';
 import CustomerFacts from '../components/CustomerFacts.vue';
@@ -240,6 +241,13 @@ async function save(): Promise<void> {
         <CustomerFacts
           v-else
           :customer="customer"
+        />
+      </section>
+
+      <section class="customer-detail__panel">
+        <HealthPanel
+          :customer-id="customer.id"
+          :editable="canManage"
         />
       </section>
 
