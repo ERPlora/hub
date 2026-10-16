@@ -1,14 +1,13 @@
 <script setup lang="ts">
 // Staff → Roles (WORKBOOK «Pantallas · Roles»; STAFF-F04, F23): the live `staff.role.list` in a
 // server-side DataTable — Role (its colour, and «Retired» on a retired one), Description and Members
-// (the active people who hold it) —, «Search role…», sort by any column, filters, 50 a page. Whoever
+// (the active people who hold it) —, «Search role…», sort by any column, filters behind the table's funnel, 50 a page. Whoever
 // manages roles adds («New») and opens a row («Edit · {name}», where a role is also retired). Changes
 // come back through the stream.
-import { type DataTableColumn, DataTable, EmptyState, StatusPill } from '@erplora/ui/components';
+import { type DataTableColumn, type DataTableFilterField, type DataTableFilters, DataTable, EmptyState, StatusPill } from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
-import FilterPanel, { type FilterSpec, type FilterValues } from '../components/FilterPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RoleFormModal from '../components/RoleFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -22,11 +21,12 @@ const t = useT();
 const canManage = computed(() => session.can('staff.manage_settings'));
 
 const table = useServerTable({ sort: 'name' });
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
 /** The filters as the query takes them: status is a yes/no, members are whole numbers. */
-function filterParams(values: FilterValues): Partial<RoleListIn> {
+function filterParams(values: DataTableFilters): Partial<RoleListIn> {
   const { is_active: active, member_count_min: min, member_count_max: max, ...rest } = values;
   return {
     ...rest,
@@ -49,9 +49,10 @@ const {
 table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 
-const filterSpecs = computed<FilterSpec[]>(() => [
+/** The filters with no column of their own, after Members from–to (on its column). */
+const filterFields = computed<DataTableFilterField[]>(() => [
   {
-    kind: 'select',
+    type: 'select',
     key: 'is_active',
     label: t('staff.roles.filters.state'),
     options: [
@@ -59,8 +60,7 @@ const filterSpecs = computed<FilterSpec[]>(() => [
       { value: 'false', label: t('staff.roles.filters.retired') },
     ],
   },
-  { kind: 'text', key: 'color', label: t('staff.roles.filters.color') },
-  { kind: 'range', key: 'member_count', label: t('staff.roles.filters.members'), keys: ['member_count_min', 'member_count_max'] },
+  { type: 'text', key: 'color', label: t('staff.roles.filters.color') },
 ]);
 
 const columns = computed<DataTableColumn<RoleOut>[]>(() => [
@@ -71,7 +71,14 @@ const columns = computed<DataTableColumn<RoleOut>[]>(() => [
     sortable: true,
     format: (_, row) => row.description.trim() || '—',
   },
-  { key: 'member_count', label: t('staff.roles.columns.members'), sortable: true, align: 'right', format: (_, row) => String(row.member_count) },
+  {
+    key: 'member_count',
+    label: t('staff.roles.columns.members'),
+    sortable: true,
+    align: 'right',
+    format: (_, row) => String(row.member_count),
+    filter: { type: 'range', keys: ['member_count_min', 'member_count_max'], min: 0, step: 1 },
+  },
 ]);
 
 const editing = ref<RoleOut | null>(null);
@@ -99,10 +106,13 @@ function openForm(role: RoleOut | null): void {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="staff-roles"
       fill
       server-side
       searchable
+      filterable
+      :filter-fields="filterFields"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -128,13 +138,6 @@ function openForm(role: RoleOut | null): void {
       @add="openForm(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <FilterPanel
-          v-model="filters"
-          testid="staff-roles"
-          :filters="filterSpecs"
-        />
-      </template>
       <template #name="{ row }">
         <span class="staff-role">
           <span

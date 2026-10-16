@@ -19,9 +19,9 @@ en `packages/ui` (8c30c2a) y lo usan el menú (`apps/staff/apps.py`) y la barra 
   label)`. Campo con caja como el `ion-select` (`fill="outline"`, `mode="md"`) que abre un
   `FormModal` con `ion-searchbar` (debounce 300 ms), la lista, «Cargando…», «Sin resultados» y el
   error; una respuesta tardía de una búsqueda vieja no pisa la nueva.
-- **Uso en staff:** «Rol» y «Usuario del Hub» de la ficha; «Miembro» de la ausencia y de Horarios;
-  filtros «Rol», «Usuario del Hub» y «Miembro». Tax tiene otro igual: con el compartido se borran los
-  dos.
+- **Uso en staff:** «Rol» y «Usuario del Hub» de la ficha; «Miembro» de la ausencia y de Horarios.
+  Los filtros «Rol», «Usuario del Hub» y «Miembro» ya son el `lookup` del embudo de `DataTable`. Tax
+  tiene otro igual: con el compartido se borran los dos.
 
 ### Fecha y hora en el orden del idioma del negocio
 
@@ -34,12 +34,3 @@ en `packages/ui` (8c30c2a) y lo usan el menú (`apps/staff/apps.py`) y la barra 
 - **Y un formateador** `formatDate(iso, locale)` en `@erplora/ui/components/format` para los días de
   calendario (en UTC, sin desplazar un día), junto a `formatDateTime`; staff lo tiene en
   `frontend/lib/format.ts`.
-
-### Filtros por columna en `DataTable`
-
-- **Para qué:** el `ok-data-table` viejo filtraba por columna en su panel lateral. Staff (como tax) lo
-  suple con `frontend/components/FilterPanel.vue` en el slot `filters`: botón «Filtros» con contador y
-  un `FormModal` con un control por filtro (texto, lista cerrada con «Cualquiera», `SearchSelect`,
-  rango de números o de fechas).
-- **API propuesta:** `filters` en la columna (`{ kind: 'text' | 'select' | 'search' | 'range', … }`) y
-  `v-model:filters` en la tabla; con eso se borran los `FilterPanel` de cada app.

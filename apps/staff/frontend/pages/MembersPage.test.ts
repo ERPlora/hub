@@ -12,7 +12,6 @@ import type { Component } from 'vue';
 
 import type { MemberMineOut, MemberOut } from '../operations';
 import { click, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
-import FilterPanel from '../components/FilterPanel.vue';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import TerminateDialog from '../components/TerminateDialog.vue';
@@ -68,15 +67,30 @@ async function setup(options: MountOptions = {}) {
     await m.reopen();
     await m.result(OP, data);
   }
+  /** The table's funnel applies its filters (`v-model:filters`): what the panel's «Apply» emits. */
   async function filter(values: Record<string, string>) {
-    m.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', values);
+    table().vm.$emit('update:filters', values);
+    await flush();
+  }
+  /** Opens the funnel's panel, sets each control as Ionic does and applies the draft. */
+  async function applyInPanel(values: Record<string, string>) {
+    await m.find('staff-members-filters-toggle').trigger('click');
+    await flush();
+    const panel = m.find('staff-members-filters-panel');
+    for (const [name, value] of Object.entries(values)) {
+      const control = panel.get(`[data-testid="staff-members-filter-${name}"]`).element;
+      const event = control.tagName === 'ION-SELECT' || (control as HTMLInputElement).type === 'date' ? 'ionChange' : 'ionInput';
+      control.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+      await flush();
+    }
+    await panel.get('[data-testid="staff-members-filters-apply"]').trigger('click');
     await flush();
   }
   async function action(id: string, actionId: string) {
     await m.find(`staff-members-row-${id}-${actionId}`).trigger('click');
     await settle();
   }
-  return { ...m, table, prop, rows, cells, list, show, showOnNewStream, filter, action };
+  return { ...m, table, prop, rows, cells, list, show, showOnNewStream, filter, applyInPanel, action };
 }
 
 describe('MembersPage: the live directory', () => {
@@ -112,8 +126,7 @@ describe('MembersPage: the live directory', () => {
     const s = await setup();
     expect(s.params('staff.member.compensation')).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
     s.table().vm.$emit('update:search', 'ana');
-    s.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', { status: 'active' });
-    await flush();
+    await s.filter({ status: 'active' });
     s.table().vm.$emit('loadMore');
     await flush();
     s.table().vm.$emit('loadMore');
@@ -157,45 +170,70 @@ describe('MembersPage: the live directory', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
   });
 
-  it('filters by the old columns: text, role, status, bookable as a yes/no, hire date from–to and Hub user', async () => {
+  it('filters behind the table funnel as the old columns did: each column its own, the rest as fields of the panel', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
-    type Spec = { key: string; label: string; kind: string; options?: unknown[]; load?: (search: string) => Promise<unknown> };
-    const specs = s.wrapper.findComponent(FilterPanel).props('filters') as unknown as Spec[];
-    expect(specs.map((f) => [f.key, f.label, f.kind])).toEqual([
-      ['first_name', 'First name', 'text'],
-      ['last_name', 'Last name', 'text'],
-      ['email', 'Email', 'text'],
-      ['phone', 'Phone', 'text'],
-      ['role_name', 'Role', 'search'],
-      ['status', 'Status', 'select'],
-      ['is_bookable', 'Bookable', 'select'],
-      ['hire_date', 'Hire date', 'range'],
-      ['color', 'Color (#RRGGBB)', 'text'],
-      ['user_id', 'Hub user', 'search'],
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; options?: unknown[]; load?: (query: string) => Promise<unknown> };
+    const columns = s.prop<Array<{ key: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.key, c.filter?.type])).toEqual([
+      ['role_name', 'lookup'],
+      ['email', 'text'],
+      ['phone', 'text'],
+      ['status', 'select'],
     ]);
-    expect(specs.find((f) => f.key === 'status')?.options).toEqual([
+    expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
       { value: 'active', label: 'Active' },
       { value: 'on_leave', label: 'On leave' },
       { value: 'inactive', label: 'Inactive' },
     ]);
+    const fields = s.prop<Array<Filter & { key: string; label: string }>>('filterFields');
+    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([
+      ['first_name', 'First name', 'text'],
+      ['last_name', 'Last name', 'text'],
+      ['is_bookable', 'Bookable', 'boolean'],
+      ['hire_date', 'Hire date', 'daterange'],
+      ['color', 'Color (#RRGGBB)', 'text'],
+      ['user_id', 'Hub user', 'lookup'],
+    ]);
+    expect(fields.find((f) => f.key === 'hire_date')?.keys).toEqual(['hire_date_from', 'hire_date_to']);
     // Role and Hub user search the server (more than 100 may exist): every role by name, and the accounts.
     s.answerBy({ '/api/staff/roles': [200, ROLES], '/api/staff/accounts': [200, ACCOUNTS] });
-    expect(await specs.find((f) => f.key === 'role_name')?.load?.('sty')).toEqual([{ value: 'Stylist', label: 'Stylist' }]);
-    expect(await specs.find((f) => f.key === 'user_id')?.load?.('')).toEqual([{ value: '4', label: 'Ana López' }]);
+    expect(await columns.find((c) => c.key === 'role_name')?.filter?.load?.('sty')).toEqual([{ value: 'Stylist', label: 'Stylist' }]);
+    expect(await fields.find((f) => f.key === 'user_id')?.load?.('')).toEqual([{ value: '4', label: 'Ana López' }]);
     expect(s.sent().map((c) => [c.path, c.query])).toEqual([
       ['/api/staff/roles', { search: 'sty', sort: 'name', limit: '100' }],
       ['/api/staff/accounts', { limit: '100' }],
     ]);
+  });
+
+  it('sends the filters as the query takes them: bookable a yes/no, the Hub user a number, from the first page', async () => {
+    const s = await setup();
+    await s.show(page(ROWS, 120));
+    s.table().vm.$emit('pageChange', 1);
+    await flush();
     await s.filter({ status: 'on_leave', is_bookable: 'false', hire_date_from: '2024-01-01', user_id: '4', role_name: 'Stylist' });
     expect(s.list()).toEqual([
       { status: 'on_leave', is_bookable: false, hire_date_from: '2024-01-01', user_id: 4, role_name: 'Stylist', sort: 'name', limit: 50, offset: 0 },
     ]);
+    expect(s.prop('filters')).toEqual({ status: 'on_leave', is_bookable: 'false', hire_date_from: '2024-01-01', user_id: '4', role_name: 'Stylist' });
+  });
+
+  it('the funnel panel applies what is set in it on «Apply», and the funnel counts the filters in use', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.find('staff-members-filters-count').exists()).toBe(false);
+    await s.applyInPanel({ status: 'inactive', first_name: 'Bea', is_bookable: 'true' });
+    expect(s.list()).toEqual([{ status: 'inactive', first_name: 'Bea', is_bookable: true, sort: 'name', limit: 50, offset: 0 }]);
+    expect(s.find('staff-members-filters-count').text()).toBe('3');
+    await s.showOnNewStream(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
   });
 
   it('an employee has no Hub user filter (only who adds or edits may read the accounts)', async () => {
     const s = await setup({ session: EMPLOYEE });
-    const specs = s.wrapper.findComponent(FilterPanel).props('filters') as unknown as Array<{ key: string }>;
-    expect(specs.map((f) => f.key)).not.toContain('user_id');
+    expect(s.prop<Array<{ key: string }>>('filterFields').map((f) => f.key)).not.toContain('user_id');
   });
 
   it('«Load more» on a phone never asks the server for more than 100 rows: past 100, a second window', async () => {

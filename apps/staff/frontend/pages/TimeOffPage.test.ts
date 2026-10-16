@@ -11,7 +11,6 @@ import type { Component } from 'vue';
 
 import type { TimeOffDetailOut, TimeOffOut } from '../operations';
 import { EMPLOYEE, flush, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
-import FilterPanel from '../components/FilterPanel.vue';
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -102,19 +101,38 @@ describe('TimeOffPage: the live list', () => {
     expect(s.list()).toEqual([{ search: 'bea', sort: 'member_name', limit: 50, offset: 0 }]);
   });
 
-  it('filters by member (searched), type, status, full day as a yes/no, and dates', async () => {
+  it('filters behind the table funnel: member (searched), type and status on their columns, then full day as a yes/no and dates', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
-    const specs = s.wrapper.findComponent(FilterPanel).props('filters') as unknown as Array<{ key: string; label: string; kind: string }>;
-    expect(specs.map((f) => [f.key, f.label, f.kind])).toEqual([
-      ['member_id', 'Member', 'search'],
-      ['leave_type', 'Type', 'select'],
-      ['status', 'Status', 'select'],
-      ['is_full_day', 'Full day', 'select'],
-      ['dates', 'Dates', 'range'],
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; options?: Array<{ value: string }>; load?: (query: string) => Promise<unknown> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.label, c.filter?.key ?? c.key, c.filter?.type])).toEqual([
+      ['Member', 'member_id', 'lookup'],
+      ['Type', 'leave_type', 'select'],
+      ['Status', 'status', 'select'],
     ]);
-    s.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', { status: 'pending', is_full_day: 'true', date_from: '2026-11-01', member_id: 'm1' });
+    expect(columns.find((c) => c.key === 'status')?.filter?.options?.map((o) => o.value)).toEqual(['pending', 'approved', 'rejected', 'cancelled']);
+    const fields = s.prop<Array<Filter & { key: string; label: string }>>('filterFields');
+    expect(fields.map((f) => [f.key, f.label, f.type, f.keys])).toEqual([
+      ['is_full_day', 'Full day', 'boolean', undefined],
+      ['dates', 'Dates', 'daterange', ['date_from', 'date_to']],
+    ]);
+    s.table().vm.$emit('update:filters', { status: 'pending', is_full_day: 'true', date_from: '2026-11-01', member_id: 'm1' });
     await flush();
     expect(s.list()).toEqual([{ status: 'pending', is_full_day: true, date_from: '2026-11-01', member_id: 'm1', sort: '-start_date', limit: 50, offset: 0 }]);
+    expect(s.find('staff-time-off-filters-count').text()).toBe('4');
+  });
+
+  it('«My time off» has no filters: no funnel, no filter on any column', async () => {
+    const s = await setup();
+    await s.result('staff.member.mine', MINE);
+    s.find('staff-time-off-whose').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'mine' } }));
+    await flush();
+    expect(s.prop<Array<{ filter?: unknown }>>('columns').some((c) => c.filter)).toBe(false);
+    expect(s.prop('filterFields')).toEqual([]);
+    expect(s.find('staff-time-off-filters-toggle').exists()).toBe(false);
   });
 });
 

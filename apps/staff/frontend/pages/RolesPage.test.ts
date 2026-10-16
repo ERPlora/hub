@@ -10,7 +10,6 @@ import type { Component } from 'vue';
 
 import type { RoleOut } from '../operations';
 import { EMPLOYEE, flush, type MountOptions, mountStaff, page } from '../__tests__/mount-staff';
-import FilterPanel from '../components/FilterPanel.vue';
 import RoleFormModal from '../components/RoleFormModal.vue';
 import RolesPage from './RolesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -79,17 +78,29 @@ describe('RolesPage', () => {
     expect(s.list()).toEqual([{ search: 'sty', sort: '-member_count', limit: 50, offset: 0 }]);
   });
 
-  it('filters by status (a yes/no on the server), colour and members from–to', async () => {
+  it('filters behind the table funnel: members from–to on its column, then status (a yes/no on the server) and colour', async () => {
+    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
-    const specs = s.wrapper.findComponent(FilterPanel).props('filters') as unknown as Array<{ key: string; label: string; kind: string }>;
-    expect(specs.map((f) => [f.key, f.label, f.kind])).toEqual([
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; min?: number; step?: number; options?: unknown[] };
+    const columns = s.prop<Array<{ key: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.key, c.filter])).toEqual([
+      ['member_count', { type: 'range', keys: ['member_count_min', 'member_count_max'], min: 0, step: 1 }],
+    ]);
+    const fields = s.prop<Array<Filter & { key: string; label: string }>>('filterFields');
+    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([
       ['is_active', 'Status', 'select'],
       ['color', 'Color (#RRGGBB)', 'text'],
-      ['member_count', 'Members', 'range'],
     ]);
-    s.wrapper.findComponent(FilterPanel).vm.$emit('update:modelValue', { is_active: 'false', member_count_min: '1' });
+    expect(fields[0].options).toEqual([
+      { value: 'true', label: 'Active' },
+      { value: 'false', label: 'Retired' },
+    ]);
+    s.table().vm.$emit('update:filters', { is_active: 'false', member_count_min: '1' });
     await flush();
     expect(s.list()).toEqual([{ is_active: false, member_count_min: 1, sort: 'name', limit: 50, offset: 0 }]);
+    expect(s.find('staff-roles-filters-count').text()).toBe('2');
   });
 
   it('who manages roles adds and opens a row; «+» is «New», a row «Edit · {name}»', async () => {
