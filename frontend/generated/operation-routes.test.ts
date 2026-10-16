@@ -75,7 +75,7 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('inventory.'))).toHaveLength(26);
   });
 
-  it('binds the 37 customer operations that have a route (apps/customer/api.py); purchase.record/void are the system\'s', () => {
+  it('binds the 41 customer operations that have a route (apps/customer/api.py); purchase.record/void are the system\'s', () => {
     const customer = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('customer.')));
     expect(customer).toEqual({
       'customer.customer.list': { method: 'get', path: '/api/customer/customers' },
@@ -112,6 +112,11 @@ describe('OPERATION_ROUTES', () => {
       'customer.consent.state': { method: 'get', path: '/api/customer/consents/state' },
       'customer.consent.grant': { method: 'post', path: '/api/customer/consents/grant' },
       'customer.consent.withdraw': { method: 'post', path: '/api/customer/consents/withdraw' },
+      // CUSTOMER-F32: the health data, screen only (no assistant tool, no API key: GDPR art. 9).
+      'customer.health.detail': { method: 'get', path: '/api/customer/health' },
+      'customer.health.grant': { method: 'post', path: '/api/customer/health/grant' },
+      'customer.health.withdraw': { method: 'post', path: '/api/customer/health/withdraw' },
+      'customer.health.update': { method: 'post', path: '/api/customer/health/update' },
       'customer.order.list': { method: 'get', path: '/api/customer/orders' },
       'customer.order.customer': { method: 'get', path: '/api/customer/orders/customer' },
       'customer.order.link': { method: 'post', path: '/api/customer/orders/link' },
