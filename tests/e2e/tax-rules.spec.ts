@@ -164,6 +164,7 @@ test('TAX-F11/F03: the jurisdiction filter narrows to the Canary Islands rule; d
   await searchFor(page, key);
   await expect(rows(page)).toHaveCount(2);
 
+  // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   // The table's funnel → Country Spain, Region «CN», «Apply»: only the Canary Islands rule.
   await shown(page).locator('[data-testid=tax-rules-filters-toggle]').click();
   const panel = shown(page).locator('[data-testid=tax-rules-filters-panel]');
