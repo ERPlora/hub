@@ -32,6 +32,10 @@ from apps.customer.schemas import (
     GroupListIn,
     GroupPatchIn,
     GroupRefIn,
+    HealthDetailIn,
+    HealthGrantIn,
+    HealthIn,
+    HealthWithdrawIn,
     ImportIn,
     MergeIn,
     NoteIn,
@@ -227,6 +231,29 @@ async def consent_grant(request, data: ConsentGrantIn):
 @bind(router, "customer.consent.withdraw", "/customer/consents/withdraw", status=201)
 async def consent_withdraw(request, data: ConsentWithdrawIn):
     return await run_operation(request, services.withdraw_consent, data)
+
+
+# Health data (CUSTOMER-F32): for the screen only (no API key reaches these operations).
+
+
+@bind(router, "customer.health.detail", "/customer/health")
+async def health_detail(request, params: Query[HealthDetailIn]):
+    return await run_operation(request, queries.health_detail, params)
+
+
+@bind(router, "customer.health.grant", "/customer/health/grant")
+async def health_grant(request, data: HealthGrantIn):
+    return await run_operation(request, services.grant_health, data)
+
+
+@bind(router, "customer.health.withdraw", "/customer/health/withdraw")
+async def health_withdraw(request, data: HealthWithdrawIn):
+    return await run_operation(request, services.withdraw_health, data)
+
+
+@bind(router, "customer.health.update", "/customer/health/update")
+async def health_update(request, data: HealthIn):
+    return await run_operation(request, services.update_health, data)
 
 
 @bind(router, "customer.order.list", "/customer/orders")

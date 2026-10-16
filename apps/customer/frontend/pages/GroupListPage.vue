@@ -127,6 +127,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       :sort-dir="list.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: GroupRow) => row.name"
+      card-title-column="name"
       :card-icon="() => 'ion:people-outline'"
       :entity-label="{ one: $t('customer.groups.entity.one'), many: $t('customer.groups.entity.many') }"
       :loading="status === 'loading'"

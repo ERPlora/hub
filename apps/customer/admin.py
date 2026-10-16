@@ -15,6 +15,7 @@ from apps.customer.models import (
     CustomerTag,
     CustomField,
     CustomFieldValue,
+    HealthRecord,
     OrderLink,
     Purchase,
 )
@@ -145,3 +146,10 @@ class ConsentAdmin(admin.ModelAdmin):
 class OrderLinkAdmin(admin.ModelAdmin):
     list_display = ("order_id", "customer", "linked_at")
     search_fields = ("order_id",)
+
+
+@admin.register(HealthRecord)
+class HealthRecordAdmin(admin.ModelAdmin):
+    # Health data (CUSTOMER-F32): the list shows whose record it is and when it changed, not its data.
+    list_display = ("customer", "updated_at", "updated_by")
+    raw_id_fields = ("customer",)

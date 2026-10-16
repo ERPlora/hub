@@ -815,7 +815,9 @@ class CustomFieldValueOut(Schema):
 
 class ConsentStateRow(Schema):
     purpose: str = Field(description="What the consent is for.")
-    channel: ConsentChannel = Field(description="The channel.")
+    channel: ConsentChannel | Literal[""] = Field(
+        description="The channel; empty for a permission that is not about reaching the person (health data)."
+    )
     state: Literal["granted", "withdrawn"] = Field(
         description="The last decision: granted or withdrawn."
     )
@@ -933,7 +935,9 @@ class ConsentRow(Schema):
     id: UUID = Field(description="The fact's id.")
     customer_id: UUID = Field(description="The customer's id.")
     purpose: str = Field(description="What it is for.")
-    channel: ConsentChannel = Field(description="The channel.")
+    channel: ConsentChannel | Literal[""] = Field(
+        description="The channel; empty for a permission that is not about reaching the person (health data)."
+    )
     state: Literal["granted", "withdrawn"] = Field(description="What was decided.")
     contact_point: str = Field(description="The address it was decided for.")
     source: ConsentSource = Field(description="Where it was decided.")
@@ -1058,3 +1062,64 @@ class FieldRow(Schema):
 
 
 FieldPage = Page[FieldRow]
+
+
+# Health data (CUSTOMER-F32): its own block, never on the card, the list, the export or the assistant.
+
+HealthTestResult = Literal["", "negative", "positive"]
+
+
+class HealthDetailIn(CustomerOfIn):
+    pass
+
+
+class HealthGrantIn(CustomerOfIn):
+    notice_text: _text(2000, 1) = Field(
+        description="The exact words read to the customer, stored as proof."
+    )
+    notice_version: _text(60) = Field("", description="The version of those words.")
+    source: ConsentSource = Field(
+        "counter",
+        description="Where it was given: counter, web_form, phone, email, import or receipt.",
+    )
+    evidence: _text(500) = Field(
+        "", description="An outside reference that backs it (a signed form)."
+    )
+    occurred_at: datetime | None = Field(
+        None, description="When the customer said it, if not now."
+    )
+
+
+class HealthWithdrawIn(CustomerOfIn):
+    source: ConsentSource = Field(
+        "counter",
+        description="Where it was withdrawn: counter, web_form, phone, email, import or receipt.",
+    )
+    reason: _text(500) = Field("", description="Why, if the customer said; never required.")
+
+
+class HealthIn(CustomerOfIn):
+    allergies: _text(2000) = Field(
+        "", description="Allergies and sensitivities, as the customer tells them."
+    )
+    sensitivity_test_on: date | None = Field(
+        None, description="The day of the last sensitivity (patch) test."
+    )
+    sensitivity_test_result: HealthTestResult = Field(
+        "", description="Its result: negative, positive or empty while unread."
+    )
+
+
+class HealthOut(Schema):
+    customer_id: UUID = Field(description="The customer's id.")
+    consent: Literal["none", "granted", "withdrawn"] = Field(
+        description="The last decision on the permission to keep health data; none if never asked."
+    )
+    consent_at: datetime | None = Field(description="When that decision was said.")
+    consent_by: str = Field(description="Who wrote it down.")
+    notice_text: str = Field(description="The exact words the customer said yes to.")
+    allergies: str = Field(description="Allergies and sensitivities.")
+    sensitivity_test_on: date | None = Field(description="The day of the last sensitivity test.")
+    sensitivity_test_result: HealthTestResult = Field(description="Its result.")
+    updated_at: datetime | None = Field(description="When the health data last changed.")
+    updated_by: str = Field(description="Who changed it.")

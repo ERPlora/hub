@@ -24,6 +24,7 @@ import {
 } from '../__tests__/mount-customer';
 import ActivityPanel from '../components/ActivityPanel.vue';
 import ConsentPanel from '../components/ConsentPanel.vue';
+import HealthPanel from '../components/HealthPanel.vue';
 import CustomerCardBlocks from '../components/CustomerCardBlocks.vue';
 import CustomerDeleteDialog from '../components/CustomerDeleteDialog.vue';
 import CustomerFacts from '../components/CustomerFacts.vue';
@@ -80,10 +81,10 @@ describe('CustomerDetailPage: the card, live', () => {
     expect(s.wrapper.findComponent(CustomerFacts).props('customer')).toEqual(DETAIL);
   });
 
-  it('lays out the card in the product order: data, groups and tags, consent, note and activity, purchases, orders, other apps', async () => {
+  it('lays out the card in the product order: data, health, groups and tags, consent, note and activity, purchases, orders, other apps', async () => {
     const s = await setup();
     await s.show(DETAIL);
-    const order = [CustomerFacts, MembershipEditor, ConsentPanel, ActivityPanel, PurchaseHistory, LinkedOrders, CustomerCardBlocks].map(
+    const order = [CustomerFacts, HealthPanel, MembershipEditor, ConsentPanel, ActivityPanel, PurchaseHistory, LinkedOrders, CustomerCardBlocks].map(
       (c) => s.wrapper.findComponent(c as never).element,
     );
     for (let i = 1; i < order.length; i++) {
@@ -95,6 +96,42 @@ describe('CustomerDetailPage: the card, live', () => {
     ]);
     expect(s.wrapper.findComponent(ConsentPanel).props()).toMatchObject({ customerId: 'c1', consent: DETAIL.consent, editable: true });
     expect(s.wrapper.findComponent(CustomerCardBlocks).props('customerId')).toBe('c1');
+    // CUSTOMER-F32: the allergies right after the data, where whoever does the service looks first.
+    expect(s.wrapper.findComponent(HealthPanel).props()).toMatchObject({ customerId: 'c1', editable: true });
+  });
+
+  it('opens one stream: the blocks follow the card id from the start, hidden until the card arrives', async () => {
+    const s = await setup();
+    // Mounted only after the first result, the blocks made the SDK abort that stream and open another.
+    const blocks = [
+      'customer.health.detail',
+      'customer.group.list',
+      'customer.tag.list',
+      'customer.consent.history',
+      'customer.activity.list',
+      'customer.purchase.list',
+      'customer.order.list',
+    ] as const;
+    expect(blocks.filter((op) => s.params(op).length === 0)).toEqual([]);
+    expect((s.testid('customer-detail-blocks').element as HTMLElement).style.display).toBe('none');
+    await s.show(DETAIL);
+    await s.clock.advance(150);
+    expect(s.net.streams).toHaveLength(1);
+    expect(s.call.aborted()).toBe(false);
+    expect((s.testid('customer-detail-blocks').element as HTMLElement).style.display).toBe('');
+  });
+
+  it('a card that is gone, or an app that is off, follows none of its blocks', async () => {
+    const s = await setup();
+    await s.show(DETAIL);
+    s.call.push(errorFrame(subId(s.client, CARD), 'customer.customer_unavailable'));
+    await flush();
+    expect(s.testid('customer-detail-blocks').exists()).toBe(false);
+    expect(s.wrapper.findComponent(HealthPanel).exists()).toBe(false);
+    const off = await setup();
+    off.call.push(errorFrame(subId(off.client, CARD), 'app_inactive'));
+    await flush();
+    expect(off.testid('customer-detail-blocks').exists()).toBe(false);
   });
 
   it('a change made elsewhere shows without reloading', async () => {
@@ -166,6 +203,7 @@ describe('CustomerDetailPage: the buttons the profile allows', () => {
     expect(buttons(viewer)).toEqual([]);
     expect(viewer.wrapper.findAllComponents(MembershipEditor).every((m) => m.props('editable') === false)).toBe(true);
     expect(viewer.wrapper.findComponent(ConsentPanel).props('editable')).toBe(false);
+    expect(viewer.wrapper.findComponent(HealthPanel).props('editable')).toBe(false);
     expect(viewer.wrapper.findComponent(ActivityPanel).props('canAddNote')).toBe(false);
   });
 

@@ -234,7 +234,10 @@
         "consent_withdrawn": "Consentimiento retirado",
         "merged": "Ficha duplicada fusionada en esta",
         "erased": "Datos personales borrados",
-        "purchase_refunded": "Devolución de compra"
+        "purchase_refunded": "Devolución de compra",
+        "health_consent_granted": "Permiso para guardar datos de salud dado",
+        "health_consent_withdrawn": "Permiso para guardar datos de salud retirado: datos de salud borrados",
+        "health_updated": "Datos de salud actualizados"
       }
     },
     "purchases": {
@@ -269,7 +272,7 @@
     },
     "erase": {
       "title": "Borrar datos personales (RGPD)",
-      "message": "Borra los datos personales de {name}, sus notas, su actividad y sus campos personalizados, y no se puede deshacer. Las ventas y facturas conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.",
+      "message": "Borra los datos personales de {name}, sus notas, su actividad, sus datos de salud y sus campos personalizados, y no se puede deshacer. Las ventas y facturas conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.",
       "reason": "Motivo (queda en la auditoría)",
       "submit": "Borrar datos personales",
       "done": "Datos personales borrados."
@@ -405,6 +408,35 @@
     },
     "blocks": {
       "failed": "No se pudo mostrar este bloque."
+    },
+    "health": {
+      "heading": "Salud y alergias",
+      "intro": "Para apuntar alergias o pruebas de sensibilidad hace falta su permiso expreso.",
+      "ask": "Pedir permiso",
+      "notice": "Doy mi permiso para que este negocio guarde mis alergias y mis pruebas de sensibilidad para atenderme con seguridad. Puedo retirarlo cuando quiera y entonces se borrarán.",
+      "recorded": "Permiso registrado.",
+      "given": "Permiso dado el {when}",
+      "withdrawnOn": "Permiso retirado el {when}.",
+      "allergies": "Alergias: {text}",
+      "noAllergies": "Sin alergias apuntadas.",
+      "test": "Prueba de sensibilidad: {date}",
+      "noTest": "Sin prueba de sensibilidad.",
+      "results": {
+        "negative": "Negativa",
+        "positive": "Positiva"
+      },
+      "noResult": "Sin resultado",
+      "withdraw": "Retirar permiso",
+      "withdrawTitle": "¿Retirar el permiso?",
+      "withdrawMessage": "Se borran sus alergias y su prueba de sensibilidad.",
+      "withdrawConfirm": "Retirar y borrar",
+      "withdrawn": "Permiso retirado y datos de salud borrados.",
+      "allergiesLabel": "Alergias y sensibilidades",
+      "dateLabel": "Fecha de la prueba de sensibilidad",
+      "resultLabel": "Resultado",
+      "saved": "Datos de salud guardados.",
+      "loadError": "No se pudieron cargar los datos de salud",
+      "purpose": "Datos de salud"
     }
   }
 }

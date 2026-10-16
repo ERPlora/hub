@@ -52,6 +52,10 @@ ROUTES = {
     ("GET", "/customer/orders", "customer.order.list"),
     ("GET", "/customer/orders/customer", "customer.order.customer"),
     ("POST", "/customer/orders/link", "customer.order.link"),
+    ("GET", "/customer/health", "customer.health.detail"),
+    ("POST", "/customer/health/grant", "customer.health.grant"),
+    ("POST", "/customer/health/withdraw", "customer.health.withdraw"),
+    ("POST", "/customer/health/update", "customer.health.update"),
 }
 
 
@@ -444,4 +448,46 @@ def test_the_import_over_http(admin_client):
         1,
         1,
         {"name": "Ensure this value has at least 1 character."},
+    )
+
+
+# Health data (CUSTOMER-F32)
+
+
+@pytest.mark.django_db
+def test_the_health_block_over_http(employee_client):
+    ana = post(employee_client, "/customer/customers", {"name": "Ana"}).json()
+    refused = post(
+        employee_client, "/customer/health/update", {"customer_id": ana["id"], "allergies": "PPD"}
+    )
+    assert (refused.status_code, refused.json()["error"]["code"]) == (
+        409,
+        "customer.health_consent_required",
+    )
+    granted = post(
+        employee_client,
+        "/customer/health/grant",
+        {"customer_id": ana["id"], "notice_text": "I let this business keep my allergies."},
+    )
+    assert (granted.status_code, granted.json()["consent"]) == (200, "granted")
+    saved = post(
+        employee_client,
+        "/customer/health/update",
+        {"customer_id": ana["id"], "allergies": "PPD", "sensitivity_test_result": "positive"},
+    )
+    assert (saved.status_code, saved.json()["error"]["fields"]) == (
+        422,
+        {"sensitivity_test_on": "Enter the date of the test."},
+    )
+    saved = post(
+        employee_client, "/customer/health/update", {"customer_id": ana["id"], "allergies": "PPD"}
+    )
+    assert (saved.status_code, saved.json()["allergies"]) == (200, "PPD")
+    block = get(employee_client, "/customer/health", customer_id=ana["id"]).json()
+    assert (block["consent"], block["allergies"]) == ("granted", "PPD")
+    gone = post(employee_client, "/customer/health/withdraw", {"customer_id": ana["id"]})
+    assert (gone.status_code, gone.json()["consent"], gone.json()["allergies"]) == (
+        200,
+        "withdrawn",
+        "",
     )

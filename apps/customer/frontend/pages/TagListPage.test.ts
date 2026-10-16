@@ -36,6 +36,11 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('TagListPage', () => {
+  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+    const s = await setup();
+    expect(s.prop('cardTitleColumn')).toBe('name');
+  });
+
   it('is «Customer tags», following the tags by name', async () => {
     const s = await setup();
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Customer tags');

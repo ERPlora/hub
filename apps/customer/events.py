@@ -41,6 +41,9 @@ TAG_DELETED = "customer.tag.deleted"
 FIELD_CREATED = "customer.field.created"
 FIELD_UPDATED = "customer.field.updated"
 FIELD_DELETED = "customer.field.deleted"
+HEALTH_CONSENT_GRANTED = "customer.health.consent_granted"
+HEALTH_CONSENT_WITHDRAWN = "customer.health.consent_withdrawn"
+HEALTH_UPDATED = "customer.health.updated"
 
 ALL = [
     CUSTOMER_CREATED,
@@ -68,6 +71,9 @@ ALL = [
     FIELD_CREATED,
     FIELD_UPDATED,
     FIELD_DELETED,
+    HEALTH_CONSENT_GRANTED,
+    HEALTH_CONSENT_WITHDRAWN,
+    HEALTH_UPDATED,
 ]
 
 # The Sales app's events (its WORKBOOK fixes their payload).

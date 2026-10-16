@@ -2,7 +2,7 @@
 // The customer card (WORKBOOK «Ficha de cliente»; CUSTOMER-F03–F07, F13–F16, F19, F23, F24), as the
 // product's sheet: the buttons the profile allows (Edit, Delete, Merge with…, Erase personal data),
 // the data — or, editing, the card's form with the custom fields and «Active», saved in one call —,
-// Groups and Tags, Marketing consent, Add note and Activity, Purchases, Linked orders and, last, the
+// Health and allergies (F32), Groups and Tags, Marketing consent, Add note and Activity, Purchases, Linked orders and, last, the
 // other apps' blocks. Everything is live: what someone else changes shows without reloading; a card
 // deleted, merged or erased meanwhile says «This customer is no longer available.».
 import { InlineFeedback } from '@erplora/ui/components';
@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router';
 
 import ActivityPanel from '../components/ActivityPanel.vue';
 import ConsentPanel from '../components/ConsentPanel.vue';
+import HealthPanel from '../components/HealthPanel.vue';
 import CustomerCardBlocks from '../components/CustomerCardBlocks.vue';
 import CustomerDeleteDialog from '../components/CustomerDeleteDialog.vue';
 import CustomerFacts from '../components/CustomerFacts.vue';
@@ -31,6 +32,7 @@ import { useCustomerI18n } from '../lib/useCustomerI18n';
 const props = defineProps<{ id: string }>();
 
 const LIST = '/customer/customers';
+const NONE: string[] = [];
 const router = useRouter();
 const session = useSession();
 const canManage = computed(() => session.can('customer.manage'));
@@ -46,6 +48,8 @@ const inactive = computed(() => error.value?.code === 'app_inactive');
 /** The card to show: none once it is gone. */
 const customer = computed(() => (gone.value || inactive.value ? undefined : card.value));
 const who = computed(() => (customer.value ? { id: customer.value.id, name: customer.value.name } : null));
+/** The blocks follow the card's id from the start, so the page opens one stream, not one per result. */
+const failed = computed(() => gone.value || inactive.value || (status.value === 'error' && !card.value));
 
 // ── The panels on the card: one at a time ────────────────────────────────────────────────────────
 type Panel = 'merge' | 'erase' | null;
@@ -242,48 +246,61 @@ async function save(): Promise<void> {
           :customer="customer"
         />
       </section>
+    </template>
+
+    <div
+      v-if="!failed"
+      v-show="customer"
+      data-testid="customer-detail-blocks"
+    >
+      <section class="customer-detail__panel">
+        <HealthPanel
+          :customer-id="id"
+          :editable="canManage"
+        />
+      </section>
 
       <section class="customer-detail__panel">
         <MembershipEditor
           kind="groups"
-          :customer-id="customer.id"
-          :selected="customer.group_ids"
+          :customer-id="id"
+          :selected="customer?.group_ids ?? NONE"
           :editable="canManage"
         />
         <MembershipEditor
           kind="tags"
           class="customer-detail__tags"
-          :customer-id="customer.id"
-          :selected="customer.tag_ids"
+          :customer-id="id"
+          :selected="customer?.tag_ids ?? NONE"
           :editable="canManage"
         />
       </section>
 
       <section class="customer-detail__panel">
         <ConsentPanel
-          :customer-id="customer.id"
-          :consent="customer.consent"
+          :customer-id="id"
+          :consent="customer?.consent ?? []"
           :editable="canManage"
         />
       </section>
 
       <section class="customer-detail__panel">
         <ActivityPanel
-          :customer-id="customer.id"
+          :customer-id="id"
           :can-add-note="canManage"
         />
       </section>
 
       <section class="customer-detail__panel">
-        <PurchaseHistory :customer-id="customer.id" />
+        <PurchaseHistory :customer-id="id" />
       </section>
 
       <section class="customer-detail__panel">
-        <LinkedOrders :customer-id="customer.id" />
+        <LinkedOrders :customer-id="id" />
       </section>
 
-      <CustomerCardBlocks :customer-id="customer.id" />
-    </template>
+      <CustomerCardBlocks :customer-id="id" />
+    </div>
 
     <CustomerDeleteDialog
       v-if="canDelete"

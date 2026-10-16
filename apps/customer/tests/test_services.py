@@ -32,8 +32,15 @@ from apps.customer.models import (
     CustomerTag,
     CustomField,
     CustomFieldValue,
+    HealthRecord,
     OrderLink,
     Purchase,
+)
+from apps.customer.schemas import (
+    HealthGrantIn,
+    HealthIn,
+    HealthOut,
+    HealthWithdrawIn,
 )
 from apps.customer.schemas import (
     ActivityIn,
@@ -77,6 +84,12 @@ from apps.customer.schemas import (
 )
 from apps.customer.schemas import (
     FieldRefIn as FieldRef,
+)
+
+from apps.customer.services import (
+    ALREADY_IMPORTED,
+    DATE_IN_FUTURE,
+    HEALTH_TEST_DATE_MISSING,
 )
 
 from .conftest import A, B, run
@@ -560,7 +573,15 @@ def test_import_reads_a_country_by_its_code_or_its_name_and_warns_when_it_names_
         ),
     )
     assert result.created == 7
-    assert [sorted(row.warnings) for row in result.rows] == [[], [], [], [], [], ["country"], ["country"]]
+    assert [sorted(row.warnings) for row in result.rows] == [
+        [],
+        [],
+        [],
+        [],
+        [],
+        ["country"],
+        ["country"],
+    ]
     assert dict(Customer.objects.values_list("name", "country")) == {
         "A": "FR",
         "B": "ES",
@@ -580,6 +601,55 @@ def test_import_takes_back_the_apostrophe_the_export_puts_in_front_of_a_formula(
     )
     ana = Customer.objects.get()
     assert (ana.name, ana.phone) == ("=Ana", "+34600111222")
+
+
+@pytest.mark.django_db
+def test_importing_the_same_file_again_creates_nothing_new():
+    """services#152, customers#15: a file imported twice (or a row repeated in it) does not duplicate."""
+    rows = [
+        {"name": "Ana", "phone": "600 111 222", "email": "ana@example.com"},
+        # Her daughter: the same phone, another person (CUSTOMER-F12): she is created.
+        {"name": "Lucía", "phone": "600 111 222"},
+        # The same row twice in the file: the second one is the same card.
+        {"name": "Ana", "phone": "600111222", "email": "ana@example.com"},
+    ]
+    first = run("customer.customer.import", ImportIn(rows=rows))
+    assert (first.created, first.skipped) == (2, 1)
+    assert first.rows[2].errors == {"name": str(ALREADY_IMPORTED)}
+    clear_outbox()
+    # The same people typed another way: case, spaces and the phone with its prefix.
+    again = run(
+        "customer.customer.import",
+        ImportIn(
+            rows=[
+                {
+                    "name": " ana ",
+                    "phone": "+34 600 111 222",
+                    "email": "ANA@example.com",
+                },
+                {"name": "Lucía", "phone": "0034600111222"},
+                # One of the three differs: not the same card, it is created.
+                {"name": "Ana", "phone": "600111222", "email": "ana.work@example.com"},
+                {"name": "Ana", "phone": "600 222 333", "email": "ana@example.com"},
+                {"name": "Marta", "phone": "600111222"},
+            ]
+        ),
+    )
+    assert (again.created, again.skipped) == (3, 2)
+    assert [row.errors for row in again.rows[:2]] == [
+        {"name": str(ALREADY_IMPORTED)}
+    ] * 2
+    assert Customer.objects.count() == 5
+    assert outbox() == [
+        (events.CUSTOMER_CREATED, {"id": str(row.id)}) for row in again.rows[2:]
+    ]
+    # Only a live card is in the way: a deleted one is imported again.
+    Customer.objects.filter(name="Lucía").update(deleted_at=timezone.now())
+    third = run(
+        "customer.customer.import",
+        ImportIn(rows=[{"name": "Lucía", "phone": "600111222"}]),
+    )
+    assert (third.created, third.skipped) == (1, 0)
 
 
 # customer.customer.set_groups / set_tags (CUSTOMER-F06)
@@ -950,6 +1020,7 @@ def test_erase_replaces_the_personal_data_and_keeps_what_the_law_keeps(erasable)
             "customer",
             "activity",
             "field_values",
+            "health",
             "memberships",
             "consent_addresses",
         ],
@@ -1633,18 +1704,33 @@ def erased(customer):
 @pytest.mark.django_db
 def test_erasing_a_card_erases_the_duplicates_merged_into_it():
     survivor = card("Ana", email="ana@example.com")
-    absorbed = card("ana", email="other@example.com", phone="+34611222333", tax_id="12345678Z", notes="Allergic")
+    absorbed = card(
+        "ana",
+        email="other@example.com",
+        phone="+34611222333",
+        tax_id="12345678Z",
+        notes="Allergic",
+    )
     hair = CustomField.objects.create(name="Hair")
     CustomFieldValue.objects.create(customer=survivor, field=hair, value="Short")
-    CustomFieldValue.objects.create(customer=absorbed, field=hair, value="Long")  # clashes: stays behind
+    CustomFieldValue.objects.create(
+        customer=absorbed, field=hair, value="Long"
+    )  # clashes: stays behind
     run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
     clear_outbox()
 
     run("customer.customer.erase", EraseIn(id=survivor.id, reason="GDPR request"))
 
     assert erased(absorbed) == ("Deleted customer", "", True)
-    assert (absorbed.phone, absorbed.tax_id, absorbed.notes, absorbed.field_values.count()) == ("", "", "", 0)
-    assert list(absorbed.activity.values_list("kind", "text")) == [("erased", "GDPR request")]
+    assert (
+        absorbed.phone,
+        absorbed.tax_id,
+        absorbed.notes,
+        absorbed.field_values.count(),
+    ) == ("", "", "", 0)
+    assert list(absorbed.activity.values_list("kind", "text")) == [
+        ("erased", "GDPR request")
+    ]
     assert outbox() == [
         (events.CUSTOMER_ERASED, {"id": str(survivor.id)}),
         (events.CUSTOMER_ERASED, {"id": str(absorbed.id)}),
@@ -1653,17 +1739,27 @@ def test_erasing_a_card_erases_the_duplicates_merged_into_it():
 
 @pytest.mark.django_db
 def test_a_merge_keeps_the_chain_flat_and_erasing_reaches_every_card_of_it():
-    first, second, third = card("A"), card("B", email="b@example.com"), card("C", email="c@example.com")
+    first, second, third = (
+        card("A"),
+        card("B", email="b@example.com"),
+        card("C", email="c@example.com"),
+    )
     run("customer.customer.merge", MergeIn(id=second.id, absorbed_id=third.id))
     run("customer.customer.merge", MergeIn(id=first.id, absorbed_id=second.id))
     third.refresh_from_db()
-    assert third.merged_into_id == first.id  # C was in B, and B went into A: C points at A
+    assert (
+        third.merged_into_id == first.id
+    )  # C was in B, and B went into A: C points at A
     clear_outbox()
 
     run("customer.customer.erase", EraseIn(id=first.id))
 
     assert erased(second)[1:] == erased(third)[1:] == ("", True)
-    assert {payload["id"] for _, payload in outbox()} == {str(first.id), str(second.id), str(third.id)}
+    assert {payload["id"] for _, payload in outbox()} == {
+        str(first.id),
+        str(second.id),
+        str(third.id),
+    }
 
 
 @pytest.mark.django_db
@@ -1692,7 +1788,13 @@ def test_repeating_the_erasure_of_a_merged_card_announces_every_card_again_and_w
 def refund(sale, refund_id, total, reason="returned", at=None):
     return system(
         "customer.purchase.refund",
-        PurchaseRefundIn(sale_id=sale, refund_id=refund_id, total=total, reason=reason, refunded_at=at),
+        PurchaseRefundIn(
+            sale_id=sale,
+            refund_id=refund_id,
+            total=total,
+            reason=reason,
+            refunded_at=at,
+        ),
     )
 
 
@@ -1707,7 +1809,14 @@ def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_histor
     # «Spent» goes down by what came back; «Purchases», the last purchase and the stage do not move.
     assert totals(ana) == (1, 1210, "first_purchase", NOW)
     line = Purchase.objects.get(refund_id=first)
-    assert (line.sale_id, line.amount, line.currency, line.status, line.recorded_at, line.void_reason) == (
+    assert (
+        line.sale_id,
+        line.amount,
+        line.currency,
+        line.status,
+        line.recorded_at,
+        line.void_reason,
+    ) == (
         sale,
         -1210,
         "EUR",
@@ -1716,13 +1825,30 @@ def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_histor
         "one cup back",
     )
     assert refund(sale, first, 1210).refunded is False  # redelivered
-    assert refund(sale, second, 1210).refunded is True  # a second refund of the same sale
+    assert (
+        refund(sale, second, 1210).refunded is True
+    )  # a second refund of the same sale
     assert totals(ana)[:2] == (1, 0)
-    entries = list(ana.activity.filter(kind="purchase_refunded").values_list("text", "data"))
-    assert entries == [("returned", {"amount": 1210, "currency": "EUR"}), ("one cup back", {"amount": 1210, "currency": "EUR"})]
+    entries = list(
+        ana.activity.filter(kind="purchase_refunded").values_list("text", "data")
+    )
+    assert entries == [
+        ("returned", {"amount": 1210, "currency": "EUR"}),
+        ("one cup back", {"amount": 1210, "currency": "EUR"}),
+    ]
     assert outbox() == [
-        (events.PURCHASE_REFUNDED, {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(first)}),
-        (events.PURCHASE_REFUNDED, {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(second)}),
+        (
+            events.PURCHASE_REFUNDED,
+            {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(first)},
+        ),
+        (
+            events.PURCHASE_REFUNDED,
+            {
+                "customer_id": str(ana.id),
+                "sale_id": str(sale),
+                "refund_id": str(second),
+            },
+        ),
     ]
 
 
@@ -1750,7 +1876,9 @@ def test_a_refund_of_an_erased_card_counts_but_adds_nothing_to_its_timeline():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+@pytest.mark.parametrize(
+    "role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+)
 def test_only_the_system_records_refunds(role):
     with pytest.raises(PermissionDenied):
         run(
@@ -1811,19 +1939,27 @@ def race(hold, attempt, then=None):
 
 
 def note_on(customer):
-    return "customer.note.add", NoteIn(customer_id=customer.id, content="Prefers mornings")
+    return "customer.note.add", NoteIn(
+        customer_id=customer.id, content="Prefers mornings"
+    )
 
 
 def activity_on(customer):
-    return "customer.activity.add", ActivityIn(customer_id=customer.id, kind="appointment.visit", title="Visit")
+    return "customer.activity.add", ActivityIn(
+        customer_id=customer.id, kind="appointment.visit", title="Visit"
+    )
 
 
 def consent_on(customer):
-    return "customer.consent.grant", ConsentGrantIn(customer_id=customer.id, channel="email", notice_text="Yes")
+    return "customer.consent.grant", ConsentGrantIn(
+        customer_id=customer.id, channel="email", notice_text="Yes"
+    )
 
 
 def order_on(customer):
-    return "customer.order.link", OrderLinkIn(order_id=uuid.uuid7(), customer_id=customer.id)
+    return "customer.order.link", OrderLinkIn(
+        order_id=uuid.uuid7(), customer_id=customer.id
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1840,7 +1976,10 @@ def test_a_write_on_a_card_being_deleted_waits_and_then_finds_it_gone(write, wri
     ana = card("Ana", email="ana@example.com")
     name, data = write(ana)
     with pytest.raises(NotFound):
-        race(lambda: run("customer.customer.delete", RefIn(id=ana.id)), lambda: run(name, data))
+        race(
+            lambda: run("customer.customer.delete", RefIn(id=ana.id)),
+            lambda: run(name, data),
+        )
     assert not written().exists()
 
 
@@ -1849,8 +1988,14 @@ def test_a_note_on_a_card_being_merged_lands_on_the_card_that_stays():
     survivor, absorbed = card("Ana"), card("ana")
     with pytest.raises(NotFound):
         race(
-            lambda: run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id)),
-            lambda: run("customer.note.add", NoteIn(customer_id=absorbed.id, content="Late note")),
+            lambda: run(
+                "customer.customer.merge",
+                MergeIn(id=survivor.id, absorbed_id=absorbed.id),
+            ),
+            lambda: run(
+                "customer.note.add",
+                NoteIn(customer_id=absorbed.id, content="Late note"),
+            ),
         )
     assert not absorbed.activity.filter(kind="note_added").exists()
 
@@ -1869,5 +2014,324 @@ def test_a_void_locks_the_card_before_its_purchase_so_it_never_deadlocks_with_a_
     def then_its_purchases():
         list(Purchase.objects.select_for_update().filter(customer=ana))
 
-    assert race(lock_the_card, lambda: void(sale), then=then_its_purchases).voided is True
+    assert (
+        race(lock_the_card, lambda: void(sale), then=then_its_purchases).voided is True
+    )
     assert totals(ana)[:2] == (0, 0)
+
+
+# customer.health.* (CUSTOMER-F32: allergies and the sensitivity test, only with explicit permission)
+
+HEALTH_WORDS = "I let this business keep my allergies and my sensitivity tests."
+
+
+@pytest.mark.parametrize(
+    ("name", "input"),
+    [
+        ("customer.health.grant", HealthGrantIn),
+        ("customer.health.withdraw", HealthWithdrawIn),
+        ("customer.health.update", HealthIn),
+    ],
+)
+def test_health_declarations_keep_the_data_away_from_the_assistant_and_the_api_keys(
+    name, input
+):
+    op = get(name)
+    assert (op.kind, op.permission, op.input, op.output) == (
+        "command",
+        "customer.manage",
+        input,
+        HealthOut,
+    )
+    assert (op.ai, op.expose_api) == (None, False)
+
+
+def grant_health(customer, actor="clara"):
+    return run(
+        "customer.health.grant",
+        HealthGrantIn(
+            customer_id=customer.id, notice_text=HEALTH_WORDS, notice_version="v1"
+        ),
+        "hub_employee",
+        actor=actor,
+    )
+
+
+@pytest.mark.django_db
+def test_health_data_is_refused_until_the_permission_is_recorded():
+    ana = card("Ana")
+    with pytest.raises(Conflict) as refused:
+        run(
+            "customer.health.update",
+            HealthIn(customer_id=ana.id, allergies="PPD"),
+            "hub_employee",
+        )
+    assert (refused.value.status, refused.value.code) == (
+        409,
+        "customer.health_consent_required",
+    )
+    assert (HealthRecord.objects.count(), outbox()) == (0, [])
+
+
+@pytest.mark.django_db
+def test_the_permission_is_a_health_fact_with_its_words_and_then_the_data_is_kept():
+    ana = card("Ana", phone="+34600111222", email="ana@example.com")
+    block = grant_health(ana)
+    fact = Consent.objects.get()
+    assert (
+        fact.purpose,
+        fact.channel,
+        fact.state,
+        fact.contact_point,
+        fact.notice_text,
+        fact.notice_version,
+        fact.recorded_by,
+    ) == ("health", "", "granted", "", HEALTH_WORDS, "v1", "clara")
+    assert (block.consent, block.consent_by, block.notice_text, block.allergies) == (
+        "granted",
+        "clara",
+        HEALTH_WORDS,
+        "",
+    )
+    granted = Activity.objects.get()
+    assert (granted.kind, granted.text, granted.related_id) == (
+        "health_consent_granted",
+        HEALTH_WORDS,
+        str(fact.id),
+    )
+    assert outbox() == [
+        (
+            events.HEALTH_CONSENT_GRANTED,
+            {"id": str(fact.id), "customer_id": str(ana.id)},
+        )
+    ]
+    clear_outbox()
+    tested = timezone.localdate() - timedelta(days=2)
+    block = run(
+        "customer.health.update",
+        HealthIn(
+            customer="Ana",
+            allergies="PPD (hair dye)",
+            sensitivity_test_on=tested,
+            sensitivity_test_result="negative",
+        ),
+        "hub_employee",
+        actor="clara",
+    )
+    record = HealthRecord.objects.get()
+    assert (
+        record.customer_id,
+        record.allergies,
+        record.sensitivity_test_on,
+        record.sensitivity_test_result,
+        record.updated_by,
+    ) == (ana.id, "PPD (hair dye)", tested, "negative", "clara")
+    assert (
+        block.allergies,
+        block.sensitivity_test_on,
+        block.sensitivity_test_result,
+    ) == (
+        "PPD (hair dye)",
+        tested,
+        "negative",
+    )
+    # The timeline says it changed, never what: the health data lives only in its block.
+    updated = Activity.objects.get(kind="health_updated")
+    assert (updated.text, updated.data, updated.related_id) == ("", {}, str(record.id))
+    assert outbox() == [
+        (events.HEALTH_UPDATED, {"id": str(record.id), "customer_id": str(ana.id)})
+    ]
+    clear_outbox()
+    # Saving the same data again changes nothing and tells nobody.
+    run(
+        "customer.health.update",
+        HealthIn(
+            customer_id=ana.id,
+            allergies="PPD (hair dye)",
+            sensitivity_test_on=tested,
+            sensitivity_test_result="negative",
+        ),
+    )
+    assert (outbox(), Activity.objects.filter(kind="health_updated").count()) == ([], 1)
+
+
+@pytest.mark.django_db
+def test_withdrawing_the_permission_erases_the_health_data_at_once():
+    ana = card("Ana")
+    grant_health(ana)
+    run("customer.health.update", HealthIn(customer_id=ana.id, allergies="Latex"))
+    clear_outbox()
+    block = run(
+        "customer.health.withdraw",
+        HealthWithdrawIn(customer_id=ana.id, reason="Asked at the counter"),
+        "hub_employee",
+        actor="clara",
+    )
+    assert (block.consent, block.allergies, HealthRecord.objects.count()) == (
+        "withdrawn",
+        "",
+        0,
+    )
+    fact = Consent.objects.get(state="withdrawn")
+    assert (fact.purpose, fact.channel, fact.reason, fact.recorded_by) == (
+        "health",
+        "",
+        "Asked at the counter",
+        "clara",
+    )
+    assert Activity.objects.filter(kind="health_consent_withdrawn").count() == 1
+    assert outbox() == [
+        (
+            events.HEALTH_CONSENT_WITHDRAWN,
+            {"id": str(fact.id), "customer_id": str(ana.id)},
+        )
+    ]
+    with pytest.raises(Conflict):
+        run("customer.health.update", HealthIn(customer_id=ana.id, allergies="Latex"))
+
+
+@pytest.mark.django_db
+def test_a_test_in_the_future_or_a_result_without_its_date_saves_nothing():
+    ana = card("Ana")
+    grant_health(ana)
+    clear_outbox()
+    for data, message in (
+        (
+            {"sensitivity_test_on": timezone.localdate() + timedelta(days=1)},
+            DATE_IN_FUTURE,
+        ),
+        ({"sensitivity_test_result": "positive"}, HEALTH_TEST_DATE_MISSING),
+    ):
+        with pytest.raises(InvalidPayload) as refused:
+            run("customer.health.update", HealthIn(customer_id=ana.id, **data))
+        assert invalid(refused.value)[0] == 422
+        assert refused.value.fields == {"sensitivity_test_on": message}
+    assert (HealthRecord.objects.count(), outbox()) == (0, [])
+
+
+@pytest.mark.django_db
+def test_health_on_a_card_that_is_gone_or_by_who_does_not_manage_cards_is_refused():
+    ana = card("Ana", deleted_at=timezone.now())
+    for name, data in (
+        (
+            "customer.health.grant",
+            HealthGrantIn(customer_id=ana.id, notice_text=HEALTH_WORDS),
+        ),
+        ("customer.health.withdraw", HealthWithdrawIn(customer_id=ana.id)),
+        ("customer.health.update", HealthIn(customer_id=ana.id, allergies="PPD")),
+    ):
+        with pytest.raises(NotFound):
+            run(name, data)
+    bea = card("Bea")
+    with pytest.raises(PermissionDenied):
+        run(
+            "customer.health.grant",
+            HealthGrantIn(customer_id=bea.id, notice_text=HEALTH_WORDS),
+            "hub_guest",
+        )
+    assert (Consent.objects.count(), outbox()) == (0, [])
+
+
+@pytest.mark.django_db
+def test_erasing_a_card_erases_its_health_data():
+    ana = card("Ana")
+    grant_health(ana)
+    run("customer.health.update", HealthIn(customer_id=ana.id, allergies="PPD"))
+    run("customer.customer.erase", EraseIn(id=ana.id))
+    assert HealthRecord.objects.count() == 0
+    assert Consent.objects.filter(customer=ana, purpose="health").exists()
+
+
+@pytest.mark.django_db
+def test_a_merge_brings_the_duplicates_health_data_while_the_permission_holds():
+    survivor, absorbed = card("Ana"), card("Ana G.")
+    grant_health(absorbed)
+    run(
+        "customer.health.update",
+        HealthIn(
+            customer_id=absorbed.id,
+            allergies="PPD",
+            sensitivity_test_on=timezone.localdate(),
+            sensitivity_test_result="negative",
+        ),
+    )
+    run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
+    record = HealthRecord.objects.get()
+    assert (record.customer_id, record.allergies) == (survivor.id, "PPD")
+    # The survivor's own data stays; only its empty fields are filled.
+    other = card("Ana García")
+    grant_health(other)
+    run("customer.health.update", HealthIn(customer_id=other.id, allergies="Latex"))
+    run("customer.customer.merge", MergeIn(id=other.id, absorbed_id=survivor.id))
+    kept = HealthRecord.objects.get()
+    assert (
+        kept.customer_id,
+        kept.allergies,
+        kept.sensitivity_test_on,
+        kept.sensitivity_test_result,
+    ) == (other.id, "Latex", timezone.localdate(), "negative")
+
+
+@pytest.mark.django_db
+def test_a_merge_fills_the_survivors_empty_allergies_with_the_duplicates():
+    survivor, absorbed = card("Ana"), card("Ana G.")
+    for one in (survivor, absorbed):
+        grant_health(one)
+    today = timezone.localdate()
+    run(
+        "customer.health.update",
+        HealthIn(
+            customer_id=survivor.id,
+            sensitivity_test_on=today,
+            sensitivity_test_result="negative",
+        ),
+    )
+    run("customer.health.update", HealthIn(customer_id=absorbed.id, allergies="PPD"))
+    run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
+    kept = HealthRecord.objects.get()
+    assert (kept.customer_id, kept.allergies, kept.sensitivity_test_on) == (
+        survivor.id,
+        "PPD",
+        today,
+    )
+
+
+@pytest.mark.django_db
+def test_a_merge_drops_the_health_data_when_the_last_decision_withdrew_the_permission():
+    survivor, absorbed = card("Ana"), card("Ana G.")
+    grant_health(absorbed)
+    run("customer.health.update", HealthIn(customer_id=absorbed.id, allergies="PPD"))
+    # The survivor said no after the duplicate said yes: the last decision rules.
+    grant_health(survivor)
+    run("customer.health.withdraw", HealthWithdrawIn(customer_id=survivor.id))
+    run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
+    assert HealthRecord.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_who_wrote_it_is_the_persons_name_never_their_account_id():
+    """CUSTOMER-F05, F14, F32: «with your name and the time», not the session's account id."""
+    from django.contrib.auth import get_user_model
+
+    users = get_user_model().objects
+    clara = users.create_user(
+        username="saas:0199-clara",
+        first_name="Clara",
+        last_name="Ruiz",
+        email="clara@example.com",
+    )
+    nameless = users.create_user(username="saas:0199-luis", email="luis@example.com")
+    ana = card("Ana")
+    note = run(
+        "customer.note.add",
+        NoteIn(customer_id=ana.id, content="Prefers mornings"),
+        actor=clara,
+    )
+    assert note.actor == "Clara Ruiz"
+    fact = run(
+        "customer.consent.grant",
+        ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes."),
+        actor=nameless,
+    )
+    assert fact.recorded_by == "luis@example.com"
+    assert grant_health(ana, actor=clara).consent_by == "Clara Ruiz"

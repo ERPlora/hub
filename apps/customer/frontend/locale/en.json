@@ -234,7 +234,10 @@
         "consent_withdrawn": "Consent withdrawn",
         "merged": "Duplicate customer merged into this one",
         "erased": "Personal data erased",
-        "purchase_refunded": "Purchase refunded"
+        "purchase_refunded": "Purchase refunded",
+        "health_consent_granted": "Permission to keep health data given",
+        "health_consent_withdrawn": "Permission to keep health data withdrawn: health data erased",
+        "health_updated": "Health data updated"
       }
     },
     "purchases": {
@@ -269,7 +272,7 @@
     },
     "erase": {
       "title": "Erase personal data (GDPR)",
-      "message": "This erases {name}'s personal data, their notes, their activity and their custom fields, and cannot be undone. Sales and invoices keep their reference. An audit entry records who, when and why.",
+      "message": "This erases {name}'s personal data, their notes, their activity, their health data and their custom fields, and cannot be undone. Sales and invoices keep their reference. An audit entry records who, when and why.",
       "reason": "Reason (kept in the audit)",
       "submit": "Erase personal data",
       "done": "Personal data erased."
@@ -405,6 +408,35 @@
     },
     "blocks": {
       "failed": "This block could not be shown."
+    },
+    "health": {
+      "heading": "Health and allergies",
+      "intro": "To note allergies or sensitivity tests you need their explicit permission.",
+      "ask": "Ask for permission",
+      "notice": "I give my permission for this business to keep my allergies and my sensitivity tests to look after me safely. I can withdraw it whenever I want and they will then be erased.",
+      "recorded": "Permission recorded.",
+      "given": "Permission given on {when}",
+      "withdrawnOn": "Permission withdrawn on {when}.",
+      "allergies": "Allergies: {text}",
+      "noAllergies": "No allergies noted.",
+      "test": "Sensitivity test: {date}",
+      "noTest": "No sensitivity test.",
+      "results": {
+        "negative": "Negative",
+        "positive": "Positive"
+      },
+      "noResult": "No result",
+      "withdraw": "Withdraw permission",
+      "withdrawTitle": "Withdraw the permission?",
+      "withdrawMessage": "Their allergies and sensitivity test are erased.",
+      "withdrawConfirm": "Withdraw and erase",
+      "withdrawn": "Permission withdrawn and health data erased.",
+      "allergiesLabel": "Allergies and sensitivities",
+      "dateLabel": "Sensitivity test date",
+      "resultLabel": "Result",
+      "saved": "Health data saved.",
+      "loadError": "The health data could not be loaded",
+      "purpose": "Health data"
     }
   }
 }

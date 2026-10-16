@@ -47,6 +47,11 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('GroupListPage', () => {
+  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+    const s = await setup();
+    expect(s.prop('cardTitleColumn')).toBe('name');
+  });
+
   it('is «Customer groups» in the Groups tab, following the groups by name, 50 a page', async () => {
     const s = await setup();
     const page = s.wrapper.findComponent(AppPage);

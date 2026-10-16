@@ -20,6 +20,7 @@ from apps.customer.admin import (
     CustomerGroupAdmin,
     CustomerTagAdmin,
     CustomFieldAdmin,
+    HealthRecordAdmin,
     CustomFieldValueInline,
     OrderLinkAdmin,
     PurchaseAdmin,
@@ -35,6 +36,7 @@ from apps.customer.models import (
     CustomFieldValue,
     OrderLink,
     Purchase,
+    HealthRecord,
 )
 
 REGISTERED = {
@@ -46,6 +48,7 @@ REGISTERED = {
     Purchase: PurchaseAdmin,
     Consent: ConsentAdmin,
     OrderLink: OrderLinkAdmin,
+    HealthRecord: HealthRecordAdmin,
 }
 HOST = "hubs.localhost"  # the admin lives only on the platform host (PLAN §18.1.3)
 

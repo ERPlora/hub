@@ -51,6 +51,9 @@ def test_the_events():
         "FIELD_CREATED": "customer.field.created",
         "FIELD_UPDATED": "customer.field.updated",
         "FIELD_DELETED": "customer.field.deleted",
+        "HEALTH_CONSENT_GRANTED": "customer.health.consent_granted",
+        "HEALTH_CONSENT_WITHDRAWN": "customer.health.consent_withdrawn",
+        "HEALTH_UPDATED": "customer.health.updated",
     }
 
 

@@ -482,3 +482,45 @@ msgstr "Esta fecha está en el futuro."
 
 msgid "Country not recognised: imported without country, check it on the card."
 msgstr "País no reconocido: importado sin país, revísalo en la ficha."
+
+msgid "There is already a card with this name, phone and email: it is not created again."
+msgstr "Ya hay una ficha con este nombre, teléfono y email: no se vuelve a crear."
+
+msgid "Enter the date of the test."
+msgstr "Pon la fecha de la prueba."
+
+msgid "Health data updated"
+msgstr "Datos de salud actualizados"
+
+msgid "Permission to keep health data given"
+msgstr "Permiso para guardar datos de salud dado"
+
+msgid "Permission to keep health data withdrawn: health data erased"
+msgstr "Permiso para guardar datos de salud retirado: datos de salud borrados"
+
+msgid "Record their permission first to keep health data."
+msgstr "Registra antes su permiso para guardar datos de salud."
+
+msgid "allergies and sensitivities"
+msgstr "alergias y sensibilidades"
+
+msgid "health record"
+msgstr "datos de salud"
+
+msgid "health records"
+msgstr "datos de salud"
+
+msgid "result"
+msgstr "resultado"
+
+msgid "sensitivity test date"
+msgstr "fecha de la prueba de sensibilidad"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "Negative"
+msgstr "Negativa"
+
+msgid "Positive"
+msgstr "Positiva"

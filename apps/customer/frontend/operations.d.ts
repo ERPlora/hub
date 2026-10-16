@@ -163,7 +163,7 @@ export interface CustomFieldValueOut {
 
 export interface ConsentStateRow {
   purpose: string;
-  channel: ConsentChannel;
+  channel: ConsentChannel | '';
   state: 'granted' | 'withdrawn';
   contact_point: string;
   source: ConsentSource;
@@ -244,7 +244,8 @@ export interface ConsentRow {
   id: string;
   customer_id: string;
   purpose: string;
-  channel: ConsentChannel;
+  /** Empty for a permission that is not about reaching the person (health data, CUSTOMER-F32). */
+  channel: ConsentChannel | '';
   state: 'granted' | 'withdrawn';
   contact_point: string;
   source: ConsentSource;
@@ -389,6 +390,42 @@ export interface FieldPatchIn {
   is_active?: boolean;
 }
 
+/** Health data of a card (CUSTOMER-F32): its own block, only with the person's explicit permission. */
+export type HealthTestResult = '' | 'negative' | 'positive';
+
+export interface HealthOut {
+  customer_id: string;
+  consent: 'none' | 'granted' | 'withdrawn';
+  consent_at: string | null;
+  consent_by: string;
+  notice_text: string;
+  allergies: string;
+  /** `YYYY-MM-DD`. */
+  sensitivity_test_on: string | null;
+  sensitivity_test_result: HealthTestResult;
+  updated_at: string | null;
+  updated_by: string;
+}
+
+export interface HealthGrantIn extends CustomerOfIn {
+  notice_text: string;
+  notice_version?: string;
+  source?: ConsentSource;
+  evidence?: string;
+  occurred_at?: string | null;
+}
+
+export interface HealthWithdrawIn extends CustomerOfIn {
+  source?: ConsentSource;
+  reason?: string;
+}
+
+export interface HealthIn extends CustomerOfIn {
+  allergies?: string;
+  sensitivity_test_on?: string | null;
+  sensitivity_test_result?: HealthTestResult;
+}
+
 export interface ConsentGrantIn extends CustomerOfIn {
   channel: ConsentChannel;
   notice_text: string;
@@ -489,6 +526,10 @@ declare module '@erplora/ui/sdk' {
       output: CustomerPageOf<OrderRow>;
     };
     'customer.order.customer': { input: { order_id: string }; output: { order_id: string; customer_id: string | null } };
+    'customer.health.detail': { input: CustomerOfIn; output: HealthOut };
+    'customer.health.grant': { input: HealthGrantIn; output: HealthOut };
+    'customer.health.withdraw': { input: HealthWithdrawIn; output: HealthOut };
+    'customer.health.update': { input: HealthIn; output: HealthOut };
     'customer.order.link': {
       input: { order_id: string; customer_id?: string | null; customer?: string | null };
       output: { order_id: string; customer_id: string | null };

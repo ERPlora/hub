@@ -14,6 +14,7 @@ from apps.customer.models import (
     CustomerTag,
     CustomField,
     CustomFieldValue,
+    HealthRecord,
     OrderLink,
     Purchase,
 )
@@ -265,6 +266,9 @@ def test_activity_is_newest_first():
         "consent_withdrawn",
         "merged",
         "erased",
+        "health_consent_granted",
+        "health_consent_withdrawn",
+        "health_updated",
     ]
     assert (new.title, new.data, new.related_id, new.related_type, new.actor) == (
         "",
@@ -349,3 +353,28 @@ def test_an_order_has_at_most_one_customer():
         "customer_order_link_unique",
         lambda: OrderLink.objects.create(order_id=ORDER, customer=make_customer("Bea")),
     )
+
+
+# HealthRecord (CUSTOMER-F32)
+
+
+@pytest.mark.django_db
+def test_a_card_has_at_most_one_health_record_and_it_never_names_its_data():
+    ana = Customer.objects.create(name="Ana")
+    record = HealthRecord.objects.create(customer=ana, allergies="PPD")
+    assert (record.sensitivity_test_on, record.sensitivity_test_result) == (None, "")
+    # Its text in the admin and in logs says whose it is, never what it holds.
+    assert "PPD" not in str(record)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        HealthRecord.objects.create(customer=ana, allergies="Latex")
+
+
+def test_a_health_permission_has_no_channel():
+    assert Consent._meta.get_field("channel").blank is True
+
+
+def test_a_health_permission_names_its_purpose_where_a_channel_would_go():
+    # The admin and the logs read «health: Given», never «: Given» (a channel-less fact, CUSTOMER-F32).
+    fact = Consent(purpose="health", channel="", state="granted")
+    assert str(fact) == "health: Given"
+    assert str(Consent(purpose="marketing", channel="email", state="granted")) == "Email: Given"

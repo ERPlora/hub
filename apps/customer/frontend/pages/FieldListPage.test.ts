@@ -45,6 +45,11 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('FieldListPage', () => {
+  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+    const s = await setup();
+    expect(s.prop('cardTitleColumn')).toBe('name');
+  });
+
   it('is «Custom fields», following the fields by their order', async () => {
     const s = await setup();
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Custom fields');

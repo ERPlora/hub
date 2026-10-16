@@ -133,6 +133,11 @@ def test_spanish_texts():
             str(services.GROUP_NAME_TAKEN)
             == "Ya hay un grupo con ese nombre. Elige otro nombre."
         )
+        assert (
+            str(services.HEALTH_CONSENT_REQUIRED)
+            == "Registra antes su permiso para guardar datos de salud."
+        )
+        assert str(models.HealthRecord.TestResult.NEGATIVE.label) == "Negativa"
 
 
 @pytest.mark.django_db

@@ -90,6 +90,11 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('CustomerListPage: the screen', () => {
+  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+    const s = await setup();
+    expect(s.prop('cardTitleColumn')).toBe('name');
+  });
+
   it('is «Customers» with the four section tabs', async () => {
     const s = await setup();
     const page = s.wrapper.findComponent(AppPage);
