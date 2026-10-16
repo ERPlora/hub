@@ -248,7 +248,7 @@ Sale: la F1 (avisa `invoice.invoice.issued`). Es una copia: editar después la f
 cambia. Un cliente de fuera de España se declara por su país y su tipo de documento.
 Si falla: como en INVOICE-F01. Sin nombre, NIF y dirección del cliente, «Una factura completa necesita
 el nombre, el NIF y la dirección del cliente.» y no se emite nada. El destinatario se lee igual que en
-cualquier otro documento (`apps/customer/tax_ids.py`): un NIF español que no valida, o un NIF extranjero
+cualquier otro documento: un NIF español que no valida, o un NIF extranjero
 sin su tipo de documento, se rechaza bajo su campo (422) y no se emite nada. En un **tique** (F2) el
 destinatario es opcional: si el NIF de la ficha o del cobro no valida, el tique sale igualmente con el
 nombre y sin NIF (queda en el registro de la aplicación), para que nunca quede «pendiente» por eso.

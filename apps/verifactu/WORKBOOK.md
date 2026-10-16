@@ -1,7 +1,7 @@
 # Workbook — VeriFactu (app)
 Prefijo: VERIFACTU
 Alcance MVP: núcleo
-Estado de la app: servidor, páginas, envío por el worker (`base/scheduler.py`) y pasarela del SaaS
+Estado de la app: servidor, páginas, envío por el worker y pasarela del SaaS
 (`fiscal_gateway/`, saas#22) hechos (bloque fiscal, 2026-10-15); sin validar todavía en `pre` contra la AEAT de
 pruebas. Lo que depende de piezas que aún no existen lo dice cada flujo en su línea `Estado:`
 
@@ -225,7 +225,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
 | VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | hecho |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
-| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto (`base/scheduler.py`; en la fase 1, sobre un solo hub) |
+| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto (en la fase 1, sobre un solo hub) |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
 | VERIFACTU-F22 | Reintentar una entrada de la cola | hecho |
 | VERIFACTU-F23 | Descartar una entrada de la cola | desaparece — un registro generado no se descarta nunca |
@@ -270,7 +270,7 @@ Entra: el `.p12`/`.pfx` en base64 y su contraseña (`verifactu.certificate.uploa
 Sale: el certificado guardado (`OwnCertificate`), un evento «Certificado propio de … subido» y el aviso
 `verifactu.config.changed`. El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
 ni en la foto, ni en los registros del servidor.
-Si falla (409, el certificado no se guarda):
+Si falla: el certificado no se guarda (409):
 - sin clave de almacenamiento en el servidor, «Este servidor aún no puede guardar certificados: ERPlora tiene
   que configurar su clave de almacenamiento.» (`verifactu.certificate_storage_unavailable`);
 - sin emisor, «Configura antes el emisor en Facturación → Emisor.» (`verifactu.issuer_missing`);
@@ -364,7 +364,8 @@ Estado: desaparece — sin identidad por hub (ronda 5); el Hub firma cada llamad
 Actor: ninguno
 Pantalla: ninguna
 Pasos:
-1. No hay nada que pedir: el Hub y la cuenta de ERPlora se hablan por su canal interno firmado.
+1. No hay nada que pedir ni que renovar.
+2. El Hub y la cuenta de ERPlora se hablan por su canal interno firmado.
 Entra: nada.
 Sale: nada.
 Si falla: no aplica.
@@ -609,7 +610,7 @@ Si falla: sin VeriFactu activa o sin permiso de consulta, el documento sale sin 
 Implicados: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Enviar después lo que no pudo salir (contingencia automática)
-Estado: hecho — la corre el worker cada minuto (`base/scheduler.py`; en la fase 1, sobre un solo hub)
+Estado: hecho — la corre el worker cada minuto (en la fase 1, sobre un solo hub)
 Actor: sistema
 Pantalla: Contingencia
 Pasos:
@@ -806,7 +807,8 @@ Actor: sistema
 Pantalla: Hub: Apps
 Pasos:
 1. Al apagar VeriFactu (o Facturación, que se la lleva), la plataforma pregunta a VeriFactu cuántos registros
-   no están en la AEAT y lo niega si queda alguno.
+   no están en la AEAT.
+2. Si queda alguno, lo niega.
 Entra: la petición de apagar.
 Sale: nada si se niega.
 Si falla: «VeriFactu aún tiene {n} registro(s) que la AEAT no ha aceptado.».
@@ -817,7 +819,8 @@ Estado: no hecho — la baja censal es del negocio, fuera de ERPlora
 Actor: administrador
 Pantalla: ninguna
 Pasos:
-1. El cese ante Hacienda es la baja censal (modelo 036/037), fuera de ERPlora: el software no envía nada.
+1. El cese ante Hacienda es la baja censal (modelo 036/037), fuera de ERPlora.
+2. El software no envía nada.
 Entra: nada.
 Sale: nada.
 Si falla: no aplica.
@@ -839,7 +842,7 @@ en este servidor: vuelve a subirlo».
 Implicados: VERIFACTU-F02
 
 ### VERIFACTU-F35 Preguntar a la AEAT si ya tiene un registro de la cola
-Estado: hecho — en el admin de Django del Hub (soporte) y por la API; en la SPA, pendiente de botón
+Estado: hecho — en el admin de Django del Hub (soporte) y por la API; en la SPA, aún sin botón
 Actor: responsable, administrador (enviar); el staff de ERPlora desde el admin
 Pantalla: admin de Django (`hubs.erplora.com/admin`, Registros → «Consultar a la AEAT (sale de la cola si ya lo
 tiene)»)
@@ -941,9 +944,8 @@ sellado no añade nada (`already`).
 
 - **Facturación** (requisito): la factura emitida (`Invoice`), leída de su fila por su id; para la factura de
   prueba, su operación `invoice.invoice.create`.
-  Un registro guarda su factura con `PROTECT` (la ley conserva las dos): la limpieza de los e2e de Facturación
-  tiene que borrar antes los registros de VeriFactu de sus facturas (`tests/e2e/verifactu-records.spec.ts`,
-  `cleanVerifactu`).
+  Un registro guarda su factura con `PROTECT` (la ley conserva las dos); lo que eso exige a las pruebas de
+  Facturación, en «Contrato con Facturación».
 
 ### Quién la usa
 
@@ -1070,6 +1072,8 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
    aviso real del outbox.
 4. Facturación **no** pide nada al anular una venta: su R5 se registra como un alta más (VERIFACTU-F14). El
    registro de anulación (VERIFACTU-F30) es solo para una factura emitida por error.
+5. **Los e2e de Facturación**: como un registro guarda su factura con `PROTECT`, su limpieza tiene que borrar
+   antes los registros de VeriFactu de sus facturas (`tests/e2e/verifactu-records.spec.ts`, `cleanVerifactu`).
 
 ### Contrato con el SaaS
 
