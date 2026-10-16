@@ -183,6 +183,7 @@ El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los
 | CUSTOMER-F28 | Crear, cambiar y eliminar etiquetas de clientes | hecho | común |
 | CUSTOMER-F29 | Definir los campos personalizados de la ficha | hecho | común |
 | CUSTOMER-F30 | Dar la ficha de un cliente a otras apps | hecho | común |
+| CUSTOMER-F31 | Ver las cifras de los clientes | hecho | común |
 
 «Hecho»: servidor y páginas con sus tests (de las páginas y de extremo a extremo en Chrome). «Parcial»:
 lo que falta y por qué va en su «Estado».
@@ -844,6 +845,26 @@ Si falla: una ficha que no existe, eliminada, unida a otra o con los datos borra
 «Este cliente ya no está disponible.». Una ficha desactivada sí se devuelve.
 Implicados: APPOINTMENT-F01, SERVICE-F16, SALE-F05
 
+### CUSTOMER-F31 Ver las cifras de los clientes
+<!-- origen: fi:modules/customers#widget-customers-total-kpi-customers-active-stat-customers-revenue-kpi -->
+Estado: hecho
+Vertical: común
+Actor: todos
+Pantalla: Clientes
+Pasos:
+1. Abre **Clientes**: arriba, encima de la tabla, salen cuatro cifras: «Clientes», «Activos», «VIP» e
+   «Ingresos».
+2. «Clientes» cuenta las fichas que siguen en la lista; «Activos», las que tienen marcada la casilla
+   «Activo»; «VIP», las de la etapa «VIP», e «Ingresos» suma lo que han gastado todas ellas, en euros.
+3. Las cifras cambian solas, sin recargar, cuando alguien da de alta, edita, elimina, une o borra los
+   datos de una ficha, o cuando se cobra, se anula o se devuelve una venta con cliente.
+Entra: nada: cuentan todas las fichas que siguen en la lista, no solo las que deja ver la búsqueda o
+los filtros de la tabla.
+Sale: nada; solo lectura.
+Si falla: «No se pudieron cargar las cifras» en su sitio, y la tabla sigue funcionando. Mientras
+llegan, cada cifra enseña «…». En el móvil van de dos en dos, para que la tabla se siga viendo debajo.
+Implicados: ninguno
+
 ## Qué comparten los verticales
 
 Tocar una pieza de esta tabla afecta a la peluquería **y** al restaurante.
@@ -877,7 +898,7 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 |---|---|---|---|---|
 | Las fichas, con búsqueda, filtros, orden y páginas | ver | F02, F17 | sí | `customer.customer.list` |
 | La ficha completa, con grupos, etiquetas, campos y consentimiento por canal | ver | F03, F30 | sí | `customer.customer.detail` |
-| Las cifras: clientes, activos, VIP e ingresos | ver | F02 | sí | `customer.customer.stats` |
+| Las cifras: clientes, activos, VIP e ingresos | ver | F02, F31 | sí | `customer.customer.stats` |
 | Las fichas que llevan un número de teléfono | ver | F10, F12, F18 | no | `customer.customer.by_phone` |
 | El CSV de todas las fichas que cumplen la búsqueda | exportar | F09 | no | `customer.customer.export` |
 | Los grupos, con cuántas fichas tiene cada uno | ver | F06, F27 | sí | `customer.group.list` |
@@ -1063,6 +1084,9 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   libre); el país se busca por su nombre; los teléfonos se pintan agrupados (`+34 600 111 222`); la ficha
   enseña además las compras y los pedidos enlazados; en el móvil «Cargar más» pide trozos de 100 como
   mucho (lo que acepta una consulta).
+- **Cifras**: los tres «widgets de escritorio» (clientes, activos e ingresos) que anunciaba la
+  documentación del producto nunca se declararon en el módulo; aquí no hay escritorio de widgets y esas
+  cifras, más «VIP», son las de arriba de la lista (F31).
 - Fuera, a propósito: el descuento por grupo (ya retirado en el producto), la tarea de reescribir
   teléfonos antiguos y su copia, el estado «Marcado antes de que hubiera registro» y el canal «any»
   del consentimiento (solo existían para datos heredados) y el permiso `customers.manage_settings`
