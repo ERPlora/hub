@@ -74,10 +74,12 @@ _OPTION_ORDER = {
 
 
 def find_group(
-    group_id: UUID | None, said: str | None, *, lock: bool = False
+    group_id: UUID | None, said: str | None, *, lock: bool = False, rows=None
 ) -> ModifierGroup:
     """The group named by its id, or by its name as a person says it: exact (whatever the case), else
-    the only one that contains it. ``NotFound`` when none; 409 ``modifier.group_ambiguous`` when several."""
+    the only one that contains it. ``NotFound`` when none; 409 ``modifier.group_ambiguous`` when several.
+    The group comes from ``rows`` when given (e.g. with its counts): one read, so a deletion committed
+    meanwhile is either not seen yet or not found, never a row that vanished between two reads."""
     groups = ModifierGroup.objects.all()
     if group_id is None:
         candidates = _first_match(
@@ -90,7 +92,7 @@ def find_group(
                 code="modifier.group_ambiguous",
             )
         group_id = candidates[0].pk if candidates else None
-    found = groups.filter(pk=group_id)
+    found = (groups if rows is None else rows).filter(pk=group_id)
     group = (found.select_for_update() if lock else found).first()
     if group is None:
         raise NotFound(str(GROUP_NOT_FOUND))
@@ -286,7 +288,7 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     },
 )
 def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
-    return load_group(find_group(data.id, data.group).id)
+    return group_row(find_group(data.id, data.group, rows=groups_with_counts()))
 
 
 # The options (MODIFIER-F04)
