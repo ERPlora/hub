@@ -535,7 +535,7 @@ Entra: las facturas del hub.
 Sale: nada; solo se lee.
 Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar». Un total que no
 es un importe dice «Escribe un importe, como 12,50» bajo su campo, y una fecha final anterior a la
-inicial, «La fecha final es anterior a la inicial.»; ninguno de los dos filtra.
+inicial, «La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
 Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura

@@ -223,6 +223,6 @@ test('FIX-DATATABLE-HUB-FILTERS-2A: Invoices filter by total in euros behind the
   await toggle.click();
   const to = panel.locator('[data-testid=invoice-list-filter-issue_date_to]');
   await expect(to).toHaveClass(/ion-invalid/);
-  await expect(to.locator('.error-text')).toHaveText(/The end date is before the start date\.|La fecha final es anterior a la inicial\./);
+  await expect(to.locator('.error-text')).toHaveText(/The end date cannot be before the start date\.|La fecha final no puede ser anterior a la inicial\./);
   await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2A-invoice-error-1440') });
 });

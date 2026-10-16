@@ -233,7 +233,7 @@ describe('InvoicesPage: the live list', () => {
     await s.filter({ total_amount_from: 'doce', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
     expect(s.prop('filterErrors')).toEqual({
       total_amount_from: 'Type an amount, like 12.50',
-      issue_date_to: 'The end date is before the start date.',
+      issue_date_to: 'The end date cannot be before the start date.',
     });
     expect(s.params()).toEqual([{ sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No invoices yet.');
@@ -377,7 +377,7 @@ describe('InvoicesPage: the rest', () => {
     expect(s.prop('searchPlaceholder')).toBe('Buscar facturas…');
     expect(s.prop<Array<{ label: string }>>('filterFields').map((f) => f.label)).toEqual(['Serie', 'Origen']);
     await s.filter({ total_amount_to: 'mil', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Escribe un importe, como 12,50', issue_date_to: 'La fecha final es anterior a la inicial.' });
+    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Escribe un importe, como 12,50', issue_date_to: 'La fecha final no puede ser anterior a la inicial.' });
   });
 });
 

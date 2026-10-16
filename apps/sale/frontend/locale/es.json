@@ -413,7 +413,7 @@
       "loadError": "No se pudieron cargar las ventas",
       "filters": {
         "amountInvalid": "Escribe un importe, como 12,50",
-        "dateOrder": "La fecha final es anterior a la inicial."
+        "dateOrder": "La fecha final no puede ser anterior a la inicial."
       },
       "picker": {
         "search": "Buscar…",

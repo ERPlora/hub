@@ -89,7 +89,7 @@
       "series": "Serie",
       "source": "Origen",
       "amountInvalid": "Escribe un importe, como 12,50",
-      "dateOrder": "La fecha final es anterior a la inicial."
+      "dateOrder": "La fecha final no puede ser anterior a la inicial."
     },
     "detail": {
       "title": "Factura {number}",

@@ -199,6 +199,6 @@ test('FIX-DATATABLE-HUB-FILTERS-2A: Sales filter by total in euros and by paymen
   await toggle.click();
   const to = panel.locator('[data-testid=sales-table-filter-date_to]');
   await expect(to).toHaveClass(/ion-invalid/);
-  await expect(to.locator('.error-text')).toHaveText(/The end date is before the start date\.|La fecha final es anterior a la inicial\./);
+  await expect(to.locator('.error-text')).toHaveText(/The end date cannot be before the start date\.|La fecha final no puede ser anterior a la inicial\./);
   await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2A-sale-error-1440') });
 });

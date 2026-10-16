@@ -835,8 +835,8 @@ Entra: nada de otras apps.
 Sale: nada.
 Si falla: «Error cargando métricas» (las cifras salen como «—»). Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
-un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final es
-anterior a la inicial.»; ninguno de los dos filtra y manda el periodo.
+un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
+puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo.
 Implicados: STAFF-F21
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
