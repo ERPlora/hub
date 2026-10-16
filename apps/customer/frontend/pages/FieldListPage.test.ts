@@ -40,7 +40,8 @@ async function setup(options: MountOptions = {}) {
   const call = await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  return { ...m, call, table, prop, show: (page: unknown) => m.result(call, LIST, page) };
+  const find = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
+  return { ...m, call, table, prop, find, show: (page: unknown) => m.result(call, LIST, page) };
 }
 
 describe('FieldListPage', () => {

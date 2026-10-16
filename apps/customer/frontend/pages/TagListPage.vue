@@ -1,15 +1,21 @@
 <script setup lang="ts">
 // Customers → Tags (WORKBOOK «Pantallas · Etiquetas»; CUSTOMER-F28): the live `customer.tag.list` in
 // a server-side DataTable — Name, Color, Customers (live cards with it), Active —, «Search tag…» and
-// the active filter. «Add» and «Edit» (also a tap on the row) to whoever configures; «Delete» to the
+// the active filter behind the table's funnel. «Add» and «Edit» (also a tap on the row) to whoever configures; «Delete» to the
 // owner and the admin. The same screen as Groups.
-import { type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
+import {
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+} from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import TagFormModal from '../components/TagFormModal.vue';
-import SelectFilters, { type SelectFilterSpec } from '../components/SelectFilters.vue';
 import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { type SortDir, useListState } from '../lib/useListState';
@@ -23,7 +29,8 @@ const canDelete = computed(() => session.can('customer.delete'));
 const { t } = useCustomerI18n();
 
 const list = useListState({ sort: 'name' });
-const filters = ref<Record<string, string>>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 watch(filters, (now) => list.restart({ narrowed: Object.keys(now).length > 0 }));
 const query = computed(
   () =>
@@ -36,22 +43,23 @@ const { data: result, status, error, refresh } = useLiveList('customer.tag.list'
 list.followResult(result);
 const inactive = computed(() => error.value?.code === 'app_inactive');
 
-const filterSpecs = computed<SelectFilterSpec[]>(() => [
-  {
-    key: 'is_active',
-    label: t('customer.tags.columns.active'),
-    options: [
-      { value: 'true', label: t('customer.tags.showActive') },
-      { value: 'false', label: t('customer.tags.showInactive') },
-    ],
-  },
-]);
-
 const columns = computed<DataTableColumn<TagRow>[]>(() => [
   { key: 'name', label: t('customer.tags.columns.name'), sortable: true, priority: 'high' },
   { key: 'color', label: t('customer.tags.columns.color'), sortable: true, cell: 'color' },
   { key: 'customer_count', label: t('customer.tags.columns.customers'), sortable: true, align: 'right' },
-  { key: 'is_active', label: t('customer.tags.columns.active'), sortable: true, cell: 'active' },
+  {
+    key: 'is_active',
+    label: t('customer.tags.columns.active'),
+    sortable: true,
+    cell: 'active',
+    filter: {
+      type: 'select',
+      options: [
+        { value: 'true', label: t('customer.tags.showActive') },
+        { value: 'false', label: t('customer.tags.showInactive') },
+      ],
+    },
+  },
 ]);
 
 const actions = computed<DataTableAction<TagRow>[]>(() => [
@@ -103,10 +111,12 @@ function onSort(next: { sort: string; dir: SortDir }): void {
     <DataTable
       v-else
       v-model:search="list.search.value"
+      v-model:filters="filters"
       testid="customer-tags"
       fill
       server-side
       searchable
+      filterable
       :row-clickable="canConfigure"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
@@ -134,13 +144,6 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       @add="edit(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <SelectFilters
-          v-model="filters"
-          testid="customer-tags"
-          :filters="filterSpecs"
-        />
-      </template>
       <template #color="{ row }">
         <span
           class="customer-color"

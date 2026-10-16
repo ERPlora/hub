@@ -27,10 +27,6 @@ Lo que la app necesita de `@erplora/ui` y todavía no está. Mientras tanto usa 
   `open('create' | 'edit', { title })` / `close()`. Uso: alta de cliente (`CustomerCreateModal.vue`) y
   grupos, etiquetas y campos (`GroupFormModal.vue`, `TagFormModal.vue`, `FieldFormModal.vue`); hoy van en
   `FormModal`.
-- **Filtros de columna del `DataTable`** — el producto filtraba por columna desde la tabla (texto, lista y
-  rango). API propuesta: `filterable` y `filterType: 'text' | 'select' | 'range'` (+ `options`) por columna,
-  evento `filterChange({ col, value })`. Uso: las cuatro listas de Clientes; hoy un botón «Filtros» con un
-  `FormModal` (`CustomerFilters.vue`, `SelectFilters.vue`).
 - **`Kpi`** — la tarjeta de cifra del producto (`ok-kpi`: etiqueta en versalitas sobre un valor grande,
   delta opcional). API propuesta: `label`, `value`, `delta?`, `trend?`, `icon?`. Uso: las cuatro cifras de
   la lista (`CustomerStats.vue`, que hoy la pinta con su propio CSS).

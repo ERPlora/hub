@@ -1023,10 +1023,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   ficha que ya no está disponible no se devuelve como cliente del pedido.
 - **Pantallas** (las mismas vistas, pestañas y textos; `UI-REQUESTS.md` lleva lo que falta en
   `@erplora/ui`): el alta y la edición de grupos, etiquetas y campos van en un diálogo, no en el panel
-  lateral de la tabla; los filtros de la tabla, tras un botón «Filtros»; el color de un grupo o etiqueta
-  se elige de los colores del tema (antes, texto libre); el país se busca por su nombre; los teléfonos se
-  pintan agrupados (`+34 600 111 222`); la ficha enseña además las compras y los pedidos enlazados; en el
-  móvil «Cargar más» pide trozos de 100 como mucho (lo que acepta una consulta).
+  lateral de la tabla; el color de un grupo o etiqueta se elige de los colores del tema (antes, texto
+  libre); el país se busca por su nombre; los teléfonos se pintan agrupados (`+34 600 111 222`); la ficha
+  enseña además las compras y los pedidos enlazados; en el móvil «Cargar más» pide trozos de 100 como
+  mucho (lo que acepta una consulta).
 - Fuera, a propósito: el descuento por grupo (ya retirado en el producto), la tarea de reescribir
   teléfonos antiguos y su copia, el estado «Marcado antes de que hubiera registro» y el canal «any»
   del consentimiento (solo existían para datos heredados) y el permiso `customers.manage_settings`
