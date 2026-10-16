@@ -469,8 +469,14 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
 });
 
 describe('ItemListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
-  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the bottom of the page', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+
+  it('declares no section tabs: the demo has a single list, like its create and detail pages', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(AppPage).props('tabs')).toEqual([]);
+    expect(s.wrapper.find('ion-footer.section-tabbar').exists()).toBe(false);
   });
 });

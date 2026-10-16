@@ -89,10 +89,6 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
   <AppPage
     :title="$t('demo.items.title')"
     content-layout="fill"
-    :tabs="[
-      { id: 'items', label: $t('demo.items.title'), icon: 'ion:list-outline', to: '/demo/items' },
-      { id: 'new', label: $t('demo.items.new'), icon: 'ion:add', to: '/demo/items/new' },
-    ]"
   >
     <InlineFeedback
       v-if="status === 'reconnecting'"
