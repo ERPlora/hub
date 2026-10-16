@@ -47,7 +47,7 @@ export function assertMigrationsApplied(manage: ManagePy, database: string): voi
     const check = manage(args);
     if (check.status === 0) continue;
     const command = `manage.py ${args.join(' ')}`;
-    const pending = check.status === 1 ? listedMigrations(check.stdout) : [];
+    const pending = listedMigrations(check.stdout);
     if (pending.length > 0) {
       const fix = ['migrate', 'migrate_hubs']
         .map((name) => `DB_NAME=${database} uv run python manage.py ${name}`)
