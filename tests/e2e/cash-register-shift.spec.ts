@@ -3,9 +3,10 @@
 // shirt in cash at the till (Inventory's product at Taxes' 21 %), sees it in the open shift's expected
 // cash, takes 2.00 € out for a supplier, counts the drawer by notes and coins (110.00 €) and closes it from
 // the count: 10 cents short, frozen. The detail shows the ticket's line, the movement and the count, and
-// prints the Z report. Screenshots of the sessions and the detail in the three viewports.
+// prints the Z report. Screenshots of the sessions and the detail in the three viewports. The sessions filter
+// behind the table's funnel, with its count, at every width; an amount it cannot read is said under its field.
 // What this file creates is deleted after it (its sessions, lines and counts, the sale and the product).
-import { expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { createProduct, dialog, fill, pick, type Product } from './inventory-helpers';
@@ -64,12 +65,8 @@ function cleanSaleAndProduct(sku: string): void {
   );
 }
 
-test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/cash_register/sessions');
-  shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: SKU, price: 1210, tax_category_key: 'product.generic' });
-  // One drawer open per business: a shift some earlier run left open is closed (at its expected) first.
+/** One drawer open per business: a shift some earlier run (or test) left open is closed, at its expected. */
+async function closeLeftOpen(context: BrowserContext): Promise<void> {
   const current = await api<Current>(context, A, 'GET', '/cash_register/sessions/current');
   const left = current.data.session;
   if (left) {
@@ -80,6 +77,14 @@ test.beforeAll(async ({ browser }) => {
     });
     expect(closed.status).toBe(200);
   }
+}
+
+test.beforeAll(async ({ browser }) => {
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/cash_register/sessions');
+  shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: SKU, price: 1210, tax_category_key: 'product.generic' });
+  await closeLeftOpen(context);
   await context.close();
 });
 
@@ -218,4 +223,75 @@ test('CASH_REGISTER-F11, F16: the detail of the closed shift names the ticket an
   const printed = await page.evaluate(() => (window as unknown as { printed: string[] }).printed);
   expect(printed).toHaveLength(1);
   expect(printed[0]).toMatch(/Cash closing \(Z\)|Cierre de caja \(Z\)/);
+});
+
+/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk (two
+ *  columns), as the SaaS panel's `VIEWPORTS`. */
+const FILTER_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+];
+
+/** A session opened with `float` cents and closed at it, by the API (setup; the check is the list's). */
+async function closedSession(context: BrowserContext, float: number): Promise<string> {
+  const opened = await api<{ id: string }>(context, A, 'POST', '/cash_register/sessions/open', { opening_balance: float });
+  expect(opened.status, JSON.stringify(opened.data)).toBe(201);
+  mine.add(opened.data.id);
+  const closed = await api(context, A, 'POST', '/cash_register/sessions/close', { session_id: opened.data.id, closing_balance: float });
+  expect(closed.status, JSON.stringify(closed.data)).toBe(200);
+  return opened.data.id;
+}
+
+// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+test('FIX-DATATABLE-HUB-FILTERS-2B: Sessions filter by Opening (euros) behind the funnel, with its count, the panel open at every width; a wrong amount is said under it', async ({
+  page,
+  context,
+}) => {
+  await login(page, A, '/cash_register/sessions');
+  await closeLeftOpen(context);
+  const kept = await closedSession(context, 4321);
+  const other = await closedSession(context, 1234);
+  const panel = shown(page).locator('[data-testid=cash-register-sessions-filters-panel]');
+  const toggle = shown(page).locator('[data-testid=cash-register-sessions-filters-toggle]');
+  const count = shown(page).locator('[data-testid=cash-register-sessions-filters-count]');
+  const box = (name: string) => panel.locator(`[data-testid=cash-register-sessions-filter-${name}] input`);
+  for (const vp of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/cash_register/sessions`);
+    await sessionsReady(page);
+    await expect(rowOf(page, other)).toBeVisible();
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    // «43,21» as typed: euros, sent as 4321 cents (cash_register#103, hub#2271).
+    await box('opening_min').fill('43,21');
+    await box('opening_max').fill('43,21');
+    await panel.locator('[data-testid=cash-register-sessions-filters-apply]').click();
+    await expect(panel).toBeHidden();
+    await expect(count).toHaveText('1');
+    await expect(rowOf(page, kept)).toBeVisible();
+    await expect(rowOf(page, other)).toHaveCount(0);
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-2B-cash_register-${vp.label}`) });
+    await panel.locator('[data-testid=cash-register-sessions-filters-clear]').click();
+    await expect(count).toHaveCount(0);
+    await panel.locator('[data-testid=cash-register-sessions-filters-close]').click();
+    await expect(panel).toBeHidden();
+    await expect(rowOf(page, other)).toBeVisible();
+  }
+  // An amount it cannot read: the funnel says so, the field says why, and it does not filter.
+  await toggle.click();
+  await box('opening_min').fill('abc');
+  await panel.locator('[data-testid=cash-register-sessions-filters-apply]').click();
+  await expect(toggle).toHaveAttribute('data-invalid', 'true');
+  await expect(count).toHaveText('1');
+  await expect(rowOf(page, other)).toBeVisible();
+  await toggle.click();
+  await expect(panel.getByText(/This is not an amount\.|Esto no es un importe\./)).toBeVisible();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2B-cash_register-error') });
+  await panel.locator('[data-testid=cash-register-sessions-filters-clear]').click();
+  await expect(count).toHaveCount(0);
 });
