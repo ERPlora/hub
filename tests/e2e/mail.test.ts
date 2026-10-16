@@ -1,12 +1,13 @@
 // `readMailCode`: the sign-in code the local SaaS mails on every password login, read from the files
-// Django's file e-mail backend writes (`saas-next/.mail/<timestamp>-<id>.log`, RFC 822, quoted-printable).
+// Django's file e-mail backend writes (`saas/.mail/<timestamp>-<id>.log`, RFC 822, quoted-printable);
+// `mailDirFrom`: that folder.
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { readMailCode } from './mail';
+import { mailDirFrom, readMailCode } from './mail';
 
 const SEPARATOR = '-'.repeat(79);
 
@@ -108,11 +109,26 @@ describe('readMailCode', () => {
     );
   });
 
-  it('waits for a folder that does not exist yet, then fails the same way', async () => {
-    const missing = join(dir, 'not-yet');
+  it('fails at once, naming the folder and E2E_MAIL_DIR, when the folder does not exist', async () => {
+    // The SaaS writes the mail before it answers the sign-in form: a folder still missing then is one
+    // it never writes to, and waiting the whole timeout for it only hides that.
+    const missing = join(dir, 'elsewhere');
+    const started = Date.now();
 
     await expect(
-      readMailCode({ dir: missing, to: 'owner@example.com', since, timeout: 60, interval: 20 }),
-    ).rejects.toThrow(/no sign-in code mailed to owner@example\.com in .*not-yet.* within 60 ms/);
+      readMailCode({ dir: missing, to: 'owner@example.com', since, timeout: 2_000, interval: 20 }),
+    ).rejects.toThrow(new RegExp(`mail folder ${escape(missing)} does not exist.*E2E_MAIL_DIR`));
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+});
+
+describe('mailDirFrom', () => {
+  it("defaults to the shared SaaS's folder beside the Hub, saas/.mail", () => {
+    expect(mailDirFrom({}, '/repo')).toBe(join('/repo', 'saas', '.mail'));
+  });
+
+  it('takes E2E_MAIL_DIR when it is set, and the default when it is empty', () => {
+    expect(mailDirFrom({ E2E_MAIL_DIR: '/elsewhere/.mail' }, '/repo')).toBe('/elsewhere/.mail');
+    expect(mailDirFrom({ E2E_MAIL_DIR: '' }, '/repo')).toBe(join('/repo', 'saas', '.mail'));
   });
 });

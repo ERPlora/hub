@@ -1,6 +1,6 @@
 // The sign-in code the local SaaS mails on every password login (`ACCOUNT_LOGIN_BY_CODE_REQUIRED`).
 // In local the SaaS uses Django's file e-mail backend: one `<timestamp>-<id>.log` per connection in
-// `saas-next/.mail/`, each message in RFC 822 (headers, a blank line, a quoted-printable body) followed
+// `saas/.mail/`, each message in RFC 822 (headers, a blank line, a quoted-printable body) followed
 // by a line of 79 dashes. The code is the body's line of six digits, alone. No Playwright here: the
 // browser steps live in helpers.ts.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -58,14 +58,20 @@ function codeOf(message: string, to: string): string | undefined {
   return CODE.exec(body)?.[1];
 }
 
-/** Files of `dir` modified since `since`, newest first; none while the folder does not exist yet. */
+/** Files of `dir` modified since `since`, newest first. */
 function mailsSince(dir: string, since: number): string[] {
   let names: string[];
   try {
     names = readdirSync(dir);
   } catch (error) {
-    // The SaaS creates the folder with its first mail.
-    if ((error as { code?: unknown }).code === 'ENOENT') return [];
+    // The SaaS writes the mail (creating the folder with its first one) before it answers the sign-in
+    // form: a folder still missing is one it never writes to, and no wait would change that.
+    if ((error as { code?: unknown }).code === 'ENOENT') {
+      throw new Error(
+        `mail folder ${dir} does not exist: the SaaS writes its mails elsewhere (its checkout's .mail/ or its EMAIL_FILE_PATH); point E2E_MAIL_DIR at it`,
+        { cause: error },
+      );
+    }
     throw error;
   }
   const mails: { path: string; mtime: number }[] = [];
@@ -90,11 +96,21 @@ function findCode(dir: string, to: string, since: number): string | undefined {
   return undefined;
 }
 
+/**
+ * Where the local SaaS writes its mails: `E2E_MAIL_DIR`, else the shared SaaS's folder beside the Hub
+ * (`<repoDir>/saas/.mail`, its `EMAIL_FILE_PATH` default). A SaaS served from another checkout writes
+ * to that checkout's `.mail/`: its run sets `E2E_MAIL_DIR`.
+ */
+export function mailDirFrom(env: Record<string, string | undefined>, repoDir: string): string {
+  return env.E2E_MAIL_DIR || join(repoDir, 'saas', '.mail');
+}
+
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * The six-digit sign-in code of the newest mail to `to` written to `dir` since `since`, waiting up to
- * `timeout` ms for it. Fails naming the address, the folder and the wait when none arrives.
+ * `timeout` ms for it. Fails naming the address, the folder and the wait when none arrives, and at
+ * once when the folder does not exist.
  */
 export async function readMailCode({ dir, to, since, timeout = 15_000, interval = 250 }: ReadMailCodeOptions): Promise<string> {
   const deadline = Date.now() + timeout;
