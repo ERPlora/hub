@@ -52,8 +52,8 @@ setup() {
     {"name": "hub-migrate", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-prod-hub-migrate.json"
   task_definition erplora-prod-db-bootstrap '[
     {"name": "db-bootstrap", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-prod-db-bootstrap.json"
-  # pre: the same families in the same cluster, named erplora-pre-*, on its own ECR repository; its
-  # services are hub-pre and worker-pre, their containers keep the short names.
+  # pre: the same families in its own cluster (erplora-pre), named erplora-pre-*, on its own ECR
+  # repository; its services are hub-pre and worker-pre, their containers keep the short names.
   task_definition erplora-pre-hub '[
     {"name": "hub", "image": "reg.example/erplora/hub-pre:bootstrap"},
     {"name": "pgbouncer", "image": "reg.example/erplora/hub-pre:bootstrap"}]' > "$FIXTURES/erplora-pre-hub.json"
@@ -129,7 +129,8 @@ case "$1 $2" in
     if [ -n "${FAKE_RUN_TASK_FAILURE:-}" ]; then
       jq -n --arg reason "$FAKE_RUN_TASK_FAILURE" '{tasks: [], failures: [{arn: "arn:capacity", reason: $reason}]}'
     else
-      echo '{"tasks": [{"taskArn": "arn:task/erplora-prod/migrate1"}], "failures": []}'
+      # The task ARN names the cluster the task runs in, as ECS does.
+      echo "{\"tasks\": [{\"taskArn\": \"arn:task/$(value --cluster)/migrate1\"}], \"failures\": []}"
     fi
     ;;
   "ecs describe-tasks")
@@ -180,6 +181,12 @@ last_line_of() { grep -n -- "$1" "$CALLS_LOG" | tail -1 | cut -d: -f1; }
 count_of() { grep -c -- "$1" "$CALLS_LOG" || true; }
 # registered <family> <jq filter>: evaluates the filter on the revision registered for <family>.
 registered() { jq -e --arg family "$1" "select(.family == \$family) | $2" "$REGISTERED_LOG" > /dev/null; }
+# clusters_named: the clusters the cluster-scoped ECS calls named, one per line, without repeats
+# ("-" for such a call without --cluster); nothing when there was no such call.
+clusters_named() {
+  grep -E "^ecs (describe-services|run-task|describe-tasks|update-service|wait) " "$CALLS_LOG" |
+    awk '{ c = "-"; for (i = 1; i < NF; i++) if ($i == "--cluster") c = $(i + 1); print c }' | sort -u
+}
 
 # --- a deploy that succeeds ---------------------------------------------------
 setup
@@ -248,7 +255,7 @@ ssm put-parameter --name /erplora/prod/hub/image_tag --value abc123 --type Strin
 CALLS
 )" ]'
 
-# --- pre: same cluster, its own families, services, repository and tag ---------------
+# --- pre: its own cluster, families, services, repository and tag ---------------------
 setup
 run_deploy ENVIRONMENT=pre && status=0 || status=$?
 check "pre: the deploy succeeds" '[ "$status" -eq 0 ]'
@@ -260,14 +267,15 @@ check "pre: the image is pre's repository, on the app and on its pgbouncer" \
    registered erplora-pre-hub-migrate ".containerDefinitions[0].image == \"reg.example/erplora/hub-pre:abc123\""'
 check "pre: the new revisions keep Environment=pre" \
   'for f in hub worker hub-migrate; do registered "erplora-pre-$f" "any(.tags[]; .key == \"Environment\" and .value == \"pre\")" || exit 1; done'
-check "pre: the migration runs pre's hub-migrate with worker-pre's network, in the shared cluster" \
-  'grep -q "^ecs describe-services --cluster erplora-prod --services worker-pre .*networkConfiguration" "$CALLS_LOG" &&
-   grep -q "run-task --cluster erplora-prod .*--task-definition arn:td/erplora-pre-hub-migrate:2 " "$CALLS_LOG" &&
+check "pre: every cluster-scoped call names pre's cluster, erplora-pre" '[ "$(clusters_named)" = erplora-pre ]'
+check "pre: the migration runs pre's hub-migrate with worker-pre's network, in pre's cluster" \
+  'grep -q "^ecs describe-services --cluster erplora-pre --services worker-pre .*networkConfiguration" "$CALLS_LOG" &&
+   grep -q "run-task --cluster erplora-pre .*--task-definition arn:td/erplora-pre-hub-migrate:2 " "$CALLS_LOG" &&
    grep -q "describe-tasks .*containers\[?name==.hub-migrate.\]\.exitCode" "$CALLS_LOG"'
 check "pre: updates only hub-pre and worker-pre, to pre's revisions" \
   '[ "$(grep -c "update-service" "$CALLS_LOG")" -eq 2 ] &&
-   grep -q "update-service --cluster erplora-prod --service hub-pre --task-definition arn:td/erplora-pre-hub:2 " "$CALLS_LOG" &&
-   grep -q "update-service --cluster erplora-prod --service worker-pre --task-definition arn:td/erplora-pre-worker:2 " "$CALLS_LOG"'
+   grep -q "update-service --cluster erplora-pre --service hub-pre --task-definition arn:td/erplora-pre-hub:2 " "$CALLS_LOG" &&
+   grep -q "update-service --cluster erplora-pre --service worker-pre --task-definition arn:td/erplora-pre-worker:2 " "$CALLS_LOG"'
 check "pre: a push wakes its services (desired count 1)" \
   '[ "$(grep -c "update-service .*--desired-count 1 " "$CALLS_LOG")" -eq 2 ]'
 check "pre: waits for hub-pre and worker-pre and checks their rollouts" \
@@ -275,13 +283,25 @@ check "pre: waits for hub-pre and worker-pre and checks their rollouts" \
    for s in hub-pre worker-pre; do grep -q "describe-services .*--services $s .*deployments" "$CALLS_LOG" || exit 1; done'
 check "pre: records its own image tag" \
   'grep -q "^ssm put-parameter --name /erplora/pre/hub/image_tag --value abc123 --type String --overwrite" "$CALLS_LOG"'
-check "pre: a pre run never names a prod family, service, parameter or repository" \
-  '! grep -Eq "erplora-prod-|/erplora/prod/|erplora/hub:|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG" "$REGISTERED_LOG"'
+check "pre: a pre run never names a prod cluster, family, service, parameter or repository" \
+  '! grep -Eq "erplora-prod|/erplora/prod/|erplora/hub:|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG" "$REGISTERED_LOG"'
 check "pre: db-bootstrap is never read nor registered" '! grep -q db-bootstrap "$CALLS_LOG" "$REGISTERED_LOG"'
 setup
 run_deploy ENVIRONMENT=pre FAKE_MIGRATE_EXIT=1 && status=0 || status=$?
 check "pre: a failed migration names pre's log group" \
   '[ "$status" -ne 0 ] && grep -q "::error::hub-migrate .*code 1.*/ecs/erplora-pre-hub-migrate" "$work/out.log"'
+
+# --- the cluster: the environment's own unless CLUSTER is given -------------------------
+setup
+run_deploy && status=0 || status=$?
+check "prod: every cluster-scoped call names prod's cluster, erplora-prod" \
+  '[ "$status" -eq 0 ] && [ "$(clusters_named)" = erplora-prod ]'
+for environment in prod pre; do
+  setup
+  run_deploy ENVIRONMENT="$environment" CLUSTER=custom-cluster && status=0 || status=$?
+  check "$environment: an explicit CLUSTER is used in every cluster-scoped call" \
+    '[ "$status" -eq 0 ] && [ "$(clusters_named)" = custom-cluster ]'
+done
 
 # --- the environment ----------------------------------------------------------
 for environment in "" dev PROD staging; do

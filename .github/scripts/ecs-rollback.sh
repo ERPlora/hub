@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Puts the hub's services of one environment back on the ACTIVE revision right before the one their
 # PRIMARY deployment runs and records that revision's image tag in /erplora/<environment>/hub/image_tag
-# (aws-next README, "Imagen"). prod: services hub and worker, families erplora-prod-*, image
-# erplora/hub; pre: services hub-pre and worker-pre (same cluster), families erplora-pre-*, image
+# (aws-next README, "Imagen"). Each environment has its own ECS cluster, erplora-<environment>.
+# prod: cluster erplora-prod, services hub and worker, families erplora-prod-*, image erplora/hub;
+# pre: cluster erplora-pre, services hub-pre and worker-pre, families erplora-pre-*, image
 # erplora/hub-pre.
 #   1. finds each service's previous revision; nothing changes unless every service has one, every
 #      one is of this environment (tag Environment=<environment>, task and execution roles
@@ -19,7 +20,7 @@
 # the newer image until the next deploy; to go back everywhere, deploy the previous release.
 #
 # Env: CONFIRM (exactly ROLLBACK), AWS_REGION, ENVIRONMENT (prod | pre); optional CLUSTER
-#      (erplora-prod, also pre's), POLL_SECONDS (15), ROLLOUT_TIMEOUT_SECONDS (600).
+#      (erplora-<environment>), POLL_SECONDS (15), ROLLOUT_TIMEOUT_SECONDS (600).
 set -euo pipefail
 
 if [ "${CONFIRM:-}" != ROLLBACK ]; then
@@ -39,7 +40,7 @@ case "${ENVIRONMENT:-}" in
     exit 1
     ;;
 esac
-CLUSTER="${CLUSTER:-erplora-prod}"
+CLUSTER="${CLUSTER:-erplora-$ENVIRONMENT}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
 ROLLOUT_TIMEOUT_SECONDS="${ROLLOUT_TIMEOUT_SECONDS:-600}"
 for var in POLL_SECONDS ROLLOUT_TIMEOUT_SECONDS; do
