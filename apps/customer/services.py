@@ -112,6 +112,9 @@ DATE_IN_FUTURE = _("This date is in the future.")
 COUNTRY_IMPORTED_EMPTY = _(
     "Country not recognised: imported without country, check it on the card."
 )
+ALREADY_IMPORTED = _(
+    "There is already a card with this name, phone and email: it is not created again."
+)
 
 #: The name an erased card keeps (CUSTOMER-F16): data, not a text of the interface.
 ERASED_NAME = "Deleted customer"
@@ -403,6 +406,22 @@ def _import_row(
     return values, {}, warnings
 
 
+def _already_imported(values: dict) -> bool:
+    """A live card with the same name, phone and email: the row was imported before (services#152).
+
+    Only the three together: two people may share a phone or an email (CUSTOMER-F12).
+    """
+    return (
+        Customer.objects.live()
+        .filter(
+            name__iexact=values["name"],
+            phone=values["phone"],
+            email__iexact=values["email"],
+        )
+        .exists()
+    )
+
+
 @operation(
     "customer.customer.import",
     kind="command",
@@ -420,6 +439,8 @@ def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     for index, row in enumerate(data.rows):
         values, errors, warnings = _import_row(row, ctx)
         customer_id = None
+        if not errors and _already_imported(values):
+            errors = {"name": str(ALREADY_IMPORTED)}
         if not errors:
             customer = Customer.objects.create(**values)
             record_event(ctx, events.CUSTOMER_CREATED, {"id": str(customer.id)})
@@ -875,7 +896,9 @@ def withdraw_consent(ctx: OperationContext, data: ConsentWithdrawIn) -> Consent:
 def link_order(ctx: OperationContext, data: OrderLinkIn) -> dict:
     unlinking = data.customer_id is None and not (data.customer or "").strip()
     # The card before the link, the order a merge takes them in (cards, then what hangs from them).
-    customer = None if unlinking else find_customer(data.customer_id, data.customer, lock=True)
+    customer = (
+        None if unlinking else find_customer(data.customer_id, data.customer, lock=True)
+    )
     link = OrderLink.objects.select_for_update().filter(order_id=data.order_id).first()
     if customer is None:
         if link is not None:
@@ -1113,13 +1136,19 @@ def _locked_purchase(sale_id: UUID) -> tuple[Customer, Purchase] | None:
     is locked, and the purchase is read again, locked, checking it is still that card's and paid.
     """
     for _attempt in range(VOID_ATTEMPTS):
-        found = Purchase.objects.filter(sale_id=sale_id, status=Purchase.Status.CONFIRMED).values_list("customer_id", flat=True).first()
+        found = (
+            Purchase.objects.filter(sale_id=sale_id, status=Purchase.Status.CONFIRMED)
+            .values_list("customer_id", flat=True)
+            .first()
+        )
         if found is None:
             return None
         customer = Customer.objects.select_for_update().get(pk=found)
         purchase = (
             Purchase.objects.select_for_update()
-            .filter(sale_id=sale_id, customer=customer, status=Purchase.Status.CONFIRMED)
+            .filter(
+                sale_id=sale_id, customer=customer, status=Purchase.Status.CONFIRMED
+            )
             .first()
         )
         if purchase is not None:

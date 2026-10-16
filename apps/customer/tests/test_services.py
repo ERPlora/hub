@@ -79,6 +79,8 @@ from apps.customer.schemas import (
     FieldRefIn as FieldRef,
 )
 
+from apps.customer.services import ALREADY_IMPORTED
+
 from .conftest import A, B, run
 
 WAIT = 1.0
@@ -560,7 +562,15 @@ def test_import_reads_a_country_by_its_code_or_its_name_and_warns_when_it_names_
         ),
     )
     assert result.created == 7
-    assert [sorted(row.warnings) for row in result.rows] == [[], [], [], [], [], ["country"], ["country"]]
+    assert [sorted(row.warnings) for row in result.rows] == [
+        [],
+        [],
+        [],
+        [],
+        [],
+        ["country"],
+        ["country"],
+    ]
     assert dict(Customer.objects.values_list("name", "country")) == {
         "A": "FR",
         "B": "ES",
@@ -580,6 +590,55 @@ def test_import_takes_back_the_apostrophe_the_export_puts_in_front_of_a_formula(
     )
     ana = Customer.objects.get()
     assert (ana.name, ana.phone) == ("=Ana", "+34600111222")
+
+
+@pytest.mark.django_db
+def test_importing_the_same_file_again_creates_nothing_new():
+    """services#152, customers#15: a file imported twice (or a row repeated in it) does not duplicate."""
+    rows = [
+        {"name": "Ana", "phone": "600 111 222", "email": "ana@example.com"},
+        # Her daughter: the same phone, another person (CUSTOMER-F12): she is created.
+        {"name": "Lucía", "phone": "600 111 222"},
+        # The same row twice in the file: the second one is the same card.
+        {"name": "Ana", "phone": "600111222", "email": "ana@example.com"},
+    ]
+    first = run("customer.customer.import", ImportIn(rows=rows))
+    assert (first.created, first.skipped) == (2, 1)
+    assert first.rows[2].errors == {"name": str(ALREADY_IMPORTED)}
+    clear_outbox()
+    # The same people typed another way: case, spaces and the phone with its prefix.
+    again = run(
+        "customer.customer.import",
+        ImportIn(
+            rows=[
+                {
+                    "name": " ana ",
+                    "phone": "+34 600 111 222",
+                    "email": "ANA@example.com",
+                },
+                {"name": "Lucía", "phone": "0034600111222"},
+                # One of the three differs: not the same card, it is created.
+                {"name": "Ana", "phone": "600111222", "email": "ana.work@example.com"},
+                {"name": "Ana", "phone": "600 222 333", "email": "ana@example.com"},
+                {"name": "Marta", "phone": "600111222"},
+            ]
+        ),
+    )
+    assert (again.created, again.skipped) == (3, 2)
+    assert [row.errors for row in again.rows[:2]] == [
+        {"name": str(ALREADY_IMPORTED)}
+    ] * 2
+    assert Customer.objects.count() == 5
+    assert outbox() == [
+        (events.CUSTOMER_CREATED, {"id": str(row.id)}) for row in again.rows[2:]
+    ]
+    # Only a live card is in the way: a deleted one is imported again.
+    Customer.objects.filter(name="Lucía").update(deleted_at=timezone.now())
+    third = run(
+        "customer.customer.import",
+        ImportIn(rows=[{"name": "Lucía", "phone": "600111222"}]),
+    )
+    assert (third.created, third.skipped) == (1, 0)
 
 
 # customer.customer.set_groups / set_tags (CUSTOMER-F06)
@@ -1633,18 +1692,33 @@ def erased(customer):
 @pytest.mark.django_db
 def test_erasing_a_card_erases_the_duplicates_merged_into_it():
     survivor = card("Ana", email="ana@example.com")
-    absorbed = card("ana", email="other@example.com", phone="+34611222333", tax_id="12345678Z", notes="Allergic")
+    absorbed = card(
+        "ana",
+        email="other@example.com",
+        phone="+34611222333",
+        tax_id="12345678Z",
+        notes="Allergic",
+    )
     hair = CustomField.objects.create(name="Hair")
     CustomFieldValue.objects.create(customer=survivor, field=hair, value="Short")
-    CustomFieldValue.objects.create(customer=absorbed, field=hair, value="Long")  # clashes: stays behind
+    CustomFieldValue.objects.create(
+        customer=absorbed, field=hair, value="Long"
+    )  # clashes: stays behind
     run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
     clear_outbox()
 
     run("customer.customer.erase", EraseIn(id=survivor.id, reason="GDPR request"))
 
     assert erased(absorbed) == ("Deleted customer", "", True)
-    assert (absorbed.phone, absorbed.tax_id, absorbed.notes, absorbed.field_values.count()) == ("", "", "", 0)
-    assert list(absorbed.activity.values_list("kind", "text")) == [("erased", "GDPR request")]
+    assert (
+        absorbed.phone,
+        absorbed.tax_id,
+        absorbed.notes,
+        absorbed.field_values.count(),
+    ) == ("", "", "", 0)
+    assert list(absorbed.activity.values_list("kind", "text")) == [
+        ("erased", "GDPR request")
+    ]
     assert outbox() == [
         (events.CUSTOMER_ERASED, {"id": str(survivor.id)}),
         (events.CUSTOMER_ERASED, {"id": str(absorbed.id)}),
@@ -1653,17 +1727,27 @@ def test_erasing_a_card_erases_the_duplicates_merged_into_it():
 
 @pytest.mark.django_db
 def test_a_merge_keeps_the_chain_flat_and_erasing_reaches_every_card_of_it():
-    first, second, third = card("A"), card("B", email="b@example.com"), card("C", email="c@example.com")
+    first, second, third = (
+        card("A"),
+        card("B", email="b@example.com"),
+        card("C", email="c@example.com"),
+    )
     run("customer.customer.merge", MergeIn(id=second.id, absorbed_id=third.id))
     run("customer.customer.merge", MergeIn(id=first.id, absorbed_id=second.id))
     third.refresh_from_db()
-    assert third.merged_into_id == first.id  # C was in B, and B went into A: C points at A
+    assert (
+        third.merged_into_id == first.id
+    )  # C was in B, and B went into A: C points at A
     clear_outbox()
 
     run("customer.customer.erase", EraseIn(id=first.id))
 
     assert erased(second)[1:] == erased(third)[1:] == ("", True)
-    assert {payload["id"] for _, payload in outbox()} == {str(first.id), str(second.id), str(third.id)}
+    assert {payload["id"] for _, payload in outbox()} == {
+        str(first.id),
+        str(second.id),
+        str(third.id),
+    }
 
 
 @pytest.mark.django_db
@@ -1692,7 +1776,13 @@ def test_repeating_the_erasure_of_a_merged_card_announces_every_card_again_and_w
 def refund(sale, refund_id, total, reason="returned", at=None):
     return system(
         "customer.purchase.refund",
-        PurchaseRefundIn(sale_id=sale, refund_id=refund_id, total=total, reason=reason, refunded_at=at),
+        PurchaseRefundIn(
+            sale_id=sale,
+            refund_id=refund_id,
+            total=total,
+            reason=reason,
+            refunded_at=at,
+        ),
     )
 
 
@@ -1707,7 +1797,14 @@ def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_histor
     # «Spent» goes down by what came back; «Purchases», the last purchase and the stage do not move.
     assert totals(ana) == (1, 1210, "first_purchase", NOW)
     line = Purchase.objects.get(refund_id=first)
-    assert (line.sale_id, line.amount, line.currency, line.status, line.recorded_at, line.void_reason) == (
+    assert (
+        line.sale_id,
+        line.amount,
+        line.currency,
+        line.status,
+        line.recorded_at,
+        line.void_reason,
+    ) == (
         sale,
         -1210,
         "EUR",
@@ -1716,13 +1813,30 @@ def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_histor
         "one cup back",
     )
     assert refund(sale, first, 1210).refunded is False  # redelivered
-    assert refund(sale, second, 1210).refunded is True  # a second refund of the same sale
+    assert (
+        refund(sale, second, 1210).refunded is True
+    )  # a second refund of the same sale
     assert totals(ana)[:2] == (1, 0)
-    entries = list(ana.activity.filter(kind="purchase_refunded").values_list("text", "data"))
-    assert entries == [("returned", {"amount": 1210, "currency": "EUR"}), ("one cup back", {"amount": 1210, "currency": "EUR"})]
+    entries = list(
+        ana.activity.filter(kind="purchase_refunded").values_list("text", "data")
+    )
+    assert entries == [
+        ("returned", {"amount": 1210, "currency": "EUR"}),
+        ("one cup back", {"amount": 1210, "currency": "EUR"}),
+    ]
     assert outbox() == [
-        (events.PURCHASE_REFUNDED, {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(first)}),
-        (events.PURCHASE_REFUNDED, {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(second)}),
+        (
+            events.PURCHASE_REFUNDED,
+            {"customer_id": str(ana.id), "sale_id": str(sale), "refund_id": str(first)},
+        ),
+        (
+            events.PURCHASE_REFUNDED,
+            {
+                "customer_id": str(ana.id),
+                "sale_id": str(sale),
+                "refund_id": str(second),
+            },
+        ),
     ]
 
 
@@ -1750,7 +1864,9 @@ def test_a_refund_of_an_erased_card_counts_but_adds_nothing_to_its_timeline():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+@pytest.mark.parametrize(
+    "role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+)
 def test_only_the_system_records_refunds(role):
     with pytest.raises(PermissionDenied):
         run(
@@ -1811,19 +1927,27 @@ def race(hold, attempt, then=None):
 
 
 def note_on(customer):
-    return "customer.note.add", NoteIn(customer_id=customer.id, content="Prefers mornings")
+    return "customer.note.add", NoteIn(
+        customer_id=customer.id, content="Prefers mornings"
+    )
 
 
 def activity_on(customer):
-    return "customer.activity.add", ActivityIn(customer_id=customer.id, kind="appointment.visit", title="Visit")
+    return "customer.activity.add", ActivityIn(
+        customer_id=customer.id, kind="appointment.visit", title="Visit"
+    )
 
 
 def consent_on(customer):
-    return "customer.consent.grant", ConsentGrantIn(customer_id=customer.id, channel="email", notice_text="Yes")
+    return "customer.consent.grant", ConsentGrantIn(
+        customer_id=customer.id, channel="email", notice_text="Yes"
+    )
 
 
 def order_on(customer):
-    return "customer.order.link", OrderLinkIn(order_id=uuid.uuid7(), customer_id=customer.id)
+    return "customer.order.link", OrderLinkIn(
+        order_id=uuid.uuid7(), customer_id=customer.id
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1840,7 +1964,10 @@ def test_a_write_on_a_card_being_deleted_waits_and_then_finds_it_gone(write, wri
     ana = card("Ana", email="ana@example.com")
     name, data = write(ana)
     with pytest.raises(NotFound):
-        race(lambda: run("customer.customer.delete", RefIn(id=ana.id)), lambda: run(name, data))
+        race(
+            lambda: run("customer.customer.delete", RefIn(id=ana.id)),
+            lambda: run(name, data),
+        )
     assert not written().exists()
 
 
@@ -1849,8 +1976,14 @@ def test_a_note_on_a_card_being_merged_lands_on_the_card_that_stays():
     survivor, absorbed = card("Ana"), card("ana")
     with pytest.raises(NotFound):
         race(
-            lambda: run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id)),
-            lambda: run("customer.note.add", NoteIn(customer_id=absorbed.id, content="Late note")),
+            lambda: run(
+                "customer.customer.merge",
+                MergeIn(id=survivor.id, absorbed_id=absorbed.id),
+            ),
+            lambda: run(
+                "customer.note.add",
+                NoteIn(customer_id=absorbed.id, content="Late note"),
+            ),
         )
     assert not absorbed.activity.filter(kind="note_added").exists()
 
@@ -1869,5 +2002,7 @@ def test_a_void_locks_the_card_before_its_purchase_so_it_never_deadlocks_with_a_
     def then_its_purchases():
         list(Purchase.objects.select_for_update().filter(customer=ana))
 
-    assert race(lock_the_card, lambda: void(sale), then=then_its_purchases).voided is True
+    assert (
+        race(lock_the_card, lambda: void(sale), then=then_its_purchases).voided is True
+    )
     assert totals(ana)[:2] == (0, 0)

@@ -482,3 +482,6 @@ msgstr "Esta fecha está en el futuro."
 
 msgid "Country not recognised: imported without country, check it on the card."
 msgstr "País no reconocido: importado sin país, revísalo en la ficha."
+
+msgid "There is already a card with this name, phone and email: it is not created again."
+msgstr "Ya hay una ficha con este nombre, teléfono y email: no se vuelve a crear."
