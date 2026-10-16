@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { readMailCode } from './mail';
+import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
 import { STACK } from './stack';
 
@@ -72,7 +72,7 @@ export const OWNER: Credentials = { email: 'owner@example.com', password: 'owner
 /** The PoC's employee in the SaaS (`demo_seed`): `hub_employee` of `a` and `b`, views Demo only. */
 export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 'employee' };
 /** Where the local SaaS writes its mails (Django's file backend); `E2E_MAIL_DIR` overrides it. */
-export const MAIL_DIR = process.env.E2E_MAIL_DIR ?? join(REPO_DIR, 'saas-next', '.mail');
+export const MAIL_DIR = mailDirFrom(process.env, REPO_DIR);
 /** Slack between our clock and the mail file's modification time, in ms. */
 const MAIL_CLOCK_SLACK = 50;
 

@@ -90,6 +90,11 @@ function findCode(dir: string, to: string, since: number): string | undefined {
   return undefined;
 }
 
+/** Where the local SaaS writes its mails: `E2E_MAIL_DIR`, else the shared SaaS's folder beside the Hub. */
+export function mailDirFrom(env: Record<string, string | undefined>, repoDir: string): string {
+  return env.E2E_MAIL_DIR ?? join(repoDir, 'saas-next', '.mail');
+}
+
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
