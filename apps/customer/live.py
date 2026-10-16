@@ -11,6 +11,8 @@ from apps.customer import events as E
 #: A card that leaves the lists: deleted, merged into another or erased.
 CARD_GONE = [E.CUSTOMER_DELETED, E.CUSTOMER_MERGED, E.CUSTOMER_ERASED]
 PURCHASES = [E.PURCHASE_RECORDED, E.PURCHASE_VOIDED, E.PURCHASE_REFUNDED]
+HEALTH_CONSENT = [E.HEALTH_CONSENT_GRANTED, E.HEALTH_CONSENT_WITHDRAWN]
+HEALTH = [*HEALTH_CONSENT, E.HEALTH_UPDATED]
 CONSENT = [E.CONSENT_GRANTED, E.CONSENT_WITHDRAWN]
 ORDERS = [E.ORDER_LINKED, E.ORDER_UNLINKED]
 
@@ -62,11 +64,13 @@ live(
 live("customer.field.list", on=[E.FIELD_CREATED, E.FIELD_UPDATED, E.FIELD_DELETED])
 live(
     "customer.activity.list",
-    on=[E.NOTE_ADDED, E.ACTIVITY_RECORDED, *CONSENT, *PURCHASES, *CARD_GONE],
+    on=[E.NOTE_ADDED, E.ACTIVITY_RECORDED, *CONSENT, *PURCHASES, *HEALTH, *CARD_GONE],
 )
 live("customer.purchase.list", on=[*PURCHASES, *CARD_GONE])
 live("customer.purchase.divergences", on=[*PURCHASES, *CARD_GONE])
-live("customer.consent.state", on=[*CONSENT, *CARD_GONE])
-live("customer.consent.history", on=[*CONSENT, *CARD_GONE])
+live("customer.consent.state", on=[*CONSENT, *HEALTH_CONSENT, *CARD_GONE])
+live("customer.consent.history", on=[*CONSENT, *HEALTH_CONSENT, *CARD_GONE])
 live("customer.order.customer", on=[*ORDERS, *CARD_GONE])
 live("customer.order.list", on=[*ORDERS, *CARD_GONE])
+# Health data (CUSTOMER-F32): its own block, re-run by its own events and when the card goes.
+live("customer.health.detail", on=[*HEALTH, *CARD_GONE])

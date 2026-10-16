@@ -273,6 +273,15 @@ class Activity(UUIDModel):
         CONSENT_WITHDRAWN = "consent_withdrawn", _("Consent withdrawn")
         MERGED = "merged", _("Duplicate customer merged into this one")
         ERASED = "erased", _("Personal data erased")
+        HEALTH_CONSENT_GRANTED = (
+            "health_consent_granted",
+            _("Permission to keep health data given"),
+        )
+        HEALTH_CONSENT_WITHDRAWN = (
+            "health_consent_withdrawn",
+            _("Permission to keep health data withdrawn: health data erased"),
+        )
+        HEALTH_UPDATED = "health_updated", _("Health data updated")
 
     customer = models.ForeignKey(
         Customer,
@@ -387,7 +396,10 @@ class Consent(UUIDModel):
     )
     # What it is for: marketing unless the business asks for something else.
     purpose = models.CharField(_("purpose"), max_length=40, default="marketing")
-    channel = models.CharField(_("channel"), max_length=12, choices=Channel.choices)
+    # Empty for a permission that is not about reaching the person: health data (CUSTOMER-F32).
+    channel = models.CharField(
+        _("channel"), max_length=12, choices=Channel.choices, blank=True
+    )
     state = models.CharField(_("state"), max_length=12, choices=State.choices)
     # The address it was given for, as it was then (an email, a phone, a postal address).
     contact_point = models.CharField(_("address"), max_length=255, blank=True)
@@ -417,6 +429,41 @@ class Consent(UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.get_channel_display()}: {self.get_state_display()}"
+
+
+class HealthRecord(UUIDModel):
+    """A card's health data (CUSTOMER-F32): allergies and the last sensitivity test, one row per card.
+
+    Special category data (GDPR art. 9): only written while the card's last ``health`` consent fact is
+    a grant, deleted when it is withdrawn and when the card is erased. No other read carries it.
+    """
+
+    class TestResult(models.TextChoices):
+        NEGATIVE = "negative", _("Negative")
+        POSITIVE = "positive", _("Positive")
+
+    customer = models.OneToOneField(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="health",
+        verbose_name=_("customer"),
+    )
+    allergies = models.TextField(_("allergies and sensitivities"), blank=True)
+    sensitivity_test_on = models.DateField(
+        _("sensitivity test date"), null=True, blank=True
+    )
+    sensitivity_test_result = models.CharField(
+        _("result"), max_length=12, choices=TestResult.choices, blank=True
+    )
+    updated_at = models.DateTimeField(_("updated at"), default=timezone.now)
+    updated_by = models.CharField(_("updated by"), max_length=128, blank=True)
+
+    class Meta:
+        verbose_name = _("health record")
+        verbose_name_plural = _("health records")
+
+    def __str__(self) -> str:
+        return str(self.customer_id)
 
 
 class OrderLink(UUIDModel):

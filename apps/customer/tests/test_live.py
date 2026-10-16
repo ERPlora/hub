@@ -67,6 +67,9 @@ EXPECTED = {
         E.PURCHASE_RECORDED,
         E.PURCHASE_VOIDED,
         E.PURCHASE_REFUNDED,
+        E.HEALTH_CONSENT_GRANTED,
+        E.HEALTH_CONSENT_WITHDRAWN,
+        E.HEALTH_UPDATED,
         *CARD_GONE,
     ],
     "customer.purchase.list": [E.PURCHASE_RECORDED, E.PURCHASE_VOIDED, E.PURCHASE_REFUNDED, *CARD_GONE],
@@ -76,10 +79,28 @@ EXPECTED = {
         E.PURCHASE_REFUNDED,
         *CARD_GONE,
     ],
-    "customer.consent.state": [E.CONSENT_GRANTED, E.CONSENT_WITHDRAWN, *CARD_GONE],
-    "customer.consent.history": [E.CONSENT_GRANTED, E.CONSENT_WITHDRAWN, *CARD_GONE],
+    "customer.consent.state": [
+        E.CONSENT_GRANTED,
+        E.CONSENT_WITHDRAWN,
+        E.HEALTH_CONSENT_GRANTED,
+        E.HEALTH_CONSENT_WITHDRAWN,
+        *CARD_GONE,
+    ],
+    "customer.consent.history": [
+        E.CONSENT_GRANTED,
+        E.CONSENT_WITHDRAWN,
+        E.HEALTH_CONSENT_GRANTED,
+        E.HEALTH_CONSENT_WITHDRAWN,
+        *CARD_GONE,
+    ],
     "customer.order.customer": [E.ORDER_LINKED, E.ORDER_UNLINKED, *CARD_GONE],
     "customer.order.list": [E.ORDER_LINKED, E.ORDER_UNLINKED, *CARD_GONE],
+    "customer.health.detail": [
+        E.HEALTH_CONSENT_GRANTED,
+        E.HEALTH_CONSENT_WITHDRAWN,
+        E.HEALTH_UPDATED,
+        *CARD_GONE,
+    ],
 }
 
 

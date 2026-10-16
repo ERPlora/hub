@@ -31,6 +31,7 @@ from apps.customer.models import (
     CustomerTag,
     CustomField,
     CustomFieldValue,
+    HealthRecord,
     OrderLink,
     Purchase,
 )
@@ -46,7 +47,10 @@ from apps.customer.queries import (
     find_field,
     find_group,
     find_tag,
+    HEALTH_PURPOSE,
+    health_consent,
     load_detail,
+    load_health,
 )
 from apps.customer.schemas import (
     OPTIONS_MISSING,
@@ -71,6 +75,10 @@ from apps.customer.schemas import (
     GroupPatchIn,
     GroupRefIn,
     GroupRow,
+    HealthGrantIn,
+    HealthIn,
+    HealthOut,
+    HealthWithdrawIn,
     ImportIn,
     ImportOut,
     ImportRowIn,
@@ -112,6 +120,8 @@ DATE_IN_FUTURE = _("This date is in the future.")
 COUNTRY_IMPORTED_EMPTY = _(
     "Country not recognised: imported without country, check it on the card."
 )
+HEALTH_CONSENT_REQUIRED = _("Record their permission first to keep health data.")
+HEALTH_TEST_DATE_MISSING = _("Enter the date of the test.")
 ALREADY_IMPORTED = _(
     "There is already a card with this name, phone and email: it is not created again."
 )
@@ -123,6 +133,7 @@ ERASE_SCOPE = [
     "customer",
     "activity",
     "field_values",
+    "health",
     "memberships",
     "consent_addresses",
 ]
@@ -626,6 +637,7 @@ def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
     survivor.tags.add(*absorbed.tags.all())
     absorbed.groups.clear()
     absorbed.tags.clear()
+    _merge_health(survivor, absorbed)
 
     # The cards merged into the duplicate before now point at the survivor: the chain stays flat.
     Customer.objects.filter(merged_into=absorbed).update(merged_into=survivor)
@@ -649,6 +661,29 @@ def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
         {"id": str(survivor.id), "absorbed_id": str(absorbed.id)},
     )
     return load_detail(survivor)
+
+
+def _merge_health(survivor: Customer, absorbed: Customer) -> None:
+    """The survivor keeps its health data and fills its gaps with the duplicate's (CUSTOMER-F13, F32).
+
+    Their consent facts already moved: if the last health decision of the person is not a grant, no
+    health data stays.
+    """
+    duplicate = HealthRecord.objects.filter(customer=absorbed).first()
+    own = HealthRecord.objects.filter(customer=survivor).first()
+    if duplicate and own:
+        own.allergies = own.allergies or duplicate.allergies
+        if not own.sensitivity_test_on:
+            own.sensitivity_test_on = duplicate.sensitivity_test_on
+            own.sensitivity_test_result = duplicate.sensitivity_test_result
+        own.save()
+        duplicate.delete()
+    elif duplicate:
+        duplicate.customer = survivor
+        duplicate.save(update_fields=["customer"])
+    fact = health_consent(survivor)
+    if fact is None or fact.state != Consent.State.GRANTED:
+        HealthRecord.objects.filter(customer=survivor).delete()
 
 
 @operation(
@@ -698,6 +733,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
         customer.save()
         customer.activity.all().delete()
         customer.field_values.all().delete()
+        HealthRecord.objects.filter(customer=customer).delete()
         customer.groups.clear()
         customer.tags.clear()
         customer.consents.update(contact_point="", evidence="", reason="")
@@ -879,6 +915,142 @@ def withdraw_consent(ctx: OperationContext, data: ConsentWithdrawIn) -> Consent:
 
 
 # ── Orders (CUSTOMER-F19) ───────────────────────────────────────────────────────────────────────
+
+
+# ── Health data (CUSTOMER-F32) ──────────────────────────────────────────────────────────────────
+# Special category data (GDPR art. 9): kept only while the card's last health decision is a grant,
+# erased when it is withdrawn. No ``ai`` and no ``expose_api``: never for the assistant nor an API key.
+
+
+def _health_fact(ctx: OperationContext, data, customer: Customer, state: str) -> Consent:
+    now = timezone.now()
+    occurred_at = getattr(data, "occurred_at", None) or now
+    if occurred_at > now + CLOCK_SKEW:
+        raise InvalidPayload(
+            DATE_IN_FUTURE,
+            code="customer.date_in_future",
+            fields={"occurred_at": DATE_IN_FUTURE},
+        )
+    granted = state == Consent.State.GRANTED
+    fact = Consent.objects.create(
+        customer=customer,
+        purpose=HEALTH_PURPOSE,
+        channel="",
+        state=state,
+        source=data.source,
+        notice_text=data.notice_text if granted else "",
+        notice_version=data.notice_version if granted else "",
+        evidence=data.evidence if granted else "",
+        reason="" if granted else data.reason,
+        recorded_by=_actor(ctx),
+        occurred_at=occurred_at,
+        created_at=now,
+    )
+    Activity.objects.create(
+        customer=customer,
+        kind=Activity.Kind.HEALTH_CONSENT_GRANTED
+        if granted
+        else Activity.Kind.HEALTH_CONSENT_WITHDRAWN,
+        text=fact.notice_text if granted else fact.reason,
+        related_id=str(fact.id),
+        related_type="consent",
+        data={
+            "purpose": HEALTH_PURPOSE,
+            "source": fact.source,
+            "notice_version": fact.notice_version,
+            "occurred_at": occurred_at.isoformat(),
+        },
+        actor=_actor(ctx),
+    )
+    record_event(
+        ctx,
+        events.HEALTH_CONSENT_GRANTED if granted else events.HEALTH_CONSENT_WITHDRAWN,
+        {"id": str(fact.id), "customer_id": str(customer.id)},
+    )
+    return fact
+
+
+@operation(
+    "customer.health.grant",
+    kind="command",
+    permission="customer.manage",
+    input=HealthGrantIn,
+    output=HealthOut,
+)
+def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
+    customer = find_customer(data.customer_id, data.customer, lock=True)
+    _health_fact(ctx, data, customer, Consent.State.GRANTED)
+    return load_health(customer)
+
+
+@operation(
+    "customer.health.withdraw",
+    kind="command",
+    permission="customer.manage",
+    input=HealthWithdrawIn,
+    output=HealthOut,
+)
+def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
+    customer = find_customer(data.customer_id, data.customer, lock=True)
+    _health_fact(ctx, data, customer, Consent.State.WITHDRAWN)
+    # Withdrawing the only ground to keep them erases them in the same step (GDPR arts. 7.3, 17.1.b).
+    HealthRecord.objects.filter(customer=customer).delete()
+    return load_health(customer)
+
+
+@operation(
+    "customer.health.update",
+    kind="command",
+    permission="customer.manage",
+    input=HealthIn,
+    output=HealthOut,
+)
+def update_health(ctx: OperationContext, data: HealthIn) -> dict:
+    customer = find_customer(data.customer_id, data.customer, lock=True)
+    fact = health_consent(customer)
+    if fact is None or fact.state != Consent.State.GRANTED:
+        raise Conflict(HEALTH_CONSENT_REQUIRED, code="customer.health_consent_required")
+    if data.sensitivity_test_on and data.sensitivity_test_on > timezone.localdate():
+        raise InvalidPayload(
+            DATE_IN_FUTURE,
+            code="customer.date_in_future",
+            fields={"sensitivity_test_on": DATE_IN_FUTURE},
+        )
+    if data.sensitivity_test_result and not data.sensitivity_test_on:
+        raise InvalidPayload(
+            HEALTH_TEST_DATE_MISSING,
+            code="customer.health_test_date_missing",
+            fields={"sensitivity_test_on": HEALTH_TEST_DATE_MISSING},
+        )
+    values = {
+        "allergies": data.allergies,
+        "sensitivity_test_on": data.sensitivity_test_on,
+        "sensitivity_test_result": data.sensitivity_test_result,
+    }
+    record = HealthRecord.objects.filter(customer=customer).first()
+    if record is None:
+        record = HealthRecord(customer=customer)
+    elif not _changes(record, values):
+        return load_health(customer)
+    for field, value in values.items():
+        setattr(record, field, value)
+    record.updated_at = timezone.now()
+    record.updated_by = _actor(ctx)
+    record.save()
+    # The timeline says it changed and who did it, never what: the data lives in its block only.
+    Activity.objects.create(
+        customer=customer,
+        kind=Activity.Kind.HEALTH_UPDATED,
+        related_id=str(record.id),
+        related_type="health",
+        actor=_actor(ctx),
+    )
+    record_event(
+        ctx,
+        events.HEALTH_UPDATED,
+        {"id": str(record.id), "customer_id": str(customer.id)},
+    )
+    return load_health(customer)
 
 
 @operation(

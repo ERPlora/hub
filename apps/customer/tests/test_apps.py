@@ -51,6 +51,11 @@ OPERATIONS = {
     "customer.consent.grant": "customer.manage",
     "customer.consent.withdraw": "customer.manage",
     "customer.order.link": "customer.manage",
+    # health data (CUSTOMER-F32)
+    "customer.health.detail": "customer.view",
+    "customer.health.grant": "customer.manage",
+    "customer.health.withdraw": "customer.manage",
+    "customer.health.update": "customer.manage",
     "customer.group.create": "customer.configure",
     "customer.group.update": "customer.configure",
     "customer.group.delete": "customer.delete",
@@ -79,6 +84,13 @@ HIGH_RISK = {
 }
 #: Open to API keys, as in the product's module.json.
 EXPOSED = {"customer.order.list", "customer.consent.state"}
+#: Health data (CUSTOMER-F32, GDPR art. 9): for the screen only, never a tool of the assistant.
+SCREEN_ONLY = {
+    "customer.health.detail",
+    "customer.health.grant",
+    "customer.health.withdraw",
+    "customer.health.update",
+}
 
 
 def customer():
@@ -196,6 +208,9 @@ def test_the_system_only_permission_is_declared_by_no_app():
 
 def test_every_operation_tells_the_assistant_what_it_does():
     for name, op in customer_operations().items():
+        if name in SCREEN_ONLY:
+            assert op.ai is None, name
+            continue
         assert isinstance(op.ai, dict), name
         assert (
             isinstance(op.ai.get("description"), str) and len(op.ai["description"]) > 20
@@ -204,6 +219,8 @@ def test_every_operation_tells_the_assistant_what_it_does():
 
 def test_commands_declare_their_risk_and_queries_do_not():
     for name, op in customer_operations().items():
+        if name in SCREEN_ONLY:
+            continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"
             assert op.ai.get("risk") == expected, name
