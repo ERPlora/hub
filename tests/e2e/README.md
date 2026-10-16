@@ -70,3 +70,12 @@ CI=1 pnpm e2e
 # 3. Al terminar: parar ese runserver y su SaaS, y borrar la BD
 node tests/e2e/database.ts --drop
 ```
+
+## Medir cuándo acaba una petición
+
+En la pila de desarrollo Vite sirve cada módulo de la SPA por separado, y llenan el búfer de Resource Timing de
+Chrome (250 entradas) antes del primer clic: `performance.getEntriesByType('resource')` ya no lista la petición que
+se mide (el 16-10-2026 dio `NaN` en `delete-item.spec.ts` y `null` en `optimistic-add-line.spec.ts`). La spec que
+cronometra una petición usa `resource-timing.ts`: `recordResponses(page)` antes de que cargue la página (un
+`PerformanceObserver`, que ve todas las entradas) y `responseEnd(page, '/api/…')` después. Sin esa petición o sin
+el registro falla diciendo qué falta; nunca devuelve `NaN` ni `null`.

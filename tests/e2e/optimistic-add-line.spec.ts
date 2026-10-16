@@ -4,6 +4,7 @@
 import { type Page, expect, test } from '@playwright/test';
 
 import { A, api, createItem, itemDetail, login, record, shot, uniqueName } from './helpers';
+import { recordResponses, responseEnd } from './resource-timing';
 
 /** Arms in-page probes: click time of «Add line», first/last time a provisional line is on screen. */
 async function armProbes(page: Page): Promise<void> {
@@ -26,20 +27,18 @@ async function armProbes(page: Page): Promise<void> {
   });
 }
 
+/** The probes against the click, and the end of the add_line request that click sent (from the recorder: Vite's
+ *  dev modules fill the page's resource timing buffer before the first click). */
 async function readProbes(page: Page) {
-  return page.evaluate(() => {
-    const t = (window as unknown as { __t: Record<string, number> }).__t;
-    const entry = performance
-      .getEntriesByType('resource')
-      .filter((e) => e.name.includes('/api/demo/items/add_line'))
-      .at(-1) as PerformanceResourceTiming | undefined;
-    const r = (v: number | undefined) => (v === undefined ? null : Math.round(v - t.click));
-    return {
-      clickToShownMs: r(t.shown),
-      clickToResponseMs: r(entry?.responseEnd),
-      clickToPendingGoneMs: r(t.gone),
-    };
-  });
+  const t = await page.evaluate(() => (window as unknown as { __t: Record<string, number> }).__t);
+  expect(t.click, 'the page timed the click on «Add line»').toBeDefined();
+  const response = await responseEnd(page, '/api/demo/items/add_line', { since: t.click });
+  const r = (v: number | undefined) => (v === undefined ? null : Math.round(v - t.click));
+  return {
+    clickToShownMs: r(t.shown),
+    clickToResponseMs: Math.round(response.pageMs - t.click),
+    clickToPendingGoneMs: r(t.gone),
+  };
 }
 
 async function addLine(page: Page, text: string): Promise<void> {
@@ -51,6 +50,7 @@ async function addLine(page: Page, text: string): Promise<void> {
 const lineTexts = (page: Page) => page.locator('[data-testid=demo-line-text]').allInnerTexts();
 
 test('add line: optimistic, 409 rollback with toast, server keeps only saved lines, idempotent', async ({ page, context }) => {
+  await recordResponses(page);
   await login(page, A);
   const item = await createItem(context, A, uniqueName('Optimistic'));
   await page.goto(`/demo/items/${item.id}`);
@@ -115,7 +115,7 @@ test('add line: optimistic, 409 rollback with toast, server keeps only saved lin
   expect(natural.clickToShownMs).not.toBeNull();
   expect(natural.clickToShownMs!).toBeLessThan(100);
   expect(slow.clickToShownMs!).toBeLessThan(100);
-  expect(slow.clickToShownMs!).toBeLessThan(slow.clickToResponseMs!);
+  expect(slow.clickToShownMs!).toBeLessThan(slow.clickToResponseMs);
   expect(conflictStatus).toBe(409);
   expect(rejected.clickToShownMs).not.toBeNull();
   expect(toastMessage).toContain('closed');
