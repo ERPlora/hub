@@ -14,6 +14,7 @@ import type { CategoryRowOut, RuleOut } from '../operations';
 import { BYE, click, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax, settle } from '../__tests__/mount-tax';
 import RuleCreateModal from '../components/RuleCreateModal.vue';
 import RuleEndModal from '../components/RuleEndModal.vue';
+import SetupNotice from '../components/SetupNotice.vue';
 import RulesPage from './RulesPage.vue';
 import source from './RulesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -121,6 +122,8 @@ describe('RulesPage: the live list', () => {
     const s = await setup();
     expect(s.params()).toEqual([{ status: 'active', sort: 'tax_category_key', dir: 'asc', limit: 50, offset: 0 }]);
     expect(s.find('tax-rules-loading').exists()).toBe(true);
+    // pm#611: while it loads, the list never counts «0 rules» under the spinner.
+    expect(s.wrapper.text()).not.toMatch(/\b0 rules?\b/);
     await s.show(PAGE);
     expect(s.find('tax-rules-loading').exists()).toBe(false);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'tax-rules', total: 3, views: ['table', 'cards'] });
@@ -183,7 +186,7 @@ describe('RulesPage: the live list', () => {
 });
 
 // On a phone the list is cards (the DataTable's breakpoint): a card's body says every field once,
-// without the category its title already names, and leaves out the columns the person hid.
+// without the category its title already names (`cardTitleColumn`).
 describe('RulesPage on a phone: the rule cards', () => {
   function phone(): void {
     vi.stubGlobal('matchMedia', (query: string) => ({
@@ -201,26 +204,26 @@ describe('RulesPage on a phone: the rule cards', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows every field but the category once, and drops the ones hidden in the column chooser', async () => {
+  it('shows every field but the category once, in the table’s own card body', async () => {
     phone();
     const s = await setup();
     await s.show(PAGE);
+    // The table's own card body, told which column the title names (`cardTitleColumn`).
+    expect(s.prop('cardTitleColumn')).toBe('tax_category_key');
     const fields = () =>
-      s.rows()[2].findAll('[data-testid="tax-rule-card-field"]').map((f) => [f.attributes('data-key'), f.find('.tax-rule-card__value').text()]);
+      s.rows()[2].findAll('.data-table__field').map((f) => [f.find('.data-table__field-label').text(), f.find('.data-table__field-value').text()]);
     expect(s.rows()[2].text()).toContain('Servicio — sanitario');
     expect(fields()).toEqual([
-      ['country_code', 'ES'],
-      ['region_code', 'ES-CN'],
-      ['rate_pct', '0.00%'],
-      ['tax_type', 'VAT'],
-      ['operation_class', 'Exempt · E1'],
-      ['valid_from', 'Sep 1, 2012'],
-      ['valid_to', 'Dec 31, 2026'],
-      ['is_active', 'Yes'],
+      ['Country', 'ES'],
+      ['Region', 'ES-CN'],
+      ['%', '0.00%'],
+      ['Type', 'VAT'],
+      ['Qualification', 'Exempt · E1'],
+      ['Valid from', 'Sep 1, 2012'],
+      ['Valid to', 'Dec 31, 2026'],
+      ['Active', 'Yes'],
     ]);
-    s.table().vm.$emit('columnsChange', ['tax_category_key', 'country_code', 'rate_pct']);
-    await flush();
-    expect(fields().map(([key]) => key)).toEqual(['country_code', 'rate_pct']);
+    // A column hidden in the chooser leaves the card too: the table's own body does it (its cards tests).
   });
 });
 
@@ -322,8 +325,8 @@ describe('RulesPage: the row actions (TAX-F07, F08)', () => {
     await s.show(PAGE);
     expect(s.prop<Array<{ id: string; label: string; icon: string; color?: string }>>('actions').map((a) => [a.id, a.label, a.icon, a.color ?? null])).toEqual([
       ['end', 'Set end date', 'calendar-outline', null],
-      ['deactivate', 'Deactivate', 'close-outline', 'danger'],
-      ['restore', 'Restore', 'refresh-outline', 'success'],
+      ['deactivate', 'Deactivate', 'ban-outline', 'danger'],
+      ['restore', 'Restore', 'arrow-undo-outline', 'success'],
     ]);
     expect(s.find('tax-rules-row-r1-end').exists()).toBe(true);
     expect(s.find('tax-rules-row-r1-deactivate').exists()).toBe(true);
@@ -474,5 +477,19 @@ describe('RulesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('RulesPage: «Your taxes» (TAX-F17)', () => {
+  it('carries the setup step for whoever manages taxes, and asks whether a rule applies', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(true);
+    expect(s.paramsOf('tax.rule.status')).toEqual([{}]);
+  });
+
+  it('an employee neither sees it nor asks for it', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(false);
+    expect(s.paramsOf('tax.rule.status')).toEqual([]);
   });
 });

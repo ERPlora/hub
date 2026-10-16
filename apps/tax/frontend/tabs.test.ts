@@ -31,9 +31,9 @@ describe('the tax tabbar', () => {
     expect(tabsIn('es').map((t) => t.label)).toEqual(['Categorías', 'Reglas', 'Alias']);
   });
 
-  it('gives every tab a registered icon, the rules their receipt as in the old menu', () => {
+  it('gives every tab a registered icon, the old menu\'s: price tags, receipt and the horizontal swap', () => {
     for (const tab of TAX_TABS) expect(Object.hasOwn(ION_ICONS, tab.icon.replace(/^ion:/, '')), tab.icon).toBe(true);
-    expect(TAX_TABS.find((t) => t.id === 'rules')?.icon).toBe('ion:receipt-outline');
+    expect(TAX_TABS.map((t) => t.icon)).toEqual(['ion:pricetags-outline', 'ion:receipt-outline', 'ion:swap-horizontal-outline']);
   });
 
   it('wears the same icons and paths as the menu entries of apps.py (one icon per section everywhere)', () => {

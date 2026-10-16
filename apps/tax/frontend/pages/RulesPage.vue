@@ -23,6 +23,7 @@ import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import SetupNotice from '../components/SetupNotice.vue';
 import RuleCreateModal from '../components/RuleCreateModal.vue';
 import RuleEndModal from '../components/RuleEndModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -145,18 +146,6 @@ const columns = computed<DataTableColumn<RuleOut>[]>(() => [
   { key: 'is_active', label: t('tax.rules.columns.active'), sortable: true, priority: 'low', format: (value) => (value ? t('tax.yes') : t('tax.no')) },
 ]);
 
-/** The columns the person hid in the column chooser: a card leaves them out, as the table does. */
-const hiddenColumns = ref<ReadonlySet<string>>(new Set());
-function onColumnsChange(visible: string[]): void {
-  hiddenColumns.value = new Set(columns.value.map((c) => c.key).filter((key) => !visible.includes(key)));
-}
-/** A card's body: every shown field but the category, which its title already names. */
-const cardColumns = computed(() => columns.value.filter((c) => c.key !== 'tax_category_key' && !hiddenColumns.value.has(c.key)));
-const cardValue = (column: DataTableColumn<RuleOut>, row: RuleOut): string => {
-  const value = (row as unknown as Record<string, unknown>)[column.key];
-  return column.format ? column.format(value, row) : dash(value);
-};
-
 // ── Row actions ────────────────────────────────────────────────────────────────────────────────
 /** A row action that has no dialog to show its refusal (Restore) says it on the page. */
 const pageError = ref('');
@@ -166,11 +155,11 @@ const actions = computed<DataTableAction<RuleOut>[]>(() =>
   canManage.value
     ? [
         { id: 'end', label: t('tax.rules.actions.end'), icon: 'calendar-outline', hidden: (row) => !row.is_active },
-        { id: 'deactivate', label: t('tax.rules.actions.deactivate'), icon: 'close-outline', color: 'danger', hidden: (row) => !row.is_active },
+        { id: 'deactivate', label: t('tax.rules.actions.deactivate'), icon: 'ban-outline', color: 'danger', hidden: (row) => !row.is_active },
         {
           id: 'restore',
           label: t('tax.rules.actions.restore'),
-          icon: 'refresh-outline',
+          icon: 'arrow-undo-outline',
           color: 'success',
           hidden: (row) => row.is_active,
           loading: (row) => restoring.value === row.id,
@@ -246,6 +235,7 @@ function create(): void {
       :error="error"
       :read-only="!canManage"
     />
+    <SetupNotice v-if="canManage" />
     <InlineFeedback
       v-if="pageError"
       tone="danger"
@@ -273,6 +263,7 @@ function create(): void {
       :views="['table', 'cards']"
       :card-breakpoint="834"
       :card-title="ruleCardTitle"
+      card-title-column="tax_category_key"
       :entity-label="{ one: $t('tax.rules.entity.one'), many: $t('tax.rules.entity.many') }"
       :loading="status === 'loading'"
       :error="tableError"
@@ -285,7 +276,6 @@ function create(): void {
       @load-more="table.loadMore"
       @page-size-change="table.setPageSize"
       @sort-change="table.setSort"
-      @columns-change="onColumnsChange"
       @action="onAction"
       @add="create"
       @retry="refresh()"
@@ -306,18 +296,6 @@ function create(): void {
             {{ $t(`tax.rules.status.${value}`) }}
           </ion-select-option>
         </ion-select>
-      </template>
-      <template #card="{ row }">
-        <div
-          v-for="column in cardColumns"
-          :key="column.key"
-          class="tax-rule-card__field"
-          data-testid="tax-rule-card-field"
-          :data-key="column.key"
-        >
-          <span class="tax-rule-card__label">{{ column.label }}</span>
-          <span class="tax-rule-card__value">{{ cardValue(column, row) }}</span>
-        </div>
       </template>
       <template #empty>
         <EmptyState
@@ -349,20 +327,3 @@ function create(): void {
   </AppPage>
 </template>
 
-<style scoped>
-/* A rule card's fields, as the table's own card body paints them. */
-.tax-rule-card__field {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 13px;
-}
-.tax-rule-card__label {
-  color: var(--color-muted, var(--ion-color-medium));
-}
-.tax-rule-card__value {
-  font-weight: 500;
-  text-align: right;
-  color: var(--color, var(--ion-text-color));
-}
-</style>

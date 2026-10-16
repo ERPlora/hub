@@ -1,21 +1,21 @@
 <script setup lang="ts">
-// TAX-F04/F05/F06/F11 — a new rule, field for field as the old create panel: Country (searched in the
-// closed ISO list, never typed: «ZZ» made a rule that matched nothing), Region, Category (searched on
-// the server among all the business's), %, Type, Qualification, Exemption reason (only when exempt),
+// TAX-F04/F05/F06/F11 — a new rule, field for field as the old create panel: Country (a Combo over the
+// closed ISO list, the old ok-combo: «ZZ» made a rule that matched nothing), Region, Category (a Combo
+// searching the server among all the business's), %, Type, Qualification, Exemption reason (only when exempt),
 // Regime, Valid from, Valid to, «Root rule (component of)» (the roots the server says the component
 // may hang from: ParentRuleSelect) and «Component label». A class that charges no tax pins the rate to
 // 0 % (the server refuses any other). The server decides; its refusals stay here under their field.
-import { FormModal } from '@erplora/ui/components';
-import { useCommand, useLive } from '@erplora/ui/sdk';
+import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { useLocale } from '../composables/useT';
 import { countryOptions } from '../lib/countries';
-import { categoryOptionLabel, chargesNoTax, OPERATION_CLASSES, TAX_TYPES } from '../lib/rules';
+import { categoryCombo } from '../lib/pickers';
+import { chargesNoTax, OPERATION_CLASSES, TAX_TYPES } from '../lib/rules';
 import type { OperationClass, RuleIn, TaxType } from '../operations';
 import ParentRuleSelect from './ParentRuleSelect.vue';
-import SearchSelect from './SearchSelect.vue';
 
 const open = defineModel<boolean>('open', { default: false });
 
@@ -53,18 +53,12 @@ const locale = useLocale();
 const form = ref(blank());
 const { run, error, pending } = useCommand('tax.rule.create');
 
+/** What the two Combos show: the chosen option (its code or key is what the form keeps). */
+const country = ref<ComboOption | null>(null);
+const category = ref<ComboOption | null>(null);
 /** The category picker searches the server: all the business's categories, not a first page. */
-const categoryQuery = ref('');
-const categories = useLive('tax.category.list', () => ({
-  search: categoryQuery.value || undefined,
-  sort: 'display_name' as const,
-  dir: 'asc' as const,
-  limit: 50,
-}));
-const categoryOptions = computed(() =>
-  (categories.data.value?.rows ?? []).map((category) => ({ value: category.key, label: categoryOptionLabel(category) })),
-);
-const countries = computed(() => countryOptions(locale.value));
+const searchCategories = categoryCombo(useLiveClient());
+const countries = computed<ComboOption[]>(() => countryOptions(locale.value).map((option) => ({ id: option.value, label: option.label })));
 
 const noTax = computed(() => chargesNoTax(form.value.operation_class));
 const complete = computed(() => form.value.country_code !== '' && form.value.tax_category_key !== '' && form.value.rate_pct.trim() !== '');
@@ -72,6 +66,23 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 
 function set<K extends keyof RuleForm>(field: K, value: unknown): void {
   form.value = { ...form.value, [field]: value == null ? '' : String(value) };
+}
+
+function chooseCountry(option: ComboOption | null): void {
+  country.value = option;
+  set('country_code', option?.id);
+}
+
+function chooseCategory(option: ComboOption | null): void {
+  category.value = option;
+  set('tax_category_key', option?.id);
+}
+
+function reset(): void {
+  form.value = blank();
+  country.value = null;
+  category.value = null;
+  error.value = null;
 }
 
 /** A class without tax pins the rate to 0; leaving it asks for the rate again, not a 0 nobody typed. */
@@ -112,16 +123,12 @@ async function save(): Promise<void> {
   } catch {
     return; // `error` holds it and the dialog paints it.
   }
-  form.value = blank();
-  categoryQuery.value = '';
-  error.value = null;
+  reset();
   open.value = false;
 }
 
 function cancel(): void {
-  form.value = blank();
-  categoryQuery.value = '';
-  error.value = null;
+  reset();
 }
 </script>
 
@@ -139,14 +146,14 @@ function cancel(): void {
   >
     <template #default="{ fieldErrors }">
       <div class="tax-form">
-        <SearchSelect
+        <Combo
           testid="tax-rule-form-country_code"
-          :model-value="form.country_code"
+          :model-value="country"
           :options="countries"
           :label="$t('tax.rules.columns.country')"
           :placeholder="$t('tax.rules.form.countryPlaceholder')"
           :error-text="fieldErrors.country_code"
-          @update:model-value="set('country_code', $event)"
+          @update:model-value="chooseCountry"
         />
         <ion-input
           data-testid="tax-rule-form-region_code"
@@ -163,16 +170,14 @@ function cancel(): void {
           :class="invalid(fieldErrors.region_code)"
           @ion-input="set('region_code', $event.detail.value)"
         />
-        <SearchSelect
-          v-model:query="categoryQuery"
+        <Combo
           testid="tax-rule-form-tax_category_key"
-          :model-value="form.tax_category_key"
-          :options="categoryOptions"
-          :loading="categories.status.value === 'loading' && !categoryOptions.length"
+          :model-value="category"
+          :search="searchCategories"
           :label="$t('tax.rules.columns.category')"
           :placeholder="$t('tax.rules.form.categoryPlaceholder')"
           :error-text="fieldErrors.tax_category_key"
-          @update:model-value="set('tax_category_key', $event)"
+          @update:model-value="chooseCategory"
         />
         <ion-input
           data-testid="tax-rule-form-rate_pct"

@@ -10,6 +10,7 @@ import type { Component } from 'vue';
 import type { AliasOut, CategoryRowOut } from '../operations';
 import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax } from '../__tests__/mount-tax';
 import AliasCreateModal from '../components/AliasCreateModal.vue';
+import SetupNotice from '../components/SetupNotice.vue';
 import AliasesPage from './AliasesPage.vue';
 import source from './AliasesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -66,11 +67,13 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('AliasesPage: the live list', () => {
-  it('follows tax.alias.list sorted by alias, 50 from the first, and the categories for its pickers', async () => {
+  it('follows tax.alias.list sorted by alias, 50 from the first; its category pickers search on demand, not live', async () => {
     const s = await setup();
     expect(s.listParams()).toEqual([{ sort: 'alias', dir: 'asc', limit: 50, offset: 0 }]);
-    expect(s.params('tax.category.list')).toEqual([{ sort: 'display_name', dir: 'asc', limit: 50 }]);
+    expect(s.params('tax.category.list')).toEqual([]);
     expect(s.find('tax-aliases-loading').exists()).toBe(true);
+    // pm#611: while it loads, the list never counts «0 alias…» under the spinner.
+    expect(s.wrapper.text()).not.toMatch(/\b0 alias(es)?\b/);
     await s.show(PAGE);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'tax-aliases', total: 2, views: ['table', 'cards'] });
     expect(s.prop('searchPlaceholder')).toBe('Search alias or category…');
@@ -199,5 +202,19 @@ describe('AliasesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('AliasesPage: «Your taxes» (TAX-F17)', () => {
+  it('carries the setup step for whoever manages taxes, and asks whether a rule applies', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(true);
+    expect(s.params('tax.rule.status')).toEqual([{}]);
+  });
+
+  it('an employee neither sees it nor asks for it', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(false);
+    expect(s.params('tax.rule.status')).toEqual([]);
   });
 });

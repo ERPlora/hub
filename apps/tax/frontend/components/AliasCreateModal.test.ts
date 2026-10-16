@@ -1,7 +1,8 @@
 // TAX-F14 (teach a category alias by hand): the «+» of Aliases opens this dialog — the Alias (the
-// outside text), the Category CHOSEN among all the business's, searched on the server (never typed: a
-// wrong key would put the wrong VAT on an import) and the Origin, «Learned» to begin with; «Add». A
+// outside text), the Category CHOSEN among all the business's in a Combo searching the server (never a
+// typed key: a wrong key would put the wrong VAT on an import) and the Origin, «Learned» to begin with; «Add». A
 // repeated alias (409) is said under Alias; the dialog closes when the server saved it.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CategoryRowOut } from '../operations';
@@ -34,22 +35,22 @@ async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountTax(AliasCreateModal, { props: { open: true }, locale, path: '/tax/aliases' });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await settle();
-  await m.live();
-  await m.result('tax.category.list', CATEGORY_PAGE);
   const field = (name: string) => m.inDoc(`tax-alias-form-${name}`) as Control;
   const add = () => m.inDoc('tax-alias-form-submit') as Control;
   const options = (name: string) =>
     [...field(name).querySelectorAll('ion-select-option')].map((o) => [(o as Control).value, o.textContent?.trim()]);
-  /** Opens the category list and returns its choices. */
-  async function categories() {
-    await click(field('category'));
-    return m.wrapper.findAll('[data-testid="tax-alias-form-category-option"]').map((o) => [o.attributes('data-value'), o.text().trim()]);
+  const combo = () => m.wrapper.findComponent(Combo);
+  /** The category options the server answers for `text` (the Combo's own search). */
+  async function categories(text: string) {
+    m.answer(200, CATEGORY_PAGE);
+    return (combo().props('search') as (q: string) => Promise<ComboOption[]>)(text);
   }
+  /** Chooses a category, as the Combo does when the person picks an option. */
   async function chooseCategory(value: string) {
-    await click(field('category'));
-    await click(m.wrapper.get(`[data-testid="tax-alias-form-category-option"][data-value="${value}"]`).element);
+    combo().vm.$emit('update:modelValue', { id: value, label: value });
+    await settle();
   }
-  return { ...m, field, add, options, categories, chooseCategory };
+  return { ...m, field, add, options, combo, categories, chooseCategory };
 }
 
 describe('AliasCreateModal (TAX-F14)', () => {
@@ -62,14 +63,14 @@ describe('AliasCreateModal (TAX-F14)', () => {
       'Category',
       'Choose a category',
     ]);
-    expect(s.params('tax.category.list')).toEqual([{ sort: 'display_name', dir: 'asc', limit: 50 }]);
-    expect(await s.categories()).toEqual([
-      ['restaurant.food', 'Restauración — comida (restaurant.food)'],
-      ['product.generic', 'Producto — general (product.generic)'],
+    expect(s.params('tax.category.list')).toEqual([]);
+    expect(await s.categories('comida')).toEqual([
+      { id: 'restaurant.food', label: 'Restauración — comida', hint: 'restaurant.food' },
+      { id: 'product.generic', label: 'Producto — general', hint: 'product.generic' },
     ]);
-    await ionValue(s.inDoc('tax-alias-form-category-search'), 'comida', 'ionInput');
-    expect(s.params('tax.category.list')).toEqual([{ search: 'comida', sort: 'display_name', dir: 'asc', limit: 50 }]);
-    await click(s.inDoc('tax-alias-form-category-close'));
+    expect(s.sent()).toEqual([
+      { method: 'GET', path: '/api/tax/categories', query: { search: 'comida', sort: 'display_name', dir: 'asc', limit: '50' }, body: undefined },
+    ]);
     expect([s.field('source').value, s.options('source')]).toEqual([
       'learned',
       [

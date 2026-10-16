@@ -12,6 +12,7 @@ import type { Component } from 'vue';
 import type { CategoryRowOut } from '../operations';
 import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax } from '../__tests__/mount-tax';
 import CategoryCreateModal from '../components/CategoryCreateModal.vue';
+import SetupNotice from '../components/SetupNotice.vue';
 import CategoriesPage from './CategoriesPage.vue';
 import source from './CategoriesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -55,7 +56,7 @@ async function setup(options: MountOptions = {}) {
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
   const rows = () => m.wrapper.findAll('[data-testid="tax-categories-row"]');
-  /** The params of the list's subscription (the only one of this page). */
+  /** The params of the list's subscription (the page's own; «Your taxes» asks apart). */
   const params = () => m.params(OP);
   const show = (page: unknown) => m.result(OP, page);
   async function showOnNewStream(page: unknown) {
@@ -67,7 +68,7 @@ async function setup(options: MountOptions = {}) {
     table().vm.$emit('update:filters', values);
     await flush();
   }
-  return { ...m, call, table, prop, rows, params, show, showOnNewStream, filter };
+  return { ...m, paramsOf: m.params, call, table, prop, rows, params, show, showOnNewStream, filter };
 }
 
 describe('CategoriesPage: the live list', () => {
@@ -75,6 +76,8 @@ describe('CategoriesPage: the live list', () => {
     const s = await setup();
     expect(s.params()).toEqual([{ sort: 'key', dir: 'asc', limit: 50, offset: 0 }]);
     expect(s.find('tax-categories-loading').exists()).toBe(true);
+    // pm#611: while it loads, the list never counts «0 categor…» under the spinner.
+    expect(s.wrapper.text()).not.toMatch(/\b0 categor(y|ies)\b/);
     await s.show(PAGE);
     expect(s.find('tax-categories-loading').exists()).toBe(false);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'tax-categories', pageSize: 50, total: 3, page: 0, views: ['table', 'cards'] });
@@ -344,5 +347,19 @@ describe('CategoriesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('CategoriesPage: «Your taxes» (TAX-F17)', () => {
+  it('carries the setup step for whoever manages taxes, and asks whether a rule applies', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(true);
+    expect(s.paramsOf('tax.rule.status')).toEqual([{}]);
+  });
+
+  it('an employee neither sees it nor asks for it', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(false);
+    expect(s.paramsOf('tax.rule.status')).toEqual([]);
   });
 });
