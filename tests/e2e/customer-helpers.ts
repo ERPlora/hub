@@ -73,7 +73,7 @@ export function cleanUp(): void {
     const list = quoted(ids);
     // The duplicates merged into them too (their `merged_into` points here).
     psql(`update customer_customer set merged_into_id = null where merged_into_id in (${list})`);
-    for (const table of ['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_orderlink', 'customer_purchase']) {
+    for (const table of ['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_healthrecord', 'customer_orderlink', 'customer_purchase']) {
       psql(`delete from ${table} where customer_id in (${list})`);
     }
     psql(`delete from customer_customer where id in (${list})`);
@@ -85,4 +85,24 @@ export function cleanUp(): void {
   psql(`delete from customer_customfieldvalue where field_id in (select id from customer_customfield where name like '${PREFIX}%')`);
   psql(`delete from customer_customfield where name like '${PREFIX}%'`);
   createdIds.clear();
+}
+
+/** The three sizes every flow of the app is seen at (brief APP-CUSTOMER): a phone, a tablet and a desk. */
+export const FLOW_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** How many pixels the shown page scrolls sideways (0 when everything fits its width). */
+export async function horizontalOverflow(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const content = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden) ion-content') as
+      | (HTMLElement & { getScrollElement?: () => Promise<HTMLElement> })
+      | null;
+    const inner = content?.getScrollElement ? await content.getScrollElement() : null;
+    const outer = document.documentElement.scrollWidth - window.innerWidth;
+    const own = inner ? inner.scrollWidth - inner.clientWidth : 0;
+    return Math.max(outer, own);
+  });
 }
