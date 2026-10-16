@@ -4,6 +4,13 @@
 // start it first. A branch beside another session's stack runs its own on other ports and database
 // (`E2E_HUB_PORT`, `VITE_DEV_PORT`, `SAAS_URL`, `DB_NAME`: `stack.ts`). One worker: the specs share that server and some of them restart it.
 //
+// `globalSetup` (`global-setup.ts`) first stops the run if the local databases of that `DB_NAME` have
+// unapplied migrations: it runs `manage.py migrate --check --plan` (control) and `manage.py migrate_hubs
+// --check` (the hub databases; phase 1: control again), which apply nothing, and aborts naming what is
+// pending and the command that applies it, `uv run python manage.py migrate && uv run python manage.py
+// migrate_hubs` from this checkout. It never migrates them (sessions share them): without it, a database
+// behind the code failed the specs with «not valid JSON» (2026-10-16).
+//
 // Each run writes into its own folder, `.artifacts/test-results/<PW_RUN_ID>/` (traces, failure
 // screenshots and `results.json`, the JSON report), so a run never wipes another's evidence:
 // Playwright empties `outputDir` when a run starts, and two sessions may run the suite at once.
@@ -34,6 +41,7 @@ process.env.PW_RUN_ID ??= newRunId(new Date());
 const OUTPUT_DIR = resolve(process.env.E2E_OUTPUT_DIR ?? join(HERE, '.artifacts', 'test-results', process.env.PW_RUN_ID));
 
 export default defineConfig({
+  globalSetup: join(HERE, 'global-setup.ts'),
   testDir: '.',
   testMatch: '*.spec.ts',
   outputDir: OUTPUT_DIR,
