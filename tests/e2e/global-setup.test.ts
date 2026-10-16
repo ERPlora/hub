@@ -132,6 +132,34 @@ describe('assertMigrationsApplied', () => {
     expect(() => assertMigrationsApplied(manage.run, 'hub')).not.toThrow('unapplied migrations');
   });
 
+  // flow: ninguno — FIX de la infraestructura e2e del Hub (aislar los datos de cada ejecución)
+  it('says how to create the e2e database of a stack beside the shared one when it does not exist yet', () => {
+    const missing: CommandResult = {
+      status: 1,
+      stdout: '',
+      stderr:
+        "WARNING psycopg.pool error connecting in 'pool-1': connection failed: connection to server at \"127.0.0.1\", " +
+        'port 5432 failed: FATAL:  database "hub_e2e_8030" does not exist\n' +
+        "django.db.utils.OperationalError: couldn't get a connection after 5.00 sec\n",
+    };
+    const manage = fakeManagePy({ migrate: missing });
+
+    expect(() => assertMigrationsApplied(manage.run, 'hub_e2e_8030')).toThrow(
+      'The database of the e2e (DB_NAME=hub_e2e_8030) does not exist. Create and migrate it with ' +
+        '`DB_NAME=hub_e2e_8030 node tests/e2e/database.ts` from this checkout, then start its runserver and retry.',
+    );
+    expect(() => assertMigrationsApplied(manage.run, 'hub_e2e_8030')).not.toThrow('unapplied migrations');
+    expect(manage.calls.every((args) => args.includes('--check'))).toBe(true);
+
+    // An e2e database that exists but cannot be checked (Postgres down) is the generic failure too.
+    const down = fakeManagePy({ migrate: UNREACHABLE });
+    expect(() => assertMigrationsApplied(down.run, 'hub_e2e_8030')).toThrow(/^Could not check the migrations[^\n]*\n[^\n]*Connection refused$/);
+
+    // database.ts prepares only e2e databases: a missing `hub` is the generic failure, with what Postgres said.
+    const shared = fakeManagePy({ migrate: { ...missing, stderr: 'FATAL:  database "hub" does not exist\n' } });
+    expect(() => assertMigrationsApplied(shared.run, 'hub')).toThrow(/^Could not check the migrations[^\n]*\nFATAL: {2}database "hub" does not exist$/);
+  });
+
   it('reports a migrate_hubs --check that fails without listing anything', () => {
     const manage = fakeManagePy({
       migrate: UP_TO_DATE,
