@@ -966,3 +966,22 @@ def test_the_countries_of_the_business_rules_once_each_sorted(no_seed):
 def test_the_seeded_business_sells_in_spain():
     assert run("tax.rule.countries", RuleCountriesIn(), role="hub_employee").countries == ["ES"]
 
+
+
+def test_only_tax_resolves_a_rule():
+    # hub#295: the rule of a line was resolved in three places and one charged what another declared.
+    # Sales and Invoicing call resolve_tax / calculate_tax; no other app looks rules up by itself (a
+    # frozen rule read back by its id is not a lookup).
+    import re
+    from pathlib import Path
+
+    apps_dir = Path(__file__).resolve().parents[2]
+    lookup = re.compile(r"TaxRule\.objects\.(?!in_bulk\b)\w+")
+    offenders = [
+        f"{path.relative_to(apps_dir)}:{number}"
+        for path in sorted(apps_dir.glob("*/**/*.py"))
+        if path.parts[len(apps_dir.parts)] != "tax" and "tests" not in path.parts
+        for number, line in enumerate(path.read_text().splitlines(), 1)
+        if lookup.search(line)
+    ]
+    assert offenders == []
