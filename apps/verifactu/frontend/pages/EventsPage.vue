@@ -2,18 +2,18 @@
 // VeriFactu → Events (VERIFACTU-F31; the old `erp-verifactu-events`): «Audit events», the live
 // `verifactu.event.list` in a server-side DataTable — When (the business's clock), Severity, Type and Message, which
 // the server composes in the reader's language —, the newest first, search «Search type or message…» (the words that
-// show, in Spanish or English) and the filters of type, severity and day. Unlike the old screen it follows itself.
-import { type DataTableColumn, DataTable, EmptyState, formatDateTime, StatusPill } from '@erplora/ui/components';
+// show, in Spanish or English) and, behind the table's funnel, the filters of When (by day), Severity and Type on
+// their columns. Unlike the old screen it follows itself.
+import { type DataTableColumn, type DataTableFilters, DataTable, EmptyState, formatDateTime, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import ListFilters from '../components/ListFilters.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
-import { filterCount, filterQuery, type FilterValues } from '../components/filters';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { severityTone } from '../lib/record';
+import { backwardsDays, filterParams, filtersInUse } from '../lib/filters';
+import { EVENT_KINDS, SEVERITIES, severityTone } from '../lib/record';
 import type { EventListIn, EventOut } from '../operations';
 import { verifactuTabs } from '../tabs';
 
@@ -21,22 +21,50 @@ const router = useRouter();
 const t = useT();
 const locale = useLocale();
 
-const filters = ref<FilterValues>({});
+/** The table's filters (its funnel): a filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 const table = useServerTable('verifactu.event.list', {
   sort: 'created_at',
   dir: 'desc',
   maxSearch: 120,
-  filters: (): Partial<EventListIn> => filterQuery(filters.value),
-  narrowed: () => filterCount(filters.value) > 0,
+  filters: (): Partial<EventListIn> => filterParams(filters.value),
+  narrowed: () => filtersInUse(filters.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 const blocked = computed(() => blockingError(error.value));
-const tableError = computed(() => (status.value === 'error' ? error.value?.message : undefined));
+/** What the server refused (a 422 of the list) and a day «until» before its «from», under each filter: the rows stay. */
+const filterErrors = computed<Record<string, string>>(() => ({
+  ...(error.value?.fields ?? {}),
+  ...Object.fromEntries(backwardsDays(filters.value).map((name) => [name, t('verifactu.filters.dateOrder')])),
+}));
+const tableError = computed(() => (status.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? error.value?.message : undefined));
 
 const columns = computed<DataTableColumn<EventOut>[]>(() => [
-  { key: 'created_at', label: t('verifactu.events.columns.when'), sortable: true, width: 'minmax(9rem, 11rem)', format: (_, row) => formatDateTime(row.created_at, locale.value) },
-  { key: 'severity', label: t('verifactu.events.columns.severity'), sortable: true, cell: 'severity', width: 'minmax(6rem, 8rem)', format: (_, row) => t(`verifactu.severity.${row.severity}`) },
-  { key: 'kind', label: t('verifactu.events.columns.type'), sortable: true, width: 'minmax(8rem, 11rem)', format: (_, row) => t(`verifactu.kind.${row.kind}`) },
+  {
+    key: 'created_at',
+    label: t('verifactu.events.columns.when'),
+    sortable: true,
+    width: 'minmax(9rem, 11rem)',
+    format: (_, row) => formatDateTime(row.created_at, locale.value),
+    filter: { type: 'daterange', keys: ['date_from', 'date_to'] },
+  },
+  {
+    key: 'severity',
+    label: t('verifactu.events.columns.severity'),
+    sortable: true,
+    cell: 'severity',
+    width: 'minmax(6rem, 8rem)',
+    format: (_, row) => t(`verifactu.severity.${row.severity}`),
+    filter: { type: 'select', options: SEVERITIES.map((value) => ({ value, label: t(`verifactu.severity.${value}`) })) },
+  },
+  {
+    key: 'kind',
+    label: t('verifactu.events.columns.type'),
+    sortable: true,
+    width: 'minmax(8rem, 11rem)',
+    format: (_, row) => t(`verifactu.kind.${row.kind}`),
+    filter: { type: 'select', options: EVENT_KINDS.map((value) => ({ value, label: t(`verifactu.kind.${value}`) })) },
+  },
   { key: 'message', label: t('verifactu.events.columns.message'), priority: 'high', width: 'minmax(14rem, 1fr)' },
 ]);
 
@@ -60,10 +88,13 @@ function open(row: EventOut): void {
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="verifactu-events"
       fill
       server-side
       searchable
+      filterable
+      :filter-errors="filterErrors"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -86,12 +117,6 @@ function open(row: EventOut): void {
       @row-click="open"
       @retry="refresh()"
     >
-      <template #filters>
-        <ListFilters
-          v-model="filters"
-          list="events"
-        />
-      </template>
       <template #severity="{ row }">
         <StatusPill
           size="sm"

@@ -93,7 +93,9 @@ móvil, tarjetas con el número de factura como título) con «Seq», «Factura�
 Anulación), «F.» (F1…R5), «Emisor», «Total», «Entorno» (Pruebas / Producción) y «Estado» (Pendiente,
 Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color). Buscador «Buscar factura,
 emisor o NIF…» (número de secuencia, número de factura, nombre o NIF del emisor). Filtros de estado, tipo,
-tipo de factura, entorno, fecha y total (en euros). Lo último sellado sale arriba. Por fila: «Ver» (también
+tipo de factura, entorno, fecha y total (en euros), tras el embudo de la tabla con su contador; un total que no
+es un importe, o una fecha «hasta» anterior a la «desde», se dice bajo su campo y no filtra. Lo último sellado
+sale arriba. Por fila: «Ver» (también
 al pulsar la fila) y «Cotejar en la AEAT» (abre la página de cotejo del QR). La lista se pone al día sola
 cuando nace, sale o cambia un registro en cualquier dispositivo.
 Vacía: «Todavía no hay registros. Cada factura que emitas se sella y aparece aquí.»; con búsqueda o filtro,
@@ -131,7 +133,8 @@ Menú **VeriFactu → Eventos**. Título «Eventos de auditoría». Tabla, lo m�
 aceptado, Aceptado con errores, Envío fallido, Cola procesada, Registro reprogramado, Cadena verificada, Cadena
 rota, Consulta a la AEAT, Cadena recuperada, Prueba de conexión, Configuración cambiada) y «Mensaje», compuesto en el idioma de
 quien mira. Buscador «Buscar tipo o mensaje…» que encuentra por las palabras que se ven, en español o en
-inglés; filtros de tipo, severidad y fecha. Se pone al día sola.
+inglés; filtros de tipo, severidad y fecha, tras el embudo de la tabla con su contador (una fecha «hasta»
+anterior a la «desde» se dice bajo su campo y no filtra). Se pone al día sola.
 Vacía: «Sin eventos.». Cargando: «Cargando…». Error: el mensaje con «Reintentar».
 
 ### Recuperación
