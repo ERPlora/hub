@@ -3,11 +3,13 @@
 // `post` helper got Django's HTML error page), a red that never said its cause. It checks the control
 // database (`migrate --check`) and the hub databases (`migrate_hubs --check`; phase 1: the control
 // database again) of the run's `DB_NAME` (`stack.ts`), and never migrates: other sessions share them.
+// A stack's own e2e database that does not exist yet is said as such, with `database.ts`, which creates
+// it (runserver cannot start without it, so the e2e cannot create it here).
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { STACK } from './stack';
+import { isE2eDatabase, STACK } from './stack.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HUB_DIR = resolve(HERE, '..', '..');
@@ -58,6 +60,12 @@ export function assertMigrationsApplied(manage: ManagePy, database: string): voi
       );
     }
     const output = [check.stdout.trim(), check.stderr.trim()].filter(Boolean).join('\n');
+    if (isE2eDatabase(database) && output.includes(`database "${database}" does not exist`)) {
+      throw new Error(
+        `The database of the e2e (DB_NAME=${database}) does not exist. Create and migrate it with ` +
+          `\`DB_NAME=${database} node tests/e2e/database.ts\` from this checkout, then start its runserver and retry.`,
+      );
+    }
     const exit = check.status === null ? 'no status' : String(check.status);
     throw new Error(`Could not check the migrations of the ${where}: \`${command}\` exited with ${exit}:\n${output}`);
   }

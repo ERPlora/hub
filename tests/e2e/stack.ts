@@ -4,6 +4,11 @@
 // at it with the same variables Django and Vite read: `E2E_HUB_PORT` (runserver's port, only the
 // specs need it), `VITE_DEV_PORT` (`config/settings.py`, `vite.config.ts`), `SAAS_URL` and `DB_NAME`
 // (`config/settings.py`). runserver restarted by a spec (`startRunserver`) inherits them.
+//
+// A stack beside the shared one runs on its own e2e database (`hub_e2e_<port>`, `database.ts` creates
+// and migrates it): on 2026-10-16 two stacks (8030 and 8040) ran on the default `hub` and the cash sale
+// of one fell into the other's open shift. Phase 1 keeps every hub's business in that one database, so
+// `DB_NAME` is all a run needs to be on its own; without it, or with `hub`, the run is refused.
 
 type Env = Record<string, string | undefined>;
 
@@ -48,6 +53,16 @@ function origin(env: Env, name: string, fallback: string): string {
   return url.origin;
 }
 
+/** runserver's port and database of the shared dev stack. */
+const SHARED_PORT = 8000;
+const SHARED_DATABASE = 'hub';
+
+/** An e2e database: `hub_…` with `e2e` as one of its words (`hub_e2e_8030`, `hub_fix_e2e_a`). The only kind
+ *  a stack beside the shared one runs on, and the only kind `database.ts` creates, migrates or drops. */
+export function isE2eDatabase(name: string): boolean {
+  return /^hub(?:_[a-z0-9]+)*_e2e(?:_[a-z0-9]+)*$/.test(name);
+}
+
 function database(env: Env, name: string, fallback: string): string {
   const raw = env[name] || fallback;
   // It goes into a shell command (`psql -d …`) as is.
@@ -57,14 +72,27 @@ function database(env: Env, name: string, fallback: string): string {
   return raw;
 }
 
+/** The run's database: the stack beside the shared one gets its own e2e database, or nothing runs. */
+function databaseOf(env: Env, hubPort: number): string {
+  const name = database(env, 'DB_NAME', SHARED_DATABASE);
+  if (hubPort === SHARED_PORT || isE2eDatabase(name)) return name;
+  const own = `hub_e2e_${hubPort}`;
+  const given = env.DB_NAME ? `DB_NAME=${name}` : `the shared ${SHARED_DATABASE} (DB_NAME unset)`;
+  throw new Error(
+    `A stack beside the shared one (E2E_HUB_PORT=${hubPort}) runs on its own e2e database, not on ${given}: ` +
+      `another run would write into it. Export DB_NAME=${own} for its runserver and its e2e, and create it with ` +
+      `\`DB_NAME=${own} node tests/e2e/database.ts\` before starting runserver (tests/e2e/README.md).`,
+  );
+}
+
 export function stackFrom(env: Env): Stack {
-  const hubPort = port(env, 'E2E_HUB_PORT', 8000);
+  const hubPort = port(env, 'E2E_HUB_PORT', SHARED_PORT);
   const vitePort = port(env, 'VITE_DEV_PORT', 5173);
   return {
     hubPort,
     vitePort,
     saas: origin(env, 'SAAS_URL', 'http://localhost:8001'),
-    database: database(env, 'DB_NAME', 'hub'),
+    database: databaseOf(env, hubPort),
     healthz: `http://127.0.0.1:${hubPort}/healthz`,
     viteClient: `http://localhost:${vitePort}/static/spa/@vite/client`,
     hub: (slug: string) => `http://${slug}.localhost:${hubPort}`,
