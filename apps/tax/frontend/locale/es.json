@@ -19,16 +19,6 @@
     "add": "Añadir",
     "noResults": "Sin resultados",
     "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
-    "filters": {
-      "button": "Filtros",
-      "count": "Filtros: {n}",
-      "title": "Filtros",
-      "clear": "Limpiar",
-      "done": "Hecho",
-      "any": "Cualquiera",
-      "from": "Desde",
-      "to": "Hasta"
-    },
     "searchSelect": {
       "search": "Buscar…",
       "close": "Cerrar"

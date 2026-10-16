@@ -12,21 +12,26 @@ import { useLocale, useT } from './useT';
 
 describe('useT', () => {
   it('translates in the app language, with named values, and follows a change of language', async () => {
-    const i18n = createShellI18n({ locale: 'en', messages: { en, es } });
+    // The catalog has no text with a named value today, so the case brings its own.
+    const messages = {
+      en: { ...en, probe: { count: 'Rules: {n}' } },
+      es: { ...es, probe: { count: 'Reglas: {n}' } },
+    };
+    const i18n = createShellI18n({ locale: 'en', messages });
     const wrapper = mount(
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('tax.title')} · ${t('tax.filters.count', { n: 2 })}`);
+          const text = computed(() => `${t('tax.title')} · ${t('probe.count', { n: 2 })}`);
           return () => h('p', text.value);
         },
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('Taxes · Filters: 2');
+    expect(wrapper.text()).toBe('Taxes · Rules: 2');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toBe('Impuestos · Filtros: 2');
+    expect(wrapper.text()).toBe('Impuestos · Reglas: 2');
   });
 
   it('only works inside a component, which is where the app’s translator lives', () => {

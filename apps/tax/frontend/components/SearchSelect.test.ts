@@ -92,14 +92,6 @@ describe('SearchSelect', () => {
     expect(s.field().value).toBe('Spain (ES)');
   });
 
-  it('can offer «Any» first, which is no value', async () => {
-    const s = await setup({ modelValue: 'ES', anyLabel: 'Any' });
-    await s.open();
-    expect(s.options()[0]).toEqual(['', 'Any']);
-    await click(s.inDoc('country-option'));
-    expect(s.wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['']);
-  });
-
   it('paints an error under the field; disabled, it does not open', async () => {
     const s = await setup({ errorText: 'Choose one', disabled: true });
     expect([s.field().errorText, s.field().classList.contains('ion-invalid')]).toEqual(['Choose one', true]);
