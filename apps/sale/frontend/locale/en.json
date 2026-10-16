@@ -6,7 +6,7 @@
       "pos": "Sell",
       "sales": "Sales",
       "quickNotes": "Quick notes",
-      "departments": "Departments",
+      "departments": "Sections",
       "settings": "Settings"
     },
     "live": {
@@ -123,9 +123,9 @@
       "staffLoadFailed": "The team could not be loaded. The sale is still attributed to whoever is signed in.",
       "staffPickerEmpty": "This hub has nobody else to serve. Add staff from Settings.",
       "staffNoResults": "Nobody in the team matches your search.",
-      "department": "Department (VAT)",
-      "departmentSearch": "Search a department…",
-      "departmentsLoadFailed": "The departments could not be loaded.",
+      "department": "Section (VAT)",
+      "departmentSearch": "Search a section…",
+      "departmentsLoadFailed": "The sections could not be loaded.",
       "addAmount": "Add {amount}",
       "numpadClear": "Clear",
       "lineNoteOf": "Note on {name}",
@@ -502,16 +502,16 @@
       "deleteFailed": "The quick note could not be deleted."
     },
     "departments": {
-      "intro": "The families the till offers when you charge an amount that is not in the catalogue. Each one carries its own VAT. Leave the list empty and the till falls back to the plain tax categories.",
-      "search": "Search a department…",
-      "loading": "Loading departments…",
-      "empty": "No departments yet. Add the families you ring up by hand — “Fruit and veg”, “Butchery”, “Household”.",
+      "intro": "The sections the till offers when you charge an amount that is not in the catalogue. Each one carries its own VAT. Leave the list empty and the till falls back to the plain tax categories.",
+      "search": "Search a section…",
+      "loading": "Loading sections…",
+      "empty": "No sections yet. Add the ones you ring up by hand — “Fruit and veg”, “Butchery”, “Household”.",
       "noResults": "No results",
-      "noResultsMessage": "No department matches your search.",
-      "loadError": "The departments could not be loaded.",
+      "noResultsMessage": "No section matches your search.",
+      "loadError": "The sections could not be loaded.",
       "entity": {
-        "one": "department",
-        "many": "departments"
+        "one": "section",
+        "many": "sections"
       },
       "columns": {
         "name": "Name",
@@ -522,19 +522,19 @@
       "edit": "Edit",
       "delete": "Delete",
       "form": {
-        "createTitle": "New department",
-        "editTitle": "Edit department",
+        "createTitle": "New section",
+        "editTitle": "Edit section",
         "add": "Add",
         "save": "Save",
         "namePlaceholder": "e.g. Fruit and veg",
         "taxPlaceholder": "Choose the VAT"
       },
-      "taxCategoryMissing": "Choose the VAT this department charges.",
-      "saveFailed": "The department could not be saved.",
-      "deleteTitle": "Delete department",
+      "taxCategoryMissing": "Choose the VAT this section charges.",
+      "saveFailed": "The section could not be saved.",
+      "deleteTitle": "Delete section",
       "deleteMessage": "{name} — It stops being offered at the till. Everything already sold keeps the name and the VAT it was charged with.",
       "deleteCancel": "Cancel",
-      "deleteFailed": "The department could not be deleted."
+      "deleteFailed": "The section could not be deleted."
     },
     "settings": {
       "heading": "Point of sale",

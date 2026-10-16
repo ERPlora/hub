@@ -20,7 +20,7 @@ class SaleConfig(LiveAppConfig):
     )
     description = _(
         "Sales & POS is the business's cash register. Build the check by tapping articles or typing an "
-        "open price by department, add notes, discounts and comps, park it and pick it up again, charge "
+        "open price by section, add notes, discounts and comps, park it and pick it up again, charge "
         "it whole or in parts, in cash with change, by card or split between several methods, as a "
         "ticket or a full invoice. Every sale gets its number of the day and its VAT line by line, is "
         "never edited, and is corrected by voiding it or refunding it, whole or in part. Inventory "
@@ -59,7 +59,8 @@ class SaleConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: the old `storefront` (filled) and
-    # `chatbubble-ellipses-outline` wait in UI-REQUESTS.md.
+    # `chatbubble-ellipses-outline` wait in UI-REQUESTS.md. The departments of the open price read
+    # «Sections»: the old «Departments» was one word wider than a fifth of a phone's tabbar.
     navigation = [
         Nav("pos", _("Sell"), "ion:storefront-outline", "/sale/pos"),
         Nav("sales", _("Sales"), "ion:cart-outline", "/sale/sales"),
@@ -69,6 +70,6 @@ class SaleConfig(LiveAppConfig):
             "ion:chatbubbles-outline",
             "/sale/quick-notes",
         ),
-        Nav("departments", _("Departments"), "ion:grid-outline", "/sale/departments"),
+        Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
     ]

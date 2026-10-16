@@ -1,6 +1,6 @@
 // `refusal(error, fallback)`: what a person reads when a command of the sale app failed (a FormModal's
 // `error`, a window's or a page's notice). The server's refusals arrive translated
-// (`sale.department_not_found`: «That department is no longer in this business…»), with their 422
+// (`sale.department_not_found`: «That section is no longer in this business…»), with their 422
 // `fields`; a failure the server did not word (the network dropped, an answer that is not the API's
 // envelope, something that is not an API error at all) says the screen's own sentence («The quick note
 // could not be saved.»), never the SDK's English.

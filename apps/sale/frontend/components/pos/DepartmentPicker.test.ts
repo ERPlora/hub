@@ -1,5 +1,5 @@
-// «Department (VAT)» of the open price (SALE-F09, F35): the business's departments, each with the rate
-// it charges today, searched on the server; without departments, Taxes' categories through the app's one
+// «Section (VAT)» of the open price (SALE-F09, F35): the business's sections, each with the rate
+// it charges today, searched on the server; without sections, Taxes' categories through the app's one
 // tax-category picker (which says it when there is none either).
 import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
@@ -57,7 +57,7 @@ describe('DepartmentPicker', () => {
     const m = await setup();
     await m.result(DEPARTMENTS, page([]));
     const picker = m.wrapper.findComponent(TaxCategoryPicker);
-    expect(picker.props()).toMatchObject({ label: 'Department (VAT)', testid: 'pos-tax-category', modelValue: '' });
+    expect(picker.props()).toMatchObject({ label: 'Section (VAT)', testid: 'pos-tax-category', modelValue: '' });
     picker.vm.$emit('update:modelValue', 'food');
     await m.wrapper.vm.$nextTick();
     expect(m.choice.value).toEqual({ kind: 'tax', key: 'food' });
@@ -70,13 +70,13 @@ describe('DepartmentPicker', () => {
     await m.reopen();
     await m.result(DEPARTMENTS, page([]));
     expect(m.wrapper.findComponent(TaxCategoryPicker).exists()).toBe(false);
-    expect(m.find('pos-departments-none').text()).toBe('No department matches your search.');
+    expect(m.find('pos-departments-none').text()).toBe('No section matches your search.');
   });
 
   it('says it when the departments cannot be read', async () => {
     const m = await setup();
     m.net.lastStream().push(errorFrame(m.subId(DEPARTMENTS), 'internal_error'));
     await m.reopen();
-    expect(m.find('pos-departments-error').text()).toBe('The departments could not be loaded.');
+    expect(m.find('pos-departments-error').text()).toBe('The sections could not be loaded.');
   });
 });
