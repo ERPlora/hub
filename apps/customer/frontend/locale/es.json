@@ -272,7 +272,7 @@
     },
     "erase": {
       "title": "Borrar datos personales (RGPD)",
-      "message": "Borra los datos personales de {name}, sus notas, su actividad y sus campos personalizados, y no se puede deshacer. Las ventas y facturas conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.",
+      "message": "Borra los datos personales de {name}, sus notas, su actividad, sus datos de salud y sus campos personalizados, y no se puede deshacer. Las ventas y facturas conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.",
       "reason": "Motivo (queda en la auditoría)",
       "submit": "Borrar datos personales",
       "done": "Datos personales borrados."

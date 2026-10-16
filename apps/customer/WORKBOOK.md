@@ -360,9 +360,10 @@ Pasos:
    `notes`/«Notas» (las mismas columnas que da la exportación, CUSTOMER-F09), y además `source`,
    `preferred_channel`, `birthday`, `anniversary` y `avatar`.
 3. Mientras trabaja sale «Importando…». Al acabar, un resumen «Importación: {total} filas —
-   {creadas} creadas, {omitidas} omitidas.» con cada fila omitida y su motivo (falta el nombre, el
-   email no es válido, el teléfono no es válido…) y las que tienen algo que revisar («país no
-   reconocido: importado sin país, revísalo en la ficha»).
+   {creadas} creadas, {omitidas} omitidas.» con cada fila omitida y su motivo, que empieza por la
+   columna de la que habla («Nombre: Este campo es obligatorio.»; igual con un email o un teléfono
+   que no son válidos), y las que tienen algo que revisar («país no reconocido: importado sin país,
+   revísalo en la ficha»).
 Entra: el fichero, que la pantalla envía en bloques de 50 filas.
 Sale: las fichas creadas, con origen «Importación», el teléfono en formato internacional y sin
 consentimiento (aunque el fichero traiga una columna de consentimiento), y un aviso de ficha creada
@@ -543,7 +544,7 @@ Pantalla: Ficha de cliente
 Pasos:
 1. En la ficha pulsa **Borrar datos personales**.
 2. Sale «Borrar datos personales (RGPD)» con el texto «Borra los datos personales de {nombre}, sus
-   notas, su actividad y sus campos personalizados, y no se puede deshacer. Las ventas y facturas
+   notas, su actividad, sus datos de salud y sus campos personalizados, y no se puede deshacer. Las ventas y facturas
    conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.» y el campo
    «Motivo (queda en la auditoría)».
 3. Pulsa **Borrar datos personales**. La ficha se cierra y sale «Datos personales borrados.».
@@ -552,7 +553,7 @@ eliminada o unida a otra. Las fichas duplicadas que se unieron en ella (CUSTOMER
 persona: sus datos se borran en el mismo paso, cada una con su auditoría y su aviso.
 Sale: la ficha se queda con su identificador, el nombre fijo `Deleted customer` y sin contacto, NIF,
 dirección, fechas, notas internas ni canal, y desaparece de todas las listas. Se borran su actividad
-(notas incluidas), sus valores de campos personalizados y su pertenencia a grupos y etiquetas; sus
+(notas incluidas), sus datos de salud (CUSTOMER-F32), sus valores de campos personalizados y su pertenencia a grupos y etiquetas; sus
 consentimientos se quedan sin dirección, justificante ni motivo. Se conservan el origen, la etapa,
 las compras, el gastado, la última compra y la fecha de alta, las compras y los pedidos enlazados
 (prueba comercial y fiscal) y una única entrada de auditoría (quién, cuándo, el motivo y qué se borró

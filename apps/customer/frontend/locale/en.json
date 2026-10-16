@@ -272,7 +272,7 @@
     },
     "erase": {
       "title": "Erase personal data (GDPR)",
-      "message": "This erases {name}'s personal data, their notes, their activity and their custom fields, and cannot be undone. Sales and invoices keep their reference. An audit entry records who, when and why.",
+      "message": "This erases {name}'s personal data, their notes, their activity, their health data and their custom fields, and cannot be undone. Sales and invoices keep their reference. An audit entry records who, when and why.",
       "reason": "Reason (kept in the audit)",
       "submit": "Erase personal data",
       "done": "Personal data erased."

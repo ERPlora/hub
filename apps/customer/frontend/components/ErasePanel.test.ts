@@ -27,7 +27,10 @@ describe('ErasePanel', () => {
   it('says what it erases and that it cannot be undone, and asks the reason', async () => {
     const s = await setup();
     expect(s.wrapper.get('h3').text()).toBe('Erase personal data (GDPR)');
-    expect(s.wrapper.text()).toContain("This erases Ana García's personal data, their notes, their activity and their custom fields, and cannot be undone.");
+    // CUSTOMER-F32: the health data goes too, and the person erasing must know it.
+    expect(s.wrapper.text()).toContain(
+      "This erases Ana García's personal data, their notes, their activity, their health data and their custom fields, and cannot be undone.",
+    );
     expect(s.wrapper.findComponent(IonInput).props('label')).toBe('Reason (kept in the audit)');
   });
 
