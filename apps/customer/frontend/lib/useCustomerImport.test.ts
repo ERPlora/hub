@@ -59,10 +59,20 @@ describe('useCustomerImport', () => {
     expect(s.api().report.value).toEqual({
       total: 2,
       created: 1,
-      skipped: [{ line: 2, reasons: ['This field is required.'] }],
+      // A reason says which column it is about (the server's message alone said «this value»).
+      skipped: [{ line: 2, reasons: ['Name: This field is required.'] }],
       warnings: [{ line: 3, reasons: ['Country not recognised: imported without it.'] }],
       failed: [],
     });
+  });
+
+  it('a reason of a column it does not know, or of no column, goes as the server says it', async () => {
+    const s = await setup();
+    s.net.onApi(() =>
+      json({ created: 0, skipped: 1, rows: [{ index: 0, id: null, errors: { odd: 'Broken.' }, warnings: {} }] }),
+    );
+    await s.api().importFile(file('name\nAna\n'));
+    expect(s.api().report.value?.skipped).toEqual([{ line: 2, reasons: ['Broken.'] }]);
   });
 
   it('a block the server refuses is reported with its lines and reason; the next blocks still go', async () => {

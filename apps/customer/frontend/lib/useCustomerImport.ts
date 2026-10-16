@@ -7,6 +7,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { ref, shallowRef } from 'vue';
 
 import { type CsvRow, importBlocks, rowsFromCsv } from './csvImport';
+import { useCustomerI18n } from './useCustomerI18n';
 
 export interface ImportLine {
   /** Line of the file (the header is line 1). */
@@ -38,8 +39,32 @@ export function decode(buffer: ArrayBuffer): string {
   }
 }
 
+/** The label of each column of a row the server may refuse, as the card's form names it. */
+const COLUMN_LABELS: Record<string, string> = {
+  name: 'customer.form.name',
+  email: 'customer.form.email',
+  phone: 'customer.form.phone',
+  tax_id: 'customer.form.taxId',
+  company_name: 'customer.form.company',
+  address: 'customer.form.address',
+  city: 'customer.form.city',
+  postal_code: 'customer.form.postalCode',
+  country: 'customer.form.country',
+  avatar: 'customer.form.avatar',
+  birthday: 'customer.form.birthday',
+  anniversary: 'customer.form.anniversary',
+  source: 'customer.form.source',
+  lifecycle_stage: 'customer.form.stage',
+  preferred_channel: 'customer.form.preferredChannel',
+  notes: 'customer.form.notes',
+};
+
 export function useCustomerImport() {
+  const { t } = useCustomerI18n();
   const { run } = useCommand('customer.customer.import');
+  /** «Name: …»: the server's reason with the column it is about. */
+  const reason = (field: string, message: string): string =>
+    COLUMN_LABELS[field] ? `${t(COLUMN_LABELS[field])}: ${message}` : message;
   const importing = ref(false);
   const report = shallowRef<ImportReport | null>(null);
   const problem = ref<ImportProblem | null>(null);
@@ -71,7 +96,7 @@ export function useCustomerImport() {
           out.created += answer.created;
           for (const result of answer.rows) {
             const line = block[result.index]?.line ?? result.index + 2;
-            const errors = Object.values(result.errors);
+            const errors = Object.entries(result.errors).map(([field, message]) => reason(field, message));
             const warnings = Object.values(result.warnings);
             if (errors.length) out.skipped.push({ line, reasons: errors });
             if (warnings.length) out.warnings.push({ line, reasons: warnings });
