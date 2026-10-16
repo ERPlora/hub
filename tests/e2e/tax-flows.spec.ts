@@ -97,6 +97,32 @@ test('TAX-F03: a component is read right under its root; Status reaches the deac
   expect(box && Math.min(box.width, box.height), 'the Restore target on a phone').toBeGreaterThanOrEqual(44);
 });
 
+// flow: TAX-F03 · gh:hub#2406
+test('TAX-F03: on a phone «Load more» brings the rest and the footer counts every rule on screen', async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, A, '/tax/rules');
+  const key = await freshCategory(context, 'f03_more');
+  // 51 rules of one category, one country each: one more than a page.
+  const countries = 'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU'.split(' ');
+  expect(countries).toHaveLength(51);
+  const bulk = await api(context, A, 'POST', '/tax/rules/bulk_create', {
+    rules: countries.map((country_code) => ({ country_code, tax_category_key: key, rate_pct: 10 })),
+  });
+  expect(bulk.status).toBe(201);
+  await listReady(page, 'rules');
+  await shown(page).locator('[data-testid=tax-rules-search] input').fill(key);
+  const footer = shown(page).locator('.data-table__pager-info');
+  // The search has landed (it is debounced): the first page of the 51.
+  await expect(footer).toContainText(/1\s*[–-]\s*50 of 51 rules/);
+  await expect(rows(page, 'rules')).toHaveCount(50);
+  await shown(page).locator('[data-testid=tax-rules-load-more]').click();
+  await expect(rows(page, 'rules')).toHaveCount(51);
+  await expect(footer).toContainText('51 rules');
+  // hub#2406: never «Showing 51–51» over 51 rules on screen.
+  await expect(footer).not.toContainText(/51\s*[–-]\s*51/);
+  await expect(shown(page).locator('[data-testid=tax-rules-load-more]')).toHaveCount(0);
+});
+
 // flow: TAX-F04 · gh:pm#513 · gh:taxes#47
 test('TAX-F04: a rule is created with the Country and Category combos; an overlap is told under «Valid from» at every width', async ({
   page,
