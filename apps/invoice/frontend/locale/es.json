@@ -86,21 +86,10 @@
       "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros."
     },
     "filters": {
-      "status": "Estado",
-      "type": "Tipo",
       "series": "Serie",
       "source": "Origen",
-      "dateFrom": "Emitidas desde",
-      "dateTo": "Emitidas hasta",
-      "totalFrom": "Total desde (€)",
-      "totalTo": "Total hasta (€)",
-      "any": "Cualquiera",
-      "clear": "Quitar filtros",
-      "button": "Filtros",
-      "title": "Filtrar facturas",
-      "count": "Filtros: {n} en uso",
-      "done": "Hecho",
-      "amountInvalid": "Escribe un importe, como 12,50"
+      "amountInvalid": "Escribe un importe, como 12,50",
+      "dateOrder": "La fecha final es anterior a la inicial."
     },
     "detail": {
       "title": "Factura {number}",

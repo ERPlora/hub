@@ -2,26 +2,36 @@
 // Invoicing → Invoices (INVOICE-F16, F19, F03, F08; the old `erp-invoice-list`): the live
 // `invoice.invoice.list` in a server-side DataTable — Number, Customer, Total, Status, Date, Type —, the
 // last issued first (the old list sat on the internal id), 50 a page, search «Search invoices…» (number,
-// customer's name or tax ID) and the filters panel (status, type, series, source, dates, total); table or
+// customer's name or tax ID) and the filters behind the table's funnel (total, status, date and type on
+// their columns, then series and source; an amount it cannot read, or a «to» day before its «from», is
+// said under its field and does not filter; so is what the server refused); table or
 // cards (on a phone, cards titled by the number). A row, or «View», opens its invoice. «Mark as paid» only
 // on an issued invoice and for whoever may issue; «Rectify» only where it applies and for whoever may
 // rectify; «+» opens «New manual invoice». A refused row action is said above the table. Issued, rectified
 // and paid invoices come back through the stream by themselves: nothing here refetches.
-import { type DataTableAction, type DataTableColumn, DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import {
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilterField,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+  StatusPill,
+} from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
-import InvoiceFilters from '../components/InvoiceFilters.vue';
-import { filterCount, filterQuery, type InvoiceFilterValues } from '../components/filters';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney } from '../lib/format';
-import { statusTone } from '../lib/invoice';
+import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
+import { filterQuery, filtersInUse, invalidAmounts, reversedDates } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
 import { invoiceTabs } from '../tabs';
 
@@ -32,20 +42,31 @@ const router = useRouter();
 const t = useT();
 const locale = useLocale();
 
-const filters = ref<InvoiceFilterValues>({});
+/** The longest series code the server takes (`SERIES_CODE_MAX_LENGTH`). */
+const SERIES_MAX = 20;
+
+/** The table's filters (its funnel), as typed: the total in euros. A filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 const table = useServerTable('invoice.invoice.list', {
   sort: 'issued_at',
   dir: 'desc',
   maxSearch: 120,
   filters: (): Partial<InvoiceListIn> => filterQuery(filters.value),
-  narrowed: () => filterCount(filters.value) > 0,
+  // Only the filters that really apply narrow the list (an amount it cannot read does not).
+  narrowed: () => filtersInUse(filters.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
 const blocked = computed(() => blockingError(error.value));
 /** A filter the server refused (a 422 of the list): said under the filter, the rows stay. */
-const filterErrors = computed(() => error.value?.fields ?? {});
-const tableError = computed(() => (status.value === 'error' && !Object.keys(filterErrors.value).length ? error.value?.message : undefined));
+const refusedFilters = computed(() => error.value?.fields ?? {});
+const tableError = computed(() => (status.value === 'error' && !Object.keys(refusedFilters.value).length ? error.value?.message : undefined));
+/** Under each filter: what it cannot read or a reversed range, else what the server refused. */
+const filterErrors = computed<Record<string, string>>(() => ({
+  ...refusedFilters.value,
+  ...Object.fromEntries(invalidAmounts(filters.value).map((key) => [key, t('invoice.filters.amountInvalid')])),
+  ...(reversedDates(filters.value) ? { issue_date_to: t('invoice.filters.dateOrder') } : {}),
+}));
 
 const dash = (value: unknown): string => (value === null || value === undefined || value === '' ? '—' : String(value));
 
@@ -59,9 +80,25 @@ const columns = computed<DataTableColumn<InvoiceRowOut>[]>(() => [
     align: 'right',
     width: 'minmax(7rem, 8rem)',
     format: (_, row) => formatMoney(row.total_amount, locale.value),
+    filter: { type: 'range', amount: true, keys: ['total_amount_from', 'total_amount_to'] },
   },
-  { key: 'status', label: t('invoice.list.columns.status'), sortable: true, cell: 'status', width: 'minmax(7rem, 9rem)', format: (_, row) => t(`invoice.status.${row.status}`) },
-  { key: 'issue_date', label: t('invoice.list.columns.date'), sortable: true, width: 'minmax(7rem, 9rem)', format: (_, row) => formatDate(row.issue_date, locale.value) },
+  {
+    key: 'status',
+    label: t('invoice.list.columns.status'),
+    sortable: true,
+    cell: 'status',
+    width: 'minmax(7rem, 9rem)',
+    format: (_, row) => t(`invoice.status.${row.status}`),
+    filter: { type: 'select', options: STATUS_CODES.map((code) => ({ value: code, label: t(`invoice.status.${code}`) })) },
+  },
+  {
+    key: 'issue_date',
+    label: t('invoice.list.columns.date'),
+    sortable: true,
+    width: 'minmax(7rem, 9rem)',
+    format: (_, row) => formatDate(row.issue_date, locale.value),
+    filter: { type: 'daterange', keys: ['issue_date_from', 'issue_date_to'] },
+  },
   {
     key: 'invoice_type',
     label: t('invoice.list.columns.type'),
@@ -69,7 +106,14 @@ const columns = computed<DataTableColumn<InvoiceRowOut>[]>(() => [
     priority: 'low',
     width: 'minmax(6rem, 8rem)',
     format: (_, row) => t(`invoice.types.${row.invoice_type}`),
+    filter: { type: 'select', options: TYPE_CODES.map((code) => ({ value: code, label: t(`invoice.typeNames.${code}`) })) },
   },
+]);
+
+/** The filters with no column of their own, after the columns' (Total, Status, Date, Type). */
+const filterFields = computed<DataTableFilterField[]>(() => [
+  { type: 'text', key: 'series_code', label: t('invoice.filters.series'), maxlength: SERIES_MAX },
+  { type: 'select', key: 'source_type', label: t('invoice.filters.source'), options: SOURCE_CODES.map((code) => ({ value: code, label: t(`invoice.sources.${code}`) })) },
 ]);
 
 const paid = useMarkPaid();
@@ -134,10 +178,14 @@ function onAction({ actionId, row }: { actionId: string; row: InvoiceRowOut }): 
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="invoice-list"
       fill
       server-side
       searchable
+      filterable
+      :filter-fields="filterFields"
+      :filter-errors="filterErrors"
       row-clickable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
@@ -165,12 +213,6 @@ function onAction({ actionId, row }: { actionId: string; row: InvoiceRowOut }): 
       @add="creating = true"
       @retry="refresh()"
     >
-      <template #filters>
-        <InvoiceFilters
-          v-model="filters"
-          :field-errors="filterErrors"
-        />
-      </template>
       <template #status="{ row }">
         <StatusPill
           size="sm"
