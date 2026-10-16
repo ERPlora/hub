@@ -2049,7 +2049,9 @@ def test_health_declarations_keep_the_data_away_from_the_assistant_and_the_api_k
 def grant_health(customer, actor="clara"):
     return run(
         "customer.health.grant",
-        HealthGrantIn(customer_id=customer.id, notice_text=HEALTH_WORDS, notice_version="v1"),
+        HealthGrantIn(
+            customer_id=customer.id, notice_text=HEALTH_WORDS, notice_version="v1"
+        ),
         "hub_employee",
         actor=actor,
     )
@@ -2098,7 +2100,10 @@ def test_the_permission_is_a_health_fact_with_its_words_and_then_the_data_is_kep
         str(fact.id),
     )
     assert outbox() == [
-        (events.HEALTH_CONSENT_GRANTED, {"id": str(fact.id), "customer_id": str(ana.id)})
+        (
+            events.HEALTH_CONSENT_GRANTED,
+            {"id": str(fact.id), "customer_id": str(ana.id)},
+        )
     ]
     clear_outbox()
     tested = timezone.localdate() - timedelta(days=2)
@@ -2121,7 +2126,11 @@ def test_the_permission_is_a_health_fact_with_its_words_and_then_the_data_is_kep
         record.sensitivity_test_result,
         record.updated_by,
     ) == (ana.id, "PPD (hair dye)", tested, "negative", "clara")
-    assert (block.allergies, block.sensitivity_test_on, block.sensitivity_test_result) == (
+    assert (
+        block.allergies,
+        block.sensitivity_test_on,
+        block.sensitivity_test_result,
+    ) == (
         "PPD (hair dye)",
         tested,
         "negative",
@@ -2204,7 +2213,10 @@ def test_a_test_in_the_future_or_a_result_without_its_date_saves_nothing():
 def test_health_on_a_card_that_is_gone_or_by_who_does_not_manage_cards_is_refused():
     ana = card("Ana", deleted_at=timezone.now())
     for name, data in (
-        ("customer.health.grant", HealthGrantIn(customer_id=ana.id, notice_text=HEALTH_WORDS)),
+        (
+            "customer.health.grant",
+            HealthGrantIn(customer_id=ana.id, notice_text=HEALTH_WORDS),
+        ),
         ("customer.health.withdraw", HealthWithdrawIn(customer_id=ana.id)),
         ("customer.health.update", HealthIn(customer_id=ana.id, allergies="PPD")),
     ):
@@ -2261,6 +2273,30 @@ def test_a_merge_brings_the_duplicates_health_data_while_the_permission_holds():
 
 
 @pytest.mark.django_db
+def test_a_merge_fills_the_survivors_empty_allergies_with_the_duplicates():
+    survivor, absorbed = card("Ana"), card("Ana G.")
+    for one in (survivor, absorbed):
+        grant_health(one)
+    today = timezone.localdate()
+    run(
+        "customer.health.update",
+        HealthIn(
+            customer_id=survivor.id,
+            sensitivity_test_on=today,
+            sensitivity_test_result="negative",
+        ),
+    )
+    run("customer.health.update", HealthIn(customer_id=absorbed.id, allergies="PPD"))
+    run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
+    kept = HealthRecord.objects.get()
+    assert (kept.customer_id, kept.allergies, kept.sensitivity_test_on) == (
+        survivor.id,
+        "PPD",
+        today,
+    )
+
+
+@pytest.mark.django_db
 def test_a_merge_drops_the_health_data_when_the_last_decision_withdrew_the_permission():
     survivor, absorbed = card("Ana"), card("Ana G.")
     grant_health(absorbed)
@@ -2279,12 +2315,17 @@ def test_who_wrote_it_is_the_persons_name_never_their_account_id():
 
     users = get_user_model().objects
     clara = users.create_user(
-        username="saas:0199-clara", first_name="Clara", last_name="Ruiz", email="clara@example.com"
+        username="saas:0199-clara",
+        first_name="Clara",
+        last_name="Ruiz",
+        email="clara@example.com",
     )
     nameless = users.create_user(username="saas:0199-luis", email="luis@example.com")
     ana = card("Ana")
     note = run(
-        "customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"), actor=clara
+        "customer.note.add",
+        NoteIn(customer_id=ana.id, content="Prefers mornings"),
+        actor=clara,
     )
     assert note.actor == "Clara Ruiz"
     fact = run(
