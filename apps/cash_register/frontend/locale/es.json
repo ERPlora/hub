@@ -85,20 +85,6 @@
       }
     },
     "filters": {
-      "status": "Estado",
-      "number": "Número de sesión",
-      "opening": "Apertura",
-      "expected": "Esperado",
-      "counted": "Contado",
-      "difference": "Diferencia",
-      "from": "Desde",
-      "to": "Hasta",
-      "any": "Cualquiera",
-      "button": "Filtros",
-      "title": "Filtrar sesiones",
-      "count": "Filtros: {n}",
-      "clear": "Borrar",
-      "done": "Hecho",
       "amountInvalid": "Esto no es un importe."
     },
     "open": {

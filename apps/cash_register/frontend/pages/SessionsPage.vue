@@ -4,11 +4,20 @@
 // is past its daily cut-off, which opening the next one closes), and the live `cash_register.session.list`
 // newest first in a server-side DataTable — Session, Opened on, Status, Opening, Expected (live while open,
 // empty when a blind count hides it from this person), Counted, Difference with its sign — with search by
-// number, the filters, table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on
+// number, the filters behind the table's funnel (Session, Status and the four amounts on their columns,
+// the amounts typed in euros), table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on
 // the open session, «Movement», «Count» and «Close», each by its permission; a closing count opens the
 // close. The cash charged with no session open is said, with its list. Every action comes back through
 // the stream by itself: nothing here refetches.
-import { type DataTableAction, type DataTableColumn, DataTable, EmptyState, formatDateTime, InlineFeedback } from '@erplora/ui/components';
+import {
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  formatDateTime,
+  InlineFeedback,
+} from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -19,12 +28,11 @@ import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
 import MovementModal from '../components/MovementModal.vue';
 import OpenSessionModal from '../components/OpenSessionModal.vue';
-import SessionFilters from '../components/SessionFilters.vue';
 import UnassignedModal from '../components/UnassignedModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { filterCount, filterQuery, type SessionFilterValues } from '../lib/filters';
 import { formatMoney, formatSignedMoney } from '../lib/money';
+import { AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, unreadableAmounts } from '../lib/sessionFilters';
 import type { CountType, SessionRow } from '../operations';
 import { cashRegisterTabs } from '../tabs';
 
@@ -39,21 +47,27 @@ const locale = useLocale();
 const router = useRouter();
 
 const current = useLive('cash_register.session.current', {});
-const filters = ref<SessionFilterValues>({});
+/** The table's filters (its funnel), as typed: the amounts in euros. A filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 const table = useServerTable('cash_register.session.list', {
   sort: 'opened_at',
   dir: 'desc',
   maxSearch: 24,
-  filters: () => filterQuery(filters.value),
-  narrowed: () => filterCount(filters.value) > 0,
+  filters: () => filterParams(filters.value),
+  // Only the filters that really apply narrow the list (an amount it cannot read does not).
+  narrowed: () => filtersInUse(filters.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
 /** The failures that replace the list with a notice: the app is off here, or the person may not look. */
 const blocked = computed(() => (error.value?.code === 'app_inactive' || error.value?.code === 'permission_denied' ? error.value.code : null));
-const filterErrors = computed(() => error.value?.fields ?? {});
+/** What the server refused (a 422 of the list) and the amounts it cannot read, under each filter: the rows stay. */
+const filterErrors = computed<Record<string, string>>(() => ({
+  ...(error.value?.fields ?? {}),
+  ...Object.fromEntries(unreadableAmounts(filters.value).map((name) => [name, t('cash_register.filters.amountInvalid')])),
+}));
 const tableError = computed(() =>
-  status.value === 'error' && !Object.keys(filterErrors.value).length ? (error.value?.message ?? t('cash_register.sessions.loadError')) : undefined,
+  status.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? (error.value?.message ?? t('cash_register.sessions.loadError')) : undefined,
 );
 
 // ── The open session ─────────────────────────────────────────────────────────────────────────────
@@ -69,20 +83,57 @@ const unassignedCash = computed(() => current.data.value?.unassigned_cash ?? 0);
 
 // ── Columns ──────────────────────────────────────────────────────────────────────────────────────
 const money = (cents: number | null): string => formatMoney(cents, locale.value);
+/** An amount column's filter: from–to, typed in euros (`AMOUNT_RANGES`). */
+const amountFilter = (range: keyof typeof AMOUNT_RANGES) => ({ type: 'range' as const, amount: true, keys: AMOUNT_RANGES[range] });
 
 const columns = computed<DataTableColumn<SessionRow>[]>(() => [
-  { key: 'number', label: t('cash_register.sessions.columns.number'), sortable: true, priority: 'high', width: 'minmax(7rem,1fr)' },
+  {
+    key: 'number',
+    label: t('cash_register.sessions.columns.number'),
+    sortable: true,
+    priority: 'high',
+    width: 'minmax(7rem,1fr)',
+    filter: { type: 'text', maxlength: 24 },
+  },
   { key: 'opened_at', label: t('cash_register.sessions.columns.openedAt'), sortable: true, format: (_, row) => formatDateTime(row.opened_at, locale.value) },
-  { key: 'status', label: t('cash_register.sessions.columns.status'), sortable: true, format: (_, row) => t(`cash_register.status.${row.status}`) },
-  { key: 'opening_balance', label: t('cash_register.sessions.columns.opening'), sortable: true, align: 'right', format: (_, row) => money(row.opening_balance) },
-  { key: 'expected_balance', label: t('cash_register.sessions.columns.expected'), sortable: true, align: 'right', format: (_, row) => money(row.expected_balance) },
-  { key: 'closing_balance', label: t('cash_register.sessions.columns.counted'), sortable: true, align: 'right', format: (_, row) => money(row.closing_balance) },
+  {
+    key: 'status',
+    label: t('cash_register.sessions.columns.status'),
+    sortable: true,
+    format: (_, row) => t(`cash_register.status.${row.status}`),
+    filter: { type: 'select', options: SESSION_STATUSES.map((value) => ({ value, label: t(`cash_register.status.${value}`) })) },
+  },
+  {
+    key: 'opening_balance',
+    label: t('cash_register.sessions.columns.opening'),
+    sortable: true,
+    align: 'right',
+    format: (_, row) => money(row.opening_balance),
+    filter: amountFilter('opening'),
+  },
+  {
+    key: 'expected_balance',
+    label: t('cash_register.sessions.columns.expected'),
+    sortable: true,
+    align: 'right',
+    format: (_, row) => money(row.expected_balance),
+    filter: amountFilter('expected'),
+  },
+  {
+    key: 'closing_balance',
+    label: t('cash_register.sessions.columns.counted'),
+    sortable: true,
+    align: 'right',
+    format: (_, row) => money(row.closing_balance),
+    filter: amountFilter('counted'),
+  },
   {
     key: 'difference',
     label: t('cash_register.sessions.columns.difference'),
     sortable: true,
     align: 'right',
     format: (_, row) => formatSignedMoney(row.difference, locale.value),
+    filter: amountFilter('difference'),
   },
 ]);
 
@@ -198,10 +249,13 @@ function onCounted(count: { type: CountType; total: number }): void {
     <DataTable
       v-else
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="cash-register-sessions"
       fill
       server-side
       searchable
+      filterable
+      :filter-errors="filterErrors"
       row-clickable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
@@ -229,12 +283,6 @@ function onCounted(count: { type: CountType; total: number }): void {
       @action="onAction"
       @retry="refresh()"
     >
-      <template #filters>
-        <SessionFilters
-          v-model="filters"
-          :field-errors="filterErrors"
-        />
-      </template>
       <template #empty>
         <EmptyState
           data-testid="cash-register-sessions-empty"
