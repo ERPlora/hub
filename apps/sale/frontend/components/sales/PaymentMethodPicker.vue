@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The payment-method picker of Sales: the «Payment» filter, and «Give it back through» in a refund. A
+// The payment-method picker of Sales: «Give it back through» in a refund (the list's «Payment» filter is
+// the table funnel's lookup, `lib/salesFilters.ts`). A
 // read-only outlined field opening a window with a searchbar and the list, the pattern Ionic recommends
 // for a list that may grow (an `ion-select` has no search). The list is the server's
 // (`sale.payment_method.list`, searched there, a short page), live while the picker is on screen. A

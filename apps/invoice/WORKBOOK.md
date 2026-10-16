@@ -521,6 +521,7 @@ saltó números, o uno que nunca se usó; antes del primer número de una serie 
 Implicados: ninguno
 
 ### INVOICE-F16 Buscar una factura
+<!-- origen: fi:modules/invoice#navigation-web-components fi:modules/invoice#query-invoice-list old:invoice/workflow/consulta.md#invoice-f16 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Facturas
@@ -532,7 +533,9 @@ Pasos:
 4. Pulsa «Ver», o la fila, para abrirla (INVOICE-F17).
 Entra: las facturas del hub.
 Sale: nada; solo se lee.
-Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar».
+Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar». Un total que no
+es un importe dice «Escribe un importe, como 12,50» bajo su campo, y una fecha final anterior a la
+inicial, «La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
 Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura

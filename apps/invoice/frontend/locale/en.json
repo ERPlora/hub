@@ -86,21 +86,10 @@
       "noResultsMessage": "Nothing matches your search or filters."
     },
     "filters": {
-      "status": "Status",
-      "type": "Type",
       "series": "Series",
       "source": "Source",
-      "dateFrom": "Issued from",
-      "dateTo": "Issued until",
-      "totalFrom": "Total from (€)",
-      "totalTo": "Total up to (€)",
-      "any": "Any",
-      "clear": "Clear filters",
-      "button": "Filters",
-      "title": "Filter invoices",
-      "count": "Filters: {n} in use",
-      "done": "Done",
-      "amountInvalid": "Type an amount, like 12.50"
+      "amountInvalid": "Type an amount, like 12.50",
+      "dateOrder": "The end date cannot be before the start date."
     },
     "detail": {
       "title": "Invoice {number}",

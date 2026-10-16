@@ -3,23 +3,32 @@
 // with, 7 days, 30 days, All) counted from the hub's business day, the six figures of the period (only
 // for whoever may see the reports) and the live `sale.sale.list` in a server-side DataTable — Date,
 // Number, Customer, Payment, Status («<amount> left to refund» under a sale partly refunded), Total —,
-// with search, the filters (status, payment, date, total; a date range replaces the period), table or
+// with search, the filters behind the table's funnel (date, payment, status, total on their columns; a
+// date range replaces the period; an amount it cannot read, or a «to» day before its «from», is said
+// under its field and does not filter), table or
 // cards and 50 a page. A row opens its document; «Document» and «Reprint» for everyone; «Void» and
 // «Refund» by permission, only where they apply; a sale whose fiscal documents wait says «Document
 // pending» under its status and offers «Issue now» (`sale.sale.issue_documents`) to whoever charges. Charges, voids and refunds come back through the
 // stream by themselves: nothing here refetches. Everything the screen shows is the server's.
-import { type DataTableAction, type DataTableColumn, DataTable, EmptyState, formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
-import { useCommand } from '@erplora/ui/sdk';
+import {
+  type DataTableAction,
+  type DataTableColumn,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  formatDateTime,
+  InlineFeedback,
+  StatusPill,
+} from '@erplora/ui/components';
+import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
-import { filterCount, filterQuery, hasDateRange, type SalesFilterValues } from '../components/sales/filters';
 import { type DayBounds, type Period, PERIODS, periodBounds } from '../components/sales/period';
 import RefundModal from '../components/sales/RefundModal.vue';
-import SalesFilters from '../components/sales/SalesFilters.vue';
 import SalesKpis from '../components/sales/SalesKpis.vue';
 import { useBusinessDay } from '../components/sales/useBusinessDay';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
@@ -27,6 +36,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney } from '../lib/format';
 import { refusal } from '../lib/refusal';
+import { filterQuery, filtersInUse, hasDateRange, invalidAmounts, paymentMethodSearch, reversedDates, SALE_STATUSES } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
 import { saleTabs } from '../tabs';
 
@@ -44,12 +54,14 @@ const canRefund = computed(() => session.can('sale.refund_sale'));
 const canIssue = computed(() => session.can('sale.take_payment'));
 const t = useT();
 const locale = useLocale();
+const client = useLiveClient();
 
 // ── The period: from the hub's business day; a date range of the filters replaces it ────────────
 const day = useBusinessDay();
 onMounted(() => void day.read());
 const period = shallowRef<Period>('today');
-const filters = ref<SalesFilterValues>({});
+/** The table's filters (its funnel), as typed: the total in euros. A filter not in use is absent. */
+const filters = ref<DataTableFilters>({});
 
 const bounds = computed<DayBounds>(() => {
   if (!hasDateRange(filters.value)) return periodBounds(period.value, day.today.value);
@@ -63,11 +75,9 @@ function pickPeriod(event: CustomEvent<{ value?: unknown }>): void {
   const value = event.detail.value as Period;
   if (!PERIODS.includes(value)) return;
   period.value = value;
-  if (hasDateRange(filters.value)) {
-    const rest: Record<string, string | undefined> = { ...filters.value };
-    delete rest.date_from;
-    delete rest.date_to;
-    filters.value = rest;
+  const dates = ['date_from', 'date_to'];
+  if (dates.some((name) => name in filters.value)) {
+    filters.value = Object.fromEntries(Object.entries(filters.value).filter(([name]) => !dates.includes(name)));
   }
   void day.read();
 }
@@ -78,27 +88,58 @@ const table = useServerTable('sale.sale.list', {
   dir: 'desc',
   maxSearch: 200,
   filters: (): Partial<SaleListIn> => ({ ...filterQuery(filters.value), ...bounds.value }),
-  narrowed: () => filterCount(filters.value) > 0,
+  // Only the filters that really apply narrow the list (an amount it cannot read does not).
+  narrowed: () => filtersInUse(filters.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
 /** The failures that replace the list with a notice: the app is off here, or the person may not look. */
 const blocked = computed(() => (error.value?.code === 'app_inactive' || error.value?.code === 'permission_denied' ? error.value.code : null));
 /** A filter the server refused (a 422 of the list): said under the filter, the rows stay. */
-const filterErrors = computed(() => error.value?.fields ?? {});
-const tableError = computed(() => (status.value === 'error' && !Object.keys(filterErrors.value).length ? error.value?.message : undefined));
+const refusedFilters = computed(() => error.value?.fields ?? {});
+const tableError = computed(() => (status.value === 'error' && !Object.keys(refusedFilters.value).length ? error.value?.message : undefined));
+/** Under each filter: what it cannot read or a reversed range, else what the server refused. */
+const filterErrors = computed<Record<string, string>>(() => ({
+  ...refusedFilters.value,
+  ...Object.fromEntries(invalidAmounts(filters.value).map((key) => [key, t('sale.sales.filters.amountInvalid')])),
+  ...(reversedDates(filters.value) ? { date_to: t('sale.sales.filters.dateOrder') } : {}),
+}));
 
 // ── Columns ──────────────────────────────────────────────────────────────────────────────────────
 const dash = (value: unknown): string => (value === null || value === undefined || value === '' ? '—' : String(value));
 const money = (cents: number): string => formatMoney(cents, locale.value);
 
+/** «Payment» searches the business's methods on the server: there may be more than a list holds. */
+const findPaymentMethods = paymentMethodSearch(client);
+
 const columns = computed<DataTableColumn<SaleRow>[]>(() => [
-  { key: 'created_at', label: t('sale.sales.columns.date'), sortable: true, format: (_, row) => formatDateTime(row.created_at, locale.value) },
+  {
+    key: 'created_at',
+    label: t('sale.sales.columns.date'),
+    sortable: true,
+    format: (_, row) => formatDateTime(row.created_at, locale.value),
+    // Business days, as the period counts them.
+    filter: { type: 'daterange', keys: ['date_from', 'date_to'] },
+  },
   { key: 'number', label: t('sale.sales.columns.number'), sortable: true, priority: 'high' },
   { key: 'customer_name', label: t('sale.sales.columns.customer'), sortable: true, format: dash },
-  { key: 'payment_method_name', label: t('sale.sales.columns.payment'), sortable: true, format: dash },
-  { key: 'status', label: t('sale.sales.columns.status'), sortable: true, cell: 'status', format: (_, row) => t(`sale.sales.status.${row.status}`) },
-  { key: 'total', label: t('sale.sales.columns.total'), sortable: true, align: 'right', format: (_, row) => money(row.total) },
+  { key: 'payment_method_name', label: t('sale.sales.columns.payment'), sortable: true, format: dash, filter: { type: 'lookup', load: findPaymentMethods } },
+  {
+    key: 'status',
+    label: t('sale.sales.columns.status'),
+    sortable: true,
+    cell: 'status',
+    format: (_, row) => t(`sale.sales.status.${row.status}`),
+    filter: { type: 'select', options: SALE_STATUSES.map((value) => ({ value, label: t(`sale.sales.status.${value}`) })) },
+  },
+  {
+    key: 'total',
+    label: t('sale.sales.columns.total'),
+    sortable: true,
+    align: 'right',
+    format: (_, row) => money(row.total),
+    filter: { type: 'range', amount: true, keys: ['total_min', 'total_max'] },
+  },
 ]);
 
 /** A completed sale part of whose money already went back: what is still left to refund. */
@@ -238,10 +279,13 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
     <DataTable
       v-else
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="sales-table"
       fill
       server-side
       searchable
+      filterable
+      :filter-errors="filterErrors"
       row-clickable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
@@ -267,12 +311,6 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
       @action="onAction"
       @retry="refresh()"
     >
-      <template #filters>
-        <SalesFilters
-          v-model="filters"
-          :field-errors="filterErrors"
-        />
-      </template>
       <template #status="{ row }">
         <span class="sales-page__status">
           <span>{{ $t(`sale.sales.status.${row.status}`) }}</span>

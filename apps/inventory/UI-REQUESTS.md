@@ -28,8 +28,6 @@ Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`
   emite `update:modelValue` y `update:search`. Uso: categoría fiscal (producto y categoría), categorías del
   producto. Hoy `components/SearchSelect.vue`.
 - **`DataTable`**, lo que el `ok-data-table` viejo tenía y el puerto aún no:
-  - **filtros por columna** (texto, lista cerrada, rango desde–hasta, con importes y cantidades leídos como
-    se teclean) con el embudo y su contador; hoy `components/ProductFilters.vue` en el hueco `filters`;
   - **importar / exportar CSV** (`importable`, `exportable`; el import entrega el texto ya decodificado: UTF-8
     con o sin BOM o Windows-1252 de Excel); hoy `components/CsvButtons.vue` en el hueco `toolbar`;
   - **panel lateral** de alta y edición (el `open('create'|'edit')` viejo); hoy los formularios van en `FormModal`.

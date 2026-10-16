@@ -412,17 +412,8 @@
       "loading": "Cargando…",
       "loadError": "No se pudieron cargar las ventas",
       "filters": {
-        "button": "Filtros",
-        "count": "Filtros: {n} en uso",
-        "title": "Filtrar ventas",
-        "any": "Cualquiera",
-        "clear": "Limpiar",
-        "done": "Hecho",
-        "dateFrom": "Fecha desde",
-        "dateTo": "Fecha hasta",
-        "totalMin": "Total desde",
-        "totalMax": "Total hasta",
-        "amountInvalid": "Escribe un importe, como 12,50"
+        "amountInvalid": "Escribe un importe, como 12,50",
+        "dateOrder": "La fecha final no puede ser anterior a la inicial."
       },
       "picker": {
         "search": "Buscar…",

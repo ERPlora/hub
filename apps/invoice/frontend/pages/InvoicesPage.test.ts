@@ -1,6 +1,6 @@
 // Invoicing → Invoices (INVOICE-F16, F19, F03, F08; the old `erp-invoice-list`): the live
 // `invoice.invoice.list` in a server-side DataTable — Number, Customer, Total, Status, Date, Type —, the last
-// issued first, 50 a page, search «Search invoices…» and the filters panel. A row opens its invoice; «Mark
+// issued first, 50 a page, search «Search invoices…» and the filters behind the table's funnel. A row opens its invoice; «Mark
 // as paid» only where it applies and for whoever may issue; «Rectify» only where it applies and for
 // whoever may rectify; «+» opens «New manual invoice». Every state of the screen and the tabbar.
 import { DataTable, EmptyState } from '@erplora/ui/components';
@@ -10,7 +10,6 @@ import type { Component } from 'vue';
 
 import { BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
-import InvoiceFilters from '../components/InvoiceFilters.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
 import type { InvoiceRowOut } from '../operations';
@@ -80,7 +79,9 @@ async function setup(options: MountOptions = {}) {
     table().vm.$emit(name, ...args);
     await flush();
   }
-  return { ...m, call, table, prop, rows, params, show, emit };
+  /** What the table's funnel applies (`v-model:filters`): the filters by name, as typed. */
+  const filter = (values: Record<string, string>) => emit('update:filters', values);
+  return { ...m, call, table, prop, rows, params, show, emit, filter };
 }
 
 describe('InvoicesPage: the live list', () => {
@@ -133,9 +134,118 @@ describe('InvoicesPage: the live list', () => {
   it('the filters travel with the query, from the first page', async () => {
     const s = await setup();
     await s.show(PAGE);
-    s.wrapper.findComponent(InvoiceFilters).vm.$emit('update:modelValue', { status: 'paid', total_amount_from: '10' });
-    await flush();
+    await s.filter({ status: 'paid', total_amount_from: '10' });
     expect(s.params()).toEqual([{ status: 'paid', total_amount_from: 1000, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
+  });
+
+  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+  it('filters behind the table funnel: total, status, date and type on their columns, then series and source', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; maxlength?: number; label?: string; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.label, c.filter?.type, c.filter?.keys, c.filter?.amount])).toEqual([
+      ['Total', 'range', ['total_amount_from', 'total_amount_to'], true],
+      ['Status', 'select', undefined, undefined],
+      ['Date', 'daterange', ['issue_date_from', 'issue_date_to'], undefined],
+      ['Type', 'select', undefined, undefined],
+    ]);
+    expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
+      { value: 'issued', label: 'Issued' },
+      { value: 'paid', label: 'Paid' },
+      { value: 'cancelled', label: 'Cancelled' },
+    ]);
+    expect(columns.find((c) => c.key === 'invoice_type')?.filter?.options?.map((o) => [o.value, o.label])).toEqual([
+      ['F1', 'Invoice (F1)'],
+      ['F2', 'Ticket (F2)'],
+      ['F3', 'Invoice replacing a ticket (F3)'],
+      ['R1', 'Rectifying (R1)'],
+      ['R2', 'Rectifying (R2)'],
+      ['R3', 'Rectifying (R3)'],
+      ['R4', 'Rectifying (R4)'],
+      ['R5', 'Rectifying (R5)'],
+    ]);
+    const fields = s.prop<Filter[]>('filterFields');
+    expect(fields.map((f) => [f.key, f.label, f.type, f.maxlength])).toEqual([
+      ['series_code', 'Series', 'text', 20],
+      ['source_type', 'Source', 'select', undefined],
+    ]);
+    expect(fields[1].options?.map((o) => o.value)).toEqual(['sale', 'manual', 'substitution', 'rectification', 'refund', 'void']);
+  });
+
+  it('every filter of the funnel reaches the server with its own parameter, from the first page', async () => {
+    const s = await setup();
+    await s.show({ ...PAGE, total: 120 });
+    await s.find('invoice-list-page-next').trigger('click');
+    await flush();
+    await s.filter({
+      status: 'issued',
+      invoice_type: 'F1',
+      series_code: ' fact ',
+      source_type: 'manual',
+      issue_date_from: '2026-10-01',
+      issue_date_to: '2026-10-14',
+      total_amount_from: '12',
+      total_amount_to: '100,5',
+    });
+    expect(s.params()).toEqual([
+      {
+        status: 'issued',
+        invoice_type: 'F1',
+        series_code: 'FACT',
+        source_type: 'manual',
+        issue_date_from: '2026-10-01',
+        issue_date_to: '2026-10-14',
+        total_amount_from: 1200,
+        total_amount_to: 10050,
+        sort: 'issued_at',
+        dir: 'desc',
+        limit: 50,
+        offset: 0,
+      },
+    ]);
+  });
+
+  it('the funnel panel applies on «Apply» and counts the filtered columns', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    await s.find('invoice-list-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('invoice-list-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="invoice-list-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('status', 'ionChange', 'paid');
+    set('total_amount_to', 'ionInput', '50');
+    set('series_code', 'ionInput', 'tick');
+    await flush();
+    expect(s.params(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="invoice-list-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.params()).toEqual([{ status: 'paid', series_code: 'TICK', total_amount_to: 5000, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.find('invoice-list-filters-count').text()).toBe('3');
+  });
+
+  it('an amount it cannot read, or a «to» day before its «from», is said under it and neither filters nor narrows', async () => {
+    const s = await setup();
+    await s.show(EMPTY);
+    expect(s.prop('filterErrors')).toEqual({});
+    await s.filter({ total_amount_from: 'doce', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_amount_from: 'Type an amount, like 12.50',
+      issue_date_to: 'The end date cannot be before the start date.',
+    });
+    expect(s.params()).toEqual([{ sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No invoices yet.');
+  });
+
+  it('a filter the server refused (a 422 of the list) is said under it, and the rows stay', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    s.call.push(`event: error\ndata: ${JSON.stringify({ id: s.subId(OP), error: { code: 'invalid_field', message: 'Invalid', fields: { total_amount_to: 'Too big.' } } })}\n\n`);
+    await flush();
+    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Too big.' });
+    expect(s.prop('error')).toBeUndefined();
   });
 
   it('with no invoice at all says «No invoices yet.»', async () => {
@@ -265,6 +375,9 @@ describe('InvoicesPage: the rest', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Número', 'Cliente', 'Total', 'Estado', 'Fecha', 'Tipo']);
     expect(s.rows()[0].findAll('[role="cell"]').slice(2, 5).map((c) => plain(c.text().trim()))).toEqual(['12,10 €', 'Emitida', '14/10/2026']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar facturas…');
+    expect(s.prop<Array<{ label: string }>>('filterFields').map((f) => f.label)).toEqual(['Serie', 'Origen']);
+    await s.filter({ total_amount_to: 'mil', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
+    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Escribe un importe, como 12,50', issue_date_to: 'La fecha final no puede ser anterior a la inicial.' });
   });
 });
 

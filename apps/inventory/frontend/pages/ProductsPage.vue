@@ -2,14 +2,24 @@
 // Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20), the old
 // `erp-inventory-products`: the live `inventory.product.list` in a server-side DataTable — Name, SKU,
 // Price, Stock («—» without stock control) and Status (a switch, «Yes»/«No», or «Not configured ·
-// Missing tax category», which opens the form) —, search, sort, filters, 50 a page. «+», import and
+// Missing tax category», which opens the form) —, search, sort, the filters behind the table's funnel
+// (name, SKU, price and stock ranges, status; the old table's), 50 a page. «+», import and
 // export CSV; per row the sheet, the stock dialogs (physical products), edit and delete; each only for
 // whoever may. Writes come back through the stream; nothing here refetches. A refused row action (the
 // switch, delete, export) is said above the table: no dialog is open then.
-import { type DataTableAction, type DataTableActionEvent, type DataTableColumn, DataTable, EmptyState, InlineFeedback, useConfirm } from '@erplora/ui/components';
+import {
+  type DataTableAction,
+  type DataTableActionEvent,
+  type DataTableColumn,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+  useConfirm,
+} from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonChip, IonLabel, IonProgressBar, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
+import { IonButton, IonChip, IonLabel, IonProgressBar, IonToggle } from '@ionic/vue';
 import { HubIcon } from '@erplora/ui/shell';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -19,7 +29,6 @@ import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ImportReportModal from '../components/ImportReportModal.vue';
 import ImportTaxModal from '../components/ImportTaxModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
-import ProductFilters, { filterParams, type ProductFilterValues } from '../components/ProductFilters.vue';
 import ProductFormModal from '../components/ProductFormModal.vue';
 import StockModal, { type StockAction } from '../components/StockModal.vue';
 import { useInventoryTabs } from '../composables/useInventoryTabs';
@@ -30,12 +39,11 @@ import { useT } from '../composables/useT';
 import { useUnits } from '../composables/useUnits';
 import { saveTextFile } from '../lib/download';
 import { formatMoney, formatQuantity } from '../lib/format';
+import { filterParams, filtersInUse, PRODUCT_STATUSES, type ProductStatus, type UnreadableEnd, unreadableEnds } from '../lib/productFilters';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
-type Status = NonNullable<InputOf<'inventory.product.list'>['status']>;
-
 /** `?status=` of a link (the till's «N articles cannot be sold» opens «unconfigured»). */
-const STATUS_FROM_QUERY: Record<string, Status> = { unconfigured: 'needs_tax_setup', needs_tax_setup: 'needs_tax_setup', active: 'active', inactive: 'inactive' };
+const STATUS_FROM_QUERY: Record<string, ProductStatus> = { unconfigured: 'needs_tax_setup', needs_tax_setup: 'needs_tax_setup', active: 'active', inactive: 'inactive' };
 
 const { t, locale } = useT();
 const tabs = useInventoryTabs();
@@ -56,24 +64,27 @@ const canExport = can('inventory.export_product');
 // ── The list ──────────────────────────────────────────────────────────────────────────────────────
 const table = useServerTable<NonNullable<InputOf<'inventory.product.list'>['sort']>>({ sort: 'name' });
 const PATH = '/inventory/products';
-const statusOf = (query: unknown): Status | 'all' => STATUS_FROM_QUERY[String(query ?? '')] ?? 'all';
-const status = ref<Status | 'all'>(statusOf(route.query.status));
+/** The filters with the Status of a link's `?status=` (none: no Status filter); the others stay. */
+function withStatusOf(values: DataTableFilters, query: unknown): DataTableFilters {
+  const rest = Object.fromEntries(Object.entries(values).filter(([name]) => name !== 'status'));
+  const status = STATUS_FROM_QUERY[String(query ?? '')];
+  return status ? { ...rest, status } : rest;
+}
+/** The table's filters (its funnel), as typed: the price in euros. A filter not in use is absent. */
+const filters = ref<DataTableFilters>(withStatusOf({}, route.query.status));
 // A link to this page with another `?status=` while it is open (Ionic keeps it mounted) applies it.
 // Only on this page's own address: leaving for another tab leaves the filter as it was.
 watch(
   () => [route.path, route.query.status] as const,
   ([path, query], [, before]) => {
-    if (path === PATH && query !== before) status.value = statusOf(query);
+    if (path === PATH && query !== before) filters.value = withStatusOf(filters.value, query);
   },
 );
-const filters = ref<ProductFilterValues>({});
-table.restart({ narrowed: status.value !== 'all' });
-watch([status, filters], ([now, values]) => table.restart({ narrowed: now !== 'all' || Object.keys(values).length > 0 }));
+// Only the filters that really apply narrow the list (an amount it cannot read does not).
+table.restart({ narrowed: filtersInUse(filters.value) > 0 });
+watch(filters, (now) => table.restart({ narrowed: filtersInUse(now) > 0 }));
 
-const listFilters = () => ({
-  ...(status.value !== 'all' ? { status: status.value } : {}),
-  ...filterParams(filters.value),
-});
+const listFilters = () => filterParams(filters.value);
 const { data: result, status: listStatus, error, refresh } = useLiveList(
   'inventory.product.list',
   () => ({ ...listFilters(), ...table.params.value }),
@@ -83,17 +94,47 @@ table.followResult(result);
 const rows = computed(() => result.value?.rows ?? []);
 const inactive = computed(() => error.value?.code === 'app_inactive');
 
-function filterByStatus(event: CustomEvent<{ value?: unknown }>): void {
-  const value = String(event.detail.value ?? 'all');
-  status.value = (['active', 'inactive', 'needs_tax_setup'] as string[]).includes(value) ? (value as Status) : 'all';
+/** Why an end of a range cannot be read, as its field would say it. */
+function unreadableMessage({ name, problem }: UnreadableEnd): string {
+  if (problem === 'not_quantity') return t('inventory.common.noQuantity');
+  if (problem.reason === 'not_amount') return t('inventory.common.noAmount');
+  return t('inventory.common.ambiguousAmount', {
+    typed: (filters.value[name] ?? '').trim(),
+    grouped: formatMoney(problem.grouped, locale.value),
+    decimal: formatMoney(problem.decimal, locale.value),
+  });
 }
+/** Under each filter: an end it cannot read, else what the server refused (a 422 of the list). */
+const filterErrors = computed<Record<string, string>>(() => ({
+  ...(error.value?.fields ?? {}),
+  ...Object.fromEntries(unreadableEnds(filters.value).map((end) => [end.name, unreadableMessage(end)])),
+}));
+/** A refused filter is said under it and the rows stay; any other failure replaces them. */
+const tableError = computed(() =>
+  listStatus.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? error.value?.message : undefined,
+);
+
+const STATUS_LABELS: Record<ProductStatus, string> = { active: 'inventory.common.yes', inactive: 'inventory.common.no', needs_tax_setup: 'inventory.products.filters.unconfigured' };
 
 const columns = computed<DataTableColumn<Product>[]>(() => [
-  { key: 'name', label: t('inventory.common.name'), sortable: true, priority: 'high' },
-  { key: 'sku', label: t('inventory.common.sku'), sortable: true },
-  { key: 'price', label: t('inventory.common.price'), sortable: true, align: 'right', format: (value) => formatMoney(Number(value), locale.value) },
-  { key: 'stock', label: t('inventory.common.stock'), sortable: true, align: 'right', cell: 'stock' },
-  { key: 'status', label: t('inventory.common.status'), align: 'center', cell: 'status' },
+  { key: 'name', label: t('inventory.common.name'), sortable: true, priority: 'high', filter: { type: 'text', maxlength: 200 } },
+  { key: 'sku', label: t('inventory.common.sku'), sortable: true, filter: { type: 'text', maxlength: 64 } },
+  {
+    key: 'price',
+    label: t('inventory.common.price'),
+    sortable: true,
+    align: 'right',
+    format: (value) => formatMoney(Number(value), locale.value),
+    filter: { type: 'range', amount: true, keys: ['price_min', 'price_max'] },
+  },
+  { key: 'stock', label: t('inventory.common.stock'), sortable: true, align: 'right', cell: 'stock', filter: { type: 'range', amount: true, keys: ['stock_min', 'stock_max'] } },
+  {
+    key: 'status',
+    label: t('inventory.common.status'),
+    align: 'center',
+    cell: 'status',
+    filter: { type: 'select', options: PRODUCT_STATUSES.map((value) => ({ value, label: t(STATUS_LABELS[value]) })) },
+  },
 ]);
 
 const isService = (row: Product): boolean => row.product_type === 'service';
@@ -281,10 +322,13 @@ async function exportFile(): Promise<void> {
     <DataTable
       v-else
       v-model:search="table.search.value"
+      v-model:filters="filters"
       testid="inventory-products"
       fill
       server-side
       searchable
+      filterable
+      :filter-errors="filterErrors"
       row-clickable
       :rows="rows"
       :total="result?.total ?? 0"
@@ -298,7 +342,7 @@ async function exportFile(): Promise<void> {
       :actions="actions"
       :addable="canAdd"
       :loading="listStatus === 'loading'"
-      :error="listStatus === 'error' ? error?.message : undefined"
+      :error="tableError"
       :search-placeholder="$t('inventory.products.search')"
       :labels="{ add: $t('inventory.products.new'), loadError: $t('inventory.products.loadError'), retry: $t('inventory.live.retry') }"
       @page-change="table.goToPage"
@@ -310,29 +354,6 @@ async function exportFile(): Promise<void> {
       @add="openForm(null)"
       @retry="refresh()"
     >
-      <template #filters>
-        <ion-select
-          data-testid="inventory-products-status-filter"
-          interface="popover"
-          :aria-label="$t('inventory.products.filters.status')"
-          :value="status"
-          @ion-change="filterByStatus"
-        >
-          <ion-select-option value="all">
-            {{ $t('inventory.products.filters.all') }}
-          </ion-select-option>
-          <ion-select-option value="active">
-            {{ $t('inventory.common.yes') }}
-          </ion-select-option>
-          <ion-select-option value="inactive">
-            {{ $t('inventory.common.no') }}
-          </ion-select-option>
-          <ion-select-option value="needs_tax_setup">
-            {{ $t('inventory.products.filters.unconfigured') }}
-          </ion-select-option>
-        </ion-select>
-        <ProductFilters v-model="filters" />
-      </template>
       <template #toolbar>
         <CsvButtons
           testid="inventory-products"

@@ -412,17 +412,8 @@
       "loading": "Loading…",
       "loadError": "The sales could not be loaded",
       "filters": {
-        "button": "Filters",
-        "count": "Filters: {n} in use",
-        "title": "Filter sales",
-        "any": "Any",
-        "clear": "Clear",
-        "done": "Done",
-        "dateFrom": "Date from",
-        "dateTo": "Date to",
-        "totalMin": "Total from",
-        "totalMax": "Total to",
-        "amountInvalid": "Type an amount, like 12.50"
+        "amountInvalid": "Type an amount, like 12.50",
+        "dateOrder": "The end date cannot be before the start date."
       },
       "picker": {
         "search": "Search…",

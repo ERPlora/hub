@@ -3,13 +3,15 @@
 //     customer's name, tax ID and address) becomes a full invoice F1, paid; it is found in Invoices by its
 //     number, opened, and printed as the A4 paper;
 //   - INVOICE-F01, F09: a ticket refunded whole in Sales gets its rectifying invoice R5, the ticket is
-//     cancelled, and the R5 opens the ticket it rectifies.
+//     cancelled, and the R5 opens the ticket it rectifies;
+//   - the list filters behind the table's funnel (the total in euros), with its count, at every width; a
+//     «to» day before its «from» is said under it and does not filter.
 // Phase 1 has no outbox relay: the sale's real event, read from the outbox, is handed to the operation the
 // reaction runs (invoice-helpers.ts `deliver`), as the relay will. Screenshots in the three viewports.
 // What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, shown } from './helpers';
+import { A, api, login, shot, shown } from './helpers';
 import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, deliver, ensureIssuer, invoiceOf, snapshotSeries } from './invoice-helpers';
@@ -42,6 +44,14 @@ test.afterAll(() => {
     cleanInventory();
   }
 });
+
+/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
+ *  (two columns), as the SaaS panel's `VIEWPORTS`. */
+const FILTER_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+];
 
 async function tillReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
@@ -162,4 +172,57 @@ test('INVOICE-F01 and F09: a ticket refunded whole in Sales gets its rectifying 
   await shots(page, 'invoice-cancelled-ticket', async (p) => {
     await expect(shown(p).locator('[data-testid=invoice-detail-status]')).toHaveText('Cancelled');
   });
+});
+
+// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+test('FIX-DATATABLE-HUB-FILTERS-2A: Invoices filter by total in euros behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
+  await login(page, A, '/invoice/invoices');
+  // Two tickets, 12,10 € and 6,05 €, each handed to Invoicing as the relay will.
+  const dearSale = await chargeByApi(context, { lines: [{ product: shampoo.sku }], payments: [{ method: 'card' }] });
+  const cheapSale = await chargeByApi(context, { lines: [{ product: wax.sku }], payments: [{ method: 'card' }] });
+  const dear = await deliver(context, 'sale.sale.completed', dearSale.id);
+  const cheap = await deliver(context, 'sale.sale.completed', cheapSale.id);
+  expect([dear.total_amount, cheap.total_amount]).toEqual([1210, 605]);
+  const rowOf = (number: string) => shown(page).locator('[data-testid=invoice-list-row]', { hasText: number });
+  const panel = shown(page).locator('[data-testid=invoice-list-filters-panel]');
+  const toggle = shown(page).locator('[data-testid=invoice-list-filters-toggle]');
+  const count = shown(page).locator('[data-testid=invoice-list-filters-count]');
+  for (const vp of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/invoice/invoices`);
+    await expect(rowOf(dear.number)).toBeVisible();
+    await expect(rowOf(cheap.number)).toBeVisible();
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    // «Total from 10» is ten euros (invoice#113): the 12,10 € ticket stays, the 6,05 € one goes.
+    await panel.locator('[data-testid=invoice-list-filter-total_amount_from] input').fill('10');
+    await panel.locator('[data-testid=invoice-list-filters-apply]').click();
+    await expect(panel).toBeHidden();
+    await expect(count).toHaveText('1');
+    await expect(rowOf(dear.number)).toBeVisible();
+    await expect(rowOf(cheap.number)).toHaveCount(0);
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-2A-invoice-${vp.label}`) });
+    await panel.locator('[data-testid=invoice-list-filters-clear]').click();
+    await expect(count).toHaveCount(0);
+    await panel.locator('[data-testid=invoice-list-filters-close]').click();
+    await expect(panel).toBeHidden();
+    await expect(rowOf(cheap.number)).toBeVisible();
+  }
+
+  // «Issued» from the 14th to the 1st: said under «to», the funnel turns red, and nothing is filtered.
+  await toggle.click();
+  await panel.locator('[data-testid=invoice-list-filter-issue_date_from] input').fill('2026-10-14');
+  await panel.locator('[data-testid=invoice-list-filter-issue_date_to] input').fill('2026-10-01');
+  await panel.locator('[data-testid=invoice-list-filters-apply]').click();
+  await expect(toggle).toHaveAttribute('data-invalid', 'true');
+  await expect(rowOf(dear.number)).toBeVisible();
+  await expect(rowOf(cheap.number)).toBeVisible();
+  await toggle.click();
+  const to = panel.locator('[data-testid=invoice-list-filter-issue_date_to]');
+  await expect(to).toHaveClass(/ion-invalid/);
+  await expect(to.locator('.error-text')).toHaveText(/The end date cannot be before the start date\.|La fecha final no puede ser anterior a la inicial\./);
+  await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2A-invoice-error-1440') });
 });

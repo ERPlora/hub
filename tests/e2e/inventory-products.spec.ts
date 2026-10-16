@@ -6,7 +6,9 @@
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
 //     one in the form fixes it;
 //   - INVENTORY-F11: the export downloads the filtered catalog with the headers the import reads;
-//   - the tabs walk the five sections; screenshots of every page in three viewports.
+//   - the tabs walk the five sections; screenshots of every page in three viewports;
+//   - the list filters behind the table's funnel (price in euros), with its count, at every width; an
+//     amount it cannot read is said under its field and does not filter.
 import { expect, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
@@ -28,6 +30,14 @@ import {
 test.afterAll(() => {
   cleanInventory();
 });
+
+/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
+ *  (two columns), as the SaaS panel's `VIEWPORTS`. */
+const FILTER_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+];
 
 test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, active and configured', async ({ page, context }) => {
   const sku = `E2E-NEW-${stamp()}`;
@@ -165,4 +175,54 @@ test('the tabs walk the five sections, each on its address; screenshots of every
   await shown(page).locator('[data-testid=tab-dashboard]').click();
   await page.waitForURL(/\/inventory\/dashboard$/);
   expect(shots).toHaveLength(15);
+});
+
+// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+test('FIX-DATATABLE-HUB-FILTERS-2A: Products filter by price in euros behind the funnel, with its count; an amount it cannot read is said under it', async ({ page, context }) => {
+  const run = stamp();
+  await login(page, A, '/inventory/products');
+  // 2,20 € and 15,00 €: «Price from 10» is ten euros (inventory#115), never ten cents.
+  const cheap = await createProduct(context, { name: `E2E Cheap ${run}`, sku: `E2E-FIL-C-${run}`, price: 220 });
+  const dear = await createProduct(context, { name: `E2E Dear ${run}`, sku: `E2E-FIL-D-${run}`, price: 1500 });
+  const panel = shown(page).locator('[data-testid=inventory-products-filters-panel]');
+  const toggle = shown(page).locator('[data-testid=inventory-products-filters-toggle]');
+  const count = shown(page).locator('[data-testid=inventory-products-filters-count]');
+  const priceFrom = panel.locator('[data-testid=inventory-products-filter-price_min]');
+  for (const vp of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/inventory/products`);
+    await productsReady(page);
+    await searchProducts(page, run);
+    await expect(productRow(page, cheap.sku)).toBeVisible();
+    await expect(productRow(page, dear.sku)).toBeVisible();
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await priceFrom.locator('input').fill('10');
+    await panel.locator('[data-testid=inventory-products-filters-apply]').click();
+    await expect(panel).toBeHidden();
+    await expect(count).toHaveText('1');
+    await expect(productRow(page, dear.sku)).toBeVisible();
+    await expect(productRow(page, cheap.sku)).toHaveCount(0);
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-2A-inventory-${vp.label}`) });
+    await panel.locator('[data-testid=inventory-products-filters-clear]').click();
+    await expect(count).toHaveCount(0);
+    await panel.locator('[data-testid=inventory-products-filters-close]').click();
+    await expect(panel).toBeHidden();
+    await expect(productRow(page, cheap.sku)).toBeVisible();
+  }
+
+  // «doce» is not an amount: said under «Price from», the funnel turns red, and nothing is filtered.
+  await toggle.click();
+  await priceFrom.locator('input').fill('doce');
+  await panel.locator('[data-testid=inventory-products-filters-apply]').click();
+  await expect(toggle).toHaveAttribute('data-invalid', 'true');
+  await expect(productRow(page, cheap.sku)).toBeVisible();
+  await expect(productRow(page, dear.sku)).toBeVisible();
+  await toggle.click();
+  await expect(priceFrom).toHaveClass(/ion-invalid/);
+  await expect(priceFrom.locator('.error-text')).toHaveText(/This is not an amount|Esto no es un importe/);
+  await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2A-inventory-error-1440') });
 });

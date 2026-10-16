@@ -1,7 +1,8 @@
 // Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20): the
 // live `inventory.product.list` — Name, SKU, Price, Stock («—» without stock control) and Status (a
 // switch, «Yes»/«No» for whoever cannot change products, or «Not configured · Missing tax category»)
-// —, «Search product…», sort by column, filters (status, name, SKU, price and stock ranges), 50 a page.
+// —, «Search product…», sort by column, the filters behind the table's funnel (name, SKU, price and stock
+// ranges, status), 50 a page.
 // «+», import and export CSV, each for whoever may; per row «Details», «Receive stock», «Count stock»,
 // «Write off stock» (physical products, with the permission to move stock), «Edit» and «Delete». A
 // row opens its sheet. A refused row action is said above the table.
@@ -15,7 +16,6 @@ import { type ApiCall, EMPLOYEE, errorFrame, flush, type MountOptions, mountInve
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
-import ProductFilters from '../components/ProductFilters.vue';
 import ProductFormModal from '../components/ProductFormModal.vue';
 import StockModal from '../components/StockModal.vue';
 import { formatMoney } from '../lib/format';
@@ -70,7 +70,12 @@ async function setup(options: MountOptions = {}, answer?: (call: ApiCall) => Res
     await m.clock.advance(150);
     await m.result(m.net.lastStream(), 'inventory.product.list', data);
   }
-  return { ...m, call, testid, table, prop, rows, act, onNewStream, show: (data: unknown, rev?: number) => m.result(call, 'inventory.product.list', data, rev) };
+  /** What the table's funnel applies (`v-model:filters`): the filters by name, as typed. */
+  async function filter(values: Record<string, string>) {
+    table().vm.$emit('update:filters', values);
+    await flush();
+  }
+  return { ...m, call, testid, table, prop, rows, act, onNewStream, filter, show: (data: unknown, rev?: number) => m.result(call, 'inventory.product.list', data, rev) };
 }
 
 describe('ProductsPage: the list', () => {
@@ -148,25 +153,93 @@ describe('ProductsPage: the list', () => {
     s.table().vm.$emit('sortChange', { sort: 'price', dir: 'desc' });
     await flush();
     expect(s.params('inventory.product.list')).toEqual([{ sort: '-price', limit: 50, offset: 0 }]);
-    s.wrapper.findComponent(ProductFilters).vm.$emit('update:modelValue', { name: 'caf', priceMin: '2,20' });
-    await flush();
+    await s.filter({ name: 'caf', price_min: '2,20' });
     expect(s.params('inventory.product.list')).toEqual([{ name: 'caf', price_min: 220, sort: '-price', limit: 50, offset: 0 }]);
   });
 
-  it('the status filter: All, Yes, No and Not configured', async () => {
+  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+  it('filters behind the table funnel, on their columns: name, SKU, price and stock (as typed) and status', async () => {
     const s = await setup();
     await s.show(LIST);
-    const select = s.testid('inventory-products-status-filter');
-    expect(select.attributes('aria-label')).toBe('Filter by status');
-    expect(select.findAll('ion-select-option').map((o) => o.text())).toEqual(['All', 'Yes', 'No', 'Not configured']);
-    select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'needs_tax_setup' } }));
+    expect(s.prop('filterable')).toBe(true);
+    type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; maxlength?: number; options?: Array<{ value: string; label: string }> };
+    const columns = s.prop<Array<{ key: string; label: string; filter?: Filter }>>('columns');
+    expect(columns.filter((c) => c.filter).map((c) => [c.label, c.filter?.type, c.filter?.keys, c.filter?.amount, c.filter?.maxlength])).toEqual([
+      ['Name', 'text', undefined, undefined, 200],
+      ['SKU', 'text', undefined, undefined, 64],
+      ['Price', 'range', ['price_min', 'price_max'], true, undefined],
+      ['Stock', 'range', ['stock_min', 'stock_max'], true, undefined],
+      ['Status', 'select', undefined, undefined, undefined],
+    ]);
+    expect(columns.find((c) => c.key === 'status')?.filter?.options).toEqual([
+      { value: 'active', label: 'Yes' },
+      { value: 'inactive', label: 'No' },
+      { value: 'needs_tax_setup', label: 'Not configured' },
+    ]);
+    // No control of its own beside the table: the status lives in the funnel, as in the old table.
+    expect(s.testid('inventory-products-status-filter').exists()).toBe(false);
+  });
+
+  it('every filter of the funnel reaches the server with its own parameter, from the first page', async () => {
+    const s = await setup();
+    await s.show(page(LIST.rows, 120));
+    await s.testid('inventory-products-page-next').trigger('click');
     await flush();
-    expect(s.params('inventory.product.list')).toEqual([{ status: 'needs_tax_setup', sort: 'name', limit: 50, offset: 0 }]);
+    await s.filter({ name: 'caf', sku: 'CAF', price_min: '12', price_max: '1.250,50', stock_min: '1,5', stock_max: '10', status: 'needs_tax_setup' });
+    expect(s.params('inventory.product.list')).toEqual([
+      { name: 'caf', sku: 'CAF', price_min: 1200, price_max: 125050, stock_min: '1.5', stock_max: '10', status: 'needs_tax_setup', sort: 'name', limit: 50, offset: 0 },
+    ]);
+  });
+
+  it('the funnel panel applies on «Apply» and counts the filtered columns', async () => {
+    const s = await setup();
+    await s.show(LIST);
+    await s.testid('inventory-products-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.testid('inventory-products-filters-panel');
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="inventory-products-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    // A closed list opens as a popover: no «CANCEL»/«OK» of an alert in English (hub#1736).
+    expect((panel.get('[data-testid="inventory-products-filter-status"]').element as HTMLElement & { interface?: string }).interface).toBe('popover');
+    set('sku', 'ionInput', 'CAF');
+    set('price_min', 'ionInput', '2,20');
+    set('status', 'ionChange', 'inactive');
+    await flush();
+    expect(s.params('inventory.product.list'), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="inventory-products-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.params('inventory.product.list')).toEqual([{ sku: 'CAF', price_min: 220, status: 'inactive', sort: 'name', limit: 50, offset: 0 }]);
+    expect(s.testid('inventory-products-filters-count').text()).toBe('3');
+  });
+
+  it('an amount or a quantity it cannot read is said under its end, and neither filters nor makes the list look filtered', async () => {
+    const s = await setup();
+    await s.show(page([]));
+    expect(s.prop('filterErrors')).toEqual({});
+    await s.filter({ price_min: 'doce', price_max: '1.250', stock_min: 'x' });
+    expect(s.prop('filterErrors')).toEqual({
+      price_min: 'This is not an amount. Type a figure, for example 12.50.',
+      price_max: `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en')} or ${formatMoney(125, 'en')}. Write the decimals so there is no doubt.`,
+      stock_min: 'This is not a quantity. Type a figure with up to three decimals, for example 2.5.',
+    });
+    expect(s.params('inventory.product.list')).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No products');
+  });
+
+  it('a filter the server refused (a 422 of the list) is said under it, and the rows stay', async () => {
+    const s = await setup();
+    await s.show(LIST);
+    s.call.push(`event: error\ndata: ${JSON.stringify({ id: subId(s.client, 'inventory.product.list'), error: { code: 'invalid_field', message: 'Invalid', fields: { price_max: 'Too big.' } } })}\n\n`);
+    await flush();
+    expect(s.prop('filterErrors')).toEqual({ price_max: 'Too big.' });
+    expect(s.prop('error')).toBeUndefined();
   });
 
   it('opened from the till\'s warning (?status=unconfigured) lists only what lacks a tax category', async () => {
     const s = await setup({ path: '/inventory/products?status=unconfigured' });
     expect(s.params('inventory.product.list')).toEqual([{ status: 'needs_tax_setup', sort: 'name', limit: 50, offset: 0 }]);
+    // The funnel shows it applied: «Status → Not configured», counted.
+    expect(s.prop('filters')).toEqual({ status: 'needs_tax_setup' });
   });
 
   it('a new ?status= while the page is open applies its filter from the first page', async () => {
@@ -177,7 +250,7 @@ describe('ProductsPage: the list', () => {
     await s.router.push('/inventory/products?status=unconfigured');
     await flush();
     expect(s.params('inventory.product.list')).toEqual([{ status: 'needs_tax_setup', sort: 'name', limit: 50, offset: 0 }]);
-    expect((s.testid('inventory-products-status-filter').element as HTMLElement & { value?: unknown }).value).toBe('needs_tax_setup');
+    expect(s.prop('filters')).toEqual({ status: 'needs_tax_setup' });
     await s.router.push('/inventory/products');
     await flush();
     expect(s.params('inventory.product.list')).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
@@ -187,8 +260,7 @@ describe('ProductsPage: the list', () => {
     const s = await setup();
     await s.show(page([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No products');
-    s.wrapper.findComponent(ProductFilters).vm.$emit('update:modelValue', { sku: 'zzz' });
-    await flush();
+    await s.filter({ sku: 'zzz' });
     await s.onNewStream(page([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No product matches the search or the filters.');
   });
@@ -313,11 +385,10 @@ describe('ProductsPage: import and export', () => {
   it('exports everything the search and filters find, with the file the server wrote', async () => {
     const s = await setup({}, () => ok({ filename: 'inventario-productos.csv', content_type: 'text/csv', content: '﻿Nombre;SKU\n' }));
     await s.show(LIST);
-    s.wrapper.findComponent(ProductFilters).vm.$emit('update:modelValue', { sku: 'CAF' });
-    await flush();
+    await s.filter({ sku: 'CAF', price_min: '2' });
     s.wrapper.findComponent(CsvButtons).vm.$emit('export');
     await flush();
-    expect(s.query(s.calls('/api/inventory/products/export')[0])).toEqual({ sku: 'CAF', sort: 'name' });
+    expect(s.query(s.calls('/api/inventory/products/export')[0])).toEqual({ sku: 'CAF', price_min: '200', sort: 'name' });
     expect(mocks.save).toHaveBeenCalledWith('inventario-productos.csv', '﻿Nombre;SKU\n', 'text/csv');
   });
 
@@ -358,6 +429,13 @@ describe('ProductsPage', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'SKU', 'Precio', 'Stock', 'Estado']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar producto…');
     expect(s.testid('inventory-products-unconfigured-p3').find('span').text()).toBe('Sin configurar · Falta la categoría fiscal');
+    type Column = { key: string; filter?: { options?: Array<{ label: string }> } };
+    expect(s.prop<Column[]>('columns').find((c) => c.key === 'status')?.filter?.options?.map((o) => o.label)).toEqual(['Sí', 'No', 'Sin configurar']);
+    await s.filter({ price_min: 'doce', stock_max: 'x' });
+    expect(s.prop('filterErrors')).toEqual({
+      price_min: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      stock_max: 'Esto no es una cantidad. Escribe una cifra con hasta tres decimales, por ejemplo 2,5.',
+    });
   });
 });
 

@@ -32,9 +32,3 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
 - **Qué**: `printPaper(element)` (copia del papel en un contenedor del `body`, `window.print()`, se quita en
   `afterprint`) en `@erplora/ui`, para no depender de Ventas.
 - **Hoy**: la ficha importa `apps/sale/frontend/lib/print.ts` (Ventas es requisito de Facturación).
-
-## Filtros por columna en `DataTable`
-
-- **Qué**: lo mismo que pide `apps/tax/UI-REQUESTS.md` (cajón de filtros del `ok-data-table`).
-- **Hoy**: `frontend/components/InvoiceFilters.vue` en el slot `filters` (Estado, Tipo, Serie, Origen,
-  fechas y total). Se borra cuando el `DataTable` lo traiga.

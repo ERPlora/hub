@@ -72,19 +72,7 @@
       "deleteError": "The product could not be deleted",
       "exportError": "The catalog could not be exported",
       "filters": {
-        "button": "Filters",
-        "title": "Filter products",
-        "status": "Filter by status",
-        "all": "All",
-        "unconfigured": "Not configured",
-        "name": "Name",
-        "sku": "SKU",
-        "priceMin": "Price from",
-        "priceMax": "Price to",
-        "stockMin": "Stock from",
-        "stockMax": "Stock to",
-        "apply": "Apply filters",
-        "clear": "Clear filters"
+        "unconfigured": "Not configured"
       },
       "actions": {
         "detail": "Details",
