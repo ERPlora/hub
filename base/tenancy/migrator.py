@@ -5,6 +5,7 @@ databases: it migrates the control database (``default``) only, under a session 
 two overlapping deploys never migrate at once (the second waits, then finds nothing to apply).
 Phase 2 adds the templates (``hub_template_<vertical>``) and then every hub behind, each through
 its direct ``hub_<hex>__ddl`` connection, expand/contract, with the schema lock per hub (PLAN-DB).
+``pending_control`` is ``migrate_hubs --check``: what a run would apply, applying nothing.
 
 The only module of ``base/`` and ``apps/`` that names a connection by hand and takes a session
 advisory lock (``tests/test_guardrails.py``): the control database is reached directly, never
@@ -16,6 +17,7 @@ import logging
 
 from django.core.management import call_command
 from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.recorder import MigrationRecorder
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,16 @@ LOCK_NAME = "erplora.migrate_hubs"
 LOCK_KEY = int.from_bytes(
     hashlib.blake2b(LOCK_NAME.encode(), digest_size=8).digest(), "big", signed=True
 )
+
+
+def pending_control() -> list[str]:
+    """What ``migrate_control`` would apply, as ``<app>.<migration>`` in order; applies nothing.
+
+    Reads ``django_migrations`` without the lock: a run in progress shows as pending.
+    """
+    executor = MigrationExecutor(connections[CONTROL_ALIAS])
+    plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
+    return [f"{migration.app_label}.{migration.name}" for migration, _backwards in plan]
 
 
 def migrate_control(*, stdout=None, verbosity: int = 1) -> int:
