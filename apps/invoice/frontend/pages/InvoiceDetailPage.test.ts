@@ -125,6 +125,8 @@ describe('InvoiceDetailPage: what it shows', () => {
     expect(s.field('notes')).toBe('Thanks');
     expect(s.find('invoice-detail-paid-at').exists()).toBe(false);
     expect(s.wrapper.findComponent(InvoiceLinesTable).props('lines')).toEqual(INVOICE.lines);
+    // The rate is named by the tax the invoice declares (its breakdown): VAT here.
+    expect(s.wrapper.findComponent(InvoiceLinesTable).props('taxes')).toEqual(['vat']);
     expect(s.find('invoice-missing-tax-id').exists()).toBe(false);
   });
 

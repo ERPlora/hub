@@ -5,12 +5,14 @@
 // a price that is not an amount is said with its line before anything is sent. It runs
 // `invoice.invoice.create` with the prices in cents (VAT not included), says «Invoice <number> issued» and
 // closes; the list paints the new row by itself. A refusal stays in the window, under its field when it is
-// one, and what was written is kept.
+// one, and what was written is kept. The rate of a line is named by the tax of the business's territory and
+// starts at its general rate (`invoice.invoice.line_defaults`, followed live): IGIC in the Canary Islands,
+// IPSI in Ceuta and Melilla, VAT elsewhere; without a rule of its own tax, the person types it.
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import { click, ionValue, mountInvoice } from '../__tests__/mount-invoice';
+import { click, errorFrame, flush, ionValue, mountInvoice } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from './InvoiceCreateModal.vue';
 import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
 import RecipientFields from './RecipientFields.vue';
@@ -34,6 +36,7 @@ const SeriesSelectStub = defineComponent({
 });
 const CustomerSearchStub = defineComponent({ name: 'CustomerSearch', setup: () => () => h('div') });
 
+const DEFAULTS = 'invoice.invoice.line_defaults';
 const RECIPIENT = { customerId: null, name: 'Talleres Pérez SL', taxId: 'B12345674', address: 'Calle Luna 3', country: 'ES', idType: '' };
 const CREATED = { id: 'i9', number: 'FACT-2026-000009' };
 
@@ -58,7 +61,13 @@ async function setup(locale: 'en' | 'es' = 'en') {
     await m.wrapper.vm.$nextTick();
   }
   const submit = () => m.inDoc('invoice-create-submit') as HTMLElement & { disabled: boolean };
-  return { ...m, choose, recipient, line, submit };
+  const editor = () => m.wrapper.findComponent(InvoiceLinesEditor);
+  const call = await m.live();
+  /** What a typed line starts with in the business's territory, as the server answers it. */
+  async function territory(tax: string, rate: string | null) {
+    await m.result(DEFAULTS, { tax, tax_rate: rate });
+  }
+  return { ...m, call, choose, recipient, line, submit, editor, territory };
 }
 
 describe('InvoiceCreateModal', () => {
@@ -66,7 +75,9 @@ describe('InvoiceCreateModal', () => {
     const s = await setup();
     expect(s.inDoc('invoice-create')?.getAttribute('aria-label')).toBe('New manual invoice');
     expect(s.find('series-select-stub').exists()).toBe(true);
-    expect(s.wrapper.findComponent(InvoiceLinesEditor).props('modelValue')).toEqual([{ uid: 1, description: '', quantity: '1', price: '', taxRate: '21' }]);
+    await s.territory('vat', '21.00');
+    expect(s.editor().props('modelValue')).toEqual([{ uid: 1, description: '', quantity: '1', price: '', taxRate: '21' }]);
+    expect(s.editor().props('tax')).toBe('vat');
     expect((s.inDoc('invoice-create-notes') as unknown as { label: string }).label).toBe('Notes');
     expect(s.submit().textContent?.trim()).toBe('Issue invoice');
   });
@@ -132,6 +143,46 @@ describe('InvoiceCreateModal', () => {
     expect(s.wrapper.findComponent(RecipientFields).props('fieldErrors')).toEqual({ customer_tax_id: 'This field is required.' });
     expect(s.wrapper.findComponent(InvoiceLinesEditor).props('modelValue')[0].description).toBe('Course');
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+
+  it('follows what a typed line starts with: the territory’s tax and its general rate', async () => {
+    const s = await setup();
+    expect(s.params(DEFAULTS)).toEqual([{}]);
+    await s.territory('igic', '7.00');
+    expect(s.editor().props('modelValue')[0].taxRate).toBe('7');
+    expect([s.editor().props('tax'), s.editor().props('defaultRate')]).toEqual(['igic', '7']);
+  });
+
+  it('a territory without a rule of its own tax starts with no rate, and «Issue invoice» waits for one', async () => {
+    const s = await setup();
+    await s.territory('ipsi', null);
+    expect(s.editor().props('modelValue')[0].taxRate).toBe('');
+    await s.choose('TICKET', 'F2');
+    await s.line('Coffee', '1,50', '1', '');
+    expect(s.submit().disabled).toBe(true);
+    await s.line('Coffee', '1,50', '1', '4');
+    expect(s.submit().disabled).toBe(false);
+  });
+
+  it('a rate already typed is kept when the territory’s answer arrives or changes', async () => {
+    const s = await setup();
+    await s.line('Course', '10', '1', '3');
+    await s.territory('igic', '7.00');
+    expect(s.editor().props('modelValue')[0].taxRate).toBe('3');
+    await s.line('Course', '10', '1', '7');
+    await s.result(DEFAULTS, { tax: 'igic', tax_rate: '9.50' }, {}, 2);
+    expect(s.editor().props('modelValue')[0].taxRate).toBe('9.5');
+  });
+
+  it('says when the territory cannot be read; the rate can still be typed', async () => {
+    const s = await setup();
+    s.call.push(errorFrame(s.subId(DEFAULTS), 'invoice.boom'));
+    await flush();
+    expect(s.inDoc('invoice-create-error')?.textContent).toContain('Could not read the business’s tax territory: type the rate of each line.');
+    expect(s.editor().props('tax')).toBeUndefined();
+    await s.choose('TICKET', 'F2');
+    await s.line('Coffee', '1,50', '1', '7');
+    expect(s.submit().disabled).toBe(false);
   });
 
   it('speaks Spanish', async () => {

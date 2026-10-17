@@ -9,6 +9,7 @@ import {
   documentNote,
   isSimplified,
   missingTaxId,
+  rateHeader,
   SOURCE_CODES,
   STATUS_CODES,
   statusTone,
@@ -31,6 +32,20 @@ const entry = (over: Partial<BreakdownOut>): BreakdownOut => ({
   quota: 210,
   surcharge_quota: 0,
   ...over,
+});
+
+describe('rateHeader', () => {
+  it('names the rate by the tax its lines are declared with: VAT, IGIC or IPSI', () => {
+    expect(rateHeader(['vat', 'vat'], t)).toBe('invoice.taxPct.vat');
+    expect(rateHeader(['igic'], t)).toBe('invoice.taxPct.igic');
+    expect(rateHeader(['ipsi'], t)).toBe('invoice.taxPct.ipsi');
+  });
+
+  it('is a plain «Tax %» when the tax is not known yet, is not one or is mixed', () => {
+    expect(rateHeader([], t)).toBe('invoice.taxPct.any');
+    expect(rateHeader(['vat', 'igic'], t)).toBe('invoice.taxPct.any');
+    expect(rateHeader(['sales_tax'], t)).toBe('invoice.taxPct.any');
+  });
 });
 
 describe('the closed lists the server knows', () => {

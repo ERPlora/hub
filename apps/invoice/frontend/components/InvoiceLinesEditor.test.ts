@@ -1,6 +1,7 @@
 // The lines of a manual invoice (INVOICE-F03; the old form's rows): «Description», «Qty» (1 to begin
-// with), «Price» (VAT not included, euros as typed) and «VAT %» (21 to begin with); «+ Line» adds one and
-// the cross removes one (never the last). Each line names its hooks by its own id, so removing the first
+// with), «Price» (VAT not included, euros as typed) and the rate, named by the tax of the business's
+// territory («VAT %», «IGIC %», «IPSI %»; «Tax %» while it is not known); «+ Line» adds one at the
+// territory's general rate and the cross removes one (never the last). Each line names its hooks by its own id, so removing the first
 // never renames the others. What the server refused on a line is said under its field.
 import { describe, expect, it } from 'vitest';
 
@@ -18,12 +19,24 @@ async function setup(modelValue: DraftLine[] = [blankLine(1)], extra: Record<str
 }
 
 describe('InvoiceLinesEditor', () => {
-  it('paints each line with its four fields, one unit at 21 % to begin with, and no cross on the last one', async () => {
-    const s = await setup();
+  it('paints each line with its four fields, one unit at the rate it starts with, and no cross on the last one', async () => {
+    const s = await setup([blankLine(1, '21')], { tax: 'vat' });
     expect(['description', 'quantity', 'price', 'tax-rate'].map((key) => prop(s.field(1, key), 'label'))).toEqual(['Description', 'Qty', 'Price', 'VAT %']);
     expect([prop(s.field(1, 'quantity'), 'value'), prop(s.field(1, 'tax-rate'), 'value')]).toEqual(['1', '21']);
     expect(prop(s.field(1, 'price'), 'inputmode')).toBe('decimal');
     expect(s.find('invoice-line-1-remove').exists()).toBe(false);
+  });
+
+  it('names the rate by the tax of the business’s territory: IGIC in the Canary Islands, IPSI in Ceuta and Melilla', async () => {
+    expect(prop((await setup([blankLine(1)], { tax: 'igic' })).field(1, 'tax-rate'), 'label')).toBe('IGIC %');
+    expect(prop((await setup([blankLine(1)], { tax: 'ipsi' })).field(1, 'tax-rate'), 'label')).toBe('IPSI %');
+    expect(prop((await setup([blankLine(1)])).field(1, 'tax-rate'), 'label')).toBe('Tax %');
+  });
+
+  it('«+ Line» starts the new line at the territory’s general rate', async () => {
+    const s = await setup([blankLine(1, '7')], { tax: 'igic', defaultRate: '7' });
+    await click(s.find('invoice-lines-add').element);
+    expect(s.emitted().at(-1)).toEqual([blankLine(1, '7'), blankLine(2, '7')]);
   });
 
   it('what is typed travels as a new list', async () => {
@@ -49,8 +62,10 @@ describe('InvoiceLinesEditor', () => {
   });
 
   it('speaks Spanish', async () => {
-    const s = await setup([blankLine(1)], {}, 'es');
+    const s = await setup([blankLine(1)], { tax: 'vat' }, 'es');
     expect(['description', 'quantity', 'price', 'tax-rate'].map((key) => prop(s.field(1, key), 'label'))).toEqual(['Descripción', 'Cant.', 'Precio', 'IVA %']);
+    expect(prop((await setup([blankLine(1)], { tax: 'igic' }, 'es')).field(1, 'tax-rate'), 'label')).toBe('IGIC %');
+    expect(prop((await setup([blankLine(1)], {}, 'es')).field(1, 'tax-rate'), 'label')).toBe('Imp. %');
     expect(s.find('invoice-lines-add').text()).toBe('+ Línea');
   });
 });

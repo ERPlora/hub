@@ -1,19 +1,23 @@
 <script setup lang="ts">
 // «New manual invoice» (INVOICE-F03; the old create panel of the table, now a dialog): the «Series» (the
 // active invoice and ticket series), the recipient (a card of Customers or typed: name, country, tax ID,
-// address), «Notes» and the lines (description, quantity, price WITHOUT VAT, VAT %). «Issue invoice» stays
-// grey until every line has a description, a quantity and a price and, for an invoice series (F1), until
-// the recipient is complete; a price that is not an amount is said with its line before anything is sent.
-// It runs `invoice.invoice.create` (the server computes the VAT, closed once per rate, and numbers it),
+// address), «Notes» and the lines (description, quantity, price WITHOUT the tax, rate %). The rate is named by
+// the tax of the business's territory and starts at its general rate (`invoice.invoice.line_defaults`,
+// followed live; TAX-F11): «VAT %» and 21 on the peninsula, «IGIC %» in the Canary Islands, «IPSI %» in Ceuta
+// and Melilla, blank when the territory has no rule of its own tax. «Issue invoice» stays grey until every
+// line has a description, a quantity, a price and a rate and, for an invoice series (F1), until the
+// recipient is complete; a price that is not an amount is said with its line before anything is sent.
+// It runs `invoice.invoice.create` (the server computes the tax, closed once per rate, and numbers it),
 // says «Invoice <number> issued» and closes; the list paints the new row by itself, live. A refusal stays in
 // the window, under its field when it is one (recipient or line), and what was written is kept.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
-import { useCommand } from '@erplora/ui/sdk';
+import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
-import { useT } from '../composables/useT';
+import { useLocale, useT } from '../composables/useT';
+import { typedRate } from '../lib/format';
 import { type Recipient, recipientComplete, recipientFrom, recipientPayload } from '../lib/recipient';
 import { refusal } from '../lib/refusal';
 import type { InvoiceOut, InvoiceType } from '../operations';
@@ -26,7 +30,12 @@ const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ created: [invoice: InvoiceOut] }>();
 
 const t = useT();
+const locale = useLocale();
 const command = useCommand('invoice.invoice.create');
+/** What a typed line starts with: the tax of the business's territory and its general rate. */
+const defaults = useLive('invoice.invoice.line_defaults', () => ({}));
+const tax = computed(() => defaults.data.value?.tax);
+const defaultRate = computed(() => typedRate(defaults.data.value?.tax_rate ?? null, locale.value));
 const seriesCode = shallowRef('');
 const invoiceType = shallowRef<InvoiceType | undefined>(undefined);
 const recipient = shallowRef<Recipient>(recipientFrom(null));
@@ -41,19 +50,28 @@ watch(
     if (!now) return;
     recipient.value = recipientFrom(null);
     notes.value = '';
-    lines.value = [blankLine(1)];
+    lines.value = [blankLine(1, defaultRate.value)];
     local.value = null;
     command.error.value = null;
   },
   { immediate: true },
 );
 
+// A line still at the rate it started with follows the territory's answer (it may come after the window
+// opens, or change while it is open); a rate the person typed stays.
+watch(defaultRate, (now, before) => {
+  lines.value = lines.value.map((line) => (line.taxRate === before ? { ...line, taxRate: now } : line));
+});
+
 /** An invoice (F1) names its recipient whole; a ticket (F2) may name nobody. */
 const needsRecipient = computed(() => invoiceType.value !== 'F2');
 const ready = computed(() => linesReady(lines.value) && (!needsRecipient.value || recipientComplete(recipient.value)));
-const error = computed<FormModalError | null>(() =>
-  local.value ? { message: local.value } : refusal(command.error.value, t('invoice.create.failed')),
-);
+const error = computed<FormModalError | null>(() => {
+  if (local.value) return { message: local.value };
+  // Without the territory the rate is named «Tax %» and starts blank: the person types it.
+  const unknownTerritory = defaults.error.value ? { message: t('invoice.create.defaultsFailed') } : null;
+  return refusal(command.error.value, t('invoice.create.failed')) ?? unknownTerritory;
+});
 const fieldErrors = computed(() => error.value?.fields ?? {});
 
 async function issue(): Promise<void> {
@@ -113,6 +131,8 @@ async function issue(): Promise<void> {
       <InvoiceLinesEditor
         v-model="lines"
         :field-errors="fieldErrors"
+        :tax="tax"
+        :default-rate="defaultRate"
       />
     </div>
   </FormModal>

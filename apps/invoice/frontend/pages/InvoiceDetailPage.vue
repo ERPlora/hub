@@ -218,7 +218,10 @@ function onSubstituted(full: InvoiceOut): void {
             </dd>
           </div>
         </dl>
-        <InvoiceLinesTable :lines="invoice.lines" />
+        <InvoiceLinesTable
+          :lines="invoice.lines"
+          :taxes="invoice.tax_breakdown.map((entry) => entry.tax)"
+        />
         <InvoiceTotals :invoice="invoice" />
         <InlineFeedback
           v-if="paid.refused.value"

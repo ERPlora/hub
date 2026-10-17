@@ -160,6 +160,17 @@ export interface DocumentOut {
   html: string;
 }
 
+/** What a line of a manual invoice starts with when its rate is typed (INVOICE-F03, TAX-F11). */
+export type LineDefaultsIn = Record<string, never>;
+
+export interface LineDefaultsOut {
+  /** The tax a typed rate is declared with, the business territory's: `vat`, `igic` (Canary Islands) or
+   *  `ipsi` (Ceuta and Melilla). */
+  tax: string;
+  /** The territory's general rate («7.00»), from its own rule in Taxes; `null` without a rule of that tax. */
+  tax_rate: string | null;
+}
+
 export interface BySourceIn {
   sale_id?: string;
   sale?: string;
@@ -371,6 +382,7 @@ declare module '@erplora/ui/sdk' {
     'invoice.invoice.get': { input: InvoiceGetIn; output: InvoiceOut };
     'invoice.invoice.by_source': { input: BySourceIn; output: BySourceOut };
     'invoice.invoice.document': { input: DocumentIn; output: DocumentOut };
+    'invoice.invoice.line_defaults': { input: LineDefaultsIn; output: LineDefaultsOut };
     'invoice.invoice.create': { input: InvoiceCreateIn; output: InvoiceOut };
     'invoice.invoice.create_from_sale': { input: FromSaleIn; output: IssueOut };
     'invoice.invoice.substitute': { input: SubstituteIn; output: IssueOut };

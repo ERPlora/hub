@@ -59,6 +59,12 @@
       "notSubject": "Not subject",
       "reverseCharge": "Reverse charge"
     },
+    "taxPct": {
+      "vat": "VAT %",
+      "igic": "IGIC %",
+      "ipsi": "IPSI %",
+      "any": "Tax %"
+    },
     "list": {
       "search": "Search invoices…",
       "columns": {
@@ -122,7 +128,6 @@
         "description": "Description",
         "qty": "Qty",
         "price": "Price",
-        "taxPct": "VAT %",
         "base": "Base",
         "tax": "Tax",
         "total": "Total",
@@ -202,15 +207,15 @@
       "line": {
         "description": "Description",
         "qty": "Qty",
-        "price": "Price",
-        "taxPct": "VAT %"
+        "price": "Price"
       },
       "addLine": "+ Line",
       "removeLine": "Remove line",
       "submit": "Issue invoice",
       "done": "Invoice {number} issued",
       "failed": "Could not create the invoice",
-      "notAnAmount": "Line {line}: the price is not an amount. Type a figure, such as 12.50."
+      "notAnAmount": "Line {line}: the price is not an amount. Type a figure, such as 12.50.",
+      "defaultsFailed": "Could not read the business’s tax territory: type the rate of each line."
     },
     "series": {
       "title": "Numbering series",

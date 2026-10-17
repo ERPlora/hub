@@ -56,6 +56,11 @@ async def invoice_document(request, params: Query[DocumentIn]):
     return await run_operation(request, queries.document, params)
 
 
+@bind(router, "invoice.invoice.line_defaults", "/invoice/invoices/line_defaults")
+async def invoice_line_defaults(request):
+    return await run_operation(request, queries.line_defaults)
+
+
 @bind(router, "invoice.invoice.create", "/invoice/invoices", status=201)
 async def invoice_create(request, data: InvoiceCreateIn):
     return await run_operation(request, services.create, data)

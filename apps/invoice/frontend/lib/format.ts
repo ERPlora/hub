@@ -57,6 +57,12 @@ export function formatQuantity(value: string | number, locale: string): string {
   return numberFormat(locale, 'quantity', { maximumFractionDigits: 3 }).format(Number(value));
 }
 
+/** A rate of the server as a person types it («7.00» → «7», «9.50» → «9,5» in Spanish); none is blank. */
+export function typedRate(value: string | null, locale: string): string {
+  if (missing(value)) return '';
+  return numberFormat(locale, 'typed-rate', { maximumFractionDigits: 2, useGrouping: false }).format(Number(value));
+}
+
 /** A calendar day («2026-09-29» → «29/9/2026» in Spanish), built from its parts and formatted in UTC so no
  *  clock moves it to the day before; not a day is shown as it came, nothing is «—». */
 export function formatDate(value: string | null | undefined, locale: string): string {

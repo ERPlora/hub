@@ -59,6 +59,12 @@
       "notSubject": "No sujeto",
       "reverseCharge": "Inversión del sujeto pasivo"
     },
+    "taxPct": {
+      "vat": "IVA %",
+      "igic": "IGIC %",
+      "ipsi": "IPSI %",
+      "any": "Imp. %"
+    },
     "list": {
       "search": "Buscar facturas…",
       "columns": {
@@ -122,7 +128,6 @@
         "description": "Descripción",
         "qty": "Cant.",
         "price": "Precio",
-        "taxPct": "IVA %",
         "base": "Base",
         "tax": "Impuesto",
         "total": "Total",
@@ -202,15 +207,15 @@
       "line": {
         "description": "Descripción",
         "qty": "Cant.",
-        "price": "Precio",
-        "taxPct": "IVA %"
+        "price": "Precio"
       },
       "addLine": "+ Línea",
       "removeLine": "Quitar línea",
       "submit": "Emitir factura",
       "done": "Factura {number} emitida",
       "failed": "No se pudo crear la factura",
-      "notAnAmount": "Línea {line}: el precio no es un importe. Escribe una cifra, por ejemplo 12,50."
+      "notAnAmount": "Línea {line}: el precio no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "defaultsFailed": "No se pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea."
     },
     "series": {
       "title": "Series de numeración",

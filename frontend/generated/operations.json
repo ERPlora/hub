@@ -251,6 +251,7 @@
   "invoice.invoice.get": { "method": "get", "path": "/api/invoice/invoices/detail" },
   "invoice.invoice.by_source": { "method": "get", "path": "/api/invoice/invoices/by_source" },
   "invoice.invoice.document": { "method": "get", "path": "/api/invoice/invoices/document" },
+  "invoice.invoice.line_defaults": { "method": "get", "path": "/api/invoice/invoices/line_defaults" },
   "invoice.invoice.create": { "method": "post", "path": "/api/invoice/invoices" },
   "invoice.invoice.create_from_sale": { "method": "post", "path": "/api/invoice/invoices/from_sale" },
   "invoice.invoice.substitute": { "method": "post", "path": "/api/invoice/invoices/substitute" },
