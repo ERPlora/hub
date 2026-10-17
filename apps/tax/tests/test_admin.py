@@ -121,10 +121,21 @@ def test_the_business_tax_settings_are_in_the_admin(superuser):
             registered.has_view_permission,
             registered.has_add_permission,
             registered.has_change_permission,
-            registered.has_delete_permission,
         )
     )
+    # Never deleted: the row is the business's jurisdiction, and «Whole country» goes through the operation
+    # (its event re-prices the open tills); deleting it would move the business in silence.
+    assert registered.has_delete_permission(request) is False
     assert "region_code" in registered.list_display
+
+
+@pytest.mark.django_db
+def test_the_settings_row_cannot_be_deleted_from_the_admin(client, superuser):
+    settings = TaxSettings.objects.create(region_code="ES-CN")
+    on_a_hub(client, superuser)
+    response = client.post(f"/admin/tax/taxsettings/{settings.pk}/delete/", {"post": "yes"}, HTTP_HOST="hubs.localhost")
+    assert response.status_code == 403
+    assert TaxSettings.objects.filter(pk=settings.pk, region_code="ES-CN").exists()
 
 
 def test_the_staff_cannot_add_a_second_settings_row(superuser):

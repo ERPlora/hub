@@ -186,3 +186,8 @@ class TaxSettingsAdmin(admin.ModelAdmin):
     def has_add_permission(self, request) -> bool:
         # One row at most (``tax_settings_single_row``): once it exists, the staff changes it, never adds another.
         return super().has_add_permission(request) and not TaxSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        # Never deleted: «Whole country» goes through the operation (its event re-prices the open tills); deleting
+        # the row would move the business's jurisdiction in silence.
+        return False
