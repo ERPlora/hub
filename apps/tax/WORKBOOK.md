@@ -544,7 +544,7 @@ reactivarla, la última desactivada).
 | Los alias, con búsqueda, filtros (categoría, origen) y páginas | ver | F13, F15 | `tax.alias.list` |
 | La categoría que corresponde a un texto de fuera, y por qué casó | ver | F15 | `tax.alias.resolve` |
 | El impuesto de un importe: base, cuota, total, tipo, calificación y desglose | ver | F18, F19 | `tax.rate.calculate` |
-| El país y el territorio fiscal del negocio, y los territorios que puede elegir | ver | F11 | `tax.settings.get` |
+| El país y el territorio fiscal del negocio, el impuesto de ese territorio (`tax_kind`: IVA, IGIC o IPSI) y los territorios que puede elegir | ver | F11 | `tax.settings.get` |
 
 Categorías, reglas, alias, el estado de configuración, las raíces de un componente, los países y los ajustes se pueden seguir en vivo.
 
@@ -640,6 +640,14 @@ cajero del producto actual es un empleado.
   (el territorio del negocio hoy), la línea de venta sin su regla (`_charged_kind` de Facturación: el
   territorio que la línea congeló al cobrarse), el 0 % pedido expresamente (`fallback_zero`) y el alta de
   una regla sin `tax_type`. VeriFactu lo declara como `Impuesto` 03, 02 o 01.
+- **El impuesto del territorio lo publica solo Impuestos** (ronda 2026-10-17 de PLAN-HUB): `tax.settings.get`
+  (y la respuesta de `tax.settings.update`) lo devuelve en `tax_kind`, vivo sobre `tax.settings.updated`.
+  Ninguna otra app lo republica con una operación propia (Ventas y Facturación tenían una fachada cada una;
+  se borraron). En la SPA, `useTaxKind()` y `useTaxName()` de `frontend/composables/useTaxName.ts` lo leen
+  con una sola suscripción por pestaña y dan la familia y su nombre corto («IVA», «IGIC», «IPSI»,
+  `tax.common.taxName.*`); `taxNameKey(familia)` nombra cualquier otra (la que declararon las ventas de un
+  periodo). En el servidor, `schemas.TAX_KIND_NAMES` da el mismo nombre corto a un mensaje («Falta configurar
+  su IGIC.», el 409 `sale.tax_category_missing` de Ventas). Todo rol que vende o factura tiene `tax.view`.
 - **Solape**: crear, reactivar, poner fecha de fin y el lote bloquean la fila de la categoría
   (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
   en cola y la segunda ve la primera (tests con dos sesiones reales para crear, reactivar, poner fecha

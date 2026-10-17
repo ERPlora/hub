@@ -1,17 +1,20 @@
-// The tax figure of Sales → Sales of a business with a tax territory (SALE-F28 with TAX-F11;
-// FIX-SALE-KPI-TAX-LABEL-REGION): the figure is named by the tax the business's sales are declared with,
-// its territory's. In the Canary Islands, with an IGIC 7 % rule on the generic goods, a sale charged at the
-// till is declared IGIC 7 % and the figures of the period say «IGIC», never «VAT»; back to the whole
-// country, the open screen renames it «VAT» by itself (live), and on the peninsula it still says «VAT». The
-// figures are seen at 390×844, 834×1112 and 1440×900 (`FIX-SALE-KPI-TAX-LABEL-REGION-<width>.png`). What
-// the run makes is deleted after it, and the business goes back to the whole country.
-// flow: ninguno — FIX de SALE-F28 (cifras de ventas): en Canarias, Ceuta o Melilla la cifra de impuestos dice «IVA»
+// The tax figure of Sales → Sales (SALE-F28 with TAX-F11; FIX-SALE-KPI-TAX-LABEL-REGION and the round
+// 2026-10-17 of PLAN-HUB): the figure is named by the tax the period's sales were DECLARED with, never by the
+// territory kept today. Without sales in the period it is named by the business territory's, as Taxes
+// publishes it (`tax.settings.get`), and a change of territory renames it on the open screen (live). In the
+// Canary Islands, with an IGIC 7 % rule on the generic goods, a sale charged at the till is declared IGIC 7 %
+// and the figure says «IGIC», never «VAT»; back to the whole country it still says «IGIC» (what those sales
+// declared), and once a sale at the peninsula's VAT joins the period it says «Taxes» by itself (live). The
+// figures are seen at 390×844, 834×1112 and 1440×900 (`FIX-SALE-KPI-TAX-LABEL-REGION-<width>.png`). What the
+// run makes is deleted before and after it (the «Today» period holds no sale but this spec's: its own e2e
+// database), and the business goes back to the whole country.
+// flow: ninguno — FIX de SALE-F28 (cifras de ventas): la cifra de impuestos dice el impuesto declarado, no el territorio de hoy
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
 import { createRule, FLOW_VIEWPORTS, horizontalOverflow } from './tax-helpers';
 
 const RUN = stamp();
@@ -33,6 +36,8 @@ function wholeCountry(): void {
 test.beforeAll(async ({ browser }) => {
   snapshotSeries();
   wholeCountry();
+  // A run that stopped before its cleanup leaves its sales in «Today»: the period starts without any.
+  cleanSales();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/sales');
@@ -64,7 +69,23 @@ async function figures(page: Page) {
   return { kpis, label, value };
 }
 
-test('SALE-F28 in the Canary Islands: a sale charged at the till is declared IGIC and the figure says «IGIC»', async ({ page, context }) => {
+test('SALE-F28 without sales: the tax figure is named by the territory’s, and renamed live with it', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/sale/sales');
+  await territory(context, '');
+  const { kpis, label } = await figures(page);
+  // The precondition, said: «Today» holds no sale.
+  await expect(kpis.locator('[data-testid=sales-kpi-tickets]')).toHaveText('0');
+  await expect(label).toHaveText('VAT');
+
+  // A change of territory with the screen open renames it by itself (live), both ways.
+  await territory(context, 'ES-CN');
+  await expect(label).toHaveText('IGIC');
+  await territory(context, '');
+  await expect(label).toHaveText('VAT');
+});
+
+test('SALE-F28 in the Canary Islands: a sale charged at the till is declared IGIC and the figure says «IGIC» until a VAT sale joins it', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await territory(context, 'ES-CN');
@@ -104,15 +125,14 @@ test('SALE-F28 in the Canary Islands: a sale charged at the till is declared IGI
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 
-  // Back to the whole country with the screen open: the figure is renamed «VAT» by itself (live).
+  // Back to the whole country: the period's sales were declared IGIC, so the figure still says «IGIC»
+  // (the screen opened afresh, with the territory already the peninsula's).
   await territory(context, '');
-  await expect(shown(page).locator('[data-testid=sales-kpi-tax-label]')).toHaveText('VAT');
-});
+  const again = await figures(page);
+  await expect(again.label).toHaveText('IGIC');
 
-test('SALE-F28 on the peninsula: the tax figure still says «VAT»', async ({ page, context }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page, A, '/sale/sales');
-  await territory(context, '');
-  const { label } = await figures(page);
-  await expect(label).toHaveText('VAT');
+  // A sale at the peninsula's VAT joins the period with the screen open: two taxes, a plain «Taxes» (live).
+  const vat = await chargeByApi(context, { lines: [{ product: shirt.sku }], payments: [{ method: 'card' }] });
+  expect(vat.lines.map((line) => line.tax_rate)).toEqual(['21.00']);
+  await expect(again.label).toHaveText('Taxes');
 });

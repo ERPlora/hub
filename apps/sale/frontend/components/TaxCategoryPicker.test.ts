@@ -7,7 +7,7 @@
 // names the business territory's tax («IGIC» in the Canary Islands, «IPSI» in Ceuta and Melilla).
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, errorFrame, flush, ionValue, mountSale } from '../__tests__/mount-sale';
+import { click, errorFrame, flush, ionValue, mountSale, taxSettings } from '../__tests__/mount-sale';
 import { plain } from '../lib/format';
 import TaxCategoryPicker from './TaxCategoryPicker.vue';
 
@@ -180,11 +180,11 @@ describe('TaxCategoryPicker: the old notices', () => {
 
   it('in the Canary Islands the notices name the IGIC, in the reader’s language', async () => {
     const en = await setup();
-    await en.result('sale.sale.tax_kind', { tax: 'igic' });
+    await en.result('tax.settings.get', taxSettings('igic'));
     await en.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
     expect(en.text('tax-none')).toBe('There are no tax categories to choose from. Set up your IGIC first, in Taxes.');
     const es = await setup({}, 'es');
-    await es.result('sale.sale.tax_kind', { tax: 'igic' });
+    await es.result('tax.settings.get', taxSettings('igic'));
     await es.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
     expect(es.text('tax-none')).toBe('No hay categorías de IGIC que elegir. Configura antes tus tipos de IGIC, en Impuestos.');
     es.net.lastStream().push(errorFrame(es.subId(OP), 'permission_denied'));
@@ -194,7 +194,7 @@ describe('TaxCategoryPicker: the old notices', () => {
 
   it('in Ceuta or Melilla the search names the IPSI', async () => {
     const s = await setup({}, 'es');
-    await s.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await s.result('tax.settings.get', taxSettings('ipsi'));
     await s.result(OP, PAGE);
     await s.open();
     expect((s.inDoc('tax-search') as Control).placeholder).toBe('Buscar una categoría de IPSI…');

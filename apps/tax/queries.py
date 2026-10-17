@@ -774,10 +774,12 @@ def resolve_alias(ctx: OperationContext, params: AliasResolveIn) -> dict:
 
 def settings_row(settings: TaxSettings | None) -> dict:
     country, _region = business_jurisdiction()
+    region = (settings.region_code or None) if settings else None
     return {
         "country_code": country,
-        "region_code": (settings.region_code or None) if settings else None,
+        "region_code": region,
         "regions": list(TAX_REGIONS.get(country, ())),
+        "tax_kind": tax_kind_of(country, region),
         "updated_at": settings.updated_at if settings else None,
     }
 

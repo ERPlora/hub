@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import OpenPriceSheet from './OpenPriceSheet.vue';
@@ -50,7 +50,7 @@ describe('OpenPriceSheet', () => {
 
   it('in the Canary Islands the section names the IGIC', async () => {
     const m = await setup({}, 'es');
-    await m.result('sale.sale.tax_kind', { tax: 'igic' });
+    await m.result('tax.settings.get', taxSettings('igic'));
     expect(m.find('pos-open-price-department-label').text()).toBe('Sección (IGIC)');
   });
 

@@ -573,9 +573,10 @@ GENERAL_CATEGORIES = ("product.generic", "service.generic")
     input=LineDefaultsIn,
     output=LineDefaultsOut,
     ai={
-        "description": "What a line of a manual invoice starts with when its rate is typed: the tax it is declared "
-        "with (the business territory's: VAT, IGIC in the Canary Islands, IPSI in Ceuta and Melilla) and the "
-        "territory's general rate from its own rule in Taxes, or none when the territory has no rule of that tax."
+        "description": "The rate a line of a manual invoice starts with when its rate is typed: the territory's "
+        "general rate from its own rule in Taxes, or none when the territory has no rule of its own tax. The tax "
+        "it is declared with is the territory's, read with tax.settings.get (VAT, IGIC in the Canary Islands, "
+        "IPSI in Ceuta and Melilla)."
     },
 )
 def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
@@ -586,8 +587,8 @@ def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
     for key in GENERAL_CATEGORIES:
         resolution = resolve_tax(category_key=key)
         if resolution and resolution.tax_kind == tax and resolution.operation_class == "subject":
-            return {"tax": tax, "tax_rate": resolution.root.rate_pct}
-    return {"tax": tax, "tax_rate": None}
+            return {"tax_rate": resolution.root.rate_pct}
+    return {"tax_rate": None}
 
 
 # ── Series ──────────────────────────────────────────────────────────────────────────────────────

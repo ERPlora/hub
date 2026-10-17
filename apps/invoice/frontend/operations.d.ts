@@ -163,10 +163,8 @@ export interface DocumentOut {
 /** What a line of a manual invoice starts with when its rate is typed (INVOICE-F03, TAX-F11). */
 export type LineDefaultsIn = Record<string, never>;
 
+/** The tax a typed rate is declared with is the territory's, from Taxes (`tax.settings.get`'s `tax_kind`). */
 export interface LineDefaultsOut {
-  /** The tax a typed rate is declared with, the business territory's: `vat`, `igic` (Canary Islands) or
-   *  `ipsi` (Ceuta and Melilla). */
-  tax: string;
   /** The territory's general rate («7.00»), from its own rule in Taxes; `null` without a rule of that tax. */
   tax_rate: string | null;
 }

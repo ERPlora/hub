@@ -1017,7 +1017,8 @@ def keep(region, role="hub_admin", scope=A):
 @pytest.mark.django_db
 def test_keep_change_and_clear_the_business_region():
     kept = keep("es-cn")
-    assert (kept.country_code, kept.region_code) == ("ES", "ES-CN")
+    # The tax of the territory comes back with it: the screen renames every tax at once (TAX-F11).
+    assert (kept.country_code, kept.region_code, kept.tax_kind) == ("ES", "ES-CN", "igic")
     settings = TaxSettings.objects.get()
     assert (settings.region_code, settings.updated_by) == ("ES-CN", "tester")
     assert outbox() == [(events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": "ES-CN"})]
@@ -1026,7 +1027,7 @@ def test_keep_change_and_clear_the_business_region():
     assert keep("ES-CN").region_code == "ES-CN" and outbox() == []
     assert keep("ES-ML").region_code == "ES-ML"
     cleared = keep(None)
-    assert (cleared.region_code, TaxSettings.objects.get().region_code) == (None, "")
+    assert (cleared.region_code, cleared.tax_kind, TaxSettings.objects.get().region_code) == (None, "vat", "")
     assert outbox() == [
         (events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": "ES-ML"}),
         (events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": None}),

@@ -34,6 +34,13 @@
       "excise": "Excise",
       "import_duty": "Import duty"
     },
+    "common": {
+      "taxName": {
+        "vat": "VAT",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
+      }
+    },
     "classes": {
       "subject": "Subject",
       "subject_reverse": "Reverse charge",

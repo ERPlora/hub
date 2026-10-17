@@ -114,6 +114,12 @@ msgstr "categorías fiscales"
 msgid "VAT"
 msgstr "IVA"
 
+msgid "IGIC"
+msgstr "IGIC"
+
+msgid "IPSI"
+msgstr "IPSI"
+
 msgid "IGIC (Canary Islands)"
 msgstr "IGIC (Canarias)"
 

@@ -6,7 +6,7 @@
 // does not know under «VAT charged», a department another device deleted on top).
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, ionValue, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import type { DepartmentOut } from '../../operations';
 import DepartmentFormModal from './DepartmentFormModal.vue';
@@ -195,7 +195,7 @@ describe('DepartmentFormModal: Spanish', () => {
 describe('DepartmentFormModal: the business territory’s tax', () => {
   it('in the Canary Islands the field, its placeholder and its notice name the IGIC', async () => {
     const s = await setup(null, 'es');
-    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.result('tax.settings.get', taxSettings('igic'));
     expect([s.field('tax').label, s.field('tax').placeholder]).toEqual(['IGIC que cobra', 'Elige el IGIC']);
     await s.type('name', 'Carnicería');
     await click(s.submit());
@@ -204,7 +204,7 @@ describe('DepartmentFormModal: the business territory’s tax', () => {
 
   it('in Ceuta or Melilla it says «IPSI charged» in English', async () => {
     const s = await setup();
-    await s.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await s.result('tax.settings.get', taxSettings('ipsi'));
     expect([s.field('tax').label, s.field('tax').placeholder]).toEqual(['IPSI charged', 'Choose the IPSI']);
     await s.type('name', 'Butchery');
     await click(s.submit());

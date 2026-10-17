@@ -8,7 +8,7 @@ import { IonItem, IonLabel, IonList, IonListHeader, IonNote } from '@ionic/vue';
 import { computed } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 

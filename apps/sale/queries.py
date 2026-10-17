@@ -16,7 +16,8 @@ from uuid import UUID
 
 import pydantic
 from django.conf import settings as django_settings
-from django.db.models import Count, Exists, F, OuterRef, Q, Sum
+from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, Sum
+from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -78,7 +79,6 @@ from apps.sale.schemas import (
     ServiceLineFields,
     SettingsOut,
     StatsOut,
-    TaxKindOut,
     TodayOut,
 )
 from apps.tax.models import TaxCategory
@@ -89,6 +89,7 @@ from apps.tax.queries import (
     category_by_reference,
     current_rates,
 )
+from apps.tax.schemas import TAX_KIND_NAMES
 
 CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
@@ -113,8 +114,6 @@ PRODUCT_NOT_AVAILABLE = _(
 TAX_CATEGORY_MISSING = _(
     "«%(name)s» cannot be sold: it has no tax category. Its %(tax)s is missing."
 )
-#: The short name of each tax a territory declares its sales with (TAX-F11).
-TAX_NAMES = {"vat": _("VAT"), "igic": _("IGIC"), "ipsi": _("IPSI")}
 SERVICES_UNAVAILABLE = _(
     "Services is not active in this business: its services cannot be sold nor its vouchers used. Take the "
     "voucher off the line to charge it."
@@ -201,24 +200,9 @@ def business_day(ctx: OperationContext, params: EmptyIn) -> dict:
     return {"today": business_today()}
 
 
-@operation(
-    "sale.sale.tax_kind",
-    kind="query",
-    permission="sale.view_sale",
-    input=EmptyIn,
-    output=TaxKindOut,
-    ai={
-        "description": "The tax the business's sales are declared with, its territory's: VAT, IGIC in the Canary "
-        "Islands, IPSI in Ceuta and Melilla (what the till, the sales figures and the sections name)."
-    },
-)
-def tax_kind(ctx: OperationContext, params: EmptyIn) -> dict:
-    return {"tax": business_tax_kind()}
-
-
 def missing_tax(name: str) -> str:
     """Why an article without a tax category cannot be sold, naming the territory's tax (TAX-F11)."""
-    return str(TAX_CATEGORY_MISSING) % {"name": name, "tax": TAX_NAMES[business_tax_kind()]}
+    return str(TAX_CATEGORY_MISSING) % {"name": name, "tax": TAX_KIND_NAMES[business_tax_kind()]}
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────
@@ -1496,6 +1480,27 @@ def _period(sales, period: PeriodIn):
     return sales
 
 
+def declared_tax_kind(sales) -> str | None:
+    """The tax ``sales`` were declared with (the ``tax_type`` of their breakdown rows), what their tax figure
+    is named by (SALE-F28): the one family a territory declares (VAT, IGIC, IPSI) when they all share it;
+    ``None`` for a mix — a change of territory in the period — or a tax of no territory (the equivalence
+    surcharge, another country's). Without any row, the business territory's, what it would declare now."""
+    elements = Func(F("tax_breakdown"), function="jsonb_array_elements", output_field=JSONField())
+    declared = (
+        sales.order_by()
+        .annotate(family=KeyTextTransform("tax_type", elements))
+        .values_list("family", flat=True)
+        .distinct()
+    )
+    families = set(declared[:2])
+    if not families:
+        return business_tax_kind()
+    if len(families) > 1:
+        return None
+    family = families.pop()
+    return family if family in TAX_KIND_NAMES else None
+
+
 @operation(
     "sale.sale.stats",
     kind="query",
@@ -1504,13 +1509,15 @@ def _period(sales, period: PeriodIn):
     output=StatsOut,
     ai={
         "description": "Sales figures of a period of business days (inclusive; empty = all): tickets, revenue (refunds taken "
-        "off), average ticket, taxable base, tax, discounts, refunds and voided sales, in cents."
+        "off), average ticket, taxable base, tax, discounts, refunds and voided sales, in cents; and the tax the "
+        "sales were declared with (VAT, IGIC, IPSI; empty when they mix taxes)."
     },
 )
 def stats(ctx: OperationContext, params: PeriodIn) -> dict:
     sales = _period(Sale.objects.all(), params)
     zero = 0
-    counted = sales.filter(status__in=COUNTED).aggregate(
+    charged = sales.filter(status__in=COUNTED)
+    counted = charged.aggregate(
         count=Count("id"),
         gross=Coalesce(Sum("total"), zero),
         refunded=Coalesce(Sum("refunded_total"), zero),
@@ -1529,6 +1536,7 @@ def stats(ctx: OperationContext, params: PeriodIn) -> dict:
         "discount_total": counted["discounts"],
         "refunded_total": counted["refunded"],
         "voided_count": sales.filter(status=Sale.Status.VOIDED).count(),
+        "tax_kind": declared_tax_kind(charged),
     }
 
 
