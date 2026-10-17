@@ -3,7 +3,8 @@
 Two courses with the same name added to one menu at once give one course and a 409; two choices of the
 same product added to one course at once give one choice and a 409; a full course takes no one more
 however many arrive together. A read that a menu's deletion lands in the middle of answers what it read,
-a 404 or the till's 409, never a 500.
+a 404 or the till's 409, never a 500. A product or a tax category deleted while a write names it either
+waits for the write or refuses it as one deleted before, never a 500 nor a menu offering a deleted product.
 """
 
 import threading
