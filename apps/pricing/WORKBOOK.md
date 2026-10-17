@@ -570,6 +570,13 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   si otra elección gana la carrera (el índice lo dice), se repite: queda la última.
 - **Códigos únicos** con índice sobre `Lower(code)`; dos altas a la vez con el mismo código → una 409
   `pricing.duplicate_code`.
+- **Lo que una escritura nombra lo retiene** (`held` de Inventario, `FOR KEY SHARE`, hasta el COMMIT):
+  la categoría o el producto de una regla al crearla o editarla, el producto de un precio al ponerlo y el
+  grupo de una tarifa o de una regla al crearlas, editarlas o activar la regla. Su borrado (el «Eliminar»
+  de Inventario o de Clientes, o el del admin) espera a la escritura; uno que ya estaba en curso al leerla
+  la deja como no encontrada, igual que una borrada antes (422 `invalid_field` en su campo; un precio,
+  404; activar, 409 `pricing.rule_group_deleted`). Nunca el `IntegrityError` crudo ni una regla, un precio
+  o una tarifa colgados de algo borrado (`tests/test_concurrency.py`).
 - **Dinero en céntimos**, mitad hacia arriba, una vez por magnitud; el importe de la línea es
   `precio × (cantidad en la unidad del precio) ÷ price_quantity` con las fracciones exactas de
   `apps.inventory.models.UNIT_SPECS`, como Ventas. Divisa ISO 4217 de dos decimales (`pycountry` y
