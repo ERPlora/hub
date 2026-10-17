@@ -3,7 +3,7 @@
 // country is the business's (`tax.settings.get`, read only: it is the one of its ERPlora account); «Tax
 // region» picks one of its territories with taxes of their own — the Canary Islands (IGIC), Ceuta or Melilla
 // (IPSI) — or the whole country (VAT), and «Save» keeps it. From then on every sale and invoice charges the
-// rule of that region when its category has one. Live: untouched, the form follows the server; once
+// rule of that region, never the national VAT. Live: untouched, the form follows the server; once
 // changed, a new result never overwrites what is being chosen. A failed load says so with «Retry» and shows
 // no region as the business's. Whoever only views taxes reads it, locked, and is told why.
 import { InlineFeedback } from '@erplora/ui/components';

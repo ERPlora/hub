@@ -184,6 +184,48 @@ def test_a_rule_of_another_region_is_never_used(no_seed):
     assert resolve(region=None) is None
 
 
+TERRITORIES_WITH_OWN_TAX = ["ES-CN", "ES-CE", "ES-ML"]
+
+
+@pytest.mark.parametrize("region", TERRITORIES_WITH_OWN_TAX)
+def test_a_territory_with_its_own_tax_never_takes_the_national_vat(no_seed, region):
+    # The Canary Islands (IGIC), Ceuta and Melilla (IPSI) are outside the VAT territory: without a rule of
+    # their own, a category has no rule there, as one without any rule in the peninsula, never the 21 % VAT.
+    national = rule(category(), "21")
+    assert resolve(region=region) is None
+    assert queries.pick_root([national], region) is None
+    with pytest.raises(Conflict) as refusal:
+        queries.calculate_tax(amount=10_000, category_key="product.generic", country_code="ES", region_code=region, on=TODAY)
+    assert refusal.value.code == "tax.no_rate"
+
+
+def test_a_region_without_its_own_tax_and_the_whole_country_keep_the_national_rule(no_seed):
+    national = rule(category(), "21")
+    assert queries.pick_root([national], "ES-MD") == national
+    assert queries.pick_root([national], None) == national
+    assert queries.pick_root([national], "PT-20") == national  # the region names another country: VAT
+
+
+@pytest.mark.parametrize(
+    ("region", "expected"),
+    [
+        (None, {"product.generic": "21.00", "restaurant.food": "10.00"}),
+        ("ES-MD", {"product.generic": "21.00", "restaurant.food": "10.00"}),
+        ("ES-CN", {"product.generic": "7.00", "restaurant.food": None}),
+        ("ES-CE", {"product.generic": None, "restaurant.food": None}),
+        ("ES-ML", {"product.generic": None, "restaurant.food": None}),
+    ],
+)
+def test_current_rates_never_fill_a_territory_with_the_national_vat(no_seed, region, expected):
+    generic, food = category("product.generic"), category("restaurant.food")
+    rule(generic, "21")
+    rule(generic, "7", region="ES-CN", tax_type="igic")
+    rule(food, "10")
+    rates = queries.current_rates([generic, food], "ES", region, TODAY)
+    found = {cat.key: (str(rates[cat.id].rate_pct) if rates[cat.id] else None) for cat in (generic, food)}
+    assert found == expected
+
+
 def test_the_country_must_match(no_seed):
     rule(category(), "21", country="ES")
     assert resolve(country="PT") is None
@@ -498,9 +540,10 @@ def test_the_rate_column_follows_the_country_and_the_region(no_seed):
         "product.generic": Decimal("26.20"),
         "restaurant.food": Decimal("10.00"),
     }
+    # The Canary Islands never take the national VAT: a category without its IGIC has no rate there.
     assert rates(region_code="ES-CN") == {
         "product.generic": Decimal("7.00"),
-        "restaurant.food": Decimal("10.00"),
+        "restaurant.food": None,
     }
     assert rates(country_code="PT") == {
         "product.generic": None,
@@ -1115,3 +1158,15 @@ def test_a_zero_fallback_carries_the_tax_family_of_its_territory(no_seed):
         "ipsi",
         "ES-CE",
     )
+
+
+def test_in_a_region_without_its_own_tax_its_rule_still_beats_the_national_one(no_seed):
+    # Only the territories outside the VAT (ES-CN, ES-CE, ES-ML) drop the national rule: anywhere else the
+    # exact region still wins over the whole country, and the whole country stands in when the region has none.
+    generic = category()
+    national = rule(generic, "21")
+    madrid = rule(generic, "10", region="ES-MD")
+    assert resolve(region="ES-MD").root == madrid
+    assert queries.pick_root([national, madrid], "ES-MD") == madrid
+    assert queries.pick_root([madrid, national], "ES-MD") == madrid
+    assert queries.pick_root([national], "ES-MD") == national

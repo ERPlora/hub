@@ -214,8 +214,9 @@ Pasos:
 5. Pulsa «Añadir»; el panel se cierra y la regla sale en la tabla.
 Entra: país, región, categoría, %, tipo y fechas que elige la persona.
 Sale: la regla activa; Impuestos avisa (`tax.rule.created`). Desde ese momento Ventas y Facturación la
-usan para las ventas nuevas: gana la regla de la región del negocio y, si no hay, la del país entero;
-una regla de otra región nunca se usa. Las ventas ya hechas no cambian (TAX-F07).
+usan para las ventas nuevas: gana la regla de la región del negocio y, si no hay, la del país entero,
+salvo en Canarias, Ceuta y Melilla, donde solo vale la de su territorio (el IVA nacional no se aplica
+allí); una regla de otra región nunca se usa. Las ventas ya hechas no cambian (TAX-F07).
 Si falla: dos reglas activas de la misma categoría, país y región no pueden estar vigentes el mismo
 día: el rechazo sale en «Vigente desde» con «Se solapa con otra regla activa de este país, región y
 categoría…» (se resuelve con TAX-F07 o TAX-F08). Un país que no existe, una región de otro país, un %
@@ -349,22 +350,27 @@ Pasos:
 2. En Reglas crea una regla por cada categoría que vendes: País «España», la Región (ES-CN Canarias,
    ES-CE Ceuta o ES-ML Melilla), el % del territorio y el Tipo «IGIC (Canarias)» o «IPSI
    (Ceuta/Melilla)» (TAX-F04).
-3. No borres las reglas del IVA: en un negocio con territorio se aplican a toda categoría que no tenga
-   regla regional. Por eso hace falta una regla regional por cada categoría que vendas.
+3. Crea una regla del territorio por cada categoría que vendas: en Canarias, Ceuta y Melilla el IVA
+   nacional no se aplica nunca, así que una categoría sin regla de su territorio no se puede cobrar hasta
+   que la tenga. Las reglas del IVA no hace falta borrarlas: vuelven a usarse con «Todo el país (IVA)».
 4. Haz una venta de prueba: el tique y su desglose dicen el impuesto del territorio («IGIC 7 %»), y la
    factura lo declara igual.
 Entra: el territorio fiscal del negocio y un tipo regional por categoría que fija la persona (no se
 siembra ninguno a propósito).
 Sale: el territorio guardado, que desde ese momento usan todas las ventas, las facturas, el cálculo de
-TAX-F18 y el tipo que enseñan Categorías y las secciones de Ventas: la regla del territorio gana a la
-nacional y la familia del impuesto (IGIC, IPSI) es la de la regla. Una línea sin categoría ni regla —un
+TAX-F18 y el tipo que enseñan Categorías y las secciones de Ventas: solo cuenta la regla del territorio
+(la nacional, de IVA, nunca) y la familia del impuesto (IGIC, IPSI) es la de la regla. Una línea sin categoría ni regla —un
 tipo escrito a mano en una factura, o una venta cuya regla ya no existe— se declara con el impuesto de su
 territorio: IGIC en Canarias, IPSI en Ceuta y Melilla, IVA en el resto (la de una venta, el territorio con
 que se cobró). Evento `tax.settings.updated`, que vuelve a calcular la caja abierta.
 Si falla: un territorio que no tiene impuestos propios en el país del negocio se rechaza bajo
 «Territorio fiscal» («Esta región no tiene impuestos propios en el país de tu negocio: elige uno de sus
-territorios fiscales, o ninguno.»); una categoría sin regla regional se cobra con la nacional, al IVA;
-con «Todo el país (IVA)», las reglas regionales no se usan nunca. Quien solo consulta impuestos ve el
+territorios fiscales, o ninguno.»); una categoría sin regla de su territorio no se cobra nunca al IVA
+nacional, igual que una categoría sin ninguna regla: el TPV no deja cobrarla («… no se puede cobrar:
+ninguna regla fiscal se aplica aquí a su categoría fiscal …»), la factura la rechaza debajo de su línea
+(«Ninguna regla fiscal se aplica hoy a la categoría fiscal …») y Categorías y las secciones de Ventas no le
+enseñan tipo; se arregla creando su regla (paso 2). Con «Todo el
+país (IVA)», las reglas regionales no se usan nunca. Quien solo consulta impuestos ve el
 territorio, pero no lo cambia.
 Implicados: INVOICE-F01, SALE-F01
 
@@ -607,7 +613,8 @@ cajero del producto actual es un empleado.
   enlazable); Inventario pone su FK aquí. Ninguna categoría se borra.
 - **La resolución, una sola vez** (`queries.resolve_tax` y `queries.calculate_tax`): raíces activas y
   vigentes en la fecha, del país y la categoría; la región exacta gana a la del país entero y nunca se
-  usa otra región; dentro de un nivel, la de «Vigente desde» más reciente y, a igualdad, el `id` menor.
+  usa otra región; una región con impuesto propio (`own_tax_kind`: ES-CN, ES-CE, ES-ML) solo toma sus
+  reglas, nunca las del país entero (`pick_root`, también en `current_rates`): sin la suya, `tax.no_rate`; dentro de un nivel, la de «Vigente desde» más reciente y, a igualdad, el `id` menor.
   Sus componentes (hijos activos y vigentes, por `id`) se suman sobre la misma base. La calificación y
   la familia del impuesto son siempre las de la raíz. Ventas y Facturación (que requieren Impuestos)
   llaman a esas funciones dentro de su propia operación.

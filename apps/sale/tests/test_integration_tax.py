@@ -233,12 +233,26 @@ def test_without_a_region_the_business_charges_the_national_rule(product):
     assert (line.tax_rate, line.tax_region_code) == (Decimal("21.00"), "")
 
 
-def test_a_category_without_a_regional_rule_keeps_the_national_one(product):
+@pytest.mark.parametrize("region", ["ES-CN", "ES-CE", "ES-ML"])
+def test_a_category_without_its_territorys_rule_is_not_charged_with_the_national_vat(product, region):
+    # Outside the VAT territory the national rule of the category (restaurant.food, 10 % VAT) never stands in for
+    # the missing IGIC or IPSI: the till refuses it as a category without any rule in the peninsula.
+    from apps.sale.models import Sale
+
     regional_rule("ES-CN", "7", "igic")
-    run("tax.settings.update", {"region_code": "ES-CN"})
+    run("tax.settings.update", {"region_code": region})
     product("Menu", "MNU", 1100, "restaurant.food")
-    (line,) = charge("tax-key-0001", {"product": "MNU"}).lines
-    assert (line.tax_rate, line.tax_country_code) == (Decimal("10.00"), "ES")
+    run("sale.department.create", {"name": "Kitchen", "tax_category_key": "restaurant.food"})
+    (section,) = run("sale.department.list", {}).rows
+    assert section.tax_rate_pct is None
+    for attempt in (
+        lambda: run("sale.checkout.preview", {"lines": [{"product": "MNU"}]}),
+        lambda: charge("tax-key-0001", {"product": "MNU"}),
+    ):
+        with pytest.raises(Conflict) as refusal:
+            attempt()
+        assert refusal.value.code == "sale.no_tax_rule"
+    assert not Sale.objects.exists()
 
 
 def test_the_preview_and_the_sections_follow_the_business_region(product):
