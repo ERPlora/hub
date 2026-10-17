@@ -26,6 +26,7 @@ from live.operations import UnknownOperation, get, operation
 from live.outbox import record_event
 
 from apps.inventory.models import Category, Product
+from apps.inventory.queries import held
 from apps.kitchen import events
 from apps.kitchen.models import (
     ACTOR_MAX_LENGTH,
@@ -157,10 +158,14 @@ def actor(ctx: OperationContext) -> str:
 
 def locked_settings() -> KitchenSettings:
     """The settings row, locked: every write of the kitchen goes one after the other (made again,
-    receiving everything, if it was lost)."""
+    receiving everything, if it was lost). The live stations are held with it until the write commits
+    (``held``): the Hub admin's «Delete» of one waits for the write, so a route, a dish or a line of the
+    History never names a station gone meanwhile, and one being deleted is read once it is gone. The
+    kitchen's own «Delete» needs no more: it is a write of the kitchen too."""
     row, _created = KitchenSettings.objects.select_for_update().get_or_create(
         singleton=True, defaults={"receiving_since": EPOCH}
     )
+    held(Station.objects.filter(is_deleted=False))
     return row
 
 
@@ -1318,10 +1323,23 @@ def delete_station(ctx: OperationContext, data: StationRefIn) -> dict:
 # ── Routing (KITCHEN-F04) ────────────────────────────────────────────────────────────────────────
 
 
+def _held(model, row, missing, code: str):
+    """``row`` read again, live and held until this write commits (``held``): Inventory's «Delete» or the
+    Hub admin's waits for the write, and one deleted since it was found is not found, as one deleted
+    before."""
+    live = held(model.objects.filter(pk=row.pk, is_deleted=False))
+    if not live:
+        raise NotFound(str(missing), code=f"kitchen.{code}_not_found")
+    return live[0]
+
+
 def _target(data) -> tuple[Product | None, Category | None]:
+    """The product or the category a route names, held for the route (``_held``)."""
     if data.product_id is not None or data.product:
-        return find_product(data.product_id, data.product), None
-    return None, find_category(data.category_id, data.category)
+        product = find_product(data.product_id, data.product)
+        return _held(Product, product, PRODUCT_NOT_FOUND, "product"), None
+    category = find_category(data.category_id, data.category)
+    return None, _held(Category, category, CATEGORY_NOT_FOUND, "category")
 
 
 def _route_out(
