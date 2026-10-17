@@ -1158,3 +1158,15 @@ def test_a_zero_fallback_carries_the_tax_family_of_its_territory(no_seed):
         "ipsi",
         "ES-CE",
     )
+
+
+def test_in_a_region_without_its_own_tax_its_rule_still_beats_the_national_one(no_seed):
+    # Only the territories outside the VAT (ES-CN, ES-CE, ES-ML) drop the national rule: anywhere else the
+    # exact region still wins over the whole country, and the whole country stands in when the region has none.
+    generic = category()
+    national = rule(generic, "21")
+    madrid = rule(generic, "10", region="ES-MD")
+    assert resolve(region="ES-MD").root == madrid
+    assert queries.pick_root([national, madrid], "ES-MD") == madrid
+    assert queries.pick_root([madrid, national], "ES-MD") == madrid
+    assert queries.pick_root([national], "ES-MD") == national
