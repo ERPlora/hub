@@ -10,9 +10,16 @@ import type { SessionMe } from '@erplora/ui/shell';
 /** `base.SessionMeIn`: no parameters. */
 export type SessionMeIn = Record<string, never>;
 
-/** `base.SessionMeOut`: what the shell reads (`SessionMe`) plus the scope it was resolved for. */
+/** `base.SessionDemo`: when the demo the session is in ends (ISO 8601). */
+export interface SessionDemo {
+  expires_at: string;
+}
+
+/** `base.SessionMeOut`: what the shell reads (`SessionMe`) plus the scope it was resolved for and, on a demo's hub,
+ * when the demo ends (`null` on a business's). */
 export interface SessionMeOut extends SessionMe {
   scope: { kind: string; key: string };
+  demo: SessionDemo | null;
 }
 
 // ── demo (plan §4.5; apps/demo/schemas.py) ───────────────────────────────────────────────────

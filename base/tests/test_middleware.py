@@ -368,6 +368,26 @@ class TestTheRegistryGate:
         assert "This demo has ended" in html
         assert 'href="http://localhost:8001/demo/"' in html
 
+    @pytest.mark.parametrize("ended", ["by_time", "expired", "purged"])
+    def test_the_login_of_a_demo_that_ended_still_jumps_to_the_saas_door(self, client, hub, ended):
+        # The SaaS's «Back to my demo» starts here: its /demo/enter/ asks for a code, hears 410 and says «expired»
+        # (plan 2026-10-17, §1.7); a 410 page here would leave the SaaS believing the demo is still on.
+        import datetime as dt
+
+        from django.utils import timezone
+
+        past = timezone.now() - dt.timedelta(seconds=1)
+        fields = {"by_time": {}, "expired": {"status": "expired"}, "purged": {"status": "purged"}}[ended]
+        hub("demo-0000beef", is_demo=True, expires_at=past, **fields)
+        response = client.get("/auth/login", {"next": "/"}, HTTP_HOST="demo-0000beef.localhost:8000", HTTP_ACCEPT=HTML)
+        assert response.status_code == 302
+        assert response["Location"].startswith("http://localhost:8001/demo/enter/?hub=demo-0000beef&next=/&state=")
+
+    def test_the_login_of_a_business_that_is_gone_is_still_410(self, client, hub):
+        hub("acme", status="cancelled")
+        response = client.get("/auth/login", {"next": "/"}, HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML)
+        assert response.status_code == 410
+
     def test_a_demo_on_time_is_served(self, client, hub):
         import datetime as dt
 

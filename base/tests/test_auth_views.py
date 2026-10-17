@@ -9,6 +9,8 @@ the ``hub-admin`` audience (round 13, PLAN §18.1): it starts on the Hub too
 (``/auth/login?hub=<slug>&next=/admin/hub/<slug>/``, the SaaS admin's button) and needs its state.
 """
 
+import datetime as dt
+import hashlib
 import json
 import logging
 import time
@@ -20,8 +22,14 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.test import Client
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from live.context import system_context
 
-from base.models import Membership
+from base.models import DemoCode, Hub, Membership
+from base.registry import REGISTRY_SCOPE
+from base.schemas import DemoCodeIn, DemoCreateIn
+from base.services import demo_code_create, demo_create
 
 pytestmark = pytest.mark.django_db
 
@@ -520,3 +528,125 @@ class TestLogout:
 
     def test_only_post(self, client, saas):
         assert client.get("/auth/logout", HTTP_HOST=HOST).status_code == 405
+
+
+# A demo hub (plan 2026-10-17, §1.6): no account behind it. Its jump goes to the SaaS's /demo/enter/ with the same
+# state; the SaaS posts back a code the Hub made for the browser that owns the demo, redeemed here without the SaaS.
+
+DEMO_OWNER = hashlib.sha256(b"ana's browser").hexdigest()
+SAAS_DEMO_ENTER = "http://localhost:8001/demo/enter/"
+SAAS_DEMO_FAILED = "http://localhost:8001/demo/?state=failed"
+
+
+def new_demo(session_key: str = DEMO_OWNER) -> str:
+    """A demo of the browser ``session_key``, as ``POST /internal/demos`` leaves it; its slug."""
+    return demo_create(system_context(REGISTRY_SCOPE), DemoCreateIn(session_key=session_key, language="es")).slug
+
+
+def a_code(slug: str, session_key: str = DEMO_OWNER, language: str = "es") -> str:
+    """What the SaaS's /demo/enter/ asks for (``POST /internal/demos/{slug}/codes``) and posts to the callback."""
+    data = DemoCodeIn(slug=slug, session_key=session_key, language=language)
+    return demo_code_create(system_context(REGISTRY_SCOPE), data).code
+
+
+def host_of(slug: str) -> str:
+    return f"{slug}.localhost:8000"
+
+
+@pytest.fixture
+def demo(saas) -> str:
+    return new_demo()
+
+
+class TestDemoLoginStart:
+    def test_a_demo_jumps_to_the_saas_demo_enter_with_a_fresh_state(self, client, demo):
+        response = start_login(client, "/demo/items", host=host_of(demo))
+        state = state_of(response)
+        assert (response.status_code, response["Location"]) == (
+            302,
+            f"{SAAS_DEMO_ENTER}?hub={demo}&next=/demo/items&state={state}",
+        )
+        cookie = response.cookies[STATE_COOKIE]
+        assert (cookie["path"], cookie["max-age"], cookie["httponly"]) == ("/auth/callback", 600, True)
+
+    def test_a_page_of_the_demo_without_a_session_jumps_there_too(self, client, demo):
+        response = client.get("/demo/items", HTTP_HOST=host_of(demo), HTTP_ACCEPT="text/html")
+        assert response.status_code == 302
+        assert response["Location"].startswith(f"{SAAS_DEMO_ENTER}?hub={demo}&next=/demo/items&state=")
+        assert STATE_COOKIE in response.cookies
+
+    def test_a_business_still_jumps_to_the_saas_login(self, client, demo):
+        assert start_login(client, "/", host=HOST)["Location"].startswith(f"{SAAS_LOGIN}?hub=a&")
+
+
+class TestDemoCallback:
+    def test_a_code_of_this_browser_opens_the_owner_s_session_without_the_saas(self, client, fake_saas, demo, settings):
+        fake = fake_saas()
+        response = callback(client, {"code": a_code(demo), "next": "/demo/items"}, host=host_of(demo))
+        assert (response.status_code, response["Location"]) == (302, "/demo/items")
+        assert fake.calls == []
+        body = me(client, host_of(demo))
+        assert (body["user"]["label"], body["scope"]["key"]) == ("Demo", demo)
+        # The API's JSON keeps milliseconds.
+        ends = parse_datetime(body["demo"]["expires_at"])
+        assert abs(ends - Hub.objects.get(slug=demo).expires_at) < dt.timedelta(milliseconds=1)
+        assert Membership.objects.get(host=demo).role == "hub_owner"
+        # The code's language (the visitor's on the SaaS) is the session's.
+        assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == "es"
+        assert body["language"] == "es"
+        cookie = response.cookies[STATE_COOKIE]
+        assert (cookie.value, cookie["max-age"]) == ("", 0)
+
+    def test_the_session_is_only_for_this_demo(self, client, fake_saas, demo):
+        fake_saas()
+        callback(client, {"code": a_code(demo), "next": "/"}, host=host_of(demo))
+        assert me(client, HOST)["permissions"] == []
+
+    def test_without_this_browser_s_state_it_is_403_and_the_code_stays_unspent(self, fake_saas, demo):
+        fake = fake_saas()
+        code = a_code(demo)
+        response = Client().post("/auth/callback", {"code": code, "next": "/", "state": "x"}, HTTP_HOST=host_of(demo))
+        assert response.status_code == 403
+        assert "/auth/login" in response.content.decode()
+        assert DemoCode.objects.get().used_at is None and fake.calls == []
+
+    @pytest.mark.parametrize("how", ["spent", "expired", "another_demo_s", "missing", "unknown"])
+    def test_a_code_that_opens_nothing_goes_back_to_the_saas_demo_door(self, client, fake_saas, demo, how, caplog):
+        fake = fake_saas()
+        code = {"missing": "", "unknown": "not-a-code"}[how] if how in ("missing", "unknown") else a_code(demo)
+        if how == "spent":
+            callback(Client(), {"code": code, "next": "/"}, host=host_of(demo))
+        elif how == "expired":
+            DemoCode.objects.update(expires_at=timezone.now() - dt.timedelta(seconds=1))
+        elif how == "another_demo_s":
+            other_owner = hashlib.sha256(b"bea's browser").hexdigest()
+            code = a_code(new_demo(other_owner), other_owner)
+        with caplog.at_level(logging.WARNING, logger="base.auth_views"):
+            response = callback(client, {"code": code, "next": "/"}, host=host_of(demo))
+        assert (response.status_code, response["Location"]) == (302, SAAS_DEMO_FAILED)
+        assert me(client, host_of(demo))["user"] is None and fake.calls == []
+        assert demo in caplog.text
+
+    def test_a_demo_owner_deactivated_in_the_admin_goes_back_to_the_door(self, client, fake_saas, demo):
+        fake_saas()
+        callback(Client(), {"code": a_code(demo), "next": "/"}, host=host_of(demo))
+        get_user_model().objects.filter(username=f"demo:{demo}").update(is_active=False)
+        response = callback(client, {"code": a_code(demo), "next": "/"}, host=host_of(demo))
+        assert (response.status_code, response["Location"]) == (302, SAAS_DEMO_FAILED)
+
+    def test_the_callback_of_a_demo_that_ended_is_410(self, client, fake_saas, demo):
+        fake_saas()
+        code = a_code(demo)
+        Hub.objects.filter(slug=demo).update(expires_at=timezone.now())
+        response = client.post("/auth/callback", {"code": code, "next": "/", "state": "x"}, HTTP_HOST=host_of(demo))
+        assert (response.status_code, response.json()["error"]["code"]) == (410, "base.hub_gone")
+        assert DemoCode.objects.get().used_at is None
+
+
+class TestDemoLogout:
+    def test_leaving_a_demo_goes_back_to_the_saas_demo_door(self, client, fake_saas, demo):
+        fake_saas()
+        callback(client, {"code": a_code(demo), "next": "/"}, host=host_of(demo))
+        response = client.post("/auth/logout", HTTP_HOST=host_of(demo))
+        assert (response.status_code, response["Location"]) == (302, "http://localhost:8001/demo/")
+        assert me(client, host_of(demo))["user"] is None

@@ -14,6 +14,8 @@ from base.admin import open_hub
 from base.auth_views import auth_callback, auth_login, auth_logout
 from base.health import readyz
 from base.internal import (
+    demo_codes,
+    demos,
     hub,
     hub_restore,
     hub_state,
@@ -42,6 +44,8 @@ urlpatterns = [
     path("auth/login", auth_login, name="auth-login"),
     path("auth/callback", auth_callback, name="auth-callback"),
     path("auth/logout", auth_logout, name="auth-logout"),
+    path("internal/demos", demos, name="internal-demos"),
+    path("internal/demos/<str:slug>/codes", demo_codes, name="internal-demo-codes"),
     path("internal/hubs/<uuid:hub_id>", hub, name="internal-hub"),
     path("internal/hubs/<uuid:hub_id>/restore", hub_restore, name="internal-hub-restore"),
     path("internal/hubs/<uuid:hub_id>/state", hub_state, name="internal-hub-state"),

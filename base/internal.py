@@ -26,6 +26,15 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   newer, with its VeriFactu block, the business's status and its id in ERPlora applied through
   ``verifactu.config.sync`` on the hub's slug.
 
+The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
+
+- ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 201 ``{id, slug,
+  expires_at, created}`` for a new demo, 200 with the live one of that browser, 503 ``base.demo_full`` with
+  ``Retry-After`` when every demo is taken;
+- ``POST /internal/demos/{slug}/codes`` (``{session_key, language}``) → ``base.demo.code_create``: 201 ``{code,
+  expires_at}``; 404 without such a demo, 410 ``base.hub_gone`` once it ended, 403 ``base.demo_not_owner`` for
+  another browser. The path names the demo: v2 binds the signature to it.
+
 While the SaaS may still sign v1 only, a body that names the hub of its path (``hub_id`` or ``id``) must name the
 same one (422 ``internal.hub_mismatch``).
 
@@ -52,6 +61,7 @@ from live.operations import get as get_operation
 from pydantic import ValidationError
 
 from base.registry import REGISTRY_SCOPE
+from base.services import DEMO_FULL_RETRY_AFTER_SECONDS
 
 # ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
 # SaaS (``apps/verifactu/representation.py``); they are ``base.signing``'s.
@@ -179,6 +189,32 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
         _registry_context(),
     )
     return refused or JsonResponse({"applied": answer.applied, "version": answer.version})
+
+
+@internal_view
+@require_http_methods(["POST"])
+def demos(request: HttpRequest) -> HttpResponse:
+    """``POST /internal/demos``: a demo for the SaaS's browser; 201 when it is new, 200 when it is its live one."""
+    body = _body_object(request)
+    if body is None:
+        return _payload_invalid("The body is not a JSON object.")
+    answer, refused = _operation_call("base.demo.create", body, _registry_context())
+    if refused is not None:
+        if refused.status_code == 503:
+            refused["Retry-After"] = str(DEMO_FULL_RETRY_AFTER_SECONDS)
+        return refused
+    return JsonResponse(answer.model_dump(mode="json"), status=201 if answer.created else 200)
+
+
+@internal_view
+@require_http_methods(["POST"])
+def demo_codes(request: HttpRequest, slug: str) -> HttpResponse:
+    """``POST /internal/demos/{slug}/codes``: a one-time code into the demo ``slug`` for the browser that owns it."""
+    body = _body_object(request)
+    if body is None:
+        return _payload_invalid("The body is not a JSON object.")
+    answer, refused = _operation_call("base.demo.code_create", {**body, "slug": slug}, _registry_context())
+    return refused or JsonResponse(answer.model_dump(mode="json"), status=201)
 
 
 # ── ERPlora's own invoices: the door to its platform hub (contract point 4) ──────────────────────────────────────
