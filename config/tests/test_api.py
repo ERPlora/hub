@@ -5,6 +5,8 @@ via the ``probe_urls`` fixture).
 """
 
 import re
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -103,15 +105,74 @@ def test_route_without_auth_is_open(probe_urls, client):
 # --- Swagger -------------------------------------------------------------------------------------
 
 
+class AssetTags(HTMLParser):
+    """The <script> and <link> start tags of a page, with their attributes."""
+
+    def __init__(self, html: str):
+        super().__init__()
+        self.tags: list[tuple[str, dict[str, str | None]]] = []
+        self.feed(html)
+        self.close()
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "link"):
+            self.tags.append((tag, dict(attrs)))
+
+    def scripts(self) -> list[dict[str, str | None]]:
+        return [attrs for tag, attrs in self.tags if tag == "script"]
+
+    def external_urls(self) -> list[str]:
+        """Every src/href that does not stay on the page's origin: it has a scheme (https:) or a host (//cdn…)."""
+        urls = [attrs.get("src") or attrs.get("href") for _, attrs in self.tags]
+        return [url for url in urls if url and (urlsplit(url).scheme or urlsplit(url).netloc)]
+
+
+def assert_swagger_is_self_hosted_with_nonce(response) -> None:
+    """Swagger UI comes from ninja's own static files, never a CDN, and every script carries the CSP nonce.
+
+    Checked on the tags, not on the page text: the CSRF token and the nonce are random and can spell "cdn".
+    """
+    [nonce] = re.findall(r"'nonce-([^']+)'", response["Content-Security-Policy"])
+    page = AssetTags(response.content.decode())
+    assert len(page.scripts()) == 3  # settings JSON, bundle, init
+    assert all(attrs.get("nonce") == nonce for attrs in page.scripts())
+    assert page.external_urls() == []
+
+
 @pytest.mark.django_db
 def test_swagger_scripts_carry_the_csp_nonce(probe_urls, client):
     response = client.get("/probe/docs", HTTP_HOST="a.localhost")
     assert response.status_code == 200
-    [nonce] = re.findall(r"'nonce-([^']+)'", response["Content-Security-Policy"])
-    scripts = re.findall(r"<script\b[^>]*>", response.content.decode())
-    assert len(scripts) == 3  # settings JSON, bundle, init
-    assert all(f'nonce="{nonce}"' in tag for tag in scripts)
-    assert "cdn" not in response.content.decode().lower()
+    assert_swagger_is_self_hosted_with_nonce(response)
+
+
+# Random parts of the page pinned to values that spell "cdn" (seen in CI: a CSRF token "…swcdnuv…").
+CDN_NONCE = "cdnCDNcdn".ljust(22, "0")
+CDN_CSRF_TOKEN = "swcdnuv".ljust(64, "0")
+
+
+@pytest.mark.django_db
+def test_swagger_check_holds_when_the_nonce_and_csrf_token_spell_cdn(probe_urls, client, monkeypatch):
+    monkeypatch.setattr("django.utils.csp.generate_nonce", lambda: CDN_NONCE)
+    monkeypatch.setattr("django.template.context_processors.get_token", lambda request: CDN_CSRF_TOKEN)
+    response = client.get("/probe/docs", HTTP_HOST="a.localhost")
+    assert response.status_code == 200
+    assert CDN_CSRF_TOKEN in response.content.decode()
+    assert f"'nonce-{CDN_NONCE}'" in response["Content-Security-Policy"]
+    assert_swagger_is_self_hosted_with_nonce(response)
+
+
+@pytest.mark.django_db
+def test_swagger_check_catches_a_script_or_stylesheet_from_a_cdn(probe_urls, client):
+    html = client.get("/probe/docs", HTTP_HOST="a.localhost").content.decode()
+    bundle = AssetTags(html).scripts()[1]["src"]
+    cdn_script = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
+    cdn_style = "//cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css"
+    planted = html.replace(f'src="{bundle}"', f'src="{cdn_script}"').replace(
+        "</head>", f'<link rel="stylesheet" href="{cdn_style}"></head>'
+    )
+    assert AssetTags(html).external_urls() == []
+    assert AssetTags(planted).external_urls() == [cdn_style, cdn_script]
 
 
 # --- Mounting the routers of the apps ------------------------------------------------------------
