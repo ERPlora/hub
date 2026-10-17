@@ -1,23 +1,35 @@
 <script setup lang="ts">
 // The lines of a manual invoice (INVOICE-F03; the old form's rows): «Description» (the whole row),
-// «Qty» (1 to begin with; up to three decimals), «Price» (VAT not included, euros as typed) and «VAT %»
-// (21 to begin with); «+ Line» adds one and the cross removes one (never the last). Each line names its
+// «Qty» (1 to begin with; up to three decimals), «Price» (the tax not included, euros as typed) and the rate,
+// named by the tax of the business's territory («VAT %», «IGIC %» in the Canary Islands, «IPSI %» in Ceuta
+// and Melilla; «Tax %» while it is not known); «+ Line» adds one at the territory's general rate and the
+// cross removes one (never the last). Each line names its
 // hooks by its own id (`invoice-line-<uid>-…`), so removing the first never renames the others. What the
 // server refused on a line (`lines.<index>.<field>`) is said under its field.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput } from '@ionic/vue';
+import { computed } from 'vue';
 
+import { useT } from '../composables/useT';
+import { rateHeader } from '../lib/invoice';
 import { blankLine, type DraftLine } from './lines';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** What the server refused, by the command's field (`lines.0.quantity`…). */
     fieldErrors?: Readonly<Record<string, string>>;
+    /** The tax a typed rate is declared with (the business territory's), once known. */
+    tax?: string;
+    /** What a new line's rate starts with, as typed (the territory's general rate; blank without one). */
+    defaultRate?: string;
   }>(),
-  { fieldErrors: () => ({}) },
+  { fieldErrors: () => ({}), tax: undefined, defaultRate: '' },
 );
 
 const lines = defineModel<DraftLine[]>({ required: true });
+
+const t = useT();
+const rateLabel = computed(() => rateHeader(props.tax ? [props.tax] : [], t));
 
 type Field = 'description' | 'quantity' | 'price' | 'taxRate';
 /** The command's name of each field, for its refusals. */
@@ -29,7 +41,7 @@ function set(uid: number, field: Field, value: unknown): void {
 
 function add(): void {
   const next = Math.max(0, ...lines.value.map((line) => line.uid)) + 1;
-  lines.value = [...lines.value, blankLine(next)];
+  lines.value = [...lines.value, blankLine(next, props.defaultRate)];
 }
 
 function remove(uid: number): void {
@@ -91,7 +103,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       />
       <ion-input
         :data-testid="`invoice-line-${line.uid}-tax-rate`"
-        :label="$t('invoice.create.line.taxPct')"
+        :label="rateLabel"
         label-placement="floating"
         fill="outline"
         mode="md"

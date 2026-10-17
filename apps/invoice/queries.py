@@ -40,6 +40,8 @@ from apps.invoice.schemas import (
     InvoicePage,
     IssuerGetIn,
     IssuerOut,
+    LineDefaultsIn,
+    LineDefaultsOut,
     NumberingStatusIn,
     NumberingStatusOut,
     PlatformDocumentOut,
@@ -53,6 +55,7 @@ from apps.invoice.schemas import (
     SeriesPeekOut,
 )
 from apps.sale.queries import find_sale
+from apps.tax.queries import business_tax_kind, resolve_tax
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
@@ -557,6 +560,33 @@ def document(ctx: OperationContext, params: DocumentIn) -> dict:
     with translation.override(ctx.language):
         html = render_document(invoice, duplicate=params.duplicate)
     return {"invoice_id": invoice.id, "number": invoice.number, "html": html}
+
+
+# The general rate of a territory is the one of its generic categories: goods first, then services.
+GENERAL_CATEGORIES = ("product.generic", "service.generic")
+
+
+@operation(
+    "invoice.invoice.line_defaults",
+    kind="query",
+    permission="invoice.add_invoice",
+    input=LineDefaultsIn,
+    output=LineDefaultsOut,
+    ai={
+        "description": "What a line of a manual invoice starts with when its rate is typed: the tax it is declared "
+        "with (the business territory's: VAT, IGIC in the Canary Islands, IPSI in Ceuta and Melilla) and the "
+        "territory's general rate from its own rule in Taxes, or none when the territory has no rule of that tax."
+    },
+)
+def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
+    """A typed rate is declared subject, with the territory's tax (TAX-F11): a rule of another tax (the national
+    VAT a territory without its own rule falls back to) or an exempt one is never proposed."""
+    tax = business_tax_kind()
+    for key in GENERAL_CATEGORIES:
+        resolution = resolve_tax(category_key=key)
+        if resolution and resolution.tax_kind == tax and resolution.operation_class == "subject":
+            return {"tax": tax, "tax_rate": resolution.root.rate_pct}
+    return {"tax": tax, "tax_rate": None}
 
 
 # ── Series ──────────────────────────────────────────────────────────────────────────────────────

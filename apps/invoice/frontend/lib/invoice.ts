@@ -31,6 +31,18 @@ export function missingTaxId(invoice: Pick<InvoiceOut, 'invoice_type' | 'custome
   return !isSimplified(invoice.invoice_type) && !invoice.customer_tax_id.trim();
 }
 
+/** The families of tax a rate is named by; any other, or a mix, is a plain «Tax %». */
+const RATE_TAXES: readonly string[] = ['vat', 'igic', 'ipsi'];
+
+/** The heading of a rate («VAT %», «IGIC %», «IPSI %») by the tax its lines are declared with: the
+ *  business territory's (TAX-F11) on a new line, the breakdown's on an invoice; «Tax %» when it is not
+ *  known yet or the lines mix taxes. */
+export function rateHeader(taxes: readonly string[], t: Translate): string {
+  const distinct = new Set(taxes);
+  const [only] = distinct;
+  return distinct.size === 1 && RATE_TAXES.includes(only) ? t(`invoice.taxPct.${only}`) : t('invoice.taxPct.any');
+}
+
 /** One printed row of the breakdown. */
 export interface TaxRow {
   label: string;

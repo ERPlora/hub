@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The lines of an open invoice (INVOICE-F17; the old detail's table): «#», «Description», «Qty», «Price»
-// (WITHOUT VAT, RD 1619/2012 art. 6.1.f), «Disc.» when a line has one, «VAT %» (and the equivalence surcharge
-// next to it), «Base», «Tax», «Total»; every figure the server's,
+// (WITHOUT the tax, RD 1619/2012 art. 6.1.f), «Disc.» when a line has one, the rate (and the equivalence
+// surcharge next to it) named by the tax the invoice declares («VAT %», «IGIC %», «IPSI %»; «Tax %» when it
+// mixes them), «Base», «Tax», «Total»; every figure the server's,
 // written in the page's language (a rectifying line with its sign, in the quantity and the amounts). When
 // its box is narrower than the eight columns (a phone, a split pane), each line becomes a block whose cells
 // name their column. Without lines, «No detail lines.».
@@ -9,9 +10,14 @@ import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatPercent, formatQuantity, formatUnitPrice } from '../lib/format';
+import { rateHeader } from '../lib/invoice';
 import type { InvoiceLineOut } from '../operations';
 
-const props = defineProps<{ lines: readonly InvoiceLineOut[] }>();
+const props = defineProps<{
+  lines: readonly InvoiceLineOut[];
+  /** The taxes of the invoice's breakdown (`vat`, `igic`, `ipsi`…): they name the rate's column. */
+  taxes: readonly string[];
+}>();
 
 const t = useT();
 const locale = useLocale();
@@ -25,7 +31,7 @@ const headers = computed(() => [
   t('invoice.detail.lines.qty'),
   t('invoice.detail.lines.price'),
   ...(discounted.value ? [t('invoice.detail.lines.discount')] : []),
-  t('invoice.detail.lines.taxPct'),
+  rateHeader(props.taxes, t),
   t('invoice.detail.lines.base'),
   t('invoice.detail.lines.tax'),
   t('invoice.detail.lines.total'),

@@ -295,6 +295,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.invoice.get': { method: 'get', path: '/api/invoice/invoices/detail' },
       'invoice.invoice.by_source': { method: 'get', path: '/api/invoice/invoices/by_source' },
       'invoice.invoice.document': { method: 'get', path: '/api/invoice/invoices/document' },
+      'invoice.invoice.line_defaults': { method: 'get', path: '/api/invoice/invoices/line_defaults' },
       'invoice.invoice.create': { method: 'post', path: '/api/invoice/invoices' },
       'invoice.invoice.create_from_sale': { method: 'post', path: '/api/invoice/invoices/from_sale' },
       'invoice.invoice.substitute': { method: 'post', path: '/api/invoice/invoices/substitute' },
@@ -312,7 +313,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
       'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(20);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(21);
   });
 
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {

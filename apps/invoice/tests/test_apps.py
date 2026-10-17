@@ -105,6 +105,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.get",
         "invoice.invoice.by_source",
         "invoice.invoice.document",
+        "invoice.invoice.line_defaults",
         "invoice.invoice.create",
         "invoice.invoice.create_from_sale",
         "invoice.invoice.substitute",

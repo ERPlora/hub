@@ -125,7 +125,16 @@ describe('InvoiceDetailPage: what it shows', () => {
     expect(s.field('notes')).toBe('Thanks');
     expect(s.find('invoice-detail-paid-at').exists()).toBe(false);
     expect(s.wrapper.findComponent(InvoiceLinesTable).props('lines')).toEqual(INVOICE.lines);
+    // The rate is named by the tax the invoice declares (its breakdown): VAT here.
+    expect(s.wrapper.findComponent(InvoiceLinesTable).props('taxes')).toEqual(['vat']);
     expect(s.find('invoice-missing-tax-id').exists()).toBe(false);
+  });
+
+  it('names the rate column by the tax the invoice declares: IGIC for a business of the Canary Islands', async () => {
+    const s = await setup();
+    await s.show({ ...INVOICE, tax_breakdown: INVOICE.tax_breakdown.map((entry) => ({ ...entry, tax: 'igic', rate: '7.00' })) });
+    expect(s.wrapper.findComponent(InvoiceLinesTable).props('taxes')).toEqual(['igic']);
+    expect(s.wrapper.findComponent(InvoiceLinesTable).findAll('th').map((th) => th.text())).toContain('IGIC %');
   });
 
   it('warns of a full invoice without the customer’s tax ID', async () => {

@@ -1,7 +1,7 @@
-// The lines of a manual invoice (INVOICE-F03) as the form keeps them (what is typed: «1,5», «12,50», «21»)
-// and as `invoice.invoice.create` takes them: the quantity as a decimal with a dot, the price WITHOUT VAT in
-// cents, the VAT %. The server computes the VAT, closed once per rate; the form only checks that each line
-// can be sent.
+// The lines of a manual invoice (INVOICE-F03) as the form keeps them (what is typed: «1,5», «12,50», «7»)
+// and as `invoice.invoice.create` takes them: the quantity as a decimal with a dot, the price WITHOUT the tax
+// in cents, the rate %, declared with the tax of the business's territory (VAT, IGIC or IPSI; TAX-F11). The
+// server computes the tax, closed once per rate; the form only checks that each line can be sent.
 import { centsFromEuros } from '../lib/format';
 import type { ManualLineIn } from '../operations';
 
@@ -16,9 +16,10 @@ export interface DraftLine {
 
 const QUANTITY = /^\d+(?:[.,]\d{1,3})?$/;
 
-/** One unit at 21 %, as the old form started a line. */
-export function blankLine(uid: number): DraftLine {
-  return { uid, description: '', quantity: '1', price: '', taxRate: '21' };
+/** One unit at `taxRate` (the territory's general rate, as typed; blank while it is not known or the
+ *  territory has no rule of its own tax), as the old form started a line at 21. */
+export function blankLine(uid: number, taxRate = ''): DraftLine {
+  return { uid, description: '', quantity: '1', price: '', taxRate };
 }
 
 function quantityOf(text: string): number | undefined {
@@ -26,11 +27,13 @@ function quantityOf(text: string): number | undefined {
   return QUANTITY.test(trimmed) ? Number(trimmed.replace(',', '.')) : undefined;
 }
 
-/** Every line has a description, a quantity above zero and a price written. */
+/** Every line has a description, a quantity above zero, a price and a rate written. */
 export function linesReady(lines: readonly DraftLine[]): boolean {
   return (
     lines.length > 0 &&
-    lines.every((line) => line.description.trim() !== '' && (quantityOf(line.quantity) ?? 0) > 0 && line.price.trim() !== '')
+    lines.every(
+      (line) => line.description.trim() !== '' && (quantityOf(line.quantity) ?? 0) > 0 && line.price.trim() !== '' && line.taxRate.trim() !== '',
+    )
   );
 }
 

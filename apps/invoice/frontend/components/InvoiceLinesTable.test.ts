@@ -1,5 +1,6 @@
 // The lines of an open invoice (INVOICE-F17; the old detail's table): «#», «Description», «Qty», «Price»
-// (WITHOUT VAT, RD 1619/2012 art. 6.1.f), «Disc.» when a line has one, «VAT %», «Base», «Tax», «Total», every
+// (WITHOUT VAT, RD 1619/2012 art. 6.1.f), «Disc.» when a line has one, the rate named by the tax the invoice
+// declares («VAT %», «IGIC %», «IPSI %»; «Tax %» when it mixes them), «Base», «Tax», «Total», every
 // amount the server's in the page's language (a rectifying line with its sign; a surcharge next to its rate).
 // Narrow, each line is a block whose cells name their column. Without lines, «No detail lines.».
 import { describe, expect, it } from 'vitest';
@@ -26,8 +27,8 @@ const line = (over: Partial<InvoiceLineOut> = {}): InvoiceLineOut => ({
   ...over,
 });
 
-async function setup(lines: InvoiceLineOut[], locale: 'en' | 'es' = 'en') {
-  const m = await mountInvoice(InvoiceLinesTable, { props: { lines }, locale });
+async function setup(lines: InvoiceLineOut[], locale: 'en' | 'es' = 'en', taxes: string[] = ['vat']) {
+  const m = await mountInvoice(InvoiceLinesTable, { props: { lines, taxes }, locale });
   const cells = () => m.wrapper.findAll('[data-testid="invoice-line-row"]').map((row) => row.findAll('td').map((td) => plain(td.text())));
   return { ...m, cells };
 }
@@ -51,6 +52,15 @@ describe('InvoiceLinesTable', () => {
       'Tax',
       'Total',
     ]);
+  });
+
+  it('names the rate by the tax the invoice declares: IGIC or IPSI in their territories, «Tax %» when mixed', async () => {
+    const header = async (taxes: string[], locale: 'en' | 'es' = 'en') => (await setup([line()], locale, taxes)).wrapper.findAll('th')[4].text();
+    expect(await header(['igic'])).toBe('IGIC %');
+    expect(await header(['ipsi', 'ipsi'])).toBe('IPSI %');
+    expect(await header(['igic', 'vat'])).toBe('Tax %');
+    expect(await header(['igic'], 'es')).toBe('IGIC %');
+    expect(await header(['igic', 'vat'], 'es')).toBe('Imp. %');
   });
 
   it('without lines says «No detail lines.»', async () => {

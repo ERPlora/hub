@@ -318,6 +318,21 @@ class BySourceIn(SaleRefIn):
     """The invoice in force of a sale (its full invoice if its ticket was replaced)."""
 
 
+class LineDefaultsIn(Schema):
+    """What a line of a manual invoice starts with when its rate is typed."""
+
+
+class LineDefaultsOut(Schema):
+    tax: str = Field(
+        description="The tax a typed rate is declared with, the business territory's: vat, igic (Canary Islands) "
+        "or ipsi (Ceuta and Melilla)."
+    )
+    tax_rate: Decimal | None = Field(
+        description="The territory's general rate, %, from its own rule in Taxes; none when the territory has no "
+        "rule of that tax."
+    )
+
+
 class ManualLineIn(Schema):
     description: _text(255, min_length=1) = Field(description="What is invoiced.")
     quantity: Decimal = Field(

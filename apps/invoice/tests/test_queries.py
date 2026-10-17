@@ -6,6 +6,7 @@ Cases from the current product's tests: ``invoice_search_says_what_it_searches``
 """
 
 import datetime as dt
+from decimal import Decimal
 
 import pytest
 from django.utils import timezone
@@ -430,3 +431,80 @@ def test_nobody_without_the_permission_reads_the_invoices(issuer):
     nobody = OperationContext(scope=A, actor="x", permissions=frozenset())
     with pytest.raises(PermissionDenied):
         run("invoice.invoice.list", {}, nobody)
+
+
+# What a typed line of a manual invoice starts with (INVOICE-F03, TAX-F11)
+
+
+def regional_rule(region, category, rate, tax_type, **more):
+    run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "region_code": region,
+            "tax_category_key": category,
+            "rate_pct": rate,
+            "tax_type": tax_type,
+            **more,
+        },
+    )
+
+
+def line_defaults(ctx=None):
+    defaults = run("invoice.invoice.line_defaults", {}, ctx)
+    return defaults.tax, defaults.tax_rate
+
+
+def test_a_typed_line_starts_at_the_general_vat_of_the_whole_country(db):
+    # The peninsula does not change: VAT, at the general rate of the factory catalogue.
+    assert line_defaults(ctx_for("hub_employee")) == ("vat", Decimal("21.00"))
+
+
+@pytest.mark.parametrize(
+    ("region", "tax"), [("ES-CN", "igic"), ("ES-CE", "ipsi"), ("ES-ML", "ipsi")]
+)
+def test_a_territory_without_its_own_rule_proposes_no_rate(db, region, tax):
+    # The national 21 % VAT would be declared as IGIC or IPSI: nothing is proposed, the person types it.
+    run("tax.settings.update", {"region_code": region})
+    assert line_defaults() == (tax, None)
+
+
+@pytest.mark.parametrize(
+    ("region", "rate", "tax"), [("ES-CN", "7", "igic"), ("ES-ML", "4", "ipsi")]
+)
+def test_a_territory_proposes_the_general_rate_of_its_own_rule(db, region, rate, tax):
+    regional_rule(region, "product.generic", rate, tax)
+    run("tax.settings.update", {"region_code": region})
+    assert line_defaults() == (tax, Decimal(rate))
+
+
+def test_a_business_that_only_sells_services_proposes_their_general_rate(db):
+    regional_rule("ES-CN", "service.generic", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    assert line_defaults() == ("igic", Decimal("7.00"))
+
+
+def test_an_exempt_general_rule_is_not_proposed_as_a_typed_rate(db):
+    # A typed rate is declared subject: an exempt 0 % would be declared as taxed at 0 %.
+    regional_rule(
+        "ES-CN",
+        "product.generic",
+        "0",
+        "igic",
+        operation_class="exempt",
+        exempt_reason="E1",
+    )
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    assert line_defaults() == ("igic", None)
+
+
+def test_nobody_without_issuing_reads_what_a_typed_line_starts_with(db):
+    from live.context import OperationContext
+
+    from apps.invoice.tests.conftest import A
+
+    viewer = OperationContext(
+        scope=A, actor="x", permissions=frozenset({"invoice.view_invoice"})
+    )
+    with pytest.raises(PermissionDenied):
+        run("invoice.invoice.line_defaults", {}, viewer)

@@ -109,8 +109,9 @@ cliente: la impresora de tiques no puede sacarla como factura completa.». Debaj
 «Origen» («Venta del TPV», «Alta manual», «Sustituye a una factura simplificada», «Rectificación»,
 «Devolución de la venta», «Anulación de la venta»), «Venta» (su número), «Rectifica a» (el número de la
 original, que la abre), «Sustituye a» / «Sustituida por» (enlaces), «Rectificativas» (las que la
-corrigen), «Pagada el» y «Notas». Las líneas: «#», «Descripción», «Cant.», «Precio», «IVA %», «Base»,
-«Impuesto», «Total» (en el móvil, cada línea en bloque); sin líneas, «Sin líneas de detalle.». El
+corrigen), «Pagada el» y «Notas». Las líneas: «#», «Descripción», «Cant.», «Precio», el tipo con el
+nombre del impuesto que declara la factura («IVA %», «IGIC %» o «IPSI %»; «Imp. %» si mezcla impuestos),
+«Base», «Impuesto», «Total» (en el móvil, cada línea en bloque); sin líneas, «Sin líneas de detalle.». El
 desglose por tipo («IVA 21 %», «Recargo de equivalencia 5,2 %», «Exento (E1)», «No sujeto»,
 «Inversión del sujeto pasivo») con su base y su cuota, y los totales «Base», «Impuestos» y «Total». Los
 botones «Marcar pagada», «Rectificar» y «Factura completa» (solo en un tique que no se ha sustituido)
@@ -136,10 +137,12 @@ Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura
 ### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
 el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
-líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin IVA, en euros) e «IVA %»
-(21 de entrada). «+ Línea» añade otra y la cruz la quita. «Emitir factura» («Emitiendo…» mientras va)
-está en gris hasta que cada línea tiene descripción, cantidad y precio. Un rechazo sale encima de los
-botones, por campo cuando es de un campo.
+líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en euros) y el
+tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
+Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
+si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
+factura» («Emitiendo…» mientras va) está en gris hasta que cada línea tiene descripción, cantidad, precio
+y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
 
 ### Series
 Menú **Facturación → Series** (solo con permiso de llevar las series). La entrada «Cada serie define
@@ -255,6 +258,7 @@ nombre y sin NIF (queda en el registro de la aplicación), para que nunca quede 
 Implicados: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Emitir una factura a mano
+<!-- origen: fi:modules/invoice#command-invoice-create-handler-wasm-create_invoice old:invoice/workflow/emision.md#invoice-f03 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Facturas, Nueva factura manual
@@ -264,15 +268,19 @@ Pasos:
    aunque el año aún no las haya abierto; empieza en la predeterminada o en «FACT») y, si quieres, busca al
    cliente en Clientes: rellena nombre, NIF, dirección y país. Escribe o corrige «Cliente», «NIF
    cliente», «Dirección» y «Notas».
-3. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin IVA y
-   en euros, e «IVA %» (21 de entrada). «+ Línea» añade otra y la cruz la quita.
-4. Pulsa «Emitir factura»; está en gris hasta que cada línea tiene descripción, cantidad y precio. La
+3. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin impuesto
+   y en euros, y el tipo, que lleva el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21
+   de entrada), «IGIC %» en Canarias o «IPSI %» en Ceuta y Melilla. Empieza en el tipo general de su regla
+   de Impuestos (en Canarias, el de la regla de Canarias); si el territorio aún no tiene regla de su
+   impuesto, está vacío: escríbelo tú. «+ Línea» añade otra, con el mismo tipo de entrada, y la cruz la
+   quita.
+4. Pulsa «Emitir factura»; está en gris hasta que cada línea tiene descripción, cantidad, precio y tipo. La
    ventana se cierra y la factura aparece en la lista con su número, «Emitida» y «Origen» «Alta manual».
 Entra: lo que escribe la persona; el emisor configurado. Por la API o el asistente una línea puede
 llevar además la categoría fiscal de Impuestos: entonces su tipo y su calificación son los de la regla
-vigente hoy, no el «IVA %» escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
+vigente hoy, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
 (Impuestos → Ajustes, TAX-F11): en Canarias se declara como IGIC y en Ceuta y Melilla como IPSI.
-Sale: la factura (F1 en una serie de facturas, F2 en una de tiques) con el IVA calculado encima del
+Sale: la factura (F1 en una serie de facturas, F2 en una de tiques) con el impuesto calculado encima del
 precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (los conceptos suman el
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
 500 caracteres); avisa `invoice.invoice.issued`.
@@ -281,8 +289,10 @@ y la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «L�
 importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro
 año («Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 €
 no se puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. No se emite nada ni se gasta
-número, y lo escrito se conserva.
-Implicados: TAX-F18, CUSTOMER-F17
+número, y lo escrito se conserva. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», sale
+vacío y avisa «No se pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la
+factura se emite igual, con el impuesto del territorio.
+Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
 Estado: servidor hecho; falta la página pública de la plataforma (`/p`)
