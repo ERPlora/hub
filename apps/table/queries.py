@@ -231,11 +231,15 @@ def _locked(rows, lock: bool):
     return rows.select_for_update(of=("self",)) if lock else rows
 
 
-def find_zone(zone_id: UUID | None, said: str | None, *, lock: bool = False) -> Zone:
-    """A live zone by id, or by its name (exact, else the only one that contains it)."""
-    rows = Zone.objects.filter(is_deleted=False)
+def find_zone(
+    zone_id: UUID | None, said: str | None, *, lock: bool = False, rows=None
+) -> Zone:
+    """A live zone by id, or by its name (exact, else the only one that contains it). It comes from
+    ``rows`` when given (e.g. with what its detail shows): one read, so a deletion committed meanwhile is
+    either not seen yet or not found, never a row that vanished between two reads."""
+    zones = Zone.objects.filter(is_deleted=False)
     if zone_id is None:
-        candidates = _first_match(rows, "name", (said or "").strip())
+        candidates = _first_match(zones, "name", (said or "").strip())
         if len(candidates) > 1:
             names = ", ".join(zone.name for zone in candidates[:MAX_CANDIDATES])
             raise Conflict(
@@ -243,7 +247,8 @@ def find_zone(zone_id: UUID | None, said: str | None, *, lock: bool = False) -> 
                 code="table.zone_ambiguous",
             )
         zone_id = candidates[0].pk if candidates else None
-    zone = _locked(rows.filter(pk=zone_id), lock).first()
+    found_in = zones if rows is None else rows.filter(is_deleted=False)
+    zone = _locked(found_in.filter(pk=zone_id), lock).first()
     if zone is None:
         raise NotFound(str(ZONE_NOT_FOUND), code="table.zone_not_found")
     return zone
@@ -262,13 +267,14 @@ def find_table(
     zone_said: str | None = None,
     *,
     lock: bool = False,
+    rows=None,
 ) -> Table:
     """A table in use or not (never a deleted one) by id, or by its number (or name) and, when the
-    number repeats in several zones, its zone."""
-    rows = Table.objects.filter(is_deleted=False).select_related("zone")
+    number repeats in several zones, its zone; from ``rows`` when given, in one read (as ``find_zone``)."""
+    tables = Table.objects.filter(is_deleted=False).select_related("zone")
     if table_id is None:
         said = (said or "").strip()
-        named = rows
+        named = tables
         if zone_said:
             named = named.filter(zone=find_zone(None, zone_said))
         candidates = list(
@@ -287,7 +293,8 @@ def find_table(
                 code="table.table_ambiguous",
             )
         table_id = candidates[0].pk if candidates else None
-    table = _locked(rows.filter(pk=table_id), lock).first()
+    found_in = tables if rows is None else rows.filter(is_deleted=False)
+    table = _locked(found_in.filter(pk=table_id), lock).first()
     if table is None:
         raise NotFound(str(TABLE_NOT_FOUND), code="table.table_not_found")
     return table
@@ -299,9 +306,11 @@ def find_session(
     zone_said: str | None = None,
     *,
     lock: bool = False,
+    rows=None,
 ) -> TableSession:
-    """A table check by id (any status, never a deleted one), or the live check at the table named."""
-    rows = TableSession.objects.filter(is_deleted=False).select_related(
+    """A table check by id (any status, never a deleted one), or the live check at the table named; from
+    ``rows`` when given, in one read (as ``find_zone``)."""
+    sessions = TableSession.objects.filter(is_deleted=False).select_related(
         "table", "table__zone"
     )
     if session_id is None:
@@ -319,7 +328,8 @@ def find_session(
                 code="table.session_ambiguous",
             )
         session_id = live[0].pk
-    session = _locked(rows.filter(pk=session_id), lock).first()
+    found_in = sessions if rows is None else rows.filter(is_deleted=False)
+    session = _locked(found_in.filter(pk=session_id), lock).first()
     if session is None:
         raise NotFound(str(SESSION_NOT_FOUND), code="table.session_not_found")
     return session
@@ -595,8 +605,7 @@ def list_zones(ctx: OperationContext, params: ZoneListIn) -> dict:
     },
 )
 def get_zone(ctx: OperationContext, params: ZoneRefIn) -> dict:
-    zone = find_zone(params.id, params.zone)
-    return zone_rows([zones_now(timezone.now()).get(pk=zone.pk)])[0]
+    return zone_rows([find_zone(params.id, params.zone, rows=zones_now(timezone.now()))])[0]
 
 
 # --- Tables --------------------------------------------------------------------------------------
@@ -667,7 +676,9 @@ def list_tables(ctx: OperationContext, params: TableListIn) -> dict:
     },
 )
 def get_table(ctx: OperationContext, params: TableRefIn) -> dict:
-    return table_out(find_table(params.id, params.table, params.zone))
+    now = timezone.now()
+    shown = tables_now(now).select_related("zone")
+    return table_rows([find_table(params.id, params.table, params.zone, rows=shown)], now)[0]
 
 
 # --- Table checks --------------------------------------------------------------------------------
@@ -726,7 +737,9 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
     },
 )
 def get_session(ctx: OperationContext, params: SessionRefIn) -> dict:
-    return session_out(find_session(params.id, params.table, params.zone))
+    return session_rows(
+        [find_session(params.id, params.table, params.zone, rows=sessions_now())]
+    )[0]
 
 
 @operation(
