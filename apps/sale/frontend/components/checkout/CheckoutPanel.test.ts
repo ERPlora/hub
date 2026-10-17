@@ -9,7 +9,7 @@ import { toast } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
-import { click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountSale, resultFrame } from '../../__tests__/mount-sale';
+import { BYE, click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountSale, resultFrame } from '../../__tests__/mount-sale';
 import { RECOVERY_DELAY_MS } from '../../composables/checkout/useCheckout';
 import { plain } from '../../lib/format';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut, SettingsOut } from '../../operations';
@@ -183,6 +183,59 @@ describe('CheckoutPanel: what it reads', () => {
     await click(s.find('sale-checkout-retry').element);
     await s.reopen();
     expect(s.net.streams.length).toBe(streams + 1);
+  });
+
+  // Loading, empty, error and ready never show at once: the error replaces what was loading (Square,
+  // Shopify POS, Toast), and «Retry» goes back to loading until the server answers again.
+  it('a total that cannot be worked out: the error replaces «Working out the total…», never both', async () => {
+    const s = await setup({ preview: null });
+    s.net.lastStream().push(errorFrame(s.subId(PREVIEW_OP), 'sale.no_tax_rule'));
+    await flush();
+    expect(s.find('sale-checkout-read-error').exists()).toBe(true);
+    expect(s.find('sale-checkout-total').exists()).toBe(false);
+    expect(s.wrapper.find('ion-spinner').exists()).toBe(false);
+  });
+
+  it('«Retry» goes back to «Working out the total…» until the server answers: another error, or the total', async () => {
+    const s = await setup({ preview: null });
+    s.net.lastStream().push(errorFrame(s.subId(PREVIEW_OP), 'sale.no_tax_rule'));
+    await flush();
+    await click(s.find('sale-checkout-retry').element);
+    expect(s.find('sale-checkout-read-error').exists()).toBe(false);
+    expect(s.text('sale-checkout-total')).toBe('Working out the total…');
+    await s.reopen();
+    s.net.lastStream().push(errorFrame(s.subId(PREVIEW_OP), 'sale.no_tax_rule'));
+    await flush();
+    expect(s.find('sale-checkout-read-error').exists()).toBe(true);
+    expect(s.find('sale-checkout-total').exists()).toBe(false);
+    await click(s.find('sale-checkout-retry').element);
+    await s.reopen();
+    await s.push(PREVIEW_OP, preview());
+    expect(s.find('sale-checkout-read-error').exists()).toBe(false);
+    expect(s.text('sale-checkout-total')).toBe('€42.50');
+    expect(s.confirm().disabled).toBe(false);
+  });
+
+  it('methods that cannot be read: the error, neither their loading, «no payment method» nor how to pay', async () => {
+    const s = await setup({ methods: null });
+    s.net.lastStream().push(errorFrame(s.subId(METHODS_OP), 'server_error'));
+    await flush();
+    expect(s.find('sale-checkout-read-error').exists()).toBe(true);
+    expect(s.find('sale-checkout-methods-loading').exists()).toBe(false);
+    expect(s.find('sale-checkout-no-methods').exists()).toBe(false);
+    // The total is there, but with no method read there is nothing to pay with yet.
+    expect(s.find('sale-checkout-exact').exists()).toBe(false);
+    expect(s.find('sale-checkout-split').exists()).toBe(false);
+    expect(s.confirm().disabled).toBe(true);
+  });
+
+  it('the stream dropping before anything arrives: still working out the total and loading the methods, never «no payment method»', async () => {
+    const s = await setup({ preview: null, methods: null });
+    s.net.lastStream().push(BYE);
+    await flush();
+    expect(s.text('sale-checkout-total')).toBe('Working out the total…');
+    expect(s.find('sale-checkout-methods-loading').exists()).toBe(true);
+    expect(s.find('sale-checkout-no-methods').exists()).toBe(false);
   });
 });
 
