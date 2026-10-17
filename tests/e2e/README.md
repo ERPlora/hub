@@ -28,10 +28,14 @@ caja abierto de la otra y `cash-register-shift.spec.ts` falló).
 | Variable | Qué aísla | Quién la lee |
 |---|---|---|
 | `E2E_HUB_PORT` | puerto del `runserver` del Hub | las specs (`stack.ts`) |
-| `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings.py`, `vite.config.ts`, specs |
+| `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
 | `SAAS_URL` | el SaaS propio, donde va el login | `config/settings.py`, specs |
 | `DB_NAME` | la BD de la ejecución (control + negocio de `a`/`b`) | `config/settings.py`, specs (`psql()`) |
 | `E2E_MAIL_DIR` | la carpeta de correo del SaaS propio (código de acceso) | specs (`mail.ts`) |
+
+Para el `runserver` basta `VITE_DEV_PORT` en el `.env` del worktree; para la e2e hay que **exportarla** (Vite y
+las specs no leen el `.env`). Exportada o en el `.env`, `uv run pytest` sigue en el `5173`
+(`config/settings_pytest.py`).
 
 Reglas que el e2e hace cumplir:
 
@@ -57,9 +61,9 @@ Receta (pila en `8030`, desde la raíz de `erplora-next`; otra pila: otros puert
 ```bash
 export COMPOSE_FILE="$PWD/compose.yaml"
 # 1. SaaS propio en 8031, desde un worktree del SaaS, con su carpeta de correo
-(cd <saas-wt> && HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
+(cd <saas-wt> && VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' EMAIL_FILE_PATH="$PWD/.mail-8031" \
-  uv run python manage.py runserver 127.0.0.1:8031)    # su Vite va en 5174; un segundo SaaS del mismo commit, --novite
+  uv run python manage.py runserver 127.0.0.1:8031)    # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
 # 2. La pila del Hub, desde su worktree
 cd <hub-wt>
 export E2E_HUB_PORT=8030 VITE_DEV_PORT=5203 SAAS_URL=http://localhost:8031 DB_NAME=hub_e2e_8030 \
