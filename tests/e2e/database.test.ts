@@ -39,7 +39,7 @@ function fakeManage(answers: Record<string, CommandResult> = {}): { manage: Mana
 }
 
 describe('prepareDatabase', () => {
-  it('creates a missing e2e database and then migrates it (control and hubs)', () => {
+  it('creates a missing e2e database, migrates it (control and hubs) and leaves `a` and `b` in its registry', () => {
     const postgres = fakePostgres([]);
     const { manage, calls } = fakeManage();
 
@@ -48,16 +48,16 @@ describe('prepareDatabase', () => {
       "select 1 from pg_database where datname = 'hub_e2e_8030'",
       'create database "hub_e2e_8030"',
     ]);
-    expect(calls).toEqual([['migrate', '--no-input'], ['migrate_hubs']]);
+    expect(calls).toEqual([['migrate', '--no-input'], ['migrate_hubs'], ['seed_local_hubs']]);
   });
 
-  it('only migrates one that exists: it is idempotent and keeps its rows', () => {
+  it('only migrates and seeds one that exists: it is idempotent and keeps its rows', () => {
     const postgres = fakePostgres(['hub_e2e_8030']);
     const { manage, calls } = fakeManage();
 
     expect(prepareDatabase('hub_e2e_8030', { sql: postgres.sql, manage })).toEqual({ created: false });
     expect(postgres.statements).toEqual(["select 1 from pg_database where datname = 'hub_e2e_8030'"]);
-    expect(calls).toEqual([['migrate', '--no-input'], ['migrate_hubs']]);
+    expect(calls).toEqual([['migrate', '--no-input'], ['migrate_hubs'], ['seed_local_hubs']]);
   });
 
   it('refuses the shared `hub` and every database that is no e2e one, touching nothing', () => {
@@ -93,6 +93,12 @@ describe('prepareDatabase', () => {
     const hubs = fakeManage({ migrate_hubs: { status: null, stdout: '', stderr: 'killed' } });
     expect(() => prepareDatabase('hub_e2e_8030', { sql: fakePostgres([]).sql, manage: hubs.manage })).toThrow(
       '`manage.py migrate_hubs` exited with no status:\nkilled',
+    );
+
+    // The host gate answers 404 to a slug the registry does not have: without `a` and `b`, every spec fails.
+    const unseeded = fakeManage({ seed_local_hubs: { status: 1, stdout: '', stderr: 'CommandError: DEBUG' } });
+    expect(() => prepareDatabase('hub_e2e_8030', { sql: fakePostgres([]).sql, manage: unseeded.manage })).toThrow(
+      /^Could not seed the local hubs of the e2e database hub_e2e_8030: `manage\.py seed_local_hubs` exited with 1:\nCommandError: DEBUG$/,
     );
   });
 });
@@ -138,11 +144,11 @@ describe('runCli', () => {
     const postgres = fakePostgres([]);
     const prepared = io();
     expect(runCli([], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...prepared })).toBe(0);
-    expect(prepared.out).toEqual(['database.ts: hub_e2e_8030 created and migrated.']);
+    expect(prepared.out).toEqual(['database.ts: hub_e2e_8030 created, migrated and seeded (a, b).']);
 
     const again = io();
     expect(runCli([], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...again })).toBe(0);
-    expect(again.out).toEqual(['database.ts: hub_e2e_8030 migrated.']);
+    expect(again.out).toEqual(['database.ts: hub_e2e_8030 migrated and seeded (a, b).']);
 
     const dropped = io();
     expect(runCli(['--drop'], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...dropped })).toBe(0);

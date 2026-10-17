@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { assertMigrationsApplied, managePy, type CommandResult, type Spawn } from './global-setup';
+import { assertLocalHubsRegistered, assertMigrationsApplied, managePy, type CommandResult, type Spawn } from './global-setup';
 
 const HUB_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -209,5 +209,28 @@ describe('managePy', () => {
       stdout: '',
       stderr: 'spawnSync uv ENOENT',
     });
+  });
+});
+
+// The host gate answers 404 to a slug the registry does not have (plan 2026-10-17, §1.3): without `a` and `b` every
+// spec would fail on a 404 that never says why. `seed_local_hubs --check` writes nothing.
+describe('assertLocalHubsRegistered', () => {
+  it('passes when a and b are ready, asking only the check', () => {
+    const calls: string[][] = [];
+    assertLocalHubsRegistered((args) => (calls.push(args), { status: 0, stdout: 'a: ready\nb: ready\n', stderr: '' }), 'hub');
+    expect(calls).toEqual([['seed_local_hubs', '--check', '--no-color']]);
+  });
+
+  it('stops the run naming what is missing and the command that seeds them', () => {
+    const missing: CommandResult = {
+      status: 1,
+      stdout: '',
+      stderr: 'CommandError: Not ready in the registry: a (missing), b (missing). Run `manage.py seed_local_hubs`.\n',
+    };
+    expect(() => assertLocalHubsRegistered(() => missing, 'hub_e2e_8030')).toThrow(
+      'The local hubs a and b are not ready in the registry of the e2e (DB_NAME=hub_e2e_8030). Run ' +
+        '`DB_NAME=hub_e2e_8030 uv run python manage.py seed_local_hubs` from this checkout and retry.\n\n' +
+        'CommandError: Not ready in the registry: a (missing), b (missing). Run `manage.py seed_local_hubs`.',
+    );
   });
 });

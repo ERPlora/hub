@@ -50,6 +50,7 @@ def test_every_route_is_bound_to_its_operation():
     assert "base.session.me" in operation_ids(api)
 
 
+@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
 def test_openapi_is_served_with_operation_names_as_ids(client):
     response = client.get("/api/openapi.json", HTTP_HOST="a.localhost")
     assert response.status_code == 200

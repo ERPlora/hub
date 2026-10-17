@@ -5,8 +5,10 @@ A call is heard by its v2 signature when it carries one (method, path and body; 
 signature is the authentication: the ALB never publishes ``/internal``, so the door answers on any host (the
 SaaS reaches it by the private name).
 
-Phase 1 has no registry of hubs: ``PUT /internal/hubs/{id}/state`` (the photo) names its hub by ``slug`` and only
-its VeriFactu block and the business's status are applied, through ``verifactu.config.sync`` on that hub.
+The registry (plan 2026-10-17, §1.5): ``PUT /internal/hubs/{id}`` registers a business (202, ready at once in phase 1,
+and the SaaS hears ``ready`` after the COMMIT; 200 when it updates it), ``GET`` reads it, ``DELETE`` cancels it and
+``POST …/restore`` brings it back. ``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and
+applies its VeriFactu block and the business's status through ``verifactu.config.sync`` on the hub's slug.
 """
 
 import hashlib
@@ -17,6 +19,8 @@ import time
 import pytest
 
 from apps.verifactu.models import Config
+from base.models import Hub
+from base.signing import verify_signed
 
 HUB_ID = "0199c4b0-0000-7000-8000-000000000001"
 PATH = f"/internal/hubs/{HUB_ID}/state"
@@ -65,6 +69,15 @@ def signed(
 
 def code(answer) -> str:
     return answer.json()["error"]["code"]
+
+
+@pytest.fixture(autouse=True)
+def registered(request):
+    """The business of ``HUB_ID`` in the registry (``acme``), for the tests that use the database."""
+    if "db" not in request.fixturenames:
+        return None
+    request.getfixturevalue("db")
+    return Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
 
 
 # The signature
@@ -211,16 +224,25 @@ def test_an_older_photo_is_ignored(client, db):
     assert Config.objects.get().live_paid is True
 
 
-def test_without_the_block_nothing_is_applied(client, db):
+def test_without_the_block_verifactu_is_left_alone(client, db, registered):
     answer = signed(client, "put", PATH, {"slug": "a", "version": 1})
-    assert answer.status_code == 200 and answer.json() == {"applied": False}
+    assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 1}
     assert not Config.objects.exists()
 
 
-@pytest.mark.parametrize("slug", ["hub", "A B", "", None])
-def test_a_slug_that_names_no_hub_is_422(client, db, slug):
-    answer = signed(client, "put", PATH, {"slug": slug, "version": 1})
-    assert answer.status_code == 422 and code(answer) == "internal.slug_invalid"
+def test_a_photo_of_a_hub_the_registry_does_not_know_is_404(client, db):
+    # The SaaS registers a business (PUT /internal/hubs/{id}) before it sends its photo.
+    other = "/internal/hubs/0199c4b0-0000-7000-8000-0000000000ff/state"
+    answer = signed(client, "put", other, {"slug": "a", "version": 1, "status": "active"})
+    assert answer.status_code == 404 and code(answer) == "not_found"
+    assert not Config.objects.exists()
+
+
+def test_the_photo_is_kept_on_the_registry_as_it_came(client, db, registered):
+    body = {"hub_id": HUB_ID, "slug": "acme", "version": 2, "status": "active", "plan": {"slug": "starter"}}
+    assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 2}
+    registered.refresh_from_db()
+    assert (registered.state, registered.state_version) == (body, 2)
 
 
 @pytest.mark.parametrize(
@@ -241,10 +263,12 @@ def test_a_slug_that_names_no_hub_is_422(client, db, slug):
         {"slug": "a", "version": 1, "verifactu": []},
     ],
 )
-def test_a_photo_out_of_contract_is_422(client, db, body):
+def test_a_photo_out_of_contract_is_422(client, db, body, registered):
     answer = signed(client, "put", PATH, body)
     assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
     assert not Config.objects.exists()
+    registered.refresh_from_db()
+    assert (registered.state, registered.state_version) == ({}, 0)
 
 
 @pytest.mark.parametrize("raw", [b"not json", b"[]", b""])
@@ -258,3 +282,192 @@ def test_a_body_naming_another_hub_is_refused(client, db):
     body = {"hub_id": "0199c4b0-0000-7000-8000-000000000002", "slug": "a", "version": 1}
     answer = signed(client, "put", PATH, body)
     assert answer.status_code == 422 and code(answer) == "internal.hub_mismatch"
+
+
+
+# The registry: PUT, GET and DELETE /internal/hubs/{id}, POST …/restore (plan 2026-10-17, §1.5)
+
+NEW_ID = "0199c4b0-0000-7000-8000-000000000010"
+HUB_PATH = f"/internal/hubs/{NEW_ID}"
+REGISTRY = {
+    "id": NEW_ID,
+    "slug": "bar-pepe",
+    "name": "Bar Pepe",
+    "country": "ES",
+    "timezone": "Europe/Madrid",
+    "language": "es",
+    "vertical": None,
+}
+
+
+@pytest.fixture
+def saas_at(fake_saas, settings):
+    """The SaaS stand-in (``base.auth.post``), with this module's secret on both sides."""
+
+    def install(**kwargs):
+        fake = fake_saas(**kwargs)
+        settings.INTERNAL_SHARED_SECRET = SECRET
+        return fake
+
+    return install
+
+
+@pytest.fixture
+def saas_hears(saas_at):
+    return saas_at(body={"id": NEW_ID, "status": "active"})
+
+
+def test_unsigned_registry_calls_are_401_and_write_nothing(client, db):
+    for method in ("put", "delete"):
+        answer = getattr(client, method)(HUB_PATH, b"{}", content_type="application/json", HTTP_HOST="hub.localhost")
+        assert answer.status_code == 401 and code(answer) == "internal.unsigned"
+    answer = client.get(HUB_PATH, HTTP_HOST="hub.localhost")
+    assert answer.status_code == 401 and code(answer) == "internal.unsigned"
+    restore = client.post(f"{HUB_PATH}/restore", b"{}", content_type="application/json", HTTP_HOST="hub.localhost")
+    assert restore.status_code == 401
+    assert not Hub.objects.filter(pk=NEW_ID).exists()
+
+
+def test_a_registration_signed_301_seconds_ago_is_401(client, db):
+    answer = signed(client, "put", HUB_PATH, REGISTRY, ts=int(time.time()) - 301)
+    assert answer.status_code == 401
+    assert not Hub.objects.filter(pk=NEW_ID).exists()
+
+
+@pytest.mark.parametrize("host", ["hub.erplora.internal", "localhost:8000", "hubs.localhost"])
+def test_the_registry_answers_on_the_private_name_and_locally(client, db, settings, saas_hears, host):
+    settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "hub.erplora.internal"]
+    answer = signed(client, "put", HUB_PATH, REGISTRY, host=host, with_v2=True)
+    assert answer.status_code == 202
+
+
+def test_a_new_business_is_ready_at_once_and_the_saas_hears_it_after_the_commit(
+    client, db, saas_hears, django_capture_on_commit_callbacks
+):
+    with django_capture_on_commit_callbacks(execute=True):
+        answer = signed(client, "put", HUB_PATH, REGISTRY, with_v2=True)
+    assert answer.status_code == 202
+    body = answer.json()
+    assert {key: body[key] for key in ("id", "slug", "status", "is_demo", "expires_at", "state_version")} == {
+        "id": NEW_ID,
+        "slug": "bar-pepe",
+        "status": "ready",
+        "is_demo": False,
+        "expires_at": None,
+        "state_version": 0,
+    }
+    assert body["ready_at"] is not None and "created" not in body
+    hub = Hub.objects.get(pk=NEW_ID)
+    assert (hub.status, hub.name, hub.country) == ("ready", "Bar Pepe", "ES")
+    [call] = saas_hears.calls
+    ready_path = f"/internal/hubs/{NEW_ID}/ready"
+    assert call["url"] == f"http://localhost:8001{ready_path}"
+    assert json.loads(call["body"]) == {"id": NEW_ID}
+    now = int(call["headers"]["X-Erplora-Timestamp"])
+    assert verify_signed("POST", ready_path, call["body"], call["headers"], secrets=[SECRET], now=now)
+    assert "X-Erplora-Signature-V2" in call["headers"]
+
+
+def test_registering_it_again_is_200_and_the_saas_hears_nothing_more(
+    client, db, saas_hears, django_capture_on_commit_callbacks
+):
+    with django_capture_on_commit_callbacks(execute=True):
+        signed(client, "put", HUB_PATH, REGISTRY)
+    with django_capture_on_commit_callbacks(execute=True):
+        again = signed(client, "put", HUB_PATH, {**REGISTRY, "name": "Bar Pepe 2"})
+    assert again.status_code == 200 and again.json()["status"] == "ready"
+    assert Hub.objects.get(pk=NEW_ID).name == "Bar Pepe 2"
+    assert len(saas_hears.calls) == 1
+
+
+def test_a_saas_that_is_away_never_breaks_the_registration(
+    client, db, saas_at, django_capture_on_commit_callbacks, caplog
+):
+    saas_at(raises=OSError("connection refused"))
+    with django_capture_on_commit_callbacks(execute=True):
+        answer = signed(client, "put", HUB_PATH, REGISTRY)
+    assert answer.status_code == 202
+    assert Hub.objects.get(pk=NEW_ID).status == "ready"
+    assert "base.hub.ready_unreported" in caplog.text
+
+
+@pytest.mark.parametrize("slug", ["demo-x1234567", "hub", "Bar Pepe"])
+def test_a_slug_no_business_may_take_is_422(client, db, slug):
+    answer = signed(client, "put", HUB_PATH, {**REGISTRY, "slug": slug})
+    assert answer.status_code == 422 and code(answer) == "base.slug_invalid"
+    assert not Hub.objects.filter(pk=NEW_ID).exists()
+
+
+def test_the_slug_of_another_hub_is_409(client, db):
+    answer = signed(client, "put", HUB_PATH, {**REGISTRY, "slug": "acme"})
+    assert answer.status_code == 409 and code(answer) == "base.slug_taken"
+
+
+def test_a_registration_naming_another_hub_is_refused(client, db):
+    answer = signed(client, "put", HUB_PATH, {**REGISTRY, "id": HUB_ID})
+    assert answer.status_code == 422 and code(answer) == "internal.hub_mismatch"
+    assert not Hub.objects.filter(pk=NEW_ID).exists()
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"not json", b"[]", json.dumps({**REGISTRY, "slug": None}).encode(), json.dumps({**REGISTRY, "country": "ESP"}).encode()],
+)
+def test_a_registration_out_of_contract_is_422(client, db, raw):
+    answer = signed(client, "put", HUB_PATH, raw)
+    assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
+
+
+def test_get_answers_the_status_the_saas_waits_for(client, db):
+    answer = signed(client, "get", f"/internal/hubs/{HUB_ID}", b"", with_v2=True)
+    assert answer.status_code == 200
+    assert (answer.json()["id"], answer.json()["slug"], answer.json()["status"]) == (HUB_ID, "acme", "ready")
+
+
+def test_get_of_an_unknown_hub_is_the_404_envelope(client, db):
+    answer = signed(client, "get", HUB_PATH, b"", with_v2=True)
+    assert answer.status_code == 404 and code(answer) == "not_found"
+
+
+def test_delete_cancels_the_hub(client, db, registered):
+    answer = signed(client, "delete", f"/internal/hubs/{HUB_ID}", {"id": HUB_ID}, with_v2=True)
+    assert answer.status_code == 202 and answer.json()["status"] == "cancelled"
+    registered.refresh_from_db()
+    assert registered.status == "cancelled" and registered.cancelled_at is not None
+
+
+def test_delete_of_an_unknown_hub_is_404(client, db):
+    # The SaaS's _delete takes a 404 as «nothing to delete».
+    answer = signed(client, "delete", HUB_PATH, {"id": NEW_ID})
+    assert answer.status_code == 404
+
+
+def test_restore_brings_a_cancelled_hub_back(client, db, registered):
+    signed(client, "delete", f"/internal/hubs/{HUB_ID}", {"id": HUB_ID})
+    answer = signed(client, "post", f"/internal/hubs/{HUB_ID}/restore", {"id": HUB_ID}, with_v2=True)
+    assert answer.status_code == 200 and answer.json()["status"] == "ready"
+
+
+def test_restore_of_a_purged_hub_is_hub_purged(client, db, registered):
+    # Literal: the SaaS's _restore compares this code and marks the business deleted.
+    Hub.objects.filter(pk=HUB_ID).update(status="purged")
+    answer = signed(client, "post", f"/internal/hubs/{HUB_ID}/restore", {"id": HUB_ID})
+    assert answer.status_code == 409 and code(answer) == "hub_purged"
+
+
+def test_restore_of_an_unknown_hub_is_404(client, db):
+    # The SaaS then registers it again (PUT).
+    answer = signed(client, "post", f"{HUB_PATH}/restore", {"id": NEW_ID})
+    assert answer.status_code == 404
+
+
+def test_a_registry_call_naming_another_hub_is_refused(client, db):
+    for method, path in (("delete", f"/internal/hubs/{HUB_ID}"), ("post", f"/internal/hubs/{HUB_ID}/restore")):
+        answer = signed(client, method, path, {"id": NEW_ID})
+        assert answer.status_code == 422 and code(answer) == "internal.hub_mismatch"
+    assert Hub.objects.get(pk=HUB_ID).status == "ready"
+
+
+def test_each_registry_route_takes_only_its_methods(client, db):
+    assert signed(client, "post", HUB_PATH, REGISTRY).status_code == 405
+    assert signed(client, "get", f"{HUB_PATH}/restore", b"").status_code == 405

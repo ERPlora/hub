@@ -3,7 +3,12 @@
 ``HubHostRequiredMiddleware``: a host that is no hub (``HostScopeResolver`` with ``live.slugs``: a
 reserved name such as ``hub`` or ``www``, an invalid label, the bare host, an IP) answers 404 on every
 hub path (the SPA, ``/api``, ``/auth``…), before ninja's session auth, so an anonymous API call gets
-the 404 envelope and not a 401. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``)
+the 404 envelope and not a 401. Then the registry decides (``base.registry``, plan 2026-10-17, §1.2): a slug
+without a row is 404 too; a hub that is gone (cancelled, purged, or a demo past its ``expires_at``) is 410, a page
+with the way back to ERPlora (another demo, or the SaaS's ``/launch``); one still being prepared is 503 with
+``Retry-After``, a page that refreshes itself. The API, and any call that does not ask for a page (``Accept``
+without ``text/html``), gets the envelope instead (``base.hub_gone``, ``base.hub_preparing``). A hub that answers
+is left on ``request.hub``. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``)
 is no hub either: it is marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The
 Hub admin lives only there (PLAN §18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404,
 never the admin's own login. Static files, CSP reports and ``/readyz`` (Route 53 and the deploy probe
@@ -34,16 +39,28 @@ the shell, whose auth gate sends to ``/auth/login``, the same jump.
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.template.loader import render_to_string
 from django.urls import get_script_prefix, reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
 from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
-from base.auth import admin_hubs_url, login_redirect
+from base import registry
+from base.auth import admin_hubs_url, login_redirect, saas_url
 from base.health import READYZ_PATH
+from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
 from base.spa import spa
+
+#: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
+HUB_GONE_TEMPLATE = "base/hub_gone.html"
+HUB_PREPARING_TEMPLATE = "base/hub_preparing.html"
+#: How long a client waits before asking a hub being prepared again (``Retry-After``).
+PREPARING_RETRY_AFTER_SECONDS = 30
+#: Where a demo that ended sends the visitor (another demo), and where a business that is gone does.
+DEMO_PATH = "/demo/"
+LAUNCH_PATH = "/launch"
 
 
 class HubHostRequiredMiddleware(MiddlewareMixin):
@@ -64,15 +81,56 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         if path.startswith(self.OPEN_PREFIXES) or path == READYZ_PATH:
             return None
         try:
-            HostScopeResolver().resolve(request)
+            scope = HostScopeResolver().resolve(request)
         except Http404:
-            api_prefix = getattr(settings, "LIVE", {}).get("api_prefix", DEFAULT_API_PREFIX).rstrip("/") + "/"
-            if path.startswith(api_prefix):
-                # The envelope of an unknown API path (live.api_errors), in the request's language.
-                error = NotFound(gettext("Not found"))
-                return JsonResponse(error.envelope(), status=error.status)
-            raise
+            return self._not_found(request)
+        hub = registry.hub_by_slug(scope.key)
+        if hub is None:
+            return self._not_found(request)
+        if registry.is_gone(hub):
+            return self._gone(request, hub)
+        if registry.is_preparing(hub):
+            return self._preparing(request)
+        request.hub = hub
         return None
+
+    def _not_found(self, request: HttpRequest) -> HttpResponse:
+        if _is_api(request):
+            # The envelope of an unknown API path (live.api_errors), in the request's language.
+            error = NotFound(gettext("Not found"))
+            return JsonResponse(error.envelope(), status=error.status)
+        raise Http404("This host is no hub's.")
+
+    def _gone(self, request: HttpRequest, hub: Hub) -> HttpResponse:
+        if _wants_envelope(request):
+            return _envelope(410, "base.hub_gone", gettext("This hub is no longer available."))
+        back = saas_url(DEMO_PATH if hub.is_demo else LAUNCH_PATH)
+        html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
+        return HttpResponse(html, status=410)
+
+    def _preparing(self, request: HttpRequest) -> HttpResponse:
+        if _wants_envelope(request):
+            response = _envelope(
+                503, "base.hub_preparing", gettext("This hub is still being prepared; try again in a few seconds.")
+            )
+        else:
+            response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=503)
+        response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
+        return response
+
+
+def _is_api(request: HttpRequest) -> bool:
+    api_prefix = getattr(settings, "LIVE", {}).get("api_prefix", DEFAULT_API_PREFIX).rstrip("/") + "/"
+    return request.path_info.startswith(api_prefix)
+
+
+def _wants_envelope(request: HttpRequest) -> bool:
+    """The API, and any call that does not ask for a page, gets the JSON envelope; a browser gets the page."""
+    return _is_api(request) or "text/html" not in request.headers.get("Accept", "")
+
+
+def _envelope(status: int, code: str, message: str) -> JsonResponse:
+    return JsonResponse({"error": {"code": code, "message": message}}, status=status)
 
 
 class PlatformHostMiddleware(MiddlewareMixin):

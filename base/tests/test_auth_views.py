@@ -275,7 +275,8 @@ class TestCallbackState:
         fake_saas()
         start_login(client)
         data = {"code": "c1", "next": "/demo/items?q=1", "state": "forged"}
-        with django_assert_num_queries(0):
+        # One read, the host gate's row of the hub (base.registry); the page itself reads nothing.
+        with django_assert_num_queries(1):
             response = client.post("/auth/callback", data, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language)
         assert response.status_code == 403
         assert response["Content-Type"].startswith("text/html")

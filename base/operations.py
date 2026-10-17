@@ -10,7 +10,7 @@ An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The pl
 (``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin, PLAN §18.1)
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`is_demo_hub` and :func:`is_platform_hub` are what the apps
-ask about a hub's registry (a module never reads it). This is the only piece phase 2 replaces (scope =
+ask about a hub's registry (``base.registry``; a module never reads it). This is the only piece phase 2 replaces (scope =
 ``use_hub``).
 """
 
@@ -23,6 +23,7 @@ from django.http import Http404, HttpRequest
 from live.context import OperationContext, Scope
 from live.slugs import validate_hub_slug
 
+from base import registry
 from base.permissions import permissions_for, reload_user
 
 
@@ -36,7 +37,8 @@ class HostScopeResolver:
         if slug is None:
             raise Http404(f"{host!r} is not a host on {settings.HUB_BASE_DOMAIN!r}.")
         try:
-            validate_hub_slug(slug)
+            # A demo's slug (``demo-…``) is a hub's host too; whether it answers is the registry's (base.middleware).
+            validate_hub_slug(slug, allow_demo=True)
         except ValueError as exc:
             raise Http404(f"{slug!r} is no hub's slug ({exc}).") from None
         return Scope("host", slug)
@@ -49,9 +51,10 @@ def is_platform_host(request: HttpRequest) -> bool:
 
 
 def is_demo_hub(scope: Scope) -> bool:
-    """Whether ``scope``'s hub is an ephemeral demo (PLAN-SAAS §3.5: ``control.Hub.is_demo``, pinned to the AEAT's
-    test environment). Phase 1 has neither the control registry nor demos (block 7): no hub is one."""
-    return False
+    """Whether ``scope``'s hub is an ephemeral demo (PLAN-SAAS §3.5, pinned to the AEAT's test environment): the
+    registry's ``is_demo`` (``base.Hub`` in phase 1, plan 2026-10-17 §1.2; ``control.Hub`` in phase 2). A scope that
+    is no hub's host, or a slug without a row, is no demo."""
+    return scope.kind == "host" and registry.is_demo(scope.key)
 
 
 def is_platform_hub(scope: Scope) -> bool:

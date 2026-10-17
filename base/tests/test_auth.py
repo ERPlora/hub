@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from base import auth
+from base import auth, signing
 from base.auth import RedeemedUser
 from base.tests.conftest import ANA, SECRET
 
@@ -77,6 +77,18 @@ class TestRedeemCode:
         timestamp = headers["X-Erplora-Timestamp"]
         assert timestamp.isdigit()
         assert headers["X-Erplora-Signature"] == auth.sign(SECRET, timestamp, call["body"])
+
+    def test_signs_the_call_with_v2_too(self, fake_saas):
+        # v2 also covers the method and the route (base.signing): the SaaS judges a call that carries it by v2.
+        fake = fake_saas()
+        auth.redeem_code("c1", "a")
+        [call] = fake.calls
+        headers = call["headers"]
+        timestamp = int(headers["X-Erplora-Timestamp"])
+        assert headers["X-Erplora-Signature-V2"] == signing.sign_v2(
+            "POST", "/internal/auth/redeem", call["body"], timestamp, SECRET
+        )
+        assert headers["X-Erplora-Signature"] == signing.sign(call["body"], timestamp, SECRET)
 
     def test_a_numeric_user_id_becomes_text_and_missing_optionals_are_empty(self, fake_saas):
         fake_saas(body={"user_id": 7, "email": "bo@example.com", "role": "hub_employee"})

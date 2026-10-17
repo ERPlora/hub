@@ -4,7 +4,8 @@
 // database (`migrate --check`) and the hub databases (`migrate_hubs --check`; phase 1: the control
 // database again) of the run's `DB_NAME` (`stack.ts`), and never migrates: other sessions share them.
 // A stack's own e2e database that does not exist yet is said as such, with `database.ts`, which creates
-// it (runserver cannot start without it, so the e2e cannot create it here).
+// it (runserver cannot start without it, so the e2e cannot create it here). Then it checks that the local
+// hubs `a` and `b` are ready in the registry (`seed_local_hubs --check`; without them every host is a 404).
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,6 +72,18 @@ export function assertMigrationsApplied(manage: ManagePy, database: string): voi
   }
 }
 
+/** Throws, writing nothing, unless the local hubs `a` and `b` are ready in the registry: the host gate answers 404 to
+ * a slug without a row (`base.middleware`), so every spec would fail on a 404 that never says why. */
+export function assertLocalHubsRegistered(manage: ManagePy, database: string): void {
+  const check = manage(['seed_local_hubs', '--check', '--no-color']);
+  if (check.status === 0) return;
+  const output = [check.stdout.trim(), check.stderr.trim()].filter(Boolean).join('\n');
+  throw new Error(
+    `The local hubs a and b are not ready in the registry of the e2e (DB_NAME=${database}). Run ` +
+      `\`DB_NAME=${database} uv run python manage.py seed_local_hubs\` from this checkout and retry.\n\n${output}`,
+  );
+}
+
 /** `manage.py` from the Hub's checkout, with the environment the e2e's servers inherit and `DB_NAME` = `database`. */
 export function managePy(database: string, spawn: Spawn = spawnSync, env: NodeJS.ProcessEnv = process.env): ManagePy {
   return (args) => {
@@ -88,5 +101,7 @@ export function managePy(database: string, spawn: Spawn = spawnSync, env: NodeJS
 }
 
 export default function globalSetup(): void {
-  assertMigrationsApplied(managePy(STACK.database), STACK.database);
+  const manage = managePy(STACK.database);
+  assertMigrationsApplied(manage, STACK.database);
+  assertLocalHubsRegistered(manage, STACK.database);
 }

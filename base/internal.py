@@ -1,23 +1,33 @@
 """The SaaS's door into the Hub: ``/internal/*``, signed with HMAC-SHA256 and a timestamp (PLAN-SAAS §2, §2.2).
 
 Every call carries ``X-Erplora-Timestamp`` (unix seconds) and up to two hex signatures keyed with the shared
-secret, as ``saas-next/accounts/signing.py`` makes them:
+secret, as the SaaS makes them (``base.signing``, a port of its ``accounts/signing.py``):
 
-- ``X-Erplora-Signature`` (v1) over ``f"{timestamp}.{raw_body}"``: the body only (``base.auth.sign``);
+- ``X-Erplora-Signature`` (v1) over ``f"{timestamp}.{raw_body}"``: the body only;
 - ``X-Erplora-Signature-V2`` (v2) over ``f"v2\\n{timestamp}\\n{METHOD}\\n{path}\\n"`` + the raw body, ``path`` with its
   query: a signed body cannot be replayed on another route.
 
 A call is heard by v2 when it carries it, and then by v2 alone (naming v2 and failing it is refused even if v1
 passes: no downgrade); without v2, by v1. Each signature is checked against every live secret:
 ``INTERNAL_SHARED_SECRET`` and, during a rotation, ``INTERNAL_SHARED_SECRET_PREVIOUS``. A timestamp more than
-``INTERNAL_SIGNATURE_MAX_AGE_SECONDS`` away is refused. The signature is the authentication: the ALB never publishes
-``/internal``, so the door answers on any host (the SaaS reaches it by the private name, ``hub.erplora.internal``).
+``INTERNAL_SIGNATURE_MAX_AGE_SECONDS`` away is refused (401 ``internal.unsigned``). The signature is the
+authentication: the ALB never publishes ``/internal``, so the door answers on any host (the SaaS reaches it by the
+private name, ``hub.erplora.internal``; ``base.middleware`` leaves ``/internal/`` alone).
 
-Phase 1 has no registry of hubs (``control/``, phase 2): ``PUT /internal/hubs/{id}/state`` (the photo) names its hub
-by ``slug``, and the Hub applies what it already keeps of it, the VeriFactu block, the business's status and its id
-in ERPlora (the path's, where the signed authorisation is sent), through ``verifactu.config.sync`` on that hub, as
-the system. While the SaaS may still sign v1 only, a body that names the
-hub of its path (``hub_id`` or ``id``) must name the same one.
+The registry of hubs (plan 2026-10-17, §1.5), each route one operation of ``base`` run as the platform on the
+registry's scope (``base.registry.REGISTRY_SCOPE``):
+
+- ``PUT /internal/hubs/{id}`` (the SaaS's ``hub_registry()``) → ``base.hub.register``: 202 when it creates the row,
+  ready at once in phase 1 (the SaaS hears ``ready`` after the COMMIT), 200 when it updates it;
+- ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for;
+- ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202); ``POST /internal/hubs/{id}/restore`` →
+  ``base.hub.restore`` (200; 409 ``hub_purged`` when it can never come back);
+- ``PUT /internal/hubs/{id}/state`` (the photo) → ``base.hub.state_apply``: kept on the row if its ``version`` is
+  newer, with its VeriFactu block, the business's status and its id in ERPlora applied through
+  ``verifactu.config.sync`` on the hub's slug.
+
+While the SaaS may still sign v1 only, a body that names the hub of its path (``hub_id`` or ``id``) must name the
+same one (422 ``internal.hub_mismatch``).
 
 ``/internal/platform/invoices`` (contract point 4, PLAN-SAAS §4) is the door to ERPlora's own hub, which issues
 ERPlora's invoices: ``GET …/health`` (200 ``{"status": "ok"}`` or 503 ``{"status": "unconfigured", "detail"}``),
@@ -26,10 +36,7 @@ status) and ``GET …/{id}/pdf`` (its PDF, printed after the read, outside any t
 Invoicing as the system on ``PLATFORM_HUB_SLUG`` and answers ``{"status", "qr", "error"}``.
 """
 
-import hashlib
-import hmac
 import json
-import time
 from collections.abc import Callable
 from functools import wraps
 from uuid import UUID
@@ -39,63 +46,19 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from live.context import Scope, system_context
+from live.context import OperationContext, Scope, system_context
 from live.errors import OperationError
 from live.operations import get as get_operation
-from live.slugs import validate_hub_slug
 from pydantic import ValidationError
 
-from base.auth import SIGNATURE_HEADER, TIMESTAMP_HEADER, sign
+from base.registry import REGISTRY_SCOPE
 
-SIGNATURE_V2_HEADER = "X-Erplora-Signature-V2"
+# ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
+# SaaS (``apps/verifactu/representation.py``); they are ``base.signing``'s.
+from base.signing import SIGNATURE_V2_HEADER, sign_v2, verify_request  # noqa: F401
+
 #: The business's commercial status as the photo says it (PLAN-SAAS §2.3).
 HUB_STATUSES = ("active", "past_due", "suspended")
-
-
-def sign_v2(method: str, path: str, body: bytes, timestamp: str, secret: str) -> str:
-    """The v2 hex signature of ``method`` on ``path`` (with its query) with ``body``, sent at ``timestamp``."""
-    message = f"v2\n{timestamp}\n{method.upper()}\n{path}\n".encode() + body
-    return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
-
-
-def live_secrets() -> tuple[str, ...]:
-    """The secrets a call may be signed with: the current one and, during a rotation, the previous."""
-    candidates = (
-        settings.INTERNAL_SHARED_SECRET,
-        getattr(settings, "INTERNAL_SHARED_SECRET_PREVIOUS", ""),
-    )
-    return tuple(secret for secret in candidates if secret)
-
-
-def verify_request(request: HttpRequest, *, now: int | None = None) -> bool:
-    """Whether ``request`` is signed with a live secret within the window: by v2 if it carries it, else by v1."""
-    timestamp = request.headers.get(TIMESTAMP_HEADER)
-    if not timestamp or not (timestamp.isascii() and timestamp.isdigit()):
-        return False
-    sent_at = int(timestamp)
-    now = int(time.time()) if now is None else now
-    if abs(now - sent_at) > settings.INTERNAL_SIGNATURE_MAX_AGE_SECONDS:
-        return False
-    stamp = str(sent_at)
-    signature_v2 = request.headers.get(SIGNATURE_V2_HEADER)
-    expected: Callable[[str], str]
-    if signature_v2 is not None:
-        signature = signature_v2
-        path = request.get_full_path()
-
-        def expected(secret: str) -> str:
-            return sign_v2(request.method or "", path, request.body, stamp, secret)
-    else:
-        signature = request.headers.get(SIGNATURE_HEADER)
-
-        def expected(secret: str) -> str:
-            return sign(secret, stamp, request.body)
-
-    if not signature or not signature.isascii():
-        return False
-    return any(
-        hmac.compare_digest(expected(secret), signature) for secret in live_secrets()
-    )
 
 
 def refuse(status: int, code: str, message: str) -> JsonResponse:
@@ -133,26 +96,70 @@ def _names_another_hub(body: dict, hub_id: UUID) -> bool:
         return True
 
 
+def _body_object(request: HttpRequest) -> dict | None:
+    """The body as a JSON object, or ``None`` when it is none."""
+    try:
+        body = json.loads(request.body)
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _hub_mismatch() -> JsonResponse:
+    return refuse(422, "internal.hub_mismatch", "The body names another hub than its path.")
+
+
+def _registry_context() -> OperationContext:
+    return system_context(REGISTRY_SCOPE)
+
+
+def _hub_answer(answer) -> dict:
+    return answer.model_dump(mode="json", exclude={"created"})
+
+
+@internal_view
+@require_http_methods(["PUT", "GET", "DELETE"])
+def hub(request: HttpRequest, hub_id: UUID) -> HttpResponse:
+    """``/internal/hubs/{id}``: ``PUT`` registers the business, ``GET`` reads it, ``DELETE`` cancels it."""
+    if request.method == "GET":
+        answer, refused = _operation_call("base.hub.get", {"id": str(hub_id)}, _registry_context())
+        return refused or JsonResponse(_hub_answer(answer))
+    body = _body_object(request)
+    if body is None:
+        return _payload_invalid("The body is not a JSON object.")
+    if _names_another_hub(body, hub_id):
+        return _hub_mismatch()
+    if request.method == "DELETE":
+        answer, refused = _operation_call("base.hub.cancel", {"id": str(hub_id)}, _registry_context())
+        return refused or JsonResponse(_hub_answer(answer), status=202)
+    answer, refused = _operation_call("base.hub.register", {**body, "id": str(hub_id)}, _registry_context())
+    if refused is not None:
+        return refused
+    return JsonResponse(_hub_answer(answer), status=202 if answer.created else 200)
+
+
+@internal_view
+@require_http_methods(["POST"])
+def hub_restore(request: HttpRequest, hub_id: UUID) -> HttpResponse:
+    """``POST /internal/hubs/{id}/restore``: bring a cancelled business back; 409 ``hub_purged`` if it is gone."""
+    body = _body_object(request)
+    if body is None:
+        return _payload_invalid("The body is not a JSON object.")
+    if _names_another_hub(body, hub_id):
+        return _hub_mismatch()
+    answer, refused = _operation_call("base.hub.restore", {"id": str(hub_id)}, _registry_context())
+    return refused or JsonResponse(_hub_answer(answer))
+
+
 @internal_view
 @require_http_methods(["PUT"])
 def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     """``PUT /internal/hubs/{id}/state``: the SaaS's photo of a business; an older ``version`` changes nothing."""
-    try:
-        body = json.loads(request.body)
-    except ValueError:
-        body = None
-    if not isinstance(body, dict):
+    body = _body_object(request)
+    if body is None:
         return _payload_invalid("The body is not a JSON object.")
     if _names_another_hub(body, hub_id):
-        return refuse(
-            422, "internal.hub_mismatch", "The body names another hub than its path."
-        )
-    try:
-        slug = validate_hub_slug(body.get("slug"))
-    except ValueError as invalid:
-        return refuse(
-            422, "internal.slug_invalid", f"The slug names no hub ({invalid})."
-        )
+        return _hub_mismatch()
     version = body.get("version")
     if type(version) is not int or version < 0:
         return _payload_invalid("The version is a whole number, zero or more.")
@@ -166,25 +173,12 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     if live_paid is not None and type(live_paid) is not bool:
         # Read as it came: a string such as "false" never turns into a yes.
         return _payload_invalid("live_paid is true or false.")
-    if block is None and status is None:
-        return JsonResponse({"applied": False})
-    sync = get_operation("verifactu.config.sync")
-    try:
-        data = sync.input.model_validate(
-            {
-                **(block or {}),
-                "version": version,
-                "hub_status": status,
-                "hub_id": hub_id,
-            }
-        )
-    except ValidationError as invalid:
-        return _payload_invalid(f"The verifactu block is out of contract: {invalid}")
-    try:
-        answer = sync(system_context(Scope("host", slug)), data)
-    except OperationError as failed:
-        return JsonResponse(failed.envelope(), status=failed.status)
-    return JsonResponse({"applied": answer.applied, "version": answer.version})
+    answer, refused = _operation_call(
+        "base.hub.state_apply",
+        {"id": str(hub_id), "version": version, "status": status, "verifactu": block, "photo": body},
+        _registry_context(),
+    )
+    return refused or JsonResponse({"applied": answer.applied, "version": answer.version})
 
 
 # ── ERPlora's own invoices: the door to its platform hub (contract point 4) ──────────────────────────────────────
@@ -212,6 +206,11 @@ def _issue_answer(answer) -> dict:
 
 def _platform_call(name: str, payload: dict):
     """Runs ``name`` as the system on the platform hub: its output, or the response of its refusal."""
+    return _operation_call(name, payload, _platform_context())
+
+
+def _operation_call(name: str, payload: dict, ctx: OperationContext):
+    """Runs the operation ``name`` with ``payload`` in ``ctx``: ``(output, None)``, or ``(None, the refusal)``."""
     op = get_operation(name)
     try:
         data = op.input.model_validate(payload)
@@ -227,7 +226,7 @@ def _platform_call(name: str, payload: dict):
             status=422,
         )
     try:
-        return op(_platform_context(), data), None
+        return op(ctx, data), None
     except OperationError as failed:
         return None, JsonResponse(failed.envelope(), status=failed.status)
 

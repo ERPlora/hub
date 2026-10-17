@@ -1,0 +1,26 @@
+{% load i18n %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+410 of a hub that is gone (base.middleware): a business cancelled or purged, or a demo past its expiry. Rendered
+without the request: no context processors, no database, no scripts or styles (strict CSP).
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  {% if is_demo %}<title>{% translate "This demo has ended" %}</title>{% else %}<title>{% translate "This business is no longer available" %}</title>{% endif %}
+</head>
+<body>
+  <main>
+    {% if is_demo %}
+    <h1>{% translate "This demo has ended" %}</h1>
+    <p>{% translate "Everything typed in it is gone. You can start another one whenever you like." %}</p>
+    <p><a href="{{ back_url }}">{% translate "Create another demo" %}</a></p>
+    {% else %}
+    <h1>{% translate "This business is no longer available" %}</h1>
+    <p>{% translate "Its owner closed it in ERPlora. If it is yours, you can bring it back from your account." %}</p>
+    <p><a href="{{ back_url }}">{% translate "Go to ERPlora" %}</a></p>
+    {% endif %}
+  </main>
+</body>
+</html>

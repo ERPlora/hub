@@ -63,6 +63,11 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "runs, so it cannot go through one; read only; phase 2 replaces it with the hub's staff."
     ),
     "base/health.py": READYZ_REASON,
+    "base/registry.py": (
+        "The host gate reads the registry's row of the Host's slug (404, 410, 503) before any operation runs, "
+        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
+        "(plan 2026-10-17, §1.2)."
+    ),
     "base/tenancy/migrator.py": (
         "Phase 2: the only function that changes a hub's schema, through its direct __ddl "
         "connection and the schema lock (CLAUDE.md «Tenencia del Hub»)."
@@ -104,6 +109,11 @@ ORM_SHORTCUTS = frozenset(
 #: Files that may choose an alias by hand, each with its reason.
 ALIAS_EXCEPTIONS: dict[str, str] = {
     "base/health.py": READYZ_REASON,
+    "base/registry.py": (
+        "The host gate reads the registry's row of the Host's slug (404, 410, 503) before any operation runs, "
+        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
+        "(plan 2026-10-17, §1.2)."
+    ),
     "base/tenancy/migrator.py": (
         "Phase 2: the schema migrator opens hub_<hex>__ddl itself and takes the session "
         "pg_advisory_lock of the schema (CLAUDE.md «Tenencia del Hub», PLAN-DB §14.5)."
