@@ -38,9 +38,15 @@ COUNTRY_CODES: tuple[str, ...] = tuple(
 #: The business's country: Spain until the Hub receives the one the business chose in its ERPlora account
 #: (the SaaS's registry, phase 2), as the tax engine of the current product did.
 DEFAULT_COUNTRY = "ES"
-#: The regions of a country with taxes of their own, which a business may keep as its own (TAX-F11): the
-#: Canary Islands charge IGIC, Ceuta and Melilla IPSI. Any other region charges its country's tax.
-TAX_REGIONS: dict[str, tuple[str, ...]] = {"ES": ("ES-CN", "ES-CE", "ES-ML")}
+#: The tax family of each region with taxes of its own (TAX-F11): the Canary Islands charge IGIC, Ceuta and
+#: Melilla IPSI; any other place, its country's VAT. What a line with no category or rule is declared with.
+REGION_TAX_KINDS: dict[str, str] = {
+    "ES-CN": TaxRule.TaxType.IGIC,
+    "ES-CE": TaxRule.TaxType.IPSI,
+    "ES-ML": TaxRule.TaxType.IPSI,
+}
+#: The regions of a country with taxes of their own, which a business may keep as its own (TAX-F11).
+TAX_REGIONS: dict[str, tuple[str, ...]] = {"ES": tuple(REGION_TAX_KINDS)}
 #: Bounds of an amount in cents (± 10 000 million euros): far beyond any sale, and exact in Decimal.
 MAX_AMOUNT = 10**12
 
@@ -312,7 +318,10 @@ class RuleFields(_RegionOfTheCountry, Schema):
     rate_pct: Rate = Field(
         description="The rate in %, 0 to 100, two decimals; 0 for a class that charges no tax."
     )
-    tax_type: TaxType = Field("vat", description=TAX_TYPE)
+    tax_type: TaxType | None = Field(
+        None, description=TAX_TYPE + " Empty: the family of the rule's territory (igic in ES-CN, ipsi in ES-CE "
+        "and ES-ML, vat elsewhere)."
+    )
     exempt_reason: OptionalCode = Field(
         None,
         description="Exemption cause of the jurisdiction (E1…E6 in Spain), only for an exempt rule.",

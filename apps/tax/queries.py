@@ -30,6 +30,7 @@ from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRu
 from apps.tax.schemas import (
     DEFAULT_COUNTRY,
     REGION_OF_ANOTHER_COUNTRY,
+    REGION_TAX_KINDS,
     TAX_REGIONS,
     AliasListIn,
     AliasPage,
@@ -197,6 +198,19 @@ def _jurisdiction(country_code: str | None, region_code: str | None) -> tuple[st
     return country, region
 
 
+def tax_kind_of(country_code: str | None, region_code: str | None) -> str:
+    """The tax family of a territory (TAX-F11): IGIC in the Canary Islands, IPSI in Ceuta and Melilla, VAT
+    anywhere else. What a line with no category or rule is declared with (``Impuesto`` 03, 02 or 01)."""
+    country, region = _jurisdiction(country_code or DEFAULT_COUNTRY, region_code)
+    kind = REGION_TAX_KINDS.get(region or "")
+    return kind if kind and region.startswith(f"{country}-") else DEFAULT_TAX_KIND
+
+
+def business_tax_kind() -> str:
+    """The tax family of the business's own territory (``business_jurisdiction``)."""
+    return tax_kind_of(*business_jurisdiction())
+
+
 def asked_jurisdiction(country_code: str | None, region_code: str | None) -> tuple[str, str | None]:
     """The jurisdiction a reader asks for, as ``_jurisdiction``; a region of another country than the one
     it falls in is a 422 on its field, never a silent national rate."""
@@ -265,7 +279,7 @@ def calculate_tax(
         "tax_country_code": country_code,
         "tax_region_code": region_code,
         "tax_rule_id": resolution.root.id if resolution else None,
-        "tax_kind": resolution.tax_kind if resolution else DEFAULT_TAX_KIND,
+        "tax_kind": resolution.tax_kind if resolution else tax_kind_of(country_code, region_code),
         "tax_operation_class": resolution.operation_class
         if resolution
         else TaxRule.OperationClass.SUBJECT,

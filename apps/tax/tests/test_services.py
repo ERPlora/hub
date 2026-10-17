@@ -312,6 +312,18 @@ def test_a_regional_rule_with_its_tax_family(no_seed):
     assert (canary.region_code, canary.tax_type) == ("ES-CN", "igic")
 
 
+@pytest.mark.django_db
+def test_a_rule_without_its_tax_family_takes_the_one_of_its_territory(no_seed):
+    # TAX-F11 (pm#629 VF-17): said by voice or through the API without «IGIC», a Canary rule is still IGIC;
+    # a family said out loud is kept.
+    category()
+    canary = create_rule(region_code="ES-CN", rate_pct="7")
+    melilla = create_rule(region_code="ES-ML", rate_pct="4")
+    national = create_rule(rate_pct="21")
+    said = create_rule(region_code="ES-CE", rate_pct="4", tax_type="vat")
+    assert [rule.tax_type for rule in (canary, melilla, national, said)] == ["igic", "ipsi", "vat", "vat"]
+
+
 # Components (taxes#9, #59)
 
 

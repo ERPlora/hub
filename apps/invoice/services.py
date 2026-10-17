@@ -74,7 +74,13 @@ from apps.sale import pricing
 from apps.sale.models import OrderLine, Refund, Sale, Settings
 from apps.sale.queries import TICKET_LIMIT, business_country, find_sale
 from apps.tax.models import TaxRule
-from apps.tax.queries import resolve_category_text, resolve_tax, round_half_up
+from apps.tax.queries import (
+    business_tax_kind,
+    resolve_category_text,
+    resolve_tax,
+    round_half_up,
+    tax_kind_of,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -659,6 +665,8 @@ def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
     series = _manual_series(data, today.year, ctx)
     recipient = _recipient(data, full=series.invoice_type == "F1")
     lines, values = [], []
+    # A rate typed without a category is of the business's territory (TAX-F11): IGIC in the Canary Islands.
+    typed_kind = business_tax_kind()
     for index, item in enumerate(data.lines):
         category = ""
         if item.tax_category_key:
@@ -674,7 +682,7 @@ def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
             key = _rule_key(category, field=field, on=today)
         else:
             key = fiscal.FiscalKey(
-                tax="vat",
+                tax=typed_kind,
                 regime=GENERAL_REGIME,
                 cls="subject",
                 exempt_reason="",
@@ -749,15 +757,24 @@ def _within_ticket_limit(series: InvoiceSeries, total: int) -> None:
 # ── The invoice of a sale (INVOICE-F01, F02, F06) ───────────────────────────────────────────────
 
 
+def _charged_kind(line) -> str:
+    """The tax family of the territory a sale line was charged in, as the line froze it (TAX-F11); the
+    business's when the line kept no country."""
+    if line.tax_country_code:
+        return tax_kind_of(line.tax_country_code, line.tax_region_code)
+    return business_tax_kind()
+
+
 def _sale_key(line, rules: dict) -> fiscal.FiscalKey:
-    """The fiscal key a sale line was charged with: its frozen root rule and its components."""
+    """The fiscal key a sale line was charged with: its frozen root rule and its components; without its
+    rule, the tax family of the territory the line was charged in, never a fixed VAT."""
     components = line.tax_components or []
     main = Decimal(str(components[0]["rate_pct"])) if components else line.tax_rate
     surcharge = sum((Decimal(str(c["rate_pct"])) for c in components[1:]), Decimal(0))
     rule = rules.get(line.tax_rule_id)
     if rule is None:
         return fiscal.FiscalKey(
-            tax="vat",
+            tax=_charged_kind(line),
             regime=GENERAL_REGIME,
             cls="subject",
             exempt_reason="",
@@ -770,7 +787,7 @@ def _sale_key(line, rules: dict) -> fiscal.FiscalKey:
         else ""
     )
     return fiscal.FiscalKey(
-        tax=rule.tax_type or "vat",
+        tax=rule.tax_type or _charged_kind(line),
         regime=rule.regime_key or GENERAL_REGIME,
         cls=rule.operation_class,
         exempt_reason=exempt,

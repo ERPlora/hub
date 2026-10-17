@@ -164,7 +164,8 @@ def test_rule_defaults():
         "tax_category_key": "product.generic",
         "operation_class": "subject",
         "rate_pct": Decimal("21"),
-        "tax_type": "vat",
+        # No family: the one of the rule's territory (TAX-F11), VAT for the whole of Spain.
+        "tax_type": None,
         "exempt_reason": None,
         "regime_key": None,
         "valid_from": None,

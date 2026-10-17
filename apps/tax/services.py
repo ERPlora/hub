@@ -32,6 +32,7 @@ from apps.tax.queries import (
     parent_candidates,
     rule_row,
     settings_row,
+    tax_kind_of,
 )
 from apps.tax.schemas import (
     REGION_NOT_AVAILABLE,
@@ -215,7 +216,8 @@ def _new_rule(
         region_code=data.region_code or "",
         # As stored (two decimals): the row returned and the event say what the database keeps.
         rate_pct=data.rate_pct.quantize(CENTS),
-        tax_type=data.tax_type,
+        # No family said: the one of the rule's territory (TAX-F11), never VAT in the Canary Islands.
+        tax_type=data.tax_type or tax_kind_of(data.country_code, data.region_code),
         operation_class=data.operation_class,
         # The cause only means something on an exempt rule.
         exempt_reason=(data.exempt_reason or "") if exempt else "",

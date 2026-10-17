@@ -6,6 +6,7 @@ error is never swallowed (the document is not issued).
 """
 
 import re
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,23 @@ def test_issuing_seals_its_registration_record_in_the_same_commit(issuer):
         run("invoice.invoice.get", {"invoice_id": str(invoice.id)}).verifactu_status
         is None
     )
+
+
+@pytest.mark.parametrize(
+    ("region", "tax", "code"),
+    [(None, "vat", "01"), ("ES-CN", "igic", "03"), ("ES-CE", "ipsi", "02"), ("ES-ML", "ipsi", "02")],
+)
+def test_a_typed_rate_is_declared_with_the_tax_of_the_business_territory(issuer, region, tax, code):
+    # TAX-F11 (pm#629 VF-17): a line without a tax category takes the tax family of the business's territory;
+    # a Canary business's typed 7 % is IGIC (Impuesto 03), never VAT (01). Nothing is sent to the AEAT here.
+    run("tax.settings.update", {"region_code": region})
+    invoice = run("invoice.invoice.create", {"lines": [{**LINE, "tax_rate": "7"}], **RECIPIENT})
+    assert [(entry.tax, entry.rate, entry.quota) for entry in invoice.tax_breakdown] == [
+        (tax, Decimal("7.00"), 70)
+    ]
+    record = Record.objects.get(invoice_id=invoice.id)
+    assert [entry["tax"] for entry in record.tax_breakdown] == [tax]
+    assert re.findall(r"<sum1:Impuesto>(\d+)</sum1:Impuesto>", record.xml) == [code]
 
 
 def test_without_verifactu_the_document_is_issued_unavailable(issuer, monkeypatch):
