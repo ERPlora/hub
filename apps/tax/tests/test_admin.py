@@ -111,3 +111,13 @@ def test_the_business_tax_settings_are_in_the_admin(superuser):
         )
     )
     assert "region_code" in registered.list_display
+
+
+def test_the_staff_cannot_add_a_second_settings_row(superuser):
+    # TAX-F11: one row at most (`tax_settings_single_row`); once it exists, «Add» disappears instead of
+    # ending in the database's refusal.
+    registered = admin.site._registry[TaxSettings]
+    request = request_by(superuser)
+    assert registered.has_add_permission(request) is True
+    TaxSettings.objects.create(region_code="ES-CN")
+    assert registered.has_add_permission(request) is False

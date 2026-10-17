@@ -107,3 +107,7 @@ class TaxSettingsAdmin(admin.ModelAdmin):
     list_display = ("region_code", "updated_at", "updated_by")
     readonly_fields = ("id", "updated_at", "updated_by")
     fields = ("id", "region_code", "updated_at", "updated_by")
+
+    def has_add_permission(self, request) -> bool:
+        # One row at most (``tax_settings_single_row``): once it exists, the staff changes it, never adds another.
+        return super().has_add_permission(request) and not TaxSettings.objects.exists()
