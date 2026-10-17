@@ -7,13 +7,15 @@ from live.live_registry import live
 
 from apps.sale import events as E
 from apps.tax.events import RULE_EVENTS
+from apps.tax.events import SETTINGS_UPDATED as TAX_SETTINGS_UPDATED
 
 SALES = E.SALE_EVENTS
 FIGURES = [E.SALE_COMPLETED, E.SALE_VOIDED, E.SALE_REFUNDED]
 
 live("sale.sale.list", on=SALES)
 live("sale.sale.get", on=SALES)
-live("sale.sale.stats", on=FIGURES)
+# A period without sales names its tax figure by the business territory's (Taxes → Settings, TAX-F11).
+live("sale.sale.stats", on=[*FIGURES, TAX_SETTINGS_UPDATED])
 live("sale.sale.today", on=FIGURES)
 live("sale.sale.last_7_days", on=FIGURES)
 live("sale.sale.by_staff", on=FIGURES)

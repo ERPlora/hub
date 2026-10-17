@@ -11,6 +11,7 @@ from live.errors import Conflict
 
 from apps.inventory.models import Product
 from apps.sale.apps import SaleConfig
+from apps.sale.models import Sale
 from apps.sale.tests.conftest import ctx_for, run
 from apps.tax.models import TaxRule
 
@@ -296,3 +297,73 @@ def test_a_product_without_its_tax_says_the_territorys_tax_is_missing(product, r
         run("sale.sale.complete", {"idempotency_key": "tax-key-0001", "lines": [{"product": "WAX"}]})
     assert refusal.value.code == "sale.tax_category_missing"
     assert str(refusal.value.message).endswith(missing)
+
+
+# The tax figure of a period (SALE-F28) is named by the tax its sales were declared with (their breakdown),
+# never by the territory kept today: one family names it, a mix is a plain «Taxes» (``None``), and a period
+# without sales takes the territory's, what it would declare now.
+
+
+def stats(**period):
+    return run("sale.sale.stats", period)
+
+
+def test_the_tax_figure_of_sales_of_one_tax_is_named_by_it_whatever_the_territory_is_now(product):
+    regional_rule("ES-CN", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    product("Shirt", "SHI", 10700, "product.generic")
+    charge("tax-key-0001", {"product": "SHI"})
+    charge("tax-key-0002", {"product": "SHI"})
+    assert stats().tax_kind == "igic"
+    # Back to the whole country: what those sales declared does not change.
+    run("tax.settings.update", {"region_code": None})
+    assert stats().tax_kind == "igic"
+
+
+def test_the_tax_figure_of_sales_of_two_taxes_is_a_plain_taxes(product):
+    product("Shirt", "SHI", 12100, "product.generic")
+    vat = charge("tax-key-0001", {"product": "SHI"})
+    regional_rule("ES-CN", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    igic = charge("tax-key-0002", {"product": "SHI"})
+    assert [row.tax_type for row in vat.breakdown + igic.breakdown] == ["vat", "igic"]
+    assert stats().tax_kind is None
+    # A period that holds only one of them is named by its tax.
+    yesterday = timezone.localdate() - dt.timedelta(days=1)
+    Sale.objects.filter(pk=vat.id).update(business_day=yesterday)
+    assert stats(date_from=str(yesterday), date_to=str(yesterday)).tax_kind == "vat"
+    assert stats(date_from=str(timezone.localdate())).tax_kind == "igic"
+
+
+def test_a_voided_sale_does_not_name_the_tax_figure(product):
+    product("Shirt", "SHI", 12100, "product.generic")
+    vat = charge("tax-key-0001", {"product": "SHI"})
+    run("sale.sale.void", {"sale_id": str(vat.id), "reason": "x"})
+    regional_rule("ES-CN", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    charge("tax-key-0002", {"product": "SHI"})
+    assert stats().tax_kind == "igic"
+
+
+@pytest.mark.parametrize(
+    ("region", "tax"),
+    [(None, "vat"), ("ES-CN", "igic"), ("ES-CE", "ipsi"), ("ES-ML", "ipsi")],
+)
+def test_a_period_without_sales_names_its_tax_figure_by_the_territorys(db, region, tax):
+    if region:
+        run("tax.settings.update", {"region_code": region})
+    figures = stats()
+    assert (figures.count, figures.tax_total, figures.tax_kind) == (0, 0, tax)
+
+
+@pytest.mark.parametrize(
+    "families",
+    [["vat", "surcharge"], ["sales_tax"]],
+    ids=["vat with the equivalence surcharge", "a tax of no territory"],
+)
+def test_a_figure_with_a_tax_of_no_territory_is_a_plain_taxes(product, families):
+    product("Shirt", "SHI", 12100, "product.generic")
+    sale = charge("tax-key-0001", {"product": "SHI"})
+    (row,) = Sale.objects.get(pk=sale.id).tax_breakdown
+    Sale.objects.filter(pk=sale.id).update(tax_breakdown=[{**row, "tax_type": family} for family in families])
+    assert stats().tax_kind is None

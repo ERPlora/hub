@@ -16,7 +16,8 @@ from uuid import UUID
 
 import pydantic
 from django.conf import settings as django_settings
-from django.db.models import Count, Exists, F, OuterRef, Q, Sum
+from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, Sum
+from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -1479,6 +1480,27 @@ def _period(sales, period: PeriodIn):
     return sales
 
 
+def declared_tax_kind(sales) -> str | None:
+    """The tax ``sales`` were declared with (the ``tax_type`` of their breakdown rows), what their tax figure
+    is named by (SALE-F28): the one family a territory declares (VAT, IGIC, IPSI) when they all share it;
+    ``None`` for a mix — a change of territory in the period — or a tax of no territory (the equivalence
+    surcharge, another country's). Without any row, the business territory's, what it would declare now."""
+    elements = Func(F("tax_breakdown"), function="jsonb_array_elements", output_field=JSONField())
+    declared = (
+        sales.order_by()
+        .annotate(family=KeyTextTransform("tax_type", elements))
+        .values_list("family", flat=True)
+        .distinct()
+    )
+    families = set(declared[:2])
+    if not families:
+        return business_tax_kind()
+    if len(families) > 1:
+        return None
+    family = families.pop()
+    return family if family in TAX_KIND_NAMES else None
+
+
 @operation(
     "sale.sale.stats",
     kind="query",
@@ -1487,13 +1509,15 @@ def _period(sales, period: PeriodIn):
     output=StatsOut,
     ai={
         "description": "Sales figures of a period of business days (inclusive; empty = all): tickets, revenue (refunds taken "
-        "off), average ticket, taxable base, tax, discounts, refunds and voided sales, in cents."
+        "off), average ticket, taxable base, tax, discounts, refunds and voided sales, in cents; and the tax the "
+        "sales were declared with (VAT, IGIC, IPSI; empty when they mix taxes)."
     },
 )
 def stats(ctx: OperationContext, params: PeriodIn) -> dict:
     sales = _period(Sale.objects.all(), params)
     zero = 0
-    counted = sales.filter(status__in=COUNTED).aggregate(
+    charged = sales.filter(status__in=COUNTED)
+    counted = charged.aggregate(
         count=Count("id"),
         gross=Coalesce(Sum("total"), zero),
         refunded=Coalesce(Sum("refunded_total"), zero),
@@ -1512,6 +1536,7 @@ def stats(ctx: OperationContext, params: PeriodIn) -> dict:
         "discount_total": counted["discounts"],
         "refunded_total": counted["refunded"],
         "voided_count": sales.filter(status=Sale.Status.VOIDED).count(),
+        "tax_kind": declared_tax_kind(charged),
     }
 
 

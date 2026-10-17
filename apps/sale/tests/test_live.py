@@ -62,6 +62,10 @@ def test_a_charge_re_runs_the_sales_the_figures_and_the_checks():
     assert "sale.quick_note.list" not in affected
 
 
+def test_a_change_of_territory_re_runs_the_figures_a_period_without_sales_names_by_it():
+    assert "sale.sale.stats" in live_registry.affected(["tax.settings.updated"])
+
+
 def test_a_change_of_the_check_re_runs_the_check_and_its_preview_but_not_the_sales():
     affected = live_registry.affected([events.ORDER_CHANGED])
     assert affected >= {"sale.order.get", "sale.order.list", "sale.checkout.preview"}

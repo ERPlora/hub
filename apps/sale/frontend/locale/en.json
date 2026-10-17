@@ -375,6 +375,7 @@
         "tickets": "Tickets",
         "revenue": "Revenue",
         "avgTicket": "Avg. ticket",
+        "taxes": "Taxes",
         "discounts": "Discounts",
         "voided": "Voided",
         "error": "Error loading metrics"

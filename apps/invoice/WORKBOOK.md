@@ -759,7 +759,9 @@ por devolución y una por anulación.
   hacia arriba (`round_half_up`). El nombre del impuesto del tipo de una línea tecleada («IVA %», «IGIC %»,
   «IPSI %») lo lee la pantalla de `tax.settings.get` (`tax_kind`, con `useTaxKind()` de Impuestos), la única
   fuente: `invoice.invoice.line_defaults` solo da el tipo general y no repite el impuesto (ronda 2026-10-17
-  de PLAN-HUB).
+  de PLAN-HUB). Lo ya emitido se rotula por lo que declaró (el impuesto de su desglose; «Imp. %» si mezcla),
+  nunca por el territorio de hoy: la misma regla que la cifra de impuestos de Ventas (SALE-F28), que dice el
+  impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
   los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
 

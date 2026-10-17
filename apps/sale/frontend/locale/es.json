@@ -375,6 +375,7 @@
         "tickets": "Tickets",
         "revenue": "Ingresos",
         "avgTicket": "Ticket medio",
+        "taxes": "Impuestos",
         "discounts": "Descuentos",
         "voided": "Anuladas",
         "error": "Error cargando métricas"

@@ -1,16 +1,18 @@
 <script setup lang="ts">
 // The six figures of the period on Sales (SALE-F28; the old KPI cards): «Tickets», «Revenue» (refunds
-// already taken off), «Avg. ticket», the tax — named by the business territory's, «VAT» or «IGIC» in the
-// Canary Islands, «IPSI» in Ceuta and Melilla (`useTaxName`) —, «Discounts» and «Voided», from
-// `sale.sale.stats` over the same business days as the rows, followed live (a charge, a void or a refund
-// re-runs it; a change of territory renames the tax). A figure not read yet, or that could not be read,
-// is «—», never a zero; a failure adds «Error loading metrics».
+// already taken off), «Avg. ticket», the tax, «Discounts» and «Voided», from `sale.sale.stats` over the same
+// business days as the rows, followed live (a charge, a void or a refund re-runs it). The tax figure is named
+// by the tax its sales were declared with (the stats' `tax_kind`: «VAT», «IGIC», «IPSI»), not by the
+// territory kept today; sales of more than one tax make it a plain «Taxes». A period without sales, or
+// figures not read yet, name it by the business territory's, as Taxes publishes it (`useTaxName`, live).
+// A figure not read yet, or that could not be read, is «—», never a zero; a failure adds «Error loading
+// metrics».
 // The page mounts it only for whoever may see the reports (`sale.view_reports`).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
-import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
+import { taxNameKey, useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { StatsOut } from '../../operations';
@@ -20,12 +22,19 @@ const props = defineProps<{ bounds: DayBounds }>();
 
 const t = useT();
 const locale = useLocale();
-const taxName = useTaxName();
+const territoryTax = useTaxName();
 
 const { data, error } = useLive('sale.sale.stats', () => ({ ...props.bounds }));
 
+/** What the sales of the period declared; without sales (or figures), the territory's tax. */
+const taxLabel = computed(() => {
+  const stats = error.value ? undefined : data.value;
+  if (!stats || stats.count === 0) return territoryTax.value;
+  return stats.tax_kind ? t(taxNameKey(stats.tax_kind)) : t('sale.sales.kpis.taxes');
+});
+
 type Kind = 'count' | 'money';
-/** Each card's label key; the tax's is the territory's tax name. */
+/** Each card's label key; the tax's is `taxLabel`. */
 const CARDS: readonly { key: string; label?: string; field: keyof StatsOut; kind: Kind }[] = [
   { key: 'tickets', label: 'sale.sales.kpis.tickets', field: 'count', kind: 'count' },
   { key: 'revenue', label: 'sale.sales.kpis.revenue', field: 'total_revenue', kind: 'money' },
@@ -41,7 +50,7 @@ const cards = computed(() =>
     const value = stats?.[card.field];
     let text = '—';
     if (typeof value === 'number') text = card.kind === 'money' ? formatMoney(value, locale.value) : formatQuantity(value, '', locale.value);
-    return { key: card.key, label: card.label ? t(card.label) : taxName.value, text };
+    return { key: card.key, label: card.label ? t(card.label) : taxLabel.value, text };
   }),
 );
 </script>
