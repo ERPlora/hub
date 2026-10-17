@@ -10,6 +10,7 @@ from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
 
+from apps.tax import admin as tax_admin
 from apps.tax import queries, schemas, services
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, WHOLE_COUNTRY, TaxAlias, TaxCategory, TaxRule, TaxSettings
 
@@ -74,6 +75,7 @@ MESSAGES = [
     services.RULE_EXISTS,
     services.RULE_ALREADY_ACTIVE,
     services.RULE_ALREADY_INACTIVE,
+    tax_admin.CHOOSE_A_HUB,
 ]
 
 
