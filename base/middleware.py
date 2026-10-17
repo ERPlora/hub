@@ -1,20 +1,19 @@
 """The Hub's request gates: ``HubHostRequiredMiddleware``, ``PlatformHostMiddleware`` and ``SaasLoginRequiredMiddleware``.
 
-``HubHostRequiredMiddleware``: a host that is no hub (``HostScopeResolver`` with ``live.slugs``: a
-reserved name such as ``hub`` or ``www``, an invalid label, the bare host, an IP) answers 404 on every
-hub path (the SPA, ``/api``, ``/auth``…), before ninja's session auth, so an anonymous API call gets
-the 404 envelope and not a 401. Then the registry decides (``base.registry``, plan 2026-10-17, §1.2): a slug
-without a row is 404 too; a hub that is gone (cancelled, purged, or a demo past its ``expires_at``) is 410, a page
-with the way back to ERPlora (another demo, or the SaaS's ``/launch``), save a demo's ``/auth/login``, whose jump
-is how the SaaS's ``/demo/`` learns that it ended (plan 2026-10-17, §1.7); one still being prepared is 503 with
-``Retry-After``, a page that refreshes itself. The API, and any call that does not ask for a page (``Accept``
-without ``text/html``), gets the envelope instead (``base.hub_gone``, ``base.hub_preparing``). A hub that answers
-is left on ``request.hub``. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``)
-is no hub either: it is marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The
-Hub admin lives only there (PLAN §18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404,
-never the admin's own login. Static files, CSP reports and ``/readyz`` (Route 53 and the deploy probe
-it on the platform host and on the private name) and ``/internal/`` (the SaaS's calls, signed: ``base.internal``)
-are left alone on every host.
+``HubHostRequiredMiddleware``: a host that is no hub (``HostScopeResolver`` with ``live.slugs``: a reserved name
+such as ``hub`` or ``www``, an invalid label, the bare host, an IP) answers 404 on every hub path (the SPA,
+``/api``, ``/auth``…), before ninja's session auth, so an anonymous API call gets the 404 envelope and not a 401.
+Then the registry decides (``base.registry``, plan 2026-10-17, §1.2): a slug without a row is 404 too; a hub that is
+gone (cancelled, purged, or a demo past its ``expires_at``) is 410, a page with the way back to ERPlora (the SaaS's
+``/demo/?state=expired``, or its ``/launch``), save a demo's ``/auth/login``, whose jump is how the SaaS's
+``/demo/`` learns that it ended (plan 2026-10-17, §1.7); one still being prepared is 503 with ``Retry-After``, a
+page that refreshes itself. The API, and any call that does not ask for a page (``Accept`` without ``text/html``),
+gets the envelope instead (``base.hub_gone``, ``base.hub_preparing``). A hub that answers is left on
+``request.hub``. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``) is no hub either: it is
+marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The Hub admin lives only there (PLAN
+§18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404, never the admin's own login. Static files, CSP
+reports and ``/readyz`` (Route 53 and the deploy probe it on the platform host and on the private name) and
+``/internal/`` (the SaaS's calls, signed: ``base.internal``) are left alone on every host.
 
 Every gate looks at ``request.path_info``, the path Django resolves: ``request.path`` also carries the
 script prefix, which behind Daphne comes from the client's own ``Daphne-Root-Path`` header, so a made-up
@@ -60,8 +59,9 @@ HUB_GONE_TEMPLATE = "base/hub_gone.html"
 HUB_PREPARING_TEMPLATE = "base/hub_preparing.html"
 #: How long a client waits before asking a hub being prepared again (``Retry-After``).
 PREPARING_RETRY_AFTER_SECONDS = 30
-#: Where a demo that ended sends the visitor (another demo), and where a business that is gone does.
-DEMO_PATH = "/demo/"
+#: Where a demo that ended sends the visitor (the SaaS's /demo/, told it ended so it forgets the demo its session still
+#: holds and offers another one), and where a business that is gone does.
+DEMO_ENDED_PATH = "/demo/?state=expired"
 LAUNCH_PATH = "/launch"
 #: The one path of a demo that ended still answered: its login jumps to the SaaS's ``/demo/enter/``, which asks for a
 #: code, hears 410 and tells the visitor the demo ended (the SaaS keeps no row of a demo and is never told otherwise).
@@ -109,7 +109,7 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
     def _gone(self, request: HttpRequest, hub: Hub) -> HttpResponse:
         if _wants_envelope(request):
             return _envelope(410, "base.hub_gone", gettext("This hub is no longer available."))
-        back = saas_url(DEMO_PATH if hub.is_demo else LAUNCH_PATH)
+        back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
         html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
         return HttpResponse(html, status=410)
 

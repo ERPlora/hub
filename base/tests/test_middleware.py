@@ -366,7 +366,8 @@ class TestTheRegistryGate:
         assert response.status_code == 410
         html = response.content.decode()
         assert "This demo has ended" in html
-        assert 'href="http://localhost:8001/demo/"' in html
+        # ``state=expired``: the SaaS's /demo/ forgets the demo its session still holds and says it ended.
+        assert 'href="http://localhost:8001/demo/?state=expired"' in html
 
     @pytest.mark.parametrize("ended", ["by_time", "expired", "purged"])
     def test_the_login_of_a_demo_that_ended_still_jumps_to_the_saas_door(self, client, hub, ended):
