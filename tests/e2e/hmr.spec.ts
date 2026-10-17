@@ -11,7 +11,17 @@ import { STACK } from './stack';
 
 const VUE = join(HUB_DIR, 'apps/demo/frontend/pages/ItemListPage.vue');
 const PY = join(HUB_DIR, 'apps/demo/queries.py');
-const ROOT_TAG = `<AppPage :title="$t('demo.items.title')">`;
+/** The opening of the page's root `<AppPage`, however its tag is laid out (one line, or one attribute per
+ *  line as since hub#24): an exact copy of the tag stopped matching and the `.vue` check never ran. */
+const ROOT_TAG = /<AppPage(?=[\s/>])/;
+/** The same opening with a marker attribute, which falls through to the page's root `ion-page`. */
+const MARKED_TAG = '<AppPage data-hmr="1"';
+/** The list after the HMR round trip, as the SaaS panel's `VIEWPORTS`. */
+const VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+];
 
 type LiveLog = { at: number; status?: number }[];
 
@@ -65,17 +75,18 @@ async function touchPython(page: Page, context: BrowserContext, log: LiveLog, la
   };
 }
 
+// flow: ninguno — FIX demo (PoC §8.5: the HMR of a `.vue`, whatever the layout of its root tag)
 test('.vue edit → HMR applies without reload and without reopening the stream', async ({ page, context }) => {
   const log = trackLive(page);
   const navEntries = await openList(page);
   const original = readFileSync(VUE, 'utf8');
-  expect(original).toContain(ROOT_TAG);
+  expect(original).toMatch(ROOT_TAG);
   const from = log.length;
   let inMs = NaN;
   let outMs = NaN;
   try {
     const t0 = Date.now();
-    writeFileSync(VUE, original.replace(ROOT_TAG, `<AppPage :title="$t('demo.items.title')" data-hmr="1">`));
+    writeFileSync(VUE, original.replace(ROOT_TAG, MARKED_TAG));
     await expect(page.locator('[data-hmr="1"]')).toHaveCount(1, { timeout: 15_000 });
     inMs = Date.now() - t0;
     await page.screenshot({ path: shot('07-hmr-applied') });
@@ -101,6 +112,11 @@ test('.vue edit → HMR applies without reload and without reopening the stream'
   expect(result.sameDocument).toBe(true);
   expect(result.navigationEntries).toBe(navEntries);
   expect(result.streamsOpenedDuringHmr).toBe(0);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(row(page, name)).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: shot(`FIX-HUB-E2E-HMR-SPEC-${vp.label}`) });
+  }
 });
 
 test('.py edit → Django restarts and the page recovers by itself, without a full reload', async ({ page, context }) => {
