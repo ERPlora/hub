@@ -14,12 +14,11 @@ FIGURES = [E.SALE_COMPLETED, E.SALE_VOIDED, E.SALE_REFUNDED]
 
 live("sale.sale.list", on=SALES)
 live("sale.sale.get", on=SALES)
-live("sale.sale.stats", on=FIGURES)
+# A period without sales names its tax figure by the business territory's (Taxes → Settings, TAX-F11).
+live("sale.sale.stats", on=[*FIGURES, TAX_SETTINGS_UPDATED])
 live("sale.sale.today", on=FIGURES)
 live("sale.sale.last_7_days", on=FIGURES)
 live("sale.sale.by_staff", on=FIGURES)
-# The tax every sale screen names is the business territory's, kept in Taxes' settings (TAX-F11).
-live("sale.sale.tax_kind", on=[TAX_SETTINGS_UPDATED])
 # A partial charge takes lines off a check without changing anything else of it.
 live("sale.order.list", on=E.ORDER_EVENTS)
 live("sale.order.get", on=E.ORDER_EVENTS)

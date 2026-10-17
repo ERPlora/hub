@@ -181,7 +181,7 @@ def test_user_part_drops_the_title_and_the_header():
         "> Manual de usuario",
     ):
         assert line not in part
-    # The flows' «Estado:» lines are published as they are: nothing else is transformed.
+    # The flows' «Estado:» lines are published as they are: only the HTML comments go.
     assert "Estado: hecho" in part
 
 
@@ -230,6 +230,58 @@ def test_an_anchor_to_a_heading_the_cut_leaves_out_fails():
         )
 
 
+# The «<!-- origen: … -->» and «<!-- código: … -->» of a WORKBOOK tie it to MIGRATION.md and to its
+# sources, never reaching shared.app_doc nor the assistant (PLAN-MIGRATIONS §5).
+ORIGIN = "<!-- origen: old-hub:HUB-F212 gh:sales#131 -->"
+
+
+@pytest.mark.parametrize(
+    ("text", "commented"),
+    [
+        # On a line of its own, under a flow's title: the line goes with it.
+        ("### Paso a paso\n", f"### Paso a paso\n{ORIGIN}\n"),
+        # Between blank lines, over several lines: no blank line is doubled.
+        (
+            "## Cómo se usa\n\n",
+            "## Cómo se usa\n\n<!-- código:\n  https://example.com/a.py\n-->\n\n",
+        ),
+        # Inside a line: the text around it is joined by one space, as it reads.
+        ("**cosas**. Ver", "**cosas**. <!-- código: https://example.com/a.py --> Ver"),
+        ("**cosas**. Ver", "**cosas**. <!-- a --> Ver<!-- b -->"),
+        # Closed before the text of a line.
+        ("### Paso a paso\n", "### Paso a paso\n<!-- origen:\n  old-hub:HUB-F212 --> "),
+        # At the end of a line, and opened there to close lines below.
+        ("list.png)\n", "list.png) <!-- código: https://example.com/a.py -->\n"),
+        ("list.png)\n", "list.png) <!-- código:\n  https://example.com/a.py\n-->\n"),
+    ],
+)
+def test_user_part_leaves_out_the_html_comments(text, commented):
+    assert WORKBOOK.count(text) == 1
+    assert user_part(WORKBOOK.replace(text, commented)) == USER_PART
+
+
+def test_a_comment_inside_a_code_block_is_published_as_it_is():
+    blocks = f"```html\n{ORIGIN}\n```\n\n~~~\n<!-- varias\nlíneas -->\n~~~\n"
+    part = user_part(WORKBOOK.replace("Estado: hecho\n", f"Estado: hecho\n\n{blocks}"))
+    assert part == f"{USER_PART}\n{blocks}"
+
+
+def test_inside_a_comment_the_heading_does_not_cut_nor_a_fence_open_a_block():
+    hidden = f"### Paso a paso\n<!--\n{CUT}\n```\n-->\n"
+    assert user_part(WORKBOOK.replace("### Paso a paso\n", hidden)) == USER_PART
+
+
+def test_a_comment_that_never_closes_fails_naming_its_line():
+    # Line 17 of WORKBOOK, right under «### Paso a paso».
+    unclosed = WORKBOOK.replace("### Paso a paso\n", "### Paso a paso\n<!-- origen:\n")
+    with pytest.raises(WorkbookError, match=r"\b17\b"):
+        user_part(unclosed)
+
+
+def test_a_comment_left_open_below_the_cut_is_never_read():
+    assert user_part(f"{WORKBOOK}\nAbre un comentario con `<!--`.\n") == USER_PART
+
+
 # ── build_registry (§4.2) ──────────────────────────────────────────────────────────────────────
 
 
@@ -269,6 +321,20 @@ def test_a_module_becomes_one_entry_with_both_languages_its_icon_and_its_documen
 def test_without_a_translation_there_is_no_english_document(tmp_path):
     [entry] = build_registry([module(tmp_path)], icons=ICONS)
     assert entry.docs == {"es": USER_PART}
+
+
+def test_the_documentation_is_registered_without_the_workbooks_comments(tmp_path):
+    commented = WORKBOOK.replace("### Paso a paso\n", f"### Paso a paso\n{ORIGIN}\n")
+    [entry] = build_registry([module(tmp_path, workbook=commented)], icons=ICONS)
+    assert entry.docs == {"es": USER_PART}
+
+
+def test_a_comment_does_not_make_the_translation_stale(tmp_path):
+    # Tying a flow to its origin is no change for the customer: nothing to translate again.
+    commented = WORKBOOK.replace("### Paso a paso\n", f"### Paso a paso\n{ORIGIN}\n")
+    config = module(tmp_path, workbook=commented, en=translated(USER_PART))
+    [entry] = build_registry([config], icons=ICONS)
+    assert set(entry.docs) == {"es", "en"}
 
 
 def test_a_text_without_its_spanish_msgstr_fails_naming_the_app_and_the_field(tmp_path):

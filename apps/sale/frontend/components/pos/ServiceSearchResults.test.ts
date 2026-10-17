@@ -3,7 +3,7 @@
 // price, and a tap hands the service up. Nothing found: nothing painted.
 import { describe, expect, it } from 'vitest';
 
-import { click, mountSale } from '../../__tests__/mount-sale';
+import { click, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { page, service } from './__tests__/fixtures';
 import ServiceSearchResults from './ServiceSearchResults.vue';
@@ -44,7 +44,7 @@ describe('ServiceSearchResults', () => {
 
   it('in the Canary Islands a service without its tax names the IGIC', async () => {
     const m = await setup();
-    await m.result('sale.sale.tax_kind', { tax: 'igic' });
+    await m.result('tax.settings.get', taxSettings('igic'));
     await m.result(OP, page([service({ id: 'sv2', needs_tax_setup: true })]));
     expect(m.find('pos-search-service-sv2').find('p').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IGIC.');
   });

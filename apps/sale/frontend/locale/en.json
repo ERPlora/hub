@@ -25,11 +25,6 @@
         "loadFailed": "The {tax} categories could not be read.",
         "retry": "Retry",
         "retrying": "Retrying…"
-      },
-      "taxName": {
-        "vat": "VAT",
-        "igic": "IGIC",
-        "ipsi": "IPSI"
       }
     },
     "pos": {
@@ -380,6 +375,7 @@
         "tickets": "Tickets",
         "revenue": "Revenue",
         "avgTicket": "Avg. ticket",
+        "taxes": "Taxes",
         "discounts": "Discounts",
         "voided": "Voided",
         "error": "Error loading metrics"

@@ -91,11 +91,6 @@ async def sale_by_staff(request, params: Query[PeriodIn]):
     return await run_operation(request, queries.by_staff, params)
 
 
-@bind(router, "sale.sale.tax_kind", "/sale/sales/tax_kind")
-async def sale_tax_kind(request):
-    return await run_operation(request, queries.tax_kind)
-
-
 @bind(router, "sale.sale.complete", "/sale/sales", status=201)
 async def sale_complete(request, data: CompleteIn):
     return await run_operation(request, services.complete, data)
