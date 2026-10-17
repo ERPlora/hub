@@ -6,8 +6,8 @@
 // till's catalogue and the line of the menu are read from the API (the TPV sheet is Ventas'), eaten in,
 // ordered to take away (split, the beer at retail.alcohol) and as a pack to take away; a product
 // deactivated in Inventory shows up live as «Deactivated in Inventory»; the menu is withdrawn after its
-// confirmation. Screenshots of the list, the form and the builder at three viewports, with nothing past
-// the right edge. What it creates is named «E2E Combo …» / «E2E-CMB-…» and deleted before and after.
+// confirmation; a menu withdrawn from another tab while its builder is open says it no longer exists.
+// Screenshots of the list, the form and the builder at three viewports, with nothing past the right edge. What it creates is named «E2E Combo …» / «E2E-CMB-…» and deleted before and after.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
@@ -416,6 +416,23 @@ test('COMBO-F13: a product deactivated in Inventory shows up live in the builder
   await expect(shown(page).locator('[data-testid=combo-builder-blockers]')).toContainText('The course “Mains” has fewer choices on offer than it asks for.');
   await call(context, 'POST', '/inventory/products/update', { product: sku('HAK'), is_active: true });
   await expect(hake.locator('[data-testid$=-status]')).toHaveCount(0);
+});
+
+// flow: ninguno — FIX de una carrera: el detalle de un menú borrado a la vez da 500 en vez de 404
+test('a menu withdrawn from another tab while its builder is open says it no longer exists', async ({ page, context }) => {
+  const name = `${TAG} Gone ${STAMP}`;
+  await login(page, A, '/combo/menus');
+  const gone = await call<Detail>(context, 'POST', '/combo/combos', { name, price: 1000, tax_category_key: 'restaurant.food' }, 201);
+  await page.goto(`${A}/combo/menus/${gone.id}`);
+  await expect(shown(page).locator('[data-testid=combo-builder-name]')).toHaveText(name);
+  await expect(shown(page).locator('[data-testid=combo-course-form-name]')).toBeVisible();
+  // The other tab: the same withdrawal the list's «Withdraw» makes.
+  await call(context, 'POST', '/combo/combos/delete', { id: gone.id });
+  await expect(shown(page).locator('[data-testid=combo-builder-gone]')).toContainText('This menu no longer exists');
+  await expect(shown(page).locator('[data-testid=combo-builder-name], [data-testid=combo-course-form-name], [data-testid=combo-builder-error]')).toHaveCount(0);
+  await shoot(page, 'FIX-COMBO-DETAIL-RACE', '.ion-page:not(.ion-page-hidden) [data-testid^=combo-builder]');
+  await shown(page).locator('[data-testid=combo-builder-back]').click();
+  await expect(page).toHaveURL(/\/combo\/menus$/);
 });
 
 test('COMBO-F01, F04: the list finds the menu and withdraws it after its confirmation', async ({ page, context }) => {

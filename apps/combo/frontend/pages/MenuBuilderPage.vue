@@ -4,7 +4,8 @@
 // does on the receipt (one line eaten in, split to take away) and, when the till does not offer it yet,
 // why. Then «Courses»: a card per course in the order the till asks them (the handle and the arrows save
 // the whole order at once; «Withdraw» asks first), and «Add a course», which edits the course whose
-// «Edit details» was pressed. Every change comes back through the stream.
+// «Edit details» was pressed. Every change comes back through the stream; a menu withdrawn meanwhile
+// (here or on another device) leaves only «This menu no longer exists» and the way back.
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
@@ -27,7 +28,10 @@ const locale = useLocale();
 
 const { data: menu, status, error } = useLive('combo.combo.get', () => ({ id: props.id }));
 const blocked = computed(() => blockingError(error.value));
-const courses = computed(() => menu.value?.groups ?? []);
+// The stream keeps the last menu it painted; once the server says it is gone, nothing of it is offered.
+const gone = computed(() => error.value?.code === 'not_found');
+const shown = computed(() => (gone.value ? undefined : menu.value));
+const courses = computed(() => shown.value?.groups ?? []);
 const goods = computed(() => menu.value?.supply_kind === 'goods');
 
 // The order of the courses: the arrows of a card and the handle end in the same write.
@@ -87,7 +91,7 @@ async function confirmRemove(): Promise<void> {
 
 <template>
   <AppPage
-    :title="menu?.name ?? $t('combo.title')"
+    :title="shown?.name ?? $t('combo.title')"
     back-href="/combo/menus"
     content-layout="detail"
   >
@@ -114,19 +118,29 @@ async function confirmRemove(): Promise<void> {
           />
           {{ $t('combo.builder.back') }}
         </ion-button>
-        <template v-if="menu">
+        <template v-if="shown">
           <span
             class="combo-builder__name"
             data-testid="combo-builder-name"
-          >{{ menu.name }}</span>
+          >{{ shown.name }}</span>
           <span
             class="combo-builder__price"
             data-testid="combo-builder-price"
-          >{{ formatMoney(menu.price, locale) }}</span>
+          >{{ formatMoney(shown.price, locale) }}</span>
         </template>
       </div>
 
-      <template v-if="menu">
+      <InlineFeedback
+        v-if="gone"
+        tone="warning"
+        icon="ion:trash-outline"
+        :heading="t('combo.builder.goneTitle')"
+        data-testid="combo-builder-gone"
+      >
+        {{ $t('combo.builder.goneMessage') }}
+      </InlineFeedback>
+
+      <template v-if="shown">
         <InlineFeedback
           :tone="goods ? 'warning' : 'info'"
           icon="ion:receipt-outline"
@@ -135,14 +149,14 @@ async function confirmRemove(): Promise<void> {
           {{ goods ? $t('combo.builder.goodsWarning') : $t('combo.builder.serviceWarning') }}
         </InlineFeedback>
         <InlineFeedback
-          v-if="menu.blockers.length"
+          v-if="shown.blockers.length"
           tone="warning"
           :heading="t('combo.builder.notOnTill')"
           data-testid="combo-builder-blockers"
         >
           <ul class="combo-builder__blockers">
             <li
-              v-for="blocker in menu.blockers"
+              v-for="blocker in shown.blockers"
               :key="`${blocker.code}-${blocker.group_id ?? ''}`"
             >
               {{ blocker.message }}
@@ -158,7 +172,10 @@ async function confirmRemove(): Promise<void> {
         </InlineFeedback>
       </template>
 
-      <section class="combo-builder__courses">
+      <section
+        v-if="!gone"
+        class="combo-builder__courses"
+      >
         <h2 class="combo-builder__title">
           {{ $t('combo.courses.title') }}
         </h2>

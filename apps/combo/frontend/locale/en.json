@@ -75,7 +75,9 @@
       "serviceWarning": "This menu is billed as a single service: one line at its VAT category, whatever the components are taxed at.",
       "goodsWarning": "This menu is billed as goods: its price will be split across the components you add, one line each.",
       "notOnTill": "Not on the till yet",
-      "onTill": "On the till"
+      "onTill": "On the till",
+      "goneTitle": "This menu no longer exists",
+      "goneMessage": "It has been withdrawn, perhaps from another device."
     },
     "courses": {
       "title": "Courses",

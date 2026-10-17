@@ -121,6 +121,7 @@ máximas», la casilla «Se puede elegir la misma opción más de una vez» y «
 | Vacío | «Aún no hay menús. Crea el primero con el botón +.»; con búsqueda o filtro, «Sin resultados». En el constructor, «Aún no hay platos. Añade el primero: un menú sin platos no tiene nada que elegir.» y, en un plato, «Aún no hay elecciones: nadie puede resolver este plato.». |
 | Error | El aviso de la tabla con «Reintentar»; «No se han podido cargar los platos de este menú.» en el constructor. El rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una elección, dentro de su plato. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
+| Ya no existe | Si el menú se retira mientras su constructor está abierto (aquí o en otro dispositivo), el constructor se vacía y dice «Este menú ya no existe» («Se ha retirado, quizá desde otro dispositivo.»), con «Todos los menús» para volver. |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
@@ -211,7 +212,8 @@ Pasos:
 1. En la fila del menú, pulsa «Retirar».
 2. Confirma en «¿Retirar este menú?» («{nombre}» deja de estar a la venta, junto con sus platos y sus
    elecciones. Los tiques ya emitidos se siguen leyendo.).
-3. El menú desaparece de la lista, con sus platos y sus elecciones, y el TPV deja de ofrecerlo.
+3. El menú desaparece de la lista, con sus platos y sus elecciones, y el TPV deja de ofrecerlo. Quien
+   lo tenga abierto en su constructor ve «Este menú ya no existe».
 Entra: el menú elegido (por id o por nombre).
 Sale: el menú, sus platos y sus elecciones borrados en una sola operación (avisa: menú retirado, con
 su nombre). Los tiques emitidos llevan su copia y se siguen leyendo.
@@ -308,7 +310,7 @@ Pasos:
 Entra: el menú (por id o por nombre) y las elecciones (por id, o por el nombre o el SKU del producto,
 con el plato si hace falta), con cuántas de cada una.
 Sale: la línea del menú con sus componentes y su reparto fiscal (COMBO-F09). No guarda nada.
-Si falla (409, la venta no se guarda): «Ese menú no existe en este negocio.» (`combo.combo_missing`: un
+Si falla: la venta no se guarda y Menús dice por qué: «Ese menú no existe en este negocio.» (`combo.combo_missing`: un
 404 es también «la app no está activa»), «Ese menú ya no está a la venta.», «Elige algo del menú antes de añadirlo.», «Al menú le falta elegir en «{plato}»: elige
 {min}.», «El plato «{plato}» admite como mucho {max}.», «El plato «{plato}» no admite elegir dos veces
 lo mismo.», ««{producto}» no es una elección de este menú.», ««{producto}» está agotado.», ««{producto}»
@@ -508,8 +510,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 
 - En el aviso `sale.sale.completed`, la línea del menú lleva `components[]` con `product_id`,
   `quantity` (la de la línea ya multiplicada) e `is_service` de cada componente de COMBO-F08, y no
-  mueve stock por sí misma (INVENTORY-F22; ya implementado en `inventory.stock.apply_sale`). Probado en
-  `tests/test_integration_inventory.py` con Inventario real.
+  mueve stock por sí misma (INVENTORY-F22; ya implementado en `inventory.stock.apply_sale`). Probado con
+  Inventario real.
 - La devolución: INVENTORY-F24 ya repone las líneas que le llegan en `sale.sale.refunded`
   (`inventory.stock.restore_refund`, `lines` de producto y cantidad). Ventas manda los componentes del
   menú × los menús devueltos como esas líneas (pedido a Ventas); probado con Inventario real.

@@ -125,8 +125,12 @@ def _names(rows, label) -> str:
     return ", ".join(label(row) for row in rows[:MAX_CANDIDATES])
 
 
-def find_combo(combo_id: UUID | None, said: str | None, *, lock: bool = False) -> Combo:
-    """The menu named by its id, or by its name as a person says it."""
+def find_combo(
+    combo_id: UUID | None, said: str | None, *, lock: bool = False, rows: QuerySet[Combo] | None = None
+) -> Combo:
+    """The menu named by its id, or by its name as a person says it. It comes from ``rows`` when given
+    (e.g. with its tree): one read, so a deletion committed meanwhile is either not seen yet or not
+    found, never a row that vanished between two reads."""
     combos = Combo.objects.order_by("name", "id")
     if combo_id is None:
         candidates = _first_match(
@@ -139,7 +143,7 @@ def find_combo(combo_id: UUID | None, said: str | None, *, lock: bool = False) -
                 code="combo.combo_ambiguous",
             )
         combo_id = candidates[0].pk if candidates else None
-    found = Combo.objects.filter(pk=combo_id)
+    found = (Combo.objects.all() if rows is None else rows).filter(pk=combo_id)
     combo = (found.select_for_update() if lock else found).first()
     if combo is None:
         raise NotFound(str(COMBO_NOT_FOUND))
@@ -383,8 +387,12 @@ def blockers(combo: Combo, targets: frozenset[str]) -> list[dict]:
 
 
 def load_detail(combo_id: UUID) -> dict:
-    """The menu with its tree, whether the till offers it and why not. Services return it after a write."""
-    combo = with_tree(Combo.objects.filter(pk=combo_id)).get()
+    """The detail of a menu by its id. Services return it after a write, with the menu locked."""
+    return detail_row(with_tree(Combo.objects.filter(pk=combo_id)).get())
+
+
+def detail_row(combo: Combo) -> dict:
+    """The menu (with its prefetched tree), whether the till offers it and why not."""
     groups = list(combo.groups.all())
     targets = takeaway_targets()
     found = blockers(combo, targets)
@@ -457,7 +465,7 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
     },
 )
 def get_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
-    return load_detail(find_combo(data.id, data.combo).id)
+    return detail_row(find_combo(data.id, data.combo, rows=with_tree(Combo.objects.all())))
 
 
 # --- The till (COMBO-F07, F08, F09) --------------------------------------------------------------
@@ -746,9 +754,8 @@ def resolve_line(combo: Combo, data: ResolveIn, targets: frozenset[str]) -> dict
 )
 def resolve(ctx: OperationContext, data: ResolveIn) -> dict:
     try:
-        combo = find_combo(data.id, data.combo)
+        combo = find_combo(data.id, data.combo, rows=with_tree(Combo.objects.all()))
     except NotFound as missing:
         # The till's 409: a 404 also means «this app is not active here», which is another fix.
         raise Conflict(missing.message, code="combo.combo_missing") from None
-    tree = with_tree(Combo.objects.filter(pk=combo.pk)).get()
-    return resolve_line(tree, data, takeaway_targets())
+    return resolve_line(combo, data, takeaway_targets())
