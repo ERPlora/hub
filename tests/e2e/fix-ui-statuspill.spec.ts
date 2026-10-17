@@ -75,6 +75,9 @@ function cuts(pill: Locator): Promise<string[]> {
 async function findSale(page: Page, sale: SaleOut): Promise<Locator> {
   await shown(page).locator('[data-testid=sales-table-row], [data-testid=sales-empty]').first().waitFor({ state: 'visible' });
   await shown(page).locator('[data-testid=sales-table-search] input').fill(sale.number);
+  // The search applies after its debounce and a new read: until then the list still holds the other sales
+  // of the day, with this one among them. Measured and captured once only this sale is left.
+  await expect(shown(page).locator('[data-testid=sales-table-row]')).toHaveCount(1);
   const row = shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
   await expect(row).toBeVisible();
   return row;
