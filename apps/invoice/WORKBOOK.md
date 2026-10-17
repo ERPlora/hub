@@ -270,7 +270,8 @@ Pasos:
    ventana se cierra y la factura aparece en la lista con su número, «Emitida» y «Origen» «Alta manual».
 Entra: lo que escribe la persona; el emisor configurado. Por la API o el asistente una línea puede
 llevar además la categoría fiscal de Impuestos: entonces su tipo y su calificación son los de la regla
-vigente hoy, no el «IVA %» escrito.
+vigente hoy, no el «IVA %» escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
+(Impuestos → Ajustes, TAX-F11): en Canarias se declara como IGIC y en Ceuta y Melilla como IPSI.
 Sale: la factura (F1 en una serie de facturas, F2 en una de tiques) con el IVA calculado encima del
 precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (los conceptos suman el
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
@@ -741,7 +742,10 @@ por devolución y una por anulación.
 - **Ventas** (requisito): la venta, sus líneas, sus devoluciones y su anulación, leídas de sus filas.
 - **Impuestos** (requisito): la regla congelada en cada línea de la venta (impuesto, régimen,
   calificación, tipo y recargo) y, en el alta manual por categoría, la regla vigente hoy
-  (`resolve_tax`); el redondeo a mitad hacia arriba (`round_half_up`).
+  (`resolve_tax`, en el territorio fiscal del negocio); el impuesto de un territorio (`tax_kind_of`,
+  `business_tax_kind`) para lo que no tiene regla: la línea con tipo tecleado (el territorio del negocio) y la
+  de una venta cuya regla ya no existe (el territorio que la línea congeló al cobrarse); el redondeo a mitad
+  hacia arriba (`round_half_up`).
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
   los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
 

@@ -209,7 +209,8 @@ Pasos:
 3. Escribe parte del nombre de la Categoría, elígela de la lista y escribe el %, entre 0 y 100 (hasta
    dos decimales).
 4. Elige el Tipo («IVA» de entrada; «IGIC (Canarias)», «IPSI (Ceuta/Melilla)»…) y, si quieres, Vigente
-   desde y Vigente hasta (vacío = desde siempre / para siempre).
+   desde y Vigente hasta (vacío = desde siempre / para siempre). Por el asistente o la API, una regla sin
+   Tipo lleva el de su territorio: IGIC en ES-CN, IPSI en ES-CE y ES-ML, IVA en el resto.
 5. Pulsa «Añadir»; el panel se cierra y la regla sale en la tabla.
 Entra: país, región, categoría, %, tipo y fechas que elige la persona.
 Sale: la regla activa; Impuestos avisa (`tax.rule.created`). Desde ese momento Ventas y Facturación la
@@ -356,8 +357,10 @@ Entra: el territorio fiscal del negocio y un tipo regional por categoría que fi
 siembra ninguno a propósito).
 Sale: el territorio guardado, que desde ese momento usan todas las ventas, las facturas, el cálculo de
 TAX-F18 y el tipo que enseñan Categorías y las secciones de Ventas: la regla del territorio gana a la
-nacional y la familia del impuesto (IGIC, IPSI) es la de la regla. Evento `tax.settings.updated`, que
-vuelve a calcular la caja abierta.
+nacional y la familia del impuesto (IGIC, IPSI) es la de la regla. Una línea sin categoría ni regla —un
+tipo escrito a mano en una factura, o una venta cuya regla ya no existe— se declara con el impuesto de su
+territorio: IGIC en Canarias, IPSI en Ceuta y Melilla, IVA en el resto (la de una venta, el territorio con
+que se cobró). Evento `tax.settings.updated`, que vuelve a calcular la caja abierta.
 Si falla: un territorio que no tiene impuestos propios en el país del negocio se rechaza bajo
 «Territorio fiscal» («Esta región no tiene impuestos propios en el país de tu negocio: elige uno de sus
 territorios fiscales, o ninguno.»); una categoría sin regla regional se cobra con la nacional, al IVA;
@@ -491,7 +494,8 @@ importe ÷ (1 + tipo combinado) redondeada y la cuota es lo que resta, así que 
 céntimo (el último componente absorbe el ajuste). Es el mismo cálculo con el que Ventas cierra el tique
 y Facturación cuadra la cuota.
 Si falla: sin regla aplicable, «Ninguna regla fiscal se aplica a esta categoría en este país.»; nunca
-se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente. Sin importe o sin categoría,
+se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente (y entonces, con el impuesto
+de su territorio: IGIC en Canarias, IPSI en Ceuta y Melilla). Sin importe o sin categoría,
 debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin adivinar.
 Implicados: INVOICE-F01, SALE-F01
 
@@ -623,6 +627,12 @@ cajero del producto actual es un empleado.
   `RULE_EVENTS`, así que la caja y las listas vivas se recalculan. Ventas (`business_country`, el tipo de
   las secciones y `tax_closer`) y Facturación (`resolve_tax` de una línea con categoría) no pasan región
   suelta: leen esta fuente.
+- **El impuesto de un territorio** (`REGION_TAX_KINDS`; `queries.tax_kind_of(país, región)` y
+  `business_tax_kind()`): `igic` en ES-CN, `ipsi` en ES-CE y ES-ML, `vat` en el resto (una región de otro
+  país, también). Lo llevan lo que no tiene regla de la que sacarlo: la línea de factura con tipo tecleado
+  (el territorio del negocio hoy), la línea de venta sin su regla (`_charged_kind` de Facturación: el
+  territorio que la línea congeló al cobrarse), el 0 % pedido expresamente (`fallback_zero`) y el alta de
+  una regla sin `tax_type`. VeriFactu lo declara como `Impuesto` 03, 02 o 01.
 - **Solape**: crear, reactivar, poner fecha de fin y el lote bloquean la fila de la categoría
   (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
   en cola y la segunda ve la primera (tests con dos sesiones reales para crear, reactivar, poner fecha
