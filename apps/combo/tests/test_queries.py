@@ -7,6 +7,8 @@ left over to the largest remainders, the sum exactly the amount.
 """
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.combo.queries import split_amount
@@ -181,6 +183,25 @@ def test_a_menu_is_named_by_its_name_as_said():
     with pytest.raises(NotFound) as missing:
         run("combo.combo.get", {"combo": "brunch"})
     assert missing.value.message == "That menu does not exist in this business."
+
+
+@pytest.mark.parametrize("name", ["combo.combo.get", "combo.combo.resolve"])
+def test_a_menu_is_read_with_its_tree_in_as_many_queries_however_big(name):
+    # The menu comes with its courses and choices in the read that finds it: one more course or choice
+    # is never one more query (nor a second read of the menu, see test_concurrency.py).
+    def queries(courses: int, choices: int) -> int:
+        combo = make_combo(f"Menu {courses}x{choices}")
+        picks = []
+        for c in range(courses):
+            course = make_group(combo, f"Course {c}", min_choices=1)
+            options = [make_option(course, make_product(f"Dish {c}.{n}")) for n in range(choices)]
+            picks.append({"option_id": str(options[0].id)})
+        data = {"id": str(combo.id)} | ({"choices": picks} if name == "combo.combo.resolve" else {})
+        with CaptureQueriesContext(connection) as read:
+            run(name, data)
+        return len(read)
+
+    assert queries(3, 3) == queries(1, 1)
 
 
 def test_each_choice_says_whether_it_is_offered():

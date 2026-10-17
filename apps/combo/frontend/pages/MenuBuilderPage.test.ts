@@ -136,9 +136,32 @@ describe('MenuBuilderPage', () => {
 
   it('a menu that cannot be read says so', async () => {
     const s = await setup();
-    s.net.lastStream().push(errorFrame(s.subId(OP), 'not_found'));
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
     await flush();
     expect(s.inDoc('combo-builder-error')?.textContent).toContain('The courses of this menu could not be loaded.');
+    expect(s.inDoc('combo-builder-gone')).toBeNull();
+  });
+
+  it('a menu withdrawn from another device while open says it no longer exists, with nothing left to edit', async () => {
+    const s = await setup();
+    await s.show(MENU);
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'not_found'));
+    await flush();
+    const gone = s.wrapper.findAllComponents(InlineFeedback).find((b) => b.attributes('data-testid') === 'combo-builder-gone');
+    expect(gone?.props('heading')).toBe('This menu no longer exists');
+    expect(gone?.text()).toContain('It has been withdrawn, perhaps from another device.');
+    expect(s.cards()).toHaveLength(0);
+    expect(s.wrapper.findComponent(CourseForm).exists()).toBe(false);
+    expect([s.inDoc('combo-builder-name'), s.inDoc('combo-builder-supply'), s.inDoc('combo-builder-error')]).toEqual([null, null, null]);
+    expect(s.inDoc('combo-builder-back')?.textContent).toContain('All menus');
+  });
+
+  it('a menu that no longer exists when opened says so', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'not_found'));
+    await flush();
+    expect(s.inDoc('combo-builder-gone')?.textContent).toContain('This menu no longer exists');
+    expect([s.inDoc('combo-builder-loading'), s.inDoc('combo-builder-error')]).toEqual([null, null]);
   });
 
   it('an employee reads the menu without the form', async () => {
@@ -152,5 +175,9 @@ describe('MenuBuilderPage', () => {
     await s.show(MENU);
     expect(s.inDoc('combo-builder-back')?.textContent).toContain('Todos los menús');
     expect(s.inDoc('combo-builder-supply')?.textContent).toContain('Este menú se factura como un único servicio');
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'not_found'));
+    await flush();
+    expect(s.inDoc('combo-builder-gone')?.textContent).toContain('Este menú ya no existe');
+    expect(s.inDoc('combo-builder-gone')?.textContent).toContain('Se ha retirado, quizá desde otro dispositivo.');
   });
 });

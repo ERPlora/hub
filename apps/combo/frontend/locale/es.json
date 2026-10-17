@@ -75,7 +75,9 @@
       "serviceWarning": "Este menú se factura como un único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.",
       "goodsWarning": "Este menú se factura como entrega de bienes: su precio se repartirá entre los componentes que añadas, una línea por cada uno.",
       "notOnTill": "Todavía no sale en el TPV",
-      "onTill": "Sale en el TPV"
+      "onTill": "Sale en el TPV",
+      "goneTitle": "Este menú ya no existe",
+      "goneMessage": "Se ha retirado, quizá desde otro dispositivo."
     },
     "courses": {
       "title": "Platos",
