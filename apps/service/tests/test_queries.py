@@ -497,6 +497,20 @@ def test_get_names_a_package_by_name_and_says_when_it_fits_several():
     assert ambiguous.value.code == "service.package_ambiguous"
 
 
+def test_a_deleted_package_is_still_read_by_its_id_but_no_longer_by_its_name(tax):
+    # Its vouchers sold still name it: their «Bonos vendidos» opens it by its id.
+    sold = make_package("Sold bono", [make_service("Cut", tax=tax)], is_deleted=True)
+    shown = run("service.package.get", PackageRefIn(id=sold.id))
+    assert (shown.id, shown.status, [item.service_name for item in shown.items]) == (
+        sold.id,
+        "deleted",
+        ["Cut"],
+    )
+    with pytest.raises(NotFound) as gone:
+        run("service.package.get", PackageRefIn(package="sold bono"))
+    assert gone.value.code == "service.package_not_found"
+
+
 # ── Vouchers sold ─────────────────────────────────────────────────────────────────────────────
 
 

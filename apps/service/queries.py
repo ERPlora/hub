@@ -203,12 +203,16 @@ def find_service(
     hold: bool = False,
     offered: bool = False,
     archived: bool = False,
+    rows=None,
 ) -> Service:
     """A service by id (archived too, unless ``offered``), or by its name among the offered ones (the
-    archived ones with ``archived``, to restore one by name)."""
-    rows = Service.objects.all()
+    archived ones with ``archived``, to restore one by name). It comes from ``rows`` when given (e.g. with
+    what its detail shows): one read, so a deletion committed meanwhile is either not seen yet or not
+    found, never a row that vanished between two reads."""
+    services = Service.objects.all()
+    found_in = services if rows is None else rows
     return _resolve(
-        rows.filter(is_active=True) if offered else rows,
+        found_in.filter(is_active=True) if offered else found_in,
         service_id,
         said,
         lock=lock,
@@ -217,16 +221,23 @@ def find_service(
         missing_code="service.service_not_found",
         ambiguous=SERVICE_AMBIGUOUS,
         ambiguous_code="service.service_ambiguous",
-        named=rows.filter(is_active=not archived),
+        named=services.filter(is_active=not archived),
     )
 
 
 def find_category(
-    category_id: UUID | None, said: str | None, *, lock: bool = False, hold: bool = False
+    category_id: UUID | None,
+    said: str | None,
+    *,
+    lock: bool = False,
+    hold: bool = False,
+    rows=None,
 ) -> Category:
-    """A live category, by id or by name."""
+    """A live category, by id or by name; from ``rows`` when given, in one read (as ``find_service``)."""
+    categories = Category.objects.all()
+    found_in = categories if rows is None else rows
     return _resolve(
-        Category.objects.filter(is_deleted=False),
+        found_in.filter(is_deleted=False),
         category_id,
         said,
         lock=lock,
@@ -235,6 +246,7 @@ def find_category(
         missing_code="service.category_not_found",
         ambiguous=CATEGORY_AMBIGUOUS,
         ambiguous_code="service.category_ambiguous",
+        named=categories.filter(is_deleted=False),
     )
 
 
@@ -245,11 +257,14 @@ def find_package(
     lock: bool = False,
     hold: bool = False,
     include_deleted: bool = False,
+    rows=None,
 ) -> Package:
-    """A package by id (a deleted one too with ``include_deleted``), or a live one by its name."""
-    rows = Package.objects.all()
+    """A package by id (a deleted one too with ``include_deleted``), or a live one by its name; from
+    ``rows`` when given, in one read (as ``find_service``)."""
+    packages = Package.objects.all()
+    found_in = packages if rows is None else rows
     return _resolve(
-        rows if include_deleted else rows.filter(is_deleted=False),
+        found_in if include_deleted else found_in.filter(is_deleted=False),
         package_id,
         said,
         lock=lock,
@@ -258,7 +273,7 @@ def find_package(
         missing_code="service.package_not_found",
         ambiguous=PACKAGE_AMBIGUOUS,
         ambiguous_code="service.package_ambiguous",
-        named=rows.filter(is_deleted=False),
+        named=packages.filter(is_deleted=False),
     )
 
 
@@ -688,7 +703,7 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
     },
 )
 def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
-    return load_service(find_service(data.id, data.service).id)
+    return _service_row(find_service(data.id, data.service, rows=_services()))
 
 
 @operation(
@@ -775,7 +790,7 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     ai={"description": "Get one service category, named by its id or its name."},
 )
 def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
-    return load_category(find_category(data.id, data.category).id)
+    return _category_row(find_category(data.id, data.category, rows=_categories()))
 
 
 # --- Settings -------------------------------------------------------------------------------------
@@ -921,7 +936,9 @@ def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
     },
 )
 def get_package(ctx: OperationContext, data: PackageRefIn) -> dict:
-    return load_package(find_package(data.id, data.package, include_deleted=True).id)
+    return _package_row(
+        find_package(data.id, data.package, include_deleted=True, rows=_packages())
+    )
 
 
 # --- Vouchers sold --------------------------------------------------------------------------------

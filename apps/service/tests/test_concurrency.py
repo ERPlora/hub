@@ -9,6 +9,9 @@ card, a professional) read it unheld: a deletion committed between that read and
 write naming a deleted row (the business's «Delete» only marks it) or, the Hub admin's (the row goes), made
 the database refuse the write at its COMMIT (a 500). A write holds what it names, so the deletion waits for
 it; one already under way when the write reads it is refused, as one deleted before.
+
+A detail (a service, a category, a voucher of the catalog) that a deletion lands in the middle of answers
+what it read or 404, never a 500.
 """
 
 import threading
@@ -816,3 +819,61 @@ def test_a_write_on_a_professional_while_the_hub_admin_deletes_them_never_waits_
     assert not isinstance(outcome, OperationError), outcome
     assert not Member.objects.filter(pk=world.ana.pk).exists()
     assert not Assignment.objects.exists()
+
+
+# The details: a deletion that lands in the middle of a read
+
+#: Each detail, the row of the world it shows, the field that names it, how it says it is not found and the
+#: deletions that take that row away from it: the business's «Delete» of a category (the row stays, marked)
+#: and the Hub admin's of any of them (the row goes). Archiving a service or deleting a voucher of the
+#: catalog keeps it in its detail, so neither takes it away in the middle of the read.
+DETAILS = {
+    "service.service.get": ("spare", "service", "service.service_not_found", ["row"]),
+    "service.category.get": ("colour", "category", "service.category_not_found", ["operation", "row"]),
+    "service.package.get": ("bono", "package", "service.package_not_found", ["row"]),
+}
+DETAIL_CASES = [(detail, how) for detail, (*_, ways) in DETAILS.items() for how in ways]
+
+
+@contextmanager
+def deleted_after_the_first_read_of(target, how: str):
+    """Commits the deletion of ``target`` (``how``, as ``remove``) in another session right after the first
+    statement of this one that reads its table: a deletion landing in the middle of a read, every time."""
+    table = f'FROM "{type(target)._meta.db_table}"'
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            deletions.extend(at_once(lambda: delete(target, how)))
+        return result
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+@pytest.mark.parametrize(("detail", "how"), DETAIL_CASES)
+def test_a_row_deleted_while_its_detail_is_read_is_never_a_server_error(world, detail, how):
+    # The detail found the row and then loaded it by its id in a second read: a deletion committed between
+    # the two raised DoesNotExist (a 500). In one read it is the row as it was read.
+    attribute, _, missing, _ = DETAILS[detail]
+    row = getattr(world, attribute)
+    with deleted_after_the_first_read_of(row, how) as deletions:
+        shown = run(detail, {"id": str(row.pk)})
+    assert deleted(deletions) == ["ok"]
+    assert (shown.id, shown.name) == (row.pk, row.name)
+    # What the deletion's event runs next: not found, and the open sheet closes.
+    gone = attempt(lambda: run(detail, {"id": str(row.pk)}))
+    assert isinstance(gone, OperationError), gone
+    assert (gone.status, gone.code) == (404, missing)
+
+
+@pytest.mark.parametrize(("detail", "how"), DETAIL_CASES)
+def test_a_row_deleted_between_its_name_and_its_detail_is_not_found(world, detail, how):
+    attribute, said, missing, _ = DETAILS[detail]
+    row = getattr(world, attribute)
+    with deleted_after_the_first_read_of(row, how) as deletions:
+        outcome = attempt(lambda: run(detail, {said: row.name}))
+    assert deleted(deletions) == ["ok"]
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (404, missing)
