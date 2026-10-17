@@ -13,20 +13,28 @@ import { expect, it } from 'vitest';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const e2eDir = join(root, 'tests', 'e2e');
 
-/** The tsconfig of each `vue-tsc` run chained in the `typecheck` script (`-p`, by default tsconfig.json). */
-function typecheckProjects(): string[] {
+/**
+ * Each `vue-tsc` run chained in the `typecheck` script: its tsconfig (`-p`, by default tsconfig.json) with the
+ * run's own flags on top, so a `--noCheck` in the script counts, and anything that is not a flag (`|| true`, a
+ * pipe), which would lose the run's exit code, fails.
+ */
+function typecheckProjects(): ts.ParsedCommandLine[] {
   const script: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts.typecheck;
   return script.split('&&').map((command) => {
-    const args = command.trim().split(/\s+/);
-    if (args[0] !== 'vue-tsc') throw new Error(`"${command.trim()}" in the typecheck script is not a vue-tsc run`);
-    const flag = args.findIndex((arg) => arg === '-p' || arg === '--project');
-    const project = resolve(root, flag === -1 ? 'tsconfig.json' : args[flag + 1]);
-    return project.endsWith('.json') ? project : join(project, 'tsconfig.json');
+    const [bin, ...args] = command.trim().split(/\s+/);
+    if (bin !== 'vue-tsc') throw new Error(`"${command.trim()}" in the typecheck script is not a vue-tsc run`);
+    const { options, fileNames, errors } = ts.parseCommandLine(args);
+    const stray = [...errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, ' ')), ...fileNames];
+    if (stray.length) {
+      throw new Error(`"${command.trim()}" in the typecheck script is not a plain vue-tsc run: ${stray.join('; ')}`);
+    }
+    const project = resolve(root, options.project ?? 'tsconfig.json');
+    return parse(project.endsWith('.json') ? project : join(project, 'tsconfig.json'), options);
   });
 }
 
-function parse(project: string): ts.ParsedCommandLine {
-  const parsed = ts.getParsedCommandLineOfConfigFile(project, {}, {
+function parse(project: string, options: ts.CompilerOptions): ts.ParsedCommandLine {
+  const parsed = ts.getParsedCommandLineOfConfigFile(project, options, {
     ...ts.sys,
     onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
       throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
@@ -45,16 +53,14 @@ const e2eFiles = readdirSync(e2eDir, { recursive: true, encoding: 'utf8' })
   .map((name) => join(e2eDir, name));
 
 it('checks every .ts of tests/e2e', () => {
-  const files = new Set(typecheckProjects().flatMap((project) => [...checked(parse(project))]));
+  const files = new Set(typecheckProjects().flatMap((project) => [...checked(project)]));
   expect(e2eFiles.length).toBeGreaterThan(0);
   expect(e2eFiles.filter((file) => !files.has(file)).map((file) => relative(root, file))).toEqual([]);
 });
 
 it('reports a type error planted in a helper and in a spec', () => {
   const planted = ['helpers.ts', 'csp.spec.ts'].map((name) => join(e2eDir, name));
-  const project = typecheckProjects()
-    .map(parse)
-    .find((candidate) => planted.every((file) => checked(candidate).has(file)));
+  const project = typecheckProjects().find((candidate) => planted.every((file) => checked(candidate).has(file)));
   if (!project) throw new Error('no project of the typecheck script holds tests/e2e/');
 
   const host = ts.createCompilerHost(project.options);
