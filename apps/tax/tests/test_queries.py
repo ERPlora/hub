@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 from django.db import DatabaseError, connection
 from django.utils import timezone
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.tax import queries
@@ -1070,3 +1070,12 @@ def test_read_the_business_tax_settings(no_seed):
     keep_region("ES-ML")
     kept = run("tax.settings.get", SettingsGetIn())
     assert (kept.region_code, kept.updated_at is not None) == ("ES-ML", True)
+
+
+def test_a_region_of_another_country_than_the_business_is_a_422_never_the_national_rate(no_seed):
+    rule(category(), "21")
+    with pytest.raises(InvalidPayload) as refused:
+        calculate(amount=10_000, tax_category_key="product.generic", region_code="PT-20", date=TODAY)
+    assert (refused.value.status, list(refused.value.fields)) == (422, ["region_code"])
+    with pytest.raises(InvalidPayload):
+        categories(region_code="PT-20")
