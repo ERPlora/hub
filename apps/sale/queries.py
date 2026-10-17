@@ -81,8 +81,7 @@ from apps.sale.schemas import (
     TodayOut,
 )
 from apps.tax.models import TaxCategory
-from apps.tax.queries import business_today, category_by_reference, current_rates
-from apps.tax.schemas import DEFAULT_COUNTRY
+from apps.tax.queries import business_jurisdiction, business_today, category_by_reference, current_rates
 
 CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
@@ -170,8 +169,9 @@ TYPE_SETTING = {
 
 
 def business_country() -> str:
-    """The business's country: Spain until the Hub keeps its own (the same default as Taxes)."""
-    return DEFAULT_COUNTRY
+    """The business's country, from Taxes' one jurisdiction of the business (TAX-F11)."""
+    country, _region = business_jurisdiction()
+    return country
 
 
 def actor(ctx: OperationContext) -> str:
@@ -386,7 +386,7 @@ def department_row(department: Department, rates: dict) -> dict:
 
 def department_rates(departments: list[Department]) -> dict:
     categories = list({d.tax_category_id: d.tax_category for d in departments}.values())
-    return current_rates(categories, business_country(), None, business_today())
+    return current_rates(categories, *business_jurisdiction(), business_today())
 
 
 def _find_named(

@@ -35,14 +35,20 @@ T = TypeVar("T")
 COUNTRY_CODES: tuple[str, ...] = tuple(
     sorted(country.alpha_2 for country in pycountry.countries)
 )
-#: Until the Hub's settings keep the business's country, a caller that says none means Spain (as the
-#: tax engine of the current product did).
+#: The business's country: Spain until the Hub receives the one the business chose in its ERPlora account
+#: (the SaaS's registry, phase 2), as the tax engine of the current product did.
 DEFAULT_COUNTRY = "ES"
+#: The regions of a country with taxes of their own, which a business may keep as its own (TAX-F11): the
+#: Canary Islands charge IGIC, Ceuta and Melilla IPSI. Any other region charges its country's tax.
+TAX_REGIONS: dict[str, tuple[str, ...]] = {"ES": ("ES-CN", "ES-CE", "ES-ML")}
 #: Bounds of an amount in cents (± 10 000 million euros): far beyond any sale, and exact in Decimal.
 MAX_AMOUNT = 10**12
 
 REGION_UNKNOWN = _("Enter an ISO 3166-2 region, such as ES-CN.")
 REGION_OF_ANOTHER_COUNTRY = _("This region does not belong to the chosen country.")
+REGION_NOT_AVAILABLE = _(
+    "This region has no taxes of its own in your business's country: choose one of its tax territories, or none."
+)
 RATE_WITHOUT_TAX = _("This operation charges no tax: its rate must be 0 %.")
 RANGE_BACKWARDS = _("The last day cannot be before the first one.")
 WHICH_RULE = _("Say which rule: its id, or its country and its category.")
@@ -193,8 +199,9 @@ class CategoryListIn(_RegionOfTheCountry, PageIn):
         "id",
     ] = Field("key", description="Column to sort by.")
     dir: Direction = Field("asc", description=DIRECTION)
-    country_code: CountryCode = Field(
-        DEFAULT_COUNTRY, description=COUNTRY + " Where the rate column is read."
+    country_code: OptionalCountry = Field(
+        None,
+        description=COUNTRY + " Where the rate column is read; empty = the business's country and region.",
     )
     region_code: OptionalRegion = Field(None, description=REGION)
 
@@ -448,10 +455,14 @@ class CalculateIn(_RegionOfTheCountry, Schema):
         description="The amount in whole cents (10000 = 100.00).",
     )
     tax_category_key: CategoryRef = Field(description=CATEGORY_REF)
-    country_code: CountryCode = Field(
-        DEFAULT_COUNTRY, description=COUNTRY + " The business's; Spain by default."
+    country_code: OptionalCountry = Field(
+        None,
+        description=COUNTRY + " Empty = the business's country and region (TAX-F11); naming one asks for "
+        "that country alone, with the region given.",
     )
-    region_code: OptionalRegion = Field(None, description=REGION + " The business's.")
+    region_code: OptionalRegion = Field(
+        None, description=REGION + " Empty with no country = the business's."
+    )
     date: dt.date | None = Field(
         None, description="The day of the operation; empty = the business's today."
     )
@@ -461,6 +472,23 @@ class CalculateIn(_RegionOfTheCountry, Schema):
     allow_missing_rate: bool = Field(
         False,
         description="True to get 0 % when no rule applies; otherwise that is an error, never a guess.",
+    )
+
+
+class SettingsGetIn(Schema):
+    """Nothing to say: a business has one set of tax settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class TaxSettingsIn(Schema):
+    """The business's region: one of its country's tax territories, or none (the whole country)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    region_code: OptionalRegion = Field(
+        None,
+        description=REGION + " One of the regions with taxes of their own of the business's country.",
     )
 
 
@@ -608,3 +636,14 @@ class CalculationOut(Schema):
     components: list[ComponentOut] = Field(
         description="One entry per component: the root, then its components."
     )
+
+
+class TaxSettingsOut(Schema):
+    country_code: str = Field(description="The business's country, ISO 3166-1 alpha-2.")
+    region_code: str | None = Field(
+        description="The business's region (ES-CN, ES-CE, ES-ML); empty = the whole country."
+    )
+    regions: list[str] = Field(
+        description="The regions with taxes of their own the business may keep, in its country."
+    )
+    updated_at: dt.datetime | None = Field(description="Last change; empty = never changed.")

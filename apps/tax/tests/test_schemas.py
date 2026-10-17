@@ -38,6 +38,8 @@ from apps.tax.schemas import (
     RulePage,
     RuleRefIn,
     RuleStatusIn,
+    SettingsGetIn,
+    TaxSettingsIn,
     normalize_text,
 )
 
@@ -355,7 +357,8 @@ def test_category_list_filters_and_sort():
         "is_system": None,
         "sort": "key",
         "dir": "asc",
-        "country_code": "ES",
+        # No country: the rate column is read in the business's jurisdiction (TAX-F11).
+        "country_code": None,
         "region_code": None,
     }
     assert invalid_fields(CategoryListIn, country_code="ES", region_code="PT-20") == {
@@ -477,7 +480,8 @@ def test_calculate_in():
     assert params.model_dump() == {
         "amount": 10_000,
         "tax_category_key": "product.generic",
-        "country_code": "ES",
+        # No country: the business's jurisdiction, its region included (TAX-F11).
+        "country_code": None,
         "region_code": None,
         "date": None,
         "tax_included": False,
@@ -512,3 +516,16 @@ def test_calculation_out_fields():
         "date",
         "components",
     ]
+
+
+# The business's tax settings (TAX-F11)
+
+
+def test_tax_settings_in():
+    assert TaxSettingsIn().region_code is None
+    assert TaxSettingsIn(region_code=" es-cn ").region_code == "ES-CN"
+    assert TaxSettingsIn(region_code="").region_code is None
+    assert invalid_fields(TaxSettingsIn, region_code="XX-99") == {"region_code"}
+    # A field it does not know is refused, never dropped.
+    assert invalid_fields(TaxSettingsIn, country_code="PT") == {"country_code"}
+    assert invalid_fields(SettingsGetIn, region_code="ES-CN") == {"region_code"}

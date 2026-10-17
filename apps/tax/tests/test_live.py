@@ -7,7 +7,14 @@ from live.live_registry import live_registry
 from apps.tax import events
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
-RULE_EVENTS = ["tax.rule.created", "tax.rule.ended", "tax.rule.deactivated", "tax.rule.activated"]
+# The business's region changes which rate applies, as a rule does (TAX-F11).
+RULE_EVENTS = [
+    "tax.rule.created",
+    "tax.rule.ended",
+    "tax.rule.deactivated",
+    "tax.rule.activated",
+    "tax.settings.updated",
+]
 
 
 def tax_queries():
@@ -28,6 +35,7 @@ def test_each_list_and_its_events():
         "tax.rule.parent_candidates": RULE_EVENTS,
         "tax.rule.countries": RULE_EVENTS,
         "tax.alias.list": ["tax.alias.created"],
+        "tax.settings.get": ["tax.settings.updated"],
     }
 
 
@@ -45,4 +53,14 @@ def test_ending_a_rule_re_runs_the_rules_the_categories_and_the_status():
 def test_a_new_alias_re_runs_only_the_aliases():
     assert {name for name in live_registry.affected([events.ALIAS_CREATED]) if name.startswith("tax.")} == {
         "tax.alias.list"
+    }
+
+
+def test_a_new_region_re_prices_the_till_and_the_categories():
+    affected = live_registry.affected([events.SETTINGS_UPDATED])
+    assert affected >= {
+        "tax.settings.get",
+        "tax.category.list",
+        "sale.checkout.preview",
+        "sale.department.list",
     }

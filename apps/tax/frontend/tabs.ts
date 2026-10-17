@@ -1,13 +1,15 @@
-// The three sections of Taxes, painted as the footer tabbar of each tax page (AppPage `tabs`): the
+// The sections of Taxes and its Settings (the business's tax region, TAX-F11), painted as the footer tabbar of each tax page (AppPage `tabs`): the
 // same entries, order and paths as the app's menu (`navigation` in apps.py). Each tab follows its
 // route; picking one replaces the address, so Back leaves Taxes instead of walking its tabs.
-// Icons: the old menu's (`pricetags`, `receipt`, `swap-horizontal`), all registered in the shell.
+// Icons: the old menu's (`pricetags`, `receipt`, `swap-horizontal`) and the settings gear of every app's
+// Settings, all registered in the shell.
 import type { ShellTab } from '@erplora/ui/shell';
 
 export const TAX_TABS: readonly Omit<ShellTab, 'label'>[] = Object.freeze([
   { id: 'categories', icon: 'ion:pricetags-outline', to: '/tax/categories' },
   { id: 'rules', icon: 'ion:receipt-outline', to: '/tax/rules' },
   { id: 'aliases', icon: 'ion:swap-horizontal-outline', to: '/tax/aliases' },
+  { id: 'settings', icon: 'ion:settings-outline', to: '/tax/settings' },
 ]);
 
 /** The tabs with their labels in the reader's language (`taxTabs($t)` in a template). */

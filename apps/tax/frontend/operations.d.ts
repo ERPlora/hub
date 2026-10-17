@@ -228,6 +228,7 @@ export interface CalculateIn {
   /** Whole cents. */
   amount: number;
   tax_category_key: string;
+  /** Empty: the business's country and region (TAX-F11). */
   country_code?: string;
   region_code?: string;
   date?: string;
@@ -263,6 +264,21 @@ export interface CalculationOut {
   components: ComponentOut[];
 }
 
+// ── The business's tax settings (TAX-F11) ──────────────────────────────────────────────────────
+
+export interface TaxSettingsIn {
+  /** ISO 3166-2 (`ES-CN`); `null` = the whole country. */
+  region_code: string | null;
+}
+
+export interface TaxSettingsOut {
+  country_code: string;
+  region_code: string | null;
+  /** The regions with taxes of their own the business may keep, in its country. */
+  regions: string[];
+  updated_at: string | null;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'tax.category.list': { input: CategoryListIn; output: Page<CategoryRowOut> };
@@ -281,5 +297,7 @@ declare module '@erplora/ui/sdk' {
     'tax.alias.resolve': { input: AliasResolveIn; output: AliasResolveOut };
     'tax.alias.create': { input: AliasIn; output: AliasOut };
     'tax.rate.calculate': { input: CalculateIn; output: CalculationOut };
+    'tax.settings.get': { input: Record<string, never>; output: TaxSettingsOut };
+    'tax.settings.update': { input: TaxSettingsIn; output: TaxSettingsOut };
   }
 }

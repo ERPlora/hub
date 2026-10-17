@@ -182,3 +182,69 @@ def test_the_preview_and_the_charge_agree_to_the_cent(product):
         == sale.total
         == sale.subtotal + sale.tax_total
     )
+
+
+# The business's tax region (TAX-F11, pm#629 VF-17): a business of the Canary Islands charges IGIC and one of
+# Ceuta or Melilla IPSI; the regional rule beats the national one, and without a region the national one applies.
+
+
+def regional_rule(region, rate, tax_type, key="product.generic"):
+    return run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "region_code": region,
+            "tax_category_key": key,
+            "rate_pct": rate,
+            "tax_type": tax_type,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("region", "rate", "tax_type"),
+    [("ES-CN", "7", "igic"), ("ES-CE", "4", "ipsi"), ("ES-ML", "4", "ipsi")],
+)
+def test_a_business_of_a_region_charges_its_regional_rule(product, region, rate, tax_type):
+    canary = regional_rule(region, rate, tax_type)
+    run("tax.settings.update", {"region_code": region})
+    product("Shirt", "SHI", 10000 + int(rate) * 100, "product.generic")
+    sale = charge("tax-key-0001", {"product": "SHI"})
+    (line,) = sale.lines
+    assert (line.tax_rate, line.tax_rule_id, line.tax_country_code, line.tax_region_code) == (
+        Decimal(rate),
+        canary.id,
+        "ES",
+        region,
+    )
+    assert (sale.subtotal, sale.tax_total) == (10000, int(rate) * 100)
+    assert [(row.tax_type, row.rate_pct, row.base, row.tax) for row in sale.breakdown] == [
+        (tax_type, Decimal(rate), 10000, int(rate) * 100)
+    ]
+
+
+def test_without_a_region_the_business_charges_the_national_rule(product):
+    regional_rule("ES-CN", "7", "igic")
+    product("Shirt", "SHI", 12100, "product.generic")
+    (line,) = charge("tax-key-0001", {"product": "SHI"}).lines
+    assert (line.tax_rate, line.tax_region_code) == (Decimal("21.00"), "")
+
+
+def test_a_category_without_a_regional_rule_keeps_the_national_one(product):
+    regional_rule("ES-CN", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    product("Menu", "MNU", 1100, "restaurant.food")
+    (line,) = charge("tax-key-0001", {"product": "MNU"}).lines
+    assert (line.tax_rate, line.tax_country_code) == (Decimal("10.00"), "ES")
+
+
+def test_the_preview_and_the_sections_follow_the_business_region(product):
+    regional_rule("ES-CN", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    run("sale.department.create", {"name": "Clothes", "tax_category_key": "product.generic"})
+    (section,) = run("sale.department.list", {}).rows
+    assert section.tax_rate_pct == Decimal("7.00")
+    product("Shirt", "SHI", 10700, "product.generic")
+    preview = run("sale.checkout.preview", {"lines": [{"product": "SHI"}]})
+    assert (preview.subtotal, preview.tax_total) == (10000, 700)
+    assert [(row.tax_type, row.rate_pct) for row in preview.breakdown] == [("igic", Decimal("7.00"))]

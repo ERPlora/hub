@@ -19,19 +19,23 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.tax import events
-from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import ACTOR_MAX_LENGTH, TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.queries import (
     CATEGORY_NOT_FOUND,
     RULE_NOT_FOUND,
     alias_row,
+    business_jurisdiction,
     business_today,
     category_by_reference,
     category_row,
     load_rule,
     parent_candidates,
     rule_row,
+    settings_row,
 )
 from apps.tax.schemas import (
+    REGION_NOT_AVAILABLE,
+    TAX_REGIONS,
     AliasIn,
     AliasOut,
     CategoryIn,
@@ -43,6 +47,8 @@ from apps.tax.schemas import (
     RuleIn,
     RuleOut,
     RuleRefIn,
+    TaxSettingsIn,
+    TaxSettingsOut,
 )
 
 CENTS = Decimal("0.01")
@@ -465,3 +471,50 @@ def deactivate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
 def activate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     return _switch(ctx, _named_rule(data, _latest_deactivated), active=True)
 
+
+
+# ── The business's tax settings (TAX-F11) ──────────────────────────────────────────────────────
+
+
+def _locked_settings(ctx: OperationContext) -> TaxSettings:
+    """The business's settings row, locked; created (the whole country) the first time."""
+    settings = TaxSettings.objects.select_for_update().first()
+    if settings is not None:
+        return settings
+    try:
+        with transaction.atomic():
+            return TaxSettings.objects.create(updated_by=_actor(ctx))
+    except IntegrityError:
+        return TaxSettings.objects.select_for_update().get()
+
+
+def _actor(ctx: OperationContext) -> str:
+    return str(ctx.actor)[:ACTOR_MAX_LENGTH] if ctx.actor is not None else ""
+
+
+@operation(
+    "tax.settings.update",
+    kind="command",
+    permission="tax.manage",
+    input=TaxSettingsIn,
+    output=TaxSettingsOut,
+    ai={
+        "description": "Keep the business's tax region: ES-CN (Canary Islands, IGIC), ES-CE (Ceuta, IPSI), ES-ML "
+        "(Melilla, IPSI), or empty for the whole country (VAT). From then on every sale and invoice charges the "
+        "rule of that region when its category has one, and the national one otherwise.",
+        "risk": "high",
+    },
+)
+def update_settings(ctx: OperationContext, data: TaxSettingsIn) -> dict:
+    country, _kept = business_jurisdiction()
+    region = data.region_code
+    if region and region not in TAX_REGIONS.get(country, ()):
+        message = str(REGION_NOT_AVAILABLE)
+        raise InvalidPayload(message, code="tax.region_not_available", fields={"region_code": message})
+    settings = _locked_settings(ctx)
+    if settings.region_code != (region or ""):
+        settings.region_code = region or ""
+        settings.updated_by = _actor(ctx)
+        settings.save(update_fields=["region_code", "updated_by", "updated_at"])
+        record_event(ctx, events.SETTINGS_UPDATED, {"country_code": country, "region_code": region})
+    return settings_row(settings)

@@ -7,6 +7,8 @@
   as the equivalence surcharge. A rule is never edited or deleted: it gets an end date or is
   deactivated, and a new one is created.
 - ``TaxAlias`` is an outside text (``beer``) that the importer of inventory reads as a category.
+- ``TaxSettings`` is the business's tax region (``ES-CN``), one row at most: what every calculation that names
+  no country reads, with the business's country (TAX-F11).
 
 Phase 1 has no tenancy (like ``apps.demo``): phase 2 moves these tables to each hub's database.
 """
@@ -262,3 +264,31 @@ class TaxAlias(UUIDModel):
 
     def __str__(self) -> str:
         return self.alias
+
+
+#: Who changed a row: the operation's actor, cut as the outbox keeps it.
+ACTOR_MAX_LENGTH = 128
+#: How a business without a region reads in the admin.
+WHOLE_COUNTRY = _("Whole country")
+
+
+class TaxSettings(UUIDModel):
+    """The business's tax region: empty is the whole country (Spain's VAT); ``ES-CN`` charges IGIC and
+    ``ES-CE``/``ES-ML`` IPSI, by the rules of that region (TAX-F11). One row at most."""
+
+    singleton = models.BooleanField(_("single row"), default=True, editable=False)
+    # ISO 3166-2 (``ES-CN``), of the business's country.
+    region_code = models.CharField(_("region"), max_length=6, blank=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    updated_by = models.CharField(_("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+
+    class Meta:
+        verbose_name = _("tax settings")
+        verbose_name_plural = _("tax settings")
+        constraints = [
+            models.UniqueConstraint(fields=["singleton"], name="tax_settings_single_row"),
+            models.CheckConstraint(condition=Q(singleton=True), name="tax_settings_singleton"),
+        ]
+
+    def __str__(self) -> str:
+        return self.region_code or str(WHOLE_COUNTRY)

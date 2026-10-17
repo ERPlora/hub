@@ -23,12 +23,14 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound
+from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import operation
 
-from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
     DEFAULT_COUNTRY,
+    REGION_OF_ANOTHER_COUNTRY,
+    TAX_REGIONS,
     AliasListIn,
     AliasPage,
     AliasResolveIn,
@@ -46,6 +48,8 @@ from apps.tax.schemas import (
     RuleParentIn,
     RuleStatusIn,
     RuleStatusOut,
+    SettingsGetIn,
+    TaxSettingsOut,
     normalize_text,
 )
 
@@ -172,20 +176,46 @@ def _components(root: TaxRule, on: dt.date) -> list[TaxRule]:
     return [root, *children]
 
 
-def _jurisdiction(country_code: str, region_code: str | None) -> tuple[str, str | None]:
-    """``(COUNTRY, REGION or None)`` as the rules store them: capitals, no spaces, empty = none."""
-    region = (region_code or "").strip().upper()
-    return country_code.strip().upper(), region or None
+def business_jurisdiction() -> tuple[str, str | None]:
+    """The business's ``(COUNTRY, REGION or None)``: the one source every calculation that names no country
+    reads (sales, invoice, the API; TAX-F11). The country is Spain until the Hub receives the business's
+    from its ERPlora account; the region is the one it keeps in Taxes' settings."""
+    settings = TaxSettings.objects.first()
+    return DEFAULT_COUNTRY, (settings.region_code or None) if settings else None
+
+
+def _jurisdiction(country_code: str | None, region_code: str | None) -> tuple[str, str | None]:
+    """``(COUNTRY, REGION or None)`` as the rules store them: capitals, no spaces, empty = none.
+
+    No country is the business's jurisdiction, its region included unless one is given; naming a country
+    asks for that country alone, with the region given."""
+    region = (region_code or "").strip().upper() or None
+    country = (country_code or "").strip().upper()
+    if not country:
+        country, kept = business_jurisdiction()
+        region = region or kept
+    return country, region
+
+
+def asked_jurisdiction(country_code: str | None, region_code: str | None) -> tuple[str, str | None]:
+    """The jurisdiction a reader asks for, as ``_jurisdiction``; a region of another country than the one
+    it falls in is a 422 on its field, never a silent national rate."""
+    country, region = _jurisdiction(country_code, region_code)
+    if region and not region.startswith(f"{country}-"):
+        message = str(REGION_OF_ANOTHER_COUNTRY)
+        raise InvalidPayload(message, fields={"region_code": message})
+    return country, region
 
 
 def resolve_tax(
     *,
     category_key: str,
-    country_code: str = DEFAULT_COUNTRY,
+    country_code: str | None = None,
     region_code: str | None = None,
     on: dt.date | None = None,
 ) -> Resolution | None:
-    """The rule that applies to a line of ``category_key`` on ``on`` (default: the business's today).
+    """The rule that applies to a line of ``category_key`` on ``on`` (default: the business's today), in
+    the business's jurisdiction unless a country is named.
 
     Country and region are read in any case: sales and invoice call this without the schemas.
     """
@@ -204,7 +234,7 @@ def calculate_tax(
     *,
     amount: int,
     category_key: str,
-    country_code: str = DEFAULT_COUNTRY,
+    country_code: str | None = None,
     region_code: str | None = None,
     on: dt.date | None = None,
     tax_included: bool = False,
@@ -266,18 +296,19 @@ def calculate_tax(
     output=CalculationOut,
     ai={
         "description": "Resolve and calculate the tax of an amount in cents for a tax category (its key, name or "
-        "alias), in the business's country and region: base, tax, total, the rate and the fiscal qualification "
-        "of the operation. Without an applicable rule it fails instead of guessing a rate."
+        "alias), in the business's country and region unless a country is named: base, tax, total, the rate and "
+        "the fiscal qualification of the operation. Without an applicable rule it fails instead of guessing a rate."
     },
 )
 def calculate(ctx: OperationContext, params: CalculateIn) -> dict:
     category = category_by_reference(params.tax_category_key)
+    country_code, region_code = asked_jurisdiction(params.country_code, params.region_code)
     return calculate_tax(
         amount=params.amount,
         # A text that names no category has no rule either: tax.no_rate, never a guessed one.
         category_key=category.key if category else params.tax_category_key,
-        country_code=params.country_code,
-        region_code=params.region_code,
+        country_code=country_code,
+        region_code=region_code,
         on=params.date,
         tax_included=params.tax_included,
         allow_missing_rate=params.allow_missing_rate,
@@ -344,7 +375,8 @@ def _ordering(column: str, direction: str, *tie_breaks: str) -> list:
     expose_api=True,
     ai={
         "description": "List the active tax categories (the key products and services link to), with the "
-        "rate each one has today in a country and region; search by key, name or description."
+        "rate each one has today in a country and region (the business's unless a country is named); search by "
+        "key, name or description."
     },
 )
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
@@ -374,7 +406,8 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
         column = {"display_name": "shown_name", "display_description": "shown_description"}.get(params.sort, params.sort)
         ordered = categories.order_by(*_ordering(column, params.dir, "key", "id"))
         page = list(ordered[params.offset : params.offset + params.limit])
-        rates = current_rates(page, params.country_code, params.region_code, business_today())
+        country_code, region_code = asked_jurisdiction(params.country_code, params.region_code)
+        rates = current_rates(page, country_code, region_code, business_today())
         rows = [
             {
                 **category_row(category),
@@ -706,3 +739,32 @@ def resolve_category_text(text: str) -> tuple[str | None, str | None]:
 def resolve_alias(ctx: OperationContext, params: AliasResolveIn) -> dict:
     key, matched_by = resolve_category_text(params.text)
     return {"text": params.text, "tax_category_key": key, "matched_by": matched_by}
+
+
+# ── The business's tax settings (TAX-F11) ──────────────────────────────────────────────────────
+
+
+def settings_row(settings: TaxSettings | None) -> dict:
+    country, _region = business_jurisdiction()
+    return {
+        "country_code": country,
+        "region_code": (settings.region_code or None) if settings else None,
+        "regions": list(TAX_REGIONS.get(country, ())),
+        "updated_at": settings.updated_at if settings else None,
+    }
+
+
+@operation(
+    "tax.settings.get",
+    kind="query",
+    permission="tax.view",
+    input=SettingsGetIn,
+    output=TaxSettingsOut,
+    ai={
+        "description": "Read the business's tax region and country: the jurisdiction every sale and invoice is "
+        "charged in. ES-CN is the Canary Islands (IGIC), ES-CE Ceuta and ES-ML Melilla (IPSI); empty is the "
+        "whole country (VAT). Also the regions it may keep."
+    },
+)
+def get_settings(ctx: OperationContext, params: SettingsGetIn) -> dict:
+    return settings_row(TaxSettings.objects.first())

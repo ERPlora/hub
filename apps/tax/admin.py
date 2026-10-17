@@ -8,7 +8,7 @@ coherence of a component are checked by the operations (services.py), which the 
 
 from django.contrib import admin
 
-from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 
 #: Set by the database or the model: shown, never typed.
 AUDIT = ("id", "created_at", "updated_at")
@@ -100,3 +100,10 @@ class TaxAliasAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+
+
+@admin.register(TaxSettings)
+class TaxSettingsAdmin(admin.ModelAdmin):
+    list_display = ("region_code", "updated_at", "updated_by")
+    readonly_fields = ("id", "updated_at", "updated_by")
+    fields = ("id", "region_code", "updated_at", "updated_by")

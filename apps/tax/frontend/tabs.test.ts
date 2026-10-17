@@ -19,21 +19,27 @@ function tabsIn(locale: 'en' | 'es') {
 }
 
 describe('the tax tabbar', () => {
-  it('is Categories, Rules and Aliases, each on its own route, the order of the menu (apps.py)', () => {
+  it('is Categories, Rules, Aliases and Settings, each on its own route, the order of the menu (apps.py)', () => {
     expect(tabsIn('en').map((t) => [t.id, t.label, t.to])).toEqual([
       ['categories', 'Categories', '/tax/categories'],
       ['rules', 'Rules', '/tax/rules'],
       ['aliases', 'Aliases', '/tax/aliases'],
+      ['settings', 'Settings', '/tax/settings'],
     ]);
   });
 
   it('speaks Spanish', () => {
-    expect(tabsIn('es').map((t) => t.label)).toEqual(['Categorías', 'Reglas', 'Alias']);
+    expect(tabsIn('es').map((t) => t.label)).toEqual(['Categorías', 'Reglas', 'Alias', 'Ajustes']);
   });
 
   it('gives every tab a registered icon, the old menu\'s: price tags, receipt and the horizontal swap', () => {
     for (const tab of TAX_TABS) expect(Object.hasOwn(ION_ICONS, tab.icon.replace(/^ion:/, '')), tab.icon).toBe(true);
-    expect(TAX_TABS.map((t) => t.icon)).toEqual(['ion:pricetags-outline', 'ion:receipt-outline', 'ion:swap-horizontal-outline']);
+    expect(TAX_TABS.map((t) => t.icon)).toEqual([
+      'ion:pricetags-outline',
+      'ion:receipt-outline',
+      'ion:swap-horizontal-outline',
+      'ion:settings-outline',
+    ]);
   });
 
   it('wears the same icons and paths as the menu entries of apps.py (one icon per section everywhere)', () => {

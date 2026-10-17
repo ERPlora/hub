@@ -24,6 +24,7 @@ from apps.tax.schemas import (
     RuleParentIn,
     RuleRefIn,
     RuleStatusIn,
+    TaxSettingsIn,
 )
 
 router = Router(tags=["tax"])
@@ -119,3 +120,16 @@ async def alias_create(request, data: AliasIn):
 @bind(router, "tax.rate.calculate", "/tax/rates/calculate")
 async def rate_calculate(request, params: Query[CalculateIn]):
     return await run_operation(request, queries.calculate, params)
+
+
+# The business's tax settings (TAX-F11)
+
+
+@bind(router, "tax.settings.get", "/tax/settings")
+async def settings_get(request):
+    return await run_operation(request, queries.get_settings)
+
+
+@bind(router, "tax.settings.update", "/tax/settings")
+async def settings_update(request, data: TaxSettingsIn):
+    return await run_operation(request, services.update_settings, data)

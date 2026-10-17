@@ -21,7 +21,7 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.tax import events
-from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
     AliasIn,
     AliasOut,
@@ -33,6 +33,8 @@ from apps.tax.schemas import (
     RuleIn,
     RuleOut,
     RuleRefIn,
+    TaxSettingsIn,
+    TaxSettingsOut,
 )
 
 from .conftest import A, B, ctx_for
@@ -83,6 +85,8 @@ def refused(error, make):
         ("tax.rule.end", RuleEndIn, RuleOut, True, "high"),
         ("tax.rule.deactivate", RuleRefIn, RuleOut, False, "high"),
         ("tax.rule.activate", RuleRefIn, RuleOut, True, "high"),
+        # The business's region decides which rate every sale charges and declares (TAX-F11).
+        ("tax.settings.update", TaxSettingsIn, TaxSettingsOut, False, "high"),
     ],
 )
 def test_declarations(name, input, output, expose_api, risk):
@@ -989,3 +993,57 @@ def test_a_batch_with_twin_rows_is_refused_as_an_overlap_not_a_crash(no_seed):
     error = refused(Conflict, lambda: run("tax.rule.bulk_create", RuleBulkIn(rules=rows)))
     assert (error.code, sorted(error.fields)) == ("tax.rule_overlaps", ["rules.0.valid_from", "rules.2.valid_from"])
     assert TaxRule.objects.count() == 1
+
+
+# tax.settings.update (TAX-F11, pm#629 VF-17): the business keeps its region
+
+
+def keep(region, role="hub_admin", scope=A):
+    return run("tax.settings.update", TaxSettingsIn(region_code=region), role, scope)
+
+
+@pytest.mark.django_db
+def test_keep_change_and_clear_the_business_region():
+    kept = keep("es-cn")
+    assert (kept.country_code, kept.region_code) == ("ES", "ES-CN")
+    settings = TaxSettings.objects.get()
+    assert (settings.region_code, settings.updated_by) == ("ES-CN", "tester")
+    assert outbox() == [(events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": "ES-CN"})]
+    OutboxEvent.objects.all().delete()
+    # The same region again changes nothing: no event re-prices the open tills.
+    assert keep("ES-CN").region_code == "ES-CN" and outbox() == []
+    assert keep("ES-ML").region_code == "ES-ML"
+    cleared = keep(None)
+    assert (cleared.region_code, TaxSettings.objects.get().region_code) == (None, "")
+    assert outbox() == [
+        (events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": "ES-ML"}),
+        (events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": None}),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("region", ["PT-20", "ES-MD"])
+def test_only_a_tax_territory_of_the_business_country_is_kept(region):
+    # PT-20 is of another country; Madrid is Spain but charges the national VAT: no rule of its own.
+    error = refused(InvalidPayload, lambda: keep(region))
+    assert (error.status, error.code) == (422, "tax.region_not_available")
+    assert error.fields == {"region_code": error.message}
+    assert not TaxSettings.objects.exists() and outbox() == []
+
+
+@pytest.mark.django_db
+def test_only_who_manages_taxes_changes_the_region():
+    refused(PermissionDenied, lambda: keep("ES-CN", role="hub_employee"))
+    assert not TaxSettings.objects.exists() and outbox() == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_region_kept_on_b_notifies_the_channel_of_b_only(listen):
+    on_a, on_b = listen(A), listen(B)
+
+    keep("ES-CN", scope=B)
+
+    assert received(on_b, stop_after=1) == [
+        (channel_for(B), {"events": [events.SETTINGS_UPDATED]})
+    ]
+    assert received(on_a, timeout=QUIET) == []

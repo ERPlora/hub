@@ -13,8 +13,8 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
-from apps.tax.admin import ComponentInline, TaxAliasAdmin, TaxCategoryAdmin, TaxRuleAdmin
-from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from apps.tax.admin import ComponentInline, TaxAliasAdmin, TaxCategoryAdmin, TaxRuleAdmin, TaxSettingsAdmin
+from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 
 
 @pytest.fixture
@@ -94,3 +94,20 @@ def test_the_staff_creates_and_changes_a_category(client, superuser):
     assert changed.status_code == 302
     books.refresh_from_db()
     assert books.name == "Libros"
+
+
+def test_the_business_tax_settings_are_in_the_admin(superuser):
+    # TAX-F11: the staff sees and fixes the region a business keeps, as every other table of the app.
+    registered = admin.site._registry[TaxSettings]
+    assert isinstance(registered, TaxSettingsAdmin)
+    request = request_by(superuser)
+    assert all(
+        check(request)
+        for check in (
+            registered.has_view_permission,
+            registered.has_add_permission,
+            registered.has_change_permission,
+            registered.has_delete_permission,
+        )
+    )
+    assert "region_code" in registered.list_display

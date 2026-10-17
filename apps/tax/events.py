@@ -9,6 +9,8 @@ RULE_CREATED = "tax.rule.created"
 RULE_ENDED = "tax.rule.ended"
 RULE_DEACTIVATED = "tax.rule.deactivated"
 RULE_ACTIVATED = "tax.rule.activated"
+#: The business kept another region (TAX-F11): the rate of every category may change with it.
+SETTINGS_UPDATED = "tax.settings.updated"
 
 ALL = [
     CATEGORY_CREATED,
@@ -17,6 +19,7 @@ ALL = [
     RULE_ENDED,
     RULE_DEACTIVATED,
     RULE_ACTIVATED,
+    SETTINGS_UPDATED,
 ]
-#: Every event that changes which rate applies.
-RULE_EVENTS = [RULE_CREATED, RULE_ENDED, RULE_DEACTIVATED, RULE_ACTIVATED]
+#: Every event that changes which rate applies: a rule, or the business's region.
+RULE_EVENTS = [RULE_CREATED, RULE_ENDED, RULE_DEACTIVATED, RULE_ACTIVATED, SETTINGS_UPDATED]
