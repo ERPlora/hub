@@ -19,7 +19,9 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import pytest
+from django.contrib import admin
 from django.db import connection, transaction
+from django.test import RequestFactory
 from live.errors import OperationError
 from live.operations import get
 
@@ -257,14 +259,24 @@ def run_as_system(name, data):
     return op(ctx_for(permissions={"service.system"}), op.input.model_validate(data))
 
 
+def admin_delete(target, how: str = "delete_model") -> None:
+    """The Hub admin's «Delete» of ``target``: its page (``delete_model``) or the list's «Delete selected»
+    action (``delete_queryset``), as the staff run them."""
+    model_admin = admin.site._registry[type(target)]
+    request = RequestFactory().post("/admin/")
+    if how == "delete_queryset":
+        model_admin.delete_queryset(request, type(target).objects.filter(pk=target.pk))
+    else:
+        model_admin.delete_model(request, type(target).objects.get(pk=target.pk))
+
+
 def remove(target, how: str) -> None:
     if how == "row":
-        # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
-        type(target).objects.get(pk=target.pk).delete()
+        admin_delete(target)
     elif how == "default":
         # The settings' default tax category: they move to another one, and then the staff delete it.
         run("service.settings.update", {"default_tax_category_key": GENERAL})
-        TaxCategory.objects.get(pk=target.pk).delete()
+        admin_delete(TaxCategory.objects.get(pk=target.pk))
     else:
         run(TAKEN_AWAY[type(target), how], {"id": str(target.pk)})
 
@@ -620,3 +632,123 @@ def test_moving_a_service_while_its_old_category_is_deleted_never_waits_in_a_cir
     assert deleted(deletions) == ["ok"]
     assert Service.objects.get(pk=world.cut.pk).category_id == world.colour.id
     assert Category.objects.get(pk=hair.pk).is_deleted
+
+
+# ── The Hub admin's «Delete» and the writes that hold what they name ───────────────────────────
+#
+# Django's deletion empties or deletes what names a row (services, subcategories, assignments) and then
+# deletes the row. A write that held the row and then took one of those waited for it, while it waited for
+# the write: Postgres killed one of the two (a 500). The admin's «Delete» of a category takes every category
+# first, as the business's own «Delete» does, and assigning takes the assignment before the service, in the
+# order the deletion of the service takes them.
+
+
+@contextmanager
+def admin_deleting(target, how: str, after: Callable):
+    """The Hub admin's «Delete» of ``target`` started in another session right before the first statement of
+    this one for which ``after`` holds, and left to run a moment before this one goes on."""
+    deletions: list = []
+
+    def deletion():
+        try:
+            with transaction.atomic():
+                admin_delete(target, how)
+            deletions.append("ok")
+        except Exception as error:  # reported to the test, which fails on it
+            deletions.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=deletion)
+
+    def wrapper(execute, sql, params, many, context):
+        if thread.ident is None and after(sql):
+            thread.start()
+            time.sleep(IN_FLIGHT)
+        return execute(sql, params, many, context)
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield deletions
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+    assert thread.ident is not None, "the deletion never started"
+
+
+ADMIN_DELETIONS = ["delete_model", "delete_queryset"]
+
+
+def locks_the_service(sql: str) -> bool:
+    return 'FROM "service_service"' in sql and "FOR UPDATE" in sql
+
+
+@pytest.mark.parametrize("how", ADMIN_DELETIONS)
+def test_editing_a_service_in_its_own_category_while_the_hub_admin_deletes_it_never_waits_in_a_circle(
+    world, how
+):
+    # The edit held the category and then its own row; the admin had emptied the category (the service's row
+    # first) and waited for the category: each waited for the other.
+    hair = make_category("Hair")
+    Service.objects.filter(pk=world.cut.pk).update(category=hair)
+    with admin_deleting(hair, how, locks_the_service) as deletions:
+        outcome = attempt(
+            lambda: run(
+                "service.service.update",
+                {"id": str(world.cut.id), "category_id": str(hair.id), "price": 2500},
+            )
+        )
+    assert deleted(deletions) == ["ok"]
+    assert not isinstance(outcome, OperationError), outcome
+    cut = Service.objects.get(pk=world.cut.pk)
+    assert (cut.category_id, cut.price) == (None, 2500)
+    assert not Category.objects.filter(pk=hair.pk).exists()
+
+
+#: What is written in a category the admin is deleting, how it names it and what it leaves.
+WRITTEN_IN_A_CATEGORY = {
+    "a service": (
+        lambda w: run("service.service.create", {"name": "Perm", "price": 3000, "tax_category_key": GENERAL, "category_id": str(w.colour.id)}),
+        'INSERT INTO "service_service"',
+        lambda w: Service.objects.get(name="Perm").category_id,
+    ),
+    "a subcategory": (
+        lambda w: run("service.category.create", {"name": "Highlights", "parent_id": str(w.colour.id)}),
+        'INSERT INTO "service_category"',
+        lambda w: Category.objects.get(name="Highlights").parent_id,
+    ),
+}
+
+
+@pytest.mark.parametrize("how", ADMIN_DELETIONS)
+@pytest.mark.parametrize("written", sorted(WRITTEN_IN_A_CATEGORY))
+def test_the_hub_admin_deleting_a_category_a_write_holds_waits_and_then_empties_it(world, written, how):
+    # The admin's deletion read what named the category before the write committed and then deleted the row
+    # the write had just named: refused at its COMMIT (a 500 for the staff). Entering through every category
+    # first, it waits for the write and then reads what it left.
+    call, statement, parent = WRITTEN_IN_A_CATEGORY[written]
+    with admin_deleting(world.colour, how, lambda sql: sql.lstrip().startswith(statement)) as deletions:
+        call(world)
+    assert deleted(deletions) == ["ok"]
+    assert not Category.objects.filter(pk=world.colour.pk).exists()
+    assert parent(world) is None
+
+
+def test_reassigning_a_professional_while_the_hub_admin_deletes_the_service_never_waits_in_a_circle(world):
+    # Assigning held the service and then locked the assignment; the admin's deletion of the service had
+    # deleted its assignments first and waited for the service: each waited for the other.
+    Assignment.objects.create(service=world.spare, member=world.ana)
+    locks_the_assignment = lambda sql: 'FROM "service_assignment"' in sql and "FOR UPDATE" in sql  # noqa: E731
+    with admin_deleting(world.spare, "delete_model", locks_the_assignment) as deletions:
+        outcome = attempt(
+            lambda: run(
+                "service.assignment.assign",
+                {"service_id": str(world.spare.id), "member_id": str(world.ana.id), "custom_price": 1500},
+            )
+        )
+    assert deleted(deletions) == ["ok"]
+    # As for a service deleted before: not found, and nothing assigned.
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (404, "service.service_not_found")
+    assert not Service.objects.filter(pk=world.spare.pk).exists()
+    assert not Assignment.objects.exists()

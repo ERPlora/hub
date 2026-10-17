@@ -4,10 +4,13 @@ A second write path, for the staff only on hubs.erplora.com: it does not go thro
 rules (a name taken, a voucher's balance, the sessions that are never edited), so it warns rather than
 prevents, and it leaves no event. The one rule it keeps is the categories' tree: a parent that would
 close a loop is refused (a loop would leave the tree unreadable). What the database fills in (ids and timestamps) is shown, not edited.
+Deleting categories takes every category first, as the business's «Delete» does: a write that holds the
+category it names (a service put in it) waits for it or is waited for, never in a circle.
 """
 
 from django import forms
 from django.contrib import admin
+from django.db import transaction
 
 from apps.service.models import (
     CATEGORY_CYCLE,
@@ -23,6 +26,7 @@ from apps.service.models import (
     ServiceSettings,
     parent_problem,
 )
+from apps.service.services import lock_tree
 
 AUTOMATIC = ("id", "created_at", "updated_at")
 
@@ -95,6 +99,20 @@ class CategoryAdminForm(forms.ModelForm):
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     form = CategoryAdminForm
+
+    # Django empties what names a category (its services, its subcategories) and then deletes it. Entering
+    # through every category first, as the business's «Delete» does, it waits for a write that holds one
+    # and then reads what that write left, instead of waiting for it in a circle or deleting a category
+    # the write had just named (refused at the COMMIT).
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            lock_tree()
+            super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            lock_tree()
+            super().delete_queryset(request, queryset)
     list_display = ("name", "parent", "sort_order", "is_deleted")
     list_filter = ("is_deleted",)
     search_fields = ("name",)

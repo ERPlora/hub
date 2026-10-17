@@ -924,8 +924,12 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   COMMIT: la categoría fiscal con la lectura retenida de Impuestos (`FOR KEY SHARE`), las filas propias con
   `FOR NO KEY UPDATE` en orden de id y la ficha con el bloqueo de Clientes. Su «Eliminar», archivarla o el
   borrado del admin esperan a la escritura, y una ya en curso se rechaza como una borrada antes (el mismo
-  422 o 404); editar un servicio retiene lo que nombra antes que su propia fila, en el orden del «Eliminar»
-  de una categoría, así que nunca se esperan en círculo. Hay tests con hilos de cada carrera.
+  422 o 404). El orden evita las esperas en círculo: el borrado del admin de una categoría entra como su
+  «Eliminar», bloqueando antes todas las categorías vivas, y luego vacía lo que la nombraba (sus servicios y
+  subcategorías), ya con lo que dejó la escritura; editar un servicio retiene lo que nombra antes que su
+  propia fila; asignar bloquea la asignación que ya existía antes de retener el servicio, el orden en que el
+  borrado del admin de un servicio borra sus asignaciones y después el servicio. Hay tests con hilos de cada
+  carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
   hora (`0 * * * *`, UTC, `collapse`); hecho — la corre el worker (`base/scheduler.py`, 2026-10-15; en la
   fase 1, sobre un solo hub). Además, el saldo ya no cuenta una reserva vencida y reservar de nuevo la misma

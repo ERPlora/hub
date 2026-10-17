@@ -530,8 +530,10 @@ def _save_unique(instance, constraint: str, message, code: str) -> None:
         raise
 
 
-def _lock_tree() -> dict:
-    """Locks every live category in id order; their parents as they are now (id → parent id)."""
+def lock_tree() -> dict:
+    """Locks every live category in id order; their parents as they are now (id → parent id). Moving or
+    deleting a category takes it first, and so does the Hub admin's «Delete» (admin.py): a write that holds a
+    category it names and then its own row never waits in a circle with them."""
     rows = Category.objects.select_for_update().filter(is_deleted=False).order_by("id")
     return dict(rows.values_list("id", "parent_id"))
 
@@ -590,7 +592,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
     category_id = find_category(data.id, data.category).pk
     # Moving a category takes every live category, in id order, before its own row: two moves at
     # once go one after the other, and the second sees where the first left the tree.
-    parent_of = _lock_tree() if moving else {}
+    parent_of = lock_tree() if moving else {}
     category = find_category(category_id, None, lock=True)
     values = {
         field: getattr(data, field)
@@ -636,7 +638,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
 )
 def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     category_id = find_category(data.id, data.category).pk
-    _lock_tree()  # its children move: the same order as a move, so the two never wait for each other
+    lock_tree()  # its children move: the same order as a move, so the two never wait for each other
     category = find_category(category_id, None, lock=True)
     now = timezone.now()
     Service.objects.filter(category=category).update(category=None, updated_at=now)
@@ -729,13 +731,16 @@ def _assignment_payload(assignment: Assignment) -> dict:
     },
 )
 def assign(ctx: OperationContext, data: AssignIn) -> dict:
-    service = find_service(data.service_id, data.service, hold=True)
+    service_id = find_service(data.service_id, data.service).pk
     member = resolve_member(data.member_id, data.member, lock=True)
+    # The assignment is locked before the service is held, in the order the Hub admin's deletion of the
+    # service takes them (its assignments, then itself): the other way round, each waited for the other.
     assignment = (
         Assignment.objects.select_for_update()
-        .filter(service=service, member=member)
+        .filter(service_id=service_id, member=member)
         .first()
     )
+    service = find_service(service_id, None, hold=True)
     created = assignment is None
     if created:
         assignment = Assignment(service=service, member=member)
