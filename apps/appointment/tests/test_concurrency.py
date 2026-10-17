@@ -4,19 +4,25 @@ quien lo mantiene»: solapes con bloqueo).
 Whichever comes first wins; the other one waits for the staff record's lock, then sees the first booking
 and is refused with the real reason. Two bookings on the same day never share a number, and two runs of
 the same series never book a date twice.
+
+A detail (an appointment, a series) that a deletion lands in the middle of answers what it read or 404,
+never a 500.
 """
 
 import threading
+from contextlib import contextmanager
 
 import pytest
+from django.contrib import admin
 from django.db import connection
+from django.test import RequestFactory
 from live.errors import OperationError
 
 from apps.appointment.models import Appointment
 from apps.staff.models import Member
 from apps.staff.tests.conftest import deleted_on_screen
 
-from .conftest import MONDAY, make_settings, run, wall
+from .conftest import MONDAY, at, make_appointment, make_series, make_settings, run, wall
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -144,3 +150,85 @@ def test_a_booking_while_the_hub_admin_deletes_the_professional_leaves_them_prot
     assert len(answer.context["protected"]) == 1
     assert Member.objects.filter(pk=salon.ana.pk).exists()
     assert Appointment.objects.filter(staff=salon.ana).count() == 1
+
+
+# ── A deletion that lands in the middle of a detail ─────────────────────────────────────────────
+#
+# The series' detail found it and then loaded it again by its id: a deletion committed between the two reads
+# raised DoesNotExist (a 500) when the Hub admin deleted it (the row goes), and mixed both reads when the
+# business deleted it (the row stays, marked: the detail showed it paused). In one read it is the series as
+# it was read; what the deletion's event runs next says it is not found. An appointment's detail already
+# reads its row once: it stays here so that a second read never comes back.
+
+#: How a detail's row is taken away: the Hub admin's «Delete» from its page or with the list's «Delete
+#: selected» (the row goes, with what its ``on_delete`` takes), or the business's «Delete» (the row is marked).
+DELETIONS = ["delete_model", "delete_queryset", "operation"]
+
+#: Each detail: how its row is made, the business's «Delete» of it, what the detail shows of it (and what it
+#: was made with), and how it says it is not found.
+DETAILS = {
+    "appointment.recurring.get": (
+        make_series,
+        "appointment.recurring.delete",
+        lambda shown: (shown.id, shown.customer_name, shown.frequency, shown.is_active),
+        lambda series: (series.id, "Lucía Pérez", "weekly", True),
+        "appointment.recurring_not_found",
+    ),
+    "appointment.appointment.get": (
+        lambda salon: make_appointment(
+            salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00")
+        ),
+        "appointment.appointment.delete",
+        lambda shown: (shown.id, shown.customer_name, shown.status),
+        lambda appointment: (appointment.id, "Lucía Pérez", "confirmed"),
+        "appointment.appointment_not_found",
+    ),
+}
+
+
+def delete(target, how: str, business_delete: str) -> None:
+    """Takes ``target`` away in this session, ``how`` it says (see ``DELETIONS``), as the staff run it."""
+    if how == "operation":
+        run(business_delete, {"id": str(target.pk)})
+        return
+    model_admin = admin.site._registry[type(target)]
+    request = RequestFactory().post("/admin/")
+    if how == "delete_queryset":
+        model_admin.delete_queryset(request, type(target).objects.filter(pk=target.pk))
+    else:
+        model_admin.delete_model(request, type(target).objects.get(pk=target.pk))
+
+
+@contextmanager
+def deleted_after_the_first_read_of(target, how: str, business_delete: str):
+    """Commits the deletion of ``target`` in another session right after the first statement of this one that
+    reads its table: a deletion landing in the middle of a read, every time. Yields its outcome."""
+    table = f'FROM "{type(target)._meta.db_table}"'
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            deletions.extend(at_once(lambda: delete(target, how, business_delete)))
+        return result
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+@pytest.mark.parametrize("how", DELETIONS)
+@pytest.mark.parametrize("detail", sorted(DETAILS))
+def test_a_row_deleted_while_its_detail_is_read_is_never_a_server_error(salon, detail, how):
+    make, business_delete, shows, made_with, missing = DETAILS[detail]
+    target = make(salon)
+    with deleted_after_the_first_read_of(target, how, business_delete) as deletions:
+        shown = run(detail, {"id": str(target.pk)})
+    assert [getattr(outcome, "code", "ok") for outcome in deletions] == ["ok"]
+    assert shows(shown) == made_with(target)
+    # What the deletion's event runs next: not found, and the open sheet closes.
+    try:
+        gone = run(detail, {"id": str(target.pk)})
+    except OperationError as error:
+        gone = error
+    assert isinstance(gone, OperationError), gone
+    assert (gone.status, gone.code) == (404, missing)
