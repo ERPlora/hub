@@ -147,12 +147,14 @@ def load_category(category_id: UUID) -> dict | None:
 
 
 def find_product(
-    product_id: UUID | None, said: str | None, *, lock: bool = False
+    product_id: UUID | None, said: str | None, *, lock: bool = False, rows=None
 ) -> Product:
     """The live product named by its id, or by its SKU or name as a person says it.
 
     By text: the SKU (ignoring case), else the exact name, else the only name that contains it.
     ``NotFound`` when none matches; 409 ``inventory.product_ambiguous`` when several do.
+    The product comes from ``rows`` when given (e.g. ready for its row): one read, so a deletion committed
+    meanwhile is either not seen yet or not found, never a row that vanished between two reads.
     """
     products = Product.objects.filter(is_deleted=False)
     if product_id is None:
@@ -169,7 +171,7 @@ def find_product(
                 code="inventory.product_ambiguous",
             )
         product_id = candidates[0].pk if candidates else None
-    found = products.filter(pk=product_id)
+    found = (products if rows is None else rows).filter(pk=product_id)
     product = (found.select_for_update() if lock else found).first()
     if product is None:
         raise NotFound(str(PRODUCT_NOT_FOUND))
@@ -241,7 +243,9 @@ def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
     },
 )
 def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
-    return load_product(find_product(data.id, data.product).id)
+    return _product_row(
+        find_product(data.id, data.product, rows=_products(current_settings()))
+    )
 
 
 @operation(
