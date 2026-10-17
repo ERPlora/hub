@@ -89,12 +89,18 @@ test('TAX-F03: a component is read right under its root; Status reaches the deac
   await pickSelect(page, shown(page).locator('[data-testid=tax-rules-status]'), /^Deactivated$/);
   await expect(rows(page, 'rules')).toHaveCount(1);
   await expect(rows(page, 'rules').first()).toContainText('PT');
-  // taxes#12: on a phone, a card's actions are comfortable targets (44 px or more).
+  // taxes#12: on a phone, a card's actions are comfortable targets (44 px or more). Crossing to 390
+  // turns the table into cards: the table row's Restore is still on screen for a moment and is torn
+  // down while measured (its box comes back null), so the target is the card's own, once painted.
   await page.setViewportSize({ width: 390, height: 844 });
-  const restore = shown(page).locator(`[data-testid=tax-rules-row-${old.id}-restore]`).first();
+  const restore = shown(page).locator(`ion-card[data-testid=tax-rules-row] [data-testid=tax-rules-row-${old.id}-restore]`);
   await expect(restore).toBeVisible();
-  const box = await restore.boundingBox();
-  expect(box && Math.min(box.width, box.height), 'the Restore target on a phone').toBeGreaterThanOrEqual(44);
+  await expect
+    .poll(async () => {
+      const box = await restore.boundingBox();
+      return box && Math.min(box.width, box.height);
+    }, { message: 'the Restore target on a phone' })
+    .toBeGreaterThanOrEqual(44);
 });
 
 // flow: TAX-F03 · gh:hub#2406
