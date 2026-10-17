@@ -43,6 +43,7 @@ from apps.inventory.queries import (
     current_settings,
     find_category,
     find_product,
+    held,
     load_category,
     load_product,
     quantity_text,
@@ -214,7 +215,10 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
     eans = {_unguarded(row.ean13.strip()) for row in rows if row.ean13.strip()}
     live_eans = set(Product.objects.filter(is_deleted=False, ean13__in=eans).values_list("ean13", flat=True))
     keys = {row.tax_category_key.strip() for row in rows if row.tax_category_key.strip()}
-    tax_categories = {tax.key: tax for tax in TaxCategory.objects.filter(key__in=keys, is_active=True)}
+    # Held in the order Taxes locks them (by key), so neither waits for the other in a circle.
+    tax_categories = {
+        tax.key: tax for tax in held(TaxCategory.objects.filter(key__in=keys, is_active=True).order_by("key"))
+    }
     seen_skus: set[str] = set()
     report = []
     for row in rows:
@@ -341,7 +345,7 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
 )
 def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict:
     product = find_product(data.product_id, data.product, lock=True)
-    category = find_category(data.category_id, data.category)
+    category = find_category(data.category_id, data.category, hold=True)
     _, created = ProductCategory.objects.get_or_create(product=product, category=category)
     if created:
         _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category.id)
@@ -409,8 +413,9 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
     texts = {row.tax_category_key.strip() for row in data.rows if row.tax_category_key.strip()}
     resolve = get("tax.alias.resolve")
     resolved = {text: resolve(ctx, resolve.input(text=text)).tax_category_key for text in texts}
+    keys = {key for key in resolved.values() if key}
     tax_categories = {
-        tax.key: tax for tax in TaxCategory.objects.filter(key__in={key for key in resolved.values() if key}, is_active=True)
+        tax.key: tax for tax in held(TaxCategory.objects.filter(key__in=keys, is_active=True).order_by("key"))
     }
     taken = {name.casefold() for name in Category.objects.filter(is_deleted=False).values_list("name", flat=True)}
     report = []
@@ -800,15 +805,18 @@ def _q(value: Decimal) -> str:
 
 
 def _tax_category(key: str, field: str = "tax_category_key") -> TaxCategory:
-    tax_category = TaxCategory.objects.filter(key=key, is_active=True).first()
+    """The active tax category of ``key``, held for the write that names it (see ``held``)."""
+    tax_category = next(iter(held(TaxCategory.objects.filter(key=key, is_active=True)[:1])), None)
     if tax_category is None:
         raise InvalidPayload(str(TAX_CATEGORY_UNKNOWN), code="invalid_field", fields={field: str(TAX_CATEGORY_UNKNOWN)})
     return tax_category
 
 
 def _live_categories(category_ids: list[UUID]) -> list[Category]:
+    """The live categories of ``category_ids``, held for the write that puts a product in them (see ``held``)."""
     wanted = list(dict.fromkeys(category_ids))
-    categories = {category.id: category for category in Category.objects.filter(pk__in=wanted, is_deleted=False)}
+    live = Category.objects.filter(pk__in=wanted, is_deleted=False).order_by("id")
+    categories = {category.id: category for category in held(live)}
     if len(categories) != len(wanted):
         raise InvalidPayload(str(CATEGORY_UNKNOWN), code="invalid_field", fields={"category_ids": str(CATEGORY_UNKNOWN)})
     return [categories[category_id] for category_id in wanted]
