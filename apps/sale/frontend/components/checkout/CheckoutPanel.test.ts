@@ -216,13 +216,16 @@ describe('CheckoutPanel: what it reads', () => {
     expect(s.confirm().disabled).toBe(false);
   });
 
-  it('methods that cannot be read: the error, neither their loading nor «no payment method»', async () => {
+  it('methods that cannot be read: the error, neither their loading, «no payment method» nor how to pay', async () => {
     const s = await setup({ methods: null });
     s.net.lastStream().push(errorFrame(s.subId(METHODS_OP), 'server_error'));
     await flush();
     expect(s.find('sale-checkout-read-error').exists()).toBe(true);
     expect(s.find('sale-checkout-methods-loading').exists()).toBe(false);
     expect(s.find('sale-checkout-no-methods').exists()).toBe(false);
+    // The total is there, but with no method read there is nothing to pay with yet.
+    expect(s.find('sale-checkout-exact').exists()).toBe(false);
+    expect(s.find('sale-checkout-split').exists()).toBe(false);
     expect(s.confirm().disabled).toBe(true);
   });
 
