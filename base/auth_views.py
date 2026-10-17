@@ -16,6 +16,12 @@ jump to the Hub admin (round 13, PLAN §18.1), which the SaaS admin's button sta
 ``state``; the callback wants ``next`` to be the deep link ``/admin/hub/<slug>/`` of a hub and that
 ``state``, redeems the code with the ``hub-admin`` audience for that slug, and a failure goes back to
 the SaaS admin's Hubs page.
+
+On a demo's host (``request.hub.is_demo``, plan 2026-10-17 §1.6) there is no account behind the session: the login
+jumps to the SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``) with the same ``state``, the callback, with
+that ``state``, redeems a code the Hub made itself for the browser that owns the demo (``base.services``, never the
+SaaS) and opens the session of the demo's owner; a code that opens nothing goes back to the SaaS's demo door
+(``/demo/?state=failed``), and leaving the demo too (``/demo/``).
 """
 
 import logging
@@ -57,7 +63,16 @@ def auth_login(request: HttpRequest) -> HttpResponseRedirect:
     if getattr(request, "platform_host", False):
         return _admin_login(request)
     slug = HostScopeResolver().resolve(request).key
-    return auth.login_redirect(slug, safe_next(request.GET.get("next")))
+    next_path = safe_next(request.GET.get("next"))
+    if _is_demo(request):
+        return auth.demo_login_redirect(slug, next_path)
+    return auth.login_redirect(slug, next_path)
+
+
+def _is_demo(request: HttpRequest) -> bool:
+    """Whether the request is on a demo's host (``base.middleware`` leaves the registry's row on ``request.hub``)."""
+    hub = getattr(request, "hub", None)
+    return hub is not None and hub.is_demo
 
 
 def _admin_login(request: HttpRequest) -> HttpResponseRedirect:
@@ -84,6 +99,8 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     if not auth.state_matches(request, request.POST.get("state")):
         logger.warning("Login on hub %r refused: the state is not this browser's (missing, expired or another one).", slug)
         return _sign_in_again(next_path)
+    if _is_demo(request):
+        return _demo_callback(request, request.hub, next_path)
     result = auth.redeem_code(request.POST.get("code"), slug)
     if not result.ok:
         return auth.login_redirect(slug, next_path, error=result.error)
@@ -93,6 +110,22 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
     return auth.forget_state(_with_language(HttpResponseRedirect(next_path), result.user.locale))
+
+
+def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:
+    """A demo's code, redeemed here (never by the SaaS): the owner's session and ``next``, else the SaaS's door."""
+    redeemed = services.redeem_demo_code(hub.slug, request.POST.get("code"))
+    if redeemed is None:
+        logger.warning(
+            "Demo login on %r refused: the code is missing, spent, out of its minute or another demo's.", hub.slug
+        )
+        return auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
+    try:
+        services.open_demo_session(request, hub)
+    except services.InactiveUser:
+        logger.warning("Demo login on %r refused: its owner was deactivated.", hub.slug)
+        return auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
+    return auth.forget_state(_with_language(HttpResponseRedirect(next_path), redeemed.language))
 
 
 def _sign_in_again(next_path: str) -> HttpResponseForbidden:
@@ -157,9 +190,10 @@ def _with_language(response: HttpResponse, locale: str) -> HttpResponse:
 
 @require_POST
 def auth_logout(request: HttpRequest) -> HttpResponseRedirect:
-    """Close the Hub's session, then the SaaS's (its page asks to confirm)."""
+    """Close the Hub's session, then the SaaS's (its page asks to confirm); a demo's goes back to the demo door."""
+    demo = _is_demo(request)
     logout(request)
-    return HttpResponseRedirect(auth.saas_url(SAAS_LOGOUT_PATH))
+    return HttpResponseRedirect(auth.saas_url(auth.DEMO_DOOR_PATH if demo else SAAS_LOGOUT_PATH))
 
 
 def safe_next(value: str | None) -> str:

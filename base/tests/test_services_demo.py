@@ -1,0 +1,471 @@
+"""The demo hubs (plan 2026-10-17, §1.5–§1.7): an empty hub for one browser of the SaaS, entered with a one-time code,
+purged by the worker once its hour is up.
+
+``base.demo.create`` (``POST /internal/demos``) gives a browser, named by the sha256 of its SaaS token, its live demo
+or a new ``demo-<8 hex>`` up to ``MAX_CONCURRENT_DEMOS``; ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
+of a minute for the browser that owns it, which the demo's ``/auth/callback`` redeems here (``redeem_demo_code``) and
+turns into a session as ``demo:<slug>``, the owner (``open_demo_session``). ``base.demo.expire`` ends one now; the
+reaper (``reap_demos``) purges those that ended and, after ``DEMO_TOMBSTONE_DAYS``, forgets them.
+"""
+
+import datetime as dt
+import hashlib
+import logging
+import re
+
+import pydantic
+import pytest
+from django.contrib.auth import get_user_model
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.utils import timezone
+from live.context import OperationContext, system_context
+from live.errors import Conflict, NotFound, OperationError, PermissionDenied
+from live.models import OutboxEvent
+
+from base import registry, services
+from base.models import DemoCode, Hub, Membership
+from base.queries import demo_get
+from base.schemas import DemoCodeIn, DemoCreateIn, DemoSlugIn
+from base.services import (
+    InactiveUser,
+    demo_code_create,
+    demo_create,
+    demo_expire,
+    demo_purge,
+    open_demo_session,
+    purge_demo_data,
+    reap_demo_tombstones,
+    reap_demos,
+    redeem_demo_code,
+)
+
+pytestmark = pytest.mark.django_db
+
+SYSTEM = system_context(registry.REGISTRY_SCOPE)
+ANA = hashlib.sha256(b"ana's browser").hexdigest()
+BEA = hashlib.sha256(b"bea's browser").hexdigest()
+CARLA = hashlib.sha256(b"carla's browser").hexdigest()
+MINUTE = dt.timedelta(minutes=1)
+
+
+def create(session_key: str = ANA, **changes):
+    return demo_create(SYSTEM, DemoCreateIn(session_key=session_key, **changes))
+
+
+def code_for(slug: str, session_key: str = ANA, language: str = "en"):
+    return demo_code_create(SYSTEM, DemoCodeIn(slug=slug, session_key=session_key, language=language))
+
+
+def lapse(slug: str) -> None:
+    """The demo's hour ran out a minute ago, and the reaper has not come yet."""
+    Hub.objects.filter(slug=slug).update(expires_at=timezone.now() - MINUTE)
+
+
+def events(name: str) -> list[dict]:
+    return list(OutboxEvent.objects.filter(name=name).values_list("payload", flat=True))
+
+
+def a_user_context(**fields) -> OperationContext:
+    user = get_user_model().objects.create_user(username="ana", password="pw", **fields)
+    return OperationContext(scope=registry.REGISTRY_SCOPE, actor=user, permissions=frozenset({"*"}))
+
+
+def a_request(rf):
+    request = rf.post("/auth/callback")
+    SessionMiddleware(lambda request: None).process_request(request)
+    return request
+
+
+def entered(rf, slug: str, session_key: str = ANA):
+    """The demo ``slug`` as its browser leaves it once inside: a code spent and the owner's session open."""
+    redeemed = redeem_demo_code(slug, code_for(slug, session_key).code)
+    open_demo_session(a_request(rf), redeemed.hub)
+    return redeemed
+
+
+class TestCreate:
+    def test_a_new_demo_is_an_empty_hub_of_its_own_ready_for_an_hour(self, settings):
+        settings.DEMO_TTL_MINUTES = 60
+        before = timezone.now()
+        answer = create(vertical="restaurant", language="es")
+        after = timezone.now()
+        assert answer.created is True
+        assert re.fullmatch(r"demo-[0-9a-f]{8}", answer.slug)
+        hub = Hub.objects.get(slug=answer.slug)
+        assert (hub.id, hub.is_demo, hub.status, hub.vertical, hub.language, hub.demo_session_key) == (
+            answer.id,
+            True,
+            "ready",
+            "restaurant",
+            "es",
+            ANA,
+        )
+        assert before + 60 * MINUTE <= hub.expires_at <= after + 60 * MINUTE
+        assert answer.expires_at == hub.expires_at and hub.ready_at is not None
+        assert events("base.demo.created") == [{"id": str(hub.id), "slug": hub.slug, "vertical": "restaurant"}]
+
+    def test_its_hour_is_the_setting_s(self, settings):
+        settings.DEMO_TTL_MINUTES = 15
+        answer = create()
+        assert 14 * MINUTE < answer.expires_at - timezone.now() <= 15 * MINUTE
+
+    def test_the_same_browser_gets_its_live_demo_again_and_no_new_one(self):
+        first = create()
+        again = create()
+        assert (again.created, again.id, again.slug, again.expires_at) == (False, first.id, first.slug, first.expires_at)
+        assert Hub.objects.filter(is_demo=True).count() == 1
+        assert len(events("base.demo.created")) == 1
+
+    def test_another_browser_gets_another_demo(self):
+        assert create(ANA).slug != create(BEA).slug
+
+    def test_a_browser_whose_demo_ran_out_gets_a_new_one_and_the_old_one_waits_for_the_reaper(self):
+        first = create()
+        lapse(first.slug)
+        again = create()
+        assert again.created and again.slug != first.slug
+        assert Hub.objects.get(slug=first.slug).status == "expired"
+
+    def test_the_cap_of_live_demos_is_a_503_demo_full(self, settings):
+        settings.MAX_CONCURRENT_DEMOS = 2
+        create(ANA)
+        create(BEA)
+        with pytest.raises(OperationError) as full:
+            create(CARLA)
+        assert (full.value.status, full.value.code) == (503, "base.demo_full")
+        assert Hub.objects.filter(is_demo=True).count() == 2
+
+    def test_a_browser_with_its_demo_is_answered_even_at_the_cap(self, settings):
+        settings.MAX_CONCURRENT_DEMOS = 1
+        first = create(ANA)
+        assert create(ANA).slug == first.slug
+
+    def test_demos_that_ran_out_and_businesses_never_count_against_the_cap(self, settings):
+        settings.MAX_CONCURRENT_DEMOS = 1
+        lapse(create(ANA).slug)
+        # ``a`` and ``b`` (conftest) are ready hubs too, and no demos.
+        assert create(BEA).created
+
+    def test_two_calls_of_one_browser_at_once_end_in_one_demo(self, monkeypatch):
+        # The second call did not see the first one's demo yet; the unique constraint catches it.
+        first = create()
+        real, looks = services._live_demo_of, []
+
+        def late(session_key, now):
+            looks.append(session_key)
+            return None if len(looks) == 1 else real(session_key, now)
+
+        monkeypatch.setattr(services, "_live_demo_of", late)
+        again = create()
+        assert (again.created, again.slug) == (False, first.slug)
+        assert Hub.objects.filter(is_demo=True).count() == 1
+
+    def test_an_address_already_taken_is_drawn_again(self, monkeypatch):
+        Hub.objects.create(slug="demo-0000beef", is_demo=True, status="purged")
+        draws = iter(["0000beef", "0000cafe"])
+        monkeypatch.setattr(services.secrets, "token_hex", lambda nbytes: next(draws))
+        assert create().slug == "demo-0000cafe"
+
+    def test_no_free_address_after_a_few_draws_is_a_503(self, monkeypatch):
+        Hub.objects.create(slug="demo-0000beef", is_demo=True, status="purged")
+        monkeypatch.setattr(services.secrets, "token_hex", lambda nbytes: "0000beef")
+        with pytest.raises(OperationError) as refused:
+            create()
+        assert (refused.value.status, refused.value.code) == (503, "base.demo_unavailable")
+
+    def test_only_the_platform_creates_one(self):
+        with pytest.raises(PermissionDenied) as refused:
+            demo_create(a_user_context(), DemoCreateIn(session_key=ANA))
+        assert refused.value.code == "base.internal_only"
+        assert not Hub.objects.filter(is_demo=True).exists()
+
+    @pytest.mark.parametrize("session_key", ["", "k" * 64, ANA.upper(), ANA[:-1], ANA + "0"])
+    def test_the_browser_is_named_by_a_sha256_in_hex(self, session_key):
+        with pytest.raises(pydantic.ValidationError):
+            DemoCreateIn(session_key=session_key)
+
+
+class TestCodeCreate:
+    def test_the_owner_gets_a_one_time_code_of_a_minute_kept_by_its_hash(self):
+        demo = create()
+        before = timezone.now()
+        answer = code_for(demo.slug, language="es")
+        after = timezone.now()
+        assert len(answer.code) >= 43
+        [row] = DemoCode.objects.all()
+        assert row.code_hash == hashlib.sha256(answer.code.encode()).hexdigest()
+        assert (row.hub.slug, row.language, row.used_at, row.expires_at) == (demo.slug, "es", None, answer.expires_at)
+        assert before + MINUTE <= answer.expires_at <= after + MINUTE
+        # The code itself is in no event.
+        assert events("base.demo.code_created") == [{"slug": demo.slug}]
+
+    def test_every_code_is_another(self):
+        demo = create()
+        assert code_for(demo.slug).code != code_for(demo.slug).code
+        assert DemoCode.objects.count() == 2
+
+    def test_another_browser_is_refused_with_403(self):
+        demo = create(ANA)
+        with pytest.raises(PermissionDenied) as refused:
+            code_for(demo.slug, BEA)
+        assert (refused.value.status, refused.value.code) == (403, "base.demo_not_owner")
+        assert not DemoCode.objects.exists()
+
+    def test_a_demo_that_ran_out_is_410_hub_gone(self):
+        demo = create()
+        lapse(demo.slug)
+        with pytest.raises(OperationError) as gone:
+            code_for(demo.slug)
+        assert (gone.value.status, gone.value.code) == (410, "base.hub_gone")
+
+    def test_a_purged_demo_is_410_too(self):
+        Hub.objects.create(slug="demo-0000beef", is_demo=True, status="purged", demo_session_key=ANA)
+        with pytest.raises(OperationError) as gone:
+            code_for("demo-0000beef")
+        assert gone.value.status == 410
+
+    @pytest.mark.parametrize("slug", ["demo-00000000", "a"])
+    def test_a_slug_that_names_no_demo_is_404(self, slug):
+        with pytest.raises(NotFound):
+            code_for(slug)
+
+    def test_only_the_platform_asks_for_one(self):
+        demo = create()
+        with pytest.raises(PermissionDenied) as refused:
+            demo_code_create(a_user_context(), DemoCodeIn(slug=demo.slug, session_key=ANA))
+        assert refused.value.code == "base.internal_only"
+
+
+class TestRedeem:
+    def test_a_code_opens_once(self):
+        demo = create()
+        code = code_for(demo.slug).code
+        redeemed = redeem_demo_code(demo.slug, code)
+        assert redeemed.hub.slug == demo.slug and redeemed.used_at is not None
+        assert DemoCode.objects.get().used_at is not None
+        assert redeem_demo_code(demo.slug, code) is None
+
+    def test_a_code_past_its_minute_is_refused(self):
+        demo = create()
+        code = code_for(demo.slug).code
+        assert redeem_demo_code(demo.slug, code, now=timezone.now() + dt.timedelta(seconds=61)) is None
+        assert DemoCode.objects.get().used_at is None
+
+    def test_a_code_of_another_demo_is_refused_and_stays_unspent(self):
+        mine, other = create(ANA), create(BEA)
+        code = code_for(mine.slug).code
+        assert redeem_demo_code(other.slug, code) is None
+        assert redeem_demo_code(mine.slug, code) is not None
+
+    def test_a_code_of_a_demo_that_ran_out_is_refused(self):
+        demo = create()
+        code = code_for(demo.slug).code
+        lapse(demo.slug)
+        assert redeem_demo_code(demo.slug, code) is None
+
+    @pytest.mark.parametrize("code", [None, "", "   ", "not-a-code"])
+    def test_no_code_or_an_unknown_one_is_refused(self, code):
+        demo = create()
+        code_for(demo.slug)
+        assert redeem_demo_code(demo.slug, code) is None
+
+
+class TestOpenSession:
+    def test_opens_a_session_as_the_demo_s_owner_never_staff(self, rf):
+        hub = Hub.objects.get(slug=create().slug)
+        request = a_request(rf)
+        user = open_demo_session(request, hub)
+        assert (user.username, user.first_name, user.is_staff, user.is_superuser, user.has_usable_password()) == (
+            f"demo:{hub.slug}",
+            "Demo",
+            False,
+            False,
+            False,
+        )
+        assert list(Membership.objects.filter(user=user).values_list("host", "role")) == [(hub.slug, "hub_owner")]
+        assert request.session["_auth_user_id"] == str(user.pk)
+        assert request.session["demo_slug"] == hub.slug
+
+    def test_entering_again_keeps_one_user_and_one_role(self, rf):
+        hub = Hub.objects.get(slug=create().slug)
+        first = open_demo_session(a_request(rf), hub)
+        again = open_demo_session(a_request(rf), hub)
+        assert first.pk == again.pk
+        assert Membership.objects.filter(host=hub.slug).count() == 1
+
+    def test_a_demo_user_raised_to_staff_by_hand_is_lowered_again(self, rf):
+        hub = Hub.objects.get(slug=create().slug)
+        user = open_demo_session(a_request(rf), hub)
+        get_user_model().objects.filter(pk=user.pk).update(is_staff=True, is_superuser=True, first_name="Root")
+        user = open_demo_session(a_request(rf), hub)
+        assert (user.is_staff, user.is_superuser, user.first_name) == (False, False, "Demo")
+
+    def test_a_demo_user_deactivated_in_the_admin_is_refused(self, rf):
+        hub = Hub.objects.get(slug=create().slug)
+        user = open_demo_session(a_request(rf), hub)
+        get_user_model().objects.filter(pk=user.pk).update(is_active=False)
+        request = a_request(rf)
+        with pytest.raises(InactiveUser):
+            open_demo_session(request, hub)
+        assert "_auth_user_id" not in request.session
+
+
+class TestExpire:
+    def test_ends_the_demo_now_and_its_host_is_gone(self):
+        demo = create()
+        answer = demo_expire(SYSTEM, DemoSlugIn(slug=demo.slug))
+        hub = Hub.objects.get(slug=demo.slug)
+        assert (answer.slug, answer.status, hub.status) == (demo.slug, "expired", "expired")
+        assert hub.expires_at <= timezone.now() and registry.is_gone(hub)
+        assert events("base.demo.expired") == [{"id": str(hub.id), "slug": demo.slug}]
+
+    def test_its_browser_may_start_another_one(self):
+        demo = create()
+        demo_expire(SYSTEM, DemoSlugIn(slug=demo.slug))
+        assert create().slug != demo.slug
+
+    def test_a_demo_that_ended_stays_as_it_is(self):
+        demo = create()
+        demo_expire(SYSTEM, DemoSlugIn(slug=demo.slug))
+        ended_at = Hub.objects.get(slug=demo.slug).expires_at
+        demo_expire(SYSTEM, DemoSlugIn(slug=demo.slug))
+        assert Hub.objects.get(slug=demo.slug).expires_at == ended_at
+        assert len(events("base.demo.expired")) == 1
+
+    @pytest.mark.parametrize("slug", ["demo-00000000", "a"])
+    def test_a_slug_that_names_no_demo_is_404(self, slug):
+        with pytest.raises(NotFound):
+            demo_expire(SYSTEM, DemoSlugIn(slug=slug))
+        assert Hub.objects.get(slug="a").status == "ready"
+
+    def test_the_platform_s_admins_may_end_one_from_the_hub_admin(self):
+        demo = create()
+        staff = a_user_context(is_staff=True, is_superuser=True)
+        assert demo_expire(staff, DemoSlugIn(slug=demo.slug)).status == "expired"
+
+    @pytest.mark.parametrize("fields", [{}, {"is_staff": True}, {"is_superuser": True}])
+    def test_nobody_else_ends_one(self, fields):
+        demo = create()
+        with pytest.raises(PermissionDenied) as refused:
+            demo_expire(a_user_context(**fields), DemoSlugIn(slug=demo.slug))
+        assert refused.value.code == "base.internal_only"
+        assert Hub.objects.get(slug=demo.slug).status == "ready"
+
+
+class TestGet:
+    def test_answers_a_demo_s_status(self):
+        demo = create()
+        answer = demo_get(SYSTEM, DemoSlugIn(slug=demo.slug))
+        assert (answer.slug, answer.status, answer.expires_at) == (demo.slug, "ready", demo.expires_at)
+
+    @pytest.mark.parametrize("slug", ["demo-00000000", "a"])
+    def test_a_slug_that_names_no_demo_is_404(self, slug):
+        with pytest.raises(NotFound):
+            demo_get(SYSTEM, DemoSlugIn(slug=slug))
+
+    def test_only_for_the_platform(self):
+        demo = create()
+        with pytest.raises(PermissionDenied):
+            demo_get(a_user_context(), DemoSlugIn(slug=demo.slug))
+
+
+class TestReaper:
+    def test_purges_only_the_demos_whose_time_is_up(self, rf):
+        ended, live = create(ANA), create(BEA)
+        entered(rf, ended.slug, ANA)
+        entered(rf, live.slug, BEA)
+        code_for(ended.slug, ANA)
+        lapse(ended.slug)
+        assert reap_demos() == 1
+        hub = Hub.objects.get(slug=ended.slug)
+        assert (hub.status, hub.purged_at is not None) == ("purged", True)
+        assert not Membership.objects.filter(host=ended.slug).exists()
+        assert not get_user_model().objects.filter(username=f"demo:{ended.slug}").exists()
+        assert not DemoCode.objects.filter(hub=hub).exists()
+        assert events("base.demo.purged") == [{"id": str(hub.id), "slug": ended.slug}]
+        # The live demo is untouched: its row, its owner and its code.
+        assert Hub.objects.get(slug=live.slug).status == "ready"
+        assert Membership.objects.filter(host=live.slug).exists()
+        assert DemoCode.objects.filter(hub__slug=live.slug).exists()
+
+    def test_a_demo_ended_by_hand_is_purged_too(self):
+        demo = create()
+        demo_expire(SYSTEM, DemoSlugIn(slug=demo.slug))
+        assert reap_demos() == 1
+        assert Hub.objects.get(slug=demo.slug).status == "purged"
+
+    def test_the_other_hubs_and_their_members_are_never_touched(self, make_user):
+        make_user("bea", host="a", role="hub_owner")
+        Hub.objects.create(slug="acme", status="ready", expires_at=timezone.now() - MINUTE)
+        assert reap_demos() == 0
+        assert Membership.objects.filter(host="a").exists()
+        assert Hub.objects.get(slug="acme").status == "ready"
+
+    def test_hands_each_purged_demo_to_purge_demo_data(self, monkeypatch):
+        purged = []
+        monkeypatch.setattr(services, "purge_demo_data", lambda hub: purged.append(hub.slug))
+        demo = create()
+        lapse(demo.slug)
+        reap_demos()
+        assert purged == [demo.slug]
+
+    def test_a_demo_whose_purge_fails_is_logged_and_the_others_are_purged(self, monkeypatch, caplog):
+        first, second = create(ANA), create(BEA)
+        lapse(first.slug)
+        lapse(second.slug)
+
+        def purge(hub):
+            if hub.slug == first.slug:
+                raise RuntimeError("the database went away")
+
+        monkeypatch.setattr(services, "purge_demo_data", purge)
+        with caplog.at_level(logging.ERROR, logger="base.services"):
+            assert reap_demos() == 1
+        assert Hub.objects.get(slug=first.slug).status == "ready"
+        assert Hub.objects.get(slug=second.slug).status == "purged"
+        assert first.slug in caplog.text
+
+    def test_purging_a_demo_that_has_not_ended_is_refused(self):
+        demo = create()
+        with pytest.raises(Conflict) as refused:
+            demo_purge(SYSTEM, DemoSlugIn(slug=demo.slug))
+        assert refused.value.code == "base.demo_live"
+        assert Hub.objects.get(slug=demo.slug).status == "ready"
+
+    def test_purging_twice_changes_nothing_more(self):
+        demo = create()
+        lapse(demo.slug)
+        reap_demos()
+        purged_at = Hub.objects.get(slug=demo.slug).purged_at
+        assert demo_purge(SYSTEM, DemoSlugIn(slug=demo.slug)).status == "purged"
+        assert Hub.objects.get(slug=demo.slug).purged_at == purged_at
+        assert len(events("base.demo.purged")) == 1
+
+    def test_phase_1_purges_no_data_of_the_apps(self):
+        # The apps' tables are shared by every hub and carry no hub_id (plan §1.7): nothing tells a demo's rows apart.
+        hub = Hub.objects.get(slug=create().slug)
+        before = {model: model.objects.count() for model in (OutboxEvent, Hub, Membership)}
+        assert purge_demo_data(hub) is None
+        assert {model: model.objects.count() for model in before} == before
+
+
+class TestTombstones:
+    def test_a_purged_demo_is_forgotten_after_its_days(self, settings):
+        settings.DEMO_TOMBSTONE_DAYS = 7
+        now = timezone.now()
+        old = now - dt.timedelta(days=7, minutes=1)
+        Hub.objects.create(slug="demo-00000001", is_demo=True, status="purged", purged_at=old)
+        Hub.objects.create(slug="demo-00000002", is_demo=True, status="purged", purged_at=now - dt.timedelta(days=6))
+        Hub.objects.create(slug="acme", status="cancelled", cancelled_at=now - dt.timedelta(days=30))
+        assert reap_demo_tombstones(now) == 1
+        assert sorted(Hub.objects.exclude(slug__in=["a", "b"]).values_list("slug", flat=True)) == [
+            "acme",
+            "demo-00000002",
+        ]
+
+    def test_the_reaper_forgets_old_tombstones_on_its_way(self, settings):
+        settings.DEMO_TOMBSTONE_DAYS = 7
+        eight_days_ago = timezone.now() - dt.timedelta(days=8)
+        Hub.objects.create(slug="demo-00000001", is_demo=True, status="purged", purged_at=eight_days_ago)
+        reap_demos()
+        assert not Hub.objects.filter(slug="demo-00000001").exists()

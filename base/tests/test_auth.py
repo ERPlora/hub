@@ -7,6 +7,7 @@ import logging
 import threading
 import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -44,6 +45,44 @@ class TestLoginUrl:
             auth.login_url("a", "/demo/items")
         with pytest.raises(TypeError):
             auth.login_url("a", state="s1")
+
+
+class TestDemoLogin:
+    """A demo's jump (plan 2026-10-17, §1.6 step 2): to the SaaS's ``/demo/enter/``, with the same ``state`` cookie."""
+
+    def test_the_enter_url_carries_the_demo_a_readable_next_and_the_state(self):
+        url = auth.demo_enter_url("demo-0000beef", "/demo/items?q=1", state="s1")
+        assert url == "http://localhost:8001/demo/enter/?hub=demo-0000beef&next=/demo/items%3Fq%3D1&state=s1"
+
+    def test_the_jump_leaves_the_state_cookie_the_callback_takes(self, rf):
+        response = auth.demo_login_redirect("demo-0000beef", "/")
+        [state] = parse_qs(urlsplit(response["Location"]).query)["state"]
+        assert (response.status_code, response["Location"]) == (
+            302,
+            f"http://localhost:8001/demo/enter/?hub=demo-0000beef&next=/&state={state}",
+        )
+        cookie = response.cookies[auth.STATE_COOKIE]
+        assert (cookie["path"], cookie["max-age"], cookie["httponly"], cookie["secure"]) == (
+            "/auth/callback",
+            600,
+            True,
+            True,
+        )
+        request = rf.post("/auth/callback")
+        request.COOKIES[auth.STATE_COOKIE] = cookie.value
+        assert auth.state_matches(request, state)
+        assert not auth.state_matches(request, "another")
+
+    def test_every_jump_has_its_own_state(self):
+        first, second = (auth.demo_login_redirect("demo-0000beef", "/") for _ in range(2))
+        assert first["Location"] != second["Location"]
+
+    def test_a_failed_entry_goes_back_to_the_saas_demo_door(self, settings):
+        settings.SAAS_URL = "https://erplora.com/"
+        assert auth.demo_failed_url() == "https://erplora.com/demo/?state=failed"
+
+    def test_a_code_lasts_a_minute(self):
+        assert auth.DEMO_CODE_TTL_SECONDS == 60
 
 
 class TestAdminHubsUrl:

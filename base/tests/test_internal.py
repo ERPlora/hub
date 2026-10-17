@@ -5,6 +5,10 @@ A call is heard by its v2 signature when it carries one (method, path and body; 
 signature is the authentication: the ALB never publishes ``/internal``, so the door answers on any host (the
 SaaS reaches it by the private name).
 
+The demos (§1.5, §1.6): ``POST /internal/demos`` gives a browser of the SaaS its demo (201 new, 200 its live one, 503
+``base.demo_full`` with ``Retry-After`` at the cap) and ``POST /internal/demos/{slug}/codes`` a one-time code into it
+for that browser only (201; 403 another browser's, 410 once it ended, 404 none), as the SaaS's ``hub_client`` reads them.
+
 The registry (plan 2026-10-17, §1.5): ``PUT /internal/hubs/{id}`` registers a business (202, ready at once in phase 1,
 and the SaaS hears ``ready`` after the COMMIT; 200 when it updates it), ``GET`` reads it, ``DELETE`` cancels it and
 ``POST …/restore`` brings it back. ``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and
@@ -14,12 +18,15 @@ applies its VeriFactu block and the business's status through ``verifactu.config
 import hashlib
 import hmac
 import json
+import re
 import time
 
 import pytest
 
+from django.utils.dateparse import parse_datetime
+
 from apps.verifactu.models import Config
-from base.models import Hub
+from base.models import DemoCode, Hub
 from base.signing import verify_signed
 
 HUB_ID = "0199c4b0-0000-7000-8000-000000000001"
@@ -471,3 +478,110 @@ def test_a_registry_call_naming_another_hub_is_refused(client, db):
 def test_each_registry_route_takes_only_its_methods(client, db):
     assert signed(client, "post", HUB_PATH, REGISTRY).status_code == 405
     assert signed(client, "get", f"{HUB_PATH}/restore", b"").status_code == 405
+
+
+# The demos: POST /internal/demos and POST /internal/demos/{slug}/codes (plan 2026-10-17, §1.5 and §1.6)
+
+DEMOS_PATH = "/internal/demos"
+#: Two browsers of the SaaS, as it names them: the sha256 of a random token of each session.
+OWNER = hashlib.sha256(b"ana's browser").hexdigest()
+STRANGER = hashlib.sha256(b"bea's browser").hexdigest()
+
+
+def new_demo(client, session_key=OWNER, **body):
+    """The SaaS's ``create_demo``: its body as it sends it, signed v1 + v2."""
+    payload = {"session_key": session_key, "vertical": None, "language": "en", **body}
+    return signed(client, "post", DEMOS_PATH, payload, with_v2=True)
+
+
+def demo_code(client, slug, session_key=OWNER, language="es"):
+    """The SaaS's ``create_demo_code``."""
+    path = f"/internal/demos/{slug}/codes"
+    return signed(client, "post", path, {"session_key": session_key, "language": language}, with_v2=True)
+
+
+def test_a_new_demo_is_201_with_what_the_saas_reads(client, db):
+    answer = new_demo(client)
+    assert answer.status_code == 201
+    body = answer.json()
+    assert set(body) == {"id", "slug", "expires_at", "created"} and body["created"] is True
+    assert re.fullmatch(r"demo-[0-9a-f]{8}", body["slug"])
+    hub = Hub.objects.get(slug=body["slug"])
+    assert (body["id"], hub.is_demo, hub.status, hub.demo_session_key) == (str(hub.id), True, "ready", OWNER)
+    # An aware ISO 8601, as the SaaS's door parses it (``parse_datetime`` and ``is_aware``).
+    expires_at = parse_datetime(body["expires_at"])
+    assert expires_at.tzinfo is not None and expires_at == hub.expires_at
+
+
+def test_the_same_browser_again_is_200_with_its_live_demo(client, db):
+    first = new_demo(client).json()
+    again = new_demo(client)
+    assert again.status_code == 200
+    assert again.json() == {**first, "created": False}
+
+
+def test_at_the_cap_it_is_503_demo_full_with_retry_after(client, db, settings):
+    settings.MAX_CONCURRENT_DEMOS = 1
+    new_demo(client)
+    answer = new_demo(client, STRANGER)
+    assert (answer.status_code, code(answer), answer["Retry-After"]) == (503, "base.demo_full", "60")
+    assert Hub.objects.filter(is_demo=True).count() == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"[]", b"nope", b"{}", json.dumps({"session_key": "not-a-sha256"}).encode()],
+    ids=["array", "not-json", "no-key", "bad-key"],
+)
+def test_a_demo_asked_out_of_contract_is_422(client, db, raw):
+    answer = signed(client, "post", DEMOS_PATH, raw)
+    assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
+    assert not Hub.objects.filter(is_demo=True).exists()
+
+
+def test_unsigned_demo_calls_are_401_and_make_nothing(client, db):
+    raw = json.dumps({"session_key": OWNER}).encode()
+    answer = client.post(DEMOS_PATH, raw, content_type="application/json", HTTP_HOST="hub.localhost")
+    assert answer.status_code == 401 and code(answer) == "internal.unsigned"
+    slug = new_demo(client).json()["slug"]
+    answer = client.post(f"/internal/demos/{slug}/codes", raw, content_type="application/json", HTTP_HOST="hub.localhost")
+    assert answer.status_code == 401
+    assert Hub.objects.filter(is_demo=True).count() == 1 and not DemoCode.objects.exists()
+
+
+def test_the_owner_gets_a_one_time_code_201(client, db):
+    slug = new_demo(client).json()["slug"]
+    answer = demo_code(client, slug)
+    assert answer.status_code == 201
+    body = answer.json()
+    assert set(body) == {"code", "expires_at"} and len(body["code"]) >= 43
+    assert parse_datetime(body["expires_at"]).tzinfo is not None
+    [row] = DemoCode.objects.all()
+    assert (row.hub.slug, row.language, row.used_at) == (slug, "es", None)
+    assert row.code_hash == hashlib.sha256(body["code"].encode()).hexdigest()
+
+
+def test_another_browser_s_code_is_403_demo_not_owner(client, db):
+    slug = new_demo(client).json()["slug"]
+    answer = demo_code(client, slug, STRANGER)
+    assert (answer.status_code, code(answer)) == (403, "base.demo_not_owner")
+    assert not DemoCode.objects.exists()
+
+
+def test_a_code_of_a_demo_that_ended_is_410_hub_gone(client, db):
+    slug = new_demo(client).json()["slug"]
+    Hub.objects.filter(slug=slug).update(expires_at=Hub.objects.get(slug=slug).created_at)
+    answer = demo_code(client, slug)
+    assert (answer.status_code, code(answer)) == (410, "base.hub_gone")
+
+
+@pytest.mark.parametrize("slug", ["demo-00000000", "acme"])
+def test_a_code_of_no_demo_is_404(client, db, slug):
+    answer = demo_code(client, slug)
+    assert (answer.status_code, code(answer)) == (404, "not_found")
+
+
+def test_each_demo_route_takes_only_post(client, db):
+    assert signed(client, "get", DEMOS_PATH, b"").status_code == 405
+    slug = new_demo(client).json()["slug"]
+    assert signed(client, "put", f"/internal/demos/{slug}/codes", {"session_key": OWNER}).status_code == 405

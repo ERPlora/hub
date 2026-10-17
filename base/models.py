@@ -6,6 +6,8 @@ Host (``a`` for ``a.localhost``). Phase 2 replaces it with the hub's own staff i
 ``Hub`` is the registry of the hubs this Hub serves (docs/plans/2026-10-17-demo-hubs-fase-1.md, §1.1): the SaaS
 writes it through ``/internal/hubs/{id}`` (``base.internal``) and the host gate reads it (``base.registry``). Phase 2
 moves it to ``control.Hub``, the same columns plus ``db_name``, ``schema_state``, ``schema_apps`` and ``cluster``.
+``DemoCode`` is a one-time code into a demo hub, which the SaaS asks for (``POST /internal/demos/{slug}/codes``) and
+the demo's ``/auth/callback`` redeems here, without calling the SaaS back.
 """
 
 import uuid
@@ -152,3 +154,26 @@ class Hub(models.Model):
 
     def __str__(self) -> str:
         return self.slug
+
+
+class DemoCode(UUIDModel):
+    """A one-time code into a demo hub (plan 2026-10-17, §1.1 and §1.6), kept by its sha256 only, never in clear.
+
+    The SaaS asks for one for the browser that owns the demo and posts it to the demo's ``/auth/callback`` in a form
+    (never in a URL); it opens one session, within its minute (``expires_at``), and ``used_at`` says it was spent. A
+    demo has several (a visitor who lost the cookie enters again); they go with it when the worker purges it.
+    """
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="demo_codes", verbose_name=_("hub"))
+    code_hash = models.CharField(_("code hash"), max_length=64, unique=True)
+    language = models.CharField(_("language"), max_length=8, blank=True)
+    expires_at = models.DateTimeField(_("expires at"))
+    used_at = models.DateTimeField(_("used at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("demo code")
+        verbose_name_plural = _("demo codes")
+        ordering = ["expires_at"]
+
+    def __str__(self) -> str:
+        return f"{self.hub} ({self.expires_at:%Y-%m-%d %H:%M:%S})"

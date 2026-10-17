@@ -4,7 +4,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from base.models import Hub, Membership
+from base.models import DemoCode, Hub, Membership
 
 pytestmark = pytest.mark.django_db
 
@@ -111,3 +111,34 @@ class TestHub:
 
     def test_its_text_is_its_slug(self):
         assert str(Hub(slug="acme")) == "acme"
+
+
+# The one-time codes into a demo (plan 2026-10-17, §1.1): kept by their sha256 only, several per demo.
+
+
+class TestDemoCode:
+    @pytest.fixture
+    def demo(self):
+        return Hub.objects.create(slug="demo-0000beef", is_demo=True, status="ready", demo_session_key="k" * 64)
+
+    def test_a_code_is_kept_by_its_hash_with_a_uuid7_key_unused(self, demo):
+        from django.utils import timezone
+
+        code = DemoCode.objects.create(hub=demo, code_hash="h" * 64, language="es", expires_at=timezone.now())
+        assert (code.used_at, code.language, code.pk.version) == (None, "es", 7)
+
+    def test_one_hash_names_one_code(self, demo):
+        from django.utils import timezone
+
+        DemoCode.objects.create(hub=demo, code_hash="h" * 64, expires_at=timezone.now())
+        with pytest.raises(IntegrityError):
+            DemoCode.objects.create(hub=demo, code_hash="h" * 64, expires_at=timezone.now())
+
+    def test_a_demo_has_several_codes_and_takes_them_with_it(self, demo):
+        from django.utils import timezone
+
+        for digit in "12":
+            DemoCode.objects.create(hub=demo, code_hash=digit * 64, expires_at=timezone.now())
+        assert demo.demo_codes.count() == 2
+        demo.delete()
+        assert not DemoCode.objects.exists()

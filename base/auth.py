@@ -22,6 +22,12 @@ and the audience ``hub-admin``: the SaaS admin's button opens the platform host'
 the code lands on the platform host's ``/auth/callback`` and answers a platform role
 (``platform_admin``, ``platform_support``), never a customer's. Without a hub the staff go to the
 SaaS admin's Hubs page (:func:`admin_hubs_url`), where they choose one.
+
+A demo hub (``demo-<8 hex>``, plan 2026-10-17 §1.6) has no account behind it: its jump goes to the SaaS's
+``/demo/enter/?hub=<slug>&next=<path>&state=<state>`` instead (:func:`demo_login_redirect`), with the same ``state``
+cookie, and the SaaS posts back a code that the Hub made itself for the browser that owns the demo
+(``base.demo.code_create``), redeemed here without calling the SaaS. A failed entry goes back to the SaaS's demo
+door (:func:`demo_failed_url`).
 """
 
 import json
@@ -31,6 +37,7 @@ import secrets
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
@@ -49,6 +56,11 @@ LOGIN_PATH = "/hub-login/"
 ADMIN_HUBS_PATH = "/admin/accounts/hubs/"
 REDEEM_PATH = "/internal/auth/redeem"
 TIMEOUT_SECONDS = 5
+#: How long a one-time code into a demo lasts (``base.demo.code_create``): the SaaS posts it at once.
+DEMO_CODE_TTL_SECONDS = 60
+#: The SaaS's pages of the demo: where its jump comes back with the ``state``, and its door.
+DEMO_ENTER_PATH = "/demo/enter/"
+DEMO_DOOR_PATH = "/demo/"
 
 #: The ``state`` of this browser's jump to the SaaS's login, signed; only the callback reads it.
 STATE_COOKIE = "hub_login_state"
@@ -138,8 +150,29 @@ def login_redirect(
     slug: str, next_path: str, error: str | None = None, audience: str = HUB_SESSION_AUDIENCE
 ) -> HttpResponseRedirect:
     """The jump to the SaaS's login with a fresh ``state``, left in this browser's cookie for the callback."""
+    return _jump(lambda state: login_url(slug, next_path, state=state, error=error, audience=audience))
+
+
+def demo_enter_url(slug: str, next_path: str, *, state: str) -> str:
+    """The SaaS's ``/demo/enter/`` for the demo ``slug``, with the ``state`` the callback will ask back."""
+    params = {"hub": slug, "next": next_path, "state": state}
+    return f"{saas_url(DEMO_ENTER_PATH)}?{urlencode(params, safe='/')}"
+
+
+def demo_login_redirect(slug: str, next_path: str) -> HttpResponseRedirect:
+    """A demo's jump: to the SaaS's ``/demo/enter/``, with a fresh ``state`` in the same cookie as a business's."""
+    return _jump(lambda state: demo_enter_url(slug, next_path, state=state))
+
+
+def demo_failed_url() -> str:
+    """The SaaS's demo door, told that the entry failed (a code spent, expired or another demo's)."""
+    return f"{saas_url(DEMO_DOOR_PATH)}?{urlencode({'state': 'failed'})}"
+
+
+def _jump(url_for: Callable[[str], str]) -> HttpResponseRedirect:
+    """A redirect to ``url_for(state)`` with a fresh ``state``, left in this browser's cookie for the callback."""
     state = secrets.token_urlsafe(32)
-    response = HttpResponseRedirect(login_url(slug, next_path, state=state, error=error, audience=audience))
+    response = HttpResponseRedirect(url_for(state))
     response.set_signed_cookie(
         STATE_COOKIE,
         state,
