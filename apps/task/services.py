@@ -1,7 +1,10 @@
 """Write operations of the task app: one operation = one transaction, with its events in the outbox.
 
 A write on a task locks its row (``select_for_update``) before it looks at its status, so two people
-completing it at once are queued and the second one sees the first one's work. A task the caller does
+completing it at once are queued and the second one sees the first one's work. A write that names a
+person (an assignee, a project's owner) holds their staff record first, before the task or the project:
+the Hub admin's «Delete» of a person takes the record and then clears what names it, so it waits for the
+write, or the write waits for it and hears the person is gone. A task the caller does
 not see does not exist for them (404); one they see but may not change is a 403. Refusals about a field
 carry it, so the screen puts them next to it. Nothing fails in silence: a refused create writes nothing
 and spends no number.
@@ -78,12 +81,14 @@ def _project(project_id: UUID | None, text: str | None) -> Project | None:
 
 
 def _member(member_id: UUID | None, name: str | None, *, id_field: str, name_field: str) -> Member | None:
-    """A staff record that may take tasks: live (not terminated) and not inactive."""
+    """A staff record that may take tasks: live (not terminated) and not inactive, held until the end of
+    the command so that it is not deleted under the task or project that names it. Called before the task
+    or the project is locked: the deletion of a person holds them and then waits for those rows."""
     if member_id is None and name is None:
         return None
     field = id_field if member_id else name_field
     try:
-        member = resolve_member(member_id, name)
+        member = resolve_member(member_id, name, lock=True)
     except NotFound as error:
         raise _field_refusal(error, field) from None
     if member.status == Member.Status.INACTIVE:
@@ -276,13 +281,13 @@ def complete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
 )
 def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
     caller = Caller(ctx)
-    task = _changeable(caller, data.id, data.task)
     if data.to_me:
         if caller.member is None:
             raise InvalidPayload(str(NO_OWN_RECORD), code="invalid_field", fields={"to_me": str(NO_OWN_RECORD)})
         assignee = _member(caller.member.pk, None, id_field="to_me", name_field="to_me")
     else:
         assignee = _member(data.member_id, data.member, id_field="member_id", name_field="member")
+    task = _changeable(caller, data.id, data.task)
     new_id = assignee.pk if assignee else None
     if new_id != task.assigned_to_id:
         task.assigned_to = assignee
@@ -417,21 +422,22 @@ def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
     },
 )
 def update_project(ctx: OperationContext, data: ProjectPatchIn) -> dict:
-    project = _locked_project(data.id, data.project)
     sent = data.model_fields_set
+    owner_sent = True
+    if "owner" in sent and data.owner is not None:
+        owner = _member(None, data.owner, id_field="owner_id", name_field="owner")
+    elif "owner_id" in sent:
+        owner = _member(data.owner_id, None, id_field="owner_id", name_field="owner")
+    else:
+        owner_sent, owner = False, None
+    project = _locked_project(data.id, data.project)
     changes: dict = {}
     for field in ("name", "color", "is_active"):
         value = getattr(data, field)
         if field in sent and value is not None and value != getattr(project, field):
             changes[field] = value
-    if "owner" in sent and data.owner is not None:
-        owner = _member(None, data.owner, id_field="owner_id", name_field="owner")
-        if owner.pk != project.owner_id:
-            changes["owner"] = owner
-    elif "owner_id" in sent:
-        owner = _member(data.owner_id, None, id_field="owner_id", name_field="owner")
-        if (owner.pk if owner else None) != project.owner_id:
-            changes["owner"] = owner
+    if owner_sent and (owner.pk if owner else None) != project.owner_id:
+        changes["owner"] = owner
     if changes:
         for field, value in changes.items():
             setattr(project, field, value)

@@ -453,6 +453,10 @@ cliente o a un compañero).
   Nada de ella se cuela por otra fila: ni el número ni el título de una tarea madre ajena, ni las
   subtareas ajenas en el contador, ni las tareas ajenas en los contadores de un proyecto.
 - Las escrituras sobre una tarea bloquean su fila (`select_for_update`) antes de mirar su estado.
+  La que nombra a una persona (responsable de una tarea o de un proyecto) bloquea antes su ficha de
+  Personal (`resolve_member(…, lock=True)`) y después la tarea o el proyecto: es el orden del «Delete»
+  del admin del Hub (`lock_members` de Personal y luego lo que la nombra), así que uno espera al otro y
+  nunca en círculo. Si la persona ya se borró, la escritura responde «no existe» en su campo, nunca 500.
 - El «hoy» es `timezone.localdate()` (zona del negocio; en la fase 1, `TIME_ZONE` = Europe/Madrid);
   las páginas calculan «vencida» y «vence hoy» en esa misma zona.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
