@@ -3,9 +3,12 @@
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations' rules
 (a station's name taken twice: the database's own constraints still refuse it) and it leaves no event. The
 dishes are an inline of their ticket. What the database fills in (ids and timestamps) is shown, not edited.
+A station's «Delete» goes in line with the kitchen's writes (``locked_settings``): it waits for the one under
+way, and a route, a dish or a line of the History never names a station deleted meanwhile.
 """
 
 from django.contrib import admin
+from django.db import transaction
 
 from apps.kitchen.models import (
     CategoryRoute,
@@ -17,6 +20,7 @@ from apps.kitchen.models import (
     Ticket,
     TicketItem,
 )
+from apps.kitchen.services import locked_settings
 
 AUTOMATIC = ("id", "created_at", "updated_at")
 
@@ -51,6 +55,16 @@ class StationAdmin(admin.ModelAdmin):
         "created_by",
         "updated_by",
     )
+
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            locked_settings()
+            super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            locked_settings()
+            super().delete_queryset(request, queryset)
 
 
 @admin.register(ProductRoute)
