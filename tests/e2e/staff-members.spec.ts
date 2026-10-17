@@ -136,6 +136,7 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
     await page.locator('[data-testid=staff-member-terminate-reason] textarea').fill('Moves abroad');
     await page.screenshot({ path: shot('staff-members-terminate') });
     await page.locator('[data-testid=staff-member-terminate-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-member-terminate]')).toBeHidden();
     await expect(rowOf(page, aloneName)).toHaveCount(0);
     expect(psql(`select status || '|' || termination_reason from staff_member where id = '${aloneId}'`)).toBe('terminated|Moves abroad');
     await page.screenshot({ path: shot('staff-members-desktop') });

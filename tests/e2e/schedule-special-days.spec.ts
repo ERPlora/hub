@@ -106,8 +106,10 @@ test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, correct
   // Delete asks first.
   const id = psql(`select id from schedule_specialday where name = '${name}'`);
   await rowAction(page, 'schedule-special-days', id, 'delete');
-  await expect(page.locator('ion-modal[data-testid=schedule-special-day-delete]')).toContainText(`«${name}» will be deleted. This cannot be undone.`);
+  const confirm = page.locator('ion-modal[data-testid=schedule-special-day-delete]');
+  await expect(confirm).toContainText(`«${name}» will be deleted. This cannot be undone.`);
   await page.locator('[data-testid=schedule-special-day-delete-submit]').click();
+  await expect(confirm).toBeHidden();
   await expect(row).toHaveCount(0);
 });
 
@@ -139,6 +141,7 @@ test('SCHEDULE-F05, F06: an override added, another over the same dates refused,
   const id = psql(`select id from schedule_override where reason = '${reason}'`);
   await rowAction(page, 'schedule-overrides', id, 'delete');
   await page.locator('[data-testid=schedule-override-delete-submit]').click();
+  await expect(page.locator('ion-modal[data-testid=schedule-override-delete]')).toBeHidden();
   await expect(row).toHaveCount(0);
 });
 

@@ -70,6 +70,7 @@ test('SALE-F36: the owner prepares a quick note, changes it and deletes it', asy
   await shown(page).locator(`[data-testid=sale-quick-notes-row-${id}-delete]`).first().click();
   const confirm = page.locator('ion-modal').filter({ hasText: /Delete quick note|Eliminar nota rápida/ }).last();
   await confirm.locator('.ep-form-modal__submit').click();
+  await expect(confirm).toBeHidden();
   await expect(shown(page).locator(`[data-testid=sale-quick-notes-row][data-id="${id}"]`)).toHaveCount(0);
 });
 

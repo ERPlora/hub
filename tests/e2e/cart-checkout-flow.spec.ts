@@ -126,6 +126,7 @@ test('Carts: create, refuse a twin, search, abandon, delete after confirming', a
     await expect(confirm).toBeVisible();
     await page.screenshot({ path: shot('cart-checkout-delete-desktop') });
     await confirm.locator('.ep-form-modal__submit').click();
+    await expect(confirm).toBeHidden();
     await expect(rowOf(page, 'cart-checkout-carts', secondId)).toHaveCount(0);
     expect(psql(`select deleted_at is not null from cart_checkout_cart where id = '${secondId}'`)).toBe('t');
     await page.screenshot({ path: shot('cart-checkout-carts-desktop') });

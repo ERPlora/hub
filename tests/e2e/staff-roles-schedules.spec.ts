@@ -111,6 +111,7 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     await row.getByText('Regular schedule').click();
     await page.locator('[data-testid=staff-schedule-form-day-4-working]').click();
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-schedule-form]')).toBeHidden();
     await expect(row).not.toContainText('Fri');
     await page.screenshot({ path: shot('staff-schedules-desktop') });
 

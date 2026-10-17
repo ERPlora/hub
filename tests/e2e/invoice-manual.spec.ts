@@ -116,6 +116,7 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   await detail.locator('[data-testid=invoice-detail-mark-paid]').click();
   const confirm = page.locator('ion-modal').filter({ hasText: `Mark ${invoice.number} as paid?` }).last();
   await confirm.locator('.ep-form-modal__submit').click();
+  await expect(confirm).toBeHidden();
   await expect(detail.locator('[data-testid=invoice-detail-status]')).toHaveText('Paid');
   await expect(detail.locator('[data-testid=invoice-detail-paid-at]')).toBeVisible();
   await expect(detail.locator('[data-testid=invoice-detail-mark-paid]')).toHaveCount(0);

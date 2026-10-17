@@ -40,6 +40,7 @@ async function confirmDialog(page: Page, title: string): Promise<void> {
   const dialog = page.locator('ion-modal.ep-form-modal').filter({ hasText: title });
   await expect(dialog).toBeVisible();
   await dialog.locator('.ep-form-modal__submit').click();
+  await expect(dialog).toBeHidden();
 }
 
 test('an automation from the gallery and one from scratch, allowed, on, run by hand and read in its history', async ({ browser }) => {

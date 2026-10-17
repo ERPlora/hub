@@ -75,6 +75,18 @@ CI=1 pnpm e2e
 node tests/e2e/database.ts --drop
 ```
 
+## La página a la vista y los diálogos
+
+`shown(page)` (`helpers.ts`) es la página que enseña `IonRouterOutlet`, nunca un diálogo abierto encima: Ionic Vue
+envuelve el contenido de un `ion-modal` en un `.ion-page` propio y lleva el diálogo presentado a `ion-app`, detrás
+de las páginas, así que «el último `.ion-page` visible» era el diálogo. Ahí la lista no tiene filas, y una spec que
+contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (el 17-10-2026, en
+`sale-backoffice.spec.ts` y `combo-menus.spec.ts`). `helpers-shown.spec.ts` falla si vuelve a pasar.
+
+- Un diálogo se busca en la página entera: `page.locator('ion-modal[data-testid=…]')`, nunca dentro de `shown(page)`.
+- Tras confirmar un diálogo, se espera `await expect(<diálogo>).toBeHidden()` antes de contar filas o afirmar que
+  algo ya no está.
+
 ## Medir cuándo acaba una petición
 
 En la pila de desarrollo Vite sirve cada módulo de la SPA por separado, y llenan el búfer de Resource Timing de

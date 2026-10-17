@@ -74,6 +74,7 @@ test('Categories and services: create, a duplicate refused, a professional assig
       `${service} — it will no longer be offered or bookable.`,
     );
     await page.locator('[data-testid=service-services-archive-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=service-services-archive]')).toBeHidden();
     await expect(row).toHaveCount(0);
     await view.locator('[data-testid=service-services-filter-status]').click();
     await page.locator('ion-popover').getByText('Archived', { exact: true }).click();
