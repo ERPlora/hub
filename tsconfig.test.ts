@@ -141,6 +141,61 @@ it('opens every file pnpm typecheck checks, in an editor, in a project that chec
   expect(lost.map(([file]) => relative(root, file))).toEqual([]);
 }, 60_000);
 
+/** What the image's `web` stage (Dockerfile) copies from the build context, as repo paths or globs. */
+function webStageCopies(): string[] {
+  const lines = readFileSync(join(root, 'Dockerfile'), 'utf8').split('\n');
+  const start = lines.findIndex((line) => /^FROM\s.+\sAS\s+web\s*$/i.test(line));
+  if (start < 0) throw new Error('the Dockerfile has no `web` stage');
+  const end = lines.findIndex((line, index) => index > start && /^FROM\s/i.test(line));
+  return lines
+    .slice(start + 1, end < 0 ? undefined : end)
+    .filter((line) => /^COPY\s/i.test(line) && !/\s--from=/.test(line))
+    .flatMap((line) => {
+      const args = line.trim().split(/\s+/).slice(1).filter((arg) => !arg.startsWith('--'));
+      const target = args.pop();
+      // Into the same place as in the repo: root files into `./`, a path into itself.
+      const sameLayout = target === './' ? args.every((source) => !source.includes('/')) : args.length === 1 && args[0] === target;
+      if (!sameLayout) throw new Error(`"${line.trim()}" does not keep the repo's layout`);
+      return args;
+    });
+}
+
+function copiedBy(sources: string[], file: string): boolean {
+  return sources.some((source) =>
+    source.includes('*')
+      ? new RegExp(`^${source.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`).test(file)
+      : file === source || file.startsWith(`${source}/`),
+  );
+}
+
+/** A tsconfig and every tsconfig it extends or references, recursively. */
+function configClosure(config: string, seen = new Set<string>()): Set<string> {
+  if (seen.has(config)) return seen;
+  seen.add(config);
+  const { config: raw, error } = ts.readConfigFile(config, ts.sys.readFile);
+  if (error) throw new Error(ts.flattenDiagnosticMessageText(error.messageText, '\n'));
+  const extended: string[] = raw.extends === undefined ? [] : [raw.extends].flat();
+  for (const parent of extended) {
+    if (!parent.startsWith('.')) throw new Error(`${relative(root, config)} extends a package (${parent}): not followed`);
+    configClosure(resolve(dirname(config), parent), seen);
+  }
+  for (const reference of raw.references ?? []) {
+    configClosure(ts.resolveProjectReferencePath({ path: resolve(dirname(config), reference.path) }), seen);
+  }
+  return seen;
+}
+
+it('copies into the image every tsconfig Vite reads to compile the SPA: tsconfig.json and what it references or extends', () => {
+  // Vite's esbuild takes each file's compiler options from the nearest tsconfig.json, through its references.
+  // Without them it compiles class fields as constructor assignments (`useDefineForClassFields` false; the
+  // base's target ES2022 makes it true): the image would ship a bundle `pnpm build` never built.
+  const sources = webStageCopies();
+  const configs = [...configClosure(join(root, 'tsconfig.json'))].map((config) => relative(root, config));
+
+  expect(configs).toEqual(expect.arrayContaining(['tsconfig.json', 'tsconfig.app.json']));
+  expect(configs.filter((config) => !copiedBy(sources, config))).toEqual([]);
+});
+
 it('type-checks the SPA in pnpm build too: the image runs it, and a run without its project checks nothing', () => {
   const spa = vueTscProject(scripts.build.split('&&')[0], VUE);
   const files = ['frontend/main.ts', 'apps/demo/frontend/routes.ts'].map((name) => join(root, name));
