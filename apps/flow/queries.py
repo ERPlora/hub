@@ -259,16 +259,19 @@ def live_flows() -> QuerySet[Flow]:
     return Flow.objects.filter(deleted_at__isnull=True)
 
 
-def resolve_flow(flow_id, text: str | None, *, lock: bool = False) -> Flow:
+def resolve_flow(
+    flow_id, text: str | None, *, lock: bool = False, rows: QuerySet[Flow] | None = None
+) -> Flow:
     """The automation of ``flow_id``, or the one whose name is or contains ``text``.
 
     ``NotFound`` when none (a deleted one included); ``Conflict`` ``flow.ambiguous_flow`` naming the
-    candidates when a text fits several. ``lock`` holds its row until the COMMIT.
+    candidates when a text fits several. ``lock`` holds its row until the COMMIT. It comes from
+    ``rows`` (automations that are not deleted, e.g. ``with_last_run``) when given, in one read by its
+    id: a deletion committed meanwhile is either not seen yet or not found, never a row that vanished
+    or was deleted between two reads.
     """
-    flows = live_flows()
-    if flow_id is not None:
-        candidates = list(flows.filter(pk=flow_id).values_list("pk", flat=True))
-    else:
+    if flow_id is None:
+        flows = live_flows()
         exact = list(flows.filter(name__iexact=text).values_list("pk", "name"))
         matches = exact or list(
             flows.filter(name__icontains=text)
@@ -281,13 +284,12 @@ def resolve_flow(flow_id, text: str | None, *, lock: bool = False) -> Flow:
                 str(AMBIGUOUS_FLOW) % {"text": text, "names": names},
                 code="flow.ambiguous_flow",
             )
-        candidates = [pk for pk, _ in matches]
-    if not candidates:
+        flow_id = matches[0][0] if matches else None
+    found = (live_flows() if rows is None else rows).filter(pk=flow_id)
+    flow = (found.select_for_update() if lock else found).first()
+    if flow is None:
         raise NotFound(str(FLOW_NOT_FOUND))
-    found = Flow.objects.filter(pk=candidates[0])
-    if lock:
-        found = found.select_for_update()
-    return found.get()
+    return flow
 
 
 def trigger_of(flow: Flow) -> dict[str, Any]:
@@ -322,7 +324,9 @@ def with_last_run(flows: QuerySet[Flow]) -> QuerySet[Flow]:
 
 
 def flow_row(flow: Flow) -> dict[str, Any]:
-    """What ``FlowOut`` shows of an automation (annotated with ``with_last_run`` or not)."""
+    """What ``FlowOut`` shows of an automation (annotated with ``with_last_run`` or not). Not annotated, it
+    reads its last run again: only for a row the caller has just written or holds locked; a plain read
+    takes it annotated from ``resolve_flow(rows=…)``."""
     required = document.required_grants(flow.steps)
     if not hasattr(flow, "last_run_id"):
         flow = with_last_run(Flow.objects.filter(pk=flow.pk)).get()
@@ -407,7 +411,7 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     },
 )
 def flow_detail(ctx: OperationContext, data: FlowRefIn) -> dict:
-    return flow_row(resolve_flow(data.id, data.flow))
+    return flow_row(resolve_flow(data.id, data.flow, rows=with_last_run(live_flows())))
 
 
 @operation(
