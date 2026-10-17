@@ -13,6 +13,7 @@ from uuid import UUID
 from babel import Locale
 from babel.numbers import format_currency, format_decimal, get_decimal_symbol
 from django.conf import settings
+from django.core.exceptions import EmptyResultSet
 from django.db.models import (
     BooleanField,
     Case,
@@ -22,6 +23,7 @@ from django.db.models import (
     F,
     Prefetch,
     Q,
+    QuerySet,
     Sum,
     Value,
     When,
@@ -147,12 +149,14 @@ def load_category(category_id: UUID) -> dict | None:
 
 
 def find_product(
-    product_id: UUID | None, said: str | None, *, lock: bool = False
+    product_id: UUID | None, said: str | None, *, lock: bool = False, rows=None
 ) -> Product:
     """The live product named by its id, or by its SKU or name as a person says it.
 
     By text: the SKU (ignoring case), else the exact name, else the only name that contains it.
     ``NotFound`` when none matches; 409 ``inventory.product_ambiguous`` when several do.
+    The product comes from ``rows`` when given (e.g. ready for its row): one read, so a deletion committed
+    meanwhile is either not seen yet or not found, never a row that vanished between two reads.
     """
     products = Product.objects.filter(is_deleted=False)
     if product_id is None:
@@ -169,7 +173,7 @@ def find_product(
                 code="inventory.product_ambiguous",
             )
         product_id = candidates[0].pk if candidates else None
-    found = products.filter(pk=product_id)
+    found = (products if rows is None else rows).filter(pk=product_id)
     product = (found.select_for_update() if lock else found).first()
     if product is None:
         raise NotFound(str(PRODUCT_NOT_FOUND))
@@ -177,9 +181,16 @@ def find_product(
 
 
 def find_category(
-    category_id: UUID | None, said: str | None, *, lock: bool = False
+    category_id: UUID | None,
+    said: str | None,
+    *,
+    lock: bool = False,
+    hold: bool = False,
 ) -> Category:
-    """The live category named by its id, or by its name or slug: exact first, else the only one that contains it."""
+    """The live category named by its id, or by its name or slug: exact first, else the only one that contains it.
+
+    ``lock`` takes it to change it; ``hold`` takes it to name it (a product put in it, see ``held``).
+    """
     categories = Category.objects.filter(is_deleted=False)
     if category_id is None:
         candidates = _first_match(
@@ -194,10 +205,27 @@ def find_category(
             )
         category_id = candidates[0].pk if candidates else None
     found = categories.filter(pk=category_id)
-    category = (found.select_for_update() if lock else found).first()
+    if hold:
+        category = next(iter(held(found[:1])), None)
+    else:
+        category = (found.select_for_update() if lock else found).first()
     if category is None:
         raise NotFound(str(CATEGORY_NOT_FOUND))
     return category
+
+
+def held(rows: QuerySet) -> list:
+    """``rows``, each held until this transaction ends with a key-share lock taken in the same read, for a
+    write that names them (a product put in a category, a tax category chosen): a deletion, the business's
+    «Delete» or the Hub admin's, waits for this write, while another write that names them goes on, so two
+    writes never wait for each other in a circle. One being deleted meanwhile is read once the deletion ends:
+    gone, as one deleted before. The ORM has no ``FOR KEY SHARE``: it is appended to the SQL the ORM wrote,
+    and the rows still come from the hub's database by the router."""
+    try:
+        sql, params = rows.query.sql_with_params()
+    except EmptyResultSet:  # an empty ``__in``: nothing to read nor to hold
+        return []
+    return list(rows.model.objects.raw(f"{sql} FOR KEY SHARE", params))
 
 
 def _first_match(queryset, lookups) -> list:
@@ -241,7 +269,9 @@ def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
     },
 )
 def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
-    return load_product(find_product(data.id, data.product).id)
+    return _product_row(
+        find_product(data.id, data.product, rows=_products(current_settings()))
+    )
 
 
 @operation(
