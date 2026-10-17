@@ -386,6 +386,17 @@ def _refuse_live_time_off(member: Member) -> None:
         raise Conflict(str(ACTIVE_TIME_OFF), code="staff.active_time_off")
 
 
+def lock_members(ids) -> list[UUID]:
+    """Locks the records ``ids`` (terminated ones too) in id order; the ids of those still there.
+
+    Every write on a person locks their record before what hangs from it (their schedules, their time
+    off, what other apps keep about them), and so does the Hub admin's «Delete» (admin.py) before Django
+    deletes all that and then the record: the other way round, each waited for the other.
+    """
+    rows = Member.objects.select_for_update().filter(pk__in=ids).order_by("id")
+    return list(rows.values_list("id", flat=True))
+
+
 # --- Roles -----------------------------------------------------------------------------------------
 
 
