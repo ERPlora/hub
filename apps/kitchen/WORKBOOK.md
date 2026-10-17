@@ -738,14 +738,17 @@ que no tiene ningún papel: solo el sistema (`*`).
   escribir nada ni avisar.
 - **Asentar** (`settle`, al empezar toda escritura): bloquea la fila de ajustes (todas las escrituras
   de Cocina de un negocio van en fila: dos cocineros a la vez no se pisan), guarda las rondas por
-  recibir y aplica lo que hizo Ventas. Con ella retiene las estaciones vivas hasta el COMMIT (`held` de
-  Inventario, `FOR KEY SHARE`): el borrado de una desde el admin del Hub espera a la escritura, así ninguna
-  ruta, plato ni línea del Historial nombra una estación que ya no existe, y una cuyo borrado ya está en
-  curso se lee terminada (su plato va por su categoría o a «Sin estación»); el «Eliminar» de Cocina ya va en
-  fila. **Enrutar** retiene además su producto o su categoría: el «Eliminar» de Inventario o el del admin
-  espera, y uno ya en curso se lee terminado, como uno borrado antes (404 `kitchen.product_not_found`,
-  `kitchen.category_not_found`, `kitchen.station_not_found`), nunca un 500 ni una ruta a algo ya borrado.
-  Probado con hilos en `test_concurrency.py`. Las mismas reglas las aplica la lectura sin escribir
+  recibir y aplica lo que hizo Ventas. El «Eliminar» de una estación en el admin del Hub entra en la misma
+  fila (`StationAdmin.delete_model`/`delete_queryset` bloquean antes la fila de ajustes), como el de Cocina:
+  espera a la escritura en curso, así ninguna ruta, plato ni línea del Historial nombra una estación borrada
+  a la vez, y la escritura que llega detrás ya no la ve (su plato va por su categoría o a «Sin estación»).
+  **Enrutar** bloquea primero la ruta que sustituye y después retiene su producto o su categoría hasta el
+  COMMIT (`held` de Inventario, `FOR KEY SHARE`), en el mismo orden en que borra el admin (primero lo que
+  apunta a la fila, la fila al final): el «Eliminar» de Inventario o el del admin espera a la ruta, uno ya en
+  curso se lee terminado, como uno borrado antes (404 `kitchen.product_not_found`,
+  `kitchen.category_not_found`, `kitchen.station_not_found`), y nunca hay un 500, un interbloqueo ni una ruta
+  creada a algo ya borrado. Quitar una ruta solo la bloquea (no nombra nada). Probado con hilos en
+  `test_concurrency.py`. Las mismas reglas las aplica la lectura sin escribir
   (`queries.effective`): F29 (plato anulado), F28 (cuenta anulada) y F27 (cerrada: la Lista desde
   antes del cierre pasa a Servida; la de papel o con la cocina en papel desde antes del cierre, a
   Servida con sus platos).

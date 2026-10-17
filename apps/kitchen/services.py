@@ -158,14 +158,11 @@ def actor(ctx: OperationContext) -> str:
 
 def locked_settings() -> KitchenSettings:
     """The settings row, locked: every write of the kitchen goes one after the other (made again,
-    receiving everything, if it was lost). The live stations are held with it until the write commits
-    (``held``): the Hub admin's «Delete» of one waits for the write, so a route, a dish or a line of the
-    History never names a station gone meanwhile, and one being deleted is read once it is gone. The
-    kitchen's own «Delete» needs no more: it is a write of the kitchen too."""
+    receiving everything, if it was lost), and so does the Hub admin's «Delete» of a station (admin.py), so a
+    route, a dish or a line of the History never names a station deleted meanwhile."""
     row, _created = KitchenSettings.objects.select_for_update().get_or_create(
         singleton=True, defaults={"receiving_since": EPOCH}
     )
-    held(Station.objects.filter(is_deleted=False))
     return row
 
 
@@ -1334,12 +1331,19 @@ def _held(model, row, missing, code: str):
 
 
 def _target(data) -> tuple[Product | None, Category | None]:
-    """The product or the category a route names, held for the route (``_held``)."""
     if data.product_id is not None or data.product:
-        product = find_product(data.product_id, data.product)
-        return _held(Product, product, PRODUCT_NOT_FOUND, "product"), None
-    category = find_category(data.category_id, data.category)
-    return None, _held(Category, category, CATEGORY_NOT_FOUND, "category")
+        return find_product(data.product_id, data.product), None
+    return None, find_category(data.category_id, data.category)
+
+
+def _route_of(product: Product | None, category: Category | None):
+    """The route of ``product`` or of ``category`` (or none), locked."""
+    routes = (
+        ProductRoute.objects.filter(product=product)
+        if product
+        else CategoryRoute.objects.filter(category=category)
+    )
+    return routes.select_for_update(of=("self",)).select_related("station").first()
 
 
 def _route_out(
@@ -1387,6 +1391,13 @@ def set_route(ctx: OperationContext, data: RoutingSetIn) -> dict:
     if not station.is_active:
         raise Conflict(str(STATION_INACTIVE), code="kitchen.station_inactive")
     product, category = _target(data)
+    # The route it replaces is locked before its product or category is held: the Hub admin's «Delete» of a
+    # product or a category takes its route first and the row last, so neither waits for the other in a circle.
+    _route_of(product, category)
+    if product is not None:
+        product = _held(Product, product, PRODUCT_NOT_FOUND, "product")
+    else:
+        category = _held(Category, category, CATEGORY_NOT_FOUND, "category")
     who = actor(ctx)
     if product is not None:
         ProductRoute.objects.update_or_create(
@@ -1416,12 +1427,9 @@ def set_route(ctx: OperationContext, data: RoutingSetIn) -> dict:
 def clear_route(ctx: OperationContext, data: RoutingClearIn) -> dict:
     begin(ctx)
     product, category = _target(data)
-    routes = (
-        ProductRoute.objects.filter(product=product)
-        if product
-        else CategoryRoute.objects.filter(category=category)
-    )
-    route = routes.select_related("station").first()
+    # Locked, not held: taking a route away names nothing, and the Hub admin's «Delete» of its product or
+    # category (which takes the route first) waits for it, or took it already and it is not found.
+    route = _route_of(product, category)
     if route is None:
         raise NotFound(str(ROUTE_NOT_FOUND), code="kitchen.route_not_found")
     station = route.station
