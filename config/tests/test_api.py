@@ -130,13 +130,17 @@ class AssetTags(HTMLParser):
 def assert_swagger_is_self_hosted_with_nonce(response) -> None:
     """Swagger UI comes from ninja's own static files, never a CDN, and every script carries the CSP nonce.
 
-    Checked on the tags, not on the page text: the CSRF token and the nonce are random and can spell "cdn".
+    No <script>/<link> leaves the origin, and no "cdn" anywhere else (an @import, an <img>, an inline import)
+    once the CSRF token and the nonce are taken out: they are random and can spell "cdn".
     """
     [nonce] = re.findall(r"'nonce-([^']+)'", response["Content-Security-Policy"])
-    page = AssetTags(response.content.decode())
+    html = response.content.decode()
+    [csrf_token] = re.findall(r'data-csrf-token="([^"]*)"', html)
+    page = AssetTags(html)
     assert len(page.scripts()) == 3  # settings JSON, bundle, init
     assert all(attrs.get("nonce") == nonce for attrs in page.scripts())
     assert page.external_urls() == []
+    assert "cdn" not in html.replace(nonce, "").replace(csrf_token, "").lower()
 
 
 @pytest.mark.django_db
