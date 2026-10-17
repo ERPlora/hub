@@ -372,8 +372,17 @@ def test_keep_the_business_region_and_calculate_in_it(admin_client):
     kept = post(admin_client, "/tax/settings", {"region_code": "ES-CN"})
     assert (kept.status_code, kept.json()["country_code"], kept.json()["region_code"]) == (200, "ES", "ES-CN")
     calculated = get(admin_client, "/tax/rates/calculate", amount=10_000, tax_category_key="product.generic")
-    # No IGIC rule yet: a category without a regional rule keeps the national one.
-    assert (calculated.json()["tax"], calculated.json()["tax_region_code"]) == (2_100, "ES-CN")
+    # No IGIC rule yet: the Canary Islands never take the national VAT, so there is no rule to calculate with.
+    assert (calculated.status_code, calculated.json()["error"]["code"]) == (409, "tax.no_rate")
+    created = post(
+        admin_client,
+        "/tax/rules",
+        {"country_code": "ES", "region_code": "ES-CN", "tax_category_key": "product.generic", "rate_pct": "7"},
+    )
+    assert created.status_code == 201
+    calculated = get(admin_client, "/tax/rates/calculate", amount=10_000, tax_category_key="product.generic")
+    body = calculated.json()
+    assert (body["tax"], body["tax_kind"], body["tax_region_code"]) == (700, "igic", "ES-CN")
 
 
 @pytest.mark.django_db

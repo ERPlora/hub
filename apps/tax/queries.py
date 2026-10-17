@@ -6,7 +6,8 @@ rule applies and of the money arithmetic. ``tax.rate.calculate`` wraps them, and
 what the assistant says can never drift apart.
 
 Resolution: the candidates are the active root rules of the country and the category in force on the
-date; an exact region beats the whole country and a rule of another region is never used; inside a
+date; an exact region beats the whole country and a rule of another region is never used; a region with a
+tax of its own (IGIC, IPSI) only takes its own rules, never the national VAT; inside a
 level the newest ``valid_from`` wins, then the lowest ``id``. The root's active components in force
 add their rate over the same base. The qualification and the tax family are always the root's.
 """
@@ -163,10 +164,17 @@ def _precedence(rule: TaxRule) -> tuple:
 
 
 def pick_root(candidates: Iterable[TaxRule], region_code: str | None) -> TaxRule | None:
-    """The root rule among ``candidates`` (one category): the region's, else the whole country's."""
+    """The root rule among ``candidates`` (one category): the region's, else the whole country's — except in a
+    region with a tax of its own (the Canary Islands, Ceuta, Melilla: outside the VAT territory), where only its
+    own rule applies. There the national VAT never stands in for a missing IGIC or IPSI rule: no rule, as a
+    category without any rule elsewhere."""
     candidates = list(candidates)
     for level in ([region_code] if region_code else []) + [""]:
-        matching = [rule for rule in candidates if rule.region_code == level]
+        matching = [
+            rule
+            for rule in candidates
+            if rule.region_code == level and (level or not own_tax_kind(rule.country_code, region_code))
+        ]
         if matching:
             return min(matching, key=_precedence)
     return None
@@ -198,12 +206,18 @@ def _jurisdiction(country_code: str | None, region_code: str | None) -> tuple[st
     return country, region
 
 
+def own_tax_kind(country_code: str, region_code: str | None) -> str | None:
+    """The tax of a region of ``country_code`` with one of its own (IGIC in ES-CN, IPSI in ES-CE and ES-ML), or
+    ``None``: the region charges its country's VAT (a region of another country, too)."""
+    kind = REGION_TAX_KINDS.get(region_code or "")
+    return kind if kind and region_code.startswith(f"{country_code}-") else None
+
+
 def tax_kind_of(country_code: str | None, region_code: str | None) -> str:
     """The tax family of a territory (TAX-F11): IGIC in the Canary Islands, IPSI in Ceuta and Melilla, VAT
     anywhere else. What a line with no category or rule is declared with (``Impuesto`` 03, 02 or 01)."""
     country, region = _jurisdiction(country_code or DEFAULT_COUNTRY, region_code)
-    kind = REGION_TAX_KINDS.get(region or "")
-    return kind if kind and region.startswith(f"{country}-") else DEFAULT_TAX_KIND
+    return own_tax_kind(country, region) or DEFAULT_TAX_KIND
 
 
 def business_tax_kind() -> str:

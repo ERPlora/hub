@@ -503,7 +503,8 @@ def _actor(ctx: OperationContext) -> str:
     ai={
         "description": "Keep the business's tax region: ES-CN (Canary Islands, IGIC), ES-CE (Ceuta, IPSI), ES-ML "
         "(Melilla, IPSI), or empty for the whole country (VAT). From then on every sale and invoice charges the "
-        "rule of that region when its category has one, and the national one otherwise.",
+        "rule of that region; a category without one cannot be charged there until it has it (the national VAT "
+        "never applies in those territories).",
         "risk": "high",
     },
 )

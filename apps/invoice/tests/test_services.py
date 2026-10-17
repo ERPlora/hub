@@ -319,6 +319,17 @@ def test_a_line_with_a_tax_category_takes_the_rule_of_the_business_region(issuer
     assert invoice.total_amount == 10700
 
 
+def test_a_line_of_a_category_without_the_territorys_rule_is_refused_not_declared_as_vat(issuer):
+    # The Canary Islands are outside the VAT territory: the national 21 % of the category never stands in for
+    # its missing IGIC (TAX-F11); the line is refused on its field, as one of a category without any rule.
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    line = {"description": "Shirt", "quantity": "1", "unit_price": 10000, "tax_category_key": "product.generic"}
+    with pytest.raises(Conflict) as refused:
+        manual(lines=[line])
+    assert refused.value.code == "invoice.no_tax_rule"
+    assert list(refused.value.fields) == ["lines.0.tax_category_key"]
+
+
 def test_an_unknown_tax_category_is_refused_on_its_line(issuer):
     with pytest.raises(OperationError) as refused:
         manual(

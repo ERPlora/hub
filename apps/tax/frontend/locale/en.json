@@ -167,7 +167,7 @@
       "country": "Country",
       "countryHelp": "It is the country of your ERPlora account.",
       "region": "Tax region",
-      "regionHelp": "The Canary Islands charge IGIC and Ceuta and Melilla IPSI. Each category is charged with the rule of your region when it has one — create its rule in Rules — and with the national one otherwise.",
+      "regionHelp": "The Canary Islands charge IGIC and Ceuta and Melilla IPSI. Each category is charged with the rule of your region: create one per category in Rules. Until it has one, the till cannot charge it — the national VAT never applies there.",
       "regions": {
         "wholeCountry": "Whole country (VAT)",
         "canaryIslands": "Canary Islands (IGIC)",

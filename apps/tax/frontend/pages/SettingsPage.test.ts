@@ -74,7 +74,7 @@ describe('SettingsPage', () => {
       ['ES-CE', 'Ceuta (IPSI)'],
       ['ES-ML', 'Melilla (IPSI)'],
     ]);
-    expect(s.find('tax-settings-region-help').text()).toContain('create its rule in Rules');
+    expect(s.find('tax-settings-region-help').text()).toContain('create one per category in Rules');
   });
 
   it('«Save» keeps the region chosen and says «Tax region saved.»; the whole country sends none', async () => {

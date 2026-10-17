@@ -579,8 +579,9 @@ GENERAL_CATEGORIES = ("product.generic", "service.generic")
     },
 )
 def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
-    """A typed rate is declared subject, with the territory's tax (TAX-F11): a rule of another tax (the national
-    VAT a territory without its own rule falls back to) or an exempt one is never proposed."""
+    """A typed rate is declared subject, with the territory's tax (TAX-F11): a rule of another tax (a regional one
+    kept with another tax; the national VAT never applies in a territory with its own) or an exempt one is never
+    proposed."""
     tax = business_tax_kind()
     for key in GENERAL_CATEGORIES:
         resolution = resolve_tax(category_key=key)
