@@ -1,16 +1,18 @@
 """Two devices at once (PRINTING-F18): real claims in threads, real row locks.
 
 Two devices that claim at once never take the same job (``SELECT … FOR UPDATE SKIP LOCKED``); two requests
-with the same key at once queue one job; two confirmations at once confirm it once.
+with the same key at once queue one job; two confirmations at once confirm it once. A read that a printer's
+deletion lands in the middle of answers what it read or 404, never a 500.
 """
 
 import threading
+from contextlib import contextmanager
 
 import pytest
 from django.db import connection
-from live.errors import OperationError
+from live.errors import NotFound, OperationError
 
-from apps.printing.models import PrintJob
+from apps.printing.models import Printer, PrintJob, Settings
 from apps.printing.tests.conftest import RECEIPT, enqueue, printer, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -70,3 +72,61 @@ def test_two_confirmations_at_once_confirm_once():
     results = at_once(done, done)
     assert [result.confirmed for result in results] == [True, True]
     assert PrintJob.objects.get(pk=queued.id).status == "done"
+
+
+# A printer deleted while it is being read. The app never deletes one (it is deactivated), but the staff's
+# admin can delete one without jobs. The reads found it and then loaded it again by its id (its queue, or
+# the settings' chosen printer), so a deletion committed between the two raised DoesNotExist (a 500).
+# Each case lands the deletion there.
+
+
+@contextmanager
+def deleted_after_the_first_read_of(model, gone):
+    """Deletes the printer ``gone`` as the admin does, in another session, committed right after the first
+    statement of this one that reads ``model``'s table: a deletion landing in the middle of a read."""
+    table = f'"{model._meta.db_table}"'
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            deletions.extend(at_once(lambda: Printer.objects.get(pk=gone.id).delete()))
+        return result
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+def deleted(deletions) -> list[str]:
+    return ["ok" if not isinstance(result, Exception) else repr(result) for result in deletions]
+
+
+@pytest.mark.parametrize("ref", ["id", "name"])
+@pytest.mark.parametrize("name", ["printing.printer.get", "printing.printer.status"])
+def test_a_printer_deleted_while_it_is_read_is_never_a_server_error(name, ref):
+    till = printer("Till")
+    said = {"printer_id": str(till.id)} if ref == "id" else {"printer": "till"}
+    with deleted_after_the_first_read_of(Printer, till) as deletions:
+        read = run(name, said)
+    assert deleted(deletions) == ["ok"]
+    row = read if name == "printing.printer.get" else read.printer
+    # The printer as it was read, with its queue.
+    assert (row.id, row.name, row.state, row.pending) == (till.id, "Till", "ready", 0)
+    # What runs next (a reload, the assistant asking again): not found, with the app's key.
+    with pytest.raises(NotFound) as error:
+        run(name, said)
+    assert (error.value.code, error.value.status) == ("printing.printer_not_found", 404)
+
+
+def test_the_chosen_printer_deleted_while_the_summary_is_read_is_never_a_server_error():
+    till = printer("Till")
+    run("printing.settings.update", {"receipt_printer": "Till"})
+    with deleted_after_the_first_read_of(Settings, till) as deletions:
+        summary = run("printing.job.summary")
+    assert deleted(deletions) == ["ok"]
+    receipts = next(row for row in summary.usages if row.usage == "receipt")
+    # The settings as they were read, with their chosen printer.
+    assert receipts.default_printer == "Till"
+    # Read again: the admin's deletion cleared the choice.
+    receipts = next(row for row in run("printing.job.summary").usages if row.usage == "receipt")
+    assert (receipts.default_printer, receipts.printers) == (None, 0)
