@@ -78,13 +78,24 @@ const reads = [preview, whole, methodPage, settings];
 const readError = computed(() => reads.map((read) => read.error.value).find(Boolean) ?? null);
 const reconnecting = computed(() => reads.some((read) => read.status.value === 'reconnecting'));
 
+/** From the tap on «Retry» until the server answers again (a result or another error): loading again. */
+const retrying = shallowRef(false);
+watch([readError, preview.data], () => (retrying.value = false));
+function retry(): void {
+  retrying.value = true;
+  preview.refresh();
+}
+/** A read failed: its error replaces what was loading, never both (and «Retry» brings the loading back). */
+const failed = computed(() => !!readError.value && !retrying.value);
+
 /** The amount to charge; `undefined` until the server has worked it out. */
 const total = computed(() => (preview.status.value === 'loading' ? undefined : preview.data.value?.total));
 const cashLimit = computed(() => preview.data.value?.cash_limit ?? null);
 /** What the cash limit looks at: the whole operation, also when this is one part of a check. */
 const operationTotal = computed(() => (total.value === undefined ? undefined : (preview.data.value?.operation_total ?? total.value)));
 const ticketLimit = computed(() => preview.data.value?.ticket_limit ?? null);
-const methodsLoaded = computed(() => methodPage.status.value !== 'loading' || methodPage.data.value !== undefined);
+/** Only a page of methods says whether there is any: an error or a dropped stream is not «none». */
+const methodsLoaded = computed(() => methodPage.data.value !== undefined);
 const methods = computed<PaymentMethodOut[]>(() => chargeableMethods(methodPage.data.value?.rows ?? []));
 
 const partialText = computed(() => {
@@ -236,7 +247,8 @@ function openDrawer(): void {
     </div>
     <div class="sheet-top">
       <InlineFeedback
-        v-if="readError"
+        v-if="failed && readError"
+        class="pay-error"
         tone="danger"
         data-testid="sale-checkout-read-error"
       >
@@ -246,7 +258,7 @@ function openDrawer(): void {
             fill="clear"
             size="small"
             data-testid="sale-checkout-retry"
-            @click="preview.refresh()"
+            @click="retry"
           >
             {{ $t('sale.live.retry') }}
           </ion-button>
@@ -260,6 +272,7 @@ function openDrawer(): void {
         {{ $t('sale.live.reconnecting') }}
       </p>
       <div
+        v-if="total !== undefined || !failed"
         class="pay-total"
         data-testid="sale-checkout-total"
         aria-live="polite"
@@ -316,7 +329,7 @@ function openDrawer(): void {
       </CheckoutSide>
       <div class="pay-tender">
         <p
-          v-if="!methodsLoaded"
+          v-if="!methodsLoaded && !failed"
           class="pay-note"
           data-testid="sale-checkout-methods-loading"
         >
@@ -327,14 +340,14 @@ function openDrawer(): void {
           {{ $t('sale.checkout.loadingMethods') }}
         </p>
         <p
-          v-else-if="!methods.length"
+          v-else-if="methodsLoaded && !methods.length"
           class="pay-note"
           data-testid="sale-checkout-no-methods"
         >
           {{ $t('sale.checkout.noMethods') }}
         </p>
         <CheckoutTender
-          v-else-if="total !== undefined"
+          v-else-if="methodsLoaded && total !== undefined"
           :methods="methods"
           :method="tender.method.value"
           :cash-off="tender.cashOff.value"
@@ -413,6 +426,11 @@ function openDrawer(): void {
   font-weight: 800;
   letter-spacing: -0.02em;
   text-align: center;
+}
+
+/* The error stands where the figure would: the same room below it. */
+.pay-error {
+  margin: 0 0 0.9rem;
 }
 
 .pay-total__loading {
