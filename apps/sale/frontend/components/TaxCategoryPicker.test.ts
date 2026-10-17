@@ -3,7 +3,8 @@
 // an outlined field, labelled by its host, that opens a modal with a searchbar over the live
 // `tax.category.list` (50 at a time, searched on the server). Each choice reads «Name · rate» with the
 // rate the server says it charges today. Under the field, the old notices: no category to choose («Set up
-// your VAT first, in Taxes.») and a failed read («The tax categories could not be read.» with «Retry»).
+// your VAT first, in Taxes.») and a failed read («The VAT categories could not be read.» with «Retry»). Each
+// names the business territory's tax («IGIC» in the Canary Islands, «IPSI» in Ceuta and Melilla).
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, flush, ionValue, mountSale } from '../__tests__/mount-sale';
@@ -121,7 +122,7 @@ describe('TaxCategoryPicker: the choices, searched on the server', () => {
     await s.open();
     await s.search('zzz');
     await s.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
-    expect(s.text('tax-empty')).toBe('No tax category matches your search.');
+    expect(s.text('tax-empty')).toBe('No VAT category matches your search.');
     expect(s.inDoc('tax-none')).toBeNull();
   });
 
@@ -162,12 +163,12 @@ describe('TaxCategoryPicker: the old notices', () => {
     expect(s.wrapper.emitted('update:empty')?.at(-1)).toEqual([false]);
   });
 
-  it('a failed read: «The tax categories could not be read.», the server’s words and «Retry» («Retrying…» meanwhile)', async () => {
+  it('a failed read: «The VAT categories could not be read.», the server’s words and «Retry» («Retrying…» meanwhile)', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'permission_denied'));
     await flush();
     const notice = s.text('tax-error');
-    expect(notice).toContain('The tax categories could not be read.');
+    expect(notice).toContain('The VAT categories could not be read.');
     expect(notice).toContain('msg permission_denied');
     const retry = () => s.inDoc('tax-retry') as Control;
     expect(retry().textContent?.trim()).toBe('Retry');
@@ -175,6 +176,31 @@ describe('TaxCategoryPicker: the old notices', () => {
     expect([retry().textContent?.trim(), retry().disabled]).toEqual(['Retrying…', true]);
     await s.result(OP, PAGE);
     expect(s.inDoc('tax-error')).toBeNull();
+  });
+
+  it('in the Canary Islands the notices name the IGIC, in the reader’s language', async () => {
+    const en = await setup();
+    await en.result('sale.sale.tax_kind', { tax: 'igic' });
+    await en.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
+    expect(en.text('tax-none')).toBe('There are no tax categories to choose from. Set up your IGIC first, in Taxes.');
+    const es = await setup({}, 'es');
+    await es.result('sale.sale.tax_kind', { tax: 'igic' });
+    await es.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
+    expect(es.text('tax-none')).toBe('No hay categorías de IGIC que elegir. Configura antes tus tipos de IGIC, en Impuestos.');
+    es.net.lastStream().push(errorFrame(es.subId(OP), 'permission_denied'));
+    await flush();
+    expect(es.text('tax-error')).toContain('No se han podido leer las categorías de IGIC.');
+  });
+
+  it('in Ceuta or Melilla the search names the IPSI', async () => {
+    const s = await setup({}, 'es');
+    await s.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await s.result(OP, PAGE);
+    await s.open();
+    expect((s.inDoc('tax-search') as Control).placeholder).toBe('Buscar una categoría de IPSI…');
+    await s.search('zzz');
+    await s.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
+    expect(s.text('tax-empty')).toBe('Ninguna categoría de IPSI coincide con tu búsqueda.');
   });
 
   it('speaks Spanish, with the rate as Spain writes it', async () => {

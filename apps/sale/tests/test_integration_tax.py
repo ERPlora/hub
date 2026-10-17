@@ -6,9 +6,12 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
+from live.context import OperationContext
+from live.errors import Conflict, PermissionDenied
 
-from apps.sale.tests.conftest import run
+from apps.inventory.models import Product
+from apps.sale.tests.conftest import A, ctx_for, run
 from apps.tax.models import TaxRule
 
 pytestmark = pytest.mark.django_db
@@ -248,3 +251,49 @@ def test_the_preview_and_the_sections_follow_the_business_region(product):
     preview = run("sale.checkout.preview", {"lines": [{"product": "SHI"}]})
     assert (preview.subtotal, preview.tax_total) == (10000, 700)
     assert [(row.tax_type, row.rate_pct) for row in preview.breakdown] == [("igic", Decimal("7.00"))]
+
+
+# The tax every sale screen names (SALE-F28 and the till): the business territory's, as Taxes keeps it.
+
+
+@pytest.mark.parametrize(
+    ("region", "tax"),
+    [(None, "vat"), ("ES-CN", "igic"), ("ES-CE", "ipsi"), ("ES-ML", "ipsi")],
+)
+def test_the_tax_the_sales_are_named_by_is_the_territorys(db, region, tax):
+    if region:
+        run("tax.settings.update", {"region_code": region})
+    assert run("sale.sale.tax_kind", {}, ctx_for("hub_employee")).tax == tax
+
+
+def test_back_to_the_whole_country_the_sales_are_named_by_the_vat_again(db):
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    run("tax.settings.update", {"region_code": None})
+    assert run("sale.sale.tax_kind", {}).tax == "vat"
+
+
+def test_nobody_without_seeing_the_sales_reads_their_tax(db):
+    nobody = OperationContext(scope=A, actor="x", permissions=frozenset())
+    with pytest.raises(PermissionDenied):
+        run("sale.sale.tax_kind", {}, nobody)
+
+
+@pytest.mark.parametrize(
+    ("region", "language", "missing"),
+    [
+        (None, "en", "Its VAT is missing."),
+        ("ES-CN", "en", "Its IGIC is missing."),
+        ("ES-ML", "en", "Its IPSI is missing."),
+        (None, "es", "Falta configurar su IVA."),
+        ("ES-CN", "es", "Falta configurar su IGIC."),
+    ],
+)
+def test_a_product_without_its_tax_says_the_territorys_tax_is_missing(product, region, language, missing):
+    if region:
+        run("tax.settings.update", {"region_code": region})
+    product("Wax", "WAX", 500, "product.generic")
+    Product.objects.filter(sku="WAX").update(tax_category=None)
+    with translation.override(language), pytest.raises(Conflict) as refusal:
+        run("sale.sale.complete", {"idempotency_key": "tax-key-0001", "lines": [{"product": "WAX"}]})
+    assert refusal.value.code == "sale.tax_category_missing"
+    assert str(refusal.value.message).endswith(missing)

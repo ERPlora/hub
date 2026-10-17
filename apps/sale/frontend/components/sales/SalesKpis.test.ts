@@ -1,5 +1,6 @@
 // The six figures of the period on Sales (SALE-F28): «Tickets», «Revenue» (refunds already taken off),
-// «Avg. ticket», «VAT», «Discounts» and «Voided», from `sale.sale.stats` over the same business days as
+// «Avg. ticket», the tax («VAT»; «IGIC» in the Canary Islands, «IPSI» in Ceuta and Melilla: the business
+// territory's, `useTaxName`), «Discounts» and «Voided», from `sale.sale.stats` over the same business days as
 // the rows, live. Until they arrive, and when they cannot be read, each says «—» (a figure that could
 // not be read is not a zero), and a failure adds «Error loading metrics».
 import { describe, expect, it } from 'vitest';
@@ -77,6 +78,29 @@ describe('SalesKpis', () => {
     s.call.push(errorFrame(s.subId('sale.sale.stats'), 'sale.boom'));
     await flush();
     expect(s.find('sales-kpis-error').text()).toContain('Error cargando métricas');
+  });
+
+  it.each([
+    ['vat', 'en', 'VAT'],
+    ['igic', 'en', 'IGIC'],
+    ['ipsi', 'en', 'IPSI'],
+    ['vat', 'es', 'IVA'],
+    ['igic', 'es', 'IGIC'],
+    ['ipsi', 'es', 'IPSI'],
+  ] as const)('the tax is named by the business territory’s: %s in %s is «%s»', async (tax, locale, label) => {
+    const s = await setup(undefined, locale);
+    await s.result('sale.sale.stats', STATS);
+    await s.result('sale.sale.tax_kind', { tax });
+    expect(s.cards()[3]).toEqual([label, locale === 'es' ? '1500,50 €' : '€1,500.50']);
+  });
+
+  it('a change of territory renames the tax and leaves the figure as it is', async () => {
+    const s = await setup();
+    await s.result('sale.sale.stats', STATS);
+    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    expect(s.cards()[3]).toEqual(['IGIC', '€1,500.50']);
+    await s.result('sale.sale.tax_kind', { tax: 'vat' }, {}, 2);
+    expect(s.cards()[3]).toEqual(['VAT', '€1,500.50']);
   });
 
   it('below 768 px the cards are one row that scrolls sideways', () => {

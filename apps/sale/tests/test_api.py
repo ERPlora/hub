@@ -20,6 +20,7 @@ ROUTES = {
     ("GET", "/sale/sales/today", "sale.sale.today"),
     ("GET", "/sale/sales/last_7_days", "sale.sale.last_7_days"),
     ("GET", "/sale/sales/by_staff", "sale.sale.by_staff"),
+    ("GET", "/sale/sales/tax_kind", "sale.sale.tax_kind"),
     ("POST", "/sale/sales", "sale.sale.complete"),
     ("POST", "/sale/sales/complete_over_limit", "sale.sale.complete_over_limit"),
     ("POST", "/sale/sales/void", "sale.sale.void"),

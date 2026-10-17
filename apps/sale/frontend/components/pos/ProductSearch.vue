@@ -12,6 +12,7 @@ import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
@@ -20,6 +21,7 @@ withDefaults(defineProps<{ withServices?: boolean }>(), { withServices: false })
 const emit = defineEmits<{ pick: [product: ProductOut]; pickService: [service: ServiceSaleOut]; close: [] }>();
 
 const locale = useLocale();
+const taxName = useTaxName();
 const term = shallowRef('');
 const { data, status, error } = useLive('inventory.product.list', () => ({
   search: term.value,
@@ -104,7 +106,7 @@ onMounted(() => void bar.value?.$el.setFocus?.());
         <ion-label>
           <h3>{{ item.name }}</h3>
           <p :class="{ 'pos-search__warn': item.needs_tax_setup }">
-            {{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory') : item.sku }}
+            {{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory', { tax: taxName }) : item.sku }}
           </p>
         </ion-label>
         <ion-note

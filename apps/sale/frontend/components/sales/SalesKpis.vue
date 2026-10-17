@@ -1,13 +1,16 @@
 <script setup lang="ts">
 // The six figures of the period on Sales (SALE-F28; the old KPI cards): «Tickets», «Revenue» (refunds
-// already taken off), «Avg. ticket», «VAT», «Discounts» and «Voided», from `sale.sale.stats` over the
-// same business days as the rows, followed live (a charge, a void or a refund re-runs it). A figure not
-// read yet, or that could not be read, is «—», never a zero; a failure adds «Error loading metrics».
+// already taken off), «Avg. ticket», the tax — named by the business territory's, «VAT» or «IGIC» in the
+// Canary Islands, «IPSI» in Ceuta and Melilla (`useTaxName`) —, «Discounts» and «Voided», from
+// `sale.sale.stats` over the same business days as the rows, followed live (a charge, a void or a refund
+// re-runs it; a change of territory renames the tax). A figure not read yet, or that could not be read,
+// is «—», never a zero; a failure adds «Error loading metrics».
 // The page mounts it only for whoever may see the reports (`sale.view_reports`).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { StatsOut } from '../../operations';
@@ -17,15 +20,17 @@ const props = defineProps<{ bounds: DayBounds }>();
 
 const t = useT();
 const locale = useLocale();
+const taxName = useTaxName();
 
 const { data, error } = useLive('sale.sale.stats', () => ({ ...props.bounds }));
 
 type Kind = 'count' | 'money';
-const CARDS: readonly { key: string; label: string; field: keyof StatsOut; kind: Kind }[] = [
+/** Each card's label key; the tax's is the territory's tax name. */
+const CARDS: readonly { key: string; label?: string; field: keyof StatsOut; kind: Kind }[] = [
   { key: 'tickets', label: 'sale.sales.kpis.tickets', field: 'count', kind: 'count' },
   { key: 'revenue', label: 'sale.sales.kpis.revenue', field: 'total_revenue', kind: 'money' },
   { key: 'avg-ticket', label: 'sale.sales.kpis.avgTicket', field: 'avg_ticket', kind: 'money' },
-  { key: 'tax', label: 'sale.sales.kpis.tax', field: 'tax_total', kind: 'money' },
+  { key: 'tax', field: 'tax_total', kind: 'money' },
   { key: 'discounts', label: 'sale.sales.kpis.discounts', field: 'discount_total', kind: 'money' },
   { key: 'voided', label: 'sale.sales.kpis.voided', field: 'voided_count', kind: 'count' },
 ];
@@ -36,7 +41,7 @@ const cards = computed(() =>
     const value = stats?.[card.field];
     let text = '—';
     if (typeof value === 'number') text = card.kind === 'money' ? formatMoney(value, locale.value) : formatQuantity(value, '', locale.value);
-    return { key: card.key, label: t(card.label), text };
+    return { key: card.key, label: card.label ? t(card.label) : taxName.value, text };
   }),
 );
 </script>

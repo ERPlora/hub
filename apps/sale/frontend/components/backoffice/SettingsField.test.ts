@@ -26,7 +26,7 @@ type Control = HTMLElement & {
 const fieldOf = (key: SettingsKey) => SETTINGS_FIELDS.find((field) => field.key === key)!;
 
 async function setup(key: SettingsKey, props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(SettingsField, { props: { field: fieldOf(key), value: '', disabled: false, ...props }, locale });
+  const m = await mountSale(SettingsField, { props: { field: fieldOf(key), value: '', disabled: false, taxName: 'VAT', ...props }, locale });
   const control = () => m.inDoc(`sale-settings-field-${key}`) as Control;
   // happy-dom reads no text off an `ion-item`: the name and the explanation are read from their own nodes.
   const text = () => m.wrapper.findAll('h2, p').map((node) => node.element.textContent?.trim()).join(' ');
@@ -111,6 +111,16 @@ describe('SettingsField', () => {
     expect(s.wrapper.find('[slot="start"]').exists()).toBe(true);
     const plain = await setup('allow_card', { value: true });
     expect(plain.wrapper.find('[slot="start"]').exists()).toBe(false);
+  });
+
+  it('«Prices include VAT» names the tax its form gives it: the business territory’s («IGIC», «IPSI»)', async () => {
+    const vat = await setup('default_tax_included', { value: true, taxName: 'IVA' }, 'es');
+    expect(vat.text()).toContain('Precios con IVA incluido');
+    const s = await setup('default_tax_included', { value: true, taxName: 'IGIC' }, 'es');
+    expect(s.text()).toContain('Precios con IGIC incluido');
+    expect(s.control().getAttribute('aria-label')).toBe('Precios con IGIC incluido');
+    const ipsi = await setup('default_tax_included', { value: true, taxName: 'IPSI' });
+    expect(ipsi.text()).toContain('Prices include IPSI');
   });
 
   it('speaks Spanish', async () => {

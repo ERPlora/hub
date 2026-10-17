@@ -191,3 +191,23 @@ describe('DepartmentFormModal: Spanish', () => {
     expect(s.field('tax').errorText).toBe('Elige el IVA que cobra esta sección.');
   });
 });
+
+describe('DepartmentFormModal: the business territory’s tax', () => {
+  it('in the Canary Islands the field, its placeholder and its notice name the IGIC', async () => {
+    const s = await setup(null, 'es');
+    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    expect([s.field('tax').label, s.field('tax').placeholder]).toEqual(['IGIC que cobra', 'Elige el IGIC']);
+    await s.type('name', 'Carnicería');
+    await click(s.submit());
+    expect(s.field('tax').errorText).toBe('Elige el IGIC que cobra esta sección.');
+  });
+
+  it('in Ceuta or Melilla it says «IPSI charged» in English', async () => {
+    const s = await setup();
+    await s.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    expect([s.field('tax').label, s.field('tax').placeholder]).toEqual(['IPSI charged', 'Choose the IPSI']);
+    await s.type('name', 'Butchery');
+    await click(s.submit());
+    expect(s.field('tax').errorText).toBe('Choose the IPSI this section charges.');
+  });
+});

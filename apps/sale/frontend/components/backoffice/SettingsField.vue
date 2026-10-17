@@ -21,6 +21,8 @@ const props = withDefaults(
     error?: string;
     /** An icon at the start of the row (the old screen put its own on the first one). */
     icon?: string;
+    /** The business territory's tax («VAT», «IGIC», «IPSI»), read once by the form for every row. */
+    taxName: string;
   }>(),
   { error: undefined, icon: undefined },
 );
@@ -28,7 +30,8 @@ const props = withDefaults(
 const emit = defineEmits<{ 'update:value': [value: string | boolean] }>();
 
 const t = useT();
-const label = computed(() => t(`sale.settings.fields.${props.field.key}.label`));
+// «Prices include VAT» names the business territory's tax («IGIC», «IPSI»); the other names ignore it.
+const label = computed(() => t(`sale.settings.fields.${props.field.key}.label`, { tax: props.taxName }));
 const description = computed(() => (props.field.described ? t(`sale.settings.fields.${props.field.key}.description`) : undefined));
 const testid = computed(() => `sale-settings-field-${props.field.key}`);
 /** A switch or a choice says its refusal under the name; a box, under itself. */

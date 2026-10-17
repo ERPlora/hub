@@ -63,6 +63,13 @@ describe('DepartmentPicker', () => {
     expect(m.choice.value).toEqual({ kind: 'tax', key: 'food' });
   });
 
+  it('in Ceuta or Melilla the categories’ picker is «Section (IPSI)»', async () => {
+    const m = await setup();
+    await m.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await m.result(DEPARTMENTS, page([]));
+    expect(m.wrapper.findComponent(TaxCategoryPicker).props()).toMatchObject({ label: 'Section (IPSI)' });
+  });
+
   it('a search that finds no department is not the same as having none', async () => {
     const m = await setup();
     await m.result(DEPARTMENTS, page([department('d1', 'Fruit')]));

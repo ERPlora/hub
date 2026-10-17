@@ -1133,6 +1133,13 @@ class StatsOut(Schema):
     voided_count: int = Field(description="Sales voided.")
 
 
+class TaxKindOut(Schema):
+    tax: Literal["vat", "igic", "ipsi"] = Field(
+        description="The tax the business's sales are declared with, its territory's: vat, igic (Canary Islands) "
+        "or ipsi (Ceuta and Melilla)."
+    )
+
+
 class TodayOut(Schema):
     day: date = Field(description="Today's business day.")
     total: int = Field(description="Sold today, in cents.")

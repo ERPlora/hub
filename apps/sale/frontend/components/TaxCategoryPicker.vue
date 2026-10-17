@@ -4,7 +4,8 @@
 // loads them all. An outlined read-only field, labelled by its host, opens a modal with a searchbar over
 // the live `tax.category.list` (50 at a time, searched on the server, the pattern Ionic recommends for
 // long lists); each choice reads «Name · rate» with the rate the server says it charges today. Under the
-// field, the old screen's notices: no category to choose, or a failed read with «Retry».
+// field, the old screen's notices: no category to choose, or a failed read with «Retry». The texts name
+// the business territory's tax («VAT», «IGIC», «IPSI»: `useTaxName`).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -24,6 +25,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useTaxName } from '../composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { taxLabel } from '../lib/taxLabel';
 
@@ -54,6 +56,9 @@ const empty = defineModel<boolean>('empty', { default: false });
 
 const t = useT();
 const locale = useLocale();
+const taxName = useTaxName();
+/** The territory's tax, for the texts that name it. */
+const named = computed(() => ({ tax: taxName.value }));
 
 const open = ref(false);
 const typed = ref('');
@@ -142,7 +147,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
       v-if="failed"
       tone="danger"
       :data-testid="`${testid}-error`"
-      :heading="t('sale.common.taxPicker.loadFailed')"
+      :heading="t('sale.common.taxPicker.loadFailed', named)"
     >
       {{ error?.message }}
       <template #actions>
@@ -162,7 +167,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
       tone="warning"
       :data-testid="`${testid}-none`"
     >
-      {{ t('sale.common.taxPicker.none') }}
+      {{ t('sale.common.taxPicker.none', named) }}
     </InlineFeedback>
 
     <ion-modal
@@ -191,7 +196,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
           <ion-searchbar
             :data-testid="`${testid}-search`"
             :value="typed"
-            :placeholder="t('sale.common.taxPicker.search')"
+            :placeholder="t('sale.common.taxPicker.search', named)"
             :debounce="250"
             @ion-input="typed = String($event.detail.value ?? '')"
           />
@@ -208,7 +213,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
           v-else-if="failed"
           class="ion-margin"
           tone="danger"
-          :heading="t('sale.common.taxPicker.loadFailed')"
+          :heading="t('sale.common.taxPicker.loadFailed', named)"
         >
           {{ error?.message }}
         </InlineFeedback>
@@ -235,14 +240,14 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
           v-else-if="none"
           class="ion-padding ion-text-center sale-tax-picker__muted"
         >
-          {{ t('sale.common.taxPicker.none') }}
+          {{ t('sale.common.taxPicker.none', named) }}
         </p>
         <p
           v-else
           class="ion-padding ion-text-center sale-tax-picker__muted"
           :data-testid="`${testid}-empty`"
         >
-          {{ t('sale.common.taxPicker.noResults') }}
+          {{ t('sale.common.taxPicker.noResults', named) }}
         </p>
         <p
           v-if="more && options.length"

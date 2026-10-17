@@ -49,6 +49,13 @@ describe('ProductSearch', () => {
     expect(m.wrapper.emitted('pick')).toEqual([[blocked]]);
   });
 
+  it('in Ceuta or Melilla a match without its tax names the IPSI', async () => {
+    const m = await setup();
+    await m.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await m.result(OP, page([product({ id: 'p2', name: 'Tea', needs_tax_setup: true })]));
+    expect(m.find('pos-search-p2').find('p').text()).toBe('Cannot be sold: no tax category. IPSI needs to be set up.');
+  });
+
   it('says «No products.» when nothing matches and the error when the catalogue cannot be read', async () => {
     const m = await setup();
     await m.result(OP, page([]));

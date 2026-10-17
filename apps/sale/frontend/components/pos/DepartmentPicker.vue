@@ -4,7 +4,7 @@ export type OpenPriceChoice = { kind: 'department'; id: string } | { kind: 'tax'
 </script>
 
 <script setup lang="ts">
-// «Section (VAT)» of the open-price sheet (SALE-F09): the business's departments in their order, each
+// «Section (VAT)» (the business territory's tax: «Section (IGIC)»…) of the open-price sheet (SALE-F09): the business's departments in their order, each
 // with the rate its category charges today, 20 at a time and searched on the server; a tap chooses one.
 // A business without departments gets Taxes' categories instead, through the app's one tax-category
 // picker (which says it when there is none either); a search that finds nothing is not «no
@@ -13,6 +13,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { IonSearchbar, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { formatPercent } from '../../lib/format';
 import TaxCategoryPicker from '../TaxCategoryPicker.vue';
@@ -20,6 +21,7 @@ import TaxCategoryPicker from '../TaxCategoryPicker.vue';
 const choice = defineModel<OpenPriceChoice | null>({ required: true });
 
 const locale = useLocale();
+const taxName = useTaxName();
 const term = shallowRef('');
 const { data, status, error } = useLive('sale.department.list', () => ({
   search: term.value,
@@ -48,7 +50,7 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
   <TaxCategoryPicker
     v-if="none"
     v-model="taxKey"
-    :label="$t('sale.pos.department')"
+    :label="$t('sale.pos.department', { tax: taxName })"
     testid="pos-tax-category"
   />
   <div

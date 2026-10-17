@@ -83,6 +83,10 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   abierta (SALE-F08); con tarjeta y otros medios, sí.
 - Los artículos tienen que tener categoría de IVA: si no, salen marcados «Falta el IVA» y no se
   venden.
+- **Canarias, Ceuta y Melilla**: si en **Impuestos → Ajustes** el negocio es de Canarias, Ventas dice
+  «IGIC» donde dice «IVA» (las cifras de Ventas, «Falta el IGIC», «Sección (IGIC)», «IGIC que cobra»,
+  «Precios con IGIC incluido»…); en Ceuta o Melilla, «IPSI». Cambiar el territorio lo renombra al
+  momento, en todas las pantallas abiertas.
 - De fábrica hay dos medios de pago: **Efectivo** y **Tarjeta**. Bizum, transferencia u otro se
   añaden con el asistente diciendo su tipo (SALE-F37).
 - Venta por peso: tecleando la cantidad (SALE-F10); no hay lector de báscula.
@@ -827,7 +831,8 @@ Pasos:
 1. Abre **Ventas / TPV → Ventas**. Arriba, el periodo («Hoy» por defecto, «7 días», «30 días»,
    «Todo»), contado en el día del negocio.
 2. Las cifras del periodo: «Tickets», «Ingresos», «Ticket medio», «IVA», «Descuentos» y «Anuladas».
-   «Ingresos» ya resta lo devuelto.
+   «Ingresos» ya resta lo devuelto. En un negocio de Canarias la cifra del impuesto se llama «IGIC»,
+   y en uno de Ceuta o Melilla, «IPSI» (el territorio de **Impuestos → Ajustes**).
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
    <importe>» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
    estado, pago, fecha o total, u ordena.
@@ -1111,6 +1116,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo | informes | F16, F28 | `sale.sale.by_staff` |
+| El impuesto con que se declaran las ventas, el del territorio del negocio (IVA; IGIC en Canarias, IPSI en Ceuta y Melilla), que nombran las cifras, el TPV, las secciones y los ajustes | ver ventas | F07, F09, F28, F34, F35 | `sale.sale.tax_kind` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |

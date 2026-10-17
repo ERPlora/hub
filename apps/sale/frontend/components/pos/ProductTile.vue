@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // A product tile of the till's grid: the initials over a colour derived from the name, the name, the
 // unit (when it is not «ud») and the price; never the SKU. A product without VAT (SALE-F07) is marked
-// «VAT missing», looks blocked and still takes the tap (never the native `disabled`: a touchscreen
+// «VAT missing» («IGIC missing», «IPSI missing»: the business territory's tax), looks blocked and still takes the tap (never the native `disabled`: a touchscreen
 // would swallow it and nobody would learn why); the grid answers that tap with the reason.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import { initials, tileGradient } from './till';
@@ -16,10 +17,11 @@ const emit = defineEmits<{ pick: [product: ProductOut] }>();
 
 const t = useT();
 const locale = useLocale();
+const taxName = useTaxName();
 
 const blocked = computed(() => props.product.needs_tax_setup);
 const label = computed(() =>
-  blocked.value ? `${props.product.name} · ${t('sale.pos.notSellableNoTaxCategory')}` : undefined,
+  blocked.value ? `${props.product.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined,
 );
 const thumbStyle = computed(() => ({ background: tileGradient(props.product.name) }));
 </script>
@@ -53,7 +55,7 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
       <span
         v-if="blocked"
         class="pos-tile__badge"
-      >{{ $t('sale.pos.notSellableBadge') }}</span>
+      >{{ $t('sale.pos.notSellableBadge', { tax: taxName }) }}</span>
       <span
         v-if="product.unit !== 'ud'"
         class="pos-tile__unit"

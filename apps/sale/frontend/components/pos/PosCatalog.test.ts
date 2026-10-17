@@ -93,6 +93,16 @@ describe('PosCatalog: taps', () => {
     expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
   });
 
+  it('in the Canary Islands the reason of a blocked tap names the IGIC', async () => {
+    const s = await setup({}, 'es');
+    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.result(PRODUCTS, page([product({ id: 'p1', needs_tax_setup: true })]), { sort: 'name' });
+    await click(s.find('pos-product-p1').element);
+    const reason = 'No se puede vender: sin categoría fiscal. Falta configurar el IGIC.';
+    expect(s.find('pos-tap-notice').text()).toBe(reason);
+    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
+  });
+
   it('the next sellable tap clears that notice', async () => {
     const s = await setup();
     await s.result(PRODUCTS, page([product({ id: 'p1', needs_tax_setup: true }), product({ id: 'p2' })]), { sort: 'name' });

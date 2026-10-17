@@ -15,6 +15,7 @@ import ListNotices, { blockingError, type ListRefusal } from '../components/back
 import { refusal } from '../lib/refusal';
 import { taxLabel } from '../lib/taxLabel';
 import { useServerTable } from '../composables/useServerTable';
+import { useTaxName } from '../composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import type { DepartmentOut } from '../operations';
 import { saleTabs } from '../tabs';
@@ -22,6 +23,8 @@ import { saleTabs } from '../tabs';
 const session = useSession();
 const canManage = computed(() => session.can('sale.manage_settings'));
 const t = useT();
+// What a section charges is named by the business territory's tax («VAT», «IGIC», «IPSI»).
+const taxName = useTaxName();
 const locale = useLocale();
 const { confirm } = useConfirm();
 
@@ -36,7 +39,7 @@ const columns = computed<DataTableColumn<DepartmentOut>[]>(() => [
   { key: 'name', label: t('sale.departments.columns.name'), sortable: true, priority: 'high' },
   {
     key: 'tax_category_key',
-    label: t('sale.departments.columns.taxCategory'),
+    label: t('sale.departments.columns.taxCategory', { tax: taxName.value }),
     format: (_, row) => taxLabel(row.tax_category_name, row.tax_rate_pct, locale.value, row.tax_category_key),
   },
   { key: 'sort_order', label: t('sale.departments.columns.sortOrder'), sortable: true, align: 'right' },
@@ -69,7 +72,7 @@ async function remove(department: DepartmentOut): Promise<void> {
   refused.value = null;
   const yes = await confirm({
     title: t('sale.departments.deleteTitle'),
-    message: t('sale.departments.deleteMessage', { name: department.name }),
+    message: t('sale.departments.deleteMessage', { name: department.name, tax: taxName.value }),
     confirmLabel: t('sale.departments.delete'),
     cancelLabel: t('sale.departments.deleteCancel'),
     confirmIcon: 'ion:trash-outline',
@@ -107,7 +110,7 @@ const cardTitle = (row: DepartmentOut): string => row.name;
       class="sale-backoffice-intro"
       data-testid="sale-departments-intro"
     >
-      {{ $t('sale.departments.intro') }}
+      {{ $t('sale.departments.intro', { tax: taxName }) }}
     </p>
     <ListNotices
       testid="sale-departments"
