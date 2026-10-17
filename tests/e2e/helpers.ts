@@ -269,7 +269,7 @@ export const shown = (page: Page): Locator =>
   page.locator(`.ion-page:not(.ion-page-hidden):not(:is(${OVERLAYS}) *)`).last();
 
 /**
- * The ⠿ «My apps» button of the hub's topbar (`nav: 'launcher'`, PLAN-MIGRATIONS §13): there once the
+ * The ⠿ «My apps» button of the hub's topbar (its sidebar, PLAN-MIGRATIONS §16): there once the
  * authenticated shell is painted (every page of the stack has its own; the first one is enough).
  */
 export const topbarApps = (page: Page): Locator => page.locator('[data-testid=topbar-apps]').first();

@@ -1,6 +1,6 @@
 // PoC §8.7 (CSP, zero violations), §8.11 (OpenAPI ↔ list), §8.13 (no Iconify requests) and part of
-// §8.4 (list → detail → back): the real login on `a`, the shell with its topbar (Back, ⠿ apps, user;
-// no side menu, PLAN-MIGRATIONS §13), the empty state.
+// §8.4 (list → detail → back): the real login on `a`, the shell with the old hub's side menu and its
+// topbar (⠿ apps; Back on a detail only, PLAN-MIGRATIONS §16), the empty state.
 import { expect, test } from '@playwright/test';
 
 import {
@@ -38,7 +38,10 @@ test('login on a: shell, topbar with Demo among the apps, empty state, CSP heade
   const csp = response?.headers()['content-security-policy'] ?? '';
 
   await expect(page.locator('ion-app')).toHaveCount(1);
-  await expect(page.locator('ion-menu, ion-split-pane')).toHaveCount(0);
+  // The old hub's side menu (PLAN-MIGRATIONS §16), pinned at this width: the platform's entries whose
+  // screen exists (Home today), never an app; the apps are the topbar's sheet.
+  await expect(page.locator('ion-menu.dash-menu')).toBeVisible();
+  await expect(page.locator('ion-menu.dash-menu ion-item.nav-item')).toHaveText([/^\s*Home\s*$/]);
   await listReady(page);
   const apps = await openApps(page);
   await expect(apps.locator('[data-testid=apps-launcher-app]', { hasText: 'Demo' })).toBeVisible();

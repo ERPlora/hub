@@ -2,7 +2,7 @@
 // Groups, Tags and Fields move between them (the address follows, Back leaves the section); a row
 // opens the card and its Back returns; every page at 390×844 (phone), 834×1194 (tablet) and
 // 1440×900 (desktop) without horizontal scroll, with a screenshot of each for the comparison with the
-// product's screens. On the phone the list shows cards; there is no side menu at any width. The list
+// product's screens. On the phone the list shows cards and the side menu is a closed drawer. The list
 // filters behind the table's funnel, with its count, at every width.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -96,7 +96,9 @@ test('every page at 390 / 834 / 1440 without horizontal scroll; the phone shows 
       await page.goto('/customer/customers');
       await customersReady(page);
       await expect(shown(page).locator('.data-table__cards')).toBeVisible();
-      await expect(page.locator('ion-split-pane, ion-menu')).toHaveCount(0);
+      // The phone has the whole width: the side menu is a closed drawer (PLAN-MIGRATIONS §16).
+      await expect(page.locator('ion-split-pane')).not.toHaveClass(/split-pane-visible/);
+      await expect(page.locator('ion-menu.dash-menu')).toBeHidden();
     }
   }
   record('customer-viewports', results);

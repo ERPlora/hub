@@ -1,7 +1,7 @@
-// FIX-SHELL-NAV (PLAN-MIGRATIONS §13, Ioan 2026-10-15): the hub's shell is the old hub's. No side menu
-// at any width; the topbar carries the way around: Back on the left on every screen but Home (also the
-// root of an app), the title in the middle, the ⠿ «My apps» sheet and the user on the right; the
-// sections of an app stay in its bottom tabbar.
+// FIX-SHELL-NAV (PLAN-MIGRATIONS §13) → FIX-SHELL-SPLIT-PANE (§16, Ioan 2026-10-17): the hub's shell is the old
+// hub's, side menu included. Moving between apps: the ⠿ «My apps» sheet and Home (the first entry of the
+// side menu, pinned from 992 px and a drawer below); no Back on the screens of a module; the sections of
+// an app stay in its bottom tabbar. The menu, the rail and the drawer themselves: shell-split-pane.spec.ts.
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
@@ -18,22 +18,30 @@ type Box = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Box, b: Box): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-/** The topbar of the screen on view and its four pieces. */
-function topbar(page: Page): Record<'title' | 'back' | 'apps' | 'user', Locator> {
+/** The topbar of the screen on view and its pieces: the way to the menu (drawer or rail), the title, Back and the apps. */
+function topbar(page: Page): Record<'title' | 'drawer' | 'rail' | 'back' | 'apps', Locator> {
   const bar = shown(page).locator('ion-header.app-topbar');
   return {
     title: bar.locator('ion-title'),
+    drawer: bar.locator('ion-menu-button'),
+    rail: bar.locator('[data-testid=topbar-rail]'),
     back: bar.locator('[data-testid=topbar-back]'),
     apps: bar.locator('[data-testid=topbar-apps]'),
-    user: bar.locator('[data-testid=topbar-user]'),
   };
+}
+
+/** Home, from the side menu: pinned from 992 px, through the hamburger's drawer below. */
+async function goHomeFromMenu(page: Page): Promise<void> {
+  const home = page.locator('ion-menu.dash-menu [data-testid=nav-home]');
+  if (!(await home.isVisible())) await topbar(page).drawer.click();
+  await home.click();
 }
 
 /** Enabled tiles of the sheet other than Demo (the app the specs start in). */
 const otherApps = (sheet: Locator): Locator =>
   sheet.locator('[data-testid=apps-launcher-app]:not([disabled])').filter({ hasNotText: /^\s*Demo\s*$/ });
 
-test('390 / 834 / 1440: no side menu; Back, ⠿ apps and the user in the topbar, clear of the title', async ({ page }) => {
+test('390 / 834 / 1440: the way to the menu, the ⠿ apps and no Back in the topbar, clear of the title', async ({ page }) => {
   await login(page, A);
   const results: Record<string, unknown> = {};
   for (const vp of VIEWPORTS) {
@@ -41,23 +49,24 @@ test('390 / 834 / 1440: no side menu; Back, ⠿ apps and the user in the topbar,
     // The root of an app with sections (Customers, the old hub's reference screen).
     await page.goto('/customer/customers');
     const bar = topbar(page);
-    // hub#1831: the way out is there on the first paint, not once an `ion-menu` registers.
-    for (const piece of [bar.back, bar.apps, bar.user]) await expect(piece).toBeVisible();
-    await expect(page.locator('ion-menu, ion-split-pane, ion-menu-button')).toHaveCount(0);
+    // hub#1831: the way to the menu is there on the first paint: the drawer's below lg, the rail's from lg.
+    const menuDoor = vp.width >= 992 ? bar.rail : bar.drawer;
+    for (const piece of [menuDoor, bar.apps]) await expect(piece).toBeVisible();
+    await expect(vp.width >= 992 ? bar.drawer : bar.rail).toBeHidden();
+    await expect(bar.back).toHaveCount(0);
     await customersReady(page);
     await page.waitForTimeout(400);
 
     // hub#690: on a phone (ios) the icons covered the title.
     const title = (await bar.title.boundingBox())!;
-    const boxes = { back: (await bar.back.boundingBox())!, apps: (await bar.apps.boundingBox())!, user: (await bar.user.boundingBox())! };
+    const boxes = { menu: (await menuDoor.boundingBox())!, apps: (await bar.apps.boundingBox())! };
     results[vp.label] = { title, ...boxes };
     for (const [name, box] of Object.entries(boxes)) {
       expect(overlaps(title, box), `${vp.label}: the title runs over ${name}`).toBe(false);
       expect(box.x + box.width, `${vp.label}: ${name} inside the screen`).toBeLessThanOrEqual(vp.width);
     }
-    expect(boxes.back.x, `${vp.label}: Back on the left`).toBeLessThan(title.x);
+    expect(boxes.menu.x, `${vp.label}: the menu door on the left`).toBeLessThan(title.x);
     expect(boxes.apps.x, `${vp.label}: apps on the right`).toBeGreaterThan(title.x);
-    expect(boxes.user.x, `${vp.label}: the user after the apps`).toBeGreaterThan(boxes.apps.x);
     // The sections of the app are its bottom tabbar.
     await expect(shown(page).locator('ion-footer ion-segment-button').first()).toBeVisible();
     await page.screenshot({ path: shot(`FIX-SHELL-NAV-${vp.label}`) });
@@ -74,16 +83,19 @@ test('390 / 834 / 1440: no side menu; Back, ⠿ apps and the user in the topbar,
   record('FIX-SHELL-NAV-topbar', results);
 });
 
-test('Back from the root of an app goes Home; Home has no Back and paints the apps', async ({ page }) => {
-  await login(page, A);
-  await page.goto('/demo/items'); // a link straight into the app: no history to go back to
-  await listReady(page);
-  await topbar(page).back.click();
-  await expect(page).toHaveURL(`${A}/`);
-  await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
-  await expect(topbar(page).back).toHaveCount(0);
-  await expect(topbar(page).apps).toBeVisible();
-});
+for (const vp of [VIEWPORTS[0], VIEWPORTS[2]]) {
+  test(`${vp.label}: from the root of an app opened by a link, the menu's Home goes Home; Home paints the apps`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await login(page, A);
+    await page.goto('/demo/items'); // a link straight into the app: no history to go back to
+    await listReady(page);
+    await goHomeFromMenu(page);
+    await expect(page).toHaveURL(`${A}/`);
+    await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+    await expect(topbar(page).back).toHaveCount(0);
+    await expect(topbar(page).apps).toBeVisible();
+  });
+}
 
 test('the «My apps» sheet opens another app, and closes', async ({ page }) => {
   await login(page, A);
@@ -95,19 +107,20 @@ test('the «My apps» sheet opens another app, and closes', async ({ page }) => 
   await target.click();
   await expect(sheet).toHaveCount(0);
   await expect(page).not.toHaveURL(/\/demo\//);
-  await expect(topbar(page).back).toBeVisible();
+  await expect(topbar(page).apps).toBeVisible();
+  await expect(topbar(page).back).toHaveCount(0);
   record('FIX-SHELL-NAV-open-app', { opened: name, url: page.url() });
 });
 
 // hub#2242 / hub#2241: going to an app and back fast left the address and the page out of step, or
-// the page stuck on its skeleton.
-test('apps and Back, fast and repeated: the address and the page stay in step', async ({ page }) => {
+// the page stuck on its skeleton. Back to Home is the menu's Home now (pinned at this width).
+test('apps and Home, fast and repeated: the address and the page stay in step', async ({ page }) => {
   await login(page, A, '/');
   await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
   for (let round = 0; round < 4; round += 1) {
     const sheet = await openApps(page);
     await sheet.locator('[data-testid=apps-launcher-app]', { hasText: 'Demo' }).click();
-    await topbar(page).back.click();
+    await page.locator('ion-menu.dash-menu [data-testid=nav-home]').click();
   }
   await expect(page).toHaveURL(`${A}/`);
   await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
