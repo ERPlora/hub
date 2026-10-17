@@ -177,6 +177,23 @@ def test_a_vite_port_that_is_no_port_refuses_to_start(load_settings):
         load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="70000")
 
 
+@pytest.mark.parametrize("source", ["environment", "dotenv-only"])
+def test_runserver_starts_vite_on_the_port_django_read(load_settings, tmp_path, source):
+    """`manage.py runserver` starts Vite with LIVE["vite"] and the process environment (packages/live),
+    and vite.config.ts reads VITE_DEV_PORT from that environment only, while Django reads it from the
+    environment or from .env. The command carries the port Django chose, whatever its source: with the
+    variable only in .env, Django's page pointed at :5203 while its Vite listened on :5173 (or died on
+    the Vite already there), and the page never loaded."""
+    if source == "environment":
+        loaded = load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="5203")
+    else:
+        (tmp_path / ".env").write_text("VITE_DEV_PORT=5203\n")
+        loaded = load_settings(**DEVELOPMENT_ENV)
+
+    assert loaded["LIVE"]["spa"]["dev_server"] == "http://localhost:5203"
+    assert loaded["LIVE"]["vite"]["command"] == ["env", "VITE_DEV_PORT=5203", "pnpm", "run", "dev"]
+
+
 def test_production_uses_the_base_csp_and_no_dev_server(load_settings):
     loaded = load_settings(**PRODUCTION_ENV)
     assert loaded["DEBUG"] is False
@@ -701,8 +718,12 @@ def test_live_settings():
         "violet",
     ]
     assert spa["palette_default"] == "erplora"
-    # Vite runs from the hub's own directory: the repo is its own pnpm workspace (no erplora-next root).
-    assert live["vite"] == {"command": ["pnpm", "run", "dev"], "cwd": str(BASE_DIR)}
+    # Vite runs from the hub's own directory: the repo is its own pnpm workspace (no erplora-next root),
+    # on the port this run read (config/settings_pytest.py pins 5173).
+    assert live["vite"] == {
+        "command": ["env", "VITE_DEV_PORT=5173", "pnpm", "run", "dev"],
+        "cwd": str(BASE_DIR),
+    }
 
 
 # ── The `shared` alias: the SaaS's `saas` database, for register_apps only (round 16, PLAN §21) ──

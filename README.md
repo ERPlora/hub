@@ -15,6 +15,10 @@ exigen `SECRET_KEY`, `SAAS_URL` e `INTERNAL_SHARED_SECRET`, como en producción.
 el resto de variables toma los valores locales por defecto (lista completa en el `.env.example` de
 erplora-next). `.env` nunca se sube al repo.
 
+`runserver` arranca Vite en el `VITE_DEV_PORT` que lee Django, del entorno o del `.env` (por defecto `5173`):
+a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
+del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
+
 ## Despliegue: `main` → prod, `pre` → pre
 
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
