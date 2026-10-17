@@ -57,7 +57,9 @@ SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=False, cast=bool)
 SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W008", "security.W021"]
 
 # Vite's dev server (`vite.config.ts` reads the same VITE_DEV_PORT): 5173 unless a second checkout runs
-# beside another one, as the e2e of a branch does.
+# beside another one, as the e2e of a branch does. `runserver` hands the port it read to the Vite it
+# starts (LIVE["vite"]); `pnpm run dev` or the e2e on their own read the process environment only, not
+# this repo's .env.
 VITE_DEV_PORT = config("VITE_DEV_PORT", default=5173, cast=int)
 if not 0 < VITE_DEV_PORT < 65536:
     raise ImproperlyConfigured(f"VITE_DEV_PORT must be a TCP port, not {VITE_DEV_PORT}.")
@@ -384,8 +386,13 @@ LIVE = {
             "violet",
         ],
     },
-    # The repo is its own pnpm workspace (packages/ui is a submodule), so Vite runs from here.
-    "vite": {"command": ["pnpm", "run", "dev"], "cwd": str(BASE_DIR)},
+    # The repo is its own pnpm workspace (packages/ui is a submodule), so Vite runs from here, with the
+    # port Django read (environment or .env): vite.config.ts reads VITE_DEV_PORT from the process
+    # environment only, and a Vite on another port than the page's leaves a page that never loads.
+    "vite": {
+        "command": ["env", f"VITE_DEV_PORT={VITE_DEV_PORT}", "pnpm", "run", "dev"],
+        "cwd": str(BASE_DIR),
+    },
 }
 
 # Email: the console locally; in production the SES API signed by the task role (no static keys,
