@@ -113,6 +113,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   await expect(confirm).toContainText(/0 (product\(s\) will lose|producto\(s\) quedarán)/);
   await page.screenshot({ path: shot('inventory-category-delete-1280') });
   await confirm.locator('.ep-form-modal__submit').click();
+  await expect(confirm).toBeHidden();
   await expect(renamed).toHaveCount(0);
 
   const file = csvFile('inventory-categories', ['name;slug', `${name} one;`, `${name} two;e2e-two-${stamp().toLowerCase()}`, ';']);

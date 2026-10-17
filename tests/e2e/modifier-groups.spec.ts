@@ -217,6 +217,7 @@ test('MODIFIER-F01 to F07: the owner builds a group, applies it to a product and
   const confirm = dialog(page, 'modifier-groups-delete');
   await expect(confirm).toContainText(/1 option\(s\) will be deleted|Se borrarán 1 opción/);
   await confirm.locator('[data-testid=modifier-groups-delete-submit]').click();
+  await expect(confirm).toBeHidden();
   await expect(groupRow(page, group.id)).toHaveCount(0);
   expect((await api(context, A, 'GET', `/modifier/groups/detail?id=${group.id}`)).status).toBe(404);
 });

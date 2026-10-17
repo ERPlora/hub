@@ -138,6 +138,7 @@ test('the owner reads, organises and erases a WhatsApp conversation; the compose
   const confirm = page.locator('ion-modal.ep-form-modal').filter({ hasText: "Erase this number's data?" });
   await expect(confirm).toContainText(phone);
   await confirm.locator('.ep-form-modal__submit').click();
+  await expect(confirm).toBeHidden();
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-erased]')).toContainText('The data of this number has been erased.');
   await expect(rowOf(page, phone)).toHaveCount(0);
 });

@@ -191,8 +191,10 @@ test('A VIP list with an Inventory product, a rule, and the price of a VIP custo
     // The rule is deactivated, asking first, and the discount goes (PRICING-F12).
     const ruleId = psql(`select id from pricing_discountrule where code = '${ruleCode}'`);
     await rowAction(page, 'pricing-rules', ruleId, 'deactivate');
-    await expect(page.locator('ion-modal[data-testid=pricing-rules-deactivate]')).toContainText('will stop applying to new sales.');
+    const deactivate = page.locator('ion-modal[data-testid=pricing-rules-deactivate]');
+    await expect(deactivate).toContainText('will stop applying to new sales.');
     await page.locator('[data-testid=pricing-rules-deactivate-submit]').click();
+    await expect(deactivate).toBeHidden();
     await expect(ruleRow).toHaveCount(0);
     const after = await api<{ unit_price: number; discount: number; rule_code: string | null }>(context, A, 'GET', asked);
     expect(after.data).toMatchObject({ unit_price: 1200, discount: 0, rule_code: null });

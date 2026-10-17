@@ -252,8 +252,16 @@ export async function clearItems(context: BrowserContext, origin: string): Promi
   }
 }
 
-/** The page shown by `IonRouterOutlet` (hidden pages stay in the DOM). */
-export const shown = (page: Page): Locator => page.locator('.ion-page:not(.ion-page-hidden)').last();
+/** Ionic's overlays. An inline `ion-modal` wraps its content in an `.ion-page` of its own. */
+const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy';
+
+/**
+ * The page shown by `IonRouterOutlet` (hidden pages stay in the DOM), never a dialog presented over it:
+ * Ionic moves a presented modal to `ion-app`, after the pages, so the last visible `.ion-page` would be the
+ * dialog's. A dialog is found with `page.locator('ion-modal[data-testid=…]')`, not here.
+ */
+export const shown = (page: Page): Locator =>
+  page.locator(`.ion-page:not(.ion-page-hidden):not(:is(${OVERLAYS}) *)`).last();
 
 /**
  * The ⠿ «My apps» button of the hub's topbar (`nav: 'launcher'`, PLAN-MIGRATIONS §13): there once the

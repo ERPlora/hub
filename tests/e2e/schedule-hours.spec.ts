@@ -80,6 +80,7 @@ test('SCHEDULE-F01–F03: the default week, a split Monday, an overlap refused, 
   await page.screenshot({ path: shot('schedule-hours-422-1280') });
   await page.locator('[data-testid=schedule-day-form-intervals-open-1] input').fill('17:00');
   await page.locator('[data-testid=schedule-day-form-submit]').click();
+  await expect(dialog).toBeHidden();
   await expect(view.locator('[data-testid=schedule-hours-row]').first()).toContainText('10:00 AM–02:00 PM · 05:00 PM–08:00 PM');
   // Saving a day confirms the week: the notice goes.
   await expect(view.locator('[data-testid=schedule-hours-default-week]')).toHaveCount(0);

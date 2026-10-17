@@ -90,6 +90,7 @@ test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; s
     await rowAction(page, 'service-packages', packageId, 'delete');
     await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toContainText('the package and its 1 line(s) leave the catalogue');
     await page.locator('[data-testid=service-packages-delete-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toBeHidden();
     await expect(row).toHaveCount(0);
     await view.locator('[data-testid=service-packages-filter-status]').click();
     await page.locator('ion-popover').getByText('Deleted', { exact: true }).click();
