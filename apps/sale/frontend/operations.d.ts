@@ -635,6 +635,14 @@ export interface StatsOut {
   voided_count: number;
 }
 
+/** The tax the business's sales are declared with, its territory's (TAX-F11): `igic` in the Canary Islands,
+ *  `ipsi` in Ceuta and Melilla, `vat` anywhere else. */
+export type TaxKind = 'vat' | 'igic' | 'ipsi';
+
+export interface TaxKindOut {
+  tax: TaxKind;
+}
+
 export interface TodayOut {
   day: string;
   total: number;
@@ -757,6 +765,7 @@ declare module '@erplora/ui/sdk' {
     'sale.sale.today': { input: Record<string, never>; output: TodayOut };
     'sale.sale.last_7_days': { input: Record<string, never>; output: LastDaysOut };
     'sale.sale.by_staff': { input: PeriodIn; output: ByStaffOut };
+    'sale.sale.tax_kind': { input: Record<string, never>; output: TaxKindOut };
     'sale.sale.complete': { input: CompleteIn; output: SaleOut };
     'sale.sale.complete_over_limit': { input: CompleteIn; output: SaleOut };
     'sale.sale.void': { input: VoidIn; output: SaleOut };

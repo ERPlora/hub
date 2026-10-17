@@ -78,10 +78,17 @@ from apps.sale.schemas import (
     ServiceLineFields,
     SettingsOut,
     StatsOut,
+    TaxKindOut,
     TodayOut,
 )
 from apps.tax.models import TaxCategory
-from apps.tax.queries import business_jurisdiction, business_today, category_by_reference, current_rates
+from apps.tax.queries import (
+    business_jurisdiction,
+    business_tax_kind,
+    business_today,
+    category_by_reference,
+    current_rates,
+)
 
 CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
@@ -104,8 +111,10 @@ PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
 )
 TAX_CATEGORY_MISSING = _(
-    "«%(name)s» cannot be sold: it has no tax category. Its VAT is missing."
+    "«%(name)s» cannot be sold: it has no tax category. Its %(tax)s is missing."
 )
+#: The short name of each tax a territory declares its sales with (TAX-F11).
+TAX_NAMES = {"vat": _("VAT"), "igic": _("IGIC"), "ipsi": _("IPSI")}
 SERVICES_UNAVAILABLE = _(
     "Services is not active in this business: its services cannot be sold nor its vouchers used. Take the "
     "voucher off the line to charge it."
@@ -190,6 +199,26 @@ def actor(ctx: OperationContext) -> str:
 )
 def business_day(ctx: OperationContext, params: EmptyIn) -> dict:
     return {"today": business_today()}
+
+
+@operation(
+    "sale.sale.tax_kind",
+    kind="query",
+    permission="sale.view_sale",
+    input=EmptyIn,
+    output=TaxKindOut,
+    ai={
+        "description": "The tax the business's sales are declared with, its territory's: VAT, IGIC in the Canary "
+        "Islands, IPSI in Ceuta and Melilla (what the till, the sales figures and the sections name)."
+    },
+)
+def tax_kind(ctx: OperationContext, params: EmptyIn) -> dict:
+    return {"tax": business_tax_kind()}
+
+
+def missing_tax(name: str) -> str:
+    """Why an article without a tax category cannot be sold, naming the territory's tax (TAX-F11)."""
+    return str(TAX_CATEGORY_MISSING) % {"name": name, "tax": TAX_NAMES[business_tax_kind()]}
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────
@@ -725,7 +754,7 @@ def freeze_service_line(
         raise Conflict(str(SERVICE_NOT_AVAILABLE), code="sale.service_not_available")
     if service.needs_tax_setup or not service.tax_category_key:
         raise Conflict(
-            str(TAX_CATEGORY_MISSING) % {"name": service.name},
+            missing_tax(service.name),
             code="sale.tax_category_missing",
         )
     check_grid(data.quantity, GRID_FALLBACK, "ud")
@@ -801,7 +830,7 @@ def freeze_product_line(
         raise Conflict(str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available")
     if product.needs_tax_setup or not product.tax_category_key:
         raise Conflict(
-            str(TAX_CATEGORY_MISSING) % {"name": product.name},
+            missing_tax(product.name),
             code="sale.tax_category_missing",
         )
     units = units if units is not None else inventory_units(ctx)

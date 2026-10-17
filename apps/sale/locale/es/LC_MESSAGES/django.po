@@ -487,8 +487,17 @@ msgid "A product of the ticket is no longer in the catalog. Remove the line and 
 msgstr "Un producto del tique ya no está en el catálogo. Quita la línea y vuelve a añadirla."
 
 #, python-format
-msgid "«%(name)s» cannot be sold: it has no tax category. Its VAT is missing."
-msgstr "«%(name)s» no se puede vender: no tiene categoría fiscal. Falta configurar su IVA."
+msgid "«%(name)s» cannot be sold: it has no tax category. Its %(tax)s is missing."
+msgstr "«%(name)s» no se puede vender: no tiene categoría fiscal. Falta configurar su %(tax)s."
+
+msgid "VAT"
+msgstr "IVA"
+
+msgid "IGIC"
+msgstr "IGIC"
+
+msgid "IPSI"
+msgstr "IPSI"
 
 #, python-format
 msgid "The quantity does not fit the step of the product (%(step)s %(unit)s)."
