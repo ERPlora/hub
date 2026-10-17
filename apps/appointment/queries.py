@@ -985,16 +985,23 @@ def list_blocked_times(ctx: OperationContext, params: BlockedTimeListIn) -> dict
 # ── Series ───────────────────────────────────────────────────────────────────────────────────
 
 
+def series_with_lines() -> QuerySet[Recurring]:
+    """The series with the services they book (what ``series_out`` shows)."""
+    return Recurring.objects.prefetch_related("lines__service")
+
+
 def series_rows(ctx: OperationContext) -> QuerySet[Recurring]:
-    return visible(
-        ctx, Recurring.objects.filter(deleted_at__isnull=True)
-    ).prefetch_related("lines__service")
+    return visible(ctx, series_with_lines().filter(deleted_at__isnull=True))
 
 
 def find_series(
-    ctx: OperationContext, series_id: UUID, *, lock: bool = False
+    ctx: OperationContext, series_id: UUID, *, lock: bool = False, rows=None
 ) -> Recurring:
-    rows = visible(ctx, Recurring.objects.filter(deleted_at__isnull=True, pk=series_id))
+    """The live series the caller may see (``NotFound`` otherwise). It comes from ``rows`` when given (e.g.
+    ``series_with_lines()``, what its detail shows): one read, so a deletion committed meanwhile is either
+    not seen yet or not found, never a series that vanished or changed between two reads."""
+    found_in = Recurring.objects.all() if rows is None else rows
+    rows = visible(ctx, found_in.filter(deleted_at__isnull=True, pk=series_id))
     if lock:
         rows = rows.select_for_update(of=("self",))
     found = rows.first()
@@ -1040,9 +1047,7 @@ def series_out(series: Recurring) -> dict:
 
 
 def load_series(series_id: UUID) -> dict:
-    return series_out(
-        Recurring.objects.prefetch_related("lines__service").get(pk=series_id)
-    )
+    return series_out(series_with_lines().get(pk=series_id))
 
 
 RECURRING_ORDER = {
@@ -1113,15 +1118,13 @@ def series_reach(series: Recurring, from_date: dt.date) -> tuple[int, int]:
     },
 )
 def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
-    series = find_series(ctx, data.id)
+    series = find_series(ctx, data.id, rows=series_with_lines())
     dates, upcoming_date = engine.dates(pattern_of(series), until=today())
     remaining = [day for day in dates if day >= today()]
     next_date = remaining[0] if remaining else upcoming_date
     upcoming, charged = series_reach(series, data.from_date or today())
     return {
-        **series_out(
-            Recurring.objects.prefetch_related("lines__service").get(pk=series.pk)
-        ),
+        **series_out(series),
         "next_date": next_date,
         "upcoming": upcoming,
         "charged": charged,

@@ -11,7 +11,7 @@ import pytest
 from django.utils import timezone
 from live.errors import NotFound
 
-from apps.appointment.models import Appointment, History, Recurring, RecurringService
+from apps.appointment.models import Appointment, History
 
 from .conftest import (
     MONDAY,
@@ -22,6 +22,7 @@ from .conftest import (
     make_customer,
     make_day,
     make_member,
+    make_series,
     make_settings,
     make_shift,
     make_time_off,
@@ -512,23 +513,6 @@ def test_the_blocks_of_a_range_are_the_business_ones_and_the_professionals(salon
         ).total
         == 3
     )
-
-
-def make_series(salon, **fields):
-    series = Recurring.objects.create(
-        customer=salon.lucia,
-        customer_name=salon.lucia.name,
-        staff=salon.ana,
-        staff_name=salon.ana.full_name,
-        frequency=fields.pop("frequency", "weekly"),
-        day_of_week=fields.pop("day_of_week", 0),
-        time=dt.time(10),
-        duration_minutes=30,
-        start_date=fields.pop("start_date", MONDAY),
-        **fields,
-    )
-    RecurringService.objects.create(recurring=series, service=salon.cut, position=0)
-    return series
 
 
 def test_the_series_list_searches_and_filters(salon):
