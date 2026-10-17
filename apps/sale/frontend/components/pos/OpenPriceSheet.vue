@@ -7,7 +7,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import type { OpenLineIn } from '../../operations';
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { centsFromEuros, formatMoney } from '../../lib/format';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';

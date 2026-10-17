@@ -29,7 +29,6 @@ def test_the_live_queries():
         "sale.sale.today",
         "sale.sale.last_7_days",
         "sale.sale.by_staff",
-        "sale.sale.tax_kind",
         "sale.order.list",
         "sale.order.get",
         "sale.checkout.preview",
@@ -61,7 +60,10 @@ def test_a_charge_re_runs_the_sales_the_figures_and_the_checks():
         "sale.checkout.preview",
     }
     assert "sale.quick_note.list" not in affected
-    assert "sale.sale.tax_kind" not in affected
+
+
+def test_a_change_of_territory_re_runs_the_figures_a_period_without_sales_names_by_it():
+    assert "sale.sale.stats" in live_registry.affected(["tax.settings.updated"])
 
 
 def test_a_change_of_the_check_re_runs_the_check_and_its_preview_but_not_the_sales():
@@ -84,8 +86,3 @@ def test_the_settings_re_run_the_methods_allowed_and_the_preview():
         "sale.checkout.preview",
     } <= affected
 
-
-def test_the_territory_re_runs_the_tax_the_screens_name_and_a_rule_does_not():
-    # The tax named on every sale screen follows the business's territory (Taxes → Settings) alone.
-    assert "sale.sale.tax_kind" in live_registry.affected(["tax.settings.updated"])
-    assert "sale.sale.tax_kind" not in live_registry.affected(["tax.rule.created"])

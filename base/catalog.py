@@ -5,7 +5,8 @@ written by ``register_apps`` from what the code already says: the ``LiveAppConfi
 English and its Spanish catalogue, the icon baked in ``frontend/generated/app-icons.json`` and the
 customer's part of ``WORKBOOK.md`` (Spanish) and of ``WORKBOOK.en.md`` (its versioned translation).
 
-- ``user_part`` cuts the customer's part of a WORKBOOK (§4.1).
+- ``user_part`` cuts the customer's part of a WORKBOOK (§4.1), without its HTML comments
+  (PLAN-MIGRATIONS §5).
 - ``build_registry`` reads it all without a database or the network (§4.2): ``register_apps
   --check`` and the image's build run it; every problem is gathered, naming the app and the field.
 - ``register_apps`` writes the registry in one transaction on the ``shared`` alias (§4.2).
@@ -68,6 +69,7 @@ _HEADER_RE = re.compile(
     r"\A<!-- generated from WORKBOOK\.md sha256:([0-9a-f]{64}) -->[ \t]*\n+"
 )
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_COMMENT_START, _COMMENT_END = "<!--", "-->"
 _HEADING_ID_RE = re.compile(r'<h[1-6][^>]*\sid="([^"]*)"')
 _ANCHOR_RE = re.compile(r'<a\s[^>]*href="#([^"]*)"')
 #: What register_apps needs on each table of ``shared`` (``bootstrap_databases`` grants it to hub_shared).
@@ -120,42 +122,103 @@ def user_part(text: str) -> str:
     """The customer's part of a WORKBOOK: from its first ``## `` to ``## Para quien lo mantiene``.
 
     Before it (the title, ``Prefijo``, ``Alcance MVP``, ``Estado de la app`` and the quote) speaks
-    of the process; after it, of the code. Nothing else is transformed. Raises ``WorkbookError``
-    without that heading (never a whole WORKBOOK by mistake), with nothing above it, or when a
+    of the process; after it, of the code. Its HTML comments go too (``_uncommented_lines``);
+    nothing else is transformed. Raises ``WorkbookError`` without that heading (never a whole
+    WORKBOOK by mistake), with nothing above it, with a comment that never closes, or when a
     ``](#…)`` link points at no heading of the part.
     """
-    lines = text.splitlines()
-    start = cut = None
-    fence = None
-    for index, line in enumerate(lines):
-        match = _FENCE_RE.match(line)
-        if fence is not None:
-            if (
-                match
-                and match.group(1)[0] == fence[0]
-                and len(match.group(1)) >= len(fence)
-            ):
-                if not line.strip().lstrip(fence[0]):
-                    fence = None
-            continue
-        if match:
-            fence = match.group(1)
+    part = None
+    for line, code in _uncommented_lines(text):
+        if code:
+            if part is not None:
+                part.append(line)
             continue
         if line.rstrip() == MAINTAINERS_HEADING:
-            cut = index
             break
-        if start is None and line.startswith("## "):
-            start = index
-    if cut is None:
+        if part is None and line.startswith("## "):
+            part = []
+        if part is not None:
+            part.append(line)
+    else:
         raise WorkbookError(
             f"no «{MAINTAINERS_HEADING}» heading: write it where the customer's part ends "
             "(everything above it is published)."
         )
-    if start is None:
+    if part is None:
         raise WorkbookError(f"nothing for the customer above «{MAINTAINERS_HEADING}».")
-    part = "\n".join(lines[start:cut]).strip() + "\n"
-    check_anchors(part)
-    return part
+    published = "\n".join(part).strip() + "\n"
+    check_anchors(published)
+    return published
+
+
+def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:
+    """Each line of ``text`` without its HTML comments, and whether it is in a fenced code block.
+
+    The ``<!-- origen: … -->`` and ``<!-- código: … -->`` of a WORKBOOK tie it to ``MIGRATION.md``
+    and to its sources, never reaching ``shared.app_doc`` nor the assistant (PLAN-MIGRATIONS §5);
+    in a code block they are text, and a heading or a fence in a comment is not one. A line that
+    was only a comment goes, and so do the blank lines it would double. Lazy: what ``user_part``
+    never reads (the maintainers' part) is never checked. Raises ``WorkbookError`` when a comment
+    is still open at the end.
+    """
+    fence = None
+    opened = None  # the number of the line where the comment being skipped began
+    last_blank, collapse = True, False
+    for number, line in enumerate(text.splitlines(), start=1):
+        if opened is None:
+            match = _FENCE_RE.match(line)
+            if fence is not None or match:
+                if fence is None:
+                    fence = match.group(1)
+                elif (
+                    match
+                    and match.group(1)[0] == fence[0]
+                    and len(match.group(1)) >= len(fence)
+                    and not line.strip().lstrip(fence[0])
+                ):
+                    fence = None
+                last_blank, collapse = not line.strip(), False
+                yield line, True
+                continue
+        commented = opened is not None or _COMMENT_START in line
+        if commented:
+            line, opened = _uncomment(line, opened, number)
+        if line.strip():
+            last_blank, collapse = False, False
+            yield line, False
+        elif commented:
+            collapse = last_blank
+        elif not collapse:
+            last_blank = True
+            yield line, False
+    if opened is not None:
+        raise WorkbookError(
+            f"the HTML comment opened on line {opened} never closes: end it with «{_COMMENT_END}»."
+        )
+
+
+def _uncomment(line: str, opened: int | None, number: int) -> tuple[str, int | None]:
+    """``line`` (number ``number``) without its comments, and where the one still open began.
+
+    ``opened`` is that of the line before: the line starts inside a comment. The text on both
+    sides of a comment is joined as it reads, with the space that was there and no other.
+    """
+    kept, rest = "", line
+    while True:
+        if opened is None:
+            start = rest.find(_COMMENT_START)
+            if start == -1:
+                return kept + rest, None
+            kept, rest = kept + rest[:start], rest[start + len(_COMMENT_START) :]
+            opened = number
+        end = rest.find(_COMMENT_END)
+        if end == -1:
+            return kept.rstrip(), opened
+        rest, opened = rest[end + len(_COMMENT_END) :], None
+        if not kept.strip():
+            rest = rest.lstrip()
+        elif not rest[:1].strip():
+            kept = kept.rstrip()
 
 
 def check_anchors(markdown: str) -> None:

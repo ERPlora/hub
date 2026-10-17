@@ -451,8 +451,11 @@ def regional_rule(region, category, rate, tax_type, **more):
 
 
 def line_defaults(ctx=None):
+    """The rate a typed line starts with, and the tax its rate column is named by (Taxes' settings, the one
+    place that publishes the territory's tax: invoice republishes nothing of it, TAX-F11)."""
     defaults = run("invoice.invoice.line_defaults", {}, ctx)
-    return defaults.tax, defaults.tax_rate
+    assert set(defaults.model_dump()) == {"tax_rate"}
+    return run("tax.settings.get", {}, ctx).tax_kind, defaults.tax_rate
 
 
 def test_a_typed_line_starts_at_the_general_vat_of_the_whole_country(db):

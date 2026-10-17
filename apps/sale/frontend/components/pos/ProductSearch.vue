@@ -12,7 +12,7 @@ import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';

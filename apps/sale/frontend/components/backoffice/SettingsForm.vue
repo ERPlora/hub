@@ -16,7 +16,7 @@ import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonCard, IonCardContent, IonList, IonSpinner } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
 import type { SettingsOut, SettingsPatchIn } from '../../operations';
 import { refusal } from '../../lib/refusal';

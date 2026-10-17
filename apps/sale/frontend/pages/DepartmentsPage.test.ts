@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale } from '../__tests__/mount-sale';
+import { BYE, EMPLOYEE, errorFrame, flush, mountSale, taxSettings, type MountOptions } from '../__tests__/mount-sale';
 import DepartmentFormModal from '../components/backoffice/DepartmentFormModal.vue';
 import { plain } from '../lib/format';
 import type { DepartmentOut } from '../operations';
@@ -183,7 +183,7 @@ describe('DepartmentsPage: whoever may change the till settings', () => {
 
   it('in the Canary Islands the intro, the column and the deletion name the IGIC', async () => {
     const s = await setup({ locale: 'es' });
-    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.result('tax.settings.get', taxSettings('igic'));
     await s.show(PAGE);
     expect(s.find('sale-departments-intro').text()).toContain('Cada una lleva su IGIC.');
     expect(s.prop<Array<{ key: string; label: string }>>('columns')[1].label).toBe('IGIC que cobra');

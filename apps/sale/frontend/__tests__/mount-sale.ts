@@ -1,6 +1,7 @@
 // Test helper of the sale app's pages and components, as `mount-tax.ts` is the tax app's: the SDK's live
 // harness (fake clock, fake network serving the stream and the API) on the hub's generated op → route
-// map, the shell's i18n with the sale catalogues merged in, a session and a memory router.
+// map, the shell's i18n with the sale catalogues merged in (and Taxes', whose `useTaxName` names the
+// territory's tax on every sale screen), a session and a memory router.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
 // from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
@@ -17,6 +18,9 @@ import {
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
+import taxEn from '../../../tax/frontend/locale/en.json';
+import taxEs from '../../../tax/frontend/locale/es.json';
+import type { TaxSettingsOut, TerritoryTaxKind } from '../../../tax/frontend/operations';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -89,7 +93,10 @@ export async function mountSale(component: Component, options: MountOptions = {}
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [
+        router,
+        createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...taxEn, ...en }, es: { ...taxEs, ...es } } }),
+      ],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },
@@ -149,6 +156,13 @@ export async function mountSale(component: Component, options: MountOptions = {}
   };
 
   return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, find, inDoc };
+}
+
+/** Taxes' settings of a business whose territory declares `tax_kind` (`tax.settings.get`, what every sale
+ *  screen names the tax by). */
+export function taxSettings(tax_kind: TerritoryTaxKind): TaxSettingsOut {
+  const region_code = { vat: null, igic: 'ES-CN', ipsi: 'ES-CE' }[tax_kind];
+  return { country_code: 'ES', region_code, regions: ['ES-CN', 'ES-CE', 'ES-ML'], tax_kind, updated_at: null };
 }
 
 /** Mounts `use` (a composable call) inside a component of the sale app's harness. */

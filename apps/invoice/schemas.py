@@ -323,10 +323,9 @@ class LineDefaultsIn(Schema):
 
 
 class LineDefaultsOut(Schema):
-    tax: str = Field(
-        description="The tax a typed rate is declared with, the business territory's: vat, igic (Canary Islands) "
-        "or ipsi (Ceuta and Melilla)."
-    )
+    """The tax a typed rate is declared with is the business territory's, which Taxes publishes
+    (``tax.settings.get``'s ``tax_kind``): this operation does not repeat it."""
+
     tax_rate: Decimal | None = Field(
         description="The territory's general rate, %, from its own rule in Taxes; none when the territory has no "
         "rule of that tax."

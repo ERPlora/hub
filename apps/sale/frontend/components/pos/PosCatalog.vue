@@ -17,7 +17,7 @@ import { computed, shallowRef, watch } from 'vue';
 import type { CategoryOut, ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useLiveWindows } from '../../composables/useLiveWindows';
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
 import CatalogNotices from './CatalogNotices.vue';
 import CategoryStrip from './CategoryStrip.vue';

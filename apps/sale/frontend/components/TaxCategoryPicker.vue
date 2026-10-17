@@ -25,7 +25,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useTaxName } from '../composables/useTaxName';
+import { useTaxName } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { taxLabel } from '../lib/taxLabel';
 
