@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
-    "typecheck": "vue-tsc --noEmit",
+    "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tests/e2e/tsconfig.json",
     "lint": "eslint .",
     "e2e": "playwright test -c tests/e2e/playwright.config.ts",
     "gen:app-icons": "node scripts/app-icons.mjs"
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.5",
     "@vue/test-utils": "^2.0.0",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^10.11.1",
