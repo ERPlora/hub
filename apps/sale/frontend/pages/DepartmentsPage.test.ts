@@ -181,6 +181,19 @@ describe('DepartmentsPage: whoever may change the till settings', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/sale/departments/delete', query: {}, body: { id: 'd2' } }]);
   });
 
+  it('in the Canary Islands the intro, the column and the deletion name the IGIC', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.show(PAGE);
+    expect(s.find('sale-departments-intro').text()).toContain('Cada una lleva su IGIC.');
+    expect(s.prop<Array<{ key: string; label: string }>>('columns')[1].label).toBe('IGIC que cobra');
+    mocks.confirm.mockResolvedValue(false);
+    await s.emit('action', { actionId: 'delete', row: PAGE.rows[1] });
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Butchery — Deja de ofrecerse en el TPV. Lo ya vendido conserva el nombre y el IGIC con los que se cobró.' }),
+    );
+  });
+
   it('a section another device deleted: «The section could not be deleted.» and the server’s words', async () => {
     const s = await setup();
     await s.show(PAGE);

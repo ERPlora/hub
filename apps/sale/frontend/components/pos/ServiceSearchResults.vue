@@ -8,6 +8,7 @@ import { IonItem, IonLabel, IonList, IonListHeader, IonNote } from '@ionic/vue';
 import { computed } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 
@@ -15,6 +16,7 @@ const props = defineProps<{ term: string }>();
 const emit = defineEmits<{ pick: [service: ServiceSaleOut] }>();
 
 const locale = useLocale();
+const taxName = useTaxName();
 const { data } = useLive('service.service.list_for_sale', () => ({ search: props.term, limit: 20, offset: 0 }));
 const rows = computed(() => data.value?.rows ?? []);
 </script>
@@ -39,7 +41,7 @@ const rows = computed(() => data.value?.rows ?? []);
       <ion-label>
         <h3>{{ item.name }}</h3>
         <p :class="{ 'pos-search__warn': item.needs_tax_setup }">
-          {{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory') : $t('sale.pos.serviceMinutes', { minutes: item.duration_minutes }) }}
+          {{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory', { tax: taxName }) : $t('sale.pos.serviceMinutes', { minutes: item.duration_minutes }) }}
         </p>
       </ion-label>
       <ion-note

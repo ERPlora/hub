@@ -42,6 +42,13 @@ describe('ServiceSearchResults', () => {
     expect(row.find('p').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
   });
 
+  it('in the Canary Islands a service without its tax names the IGIC', async () => {
+    const m = await setup();
+    await m.result('sale.sale.tax_kind', { tax: 'igic' });
+    await m.result(OP, page([service({ id: 'sv2', needs_tax_setup: true })]));
+    expect(m.find('pos-search-service-sv2').find('p').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IGIC.');
+  });
+
   it('nothing found paints nothing', async () => {
     const m = await setup();
     await m.result(OP, page([]));

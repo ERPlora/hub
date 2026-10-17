@@ -2,6 +2,7 @@
 // SALE-F35: «New section» (the «+» of Sections) or «Edit section» (a row's «Edit»), as the old
 // table's create panel: Name, «VAT charged» (TaxCategoryPicker, searched on the server) and Position,
 // «Add» or «Save». No VAT chosen: «Choose the VAT this section charges.» under it, and nothing is sent.
+// «VAT» is the business territory's tax («IGIC» in the Canary Islands, «IPSI» in Ceuta and Melilla).
 // An edit sends only what changed (nothing changed: it just closes). It closes once the server saved it
 // — the live list paints the department with the rate its category charges —; a refusal keeps it open
 // with what was typed (`refusal`).
@@ -10,6 +11,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { refusal } from '../../lib/refusal';
 import { taxLabel } from '../../lib/taxLabel';
@@ -24,6 +26,7 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
+const taxName = useTaxName();
 const locale = useLocale();
 const create = useCommand('sale.department.create');
 const update = useCommand('sale.department.update');
@@ -123,11 +126,11 @@ async function save(): Promise<void> {
         <TaxCategoryPicker
           v-model="taxKey"
           v-model:empty="noCategories"
-          :label="$t('sale.departments.columns.taxCategory')"
-          :placeholder="$t('sale.departments.form.taxPlaceholder')"
+          :label="$t('sale.departments.columns.taxCategory', { tax: taxName })"
+          :placeholder="$t('sale.departments.form.taxPlaceholder', { tax: taxName })"
           testid="sale-department-form-tax"
           :chosen-label="currentTax"
-          :error-text="taxMissing ? $t('sale.departments.taxCategoryMissing') : fieldErrors.tax_category_key"
+          :error-text="taxMissing ? $t('sale.departments.taxCategoryMissing', { tax: taxName }) : fieldErrors.tax_category_key"
         />
         <ion-input
           data-testid="sale-department-form-order"

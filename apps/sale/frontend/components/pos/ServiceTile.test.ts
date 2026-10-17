@@ -38,6 +38,13 @@ describe('ServiceTile', () => {
     expect(m.wrapper.emitted('pick')).toEqual([[service({ needs_tax_setup: true })]]);
   });
 
+  it('in Ceuta or Melilla the badge names the IPSI, in the reader’s language', async () => {
+    const m = await mountSale(ServiceTile, { props: { service: service({ needs_tax_setup: true }) }, locale: 'es' });
+    await m.live();
+    await m.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    expect(m.find('pos-service-sv1').find('.pos-tile__badge').text()).toBe('Falta el IPSI');
+  });
+
   it('a tap hands the service up', async () => {
     const m = await mountSale(ServiceTile, { props: { service: service() } });
     await click(m.find('pos-service-sv1').element);

@@ -34,6 +34,17 @@ describe('CatalogNotices', () => {
     expect(many.find('pos-catalog-health').attributes('role')).toBe('status');
   });
 
+  it('in the Canary Islands the count names the IGIC', async () => {
+    const one = await setup({ locale: 'es' });
+    await one.result('sale.sale.tax_kind', { tax: 'igic' });
+    await one.result(OP, page([product({ needs_tax_setup: true })], 1, 1));
+    expect(one.find('pos-catalog-health').text()).toBe('1 artículo no se puede vender: le falta configurar el IGIC.');
+    const many = await setup();
+    await many.result('sale.sale.tax_kind', { tax: 'igic' });
+    await many.result(OP, page([product({ needs_tax_setup: true })], 3, 1));
+    expect(many.find('pos-catalog-health').text()).toBe('3 items cannot be sold: their IGIC is not set up.');
+  });
+
   it('only whoever can change products gets «Review the catalogue», which opens the unconfigured ones', async () => {
     const seller = await setup();
     await seller.result(OP, page([product()], 2, 1));

@@ -48,6 +48,12 @@ describe('OpenPriceSheet', () => {
     expect(m.find('pos-open-price-department-label').text()).toBe('Sección (IVA)');
   });
 
+  it('in the Canary Islands the section names the IGIC', async () => {
+    const m = await setup({}, 'es');
+    await m.result('sale.sale.tax_kind', { tax: 'igic' });
+    expect(m.find('pos-open-price-department-label').text()).toBe('Sección (IGIC)');
+  });
+
   it('«Add» waits for an amount and a department, then hands the line up in cents', async () => {
     const m = await setup({}, 'es');
     expect(m.disabled()).toBe(true);

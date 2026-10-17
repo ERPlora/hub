@@ -17,14 +17,19 @@
     },
     "common": {
       "taxPicker": {
-        "search": "Buscar una categoría de IVA…",
+        "search": "Buscar una categoría de {tax}…",
         "close": "Cerrar",
-        "noResults": "Ninguna categoría de IVA coincide con tu búsqueda.",
+        "noResults": "Ninguna categoría de {tax} coincide con tu búsqueda.",
         "more": "Se muestran {shown} de {total}. Escribe para acotar la lista.",
-        "none": "No hay categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.",
-        "loadFailed": "No se han podido leer las categorías de IVA.",
+        "none": "No hay categorías de {tax} que elegir. Configura antes tus tipos de {tax}, en Impuestos.",
+        "loadFailed": "No se han podido leer las categorías de {tax}.",
         "retry": "Reintentar",
         "retrying": "Reintentando…"
+      },
+      "taxName": {
+        "vat": "IVA",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
       }
     },
     "pos": {
@@ -45,10 +50,10 @@
       "openPrice": "Precio libre",
       "openPriceTag": "+ €",
       "managerOnly": "Lo tiene que hacer un responsable",
-      "notSellableBadge": "Falta el IVA",
-      "notSellableNoTaxCategory": "No se puede vender: sin categoría fiscal. Falta configurar el IVA.",
-      "catalogBlockedOne": "1 artículo no se puede vender: le falta configurar el IVA.",
-      "catalogBlocked": "{count} artículos no se pueden vender: les falta configurar el IVA.",
+      "notSellableBadge": "Falta el {tax}",
+      "notSellableNoTaxCategory": "No se puede vender: sin categoría fiscal. Falta configurar el {tax}.",
+      "catalogBlockedOne": "1 artículo no se puede vender: le falta configurar el {tax}.",
+      "catalogBlocked": "{count} artículos no se pueden vender: les falta configurar el {tax}.",
       "catalogBlockedFix": "Revisar el catálogo",
       "catalogAppInactive": "{app} no está activa, así que no hay rejilla de productos. Puedes cobrar ventas a precio libre; actívala desde Aplicaciones para vender desde un catálogo.",
       "catalogLoadFailed": "No se ha podido cargar el catálogo.",
@@ -123,7 +128,7 @@
       "staffLoadFailed": "No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.",
       "staffPickerEmpty": "Este hub no tiene a nadie más para atender. Da de alta personal en Ajustes.",
       "staffNoResults": "Nadie del equipo coincide con tu búsqueda.",
-      "department": "Sección (IVA)",
+      "department": "Sección ({tax})",
       "departmentSearch": "Buscar una sección…",
       "departmentsLoadFailed": "No se han podido cargar las secciones.",
       "addAmount": "Añadir {amount}",
@@ -375,7 +380,6 @@
         "tickets": "Tickets",
         "revenue": "Ingresos",
         "avgTicket": "Ticket medio",
-        "tax": "IVA",
         "discounts": "Descuentos",
         "voided": "Anuladas",
         "error": "Error cargando métricas"
@@ -502,7 +506,7 @@
       "deleteFailed": "No se ha podido eliminar la nota rápida."
     },
     "departments": {
-      "intro": "Las secciones que el TPV ofrece al cobrar un importe que no está en el catálogo. Cada una lleva su IVA. Si dejas la lista vacía, el TPV vuelve a ofrecer las categorías fiscales tal cual.",
+      "intro": "Las secciones que el TPV ofrece al cobrar un importe que no está en el catálogo. Cada una lleva su {tax}. Si dejas la lista vacía, el TPV vuelve a ofrecer las categorías fiscales tal cual.",
       "search": "Buscar una sección…",
       "loading": "Cargando secciones…",
       "empty": "Todavía no hay secciones. Añade las que cobras a mano: «Frutas y verduras», «Carnicería», «Droguería».",
@@ -515,7 +519,7 @@
       },
       "columns": {
         "name": "Nombre",
-        "taxCategory": "IVA que cobra",
+        "taxCategory": "{tax} que cobra",
         "sortOrder": "Posición"
       },
       "add": "Añadir",
@@ -527,12 +531,12 @@
         "add": "Añadir",
         "save": "Guardar",
         "namePlaceholder": "p. ej. Frutas y verduras",
-        "taxPlaceholder": "Elige el IVA"
+        "taxPlaceholder": "Elige el {tax}"
       },
-      "taxCategoryMissing": "Elige el IVA que cobra esta sección.",
+      "taxCategoryMissing": "Elige el {tax} que cobra esta sección.",
       "saveFailed": "No se ha podido guardar la sección.",
       "deleteTitle": "Eliminar sección",
-      "deleteMessage": "{name} — Deja de ofrecerse en el TPV. Lo ya vendido conserva el nombre y el IVA con los que se cobró.",
+      "deleteMessage": "{name} — Deja de ofrecerse en el TPV. Lo ya vendido conserva el nombre y el {tax} con los que se cobró.",
       "deleteCancel": "Cancelar",
       "deleteFailed": "No se ha podido eliminar la sección."
     },
@@ -582,7 +586,7 @@
           "label": "Permitir tiques aparcados"
         },
         "default_tax_included": {
-          "label": "Precios con IVA incluido"
+          "label": "Precios con {tax} incluido"
         },
         "auto_invoice_with_tax_id": {
           "label": "Emitir factura si el cliente tiene NIF"

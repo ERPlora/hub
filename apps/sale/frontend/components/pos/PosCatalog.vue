@@ -17,6 +17,7 @@ import { computed, shallowRef, watch } from 'vue';
 import type { CategoryOut, ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useLiveWindows } from '../../composables/useLiveWindows';
+import { useTaxName } from '../../composables/useTaxName';
 import { useT } from '../../composables/useT';
 import CatalogNotices from './CatalogNotices.vue';
 import CategoryStrip from './CategoryStrip.vue';
@@ -39,6 +40,7 @@ const props = withDefaults(
 const emit = defineEmits<{ add: [product: ProductOut]; service: [service: ServiceSaleOut]; openPrice: [] }>();
 
 const t = useT();
+const taxName = useTaxName();
 
 const categoryId = shallowRef('');
 const servicesCount = shallowRef<number | undefined>(undefined);
@@ -80,7 +82,7 @@ const emptyText = computed(() => {
 
 /** A tap on something without VAT: the reason above the grid and in a toast; nothing is added. */
 function blocked(): void {
-  const reason = t('sale.pos.notSellableNoTaxCategory');
+  const reason = t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value });
   tapNotice.value = reason;
   void toast(reason, 'warning');
 }

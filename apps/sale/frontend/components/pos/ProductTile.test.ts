@@ -36,6 +36,15 @@ describe('ProductTile', () => {
     expect(m.wrapper.emitted('pick')).toEqual([[product({ needs_tax_setup: true })]]);
   });
 
+  it('in the Canary Islands the badge and the reason name the IGIC', async () => {
+    const m = await mountSale(ProductTile, { props: { product: product({ needs_tax_setup: true }) } });
+    await m.live();
+    await m.result('sale.sale.tax_kind', { tax: 'igic' });
+    const tile = m.find('pos-product-p1');
+    expect(tile.find('.pos-tile__badge').text()).toBe('IGIC missing');
+    expect(tile.attributes('aria-label')).toBe('Café con leche · Cannot be sold: no tax category. IGIC needs to be set up.');
+  });
+
   it('a tap hands the product up', async () => {
     const m = await mountSale(ProductTile, { props: { product: product() } });
     await click(m.find('pos-product-p1').element);

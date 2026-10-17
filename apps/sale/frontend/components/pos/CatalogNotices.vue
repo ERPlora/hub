@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The notices above the till's grid (SALE-F07). The state of the catalogue, a quiet sentence: how many
-// articles cannot be sold for lack of VAT (counted on the server: one row asked, its total read), with
+// articles cannot be sold for lack of VAT — the business territory's tax — (counted on the server: one row asked, its total read), with
 // «Review the catalogue» — to Inventory's unconfigured products — only for whoever can fix it. And
 // the reason of the last tap on a blocked tile, boxed, where the cashier is looking. When Inventory is
 // off the count cannot be read and the grid itself says why.
@@ -10,11 +10,13 @@ import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useTaxName } from '../../composables/useTaxName';
 import { useT } from '../../composables/useT';
 
 defineProps<{ tapNotice: string | null }>();
 
 const t = useT();
+const taxName = useTaxName();
 const router = useRouter();
 const session = useSession();
 const canFix = computed(() => session.can('inventory.change_product'));
@@ -23,7 +25,9 @@ const { data, error } = useLive('inventory.product.list', { needs_tax_setup: tru
 
 const blocked = computed(() => (error.value ? 0 : (data.value?.total ?? 0)));
 const sentence = computed(() =>
-  blocked.value === 1 ? t('sale.pos.catalogBlockedOne') : t('sale.pos.catalogBlocked', { count: blocked.value }),
+  blocked.value === 1
+    ? t('sale.pos.catalogBlockedOne', { tax: taxName.value })
+    : t('sale.pos.catalogBlocked', { count: blocked.value, tax: taxName.value }),
 );
 
 function review(): void {

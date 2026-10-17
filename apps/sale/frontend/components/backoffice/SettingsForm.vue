@@ -8,13 +8,15 @@
 // «Settings saved.»; a refusal says «Could not save settings.» with the server's words and marks the
 // fields it names. A read that fails (or that the server refuses) shows no values at all: never the
 // factory ones as if they were the business's. `editable` is fixed for the life of the form: the page
-// remounts it when the person changes.
+// remounts it when the person changes. The rows that name the tax («Prices include VAT») name the business
+// territory's, read here with the settings so the stream opens with both (`useTaxName`).
 import { InlineFeedback } from '@erplora/ui/components';
 import { type UseLive, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonCard, IonCardContent, IonList, IonSpinner } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useTaxName } from '../../composables/useTaxName';
 import { useT } from '../../composables/useT';
 import type { SettingsOut, SettingsPatchIn } from '../../operations';
 import { refusal } from '../../lib/refusal';
@@ -33,6 +35,7 @@ const t = useT();
 const live: UseLive<SettingsOut> = props.editable ? useLive('sale.settings.get', {}) : useLive('sale.pos_settings.get', {});
 const { status, error, refresh } = live;
 const update = useCommand('sale.settings.update');
+const taxName = useTaxName();
 
 /** The business's values: the live ones, or what the last save answered until the stream catches up. */
 const server = shallowRef<SettingsOut>();
@@ -177,6 +180,7 @@ const failed = computed(() => !server.value && status.value === 'error' && !forb
               :disabled="!editable"
               :error="fieldErrors[field.key]"
               :icon="index === 0 ? 'ion:card-outline' : undefined"
+              :tax-name="taxName"
               @update:value="set(field.key, $event)"
             />
           </ion-list>

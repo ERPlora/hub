@@ -82,6 +82,19 @@ describe('SettingsForm: reading', () => {
     ]);
   });
 
+  it('reads the business territory’s tax from the start and names it in «Prices include IGIC»', async () => {
+    const s = await setup(true, 'es');
+    // Asked with the settings, before any row is painted: the stream opens with both, and is not reopened.
+    expect(s.params('sale.sale.tax_kind')).toEqual([{}]);
+    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.show(SETTINGS);
+    expect(s.control('default_tax_included').getAttribute('aria-label')).toBe('Precios con IGIC incluido');
+    const r = await setup(false);
+    expect(r.params('sale.sale.tax_kind')).toEqual([{}]);
+    await r.show(SETTINGS);
+    expect(r.control('default_tax_included').getAttribute('aria-label')).toBe('Prices include VAT');
+  });
+
   it('untouched, follows a change made elsewhere', async () => {
     const s = await setup();
     await s.show(SETTINGS);

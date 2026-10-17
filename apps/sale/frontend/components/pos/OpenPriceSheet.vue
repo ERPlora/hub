@@ -7,6 +7,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import type { OpenLineIn } from '../../operations';
+import { useTaxName } from '../../composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { centsFromEuros, formatMoney } from '../../lib/format';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
@@ -18,6 +19,7 @@ const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ add: [line: Pick<OpenLineIn, 'unit_price' | 'department_id' | 'tax_category_key'>] }>();
 
 const locale = useLocale();
+const taxName = useTaxName();
 const typed = shallowRef('');
 const choice = shallowRef<OpenPriceChoice | null>(null);
 
@@ -58,7 +60,7 @@ function add(): void {
       class="pos-sheet-label"
       data-testid="pos-open-price-department-label"
     >
-      {{ $t('sale.pos.department') }}
+      {{ $t('sale.pos.department', { tax: taxName }) }}
     </p>
     <DepartmentPicker v-model="choice" />
     <template #foot>
