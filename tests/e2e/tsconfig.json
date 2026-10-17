@@ -1,0 +1,7 @@
+{
+  // The e2e suite runs in Node (Playwright and Vitest), not in the SPA: its own project, chained in the
+  // `typecheck` script of package.json, with Node's types instead of Vite's client ones.
+  "extends": "../../packages/ui/tsconfig.base.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["**/*.ts"]
+}

@@ -5,6 +5,11 @@ Las specs (`*.spec.ts`) manejan Chrome contra una pila de desarrollo que ya est�
 defecto; `E2E_HEADED=1` lo enseña. Los `*.test.ts` de esta carpeta son Vitest (`pnpm test`): prueban la
 configuración del e2e, no el producto.
 
+`pnpm typecheck` (y la CI) comprueba los tipos de todos los `.ts` de esta carpeta con su propio
+`tsconfig.json`, que lleva los tipos de Node (`process`, `node:fs`) en lugar de los del cliente de Vite, sin
+añadirlos al `tsconfig.json` de la SPA. Un error de tipos en una spec o en un helper rompe la CI;
+`typecheck.test.ts` vigila que ningún fichero de aquí se quede fuera.
+
 ```bash
 CI=1 pnpm e2e                                  # toda la suite
 CI=1 pnpm e2e tests/e2e/sale-sales.spec.ts     # una spec: SIN `--` (con él, Playwright ignora el filtro)
