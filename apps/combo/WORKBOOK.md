@@ -553,7 +553,11 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   a la vez del mismo nombre o del mismo producto dan una y un 409 (`combo.group_exists`,
   `combo.option_exists`), los topes (20 platos, 40 elecciones) no se rebasan y retirar un menú mientras se
   le añade una elección no deja nada colgado. Las restricciones únicas de la base son la última red: un
-  `IntegrityError` se convierte en su 409 dentro de un savepoint, nunca un 500. Probado con hilos.
+  `IntegrityError` se convierte en su 409 dentro de un savepoint, nunca un 500. Crear o cambiar una
+  elección retiene su producto, y crear o cambiar un menú su categoría fiscal, hasta el COMMIT (`held` de
+  Inventario, `FOR KEY SHARE`): un borrado a la vez (el «Eliminar» de Inventario o el del admin del Hub)
+  espera a la escritura, y uno ya en curso se lee terminado, como uno borrado antes (422 `invalid_field` en
+  el campo que lo nombra), nunca un 500 ni un menú que ofrece un producto borrado. Probado con hilos.
 - **Sale en el TPV** (`for_sale`, y el aviso del constructor): a la venta ∧ al menos una elección
   ofrecida ∧ cada plato obligatorio con elecciones ofrecidas suficientes (`min`, o una si se puede
   repetir) ∧ (partido) algún precio de catálogo que pesar. Ofrecida = disponible ∧ producto activo,

@@ -3,18 +3,22 @@
 Two courses with the same name added to one menu at once give one course and a 409; two choices of the
 same product added to one course at once give one choice and a 409; a full course takes no one more
 however many arrive together. A read that a menu's deletion lands in the middle of answers what it read,
-a 404 or the till's 409, never a 500.
+a 404 or the till's 409, never a 500. A product or a tax category deleted while a write names it either
+waits for the write or refuses it as one deleted before, never a 500 nor a menu offering a deleted product.
 """
 
 import threading
+import time
 from contextlib import contextmanager
+from types import SimpleNamespace
 
 import pytest
-from django.db import connection
+from django.db import connection, transaction
 from live.errors import Conflict, NotFound, OperationError
 from live.models import OutboxEvent
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
+from apps.inventory.models import Product
 
 from .conftest import FOOD, make_combo, make_group, make_option, make_product, run
 
@@ -246,3 +250,232 @@ def test_a_menu_withdrawn_between_its_name_and_its_price_is_missing_for_the_till
         "combo.combo_missing",
         409,
     )
+
+
+# A product or a tax category deleted while a write names it. The writes that offer a product in a course
+# read it unheld: a deletion committed between that read and the write either left a menu offering a deleted
+# product or, the Hub admin's, made the database refuse the write at its COMMIT (a 500, after DoesNotExist on
+# the way out). The same for the tax category a menu is created or edited with. A write holds what it names,
+# so the deletion waits for it; one already under way when the write reads it is not found, as one deleted
+# before. Both Inventory's «Delete» (the row stays, marked deleted) and the Hub admin's (the row goes).
+
+DELETIONS = ["operation", "row"]
+#: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).
+LOCK_TIMEOUT = "300ms"
+#: Postgres' ``lock_not_available``: the deletion found the row held.
+LOCK_NOT_AVAILABLE = "55P03"
+#: How long a deletion under way holds its row before it commits.
+IN_FLIGHT = 0.5
+PROBE = "product.probe"
+
+
+def remove(target, how: str) -> None:
+    if how == "operation":
+        run("inventory.product.delete", {"id": str(target.id)})
+    else:
+        # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
+        type(target).objects.get(pk=target.pk).delete()
+
+
+def delete(target, how: str) -> None:
+    """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds. The
+    lock timeout is the transaction's (SET LOCAL): a session-level one would go back with the connection and
+    reach the tests after this one."""
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
+        remove(target, how)
+
+
+@contextmanager
+def deleted_just_before(statement: str, target, how: str):
+    """Deletes ``target`` in another session right before the first statement of this one that starts with
+    ``statement`` (the write that names it): between the read that found it and the write, every time. It
+    commits, or waits for this session when it holds the row (and gives up)."""
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        if not deletions and sql.lstrip().startswith(statement):
+            deletions.extend(at_once(lambda: delete(target, how)))
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+@contextmanager
+def deleted_in_flight(target, how: str):
+    """A deletion of ``target`` under way in another session when this one first reads its table: it holds
+    the row, as a deletion takes it first, and commits a moment later while this one goes on."""
+    table = f'FROM "{type(target)._meta.db_table}"'
+    holds = threading.Event()
+    deletions: list = []
+
+    def deletion():
+        try:
+            with transaction.atomic():
+                type(target).objects.select_for_update().get(pk=target.pk)
+                holds.set()
+                time.sleep(IN_FLIGHT)
+                remove(target, how)
+            deletions.append("ok")
+        except Exception as error:  # reported to the test, which fails on it
+            deletions.append(repr(error))
+        finally:
+            holds.set()
+            connection.close()
+
+    thread = threading.Thread(target=deletion)
+
+    def wrapper(execute, sql, params, many, context):
+        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            thread.start()
+            holds.wait(5)
+        return execute(sql, params, many, context)
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield deletions
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+
+
+def sqlstate(error) -> str | None:
+    while error is not None:
+        if getattr(error, "sqlstate", None):
+            return error.sqlstate
+        error = error.__cause__ or error.__context__
+    return None
+
+
+def held(deletions) -> bool:
+    """The deletion waited for the row this write holds (and gave up)."""
+    return len(deletions) == 1 and sqlstate(deletions[0]) == LOCK_NOT_AVAILABLE
+
+
+def attempt(call):
+    """What ``call`` answers: its result, or the error it is refused with (a 500 is raised as it comes)."""
+    try:
+        return call()
+    except OperationError as error:
+        return error
+
+
+@pytest.fixture
+def world():
+    from apps.tax.models import TaxCategory
+
+    combo = make_combo()
+    course = make_group(combo)
+    return SimpleNamespace(
+        combo=combo,
+        course=course,
+        option=make_option(course, make_product("Hake")),
+        sole=make_product("Sole"),
+        # Named by nothing yet, so the staff may delete it in the Hub admin.
+        probe=TaxCategory.objects.create(key=PROBE, name="Probe"),
+    )
+
+
+#: Each write that offers ``sole`` in the course, the statement that writes it down and the field that
+#: names it (the one a product deleted before is refused on).
+PRODUCT_WRITES = {
+    "option.create": (
+        lambda w: run("combo.option.create", {"group_id": str(w.course.id), "product_id": str(w.sole.id)}),
+        'INSERT INTO "combo_choiceoption"',
+        "product_id",
+    ),
+    "option.create_by_name": (
+        lambda w: run("combo.option.create", {"group_id": str(w.course.id), "product": "Sole"}),
+        'INSERT INTO "combo_choiceoption"',
+        "product",
+    ),
+    "option.bulk_create": (
+        lambda w: run("combo.option.bulk_create", {"group_id": str(w.course.id), "product_ids": [str(w.sole.id)]}),
+        'INSERT INTO "combo_choiceoption"',
+        "product_ids",
+    ),
+    "option.update": (
+        lambda w: run("combo.option.update", {"id": str(w.option.id), "new_product_id": str(w.sole.id)}),
+        'UPDATE "combo_choiceoption" SET',
+        "new_product_id",
+    ),
+}
+
+
+def offers_deleted(product) -> bool:
+    """A choice of ``product`` while it is deleted (marked or gone): what a menu must never be left with."""
+    return ChoiceOption.objects.filter(product_id=product.id).exists() and not Product.objects.filter(
+        pk=product.pk, is_deleted=False
+    ).exists()
+
+
+@pytest.mark.parametrize("how", DELETIONS)
+@pytest.mark.parametrize("write", sorted(PRODUCT_WRITES))
+def test_a_product_deleted_while_a_menu_offers_it_waits_for_the_write(world, write, how):
+    call, statement, _ = PRODUCT_WRITES[write]
+    with deleted_just_before(statement, world.sole, how) as deletions:
+        call(world)
+    assert held(deletions), deleted(deletions)
+    assert not offers_deleted(world.sole)
+    assert ChoiceOption.objects.filter(group=world.course, product=world.sole).count() == 1
+
+
+@pytest.mark.parametrize("how", DELETIONS)
+@pytest.mark.parametrize("write", sorted(PRODUCT_WRITES))
+def test_a_product_being_deleted_when_a_menu_offers_it_is_refused(world, write, how):
+    call, _, field = PRODUCT_WRITES[write]
+    with deleted_in_flight(world.sole, how) as deletions:
+        outcome = attempt(lambda: call(world))
+    assert deletions == ["ok"]
+    # As for a product deleted before: the form says which field.
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code, list(outcome.fields)) == (422, "invalid_field", [field])
+    assert not ChoiceOption.objects.filter(product_id=world.sole.id).exists()
+    assert ChoiceOption.objects.get(pk=world.option.pk).product.name == "Hake"
+
+
+#: Each write that names the tax category ``probe``, and the statement that writes it down.
+TAX_WRITES = {
+    "combo.create": (
+        lambda w: run(
+            "combo.combo.create",
+            {"name": "Menu of the night", "price": 1500, "supply_kind": "service", "tax_category_key": PROBE},
+        ),
+        'INSERT INTO "combo_combo"',
+    ),
+    "combo.update": (
+        lambda w: run("combo.combo.update", {"id": str(w.combo.id), "tax_category_key": PROBE}),
+        'UPDATE "combo_combo" SET',
+    ),
+}
+
+
+def named_by(tax) -> int:
+    return Combo.objects.filter(tax_category=tax).count()
+
+
+@pytest.mark.parametrize("write", sorted(TAX_WRITES))
+def test_a_tax_category_deleted_while_a_menu_names_it_waits_for_the_write(world, write):
+    call, statement = TAX_WRITES[write]
+    with deleted_just_before(statement, world.probe, "row") as deletions:
+        call(world)
+    assert held(deletions), deleted(deletions)
+    assert named_by(world.probe) == 1
+
+
+@pytest.mark.parametrize("write", sorted(TAX_WRITES))
+def test_a_tax_category_being_deleted_when_a_menu_names_it_is_refused(world, write):
+    from apps.tax.models import TaxCategory
+
+    call, _ = TAX_WRITES[write]
+    with deleted_in_flight(world.probe, "row") as deletions:
+        outcome = attempt(lambda: call(world))
+    assert deletions == ["ok"]
+    assert not TaxCategory.objects.filter(pk=world.probe.pk).exists()
+    # As for a key that does not exist: the form says which field.
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code, list(outcome.fields)) == (422, "invalid_field", ["tax_category_key"])
+    assert not Combo.objects.filter(name="Menu of the night").exists()
+    assert Combo.objects.get(pk=world.combo.pk).tax_category.key == FOOD
