@@ -4,7 +4,10 @@ A refusal writes nothing and records no event; it carries the field it is about,
 next to it. Codes are unique whatever their case (the database's index decides, also between two
 people saving at once); at most one list is general: making one general takes the mark from the other
 in a savepoint, and if another choice wins the race (the index says so), it is tried again, so the last
-one stays (WORKBOOK «Para quien lo mantiene»).
+one stays (WORKBOOK «Para quien lo mantiene»). A write that names another app's row (a rule's category or
+product, a price's product, a list's or a rule's customer group) holds it until it ends (Inventory's
+``held``): its deletion waits for the write, and one under way when it is read is not found, as one deleted
+before.
 """
 
 from decimal import Decimal
@@ -18,10 +21,12 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from live.operations import operation
 from live.outbox import record_event
 
+from apps.customer import queries as customer_queries
 from apps.customer.models import CustomerGroup
 from apps.customer.queries import find_group
-from apps.inventory.models import fits_unit, increment_of
-from apps.inventory.queries import find_category, find_product
+from apps.inventory import queries as inventory_queries
+from apps.inventory.models import Product, fits_unit, increment_of
+from apps.inventory.queries import find_category, find_product, held
 from apps.pricing import events
 from apps.pricing.models import ACTOR_MAX_LENGTH, DiscountRule, PriceItem, PriceList
 from apps.pricing.queries import (
@@ -109,12 +114,31 @@ def _field_error(error: OperationError, field: str):
     return Conflict(error.message, code=error.code, fields={field: error.message})
 
 
+def _held_one(rows, gone) -> Any:
+    """The row of ``rows`` (one at most), held until this write ends (``held``); ``NotFound`` with ``gone``
+    when it is no longer there, as one deleted before."""
+    found = held(rows)
+    if not found:
+        raise NotFound(str(gone))
+    return found[0]
+
+
+def _held_product(product_id: UUID | None, said: str | None) -> Product:
+    """The live product named by its id, or by its SKU or name (Inventory's lookup), held until this write ends."""
+    product = find_product(product_id, said)
+    # Inventory's own refusal (its text, in its catalog), as for one deleted before.
+    return _held_one(Product.objects.filter(pk=product.pk, is_deleted=False), inventory_queries.PRODUCT_NOT_FOUND)
+
+
 def _group_id(group_id: UUID | None, said: str | None) -> UUID | None:
-    """The id of the customer group named by its id or its name (Customers' lookup); none = no group."""
+    """The id of the customer group named by its id or its name (Customers' lookup), held until this write
+    ends; none = no group."""
     if group_id is None and said is None:
         return None
     try:
-        return find_group(group_id, said).id
+        group = find_group(group_id, said)
+        # Customers' own refusal (its text, in its catalog), as for one deleted before.
+        return _held_one(CustomerGroup.objects.filter(pk=group.pk), customer_queries.GROUP_UNAVAILABLE).id
     except (NotFound, Conflict) as error:
         raise _field_error(error, "customer_group_id" if group_id is not None else "customer_group") from None
 
@@ -382,7 +406,7 @@ def add_price_item(ctx: OperationContext, data: PriceItemIn) -> dict:
         price_list=price_list, price=data.price, min_quantity=data.min_quantity, created_by=actor, updated_by=actor
     )
     if data.product_id is not None or data.product is not None:
-        item.product = find_product(data.product_id, data.product)
+        item.product = _held_product(data.product_id, data.product)
         _check_step(data.min_quantity, item.product.unit)
     else:
         service = call_service(ctx, data.service_id, data.service)
@@ -509,7 +533,8 @@ def _set_value(rule: DiscountRule, values: dict[str, Any]) -> None:
 
 
 def _set_target(ctx: OperationContext, rule: DiscountRule, values: dict[str, Any]) -> None:
-    """The category, product or service of the rule's scope (by id or text); the others, empty."""
+    """The category, product or service of the rule's scope (by id or text), the first two held until this
+    write ends; the others, empty."""
     rule.category, rule.product, rule.service_id, rule.service_name = None, None, None, ""
     if rule.applies_to not in SCOPE_TARGETS:
         return
@@ -517,9 +542,9 @@ def _set_target(ctx: OperationContext, rule: DiscountRule, values: dict[str, Any
     target_id, said = values.get(id_key), values.get(text_key)
     try:
         if rule.applies_to == DiscountRule.Scope.CATEGORY:
-            rule.category = find_category(target_id, said)
+            rule.category = find_category(target_id, said, hold=True)
         elif rule.applies_to == DiscountRule.Scope.PRODUCT:
-            rule.product = find_product(target_id, said)
+            rule.product = _held_product(target_id, said)
         else:
             service = call_service(ctx, target_id, said)
             rule.service_id, rule.service_name = service.id, service.name
@@ -652,8 +677,9 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
         )
         raise Conflict(str(message), code=code)
     group = rule.customer_group_id
-    if active and group is not None and not CustomerGroup.objects.filter(pk=group).exists():
+    if active and group is not None and not held(CustomerGroup.objects.filter(pk=group)):
         # Its group was deleted in Customers: it would apply to nobody, or, without the group, to everybody.
+        # Held when it is there, so its deletion waits for the rule to be on (and switches it off after).
         raise Conflict(str(RULE_GROUP_DELETED), code="pricing.rule_group_deleted")
     rule.is_active = active
     rule.updated_by = _actor(ctx)
