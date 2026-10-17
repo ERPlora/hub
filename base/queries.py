@@ -1,4 +1,5 @@
-"""Read operations of base: the session's ``me`` and the registry's row of a hub (``base.hub.get``)."""
+"""Read operations of base: the session's ``me``, the registry's row of a hub (``base.hub.get``) and a demo's status
+(``base.demo.get``)."""
 
 from typing import Any
 
@@ -11,7 +12,16 @@ from live.operations import operation
 
 from base.models import Hub
 from base.registry import hub_answer, internal_only
-from base.schemas import HubGetIn, HubOut, HubsBySlugIn, HubsBySlugOut, SessionMeIn, SessionMeOut
+from base.schemas import (
+    DemoSlugIn,
+    DemoStatusOut,
+    HubGetIn,
+    HubOut,
+    HubsBySlugIn,
+    HubsBySlugOut,
+    SessionMeIn,
+    SessionMeOut,
+)
 
 
 @operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
@@ -19,8 +29,8 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     """The user, its permissions, and the menu and apps it may see on this scope, already translated.
 
     Menu and apps list modules only (``module_configs``): a platform app such as ``base`` is always
-    on and never shows. No permission: an anonymous visitor gets ``user: None`` and nothing else,
-    which tells the SPA to send it to the login.
+    on and never shows. ``demo`` says when the demo ends, on a demo's hub only. No permission: an
+    anonymous visitor gets ``user: None`` and nothing else, which tells the SPA to send it to the login.
     """
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
@@ -43,7 +53,16 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
             ],
             "apps": [{"label": config.label, "state": "on"} for config in visible],
             "language": ctx.language,
+            "demo": _demo(ctx),
         }
+
+
+def _demo(ctx: OperationContext) -> dict[str, Any] | None:
+    """When the demo of this scope ends (plan 2026-10-17, §1.6), or ``None`` on a business's hub."""
+    if ctx.scope.kind != "host":
+        return None
+    hub = Hub.objects.filter(slug=ctx.scope.key, is_demo=True).first()
+    return None if hub is None else {"expires_at": hub.expires_at}
 
 
 def _can_see(ctx: OperationContext, config: Any) -> bool:
@@ -76,3 +95,13 @@ def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
     internal_only(ctx)
     found = dict(Hub.objects.filter(slug__in=data.slugs).values_list("slug", "status"))
     return {"hubs": [{"slug": slug, "status": found.get(slug)} for slug in data.slugs]}
+
+
+@operation("base.demo.get", kind="query", permission=None, input=DemoSlugIn, output=DemoStatusOut)
+def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
+    """The status of the demo ``data.slug``, for the platform only: ``manage.py demo_expire`` says it once done."""
+    internal_only(ctx)
+    hub = Hub.objects.filter(slug=data.slug, is_demo=True).first()
+    if hub is None:
+        raise NotFound(gettext("No demo has this address."))
+    return {"slug": hub.slug, "status": hub.status, "expires_at": hub.expires_at}

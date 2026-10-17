@@ -5,7 +5,8 @@ reserved name such as ``hub`` or ``www``, an invalid label, the bare host, an IP
 hub path (the SPA, ``/api``, ``/auth``…), before ninja's session auth, so an anonymous API call gets
 the 404 envelope and not a 401. Then the registry decides (``base.registry``, plan 2026-10-17, §1.2): a slug
 without a row is 404 too; a hub that is gone (cancelled, purged, or a demo past its ``expires_at``) is 410, a page
-with the way back to ERPlora (another demo, or the SaaS's ``/launch``); one still being prepared is 503 with
+with the way back to ERPlora (another demo, or the SaaS's ``/launch``), save a demo's ``/auth/login``, whose jump
+is how the SaaS's ``/demo/`` learns that it ended (plan 2026-10-17, §1.7); one still being prepared is 503 with
 ``Retry-After``, a page that refreshes itself. The API, and any call that does not ask for a page (``Accept``
 without ``text/html``), gets the envelope instead (``base.hub_gone``, ``base.hub_preparing``). A hub that answers
 is left on ``request.hub``. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``)
@@ -33,7 +34,8 @@ A browser without a session that loads a SPA route jumps to the SaaS's ``/hub-lo
 SaaS comes back with a one-time code and that ``state`` to ``/auth/callback``. Only page loads of the
 SPA are redirected: anything with a URL of its own in Django (``/api`` answers 401, ``/auth``,
 ``/healthz``, static files…) never reaches the SPA view. A request that does not ask for HTML gets
-the shell, whose auth gate sends to ``/auth/login``, the same jump.
+the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
+SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
 """
 
 from django.conf import settings
@@ -47,7 +49,7 @@ from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
 from base import registry
-from base.auth import admin_hubs_url, login_redirect, saas_url
+from base.auth import admin_hubs_url, demo_login_redirect, login_redirect, saas_url
 from base.health import READYZ_PATH
 from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
@@ -61,6 +63,9 @@ PREPARING_RETRY_AFTER_SECONDS = 30
 #: Where a demo that ended sends the visitor (another demo), and where a business that is gone does.
 DEMO_PATH = "/demo/"
 LAUNCH_PATH = "/launch"
+#: The one path of a demo that ended still answered: its login jumps to the SaaS's ``/demo/enter/``, which asks for a
+#: code, hears 410 and tells the visitor the demo ended (the SaaS keeps no row of a demo and is never told otherwise).
+DEMO_ENTRY_PATH = "/auth/login"
 
 
 class HubHostRequiredMiddleware(MiddlewareMixin):
@@ -87,7 +92,7 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         hub = registry.hub_by_slug(scope.key)
         if hub is None:
             return self._not_found(request)
-        if registry.is_gone(hub):
+        if registry.is_gone(hub) and not (hub.is_demo and path == DEMO_ENTRY_PATH):
             return self._gone(request, hub)
         if registry.is_preparing(hub):
             return self._preparing(request)
@@ -169,4 +174,7 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         if request.method not in ("GET", "HEAD") or "text/html" not in request.headers.get("Accept", ""):
             return None
         slug = HostScopeResolver().resolve(request).key
+        hub = getattr(request, "hub", None)
+        if hub is not None and hub.is_demo:
+            return demo_login_redirect(slug, request.get_full_path())
         return login_redirect(slug, request.get_full_path())

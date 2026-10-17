@@ -11,5 +11,9 @@ def test_every_event_is_named_as_the_convention_says():
         "base.hub.state_applied",
         "base.hub.cancelled",
         "base.hub.restored",
+        "base.demo.created",
+        "base.demo.code_created",
+        "base.demo.expired",
+        "base.demo.purged",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)

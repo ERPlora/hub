@@ -265,6 +265,12 @@ INTERNAL_SHARED_SECRET = (
 INTERNAL_SHARED_SECRET_PREVIOUS = config("INTERNAL_SHARED_SECRET_PREVIOUS", default="")
 # How far an internal call's X-Erplora-Timestamp may be from now (both ways), as in the SaaS.
 INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
+# The demo hubs (plan 2026-10-17, §1.11), which the SaaS's /demo/ asks for: how many may be live at once (503
+# base.demo_full beyond; the final figure after measuring, PLAN-SAAS §3.5), how long each lives, and how many days a
+# purged one still answers 410 before its host is 404. Defaults for every environment; the variables only tune them.
+MAX_CONCURRENT_DEMOS = config("MAX_CONCURRENT_DEMOS", default=50, cast=int)
+DEMO_TTL_MINUTES = config("DEMO_TTL_MINUTES", default=60, cast=int)
+DEMO_TOMBSTONE_DAYS = config("DEMO_TOMBSTONE_DAYS", default=7, cast=int)
 # The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals a business's own VeriFactu
 # certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
 # certificate is refused visibly (verifactu.certificate_storage_unavailable).

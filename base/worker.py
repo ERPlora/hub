@@ -14,9 +14,12 @@ Then it schedules the apps' tasks once (``scheduler.sync``: a failure is fatal, 
 (5 s), runs the ones that are due (``scheduler.run_due``): the VeriFactu queue every minute
 (VERIFACTU-F20) and every other ``scheduled_tasks`` an app declares, each claimed with ``SKIP LOCKED``.
 A tick that fails (the database went away) is logged and the next one tries again; a stop request
-ends the loop at once. Phase 1 runs them on one fixed scope (``WORKER_SCOPE_SLUG``); phase 2 adds, in
-this loop, the hubs whose ``hub_due`` has come (each under ``use_hub``), the outbox relay, the hubs'
-provisioning and purge and the demo reaper.
+ends the loop at once. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
+demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
+pass that fails is logged and the next one tries again, and the worker never stops for it. Every pass
+releases its connection. Phase 1 runs them on one fixed scope (``WORKER_SCOPE_SLUG``); phase 2 adds, in
+this loop, the hubs whose ``hub_due`` has come (each under ``use_hub``), the outbox relay and the hubs'
+provisioning and purge.
 """
 
 import datetime as dt
@@ -28,6 +31,7 @@ from django.db import close_old_connections
 from django.utils import timezone
 
 from base import catalog, scheduler
+from base.services import reap_demos
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,8 @@ TICK_SECONDS = 5.0
 #: The waits while the SaaS has not migrated ``shared`` yet: they double, 5 s first, 60 s at most.
 RETRY_FIRST_SECONDS = 5
 RETRY_MAX_SECONDS = 60
+#: How often the demo reaper purges the demos that ended (their hosts answer 410 from their end anyway).
+REAPER_INTERVAL_SECONDS = 60
 
 
 def run(
@@ -87,11 +93,30 @@ def run(
     else:
         registered = f"{result.written} app(s) registered: {', '.join(result.apps)}"
     logger.info("worker: waiting for work (%s).", registered)
+    next_reap: dt.datetime | None = None
     while not stop.is_set():
-        _tick(clock())
+        now = clock()
+        _tick(now)
+        if next_reap is None or now >= next_reap:
+            _reap(now)
+            next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
         wait(tick_seconds)
     logger.info("worker: stopped.")
     return 0
+
+
+def _reap(now: dt.datetime) -> None:
+    """Purge the demos that ended by ``now``; a failure is logged and the next pass tries again."""
+    try:
+        purged = reap_demos(now)
+    except Exception:
+        logger.exception("worker: the demo reaper failed; its next pass tries again.")
+    else:
+        if purged:
+            logger.info("worker: purged %d demo(s).", purged)
+    finally:
+        # The reaper's connection is not kept open while the worker idles, nor a broken one taken further.
+        close_old_connections()
 
 
 def _tick(now: dt.datetime) -> None:

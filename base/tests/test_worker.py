@@ -6,8 +6,10 @@ migrated yet (the first deploy) is waited for, with a warning and a backoff of 5
 then 60 s; any other failure stops the worker with 1. Then it schedules the apps' tasks once
 (``scheduler.sync``; a failure there is fatal too) and, on every tick, runs the ones that are due
 (``scheduler.run_due``) until asked to stop, waking up at once: ECS gives it 30 s after SIGTERM. A
-tick that fails is logged and the next one tries again. No database here: ``register_apps`` and the
-scheduler are replaced; their own tests are ``test_register_apps.py`` and ``test_scheduler.py``.
+tick that fails is logged and the next one tries again. On the first tick and then every
+``REAPER_INTERVAL_SECONDS`` it purges the demos that ended (``reap_demos``, plan 2026-10-17 §1.7); a reaper that
+fails is logged and never stops the worker. No database here: ``register_apps``, the scheduler and the reaper are
+replaced; their own tests are ``test_register_apps.py``, ``test_scheduler.py`` and ``test_services_demo.py``.
 """
 
 import datetime as dt
@@ -44,6 +46,27 @@ class FakeScheduler:
         if self.failures:
             raise self.failures.pop(0)
         return ["verifactu.process_queue"]
+
+
+class FakeReaper:
+    """Stands in for ``reap_demos``: records the clock of each pass, and raises the failures it is given."""
+
+    def __init__(self) -> None:
+        self.passes: list[dt.datetime] = []
+        self.failures: list[Exception] = []
+
+    def __call__(self, now: dt.datetime) -> int:
+        self.passes.append(now)
+        if self.failures:
+            raise self.failures.pop(0)
+        return 1
+
+
+@pytest.fixture(autouse=True)
+def reaper(monkeypatch) -> FakeReaper:
+    fake = FakeReaper()
+    monkeypatch.setattr(worker, "reap_demos", fake)
+    return fake
 
 
 @pytest.fixture(autouse=True)
@@ -193,8 +216,8 @@ def test_releases_the_connection_between_attempts(monkeypatch):
 
     worker.run(stop, tick_seconds=TICK, wait=wait)
 
-    # The SaaS's database is not held open while it waits, nor while it idles.
-    assert released == [1, 2]
+    # The SaaS's database is not held open while it waits, nor while it idles, nor after the reaper's first pass.
+    assert released == [1, 2, 2]
 
 
 def test_a_stop_while_it_waits_for_the_schema_exits_0_without_working(monkeypatch, caplog):
@@ -340,5 +363,68 @@ def test_a_tick_that_fails_is_logged_and_the_next_one_tries_again(monkeypatch, c
     [record] = [r for r in caplog.records if r.name == "base.worker"]
     assert "next tick" in record.getMessage()
     assert record.exc_info[1] is failure
-    # The broken connection is released before the next tick.
-    assert calls.count("close_old_connections") == 2
+    # The broken connection is released before the next tick: after registering, after the failed tick, and after
+    # each of the reaper's two passes (10:00 and 10:01).
+    assert calls.count("close_old_connections") == 4
+
+
+# ── The demo reaper (plan 2026-10-17, §1.7) ─────────────────────────────────────────────────────
+
+
+def at(*seconds: int):
+    """A clock that answers 10:00 UTC plus ``seconds``, one call after another (the first is the scheduler's)."""
+    pending = [ten(0) + dt.timedelta(seconds=second) for second in seconds]
+    return lambda: pending.pop(0)
+
+
+def test_reaps_the_demos_on_the_first_tick_then_every_minute(calls, reaper):
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 6)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=at(0, 0, 30, 59, 60, 119, 120))
+
+    second = dt.timedelta(seconds=1)
+    assert reaper.passes == [ten(0), ten(0) + 60 * second, ten(0) + 120 * second]
+    assert worker.REAPER_INTERVAL_SECONDS == 60
+
+
+def test_a_stop_before_the_first_tick_reaps_nothing(calls, reaper):
+    worker.run(stopped())
+
+    assert reaper.passes == []
+
+
+def test_releases_the_connection_after_each_pass_of_the_reaper(calls, monkeypatch):
+    monkeypatch.setattr(worker, "reap_demos", lambda now: calls.append("reap_demos") or 0)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 1)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
+
+    assert calls == ["register_apps", "close_old_connections", "reap_demos", "close_old_connections"]
+
+
+def test_a_reaper_that_fails_is_logged_and_never_stops_the_worker(monkeypatch, caplog, calls, tasks, reaper):
+    failure = DatabaseError("server closed the connection unexpectedly")
+    reaper.failures.append(failure)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 3)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1, 2)) == 0
+
+    # It tries again a minute later, and the scheduled tasks ran on every tick all along.
+    assert reaper.passes == [ten(0), ten(1), ten(2)]
+    assert tasks.ticks == [ten(0), ten(1), ten(2)]
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "demo" in record.getMessage() and record.exc_info[1] is failure
+
+
+def test_a_failed_tick_of_the_scheduler_still_reaps(calls, tasks, reaper):
+    tasks.failures.append(DatabaseError("deadlock detected"))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 1)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
+
+    assert reaper.passes == [ten(0)]
