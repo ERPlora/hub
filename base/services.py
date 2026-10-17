@@ -38,7 +38,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, Permission
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.http import HttpRequest
 from django.utils import timezone
@@ -431,6 +431,11 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
 DEMO_FULL_RETRY_AFTER_SECONDS = 60
 #: How many addresses ``base.demo.create`` draws before it gives up (2³² of them: a second draw is already rare).
 DEMO_SLUG_DRAWS = 5
+#: Taken by ``base.demo.create`` before it counts the live demos, held until its transaction ends: two calls at once
+#: create one after the other and never pass ``MAX_CONCURRENT_DEMOS``. A transaction lock, as PgBouncer in transaction
+#: mode needs (a session one would outlive the transaction on a pooled connection, and is forbidden); no row stands
+#: for "the demos" to ``SELECT … FOR UPDATE``, and locking the live ones would not stop a new one being inserted.
+DEMO_CAP_LOCK = "SELECT pg_advisory_xact_lock(hashtext('erplora.base.demo.create'))"
 #: The demo a session was opened in (:func:`open_demo_session`).
 DEMO_SLUG_SESSION_KEY = "demo_slug"
 #: The name the owner of every demo goes by in the shell.
@@ -488,9 +493,10 @@ def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
 
     A new one is ready at once (phase 1 has no database to clone, plan §1.5) and ends ``DEMO_TTL_MINUTES`` from now;
     ``vertical`` is only noted (the verticals' seed comes with the blueprints). Beyond ``MAX_CONCURRENT_DEMOS`` live
-    demos it is ``base.demo_full`` (503); the cap is counted, not locked, so two calls at the same instant may pass it
-    by one, which costs a row in phase 1. A demo of this browser that ran out and the reaper has not purged yet is
-    marked ``expired`` first: it frees the browser for a new one (one live demo per browser, a unique constraint).
+    demos it is ``base.demo_full`` (503). The count and the new row hold :data:`DEMO_CAP_LOCK`, so two calls at the
+    same instant never pass the cap: the second counts once the first has committed. A demo of this browser that ran
+    out and the reaper has not purged yet is marked ``expired`` first: it frees the browser for a new one (one live
+    demo per browser, a unique constraint).
     """
     internal_only(ctx)
     now = timezone.now()
@@ -500,6 +506,8 @@ def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     Hub.objects.filter(
         is_demo=True, status=Hub.Status.READY, demo_session_key=data.session_key, expires_at__lte=now
     ).update(status=Hub.Status.EXPIRED, updated_at=now)
+    with connection.cursor() as cursor:
+        cursor.execute(DEMO_CAP_LOCK)
     live_demos = Hub.objects.filter(is_demo=True, status=Hub.Status.READY, expires_at__gt=now).count()
     if live_demos >= settings.MAX_CONCURRENT_DEMOS:
         raise _demo_full()

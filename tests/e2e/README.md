@@ -67,7 +67,8 @@ Receta (pila en `8030`, desde la raíz de `erplora-next`; otra pila: otros puert
 export COMPOSE_FILE="$PWD/compose.yaml"
 # 1. SaaS propio en 8031, desde un worktree del SaaS, con su carpeta de correo
 (cd <saas-wt> && VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
-  HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' EMAIL_FILE_PATH="$PWD/.mail-8031" \
+  HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' HUB_INTERNAL_URL=http://localhost:8030 \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" \
   uv run python manage.py runserver 127.0.0.1:8031)    # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
 # 2. La pila del Hub, desde su worktree
 cd <hub-wt>
@@ -79,6 +80,26 @@ CI=1 pnpm e2e
 # 3. Al terminar: parar ese runserver y su SaaS, y borrar la BD
 node tests/e2e/database.ts --drop
 ```
+
+## La demo (`demo.spec.ts`)
+
+Recorre la demo de punta a punta (plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
+`/demo/` del SaaS → «Try the demo» → `demo-<hex>.localhost:<puerto>` con la shell y la sesión «Demo» → crea un ítem
+→ `manage.py demo_expire <slug>` (por `execFileSync`, desde este checkout y con el `DB_NAME` de la ejecución) → 410
+«This demo has ended» → su enlace → `/demo/?state=expired` del SaaS → otra demo. Pide dos cosas que el resto de
+specs no piden:
+
+- **El SaaS con la puerta de la demo** (`ERPlora/saas` con `/demo/?state=expired`, en `main` desde el 2026-10-17) y
+  su `HUB_INTERNAL_URL` en el Hub de esta pila (la receta de arriba la lleva): el SaaS crea la demo
+  llamando él mismo a `/internal/demos`; apuntado a otro puerto, la crea en otro Hub y esta ejecución no la ve.
+- El mismo `INTERNAL_SHARED_SECRET` en los dos (en local, el valor por defecto de ambos).
+
+```bash
+CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportadas
+```
+
+Cada ejecución crea dos demos en la BD de la pila y las deja purgadas (lápidas `DEMO_TOMBSTONE_DAYS`); no gasta el
+tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
 ## La página a la vista y los diálogos
 

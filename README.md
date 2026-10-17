@@ -54,7 +54,7 @@ las tablas de las apps con las demás demos y con `a`/`b` (limitación aceptada;
 
 | Ruta | Operación | Respuesta |
 |---|---|---|
-| `POST /internal/demos` `{session_key, vertical, language}` | `base.demo.create` | 201 `{id, slug, expires_at, created: true}`; 200 con la demo viva de ese navegador (`created: false`); 503 `base.demo_full` + `Retry-After: 60` con `MAX_CONCURRENT_DEMOS` (50) vivas; 422 `internal.payload_invalid` |
+| `POST /internal/demos` `{session_key, vertical, language}` | `base.demo.create` | 201 `{id, slug, expires_at, created: true}`; 200 con la demo viva de ese navegador (`created: false`); 503 `base.demo_full` + `Retry-After: 60` con `MAX_CONCURRENT_DEMOS` (50) vivas (el recuento y el alta van bajo `pg_advisory_xact_lock`: dos altas a la vez nunca pasan el tope); 422 `internal.payload_invalid` |
 | `POST /internal/demos/{slug}/codes` `{session_key, language}` | `base.demo.code_create` | 201 `{code, expires_at}` (un uso, 60 s, solo se guarda su sha256); 404; 410 `base.hub_gone`; 403 `base.demo_not_owner` |
 
 `session_key` es el sha256 (hex) de un token aleatorio de la sesión del navegador en el SaaS: una demo viva por
@@ -65,7 +65,8 @@ lo envía en un formulario a `/auth/callback`, que lo canjea **en local** (sin l
 `{SAAS_URL}/demo/?state=failed`; salir de la demo, a `{SAAS_URL}/demo/`. `GET /api/me` lleva `demo: {expires_at}`
 (`null` en un negocio).
 
-Caducidad: desde `expires_at` el host responde **410** («This demo has ended», con enlace a `/demo/` del SaaS). El
+Caducidad: desde `expires_at` el host responde **410** («This demo has ended», con enlace a `/demo/?state=expired` del
+SaaS, que olvida la demo que su sesión aún daba por viva: una demo puede acabar antes de su hora). El
 worker la purga en ≤ 60 s (`reap_demos`, `base.demo.purge`: borra sus códigos, su `Membership` y el usuario
 `demo:<slug>`; `purge_demo_data` no borra nada en la fase 1 y en la fase 2 hará el `DROP DATABASE`) y la fila queda
 `purged` como lápida `DEMO_TOMBSTONE_DAYS` (7) días; después, 404. Para terminar una demo a mano: la acción «Expire
@@ -82,8 +83,10 @@ secreto local `local-internal-shared-secret` es el mismo en los dos):
 uv run python manage.py runserver                 # Hub en :8000 (con `migrate` y `seed_local_hubs` hechos)
 (cd ../saas && uv run python manage.py runserver 127.0.0.1:8001)
 # http://localhost:8001/demo/ → «Try the demo» → http://demo-<hex>.localhost:8000/ con la sesión «Demo»
-uv run python manage.py demo_expire demo-<hex>    # el host pasa a 410 y /demo/ del SaaS a «expired»
+uv run python manage.py demo_expire demo-<hex>    # el host pasa a 410 y su enlace lleva a /demo/ del SaaS en «expired»
 ```
+
+La e2e de punta a punta es `tests/e2e/demo.spec.ts` (cómo correrla: `tests/e2e/README.md`, «La demo»).
 
 ## Despliegue: `main` → prod, `pre` → pre
 

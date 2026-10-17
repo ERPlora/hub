@@ -1,6 +1,11 @@
 // Shared steps of the browser PoC (plan §8): the real login per host (Hub → SaaS → /auth/callback),
 // the demo's API for setup, the list's readiness, the measurements file and the control of the dev
 // server (runserver + Vite).
+//
+// The local hubs `a` and `b` answer only once they are rows of the registry (`base.Hub`): without them every
+// host is a 404 (plan 2026-10-17, §1.3). `manage.py seed_local_hubs` (DEBUG only, idempotent) adds them;
+// `database.ts` runs it on an e2e database and `global-setup.ts` checks it (`seed_local_hubs --check`) before
+// the first spec. The shared `hub` database needs it once, by hand.
 import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

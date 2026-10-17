@@ -8,15 +8,18 @@ turns into a session as ``demo:<slug>``, the owner (``open_demo_session``). ``ba
 reaper (``reap_demos``) purges those that ended and, after ``DEMO_TOMBSTONE_DAYS``, forgets them.
 """
 
+import contextlib
 import datetime as dt
 import hashlib
 import logging
 import re
+import threading
 
 import pydantic
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.db import connection
 from django.utils import timezone
 from live.context import OperationContext, system_context
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
@@ -183,6 +186,50 @@ class TestCreate:
     def test_the_browser_is_named_by_a_sha256_in_hex(self, session_key):
         with pytest.raises(pydantic.ValidationError):
             DemoCreateIn(session_key=session_key)
+
+
+class TestCreateAtOnce:
+    """Two browsers asking for the last free demo at the same instant, each in its own session and transaction."""
+
+    @pytest.mark.django_db(transaction=True)
+    def test_two_browsers_at_once_never_pass_the_cap(self, settings, monkeypatch, transactional_db):
+        # Each call stops between counting the live demos and drawing its address until the other one gets there
+        # too (or two seconds pass): without a lock both count none and both make one; with it the second one
+        # counts only after the first has committed, and is told the demos are full.
+        settings.MAX_CONCURRENT_DEMOS = 1
+        draw, both_counted = services.secrets.token_hex, threading.Barrier(2)
+
+        def counted_then_draw(nbytes):
+            with contextlib.suppress(threading.BrokenBarrierError):
+                both_counted.wait(2)
+            return draw(nbytes)
+
+        monkeypatch.setattr(services.secrets, "token_hex", counted_then_draw)
+        results = at_once(lambda: create(ANA), lambda: create(BEA))
+        assert sorted(getattr(result, "code", "created") for result in results) == ["base.demo_full", "created"]
+        assert Hub.objects.filter(is_demo=True).count() == 1
+
+
+def at_once(*calls):
+    """Runs every ``call`` in its own thread (its own connection), released together; their results or errors."""
+    start = threading.Barrier(len(calls))
+    results: list = [None] * len(calls)
+
+    def run(index, call):
+        try:
+            start.wait(5)
+            results[index] = call()
+        except Exception as error:  # the test reads the error, an unexpected one included
+            results[index] = error
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=run, args=(index, call)) for index, call in enumerate(calls)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(30)
+    return results
 
 
 class TestCodeCreate:
