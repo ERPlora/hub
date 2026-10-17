@@ -1301,7 +1301,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   hacia arriba; invitación a 0 (y su coste a `gift_total`); el importe fijo de la cuenta se reparte por
   peso (bruto con IVA incluido, base sin él) con resto mayor y empate a la línea anterior; y el cierre
   **una vez por clave fiscal**: cada categoría se resuelve a su regla con
-  `apps.tax.queries.calculate_tax` (la vigente el día del negocio, país del negocio) y las líneas se
+  `apps.tax.queries.calculate_tax` (la vigente el día del negocio, en su país y su territorio fiscal de
+  Impuestos → Ajustes, TAX-F11) y las líneas se
   agrupan por la clave de esa regla (impuesto, régimen, calificación, causa de exención y tipos de sus
   componentes: la `FiscalKey` de `apps/invoice/fiscal.py`); cada clave se cierra una sola vez sobre el
   dinero de todas sus líneas, sean de la categoría que sean, y se reparte entre ellas por peso **como
@@ -1384,7 +1385,7 @@ administrador y responsable, los mismos que anulan y devuelven).
   una cita con otra cuenta abierta → 409 `sale.appointment_check_open`.
 - **Índices que lee Caja**: `sale_sale_voided_idx` (parcial, `voided_at` no nulo) y
   `sale_refund_created_idx` (migración `0005`, reversible).
-- **Límites legales en España** (país del negocio, hoy `ES` fijo como en Impuestos): nada en efectivo
+- **Límites legales en España** (país del negocio, el de Impuestos: hoy `ES` para todos): nada en efectivo
   desde 1.000 € (100.000 céntimos), también repartido y también en una cuenta cobrada por partes (la
   operación es la cuenta entera: lo ya cobrado más lo que le queda, `operation_total` de la previsión); tique hasta 3.000 € con IVA (300.000), por
   encima solo factura.
