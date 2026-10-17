@@ -7,7 +7,7 @@ configuración del e2e, no el producto.
 
 `pnpm typecheck` (y la CI) comprueba los tipos de todos los `.ts` de esta carpeta con su propio
 `tsconfig.json`, que lleva los tipos de Node (`process`, `node:fs`) en lugar de los del cliente de Vite, sin
-añadirlos al `tsconfig.json` de la SPA. Un error de tipos en una spec o en un helper rompe la CI;
+añadirlos al proyecto de la SPA (`tsconfig.app.json`). Un error de tipos en una spec o en un helper rompe la CI;
 `typecheck.test.ts` vigila que ningún fichero de aquí se quede fuera.
 
 ```bash

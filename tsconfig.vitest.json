@@ -1,7 +1,7 @@
 {
   // The Vitest tests of the SPA and their helpers (`__tests__/`, `frontend/testing/`): the SPA's setup plus
   // Node's types, because they run in Node (happy-dom). The `.d.ts` carry the operations' types of the SDK.
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.app.json",
   "compilerOptions": { "types": ["vite/client", "node"] },
   "include": [
     "frontend/**/*.test.ts",

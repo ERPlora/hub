@@ -1,10 +1,12 @@
 {
-  // The SPA, the code that runs in the browser: Vite's client types and no Node's, so a `process.env` in a page
-  // fails the typecheck instead of the page (tsconfig.test.ts). What runs in Node has its own project: the Vitest
-  // tests and their helpers, tsconfig.vitest.json; the root config, tsconfig.node.json; the e2e suite,
-  // tests/e2e/tsconfig.json. `pnpm typecheck` checks the four; `pnpm build` (and the image), this one.
-  "extends": "./packages/ui/tsconfig.base.json",
-  "compilerOptions": { "allowJs": true, "resolveJsonModule": true },
-  "include": ["frontend/**/*", "apps/*/frontend/**/*", "packages/ui/src/shell/shims.d.ts"],
-  "exclude": ["node_modules", "frontend/dist", "**/*.test.ts", "**/__tests__/**", "frontend/testing/**"]
+  // What an editor opens: no file of its own, each file in the project `pnpm typecheck` checks it with
+  // (tsconfig.test.ts). The SPA, tsconfig.app.json; the Vitest tests and their helpers, tsconfig.vitest.json; the
+  // root config, tsconfig.node.json (the e2e suite has its own, tests/e2e/tsconfig.json). No `vue-tsc` run reads
+  // this file: the scripts name each project with `-p`, so the references need no `composite` nor `--build`.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.vitest.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }
