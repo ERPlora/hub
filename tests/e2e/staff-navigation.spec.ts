@@ -53,8 +53,9 @@ test('the «My apps» sheet leads to Personal, the tabbar to every section, and 
   try {
     // A sample record, so every list has something to paint.
     expect((await api(context, A, 'POST', '/staff/members', { first_name: `${TAG} Lola`, last_name: 'Muestra' })).status).toBe(201);
-    // No side menu in the hub (PLAN-MIGRATIONS §13): the app is a tile of the sheet, its sections are the tabbar.
-    await expect(page.locator('ion-menu, ion-split-pane')).toHaveCount(0);
+    // No app in the hub's side menu (PLAN-MIGRATIONS §16): the app is a tile of the sheet, its sections are the tabbar.
+    await expect(page.locator('ion-menu.dash-menu [data-testid=nav-home]')).toBeVisible();
+    await expect(page.locator('ion-menu.dash-menu ion-item.nav-item', { hasText: 'Personal' })).toHaveCount(0);
     const sheet = await openApps(page);
     await expect(sheet.locator('[data-testid=apps-launcher-app]', { hasText: 'Personal' })).toBeVisible();
     await sheet.locator('[data-testid=apps-launcher-close]').click();

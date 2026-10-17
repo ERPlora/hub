@@ -229,7 +229,7 @@ test('production build: CSP with nonce, strict-dynamic and Trusted Types enforce
   await expect(page).toHaveURL(/\/demo\/items$/);
   await expect(shown(page).getByText(created, { exact: true }).first()).toBeVisible();
 
-  // Phone: the topbar's ⠿ button and the «My apps» sheet (no side menu in the hub).
+  // Phone: the topbar's ⠿ button and the «My apps» sheet (the side menu is a closed drawer there).
   await page.setViewportSize({ width: 390, height: 844 });
   await listReady(page);
   await openApps(page);

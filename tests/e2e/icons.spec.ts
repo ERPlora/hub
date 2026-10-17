@@ -112,7 +112,7 @@ test('every visible ion-icon paints a sized SVG; no Iconify request, no icon URL
   await expect(shown(page).locator('[data-testid=demo-form]')).toBeVisible();
   all.push(...(await icons(page, 'create')));
 
-  // Phone: the topbar's ⠿ button and the «My apps» sheet (no side menu in the hub).
+  // Phone: the topbar's ⠿ button and the «My apps» sheet (the side menu is a closed drawer there).
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/demo/items');
   await listReady(page);

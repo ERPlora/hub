@@ -1,6 +1,7 @@
 // PoC §8.6: list, detail, «New item» and «Edit item» at 390×844 (phone), 834×1194 (tablet) and
-// 1440×900 (desktop) with no horizontal scroll. The hub's shell has no side menu at any width
-// (PLAN-MIGRATIONS §13): «back» and the ⠿ «My apps» sheet live in the topbar.
+// 1440×900 (desktop) with no horizontal scroll. The hub's shell is the old hub's (PLAN-MIGRATIONS §16):
+// the side menu pinned from 992 px (the topbar's rail toggle) and a drawer below (its hamburger), the ⠿
+// «My apps» sheet in the topbar, and no Back on the list, the root of the app.
 import { type Page, expect, test } from '@playwright/test';
 
 import { A, api, createItem, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
@@ -29,13 +30,15 @@ async function overflow(page: Page) {
 async function chromeState(page: Page) {
   const bar = shown(page);
   return {
-    sideMenus: await page.locator('ion-menu, ion-split-pane, ion-menu-button').count(),
+    pinnedMenu: await page.locator('ion-menu.dash-menu').isVisible(),
+    drawerButton: await bar.locator('ion-menu-button').isVisible(),
+    railToggle: await bar.locator('[data-testid=topbar-rail]').isVisible(),
     back: await bar.locator('[data-testid=topbar-back]').isVisible(),
     apps: await bar.locator('[data-testid=topbar-apps]').isVisible(),
   };
 }
 
-test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; no side menu, back and apps in the topbar', async ({ page, context }) => {
+test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; the menu pinned from 992 px, a drawer below, apps in the topbar', async ({ page, context }) => {
   await login(page, A);
   const item = await createItem(context, A, uniqueName('Viewport item with a fairly long name to test wrapping'));
   await api(context, A, 'POST', '/demo/items/add_line', { id: item.id, text: 'A line', qty: '2', client_line_id: crypto.randomUUID() });
@@ -84,9 +87,8 @@ test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; n
     expect(detail.documentScrollWidth, `${vp.label} detail`).toBeLessThanOrEqual(detail.innerWidth);
     expect(list.contentScrollWidth!, `${vp.label} list content`).toBeLessThanOrEqual(list.contentClientWidth!);
     expect(detail.contentScrollWidth!, `${vp.label} detail content`).toBeLessThanOrEqual(detail.contentClientWidth!);
-    expect(chrome.sideMenus, `${vp.label} side menu`).toBe(0);
-    expect(chrome.back, `${vp.label} back`).toBe(true);
-    expect(chrome.apps, `${vp.label} apps`).toBe(true);
+    const pinned = vp.width >= 992;
+    expect(chrome, `${vp.label} chrome`).toEqual({ pinnedMenu: pinned, drawerButton: !pinned, railToggle: pinned, back: false, apps: true });
   }
   record('08-viewports', results);
 });
