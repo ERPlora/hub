@@ -108,24 +108,41 @@ def _as_uuid(text: str) -> uuid.UUID | None:
         return None
 
 
+def first_held(printers: QuerySet[Printer]) -> Printer | None:
+    """The first printer of ``printers``, held until this transaction ends with a key-share lock, taken in the
+    same read: the admin's deletion waits for it, while another write that names it (a job, a test page, the
+    settings) or changes it goes on, so two writes never wait for each other in a circle (a deadlock is a
+    500). The ORM has no ``FOR KEY SHARE``: it is appended to the SQL the ORM wrote, and the row still comes
+    from the hub's database by the router."""
+    sql, params = printers[:1].query.sql_with_params()
+    return next(iter(Printer.objects.raw(f"{sql} FOR KEY SHARE", params)), None)
+
+
 def find_printer(
-    printer_id: uuid.UUID | None, name: str | None, *, lock: bool = False, rows: QuerySet[Printer] | None = None
+    printer_id: uuid.UUID | None,
+    name: str | None,
+    *,
+    lock: bool = False,
+    hold: bool = False,
+    rows: QuerySet[Printer] | None = None,
 ) -> Printer:
     """The printer named by its id, or by its name (whatever its case; a name may also carry an id). It comes
     from ``rows`` when given (a read: with its queue): one read, so a deletion committed meanwhile is either
-    not seen yet or not found, never a row that vanished between two reads."""
+    not seen yet or not found, never a row that vanished between two reads. ``lock`` takes it to change it
+    (``FOR NO KEY UPDATE``: a write that only names it goes on); ``hold`` takes it to name it (key share)."""
     printers = Printer.objects.all() if rows is None else rows
     if lock:
-        printers = printers.select_for_update()
+        printers = printers.select_for_update(no_key=True)
+    first = first_held if hold else (lambda found: found.first())
     found = None
     if printer_id is not None:
-        found = printers.filter(pk=printer_id).first()
+        found = first(printers.filter(pk=printer_id))
     elif name is not None:
         as_id = _as_uuid(name)
         if as_id is not None:
-            found = printers.filter(pk=as_id).first()
+            found = first(printers.filter(pk=as_id))
         if found is None:
-            found = printers.annotate(lowered=Lower("name")).filter(lowered=name.strip().lower()).first()
+            found = first(printers.annotate(lowered=Lower("name")).filter(lowered=name.strip().lower()))
     if found is None:
         raise NotFound(str(NO_PRINTER), code="printing.printer_not_found")
     return found

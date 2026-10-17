@@ -746,3 +746,12 @@ def test_an_a4_page_prints_once_whatever_the_receipt_copies():
     run("printing.settings.update", {"receipt_copies": 3})
     page = enqueue("receipt", {}, format="a4", html="<p>T-1</p>")
     assert page.job.copies == 1
+
+
+def test_a_chosen_printer_that_is_inactive_is_passed_over_for_the_first_active_one_of_its_function():
+    till = printer("Till")
+    spare = printer("Spare")
+    run("printing.settings.update", {"receipt_printer": "Till"})
+    run("printing.printer.update", {"printer_id": str(till.id), "is_active": False})
+    queued = enqueue()
+    assert (queued.job.printer_id, queued.job.printer_name) == (spare.id, "Spare")

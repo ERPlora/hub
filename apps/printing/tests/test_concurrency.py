@@ -7,6 +7,7 @@ it, so the deletion waits for it, and one deleted before is not found.
 """
 
 import threading
+import time
 from contextlib import contextmanager
 
 import pytest
@@ -210,3 +211,118 @@ def test_the_printer_a_receipt_goes_to_by_itself_deleted_while_it_is_queued_wait
     assert held(deletions), deleted(deletions)
     assert (queued.job.printer_id, queued.job.status) == (till.id, "pending")
     assert Printer.objects.filter(pk=till.id).exists()
+
+
+# Two writes that name printers at once must never wait for each other in a circle (a deadlock is a 500). A
+# write that names a printer holds it with a key-share lock, which the admin's deletion waits for but another
+# write that names it does not: two rounds of paper on the same printers in any order, a round of paper while
+# the owner changes a printer whose queue moves to another, or while the owner chooses one in the settings.
+
+DEADLOCK = "40P01"
+
+
+def sqlstate(result) -> str | None:
+    return getattr(result, "sqlstate", None) or getattr(getattr(result, "__cause__", None), "sqlstate", None)
+
+
+def paper(name: str, key: str):
+    return enqueue(
+        document_type="kitchen_order",
+        usage="kitchen",
+        printer=name,
+        document={"ticket_id": "T-2", "items": [{"name": "Soup", "quantity": 1}]},
+        job_key=key,
+    )
+
+
+def staggered(*calls):
+    """Runs every ``call`` in its own thread and session, started together but paced by the calls themselves."""
+    results: list = [None] * len(calls)
+
+    def worker(index, call):
+        try:
+            results[index] = call()
+        except Exception as error:  # reported by the test
+            results[index] = error
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(30)
+    return results
+
+
+def test_two_rounds_of_paper_on_the_same_printers_in_inverse_order_never_deadlock():
+    printer("Kitchen", usage="kitchen")
+    printer("Bar", usage="bar")
+    both_hold_one = threading.Barrier(2)
+
+    def round_of(first, second, tag):
+        def go():
+            with transaction.atomic():  # as Kitchen does: every sheet of a ticket in its own transaction
+                one = paper(first, f"{tag}-1")
+                both_hold_one.wait(5)
+                time.sleep(0.3)
+                two = paper(second, f"{tag}-2")
+                return (one.job.printer_name, two.job.printer_name)
+
+        return go
+
+    results = staggered(round_of("Kitchen", "Bar", "a"), round_of("Bar", "Kitchen", "b"))
+    assert [sqlstate(result) for result in results] == [None, None], results
+    assert results == [("Kitchen", "Bar"), ("Bar", "Kitchen")]
+
+
+def test_a_round_of_paper_while_a_printer_with_queue_is_deactivated_never_deadlocks():
+    printer("Kitchen", usage="kitchen")
+    printer("Kitchen 2", usage="kitchen")
+    paper("Kitchen", "queued-on-kitchen")  # Kitchen's queue moves to Kitchen 2 when it is deactivated
+    round_holds_kitchen_2 = threading.Event()
+
+    def round_of_paper():
+        with transaction.atomic():
+            first = paper("Kitchen 2", "round-kitchen-2")
+            round_holds_kitchen_2.set()
+            time.sleep(0.6)  # the deactivation is under way
+            second = paper("Kitchen", "round-kitchen")
+            return (first.job.printer_name, second.job.printer_name)
+
+    def deactivate():
+        round_holds_kitchen_2.wait(5)
+        return run("printing.printer.update", {"printer": "Kitchen", "is_active": False}).state
+
+    results = staggered(round_of_paper, deactivate)
+    assert [sqlstate(result) for result in results] == [None, None], results
+    assert results[1] == "inactive"
+    # The round either queued on Kitchen before it went inactive, or was refused: never a server error.
+    assert results[0] == ("Kitchen 2", "Kitchen") or isinstance(results[0], OperationError), results[0]
+
+
+def test_choosing_a_printer_while_its_function_is_changed_never_deadlocks():
+    printer("Kitchen", usage="kitchen")
+    run("printing.settings.update", {"kitchen_printer": "Kitchen"})
+    settings_held = threading.Event()
+
+    def choose():
+        def pause_after_the_settings_are_read(execute, sql, params, many, context):
+            result = execute(sql, params, many, context)
+            if sql.lstrip().upper().startswith("SELECT") and 'FROM "printing_settings"' in sql and not settings_held.is_set():
+                settings_held.set()
+                time.sleep(0.6)  # the change of function is under way
+            return result
+
+        with connection.execute_wrapper(pause_after_the_settings_are_read):
+            return run("printing.settings.update", {"kitchen_printer": "Kitchen"}).kitchen_printer_id
+
+    def change_function():
+        settings_held.wait(5)
+        return run("printing.printer.update", {"printer": "Kitchen", "usage": "bar"}).usage
+
+    results = staggered(choose, change_function)
+    assert [sqlstate(result) for result in results] == [None, None], results
+    assert results[1] == "bar"
+    # The choice either landed before the change (which then cleared it) or was refused: never a server error.
+    assert isinstance(results[0], OperationError) or results[0] is not None, results[0]
