@@ -45,6 +45,22 @@ def test_django_prefixes_never_get_the_shell(client, path):
     assert not is_shell(response)
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/internal/hubs/0199c4b0-0000-7000-8000-000000000001", "/internal/hubs/0199c4b0-0000-7000-8000-000000000001/restore"],
+)
+def test_the_registry_door_is_routed_and_refuses_an_unsigned_call(client, path):
+    # The SaaS's PUT/GET/DELETE /internal/hubs/{id} and POST …/restore (base.internal), never the shell.
+    response = client.put(path, b"{}", content_type="application/json", HTTP_HOST=HOST)
+    assert (response.status_code, response.json()["error"]["code"]) == (401, "internal.unsigned")
+    assert not is_shell(response)
+
+
+def test_the_registry_routes_resolve_to_their_views():
+    assert resolve("/internal/hubs/0199c4b0-0000-7000-8000-000000000001").url_name == "internal-hub"
+    assert resolve("/internal/hubs/0199c4b0-0000-7000-8000-000000000001/restore").url_name == "internal-hub-restore"
+
+
 def test_unknown_api_path_is_the_json_error_envelope(client):
     response = client.get("/api/nope", HTTP_HOST=HOST)
     assert response.status_code == 404

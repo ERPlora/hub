@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 from django.contrib import admin
 
-from base.admin import ADMIN_HUB_SESSION_KEY, MembershipAdmin, TaskScheduleAdmin
-from base.models import Membership, TaskSchedule
+from base.admin import ADMIN_HUB_SESSION_KEY, HubAdmin, MembershipAdmin, TaskScheduleAdmin
+from base.models import Hub, Membership, TaskSchedule
 
 pytestmark = pytest.mark.django_db
 HOST = "a.localhost:8000"
@@ -22,6 +22,42 @@ BANNER = 'id="admin-hub"'
 
 def test_membership_is_registered():
     assert isinstance(admin.site._registry[Membership], MembershipAdmin)
+
+
+class TestHubRegistry:
+    """The registry of hubs (plan 2026-10-17, §1.1): read only; the SaaS writes it through /internal/hubs/{id}."""
+
+    def test_is_registered(self):
+        assert isinstance(admin.site._registry[Hub], HubAdmin)
+
+    def test_lists_the_hubs_with_their_status(self, client, superuser):
+        Hub.objects.create(slug="acme", name="Acme Bar", status="cancelled", vertical="restaurant")
+        client.force_login(superuser)
+        html = client.get("/admin/base/hub/", HTTP_HOST=PLATFORM).content.decode()
+        assert "acme" in html and "restaurant" in html and "Cancelled" in html
+
+    def test_filters_by_status_and_demo_and_searches_by_slug_name_or_id(self, client, superuser):
+        acme = Hub.objects.create(slug="acme", name="Acme Bar", status="cancelled")
+        Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True)
+        client.force_login(superuser)
+        cancelled = client.get("/admin/base/hub/?status__exact=cancelled", HTTP_HOST=PLATFORM).content.decode()
+        assert "acme" in cancelled and "demo-0000beef" not in cancelled
+        demos = client.get("/admin/base/hub/?is_demo__exact=1", HTTP_HOST=PLATFORM).content.decode()
+        assert "demo-0000beef" in demos and "/admin/base/hub/{}/".format(acme.pk) not in demos
+        for query in ("Acme", str(acme.pk)):
+            found = client.get("/admin/base/hub/", {"q": query}, HTTP_HOST=PLATFORM).content.decode()
+            assert f"/admin/base/hub/{acme.pk}/" in found
+
+    def test_nothing_is_added_changed_or_deleted_by_hand(self, client, superuser):
+        hub = Hub.objects.create(slug="acme", status="ready")
+        client.force_login(superuser)
+        assert client.get("/admin/base/hub/add/", HTTP_HOST=PLATFORM).status_code == 403
+        assert client.get(f"/admin/base/hub/{hub.pk}/delete/", HTTP_HOST=PLATFORM).status_code == 403
+        page = client.get(f"/admin/base/hub/{hub.pk}/change/", HTTP_HOST=PLATFORM)
+        assert page.status_code == 200 and 'name="slug"' not in page.content.decode()
+        client.post(f"/admin/base/hub/{hub.pk}/change/", {"slug": "other", "status": "purged"}, HTTP_HOST=PLATFORM)
+        hub.refresh_from_db()
+        assert (hub.slug, hub.status) == ("acme", "ready")
 
 
 def scheduled_task() -> TaskSchedule:

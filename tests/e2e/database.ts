@@ -2,7 +2,7 @@
 // database, where phase 1 keeps the business of every hub (`a`, `b`…), so that two runs at once never
 // write into each other's (on 2026-10-16 the cash sale of one run fell into the other's open shift).
 //
-//   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts          creates it when missing, then migrates it
+//   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts          creates it when missing, migrates it, seeds `a`/`b`
 //   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts --drop   drops it once its runserver is stopped
 //
 // Run it before starting the stack's runserver (which cannot start without its database) and again after
@@ -52,7 +52,16 @@ function said(result: CommandResult): string {
   return `exited with ${exit}:\n${output}`;
 }
 
-/** Creates the e2e database `name` when missing, then applies every migration (control and hubs). */
+/** What `prepareDatabase` runs after creating the database, and how a failure of each is told. */
+const STEPS: { args: string[]; failure: string }[] = [
+  { args: ['migrate', '--no-input'], failure: 'Could not migrate' },
+  { args: ['migrate_hubs'], failure: 'Could not migrate' },
+  // The host gate answers 404 to a slug without a row in the registry: `a` and `b` (idempotent).
+  { args: ['seed_local_hubs'], failure: 'Could not seed the local hubs of' },
+];
+
+/** Creates the e2e database `name` when missing, applies every migration (control and hubs) and leaves the local
+ * hubs `a` and `b` in its registry. */
 export function prepareDatabase(name: string, { sql, manage }: { sql: AdminSql; manage: ManagePy }): { created: boolean } {
   refuseUnlessE2e(name);
   const found = sql(`select 1 from pg_database where datname = '${name}'`);
@@ -62,9 +71,9 @@ export function prepareDatabase(name: string, { sql, manage }: { sql: AdminSql; 
     const create = sql(`create database "${name}"`);
     if (create.status !== 0) throw new Error(`Could not create the e2e database ${name}: psql ${said(create)}`);
   }
-  for (const args of [['migrate', '--no-input'], ['migrate_hubs']]) {
+  for (const { args, failure } of STEPS) {
     const run = manage(args);
-    if (run.status !== 0) throw new Error(`Could not migrate the e2e database ${name}: \`manage.py ${args.join(' ')}\` ${said(run)}`);
+    if (run.status !== 0) throw new Error(`${failure} the e2e database ${name}: \`manage.py ${args.join(' ')}\` ${said(run)}`);
   }
   return { created };
 }
@@ -96,7 +105,7 @@ export function runCli(
       deps.print(`database.ts: ${deps.database} dropped.`);
     } else {
       const { created } = prepareDatabase(deps.database, deps);
-      deps.print(`database.ts: ${deps.database} ${created ? 'created and migrated' : 'migrated'}.`);
+      deps.print(`database.ts: ${deps.database} ${created ? 'created, migrated' : 'migrated'} and seeded (a, b).`);
     }
     return 0;
   } catch (error) {

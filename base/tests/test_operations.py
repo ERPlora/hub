@@ -27,7 +27,14 @@ def request_for(host: str, user=None, language: str = "en"):
 
 @pytest.mark.parametrize(
     ("host", "key"),
-    [("a.localhost:8000", "a"), ("b.localhost", "b"), ("B.localhost:8000", "b"), ("acme-2.localhost", "acme-2")],
+    [
+        ("a.localhost:8000", "a"),
+        ("b.localhost", "b"),
+        ("B.localhost:8000", "b"),
+        ("acme-2.localhost", "acme-2"),
+        # A demo's host is a hub's too; whether it answers is the registry's (base.middleware).
+        ("demo-0000beef.localhost:8000", "demo-0000beef"),
+    ],
 )
 def test_scope_is_the_first_label_of_the_host(host, key):
     assert HostScopeResolver().resolve(request_for(host)) == Scope("host", key)
@@ -50,6 +57,8 @@ def test_scope_is_the_first_label_of_the_host(host, key):
         "a-.localhost",
         "ab.localhost",
         "xn--bcher-kva.localhost",
+        # `demo` alone stays reserved.
+        "demo.localhost:8000",
     ],
 )
 def test_a_host_that_is_no_hub_is_not_found(host):
@@ -251,10 +260,16 @@ def test_refresh_of_an_anonymous_context():
     assert builder.refresh(ctx) == ctx
 
 
-def test_phase_one_has_no_demo_hubs():
-    # A demo (PLAN-SAAS §3.5) is an ephemeral hub the Hub creates with ``is_demo`` in its control registry
-    # (phase 2, block 7). Phase 1 has neither the registry nor demos: no hub is one. Apps ask here, never there.
+@pytest.mark.django_db
+def test_a_demo_hub_is_the_registry_s_word():
+    # A demo (PLAN-SAAS §3.5) is an ephemeral hub with ``is_demo`` in the registry (``base.Hub`` in phase 1, plan
+    # 2026-10-17 §1.2; ``control.Hub`` in phase 2). Apps ask here, never there.
+    from base.models import Hub
+
+    Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True)
+    assert is_demo_hub(Scope("host", "demo-0000beef")) is True
     assert is_demo_hub(Scope("host", "a")) is False
+    assert is_demo_hub(Scope("host", "demo-00000000")) is False  # no row
     assert is_demo_hub(Scope("host", "demo")) is False
 
 

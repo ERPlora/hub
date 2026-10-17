@@ -1,0 +1,20 @@
+{% load i18n %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+503 of a hub still being prepared (base.middleware), with Retry-After: it refreshes itself until the hub answers.
+Rendered without the request: no context processors, no database, no scripts or styles (strict CSP).
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="10">
+  <title>{% translate "Your business is being prepared" %}</title>
+</head>
+<body>
+  <main>
+    <h1>{% translate "Your business is being prepared" %}</h1>
+    <p>{% translate "It takes a few seconds. This page refreshes by itself." %}</p>
+  </main>
+</body>
+</html>

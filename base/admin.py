@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils.translation import gettext
 from live.slugs import validate_hub_slug
 
-from base.models import Membership, TaskSchedule
+from base.models import Hub, Membership, TaskSchedule
 
 #: The hub chosen for the admin (its slug), set by the deep link.
 ADMIN_HUB_SESSION_KEY = "admin_hub"
@@ -25,6 +25,29 @@ class MembershipAdmin(admin.ModelAdmin):
     list_filter = ("role", "host")
     search_fields = ("user__username", "user__email", "host")
     list_select_related = ("user",)
+
+
+@admin.register(Hub)
+class HubAdmin(admin.ModelAdmin):
+    """The registry of hubs (plan 2026-10-17, §1.1), read only: the SaaS writes it (``PUT /internal/hubs/{id}``)
+    and the worker purges the demos; nothing here adds, changes or deletes a row by hand."""
+
+    list_display = ("slug", "name", "status", "is_demo", "expires_at", "vertical", "created_at")
+    list_filter = ("status", "is_demo")
+    search_fields = ("slug", "name", "=id")
+    ordering = ("slug",)
+
+    def get_readonly_fields(self, request: HttpRequest, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
 
 
 @admin.register(TaskSchedule)

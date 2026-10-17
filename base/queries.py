@@ -1,13 +1,17 @@
-"""Read operations of base."""
+"""Read operations of base: the session's ``me`` and the registry's row of a hub (``base.hub.get``)."""
 
 from typing import Any
 
 from django.utils import translation
+from django.utils.translation import gettext
 from live.context import OperationContext
+from live.errors import NotFound
 from live.meta import module_configs
 from live.operations import operation
 
-from base.schemas import SessionMeIn, SessionMeOut
+from base.models import Hub
+from base.registry import hub_answer, internal_only
+from base.schemas import HubGetIn, HubOut, HubsBySlugIn, HubsBySlugOut, SessionMeIn, SessionMeOut
 
 
 @operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
@@ -52,3 +56,23 @@ def _user(actor: Any) -> dict[str, str] | None:
     if not hasattr(actor, "get_username"):  # the platform itself (live.context.system_context)
         return {"id": str(actor), "label": str(actor)}
     return {"id": str(actor.pk), "label": actor.get_full_name() or actor.get_username()}
+
+
+@operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubOut)
+def hub_get(ctx: OperationContext, data: HubGetIn) -> dict[str, Any]:
+    """The registry's row of ``data.id`` (``GET /internal/hubs/{id}``), for the platform only: the SaaS asks it about
+    a sign-up whose ``ready`` it never heard, and marks it ready when ``status`` is ``ready``."""
+    internal_only(ctx)
+    hub = Hub.objects.filter(pk=data.id).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    return hub_answer(hub)
+
+
+@operation("base.hub.by_slugs", kind="query", permission=None, input=HubsBySlugIn, output=HubsBySlugOut)
+def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
+    """The registry's status of each of ``data.slugs`` (``None`` without a row), in their order, for the platform
+    only: ``seed_local_hubs --check`` asks it about ``a`` and ``b``."""
+    internal_only(ctx)
+    found = dict(Hub.objects.filter(slug__in=data.slugs).values_list("slug", "status"))
+    return {"hubs": [{"slug": slug, "status": found.get(slug)} for slug in data.slugs]}

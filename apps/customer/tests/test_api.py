@@ -103,6 +103,7 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
+@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_names_every_route_after_its_operation(client):
     paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
     served = {

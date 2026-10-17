@@ -1,7 +1,7 @@
-"""Writes of base that are not operations: opening the Hub's session for the person the SaaS vouched for, and
-the clock of the apps' scheduled tasks (``base.scheduler``).
+"""Writes of base: opening the Hub's session for the person the SaaS vouched for, the clock of the apps' scheduled
+tasks (``base.scheduler``) and the registry of hubs (``base.Hub``, the operations ``base.hub.*``).
 
-Not an ``@operation``: it runs before there is an actor, for ``/auth/callback`` only, and needs the
+The session is not an ``@operation``: it runs before there is an actor, for ``/auth/callback`` only, and needs the
 request to log in. Phase 1 keeps it on ``django.contrib.auth`` + ``Membership``; phase 2 replaces
 it with the hub's ``DeviceSession`` (PLAN-SAAS §2.1).
 
@@ -10,20 +10,52 @@ Two doors, each with its own local copy of the SaaS account: a customer entering
 Hub admin on the platform host (:func:`open_admin_session_from_saas`, ``saas-staff:<id>``, round 13,
 PLAN §18.1). Separate copies, so an account that is both staff and a hub member neither loses
 ``is_staff`` in the admin nor gains it on its hub when it enters by the other door.
+
+The registry's operations (plan 2026-10-17, §1.5) are what the SaaS's signed ``/internal/hubs/{id}`` calls run
+(``base.internal``), as the platform only (``base.internal_only`` for anyone else), on the registry's scope. Phase 1
+has no database to clone: a sign-up is ``ready`` in its own transaction, and the SaaS hears it once it commits
+(:func:`report_ready`); if that call fails, the SaaS asks ``GET /internal/hubs/{id}`` two minutes later.
 """
 
 import datetime as dt
+import json
 import logging
+import time
 from collections.abc import Callable, Iterable
+from functools import partial
+from uuid import UUID
 
+import pydantic
+from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, Permission
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest
+from django.utils import timezone
+from django.utils.translation import gettext
+from live.context import OperationContext, Scope, system_context
+from live.errors import Conflict, InvalidPayload, NotFound
+from live.operations import get as get_operation
+from live.operations import operation
+from live.outbox import record_event
+from live.slugs import validate_hub_slug
 
+from base import auth, events, signing
+from base.registry import hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
-from base.models import Membership, TaskSchedule
+from base.models import Hub, Membership, TaskSchedule
+from base.schemas import (
+    HubCancelIn,
+    HubOut,
+    HubRegisterOut,
+    HubRegistryIn,
+    HubRestoreIn,
+    HubSeedLocalIn,
+    HubSeedLocalOut,
+    HubStateIn,
+    HubStateOut,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -183,3 +215,196 @@ def run_next_due_task(
             row.last_run = now
         row.save(update_fields=["next_run", "last_run"])
     return str(row), ran
+
+
+# ── The registry of hubs: what the SaaS's /internal/hubs/{id} runs (plan 2026-10-17, §1.5) ──────────────────────
+
+#: The path of the SaaS that hears a business is ready (``hubs/internal.py`` of the SaaS).
+READY_PATH = "/internal/hubs/{id}/ready"
+#: The statuses a hub never comes back from: the SaaS reads ``hub_purged`` literally (``_restore``).
+PURGED_STATUSES = frozenset({Hub.Status.PURGED, Hub.Status.EXPIRED})
+
+
+def _locked_hub(hub_id: UUID) -> Hub:
+    hub = Hub.objects.select_for_update().filter(pk=hub_id).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    return hub
+
+
+def _refuse_purged(hub: Hub) -> None:
+    if hub.status in PURGED_STATUSES:
+        raise Conflict(gettext("This hub was purged: it cannot come back."), code="hub_purged")
+
+
+def _slug_taken() -> Conflict:
+    return Conflict(gettext("Another hub has this address."), code="base.slug_taken")
+
+
+@operation("base.hub.register", kind="command", permission=None, input=HubRegistryIn, output=HubRegisterOut)
+def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
+    """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``ready`` at once in phase 1.
+
+    A customer's slug never takes a demo's ``demo-…`` nor a reserved name (``base.slug_invalid``); one that is
+    another hub's is ``base.slug_taken``. A cancelled hub is restored first (``base.hub_cancelled``); a purged one
+    never comes back (``hub_purged``). The SaaS hears ``ready`` after the COMMIT when the row is new or was not
+    ready yet; a rename, idempotent, says nothing.
+    """
+    internal_only(ctx)
+    try:
+        slug = validate_hub_slug(data.slug)
+    except ValueError as invalid:
+        raise InvalidPayload(
+            gettext("This address cannot name a business (%(reason)s).") % {"reason": invalid},
+            code="base.slug_invalid",
+        ) from None
+    if Hub.objects.filter(slug=slug).exclude(pk=data.id).exists():
+        raise _slug_taken()
+    now = timezone.now()
+    fields = {
+        "slug": slug,
+        "name": data.name,
+        "country": data.country,
+        "timezone": data.timezone,
+        "language": data.language,
+        "vertical": data.vertical or "",
+    }
+    hub = Hub.objects.select_for_update().filter(pk=data.id).first()
+    created = hub is None
+    if created:
+        try:
+            with transaction.atomic():
+                hub = Hub.objects.create(id=data.id, status=Hub.Status.READY, ready_at=now, **fields)
+        except IntegrityError:
+            # A concurrent call took the slug, or registered this same id first (then it is an update).
+            hub = Hub.objects.select_for_update().filter(pk=data.id).first()
+            if hub is None:
+                raise _slug_taken() from None
+            created = False
+    was_ready = created
+    if not created:
+        _refuse_purged(hub)
+        if hub.status == Hub.Status.CANCELLED:
+            raise Conflict(gettext("This hub was cancelled: restore it first."), code="base.hub_cancelled")
+        was_ready = hub.status == Hub.Status.READY
+        for field, value in fields.items():
+            setattr(hub, field, value)
+        if not was_ready:
+            hub.status, hub.ready_at = Hub.Status.READY, now
+        try:
+            with transaction.atomic():
+                hub.save()
+        except IntegrityError:
+            raise _slug_taken() from None
+    record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": hub.slug, "created": created})
+    if created or not was_ready:
+        transaction.on_commit(partial(report_ready, hub.id), robust=True)
+    return {**hub_answer(hub), "created": created}
+
+
+def report_ready(hub_id: UUID) -> None:
+    """Tell the SaaS that ``hub_id`` is ready: ``POST {SAAS_INTERNAL_URL}/internal/hubs/{id}/ready``, signed v1 + v2.
+
+    Called after the COMMIT that made it ready, never inside it. It never raises: a failure is logged and not
+    retried, because the SaaS asks ``GET /internal/hubs/{id}`` about a sign-up without its ``ready`` two minutes
+    later (``reconcile_hub_states``) and marks it itself.
+    """
+    path = READY_PATH.format(id=hub_id)
+    body = json.dumps({"id": str(hub_id)}).encode()
+    headers = {
+        "Content-Type": "application/json",
+        **signing.signed_headers("POST", path, body, int(time.time()), settings.INTERNAL_SHARED_SECRET),
+    }
+    try:
+        status, _answer = auth.post(auth.saas_internal_url(path), body, headers, auth.TIMEOUT_SECONDS)
+    except OSError as failed:
+        logger.warning("base.hub.ready_unreported hub=%s: the SaaS is unreachable (%s).", hub_id, failed)
+        return
+    if 200 <= status < 300:
+        logger.info("base.hub.ready_reported hub=%s", hub_id)
+    else:
+        logger.warning("base.hub.ready_unreported hub=%s: the SaaS answered %s.", hub_id, status)
+
+
+@operation("base.hub.state_apply", kind="command", permission=None, input=HubStateIn, output=HubStateOut)
+def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
+    """Keep the SaaS's photo of ``data.id`` if it is newer than the one kept; an equal or older one changes nothing.
+
+    Phase 1 applies of it what the apps already use: the VeriFactu block and the business's status, through
+    ``verifactu.config.sync`` on the hub's slug, in this same transaction (a block out of contract keeps
+    nothing). The rights it carries (plan, modules, members) are only kept until phase 2 applies them.
+    """
+    internal_only(ctx)
+    hub = _locked_hub(data.id)
+    if data.version <= hub.state_version:
+        return {"applied": False, "version": hub.state_version}
+    hub.state, hub.state_version = data.photo, data.version
+    hub.save(update_fields=["state", "state_version", "updated_at"])
+    if data.verifactu is not None or data.status is not None:
+        _sync_verifactu(hub, data)
+    record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
+    return {"applied": True, "version": data.version}
+
+
+def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
+    sync = get_operation("verifactu.config.sync")
+    try:
+        payload = sync.input.model_validate(
+            {**(data.verifactu or {}), "version": data.version, "hub_status": data.status, "hub_id": hub.id}
+        )
+    except pydantic.ValidationError as invalid:
+        raise InvalidPayload(
+            f"The verifactu block is out of contract: {invalid}", code="internal.payload_invalid"
+        ) from None
+    sync(system_context(Scope("host", hub.slug)), payload)
+
+
+@operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut)
+def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
+    """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore."""
+    internal_only(ctx)
+    hub = _locked_hub(data.id)
+    _refuse_purged(hub)
+    if hub.status != Hub.Status.CANCELLED:
+        hub.status, hub.cancelled_at = Hub.Status.CANCELLED, timezone.now()
+        hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        record_event(ctx, events.HUB_CANCELLED, {"id": str(hub.id)})
+    return hub_answer(hub)
+
+
+@operation("base.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubOut)
+def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
+    """Bring a cancelled hub back (``ready``); a hub that never ended stays as it is; a purged one is ``hub_purged``."""
+    internal_only(ctx)
+    hub = _locked_hub(data.id)
+    _refuse_purged(hub)
+    if hub.status == Hub.Status.CANCELLED:
+        hub.status, hub.cancelled_at = Hub.Status.READY, None
+        hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        record_event(ctx, events.HUB_RESTORED, {"id": str(hub.id)})
+    return hub_answer(hub)
+
+
+@operation("base.hub.seed_local", kind="command", permission=None, input=HubSeedLocalIn, output=HubSeedLocalOut)
+def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
+    """Leave the local hubs ``data.slugs`` ready in the registry, with an id of their own (``seed_local_hubs``).
+
+    Local development only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears
+    nothing. Idempotent: a hub already ready stays as it is; one left cancelled is ready again.
+    """
+    internal_only(ctx)
+    now = timezone.now()
+    hubs = []
+    for slug in data.slugs:
+        hub, created = Hub.objects.select_for_update().get_or_create(
+            slug=slug, defaults={"status": Hub.Status.READY, "ready_at": now}
+        )
+        outcome = "created" if created else "already_ready"
+        if not created and hub.status != Hub.Status.READY:
+            hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.READY, now, None
+            hub.save(update_fields=["status", "ready_at", "cancelled_at", "updated_at"])
+            outcome = "ready_again"
+        if outcome != "already_ready":
+            record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": slug, "created": created})
+        hubs.append({"slug": slug, "outcome": outcome})
+    return {"hubs": hubs}

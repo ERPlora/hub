@@ -3,8 +3,8 @@
 Without a session, a browser jumps to the SaaS's ``/hub-login/?hub=<slug>&next=<path>&state=<state>``
 (:func:`login_redirect`). The SaaS answers with a form that POSTs a one-time code and that ``state``,
 as it got it, to ``/auth/callback``, and the Hub redeems the code server-side (:func:`redeem_code`):
-``POST {SAAS_INTERNAL_URL}/internal/auth/redeem`` with ``{"code", "hub"}``, signed with HMAC-SHA256
-over ``f"{timestamp}.{raw_body}"`` (key ``INTERNAL_SHARED_SECRET``), the scheme of Stripe's webhook
+``POST {SAAS_INTERNAL_URL}/internal/auth/redeem`` with ``{"code", "hub"}``, signed v1 and v2 with HMAC-SHA256
+(``base.signing.signed_headers``, key ``INTERNAL_SHARED_SECRET``), the scheme of Stripe's webhook
 signatures. The HTTP call is :func:`post`, which tests replace.
 
 The ``state`` (OAuth 2.0, RFC 6749 §10.12) binds the login to the browser that started it: the jump
@@ -24,8 +24,6 @@ the code lands on the platform host's ``/auth/callback`` and answers a platform 
 SaaS admin's Hubs page (:func:`admin_hubs_url`), where they choose one.
 """
 
-import hashlib
-import hmac
 import json
 import logging
 import re
@@ -39,7 +37,10 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 
+from base import signing
 from base.models import Membership
+# The headers' names, here too for the apps that sign their own calls to the SaaS with :func:`sign`.
+from base.signing import SIGNATURE_HEADER, TIMESTAMP_HEADER
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,6 @@ LOGIN_PATH = "/hub-login/"
 #: The SaaS admin's Hubs page, where the staff's jump to the Hub admin starts and comes back on failure.
 ADMIN_HUBS_PATH = "/admin/accounts/hubs/"
 REDEEM_PATH = "/internal/auth/redeem"
-TIMESTAMP_HEADER = "X-Erplora-Timestamp"
-SIGNATURE_HEADER = "X-Erplora-Signature"
 TIMEOUT_SECONDS = 5
 
 #: The ``state`` of this browser's jump to the SaaS's login, signed; only the callback reads it.
@@ -182,8 +181,12 @@ def admin_hubs_url(error: str | None = None) -> str:
 
 
 def sign(secret: str, timestamp: str, body: bytes) -> str:
-    """Hex HMAC-SHA256 of ``f"{timestamp}.{body}"`` with ``secret``."""
-    return hmac.new(secret.encode(), timestamp.encode() + b"." + body, hashlib.sha256).hexdigest()
+    """The v1 signature (hex HMAC-SHA256 of ``f"{timestamp}.{body}"`` with ``secret``), in this module's argument order.
+
+    The apps that call the SaaS themselves (``verifactu``, ``whatsapp_inbox``) sign with it; it is
+    ``base.signing.sign``, the one scheme of both projects, which new code calls (or ``signed_headers``, v1 + v2).
+    """
+    return signing.sign(body, int(timestamp), secret)
 
 
 def post(url: str, body: bytes, headers: dict[str, str], timeout: float) -> tuple[int, bytes]:
@@ -215,11 +218,9 @@ def redeem_code(code: str | None, slug: str, audience: str = HUB_SESSION_AUDIENC
     if audience != HUB_SESSION_AUDIENCE:
         payload["audience"] = audience
     body = json.dumps(payload).encode()
-    timestamp = str(int(time.time()))
     headers = {
         "Content-Type": "application/json",
-        TIMESTAMP_HEADER: timestamp,
-        SIGNATURE_HEADER: sign(settings.INTERNAL_SHARED_SECRET, timestamp, body),
+        **signing.signed_headers("POST", REDEEM_PATH, body, int(time.time()), settings.INTERNAL_SHARED_SECRET),
     }
     try:
         status, answer = post(saas_internal_url(REDEEM_PATH), body, headers, TIMEOUT_SECONDS)

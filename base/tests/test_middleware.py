@@ -158,6 +158,9 @@ def prod_domain(settings):
 
 @pytest.mark.usefixtures("prod_domain")
 def test_with_a_base_domain_the_pages_of_another_domain_are_not_found(client, superuser):
+    from base.models import Hub
+
+    Hub.objects.create(slug="acme", status="ready")  # the registry's, as the SaaS's sign-up leaves it
     assert browse(client, "/demo/items", "acme.erplora.com")["Location"].startswith(SAAS_LOGIN)
     for host in ("acme.pre.erplora.com", "pre.erplora.com", "erplora.com"):
         assert browse(client, "/demo/items", host).status_code == 404
@@ -309,3 +312,104 @@ class TestPlatformHost:
     def test_a_hub_host_keeps_the_saas_login_of_its_hub(self, client):
         response = browse(client, "/demo/items")
         assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/demo/items&state={state_of(response)}"
+
+
+# The registry decides (plan 2026-10-17, §1.2): a slug without a row is 404, a hub that is gone 410, one still being
+# prepared 503. `a` and `b` are in it (the autouse fixture `local_hubs`, as `seed_local_hubs` leaves them).
+
+
+class TestTheRegistryGate:
+    @pytest.fixture
+    def hub(self):
+        from base.models import Hub
+
+        def make(slug, **fields):
+            return Hub.objects.create(slug=slug, **{"status": "ready", **fields})
+
+        return make
+
+    def test_a_slug_without_a_row_is_not_found(self, client):
+        assert browse(client, "/demo/items", "zzz.localhost:8000").status_code == 404
+        api = client.get("/api/me", HTTP_HOST="zzz.localhost:8000")
+        assert (api.status_code, api.json()["error"]["code"]) == (404, "not_found")
+
+    def test_a_ready_hub_serves_its_pages_and_names_itself_on_the_request(self, client, hub, rf):
+        from base.middleware import HubHostRequiredMiddleware
+
+        acme = hub("acme")
+        assert browse(client, "/demo/items", "acme.localhost:8000").status_code == 302  # to the SaaS's login
+        request = rf.get("/demo/items", HTTP_HOST="acme.localhost:8000")
+        assert HubHostRequiredMiddleware(lambda r: None).process_request(request) is None
+        assert request.hub == acme
+
+    def test_the_local_hubs_are_registered(self, client, make_user):
+        client.force_login(make_user("ana", host="a", role="hub_employee"))
+        assert browse(client, "/demo/items").status_code == 200
+        assert browse(client, "/demo/items", "b.localhost:8000").status_code == 200
+
+    @pytest.mark.parametrize("status", ["cancelled", "purged"])
+    def test_a_business_that_is_gone_is_410_with_the_way_back_to_erplora(self, client, hub, status):
+        hub("acme", status=status)
+        response = browse(client, "/", "acme.localhost:8000")
+        assert response.status_code == 410
+        html = response.content.decode()
+        assert "This business is no longer available" in html
+        assert 'href="http://localhost:8001/launch"' in html
+
+    def test_a_demo_is_gone_from_its_expiry_even_before_the_reaper(self, client, hub):
+        import datetime as dt
+
+        from django.utils import timezone
+
+        hub("demo-0000beef", is_demo=True, expires_at=timezone.now() - dt.timedelta(seconds=1))
+        response = browse(client, "/demo/items", "demo-0000beef.localhost:8000")
+        assert response.status_code == 410
+        html = response.content.decode()
+        assert "This demo has ended" in html
+        assert 'href="http://localhost:8001/demo/"' in html
+
+    def test_a_demo_on_time_is_served(self, client, hub):
+        import datetime as dt
+
+        from django.utils import timezone
+
+        hub("demo-0000beef", is_demo=True, expires_at=timezone.now() + dt.timedelta(minutes=5))
+        assert browse(client, "/", "demo-0000beef.localhost:8000").status_code == 302
+
+    def test_the_gone_page_is_translated(self, client, hub):
+        hub("acme", status="cancelled")
+        response = client.get("/", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")
+        assert "Este negocio ya no está disponible" in response.content.decode()
+
+    @pytest.mark.parametrize("path", ["/api/me", "/api/live", "/api/demo/items"])
+    def test_the_api_of_a_hub_that_is_gone_is_the_410_envelope(self, client, hub, path):
+        hub("acme", status="cancelled")
+        response = client.get(path, HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML)
+        assert response.status_code == 410
+        assert response.json() == {"error": {"code": "base.hub_gone", "message": "This hub is no longer available."}}
+
+    def test_a_call_that_does_not_ask_for_a_page_gets_the_envelope(self, client, hub):
+        hub("acme", status="cancelled")
+        response = client.post("/auth/callback", {"code": "c1"}, HTTP_HOST="acme.localhost:8000")
+        assert (response.status_code, response.json()["error"]["code"]) == (410, "base.hub_gone")
+
+    def test_a_hub_being_prepared_is_503_and_asks_to_come_back(self, client, hub):
+        hub("acme", status="requested")
+        response = browse(client, "/", "acme.localhost:8000")
+        assert (response.status_code, response["Retry-After"]) == (503, "30")
+        html = response.content.decode()
+        assert '<meta http-equiv="refresh" content="10">' in html
+        assert "Your business is being prepared" in html
+
+    def test_the_api_of_a_hub_being_prepared_is_the_503_envelope(self, client, hub):
+        hub("acme", status="failed")
+        response = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
+        assert (response.status_code, response["Retry-After"]) == (503, "30")
+        assert response.json()["error"]["code"] == "base.hub_preparing"
+
+    @pytest.mark.parametrize("host", ["localhost:8000", "hub.localhost:8000", "hub.erplora.internal", "zzz.localhost"])
+    def test_the_internal_door_is_never_the_hosts_404(self, client, settings, host):
+        # The SaaS's calls go to the private name (`hub`, reserved): its signature is the door (base.internal).
+        settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "hub.erplora.internal"]
+        response = client.get("/internal/hubs/0199c4b0-0000-7000-8000-000000000001", HTTP_HOST=host)
+        assert (response.status_code, response.json()["error"]["code"]) == (401, "internal.unsigned")
