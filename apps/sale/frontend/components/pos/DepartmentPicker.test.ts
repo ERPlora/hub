@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, errorFrame, ionValue, mountSale } from '../../__tests__/mount-sale';
+import { click, errorFrame, ionValue, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
@@ -65,7 +65,7 @@ describe('DepartmentPicker', () => {
 
   it('in Ceuta or Melilla the categories’ picker is «Section (IPSI)»', async () => {
     const m = await setup();
-    await m.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await m.result('tax.settings.get', taxSettings('ipsi'));
     await m.result(DEPARTMENTS, page([]));
     expect(m.wrapper.findComponent(TaxCategoryPicker).props()).toMatchObject({ label: 'Section (IPSI)' });
   });

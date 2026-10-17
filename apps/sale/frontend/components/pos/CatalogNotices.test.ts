@@ -3,7 +3,7 @@
 // it, and the reason of the last tap on a blocked tile.
 import { describe, expect, it } from 'vitest';
 
-import { click, errorFrame, MANAGER, mountSale } from '../../__tests__/mount-sale';
+import { click, errorFrame, MANAGER, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { page, product } from './__tests__/fixtures';
 import CatalogNotices from './CatalogNotices.vue';
 
@@ -36,11 +36,11 @@ describe('CatalogNotices', () => {
 
   it('in the Canary Islands the count names the IGIC', async () => {
     const one = await setup({ locale: 'es' });
-    await one.result('sale.sale.tax_kind', { tax: 'igic' });
+    await one.result('tax.settings.get', taxSettings('igic'));
     await one.result(OP, page([product({ needs_tax_setup: true })], 1, 1));
     expect(one.find('pos-catalog-health').text()).toBe('1 artículo no se puede vender: le falta configurar el IGIC.');
     const many = await setup();
-    await many.result('sale.sale.tax_kind', { tax: 'igic' });
+    await many.result('tax.settings.get', taxSettings('igic'));
     await many.result(OP, page([product({ needs_tax_setup: true })], 3, 1));
     expect(many.find('pos-catalog-health').text()).toBe('3 items cannot be sold: their IGIC is not set up.');
   });

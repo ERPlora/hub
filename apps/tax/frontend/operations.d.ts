@@ -271,11 +271,16 @@ export interface TaxSettingsIn {
   region_code: string | null;
 }
 
+/** The tax a territory declares its sales with: its country's VAT, or a region's own (TAX-F11). */
+export type TerritoryTaxKind = 'vat' | 'igic' | 'ipsi';
+
 export interface TaxSettingsOut {
   country_code: string;
   region_code: string | null;
   /** The regions with taxes of their own the business may keep, in its country. */
   regions: string[];
+  /** The tax the business's sales are declared with, its territory's: the one source every app names it by. */
+  tax_kind: TerritoryTaxKind;
   updated_at: string | null;
 }
 

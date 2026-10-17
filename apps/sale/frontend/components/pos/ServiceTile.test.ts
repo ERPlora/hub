@@ -3,7 +3,7 @@
 // price. One without VAT is marked «VAT missing» and still takes the tap, to say why.
 import { describe, expect, it } from 'vitest';
 
-import { click, mountSale } from '../../__tests__/mount-sale';
+import { click, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { service } from './__tests__/fixtures';
 import ServiceTile from './ServiceTile.vue';
@@ -41,7 +41,7 @@ describe('ServiceTile', () => {
   it('in Ceuta or Melilla the badge names the IPSI, in the reader’s language', async () => {
     const m = await mountSale(ServiceTile, { props: { service: service({ needs_tax_setup: true }) }, locale: 'es' });
     await m.live();
-    await m.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await m.result('tax.settings.get', taxSettings('ipsi'));
     expect(m.find('pos-service-sv1').find('.pos-tile__badge').text()).toBe('Falta el IPSI');
   });
 

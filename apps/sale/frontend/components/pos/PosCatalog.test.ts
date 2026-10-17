@@ -6,7 +6,7 @@
 import { toast } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { click, errorFrame, mountSale } from '../../__tests__/mount-sale';
+import { click, errorFrame, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { category, page, product, service } from './__tests__/fixtures';
 import CategoryStrip from './CategoryStrip.vue';
 import PosCatalog from './PosCatalog.vue';
@@ -95,7 +95,7 @@ describe('PosCatalog: taps', () => {
 
   it('in the Canary Islands the reason of a blocked tap names the IGIC', async () => {
     const s = await setup({}, 'es');
-    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.result('tax.settings.get', taxSettings('igic'));
     await s.result(PRODUCTS, page([product({ id: 'p1', needs_tax_setup: true })]), { sort: 'name' });
     await click(s.find('pos-product-p1').element);
     const reason = 'No se puede vender: sin categoría fiscal. Falta configurar el IGIC.';
