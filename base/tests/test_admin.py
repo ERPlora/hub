@@ -70,6 +70,64 @@ def scheduled_task() -> TaskSchedule:
     )
 
 
+class TestExpireNow:
+    """«Expire now» (plan 2026-10-17, §1.1): a demo ends at once (410) and the worker purges it; platform admins only."""
+
+    @pytest.fixture
+    def demo(self):
+        from django.utils import timezone
+
+        return Hub.objects.create(
+            slug="demo-0000beef",
+            is_demo=True,
+            status="ready",
+            expires_at=timezone.now() + dt.timedelta(hours=1),
+            demo_session_key="k" * 64,
+        )
+
+    def expire_now(self, client, *hubs):
+        selected = [str(hub.pk) for hub in hubs]
+        data = {"action": "expire_now", "_selected_action": selected}
+        return client.post("/admin/base/hub/", data, HTTP_HOST=PLATFORM, follow=True)
+
+    def test_ends_the_chosen_demos_and_says_so(self, client, superuser, demo):
+        from django.utils import timezone
+        from live.models import OutboxEvent
+
+        client.force_login(superuser)
+        html = self.expire_now(client, demo).content.decode()
+        demo.refresh_from_db()
+        assert demo.status == "expired" and demo.expires_at <= timezone.now()
+        assert "1 demo ended" in html
+        [event] = OutboxEvent.objects.filter(name="base.demo.expired")
+        assert event.actor == str(superuser)
+
+    def test_a_business_is_left_as_it_is_and_named(self, client, superuser, demo):
+        client.force_login(superuser)
+        business = Hub.objects.get(slug="a")
+        html = self.expire_now(client, demo, business).content.decode()
+        business.refresh_from_db()
+        assert business.status == "ready"
+        # The admin capitalises its messages («A is no demo…»).
+        assert "a is no demo" in html.lower() and "1 demo ended" in html
+
+    def test_read_only_staff_neither_see_it_nor_run_it(self, client, make_user, demo):
+        from base import services
+
+        support = make_user("support", is_staff=True)
+        support.groups.add(services._support_group())
+        client.force_login(support)
+        assert "expire_now" not in client.get("/admin/base/hub/", HTTP_HOST=PLATFORM).content.decode()
+        self.expire_now(client, demo)
+        demo.refresh_from_db()
+        assert demo.status == "ready"
+
+    def test_its_words_are_translated(self):
+        catalogue = (Path(__file__).resolve().parents[1] / "locale" / "es" / "LC_MESSAGES" / "django.po").read_text()
+        assert 'msgid "Expire now"' in catalogue
+        assert 'msgid "%(slug)s is no demo: only a demo ends here."' in catalogue
+
+
 def test_the_scheduled_tasks_are_registered():
     assert isinstance(admin.site._registry[TaskSchedule], TaskScheduleAdmin)
 
@@ -168,6 +226,13 @@ class TestDeepLink:
         client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
         client.get("/admin/hub/b/", HTTP_HOST=PLATFORM)
         assert client.session[ADMIN_HUB_SESSION_KEY] == "b"
+
+    def test_chooses_a_demo_too(self, client, superuser):
+        # A demo (demo-<8 hex>) is a hub of the registry the staff may look into (plan 2026-10-17, §1.1).
+        client.force_login(superuser)
+        response = client.get("/admin/hub/demo-0000beef/", HTTP_HOST=PLATFORM)
+        assert response.status_code == 302
+        assert client.session[ADMIN_HUB_SESSION_KEY] == "demo-0000beef"
 
     def test_no_banner_without_a_choice(self, client, superuser):
         client.force_login(superuser)

@@ -21,6 +21,7 @@ def test_anonymous(client):
     assert response.status_code == 200
     body = response.json()
     assert (body["user"], body["permissions"], body["scope"]) == (None, [], {"kind": "host", "key": "a"})
+    assert body["demo"] is None
 
 
 def test_employee_on_its_host_and_elsewhere(client, make_user):

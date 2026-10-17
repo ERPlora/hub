@@ -38,6 +38,7 @@ def test_anonymous():
         "menu": [],
         "apps": [],
         "language": "es",
+        "demo": None,
     }
 
 
@@ -134,3 +135,22 @@ def test_system_actor(two_apps):
     me = session_me("system", {"*"})
     assert me["user"] == {"id": "system", "label": "system"}
     assert [app["label"] for app in me["apps"]] == ["demo", "stock", "reports"]
+
+
+def test_on_a_demo_it_says_when_the_demo_ends():
+    # plan 2026-10-17, §1.6: the shell's banner reads it.
+    from django.utils import timezone
+
+    from base.models import Hub
+
+    demo = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="ready", expires_at=timezone.now())
+    ctx = OperationContext(scope=Scope("host", demo.slug), actor=None, permissions=frozenset(), language="en")
+    me = get("base.session.me")(ctx, SessionMeIn())
+    assert me.demo is not None and me.demo.expires_at == demo.expires_at
+
+
+@pytest.mark.parametrize("slug", ["a", "acme"])
+def test_on_a_business_or_a_slug_without_a_row_there_is_no_demo(slug):
+    assert session_me().get("demo", "missing") is None
+    ctx = OperationContext(scope=Scope("host", slug), actor=None, permissions=frozenset(), language="en")
+    assert get("base.session.me")(ctx, SessionMeIn()).demo is None

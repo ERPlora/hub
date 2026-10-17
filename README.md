@@ -45,6 +45,46 @@ Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
 no lo publica).
 
+## Demo
+
+Una demo es un hub **vacío** del propio Hub (`demo-<8 hex>`, fila `is_demo` de `base.Hub`) que pide el `/demo/` del
+SaaS, sin cuenta ni tarjeta, durante `DEMO_TTL_MINUTES` (60). En la fase 1 no tiene BD propia: sus datos comparten
+las tablas de las apps con las demás demos y con `a`/`b` (limitación aceptada; plan
+`docs/plans/2026-10-17-demo-hubs-fase-1.md`, §1.6 y §1.7).
+
+| Ruta | Operación | Respuesta |
+|---|---|---|
+| `POST /internal/demos` `{session_key, vertical, language}` | `base.demo.create` | 201 `{id, slug, expires_at, created: true}`; 200 con la demo viva de ese navegador (`created: false`); 503 `base.demo_full` + `Retry-After: 60` con `MAX_CONCURRENT_DEMOS` (50) vivas; 422 `internal.payload_invalid` |
+| `POST /internal/demos/{slug}/codes` `{session_key, language}` | `base.demo.code_create` | 201 `{code, expires_at}` (un uso, 60 s, solo se guarda su sha256); 404; 410 `base.hub_gone`; 403 `base.demo_not_owner` |
+
+`session_key` es el sha256 (hex) de un token aleatorio de la sesión del navegador en el SaaS: una demo viva por
+navegador. Entrada: el SaaS salta a `/auth/login?next=/` de la demo, que (como un negocio, con la cookie
+`hub_login_state`) vuelve a `{SAAS_URL}/demo/enter/?hub=<slug>&next=<next>&state=<state>`; el SaaS pide el código y
+lo envía en un formulario a `/auth/callback`, que lo canjea **en local** (sin llamar al SaaS) y abre la sesión de
+`demo:<slug>` («Demo», `hub_owner`, nunca staff). Un código gastado, caducado o de otra demo vuelve a
+`{SAAS_URL}/demo/?state=failed`; salir de la demo, a `{SAAS_URL}/demo/`. `GET /api/me` lleva `demo: {expires_at}`
+(`null` en un negocio).
+
+Caducidad: desde `expires_at` el host responde **410** («This demo has ended», con enlace a `/demo/` del SaaS). El
+worker la purga en ≤ 60 s (`reap_demos`, `base.demo.purge`: borra sus códigos, su `Membership` y el usuario
+`demo:<slug>`; `purge_demo_data` no borra nada en la fase 1 y en la fase 2 hará el `DROP DATABASE`) y la fila queda
+`purged` como lápida `DEMO_TOMBSTONE_DAYS` (7) días; después, 404. Para terminar una demo a mano: la acción «Expire
+now» del admin (`hubs.localhost:8000/admin/base/hub/`, solo superusuarios) o, en cualquier entorno:
+
+```bash
+uv run python manage.py demo_expire demo-1a2b3c4d   # base.demo.expire + una pasada del reaper → «demo-1a2b3c4d: purged»
+```
+
+Probarla en local, con el SaaS en `:8001` (su `HUB_INTERNAL_URL` por defecto apunta a `http://localhost:8000` y el
+secreto local `local-internal-shared-secret` es el mismo en los dos):
+
+```bash
+uv run python manage.py runserver                 # Hub en :8000 (con `migrate` y `seed_local_hubs` hechos)
+(cd ../saas && uv run python manage.py runserver 127.0.0.1:8001)
+# http://localhost:8001/demo/ → «Try the demo» → http://demo-<hex>.localhost:8000/ con la sesión «Demo»
+uv run python manage.py demo_expire demo-<hex>    # el host pasa a 410 y /demo/ del SaaS a «expired»
+```
+
 ## Despliegue: `main` → prod, `pre` → pre
 
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
