@@ -81,6 +81,8 @@ def test_the_pages_render(client, superuser):
         "/admin/tax/taxcategory/add/": b"key",
         "/admin/tax/taxrule/add/": b"rate_pct",
         "/admin/tax/taxalias/add/": b"alias",
+        # TAX-F11: the region is chosen from the business's country's tax territories, as on the screen.
+        "/admin/tax/taxsettings/add/": '<option value="ES-CN">ES-CN · IGIC (Canary Islands)</option>'.encode(),
     }
     for path, content in pages.items():
         response = client.get(path, HTTP_HOST="hubs.localhost")
