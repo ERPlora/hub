@@ -10,7 +10,7 @@ import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
 
 defineProps<{ tapNotice: string | null }>();

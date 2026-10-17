@@ -1116,7 +1116,6 @@ diciendo cuáles (409 `*_ambiguous`).
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo | informes | F16, F28 | `sale.sale.by_staff` |
-| El impuesto con que se declaran las ventas, el del territorio del negocio (IVA; IGIC en Canarias, IPSI en Ceuta y Melilla), que nombran las cifras, el TPV, las secciones y los ajustes | ver ventas | F07, F09, F28, F34, F35 | `sale.sale.tax_kind` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |

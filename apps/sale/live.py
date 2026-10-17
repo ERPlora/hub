@@ -7,7 +7,6 @@ from live.live_registry import live
 
 from apps.sale import events as E
 from apps.tax.events import RULE_EVENTS
-from apps.tax.events import SETTINGS_UPDATED as TAX_SETTINGS_UPDATED
 
 SALES = E.SALE_EVENTS
 FIGURES = [E.SALE_COMPLETED, E.SALE_VOIDED, E.SALE_REFUNDED]
@@ -18,8 +17,6 @@ live("sale.sale.stats", on=FIGURES)
 live("sale.sale.today", on=FIGURES)
 live("sale.sale.last_7_days", on=FIGURES)
 live("sale.sale.by_staff", on=FIGURES)
-# The tax every sale screen names is the business territory's, kept in Taxes' settings (TAX-F11).
-live("sale.sale.tax_kind", on=[TAX_SETTINGS_UPDATED])
 # A partial charge takes lines off a check without changing anything else of it.
 live("sale.order.list", on=E.ORDER_EVENTS)
 live("sale.order.get", on=E.ORDER_EVENTS)

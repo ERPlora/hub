@@ -15,7 +15,7 @@ import ListNotices, { blockingError, type ListRefusal } from '../components/back
 import { refusal } from '../lib/refusal';
 import { taxLabel } from '../lib/taxLabel';
 import { useServerTable } from '../composables/useServerTable';
-import { useTaxName } from '../composables/useTaxName';
+import { useTaxName } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import type { DepartmentOut } from '../operations';
 import { saleTabs } from '../tabs';

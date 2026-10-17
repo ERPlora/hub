@@ -8,6 +8,8 @@ import json
 
 import pytest
 from live.ninja import ensure_api_parity
+from live.operations import UnknownOperation
+from live.operations import get as get_operation
 
 from apps.sale.api import router
 from config.api import api
@@ -20,7 +22,6 @@ ROUTES = {
     ("GET", "/sale/sales/today", "sale.sale.today"),
     ("GET", "/sale/sales/last_7_days", "sale.sale.last_7_days"),
     ("GET", "/sale/sales/by_staff", "sale.sale.by_staff"),
-    ("GET", "/sale/sales/tax_kind", "sale.sale.tax_kind"),
     ("POST", "/sale/sales", "sale.sale.complete"),
     ("POST", "/sale/sales/complete_over_limit", "sale.sale.complete_over_limit"),
     ("POST", "/sale/sales/void", "sale.sale.void"),
@@ -108,6 +109,12 @@ def test_every_route_is_bound_to_its_operation():
         for method in route.methods
     }
     assert routes == ROUTES
+
+
+def test_no_sale_operation_republishes_the_tax_of_the_territory():
+    # The territory's tax is Taxes' (``tax.settings.get``): every sale screen reads it there (TAX-F11).
+    with pytest.raises(UnknownOperation):
+        get_operation("sale.sale.tax_kind")
 
 
 def test_the_api_keeps_parity():

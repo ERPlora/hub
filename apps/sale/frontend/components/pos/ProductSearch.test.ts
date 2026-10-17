@@ -3,7 +3,7 @@
 // with the live answer; a tap adds the product (the page applies the same rules as a tile).
 import { describe, expect, it } from 'vitest';
 
-import { click, errorFrame, ionValue, mountSale } from '../../__tests__/mount-sale';
+import { click, errorFrame, ionValue, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { page, product, service } from './__tests__/fixtures';
 import ProductSearch from './ProductSearch.vue';
@@ -51,7 +51,7 @@ describe('ProductSearch', () => {
 
   it('in Ceuta or Melilla a match without its tax names the IPSI', async () => {
     const m = await setup();
-    await m.result('sale.sale.tax_kind', { tax: 'ipsi' });
+    await m.result('tax.settings.get', taxSettings('ipsi'));
     await m.result(OP, page([product({ id: 'p2', name: 'Tea', needs_tax_setup: true })]));
     expect(m.find('pos-search-p2').find('p').text()).toBe('Cannot be sold: no tax category. IPSI needs to be set up.');
   });

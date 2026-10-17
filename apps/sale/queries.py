@@ -78,7 +78,6 @@ from apps.sale.schemas import (
     ServiceLineFields,
     SettingsOut,
     StatsOut,
-    TaxKindOut,
     TodayOut,
 )
 from apps.tax.models import TaxCategory
@@ -198,21 +197,6 @@ def actor(ctx: OperationContext) -> str:
 )
 def business_day(ctx: OperationContext, params: EmptyIn) -> dict:
     return {"today": business_today()}
-
-
-@operation(
-    "sale.sale.tax_kind",
-    kind="query",
-    permission="sale.view_sale",
-    input=EmptyIn,
-    output=TaxKindOut,
-    ai={
-        "description": "The tax the business's sales are declared with, its territory's: VAT, IGIC in the Canary "
-        "Islands, IPSI in Ceuta and Melilla (what the till, the sales figures and the sections name)."
-    },
-)
-def tax_kind(ctx: OperationContext, params: EmptyIn) -> dict:
-    return {"tax": business_tax_kind()}
 
 
 def missing_tax(name: str) -> str:

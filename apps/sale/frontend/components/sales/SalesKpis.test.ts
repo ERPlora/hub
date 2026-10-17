@@ -5,7 +5,7 @@
 // not be read is not a zero), and a failure adds «Error loading metrics».
 import { describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, mountSale } from '../../__tests__/mount-sale';
+import { errorFrame, flush, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import type { StatsOut } from '../../operations';
 import SalesKpis from './SalesKpis.vue';
@@ -90,16 +90,16 @@ describe('SalesKpis', () => {
   ] as const)('the tax is named by the business territory’s: %s in %s is «%s»', async (tax, locale, label) => {
     const s = await setup(undefined, locale);
     await s.result('sale.sale.stats', STATS);
-    await s.result('sale.sale.tax_kind', { tax });
+    await s.result('tax.settings.get', taxSettings(tax));
     expect(s.cards()[3]).toEqual([label, locale === 'es' ? '1500,50 €' : '€1,500.50']);
   });
 
   it('a change of territory renames the tax and leaves the figure as it is', async () => {
     const s = await setup();
     await s.result('sale.sale.stats', STATS);
-    await s.result('sale.sale.tax_kind', { tax: 'igic' });
+    await s.result('tax.settings.get', taxSettings('igic'));
     expect(s.cards()[3]).toEqual(['IGIC', '€1,500.50']);
-    await s.result('sale.sale.tax_kind', { tax: 'vat' }, {}, 2);
+    await s.result('tax.settings.get', taxSettings('vat'), {}, 2);
     expect(s.cards()[3]).toEqual(['VAT', '€1,500.50']);
   });
 

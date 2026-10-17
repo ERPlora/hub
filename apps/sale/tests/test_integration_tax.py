@@ -7,11 +7,11 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone, translation
-from live.context import OperationContext
-from live.errors import Conflict, PermissionDenied
+from live.errors import Conflict
 
 from apps.inventory.models import Product
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.apps import SaleConfig
+from apps.sale.tests.conftest import ctx_for, run
 from apps.tax.models import TaxRule
 
 pytestmark = pytest.mark.django_db
@@ -267,29 +267,14 @@ def test_the_preview_and_the_sections_follow_the_business_region(product):
     assert [(row.tax_type, row.rate_pct) for row in preview.breakdown] == [("igic", Decimal("7.00"))]
 
 
-# The tax every sale screen names (SALE-F28 and the till): the business territory's, as Taxes keeps it.
+# The tax every sale screen names (the till, the sections, the settings): the business territory's, read from
+# the one place that publishes it, Taxes' settings (``tax.settings.get``; Sales has no operation of its own).
 
 
-@pytest.mark.parametrize(
-    ("region", "tax"),
-    [(None, "vat"), ("ES-CN", "igic"), ("ES-CE", "ipsi"), ("ES-ML", "ipsi")],
-)
-def test_the_tax_the_sales_are_named_by_is_the_territorys(db, region, tax):
-    if region:
-        run("tax.settings.update", {"region_code": region})
-    assert run("sale.sale.tax_kind", {}, ctx_for("hub_employee")).tax == tax
-
-
-def test_back_to_the_whole_country_the_sales_are_named_by_the_vat_again(db):
+@pytest.mark.parametrize("role", sorted(SaleConfig.role_permissions))
+def test_every_role_that_sells_reads_the_territorys_tax_from_taxes(db, role):
     run("tax.settings.update", {"region_code": "ES-CN"})
-    run("tax.settings.update", {"region_code": None})
-    assert run("sale.sale.tax_kind", {}).tax == "vat"
-
-
-def test_nobody_without_seeing_the_sales_reads_their_tax(db):
-    nobody = OperationContext(scope=A, actor="x", permissions=frozenset())
-    with pytest.raises(PermissionDenied):
-        run("sale.sale.tax_kind", {}, nobody)
+    assert run("tax.settings.get", {}, ctx_for(role)).tax_kind == "igic"
 
 
 @pytest.mark.parametrize(

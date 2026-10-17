@@ -25,11 +25,6 @@
         "loadFailed": "No se han podido leer las categorías de {tax}.",
         "retry": "Reintentar",
         "retrying": "Reintentando…"
-      },
-      "taxName": {
-        "vat": "IVA",
-        "igic": "IGIC",
-        "ipsi": "IPSI"
       }
     },
     "pos": {

@@ -10,7 +10,7 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { StatsOut } from '../../operations';
