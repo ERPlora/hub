@@ -144,12 +144,27 @@ describe('main.ts', () => {
     expect(shellOptions().home).toBe(true);
   });
 
-  // PLAN-MIGRATIONS §13: the old hub's shell. No side menu at any width; Back, the «My apps» sheet
-  // and the user are in the topbar.
-  it('moves between apps with the topbar launcher, not a side menu', async () => {
+  // PLAN-MIGRATIONS §16 (Ioan, 2026-10-17): the old hub's shell, side menu included. Its entries are the
+  // platform's, in the old hub's two groups and order, never a module (they open from «My apps» and
+  // Home); each shows once its screen exists (the shell checks the router), so today only Home does.
+  it("paints the old hub's side menu: the platform's entries in its two groups, no module", async () => {
     fakeShell();
     await main.boot({});
-    expect(shellOptions().nav).toBe('launcher');
+    expect(shellOptions().sidebar).toEqual({
+      groups: [
+        [
+          { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees' },
+          { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files' },
+        ],
+        [
+          { id: 'billing', labelKey: 'sidebar.billing', icon: 'ion:card-outline', to: '/billing' },
+          { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps' },
+          { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system' },
+          { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings' },
+        ],
+      ],
+    });
+    expect(shellOptions()).not.toHaveProperty('nav');
   });
 
   it("gives the user menu the Hub's sign out (a form POST to /auth/logout), and nothing else", async () => {

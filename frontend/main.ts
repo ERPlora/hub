@@ -3,12 +3,40 @@
 // 🔴 Import order (hub#1060): the shell barrel goes first so its boot hooks wrap `customElements.define`
 // before anything loads `@ionic/vue` (the SDK does). Vite hoists eager globs above everything, so an
 // app's `routes.ts` only imports types; its pages load with `() => import(…)`. Guards: main.test.ts.
-import { createShell, type CreateShellOptions, logout, type SessionMe, type SessionStatus } from '@erplora/ui/shell';
+import {
+  createShell,
+  type CreateShellOptions,
+  logout,
+  type SessionMe,
+  type SessionStatus,
+  type ShellSidebar,
+} from '@erplora/ui/shell';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
 import { ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { OPERATION_ROUTES } from './generated/operation-routes';
+
+/**
+ * The old hub's side menu (PLAN-MIGRATIONS §16): the platform's entries in its two groups — Home (the
+ * shell's, first), Employees, Files · My plan, Apps, System, Settings — and never a module (they open
+ * from «My apps» and Home). The shell paints an entry only once its screen exists in the router, so
+ * each appears by itself when `base` brings it.
+ */
+export const SIDEBAR: ShellSidebar = {
+  groups: [
+    [
+      { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees' },
+      { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files' },
+    ],
+    [
+      { id: 'billing', labelKey: 'sidebar.billing', icon: 'ion:card-outline', to: '/billing' },
+      { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps' },
+      { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system' },
+      { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings' },
+    ],
+  ],
+};
 
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
 export type AppRoutes = { default: RouteRecordRaw[] };
@@ -71,9 +99,9 @@ export async function boot(
     loginPath: config.loginUrl,
     // The apps of the hub as a grid at `/` (where the login lands without `next`).
     home: true,
-    // The old hub's shell (PLAN-MIGRATIONS §13): no side menu; Back, the «My apps» sheet and the
-    // user are in the topbar.
-    nav: 'launcher',
+    // The old hub's shell (PLAN-MIGRATIONS §16): its side menu, pinned from 992 px and a drawer below,
+    // with the QR in its footer and the rail toggle and «My apps» in the topbar.
+    sidebar: SIDEBAR,
     // Sign out is the Hub's: a form POST to `/auth/logout`, then the SaaS's logout page.
     userMenu: { logout },
   });
