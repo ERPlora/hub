@@ -5,7 +5,9 @@ void, adjust) lock its row first and read its balance again afterwards: two till
 go one after the other and the second decides on what the first left. Writes on the services a
 professional performs lock the professional's record first, so two of them never fight over the
 «main service». A name two writes take at once ends in the database's unique constraint, translated
-to the same 409 as the check.
+to the same 409 as the check. A write that names a row (a tax category, a category, a service, a voucher
+of the catalog, a customer's card) holds it until it commits: its deletion waits for the write instead of
+breaking it at the COMMIT, and one deleted meanwhile is refused as one deleted before.
 """
 
 import datetime as dt
@@ -46,6 +48,7 @@ from apps.service.queries import (
     find_package,
     find_service,
     grants,
+    held_rows,
     load_assignment,
     load_category,
     load_grant,
@@ -104,6 +107,7 @@ from apps.service.schemas import (
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 from apps.tax.models import TaxCategory
+from apps.tax.queries import held_categories
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -225,8 +229,12 @@ def _refuse(message, code: str, field: str):
     return InvalidPayload(str(message), code=code, fields={field: str(message)})
 
 
-def _tax_category(key: str, field: str) -> TaxCategory:
-    tax = TaxCategory.objects.filter(key=key, is_active=True).first()
+def _tax_category(key: str, field: str, *, hold: bool = False) -> TaxCategory:
+    """The active tax category ``key``; with ``hold``, held until the command commits (Taxes' read)."""
+    if hold:
+        tax = held_categories([key]).get(key)
+    else:
+        tax = TaxCategory.objects.filter(key=key, is_active=True).first()
     if tax is None:
         raise _refuse(TAX_UNKNOWN, "service.tax_category_unknown", field)
     return tax
@@ -241,6 +249,31 @@ def _service_category(category_id, said, field: str) -> Category | None:
         raise _refuse(
             CATEGORY_UNAVAILABLE, "service.category_unavailable", field
         ) from exc
+
+
+def _hold_named(lines: list[tuple]) -> list[InvalidPayload]:
+    """Holds the tax category and the category each line names (``(tax category, category, what it said, field
+    prefix)``) until the command commits: each kind in one read, in key and id order, so deleting one, or the
+    «Delete» of a category that takes them all, waits for this write and never in a circle. A line whose own went
+    while it was read is refused as one deleted before: the refusals, under each line's field."""
+    taxes = held_categories(tax.key for tax, _, _, _ in lines if tax is not None)
+    named = [category.pk for _, category, _, _ in lines if category is not None]
+    categories = {row.pk for row in held_rows(Category.objects.filter(pk__in=named, is_deleted=False))}
+    refusals = []
+    for tax, category, said, prefix in lines:
+        if tax is not None and tax.key not in taxes:
+            message, code = (
+                (TAX_UNKNOWN, "service.tax_category_unknown")
+                if said.tax_category_key
+                else (TAX_REQUIRED, "service.tax_category_required")
+            )
+            refusals.append(_refuse(message, code, f"{prefix}tax_category_key"))
+        elif category is not None and category.pk not in categories:
+            field = "category_id" if said.category_id else "category"
+            refusals.append(
+                _refuse(CATEGORY_UNAVAILABLE, "service.category_unavailable", f"{prefix}{field}")
+            )
+    return refusals
 
 
 def _changes(instance, values: dict) -> dict:
@@ -319,6 +352,8 @@ def _announce_created(ctx: OperationContext, service: Service) -> None:
 )
 def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
     service = _new_service(ctx, data, current_settings())
+    if refusals := _hold_named([(service.tax_category, service.category, data, "")]):
+        raise refusals[0]
     service.save()
     _announce_created(ctx, service)
     return load_service(service.id)
@@ -339,12 +374,19 @@ def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
 )
 def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
     settings = current_settings()
-    built, problems = [], {}
+    built, named, problems = [], [], {}
     for index, line in enumerate(data.services):
+        prefix = f"services.{index}."
         try:
-            built.append(_new_service(ctx, line, settings, prefix=f"services.{index}."))
+            service = _new_service(ctx, line, settings, prefix=prefix)
         except InvalidPayload as exc:
             problems.update(exc.fields or {})
+        else:
+            built.append(service)
+            named.append((service.tax_category, service.category, line, prefix))
+    if not problems:
+        for refusal in _hold_named(named):
+            problems.update(refusal.fields or {})
     if problems:
         raise InvalidPayload(
             str(BULK_INVALID), code="service.bulk_invalid", fields=problems
@@ -369,7 +411,7 @@ def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
     },
 )
 def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
-    service = find_service(data.id, data.service, lock=True)
+    service_id = find_service(data.id, data.service).pk
     sent = data.model_fields_set
     values = {
         name: getattr(data, name)
@@ -386,6 +428,11 @@ def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
     if sent & {"category_id", "category"}:
         field = "category_id" if data.category_id else "category"
         values["category"] = _service_category(data.category_id, data.category, field)
+    # What it names is held before its own row, in the order the «Delete» of a category takes them (every
+    # category, then their services): the other way round, each waited for the other.
+    if refusals := _hold_named([(values.get("tax_category"), values.get("category"), data, "")]):
+        raise refusals[0]
+    service = find_service(service_id, None, lock=True)
     low, high = (
         values.get("min_price", service.min_price),
         values.get("max_price", service.max_price),
@@ -458,11 +505,11 @@ def _check_category_name(name: str, *, other_than=None) -> None:
         )
 
 
-def _parent(parent_id, said) -> Category | None:
+def _parent(parent_id, said, *, hold: bool = False) -> Category | None:
     if parent_id is None and said is None:
         return None
     try:
-        return find_category(parent_id, said)
+        return find_category(parent_id, said, hold=hold)
     except NotFound as exc:
         field = "parent_id" if parent_id else "parent"
         raise _refuse(
@@ -507,7 +554,7 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
     category = Category(
         name=name,
         description=data.description,
-        parent=_parent(data.parent_id, data.parent),
+        parent=_parent(data.parent_id, data.parent, hold=True),
         icon=data.icon,
         color=data.color,
         sort_order=data.sort_order,
@@ -641,7 +688,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
     if "default_tax_category_key" in sent:
         key = data.default_tax_category_key
         values["default_tax_category"] = (
-            _tax_category(key, "default_tax_category_key") if key else None
+            _tax_category(key, "default_tax_category_key", hold=True) if key else None
         )
     changes = _changes(settings, values)
     if changes or created:
@@ -682,7 +729,7 @@ def _assignment_payload(assignment: Assignment) -> dict:
     },
 )
 def assign(ctx: OperationContext, data: AssignIn) -> dict:
-    service = find_service(data.service_id, data.service)
+    service = find_service(data.service_id, data.service, hold=True)
     member = resolve_member(data.member_id, data.member, lock=True)
     assignment = (
         Assignment.objects.select_for_update()
@@ -817,22 +864,30 @@ def _check_package_name(name: str, *, other_than=None) -> None:
         )
 
 
+def _offered(service: Service | None, field: str) -> Service:
+    """``service`` as a line of a voucher takes it: refused when it does not exist or is archived."""
+    if service is None:
+        raise _refuse(LINE_SERVICE_MISSING, "service.service_not_found", field)
+    if not service.is_active:
+        raise _refuse(LINE_SERVICE_ARCHIVED, "service.service_archived", field)
+    return service
+
+
 def _line_services(data: PackageIn) -> list[Service]:
-    services = []
+    lines = []
     for index, line in enumerate(data.items):
         field = f"items.{index}.{'service_id' if line.service_id else 'service'}"
         try:
             service = find_service(line.service_id, line.service)
-        except NotFound as exc:
-            raise _refuse(
-                LINE_SERVICE_MISSING, "service.service_not_found", field
-            ) from exc
-        if not service.is_active:
-            raise _refuse(LINE_SERVICE_ARCHIVED, "service.service_archived", field)
-        services.append(service)
-    if len({service.pk for service in services}) != len(services):
+        except NotFound:
+            service = None
+        lines.append((_offered(service, field), field))
+    if len({service.pk for service, _ in lines}) != len(lines):
         raise _refuse(SERVICE_REPEATED, "service.service_repeated", "items")
-    return services
+    # Held in one read and in id order (two vouchers of the same services never wait in a circle): archiving
+    # one or deleting it in the Hub admin waits for this write, and one taken away meanwhile is refused.
+    held = {row.pk: row for row in held_rows(Service.objects.filter(pk__in=[s.pk for s, _ in lines]))}
+    return [_offered(held.get(service.pk), field) for service, field in lines]
 
 
 @operation(
@@ -968,10 +1023,10 @@ def _grant_payload(grant: Grant) -> dict:
     },
 )
 def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
-    package = find_package(data.package_id, data.package)
+    package = find_package(data.package_id, data.package, hold=True)
     if not package.is_active:
         raise NotFound(str(PACKAGE_NOT_FOUND), code="service.package_not_found")
-    customer = find_customer(data.customer_id, data.customer)
+    customer = find_customer(data.customer_id, data.customer, lock=True)
     grant = Grant.objects.create(
         package=package,
         customer=customer,
@@ -1132,7 +1187,7 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
 def reassign_grants(ctx: OperationContext, data: ReassignIn) -> dict:
     if data.id == data.absorbed_id:
         return {"moved": 0}
-    if not Customer.objects.filter(pk=data.id).exists():
+    if not Customer.objects.select_for_update().filter(pk=data.id).exists():
         raise NotFound(str(CUSTOMER_UNAVAILABLE), code="service.customer_unavailable")
     moved = Grant.objects.filter(customer_id=data.absorbed_id).update(
         customer_id=data.id, updated_at=timezone.now()
