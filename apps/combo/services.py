@@ -4,7 +4,9 @@ Only the fields sent change. A new course goes last in its menu and a new choice
 ``reorder`` takes the whole list and saves it at once. Creating a course locks its menu and creating a
 choice locks its course (``select_for_update``), so two people adding the same name or product at once
 get one row and a 409, and the caps (20 courses, 40 choices) hold; the unique constraints are the last
-net. A product must be live, active and sold by units in Inventory to become a choice.
+net. A product must be live, active and sold by units in Inventory to become a choice. A write holds the
+product or tax category it names until it commits (``held``, FOR KEY SHARE): a deletion waits for it, and
+one already under way is read once it ends, gone, as one deleted before (a 422 on the field, never a 500).
 """
 
 from uuid import UUID
@@ -52,8 +54,9 @@ from apps.combo.schemas import (
     OptionRefIn,
     OptionReorderIn,
 )
+from apps.inventory import queries as inventory
 from apps.inventory.models import Product, Unit
-from apps.inventory.queries import find_product
+from apps.inventory.queries import find_product, held
 from apps.tax.models import TaxCategory
 
 TAX_REQUIRED = _(
@@ -97,7 +100,8 @@ def _field_refusal(error: NotFound, field: str) -> InvalidPayload:
 
 
 def _tax_category(key: str) -> TaxCategory:
-    category = TaxCategory.objects.filter(key=key, is_active=True).first()
+    """The active tax category of ``key``, held for the write that names it (see ``held``)."""
+    category = next(iter(held(TaxCategory.objects.filter(key=key, is_active=True)[:1])), None)
     if category is None:
         raise InvalidPayload(
             str(TAX_UNKNOWN),
@@ -137,11 +141,17 @@ def _option_event(
 
 
 def _sellable_product(product_id: UUID | None, said: str | None, field: str) -> Product:
-    """A product that may become a choice: live, active and sold by units."""
+    """A product that may become a choice: live, active and sold by units, held for the write that offers
+    it (see ``held``)."""
     try:
-        product = find_product(product_id, said)
+        found = find_product(product_id, said)
     except NotFound as error:
         raise _field_refusal(error, field) from None
+    live = Product.objects.filter(pk=found.pk, is_deleted=False)
+    product = next(iter(held(live[:1])), None)
+    if product is None:
+        # Deleted between the two reads: Inventory's own refusal, as for one deleted before.
+        raise _field_refusal(NotFound(str(inventory.PRODUCT_NOT_FOUND)), field)
     if not product.is_active:
         message = str(PRODUCT_INACTIVE) % {"product": product.name}
         raise Conflict(message, code="combo.product_inactive", fields={field: message})
