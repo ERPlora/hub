@@ -34,6 +34,13 @@
       "excise": "Especial",
       "import_duty": "Arancel"
     },
+    "common": {
+      "taxName": {
+        "vat": "IVA",
+        "igic": "IGIC",
+        "ipsi": "IPSI"
+      }
+    },
     "classes": {
       "subject": "Sujeta",
       "subject_reverse": "Inversión del sujeto pasivo",

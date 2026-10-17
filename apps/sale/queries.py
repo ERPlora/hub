@@ -89,6 +89,7 @@ from apps.tax.queries import (
     category_by_reference,
     current_rates,
 )
+from apps.tax.schemas import TAX_KIND_NAMES
 
 CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
@@ -113,8 +114,6 @@ PRODUCT_NOT_AVAILABLE = _(
 TAX_CATEGORY_MISSING = _(
     "«%(name)s» cannot be sold: it has no tax category. Its %(tax)s is missing."
 )
-#: The short name of each tax a territory declares its sales with (TAX-F11).
-TAX_NAMES = {"vat": _("VAT"), "igic": _("IGIC"), "ipsi": _("IPSI")}
 SERVICES_UNAVAILABLE = _(
     "Services is not active in this business: its services cannot be sold nor its vouchers used. Take the "
     "voucher off the line to charge it."
@@ -218,7 +217,7 @@ def tax_kind(ctx: OperationContext, params: EmptyIn) -> dict:
 
 def missing_tax(name: str) -> str:
     """Why an article without a tax category cannot be sold, naming the territory's tax (TAX-F11)."""
-    return str(TAX_CATEGORY_MISSING) % {"name": name, "tax": TAX_NAMES[business_tax_kind()]}
+    return str(TAX_CATEGORY_MISSING) % {"name": name, "tax": TAX_KIND_NAMES[business_tax_kind()]}
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────

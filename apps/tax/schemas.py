@@ -15,6 +15,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 import pycountry
+from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import (
@@ -44,6 +45,15 @@ REGION_TAX_KINDS: dict[str, str] = {
     "ES-CN": TaxRule.TaxType.IGIC,
     "ES-CE": TaxRule.TaxType.IPSI,
     "ES-ML": TaxRule.TaxType.IPSI,
+}
+#: The tax a territory declares its sales with (TAX-F11): its country's VAT, or a region's own tax.
+TerritoryTaxKind = Literal["vat", "igic", "ipsi"]
+#: The short name of each territory's tax, as a message names it («Its IGIC is missing»); the long ones,
+#: «IGIC (Canary Islands)», are ``TaxRule.TaxType``'s labels.
+TAX_KIND_NAMES: dict[str, Promise] = {
+    TaxRule.TaxType.VAT: _("VAT"),
+    TaxRule.TaxType.IGIC: _("IGIC"),
+    TaxRule.TaxType.IPSI: _("IPSI"),
 }
 #: The regions of a country with taxes of their own, which a business may keep as its own (TAX-F11).
 TAX_REGIONS: dict[str, tuple[str, ...]] = {"ES": tuple(REGION_TAX_KINDS)}
@@ -654,5 +664,9 @@ class TaxSettingsOut(Schema):
     )
     regions: list[str] = Field(
         description="The regions with taxes of their own the business may keep, in its country."
+    )
+    tax_kind: TerritoryTaxKind = Field(
+        description="The tax the business's sales are declared with, its territory's: vat, igic (Canary Islands) "
+        "or ipsi (Ceuta and Melilla). The one source every app names the tax by."
     )
     updated_at: dt.datetime | None = Field(description="Last change; empty = never changed.")
