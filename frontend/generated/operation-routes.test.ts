@@ -165,7 +165,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 54 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route', () => {
+  it('binds the 53 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -176,7 +176,6 @@ describe('OPERATION_ROUTES', () => {
       'sale.sale.today': { method: 'get', path: '/api/sale/sales/today' },
       'sale.sale.last_7_days': { method: 'get', path: '/api/sale/sales/last_7_days' },
       'sale.sale.by_staff': { method: 'get', path: '/api/sale/sales/by_staff' },
-      'sale.sale.tax_kind': { method: 'get', path: '/api/sale/sales/tax_kind' },
       'sale.sale.complete_over_limit': { method: 'post', path: '/api/sale/sales/complete_over_limit' },
       'sale.sale.void': { method: 'post', path: '/api/sale/sales/void' },
       'sale.sale.refund': { method: 'post', path: '/api/sale/sales/refund' },

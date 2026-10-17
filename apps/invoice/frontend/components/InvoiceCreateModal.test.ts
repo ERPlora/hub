@@ -5,9 +5,10 @@
 // a price that is not an amount is said with its line before anything is sent. It runs
 // `invoice.invoice.create` with the prices in cents (VAT not included), says «Invoice <number> issued» and
 // closes; the list paints the new row by itself. A refusal stays in the window, under its field when it is
-// one, and what was written is kept. The rate of a line is named by the tax of the business's territory and
-// starts at its general rate (`invoice.invoice.line_defaults`, followed live): IGIC in the Canary Islands,
-// IPSI in Ceuta and Melilla, VAT elsewhere; without a rule of its own tax, the person types it.
+// one, and what was written is kept. The rate of a line is named by the tax of the business's territory, as
+// Taxes publishes it (`tax.settings.get`, followed live): IGIC in the Canary Islands, IPSI in Ceuta and
+// Melilla, VAT elsewhere; it starts at the territory's general rate (`invoice.invoice.line_defaults`, live);
+// without a rule of its own tax, the person types it.
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
@@ -37,6 +38,10 @@ const SeriesSelectStub = defineComponent({
 const CustomerSearchStub = defineComponent({ name: 'CustomerSearch', setup: () => () => h('div') });
 
 const DEFAULTS = 'invoice.invoice.line_defaults';
+const SETTINGS = 'tax.settings.get';
+const REGIONS: Record<string, string | null> = { vat: null, igic: 'ES-CN', ipsi: 'ES-CE' };
+/** Taxes' settings of a business whose territory declares `tax`. */
+const settingsOf = (tax: string) => ({ country_code: 'ES', region_code: REGIONS[tax], regions: ['ES-CN', 'ES-CE', 'ES-ML'], tax_kind: tax, updated_at: null });
 const RECIPIENT = { customerId: null, name: 'Talleres Pérez SL', taxId: 'B12345674', address: 'Calle Luna 3', country: 'ES', idType: '' };
 const CREATED = { id: 'i9', number: 'FACT-2026-000009' };
 
@@ -63,9 +68,10 @@ async function setup(locale: 'en' | 'es' = 'en') {
   const submit = () => m.inDoc('invoice-create-submit') as HTMLElement & { disabled: boolean };
   const editor = () => m.wrapper.findComponent(InvoiceLinesEditor);
   const call = await m.live();
-  /** What a typed line starts with in the business's territory, as the server answers it. */
+  /** The business's territory (its tax, from Taxes) and the rate a typed line starts with there. */
   async function territory(tax: string, rate: string | null) {
-    await m.result(DEFAULTS, { tax, tax_rate: rate });
+    await m.result(SETTINGS, settingsOf(tax));
+    await m.result(DEFAULTS, { tax_rate: rate });
   }
   return { ...m, call, choose, recipient, line, submit, editor, territory };
 }
@@ -145,12 +151,28 @@ describe('InvoiceCreateModal', () => {
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 
-  it('follows what a typed line starts with: the territory’s tax and its general rate', async () => {
+  it('follows what a typed line starts with: the territory’s tax (from Taxes) and its general rate', async () => {
     const s = await setup();
     expect(s.params(DEFAULTS)).toEqual([{}]);
+    expect(s.params(SETTINGS)).toEqual([{}]);
     await s.territory('igic', '7.00');
     expect(s.editor().props('modelValue')[0].taxRate).toBe('7');
     expect([s.editor().props('tax'), s.editor().props('defaultRate')]).toEqual(['igic', '7']);
+  });
+
+  it('a change of territory renames the rate of the lines', async () => {
+    const s = await setup();
+    await s.territory('igic', '7.00');
+    await s.result(SETTINGS, settingsOf('vat'), {}, 2);
+    expect(s.editor().props('tax')).toBe('vat');
+  });
+
+  it('when the territory’s tax cannot be read the rate is a plain «Tax %», still at the general rate', async () => {
+    const s = await setup();
+    s.call.push(errorFrame(s.subId(SETTINGS), 'tax.boom'));
+    await s.result(DEFAULTS, { tax_rate: '7.00' });
+    expect([s.editor().props('tax'), s.editor().props('defaultRate')]).toEqual([undefined, '7']);
+    expect(s.inDoc('invoice-create-error')).toBeNull();
   });
 
   it('opened again, a fresh line starts at the territory’s rate already known', async () => {
@@ -179,7 +201,7 @@ describe('InvoiceCreateModal', () => {
     await s.territory('igic', '7.00');
     expect(s.editor().props('modelValue')[0].taxRate).toBe('3');
     await s.line('Course', '10', '1', '7');
-    await s.result(DEFAULTS, { tax: 'igic', tax_rate: '9.50' }, {}, 2);
+    await s.result(DEFAULTS, { tax_rate: '9.50' }, {}, 2);
     expect(s.editor().props('modelValue')[0].taxRate).toBe('9.5');
   });
 

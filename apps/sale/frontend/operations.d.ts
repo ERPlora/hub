@@ -4,6 +4,7 @@
 // parity): no path parameters, ids travel in the input. Money is whole cents (numbers); decimals
 // (quantities, percentages, rates) are JSON strings on the way out («2.000», «21.00»); dates ISO.
 import type { Page } from '../../../frontend/sdk-types';
+import type { TerritoryTaxKind } from '../../tax/frontend/operations';
 
 export type SortDir = 'asc' | 'desc';
 export type DocumentType = 'ticket' | 'invoice';
@@ -633,14 +634,9 @@ export interface StatsOut {
   discount_total: number;
   refunded_total: number;
   voided_count: number;
-}
-
-/** The tax the business's sales are declared with, its territory's (TAX-F11): `igic` in the Canary Islands,
- *  `ipsi` in Ceuta and Melilla, `vat` anywhere else. */
-export type TaxKind = 'vat' | 'igic' | 'ipsi';
-
-export interface TaxKindOut {
-  tax: TaxKind;
+  /** The tax the period's sales were declared with, what its tax figure is named by; `null` when they
+   *  declared more than one (or another tax). Without sales, the business territory's. */
+  tax_kind: TerritoryTaxKind | null;
 }
 
 export interface TodayOut {
@@ -765,7 +761,6 @@ declare module '@erplora/ui/sdk' {
     'sale.sale.today': { input: Record<string, never>; output: TodayOut };
     'sale.sale.last_7_days': { input: Record<string, never>; output: LastDaysOut };
     'sale.sale.by_staff': { input: PeriodIn; output: ByStaffOut };
-    'sale.sale.tax_kind': { input: Record<string, never>; output: TaxKindOut };
     'sale.sale.complete': { input: CompleteIn; output: SaleOut };
     'sale.sale.complete_over_limit': { input: CompleteIn; output: SaleOut };
     'sale.sale.void': { input: VoidIn; output: SaleOut };

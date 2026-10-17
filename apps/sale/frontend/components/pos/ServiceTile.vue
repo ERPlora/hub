@@ -7,7 +7,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import { initials, tileGradient } from './till';

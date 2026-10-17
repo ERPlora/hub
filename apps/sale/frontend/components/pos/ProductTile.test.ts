@@ -2,7 +2,7 @@
 // their price; SALE-F07: one without VAT is marked «Falta el IVA» and still takes the tap, to say why).
 import { describe, expect, it } from 'vitest';
 
-import { click, mountSale } from '../../__tests__/mount-sale';
+import { click, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { product } from './__tests__/fixtures';
 import ProductTile from './ProductTile.vue';
@@ -39,7 +39,7 @@ describe('ProductTile', () => {
   it('in the Canary Islands the badge and the reason name the IGIC', async () => {
     const m = await mountSale(ProductTile, { props: { product: product({ needs_tax_setup: true }) } });
     await m.live();
-    await m.result('sale.sale.tax_kind', { tax: 'igic' });
+    await m.result('tax.settings.get', taxSettings('igic'));
     const tile = m.find('pos-product-p1');
     expect(tile.find('.pos-tile__badge').text()).toBe('IGIC missing');
     expect(tile.attributes('aria-label')).toBe('Café con leche · Cannot be sold: no tax category. IGIC needs to be set up.');

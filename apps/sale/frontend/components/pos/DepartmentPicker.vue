@@ -13,7 +13,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { IonSearchbar, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
-import { useTaxName } from '../../composables/useTaxName';
+import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
 import { formatPercent } from '../../lib/format';
 import TaxCategoryPicker from '../TaxCategoryPicker.vue';

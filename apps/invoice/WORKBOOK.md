@@ -686,6 +686,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
+| El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
 | El siguiente número de una serie, sin gastarlo | ver | F13 | `invoice.series.peek_next` |
 | Si la numeración del año está preparada | ver | F14 | `invoice.numbering.status` |
@@ -755,7 +756,12 @@ por devolución y una por anulación.
   (`resolve_tax`, en el territorio fiscal del negocio); el impuesto de un territorio (`tax_kind_of`,
   `business_tax_kind`) para lo que no tiene regla: la línea con tipo tecleado (el territorio del negocio) y la
   de una venta cuya regla ya no existe (el territorio que la línea congeló al cobrarse); el redondeo a mitad
-  hacia arriba (`round_half_up`).
+  hacia arriba (`round_half_up`). El nombre del impuesto del tipo de una línea tecleada («IVA %», «IGIC %»,
+  «IPSI %») lo lee la pantalla de `tax.settings.get` (`tax_kind`, con `useTaxKind()` de Impuestos), la única
+  fuente: `invoice.invoice.line_defaults` solo da el tipo general y no repite el impuesto (ronda 2026-10-17
+  de PLAN-HUB). Lo ya emitido se rotula por lo que declaró (el impuesto de su desglose; «Imp. %» si mezcla),
+  nunca por el territorio de hoy: la misma regla que la cifra de impuestos de Ventas (SALE-F28), que dice el
+  impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
   los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
 

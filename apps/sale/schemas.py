@@ -17,6 +17,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from apps.customer.tax_ids import InvalidCountry, normalize_country
+from apps.tax.schemas import TerritoryTaxKind
 
 T = TypeVar("T")
 
@@ -1131,12 +1132,10 @@ class StatsOut(Schema):
     discount_total: int = Field(description="Discounts given, in cents.")
     refunded_total: int = Field(description="Refunded in cents.")
     voided_count: int = Field(description="Sales voided.")
-
-
-class TaxKindOut(Schema):
-    tax: Literal["vat", "igic", "ipsi"] = Field(
-        description="The tax the business's sales are declared with, its territory's: vat, igic (Canary Islands) "
-        "or ipsi (Ceuta and Melilla)."
+    tax_kind: TerritoryTaxKind | None = Field(
+        description="The tax the period's sales were declared with, what its tax figure is named by: vat, igic "
+        "or ipsi when they all declared it; empty when they declared more than one (or another tax). Without "
+        "sales, the business territory's."
     )
 
 

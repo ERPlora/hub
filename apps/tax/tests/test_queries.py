@@ -10,11 +10,11 @@ from decimal import Decimal
 
 import pytest
 from django.db import DatabaseError, connection
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
-from apps.tax import queries
+from apps.tax import queries, schemas
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
     AliasListIn,
@@ -1108,11 +1108,35 @@ def test_read_the_business_tax_settings(no_seed):
         "country_code": "ES",
         "region_code": None,
         "regions": ["ES-CN", "ES-CE", "ES-ML"],
+        "tax_kind": "vat",
         "updated_at": None,
     }
     keep_region("ES-ML")
     kept = run("tax.settings.get", SettingsGetIn())
-    assert (kept.region_code, kept.updated_at is not None) == ("ES-ML", True)
+    assert (kept.region_code, kept.tax_kind, kept.updated_at is not None) == ("ES-ML", "ipsi", True)
+
+
+@pytest.mark.parametrize(
+    ("region", "tax_kind"),
+    [("ES-CN", "igic"), ("ES-CE", "ipsi"), ("ES-ML", "ipsi"), ("", "vat")],
+)
+def test_the_settings_say_the_tax_of_the_business_territory(no_seed, region, tax_kind):
+    # TAX-F11: the one place every screen reads which tax the business's sales are declared with.
+    keep_region(region)
+    assert run("tax.settings.get", SettingsGetIn(), role="hub_employee").tax_kind == tax_kind
+
+
+def test_each_territory_tax_has_its_short_name(no_seed):
+    # What a message names a territory's tax by (the till's «Its IGIC is missing»), in the reader's language.
+    assert set(schemas.TAX_KIND_NAMES) == {"vat", "igic", "ipsi"}
+    with translation.override("en"):
+        assert {kind: str(name) for kind, name in schemas.TAX_KIND_NAMES.items()} == {
+            "vat": "VAT",
+            "igic": "IGIC",
+            "ipsi": "IPSI",
+        }
+    with translation.override("es"):
+        assert str(schemas.TAX_KIND_NAMES["vat"]) == "IVA"
 
 
 def test_a_region_of_another_country_than_the_business_is_a_422_never_the_national_rate(no_seed):

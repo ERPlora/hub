@@ -67,6 +67,7 @@ MESSAGES = [
     schemas.RATE_WITHOUT_TAX,
     schemas.RANGE_BACKWARDS,
     schemas.WHICH_RULE,
+    *schemas.TAX_KIND_NAMES.values(),
     services.CATEGORY_EXISTS,
     services.ALIAS_EXISTS,
     services.RULE_OVERLAPS,
