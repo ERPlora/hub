@@ -48,7 +48,7 @@ sobre el importe del tique, y nadie lo llamaba.
 | Business Central | Listas por cliente, grupo de precios de cliente o todos, con fechas, cantidad mínima y divisa; gana el **mejor precio** (el más bajo) en la fecha; sin acuerdo, el precio de la ficha; se calcula al insertar la línea | https://learn.microsoft.com/en-us/dynamics365/business-central/sales-how-record-sales-price-discount-payment-agreements |
 | Shopify | Catálogos B2B por empresa o mercado, precio fijo o % y tramos por volumen; gana el **precio más bajo**; los descuentos automáticos no se combinan: se aplica **el mejor para el cliente**; un descuento manual del TPV siempre se aplica | https://help.shopify.com/en/manual/b2b/catalogs · https://help.shopify.com/manual/discounts/discount-combinations · https://help.shopify.com/en/manual/sell-in-person/shopify-pos/discount-management/combining-discounts |
 | Lightspeed X-Series | Libros de precios por grupo de clientes, tienda, fechas y unidades mín./máx. (tramos repitiendo el producto); el libro general es la base; entre promociones gana **la mejor para el cliente**; libro y promoción se apilan | https://x-series-support.lightspeedhq.com/hc/en-us/articles/25534056400411-Running-sales-using-price-books · https://x-series-support.lightspeedhq.com/hc/en-us/articles/25534113032859-Setting-up-multi-save-and-conditional-promotions |
-| Odoo 18 | Tarifa en la ficha del cliente o la por defecto del TPV; reglas con fechas, cantidad mínima y ámbito (producto, categoría, todo); sin regla, el precio base; al cambiar de cliente o de cantidad se recalculan las líneas que no tienen precio manual | https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale/pricing/pricelists.html · https://github.com/odoo/odoo/blob/18.0/addons/product/models/product_pricelist_item.py |
+| Odoo 18 | Tarifa en la ficha del cliente o la por defecto del TPV; reglas con fechas, cantidad mínima y ámbito (producto, categoría, todo); sin regla, el precio base; al cambiar de cliente o de cantidad se recalculan las líneas que no tienen precio manual | https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale/pricing/pricelists.html <!-- código: https://github.com/odoo/odoo/blob/18.0/addons/product/models/product_pricelist_item.py --> |
 | Square | El precio por cliente es un descuento automático ligado a un grupo de clientes; reglas por cantidad, 2x1, fechas y horas; **un solo descuento automático por artículo, el más favorable** | https://squareup.com/help/us/en/article/6603 · https://developer.squareup.com/blog/discounting-at-square/ |
 | Toast | Precios por menú, horario o nivel; descuentos automáticos 2x1, volumen, fijo o %; **uno por artículo**; los manuales nunca se quitan al recalcular | https://doc.toasttab.com/doc/platformguide/adminAutoApplyDiscounts.html · https://doc.toasttab.com/doc/platformguide/adminToastPosPricingFeatures.html |
 | WooCommerce | Cupones (%, fijo por carrito o por producto, gasto mínimo, categorías, caducidad) y Dynamic Pricing por rol, tramos por producto o categoría; en categorías gana el mayor descuento | https://woocommerce.com/document/coupon-management/ · https://woocommerce.com/document/woocommerce-dynamic-pricing/ |
@@ -85,7 +85,7 @@ kilos o líneas?
 
 | Producto | Cómo lo resuelve | Fuente |
 |---|---|---|
-| Odoo 18 | La cantidad mínima va en la unidad de medida del producto; la fidelización suma las cantidades en esa unidad y redondea hacia abajo las unidades gratis | https://github.com/odoo/odoo/blob/18.0/addons/product/models/product_pricelist_item.py · https://github.com/odoo/odoo/blob/18.0/addons/sale_loyalty/models/sale_order.py |
+| Odoo 18 | La cantidad mínima va en la unidad de medida del producto; la fidelización suma las cantidades en esa unidad y redondea hacia abajo las unidades gratis | Código fuente de Odoo 18: tarifas y fidelización <!-- código: https://github.com/odoo/odoo/blob/18.0/addons/product/models/product_pricelist_item.py · https://github.com/odoo/odoo/blob/18.0/addons/sale_loyalty/models/sale_order.py --> |
 | Business Central | Precio y descuento de línea por unidad de medida y cantidad mínima en esa unidad | https://learn.microsoft.com/en-us/dynamics365/business-central/sales-how-record-sales-price-discount-payment-agreements |
 | Dynamics 365 Commerce | Descuentos por cantidad y combinados con unidad de medida en cada línea; no convierte unidades | https://learn.microsoft.com/en-us/dynamics365/commerce/retail-discounts-overview |
 | Square | Las reglas cuentan «artículos» enteros; con unidad de medida no dice cómo cuenta 0,25 lb | https://developer.squareup.com/reference/square/objects/CatalogProductSet |
@@ -390,7 +390,7 @@ Si falla: «Esa regla ya está desactivada.», «Esa regla ya está activa.» y,
 Implicados: Clientes
 
 ### PRICING-F13 Consultar el precio de una línea
-Estado: hecho (servidor; sin pantalla propia: lo pide quien vende o el asistente)
+Estado: hecho (no tiene pantalla propia: lo pide quien vende o el asistente)
 Actor: sistema (Ventas), asistente, empleado por la API
 Pantalla: ninguna
 Pasos:
