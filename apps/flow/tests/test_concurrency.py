@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.db import connection
+from django.db import connection, transaction
 from live.context import system_context
 from live.errors import NotFound
 from live.models import OutboxEvent
@@ -111,14 +111,17 @@ DELETIONS = ["operation", "row"]
 
 
 def delete(flow, how: str) -> None:
-    """Deletes ``flow`` in this session, giving up at once on a row another session has locked."""
-    with connection.cursor() as cursor:
-        cursor.execute("SET lock_timeout = '300ms'")
-    if how == "operation":
-        run("flow.flow.delete", {"id": str(flow.id)})
-    else:
-        # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
-        Flow.objects.get(pk=flow.pk).delete()
+    """Deletes ``flow`` in this session, giving up at once on a row another session has locked. The lock
+    timeout is the transaction's (SET LOCAL): a session-level one would go back to the pool with the
+    connection and reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL lock_timeout = '300ms'")
+        if how == "operation":
+            run("flow.flow.delete", {"id": str(flow.id)})
+        else:
+            # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
+            Flow.objects.get(pk=flow.pk).delete()
 
 
 @contextmanager
