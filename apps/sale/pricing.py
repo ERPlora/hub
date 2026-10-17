@@ -307,7 +307,8 @@ def _resolve(close: Closer, line: LineIn, tax_included: bool) -> dict:
 
 
 def tax_closer(on=None) -> Closer:
-    """``close`` on tax's own calculation, in the business's country, on the business day ``on``."""
+    """``close`` on tax's own calculation, in the business's jurisdiction (its country and the region it
+    keeps in Taxes, TAX-F11: no country named), on the business day ``on``."""
     from apps.tax.queries import calculate_tax
 
     def close(category_key: str, amount: int, tax_included: bool) -> dict:

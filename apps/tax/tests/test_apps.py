@@ -59,7 +59,7 @@ def test_roles():
     assert permissions_for_role([config], "hub_employee") == {"tax.view"}
 
 
-def test_navigation_is_the_three_tabs_with_iconify_icons():
+def test_navigation_is_the_four_tabs_with_iconify_icons():
     # The icons are the frontend tabbar's (apps/tax/frontend/tabs.ts) and the old menu's
     # (`pricetags`, `receipt`, `swap-horizontal`), all registered in the shell: an unregistered one
     # paints nothing (and HubIcon throws in development).
@@ -71,6 +71,8 @@ def test_navigation_is_the_three_tabs_with_iconify_icons():
         ("categories", "Categories", "/tax/categories", "ion:pricetags-outline"),
         ("rules", "Rules", "/tax/rules", "ion:receipt-outline"),
         ("aliases", "Aliases", "/tax/aliases", "ion:swap-horizontal-outline"),
+        # The business's tax region (TAX-F11), as Sales and Inventory keep their own settings.
+        ("settings", "Settings", "/tax/settings", "ion:settings-outline"),
     ]
 
 
@@ -80,7 +82,7 @@ def test_every_operation_is_described_for_the_assistant():
     from live.operations import registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("tax.")}
-    assert len(ops) == 16
+    assert len(ops) == 18
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name

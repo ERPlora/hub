@@ -11,11 +11,11 @@ from decimal import Decimal
 import pytest
 from django.db import DatabaseError, connection
 from django.utils import timezone
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.tax import queries
-from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
     AliasListIn,
     AliasPage,
@@ -34,6 +34,8 @@ from apps.tax.schemas import (
     RuleParentIn,
     RuleStatusIn,
     RuleStatusOut,
+    SettingsGetIn,
+    TaxSettingsOut,
 )
 
 from .conftest import ctx_for
@@ -86,6 +88,8 @@ def resolve(key="product.generic", country="ES", region=None, on=TODAY):
         ("tax.alias.list", AliasListIn, AliasPage, True),
         ("tax.alias.resolve", AliasResolveIn, AliasResolveOut, True),
         ("tax.rate.calculate", CalculateIn, CalculationOut, False),
+        # The business's tax region (TAX-F11): what every calculation reads when it names no country.
+        ("tax.settings.get", SettingsGetIn, TaxSettingsOut, False),
     ],
 )
 def test_declarations(name, input, output, expose_api):
@@ -1000,3 +1004,114 @@ def test_only_tax_resolves_a_rule():
         if lookup.search(line)
     ]
     assert offenders == []
+
+
+# The business's jurisdiction (TAX-F11, pm#629 VF-17): its country and the region it keeps in Taxes. Every
+# calculation that names no country reads it: sales and invoice call these functions without one.
+
+
+def keep_region(region):
+    TaxSettings.objects.update_or_create(singleton=True, defaults={"region_code": region})
+
+
+def test_the_business_is_the_whole_of_spain_until_it_keeps_a_region(no_seed):
+    assert queries.business_jurisdiction() == ("ES", None)
+    keep_region("ES-CN")
+    assert queries.business_jurisdiction() == ("ES", "ES-CN")
+
+
+def test_a_calculation_without_a_country_is_in_the_business_jurisdiction(no_seed):
+    generic = category()
+    national = rule(generic, "21")
+    canary = rule(generic, "7", region="ES-CN", tax_type="igic")
+    assert queries.resolve_tax(category_key="product.generic", on=TODAY).root == national
+    keep_region("ES-CN")
+    assert queries.resolve_tax(category_key="product.generic", on=TODAY).root == canary
+    result = queries.calculate_tax(amount=10_000, category_key="product.generic", on=TODAY)
+    assert (result["tax"], result["tax_kind"], result["tax_country_code"], result["tax_region_code"]) == (
+        700,
+        "igic",
+        "ES",
+        "ES-CN",
+    )
+    # Naming a country asks for that jurisdiction alone: the whole of Spain is the national rule.
+    national_only = queries.resolve_tax(category_key="product.generic", country_code="ES", on=TODAY)
+    assert national_only.root == national
+
+
+def test_the_calculation_and_the_rate_column_default_to_the_business_jurisdiction(no_seed):
+    generic = category()
+    rule(generic, "21")
+    rule(generic, "7", region="ES-CN", tax_type="igic")
+    keep_region("ES-CN")
+    result = calculate(amount=10_000, tax_category_key="product.generic", date=TODAY, role="hub_employee")
+    assert (result.tax, result.tax_kind, result.tax_country_code, result.tax_region_code) == (
+        700,
+        "igic",
+        "ES",
+        "ES-CN",
+    )
+    asked = calculate(amount=10_000, tax_category_key="product.generic", country_code="ES", date=TODAY)
+    assert (asked.tax, asked.tax_region_code) == (2_100, None)
+    assert {row.key: row.rate_pct for row in categories().rows} == {"product.generic": Decimal("7.00")}
+    assert {row.key: row.rate_pct for row in categories(country_code="ES").rows} == {
+        "product.generic": Decimal("21.00")
+    }
+
+
+def test_read_the_business_tax_settings(no_seed):
+    read = run("tax.settings.get", SettingsGetIn(), role="hub_employee")
+    assert read.model_dump() == {
+        "country_code": "ES",
+        "region_code": None,
+        "regions": ["ES-CN", "ES-CE", "ES-ML"],
+        "updated_at": None,
+    }
+    keep_region("ES-ML")
+    kept = run("tax.settings.get", SettingsGetIn())
+    assert (kept.region_code, kept.updated_at is not None) == ("ES-ML", True)
+
+
+def test_a_region_of_another_country_than_the_business_is_a_422_never_the_national_rate(no_seed):
+    rule(category(), "21")
+    with pytest.raises(InvalidPayload) as refused:
+        calculate(amount=10_000, tax_category_key="product.generic", region_code="PT-20", date=TODAY)
+    assert (refused.value.status, list(refused.value.fields)) == (422, ["region_code"])
+    with pytest.raises(InvalidPayload):
+        categories(region_code="PT-20")
+
+
+# The tax family of a territory (TAX-F11): what a line without a category or a rule is declared with
+
+
+def test_each_territory_declares_its_own_tax_family(no_seed):
+    assert [
+        queries.tax_kind_of(country, region)
+        for country, region in (
+            ("ES", None),
+            ("ES", "ES-CN"),
+            (" es ", "es-ce"),
+            ("ES", "ES-ML"),
+            # Madrid charges the national VAT; a region of another country is never Spain's IGIC.
+            ("ES", "ES-MD"),
+            ("PT", "PT-20"),
+            ("PT", "ES-CN"),
+        )
+    ] == ["vat", "igic", "ipsi", "ipsi", "vat", "vat", "vat"]
+    assert queries.business_tax_kind() == "vat"
+    keep_region("ES-CN")
+    assert queries.business_tax_kind() == "igic"
+
+
+def test_a_zero_fallback_carries_the_tax_family_of_its_territory(no_seed):
+    category()
+    keep_region("ES-CE")
+    result = queries.calculate_tax(
+        amount=10_000, category_key="product.generic", on=TODAY, allow_missing_rate=True
+    )
+    assert (result["source"], result["tax"], result["tax_kind"], result["tax_region_code"]) == (
+        "fallback_zero",
+        0,
+        "ipsi",
+        "ES-CE",
+    )

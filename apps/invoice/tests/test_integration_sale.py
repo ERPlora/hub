@@ -6,6 +6,7 @@ Cases from the current product's tests: ``from_sale.hub``, ``rectify_from_refund
 ``rectify_lines`` and ``line_surcharge_rate``.
 """
 
+import re
 from decimal import Decimal
 
 import pytest
@@ -14,8 +15,9 @@ from live.errors import Conflict
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import ISSUER, ctx_for, deliver, run
-from apps.sale.models import Sale
+from apps.sale.models import Sale, SaleLine
 from apps.tax.models import TaxRule
+from apps.verifactu.models import Record
 
 pytestmark = pytest.mark.django_db
 
@@ -501,3 +503,36 @@ def test_the_issued_notice_says_where_the_document_comes_from(issuer, shelf, cha
         ("void", str(voided.id), None, True),
     }
 
+
+
+# A sale line whose rule is gone (TAX-F11, pm#629 VF-17): declared with the tax family of the territory the line
+# was charged in, as the line froze it, never a fixed VAT; nor the business's territory of today.
+
+
+@pytest.mark.parametrize(
+    ("region", "rule", "tax", "code"),
+    [
+        (None, None, "vat", "01"),
+        ("ES-CN", {"rate_pct": "7", "tax_type": "igic"}, "igic", "03"),
+        ("ES-CE", {"rate_pct": "4", "tax_type": "ipsi"}, "ipsi", "02"),
+    ],
+)
+def test_a_sale_line_without_its_rule_keeps_the_tax_of_its_territory(product, charge, region, rule, tax, code):
+    if rule:
+        run(
+            "tax.rule.create",
+            {"country_code": "ES", "region_code": region, "tax_category_key": "product.generic", **rule},
+        )
+    run("tax.settings.update", {"region_code": region})
+    product("Shirt", "SHI", 1210, "product.generic")
+    # Charged before the business has its issuer: the till keeps the document pending.
+    sale = charge("inv-region-0001", [{"product": "SHI"}])
+    assert not Invoice.objects.filter(source_sale_id=sale.id).exists()
+    SaleLine.objects.filter(sale_id=sale.id).update(tax_rule_id=None)
+    # The business moves territory afterwards: the line keeps the one it was charged in.
+    run("tax.settings.update", {"region_code": None if region else "ES-CN"})
+    run("invoice.issuer.update", ISSUER)
+    ticket = run("invoice.invoice.create_from_sale", {"sale_id": str(sale.id)}).invoice
+    assert [entry.tax for entry in ticket.tax_breakdown] == [tax]
+    record = Record.objects.get(invoice_id=ticket.id)
+    assert re.findall(r"<sum1:Impuesto>(\d+)</sum1:Impuesto>", record.xml) == [code]

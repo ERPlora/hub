@@ -5,7 +5,8 @@
       "label": "Secciones de impuestos",
       "categories": "Categorías",
       "rules": "Reglas",
-      "aliases": "Alias"
+      "aliases": "Alias",
+      "settings": "Ajustes"
     },
     "live": {
       "reconnecting": "Reconectando…",
@@ -158,6 +159,26 @@
       "heading": "Tus impuestos",
       "message": "Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular el precio de una venta.",
       "action": "Configurar"
+    },
+    "settings": {
+      "header": "Territorio fiscal del negocio",
+      "loading": "Cargando los ajustes de impuestos…",
+      "loadError": "No se pudieron cargar los ajustes de impuestos.",
+      "country": "País",
+      "countryHelp": "Es el país de tu cuenta de ERPlora.",
+      "region": "Territorio fiscal",
+      "regionHelp": "Canarias cobra IGIC y Ceuta y Melilla, IPSI. Cada categoría se cobra con la regla de tu territorio cuando la tiene —créala en Reglas— y, si no, con la nacional.",
+      "regions": {
+        "wholeCountry": "Todo el país (IVA)",
+        "canaryIslands": "Canarias (IGIC)",
+        "ceuta": "Ceuta (IPSI)",
+        "melilla": "Melilla (IPSI)"
+      },
+      "readOnly": "Puedes ver el territorio fiscal, pero no cambiarlo.",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Territorio fiscal guardado.",
+      "saveError": "No se pudo guardar el territorio fiscal."
     }
   }
 }

@@ -21,7 +21,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the sixteen tax operations to apps/tax/api.py: queries by GET, commands by POST', () => {
+  it('binds the eighteen tax operations to apps/tax/api.py: queries by GET, commands by POST', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'tax.category.list': { method: 'get', path: '/api/tax/categories' },
       'tax.category.get': { method: 'get', path: '/api/tax/categories/detail' },
@@ -39,8 +39,11 @@ describe('OPERATION_ROUTES', () => {
       'tax.alias.resolve': { method: 'get', path: '/api/tax/aliases/resolve' },
       'tax.alias.create': { method: 'post', path: '/api/tax/aliases' },
       'tax.rate.calculate': { method: 'get', path: '/api/tax/rates/calculate' },
+      // The business's tax region (TAX-F11).
+      'tax.settings.get': { method: 'get', path: '/api/tax/settings' },
+      'tax.settings.update': { method: 'post', path: '/api/tax/settings' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('tax.'))).toHaveLength(16);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('tax.'))).toHaveLength(18);
   });
 
   it('binds the twenty-six routed inventory operations to apps/inventory/api.py (the two sale reactions have no route)', () => {

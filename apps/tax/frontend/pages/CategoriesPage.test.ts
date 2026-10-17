@@ -93,6 +93,7 @@ describe('CategoriesPage: the live list', () => {
       ['categories', '/tax/categories'],
       ['rules', '/tax/rules'],
       ['aliases', '/tax/aliases'],
+      ['settings', '/tax/settings'],
     ]);
   });
 

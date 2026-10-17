@@ -90,6 +90,8 @@
   "tax.alias.resolve": { "method": "get", "path": "/api/tax/aliases/resolve" },
   "tax.alias.create": { "method": "post", "path": "/api/tax/aliases" },
   "tax.rate.calculate": { "method": "get", "path": "/api/tax/rates/calculate" },
+  "tax.settings.get": { "method": "get", "path": "/api/tax/settings" },
+  "tax.settings.update": { "method": "post", "path": "/api/tax/settings" },
   "staff.member.list": { "method": "get", "path": "/api/staff/members" },
   "staff.member.detail": { "method": "get", "path": "/api/staff/members/detail" },
   "staff.member.mine": { "method": "get", "path": "/api/staff/members/mine" },

@@ -43,4 +43,6 @@ class TaxConfig(LiveAppConfig):
         Nav("categories", _("Categories"), "ion:pricetags-outline", "/tax/categories"),
         Nav("rules", _("Rules"), "ion:receipt-outline", "/tax/rules"),
         Nav("aliases", _("Aliases"), "ion:swap-horizontal-outline", "/tax/aliases"),
+        # The business's tax region (TAX-F11).
+        Nav("settings", _("Settings"), "ion:settings-outline", "/tax/settings"),
     ]

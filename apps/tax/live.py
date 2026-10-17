@@ -2,9 +2,9 @@
 
 from live.live_registry import live
 
-from apps.tax.events import ALIAS_CREATED, CATEGORY_CREATED, RULE_EVENTS
+from apps.tax.events import ALIAS_CREATED, CATEGORY_CREATED, RULE_EVENTS, SETTINGS_UPDATED
 
-# The categories show the rate in force today: every rule event may change it.
+# The categories show the rate in force today: every rule event, and the business's region, may change it.
 live("tax.category.list", on=[CATEGORY_CREATED, *RULE_EVENTS])
 live("tax.rule.list", on=RULE_EVENTS)
 live("tax.rule.status", on=RULE_EVENTS)
@@ -12,3 +12,4 @@ live("tax.rule.status", on=RULE_EVENTS)
 live("tax.rule.parent_candidates", on=RULE_EVENTS)
 live("tax.rule.countries", on=RULE_EVENTS)
 live("tax.alias.list", on=[ALIAS_CREATED])
+live("tax.settings.get", on=[SETTINGS_UPDATED])

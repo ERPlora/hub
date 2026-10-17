@@ -6,14 +6,14 @@ from live.operations import NAME_RE
 
 from apps.tax import events
 
-PAST_FACT = re.compile(r"^tax\.(category|rule|alias)\.[a-z_]+ed$")
+PAST_FACT = re.compile(r"^tax\.(category|rule|alias|settings)\.[a-z_]+ed$")
 
 
 def declared():
     return {name: value for name, value in vars(events).items() if name.isupper() and isinstance(value, str)}
 
 
-def test_the_six_events():
+def test_the_seven_events():
     assert declared() == {
         "CATEGORY_CREATED": "tax.category.created",
         "ALIAS_CREATED": "tax.alias.created",
@@ -21,6 +21,7 @@ def test_the_six_events():
         "RULE_ENDED": "tax.rule.ended",
         "RULE_DEACTIVATED": "tax.rule.deactivated",
         "RULE_ACTIVATED": "tax.rule.activated",
+        "SETTINGS_UPDATED": "tax.settings.updated",
     }
 
 
@@ -35,5 +36,12 @@ def test_all_lists_every_event_once():
 
 
 def test_the_rule_events_are_grouped():
-    # Every one of them changes which rate applies: the lists of rules and categories re-run.
-    assert events.RULE_EVENTS == [events.RULE_CREATED, events.RULE_ENDED, events.RULE_DEACTIVATED, events.RULE_ACTIVATED]
+    # Every one of them changes which rate applies: the lists of rules and categories re-run. The business's
+    # region does too (TAX-F11): the till re-prices with it.
+    assert events.RULE_EVENTS == [
+        events.RULE_CREATED,
+        events.RULE_ENDED,
+        events.RULE_DEACTIVATED,
+        events.RULE_ACTIVATED,
+        events.SETTINGS_UPDATED,
+    ]

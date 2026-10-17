@@ -32,6 +32,9 @@ msgstr "Reglas"
 msgid "Aliases"
 msgstr "Alias"
 
+msgid "Settings"
+msgstr "Ajustes"
+
 msgid "Restaurant — food"
 msgstr "Restauración — comida"
 
@@ -251,3 +254,21 @@ msgstr "Esa regla ya está activa."
 
 msgid "That rule is already deactivated."
 msgstr "Esa regla ya está desactivada."
+
+msgid "tax settings"
+msgstr "ajustes de impuestos"
+
+msgid "single row"
+msgstr "fila única"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "Whole country"
+msgstr "Todo el país"
+
+msgid "This region has no taxes of its own in your business's country: choose one of its tax territories, or none."
+msgstr "Esta región no tiene impuestos propios en el país de tu negocio: elige uno de sus territorios fiscales, o ninguno."
+
+msgid "Choose a hub first (its link in the SaaS admin): the region is kept on that hub."
+msgstr "Elige antes un hub (su enlace en el admin del SaaS): la región se guarda en ese hub."

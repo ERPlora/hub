@@ -9,7 +9,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.utils import translation
 
-from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule, TaxSettings
 
 CANONICAL_KEYS = {
     "restaurant.food",
@@ -301,3 +301,13 @@ def test_the_two_alcohol_categories_say_where_the_drink_is_drunk():
             "Bebidas alcohólicas servidas para consumir en el local — art. 91.Uno.2.2 (ES)"
         )
         assert to_take_away.display_name == "Venta — alcohol para llevar"
+
+
+# The business's tax settings (TAX-F11): one row at most, the whole country until a region is kept
+
+
+@pytest.mark.django_db
+def test_the_tax_settings_are_one_row_of_the_whole_country():
+    kept = TaxSettings.objects.create()
+    assert (kept.pk.version, kept.region_code, kept.updated_by) == (7, "", "")
+    assert violates("tax_settings_single_row", lambda: TaxSettings.objects.create(region_code="ES-CN"))

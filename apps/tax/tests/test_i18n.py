@@ -10,8 +10,9 @@ from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
 
+from apps.tax import admin as tax_admin
 from apps.tax import queries, schemas, services
-from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule
+from apps.tax.models import SYSTEM_CATEGORY_LABELS, WHOLE_COUNTRY, TaxAlias, TaxCategory, TaxRule, TaxSettings
 
 LOCALE = Path(apps.get_app_config("tax").path) / "locale" / "es" / "LC_MESSAGES"
 _STRING = re.compile(r'^"(.*)"$')
@@ -61,6 +62,8 @@ MESSAGES = [
     queries.NO_RATE,
     schemas.REGION_UNKNOWN,
     schemas.REGION_OF_ANOTHER_COUNTRY,
+    schemas.REGION_NOT_AVAILABLE,
+    WHOLE_COUNTRY,
     schemas.RATE_WITHOUT_TAX,
     schemas.RANGE_BACKWARDS,
     schemas.WHICH_RULE,
@@ -72,6 +75,7 @@ MESSAGES = [
     services.RULE_EXISTS,
     services.RULE_ALREADY_ACTIVE,
     services.RULE_ALREADY_INACTIVE,
+    tax_admin.CHOOSE_A_HUB,
 ]
 
 
@@ -88,7 +92,7 @@ def visible_texts() -> set[str]:
     ]
     for label in SYSTEM_CATEGORY_LABELS.values():
         lazies += [text for text in label if str(text)]
-    for model in (TaxCategory, TaxRule, TaxAlias):
+    for model in (TaxCategory, TaxRule, TaxAlias, TaxSettings):
         lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
         # The primary key comes from live.models.UUIDModel: its name is Django's, not a text of this app.
         lazies += [

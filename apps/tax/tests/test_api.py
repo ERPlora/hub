@@ -29,6 +29,8 @@ ROUTES = {
     ("GET", "/tax/aliases/resolve", "tax.alias.resolve"),
     ("POST", "/tax/aliases", "tax.alias.create"),
     ("GET", "/tax/rates/calculate", "tax.rate.calculate"),
+    ("GET", "/tax/settings", "tax.settings.get"),
+    ("POST", "/tax/settings", "tax.settings.update"),
 }
 
 
@@ -348,3 +350,38 @@ def test_rules_that_cannot_be_read_are_an_internal_error_never_a_missing_app(
     assert "tax_taxrule" not in error["message"]
     with translation.override("es"):
         assert error["message"] == gettext("Internal error")
+
+
+# The business's region (TAX-F11): read by whoever sells, kept by whoever manages taxes
+
+
+@pytest.mark.django_db
+def test_whoever_sells_reads_the_business_region_but_does_not_change_it(employee_client):
+    read = get(employee_client, "/tax/settings")
+    assert (read.status_code, read.json()["region_code"], read.json()["regions"]) == (
+        200,
+        None,
+        ["ES-CN", "ES-CE", "ES-ML"],
+    )
+    denied = post(employee_client, "/tax/settings", {"region_code": "ES-CN"})
+    assert (denied.status_code, denied.json()["error"]["code"]) == (403, "permission_denied")
+
+
+@pytest.mark.django_db
+def test_keep_the_business_region_and_calculate_in_it(admin_client):
+    kept = post(admin_client, "/tax/settings", {"region_code": "ES-CN"})
+    assert (kept.status_code, kept.json()["country_code"], kept.json()["region_code"]) == (200, "ES", "ES-CN")
+    calculated = get(admin_client, "/tax/rates/calculate", amount=10_000, tax_category_key="product.generic")
+    # No IGIC rule yet: a category without a regional rule keeps the national one.
+    assert (calculated.json()["tax"], calculated.json()["tax_region_code"]) == (2_100, "ES-CN")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("region", "code"),
+    [("PT-20", "tax.region_not_available"), ("XX-99", "invalid_payload")],
+)
+def test_a_region_the_business_cannot_keep_is_422_on_its_field(admin_client, region, code):
+    response = post(admin_client, "/tax/settings", {"region_code": region})
+    error = response.json()["error"]
+    assert (response.status_code, error["code"], list(error["fields"])) == (422, code, ["region_code"])

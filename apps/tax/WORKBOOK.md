@@ -51,9 +51,10 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
   España** (TAX-F16). Con eso un negocio español puede vender sin tocar nada.
 - Activar Inventario, Servicios, Ventas o Facturación activa Impuestos con ellos, y Impuestos no se
   puede desactivar mientras alguna de ellas esté activa.
-- **País y región del negocio**: hoy los dice quien pregunta (la pantalla, Ventas o la API); sin país,
-  se usa España. Cuando los Ajustes del negocio guarden el país y la región, Impuestos los leerá de
-  allí.
+- **País y territorio fiscal del negocio**: el país es el de la cuenta de ERPlora del negocio (en la fase 1,
+  España para todos); el territorio fiscal —todo el país, Canarias, Ceuta o Melilla— se elige en
+  **Impuestos → Ajustes** (TAX-F11). Ventas, Facturación, las pantallas y el asistente calculan con los
+  dos mientras no se pregunte por otro país.
 - Si el negocio es de Portugal o de otro país, no hay ninguna regla de fábrica: hay que crearlas
   (TAX-F04), y la consulta de primeros pasos lo avisa hasta que exista una (TAX-F17).
 - **«Hoy» es la hora de Madrid** en la fase 1: el Hub todavía no guarda la zona horaria del negocio.
@@ -65,13 +66,15 @@ Configuración inicial, paso a paso:
 1. Abre **Impuestos → Categorías** y revisa que están las que vendes; crea las que falten (TAX-F02).
 2. Abre **Impuestos → Reglas** y comprueba que cada categoría tiene su tipo para tu país (TAX-F03).
    Crea las que falten (TAX-F04); si el negocio es de Canarias, Ceuta o Melilla, sigue TAX-F11.
-3. Haz una venta de prueba y comprueba el desglose del tique.
+3. Si el negocio es de Canarias, Ceuta o Melilla, elige su territorio en **Impuestos → Ajustes**
+   (TAX-F11).
+4. Haz una venta de prueba y comprueba el desglose del tique.
 
 ## Pantallas
 
-Impuestos se abre desde el menú **Impuestos** y tiene tres pestañas en la barra de abajo:
-**Categorías**, **Reglas** y **Alias**. Mientras ningún tipo esté vigente, las tres llevan arriba el
-aviso «Tus impuestos» para quien puede gestionarlos (TAX-F17). Las tres siguen el permiso de quien mira: con solo consulta
+Impuestos se abre desde el menú **Impuestos** y tiene cuatro pestañas en la barra de abajo:
+**Categorías**, **Reglas**, **Alias** y **Ajustes**. Mientras ningún tipo esté vigente, las tres primeras llevan arriba el
+aviso «Tus impuestos» para quien puede gestionarlos (TAX-F17). Todas siguen el permiso de quien mira: con solo consulta
 sale el aviso «Puedes consultar las reglas fiscales pero no modificarlas.», desaparece el botón **+** y,
 en Reglas, las acciones de fila. La app exige el permiso en cada acción aunque la pantalla enseñe el
 botón.
@@ -99,13 +102,20 @@ Tabla con Alias, Categoría, Origen («De fábrica» o «Aprendido») y Activa. 
 categoría…», filtros de Alias, Categoría y Origen y orden por cualquier columna. Botón **+** con el
 panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añadir»).
 
+### Ajustes
+«Territorio fiscal del negocio»: el «País» del negocio, solo de lectura («Es el país de tu cuenta de
+ERPlora.»), y el desplegable «Territorio fiscal» con «Todo el país (IVA)», «Canarias (IGIC)», «Ceuta
+(IPSI)» y «Melilla (IPSI)», con su explicación debajo, y «Guardar» («Territorio fiscal guardado.»).
+Quien solo consulta impuestos ve el territorio sin poder cambiarlo («Puedes ver el territorio fiscal,
+pero no cambiarlo.»). Es la pantalla de TAX-F11.
+
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | «Cargando…» mientras llega el primer resultado. |
+| Cargando | «Cargando…» mientras llega el primer resultado; en Ajustes, «Cargando los ajustes de impuestos…». |
 | Vacío | «Sin categorías fiscales.», «Sin reglas fiscales.» o «Sin alias de categorías.» (o «Sin resultados» con búsqueda o filtro), con **+** si puede crear. |
-| Error | El aviso de la tabla con «Reintentar»; un rechazo del alta sale dentro del panel, junto a su campo. |
+| Error | El aviso de la tabla con «Reintentar»; un rechazo del alta sale dentro del panel, junto a su campo. En Ajustes, «No se pudieron cargar los ajustes de impuestos.» con «Reintentar» (sin enseñar ningún territorio como el del negocio), y un rechazo al guardar, «No se pudo guardar el territorio fiscal.» con el motivo bajo «Territorio fiscal». |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | Sin tipos vigentes | Para quien puede gestionar, el aviso «Tus impuestos» con «Configurar» (TAX-F17). |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
@@ -125,7 +135,7 @@ panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añad
 | TAX-F08 | Desactivar y reactivar una regla | hecho |
 | TAX-F09 | Reparar una regla que cobra un tipo donde no toca | descartado |
 | TAX-F10 | Resolver reglas que se solapan | descartado |
-| TAX-F11 | Montar un negocio de Canarias, Ceuta o Melilla | parcial — la región del negocio no llega a Ventas |
+| TAX-F11 | Montar un negocio de Canarias, Ceuta o Melilla | hecho |
 | TAX-F12 | Crear varias reglas de golpe | hecho |
 | TAX-F13 | Ver los alias de categoría | hecho |
 | TAX-F14 | Enseñar un alias de categoría a mano | hecho |
@@ -199,7 +209,8 @@ Pasos:
 3. Escribe parte del nombre de la Categoría, elígela de la lista y escribe el %, entre 0 y 100 (hasta
    dos decimales).
 4. Elige el Tipo («IVA» de entrada; «IGIC (Canarias)», «IPSI (Ceuta/Melilla)»…) y, si quieres, Vigente
-   desde y Vigente hasta (vacío = desde siempre / para siempre).
+   desde y Vigente hasta (vacío = desde siempre / para siempre). Por el asistente o la API, una regla sin
+   Tipo lleva el de su territorio: IGIC en ES-CN, IPSI en ES-CE y ES-ML, IVA en el resto.
 5. Pulsa «Añadir»; el panel se cierra y la regla sale en la tabla.
 Entra: país, región, categoría, %, tipo y fechas que elige la persona.
 Sale: la regla activa; Impuestos avisa (`tax.rule.created`). Desde ese momento Ventas y Facturación la
@@ -328,22 +339,33 @@ Implicados: ninguno
 
 ### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
 <!-- origen: wf:cadena-fiscal#rec_fiscal-f04 old:taxes/WORKFLOW.md#taxes-f11 -->
-Estado: parcial — las reglas regionales se crean y ganan a la nacional cuando se pregunta con la región (pantalla, cálculo y API), pero el Hub no guarda la región del negocio y Ventas cobra sin ella: un negocio de Canarias, Ceuta o Melilla cobra el IVA nacional
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: Reglas
+Pantalla: Ajustes y Reglas
 Pasos:
-1. En Reglas crea una regla por cada categoría que vendes: País «España», la Región (ES-CN Canarias,
+1. En **Impuestos → Ajustes** elige el «Territorio fiscal» del negocio: «Canarias (IGIC)», «Ceuta
+   (IPSI)» o «Melilla (IPSI)», y pulsa «Guardar»: sale «Territorio fiscal guardado.». El «País» es el
+   de la cuenta de ERPlora del negocio.
+2. En Reglas crea una regla por cada categoría que vendes: País «España», la Región (ES-CN Canarias,
    ES-CE Ceuta o ES-ML Melilla), el % del territorio y el Tipo «IGIC (Canarias)» o «IPSI
    (Ceuta/Melilla)» (TAX-F04).
-2. No borres las reglas del IVA: en un negocio con región se aplican a toda categoría que no tenga
+3. No borres las reglas del IVA: en un negocio con territorio se aplican a toda categoría que no tenga
    regla regional. Por eso hace falta una regla regional por cada categoría que vendas.
-3. Haz una venta de prueba y comprueba el tipo cobrado.
-Entra: la región del negocio (la dice quien pregunta) y un tipo regional por categoría que fija la
-persona (no se siembra ninguno a propósito).
-Sale: reglas regionales; para una venta, la regla de la región gana a la nacional y la familia del
-impuesto (IGIC, IPSI) es la de la regla.
-Si falla: una categoría sin regla regional se cobra con la nacional, al IVA; sin región, las reglas
-regionales no se usan nunca.
+4. Haz una venta de prueba: el tique y su desglose dicen el impuesto del territorio («IGIC 7 %»), y la
+   factura lo declara igual.
+Entra: el territorio fiscal del negocio y un tipo regional por categoría que fija la persona (no se
+siembra ninguno a propósito).
+Sale: el territorio guardado, que desde ese momento usan todas las ventas, las facturas, el cálculo de
+TAX-F18 y el tipo que enseñan Categorías y las secciones de Ventas: la regla del territorio gana a la
+nacional y la familia del impuesto (IGIC, IPSI) es la de la regla. Una línea sin categoría ni regla —un
+tipo escrito a mano en una factura, o una venta cuya regla ya no existe— se declara con el impuesto de su
+territorio: IGIC en Canarias, IPSI en Ceuta y Melilla, IVA en el resto (la de una venta, el territorio con
+que se cobró). Evento `tax.settings.updated`, que vuelve a calcular la caja abierta.
+Si falla: un territorio que no tiene impuestos propios en el país del negocio se rechaza bajo
+«Territorio fiscal» («Esta región no tiene impuestos propios en el país de tu negocio: elige uno de sus
+territorios fiscales, o ninguno.»); una categoría sin regla regional se cobra con la nacional, al IVA;
+con «Todo el país (IVA)», las reglas regionales no se usan nunca. Quien solo consulta impuestos ve el
+territorio, pero no lo cambia.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F12 Crear varias reglas de golpe
@@ -463,15 +485,17 @@ Pasos:
    el importe ya lleva el impuesto.
 2. Se obtiene la base, la cuota, el total, el tipo combinado, la calificación, la regla aplicada y el
    desglose por componente.
-Entra: importe en céntimos, categoría, país (de entrada, España), región y fecha (de entrada, hoy; en
-la fase 1, hoy en Madrid).
+Entra: importe en céntimos, categoría, país (de entrada, el del negocio con su territorio fiscal,
+TAX-F11), región y fecha (de entrada, hoy; en la fase 1, hoy en Madrid). Si se dice un país, se
+calcula en ese país y en la región que se diga, sin el territorio del negocio.
 Sale: solo la respuesta; no guarda nada ni avisa. Sin el impuesto incluido, la cuota de cada componente
 es base × tipo redondeada al céntimo, la mitad hacia arriba. Con el impuesto incluido, la base es el
 importe ÷ (1 + tipo combinado) redondeada y la cuota es lo que resta, así que lo cobrado no se mueve un
 céntimo (el último componente absorbe el ajuste). Es el mismo cálculo con el que Ventas cierra el tique
 y Facturación cuadra la cuota.
 Si falla: sin regla aplicable, «Ninguna regla fiscal se aplica a esta categoría en este país.»; nunca
-se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente. Sin importe o sin categoría,
+se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente (y entonces, con el impuesto
+de su territorio: IGIC en Canarias, IPSI en Ceuta y Melilla). Sin importe o sin categoría,
 debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin adivinar.
 Implicados: INVOICE-F01, SALE-F01
 
@@ -514,8 +538,9 @@ reactivarla, la última desactivada).
 | Los alias, con búsqueda, filtros (categoría, origen) y páginas | ver | F13, F15 | `tax.alias.list` |
 | La categoría que corresponde a un texto de fuera, y por qué casó | ver | F15 | `tax.alias.resolve` |
 | El impuesto de un importe: base, cuota, total, tipo, calificación y desglose | ver | F18, F19 | `tax.rate.calculate` |
+| El país y el territorio fiscal del negocio, y los territorios que puede elegir | ver | F11 | `tax.settings.get` |
 
-Categorías, reglas, alias, el estado de configuración, las raíces de un componente y los países se pueden seguir en vivo.
+Categorías, reglas, alias, el estado de configuración, las raíces de un componente, los países y los ajustes se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -528,6 +553,7 @@ Categorías, reglas, alias, el estado de configuración, las raíces de un compo
 | Desactiva una regla | gestionar | F08 | `tax.rule.deactivate` |
 | Reactiva una regla | gestionar | F08 | `tax.rule.activate` |
 | Crea un alias aprendido | gestionar | F14, F15 | `tax.alias.create` |
+| Guarda el territorio fiscal del negocio (o todo el país) | gestionar | F11 | `tax.settings.update` |
 
 ### Lo que avisa
 
@@ -539,10 +565,13 @@ Categorías, reglas, alias, el estado de configuración, las raíces de un compo
 | Regla desactivada | Desactivar | Cuál | `tax.rule.deactivated` |
 | Regla reactivada | Reactivar | Cuál | `tax.rule.activated` |
 | Alias nuevo | Crear un alias | Cuál, su texto y su categoría | `tax.alias.created` |
+| Territorio fiscal cambiado | Guardar otro territorio | El país y el territorio (vacío = todo el país) | `tax.settings.updated` |
 
-Qué refresca cada aviso: las categorías, con «categoría nueva» y con los cuatro de reglas (el tipo
-vigente sale en la tabla); las reglas y el estado de configuración, con los cuatro de reglas; los
-alias, con «alias nuevo».
+Qué refresca cada aviso: las categorías, con «categoría nueva», con los cuatro de reglas y con
+«territorio fiscal cambiado» (el tipo vigente sale en la tabla); las reglas y el estado de
+configuración, con los cuatro de reglas y el del territorio; los ajustes, con «territorio fiscal
+cambiado»; los alias, con «alias nuevo». En Ventas, la caja abierta y el tipo de las secciones se
+recalculan con los cuatro de reglas y con el del territorio.
 
 ### A qué reacciona y lo que necesita de otras apps
 Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
@@ -553,21 +582,21 @@ Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
 |---|---|---|
 | Inventario | Elegir la categoría fiscal de un producto, con su tipo; comprobar que existe; reconocer la columna fiscal de un CSV y aprender textos o crear categorías al importar | `tax.category.list`, `tax.category.get`, `tax.alias.list`, `tax.alias.resolve`, `tax.category.create`, `tax.alias.create` |
 | Servicios | Elegir la categoría fiscal de un servicio | `tax.category.list` |
-| Ventas y Facturación | El tipo y la calificación de cada línea, con el cálculo de TAX-F18 | `tax.rate.calculate` (o su función, dentro de su operación) |
+| Ventas y Facturación | El tipo y la calificación de cada línea, con el cálculo de TAX-F18, en el país y el territorio fiscal del negocio | `tax.rate.calculate` (o su función, dentro de su operación) |
 
 ### Quién puede qué
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver categorías, reglas y alias, y calcular | sí | sí | sí | sí | `tax.view` |
-| Crear categorías, reglas y alias; poner fecha de fin, desactivar y reactivar reglas | sí | sí | sí | no | `tax.manage` |
+| Ver categorías, reglas, alias y el territorio fiscal, y calcular | sí | sí | sí | sí | `tax.view` |
+| Crear categorías, reglas y alias; poner fecha de fin, desactivar y reactivar reglas; cambiar el territorio fiscal | sí | sí | sí | no | `tax.manage` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
 cajero del producto actual es un empleado.
 
 ## Para quien lo mantiene
 
-- Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`),
+- Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso), `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py`
   por fichero, y las páginas (`frontend/`: Categorías, Reglas y Alias, con sus diálogos) con su Vitest y
@@ -587,6 +616,23 @@ cajero del producto actual es un empleado.
   componente con tipo mayor que 0: uno al 0 % nunca lleva cuota.
 - **País y región en cualquier caso**: `resolve_tax` y `calculate_tax` los pasan a mayúsculas, porque
   Ventas y Facturación los llaman sin pasar por los esquemas.
+- **La jurisdicción del negocio, una sola fuente** (TAX-F11, pm#629 VF-17): `queries.business_jurisdiction()`
+  da `(país, región)`: el país es `DEFAULT_COUNTRY` (`ES`) hasta que el Hub reciba el de la cuenta del SaaS
+  (registro de la fase 2; el SaaS lo bloquea cuando el negocio está listo) y la región es la fila única
+  `TaxSettings` (`tax_settings_single_row`; vacía = todo el país). `resolve_tax`, `calculate_tax`,
+  `tax.rate.calculate` y `tax.category.list` la usan cuando no se nombra país; nombrar un país pide ese
+  país solo, con la región que se diga. Una región de otro país que el que toca es 422 en `region_code`,
+  nunca el tipo nacional en silencio. `tax.settings.update` solo admite los territorios con impuestos
+  propios del país (`TAX_REGIONS`: ES-CN, ES-CE, ES-ML), 422 `tax.region_not_available`; su evento va en
+  `RULE_EVENTS`, así que la caja y las listas vivas se recalculan. Ventas (`business_country`, el tipo de
+  las secciones y `tax_closer`) y Facturación (`resolve_tax` de una línea con categoría) no pasan región
+  suelta: leen esta fuente.
+- **El impuesto de un territorio** (`REGION_TAX_KINDS`; `queries.tax_kind_of(país, región)` y
+  `business_tax_kind()`): `igic` en ES-CN, `ipsi` en ES-CE y ES-ML, `vat` en el resto (una región de otro
+  país, también). Lo llevan lo que no tiene regla de la que sacarlo: la línea de factura con tipo tecleado
+  (el territorio del negocio hoy), la línea de venta sin su regla (`_charged_kind` de Facturación: el
+  territorio que la línea congeló al cobrarse), el 0 % pedido expresamente (`fallback_zero`) y el alta de
+  una regla sin `tax_type`. VeriFactu lo declara como `Impuesto` 03, 02 o 01.
 - **Solape**: crear, reactivar, poner fecha de fin y el lote bloquean la fila de la categoría
   (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
   en cola y la segunda ve la primera (tests con dos sesiones reales para crear, reactivar, poner fecha
@@ -642,16 +688,21 @@ cajero del producto actual es un empleado.
    `restaurant.alcohol`: una migración nunca reescribe un tipo; se cambia con TAX-F07.
 11. **«Tus impuestos» sale en las pantallas de Impuestos** (TAX-F17), no en una lista de primeros pasos
    del Hub, que todavía no existe.
+12. **El territorio fiscal se elige en una pantalla** (Impuestos → Ajustes, TAX-F11): antes solo se fijaba
+   por la API de ajustes, y Ajustes del Hub dejaba elegir el país (España o Portugal), que ahora es el de
+   la cuenta de ERPlora. Solo se admiten los territorios con impuestos propios (Canarias, Ceuta, Melilla),
+   nunca un código cualquiera (hub#1496).
 
 - **«Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de los tipos que faltan
   en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business Central) y en la propia
   pantalla de impuestos (WooCommerce, Shopify, Toast). El Hub no tiene esa lista (sería de `base`), así
   que el aviso va en las tres pantallas, con `tax.rule.status` sin país (el Hub no guarda el del
   negocio). Cuando exista la lista de primeros pasos, su paso «Tus impuestos» lee la misma consulta.
-- **Región del negocio en Ventas (TAX-F11)**: `resolve_tax` y `calculate_tax` usan la región que se les
-  da, pero Ventas cierra el tique sin región (`apps/sale/pricing.py`, `tax_closer`) porque el negocio no
-  la guarda: un negocio de Canarias, Ceuta o Melilla cobra el IVA nacional (pm#629, VF-17). Se arregla
-  cuando los Ajustes del negocio guarden país y región y Ventas los pase al cálculo.
+- **Territorio fiscal del negocio (TAX-F11)**: vive en Impuestos, en la pestaña **Ajustes**, como el
+  «país fiscal» de Odoo en los ajustes de Contabilidad y el régimen IGIC de Holded o Sage en los de
+  impuestos; Square, Shopify y Toast lo sacan de la dirección del local. El país no se edita aquí: es el
+  de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro (fase
+  2); hasta entonces, España. Ventas y Facturación leen los dos de la misma fuente (pm#629, VF-17).
 
 ### Lo que NO hace, a propósito
 

@@ -285,6 +285,40 @@ def test_a_line_with_a_tax_category_takes_its_rule_not_the_rate_typed(issuer):
     )
 
 
+def test_a_line_with_a_tax_category_takes_the_rule_of_the_business_region(issuer):
+    # TAX-F11 (pm#629 VF-17): a business of the Canary Islands declares the IGIC of its rule, never the
+    # national VAT of the same category.
+    run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "region_code": "ES-CN",
+            "tax_category_key": "product.generic",
+            "rate_pct": "7",
+            "tax_type": "igic",
+        },
+    )
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    invoice = manual(
+        lines=[
+            {
+                "description": "Shirt",
+                "quantity": "1",
+                "unit_price": 10000,
+                "tax_category_key": "product.generic",
+            }
+        ]
+    )
+    entry = invoice.tax_breakdown[0]
+    assert (entry.tax, entry.rate, entry.base, entry.quota) == (
+        "igic",
+        Decimal("7.00"),
+        10000,
+        700,
+    )
+    assert invoice.total_amount == 10700
+
+
 def test_an_unknown_tax_category_is_refused_on_its_line(issuer):
     with pytest.raises(OperationError) as refused:
         manual(

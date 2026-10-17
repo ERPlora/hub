@@ -16,11 +16,12 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
 }
 
 describe('tax routes.ts', () => {
-  it('maps Categories, Rules and Aliases (the paths of the menu in apps.py), all behind a session', () => {
+  it('maps Categories, Rules, Aliases and Settings (the paths of the menu in apps.py), all behind a session', () => {
     expect(routes.map((r) => [r.path, r.meta?.auth])).toEqual([
       ['/tax/categories', true],
       ['/tax/rules', true],
       ['/tax/aliases', true],
+      ['/tax/settings', true],
     ]);
   });
 
@@ -29,6 +30,7 @@ describe('tax routes.ts', () => {
     expect(await load(routes[0])).toBe((await import('./pages/CategoriesPage.vue')).default);
     expect(await load(routes[1])).toBe((await import('./pages/RulesPage.vue')).default);
     expect(await load(routes[2])).toBe((await import('./pages/AliasesPage.vue')).default);
+    expect(await load(routes[3])).toBe((await import('./pages/SettingsPage.vue')).default);
     // Transforming three pages with their dialogs takes a while when the whole suite runs at once.
   }, 30_000);
 
