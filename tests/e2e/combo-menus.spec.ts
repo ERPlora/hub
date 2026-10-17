@@ -328,8 +328,13 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   const dessert = await addCourse(page, 'Dessert');
   await shown(page).locator(`[data-testid=combo-course-${dessert}-delete]`).click();
   await expect(page.locator('ion-modal[data-testid=combo-course-delete]')).toContainText('Remove the course «Dessert» and its choices?');
+  // Counted on the page, not in `shown()`: while the dialog is open, `shown()` is the dialog.
+  const card = page.locator(`[data-testid=combo-course-${dessert}]`);
+  await expect(card).toHaveCount(1);
   await page.locator('[data-testid=combo-course-delete-submit]').click();
-  await expect(shown(page).locator(`[data-testid=combo-course-${dessert}]`)).toHaveCount(0);
+  // The dialog closes once the course is gone.
+  await expect(page.locator('ion-modal[data-testid=combo-course-delete]')).toBeHidden();
+  await expect(card).toHaveCount(0);
 
   // COMBO-F03: «Edit details» on the list: 14,00 € and off sale; the till stops offering it; back on sale.
   await page.goto(`${A}/combo/menus`);
@@ -452,7 +457,13 @@ test('COMBO-F01, F04: the list finds the menu and withdraws it after its confirm
   }
   const dialog = page.locator('ion-modal[data-testid=combo-menus-delete]');
   await expect(dialog).toContainText(`«${MENU}» stops being on sale`);
+  // Counted on the page, not in `shown()`: while the dialog is open, `shown()` is the dialog, where the
+  // list has no row before anything is withdrawn.
+  const listed = page.locator(`[data-testid=combo-menus-row][data-id="${id}"]`);
+  await expect(listed).toHaveCount(1);
   await page.locator('[data-testid=combo-menus-delete-submit]').click();
-  await expect(row).toHaveCount(0);
+  // The dialog closes once the menu is withdrawn.
+  await expect(dialog).toBeHidden();
+  await expect(listed).toHaveCount(0);
   expect((await api(context, A, 'GET', `/combo/combos/detail?id=${id}`)).status).toBe(404);
 });

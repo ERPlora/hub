@@ -16,7 +16,7 @@ from live.models import OutboxEvent
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 
-from .conftest import make_combo, make_group, make_option, make_product, run
+from .conftest import FOOD, make_combo, make_group, make_option, make_product, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -202,8 +202,8 @@ def test_a_menu_withdrawn_while_its_detail_is_read_is_never_a_server_error():
     with withdrawn_after_the_first_read_of(combo) as deletions:
         detail = run("combo.combo.get", {"id": str(combo.id)})
     assert deleted(deletions) == ["ok"]
-    # The menu as it was read: its row, and a tree that agrees with its own count.
-    assert (detail.id, detail.name, detail.group_count) == (combo.id, "Menu of the day", len(detail.groups))
+    # The menu as it was read: its own row (its courses may already be gone with it).
+    assert (detail.id, detail.name, detail.price, detail.tax_category_key) == (combo.id, "Menu of the day", 1350, FOOD)
     # What the deletion's event runs next: not found, and the open detail says so.
     with pytest.raises(NotFound) as error:
         run("combo.combo.get", {"id": str(combo.id)})
