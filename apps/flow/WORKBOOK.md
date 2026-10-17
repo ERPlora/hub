@@ -639,6 +639,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Una sola ejecución por aviso**: se bloquea la fila de la automatización (`select_for_update`), se
   mira si ya hay ejecución con ese `trigger_key` (el id del aviso del outbox) y la restricción única
   `(flow, trigger_key)` lo respalda; dos entregas a la vez dan una ejecución.
+- **Una automatización borrada mientras se busca** (2026-10-17): `resolve_flow` la lee **una** vez por su
+  id, siempre entre las no borradas: bloqueada en las escrituras y con su última ejecución en el detalle.
+  Un borrado confirmado a la vez (el «Borrar» del negocio o el del admin) da lo que se leyó o «no existe»
+  (404), nunca un 500 ni un cambio, una copia o una ejecución sobre la ya borrada; buscada por su nombre y
+  borrada entre el nombre y la lectura, «no existe». Lo prueban los casos de borrado a mitad de
+  `tests/test_concurrency.py`.
 - **Sin cadenas infinitas**: un aviso hecho por un paso lleva el actor `flow_run:<id>`; la ejecución que
   arranca hereda su cadena. Si la automatización ya está en la cadena (se dispararía a sí misma) o la
   cadena pasa de **8** automatizaciones (`MAX_CHAIN`), no se ejecuta ningún paso y queda una ejecución
