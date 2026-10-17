@@ -10,8 +10,10 @@ from django.utils import timezone
 from live.errors import Conflict
 
 from apps.attendance.models import Break, Correction, Record
+from apps.staff.models import Member
+from apps.staff.tests.conftest import deleted_on_screen
 
-from .conftest import ctx_for, run, utc
+from .conftest import ctx_for, make_member, run, utc
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -120,3 +122,25 @@ def test_a_clock_in_while_her_old_day_is_reopened_keeps_one_open_day(
     assert outcome["error"].code == "attendance.already_clocked_in"
     assert Record.objects.filter(status="open").count() == 1
     assert Correction.objects.count() == 1
+
+
+# ── The Hub admin's «Delete» of a person while their first day is clocked in ──────────────────────
+#
+# A clock-in holds the person's record and then writes the day, which protects the record. Django's delete
+# page and its «Delete selected» check what protects a record before deleting it: the check ran before the
+# clock-in committed, and the deletion then found the day (a 500). The admin locks the record before the
+# check, so it waits for the clock-in and answers «Cannot delete», as for a person protected before.
+
+
+@pytest.mark.parametrize("how", ["page", "list"])
+def test_a_clock_in_while_the_hub_admin_deletes_the_person_leaves_them_protected(how):
+    ana = make_member()
+    writes_the_day = lambda sql: sql.lstrip().startswith('INSERT INTO "attendance_record"')  # noqa: E731
+    with deleted_on_screen(ana, how, writes_the_day) as answers:
+        record = run("attendance.record.clock_in", {"member_id": str(ana.id)})
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert (answer.status_code, str(answer.context["title"])) == (200, "Cannot delete staff member")
+    assert len(answer.context["protected"]) == 1
+    assert Member.objects.filter(pk=ana.pk).exists()
+    assert Record.objects.filter(pk=record.id, member=ana).exists()
