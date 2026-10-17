@@ -5,32 +5,39 @@
 // spec that counted 0 rows after confirming a dialog passed before anything was deleted.
 import { expect, test } from '@playwright/test';
 
-import { A, createItem, listReady, login, openApps, rowOf, shot, shown, uniqueName } from './helpers';
+import { A, api, createItem, listReady, login, openApps, rowOf, shot, shown, uniqueName } from './helpers';
 
 const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '390', width: 390, height: 844 },
 ];
 
 test('with a dialog open, shown(page) is still the page under it, with its rows', async ({ page, context }) => {
   await login(page, A);
   const item = await createItem(context, A, uniqueName('Under a dialog'));
-  await page.goto('/demo/items');
-  await listReady(page);
-  await expect(rowOf(page, item.id)).toHaveCount(1);
-
-  const sheet = await openApps(page);
-  await expect(sheet).toBeVisible();
-  // The item still exists, so a count of 0 cannot pass while the dialog is open.
-  await expect(rowOf(page, item.id)).toHaveCount(1);
-  const overlay = await shown(page).evaluate((el) =>
-    el.closest('ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy')?.tagName ?? null,
-  );
-  expect(overlay, 'shown(page) resolved inside an overlay').toBeNull();
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  try {
+    await page.goto('/demo/items');
+    await listReady(page);
     await expect(rowOf(page, item.id)).toHaveCount(1);
-    await page.screenshot({ path: shot(`FIX-HUB-E2E-SHOWN-DIALOG-${viewport.label}`) });
+
+    const sheet = await openApps(page);
+    await expect(sheet).toBeVisible();
+    // The item still exists, so a count of 0 cannot pass while the dialog is open.
+    await expect(rowOf(page, item.id)).toHaveCount(1);
+    const overlay = await shown(page).evaluate((el) =>
+      el.closest('ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy')?.tagName ?? null,
+    );
+    expect(overlay, 'shown(page) resolved inside an overlay').toBeNull();
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(rowOf(page, item.id)).toHaveCount(1);
+      // Two frames: Ionic lays the sheet and the page out again after the resize.
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+      await page.screenshot({ path: shot(`FIX-HUB-E2E-SHOWN-DIALOG-${viewport.label}`) });
+    }
+  } finally {
+    const res = await api(context, A, 'POST', '/demo/items/delete', { id: item.id });
+    expect(res.status).toBeLessThan(300);
   }
 });
