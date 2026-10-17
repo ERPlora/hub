@@ -149,19 +149,31 @@ def _first_match(rows, said: str) -> list:
     return []
 
 
+def held_rows(rows) -> list:
+    """``rows``, each held until the command commits, taken in the same read and in id order, for a write that
+    names them (a service put in a category or in a voucher, a voucher sold): their «Delete», archiving one or
+    the Hub admin's deletion waits for that write, and in the order a move of the tree takes them, so the two
+    never wait for each other in a circle. One taken away meanwhile is read once that ends: gone, or as it was
+    left. ``FOR NO KEY UPDATE`` is the ORM's lightest lock: another write that names the same row waits its
+    turn, while the database's own checks of what names it go on."""
+    return list(rows.order_by("id").select_for_update(no_key=True, of=("self",)))
+
+
 def _resolve(
     rows,
     item_id,
     said,
     *,
     lock,
+    hold=False,
     missing,
     missing_code,
     ambiguous,
     ambiguous_code,
     named=None,
 ):
-    """The row named by ``item_id`` (in ``rows``), or by ``said`` (in ``named``, ``rows`` by default)."""
+    """The row named by ``item_id`` (in ``rows``), or by ``said`` (in ``named``, ``rows`` by default):
+    ``lock`` takes it to change it, ``hold`` to name it (``held_rows``)."""
     if item_id is None:
         candidates = _first_match(rows if named is None else named, said or "")
         if len(candidates) > 1:
@@ -173,7 +185,11 @@ def _resolve(
             )
         item_id = candidates[0].pk if candidates else None
     found = rows.filter(pk=item_id)
-    row = (found.select_for_update(of=("self",)) if lock else found).first()
+    if lock:
+        found = found.select_for_update(of=("self",))
+    elif hold:
+        found = found.select_for_update(no_key=True, of=("self",))
+    row = found.first()
     if row is None:
         raise NotFound(str(missing), code=missing_code)
     return row
@@ -184,6 +200,7 @@ def find_service(
     said: str | None,
     *,
     lock: bool = False,
+    hold: bool = False,
     offered: bool = False,
     archived: bool = False,
 ) -> Service:
@@ -195,6 +212,7 @@ def find_service(
         service_id,
         said,
         lock=lock,
+        hold=hold,
         missing=SERVICE_NOT_FOUND,
         missing_code="service.service_not_found",
         ambiguous=SERVICE_AMBIGUOUS,
@@ -204,7 +222,7 @@ def find_service(
 
 
 def find_category(
-    category_id: UUID | None, said: str | None, *, lock: bool = False
+    category_id: UUID | None, said: str | None, *, lock: bool = False, hold: bool = False
 ) -> Category:
     """A live category, by id or by name."""
     return _resolve(
@@ -212,6 +230,7 @@ def find_category(
         category_id,
         said,
         lock=lock,
+        hold=hold,
         missing=CATEGORY_NOT_FOUND,
         missing_code="service.category_not_found",
         ambiguous=CATEGORY_AMBIGUOUS,
@@ -224,6 +243,7 @@ def find_package(
     said: str | None,
     *,
     lock: bool = False,
+    hold: bool = False,
     include_deleted: bool = False,
 ) -> Package:
     """A package by id (a deleted one too with ``include_deleted``), or a live one by its name."""
@@ -233,6 +253,7 @@ def find_package(
         package_id,
         said,
         lock=lock,
+        hold=hold,
         missing=PACKAGE_NOT_FOUND,
         missing_code="service.package_not_found",
         ambiguous=PACKAGE_AMBIGUOUS,

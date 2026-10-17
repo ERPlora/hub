@@ -798,3 +798,21 @@ def settings_row(settings: TaxSettings | None) -> dict:
 )
 def get_settings(ctx: OperationContext, params: SettingsGetIn) -> dict:
     return settings_row(TaxSettings.objects.first())
+
+
+# ── A tax category another app's write names ───────────────────────────────────────────────────
+
+
+def held_categories(keys: Iterable[str]) -> dict[str, TaxCategory]:
+    """The active tax categories of ``keys`` (key → category), each held until the caller's transaction ends
+    with a key-share lock taken in the same read, in key order, for a write of another app that names them (a
+    service, its settings): deleting one in the Hub admin waits for that write, while another write that names
+    it or deactivates it goes on, so two writes never wait for each other in a circle. One deleted meanwhile is
+    read once the deletion ends: gone, as one deleted before. The ORM has no ``FOR KEY SHARE``: it is appended
+    to the SQL the ORM wrote, and the rows still come from the hub's database by the router."""
+    keys = sorted(set(keys))
+    if not keys:
+        return {}
+    rows = TaxCategory.objects.filter(key__in=keys, is_active=True).order_by("key")
+    sql, params = rows.query.sql_with_params()
+    return {category.key: category for category in TaxCategory.objects.raw(f"{sql} FOR KEY SHARE", params)}

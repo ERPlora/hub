@@ -918,7 +918,18 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   cuándo y quién la soltó, la marcó vencida o la devolvió.
 - **Concurrencia**: gastar, reservar, entregar, devolver, anular y ajustar bloquean primero la fila de
   la compra (`select_for_update`, en orden de id cuando son varias): dos cajas sobre el mismo bono van
-  en fila y la segunda decide sobre lo que dejó la primera. Hay tests con hilos de cada carrera.
+  en fila y la segunda decide sobre lo que dejó la primera. Una escritura que nombra una fila (crear, dar
+  de alta de golpe o editar un servicio con su categoría fiscal o su categoría, los ajustes, la categoría
+  padre, asignar un profesional, las líneas de un bono, vender un bono y unir fichas) la retiene hasta su
+  COMMIT: la categoría fiscal con la lectura retenida de Impuestos (`FOR KEY SHARE`), las filas propias con
+  `FOR NO KEY UPDATE` en orden de id y la ficha con el bloqueo de Clientes. Su «Eliminar», archivarla o el
+  borrado del admin esperan a la escritura, y una ya en curso se rechaza como una borrada antes (el mismo
+  422 o 404). El orden evita las esperas en círculo: el borrado del admin de una categoría entra como su
+  «Eliminar», bloqueando antes todas las categorías vivas, y luego vacía lo que la nombraba (sus servicios y
+  subcategorías), ya con lo que dejó la escritura; editar un servicio retiene lo que nombra antes que su
+  propia fila; asignar bloquea la asignación que ya existía antes de retener el servicio, el orden en que el
+  borrado del admin de un servicio borra sus asignaciones y después el servicio. Hay tests con hilos de cada
+  carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
   hora (`0 * * * *`, UTC, `collapse`); hecho — la corre el worker (`base/scheduler.py`, 2026-10-15; en la
   fase 1, sobre un solo hub). Además, el saldo ya no cuenta una reserva vencida y reservar de nuevo la misma
