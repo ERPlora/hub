@@ -272,11 +272,12 @@ def _locked_settings(ctx: OperationContext) -> Settings:
 
 
 def _chosen_printer(field: str, ref: str | None, usage: str) -> Printer | None:
-    """The printer chosen for ``usage`` (by id or name): one of its own and active; ``None`` clears it."""
+    """The printer chosen for ``usage`` (by id or name): one of its own and active; ``None`` clears it. It is
+    held until the settings that name it are saved: a deletion waits for them."""
     if ref is None:
         return None
     try:
-        printer = find_printer(None, ref)
+        printer = find_printer(None, ref, lock=True)
     except NotFound as missing:  # said at the field the person filled
         raise InvalidPayload(missing.message, fields={field: missing.message}) from None
     if printer.usage != usage:
@@ -324,13 +325,13 @@ def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
 
 
 def _resolve_printer(usage: str, paper: str, settings: Settings) -> Printer | None:
-    """The printer of ``usage`` for ``paper``: the settings' choice, else the first active one by name."""
-    chosen = getattr(settings, DEFAULT_FIELDS[usage]) if getattr(settings, f"{DEFAULT_FIELDS[usage]}_id") else None
-    if chosen is not None and chosen.is_active and chosen.format == paper:
-        return chosen
-    candidates = Printer.objects.filter(is_active=True, usage=usage)
-    candidates = candidates.filter(kind=Printer.Kind.SYSTEM) if paper == PrintJob.Format.A4 else candidates.exclude(kind=Printer.Kind.SYSTEM)
-    return candidates.order_by(Lower("name"), "id").first()
+    """The printer of ``usage`` for ``paper``: the settings' choice, else the first active one by name. It is
+    held until the job that names it is saved: a deletion waits for it, and one deleted before is passed over."""
+    printers = Printer.objects.select_for_update().filter(is_active=True)
+    printers = printers.filter(kind=Printer.Kind.SYSTEM) if paper == PrintJob.Format.A4 else printers.exclude(kind=Printer.Kind.SYSTEM)
+    chosen_id = getattr(settings, f"{DEFAULT_FIELDS[usage]}_id")
+    chosen = printers.filter(pk=chosen_id).first() if chosen_id else None
+    return chosen or printers.filter(usage=usage).order_by(Lower("name"), "id").first()
 
 
 def _queued(ctx: OperationContext, job: PrintJob) -> None:
@@ -351,7 +352,8 @@ def _status_label(job: PrintJob) -> str:
 
 
 def _given_printer(ref: str, paper: str) -> Printer:
-    printer = find_printer(None, ref)
+    """The printer a job is sent to by its name or id, held until the job is saved: a deletion waits for it."""
+    printer = find_printer(None, ref, lock=True)
     if not printer.is_active:
         raise Conflict(str(JOB_PRINTER_INACTIVE), code="printing.printer_inactive")
     if printer.format != paper:
@@ -478,7 +480,8 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
     },
 )
 def test_printer(ctx: OperationContext, data: PrinterRefIn) -> dict:
-    printer = find_printer(data.printer_id, data.printer)
+    # Held until its test page is saved: a deletion waits for it.
+    printer = find_printer(data.printer_id, data.printer, lock=True)
     if not printer.is_active:
         raise Conflict(str(TEST_INACTIVE), code="printing.printer_inactive")
     # Read before any write of this command (a query runs READ ONLY).
