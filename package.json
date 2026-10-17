@@ -5,9 +5,9 @@
   "packageManager": "pnpm@10.34.7",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
     "test": "vitest run",
-    "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tests/e2e/tsconfig.json",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.vitest.json && vue-tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tests/e2e/tsconfig.json",
     "lint": "eslint .",
     "e2e": "playwright test -c tests/e2e/playwright.config.ts",
     "gen:app-icons": "node scripts/app-icons.mjs"

@@ -1,0 +1,6 @@
+{
+  // The root config and its tests (Vite, ESLint, these tsconfigs): they run in Node, with Node's types.
+  "extends": "./packages/ui/tsconfig.base.json",
+  "compilerOptions": { "allowJs": true, "types": ["node"] },
+  "include": ["*.ts", "*.js"]
+}

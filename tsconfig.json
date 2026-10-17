@@ -1,12 +1,12 @@
 {
-  "extends": "./packages/ui/tsconfig.base.json",
-  "compilerOptions": { "allowJs": true, "resolveJsonModule": true },
-  "include": [
-    "frontend/**/*",
-    "apps/*/frontend/**/*",
-    "*.ts",
-    "*.js",
-    "packages/ui/src/shell/shims.d.ts"
-  ],
-  "exclude": ["node_modules", "frontend/dist"]
+  // What an editor opens: no file of its own, each file in the project `pnpm typecheck` checks it with
+  // (tsconfig.test.ts). The SPA, tsconfig.app.json; the Vitest tests and their helpers, tsconfig.vitest.json; the
+  // root config, tsconfig.node.json (the e2e suite has its own, tests/e2e/tsconfig.json). No `vue-tsc` run reads
+  // this file: the scripts name each project with `-p`, so the references need no `composite` nor `--build`.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.vitest.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }
