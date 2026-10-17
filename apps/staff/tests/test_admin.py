@@ -105,3 +105,21 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         response = client.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("how", ["page", "list"])
+def test_a_record_is_deleted_with_what_hangs_from_it(client, superuser, how):
+    # Its «Delete» locks the record before Django deletes the rest (test_concurrency.py), in a transaction
+    # of its own: the list's «Delete selected» runs outside the one of the delete page.
+    member = make_member()
+    make_schedule(member)
+    make_time_off(member, "2026-11-02")
+    client.force_login(superuser)
+    if how == "page":
+        url, data = f"/admin/staff/member/{member.pk}/delete/", {"post": "yes"}
+    else:
+        url, data = "/admin/staff/member/", {"action": "delete_selected", "_selected_action": [str(member.pk)], "post": "yes"}
+    response = client.post(url, data, HTTP_HOST="hubs.localhost")
+    assert response.status_code == 302, response.content[:500]
+    assert not (Member.objects.exists() or Schedule.objects.exists() or TimeOff.objects.exists())

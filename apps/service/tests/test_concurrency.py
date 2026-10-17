@@ -36,6 +36,7 @@ from apps.service.models import (
     Service,
     ServiceSettings,
 )
+from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 
 from .conftest import (
@@ -751,4 +752,67 @@ def test_reassigning_a_professional_while_the_hub_admin_deletes_the_service_neve
     assert isinstance(outcome, OperationError), outcome
     assert (outcome.status, outcome.code) == (404, "service.service_not_found")
     assert not Service.objects.filter(pk=world.spare.pk).exists()
+    assert not Assignment.objects.exists()
+
+
+# ── The Hub admin's «Delete» of a professional ─────────────────────────────────────────────────
+#
+# Who performs a service is held through the professional: a write locks the staff record and then the
+# assignment. Django's deletion of the record deletes its assignments first and then the record, so it held
+# the assignment the write went for while it waited for the record the write held: Postgres killed one of
+# the two (a 500). The admin enters through the record (staff's ``lock_members``), so it waits for the write
+# and then deletes what the write left.
+
+
+def locks_an_assignment(sql: str) -> bool:
+    return 'FROM "service_assignment"' in sql and "FOR UPDATE" in sql
+
+
+def demotes_a_main_service(sql: str) -> bool:
+    return sql.lstrip().startswith('UPDATE "service_assignment"')
+
+
+#: What is written about Ana while the admin deletes her: what it needs, the call, and its first statement
+#: on an assignment once her record is held.
+WRITTEN_ABOUT_A_PROFESSIONAL = {
+    "assigning her again": (
+        lambda w: Assignment.objects.create(service=w.spare, member=w.ana),
+        lambda w, a: run(
+            "service.assignment.assign",
+            {"service_id": str(w.spare.id), "member_id": str(w.ana.id), "custom_price": 1500},
+        ),
+        locks_an_assignment,
+    ),
+    "assigning her a new main service": (
+        lambda w: Assignment.objects.create(service=w.cut, member=w.ana, is_primary=True),
+        lambda w, a: run(
+            "service.assignment.assign",
+            {"service_id": str(w.spare.id), "member_id": str(w.ana.id), "is_primary": True},
+        ),
+        demotes_a_main_service,
+    ),
+    "changing her assignment": (
+        lambda w: Assignment.objects.create(service=w.spare, member=w.ana),
+        lambda w, a: run("service.assignment.update", {"id": str(a.id), "custom_duration": 45}),
+        locks_an_assignment,
+    ),
+    "removing her assignment": (
+        lambda w: Assignment.objects.create(service=w.spare, member=w.ana),
+        lambda w, a: run("service.assignment.remove", {"id": str(a.id)}),
+        locks_an_assignment,
+    ),
+}
+
+
+@pytest.mark.parametrize("how", ADMIN_DELETIONS)
+@pytest.mark.parametrize("written", sorted(WRITTEN_ABOUT_A_PROFESSIONAL))
+def test_a_write_on_a_professional_while_the_hub_admin_deletes_them_never_waits_in_a_circle(world, written, how):
+    setup, call, after = WRITTEN_ABOUT_A_PROFESSIONAL[written]
+    assignment = setup(world)
+    with admin_deleting(world.ana, how, after) as deletions:
+        outcome = attempt(lambda: call(world, assignment))
+    # The deletion waited for the write, which went through, and then took her and all she performed.
+    assert deleted(deletions) == ["ok"]
+    assert not isinstance(outcome, OperationError), outcome
+    assert not Member.objects.filter(pk=world.ana.pk).exists()
     assert not Assignment.objects.exists()

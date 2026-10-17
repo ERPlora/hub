@@ -2,10 +2,13 @@
 
 Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
 tables; it repeals the read-only admin of round 9 that apps/demo still copies. A raw admin write
-records no event: the actions that need one call the operations of services.py.
+records no event: the actions that need one call the operations of services.py. A record's «Delete»
+locks it first (``lock_members``), as every write on that person does: it waits for the one under way
+and only then checks what protects the record.
 """
 
 from django.contrib import admin
+from django.db import transaction
 
 from apps.staff.models import (
     Member,
@@ -15,6 +18,7 @@ from apps.staff.models import (
     StaffSettings,
     TimeOff,
 )
+from apps.staff.services import lock_members
 
 
 @admin.register(Role)
@@ -43,6 +47,32 @@ class MemberAdmin(admin.ModelAdmin):
         "notes",
         ("created_at", "updated_at"),
     )
+
+    # Django deletes what hangs from a record (schedules, time off, who performs a service…) and then the
+    # record. Entering through the record first, as every write on that person does, it waits for a write
+    # under way and then deletes what that write left, instead of waiting for it in a circle.
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            lock_members([obj.pk])
+            super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            lock_members(queryset.values_list("pk", flat=True))
+            super().delete_queryset(request, queryset)
+
+    # Before deleting, the delete page and «Delete selected» check what protects the records (their days
+    # clocked in, their appointments), and a write under way may be adding one. Locked before the check, it
+    # waits for that write and sees what it left: «Cannot delete», as for a record protected before.
+    def get_deleted_objects(self, objs, request):
+        if request.method == "POST":
+            lock_members([obj.pk for obj in objs])
+        return super().get_deleted_objects(objs, request)
+
+    # The actions run outside a transaction; the lock above lasts until the deletion ends.
+    def response_action(self, request, queryset, *args, **kwargs):
+        with transaction.atomic():
+            return super().response_action(request, queryset, *args, **kwargs)
 
 
 class ScheduleDayInline(admin.TabularInline):
