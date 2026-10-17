@@ -4,7 +4,9 @@ Every check runs before anything is written, so a refusal leaves no trace. A nam
 the meantime (two people saving at once) is caught as the database's unique constraint, in a
 savepoint, and refused with the same 409 as the check. Changing a row only changes what was sent and
 says so only when something changed. A group's row is locked before its options' defaults are
-counted, so two saves of the same group wait for each other.
+counted, so two saves of the same group wait for each other. What a write names in another app (the
+product or category a group is applied to, an option's tax category) is held until it commits (Inventory's
+``held``): a deletion at the same time waits for it, or ends first and the write finds it gone.
 """
 
 from django.db import IntegrityError, transaction
@@ -14,7 +16,9 @@ from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.inventory.queries import find_category, find_product
+from apps.inventory import queries as inventory_queries
+from apps.inventory.models import Product
+from apps.inventory.queries import find_category, find_product, held
 from apps.modifier import events
 from apps.modifier.models import (
     ACTOR_MAX_LENGTH,
@@ -296,7 +300,7 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
 def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
     # The group's row is locked: a deletion at the same time waits, or is waited for and then said.
     group = find_group(data.group_id, data.group, lock=True)
-    product, category = _target(data)
+    product, category = _target(data, hold=True)
     if ModifierLink.objects.filter(
         group=group, product=product, category=category
     ).exists():
@@ -418,10 +422,13 @@ def _check_option_name(group: ModifierGroup, name: str) -> None:
 
 
 def _tax_category(text: str) -> TaxCategory:
-    """The active tax category named by its key, its name in any language or a learned alias (Taxes reads it)."""
+    """The active tax category named by its key, its name in any language or a learned alias (Taxes reads it),
+    held for the option that names it (see ``held``)."""
     key, _matched = resolve_category_text(text)
     tax_category = (
-        TaxCategory.objects.filter(key=key, is_active=True).first() if key else None
+        next(iter(held(TaxCategory.objects.filter(key=key, is_active=True)[:1])), None)
+        if key
+        else None
     )
     if tax_category is None:
         message = str(TAX_CATEGORY_UNKNOWN)
@@ -464,11 +471,23 @@ def _make_room_for_a_default(
         raise _too_many_defaults("is_default")
 
 
-def _target(data):
-    """The live product or category a link names: exactly one of them, the other ``None``."""
+def _target(data, *, hold: bool = False):
+    """The live product or category a link names: exactly one of them, the other ``None``. ``hold`` keeps it
+    for the link written next (see ``held``): one being deleted meanwhile is not found, as one deleted before."""
     if data.product_id is not None or data.product is not None:
-        return find_product(data.product_id, data.product), None
-    return None, find_category(data.category_id, data.category)
+        product = find_product(data.product_id, data.product)
+        return (_held_product(product) if hold else product), None
+    return None, find_category(data.category_id, data.category, hold=hold)
+
+
+def _held_product(product: Product) -> Product:
+    """``product`` read again with its row held: Inventory's ``find_product`` finds it by its SKU or name, and
+    has no ``hold`` of its own."""
+    live = held(Product.objects.filter(pk=product.pk, is_deleted=False)[:1])
+    if not live:
+        # Inventory's own text (and its translation), as for a product deleted before.
+        raise NotFound(str(inventory_queries.PRODUCT_NOT_FOUND))
+    return live[0]
 
 
 def _drop(ctx: OperationContext, links) -> int:

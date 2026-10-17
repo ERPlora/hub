@@ -413,7 +413,12 @@ cajero del producto actual es un empleado.
   suplemento lleva un botón ± porque el teclado decimal de un móvil no tiene el signo menos.
 - **Bloqueos**: crear o cambiar una opción y enganchar un grupo bloquean antes la fila del grupo; borrar
   el grupo a la vez espera, o es esperado y entonces se dice (404), nunca un enganche a un grupo borrado
-  que rompe el COMMIT (test con hilos).
+  que rompe el COMMIT (test con hilos). Lo que la escritura nombra de otra app (el producto o la
+  categoría de un enganche, la categoría fiscal propia de una opción) queda retenido hasta su COMMIT con
+  `held()` de Inventario (`FOR KEY SHARE`): su borrado a la vez, el «Borrar» del negocio o el del admin
+  del Hub, espera; uno que ya estaba en curso se ve acabado y se dice como uno borrado antes (404 del
+  producto o la categoría, 422 en `tax_category_key`), nunca un enganche a algo borrado ni un
+  `IntegrityError` en el COMMIT (500).
 - **Borrar es borrar**: un grupo arrastra sus opciones y enganches por `CASCADE`; Ventas guarda su
   copia congelada. Un producto o categoría de Inventario se borra lógicamente: hasta que el worker
   reparta sus avisos (F09), los enganches a lo borrado se excluyen de toda lectura.
