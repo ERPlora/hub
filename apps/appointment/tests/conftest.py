@@ -294,14 +294,15 @@ def make_appointment(
 
 
 def make_series(salon, **fields):
-    """A weekly series of a cut with Ana for Lucía, straight in the table (nothing booked yet)."""
+    """A weekly series of a cut with Ana (or ``staff``) for Lucía, straight in the table (nothing booked yet)."""
     from apps.appointment.models import Recurring, RecurringService
 
+    staff = fields.pop("staff", salon.ana)
     series = Recurring.objects.create(
         customer=salon.lucia,
         customer_name=salon.lucia.name,
-        staff=salon.ana,
-        staff_name=salon.ana.full_name,
+        staff=staff,
+        staff_name=staff.full_name,
         frequency=fields.pop("frequency", "weekly"),
         day_of_week=fields.pop("day_of_week", 0),
         time=dt.time(10),
