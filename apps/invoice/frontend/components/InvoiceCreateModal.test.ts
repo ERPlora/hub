@@ -153,6 +153,15 @@ describe('InvoiceCreateModal', () => {
     expect([s.editor().props('tax'), s.editor().props('defaultRate')]).toEqual(['igic', '7']);
   });
 
+  it('opened again, a fresh line starts at the territory’s rate already known', async () => {
+    const s = await setup();
+    await s.territory('igic', '7.00');
+    await s.line('Course', '10', '1', '3');
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    expect(s.editor().props('modelValue')).toEqual([{ uid: 1, description: '', quantity: '1', price: '', taxRate: '7' }]);
+  });
+
   it('a territory without a rule of its own tax starts with no rate, and «Issue invoice» waits for one', async () => {
     const s = await setup();
     await s.territory('ipsi', null);
