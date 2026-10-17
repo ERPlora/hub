@@ -4,7 +4,13 @@ import json
 
 import pytest
 
+from config import testing
+
 ENTRY = "frontend/main.ts"
+
+
+# Fails the test that leaves a database connection with a session setting changed (config/testing.py).
+session_settings_left_as_found = pytest.fixture(autouse=True)(testing.session_settings_left_as_found)
 
 
 @pytest.fixture
