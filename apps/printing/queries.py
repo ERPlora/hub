@@ -9,7 +9,7 @@ puts it back in the queue (services.py).
 import datetime as dt
 import uuid
 
-from django.db.models import Count, Min, Q
+from django.db.models import Count, Min, Q, QuerySet
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -64,8 +64,10 @@ def actor(ctx: OperationContext) -> str:
 
 
 def current_settings() -> Settings:
-    """The business's settings, or the factory ones (unsaved) when it never saved them."""
-    return Settings.objects.first() or Settings()
+    """The business's settings, or the factory ones (unsaved) when it never saved them. The printer chosen
+    for each function comes in the same read: one deleted meanwhile is either still there or already
+    cleared, never one left to load that is gone."""
+    return Settings.objects.select_related(*DEFAULT_FIELDS.values()).first() or Settings()
 
 
 def settings_row(settings: Settings) -> dict:
@@ -106,24 +108,47 @@ def _as_uuid(text: str) -> uuid.UUID | None:
         return None
 
 
-def find_printer(printer_id: uuid.UUID | None, name: str | None, *, lock: bool = False) -> Printer:
-    """The printer named by its id, or by its name (whatever its case; a name may also carry an id)."""
-    printers = Printer.objects.select_for_update() if lock else Printer.objects.all()
+def first_held(printers: QuerySet[Printer]) -> Printer | None:
+    """The first printer of ``printers``, held until this transaction ends with a key-share lock, taken in the
+    same read: the admin's deletion waits for it, while another write that names it (a job, a test page, the
+    settings) or changes it goes on, so two writes never wait for each other in a circle (a deadlock is a
+    500). The ORM has no ``FOR KEY SHARE``: it is appended to the SQL the ORM wrote, and the row still comes
+    from the hub's database by the router."""
+    sql, params = printers[:1].query.sql_with_params()
+    return next(iter(Printer.objects.raw(f"{sql} FOR KEY SHARE", params)), None)
+
+
+def find_printer(
+    printer_id: uuid.UUID | None,
+    name: str | None,
+    *,
+    lock: bool = False,
+    hold: bool = False,
+    rows: QuerySet[Printer] | None = None,
+) -> Printer:
+    """The printer named by its id, or by its name (whatever its case; a name may also carry an id). It comes
+    from ``rows`` when given (a read: with its queue): one read, so a deletion committed meanwhile is either
+    not seen yet or not found, never a row that vanished between two reads. ``lock`` takes it to change it
+    (``FOR NO KEY UPDATE``: a write that only names it goes on); ``hold`` takes it to name it (key share)."""
+    printers = Printer.objects.all() if rows is None else rows
+    if lock:
+        printers = printers.select_for_update(no_key=True)
+    first = first_held if hold else (lambda found: found.first())
     found = None
     if printer_id is not None:
-        found = printers.filter(pk=printer_id).first()
+        found = first(printers.filter(pk=printer_id))
     elif name is not None:
         as_id = _as_uuid(name)
         if as_id is not None:
-            found = printers.filter(pk=as_id).first()
+            found = first(printers.filter(pk=as_id))
         if found is None:
-            found = printers.annotate(lowered=Lower("name")).filter(lowered=name.strip().lower()).first()
+            found = first(printers.annotate(lowered=Lower("name")).filter(lowered=name.strip().lower()))
     if found is None:
         raise NotFound(str(NO_PRINTER), code="printing.printer_not_found")
     return found
 
 
-def _with_queue(printers):
+def _with_queue(printers: QuerySet[Printer]) -> QuerySet[Printer]:
     return printers.annotate(
         queued=Count("jobs", filter=Q(jobs__status=PrintJob.Status.PENDING)),
         oldest=Min("jobs__created_at", filter=Q(jobs__status=PrintJob.Status.PENDING)),
@@ -141,7 +166,8 @@ def printer_state(printer: Printer, oldest_pending: dt.datetime | None, now: dt.
 
 
 def printer_row(printer: Printer, now: dt.datetime | None = None) -> dict:
-    """A printer as the screens and the assistant read it, with its queue (annotated or read now)."""
+    """A printer as the screens and the assistant read it, with its queue: annotated by the read that found
+    it, or read now by a service after its write (the printer locked or just created)."""
     now = now or timezone.now()
     if not hasattr(printer, "queued"):
         printer = _with_queue(Printer.objects.filter(pk=printer.pk)).get()
@@ -212,7 +238,7 @@ def list_printers(ctx: OperationContext, params: PrinterListIn) -> dict:
     ai={"description": "Get one printer by its id or its name («the kitchen one» → Kitchen), with its state."},
 )
 def get_printer(ctx: OperationContext, params: PrinterRefIn) -> dict:
-    return printer_row(find_printer(params.printer_id, params.printer))
+    return printer_row(find_printer(params.printer_id, params.printer, rows=_with_queue(Printer.objects.all())))
 
 
 @operation(
@@ -229,7 +255,7 @@ def get_printer(ctx: OperationContext, params: PrinterRefIn) -> dict:
     },
 )
 def printer_status(ctx: OperationContext, params: PrinterRefIn) -> dict:
-    printer = find_printer(params.printer_id, params.printer)
+    printer = find_printer(params.printer_id, params.printer, rows=_with_queue(Printer.objects.all()))
     jobs = PrintJob.objects.filter(printer=printer).aggregate(
         pending=Count("id", filter=PENDING),
         oldest=Min("created_at", filter=PENDING),
@@ -372,7 +398,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
-        chosen = getattr(settings, DEFAULT_FIELDS[usage]) if getattr(settings, f"{DEFAULT_FIELDS[usage]}_id") else None
+        chosen = getattr(settings, DEFAULT_FIELDS[usage])
         usages.append(
             {
                 "usage": usage,
