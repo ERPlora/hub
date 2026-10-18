@@ -53,7 +53,9 @@ chmod 600 "$userlist"
 if [[ $trace -eq 1 ]]; then set -x; fi
 
 # Constants of PLAN-DB §5. auth_file lives under /tmp (PLAN-DB says /run/pgbouncer, which the
-# non-root user of the image cannot write).
+# non-root user of the image cannot write). log_stats keeps its default: the line it writes every
+# minute carries the average wait for a server connection, the only sign of a saturated pool
+# (max_db_connections=3) without a metrics exporter.
 config="$config_dir/pgbouncer.ini"
 cat > "$config" <<INI
 [databases]
