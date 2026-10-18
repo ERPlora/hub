@@ -34,7 +34,8 @@ run_entrypoint() {
     export PATH="$work/bin:$PATH" PGBOUNCER_CONFIG_DIR="$work/pgbouncer" \
       PGBOUNCER_SERVER_HOST=writer.cluster.example PGBOUNCER_AUTH_USER=hub_app \
       PGBOUNCER_AUTH_PASSWORD=s3cret PGBOUNCER_MAX_USER_CONNECTIONS=40
-    unset PGBOUNCER_SERVER_PORT PGBOUNCER_LISTEN_PORT PGBOUNCER_SERVER_TLS_CA_FILE
+    unset PGBOUNCER_SERVER_PORT PGBOUNCER_LISTEN_PORT PGBOUNCER_SERVER_TLS_CA_FILE \
+      PGBOUNCER_MAX_DB_CONNECTIONS PGBOUNCER_SERVER_IDLE_TIMEOUT PGBOUNCER_MAX_CLIENT_CONN
     for arg in "$@"; do
       case $arg in
         -*) unset "${arg#-}" ;;
@@ -75,10 +76,19 @@ for var in PGBOUNCER_SERVER_HOST PGBOUNCER_AUTH_USER PGBOUNCER_AUTH_PASSWORD PGB
   teardown
 done
 
-for var in PGBOUNCER_MAX_USER_CONNECTIONS PGBOUNCER_SERVER_PORT PGBOUNCER_LISTEN_PORT; do
+for var in PGBOUNCER_MAX_USER_CONNECTIONS PGBOUNCER_SERVER_PORT PGBOUNCER_LISTEN_PORT \
+  PGBOUNCER_MAX_DB_CONNECTIONS PGBOUNCER_SERVER_IDLE_TIMEOUT PGBOUNCER_MAX_CLIENT_CONN; do
   setup
   run_entrypoint "$var=forty"
   check "non-numeric $var: fails naming it" \
+    '[[ $status -ne 0 ]] && grep -q "$var" "$work/out.log" && [[ ! -s $CALLS_LOG ]]'
+  teardown
+done
+
+for var in PGBOUNCER_MAX_DB_CONNECTIONS PGBOUNCER_SERVER_IDLE_TIMEOUT PGBOUNCER_MAX_CLIENT_CONN; do
+  setup
+  run_entrypoint "$var=0"
+  check "$var=0 is refused: only positive integers" \
     '[[ $status -ne 0 ]] && grep -q "$var" "$work/out.log" && [[ ! -s $CALLS_LOG ]]'
   teardown
 done
@@ -96,9 +106,13 @@ check "writes the PLAN-DB settings" '
   [[ $status -eq 0 ]] &&
   has_line "pool_mode=transaction" && has_line "auth_type=scram-sha-256" &&
   has_line "default_pool_size=3" && has_line "max_db_connections=3" &&
-  has_line "max_client_conn=300" && has_line "server_idle_timeout=15" &&
+  has_line "max_client_conn=300" && has_line "server_idle_timeout=10" &&
   has_line "autodb_idle_timeout=300" && has_line "query_wait_timeout=10" &&
   has_line "server_tls_sslmode=verify-full" && has_line "max_prepared_statements=0"'
+check "an idle hub database costs no server connection: no minimum, no reserve" \
+  'has_line "min_pool_size=0" && has_line "reserve_pool_size=0"'
+check "every setting is written once" \
+  '[[ -z $(grep -oE "^[a-z_]+=" "$ini" | sort | uniq -d) ]]'
 check "listens on loopback only, without a unix socket" \
   'has_line "listen_addr=127.0.0.1" && has_line "unix_socket_dir=" && [[ $(grep -c "^listen_addr=" "$ini") -eq 1 ]]'
 check "max_user_connections comes from the task" 'has_line "max_user_connections=40"'
@@ -125,6 +139,15 @@ check "explicit ports, CA file and connection cap win over the defaults" '
   [[ $status -eq 0 ]] && has_line "listen_port=6433" &&
   has_line "* = host=writer.cluster.example port=5433" &&
   has_line "server_tls_ca_file=/etc/ssl/certs/other.pem" && has_line "max_user_connections=20"'
+teardown
+
+setup
+run_entrypoint PGBOUNCER_MAX_DB_CONNECTIONS=6 PGBOUNCER_SERVER_IDLE_TIMEOUT=15 \
+  PGBOUNCER_MAX_CLIENT_CONN=500
+check "the per-database cap sets the pool size too; idle timeout and client cap from the task" '
+  [[ $status -eq 0 ]] && has_line "default_pool_size=6" && has_line "max_db_connections=6" &&
+  has_line "server_idle_timeout=15" && has_line "max_client_conn=500" &&
+  has_line "min_pool_size=0" && has_line "reserve_pool_size=0"'
 teardown
 
 setup

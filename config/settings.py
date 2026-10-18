@@ -161,7 +161,9 @@ ASGI_APPLICATION = "config.asgi.application"
 # name (DB_SSLMODE=verify-full, DB_SSLROOTCERT = the RDS bundle in the image) and names its task
 # (DB_APPLICATION_NAME, pg_stat_activity); each option only when set. A dead database fails within
 # DB_CONNECT_TIMEOUT seconds, both waiting for a pooled connection and per connection attempt
-# (psycopg: 30 s and 130 s), so /readyz answers 503 before its probes give up.
+# (psycopg: 30 s and 130 s), so /readyz answers 503 before its probes give up. The pool keeps one
+# connection and gives back the rest of a burst one per minute (max_idle; psycopg's 600 s held a
+# scanner's 8 for over an hour): PLAN-DB «Conexiones», round 2026-10-18.
 
 db_optional_options = {
     "DB_SSLMODE": "sslmode",
@@ -182,7 +184,12 @@ DATABASES = {
         "HOST": config("DB_HOST", default="127.0.0.1"),
         "PORT": config("DB_PORT", default=5432, cast=int),
         "OPTIONS": {
-            "pool": {"min_size": 1, "max_size": 8, "timeout": db_connect_timeout},
+            "pool": {
+                "min_size": 1,
+                "max_size": 8,
+                "max_idle": 60,
+                "timeout": db_connect_timeout,
+            },
             "connect_timeout": db_connect_timeout,
             **{
                 option: value

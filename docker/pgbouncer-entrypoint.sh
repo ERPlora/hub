@@ -6,7 +6,11 @@
 #
 #   PGBOUNCER_SERVER_HOST           Aurora writer (required)
 #   PGBOUNCER_AUTH_USER/_PASSWORD   hub_app, the only role in the auth file (required, secrets)
-#   PGBOUNCER_MAX_USER_CONNECTIONS  server connections per task: 40 web, 20 worker (required)
+#   PGBOUNCER_MAX_USER_CONNECTIONS  server connections per task, all hub databases together
+#                                   (required; the task definition's budget, PLAN-DB «Conexiones»)
+#   PGBOUNCER_MAX_DB_CONNECTIONS    3: server connections per hub database, also its pool size
+#   PGBOUNCER_SERVER_IDLE_TIMEOUT   10: seconds an unused server connection stays open
+#   PGBOUNCER_MAX_CLIENT_CONN       300: client connections from the app
 #   PGBOUNCER_SERVER_PORT           5432
 #   PGBOUNCER_LISTEN_PORT           6432
 #   PGBOUNCER_SERVER_TLS_CA_FILE    /etc/ssl/certs/rds-global-bundle.pem (verify-full)
@@ -30,8 +34,13 @@ server_port="${PGBOUNCER_SERVER_PORT:-5432}"
 listen_port="${PGBOUNCER_LISTEN_PORT:-6432}"
 ca_file="${PGBOUNCER_SERVER_TLS_CA_FILE:-/etc/ssl/certs/rds-global-bundle.pem}"
 config_dir="${PGBOUNCER_CONFIG_DIR:-/tmp/pgbouncer}"
+max_db_connections="${PGBOUNCER_MAX_DB_CONNECTIONS:-3}"
+server_idle_timeout="${PGBOUNCER_SERVER_IDLE_TIMEOUT:-10}"
+max_client_conn="${PGBOUNCER_MAX_CLIENT_CONN:-300}"
 
-for name in PGBOUNCER_MAX_USER_CONNECTIONS PGBOUNCER_SERVER_PORT PGBOUNCER_LISTEN_PORT; do
+# Positive integers only: to pgbouncer a 0 lifts the cap or never closes an idle connection.
+for name in PGBOUNCER_MAX_USER_CONNECTIONS PGBOUNCER_SERVER_PORT PGBOUNCER_LISTEN_PORT \
+  PGBOUNCER_MAX_DB_CONNECTIONS PGBOUNCER_SERVER_IDLE_TIMEOUT PGBOUNCER_MAX_CLIENT_CONN; do
   value="${!name:-1}"
   [[ "$value" =~ ^[1-9][0-9]*$ ]] || fail "$name must be a positive integer"
 done
@@ -52,10 +61,14 @@ chmod 600 "$userlist"
 
 if [[ $trace -eq 1 ]]; then set -x; fi
 
-# Constants of PLAN-DB §5. auth_file lives under /tmp (PLAN-DB says /run/pgbouncer, which the
-# non-root user of the image cannot write). log_stats keeps its default: the line it writes every
-# minute carries the average wait for a server connection, the only sign of a saturated pool
-# (max_db_connections=3) without a metrics exporter.
+# PLAN-DB «Conexiones» (round 2026-10-18). One pool per hub database, all as hub_app: a hub
+# without activity costs no server connection (min_pool_size and reserve_pool_size 0, closed after
+# server_idle_timeout), and at max_user_connections pgbouncer evicts another hub's oldest idle
+# connection before it makes a client wait, so the task never holds more than its budget.
+# default_pool_size equals max_db_connections: with a single user they are the same cap. auth_file
+# lives under /tmp (PLAN-DB says /run/pgbouncer, which the non-root user of the image cannot
+# write). log_stats keeps its default: the line it writes every minute carries the average wait for
+# a server connection, the only sign of a saturated pool without a metrics exporter.
 config="$config_dir/pgbouncer.ini"
 cat > "$config" <<INI
 [databases]
@@ -68,11 +81,13 @@ unix_socket_dir=
 auth_type=scram-sha-256
 auth_file=$userlist
 pool_mode=transaction
-max_client_conn=300
-default_pool_size=3
-max_db_connections=3
+max_client_conn=$max_client_conn
+default_pool_size=$max_db_connections
+min_pool_size=0
+reserve_pool_size=0
+max_db_connections=$max_db_connections
 max_user_connections=$PGBOUNCER_MAX_USER_CONNECTIONS
-server_idle_timeout=15
+server_idle_timeout=$server_idle_timeout
 autodb_idle_timeout=300
 query_wait_timeout=10
 server_tls_sslmode=verify-full
