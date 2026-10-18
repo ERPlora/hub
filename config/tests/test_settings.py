@@ -118,7 +118,7 @@ def test_defaults_are_the_local_compose_database_with_a_pool(load_settings):
         "127.0.0.1",
         5432,
     )
-    assert db["OPTIONS"]["pool"] == {"min_size": 1, "max_size": 8, "timeout": 5}
+    assert db["OPTIONS"]["pool"] == {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5}
     # Its own test database, so it never drops the one the packages/live suite is using.
     assert db["TEST"]["NAME"] == "test_hub_next"
 
@@ -280,10 +280,28 @@ def test_the_internal_saas_url_comes_from_the_environment(load_settings):
     )
 
 
+def test_a_burst_of_pooled_connections_is_given_back_within_minutes(load_settings):
+    # psycopg_pool closes one connection above min_size per max_idle, 600 s by default: a scanner
+    # burst on *.erplora.com (60 requests/s, 2026-10-18) left the idle hub web holding its 8 control
+    # connections for over an hour. With 60 s it is back to one within 7 minutes; that one stays
+    # open for the next request (PLAN-DB «Conexiones», round 2026-10-18).
+    pool = load_settings(**DEVELOPMENT_ENV)["DATABASES"]["default"]["OPTIONS"]["pool"]
+    assert (pool["min_size"], pool["max_size"], pool["max_idle"]) == (1, 8, 60)
+
+
+@pytest.mark.django_db
+def test_the_running_pool_closes_idle_connections_after_60_seconds():
+    # Django hands OPTIONS["pool"] to psycopg_pool as is: the pool this process opened has it.
+    from django.db import connection
+
+    connection.ensure_connection()
+    assert (connection.pool.min_size, connection.pool.max_idle) == (1, 60)
+
+
 def test_database_tls_and_application_name_only_when_set(load_settings):
     options = load_settings(**DEVELOPMENT_ENV)["DATABASES"]["default"]["OPTIONS"]
     assert options == {
-        "pool": {"min_size": 1, "max_size": 8, "timeout": 5},
+        "pool": {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5},
         "connect_timeout": 5,
     }
     loaded = load_settings(
@@ -293,7 +311,7 @@ def test_database_tls_and_application_name_only_when_set(load_settings):
         DB_APPLICATION_NAME="worker",
     )
     assert loaded["DATABASES"]["default"]["OPTIONS"] == {
-        "pool": {"min_size": 1, "max_size": 8, "timeout": 5},
+        "pool": {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5},
         "connect_timeout": 5,
         "sslmode": "verify-full",
         "sslrootcert": "/etc/ssl/certs/rds-global-bundle.pem",
