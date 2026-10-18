@@ -54,6 +54,9 @@ check "RDS CA bundle, readable by the app user" \
 check "pgbouncer-entrypoint is an executable on the PATH" \
   '[[ $(in_image sh -c "command -v pgbouncer-entrypoint") == /usr/local/bin/pgbouncer-entrypoint ]] &&
    in_image test -x /usr/local/bin/pgbouncer-entrypoint'
+check "pgbouncer-healthcheck is an executable on the PATH" \
+  '[[ $(in_image sh -c "command -v pgbouncer-healthcheck") == /usr/local/bin/pgbouncer-healthcheck ]] &&
+   in_image test -x /usr/local/bin/pgbouncer-healthcheck'
 check "the Vite manifest lists the SPA entry" \
   'in_image python -c "import json; m = json.load(open(\"frontend/dist/.vite/manifest.json\")); assert m[\"frontend/main.ts\"][\"isEntry\"]"'
 # With PROD_ENV: without DEBUG nor SECRET_KEY the settings refuse to load (DEBUG is off by default).
@@ -98,6 +101,7 @@ done
 check "daphne serves /healthz on 8000 with a read-only filesystem" '[[ $web_up -eq 1 ]]'
 
 # The sidecar: same image, `pgbouncer-entrypoint`, the healthcheck of modules/ecs-service verbatim.
+healthcheck=(pgbouncer-healthcheck)
 bouncer="$(docker run -d --read-only --tmpfs /tmp \
   -e PGBOUNCER_SERVER_HOST=writer.invalid -e PGBOUNCER_SERVER_PORT=5432 -e PGBOUNCER_LISTEN_PORT=6432 \
   -e PGBOUNCER_MAX_USER_CONNECTIONS=40 -e PGBOUNCER_SERVER_TLS_CA_FILE=/etc/ssl/certs/rds-global-bundle.pem \
@@ -105,10 +109,19 @@ bouncer="$(docker run -d --read-only --tmpfs /tmp \
 containers+=("$bouncer")
 bouncer_up=0
 for _ in $(seq 1 20); do
-  if docker exec "$bouncer" pg_isready -q -h 127.0.0.1 -p 6432; then bouncer_up=1; break; fi
+  if docker exec "$bouncer" "${healthcheck[@]}" 2> /dev/null; then bouncer_up=1; break; fi
   sleep 0.5
 done
-check "the sidecar's healthcheck passes: pg_isready on 127.0.0.1:6432" '[[ $bouncer_up -eq 1 ]]'
+check "the sidecar's healthcheck passes on 127.0.0.1:6432" '[[ $bouncer_up -eq 1 ]]'
+check "the healthcheck leaves no line in the sidecar's log (it ran every 5 s in prod)" '
+  before="$(docker logs "$bouncer" 2>&1 | grep -v " LOG stats: ")"
+  for _ in 1 2 3; do docker exec "$bouncer" "${healthcheck[@]}"; done
+  sleep 1
+  [[ $(docker logs "$bouncer" 2>&1 | grep -v " LOG stats: ") == "$before" ]]'
+check "the healthcheck defaults to port 6432" \
+  'docker exec "$bouncer" env -u PGBOUNCER_LISTEN_PORT "${healthcheck[@]}"'
+check "the healthcheck fails where pgbouncer does not listen" \
+  '! docker exec -e PGBOUNCER_LISTEN_PORT=6433 "$bouncer" "${healthcheck[@]}" 2> /dev/null'
 check "pgbouncer is PID 1's process, not a shell around it" \
   '[[ $(docker exec "$bouncer" cat /proc/1/comm) == pgbouncer ]]'
 check "pgbouncer listens on loopback only" '

@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # Image of the hub: the web (Daphne), the worker and the one-off tasks, plus the PgBouncer sidecar
-# of hub and worker (same image, command `pgbouncer-entrypoint`). Contract with the infra:
-# aws-next/README.md, «Imagen». Needs the packages/live and packages/ui submodules checked out.
+# of hub and worker (same image, command `pgbouncer-entrypoint`, healthcheck `pgbouncer-healthcheck`).
+# Contract with the infra: aws/README.md, «Imagen». Needs the packages/live and packages/ui
+# submodules checked out.
 #   docker buildx build --platform linux/arm64 --provenance=false -t erplora/hub .
 #   bash docker/image.test.sh erplora/hub
 
@@ -58,7 +59,7 @@ RUN DEBUG=1 python manage.py compilemessages --ignore=packages \
 
 # 3) Runtime: read-only filesystem except /tmp (the sidecar writes its config there).
 FROM ${PYTHON_IMAGE}
-# PgBouncer and the PostgreSQL 18 client (pg_isready, the sidecar's healthcheck) from PGDG.
+# PgBouncer and the PostgreSQL 18 client (psql for `manage.py dbshell`, pg_isready) from PGDG.
 ADD --chmod=644 https://www.postgresql.org/media/keys/ACCC4CF8.asc /usr/share/keyrings/pgdg.asc
 RUN . /etc/os-release \
  && echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
@@ -74,6 +75,7 @@ RUN apt-get update \
 # CA bundle of RDS: TLS verify-full of the app (DB_SSLROOTCERT) and of PgBouncer towards Aurora.
 ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 COPY --chmod=755 docker/pgbouncer-entrypoint.sh /usr/local/bin/pgbouncer-entrypoint
+COPY --chmod=755 docker/pgbouncer-healthcheck.sh /usr/local/bin/pgbouncer-healthcheck
 RUN useradd --system --uid 10001 --home-dir /app app
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/project /app/project
