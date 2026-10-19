@@ -6,21 +6,26 @@ and is refused with the real reason. Two bookings on the same day never share a 
 the same series never book a date twice.
 
 A detail (an appointment, a series) that a deletion lands in the middle of answers what it read or 404,
-never a 500.
+never a 500. The Hub admin's «Delete» of an appointment or a series that a write holds waits for it and takes
+what it added (or answers «Cannot delete»); a write that comes second finds it gone.
 """
 
+import datetime as dt
 import threading
+import time
+from collections.abc import Callable
 from contextlib import contextmanager
 
 import pytest
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.db import connection
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
 from live.errors import OperationError
 
-from apps.appointment.models import Appointment
+from apps.appointment.models import Appointment, Recurring
 from apps.staff.models import Member
-from apps.staff.tests.conftest import deleted_on_screen
+from apps.staff.tests.conftest import WAIT_LIMIT, _waited_for, deleted_on_screen
 
 from .conftest import MONDAY, at, make_appointment, make_series, make_settings, run, wall
 
@@ -232,3 +237,208 @@ def test_a_row_deleted_while_its_detail_is_read_is_never_a_server_error(salon, d
         gone = error
     assert isinstance(gone, OperationError), gone
     assert (gone.status, gone.code) == (404, missing)
+
+
+# ── The Hub admin's «Delete» of an appointment or a series that a write holds ───────────────────
+#
+# A write locks the appointment (a state change, new services) or the series (booking its dates, splitting it)
+# and then adds what hangs from it: a history line, service lines, booked appointments, the series it splits
+# into. Django's «Delete» gathered what hangs from the row before the write committed and deleted the row
+# after: it missed what the write added and failed at its COMMIT, or waited for the write in a circle (a 500
+# either way). Locked first, it waits for the write and then takes what it added, or answers «Cannot delete»
+# when that protects the row; a write that comes second waits for the deletion and finds nothing.
+
+#: How the platform staff delete: from the row's delete page, or with the list's «Delete selected».
+HOW = ["page", "list"]
+
+
+def locks(table: str) -> Callable[[str], bool]:
+    """Whether a statement locks rows of ``table``."""
+    return lambda sql: f'FROM "{table}"' in sql and "FOR UPDATE" in sql
+
+
+@pytest.fixture
+def hub_staff(db) -> Client:
+    """The platform staff, signed in to the Hub admin."""
+    staff = get_user_model().objects.create_superuser(
+        username="root", password="pw", email="root@example.com"
+    )
+    client = Client()
+    client.force_login(staff)
+    return client
+
+
+def admin_delete(client: Client, how: str, *targets):
+    """The Hub admin's «Delete» of ``targets`` (one for its page), ``how`` it says (see ``HOW``); it returns
+    the answer."""
+    meta = type(targets[0])._meta
+    changelist = f"/admin/{meta.app_label}/{meta.model_name}/"
+    if how == "page":
+        [target] = targets
+        url, data = f"{changelist}{target.pk}/delete/", {"post": "yes"}
+    else:
+        url, data = changelist, {
+            "action": "delete_selected",
+            "_selected_action": [str(target.pk) for target in targets],
+            "post": "yes",
+        }
+    return lambda: client.post(
+        url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"
+    )
+
+
+@contextmanager
+def meanwhile(after: Callable[[str], bool], call):
+    """Runs ``call`` in another session right after the first statement of this one for which ``after``
+    holds; this one goes on once ``call`` waits for what it holds (or has ended). Yields its outcome (an
+    error raised, a 500 included, is the outcome)."""
+    outcome: list = []
+
+    def other():
+        try:
+            outcome.append(call())
+        except Exception as error:  # reported to the test
+            outcome.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=other)
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if thread.ident is None and after(sql):
+            thread.start()
+            deadline = time.monotonic() + WAIT_LIMIT
+            while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
+                time.sleep(0.02)
+        return result
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield outcome
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+    assert thread.ident is not None, "this session never locked"
+
+
+def booked_pending(salon) -> Appointment:
+    return make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="pending"
+    )
+
+
+#: Writes that lock an appointment and add to what hangs from it: a history line, and new service lines.
+APPOINTMENT_WRITES = {
+    "confirm": lambda salon, booked: run(
+        "appointment.appointment.confirm", {"id": str(booked.id)}
+    ),
+    "new services": lambda salon, booked: run(
+        "appointment.appointment.update",
+        {"id": str(booked.id), "services": [{"service_id": str(salon.colour.id)}]},
+    ),
+}
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(APPOINTMENT_WRITES))
+def test_the_hub_admin_deletes_an_appointment_a_write_holds_once_it_is_written(
+    salon, hub_staff, write, how
+):
+    booked = booked_pending(salon)
+    deletion = admin_delete(hub_staff, how, booked)
+    with meanwhile(locks("appointment_appointment"), deletion) as answers:
+        APPOINTMENT_WRITES[write](salon, booked)
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert not Appointment.objects.filter(pk=booked.pk).exists()
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_a_state_change_while_the_hub_admin_deletes_the_appointment_finds_it_gone(
+    salon, hub_staff, how
+):
+    booked = booked_pending(salon)
+    confirm = lambda: run("appointment.appointment.confirm", {"id": str(booked.id)})  # noqa: E731
+    with meanwhile(locks("appointment_appointment"), confirm) as outcomes:
+        answer = admin_delete(hub_staff, how, booked)()
+    assert answer.status_code == 302
+    [outcome] = outcomes
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (404, "appointment.appointment_not_found")
+    assert not Appointment.objects.filter(pk=booked.pk).exists()
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_cannot_delete_a_series_whose_dates_a_run_books_meanwhile(
+    salon, hub_staff, how
+):
+    series = make_series(salon)
+    deletion = admin_delete(hub_staff, how, series)
+    with meanwhile(locks("appointment_recurring"), deletion) as answers:
+        run("appointment.recurring.materialize", {"id": str(series.id)})
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert (answer.status_code, str(answer.context["title"])) == (
+        200,
+        "Cannot delete repeating appointment",
+    )
+    assert Recurring.objects.filter(pk=series.pk).exists()
+    assert Appointment.objects.filter(recurring=series).exists()
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_deletes_a_series_an_edit_splits_and_keeps_the_new_one(
+    salon, hub_staff, how
+):
+    series = make_series(salon, is_active=False)
+    deletion = admin_delete(hub_staff, how, series)
+    split = {
+        "id": str(series.id),
+        "from_date": (MONDAY + dt.timedelta(weeks=1)).isoformat(),
+        "time": "11:00",
+    }
+    with meanwhile(locks("appointment_recurring"), deletion) as answers:
+        out = run("appointment.recurring.update", split)
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert not Recurring.objects.filter(pk=series.pk).exists()
+    assert Recurring.objects.get(pk=out.recurring.id).split_from_id is None
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_a_run_of_a_series_while_the_hub_admin_deletes_it_finds_it_gone(
+    salon, hub_staff, how
+):
+    series = make_series(salon)
+    book = lambda: run("appointment.recurring.materialize", {"id": str(series.id)})  # noqa: E731
+    with meanwhile(locks("appointment_recurring"), book) as outcomes:
+        answer = admin_delete(hub_staff, how, series)()
+    assert answer.status_code == 302
+    [outcome] = outcomes
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (404, "appointment.recurring_not_found")
+    assert not Recurring.objects.filter(pk=series.pk).exists()
+    assert not Appointment.objects.exists()
+
+
+def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_in_a_circle(
+    salon, hub_staff
+):
+    first = booked_pending(salon)
+    second = make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "12:00"), status="pending"
+    )
+    deletion = admin_delete(hub_staff, "list", first, second)
+    with meanwhile(locks("appointment_appointment"), deletion) as answers:
+        # The agenda names them the other way round from the admin's list.
+        out = run(
+            "appointment.appointment.bulk_delete", {"ids": [str(second.id), str(first.id)]}
+        )
+    assert out.deleted == [second.id, first.id]
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert not Appointment.objects.exists()

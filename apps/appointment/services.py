@@ -255,6 +255,29 @@ def _lock_members(*members: Member | None) -> None:
         )
 
 
+def lock_appointments(ids) -> list[UUID]:
+    """Locks the appointments ``ids`` (deleted ones too) in id order; the ids of those still there.
+
+    Every write on an appointment locks it before what hangs from it (its history, its service lines), and so
+    does the Hub admin's «Delete» (admin.py) before Django gathers all that and deletes it: it waits for the
+    write under way and takes what that write added, instead of failing on it at its COMMIT. Several at once
+    go in id order, as ``appointment.appointment.bulk_delete`` takes them: two deletions never wait in a circle.
+    """
+    rows = Appointment.objects.select_for_update().filter(pk__in=ids).order_by("id")
+    return list(rows.values_list("id", flat=True))
+
+
+def lock_series(ids) -> list[UUID]:
+    """Locks the series ``ids`` (deleted ones too) in id order; the ids of those still there.
+
+    Every write on a series locks it before what hangs from it (its services, the appointments it books, the
+    series it splits into), and so does the Hub admin's «Delete» (admin.py) before Django checks what protects
+    it and gathers the rest: booked appointments it sees answer «Cannot delete».
+    """
+    rows = Recurring.objects.select_for_update().filter(pk__in=ids).order_by("id")
+    return list(rows.values_list("id", flat=True))
+
+
 def _next_number() -> str:
     """``APT-YYYYMMDD-NNNN`` of today's business day, from its counter row (locked by the UPDATE)."""
     day = today()
@@ -980,8 +1003,10 @@ def delete_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     },
 )
 def bulk_delete(ctx: OperationContext, data: BulkDeleteIn) -> dict:
+    ids = list(dict.fromkeys(data.ids))
+    lock_appointments(ids)
     deleted = []
-    for appointment_id in dict.fromkeys(data.ids):
+    for appointment_id in ids:
         appointment = find_appointment(ctx, appointment_id, None, lock=True)
         _delete(ctx, appointment)
         deleted.append(appointment.id)
