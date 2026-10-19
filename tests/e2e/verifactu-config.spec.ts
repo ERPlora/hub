@@ -2,13 +2,14 @@
 //   - VERIFACTU-F02, F03: «Mi certificado» uploads a .p12 made for the test (never a real certificate), shows its
 //     holder, NIF and expiry, and removes it after asking;
 //   - VERIFACTU-F05: «Lo remite ERPlora» refuses a signed model that is no PDF (by its bytes, not its name) with the
-//     Spanish text, and takes four minimal PDFs on to ERPlora's account. The SaaS on `main` has no review app yet
-//     (`fiscal/`) and knows no hub with this test's id, so it answers 404 and the Hub says «not linked yet»: the
-//     Hub's own checks passed and the documents reached the SaaS. A 201 needs the SaaS's `fiscal/` and a real hub;
+//     Spanish text, and takes four minimal PDFs on to ERPlora's account. The local SaaS knows no hub with the id of
+//     `a` (each e2e database gives it its own), so it answers 404 and the Hub says «not linked yet»: the Hub's own
+//     checks passed and the documents reached the SaaS. A 201 needs a hub the SaaS registered;
 //   - VERIFACTU-F08: Settings lists what keeps the business from going live, the missing paid option among it, from
 //     the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once paid.
-// The photo is the SaaS's, sent here the way the SaaS sends it. What the run changes in VeriFactu's configuration
-// and the own certificate is put back after it (or removed, if the run made it), and so is the issuer.
+// The photo is the SaaS's, sent here the way the SaaS sends it, to `a`'s row of the registry (`base_hub`). What the
+// run changes in VeriFactu's configuration, the own certificate and that row's photo is put back after it (or
+// removed, if the run made it), and so is the issuer.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -23,8 +24,10 @@ import { STACK } from './stack';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
 const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
-/** The hub's id in ERPlora as this run's photo says it (no hub of the local SaaS has it). */
-const HUB_ID = '0199e6f0-7e2e-7000-8000-00000000e2e5';
+/** The id of `a` in the registry (`base_hub`), the one `/internal/hubs/{id}/state` takes; read before the first
+ *  test. `seed_local_hubs` gives each database its own, so a fixed id was answered 404 «No hub has this id.» once
+ *  the registry came (hub#63). */
+let hubId = '';
 /** The issuer `ensureIssuer` sets: a company, so it names its legal representative and proves it. */
 const ISSUER_NIF = 'B12345674';
 const PASSWORD = 'e2e-secret';
@@ -34,7 +37,11 @@ let version = Math.floor(Date.now() / 1000);
 /** Whether VeriFactu's configuration row existed before the run (if not, the run makes it and removes it). */
 let hadConfig = true;
 /** The copies the run keeps of what it changes: VeriFactu's configuration and the own certificate. */
-const BACKUP = { config: 'e2e_verifactu_config_before', certificate: 'e2e_verifactu_owncertificate_before' };
+const BACKUP = {
+  config: 'e2e_verifactu_config_before',
+  certificate: 'e2e_verifactu_owncertificate_before',
+  photo: 'e2e_base_hub_photo_before',
+};
 
 const CONFIG_COLUMNS = [
   'route',
@@ -54,7 +61,7 @@ type Representation = 'none' | 'submitted' | 'approved' | 'returned' | 'revoked'
 async function pushPhoto(representation: Representation, livePaid: boolean): Promise<void> {
   version += 1;
   const body = JSON.stringify({
-    hub_id: HUB_ID,
+    hub_id: hubId,
     slug: 'a',
     version,
     status: 'active',
@@ -69,7 +76,7 @@ async function pushPhoto(representation: Representation, livePaid: boolean): Pro
   });
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${HUB_ID}/state`, {
+  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${hubId}/state`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
     body,
@@ -132,24 +139,40 @@ async function spanishPage(browser: import('@playwright/test').Browser, next: st
   return { context, page };
 }
 
-/** Copies the configuration and the own certificate aside (tables of the database, so a shell's quoting never
- *  touches their values) and starts from no certificate. */
+/** The id of `a` in the registry; the e2e's global setup already refused a run without it. */
+function registryIdOfA(): string {
+  const id = psql("select id from base_hub where slug = 'a'");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
+    throw new Error(`The registry of DB_NAME=${STACK.database} has no hub a (got ${JSON.stringify(id)}): run node tests/e2e/database.ts.`);
+  }
+  return id;
+}
+
+/** Copies the configuration, the own certificate and `a`'s photo aside (tables of the database, so a shell's quoting
+ *  never touches their values) and starts from no certificate. */
 function backUpConfig(): void {
+  hubId = registryIdOfA();
   hadConfig = psql('select count(*) from verifactu_config') !== '0';
   // Past the version the hub already applied, or the run's photos would change nothing.
-  version = Math.max(version, Number(psql('select coalesce(max(synced_version), 0) from verifactu_config')));
+  version = Math.max(
+    version,
+    Number(psql('select coalesce(max(synced_version), 0) from verifactu_config')),
+    Number(psql(`select state_version from base_hub where id = '${hubId}'`)),
+  );
   psql(
     [
       `drop table if exists ${BACKUP.config}`,
       `drop table if exists ${BACKUP.certificate}`,
+      `drop table if exists ${BACKUP.photo}`,
       `create table ${BACKUP.config} as select * from verifactu_config`,
       `create table ${BACKUP.certificate} as select * from verifactu_owncertificate`,
+      `create table ${BACKUP.photo} as select id, state, state_version from base_hub where id = '${hubId}'`,
       'delete from verifactu_owncertificate',
     ].join('; '),
   );
 }
 
-/** Puts back what `backUpConfig` copied: the configuration's columns the run moves and the certificate. */
+/** Puts back what `backUpConfig` copied: the configuration's columns the run moves, the certificate and `a`'s photo. */
 function restoreConfig(): void {
   const sets = CONFIG_COLUMNS.map((column) => `${column} = b.${column}`).join(', ');
   psql(
@@ -159,8 +182,10 @@ function restoreConfig(): void {
       hadConfig
         ? `update verifactu_config c set ${sets} from ${BACKUP.config} b where b.id = c.id`
         : 'delete from verifactu_config where not exists (select 1 from verifactu_record)',
+      `update base_hub h set state = b.state, state_version = b.state_version from ${BACKUP.photo} b where b.id = h.id`,
       `drop table ${BACKUP.config}`,
       `drop table ${BACKUP.certificate}`,
+      `drop table ${BACKUP.photo}`,
     ].join('; '),
   );
 }
@@ -203,9 +228,11 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
   expect(psql('select holder_tax_id from verifactu_owncertificate')).toBe(ISSUER_NIF);
 
   await own.locator('[data-testid=verifactu-config-cert-remove]').click();
-  const dialog = page.locator('ion-modal');
-  await expect(dialog).toContainText('¿Quitar el certificado?');
+  // By its title: the shell keeps other dialogs in the page (the apps launcher is an ion-modal too).
+  const dialog = page.locator('ion-modal', { hasText: '¿Quitar el certificado?' });
+  await expect(dialog).toBeVisible();
   await dialog.locator('ion-button', { hasText: 'Quitar' }).click();
+  await expect(dialog).toBeHidden();
   await expect(cert).toContainText('Sin cargar');
   await expect(cert).not.toContainText(ISSUER_NIF);
   expect(psql('select count(*) from verifactu_owncertificate')).toBe('0');
