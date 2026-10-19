@@ -8,6 +8,8 @@ either left the rule, price or list pointing at a row that is gone or, the Hub a
 refuse the write (a 500). A write holds what it names, so the deletion waits for it; one already under way
 when the write reads it is not found, as one deleted before. Both the business's «Delete» and the Hub
 admin's (the row's delete()) are landed there.
+
+The detail of a price list that a deletion lands in the middle of answers what it read or 404, never a 500.
 """
 
 import threading
@@ -24,7 +26,7 @@ from apps.customer.models import CustomerGroup
 from apps.inventory.models import Category, Product
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 
-from .conftest import ctx_for, make_category, make_group, make_list, make_product, make_rule
+from .conftest import ctx_for, make_category, make_group, make_item, make_list, make_product, make_rule
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -367,3 +369,63 @@ def test_a_customer_group_being_deleted_when_a_write_names_it_is_refused(world, 
     assert (outcome.status, outcome.code, list(outcome.fields) if fields else None) == (status, code, fields)
     # Nothing names the group that is gone: no list for it, no rule on for it.
     assert for_the_group(world.vip) == (0, 0)
+
+
+# The detail of a price list: a deletion that lands in the middle of a read
+
+
+@contextmanager
+def deleted_after_the_first_read_of(target, how: str):
+    """Commits the deletion of ``target`` (``how``, as ``remove``) in another session right after the first
+    statement of this one that reads its table: a deletion landing in the middle of a read, every time."""
+    table = f'FROM "{type(target)._meta.db_table}"'
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            deletions.extend(at_once(lambda: delete(target, how)))
+        return result
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+@pytest.fixture
+def vip_list(world):
+    """A list of the VIP group with one price: what its detail shows beyond its own columns."""
+    price_list = make_list("VIPL", name="VIP list", customer_group_id=world.vip.id)
+    make_item(price_list, world.espresso, price=120)
+    return price_list
+
+
+# Only the Hub admin deletes a price list (the row goes, its prices with it): the business deactivates it.
+def test_a_price_list_deleted_while_its_detail_is_read_is_never_a_server_error(vip_list):
+    # The detail found the list and then read it again for its group's name and its count of prices: a
+    # deletion committed between the two raised DoesNotExist (a 500). In one read it is the list as it was read.
+    with deleted_after_the_first_read_of(vip_list, "row") as deletions:
+        shown = run("pricing.price_list.get", {"id": str(vip_list.pk)})
+    assert deleted(deletions) == ["ok"]
+    assert (shown.id, shown.code, shown.customer_group_name, shown.item_count) == (vip_list.pk, "VIPL", "VIP", 1)
+    # What the detail answers next: not found, and the open sheet closes.
+    gone = attempt(lambda: run("pricing.price_list.get", {"id": str(vip_list.pk)}))
+    assert isinstance(gone, OperationError), gone
+    assert (gone.status, gone.code) == (404, "pricing.price_list_not_found")
+
+
+def test_a_price_list_deleted_between_its_name_and_its_detail_is_not_found(vip_list):
+    with deleted_after_the_first_read_of(vip_list, "row") as deletions:
+        outcome = attempt(lambda: run("pricing.price_list.get", {"price_list": "vipl"}))
+    assert deleted(deletions) == ["ok"]
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (404, "pricing.price_list_not_found")
+
+
+def test_find_list_refuses_to_lock_the_rows_it_is_given(vip_list):
+    # ``rows`` is what a detail shows (the group's name, the count of prices: grouped), and Postgres refuses
+    # ``FOR UPDATE`` on a grouped query. A write names its list without ``rows``; both at once is a mistake
+    # of the caller, told as such and not as a database error.
+    from apps.pricing.queries import _lists, find_list
+
+    with transaction.atomic(), pytest.raises(TypeError, match="rows"):
+        find_list(vip_list.pk, None, lock=True, rows=_lists())
