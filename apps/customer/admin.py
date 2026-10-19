@@ -3,7 +3,7 @@
 Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub admin, only on ``hubs.erplora.com``, has
 full CRUD over a hub's tables; what each staff member may do is Django's own permissions. A change
 made here writes no event to the outbox: the screens see it on their next re-run. The «Delete» of a card, a
-group, a tag or a custom field locks it first (``lock_rows``), as every write on it does.
+group, a tag or a custom field locks it first (``lock_customers``, ``lock_rows``), as every write on it does.
 """
 
 from django.contrib import admin
@@ -21,7 +21,7 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.services import lock_rows
+from apps.customer.services import lock_customers, lock_rows
 
 
 class LockedDeletion:
@@ -32,9 +32,13 @@ class LockedDeletion:
     deletion waits for it and then takes what it added, instead of failing at its COMMIT; a write that comes
     second waits for the deletion and finds the row gone."""
 
+    def lock(self, ids) -> list:
+        """Locks the rows ``ids`` of this admin's table in id order (``lock_rows``)."""
+        return lock_rows(self.model, ids)
+
     def get_deleted_objects(self, objs, request):
         if request.method == "POST":
-            lock_rows(self.model, [obj.pk for obj in objs])
+            self.lock([obj.pk for obj in objs])
         return super().get_deleted_objects(objs, request)
 
     # The actions run outside a transaction; the lock above lasts until the deletion ends.
@@ -71,6 +75,7 @@ class ConsentInline(admin.TabularInline):
 
 @admin.register(Customer)
 class CustomerAdmin(LockedDeletion, admin.ModelAdmin):
+    lock = staticmethod(lock_customers)  # a card before the duplicates merged into it, as an erasure takes them
     list_display = (
         "name",
         "email",

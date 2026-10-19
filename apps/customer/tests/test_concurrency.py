@@ -6,7 +6,9 @@ between the two (its purchases go with it) leaves nothing to void or refund, as 
 never a 500. The Hub admin's «Delete» of a card (its page and the list's «Delete selected») locks it before
 Django gathers what hangs from it: a write under way that holds the card and adds to it (a note, a purchase, a
 consent, a value, a group, its health data) is waited for and what it added goes too, instead of failing at the
-COMMIT; a write that comes second waits for the deletion and finds the card gone.
+COMMIT; a write that comes second waits for the deletion and finds the card gone. The same for a group, a tag or
+a custom field a write names, and a card and its duplicate are taken as a merge and an erasure take them, so
+none of them waits in a circle.
 """
 
 import threading
@@ -41,6 +43,7 @@ from apps.customer.models import (
 from apps.customer.schemas import (
     ConsentGrantIn,
     CustomerPatchIn,
+    EraseIn,
     GroupRefIn,
     HealthGrantIn,
     HealthIn,
@@ -480,6 +483,20 @@ def test_a_merge_and_the_hub_admin_deleting_both_cards_never_wait_in_a_circle(hu
     gone(deleted, first, second)
     assert OutboxEvent.objects.filter(name=events.CUSTOMER_MERGED).exists()
 
+
+
+def test_an_erasure_and_the_hub_admin_deleting_the_card_and_its_duplicate_never_wait_in_a_circle(hub_staff):
+    duplicate, kept = stored_backwards()
+    duplicate.deleted_at, duplicate.merged_into = NOW, kept
+    duplicate.save(update_fields=["deleted_at", "merged_into"])
+    erase = lambda: run("customer.customer.erase", EraseIn(id=kept.id, reason="Asked for it"))  # noqa: E731
+    # The erasure waits for the card it erases, then the Hub admin's «Delete selected» of both: both take them in
+    # id order (the duplicate merged into it comes first), so the deletion waits behind the erasure instead of
+    # holding the duplicate the erasure goes for next.
+    erased, deleted = in_turn(kept, erase, admin_delete(hub_staff, "list", kept, duplicate))
+    assert not isinstance(erased, Exception), erased
+    gone(deleted, kept, duplicate)
+    assert OutboxEvent.objects.filter(name=events.CUSTOMER_ERASED).count() == 2
 
 # ── A group, a tag or a custom field the Hub admin deletes while a write names it ─────────────────────
 #

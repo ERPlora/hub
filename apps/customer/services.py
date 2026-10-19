@@ -325,6 +325,26 @@ def lock_rows(model, ids) -> list[UUID]:
     return list(rows.values_list("id", flat=True))
 
 
+def lock_customers(ids) -> list[UUID]:
+    """Locks the cards ``ids`` as an erasure and a merge take them: a card before the duplicates merged into it
+    (each wave in id order); the ids of those still there.
+
+    The Hub admin's «Delete selected» of a card and its duplicate, in plain id order, could hold the duplicate
+    while an erasure of the card held the card and went for the duplicate: each waited for the other.
+    """
+    pending, locked = set(ids), []
+    while pending:
+        # The cards not merged into another pending one (all of them if they point at each other).
+        wave = set(
+            Customer.objects.filter(pk__in=pending)
+            .exclude(merged_into_id__in=pending)
+            .values_list("id", flat=True)
+        ) or set(pending)
+        locked += lock_rows(Customer, wave)
+        pending -= wave
+    return locked
+
+
 @operation(
     "customer.customer.create",
     kind="command",
