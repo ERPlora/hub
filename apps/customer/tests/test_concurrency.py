@@ -412,6 +412,46 @@ def test_a_write_while_the_hub_admin_deletes_the_card_finds_it_gone(hub_staff, w
     nothing_hangs_from(ana)
 
 
+@pytest.mark.parametrize(
+    "make",
+    [
+        card,
+        lambda: CustomerGroup.objects.create(name="VIP"),
+        lambda: CustomerTag.objects.create(name="Allergic"),
+        lambda: CustomField.objects.create(name="Shoe size", field_type="text"),
+    ],
+    ids=["card", "group", "tag", "custom field"],
+)
+def test_the_hub_admin_confirmation_page_of_a_row_a_write_holds_does_not_wait(hub_staff, make):
+    """The delete page (a GET, before the staff confirm) runs outside a transaction and locks nothing: it answers
+    while a write still holds the row; only the confirmed deletion (a POST) waits for the write."""
+    row = make()
+    meta = type(row)._meta
+    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
+    outcome: list = []
+
+    def other():
+        try:
+            outcome.append(hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
+        except Exception as error:  # reported to the test
+            outcome.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=other)
+    with transaction.atomic():
+        list(type(row).objects.select_for_update().filter(pk=row.pk))
+        thread.start()
+        thread.join(WAIT_LIMIT)
+        answered_while_held = not thread.is_alive()
+    thread.join(30)
+    assert answered_while_held, "the delete page waited for the write that held the row"
+    [answer] = outcome
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 200, answer.content[:500]
+    assert type(row).objects.filter(pk=row.pk).exists()
+
+
 def test_the_hub_admin_deletes_the_card_a_merge_keeps_with_what_the_merge_moved_to_it(hub_staff):
     survivor, absorbed = card("Ana"), card("ana")
     run("customer.note.add", NoteIn(customer_id=absorbed.id, content="Mornings"))
