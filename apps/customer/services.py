@@ -248,6 +248,8 @@ def _validated_field_values(
     Only active fields count: an unknown or inactive one is unavailable. Every required field must
     end up with a value, the one sent or the one stored.
     """
+    # The fields written are held until the COMMIT and read after: one deleted meanwhile is unavailable.
+    lock_rows(CustomField, [item.field_id for item in sent])
     fields = {field.id: field for field in CustomField.objects.filter(is_active=True)}
     stored = dict(
         CustomFieldValue.objects.filter(customer=customer).values_list(
@@ -306,6 +308,41 @@ def _apply_field_values(customer: Customer, kept: dict[UUID, str]) -> bool:
 
 
 # ── Customers ───────────────────────────────────────────────────────────────────────────────────
+
+
+def lock_rows(model, ids) -> list[UUID]:
+    """Locks the cards, groups, tags or custom fields ``ids`` (deleted cards too) in id order; the ids of those
+    still there.
+
+    Every write on a card locks it before what hangs from it (its activity, purchases, consents, values,
+    groups, tags, health data and orders), and then the groups, tags or fields it points at; the Hub admin's
+    «Delete» (admin.py) locks them too before Django gathers what hangs from them and deletes it, as the
+    business's own «Delete» of a group, a tag or a field does. Whichever comes second waits for the other:
+    the deletion takes what the write added, or the write finds the row gone, instead of failing at its
+    COMMIT. Several rows are taken in id order, as a merge takes its two cards.
+    """
+    rows = model.objects.select_for_update().filter(pk__in=ids).order_by("id")
+    return list(rows.values_list("id", flat=True))
+
+
+def lock_customers(ids) -> list[UUID]:
+    """Locks the cards ``ids`` as an erasure and a merge take them: a card before the duplicates merged into it
+    (each wave in id order); the ids of those still there.
+
+    The Hub admin's «Delete selected» of a card and its duplicate, in plain id order, could hold the duplicate
+    while an erasure of the card held the card and went for the duplicate: each waited for the other.
+    """
+    pending, locked = set(ids), []
+    while pending:
+        # The cards not merged into another pending one (all of them if they point at each other).
+        wave = set(
+            Customer.objects.filter(pk__in=pending)
+            .exclude(merged_into_id__in=pending)
+            .values_list("id", flat=True)
+        ) or set(pending)
+        locked += lock_rows(Customer, wave)
+        pending -= wave
+    return locked
 
 
 @operation(
@@ -473,9 +510,9 @@ def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
 def _named_ids(
     model, ids: list[UUID], names: list[str], missing, code: str, field: str
 ) -> set[UUID]:
-    """The ids of the groups or tags sent by id or by name; one that does not exist saves nothing."""
+    """The ids of the groups or tags sent by id or by name, held until the COMMIT; one that does not exist
+    (or that was deleted meanwhile) saves nothing."""
     wanted = set(ids)
-    known = set(model.objects.filter(pk__in=wanted).values_list("id", flat=True))
     for name in names:
         match = (
             model.objects.filter(name__iexact=name)
@@ -485,9 +522,8 @@ def _named_ids(
         )
         if match is None:
             raise InvalidPayload(missing, code=code, fields={field: missing})
-        known.add(match)
         wanted.add(match)
-    if wanted - known:
+    if wanted - set(lock_rows(model, wanted)):
         raise InvalidPayload(missing, code=code, fields={field: missing})
     return wanted
 
@@ -640,8 +676,9 @@ def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
     CustomFieldValue.objects.filter(customer=absorbed).exclude(
         field_id__in=list(survivor_fields)
     ).update(customer=survivor)
-    survivor.groups.add(*absorbed.groups.all())
-    survivor.tags.add(*absorbed.tags.all())
+    # The duplicate's groups and tags are held before the survivor points at them (as setting them does).
+    survivor.groups.add(*lock_rows(CustomerGroup, absorbed.groups.values("id")))
+    survivor.tags.add(*lock_rows(CustomerTag, absorbed.tags.values("id")))
     absorbed.groups.clear()
     absorbed.tags.clear()
     _merge_health(survivor, absorbed)
@@ -1314,7 +1351,9 @@ def _locked_purchase(sale_id: UUID) -> tuple[Customer, Purchase] | None:
 
     A merge locks the cards and then moves their purchases: locking the purchase first and the card
     after would make the two wait for each other. So the purchase is read without a lock, its card
-    is locked, and the purchase is read again, locked, checking it is still that card's and paid.
+    is locked, and the purchase is read again, locked, checking it is still that card's and paid. A
+    card the Hub admin deleted in between took its purchases with it: the purchase is looked for
+    again, as one a merge moved.
     """
     for _attempt in range(VOID_ATTEMPTS):
         found = (
@@ -1324,7 +1363,9 @@ def _locked_purchase(sale_id: UUID) -> tuple[Customer, Purchase] | None:
         )
         if found is None:
             return None
-        customer = Customer.objects.select_for_update().get(pk=found)
+        customer = Customer.objects.select_for_update().filter(pk=found).first()
+        if customer is None:
+            continue
         purchase = (
             Purchase.objects.select_for_update()
             .filter(
