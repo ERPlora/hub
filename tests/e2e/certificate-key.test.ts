@@ -117,6 +117,19 @@ describe('ensureCertificateKey', () => {
     }
   });
 
+  it('fills the last line that sets it, the one python-decouple reads, when an earlier one holds a key', () => {
+    const earlier = newFernetKey();
+    const path = envFile(`${NAME}=${earlier}\nDEBUG=True\n${NAME}=\n`);
+
+    expect(ensureCertificateKey(path, {})).toBe('generated');
+
+    const lines = readFileSync(path, 'utf8').split('\n');
+    expect(lines[0]).toBe(`${NAME}=${earlier}`);
+    expect(lines[2]).toMatch(new RegExp(`^${NAME}=[A-Za-z0-9_-]{43}=$`));
+    expect(lines[2]).not.toBe(`${NAME}=${earlier}`);
+    expect(lines.slice(3)).toEqual(['']);
+  });
+
   it("keeps the environment's key, which Django reads before the .env, and writes nothing", () => {
     const path = envFile('DEBUG=True\n');
 
