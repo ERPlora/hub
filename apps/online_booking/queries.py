@@ -403,7 +403,8 @@ def find_booking(ctx: OperationContext, ref: BookingRefIn) -> Appointment:
     },
 )
 def get_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
-    return load_detail(find_booking(ctx, data).id)
+    # The booking as found: reading it again by its id raised DoesNotExist (a 500) on a deletion in between.
+    return detail(find_booking(ctx, data))
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────
