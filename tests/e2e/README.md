@@ -3,7 +3,10 @@
 Las specs (`*.spec.ts`) manejan Chrome contra una pila de desarrollo que ya está arrancada: `runserver` del Hub
 (Django + su Vite), el SaaS (el login de todo hub pasa por él) y Postgres de `compose.yaml`. Oculto por
 defecto; `E2E_HEADED=1` lo enseña. Los `*.test.ts` de esta carpeta son Vitest (`pnpm test`): prueban la
-configuración del e2e, no el producto.
+configuración del e2e, no el producto. Todo `*.test.ts` del Hub que cargue Playwright (directo, por la
+configuración o por un helper) empieza por `// @vitest-environment node`: en happy-dom, el entorno por defecto,
+Playwright pide sus propios ficheros a `localhost:3000` y deja `ECONNREFUSED` detrás de una ejecución en verde.
+`playwright-environment.test.ts` lo exige.
 
 `pnpm typecheck` (y la CI) comprueba los tipos de todos los `.ts` de esta carpeta con su propio
 `tsconfig.json`, que lleva los tipos de Node (`process`, `node:fs`) en lugar de los del cliente de Vite, sin
