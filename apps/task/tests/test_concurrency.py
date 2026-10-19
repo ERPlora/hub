@@ -2,7 +2,8 @@
 
 Two tasks created at the same moment get consecutive numbers, never the same one; two completions of
 the same task close it once and the second one is told it was already closed. A task or a project given
-to a person the Hub admin is deleting at that moment is never a 500.
+to a person the Hub admin is deleting at that moment is never a 500, and neither is a task or a project
+deleted while it is being shown or changed.
 """
 
 import threading
@@ -21,7 +22,9 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.staff.models import Member
+from apps.task import events
 from apps.task.models import Project, Task
+from apps.task.queries import PROJECT_NOT_FOUND, TASK_NOT_FOUND
 
 from .conftest import ctx_for, make_member, make_project, make_task
 
@@ -84,15 +87,16 @@ IN_FLIGHT = 0.5
 ADMIN_DELETIONS = ["delete_model", "delete_queryset"]
 
 
-def admin_delete(member: Member, how: str) -> None:
-    """The Hub admin's «Delete» of ``member``: its page (``delete_model``) or the list's «Delete selected»
-    action (``delete_queryset``), as the staff run them."""
-    model_admin = admin.site._registry[Member]
+def admin_delete(target, how: str) -> None:
+    """The Hub admin's «Delete» of ``target`` (a person, a task or a project): its page (``delete_model``)
+    or the list's «Delete selected» action (``delete_queryset``), as the staff run them."""
+    model = type(target)
+    model_admin = admin.site._registry[model]
     request = RequestFactory().post("/admin/")
     if how == "delete_queryset":
-        model_admin.delete_queryset(request, Member.objects.filter(pk=member.pk))
+        model_admin.delete_queryset(request, model.objects.filter(pk=target.pk))
     else:
-        model_admin.delete_model(request, Member.objects.get(pk=member.pk))
+        model_admin.delete_model(request, model.objects.get(pk=target.pk))
 
 
 @contextmanager
@@ -274,3 +278,114 @@ def test_a_write_on_a_row_of_a_person_the_hub_admin_is_deleting_never_waits_in_a
     assert (outcome.status, outcome.code, list(outcome.fields)) == (422, "invalid_field", [field])
     assert not Member.objects.filter(pk=ana.pk).exists()
     assert left(row) is None
+
+
+# ── A task or a project deleted while it is read ─────────────────────────────────────────────────
+#
+# The detail of a task or a project found it and then loaded it again by its id, and a command found it and
+# then locked it by its id: a deletion committed between the two reads (the business's «Delete» or the Hub
+# admin's) raised DoesNotExist, a 500. The detail is read once, as it was; the command hears it is gone.
+
+#: Who takes a task or a project away: the business's «Delete» and the Hub admin's two.
+DELETIONS = ["operation", *ADMIN_DELETIONS]
+DELETE_OPERATION = {Task: "task.task.delete", Project: "task.project.delete"}
+DELETED_EVENT = {Task: events.TASK_DELETED, Project: events.PROJECT_DELETED}
+
+
+def delete(target, how: str) -> None:
+    if how == "operation":
+        run(DELETE_OPERATION[type(target)], {"id": str(target.pk)})
+    else:
+        with transaction.atomic():
+            admin_delete(target, how)
+
+
+@contextmanager
+def deleted_once_found(target, how: str):
+    """Commits the deletion of ``target`` in another session right after the first statement of this one
+    that reads its table and finds a row (the read that found it): every time between that read and the
+    next one."""
+    table = f'FROM "{type(target)._meta.db_table}"'
+    deletions: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        found = sql.lstrip().upper().startswith("SELECT") and table in sql and context["cursor"].rowcount > 0
+        if not deletions and found:
+            deletions.extend(at_once(lambda: delete(target, how)))
+        return result
+
+    with connection.execute_wrapper(wrapper):
+        yield deletions
+
+
+def a_task():
+    return make_task("Clean the store room")
+
+
+def a_project():
+    return make_project(code="OPN", name="Opening")
+
+
+#: Each detail: the row it shows, the reference it is named by and the fields that show it is that row.
+DETAILS = {
+    "a task by its id": (a_task, "task.task.detail", lambda row: {"id": str(row.pk)}, ("number", "title")),
+    "a task by its number": (a_task, "task.task.detail", lambda row: {"task": row.number}, ("number", "title")),
+    "a task by its title": (a_task, "task.task.detail", lambda row: {"task": row.title}, ("number", "title")),
+    "a project by its id": (a_project, "task.project.detail", lambda row: {"id": str(row.pk)}, ("code", "name")),
+    "a project by its code": (a_project, "task.project.detail", lambda row: {"project": row.code}, ("code", "name")),
+    "a project by its name": (a_project, "task.project.detail", lambda row: {"project": row.name}, ("code", "name")),
+}
+NOT_FOUND = {Task: TASK_NOT_FOUND, Project: PROJECT_NOT_FOUND}
+
+
+def gone(row, outcome) -> None:
+    """``outcome`` is the app's own 404 for ``row``: its code and its message, never a 500."""
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code, outcome.message) == (404, "not_found", str(NOT_FOUND[type(row)]))
+
+
+@pytest.mark.parametrize("how", DELETIONS)
+@pytest.mark.parametrize("shown", sorted(DETAILS))
+def test_a_task_or_project_deleted_while_its_detail_is_read_is_shown_as_it_was(shown, how):
+    setup, detail, named, fields = DETAILS[shown]
+    row = setup()
+    with deleted_once_found(row, how) as deletions:
+        outcome = attempt(lambda: run(detail, named(row)))
+    assert deleted(deletions) == ["ok"]
+    assert not isinstance(outcome, OperationError), outcome
+    assert (outcome.id, *(getattr(outcome, field) for field in fields)) == (
+        row.pk,
+        *(getattr(row, field) for field in fields),
+    )
+    # What the deletion's event runs next: not found, and the open sheet closes.
+    gone(row, attempt(lambda: run(detail, named(row))))
+
+
+#: Each command on a task or a project: the row it changes and what it is sent.
+CHANGED = {
+    "editing a task": (a_task, "task.task.update", lambda row: {"id": str(row.pk), "title": "Sweep the store room"}),
+    "moving a task on": (a_task, "task.task.set_status", lambda row: {"id": str(row.pk), "status": "in_progress"}),
+    "completing a task": (a_task, "task.task.complete", lambda row: {"id": str(row.pk)}),
+    "unassigning a task": (a_task, "task.task.assign", lambda row: {"id": str(row.pk)}),
+    "commenting on a task": (a_task, "task.comment.add", lambda row: {"task_id": str(row.pk), "text": "On it"}),
+    "deleting a task": (a_task, "task.task.delete", lambda row: {"id": str(row.pk)}),
+    "editing a project": (a_project, "task.project.update", lambda row: {"id": str(row.pk), "name": "Grand opening"}),
+    "deleting a project": (a_project, "task.project.delete", lambda row: {"id": str(row.pk)}),
+}
+
+
+@pytest.mark.parametrize("how", DELETIONS)
+@pytest.mark.parametrize("changed", sorted(CHANGED))
+def test_a_task_or_project_deleted_while_a_command_finds_it_is_not_found(changed, how):
+    # Twice «Delete» at once included: the second one hears it is gone, as a deletion committed before.
+    setup, command, sent = CHANGED[changed]
+    row = setup()
+    with deleted_once_found(row, how) as deletions:
+        outcome = attempt(lambda: run(command, sent(row)))
+    assert deleted(deletions) == ["ok"]
+    gone(row, outcome)
+    assert not type(row).objects.filter(pk=row.pk).exists()
+    # Nothing of the refused command is left: only the deletion's own event, if it records one.
+    recorded = list(OutboxEvent.objects.values_list("name", flat=True))
+    assert recorded == ([DELETED_EVENT[type(row)]] if how == "operation" else []), recorded

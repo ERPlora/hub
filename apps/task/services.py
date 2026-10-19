@@ -28,6 +28,8 @@ from apps.staff.queries import resolve_member
 from apps.task import events
 from apps.task.models import Comment, Project, Task, TaskCounter
 from apps.task.queries import (
+    PROJECT_NOT_FOUND,
+    TASK_NOT_FOUND,
     Caller,
     business_today,
     comment_row,
@@ -97,9 +99,12 @@ def _member(member_id: UUID | None, name: str | None, *, id_field: str, name_fie
 
 
 def _locked(caller: Caller, task_id: UUID | None, text: str | None) -> Task:
-    """The task, seen by the caller and locked until the end of the command."""
-    task = resolve_task(caller, task_id, text)
-    return Task.objects.select_for_update().get(pk=task.pk)
+    """The task, seen by the caller and locked until the end of the command. Deleted after it was found
+    (the business's «Delete» or the Hub admin's), it is not found, as one deleted before."""
+    task = Task.objects.select_for_update().filter(pk=resolve_task(caller, task_id, text).pk).first()
+    if task is None:
+        raise NotFound(str(TASK_NOT_FOUND))
+    return task
 
 
 def _changeable(caller: Caller, task_id: UUID | None, text: str | None) -> Task:
@@ -374,8 +379,12 @@ def add_comment(ctx: OperationContext, data: CommentIn) -> dict:
 
 
 def _locked_project(project_id: UUID | None, text: str | None) -> Project:
-    project = resolve_project(project_id, text)
-    return Project.objects.select_for_update().get(pk=project.pk)
+    """The project, locked until the end of the command; deleted after it was found, it is not found (as
+    ``_locked``)."""
+    project = Project.objects.select_for_update().filter(pk=resolve_project(project_id, text).pk).first()
+    if project is None:
+        raise NotFound(str(PROJECT_NOT_FOUND))
+    return project
 
 
 def _project_exists() -> Conflict:
