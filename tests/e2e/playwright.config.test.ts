@@ -1,6 +1,8 @@
+// @vitest-environment node
 // The Playwright config runs `global-setup.ts` before the first spec: the guard that refuses local
 // databases with unapplied migrations (2026-10-16). Its unit tests prove the guard; this one proves
-// Playwright calls it, which a dropped `globalSetup` line would silently undo.
+// Playwright calls it, which a dropped `globalSetup` line would silently undo. Node's environment: it
+// loads Playwright (playwright-environment.test.ts).
 import { isAbsolute, join } from 'node:path';
 
 import { expect, it } from 'vitest';
