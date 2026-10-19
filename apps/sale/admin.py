@@ -3,10 +3,12 @@
 Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com and
 has full CRUD over every table, fiscal ones included. What it saves does not go through the operations
 (no event, no numbering, no check of the tenders); the database still refuses a negative amount, a line
-that does not square, a payment whose change is not tendered − amount and a refund over the total.
+that does not square, a payment whose change is not tendered − amount and a refund over the total. An open
+check's «Delete» locks it first (``lock_orders``), as every write on it does.
 """
 
 from django.contrib import admin
+from django.db import transaction
 
 from apps.sale.models import (
     Department,
@@ -23,6 +25,7 @@ from apps.sale.models import (
     SalePayment,
     Settings,
 )
+from apps.sale.services import lock_orders
 
 AUDIT = ("id", "created_at", "updated_at")
 
@@ -101,6 +104,20 @@ class OrderAdmin(admin.ModelAdmin):
     search_fields = ("label", "id")
     readonly_fields = _readonly(Order)
     inlines = [OrderLineInline]
+
+    # «Delete» (the check's page and the list's «Delete selected») locks the checks before Django checks what
+    # protects them and gathers their lines. A write under way holds a check while it adds a line, moves lines
+    # in or out, or charges it: the deletion waits for it and then takes what it left, or answers «Cannot
+    # delete» once a sale charged it, instead of failing at its COMMIT or waiting for it in a circle.
+    def get_deleted_objects(self, objs, request):
+        if request.method == "POST":
+            lock_orders([obj.pk for obj in objs])
+        return super().get_deleted_objects(objs, request)
+
+    # The actions run outside a transaction; the lock above lasts until the deletion ends.
+    def response_action(self, request, queryset, *args, **kwargs):
+        with transaction.atomic():
+            return super().response_action(request, queryset, *args, **kwargs)
 
 
 @admin.register(OrderLine)

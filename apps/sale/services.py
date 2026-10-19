@@ -473,6 +473,17 @@ def delete_quick_note(ctx: OperationContext, data: QuickNoteRefIn) -> dict:
 # ── Open checks: the shared steps ────────────────────────────────────────────────────────────────
 
 
+def lock_orders(ids) -> list[Order]:
+    """Locks the checks ``ids`` in id order; those still there.
+
+    Every write on a check locks it before what hangs from it (its lines, the sale that charges it), and so does
+    the Hub admin's «Delete» (admin.py) before Django checks what protects it and gathers its lines: it waits for
+    the write under way and takes what that write left, instead of failing on it at its COMMIT. A write that locks
+    several (a merge) takes them here, in id order: two of them never wait in a circle.
+    """
+    return list(Order.objects.select_for_update().filter(pk__in=ids).order_by("id"))
+
+
 def _open_order(order_id: UUID) -> Order:
     """The check, locked; refused when it is no longer open (it was charged or voided under the screen)."""
     order = find_order(order_id, lock=True)
@@ -1073,13 +1084,8 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
 def merge(ctx: OperationContext, data: OrderMergeIn) -> dict:
     if data.from_order_id == data.to_order_id:
         raise Conflict(str(ORDER_CHANGED), code="sale.order_changed")
-    # Both rows locked, always in the same order: two merges at once never deadlock.
-    locked = {
-        order.id: order
-        for order in Order.objects.select_for_update()
-        .filter(pk__in=[data.from_order_id, data.to_order_id])
-        .order_by("id")
-    }
+    # Both rows locked in id order, as the Hub admin's «Delete selected» locks them: never in a circle.
+    locked = {order.id: order for order in lock_orders([data.from_order_id, data.to_order_id])}
     source, target = locked.get(data.from_order_id), locked.get(data.to_order_id)
     if source is None or target is None:
         raise NotFound(

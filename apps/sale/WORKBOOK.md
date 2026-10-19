@@ -1329,6 +1329,13 @@ administrador y responsable, los mismos que anulan y devuelven).
   Servicios: dos cajas sobre la última sesión van en fila y la segunda recibe su motivo); el cobro bloquea la cuenta, comprueba que sigue abierta, que las líneas que cobra
   siguen vivas y sin cobrar y, si la pantalla manda `order_version`, que es la misma
   (`sale.order_changed`). Anular y devolver una venta bloquean su fila: gana el primero.
+- **Borrar en el admin del Hub**: «Eliminar» de una cuenta abierta (su página y «Eliminar seleccionados»)
+  bloquea antes las cuentas (`lock_orders`, por id), así que espera a la escritura en curso y se lleva lo
+  que dejó (la línea añadida o partida, las líneas que trajo una unión) o responde «No se puede eliminar»
+  si un cobro ya la cobró; las líneas que una división o una unión se llevó a otra cuenta siguen allí, y la
+  escritura que llega después no la encuentra (`sale.order_not_found`). Unir dos cuentas las bloquea con
+  el mismo `lock_orders`: nunca se esperan en círculo con «Eliminar seleccionados»
+  (`tests/test_concurrency.py`).
 - **Numeración**: `SaleCounter` por día del negocio (zona horaria del Hub) con `UPDATE … RETURNING`
   (asignar `F("last") + 1` y guardar: Django devuelve el valor con `RETURNING`), en la transacción del
   cobro: un rechazo no gasta número y nunca hay huecos. `AAAAMMDD-NNNN`, cuatro cifras como mínimo
