@@ -15,19 +15,32 @@ import threading
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
+from uuid import uuid7
 
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import connection, transaction
 from django.test import Client, RequestFactory
+from live.context import system_context
 from live.errors import OperationError
+from live.operations import get
 
 from apps.appointment.models import Appointment, Recurring
 from apps.staff.models import Member
 from apps.staff.tests.conftest import WAIT_LIMIT, _waited_for, deleted_on_screen
 
-from .conftest import MONDAY, at, make_appointment, make_series, make_settings, run, wall
+from .conftest import (
+    MONDAY,
+    A,
+    at,
+    make_appointment,
+    make_customer,
+    make_series,
+    make_settings,
+    run,
+    wall,
+)
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -442,3 +455,182 @@ def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_
     assert not isinstance(answer, Exception), answer
     assert answer.status_code == 302
     assert not Appointment.objects.exists()
+
+
+# ── Writes that lock several appointments or series at once ─────────────────────────────────────
+#
+# The Hub admin's «Delete selected» and ``appointment.appointment.bulk_delete`` lock their rows in id order. A
+# write that locked several of the same rows in its own order (by start, by date, as the table stores them)
+# could take one of them while the deletion held the other: each waited for the other (``deadlock detected``,
+# a 500 or a failed reaction). Every write that locks several takes them in id order too, and the series
+# before their appointments (as an edit of a series does).
+
+
+def system(name: str, data: dict):
+    """Runs ``name`` as the platform (the outbox relay's reactions)."""
+    op = get(name)
+    return op(system_context(A), op.input.model_validate(data))
+
+
+def waiting() -> int:
+    """How many other sessions on this database wait for a lock."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_stat_clear_snapshot()")
+        cursor.execute(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
+            " AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
+        )
+        return cursor.fetchone()[0]
+
+
+def in_turn(row, *calls) -> list:
+    """Holds ``row`` locked in this session and starts ``calls`` in their own sessions, each once the ones before
+    wait for a lock, so they queue for ``row`` in that order; then lets it go. Their outcomes (an error raised,
+    a 500 included, is the outcome)."""
+    outcomes: list = [None] * len(calls)
+
+    def other(index, call):
+        try:
+            outcomes[index] = call()
+        except Exception as error:  # reported to the test
+            outcomes[index] = error
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=other, args=(i, call)) for i, call in enumerate(calls)]
+    with transaction.atomic():
+        list(type(row).objects.select_for_update().filter(pk=row.pk))
+        for queued, thread in enumerate(threads, start=1):
+            thread.start()
+            deadline = time.monotonic() + WAIT_LIMIT
+            while thread.is_alive() and waiting() < queued and time.monotonic() < deadline:
+                time.sleep(0.02)
+    for thread in threads:
+        thread.join(30)
+    return outcomes
+
+
+def ids_in_order() -> tuple:
+    return tuple(sorted((uuid7(), uuid7())))
+
+
+# Two rows (the first and the second by id) that a write takes the other way round.
+
+
+def by_start(salon):
+    """Two of Ana's appointments: the first by id starts later (the professional's release goes by start)."""
+    later = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "12:00"))
+    sooner = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"))
+    return later, sooner
+
+
+def by_date(salon):
+    """Two appointments of a series: the first by id is the later date (an edit of the series goes by date)."""
+    series = make_series(salon)
+    week = MONDAY + dt.timedelta(weeks=1)
+    later = make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(week, "10:00"), recurring=series, occurrence_date=week
+    )
+    sooner = make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), recurring=series, occurrence_date=MONDAY
+    )
+    return later, sooner
+
+
+def appointments_stored_backwards(salon):
+    """Two of Lucía's appointments, the second by id stored first (a change of all of hers goes as stored)."""
+    first, second = ids_in_order()
+    stored = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), id=second)
+    return make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "12:00"), id=first), stored
+
+
+def series_stored_backwards(salon):
+    """Two of Lucía's series with Ana, the second by id stored first."""
+    first, second = ids_in_order()
+    stored = make_series(salon, id=second)
+    return make_series(salon, id=first, day_of_week=1), stored
+
+
+def series_by_name(salon):
+    """Two of Ana's series: the first by id is Zoe's, after Lucía's by name (the release goes by name)."""
+    zoe = make_customer("Zoe Ruiz", phone="+34600777666")
+    first, second = make_series(salon), make_series(salon, day_of_week=1)
+    Recurring.objects.filter(pk=first.pk).update(customer=zoe, customer_name=zoe.name)
+    return first, second
+
+
+def release(salon, rows):
+    return system("appointment.staff.release", {"id": str(salon.ana.id)})
+
+
+def edit_series(salon, rows):
+    series = rows[0].recurring
+    return run(
+        "appointment.recurring.update",
+        {"id": str(series.id), "from_date": MONDAY.isoformat(), "time": "11:00"},
+    )
+
+
+def erase(salon, rows):
+    return system("appointment.customer.erase", {"id": str(salon.lucia.id)})
+
+
+def reassign(salon, rows):
+    marta = make_customer("Marta Gil", phone="+34600999888")
+    return system(
+        "appointment.customer.reassign", {"id": str(marta.id), "absorbed_id": str(salon.lucia.id)}
+    )
+
+
+#: A write that locks several rows, the two rows it takes the other way round from their ids, and the deletion
+#: that takes them in id order.
+IN_A_CIRCLE = {
+    "release by start · admin": (release, by_start, "admin"),
+    "release by start · agenda": (release, by_start, "agenda"),
+    "release series by name · admin": (release, series_by_name, "admin"),
+    "edit of a series by date · admin": (edit_series, by_date, "admin"),
+    "erase as stored · admin": (erase, appointments_stored_backwards, "admin"),
+    "erase series · admin": (erase, series_stored_backwards, "admin"),
+    "reassign as stored · admin": (reassign, appointments_stored_backwards, "admin"),
+    "reassign series · admin": (reassign, series_stored_backwards, "admin"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(IN_A_CIRCLE))
+def test_a_write_on_several_rows_and_a_deletion_of_them_never_wait_in_a_circle(salon, hub_staff, case):
+    write, make, deleter = IN_A_CIRCLE[case]
+    first, second = make(salon)
+    assert first.pk < second.pk
+    if deleter == "admin":
+        deletion = admin_delete(hub_staff, "list", first, second)
+    else:
+        deletion = lambda: run(  # noqa: E731
+            "appointment.appointment.bulk_delete", {"ids": [str(first.id), str(second.id)]}
+        )
+    deleted, written = in_turn(first, deletion, lambda: write(salon, (first, second)))
+    assert not isinstance(deleted, Exception), deleted
+    assert not isinstance(written, Exception), written
+    if deleter == "admin":
+        assert deleted.status_code == 302
+        assert not type(first).objects.filter(pk__in=[first.pk, second.pk]).exists()
+
+
+#: Writes that change a professional's or a customer's appointments and series (the series before them).
+SERIES_THEN_APPOINTMENTS = {"release": release, "erase": erase, "reassign": reassign}
+
+
+def locks_rows_of(table: str) -> Callable[[str], bool]:
+    """Whether a statement locks rows of ``table`` (to read them or to change them)."""
+    return lambda sql: locks(table)(sql) or sql.lstrip().startswith(f'UPDATE "{table}"')
+
+
+@pytest.mark.parametrize("write", sorted(SERIES_THEN_APPOINTMENTS))
+def test_a_write_on_a_series_and_its_appointments_and_an_edit_of_it_never_wait_in_a_circle(
+    salon, write
+):
+    rows = by_date(salon)
+    edit = lambda: edit_series(salon, rows)  # noqa: E731
+    with meanwhile(locks_rows_of("appointment_appointment"), edit) as edited:
+        SERIES_THEN_APPOINTMENTS[write](salon, rows)
+    [outcome] = edited
+    assert not isinstance(outcome, Exception), outcome

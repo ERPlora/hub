@@ -12,6 +12,9 @@
   keep the notice and the past.
 - **Charged is final**: a charged appointment is completed and is not moved, cancelled, marked a no-show
   nor deleted (void the sale first); a cancelled or no-show one is not charged.
+- **Several rows, one order**: a write that locks several appointments or series takes them in id order
+  (``lock_appointments``, ``lock_series``), the series before their appointments, as the Hub admin's «Delete»
+  does; then it reads them in its own order. Two writes never wait for each other in a circle.
 - The platform's reactions (``SYSTEM``) are run by the outbox relay as the system; they are idempotent.
 """
 
@@ -260,8 +263,8 @@ def lock_appointments(ids) -> list[UUID]:
 
     Every write on an appointment locks it before what hangs from it (its history, its service lines), and so
     does the Hub admin's «Delete» (admin.py) before Django gathers all that and deletes it: it waits for the
-    write under way and takes what that write added, instead of failing on it at its COMMIT. Several at once
-    go in id order, as ``appointment.appointment.bulk_delete`` takes them: two deletions never wait in a circle.
+    write under way and takes what that write added, instead of failing on it at its COMMIT. Every write that
+    locks several takes them here, in id order (after their series): two writes never wait in a circle.
     """
     rows = Appointment.objects.select_for_update().filter(pk__in=ids).order_by("id")
     return list(rows.values_list("id", flat=True))
@@ -1490,15 +1493,11 @@ def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:
         )
     new_pattern = pattern_of(target)
     outcome = {"moved": 0, "cancelled": 0, "locked": 0, "skipped": [], "booked": 0}
-    affected = (
-        Appointment.objects.select_for_update()
-        .filter(
-            recurring=series,
-            deleted_at__isnull=True,
-            occurrence_date__gte=data.from_date,
-        )
-        .order_by("occurrence_date")
+    affected = Appointment.objects.filter(
+        recurring=series, deleted_at__isnull=True, occurrence_date__gte=data.from_date
     )
+    locked = lock_appointments(affected.values_list("id", flat=True))
+    affected = affected.filter(pk__in=locked).order_by("occurrence_date")
     moment = now()
     zone = business_zone()
     for appointment in affected:
@@ -1811,12 +1810,12 @@ def release_check(ctx: OperationContext, data: OrderVoidedIn) -> dict:
     },
 )
 def reassign_customer(ctx: OperationContext, data: MergedIn) -> dict:
-    moved = Appointment.objects.filter(customer_id=data.absorbed_id).update(
-        customer_id=data.id
-    )
-    moved += Recurring.objects.filter(customer_id=data.absorbed_id).update(
-        customer_id=data.id
-    )
+    series = Recurring.objects.filter(customer_id=data.absorbed_id)
+    lock_series(series.values_list("id", flat=True))
+    appointments = Appointment.objects.filter(customer_id=data.absorbed_id)
+    lock_appointments(appointments.values_list("id", flat=True))
+    moved = appointments.update(customer_id=data.id)
+    moved += series.update(customer_id=data.id)
     if moved:
         record_event(
             ctx,
@@ -1839,7 +1838,10 @@ def reassign_customer(ctx: OperationContext, data: MergedIn) -> dict:
     },
 )
 def erase_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
+    series = Recurring.objects.filter(customer_id=data.id)
+    lock_series(series.values_list("id", flat=True))
     rows = Appointment.objects.filter(customer_id=data.id)
+    lock_appointments(rows.values_list("id", flat=True))
     changed = rows.exclude(
         customer_name="",
         customer_phone="",
@@ -1865,10 +1867,8 @@ def erase_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
             line.reason = ""
             line.new_value = new_value
             line.save(update_fields=["reason", "new_value"])
-    changed += (
-        Recurring.objects.filter(customer_id=data.id)
-        .exclude(customer_name="", is_active=False)
-        .update(customer_name="", is_active=False)
+    changed += series.exclude(customer_name="", is_active=False).update(
+        customer_name="", is_active=False
     )
     if changed:
         record_event(ctx, events.APPOINTMENT_UPDATED, {"customer_id": str(data.id)})
@@ -1889,17 +1889,15 @@ def erase_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
 )
 def release_staff(ctx: OperationContext, data: MemberEventIn) -> dict:
     changed = 0
-    upcoming = (
-        Appointment.objects.select_for_update()
-        .filter(
-            staff_id=data.id,
-            status__in=MOVABLE,
-            start__gte=now(),
-            deleted_at__isnull=True,
-        )
-        .order_by("start", "id")
+    own_series = Recurring.objects.filter(staff_id=data.id, deleted_at__isnull=True)
+    own_series = own_series.filter(
+        pk__in=lock_series(own_series.values_list("id", flat=True))
     )
-    for appointment in upcoming:
+    upcoming = Appointment.objects.filter(
+        staff_id=data.id, status__in=MOVABLE, start__gte=now(), deleted_at__isnull=True
+    )
+    locked = lock_appointments(upcoming.values_list("id", flat=True))
+    for appointment in upcoming.filter(pk__in=locked).order_by("start", "id"):
         name = appointment.staff_name
         appointment.staff = None
         appointment.save(update_fields=["staff", "updated_at"])
@@ -1911,9 +1909,7 @@ def release_staff(ctx: OperationContext, data: MemberEventIn) -> dict:
             previous_staff_id=str(data.id),
         )
         changed += 1
-    for series in Recurring.objects.select_for_update().filter(
-        staff_id=data.id, deleted_at__isnull=True
-    ):
+    for series in own_series:
         series.staff = None
         series.is_active = False
         series.save(update_fields=["staff", "is_active", "updated_at"])
