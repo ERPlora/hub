@@ -54,6 +54,9 @@ Reglas que el e2e hace cumplir:
   conserva sus filas, así que se repite tras añadir una migración. Va **antes** de arrancar `runserver`, que no
   arranca sin su BD. `--drop` la borra al terminar, nunca a la fuerza: con el `runserver` vivo, falla y lo dice.
   Solo toca BD e2e.
+- Ese mismo paso deja en el `.env` del checkout la `FISCAL_CERTIFICATE_KEY` con la que el Hub cifra los
+  certificados de prueba (sin ella, «Mi certificado» de `verifactu-config.spec.ts` recibe un 409): la genera para ese
+  checkout si falta o está vacía, y respeta la que ya haya en el `.env` o en el entorno (`certificate-key.ts`).
 - Si la BD e2e aún no existe, `global-setup.ts` lo dice con la orden que la crea.
 
 Lo que no puede comprobar el e2e, y lo pide la receta:

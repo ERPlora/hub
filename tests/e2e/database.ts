@@ -6,14 +6,16 @@
 //   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts --drop   drops it once its runserver is stopped
 //
 // Run it before starting the stack's runserver (which cannot start without its database) and again after
-// adding a migration; it keeps the rows of a database that exists. Only e2e databases (`isE2eDatabase`):
-// `hub`, `saas`, the templates and every other one are refused untouched. A drop is never forced: with a
-// connection open (its runserver) it fails and says so. Postgres is compose.yaml's (`COMPOSE_FILE` points
-// at it from a checkout elsewhere), reached as its superuser `hub`, like the specs' `psql()`.
+// adding a migration; it keeps the rows of a database that exists, and leaves the checkout's .env the key that seals
+// the test certificates (`FISCAL_CERTIFICATE_KEY`, certificate-key.ts), made for it when it has none. Only e2e
+// databases (`isE2eDatabase`): `hub`, `saas`, the templates and every other one are refused untouched. A drop is
+// never forced: with a connection open (its runserver) it fails and says so. Postgres is compose.yaml's
+// (`COMPOSE_FILE` points at it from a checkout elsewhere), reached as its superuser `hub`, like the specs' `psql()`.
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { ENV_FILE, ensureCertificateKey, type KeySource } from './certificate-key.ts';
 import { type CommandResult, type ManagePy, managePy, type Spawn } from './global-setup.ts';
 import { isE2eDatabase, STACK } from './stack.ts';
 
@@ -89,10 +91,27 @@ export function dropDatabase(name: string, { sql }: { sql: AdminSql }): void {
   throw new Error(`Could not drop the e2e database ${name}: psql ${said(drop)}`);
 }
 
-/** The command line: prepares `database`, or drops it with `--drop`. Returns the exit status. */
+/** What `runCli` says of the run's certificate key: where it came from, never the key itself. */
+function keySaid(source: KeySource, envFile: string): string {
+  if (source === 'environment') return 'FISCAL_CERTIFICATE_KEY taken from the environment (export it to runserver too).';
+  if (source === 'env-file') return `FISCAL_CERTIFICATE_KEY kept from ${envFile}.`;
+  return `FISCAL_CERTIFICATE_KEY generated in ${envFile} (restart a runserver already running: it reads the .env at start).`;
+}
+
+/** The command line: prepares `database` and leaves the certificate key in `envFile`, or drops it with `--drop`.
+ * Returns the exit status. */
 export function runCli(
   args: string[],
-  deps: { database: string; sql: AdminSql; manage: ManagePy; print: (line: string) => void; fail: (line: string) => void },
+  deps: {
+    database: string;
+    sql: AdminSql;
+    manage: ManagePy;
+    /** The checkout's .env and the environment runserver starts with: where its certificate key comes from. */
+    envFile: string;
+    env: NodeJS.ProcessEnv;
+    print: (line: string) => void;
+    fail: (line: string) => void;
+  },
 ): number {
   const [flag, ...rest] = args;
   if ((flag !== undefined && flag !== '--drop') || rest.length > 0) {
@@ -106,6 +125,7 @@ export function runCli(
     } else {
       const { created } = prepareDatabase(deps.database, deps);
       deps.print(`database.ts: ${deps.database} ${created ? 'created, migrated' : 'migrated'} and seeded (a, b).`);
+      deps.print(`database.ts: ${keySaid(ensureCertificateKey(deps.envFile, deps.env), deps.envFile)}`);
     }
     return 0;
   } catch (error) {
@@ -121,6 +141,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     database: STACK.database,
     sql: adminSql(),
     manage: managePy(STACK.database),
+    envFile: ENV_FILE,
+    env: process.env,
     print: (line) => console.log(line),
     fail: (line) => console.error(line),
   });
