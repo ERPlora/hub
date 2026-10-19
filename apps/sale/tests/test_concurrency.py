@@ -580,6 +580,36 @@ def test_the_hub_admin_cannot_delete_a_check_a_charge_holds(coffee, hub_staff, h
     assert Sale.objects.get(pk=sale.id).order_id == check.id
 
 
+def test_the_hub_admin_confirmation_page_of_a_check_a_write_holds_does_not_wait(coffee, hub_staff):
+    """The check's delete page (a GET, before the staff confirm) does not lock the check: it answers while a
+    write still holds it; only the confirmed deletion (a POST) waits for the write."""
+    check = a_check()
+    meta = Order._meta
+    url = f"/admin/{meta.app_label}/{meta.model_name}/{check.id}/delete/"
+    outcome: list = []
+
+    def other():
+        try:
+            outcome.append(hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
+        except Exception as error:  # reported to the test
+            outcome.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=other)
+    with transaction.atomic():
+        list(Order.objects.select_for_update().filter(pk=check.id))
+        thread.start()
+        thread.join(WAIT_LIMIT)
+        answered_while_held = not thread.is_alive()
+    thread.join(30)
+    assert answered_while_held, "the delete page waited for the write that held the check"
+    [answer] = outcome
+    assert not isinstance(answer, Exception), answer
+    assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
+    assert Order.objects.filter(pk=check.id).exists()
+
+
 #: Writes that come second: each finds the check gone.
 SECOND_WRITES = {
     "a line": CHECK_WRITES["a line"],
