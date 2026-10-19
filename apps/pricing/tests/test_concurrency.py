@@ -419,3 +419,13 @@ def test_a_price_list_deleted_between_its_name_and_its_detail_is_not_found(vip_l
     assert deleted(deletions) == ["ok"]
     assert isinstance(outcome, OperationError), outcome
     assert (outcome.status, outcome.code) == (404, "pricing.price_list_not_found")
+
+
+def test_find_list_refuses_to_lock_the_rows_it_is_given(vip_list):
+    # ``rows`` is what a detail shows (the group's name, the count of prices: grouped), and Postgres refuses
+    # ``FOR UPDATE`` on a grouped query. A write names its list without ``rows``; both at once is a mistake
+    # of the caller, told as such and not as a database error.
+    from apps.pricing.queries import _lists, find_list
+
+    with transaction.atomic(), pytest.raises(TypeError, match="rows"):
+        find_list(vip_list.pk, None, lock=True, rows=_lists())

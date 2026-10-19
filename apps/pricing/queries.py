@@ -107,7 +107,10 @@ def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, 
 def find_list(list_id: UUID | None, said: str | None, *, lock: bool = False, rows=None) -> PriceList:
     """A price list by its id, or by its code or name as a person says it (active or not). It comes from
     ``rows`` when given (e.g. with what its detail shows): one read, so a deletion committed meanwhile is
-    either not seen yet or not found, never a row that vanished between two reads."""
+    either not seen yet or not found, never a row that vanished between two reads. Never with ``lock``:
+    those rows are grouped (the count of prices) and Postgres refuses ``FOR UPDATE`` on a grouped query."""
+    if lock and rows is not None:
+        raise TypeError("find_list: rows= and lock=True are exclusive (FOR UPDATE is not allowed with GROUP BY)")
     lists = PriceList.objects.all()
     if list_id is None:
         list_id = _named(
