@@ -3,17 +3,25 @@
 The day's counter numbers every sale once and never leaves a hole; two charges of the same check, a void
 and a refund of the same sale, or two refunds of the last units of a line: whichever comes first wins and
 the other is refused whole.
+
+The Hub admin's «Delete» of an open check that a write holds waits for it and takes what it left (or answers
+«Cannot delete» when a sale charged it); a write that comes second finds it gone.
 """
 
 import threading
+import time
+from collections.abc import Callable
+from contextlib import contextmanager
 
 import pytest
-from django.db import connection
+from django.contrib.auth import get_user_model
+from django.db import connection, transaction
+from django.test import Client
 from django.utils import timezone
 from live.context import system_context
 from live.errors import OperationError
 
-from apps.sale.models import Order, Sale, SaleCounter
+from apps.sale.models import Order, OrderLine, Sale, SaleCounter
 from apps.sale.tests.conftest import A, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -356,3 +364,261 @@ def test_two_charges_of_one_appointment_at_once_open_one_check(coffee):
     assert answers(results) == ["already", "ok"]
     assert results[0].id == results[1].id
     assert Order.objects.filter(appointment_id=appointment).count() == 1
+
+
+# ── The Hub admin's «Delete» of an open check that a write holds ─────────────────────────────────
+#
+# Every write on an open check locks it and then adds to what hangs from it or changes it: a line, a line split
+# in units, lines it moves to another check or brings from one, the sale that charges it (which protects it).
+# Django's «Delete» gathered the check's lines before the write committed and deleted the check after: it missed
+# the line the write added and failed at its COMMIT (``IntegrityError``), deleted the lines the write had moved to
+# another check, or waited for the write in a circle (``deadlock detected``): a 500 for the staff or for the
+# till. Locked first (``lock_orders``), it waits for the write and then takes what the write left, or answers
+# «Cannot delete» when a sale charged the check; a write that comes second finds it gone.
+
+#: How the platform staff delete: from the check's delete page, or with the list's «Delete selected».
+HOW = ["page", "list"]
+
+#: How long a session waits for another one to queue behind its lock.
+WAIT_LIMIT = 10
+
+
+def _waited_for() -> bool:
+    """Whether another session waits for a lock this one holds."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_stat_clear_snapshot()")
+        cursor.execute(
+            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pg_backend_pid() = ANY (pg_blocking_pids(pid)))"
+        )
+        return cursor.fetchone()[0]
+
+
+def _waiting() -> int:
+    """How many other sessions on this database wait for a lock."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_stat_clear_snapshot()")
+        cursor.execute(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
+            " AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
+        )
+        return cursor.fetchone()[0]
+
+
+def locks(table: str) -> Callable[[str], bool]:
+    """Whether a statement locks rows of ``table``."""
+    return lambda sql: f'FROM "{table}"' in sql and "FOR UPDATE" in sql
+
+
+@pytest.fixture
+def hub_staff(db) -> Client:
+    """The platform staff, signed in to the Hub admin."""
+    staff = get_user_model().objects.create_superuser(
+        username="root", password="pw", email="root@example.com"
+    )
+    client = Client()
+    client.force_login(staff)
+    return client
+
+
+def admin_delete(client: Client, how: str, *targets):
+    """The Hub admin's «Delete» of ``targets`` (one for its page), ``how`` it says (see ``HOW``); it returns
+    the answer."""
+    meta = type(targets[0])._meta
+    changelist = f"/admin/{meta.app_label}/{meta.model_name}/"
+    if how == "page":
+        [target] = targets
+        url, data = f"{changelist}{target.pk}/delete/", {"post": "yes"}
+    else:
+        url, data = changelist, {
+            "action": "delete_selected",
+            "_selected_action": [str(target.pk) for target in targets],
+            "post": "yes",
+        }
+    return lambda: client.post(
+        url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"
+    )
+
+
+@contextmanager
+def meanwhile(after: Callable[[str], bool], call):
+    """Runs ``call`` in another session right after the first statement of this one for which ``after``
+    holds; this one goes on once ``call`` waits for what it holds (or has ended). Yields its outcome (an
+    error raised, a 500 included, is the outcome)."""
+    outcome: list = []
+
+    def other():
+        try:
+            outcome.append(call())
+        except Exception as error:  # reported to the test
+            outcome.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=other)
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if thread.ident is None and after(sql):
+            thread.start()
+            deadline = time.monotonic() + WAIT_LIMIT
+            while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
+                time.sleep(0.02)
+        return result
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield outcome
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+    assert thread.ident is not None, "this session never locked"
+
+
+def in_turn(row, *calls) -> list:
+    """Holds ``row`` locked in this session and starts ``calls`` in their own sessions, each once the ones before
+    wait for a lock, so they queue for ``row`` in that order; then lets it go. Their outcomes (an error raised,
+    a 500 included, is the outcome)."""
+    outcomes: list = [None] * len(calls)
+
+    def other(index, call):
+        try:
+            outcomes[index] = call()
+        except Exception as error:  # reported to the test
+            outcomes[index] = error
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=other, args=(i, call)) for i, call in enumerate(calls)]
+    with transaction.atomic():
+        list(type(row).objects.select_for_update().filter(pk=row.pk))
+        for queued, thread in enumerate(threads, start=1):
+            thread.start()
+            deadline = time.monotonic() + WAIT_LIMIT
+            while thread.is_alive() and _waiting() < queued and time.monotonic() < deadline:
+                time.sleep(0.02)
+    for thread in threads:
+        thread.join(30)
+    return outcomes
+
+
+def a_check(label: str = "", quantity: str = "2"):
+    """An open check with two coffees on one line."""
+    return run("sale.order.open", {"label": label, "lines": [{"product": "COF", "quantity": quantity}]})
+
+
+def merged(source, target):
+    return run("sale.order.merge", {"from_order_id": str(source.id), "to_order_id": str(target.id)})
+
+
+#: Writes that lock the check and then add to it or change what hangs from it; what each leaves is checked below.
+CHECK_WRITES = {
+    "a line": lambda check: run("sale.order.add_line", {"order_id": str(check.id), "product": "COF"}),
+    "a line split in units": lambda check: run(
+        "sale.order.split_line", {"order_id": str(check.id), "line_id": str(check.lines[0].id)}
+    ),
+    "a changed line": lambda check: run(
+        "sale.order.update_line",
+        {"order_id": str(check.id), "line_id": str(check.lines[0].id), "quantity": "3"},
+    ),
+    "lines brought from another check": lambda check: merged(a_check("other"), check),
+}
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(CHECK_WRITES))
+def test_the_hub_admin_deletes_a_check_a_write_holds_once_it_is_written(coffee, hub_staff, write, how):
+    check = a_check()
+    deletion = admin_delete(hub_staff, how, Order.objects.get(pk=check.id))
+    with meanwhile(locks("sale_order"), deletion) as answers:
+        CHECK_WRITES[write](check)
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert not Order.objects.filter(pk=check.id).exists()
+    # What the write added went with the check: no line is left without one.
+    assert not OrderLine.objects.filter(order_id=check.id).exists()
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_deletes_a_check_a_split_holds_and_the_new_check_keeps_its_lines(coffee, hub_staff, how):
+    check = a_check()
+    [line] = check.lines
+    deletion = admin_delete(hub_staff, how, Order.objects.get(pk=check.id))
+    with meanwhile(locks("sale_order"), deletion) as answers:
+        out = run("sale.order.split", {"order_id": str(check.id), "line_ids": [str(line.id)]})
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert not Order.objects.filter(pk=check.id).exists()
+    assert list(OrderLine.objects.filter(order_id=out.new_order.id).values_list("id", flat=True)) == [line.id]
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_deletes_a_check_a_merge_empties_and_the_other_keeps_its_lines(coffee, hub_staff, how):
+    source, target = a_check("source"), a_check("target")
+    deletion = admin_delete(hub_staff, how, Order.objects.get(pk=source.id))
+    with meanwhile(locks("sale_order"), deletion) as answers:
+        merged(source, target)
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert not Order.objects.filter(pk=source.id).exists()
+    assert OrderLine.objects.filter(order_id=target.id).count() == 2
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_cannot_delete_a_check_a_charge_holds(coffee, hub_staff, how):
+    check = a_check()
+    deletion = admin_delete(hub_staff, how, Order.objects.get(pk=check.id))
+    with meanwhile(locks("sale_order"), deletion) as answers:
+        sale = charge("admin-race-charge", order_id=str(check.id))()
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert (answer.status_code, str(answer.context["title"])) == (200, "Cannot delete open check")
+    assert len(answer.context["protected"]) == 1
+    assert Order.objects.get(pk=check.id).status == "completed"
+    assert Sale.objects.get(pk=sale.id).order_id == check.id
+
+
+#: Writes that come second: each finds the check gone.
+SECOND_WRITES = {
+    "a line": CHECK_WRITES["a line"],
+    "a charge": lambda check: charge("admin-race-late-charge", order_id=str(check.id))(),
+}
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(SECOND_WRITES))
+def test_a_write_while_the_hub_admin_deletes_the_check_finds_it_gone(coffee, hub_staff, write, how):
+    check = a_check()
+    with meanwhile(locks("sale_order"), lambda: SECOND_WRITES[write](check)) as outcomes:
+        answer = admin_delete(hub_staff, how, Order.objects.get(pk=check.id))()
+    assert answer.status_code == 302
+    [outcome] = outcomes
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (404, "sale.order_not_found")
+    assert not Order.objects.filter(pk=check.id).exists()
+    assert not Sale.objects.exists()
+
+
+@pytest.mark.parametrize("first_in_line", ["deletion", "merge"])
+def test_a_merge_and_the_hub_admin_deleting_both_checks_never_wait_in_a_circle(coffee, hub_staff, first_in_line):
+    first, second = sorted([a_check("one"), a_check("two")], key=lambda check: check.id)
+    rows = Order.objects.filter(pk__in=[first.id, second.id]).order_by("-id")
+    # The list names them the other way round from their ids, and the merge goes from the second to the first.
+    deletion = admin_delete(hub_staff, "list", *rows)
+    merge = lambda: merged(second, first)  # noqa: E731
+    held = Order.objects.get(pk=first.id)
+    if first_in_line == "deletion":
+        deleted, written = in_turn(held, deletion, merge)
+    else:
+        written, deleted = in_turn(held, merge, deletion)
+    assert not isinstance(deleted, Exception), deleted
+    assert deleted.status_code == 302
+    assert not Order.objects.filter(pk__in=[first.id, second.id]).exists()
+    assert not OrderLine.objects.exists()
+    if first_in_line == "deletion":
+        assert isinstance(written, OperationError), written
+        assert (written.status, written.code) == (404, "sale.order_not_found")
+    else:
+        assert not isinstance(written, Exception), written
