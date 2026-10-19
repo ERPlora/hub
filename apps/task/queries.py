@@ -211,13 +211,17 @@ def load_task(task_id: UUID, caller: Caller) -> dict:
     return task_row(annotated(Task.objects.filter(pk=task_id), caller).get(), caller)
 
 
-def resolve_task(caller: Caller, task_id: UUID | None, text: str | None) -> Task:
+def resolve_task(
+    caller: Caller, task_id: UUID | None, text: str | None, rows: QuerySet[Task] | None = None
+) -> Task:
     """A task the caller sees, by id, or by its number or title.
 
     The title is tried exact before partial, and an open task before a closed one: the first step
-    with one match wins; several → 409 ``task.ambiguous_task`` naming them; none → ``NotFound``.
+    with one match wins; several → 409 ``task.ambiguous_task`` naming them; none → ``NotFound``. It comes
+    from ``rows`` when given (e.g. with what its detail shows): the read that finds it is the only one,
+    so a deletion committed meanwhile is either not seen yet or not found, never a row gone between two.
     """
-    tasks = caller.visible(Task.objects.all())
+    tasks = caller.visible(Task.objects.all() if rows is None else rows)
     if task_id is not None:
         task = tasks.filter(pk=task_id).first()
     else:
@@ -359,7 +363,8 @@ def my_tasks(ctx: OperationContext, params: TaskMineIn) -> dict:
 )
 def task_detail(ctx: OperationContext, data: TaskRefIn) -> dict:
     caller = Caller(ctx)
-    return load_task(resolve_task(caller, data.id, data.task).pk, caller)
+    rows = annotated(Task.objects.all(), caller)
+    return task_row(resolve_task(caller, data.id, data.task, rows=rows), caller)
 
 
 @operation(
@@ -440,12 +445,15 @@ def load_project(project_id: UUID, caller: Caller) -> dict:
     return project_row(annotated_projects(Project.objects.filter(pk=project_id), caller).get())
 
 
-def resolve_project(project_id: UUID | None, text: str | None) -> Project:
+def resolve_project(
+    project_id: UUID | None, text: str | None, rows: QuerySet[Project] | None = None
+) -> Project:
     """A project by id, or by its code, its exact name or a part of its name.
 
-    Several matches → 409 ``task.ambiguous_project`` naming them; none → ``NotFound``.
+    Several matches → 409 ``task.ambiguous_project`` naming them; none → ``NotFound``. From ``rows`` when
+    given, in one read (as ``resolve_task``).
     """
-    projects = Project.objects.order_by("name", "id")
+    projects = (Project.objects.all() if rows is None else rows).order_by("name", "id")
     if project_id is not None:
         project = projects.filter(pk=project_id).first()
     else:
@@ -506,7 +514,8 @@ def list_projects(ctx: OperationContext, params: ProjectListIn) -> dict:
     ai={"description": "Returns one task project, by id, by its code or by its name."},
 )
 def project_detail(ctx: OperationContext, data: ProjectRefIn) -> dict:
-    return load_project(resolve_project(data.id, data.project).pk, Caller(ctx))
+    rows = annotated_projects(Project.objects.all(), Caller(ctx))
+    return project_row(resolve_project(data.id, data.project, rows=rows))
 
 
 # --- Helpers ---------------------------------------------------------------------------------------

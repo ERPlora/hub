@@ -28,6 +28,8 @@ from apps.staff.queries import resolve_member
 from apps.task import events
 from apps.task.models import Comment, Project, Task, TaskCounter
 from apps.task.queries import (
+    PROJECT_NOT_FOUND,
+    TASK_NOT_FOUND,
     Caller,
     business_today,
     comment_row,
@@ -71,11 +73,23 @@ def _field_refusal(error: NotFound, field: str) -> InvalidPayload:
     return InvalidPayload(error.message, code="invalid_field", fields={field: error.message})
 
 
+def _hold(model: type[Task] | type[Project], pk: UUID) -> Task | Project | None:
+    """The row ``pk``, locked until the end of the command; ``None`` when it was deleted after it was found.
+
+    Every deletion of a task or a project locks it first (``_locked``, ``_locked_project`` and the Hub
+    admin's «Delete», ``lock_tasks``/``lock_projects``): held, it is not deleted under the write that names
+    it, and a deletion that went first is seen as gone. A write holds what it names in the order the
+    deletions take them: the person (``_member``), the project, then the task.
+    """
+    return model.objects.select_for_update().filter(pk=pk).first()
+
+
 def _project(project_id: UUID | None, text: str | None) -> Project | None:
+    """The project a write names, held until the end of the command (a 422 on its field if it is not there)."""
     if project_id is None and text is None:
         return None
     try:
-        return resolve_project(project_id, text)
+        return _locked_project(project_id, text)
     except NotFound as error:
         raise _field_refusal(error, "project_id" if project_id else "project") from None
 
@@ -97,9 +111,31 @@ def _member(member_id: UUID | None, name: str | None, *, id_field: str, name_fie
 
 
 def _locked(caller: Caller, task_id: UUID | None, text: str | None) -> Task:
-    """The task, seen by the caller and locked until the end of the command."""
-    task = resolve_task(caller, task_id, text)
-    return Task.objects.select_for_update().get(pk=task.pk)
+    """The task, seen by the caller and locked until the end of the command. Deleted after it was found
+    (the business's «Delete» or the Hub admin's), it is not found, as one deleted before."""
+    task = _hold(Task, resolve_task(caller, task_id, text).pk)
+    if task is None:
+        raise NotFound(str(TASK_NOT_FOUND))
+    return task
+
+
+def _parent(caller: Caller, data: TaskIn, project: Project | None) -> tuple[Task | None, Project | None]:
+    """The parent task a new subtask names and the subtask's project, both held: the one it was told, or else
+    its parent's, held before the parent (as its deletion takes them) and none if it was deleted meanwhile,
+    as the parent then has none either."""
+    if data.parent_id is None and data.parent is None:
+        return None, project
+    field = "parent_id" if data.parent_id else "parent"
+    try:
+        found = resolve_task(caller, data.parent_id, data.parent)
+    except NotFound as error:
+        raise _field_refusal(error, field) from None
+    if project is None and found.project_id is not None:
+        project = _hold(Project, found.project_id)
+    parent = _hold(Task, found.pk)
+    if parent is None:
+        raise _field_refusal(NotFound(str(TASK_NOT_FOUND)), field)
+    return parent, project
 
 
 def _changeable(caller: Caller, task_id: UUID | None, text: str | None) -> Task:
@@ -147,16 +183,9 @@ def _set_status(ctx: OperationContext, task: Task, status: str) -> None:
 )
 def create_task(ctx: OperationContext, data: TaskIn) -> dict:
     caller = Caller(ctx)
-    project = _project(data.project_id, data.project)
-    parent = None
-    if data.parent_id is not None or data.parent is not None:
-        try:
-            parent = resolve_task(caller, data.parent_id, data.parent)
-        except NotFound as error:
-            raise _field_refusal(error, "parent_id" if data.parent_id else "parent") from None
-        if project is None:
-            project = parent.project
+    # What it names is held until the end, in the order the deletions take it: person, project, parent.
     assignee = _member(data.assigned_to_id, data.assignee, id_field="assigned_to_id", name_field="assignee")
+    parent, project = _parent(caller, data, _project(data.project_id, data.project))
     task = Task.objects.create(
         number=_next_number(business_today()),
         title=data.title,
@@ -198,8 +227,14 @@ def create_task(ctx: OperationContext, data: TaskIn) -> dict:
 )
 def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
     caller = Caller(ctx)
-    task = _changeable(caller, data.id, data.task)
     sent = data.model_fields_set
+    # The project it is moved to is held before the task, in the order its deletion takes them.
+    project, moved = None, False
+    if "project" in sent and data.project is not None:
+        project, moved = _project(None, data.project), True
+    elif "project_id" in sent:
+        project, moved = _project(data.project_id, None), True
+    task = _changeable(caller, data.id, data.task)
     changes: dict = {}
     for field in ("title", "description", "priority", "tags"):
         value = getattr(data, field)
@@ -207,14 +242,8 @@ def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
             changes[field] = value
     if "due_date" in sent and data.due_date != task.due_date:
         changes["due_date"] = data.due_date
-    if "project" in sent and data.project is not None:
-        project = _project(None, data.project)
-        if project.pk != task.project_id:
-            changes["project"] = project
-    elif "project_id" in sent:
-        project = _project(data.project_id, None)
-        if (project.pk if project else None) != task.project_id:
-            changes["project"] = project
+    if moved and (project.pk if project else None) != task.project_id:
+        changes["project"] = project
     if changes:
         for field, value in changes.items():
             setattr(task, field, value)
@@ -314,6 +343,7 @@ def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
 )
 def delete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
     task = _locked(Caller(ctx), data.id, data.task)
+    lock_tasks([task.pk])  # and its subtasks, before Django gathers what goes with it
     payload = {"id": str(task.pk), "number": task.number}
     task.delete()
     record_event(ctx, events.TASK_DELETED, payload)
@@ -374,8 +404,38 @@ def add_comment(ctx: OperationContext, data: CommentIn) -> dict:
 
 
 def _locked_project(project_id: UUID | None, text: str | None) -> Project:
-    project = resolve_project(project_id, text)
-    return Project.objects.select_for_update().get(pk=project.pk)
+    """The project, locked until the end of the command; deleted after it was found, it is not found (as
+    ``_locked``)."""
+    project = _hold(Project, resolve_project(project_id, text).pk)
+    if project is None:
+        raise NotFound(str(PROJECT_NOT_FOUND))
+    return project
+
+
+def lock_tasks(ids) -> list[UUID]:
+    """Locks the tasks ``ids`` and every subtask under them, a level after the one above it and each level in
+    id order; the ids of those still there.
+
+    A deletion of tasks (``task.task.delete`` and the Hub admin's «Delete», admin.py) locks them all before
+    Django gathers their subtasks and comments and deletes them: a write that adds to one of them (a subtask,
+    a comment) holds it first, so the deletion waits for it and takes what it added, instead of failing on it
+    at its COMMIT. A subtask is only added under a held task, so a level read once the one above is held is
+    complete.
+    """
+    locked: list[UUID] = []
+    level = list(ids)
+    while level:
+        rows = Task.objects.select_for_update().filter(pk__in=level).order_by("id")
+        held = list(rows.values_list("id", flat=True))
+        locked += held
+        level = list(Task.objects.filter(parent_id__in=held).exclude(pk__in=locked).values_list("id", flat=True))
+    return locked
+
+
+def lock_projects(ids) -> list[UUID]:
+    """Locks the projects ``ids`` in id order (as ``lock_tasks``, before their tasks are cleared)."""
+    rows = Project.objects.select_for_update().filter(pk__in=ids).order_by("id")
+    return list(rows.values_list("id", flat=True))
 
 
 def _project_exists() -> Conflict:
