@@ -4,11 +4,13 @@ Two cooks marking the same dish ready at the same instant mark it once (one Hist
 recalls of the same dish, once; two writes that both find a round not saved yet save it once, with one
 number; two sends of the same check, one round. A product, a category or a station deleted while a write
 names it either waits for the write or refuses it as one deleted before, never a 500, a deadlock nor a route
-to a deleted product.
+to a deleted product. A station or a ticket deleted while a command finds it is waited for or not found, and
+one deleted while the kitchen saves what Sales did or receives a round is left as it is, never a 500.
 """
 
 import threading
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from types import SimpleNamespace
 
@@ -16,6 +18,7 @@ import pytest
 from django.contrib.admin import site
 from django.db import connection, transaction
 from django.test import RequestFactory
+from django.utils import timezone
 from live.context import system_context
 from live.errors import NotFound, OperationError
 from live.models import OutboxEvent
@@ -29,6 +32,7 @@ from apps.kitchen.models import (
     Ticket,
     TicketItem,
 )
+from apps.kitchen.queries import STATION_NOT_FOUND, TICKET_NOT_FOUND
 
 from .conftest import A, add_line, ctx_for, fire, make_station, open_check, route_product, run
 
@@ -192,6 +196,7 @@ DELETE_OPERATIONS = {
     Product: ("inventory.product.delete", "id"),
     Category: ("inventory.category.delete", "id"),
     Station: ("kitchen.station.delete", "station_id"),
+    Ticket: ("kitchen.ticket.delete", "ticket_id"),
 }
 
 
@@ -205,6 +210,11 @@ def remove(target, how: str) -> None:
     request = RequestFactory().post("/admin/")
     if how == "admin":
         model_admin.delete_model(request, model.objects.get(pk=target.pk))
+    elif how == "admin_mark":
+        # The Hub admin's change page with «is deleted» ticked: the row stays, marked deleted.
+        row = model.objects.get(pk=target.pk)
+        row.is_deleted, row.deleted_at = True, timezone.now()
+        model_admin.save_model(request, row, None, True)
     else:
         model_admin.delete_queryset(request, model.objects.filter(pk=target.pk))
 
@@ -220,14 +230,16 @@ def delete(target, how: str) -> None:
 
 
 @contextmanager
-def deleted_just_before(statement: str, target, how: str):
+def deleted_just_before(statement: str | Callable[[str], bool], target, how: str):
     """Deletes ``target`` in another session right before the first statement of this one that starts with
-    ``statement`` (the write that names it): between the read that found it and the write, every time. It
-    commits, or waits for this session when it holds the row (and gives up)."""
+    ``statement`` (or that ``statement`` accepts: the write that names it, the lock on the row it found):
+    between the read that found it and that statement, every time. It commits, or waits for this session
+    when it holds the row or goes in line with the kitchen's writes (and gives up)."""
     deletions: list = []
+    accepts = statement if callable(statement) else lambda sql: sql.lstrip().startswith(statement)
 
     def wrapper(execute, sql, params, many, context):
-        if not deletions and sql.lstrip().startswith(statement):
+        if not deletions and accepts(sql):
             deletions.extend(at_once(lambda: delete(target, how)))
         return execute(sql, params, many, context)
 
@@ -274,16 +286,17 @@ def deleted_in_flight(target, how: str, when: str | None = None):
 
 
 @contextmanager
-def admin_deletes_around(statement, target, moment: str):
-    """The Hub admin deletes ``target`` (as its delete page, no lock timeout: a deadlock is what Postgres reports)
-    in another session, started right ``before`` or ``after`` the first statement of this one that ``statement``
-    accepts, and given ADMIN_REACHES_ITS_WAIT to end or to wait for this one."""
+def admin_deletes_around(statement, target, moment: str, how: str = "admin"):
+    """The Hub admin deletes ``target`` (as its delete page, or ``how="admin_bulk"`` as «Delete selected»; no lock
+    timeout: a deadlock is what Postgres reports) in another session, started right ``before`` or ``after`` the
+    first statement of this one that ``statement`` accepts, and given ADMIN_REACHES_ITS_WAIT to end or to wait
+    for this one."""
     deletions: list = []
 
     def deletion():
         try:
             with transaction.atomic():
-                remove(target, "admin")
+                remove(target, how)
             deletions.append("ok")
         except Exception as error:  # a deadlock, reported to the test
             deletions.append(repr(error))
@@ -559,3 +572,260 @@ def test_a_station_being_deleted_when_a_dish_goes_to_it_leaves_the_dish_with_no_
     assert not Station.objects.filter(pk=world.grill.pk).exists()
     # Its route went with the station: the dish goes to no station, as one routed after it was deleted.
     assert landed() is None
+
+
+# A station or a ticket deleted while a command finds it (FIX-KITCHEN-STATION-DELETE-RACE). A command found its
+# station or its ticket and then locked it again by its id: one gone between the two reads (the Hub admin's
+# «Delete» of a ticket did not go in line with the kitchen's writes) raised DoesNotExist, a 500, and one marked
+# deleted meanwhile (the Hub admin's change page) was changed, printed or deleted again as if it were live. Locked,
+# a row deleted since it was found is not found, as one deleted before. The kitchen's own «Delete» and the Hub
+# admin's «Delete» of a station or a ticket go in line with every write of the kitchen: they wait for it instead.
+
+#: Who takes a station or a ticket away while a command finds it: the ones that go in line with the kitchen's
+#: writes (``locked_settings``) wait for it; the Hub admin's change page comes between its two reads.
+IN_LINE_DELETIONS = {Station: ["operation", "admin", "admin_bulk"], Ticket: ["operation", "admin", "admin_bulk"]}
+BETWEEN_THE_READS = {Station: ["admin_mark"], Ticket: ["admin_mark"]}
+
+
+def locks(table: str) -> Callable[[str], bool]:
+    """The statement that locks a row of ``table`` it found (``SELECT … FOR UPDATE``)."""
+    return lambda sql: f'"{table}"' in sql and "FOR UPDATE" in sql
+
+
+def not_found(outcome, code: str, message) -> None:
+    """``outcome`` is the kitchen's own 404, as for one deleted before: its code and its message, never a 500."""
+    assert isinstance(outcome, NotFound), outcome
+    assert (outcome.status, outcome.code, outcome.message) == (404, code, str(message))
+
+
+#: Each command on a station: what it is sent, and what it leaves when it goes through.
+ON_A_STATION = {
+    "station.update": (
+        lambda station: {"station_id": str(station.id), "name": "Hot line"},
+        lambda station: Station.objects.get(pk=station.pk).name == "Hot line",
+    ),
+    "station.delete": (
+        lambda station: {"station_id": str(station.id)},
+        lambda station: Station.objects.get(pk=station.pk).is_deleted,
+    ),
+}
+
+
+@pytest.mark.parametrize("how", IN_LINE_DELETIONS[Station])
+@pytest.mark.parametrize("command", sorted(ON_A_STATION))
+def test_a_station_deleted_in_line_while_a_command_finds_it_waits_for_the_command(world, command, how):
+    sent, went_through = ON_A_STATION[command]
+    with deleted_just_before(locks("kitchen_station"), world.grill, how) as deletions:
+        outcome = attempt(lambda: run(f"kitchen.{command}", sent(world.grill)))
+    assert held(deletions), deleted(deletions)
+    assert not isinstance(outcome, OperationError), outcome
+    assert went_through(world.grill)
+
+
+@pytest.mark.parametrize("how", BETWEEN_THE_READS[Station])
+@pytest.mark.parametrize("command", sorted(ON_A_STATION))
+def test_a_station_deleted_while_a_command_finds_it_is_not_found(world, command, how):
+    sent, _ = ON_A_STATION[command]
+    recorded = OutboxEvent.objects.count()
+    with deleted_just_before(locks("kitchen_station"), world.grill, how) as deletions:
+        outcome = attempt(lambda: run(f"kitchen.{command}", sent(world.grill)))
+    assert deleted(deletions) == ["ok"]
+    not_found(outcome, "kitchen.station_not_found", STATION_NOT_FOUND)
+    # Left as the Hub admin left it, and nothing of the refused command: the Hub admin records no event.
+    assert Station.objects.filter(pk=world.grill.pk).values_list("name", "is_deleted").get() == ("Grill", True)
+    assert OutboxEvent.objects.count() == recorded
+
+
+def a_ticket(w, *then: str) -> Ticket:
+    """A ticket by hand with a burger, moved on by the kitchen's commands ``then``."""
+    ticket = run("kitchen.ticket.create", {"label": "Staff", "items": [{"product_id": str(w.burger.id)}]})
+    for name in then:
+        run(name, {"ticket_id": str(ticket.id)})
+    return Ticket.objects.get(pk=ticket.id)
+
+
+#: Each command on a ticket: the commands that bring a new ticket to where it applies, and what else it is sent.
+ON_A_TICKET = {
+    "ticket.start": ((), {}),
+    "ticket.ready": ((), {}),
+    "ticket.serve": (("kitchen.ticket.ready",), {}),
+    "ticket.recall": (("kitchen.ticket.ready",), {}),
+    "ticket.cancel": ((), {"reason": "Cold"}),
+    "ticket.delete": ((), {}),
+    "ticket.set_rush": ((), {"rush": True}),
+    "ticket.reprint": ((), {}),
+    "item.bump": ((), {}),
+    "item.recall": (("kitchen.item.bump",), {}),
+}
+
+
+@pytest.mark.parametrize("how", IN_LINE_DELETIONS[Ticket])
+@pytest.mark.parametrize("command", sorted(ON_A_TICKET))
+def test_a_ticket_deleted_in_line_while_a_command_finds_it_waits_for_the_command(world, command, how):
+    then, more = ON_A_TICKET[command]
+    ticket = a_ticket(world, *then)
+    with deleted_just_before(locks("kitchen_ticket"), ticket, how) as deletions:
+        outcome = attempt(lambda: run(f"kitchen.{command}", {"ticket_id": str(ticket.id), **more}))
+    assert held(deletions), deleted(deletions)
+    # Not refused as gone: it went through, or was refused for its own reason (a reprint with no printer).
+    assert getattr(outcome, "code", None) != "kitchen.ticket_not_found", outcome
+
+
+def state(ticket_id) -> tuple:
+    """What a command changes on a ticket: its state, priority and copies, its dishes' states, its History."""
+    ticket = Ticket.objects.get(pk=ticket_id)
+    return (
+        ticket.status,
+        ticket.priority,
+        ticket.reprint_count,
+        list(ticket.items.order_by("position").values_list("status", flat=True)),
+        ticket.log.count(),
+    )
+
+
+def left_as_the_admin_left_it(ticket_id, before: tuple) -> None:
+    """Marked deleted by the Hub admin's change page, with nothing else changed."""
+    assert Ticket.objects.get(pk=ticket_id).is_deleted
+    assert state(ticket_id) == before
+
+
+@pytest.mark.parametrize("how", BETWEEN_THE_READS[Ticket])
+@pytest.mark.parametrize("command", sorted(ON_A_TICKET))
+def test_a_ticket_deleted_while_a_command_finds_it_is_not_found(world, command, how):
+    then, more = ON_A_TICKET[command]
+    ticket = a_ticket(world, *then)
+    before = state(ticket.pk)
+    recorded = OutboxEvent.objects.count()
+    with deleted_just_before(locks("kitchen_ticket"), ticket, how) as deletions:
+        outcome = attempt(lambda: run(f"kitchen.{command}", {"ticket_id": str(ticket.id), **more}))
+    assert deleted(deletions) == ["ok"]
+    not_found(outcome, "kitchen.ticket_not_found", TICKET_NOT_FOUND)
+    left_as_the_admin_left_it(ticket.pk, before)
+    # Nothing of the refused command: the Hub admin records no event.
+    assert OutboxEvent.objects.count() == recorded
+
+
+@pytest.mark.parametrize("named", ["by its id", "by its number", "by its label"])
+def test_a_ticket_named_by_a_person_and_deleted_while_it_is_found_is_not_found(world, named):
+    ticket = a_ticket(world)
+    ref = {"by its id": {"ticket_id": str(ticket.id)}, "by its number": {"ticket": ticket.number}}.get(
+        named, {"ticket": ticket.label}
+    )
+    with deleted_just_before(locks("kitchen_ticket"), ticket, "admin_mark") as deletions:
+        outcome = attempt(lambda: run("kitchen.ticket.start", ref))
+    assert deleted(deletions) == ["ok"]
+    not_found(outcome, "kitchen.ticket_not_found", TICKET_NOT_FOUND)
+
+
+def a_round_sales_voids(w) -> Ticket:
+    """A round of a check, saved by the kitchen, whose only line Sales then voids: the kitchen's next write
+    saves that its ticket is cancelled."""
+    order = open_check("Table 4")
+    add_line(order.id, w.burger)
+    run("kitchen.ticket.send", {"order_id": str(order.id)})
+    ticket = Ticket.objects.get()
+    line = ticket.items.get().sale_line_id
+    run("sale.order.void_line", {"order_id": str(order.id), "line_id": str(line), "reason": "Cold"})
+    return ticket
+
+
+@pytest.mark.parametrize("how", ["admin", "admin_bulk"])
+def test_the_hub_admin_deleting_a_ticket_while_the_kitchen_saves_what_sales_did_waits_for_it(world, how):
+    ticket = a_round_sales_voids(world)
+    with deleted_just_before(locks("kitchen_ticket"), ticket, how) as deletions:
+        outcome = attempt(lambda: run("kitchen.ticket.sync", {}, system_context(A)))
+    assert held(deletions), deleted(deletions)
+    assert (outcome.received, outcome.changed) == (0, 1)
+    assert Ticket.objects.get(pk=ticket.pk).status == "cancelled"
+
+
+@pytest.mark.parametrize("how", BETWEEN_THE_READS[Ticket])
+def test_a_ticket_deleted_while_the_kitchen_saves_what_sales_did_is_left_alone(world, how):
+    # Every write of the kitchen starts by saving what Sales did to the tickets on the line: one the Hub admin
+    # deleted meanwhile is not saved again, and the write goes on.
+    ticket = a_round_sales_voids(world)
+    before = state(ticket.pk)
+    with deleted_just_before(locks("kitchen_ticket"), ticket, how) as deletions:
+        outcome = attempt(lambda: run("kitchen.ticket.sync", {}, system_context(A)))
+    assert deleted(deletions) == ["ok"]
+    assert not isinstance(outcome, OperationError), outcome
+    assert (outcome.received, outcome.changed) == (0, 0)
+    left_as_the_admin_left_it(ticket.pk, before)
+
+
+def a_round_saved(w) -> tuple[Ticket, dict]:
+    """A round fired by Sales and saved by the kitchen, and the reaction to its send (``kitchen.ticket.receive``)."""
+    order = open_check("Table 4")
+    add_line(order.id, w.burger)
+    fire(order.id)
+    run("kitchen.ticket.sync", {}, system_context(A))
+    ticket = Ticket.objects.get()
+    return ticket, {"order_id": str(order.id), "round_no": ticket.round_no, "priority": "rush", "waiter": "luis"}
+
+
+@pytest.mark.parametrize("how", ["admin", "admin_bulk"])
+def test_the_hub_admin_deleting_a_ticket_while_its_round_is_received_waits_for_it(world, how):
+    ticket, data = a_round_saved(world)
+    with deleted_just_before(locks("kitchen_ticket"), ticket, how) as deletions:
+        outcome = attempt(lambda: run("kitchen.ticket.receive", data, system_context(A)))
+    assert held(deletions), deleted(deletions)
+    assert (outcome.ticket.id, outcome.ticket.priority) == (ticket.id, "rush")
+
+
+@pytest.mark.parametrize("how", BETWEEN_THE_READS[Ticket])
+def test_a_ticket_deleted_while_its_round_is_received_is_not_received(world, how):
+    # The reaction to a round sent: its ticket, saved before, gets the send's priority, label and waiter and
+    # goes to paper. One the Hub admin marked deleted meanwhile is not received, as one deleted before.
+    ticket, data = a_round_saved(world)
+    before = state(ticket.pk)
+    with deleted_just_before(locks("kitchen_ticket"), ticket, how) as deletions:
+        outcome = attempt(lambda: run("kitchen.ticket.receive", data, system_context(A)))
+    assert deleted(deletions) == ["ok"]
+    assert not isinstance(outcome, OperationError), outcome
+    assert outcome.ticket is None
+    left_as_the_admin_left_it(ticket.pk, before)
+
+
+# The Hub admin's «Delete» of a ticket a cook is working on (FIX-KITCHEN-STATION-DELETE-RACE). Django's collector
+# takes a ticket's History and dishes first and the ticket last, while a cook's command holds the ticket and then
+# its dishes and writes its History: out of line, the two waited for each other in a circle (a deadlock, 40P01) or
+# the ticket went while the cook's new History line named it (the FK refused the deletion at its end). In line
+# with the kitchen's writes (``locked_settings`` → ticket, as the operations take them), the «Delete» waits for the
+# cook and then takes what the cook added; started first, the cook waits for it and hears the ticket is gone.
+
+
+def locks_the_dishes(sql: str) -> bool:
+    return '"kitchen_ticketitem"' in sql and "FOR UPDATE" in sql
+
+
+def writes_the_history(sql: str) -> bool:
+    return sql.lstrip().startswith('INSERT INTO "kitchen_logentry"')
+
+
+#: Each command of a cook on a ticket, and a statement it runs while it holds the ticket.
+COOK_ON_A_TICKET = {
+    "item.bump": ("kitchen.item.bump", locks_the_dishes),
+    "ticket.start": ("kitchen.ticket.start", writes_the_history),
+}
+
+
+@pytest.mark.parametrize("order", ["cook first, admin before", "cook first, admin after", "admin first"])
+@pytest.mark.parametrize("how", ["admin", "admin_bulk"])
+@pytest.mark.parametrize("command", sorted(COOK_ON_A_TICKET))
+def test_the_hub_admin_deleting_a_ticket_a_cook_works_on_is_no_deadlock(world, command, how, order):
+    name, statement = COOK_ON_A_TICKET[command]
+    ticket = a_ticket(world)
+    if order == "admin first":
+        deleting = deleted_in_flight(ticket, how, when=IN_LINE)
+    else:
+        deleting = admin_deletes_around(statement, ticket, order.rsplit(" ", 1)[1], how)
+    with deleting as deletions:
+        outcome = answered(lambda: run(name, {"ticket_id": str(ticket.id)}))
+    # No deadlock nor a refused deletion: the «Delete» ended, and the ticket went with all it had.
+    assert deletions == ["ok"], deletions
+    assert not Ticket.objects.filter(pk=ticket.pk).exists()
+    assert not LogEntry.objects.filter(ticket_id=ticket.pk).exists()
+    if order == "admin first":
+        not_found(outcome, "kitchen.ticket_not_found", TICKET_NOT_FOUND)
+    else:
+        assert not isinstance(outcome, Exception), outcome

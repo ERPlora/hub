@@ -48,7 +48,9 @@ from apps.kitchen.queries import (
     EPOCH,
     IN_FLIGHT,
     MAX_CANDIDATES,
+    STATION_NOT_FOUND,
     STRUCK,
+    TICKET_NOT_FOUND,
     TO_DO,
     Change,
     TicketView,
@@ -166,6 +168,14 @@ def locked_settings() -> KitchenSettings:
     return row
 
 
+def locked_row(model: type[Station] | type[Ticket], pk) -> Station | Ticket | None:
+    """The live row ``pk``, read again and locked until this write commits; ``None`` when it was deleted after
+    it was found. The Hub admin's «Delete» of a ticket and its change page («is deleted» ticked) do not go in
+    line with the kitchen's writes: one that came between the read and the lock is not found, as one deleted
+    before."""
+    return model.objects.select_for_update().filter(pk=pk, is_deleted=False).first()
+
+
 def take_number(day) -> int:
     """The next number of the business day ``day`` (``fiscal_counter`` style: no gaps, no sequences)."""
     counter, _created = DayCounter.objects.select_for_update().get_or_create(day=day)
@@ -264,9 +274,12 @@ def _persist(
     after: TicketView,
     changes: list[Change],
     settings: KitchenSettings,
-) -> None:
-    """Save what Sales did to a ticket (``effective``): its states, its History and events, its slips."""
-    ticket = Ticket.objects.select_for_update().get(pk=after.id)
+) -> bool:
+    """Save what Sales did to a ticket (``effective``): its states, its History and events, its slips. One
+    deleted since it was read is left as it is (``False``)."""
+    ticket = locked_row(Ticket, after.id)
+    if ticket is None:
+        return False
     ticket.status = after.status
     ticket.started_at = after.started_at
     ticket.ready_at = after.ready_at
@@ -344,6 +357,7 @@ def _persist(
         elif change.kind == "served":
             write_log(ticket.id, LogAction.SERVED, at=change.at)
             _ticket_event(ctx, events.TICKET_SERVED, ticket)
+    return True
 
 
 def settle(ctx: OperationContext, settings: KitchenSettings) -> tuple[int, int]:
@@ -360,8 +374,7 @@ def settle(ctx: OperationContext, settings: KitchenSettings) -> tuple[int, int]:
     ).prefetch_related("items")
     for view in saved_views(on_the_line):
         after, changes = effective(view, settings)
-        if changes:
-            _persist(ctx, view, after, changes, settings)
+        if changes and _persist(ctx, view, after, changes, settings):
             changed += 1
     return len(rounds), changed
 
@@ -374,8 +387,11 @@ def begin(ctx: OperationContext) -> KitchenSettings:
 
 
 def locked_ticket(ref: TicketRefIn, settings: KitchenSettings) -> Ticket:
-    view = find_ticket_view(ref, settings)
-    return Ticket.objects.select_for_update().get(pk=view.id)
+    """The ticket ``ref`` names, locked until the end of the write (not found if deleted since it was found)."""
+    ticket = locked_row(Ticket, find_ticket_view(ref, settings).id)
+    if ticket is None:
+        raise NotFound(str(TICKET_NOT_FOUND), code="kitchen.ticket_not_found")
+    return ticket
 
 
 def out(ticket: Ticket, print_error: str | None = None) -> dict:
@@ -526,12 +542,14 @@ def _dishes(ticket: Ticket):
 
 
 def _round_ticket(line_ids) -> Ticket | None:
-    item = (
+    """The ticket of the round of ``line_ids``, locked until the end of the write; none if it was never saved
+    or was deleted since."""
+    ticket_id = (
         TicketItem.objects.filter(sale_line_id__in=list(line_ids))
-        .select_related("ticket")
+        .values_list("ticket_id", flat=True)
         .first()
     )
-    return item.ticket if item else None
+    return locked_row(Ticket, ticket_id) if ticket_id is not None else None
 
 
 def _enrich(
@@ -543,8 +561,8 @@ def _enrich(
     priority: str,
     waiter: str,
 ) -> Ticket:
-    """What only the send knows (its label, channel, priority and who sent it), on the round's ticket."""
-    ticket = Ticket.objects.select_for_update().get(pk=ticket.pk)
+    """What only the send knows (its label, channel, priority and who sent it), on the round's ticket (locked
+    by ``_round_ticket``)."""
     before = (ticket.label, ticket.order_type, ticket.priority, ticket.waiter)
     ticket.label = (label or ticket.label)[:120]
     ticket.order_type = channel
@@ -1214,6 +1232,14 @@ def recall_items(ctx: OperationContext, data: ItemRecallIn) -> dict:
 # ── Stations (KITCHEN-F01 to F03) ────────────────────────────────────────────────────────────────
 
 
+def _locked_station(data: StationRefIn) -> Station:
+    """The station ``data`` names, locked until the end of the write (not found if deleted since it was found)."""
+    station = locked_row(Station, find_station(data.station_id, data.station).pk)
+    if station is None:
+        raise NotFound(str(STATION_NOT_FOUND), code="kitchen.station_not_found")
+    return station
+
+
 def _station_out(station: Station) -> dict:
     routes = product_routes(station=station).count() + category_routes(station=station).count()
     in_progress = in_progress_by_station(current_settings()).get(station.id, 0)
@@ -1275,8 +1301,7 @@ def create_station(ctx: OperationContext, data: StationIn) -> dict:
 def update_station(ctx: OperationContext, data: StationPatchIn) -> dict:
     # What was sent keeps the station it went to: the rounds not saved yet are saved first.
     begin(ctx)
-    station = find_station(data.station_id, data.station)
-    station = Station.objects.select_for_update().get(pk=station.pk)
+    station = _locked_station(data)
     changes = data.model_dump(exclude_unset=True, exclude={"station_id", "station"})
     changes = {name: value for name, value in changes.items() if value is not None}
     if "name" in changes:
@@ -1304,8 +1329,7 @@ def update_station(ctx: OperationContext, data: StationPatchIn) -> dict:
 )
 def delete_station(ctx: OperationContext, data: StationRefIn) -> dict:
     settings = begin(ctx)
-    station = find_station(data.station_id, data.station)
-    station = Station.objects.select_for_update().get(pk=station.pk)
+    station = _locked_station(data)
     routed = product_routes(station=station).exists() or category_routes(station=station).exists()
     busy = in_progress_by_station(settings).get(station.id, 0) > 0
     if routed or busy:
