@@ -2,10 +2,14 @@
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations' rules
 (an overlap, the numbering, a charged appointment), so it warns rather than prevents, and it leaves no
-event. What the database fills in (ids and timestamps) is shown, not edited.
+event. What the database fills in (ids and timestamps) is shown, not edited. An appointment's or a series'
+«Delete» locks it first (``lock_appointments``, ``lock_series``), as every write on it does.
 """
 
+from collections.abc import Callable
+
 from django.contrib import admin
+from django.db import transaction
 
 from apps.appointment.models import (
     Appointment,
@@ -17,8 +21,30 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
+from apps.appointment.services import lock_appointments, lock_series
 
 AUTOMATIC = ("id", "created_at", "updated_at")
+
+
+class LockedDeletion:
+    """«Delete» (the row's page and the list's «Delete selected») locks the rows with ``lock`` before Django
+    checks what protects them and gathers what goes with them. A write under way holds a row while it adds to
+    what hangs from it (a history line, service lines, booked appointments, a split series): the deletion
+    waits for it and then takes what it added, or answers «Cannot delete» when that protects the row, instead
+    of failing at its COMMIT."""
+
+    #: Locks the rows of these ids in id order (``lock_appointments``, ``lock_series``).
+    lock: Callable[[list], list]
+
+    def get_deleted_objects(self, objs, request):
+        if request.method == "POST":
+            self.lock([obj.pk for obj in objs])
+        return super().get_deleted_objects(objs, request)
+
+    # The actions run outside a transaction; the lock above lasts until the deletion ends.
+    def response_action(self, request, queryset, *args, **kwargs):
+        with transaction.atomic():
+            return super().response_action(request, queryset, *args, **kwargs)
 
 
 class AppointmentServiceInline(admin.TabularInline):
@@ -44,7 +70,8 @@ class HistoryInline(admin.TabularInline):
 
 
 @admin.register(Appointment)
-class AppointmentAdmin(admin.ModelAdmin):
+class AppointmentAdmin(LockedDeletion, admin.ModelAdmin):
+    lock = staticmethod(lock_appointments)
     list_display = (
         "number",
         "start",
@@ -123,7 +150,8 @@ class RecurringServiceInline(admin.TabularInline):
 
 
 @admin.register(Recurring)
-class RecurringAdmin(admin.ModelAdmin):
+class RecurringAdmin(LockedDeletion, admin.ModelAdmin):
+    lock = staticmethod(lock_series)
     list_display = (
         "customer_name",
         "staff_name",

@@ -674,6 +674,13 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
   profesional a la vez se esperan y la segunda ve la primera (`tests/test_concurrency.py`). Con los
   solapes permitidos, el mostrador tiene que confirmar (`confirm_overlap`, 409
   `appointment.overlap_needs_confirmation` con las citas que pisa); la clienta nunca solapa.
+- **Borrar en el admin del Hub**: «Eliminar» de una cita o de una serie (su página y «Eliminar
+  seleccionados») bloquea antes las filas (`lock_appointments`, `lock_series`, por id), así que espera a la
+  escritura en curso y se lleva lo que añadió (historial, líneas, la serie en que se parte) o responde «No
+  se puede eliminar» si la serie ya tiene citas; la escritura que llega después no la encuentra. Toda
+  escritura que bloquea varias (borrar varias citas, la baja de un profesional, editar una serie, borrar o
+  fusionar los datos de una clienta) las toma igual, por id y las series antes que sus citas, y luego las
+  lee en su orden: dos escrituras nunca se esperan en círculo (`tests/test_concurrency.py`).
 - **Numeración** `APT-AAAAMMDD-NNNN` por día de creación del negocio, con `Counter` (una fila por día)
   bloqueada en la transacción de la reserva; nunca secuencias.
 - **Reloj**: los instantes se guardan con zona (UTC) y salen en la del negocio; una hora sin zona que
