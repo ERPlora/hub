@@ -2,10 +2,12 @@
 
 Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub admin, only on ``hubs.erplora.com``, has
 full CRUD over a hub's tables; what each staff member may do is Django's own permissions. A change
-made here writes no event to the outbox: the screens see it on their next re-run.
+made here writes no event to the outbox: the screens see it on their next re-run. The «Delete» of a card, a
+group, a tag or a custom field locks it first (``lock_rows``), as every write on it does.
 """
 
 from django.contrib import admin
+from django.db import transaction
 
 from apps.customer.models import (
     Activity,
@@ -19,6 +21,26 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
+from apps.customer.services import lock_rows
+
+
+class LockedDeletion:
+    """«Delete» (the row's page and the list's «Delete selected») of a card, a group, a tag or a custom field
+    locks the rows before Django checks what protects them and gathers what goes with them. A write under way
+    holds a card while it adds to what hangs from it (a note, a purchase, a consent, a value, a group, its
+    health data, what a merge moves to it), and the groups, tags and fields it points the card at: the
+    deletion waits for it and then takes what it added, instead of failing at its COMMIT; a write that comes
+    second waits for the deletion and finds the row gone."""
+
+    def get_deleted_objects(self, objs, request):
+        if request.method == "POST":
+            lock_rows(self.model, [obj.pk for obj in objs])
+        return super().get_deleted_objects(objs, request)
+
+    # The actions run outside a transaction; the lock above lasts until the deletion ends.
+    def response_action(self, request, queryset, *args, **kwargs):
+        with transaction.atomic():
+            return super().response_action(request, queryset, *args, **kwargs)
 
 
 class CustomFieldValueInline(admin.TabularInline):
@@ -48,7 +70,7 @@ class ConsentInline(admin.TabularInline):
 
 
 @admin.register(Customer)
-class CustomerAdmin(admin.ModelAdmin):
+class CustomerAdmin(LockedDeletion, admin.ModelAdmin):
     list_display = (
         "name",
         "email",
@@ -95,21 +117,21 @@ class CustomerAdmin(admin.ModelAdmin):
 
 
 @admin.register(CustomerGroup)
-class CustomerGroupAdmin(admin.ModelAdmin):
+class CustomerGroupAdmin(LockedDeletion, admin.ModelAdmin):
     list_display = ("name", "color", "sort_order", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name", "description")
 
 
 @admin.register(CustomerTag)
-class CustomerTagAdmin(admin.ModelAdmin):
+class CustomerTagAdmin(LockedDeletion, admin.ModelAdmin):
     list_display = ("name", "color", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name",)
 
 
 @admin.register(CustomField)
-class CustomFieldAdmin(admin.ModelAdmin):
+class CustomFieldAdmin(LockedDeletion, admin.ModelAdmin):
     list_display = ("name", "field_type", "is_required", "sort_order", "is_active")
     list_filter = ("field_type", "is_required", "is_active")
     search_fields = ("name",)
