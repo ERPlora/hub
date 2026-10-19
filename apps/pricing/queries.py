@@ -104,19 +104,21 @@ def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, 
     raise NotFound(str(missing), code=missing_code)
 
 
-def find_list(list_id: UUID | None, said: str | None, *, lock: bool = False) -> PriceList:
-    """A price list by its id, or by its code or name as a person says it (active or not)."""
-    rows = PriceList.objects.all()
+def find_list(list_id: UUID | None, said: str | None, *, lock: bool = False, rows=None) -> PriceList:
+    """A price list by its id, or by its code or name as a person says it (active or not). It comes from
+    ``rows`` when given (e.g. with what its detail shows): one read, so a deletion committed meanwhile is
+    either not seen yet or not found, never a row that vanished between two reads."""
+    lists = PriceList.objects.all()
     if list_id is None:
         list_id = _named(
-            rows,
+            lists,
             said or "",
             missing=LIST_NOT_FOUND,
             missing_code="pricing.price_list_not_found",
             ambiguous=LIST_AMBIGUOUS,
             ambiguous_code="pricing.ambiguous_price_list",
         ).pk
-    found = rows.filter(pk=list_id)
+    found = (lists if rows is None else rows).filter(pk=list_id)
     price_list = (found.select_for_update() if lock else found).first()
     if price_list is None:
         raise NotFound(str(LIST_NOT_FOUND), code="pricing.price_list_not_found")
@@ -320,7 +322,7 @@ def list_price_lists(ctx: OperationContext, params: PriceListListIn) -> dict:
     ai={"description": "Get one price list by its id, its code or its name (e.g. «wholesale list»)."},
 )
 def get_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
-    return list_row(find_list(data.id, data.price_list))
+    return list_row(find_list(data.id, data.price_list, rows=_lists()))
 
 
 # ── Prices ───────────────────────────────────────────────────────────────────────────────────────
