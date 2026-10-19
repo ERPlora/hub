@@ -1,10 +1,16 @@
 // The e2e database of a stack beside the shared one (database.ts): `node tests/e2e/database.ts` creates it
 // when missing and migrates it, `--drop` deletes it. On 2026-10-16 two stacks (8030 and 8040) shared the
 // default `hub` and the cash sale of one fell into the other's open shift; each stack now runs on its own
-// e2e database, and these commands never touch any other (`hub`, `saas`, the templates…).
+// e2e database, and these commands never touch any other (`hub`, `saas`, the templates…). Preparing it also leaves
+// the checkout's .env the key that seals the test certificates (certificate-key.ts).
 // flow: ninguno — FIX de la infraestructura e2e del Hub (aislar los datos de cada ejecución)
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { newFernetKey } from './certificate-key';
 import { adminSql, dropDatabase, prepareDatabase, runCli, type AdminSql } from './database';
 import type { CommandResult, ManagePy, Spawn } from './global-setup';
 
@@ -140,30 +146,81 @@ describe('runCli', () => {
     return { out, err, print: (line: string) => out.push(line), fail: (line: string) => err.push(line) };
   }
 
+  const folders: string[] = [];
+  afterEach(() => {
+    for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
+  });
+
+  /** A checkout's .env holding `content`, and an environment without the certificate key. */
+  function checkout(content: string): { envFile: string; env: NodeJS.ProcessEnv } {
+    const folder = mkdtempSync(join(tmpdir(), 'e2e-database-'));
+    folders.push(folder);
+    const envFile = join(folder, '.env');
+    writeFileSync(envFile, content);
+    return { envFile, env: {} };
+  }
+
+  /** A checkout whose .env already has its certificate key. */
+  const keyed = () => checkout(`DEBUG=True\nFISCAL_CERTIFICATE_KEY=${newFernetKey()}\n`);
+
   it('prepares the database of DB_NAME without arguments and drops it with --drop', () => {
     const postgres = fakePostgres([]);
     const prepared = io();
-    expect(runCli([], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...prepared })).toBe(0);
-    expect(prepared.out).toEqual(['database.ts: hub_e2e_8030 created, migrated and seeded (a, b).']);
+    expect(runCli([], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...keyed(), ...prepared })).toBe(0);
+    expect(prepared.out[0]).toBe('database.ts: hub_e2e_8030 created, migrated and seeded (a, b).');
 
     const again = io();
-    expect(runCli([], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...again })).toBe(0);
-    expect(again.out).toEqual(['database.ts: hub_e2e_8030 migrated and seeded (a, b).']);
+    expect(runCli([], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...keyed(), ...again })).toBe(0);
+    expect(again.out[0]).toBe('database.ts: hub_e2e_8030 migrated and seeded (a, b).');
 
     const dropped = io();
-    expect(runCli(['--drop'], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...dropped })).toBe(0);
+    expect(runCli(['--drop'], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...keyed(), ...dropped })).toBe(0);
     expect(dropped.out).toEqual(['database.ts: hub_e2e_8030 dropped.']);
     expect(postgres.statements.at(-1)).toBe('drop database if exists "hub_e2e_8030"');
   });
 
+  it("leaves the checkout's .env a certificate key once the database is ready, and never prints it", () => {
+    const stack = checkout('DEBUG=True\n');
+    const prepared = io();
+
+    expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...stack, ...prepared })).toBe(0);
+
+    const given = readFileSync(stack.envFile, 'utf8');
+    const [line] = given.split('\n').filter((l) => l.startsWith('FISCAL_CERTIFICATE_KEY='));
+    const key = line.slice('FISCAL_CERTIFICATE_KEY='.length);
+    expect(key).toMatch(/^[A-Za-z0-9_-]{43}=$/);
+    expect(prepared.out).toHaveLength(2);
+    expect(prepared.out[1]).toMatch(/^database\.ts: FISCAL_CERTIFICATE_KEY generated in /);
+    expect(prepared.out.join('\n')).not.toContain(key);
+
+    // Again on the same checkout: the key it gave is the one the run keeps.
+    const kept = io();
+    expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres(['hub_e2e_8030']).sql, manage: fakeManage().manage, ...stack, ...kept })).toBe(0);
+    expect(kept.out[1]).toMatch(/^database\.ts: FISCAL_CERTIFICATE_KEY kept from /);
+    expect(readFileSync(stack.envFile, 'utf8')).toBe(given);
+  });
+
   it('exits 1 with the reason on stderr, and 2 on an argument it does not know', () => {
     const refused = io();
-    expect(runCli([], { database: 'hub', sql: fakePostgres(['hub']).sql, manage: fakeManage().manage, ...refused })).toBe(1);
+    expect(runCli([], { database: 'hub', sql: fakePostgres(['hub']).sql, manage: fakeManage().manage, ...keyed(), ...refused })).toBe(1);
     expect(refused.err.join('\n')).toMatch(/^database\.ts: DB_NAME=hub is no e2e database/);
 
+    const broken = checkout('DEBUG=True\nFISCAL_CERTIFICATE_KEY=not-a-key\n');
+    const unusable = io();
+    expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...broken, ...unusable })).toBe(1);
+    expect(unusable.err.join('\n')).toMatch(/^database\.ts: FISCAL_CERTIFICATE_KEY in /);
+
     const unknown = io();
-    expect(runCli(['--force'], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...unknown })).toBe(2);
+    expect(runCli(['--force'], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...keyed(), ...unknown })).toBe(2);
     expect(unknown.err).toEqual(['database.ts: unknown argument --force. Usage: node tests/e2e/database.ts [--drop]']);
+  });
+
+  it('never gives a key to a database it refused, nor when dropping one', () => {
+    for (const [args, database] of [[[], 'hub'], [['--drop'], 'hub_e2e_8030']] as const) {
+      const stack = checkout('DEBUG=True\n');
+      runCli([...args], { database, sql: fakePostgres(['hub', 'hub_e2e_8030']).sql, manage: fakeManage().manage, ...stack, ...io() });
+      expect(readFileSync(stack.envFile, 'utf8')).toBe('DEBUG=True\n');
+    }
   });
 });
 

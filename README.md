@@ -13,8 +13,8 @@ uv run pytest -q                     # Postgres de compose.yaml (`docker compose
 
 `DEBUG` está apagado si no se define: sin `DEBUG=True` en `.env` (o en el entorno), los ajustes
 exigen `SECRET_KEY`, `SAAS_URL` e `INTERNAL_SHARED_SECRET`, como en producción. Con `DEBUG=True`
-el resto de variables toma los valores locales por defecto (lista completa en el `.env.example` de
-erplora-next). `.env` nunca se sube al repo.
+el resto de variables toma los valores locales por defecto (lista completa en `.env.example`). `.env` nunca se
+sube al repo.
 
 `runserver` arranca Vite en el `VITE_DEV_PORT` que lee Django, del entorno o del `.env` (por defecto `5173`):
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
