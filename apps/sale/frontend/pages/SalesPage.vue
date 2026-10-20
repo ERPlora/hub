@@ -30,6 +30,7 @@ import ReprintJob from '../components/document/ReprintJob.vue';
 import { type DayBounds, type Period, PERIODS, periodBounds } from '../components/sales/period';
 import RefundModal from '../components/sales/RefundModal.vue';
 import SalesKpis from '../components/sales/SalesKpis.vue';
+import SalesWeek from '../components/sales/SalesWeek.vue';
 import { useBusinessDay } from '../components/sales/useBusinessDay';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
 import { useServerTable } from '../composables/useServerTable';
@@ -260,6 +261,7 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
       v-if="canReports && !blocked"
       :bounds="bounds"
     />
+    <SalesWeek v-if="canReports && !blocked && segmentValue === 'week'" />
     <InlineFeedback
       v-if="status === 'reconnecting'"
       class="sales-page__notice"

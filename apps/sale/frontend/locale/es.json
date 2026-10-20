@@ -413,6 +413,10 @@
         "voided": "Anuladas",
         "error": "Error cargando métricas"
       },
+      "week": {
+        "title": "Últimos 7 días",
+        "loadFailed": "No se han podido leer los últimos 7 días."
+      },
       "columns": {
         "date": "Fecha",
         "number": "Número",

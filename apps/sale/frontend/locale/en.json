@@ -413,6 +413,10 @@
         "voided": "Voided",
         "error": "Error loading metrics"
       },
+      "week": {
+        "title": "Last 7 days",
+        "loadFailed": "The last 7 days could not be read."
+      },
       "columns": {
         "date": "Date",
         "number": "Number",

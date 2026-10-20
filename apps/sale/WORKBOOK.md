@@ -875,7 +875,7 @@ negocio…»); hoy la plataforma no apaga apps por hub y ese camino solo se prue
 Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
-<!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 -->
+<!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 fi:modules/sales#widget-sales-last_7_days fi:modules/sales#widget-sales-recent_activity fi:modules/sales#widget-sales-tickets_today fi:modules/sales#widget-sales-today -->
 Estado: hecho
 Vertical: común
 Actor: empleado (historial), responsable (cifras)
@@ -888,7 +888,10 @@ Pasos:
    declararon las ventas del periodo: «IVA», «IGIC» si todas se cobraron con IGIC (Canarias) o «IPSI»
    (Ceuta y Melilla). Si en el periodo hay ventas de dos impuestos (porque el negocio cambió de
    territorio a mitad, por ejemplo), se llama «Impuestos». Sin ventas en el periodo, lleva el impuesto del
-   territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio.
+   territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
+   debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
+   Lo que el Inicio del producto actual enseñaba en paneles está aquí: lo de hoy y sus tickets son las
+   cifras de «Hoy», la actividad reciente es la tabla, y los últimos 7 días, esa fila.
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
    <importe>» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
    estado, pago, fecha o total, u ordena.
@@ -901,7 +904,8 @@ valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
 periodo.
-Si falla: «Error cargando métricas» (las cifras salen como «—»). Vacía: «Aún no hay ventas.». Quien
+Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
+«No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
 puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo.

@@ -19,6 +19,7 @@ import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
 import { formatDateTime } from '@erplora/ui/components';
 import { plain } from '../lib/format';
 import type { SaleRow } from '../operations';
+import SalesWeek from '../components/sales/SalesWeek.vue';
 import SalesPage from './SalesPage.vue';
 import source from './SalesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -208,6 +209,17 @@ describe('SalesPage: the period (SALE-F28 step 1)', () => {
     await s.period('all');
     expect(s.list()).toEqual([{ sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
     expect(s.paramsOf('sale.sale.stats')).toEqual([{}]);
+  });
+
+  it('«7 days» adds what was sold each of those days, under the figures (SALE-G01)', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    expect(s.paramsOf('sale.sale.last_7_days')).toEqual([]);
+    await s.period('week');
+    expect(s.paramsOf('sale.sale.last_7_days')).toEqual([{}]);
+    expect(s.wrapper.findComponent(SalesWeek).exists()).toBe(true);
+    await s.period('month');
+    expect(s.wrapper.findComponent(SalesWeek).exists()).toBe(false);
   });
 
   it('a business day it cannot read says the periods count from this device’s day', async () => {
