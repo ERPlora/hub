@@ -89,13 +89,19 @@ function retry(): void {
       </h3>
       <template v-if="session">
         <p class="cash-figures__caption">
-          {{ $t('cash_register.figures.expected') }} · {{ session.number }}
+          {{ $t('cash_register.figures.expected') }}
         </p>
         <p
           class="cash-figures__amount"
           data-testid="cash-register-figures-expected"
         >
           {{ expected }}
+        </p>
+        <p
+          class="cash-figures__caption cash-figures__session"
+          data-testid="cash-register-figures-number"
+        >
+          {{ session.number }}
         </p>
       </template>
       <p
@@ -173,6 +179,9 @@ function retry(): void {
   margin: 0;
   font-size: 0.85rem;
   color: var(--ion-color-medium-shade, #636469);
+}
+.cash-figures__session {
+  white-space: nowrap;
 }
 .cash-figures__amount {
   margin: 0;
