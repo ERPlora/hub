@@ -147,6 +147,19 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
     ]);
   });
 
+  // appointments#211: closing the panel while what it reaches is still loading closes it for good; the answer
+  // that arrives afterwards opens nothing.
+  it('closed while it loads, it stays closed when the answer arrives', async () => {
+    const s = await setup({ series: SERIES, fromDate: '2026-11-02' });
+    await s.live();
+    await s.wrapper.setProps({ open: false });
+    await settle();
+    await s.result('appointment.recurring.get', { ...SERIES, next_date: '2026-11-02', upcoming: 5, charged: 0 });
+    await settle();
+    expect(s.wrapper.props('open')).toBe(false);
+    expect((s.wrapper.emitted('update:open') ?? []).filter(([open]) => open === true)).toEqual([]);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ series: SERIES }, 'es');
     expect(s.inDoc('series-form')?.getAttribute('aria-label')).toBe('Editar cita periódica');

@@ -280,6 +280,9 @@ def test_an_automation_moves_and_books_a_batch_by_the_customers_rules(salon, act
             actor=actor,
         ),
     )
+    # gh:appointments#156 — the front desk writes down the hour she was really seen, even one already gone.
+    moved = run("appointment.appointment.reschedule", {"id": str(out.id), "start": yesterday})
+    assert moved.start == at(timezone.localdate() - dt.timedelta(days=1), "10:00")
 
 
 @pytest.mark.parametrize("actor", AUTOMATIONS)

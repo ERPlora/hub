@@ -329,7 +329,7 @@ def for_caller(ctx: OperationContext, answer: dict) -> dict:
 
 def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
     """``start``'s day and hour ready to say (a flow's template has no clock nor formatter, appointments#151):
-    the weekday and the date in the caller's language, and the hour in 24 hours as the agenda paints it."""
+    the weekday and the date in the caller's language, and the hour in 24 hours (the old product's messages)."""
     wall = start.astimezone(business_zone())
     with translation.override(ctx.language):
         day = f"{formats.date_format(wall, 'l')}, {formats.date_format(wall, 'DATE_FORMAT')}"
