@@ -25,24 +25,29 @@ def _unescape(text: str) -> str:
 
 
 def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals or contexts (the header is skipped)."""
+    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped); an entry with a
+    context is keyed ``context\x04msgid``, as gettext keys it in the compiled catalog."""
     entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgid": [], "msgstr": []}
+    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
     fuzzy, current = False, None
 
     def flush():
         msgid = _unescape("".join(parts["msgid"]))
         if msgid:
-            entries[msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
+            context = _unescape("".join(parts["msgctxt"]))
+            key = f"{context}\x04{msgid}" if parts["msgctxt"] else msgid
+            entries[key] = (_unescape("".join(parts["msgstr"])), fuzzy)
 
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line.startswith("msgid ") or (line.startswith("#") and current == "msgstr"):
+        if (line.startswith(("msgctxt ", "msgid ")) and parts["msgid"]) or (
+            line.startswith("#") and current == "msgstr"
+        ):
             flush()
-            parts, fuzzy, current = {"msgid": [], "msgstr": []}, False, None
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
-        elif line.startswith(("msgid ", "msgstr ")):
+        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
             current, _, rest = line.partition(" ")
             parts[current].append(_STRING.match(rest).group(1))
         elif current and _STRING.match(line):
@@ -78,9 +83,16 @@ def visible_texts() -> set[str]:
         *models.Session.Status.labels,
         *models.Movement.Type.labels,
         *models.Count.Type.labels,
+        *(label for _, label, _ in services.REPORT_LINES),
     ]
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {source(text) for text in lazies}
+
+
+def source(text) -> str:
+    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy``."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def test_every_entry_has_a_spanish_translation():

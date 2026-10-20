@@ -289,3 +289,54 @@ msgstr "Ya hay un cajón con ese nombre."
 #, python-format
 msgid "Session %(number)s was due to close by itself at %(time)s: open a new session (this one closes then)."
 msgstr "La sesión %(number)s debía cerrarse sola a las %(time)s: abre una sesión nueva (esta se cierra entonces)."
+
+msgid "With the blind count on, the report of an open session is printed by whoever may see the expected cash."
+msgstr "Con el arqueo ciego, el informe de una sesión abierta lo imprime quien puede ver el efectivo esperado."
+
+msgctxt "cash report"
+msgid "Closed by itself"
+msgstr "Cerrada sola"
+
+msgctxt "cash report"
+msgid "Counted"
+msgstr "Contado"
+
+msgctxt "cash report"
+msgid "Over/short"
+msgstr "Descuadre"
+
+msgctxt "cash report"
+msgid "Sales"
+msgstr "Ventas"
+
+msgctxt "cash report"
+msgid "Cash sales"
+msgstr "Ventas en efectivo"
+
+msgctxt "cash report"
+msgid "Card sales"
+msgstr "Ventas con tarjeta"
+
+msgctxt "cash report"
+msgid "Sales with other payment methods"
+msgstr "Ventas con otras formas de pago"
+
+msgctxt "cash report"
+msgid "Refunds"
+msgstr "Devoluciones"
+
+msgctxt "cash report"
+msgid "Cash in"
+msgstr "Entradas"
+
+msgctxt "cash report"
+msgid "Cash out"
+msgstr "Salidas"
+
+msgctxt "cash report"
+msgid "Comps"
+msgstr "Invitaciones"
+
+msgctxt "cash report"
+msgid "Expected"
+msgstr "Esperado"

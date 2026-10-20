@@ -169,7 +169,9 @@
       "counts": "Arqueos",
       "noMovements": "Sin movimientos en esta sesión.",
       "noCounts": "Sin arqueos en esta sesión.",
-      "loading": "Cargando…"
+      "loading": "Cargando…",
+      "printQueued": "Informe enviado a la impresora {printer}.",
+      "printQueuedDefault": "Informe enviado a la impresora de recibos."
     },
     "summary": {
       "status": "Estado",

@@ -139,6 +139,16 @@ export interface CurrentOut {
   unassigned_cash: number;
 }
 
+/** «Print» of a session's report (CASH_REGISTER-F16): x while open, z once closed. */
+export interface SessionPrintOut {
+  report: 'x' | 'z';
+  /** It went to the receipt printer's queue; false = Printing is not on here: the browser prints it. */
+  queued: boolean;
+  job_id: string | null;
+  /** The printer that prints it; null = the first device with a receipt printer. */
+  printer: string | null;
+}
+
 export interface SessionGetIn {
   session_id?: string;
   session?: string;
@@ -246,6 +256,7 @@ declare module '@erplora/ui/sdk' {
     'cash_register.session.list': { input: SessionListIn; output: Page<SessionRow> };
     'cash_register.session.current': { input: EmptyIn; output: CurrentOut };
     'cash_register.session.get': { input: SessionGetIn; output: SessionOut };
+    'cash_register.session.print': { input: SessionGetIn; output: SessionPrintOut };
     'cash_register.session.open': { input: SessionOpenIn; output: SessionRow };
     'cash_register.session.close': { input: SessionCloseIn; output: SessionRow };
     'cash_register.session.auto_close': { input: EmptyIn; output: AutoCloseOut };

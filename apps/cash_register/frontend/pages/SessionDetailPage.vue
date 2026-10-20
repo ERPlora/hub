@@ -2,11 +2,13 @@
 // Cash register → the detail of a session (CASH_REGISTER-F11, F16; the old `erp-cashregister-session-
 // detail`): «Session detail · S-…» with Back to the sessions, the summary (who opened and closed it, the
 // drawer, the figures by payment method, expected, counted, difference and the notes), the session's
-// «Movements» and «Counts», and «Print»: the X report of an open session or the Z of a closed one, through
-// the browser's dialog. Read-only; everything re-runs by itself (a sale, a movement, a count, the close).
+// «Movements» and «Counts», and «Print»: the X report of an open session or the Z of a closed one, to the
+// receipt printer's queue (Printing's PRINTING-F17), or through the browser's dialog when Printing is not on
+// in the business. A blind count hides «Print» on an open session from whoever may not see the expected
+// cash. Read-only; everything re-runs by itself (a sale, a movement, a count, the close).
 import { InlineFeedback } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, toastError } from '@erplora/ui/shell';
+import { useCommand, useLive } from '@erplora/ui/sdk';
+import { AppPage, HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue';
 
@@ -30,8 +32,12 @@ const failed = computed(() => !session.value && status.value === 'error' && !not
 const report = useTemplateRef<InstanceType<typeof ClosingReport>>('report');
 /** When the paper is printed: set at each «Print», never when the page opened. */
 const printedAt = shallowRef<Date | null>(null);
+const printing = useCommand('cash_register.session.print');
+/** A blind count keeps an open session's report from whoever may not see its expected cash. */
+const printable = computed(() => !!session.value && !(session.value.status === 'open' && session.value.expected_hidden));
 
-async function printReport(): Promise<void> {
+/** The browser's dialog, with the paper alone: the way out when Printing is not on in the business. */
+async function printHere(): Promise<void> {
   printedAt.value = new Date();
   await nextTick();
   const element = report.value?.$el as HTMLElement | undefined;
@@ -41,6 +47,19 @@ async function printReport(): Promise<void> {
   } catch {
     void toastError(t('cash_register.detail.printFailed'));
   }
+}
+
+async function printReport(): Promise<void> {
+  let sent;
+  try {
+    sent = await printing.run({ session_id: props.id });
+  } catch (refused) {
+    const message = (refused as { message?: string }).message;
+    void toastError(message ? `${t('cash_register.detail.printFailed')} ${message}` : t('cash_register.detail.printFailed'));
+    return;
+  }
+  if (!sent.queued) return printHere();
+  void toastSuccess(sent.printer ? t('cash_register.detail.printQueued', { printer: sent.printer }) : t('cash_register.detail.printQueuedDefault'));
 }
 </script>
 
@@ -104,8 +123,10 @@ async function printReport(): Promise<void> {
           {{ $t('cash_register.detail.title', { number: session.number }) }}
         </h2>
         <ion-button
+          v-if="printable"
           fill="outline"
           data-testid="cash-register-detail-print"
+          :disabled="printing.pending.value"
           @click="printReport"
         >
           <HubIcon

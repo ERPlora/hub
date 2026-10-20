@@ -169,7 +169,9 @@
       "counts": "Counts",
       "noMovements": "No movements in this session.",
       "noCounts": "No counts in this session.",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "printQueued": "Report sent to the printer {printer}.",
+      "printQueuedDefault": "Report sent to the receipt printer."
     },
     "summary": {
       "status": "Status",

@@ -463,21 +463,28 @@ Si falla: sin sesión abierta, la devolución sale en F17.
 Implicados: SALE-F31
 
 ### CASH_REGISTER-F16 Imprimir el informe de la sesión (X o Z)
+<!-- origen: qa:modules/cash_register/close-register-z-report old-hub:HUB_PERIPHERALS-F13 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
 Pantalla: Detalle de la sesión
 Pasos:
 1. En el detalle de una sesión, pulsa «Imprimir».
-2. Sale el diálogo de impresión del navegador con el informe: número de sesión, cajón, quién y cuándo
-   abrió y cerró, el fondo, las ventas por forma de pago, devoluciones, entradas, salidas,
-   invitaciones, esperado, contado, diferencia y notas. Con la sesión abierta es el «Informe parcial
-   (X)»; cerrada, el «Cierre de caja (Z)».
+2. Con **Impresión** encendida, el informe va a la cola de la impresora de recibos y sale «Informe enviado
+   a la impresora …» (o «… a la impresora de recibos» si no hay una elegida); el dispositivo con esa
+   impresora lo saca en papel. Con la sesión abierta es el «Informe parcial (X)»; cerrada, el «Cierre de
+   caja (Z)».
+3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
+   se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
+   entradas, salidas, invitaciones, el esperado y, en el Z, el contado y el descuadre.
+4. Sin Impresión encendida en el negocio, sale el diálogo de impresión del navegador con el mismo informe.
 Entra: el resumen de la sesión, el mismo que enseña la pantalla.
-Sale: el papel.
-Si falla: «No se pudo imprimir.»; con el arqueo ciego, el empleado no puede imprimir el esperado de una
-sesión abierta (sale «—»).
-Implicados: CASH_REGISTER-F11
+Sale: un trabajo en la cola de recibos de Impresión (o el papel del navegador). Cada «Imprimir» es un papel
+nuevo.
+Si falla: «No se pudo imprimir.» con el motivo de Impresión (por ejemplo, sin permiso de imprimir). Con el
+arqueo ciego, quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el
+esperado); en una cerrada sí.
+Implicados: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
 Estado: hecho
@@ -533,6 +540,7 @@ Todas se pueden seguir en vivo.
 | Cierra las sesiones olvidadas al corte del día | cerrar | F10 | `cash_register.session.auto_close` |
 | Apunta una entrada o una salida | apuntar | F05 | `cash_register.movement.add` |
 | Registra un arqueo | contar | F06 | `cash_register.count.add` |
+| Imprime el informe X o Z de una sesión en la impresora de recibos | ver sesiones | F16 | `cash_register.session.print` |
 
 ### Lo que avisa
 
@@ -559,7 +567,7 @@ momento en que se miran; las pantallas se refrescan con `sale.sale.completed`, `
 - **Cocina** (sin requisito; solo si está encendida): las comandas en marcha para la revisión del turno
   (KITCHEN-F31).
 - **Impresión** (sin requisito; solo si está encendida): lo que espera o falló en la cola, para la revisión
-  del turno (PRINTING-F01).
+  del turno (PRINTING-F01), y la cola de recibos para el informe X o Z (PRINTING-F17).
 - **Índices de Ventas para estas lecturas** (hecho, `sale/0005_cash_register_indexes`): parciales en
   `sale_sale(voided_at)` y `sale_refund(created_at)`, para que las lecturas por ventana de tiempo de
   anulaciones y devoluciones no recorran la tabla entera.
@@ -709,8 +717,8 @@ cajero del producto actual es un empleado.
 ### Lo que NO hace, a propósito
 
 - No cobra ni factura: Ventas, Facturación y VeriFactu.
-- No abre el cajón físico ni imprime en la impresora de tiques: Impresión (el informe sale por el
-  diálogo del navegador).
+- No abre el cajón físico: Impresión. El informe X o Z lo imprime Impresión, en su cola de recibos (sin
+  Impresión, el diálogo del navegador).
 - No lleva varios cajones abiertos a la vez: una sesión por negocio.
 - No reabre turnos ni edita o borra movimientos o arqueos: se corrige con otro movimiento.
 - No gestiona propinas, banco ni caja fuerte más allá de una salida de efectivo.
