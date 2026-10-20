@@ -843,7 +843,11 @@ Pasos:
 4. Toca una fila para ver su documento (SALE-F29). La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
 Entra: nada de otras apps.
-Sale: nada.
+Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
+la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que cobró
+cada uno. Cada devolución cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió,
+suma los «Ingresos» del periodo.
 Si falla: «Error cargando métricas» (las cifras salen como «—»). Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
@@ -1119,7 +1123,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo | informes | F16, F28 | `sale.sale.by_staff` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas y lo que queda (sobre lo que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
@@ -1530,6 +1534,9 @@ administrador y responsable, los mismos que anulan y devuelven).
     peso y la base salía de restar; Facturación reparte la base: el total cuadraba, la línea no).
 35. **«Elegir mesa» busca en el servidor** en vez de las pestañas de zona del producto actual (cada
     baldosa dice su zona) y una mesa ocupada no se toca (antes abría su cuenta).
+36. **Lo vendido por cada profesional resta lo devuelto** (ver 5), a quien vendió lo que vuelve (antes
+    una devolución parcial no restaba y la total borraba la venta, así que la suma de las profesionales
+    no cuadraba con los «Ingresos» del día).
 
 ### Lo que NO hace, a propósito
 

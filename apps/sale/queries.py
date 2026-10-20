@@ -1645,7 +1645,8 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     expose_api=True,
     ai={
         "description": "What each professional sold in a period of business days: their lines (a line's own professional wins "
-        "over the sale's), the sales they served, gross, base and tax in cents. For the per-professional close."
+        "over the sale's), the sales they served, gross, base and tax in cents, what refunds gave back on their lines "
+        "and the revenue left, which is what a commission is on. For the per-professional close."
     },
 )
 def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
@@ -1663,20 +1664,59 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
             gross=Sum("line_total"),
             net=Sum("net_amount"),
         )
-        .order_by("-gross", "served_by")
     )
-    return {
-        "rows": [
+    refunded = _refunded_by_staff(params)
+    totals = []
+    for row in rows:
+        given_back = refunded.get(row["served_by"], 0)
+        totals.append(
             {
                 "staff_id": row["served_by"],
                 "sales_count": row["sales_count"],
                 "gross_total": row["gross"],
                 "net_total": row["net"],
                 "tax_total": row["gross"] - row["net"],
+                "refunded_total": given_back,
+                "total_revenue": row["gross"] - given_back,
             }
-            for row in rows
+        )
+    totals.sort(key=lambda total: (-total["total_revenue"], total["staff_id"]))
+    return {"rows": totals}
+
+
+def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
+    """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents.
+
+    A refund's money goes to the lines it returned, by what the units that came back were worth; when it
+    returned none worth anything (money only, a comp, a voucher's session), to all its sale's lines by what
+    they charged. Each refund is shared out whole, to the cent (``pricing.allocate``): with the lines no
+    professional served, the rows square with the period's revenue, which takes refunds off on the day of
+    their sale too (``sale.sale.stats``)."""
+    sales = _period(Sale.objects.filter(status__in=COUNTED), params)
+    refunds = (
+        Refund.objects.filter(total__gt=0, sale__in=sales)
+        .select_related("sale")
+        .prefetch_related("sale__lines", "lines")
+    )
+    given: dict[UUID, int] = {}
+    for refund in refunds:
+        lines = list(refund.sale.lines.all())
+        returned = {back.sale_line_id: back.quantity for back in refund.lines.all()}
+        weights = [
+            pricing.half_up(
+                Fraction(line.line_total) * Fraction(returned[line.id]) / Fraction(line.quantity)
+            )
+            if line.id in returned
+            else 0
+            for line in lines
         ]
-    }
+        if not any(weights):
+            weights = [line.line_total for line in lines]
+        for line, share in zip(lines, pricing.allocate(refund.total, weights), strict=True):
+            served_by = line.staff_id or refund.sale.staff_id
+            if served_by is not None:
+                given[served_by] = given.get(served_by, 0) + share
+    return given
 
 
 # ── Refunds ──────────────────────────────────────────────────────────────────────────────────────

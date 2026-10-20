@@ -1162,11 +1162,17 @@ class StaffTotal(Schema):
     gross_total: int = Field(description="What their lines charged, in cents.")
     net_total: int = Field(description="Base of their lines, in cents.")
     tax_total: int = Field(description="Tax of their lines, in cents.")
+    refunded_total: int = Field(
+        description="What the refunds of those sales gave back on their lines, in cents."
+    )
+    total_revenue: int = Field(
+        description="What their lines charged, refunds taken off, in cents: what their commission is on."
+    )
 
 
 class ByStaffOut(Schema):
     rows: list[StaffTotal] = Field(
-        description="One row per professional, the one who sold most first."
+        description="One row per professional, the one who sold most (refunds taken off) first."
     )
 
 
