@@ -5,7 +5,9 @@ and a refund of the same sale, or two refunds of the last units of a line: which
 the other is refused whole.
 
 The Hub admin's «Delete» of an open check that a write holds waits for it and takes what it left (or answers
-«Cannot delete» when a sale charged it); a write that comes second finds it gone.
+«Cannot delete» when a sale charged it); a write that comes second finds it gone. Its «Delete» of a department or a
+payment method that a write names waits for the write and answers «Cannot delete»; a write that comes second refuses
+it as one that never was.
 """
 
 import threading
@@ -21,7 +23,15 @@ from django.utils import timezone
 from live.context import system_context
 from live.errors import OperationError
 
-from apps.sale.models import Order, OrderLine, Sale, SaleCounter
+from apps.sale.models import (
+    Department,
+    Order,
+    OrderLine,
+    PaymentMethod,
+    Refund,
+    Sale,
+    SaleCounter,
+)
 from apps.sale.tests.conftest import A, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -652,3 +662,235 @@ def test_a_merge_and_the_hub_admin_deleting_both_checks_never_wait_in_a_circle(c
         assert (written.status, written.code) == (404, "sale.order_not_found")
     else:
         assert not isinstance(written, Exception), written
+
+
+# ── The Hub admin's «Delete» of a department or a payment method that a write names ─────────────────
+#
+# An open-price line points at its department and a tender at its payment method (``PROTECT``). A write read the
+# row and then wrote what points at it; Django's «Delete» checked what protects the row before the write committed
+# and deleted it after: the write failed at its COMMIT (``IntegrityError``, a 500 at the till), or the deletion did
+# when the write committed first. The write holds the row (``FOR KEY SHARE``) and the deletion locks it before it
+# checks (``lock_rows``): whichever comes second waits. The deletion then answers «Cannot delete», or the write
+# refuses the row as one that never was (its 422 or 409 for an unknown one).
+
+
+def a_department(name: str = "Fruit") -> Department:
+    """A department of the open price that no line names yet."""
+    made = run("sale.department.create", {"name": name, "tax_category_key": "product.super_reduced"})
+    return Department.objects.get(pk=made.id)
+
+
+def a_method(name: str = "Bizum") -> PaymentMethod:
+    """A payment method that no tender names yet."""
+    made = run("sale.payment_method.create", {"name": name, "type": "other"})
+    return PaymentMethod.objects.get(pk=made.id)
+
+
+def inserts(table: str) -> Callable[[str], bool]:
+    """Whether a statement writes rows of ``table``."""
+    return lambda sql: sql.startswith(f'INSERT INTO "{table}"')
+
+
+def reads(table: str) -> Callable[[str], bool]:
+    """Whether a statement reads rows of ``table`` (the deletion looking for what protects a row)."""
+    return lambda sql: sql.startswith("SELECT") and f'FROM "{table}"' in sql
+
+
+def open_price(department: Department, cents: int = 250) -> dict:
+    return {"department_id": str(department.id), "unit_price": cents}
+
+
+def _open_price_on_a_check(department):
+    check = a_check()
+    return lambda: run("sale.order.add_open_line", {"order_id": str(check.id), **open_price(department)})
+
+
+#: Writes that name a department for the open-price line they add; each is prepared before the race and returns
+#: the call that writes.
+DEPARTMENT_WRITES = {
+    "an open-price line added to a check": _open_price_on_a_check,
+    "a check opened with an open-price line": lambda department: lambda: run(
+        "sale.order.open", {"open_lines": [open_price(department)]}
+    ),
+    "a counter sale of an open-price line": lambda department: charge(
+        "admin-race-open-price", open_lines=[open_price(department)]
+    ),
+}
+
+
+def _charge_of_a_check(method):
+    check = a_check()
+    return charge("admin-race-method-check", order_id=str(check.id), payments=[{"method_id": str(method.id)}])
+
+
+def _refund_by(method):
+    sale = charge("admin-race-method-sold", lines=[{"product": "COF"}])()
+    allocation = {"payment_id": str(sale.payments[0].id), "amount": 150, "to_method_id": str(method.id)}
+    return lambda: run("sale.sale.refund", {"sale_id": str(sale.id), "reason": "back", "allocations": [allocation]})
+
+
+#: Writes that name a payment method for the tender they record: how each is prepared, the table of that tender and
+#: the code it gives for a method that is not there.
+METHOD_WRITES = {
+    "a charge of a check": (_charge_of_a_check, "sale_salepayment", "sale.payment_method_not_available"),
+    "a counter sale": (
+        lambda method: charge(
+            "admin-race-method-counter", lines=[{"product": "COF"}], payments=[{"method_id": str(method.id)}]
+        ),
+        "sale_salepayment",
+        "sale.payment_method_not_available",
+    ),
+    "a refund by another method": (_refund_by, "sale_refundpayment", "sale.refund_method_unavailable"),
+}
+
+
+def cannot_delete(answer, model, rows: int = 1) -> None:
+    """The deletion answered «Cannot delete» the ``rows`` rows of ``model``, each protected by what a write wrote."""
+    assert not isinstance(answer, Exception), answer
+    name = model._meta.verbose_name if rows == 1 else model._meta.verbose_name_plural
+    assert (answer.status_code, str(answer.context["title"])) == (200, f"Cannot delete {name}")
+    assert len(answer.context["protected"]) == rows
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(DEPARTMENT_WRITES))
+def test_the_hub_admin_cannot_delete_a_department_a_write_names_once_it_is_written(coffee, hub_staff, write, how):
+    fruit = a_department()
+    written = DEPARTMENT_WRITES[write](fruit)
+    with meanwhile(inserts("sale_orderline"), admin_delete(hub_staff, how, fruit)) as answers:
+        written()
+    [answer] = answers
+    cannot_delete(answer, Department)
+    assert Department.objects.filter(pk=fruit.id).exists()
+    assert OrderLine.objects.filter(department=fruit).count() == 1
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(DEPARTMENT_WRITES))
+def test_a_write_naming_a_department_the_hub_admin_deletes_refuses_it_as_unknown(coffee, hub_staff, write, how):
+    fruit = a_department()
+    written = DEPARTMENT_WRITES[write](fruit)
+    lines, sales = OrderLine.objects.count(), Sale.objects.count()
+    with meanwhile(reads("sale_orderline"), written) as outcomes:
+        answer = admin_delete(hub_staff, how, fruit)()
+    assert answer.status_code == 302
+    [outcome] = outcomes
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code, set(outcome.fields)) == (422, "invalid_field", {"department_id"})
+    assert not Department.objects.filter(pk=fruit.id).exists()
+    assert (OrderLine.objects.count(), Sale.objects.count()) == (lines, sales)
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(METHOD_WRITES))
+def test_the_hub_admin_cannot_delete_a_payment_method_a_write_names_once_it_is_written(coffee, hub_staff, write, how):
+    prepare, table, _code = METHOD_WRITES[write]
+    bizum = a_method()
+    written = prepare(bizum)
+    with meanwhile(inserts(table), admin_delete(hub_staff, how, bizum)) as answers:
+        written()
+    [answer] = answers
+    cannot_delete(answer, PaymentMethod)
+    assert PaymentMethod.objects.filter(pk=bizum.id).exists()
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(METHOD_WRITES))
+def test_a_write_naming_a_payment_method_the_hub_admin_deletes_refuses_it_as_unknown(coffee, hub_staff, write, how):
+    prepare, table, code = METHOD_WRITES[write]
+    bizum = a_method()
+    written = prepare(bizum)
+    sales, refunds = Sale.objects.count(), Refund.objects.count()
+    # The write starts as the deletion looks for the tenders like the one it records.
+    with meanwhile(reads(table), written) as outcomes:
+        answer = admin_delete(hub_staff, how, bizum)()
+    assert answer.status_code == 302
+    [outcome] = outcomes
+    assert isinstance(outcome, OperationError), outcome
+    assert (outcome.status, outcome.code) == (409, code)
+    assert not PaymentMethod.objects.filter(pk=bizum.id).exists()
+    assert (Sale.objects.count(), Refund.objects.count()) == (sales, refunds)
+
+
+def _two(make) -> tuple:
+    """Two rows by ``make``, by id, whose names sort the other way round: the tables read in position and name
+    order unless told otherwise, so only an explicit id order takes them first-then-second."""
+    return make("Zeta"), make("Alpha")
+
+
+@pytest.mark.parametrize("first_in_line", ["deletion", "write"])
+def test_a_sale_and_the_hub_admin_deleting_both_its_departments_never_wait_in_a_circle(
+    coffee, hub_staff, first_in_line
+):
+    first, second = _two(a_department)
+    # The sale and the list name them the other way round from their ids.
+    sale = charge("admin-race-two-departments", open_lines=[open_price(second), open_price(first)])
+    deletion = admin_delete(hub_staff, "list", second, first)
+    if first_in_line == "deletion":
+        deleted, written = in_turn(first, deletion, sale)
+    else:
+        written, deleted = in_turn(first, sale, deletion)
+    assert not isinstance(deleted, Exception), deleted
+    assert not isinstance(written, Exception) or isinstance(written, OperationError), written
+    if first_in_line == "deletion":
+        assert deleted.status_code == 302
+        assert (written.status, written.code) == (422, "invalid_field")
+        assert not Department.objects.filter(pk__in=[first.id, second.id]).exists()
+    else:
+        cannot_delete(deleted, Department, rows=2)
+        assert OrderLine.objects.filter(sale_id=written.id).count() == 2
+
+
+@pytest.mark.parametrize("first_in_line", ["deletion", "write"])
+def test_a_sale_and_the_hub_admin_deleting_both_its_payment_methods_never_wait_in_a_circle(
+    coffee, hub_staff, first_in_line
+):
+    first, second = _two(a_method)
+    # The sale and the list name them the other way round from their ids.
+    payments = [{"method_id": str(second.id), "amount": 100}, {"method_id": str(first.id)}]
+    sale = charge("admin-race-two-methods", lines=[{"product": "COF"}], payments=payments)
+    deletion = admin_delete(hub_staff, "list", second, first)
+    if first_in_line == "deletion":
+        deleted, written = in_turn(first, deletion, sale)
+    else:
+        written, deleted = in_turn(first, sale, deletion)
+    assert not isinstance(deleted, Exception), deleted
+    assert not isinstance(written, Exception) or isinstance(written, OperationError), written
+    if first_in_line == "deletion":
+        assert deleted.status_code == 302
+        assert (written.status, written.code) == (409, "sale.payment_method_not_available")
+        assert not PaymentMethod.objects.filter(pk__in=[first.id, second.id]).exists()
+    else:
+        cannot_delete(deleted, PaymentMethod, rows=2)
+        assert Sale.objects.get(pk=written.id).payments.count() == 2
+
+
+@pytest.mark.parametrize("make", [a_department, a_method], ids=["department", "payment method"])
+def test_the_hub_admin_delete_page_of_a_row_a_write_holds_does_not_wait(coffee, hub_staff, make):
+    """The delete page of a department or a payment method (a GET, before the staff confirm) does not lock it: it
+    answers while a write still holds it; only the confirmed deletion (a POST) waits for the write."""
+    row = make()
+    meta = type(row)._meta
+    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
+    outcome: list = []
+
+    def other():
+        try:
+            outcome.append(hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
+        except Exception as error:  # reported to the test
+            outcome.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=other)
+    with transaction.atomic():
+        list(type(row).objects.select_for_update().filter(pk=row.pk))
+        thread.start()
+        thread.join(WAIT_LIMIT)
+        answered_while_held = not thread.is_alive()
+    thread.join(30)
+    assert answered_while_held, "the delete page waited for the write that held the row"
+    [answer] = outcome
+    assert not isinstance(answer, Exception), answer
+    assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
+    assert type(row).objects.filter(pk=row.pk).exists()

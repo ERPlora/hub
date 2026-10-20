@@ -1334,8 +1334,12 @@ administrador y responsable, los mismos que anulan y devuelven).
   que dejó (la línea añadida o partida, las líneas que trajo una unión) o responde «No se puede eliminar»
   si un cobro ya la cobró; las líneas que una división o una unión se llevó a otra cuenta siguen allí, y la
   escritura que llega después no la encuentra (`sale.order_not_found`). Unir dos cuentas las bloquea con
-  el mismo `lock_orders`: nunca se esperan en círculo con «Eliminar seleccionados»
-  (`tests/test_concurrency.py`).
+  el mismo `lock_orders`: nunca se esperan en círculo con «Eliminar seleccionados». «Eliminar» una sección o un
+  método de pago bloquea antes sus filas (`lock_rows`, por id), y la escritura que los nombra (la línea de precio
+  libre que se añade, abre una cuenta o va en un cobro de mostrador; el pago de un cobro; la devolución por otro
+  método) los retiene con `FOR KEY SHARE` (`held`, también por id) antes de escribir lo que los apunta: el borrado
+  espera y responde «No se puede eliminar», o la escritura que llega después recibe lo mismo que con una sección
+  (422 en su campo) o un método (409) que no existen (`tests/test_concurrency.py`).
 - **Numeración**: `SaleCounter` por día del negocio (zona horaria del Hub) con `UPDATE … RETURNING`
   (asignar `F("last") + 1` y guardar: Django devuelve el valor con `RETURNING`), en la transacción del
   cobro: un rechazo no gasta número y nunca hay huecos. `AAAAMMDD-NNNN`, cuatro cifras como mínimo
