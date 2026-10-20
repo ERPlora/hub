@@ -133,7 +133,9 @@ describe('ClockPage (ATTENDANCE-F01, F02)', () => {
     const rows = s.wrapper.findAll('[data-testid="attendance-clock-recent-row"]').map((row) => row.text());
     expect(rows).toHaveLength(2);
     expect(rows[0]).toContain('09:00 – …');
-    expect(rows[0]).toContain('In progress');
+    // attendance#18: a status reads the same here as in Records (its column and its filter).
+    expect(rows[0]).toContain('Open');
+    expect(rows[0]).not.toContain('In progress');
     expect(rows[1]).toContain('09:00 – 17:00');
     expect(rows[1]).toContain('7:30');
     expect(rows[1]).toContain('Closed');
@@ -253,6 +255,10 @@ describe('ClockPage (ATTENDANCE-F01, F02)', () => {
     expect(s.text('attendance-clock-greeting')).toBe('Hola, Ana López');
     expect(s.text('attendance-clock-status')).toBe('Dentro desde las 09:00');
     expect(s.text('attendance-clock-out')).toContain('Fichar salida');
+    // attendance#18: «Abierta», as Records names it, never «En curso».
+    const rows = s.wrapper.findAll('[data-testid="attendance-clock-recent-row"]').map((row) => row.text());
+    expect(rows[0]).toContain('Abierta');
+    expect(rows[0]).not.toContain('En curso');
   });
 });
 

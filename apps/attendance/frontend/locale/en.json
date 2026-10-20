@@ -55,11 +55,6 @@
       "unlinked": {
         "title": "Your user is not linked to any staff record",
         "message": "Ask a manager to link it in Staff to clock in."
-      },
-      "status": {
-        "open": "In progress",
-        "closed": "Closed",
-        "needs_review": "Needs review"
       }
     },
     "records": {
