@@ -861,7 +861,7 @@ def test_a_refused_command_notifies_nobody(listen, person):
 
 
 # A forgotten day is not closed as a 24-hour day: it waits for a manager's correction (review of
-# 2026-10-15, finding 1). Phase 1 has no worker running the review, so the commands judge it themselves.
+# 2026-10-15, finding 1). The commands judge it themselves, without waiting for the worker's review.
 
 
 @pytest.mark.parametrize("name", ["attendance.record.clock_out", "attendance.break.start", "attendance.break.end"])

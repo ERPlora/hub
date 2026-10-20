@@ -225,8 +225,8 @@ def review_hours() -> int:
 def is_stale(record: Record, hours: int, now: dt.datetime) -> bool:
     """An open day older than ``hours``: a forgotten clock-out (ATTENDANCE-F05).
 
-    It reads as waiting for review whether or not the scheduled review has flagged it yet (phase 1 has
-    no worker): it never counts «until now», and only a manager's correction closes it.
+    It reads as waiting for review whether or not the worker's review (every quarter of an hour) has
+    flagged it yet: it never counts «until now», and only a manager's correction closes it.
     """
     return record.status == Record.Status.OPEN and record.clock_in_at + dt.timedelta(hours=hours) < now
 

@@ -111,17 +111,24 @@ const breakMinutes = (row: RecordOut): number =>
 const columns = computed<DataTableColumn<RecordOut>[]>(() => [
   { key: 'work_date', label: t('attendance.records.columns.date'), sortable: true, priority: 'high', format: (_, row) => formatDay(row.work_date, locale.value) },
   ...(team.value
-    ? [{ key: 'member_name', label: t('attendance.records.columns.person'), sortable: true, priority: 'high' } as DataTableColumn<RecordOut>]
+    ? [
+        // A whole name, so two people of the team never read the same («María G…»).
+        { key: 'member_name', label: t('attendance.records.columns.person'), sortable: true, priority: 'high', width: 'minmax(10rem, 2fr)' } as DataTableColumn<RecordOut>,
+      ]
     : []),
   { key: 'clock_in_at', label: t('attendance.records.columns.in'), sortable: true, format: (_, row) => timeOfDay(row.clock_in_at, row.work_date, locale.value) },
   { key: 'clock_out_at', label: t('attendance.records.columns.out'), sortable: true, format: (_, row) => timeOfDay(row.clock_out_at, row.work_date, locale.value) },
-  { key: 'break_minutes', label: t('attendance.records.columns.breaks'), align: 'right', format: (_, row) => String(breakMinutes(row)) },
+  // Yields before the rest when the list is narrow (the worked time already takes the breaks off); the
+  // cards and the column chooser still show it.
+  { key: 'break_minutes', label: t('attendance.records.columns.breaks'), align: 'right', priority: 'low', format: (_, row) => String(breakMinutes(row)) },
   { key: 'worked', label: t('attendance.records.columns.worked'), align: 'right', cell: 'worked' },
   {
     key: 'status',
     label: t('attendance.records.columns.status'),
     sortable: true,
     cell: 'status',
+    // Room for «Needs review» / «Por revisar» on one line.
+    width: 'minmax(7.5rem, 1fr)',
     filter: { type: 'select', options: STATUSES.map((value) => ({ value, label: t(`attendance.status.${value}`) })) },
   },
   { key: 'location', label: t('attendance.records.columns.location'), cell: 'location', priority: 'low' },

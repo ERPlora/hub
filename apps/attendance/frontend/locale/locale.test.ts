@@ -75,10 +75,10 @@ describe('attendance catalogues (en source + es)', () => {
     }
   });
 
-  it('name every status the server knows, in the records and on the clock', () => {
+  it('name every status the server knows once, for Records and Clock in alike (attendance#18)', () => {
     for (const status of ['open', 'closed', 'needs_review']) {
       expect(EN.has(`attendance.status.${status}`), status).toBe(true);
-      expect(EN.has(`attendance.clock.status.${status}`), status).toBe(true);
+      expect(EN.has(`attendance.clock.status.${status}`), status).toBe(false);
     }
   });
 
@@ -96,7 +96,6 @@ describe('attendance catalogues (en source + es)', () => {
       ['attendance.clock.breakEnd', 'End break', 'Terminar pausa'],
       ['attendance.clock.clockedIn', 'Clocked in at {time}.', 'Entrada fichada a las {time}.'],
       ['attendance.clock.recent', 'Recent days', 'Últimas jornadas'],
-      ['attendance.clock.status.open', 'In progress', 'En curso'],
       ['attendance.status.open', 'Open', 'Abierta'],
       ['attendance.status.needs_review', 'Needs review', 'Por revisar'],
       ['attendance.records.columns.breaks', 'Breaks (min)', 'Pausas (min)'],

@@ -3,7 +3,7 @@
 // radius when the business asks for it. Whether a device is one or the other is the platform's to say,
 // with the PIN and the trusted device (`base`, phase 2): until it does, every device clocks as the
 // shared one — the strict fallback of the old module (an unknown mode never asks for a location).
-// The server applies the radius to whatever an API client or the assistant declares `personal`.
+// The server decides the mode on its own (`services.device_source`), never from what a request says.
 import type { Source } from '../operations';
 
 export function deviceMode(): Source {

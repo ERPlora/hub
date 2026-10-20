@@ -398,7 +398,7 @@ function endOf(day: RecordOut): string {
                   <StatusPill
                     size="sm"
                     :tone="TONE[day.status]"
-                    :label="t(`attendance.clock.status.${day.status}`)"
+                    :label="t(`attendance.status.${day.status}`)"
                   />
                 </div>
               </li>

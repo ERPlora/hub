@@ -50,6 +50,8 @@ const original = ref<Form | null>(null);
 const touched = ref<ReadonlySet<keyof Form>>(new Set());
 const saved = ref(false);
 const problem = ref('');
+/** What the screen judged wrong before sending, by field (WORKBOOK ATTENDANCE-F04: «se señalan en su campo»). */
+const judged = ref<Partial<Record<keyof Form, string>>>({});
 const accuracy = ref<number | null>(null);
 const locating = ref(false);
 
@@ -88,28 +90,33 @@ function set<K extends keyof Form>(field: K, value: Form[K]): void {
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
   problem.value = '';
+  // Fixing a field lifts its mark; the coordinates are judged as a pair.
+  const pair: (keyof Form)[] = field === 'workplace_lat' || field === 'workplace_lng' ? ['workplace_lat', 'workplace_lng'] : [field];
+  if (pair.some((key) => key in judged.value)) {
+    judged.value = Object.fromEntries(Object.entries(judged.value).filter(([key]) => !pair.includes(key as keyof Form)));
+  }
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
+const fieldErrors = computed<Readonly<Record<string, string>>>(() => ({ ...(saveError.value?.fields ?? {}), ...judged.value }));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 const workplaceMissing = computed(() => !!form.value?.require_location && (!form.value.workplace_lat.trim() || !form.value.workplace_lng.trim()));
 
-/** The changes to send, or the key of the first thing wrong with the form. */
-function changes(): { ok: true; value: SettingsIn } | { ok: false; key: string } {
+/** The changes to send, or the first thing wrong with the form: its field and its message's key. */
+function changes(): { ok: true; value: SettingsIn } | { ok: false; field: keyof Form; key: string } {
   const now = form.value!;
   const was = original.value!;
   const lat = now.workplace_lat.trim();
   const lng = now.workplace_lng.trim();
-  if (!!lat !== !!lng) return { ok: false, key: 'attendance.settings.coordinatesIncomplete' };
+  if (!!lat !== !!lng) return { ok: false, field: lat ? 'workplace_lng' : 'workplace_lat', key: 'attendance.settings.coordinatesIncomplete' };
   const latN = lat ? Number(lat) : null;
   const lngN = lng ? Number(lng) : null;
-  if (latN !== null && !(Number.isFinite(latN) && Math.abs(latN) <= 90)) return { ok: false, key: 'attendance.settings.invalidLatitude' };
-  if (lngN !== null && !(Number.isFinite(lngN) && Math.abs(lngN) <= 180)) return { ok: false, key: 'attendance.settings.invalidLongitude' };
+  if (latN !== null && !(Number.isFinite(latN) && Math.abs(latN) <= 90)) return { ok: false, field: 'workplace_lat', key: 'attendance.settings.invalidLatitude' };
+  if (lngN !== null && !(Number.isFinite(lngN) && Math.abs(lngN) <= 180)) return { ok: false, field: 'workplace_lng', key: 'attendance.settings.invalidLongitude' };
   const hoursText = now.auto_close_after_hours.trim();
   const hours = Number(hoursText);
-  if (!/^\d+$/.test(hoursText) || hours < 1 || hours > 24) return { ok: false, key: 'attendance.settings.invalidAutoClose' };
+  if (!/^\d+$/.test(hoursText) || hours < 1 || hours > 24) return { ok: false, field: 'auto_close_after_hours', key: 'attendance.settings.invalidAutoClose' };
   const out: SettingsIn = {};
   if (now.require_location !== was.require_location) out.require_location = now.require_location;
   if (now.geofence_radius_m !== was.geofence_radius_m) out.geofence_radius_m = Number(now.geofence_radius_m) as Radius;
@@ -124,9 +131,10 @@ function changes(): { ok: true; value: SettingsIn } | { ok: false; key: string }
 async function save(): Promise<void> {
   if (!canEdit.value || !form.value || pending.value) return;
   saved.value = false;
+  judged.value = {};
   const next = changes();
   if (!next.ok) {
-    problem.value = t(next.key);
+    judged.value = { [next.field]: t(next.key) };
     return;
   }
   if (Object.keys(next.value).length === 0) {
@@ -389,6 +397,10 @@ async function useMyLocation(): Promise<void> {
 .attendance-settings {
   display: grid;
   gap: 1.1rem;
+}
+/* The toggle's long label wraps: on one line it pushed the whole form past a phone's edge. */
+.attendance-settings ion-toggle::part(label) {
+  white-space: normal;
 }
 .attendance-settings header h2 {
   margin: 0;

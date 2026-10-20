@@ -1,8 +1,8 @@
 # Workbook — Control horario (app)
 Prefijo: ATTENDANCE
 Alcance MVP: transversal (lo necesitan la peluquería y el restaurante: todo negocio con empleados)
-Estado de la app: hecha (servidor y páginas); el panel de Inicio y el modo del dispositivo esperan a la
-plataforma (ver «Lo que queda fuera»)
+Estado de la app: hecha (servidor y páginas); el panel de Inicio, el modo del dispositivo y el aviso de
+la baja en Personal esperan a la plataforma (ver «Lo que queda fuera»)
 
 > Manual de usuario y especificación de la app `attendance`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -62,8 +62,8 @@ Se llega desde el menú de la app, «Fichar». Arriba, «Hola, <nombre>» y «So
 el estado («No has fichado la entrada», «Dentro desde las 09:00», «En pausa desde las 13:00»), el
 tiempo que lleva desde la entrada, que corre solo, y el botón grande del momento: «Fichar entrada», o
 «Empezar pausa» / «Terminar pausa» y «Fichar salida». A la derecha (debajo en el móvil), «Hoy»
-(Trabajado y Pausas, que corren solos) y «Últimas jornadas» (las diez últimas, con su estado: «En
-curso», «Cerrada», «Por revisar»). La puede abrir cualquier persona del equipo.
+(Trabajado y Pausas, que corren solos) y «Últimas jornadas» (las diez últimas, con su estado: «Abierta»,
+«Cerrada» o «Por revisar», igual que en Registros). La puede abrir cualquier persona del equipo.
 
 ### Registros
 Se llega desde el menú de la app, «Registros». Una tabla de las jornadas del mes elegido: Fecha,
@@ -71,7 +71,9 @@ Persona, Entrada, Salida, Pausas (min), Trabajado, Estado y Ubicación, con las 
 «Historial» en cada fila; en el móvil, tarjetas. Un empleado ve solo las suyas (sin columna Persona,
 con «Historial»); el responsable ve las de todo el equipo con los filtros «Persona» (con buscador),
 «Mes» y «Estado», y encima de la tabla «Fichados ahora»: cuántas personas tienen la jornada abierta y
-quiénes, desde qué hora y si están en pausa. Arriba, «Exportar CSV».
+quiénes, desde qué hora y si están en pausa. Arriba, «Exportar CSV». En una pantalla estrecha,
+«Ubicación» y «Pausas (min)» ceden su sitio primero (siguen en las tarjetas y en «Columnas»); el nombre
+de cada persona y su estado se leen enteros.
 
 ### Ajustes
 La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal», «Radio
@@ -107,9 +109,11 @@ no está activa en este negocio» si se apaga y «No tienes permiso» si el pape
 | ATTENDANCE-F10 | Sacar el mes en CSV para la gestoría o la Inspección | común | hecho |
 | ATTENDANCE-F11 | Ver quién está fichado ahora | común | hecho (en Registros; el panel de Inicio espera al Hub) |
 | ATTENDANCE-F12 | Fichar la entrada o la salida de otra persona | común | hecho (asistente y API) |
-| ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | hecho |
+| ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | parcial: el aviso de la baja llega con el relay del outbox (fase 2) |
 
 ### ATTENDANCE-F01 Fichar la entrada al llegar y la salida al irse
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f01 qa:modules/attendance/clock-in-and-out gh:attendance#1 gh:attendance#11 gh:attendance#18 gh:hub#2553 -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
 Pasos:
@@ -126,12 +130,16 @@ Sale: la jornada guardada con la hora del servidor, abierta al entrar y cerrada 
 de entrada y de salida; «Fichados ahora» sube y baja.
 Si falla: fichar la entrada con una jornada ya abierta se rechaza con «Ya tienes una jornada abierta:
 ficha la salida antes de volver a entrar.» y la pantalla enseña la jornada abierta (dos toques a la
-vez dejan una sola jornada); sin ficha vinculada, «Tu usuario no está vinculado a ninguna ficha de
-Personal: pide a un responsable que la vincule en Personal.»; con la ficha inactiva o de baja temporal,
+vez dejan una sola jornada); sin ficha vinculada, «Tu usuario no está vinculado a ninguna
+ficha de Personal: pide a un responsable que la vincule en Personal.»; con la ficha inactiva o de baja
+temporal,
 «Esa ficha de Personal no está activa (inactiva o de baja temporal): no puede fichar la entrada.» (la
 salida sí se ficha); sin conexión, el error y «Reintentar».
+Implicados: STAFF-F03, ATTENDANCE-F05, ATTENDANCE-F11
 
 ### ATTENDANCE-F02 Hacer una pausa sin salir de la jornada
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f02 qa:modules/attendance/take-a-break -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
 Pasos:
@@ -147,8 +155,10 @@ Si falla: sin jornada abierta, «No hay ninguna jornada abierta: ficha la entrad
 pausa ya en curso, «Ya hay una pausa en curso.»; terminar una pausa que no existe, «No hay ninguna
 pausa en curso que terminar.»; en una jornada olvidada (ATTENDANCE-F05), «Esta jornada lleva abierta más
 de 12 horas y está por revisar…».
+Implicados: ATTENDANCE-F01, ATTENDANCE-F05
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f03 qa:modules/attendance/clock-in-from-mobile-with-location gh:attendance#2 gh:hub#2552 gh:hub#2554 -->
 Estado: parcial — saber si un dispositivo es el TPV compartido o el móvil de alguien es de la
 plataforma, que lo traerá con el PIN y el dispositivo de confianza (fase 2), y nunca lo dice la petición
 (ni la pantalla, ni el asistente, ni la API). Hasta entonces todo dispositivo ficha como el compartido,
@@ -176,8 +186,11 @@ local fijada, «Aún no se ha fijado la ubicación del lugar de trabajo…»; si
 ubicación para fichar desde este dispositivo…»; si el GPS tarda más de 15 segundos, «Obtener tu
 posición ha tardado demasiado. Vuelve a intentarlo.». En todos los casos no se ficha y se puede fichar
 en el mostrador.
+Implicados: ATTENDANCE-F04
 
 ### ATTENDANCE-F04 Ajustar la ubicación del local y cuándo se revisa una jornada olvidada
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f04 gh:attendance#4 gh:hub#2588 -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Ajustes
 Pasos:
@@ -196,8 +209,11 @@ Si falla: una latitud o longitud fuera de rango, solo una de las dos o unas hora
 de 1 a 24 se señalan en su campo; con la ubicación pedida y el local sin fijar, avisa «Fija la
 ubicación del lugar de trabajo o nadie podrá fichar desde un dispositivo personal.»; quien no es
 responsable ve los ajustes en solo lectura.
+Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f05 gh:attendance#13 gh:attendance#15 gh:hub#2612 gh:hub#2681 -->
+Estado: hecho (servidor, tarea del worker y pantalla)
 Actor: sistema
 Pantalla: ninguna (la insignia «Por revisar» sale en Fichar y en Registros)
 Pasos:
@@ -215,27 +231,33 @@ Entra: las horas de ATTENDANCE-F04.
 Sale: la jornada en estado «Por revisar»; el aviso de jornada marcada (solo de las que se marcan).
 Si falla: si la tarea no corre, la jornada se ve igual «Por revisar» y se marca cuando la persona
 vuelve a fichar.
+Implicados: ATTENDANCE-F04, ATTENDANCE-F08
 
 ### ATTENDANCE-F06 Ver mis jornadas del mes y quién las corrigió
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f06 gh:attendance#8 -->
+Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquiera, para las suyas)
 Pantalla: Registros
 Pasos:
 1. Abre Control horario → «Registros»: ve sus jornadas del mes en curso, sin elegir persona.
 2. En «Mes» puede elegir cualquiera de los últimos cuatro años.
-3. La jornada abierta sale con «En curso» y el tiempo trabajado hasta ahora; la que falta por cerrar,
-   «Por revisar».
+3. La jornada abierta sale «Abierta», con el tiempo trabajado hasta ahora marcado «En curso»; la que
+   falta por cerrar, «Por revisar».
 4. Una jornada corregida sale con las horas nuevas; «Historial» enseña quién la corrigió, cuándo, el
    antes y el después y el motivo.
 Entra: sus jornadas y sus pausas.
 Sale: nada; solo lee.
 Si falla: «No se han podido cargar las jornadas.» y «Reintentar».
+Implicados: ATTENDANCE-F09, ATTENDANCE-F10
 
 ### ATTENDANCE-F07 Ver las jornadas de todo el equipo
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f07 gh:attendance#10 gh:attendance#14 gh:attendance#6 -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
 Pasos:
-1. Abre Control horario → «Registros»: ve las jornadas del mes de todo el equipo, con el nombre de
-   cada persona (también de quien ya se dio de baja: sus jornadas se guardan cuatro años).
+1. Abre Control horario → «Registros»: ve las jornadas del mes de todo el equipo, con el nombre entero
+   de cada persona (también de quien ya se dio de baja: sus jornadas se guardan cuatro años).
 2. Filtra por «Persona» (busca por nombre), «Mes» y «Estado» («Abierta», «Cerrada», «Por revisar»),
    y ordena por fecha, entrada, salida, persona o estado.
 3. En «Ubicación» ve si la entrada y la salida se ficharon dentro del radio del local, o «Sin
@@ -243,8 +265,11 @@ Pasos:
 Entra: las jornadas y pausas de todos; los nombres, de las fichas de Personal.
 Sale: nada; solo lee.
 Si falla: «No se han podido cargar las jornadas.» y «Reintentar».
+Implicados: STAFF-F06, ATTENDANCE-F08, ATTENDANCE-F09, ATTENDANCE-F10, ATTENDANCE-F11
 
 ### ATTENDANCE-F08 Corregir una jornada mal fichada, con su motivo
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f08 qa:modules/attendance/correct-a-workday gh:attendance#12 -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
 Pasos:
@@ -264,8 +289,11 @@ que acabó la anterior); «Esa persona ya tiene otra jornada abierta: no se pued
 hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.».
 Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
 corregir.
+Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 Ver quién cambió una jornada, cuándo y por qué
+<!-- origen: qa:modules/attendance/correct-a-workday old:attendance/WORKFLOW.md#attendance-f09 -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable; el empleado, de las suyas
 Pantalla: Registros
 Pasos:
@@ -276,8 +304,11 @@ Pasos:
 Entra: las correcciones de ATTENDANCE-F08 y ATTENDANCE-F13.
 Sale: nada; el historial no se puede editar ni borrar.
 Si falla: «No se ha podido cargar el historial.».
+Implicados: ATTENDANCE-F08, ATTENDANCE-F13
 
 ### ATTENDANCE-F10 Sacar el mes en CSV para la gestoría o la Inspección
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f10 qa:modules/attendance/export-the-month-as-csv gh:attendance#3 gh:attendance#5 -->
+Estado: hecho (servidor y pantalla)
 Actor: todos (el empleado, solo sus jornadas)
 Pantalla: Registros
 Pasos:
@@ -292,8 +323,11 @@ Sale: el fichero descargado en el dispositivo; nada se guarda en el Hub.
 Si falla: un mes sin jornadas descarga solo la cabecera y avisa «No hay jornadas con este filtro: el
 fichero solo lleva la cabecera.»; si la descarga falla, «No se ha podido exportar el CSV. Inténtalo de
 nuevo.».
+Implicados: ATTENDANCE-F06, ATTENDANCE-F07
 
 ### ATTENDANCE-F11 Ver quién está fichado ahora
+<!-- origen: old:attendance/WORKFLOW.md#attendance-f11 -->
+Estado: hecho (en Registros; el panel de Inicio espera al Hub)
 Actor: propietario, administrador, responsable
 Pantalla: Registros («Fichados ahora»)
 Pasos:
@@ -306,8 +340,11 @@ Pasos:
 Entra: las jornadas abiertas (ATTENDANCE-F01, ATTENDANCE-F08).
 Sale: nada; solo lee.
 Si falla: el aviso de error en su lugar, sin tapar la tabla.
+Implicados: ATTENDANCE-F01, ATTENDANCE-F02, ATTENDANCE-F08
 
 ### ATTENDANCE-F12 Fichar la entrada o la salida de otra persona
+<!-- origen: nuevo (Homebase, Deputy: el encargado ficha a alguien de su equipo) -->
+Estado: hecho (asistente y API)
 Actor: propietario, administrador, responsable
 Pantalla: ninguna (asistente y API)
 Pasos:
@@ -319,8 +356,14 @@ Sale: lo mismo que ATTENDANCE-F01 y ATTENDANCE-F02.
 Si falla: un empleado no puede fichar a otra persona («Solo puedes fichar tu propia entrada y
 salida.»); si el nombre vale para
 varias, se dice cuáles y se pide que elija; si no existe, «Esa persona no existe en Personal.».
+Implicados: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Cerrar la jornada abierta de quien se da de baja
+<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
+Estado: parcial — la reacción está hecha y probada contra Personal real, pero el aviso de la baja le
+llega con el relay del outbox, que es de la plataforma (fase 2). Hasta entonces la jornada abierta
+de quien se da de baja no cuenta en «Fichados ahora» y la cierra un responsable con una corrección
+(ATTENDANCE-F08).
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -331,9 +374,7 @@ Entra: el aviso de Personal `staff.member.terminated`.
 Sale: la jornada cerrada, con su entrada en el historial; el aviso de jornada corregida.
 Si falla: si la persona no tenía jornada abierta, no se hace nada (y una segunda entrega del aviso
 tampoco).
-Nota: la reacción está hecha y probada contra Personal real (`tests/test_integration_staff.py`); la
-entrega automática del aviso es el relay del outbox, que llega con el worker de la fase 2, como las
-reacciones de `inventory`, `customer` o `sale`.
+Implicados: STAFF-F06, ATTENDANCE-F08, ATTENDANCE-F09
 
 ## Servicios: lo que entra y lo que sale
 
@@ -441,8 +482,12 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.
 - La revisión de jornadas olvidadas es la tarea programada `review_stale` (`*/15 * * * *`, `collapse`,
-  en UTC, la corre el worker de la fase 2 como sistema) y la aplica también `clock_in` a la persona que
-  ficha, para no depender del worker.
+  en UTC): la corre el worker como sistema (fase 1, en su ámbito fijo; fase 2, en cada hub;
+  `tests/test_scheduled_review.py` la pasa por `base.scheduler`) y la aplica también `clock_in` a la
+  persona que ficha, para no depender del worker.
+- La reacción a `staff.member.terminated` (ATTENDANCE-F13) está hecha y probada contra Personal real
+  (`tests/test_integration_staff.py`); su entrega automática es el relay del outbox, que llega con el
+  worker de la fase 2, como las reacciones de `inventory`, `customer` o `sale`.
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
   en corregir) y todo campo de entrada lleva `description`.
 - **Admin de Django** (ronda 12, PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
@@ -463,9 +508,18 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   supresión automática no está (como attendance#7 del producto actual).
 - **Iconos propios** (café, play, ubicación, huella): pedidos en `UI-REQUESTS.md`; mientras, iconos
   registrados equivalentes.
-- **Entrega automática de los avisos de otras apps** (ATTENDANCE-F13) y **tarea programada**
-  (ATTENDANCE-F05): las corre el worker de la fase 2 (relay del outbox y tareas por hub). La reacción y la
-  operación están hechas y probadas; mientras tanto, la revisión se aplica al volver a fichar.
+- **Entrega automática del aviso de la baja** (ATTENDANCE-F13): es el relay del outbox de la fase 2. La
+  reacción está hecha y probada; mientras tanto la jornada de quien se da de baja no cuenta en
+  «Fichados ahora» y la cierra un responsable con una corrección (ATTENDANCE-F08).
+- **Varios locales con su propia ubicación** (attendance#4 del producto actual, ATTENDANCE-F04): un Hub es
+  un negocio con una ubicación; varios locales por negocio no existen en la plataforma.
+- **Botón de fichar en la cabecera del TPV** (hub#2553 del producto actual, ATTENDANCE-F01): es de la
+  pantalla de venta; hoy se ficha desde Control horario.
+- **Informe mensual en PDF por persona** (attendance#3) y **la exportación oficial para la Inspección**
+  que traerá el nuevo real decreto (attendance#5), ATTENDANCE-F10: capacidades nuevas (el producto actual
+  tampoco las tenía) y la segunda, sin formato publicado; el CSV cumple el art. 34.9 ET.
+- **Cruzar las horas con la tarifa por hora de Personal** (attendance#6, ATTENDANCE-F07): es nómina, y
+  el fichaje no la calcula (ver «Lo que NO hace»).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -477,8 +531,13 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   servidor.
 - Registros: `useLiveList` + `useServerTable` (ventanas de hasta 100 filas, orden `columna`/`-columna`),
   la persona con `Combo` (busca en `attendance.person.list`), el mes y el estado como filtros; las
-  escrituras con `useCommand`.
-- Ajustes envía solo los campos que la persona tocó y cambió.
+  escrituras con `useCommand`. Pistas de la lista: «Persona» `minmax(10rem, 2fr)` y «Estado»
+  `minmax(7.5rem, 1fr)`, para que un nombre y «Por revisar» se lean enteros; «Pausas (min)» y
+  «Ubicación» con `priority: 'low'` (ceden primero en una caja estrecha, W-19). Lo prueba
+  `tests/e2e/attendance-flows.spec.ts` a 834 y 1440.
+- Ajustes envía solo los campos que la persona tocó y cambió; lo que la pantalla juzga mal antes de
+  enviar va bajo su campo, como el 422 del servidor, y la etiqueta larga del interruptor parte línea
+  para que el formulario quepa en un móvil.
 
 ## Paridad con el producto actual (para quien lo mantiene)
 
