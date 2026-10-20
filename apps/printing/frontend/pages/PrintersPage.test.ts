@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
+import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
 import type { PrinterOut } from '../operations';
@@ -145,6 +146,44 @@ describe('PrintersPage', () => {
     s.table().vm.$emit('action', { actionId: 'edit', row: KITCHEN });
     await flush();
     expect(s.wrapper.findComponent(PrinterModal).props()).toMatchObject({ open: true, printer: KITCHEN });
+  });
+});
+
+describe('PrintersPage: search printers (PRINTING-F02)', () => {
+  const FOUND = { name: 'MTP-II', kind: 'bluetooth', address: 'AA:BB:CC:DD:EE:FF', port: null, paper_width: 58 } as const;
+
+  it('whoever sets printers up searches; the employee does not', async () => {
+    const s = await setup();
+    await s.result(LIST, PAGE);
+    expect(s.find('printing-printers-discover').text()).toBe('Search printers');
+    expect(s.wrapper.findComponent(DiscoverPrintersModal).exists()).toBe(true);
+    const manager = await setup({ session: MANAGER });
+    expect(manager.find('printing-printers-discover').exists()).toBe(true);
+    const employee = await setup({ session: EMPLOYEE });
+    expect(employee.find('printing-printers-discover').exists()).toBe(false);
+    expect(employee.wrapper.findComponent(DiscoverPrintersModal).exists()).toBe(false);
+  });
+
+  it('searches knowing the printers already added, and a printer found opens «New printer» filled in', async () => {
+    const s = await setup();
+    await s.result(LIST, PAGE);
+    await s.find('printing-printers-discover').trigger('click');
+    const discover = () => s.wrapper.findComponent(DiscoverPrintersModal);
+    expect(discover().props()).toMatchObject({ open: true, known: [KITCHEN.target, OFFICE.target, TILL.target] });
+    discover().vm.$emit('add', FOUND);
+    await flush();
+    expect(discover().props('open')).toBe(false);
+    expect(s.wrapper.findComponent(PrinterModal).props()).toMatchObject({ open: true, printer: null, draft: FOUND });
+  });
+
+  it('«Add by its address» opens an empty «New printer»', async () => {
+    const s = await setup();
+    await s.result(LIST, PAGE);
+    await s.find('printing-printers-discover').trigger('click');
+    s.wrapper.findComponent(DiscoverPrintersModal).vm.$emit('manual');
+    await flush();
+    expect(s.wrapper.findComponent(DiscoverPrintersModal).props('open')).toBe(false);
+    expect(s.wrapper.findComponent(PrinterModal).props()).toMatchObject({ open: true, printer: null, draft: null });
   });
 });
 

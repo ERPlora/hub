@@ -97,7 +97,8 @@ di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este o
 - **Impresoras**: la tabla (o tarjetas en el móvil) con Nombre, Función, Conexión, Dirección, Papel,
   Estado y Activa. El estado es «Lista», «Esperando» (tiene trabajos que no salen desde hace más de un
   minuto), «Con errores» (el último intento falló: debajo, «Último error: …») o «Inactiva». Por fila:
-  «Editar», «Probar» y «Desactivar»/«Activar». Arriba, «Añadir impresora». Vacía: «Todavía no hay
+  «Editar», «Probar» y «Desactivar»/«Activar». Arriba, «Buscar impresoras» (PRINTING-F02) y «Añadir
+  impresora». Vacía: «Todavía no hay
   impresoras. Añade la de tu caja con su dirección.». Una nota recuerda que el papel lo saca la app de
   ERPlora del dispositivo que está junto a la impresora; en un navegador añade «un navegador no llega a
   las impresoras», y dentro de la app no habla de navegadores.
@@ -108,8 +109,12 @@ Bluetooth» (Bluetooth), «Nombre de la cola USB» (USB), «Ancho de papel» (80
 sistema; debajo, «Se guarda con la impresora: la app de ERPlora imprime por ahora 32 caracteres por línea,
 sea cual sea el papel.»), «Función» y «Activa», con «Guardar» y «Cancelar».
 
-Quien no puede cambiar impresoras no ve «Añadir impresora», «Editar» ni «Desactivar»; quien no puede
-imprimir no ve «Probar».
+La ventana **Buscar impresoras** lista lo que encuentra la app del dispositivo (nombre, conexión y
+dirección), cada una con «Añadir» o «Ya añadida», con «Buscar otra vez», «Añadir por su dirección» y
+«Cerrar»; mientras busca, «Buscando impresoras…».
+
+Quien no puede cambiar impresoras no ve «Buscar impresoras», «Añadir impresora», «Editar» ni
+«Desactivar»; quien no puede imprimir no ve «Probar».
 
 ### Cola
 Menú **Impresión → Cola**. Título «Cola de impresión». La tabla de trabajos, del más reciente al más
@@ -147,7 +152,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | ID | Flujo | Vertical | Estado |
 |---|---|---|---|
 | PRINTING-F01 | Ver cómo va la impresión | común | hecho |
-| PRINTING-F02 | Encontrar una impresora de la red sin escribir su dirección | común | no hecho: lo hará la app del dispositivo (bloque 6) |
+| PRINTING-F02 | Encontrar una impresora de la red sin escribir su dirección | común | parcial: la app solo busca para el negocio al que está vinculada |
 | PRINTING-F03 | Añadir una impresora por su dirección | común | hecho |
 | PRINTING-F04 | Asignar qué sale por cada impresora | común | hecho |
 | PRINTING-F05 | Hacer una prueba de impresión | común | parcial: el papel sale con `/ws/print` |
@@ -190,20 +195,28 @@ Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08
 
 ### PRINTING-F02 Encontrar una impresora de la red sin escribir su dirección
 <!-- origen: old-hub:HUB_APP-F07 old-hub:HUB_APP-F08 old-hub:HUB_APP-F09 old-hub:HUB_APP-F15 old-hub:HUB_APP-F16 old-hub:HUB_SHELL-F138 old-hub:HUB_SHELL-F140 old-hub:HUB_APP-F13 old-hub:HUB_PERIPHERALS-F01 old-hub:HUB_PERIPHERALS-F03 old:printing/workflow/impresoras.md#printing-f02 qa:modules/printing/discover-printers qa:verticals/restaurant/10-hardware-offline-and-recovery -->
-Estado: no hecho — buscar impresoras (mDNS y barrido del puerto 9100, USB del sistema, Bluetooth
-emparejado) lo hace la app del dispositivo (`erplora_discover_printers`); su puente JavaScript llega a
-`packages/ui` con el bloque 6 (PLAN-HUB §5). Mientras tanto, la impresora se añade por su dirección
-(PRINTING-F03).
+Estado: parcial — la búsqueda está en Impresoras y la hace la app de ERPlora del dispositivo, pero la app
+solo busca para el negocio al que está vinculada, y ese vínculo llega cuando la entrada de las apps en
+erplora.com lo dé; mientras tanto la ventana lo dice y la impresora se añade por su dirección (PRINTING-F03)
 Vertical: común
 Actor: administrador, responsable
 Pantalla: Impresoras
 Pasos:
-1. (Bloque 6) En la app instalada, «Buscar impresoras» lista lo que encuentra el dispositivo.
-2. Elegir una la da de alta con su conexión y su dirección ya rellenas (PRINTING-F03).
+1. En **Impresión → Impresoras**, pulsa «Buscar impresoras».
+2. La app del dispositivo busca en la red (en el móvil, también las Bluetooth emparejadas; en el
+   ordenador, sus colas USB) y lista lo que encuentra: nombre, conexión y dirección. Las que el negocio
+   ya tiene dicen «Ya añadida»; las impresoras de oficina (A4) no se ofrecen.
+3. Pulsa «Añadir» en la que quieras: se abre «Nueva impresora» con su nombre, conexión, dirección y
+   papel ya puestos; elige su «Función» y pulsa «Guardar» (PRINTING-F03).
+4. Si no aparece, «Buscar otra vez» o «Añadir por su dirección».
 Entra: lo que encuentra la app del dispositivo.
-Sale: la impresora dada de alta en el negocio.
+Sale: la impresora dada de alta en el negocio, como en PRINTING-F03.
 Si falla: desde un navegador, «Desde el navegador no se puede buscar impresoras: añádela por su
-dirección.».
+dirección.»; sin permiso para la red local, «La app no tiene permiso para buscar en la red local: dáselo
+en los ajustes del dispositivo y vuelve a buscar.» (nunca una lista vacía); con la app sin vincular, «Esta
+app no está vinculada a este negocio: ábrelo desde la app para buscar sus impresoras.»; si la búsqueda
+falla, «No se pudo buscar impresoras.»; sin resultados, «No se ha encontrado ninguna impresora. Comprueba
+que está encendida y en la misma red, o añádela por su dirección.».
 Implicados: PRINTING-F03
 
 ### PRINTING-F03 Añadir una impresora por su dirección
@@ -710,7 +723,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 | Producto actual | Plataforma nueva | Motivo |
 |---|---|---|
 | Las impresoras viven en el registro de la app de cada dispositivo; el Hub no las conoce | Las impresoras se dan de alta en el negocio (nombre, conexión, dirección, papel, función, activa) | Square y Toast: la impresora es del punto de venta; así la ven todos los dispositivos, la cola sabe a qué impresora va cada trabajo y el asistente las nombra |
-| «Impresoras en la red»: búsqueda automática desde la app | Alta por dirección (F03); la búsqueda vuelve con el puente del bloque 6 (F02) | El puente JavaScript de la app aún no está en `packages/ui` |
+| «Impresoras en la red»: búsqueda automática desde la app | «Buscar impresoras» (F02) pide la lista a la app y abre «Nueva impresora» rellena; alta por dirección (F03) siempre | La app solo busca para el hub vinculado: hasta que el SaaS sirva `/shell/` y `?shell=1` (PLAN-SAAS bloque 3) contesta `not_the_linked_hub` y la ventana lo dice |
 | Una pantalla con tres zonas | Tres pestañas: Impresoras (con el estado), Cola y Ajustes | Patrón de la plataforma (Caja, Impuestos) |
 | Ancho de papel global, guardado y sin efecto | Ancho de papel por impresora, que viaja con el trabajo (`paper_width`) | Duda abierta 2 resuelta como Epson/Star/Square. La app de hoy imprime siempre 32 caracteres por línea (`escpos.rs`, `LINE_WIDTH`): el ancho se guarda y viaja, pero no cambia el papel hasta que la app lo use (`UI-REQUESTS.md`, «App nativa») |
 | Función por dispositivo («host» de un rol) | Función por impresora, y la impresora de cada función en ajustes | La impresora es la que imprime; el dispositivo solo la alcanza |
@@ -737,7 +750,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 | «Cola de impresión»: tarjetas por función, aviso naranja, «Todo al día», error de lectura | **Impresoras**: «Cola de impresión» (`QueueSummary`), en vivo | Sin «Refrescar»: la plataforma refresca sola; sin «Imprime desde N dispositivos» (los dispositivos son de `base`, fase 2) |
 | Trabajos atascados con «Reintentar» y «Descartar» | **Cola**: tabla completa con filtros, «Reintentar» y «Cancelar» con motivo | Se ven todos los trabajos, no solo los atascados; «Retirados recientemente» = filtro «Cancelado» |
 | «Ajustes del ticket»: nota de Ventas y enlace, ancho de papel, tique y cajón al cobrar, «Guardar ajustes» | **Ajustes**: la misma tarjeta con copias y la impresora de cada función | El ancho de papel pasa a cada impresora; el traslado del texto antiguo se retira (F15) |
-| «Impresoras en la red»: búsqueda, rol y «Probar» | **Impresoras**: tabla con función, conexión, dirección, papel, estado y «Probar» | La búsqueda vuelve con el puente del bloque 6 (F02) |
+| «Impresoras en la red»: búsqueda, rol y «Probar» | **Impresoras**: tabla con función, conexión, dirección, papel, estado y «Probar»; «Buscar impresoras» en su ventana | La búsqueda llama a `erplora_discover_printers` de la app (F02) |
 | «Añadir impresora por IP» | «Añadir impresora» (red, USB, Bluetooth o del sistema) | Se guarda en el negocio, no en el dispositivo |
 
 ### Paridad con los tests del módulo actual

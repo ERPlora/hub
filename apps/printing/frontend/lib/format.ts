@@ -58,7 +58,7 @@ export function jobDetail(job: JobOut, t: Translate, now: Date): string {
 }
 
 /** A printer's address as the app reaches it: `ip:port`, the MAC, the queue; none for the system one. */
-export function printerAddress(printer: PrinterOut): string {
+export function printerAddress(printer: Pick<PrinterOut, 'kind' | 'address' | 'port'>): string {
   if (printer.kind === 'system') return '—';
   if (printer.kind === 'network') return `${printer.address}:${printer.port}`;
   return printer.address;

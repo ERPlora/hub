@@ -116,6 +116,21 @@
       "failed": "No se pudo guardar la impresora.",
       "paperHint": "Se guarda con la impresora: la app de ERPlora imprime por ahora 32 caracteres por línea, sea cual sea el papel."
     },
+    "discover": {
+      "action": "Buscar impresoras",
+      "title": "Buscar impresoras",
+      "searching": "Buscando impresoras…",
+      "browser": "Desde el navegador no se puede buscar impresoras: añádela por su dirección.",
+      "denied": "La app no tiene permiso para buscar en la red local: dáselo en los ajustes del dispositivo y vuelve a buscar.",
+      "unlinked": "Esta app no está vinculada a este negocio: ábrelo desde la app para buscar sus impresoras.",
+      "failed": "No se pudo buscar impresoras.",
+      "empty": "No se ha encontrado ninguna impresora. Comprueba que está encendida y en la misma red, o añádela por su dirección.",
+      "add": "Añadir",
+      "added": "Ya añadida",
+      "again": "Buscar otra vez",
+      "manual": "Añadir por su dirección",
+      "close": "Cerrar"
+    },
     "summary": {
       "heading": "Cola de impresión",
       "loadError": "No se pudo leer la cola de impresión.",

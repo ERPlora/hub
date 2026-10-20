@@ -7,13 +7,16 @@
 // Every change comes back through the stream by itself.
 import { DataTable, type DataTableAction, type DataTableColumn, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, toastError, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, HubIcon, toastError, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
+import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
+import type { PrinterDraft } from '../lib/discovery';
 import { printerAddress, printerPaper, printerState, STATE_TONE } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { PrinterOut } from '../operations';
@@ -85,11 +88,17 @@ const actions = computed<DataTableAction<PrinterOut>[]>(() => [
 
 const editing = shallowRef(false);
 const target = shallowRef<PrinterOut | null>(null);
+// «Search printers» (PRINTING-F02): what the device found opens «New printer» filled in.
+const discovering = shallowRef(false);
+const draft = shallowRef<PrinterDraft | null>(null);
+const known = computed(() => rows.value.map((row) => row.target));
 const testing = shallowRef<string | null>(null);
 const toggling = shallowRef<string | null>(null);
 
-function add(): void {
+function add(from: PrinterDraft | null = null): void {
+  discovering.value = false;
   target.value = null;
+  draft.value = from;
   editing.value = true;
 }
 
@@ -120,6 +129,7 @@ async function toggle(row: PrinterOut): Promise<void> {
 function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): void {
   if (actionId === 'edit' && canManage.value) {
     target.value = row;
+    draft.value = null;
     editing.value = true;
   } else if (actionId === 'test' && canPrint.value && row.is_active && !testing.value) void sendTest(row);
   else if (actionId === 'toggle' && canManage.value && !toggling.value) void toggle(row);
@@ -144,12 +154,27 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
       <QueueSummary />
 
       <section class="printing-printers__list page-fill">
-        <h2
-          class="printing-printers__heading"
-          data-testid="printing-printers-heading"
-        >
-          {{ $t('printing.printers.heading') }}
-        </h2>
+        <div class="printing-printers__head">
+          <h2
+            class="printing-printers__heading"
+            data-testid="printing-printers-heading"
+          >
+            {{ $t('printing.printers.heading') }}
+          </h2>
+          <ion-button
+            v-if="canManage"
+            size="small"
+            fill="outline"
+            data-testid="printing-printers-discover"
+            @click="discovering = true"
+          >
+            <HubIcon
+              slot="start"
+              name="ion:search-outline"
+            />
+            {{ $t('printing.discover.action') }}
+          </ion-button>
+        </div>
         <InlineFeedback
           tone="info"
           icon="information-circle-outline"
@@ -183,7 +208,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
           :entity-label="{ one: $t('printing.printers.entity.one'), many: $t('printing.printers.entity.many') }"
           :labels="{ add: $t('printing.printers.add'), loading: $t('printing.printers.loading'), retry: $t('printing.live.retry') }"
           :columns="columns"
-          @add="add"
+          @add="add()"
           @action="onAction"
           @retry="list.refresh()"
         >
@@ -217,6 +242,14 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
       v-if="canManage"
       v-model:open="editing"
       :printer="target"
+      :draft="draft"
+    />
+    <DiscoverPrintersModal
+      v-if="canManage"
+      v-model:open="discovering"
+      :known="known"
+      @add="add"
+      @manual="add()"
     />
   </AppPage>
 </template>
@@ -233,6 +266,13 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
 }
 .printing-printers__list {
   gap: 8px;
+}
+.printing-printers__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 .printing-printers__heading {
   margin: 0;
