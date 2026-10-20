@@ -57,7 +57,8 @@ def test_a_check_opened_and_charged_in_hub_b_notifies_the_channel_of_b_only(list
         {"idempotency_key": "notify-b-0001", "order_id": str(order.id), "payments": [{"method": "cash"}]},
         ctx_for(scope=B),
     )
-    notes = received(on_b, stop_after=2)
+    # Everything B's channel heard in the window, not the first two notices: under load a write may come split.
+    notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     events = {event for _, payload in notes for event in payload["events"]}
     assert {"sale.order.opened", "sale.sale.completed"} <= events
