@@ -117,10 +117,17 @@ def _plain(text: str) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
+_ARTICLES = ("el ", "the ")
+
+
 def _weekday(value: Any) -> Any:
-    if isinstance(value, str) and _plain(value) in _BY_NAME:
-        return _BY_NAME[_plain(value)]
-    return value
+    """A name of the week («lunes», «Monday»), also as spoken: «el lunes», «the Monday»."""
+    if not isinstance(value, str):
+        return value
+    name = _plain(value)
+    for article in _ARTICLES:
+        name = name.removeprefix(article)
+    return _BY_NAME.get(name.strip(), value)
 
 
 Weekday = Annotated[int, BeforeValidator(_weekday), Field(ge=0, le=6)]

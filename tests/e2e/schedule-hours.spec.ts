@@ -4,55 +4,21 @@
 // intervals (422), confirms the week (the notice goes), makes the week start on Sunday in Settings and
 // finds the table opening on Sunday. An employee reads the week without editing. Screenshots in the three
 // viewports. The week and the settings the hub had before the file are put back after it (`afterAll`).
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
-
-/** The default week of migration 0002, unconfirmed, as the database's own hand (hub `a`'s, shared with `b`). */
-const DEFAULT_WEEK = [
-  'delete from schedule_weekdayinterval',
-  'delete from schedule_weekday',
-  'delete from schedule_schedulesettings',
-  'insert into schedule_weekday (id, weekday, is_closed, updated_at) select gen_random_uuid(), d, d >= 5, now() from generate_series(0, 6) d',
-  "insert into schedule_weekdayinterval (id, position, open_time, close_time, day_id) select gen_random_uuid(), 0, '09:00', '18:00', id from schedule_weekday where weekday < 5",
-].join('; ');
-
-/** The SQL that writes back the week and the settings as they are now (rows, ids and dates included). */
-const SNAPSHOT = [
-  "select format('insert into schedule_weekday (id, weekday, is_closed, updated_at) values (%L, %s, %L, %L)', id, weekday, is_closed, updated_at) from schedule_weekday",
-  "select format('insert into schedule_weekdayinterval (id, position, open_time, close_time, day_id) values (%L, %s, %L, %L, %L)', id, position, open_time, close_time, day_id) from schedule_weekdayinterval",
-  "select format('insert into schedule_schedulesettings (id, slot, week_starts_on, hours_confirmed, updated_at) values (%L, %s, %s, %L, %L)', id, slot, week_starts_on, hours_confirmed, updated_at) from schedule_schedulesettings",
-];
-const CLEAR = ['delete from schedule_weekdayinterval', 'delete from schedule_weekday', 'delete from schedule_schedulesettings'];
+import { DEFAULT_WEEK, noHorizontalScroll, restoreWeek, rowTexts, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 
 /** What the hub had before this file: its rows as INSERT statements, read in `beforeAll`. */
 let before: string[] = [];
 
 test.beforeAll(() => {
-  before = SNAPSHOT.flatMap((query) => psql(query).split('\n')).filter(Boolean);
+  before = snapshotWeek();
   psql(DEFAULT_WEEK);
 });
 test.afterAll(() => {
-  psql([...CLEAR, ...before].join('; '));
+  restoreWeek(before);
 });
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-async function weekReady(page: Page): Promise<void> {
-  await expect(shown(page).locator('[data-testid=schedule-hours-row]')).toHaveCount(7);
-}
-
-const rowTexts = (page: Page) => shown(page).locator('[data-testid=schedule-hours-row]').allInnerTexts();
-
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
 
 test('SCHEDULE-F01–F03: the default week, a split Monday, an overlap refused, the week confirmed', async ({ page, context }) => {
   await login(page, A, '/schedule/hours');
@@ -111,6 +77,7 @@ test('SCHEDULE-F08, F09: the business zone, and a week that starts on Sunday', a
   await expect(view.locator('[data-testid=schedule-settings-timezone]')).toContainText('Europe/Madrid');
   await view.locator('[data-testid=schedule-settings-week-start]').click();
   await page.locator('ion-popover ion-radio', { hasText: 'Sunday' }).click();
+  await expect(page.locator('ion-popover.select-popover')).toHaveCount(0);
   await view.locator('[data-testid=schedule-settings-submit]').click();
   await expect(view.locator('[data-testid=schedule-settings-saved]')).toHaveText('Saved');
   await page.screenshot({ path: shot('schedule-settings-1280') });

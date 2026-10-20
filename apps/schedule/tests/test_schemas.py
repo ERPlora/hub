@@ -60,6 +60,9 @@ def hours(*pairs: tuple[str, str]) -> list[dict[str, str]]:
         ("miercoles", 2),
         ("Sun", 6),
         ("sábado", 5),
+        ("el lunes", 0),
+        ("El Sábado", 5),
+        ("the sunday", 6),
     ],
 )
 def test_a_weekday_is_a_number_or_its_name_in_english_or_spanish(value, weekday):

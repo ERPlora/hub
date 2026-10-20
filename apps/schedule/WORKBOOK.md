@@ -103,7 +103,8 @@ API o por el asistente.
 Tabla de **siete filas fijas**, una por día de la semana, con las columnas **Día**, **Horario** y
 **Estado**; no hay botón de añadir: un día se edita. **Horario** dice, por ejemplo, «10:00–14:00 ·
 17:00–20:00», «Abierto 24 horas», «Cerrado» o «Sin definir»; **Estado** dice «Abierto», «Cerrado» o «—»
-(sin definir). Las horas salen en el reloj del idioma (24 horas en español, AM/PM en inglés). La acción
+(sin definir); encima, **Columnas** y el cambio entre tabla y tarjetas. Las horas salen en el reloj del
+idioma (24 horas en español, AM/PM en inglés). La acción
 de fila **Editar** (o tocar la fila) abre «Editar horario — {día}» con: **Día**, **Cerrado**, **Abierto
 24 horas**, una línea por tramo (**Abre**, **Cierra** y **Quitar tramo**), **+ Añadir tramo**, la pista
 «Jornada partida: una línea por tramo (10:00–14:00 y 17:00–20:00). Un cierre anterior a la apertura pasa
@@ -156,15 +157,16 @@ poder cambiarlo y sin **Guardar**.
 | SCHEDULE-F04 | Añadir un día especial | hecho |
 | SCHEDULE-F05 | Añadir un cambio temporal | hecho |
 | SCHEDULE-F06 | Borrar un día especial o un cambio temporal | hecho |
-| SCHEDULE-F07 | Cargar varios días especiales de golpe | hecho (asistente y API; sin pantalla) |
+| SCHEDULE-F07 | Cargar varios días especiales de golpe | hecho (asistente y API, como el producto actual) |
 | SCHEDULE-F08 | Elegir con qué día empieza la semana | hecho |
 | SCHEDULE-F09 | Ver la zona horaria con la que se lee el horario | hecho |
-| SCHEDULE-F10 | Preguntar si el negocio está abierto en un momento | hecho (asistente y API; sin pantalla) |
-| SCHEDULE-F11 | Dar el horario de unos días a Citas | hecho (sin pantalla) |
-| SCHEDULE-F12 | Partir de una semana por defecto al activar | hecho |
+| SCHEDULE-F10 | Preguntar si el negocio está abierto en un momento | hecho (asistente y API, como el producto actual) |
+| SCHEDULE-F11 | Dar el horario de unos días a Citas | hecho (lo leen Citas y Reservas) |
+| SCHEDULE-F12 | Partir de una semana por defecto al activar | hecho (al crear las tablas) |
 | SCHEDULE-F13 | Corregir un día especial o un cambio temporal | hecho |
 
 ### SCHEDULE-F01 Ver el horario de la semana
+<!-- origen: fi:modules/schedules#query-schedules-business_hours-list old:schedules/WORKFLOW.md#schedules-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Horario
@@ -180,6 +182,7 @@ horario.
 Implicados: ninguno
 
 ### SCHEDULE-F02 Fijar el horario de un día
+<!-- origen: qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules fi:modules/schedules#command-schedules-business_hours-set-handler-wasm-set_business_hours old:schedules/WORKFLOW.md#schedules-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horario
@@ -202,6 +205,7 @@ cerrado».
 Implicados: Citas (lee el horario en la reserva siguiente)
 
 ### SCHEDULE-F03 Confirmar la semana por defecto
+<!-- origen: old-hub:HUB_SHELL-F31 old:schedules/WORKFLOW.md#schedules-f03 wf:peluqueria-dia#rec_peluqueria-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horario
@@ -219,6 +223,7 @@ se llega desde la pantalla: el aviso solo sale cuando hay semana).
 Implicados: ninguno
 
 ### SCHEDULE-F04 Añadir un día especial
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 fi:modules/schedules#command-schedules-special_days-create-handler-wasm-create_special_day fi:modules/schedules#query-schedules-special_days-list old:schedules/WORKFLOW.md#schedules-f04 qa:modules/schedules/absences-and-holidays -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -240,6 +245,7 @@ solo espacios, bajo el nombre. Una fecha que tuvo un día especial borrado se pu
 Implicados: Citas
 
 ### SCHEDULE-F05 Añadir un cambio temporal
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 qa:modules/schedules/absences-and-holidays fi:modules/schedules#command-schedules-overrides-create-handler-wasm-create_override fi:modules/schedules#query-schedules-overrides-list old:schedules/WORKFLOW.md#schedules-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -260,6 +266,7 @@ tramos de SCHEDULE-F02.
 Implicados: Citas
 
 ### SCHEDULE-F06 Borrar un día especial o un cambio temporal
+<!-- origen: fi:modules/schedules#command-schedules-overrides-delete-sql-transaccional fi:modules/schedules#command-schedules-special_days-delete-sql-transaccional old:schedules/WORKFLOW.md#schedules-f06 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -277,7 +284,8 @@ uno.» con los candidatos.
 Implicados: Citas
 
 ### SCHEDULE-F07 Cargar varios días especiales de golpe
-Estado: hecho (asistente y API; sin pantalla)
+<!-- origen: fi:modules/schedules#command-schedules-bulk_create_special_days-handler-wasm-bulk_create_special_days old:schedules/WORKFLOW.md#schedules-f07 -->
+Estado: hecho (asistente y API, como el producto actual)
 Actor: asistente, API
 Pantalla: asistente
 Pasos:
@@ -294,6 +302,7 @@ crear nada.
 Implicados: ninguno
 
 ### SCHEDULE-F08 Elegir con qué día empieza la semana
+<!-- origen: fi:modules/schedules#command-schedules-settings-save-sql-transaccional fi:modules/schedules#query-schedules-settings-get old:schedules/WORKFLOW.md#schedules-f08 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
@@ -309,11 +318,14 @@ Si falla: un valor fuera de 1–7 sale debajo del campo y no se guarda nada.
 Implicados: ninguno
 
 ### SCHEDULE-F09 Ver la zona horaria con la que se lee el horario
+<!-- origen: old-hub:HUB_SHELL-F157 wf:peluqueria-dia#rec_peluqueria-f02 old:schedules/WORKFLOW.md#schedules-f09 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Ajustes
 Pasos:
 1. Abre **Ajustes**; arriba aparece «Zona horaria del negocio» con su nombre (Europe/Madrid).
+2. Lee la nota «Es la del Hub y el único reloj con el que se lee el horario.»: con ese reloj se leen la
+   semana, los días especiales, los cambios temporales y lo que contesta SCHEDULE-F10.
 Entra: la zona del Hub.
 Sale: nada; solo lectura. Horarios no guarda zona propia: las horas son de pared (las 10:00 son las 10:00
 antes y después del cambio de hora, sin tocar nada).
@@ -321,8 +333,9 @@ Si falla: nada que fallar; la zona siempre la da el servidor.
 Implicados: ninguno
 
 ### SCHEDULE-F10 Preguntar si el negocio está abierto en un momento
-Estado: hecho (asistente y API; sin pantalla)
-Actor: asistente, API (con la llave del negocio)
+<!-- origen: fi:modules/schedules#command-schedules-is_open-handler-wasm-is_open-solo-lectura old:schedules/WORKFLOW.md#schedules-f10 -->
+Estado: hecho (asistente y API, como el producto actual)
+Actor: asistente, API
 Pantalla: ninguna
 Pasos:
 1. Se pregunta por un momento: con zona (`2026-08-18T08:00:00Z`) se pasa al reloj del negocio; sin zona
@@ -344,11 +357,12 @@ Si falla: un momento que no es una fecha y hora reales: «Esa fecha y hora no so
 Implicados: ninguno
 
 ### SCHEDULE-F11 Dar el horario de unos días a Citas
-Estado: hecho (sin pantalla)
-Actor: sistema (Citas), asistente
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 old:schedules/WORKFLOW.md#schedules-f11 -->
+Estado: hecho (lo leen Citas y Reservas)
+Actor: sistema (Citas y Reservas), asistente
 Pantalla: ninguna
 Pasos:
-1. Citas pide el horario de un rango de días (hasta 366; un solo día vale).
+1. Citas (o Reservas) pide el horario de un rango de días (hasta 366; un solo día vale).
 2. Horarios elige para cada día la regla que manda (la misma precedencia que SCHEDULE-F10) y lo
    contesta.
 3. Citas reserva solo si la cita cabe **entera** en un tramo abierto (el de ese día o la cola de
@@ -358,10 +372,11 @@ Entra: las fechas, en días del negocio.
 Sale: solo lectura (contrato en «Para quien lo mantiene»). El final de la cita puede coincidir con el
 cierre.
 Si falla: un rango al revés o de más de 366 días se rechaza en el campo.
-Implicados: Citas
+Implicados: Citas, Reservas
 
 ### SCHEDULE-F12 Partir de una semana por defecto al activar
-Estado: hecho (sin pantalla)
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 old-hub:HUB-F22 old:schedules/WORKFLOW.md#schedules-f12 -->
+Estado: hecho (al crear las tablas)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -374,6 +389,7 @@ Si falla: no hay pantalla; si no hubiera semana, Citas vería `no_hours`.
 Implicados: ninguno
 
 ### SCHEDULE-F13 Corregir un día especial o un cambio temporal
+<!-- origen: old:schedules/WORKFLOW.md#schedules-f04 old:schedules/WORKFLOW.md#schedules-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -521,6 +537,12 @@ zona horaria del negocio.
 - **Fechas y horas en el orden del idioma del Hub** escritas a mano (`dd/mm/aaaa`, «2:30 pm», «1430»): los
   campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga los suyos (`UI-REQUESTS.md`).
 - **«Abrir ajustes del hub»** desde Ajustes: el Hub aún no tiene ajustes de zona horaria a los que ir.
+- **El asistente (chat y voz) y las llaves de API del negocio** son de la plataforma, que aún no los tiene:
+  Horarios ya declara cada operación para el asistente, con su descripción, y abre a las llaves la semana,
+  las listas, «¿abierto?» y el horario de un rango; mientras tanto, SCHEDULE-F07 y SCHEDULE-F10 se piden
+  por la API con la sesión.
+- **El icono de estrella** de la pestaña **Días especiales** (el del producto actual): `@erplora/ui` aún no lo
+  tiene y se usa el de calendario (`UI-REQUESTS.md`).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -552,7 +574,8 @@ zona horaria del negocio.
   víspera salía de la semana aunque la víspera la cerrara un festivo.
 - **La carga de golpe** acepta tramos como el alta de uno (antes solo un par apertura–cierre sin pasar
   de medianoche) y un día con horas sin `is_closed: false` es cerrado, como al crear uno; una lista con un
-  día sin nombre o sin fecha real se rechaza entera, como antes.
+  día sin nombre se rechaza entera, como antes, y ahora también con un día sin fecha real (antes se saltaba
+  solo ese día): la lista se corrige de una vez, antes de crear nada.
 - **¿Abierto?** es una consulta (antes una orden con lecturas precargadas) y su `source` de la semana se
   llama `weekly` (antes `business_hours`). El código `on_break` desaparece: era el descanso antiguo de una
   fila de antes de los tramos, que aquí no existe; tampoco el par apertura–cierre de reserva de las
