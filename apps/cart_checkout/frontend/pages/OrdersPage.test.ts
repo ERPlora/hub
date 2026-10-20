@@ -69,6 +69,16 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('OrdersPage', () => {
+  it('while the first page loads, the table paints the loading state and counts nothing (pm#611)', async () => {
+    const s = await setup();
+    expect(s.prop('loading')).toBe(true);
+    expect(s.find('cart-checkout-orders-loading').exists()).toBe(true);
+    expect(s.wrapper.text()).not.toMatch(/\b0 orders?\b/i);
+    await s.show(page(ROWS));
+    expect(s.prop('loading')).toBe(false);
+    expect(s.find('cart-checkout-orders-loading').exists()).toBe(false);
+  });
+
   it('follows the orders newest first, with the old table’s columns and no add', async () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);

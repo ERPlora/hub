@@ -20,6 +20,14 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(1999, 'en', 'KWD'))).toBe('KWD 1.999');
     expect(formatMoney(1999, 'en', 'USD')).toBe('$19.99');
   });
+
+  it('groups the thousands of a four-digit amount too, so a column of totals lines up (hub#1090)', () => {
+    // Spanish CLDR leaves 1234,56 ungrouped (minimumGroupingDigits = 2); Odoo, Business Central and
+    // the old hub's fix group it, as 12.345,60 is.
+    expect(nbsp(formatMoney(123456, 'es'))).toBe('1.234,56 €');
+    expect(nbsp(formatMoney(1234560, 'es'))).toBe('12.345,60 €');
+    expect(formatMoney(123456, 'en')).toBe('€1,234.56');
+  });
 });
 
 describe('formatQuantity', () => {
@@ -55,6 +63,32 @@ describe('toMinor: a money range filter in the unit the column shows', () => {
     expect(toMinor('')).toBeUndefined();
     expect(toMinor(undefined)).toBeUndefined();
     expect(toMinor('-3')).toBeUndefined();
+    expect(toMinor('1,2,3')).toBeUndefined();
+    expect(toMinor('12,345')).toBe(1234500);
+  });
+
+  it('reads what a person pastes, thousands marks and currency sign included (pm#521)', () => {
+    expect(toMinor('1.250,50')).toBe(125050);
+    expect(toMinor('1,250.50')).toBe(125050);
+    expect(toMinor(' 1.234,56 € ')).toBe(123456);
+    expect(toMinor('1.234.567')).toBe(123456700);
+    expect(toMinor('1.255')).toBe(125500);
+    expect(toMinor('1 250,5')).toBe(125050);
+  });
+
+  it('a mark followed by three digits ending in 0 can be thousands or a third decimal: it is not guessed', () => {
+    // «1.250» is 1.250 € or 1,25 €; the filter filters nothing rather than the wrong amount.
+    expect(toMinor('1.250')).toBeUndefined();
+    expect(toMinor('1,250')).toBeUndefined();
+    // A currency with three decimals reads it as its decimals.
+    expect(toMinor('1.250', 'KWD')).toBe(1250);
+  });
+
+  it('more decimals than the currency has, or groups that are not of three, filter nothing', () => {
+    expect(toMinor('12,3456')).toBeUndefined();
+    expect(toMinor('12.5', 'JPY')).toBeUndefined();
+    expect(toMinor('1.23.456')).toBeUndefined();
+    expect(toMinor('1.234,5.6')).toBeUndefined();
   });
 });
 
