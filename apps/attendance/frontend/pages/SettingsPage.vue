@@ -396,10 +396,9 @@ async function useMyLocation(): Promise<void> {
 <style scoped>
 .attendance-settings {
   display: grid;
-  /* One column as wide as the screen: a long label wraps instead of pushing the form past a phone. */
-  grid-template-columns: minmax(0, 1fr);
   gap: 1.1rem;
 }
+/* The toggle's long label wraps: on one line it pushed the whole form past a phone's edge. */
 .attendance-settings ion-toggle::part(label) {
   white-space: normal;
 }

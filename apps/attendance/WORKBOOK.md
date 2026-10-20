@@ -536,8 +536,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   «Ubicación» con `priority: 'low'` (ceden primero en una caja estrecha, W-19). Lo prueba
   `tests/e2e/attendance-flows.spec.ts` a 834 y 1440.
 - Ajustes envía solo los campos que la persona tocó y cambió; lo que la pantalla juzga mal antes de
-  enviar va bajo su campo, como el 422 del servidor, y el formulario es una columna `minmax(0, 1fr)`
-  para que quepa en un móvil.
+  enviar va bajo su campo, como el 422 del servidor, y la etiqueta larga del interruptor parte línea
+  para que el formulario quepa en un móvil.
 
 ## Paridad con el producto actual (para quien lo mantiene)
 
