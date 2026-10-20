@@ -25,10 +25,30 @@ B = Scope("host", "b")
 MADRID = ZoneInfo("Europe/Madrid")
 
 
+class Teammate:
+    """A person of the team as the platform passes one (a user account), without a database row: no linked
+    staff record. A plain string actor is what an automation or the platform itself passes."""
+
+    pk = None
+    email = ""
+
+    def get_username(self) -> str:
+        return "tester"
+
+    def get_full_name(self) -> str:
+        return "tester"
+
+    def __str__(self) -> str:
+        return "tester"
+
+
+TESTER = Teammate()
+
+
 def ctx_for(
     role: str = "hub_admin",
     scope: Scope = A,
-    actor: object = "tester",
+    actor: object = TESTER,
     permissions: set[str] | None = None,
 ) -> OperationContext:
     """The context a caller with ``role`` on ``scope`` gets (permissions from the apps' AppConfig).

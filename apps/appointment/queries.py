@@ -307,25 +307,48 @@ def row(appointment: Appointment) -> dict:
     }
 
 
-def detail(appointment: Appointment) -> dict:
-    """An ``AppointmentOut``: everything, contact and notes included."""
-    return {
-        **row(appointment),
-        "customer_phone": appointment.customer_phone,
-        "customer_email": appointment.customer_email,
-        "notes": appointment.notes,
-        "internal_notes": appointment.internal_notes,
-        "cancelled_at": appointment.cancelled_at,
-        "cancellation_reason": appointment.cancellation_reason,
-        "cancelled_by_customer": appointment.cancelled_by_customer,
-        "charged_at": appointment.charged_at,
-        "created_at": appointment.created_at,
-        "updated_at": appointment.updated_at,
-    }
+def by_person(ctx: OperationContext) -> bool:
+    """Whether a person of the team acts (a user account). Only a person gets the front desk's exceptions
+    and reads what is the salon's: an automation — a flow's step, the platform itself, an anonymous caller,
+    any kind still to come — is judged and answered as the customer (appointments#143, #177, #180,
+    hub#1623, hub#1662, hub#2113)."""
+    return hasattr(ctx.actor, "get_username")
 
 
-def load_detail(appointment_id: UUID) -> dict:
-    return detail(Appointment.objects.prefetch_related("lines").get(pk=appointment_id))
+#: What a caller that is not a person never reads: the customer's contact, the salon's notes and a
+#: cancellation's reason (they may hold health data). The market's client-facing surfaces never show them.
+PRIVATE = ("customer_phone", "customer_email", "notes", "internal_notes", "cancellation_reason")
+
+
+def for_caller(ctx: OperationContext, answer: dict) -> dict:
+    """``answer`` as ``ctx`` may read it: whole for a person, without ``PRIVATE`` for anyone else."""
+    if by_person(ctx):
+        return answer
+    return {name: "" if name in PRIVATE else value for name, value in answer.items()}
+
+
+def detail(ctx: OperationContext, appointment: Appointment) -> dict:
+    """An ``AppointmentOut``: everything, contact and notes included (for a person; ``for_caller``)."""
+    return for_caller(
+        ctx,
+        {
+            **row(appointment),
+            "customer_phone": appointment.customer_phone,
+            "customer_email": appointment.customer_email,
+            "notes": appointment.notes,
+            "internal_notes": appointment.internal_notes,
+            "cancelled_at": appointment.cancelled_at,
+            "cancellation_reason": appointment.cancellation_reason,
+            "cancelled_by_customer": appointment.cancelled_by_customer,
+            "charged_at": appointment.charged_at,
+            "created_at": appointment.created_at,
+            "updated_at": appointment.updated_at,
+        },
+    )
+
+
+def load_detail(ctx: OperationContext, appointment_id: UUID) -> dict:
+    return detail(ctx, Appointment.objects.prefetch_related("lines").get(pk=appointment_id))
 
 
 APPOINTMENT_ORDER = {
@@ -408,7 +431,7 @@ def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
     },
 )
 def get_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
-    return detail(find_appointment(ctx, data.id, data.number))
+    return detail(ctx, find_appointment(ctx, data.id, data.number))
 
 
 @operation(
@@ -465,11 +488,10 @@ def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
         rows,
         params.limit,
         params.offset,
-        lambda item: {
-            **row(item),
-            "notes": item.notes,
-            "internal_notes": item.internal_notes,
-        },
+        lambda item: for_caller(
+            ctx,
+            {**row(item), "notes": item.notes, "internal_notes": item.internal_notes},
+        ),
     )
 
 

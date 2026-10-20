@@ -21,6 +21,7 @@ from .conftest import (
     MONDAY,
     assign,
     at,
+    TESTER,
     ctx_for,
     make_appointment,
     make_customer,
@@ -219,6 +220,79 @@ def test_the_customer_never_books_on_top_of_another_appointment(salon):
     )
 
 
+# gh:appointments#177, #180 · gh:hub#2113 · gh:hub#1623 — the front desk's exceptions (a time already gone,
+# inside the minimum notice, «book anyway» on an overlap, cancelling outside the policy) exist because a
+# person is looking at the agenda. Only a person (a user account) gets them: an automation — a flow's step,
+# the platform itself, an anonymous caller, any kind still to come — is judged as the customer, whatever
+# source it sends, so a message cannot talk it into the front desk's door.
+AUTOMATIONS = ["flow_run:0190a1b2", "system", None]
+
+
+def as_caller(salon, actor, start, day=MONDAY, **extra):
+    data = {
+        "customer_id": str(salon.lucia.id),
+        "services": [{"service_id": str(salon.cut.id)}],
+        "staff_id": str(salon.ana.id),
+        "start": wall(day, start),
+        **extra,
+    }
+    return run("appointment.appointment.create", data, actor=actor)
+
+
+@pytest.mark.parametrize("actor", AUTOMATIONS)
+def test_an_automation_books_by_the_customers_rules_whatever_source_it_sends(salon, actor):
+    yesterday = timezone.localdate() - dt.timedelta(days=1)
+    refused("appointment.in_past", lambda: as_caller(salon, actor, "10:00", day=yesterday))
+    assert book(salon, "10:00", day=yesterday).status == "confirmed"
+    as_caller(salon, actor, "10:00")
+    refused(
+        "appointment.slot_taken",
+        lambda: as_caller(salon, actor, "10:15", confirm_overlap=True),
+    )
+    assert book(salon, "10:15", confirm_overlap=True).status == "confirmed"
+    make_settings(min_booking_notice=60 * 24 * 30)
+    refused("appointment.too_soon", lambda: as_caller(salon, actor, "12:00"))
+    assert book(salon, "12:00").status == "confirmed"
+
+
+@pytest.mark.parametrize("actor", AUTOMATIONS)
+def test_an_automation_moves_and_books_a_batch_by_the_customers_rules(salon, actor):
+    out = book(salon, "10:00")
+    yesterday = wall(timezone.localdate() - dt.timedelta(days=1), "10:00")
+    refused(
+        "appointment.in_past",
+        lambda: run(
+            "appointment.appointment.reschedule",
+            {"id": str(out.id), "start": yesterday},
+            actor=actor,
+        ),
+    )
+    refused(
+        "appointment.in_past",
+        lambda: run(
+            "appointment.appointment.bulk_create",
+            {
+                "customer_id": str(salon.lucia.id),
+                "services": [{"service_id": str(salon.cut.id)}],
+                "staff_id": str(salon.ana.id),
+                "starts": [yesterday],
+            },
+            actor=actor,
+        ),
+    )
+
+
+@pytest.mark.parametrize("actor", AUTOMATIONS)
+def test_an_automation_cancels_only_within_the_customers_policy(salon, actor):
+    out = book(salon, "10:00")
+    make_settings(allow_customer_cancellation=False)
+    cancel = lambda who: run("appointment.appointment.cancel", {"id": str(out.id)}, actor=who)  # noqa: E731
+    refused("appointment.customer_cancellation_disabled", lambda: cancel(actor))
+    make_settings(allow_customer_cancellation=True, cancellation_notice_hours=24 * 30)
+    refused("appointment.cancellation_notice_required", lambda: cancel(actor))
+    assert cancel(TESTER).status == "cancelled"
+
+
 def test_a_time_the_clock_change_skips_is_a_422_on_the_start(salon):
     spring = dt.date(2027, 3, 28)
     make_settings(max_advance_booking=0)
@@ -265,6 +339,42 @@ def test_a_batch_books_every_time_or_none(salon):
         lambda: run("appointment.appointment.bulk_create", {**data, "starts": clash}),
     )
     assert "16:15" in error.message
+
+
+def test_every_booking_tells_the_same_created_event_one_per_appointment(salon):
+    # gh:appointments#174, #138 — an automation listening to «appointment created» works the same for a
+    # single booking, a batch and a series, and hears every appointment of a batch or a series.
+    book(salon, "10:00")
+    batch = [wall(MONDAY + dt.timedelta(weeks=n), "12:00") for n in range(2)]
+    run(
+        "appointment.appointment.bulk_create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "starts": batch,
+        },
+    )
+    make_settings(max_advance_booking=15)
+    series = run(
+        "appointment.recurring.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "frequency": "weekly",
+            "day_of_week": 0,
+            "start_date": MONDAY.isoformat(),
+            "time": "16:00",
+        },
+    )
+    created = events("appointment.appointment.created")
+    assert len(created) == 1 + len(batch) + series.booked
+    assert series.booked >= 1
+    assert {tuple(sorted(payload)) for payload in created} == {
+        ("customer_id", "customer_name", "id", "number", "staff_id", "start")
+    }
+    assert {payload["customer_name"] for payload in created} == {"Lucía Pérez"}
 
 
 # ── Moving and editing (F04, F06, F22) ────────────────────────────────────────────────────────
