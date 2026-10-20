@@ -49,6 +49,9 @@ export interface Till {
   addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult>;
   /** A menu of Menus with the dishes picked (SALE-F12): always a line of its own; Menus prices it. */
   addComboLine(combo: { id: string }, staffId: string | null, choices: readonly ComboChoiceIn[]): Promise<WriteResult>;
+  /** Kitchen sends what is pending as a new round, normal or rush (SALE-F20, KITCHEN-F18); the check is read
+   *  back with its round. */
+  sendToKitchen(rush: boolean): Promise<WriteResult & { round?: number; code?: string }>;
   setQuantity(line: OrderLineOut, quantity: string): Promise<void>;
   toggleGift(line: OrderLineOut): Promise<void>;
   setNote(line: OrderLineOut, notes: string): Promise<WriteResult>;
@@ -91,6 +94,8 @@ export function useTill(options: TillOptions): Till {
   const addOpen = useCommand('sale.order.add_open_line');
   const addServiceLine = useCommand('sale.order.add_service_line');
   const addCombo = useCommand('sale.order.add_combo_line');
+  const kitchenSend = useCommand('kitchen.ticket.send');
+  const readCheck = useCommand('sale.order.get');
   const updateLine = useCommand('sale.order.update_line');
   const removeLine = useCommand('sale.order.remove_line');
   const lineStaff = useCommand('sale.order.set_line_staff');
@@ -242,6 +247,21 @@ export function useTill(options: TillOptions): Till {
     });
   }
 
+  function sendToKitchen(rush: boolean): Promise<WriteResult & { round?: number; code?: string }> {
+    return serial(async () => {
+      const id = order.value?.id ?? check.id.value;
+      if (!id) return { ok: false, message: t('sale.pos.kitchen.notSent') };
+      try {
+        const ticket = await kitchenSend.run({ order_id: id, priority: rush ? 'rush' : 'normal' });
+        accept(await readCheck.run({ order_id: id }));
+        return { ok: true, round: ticket.round_no };
+      } catch (error) {
+        const code = refusal(error, '')?.code;
+        return { ok: false, message: wordsOf(error, 'sale.pos.kitchen.notSent'), ...(code ? { code } : {}) };
+      }
+    });
+  }
+
   const setQuantity = (line: OrderLineOut, quantity: string) =>
     toast(
       attempt(
@@ -365,6 +385,7 @@ export function useTill(options: TillOptions): Till {
     addOpenLine,
     addService,
     addComboLine,
+    sendToKitchen,
     setQuantity,
     toggleGift,
     setNote,

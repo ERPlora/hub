@@ -737,3 +737,61 @@ describe('PosPage: the menus of Menus (SALE-F12)', () => {
     expect(s.inDoc('pos-menu-error')?.textContent).toContain('«Hake» is sold out.');
   });
 });
+
+describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', () => {
+  /** Kitchen is on in this business and the person may send to it. */
+  const WITH_KITCHEN = { ...MANAGER, permissions: [...MANAGER.permissions, 'kitchen.add_ticket'], apps: [{ label: 'kitchen', state: 'on' as const }] };
+  const SENT = order({ id: 'o1', version: 2, lines: [line({ id: 'l1', product_id: 'p1', round_no: 1, fired_at: '2026-10-20T12:00:00Z' })] });
+  const kitchenAnswers = (s: Awaited<ReturnType<typeof setup>>, send: () => Response | Promise<Response>) =>
+    s.net.onApi((call) => (call.url.startsWith('/api/kitchen/tickets/send') ? send() : Response.json(SENT)));
+  const sends = (s: Awaited<ReturnType<typeof setup>>) => s.sent().filter((c) => c.path === '/api/kitchen/tickets/send').map((c) => c.body);
+  const checkout = (s: Awaited<ReturnType<typeof setup>>) => s.wrapper.findComponent({ name: 'CheckoutSheet' });
+
+  it('without Kitchen on (or without the right to send to it) the cart has no «Current order»', async () => {
+    for (const session of [MANAGER, { ...WITH_KITCHEN, permissions: MANAGER.permissions }]) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCart).props('kitchen')).toBe(false);
+    }
+  });
+
+  it('«Send order» asks Kitchen for the round, rush when armed, and says which order went', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    expect(s.wrapper.findComponent(PosCart).props('kitchen')).toBe(true);
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
+    s.wrapper.findComponent(PosCart).vm.$emit('send', true);
+    await settle();
+    expect(sends(s)).toEqual([{ order_id: 'o1', priority: 'rush' }]);
+    expect(toastSuccess).toHaveBeenCalledWith('Comanda 1 enviada a cocina.');
+  });
+
+  it('charging with lines not sent sends them first, then opens the charge', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(sends(s)).toEqual([{ order_id: 'o1', priority: 'normal' }]);
+    expect(checkout(s).props('open')).toBe(true);
+  });
+
+  it('when the round cannot be sent nothing is charged and the till says why', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await s.addProduct();
+    kitchenAnswers(s, () => refused('internal_error', 'The kitchen did not answer.', 500));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(checkout(s).props('open')).toBe(false);
+    expect(toastError).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.');
+  });
+
+  it('a round another device already sent does not stop the charge', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await s.addProduct();
+    kitchenAnswers(s, () => refused('sale.nothing_to_fire', 'There is nothing new to send to the kitchen.'));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(checkout(s).props('open')).toBe(true);
+  });
+});

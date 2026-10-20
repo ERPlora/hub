@@ -227,7 +227,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F17 | Aparcar una cuenta y recuperarla | común | hecho |
 | SALE-F18 | Eliminar una cuenta abierta | común | hecho |
 | SALE-F19 | Abrir la cuenta de una mesa y dejarla en la mesa | restaurante | hecho |
-| SALE-F20 | Enviar la comanda a cocina y anular una línea enviada | restaurante | parcial |
+| SALE-F20 | Enviar la comanda a cocina y anular una línea enviada | restaurante | hecho |
 | SALE-F21 | Imprimir la cuenta para la mesa (precuenta) | restaurante | hecho |
 | SALE-F22 | Cobrar solo una parte de la cuenta | restaurante | hecho |
 | SALE-F23 | Dividir la cuenta de una mesa | restaurante | hecho |
@@ -698,30 +698,39 @@ sentar, no hay botón ni se pregunta nada a Mesas.
 Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24
 
 ### SALE-F20 Enviar la comanda a cocina y anular una línea enviada
-Estado: parcial — servidor hecho (envío por rondas y anulación de una línea enviada, también en la pantalla); la pestaña «Comanda actual» con el botón de envío la pone Cocina, que todavía no existe
+<!-- origen: wf:restaurante-dia#rec_restaurante-f07 wf:restaurante-dia#rec_restaurante-f17 wf:restaurante-dia#rec_restaurante-f08 qa:modules/sales/take-order-by-courses wf:restaurante-dia#rec_restaurante-f14 qa:modules/sales/modify-order-after-sending old:sales/workflow/sala-y-cocina.md#sales-f20 -->
+Estado: hecho
 Vertical: restaurante
 Actor: empleado (enviar), responsable (anular)
 Pantalla: Vender
 Pasos:
-1. Enviar a cocina marca las líneas pendientes de la cuenta con una ronda nueva («Comanda N») y la
-   hora de envío; un doble envío no manda nada dos veces.
-2. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
-3. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
+1. Con Cocina activa, la cuenta tiene dos pestañas: «Cuenta», con todas sus líneas, y «Comanda actual»,
+   con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
+   enviar»). Sin nada pendiente, «Todo está enviado».
+2. En «Comanda actual», revisa cantidades y quién atiende y pulsa «Enviar comanda (N)». Para que salga
+   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale «Comanda N enviada a
+   cocina.»; las líneas quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma.
+   Un doble envío no manda nada dos veces.
+3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
+   un plato que no se va a preparar. Si el envío falla, no se abre el cobro y se dice por qué.
+4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
+5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
    «Agotado», «Pedido dos veces») y «O escribe el motivo…». «Anular artículo» no se puede pulsar sin
    motivo.
-4. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
+6. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
 Entra: las líneas pendientes de la cuenta.
-Sale: las líneas con su ronda (avisa: comanda enviada, con las líneas, sus notas y quién atiende); al
-anular una línea enviada, avisa de la línea anulada con su motivo.
-Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.». Pedir que se quite una línea
-ya enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un
-motivo), ya está cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada,
-ya anulada o sin motivo se rechaza con «Esa línea no se puede anular…».
-Implicados: KITCHEN-F29
-Pendiente: la pestaña «Comanda actual» con el botón de envío la pone Cocina; hasta que exista, el envío
-se hace por el asistente o la API.
+Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
+enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
+línea enviada, avisa de la línea anulada con su motivo.
+Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
+podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Pedir que se quite una línea ya
+enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está
+cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
+se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
+cobra como siempre.
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F29
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 Estado: hecho — imprime con el diálogo de impresión del dispositivo hasta que exista Impresión

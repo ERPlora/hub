@@ -227,6 +227,20 @@
         "badge": "Menú",
         "chooseIn": "Elige {n} en «{course}»",
         "loadFailed": "No se han podido leer los menús. Inténtalo de nuevo."
+      },
+      "kitchen": {
+        "accountTab": "Cuenta",
+        "roundTab": "Comanda actual",
+        "roundTabPendingOne": "Comanda actual, 1 artículo por enviar",
+        "roundTabPending": "Comanda actual, {count} artículos por enviar",
+        "roundHint": "Revisa cantidades y quién atiende. Al enviar, estas líneas van a cocina como una comanda que puedes seguir.",
+        "allSent": "Todo está enviado",
+        "allSentHint": "Añade productos para preparar una nueva comanda.",
+        "send": "Enviar comanda ({count})",
+        "sendRush": "Enviar URGENTE ({count})",
+        "rush": "Marcar la comanda como urgente",
+        "sent": "Comanda {n} enviada a cocina.",
+        "notSent": "No se ha podido enviar la comanda a cocina. Inténtalo de nuevo."
       }
     },
     "checkout": {

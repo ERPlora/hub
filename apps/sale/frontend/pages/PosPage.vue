@@ -454,12 +454,33 @@ const documentSaleId = shallowRef<string | null>(null);
 /** The lines of the check when «Charge» opened the sheet: what a charge of all of them means. */
 let chargingLines: string[] = [];
 
-function charge(): void {
+// ── The round to the kitchen (SALE-F20; Kitchen's KITCHEN-F18) ────────────────────────────────────
+/** «Current order» and its send: Kitchen on in this business and the right to send to it. */
+const kitchenOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on') && session.can('kitchen.add_ticket'),
+);
+/** Nothing new to send (another device sent it, or only services wait): not a failure. */
+const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
+
+async function sendRound(rush: boolean): Promise<boolean> {
+  const sent = await till.sendToKitchen(rush);
+  if (sent.ok) {
+    void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
+    return true;
+  }
+  if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
+  void toastError(sent.message);
+  return false;
+}
+
+async function charge(): Promise<void> {
   if (!order.value || !lines.value.length) return;
   if (needsCustomer.value) {
     askCustomer();
     return;
   }
+  // sales#439: what is pending goes to the kitchen before the charge, or the customer pays for a dish nobody cooks.
+  if (kitchenOn.value && lines.value.some((line) => !line.fired_at && !line.is_service) && !(await sendRound(false))) return;
   chargingLines = lines.value.map((line) => line.id);
   heldWhileCharging = null;
   charging.value = true;
@@ -604,6 +625,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             :drawer="phone"
             :open-checks="openChecks"
             :table-number="seatOfCheck?.table_number ?? null"
+            :kitchen="kitchenOn"
             @park="openSheet(() => (parking = true))"
             @close="cartOpen = false"
             @rename="till.rename($event)"
@@ -619,6 +641,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             @ticket-discount="openSheet(() => (discounting = 'ticket'))"
             @prebill="prebillOpen = true"
             @charge="charge"
+            @send="sendRound"
             @resume="resume"
           >
             <template #table>
