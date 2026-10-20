@@ -57,6 +57,7 @@
   "inventory.product.bulk_create": { "method": "post", "path": "/api/inventory/products/bulk_create" },
   "inventory.product.update": { "method": "post", "path": "/api/inventory/products/update" },
   "inventory.product.delete": { "method": "post", "path": "/api/inventory/products/delete" },
+  "inventory.product.set_sold_out": { "method": "post", "path": "/api/inventory/products/sold_out" },
   "inventory.product_category.list": { "method": "get", "path": "/api/inventory/product_categories" },
   "inventory.product_category.add": { "method": "post", "path": "/api/inventory/product_categories/add" },
   "inventory.product_category.remove": { "method": "post", "path": "/api/inventory/product_categories/remove" },

@@ -9,7 +9,7 @@ import type { Page } from '../../../frontend/sdk-types';
 export type UnitCode = 'ud' | 'kg' | 'g' | 't' | 'l' | 'ml' | 'min' | 'h';
 export type ProductType = 'physical' | 'service';
 export type MovementType = 'initial' | 'reception' | 'sale' | 'void' | 'count' | 'write_off' | 'refund';
-export type ProductStatus = 'active' | 'inactive' | 'needs_tax_setup';
+export type ProductStatus = 'active' | 'inactive' | 'needs_tax_setup' | 'sold_out';
 export type ImportStatus = 'ready' | 'created' | 'skipped' | 'failed';
 
 /** A `Decimal` on the way in: a number or its string («2.5»). */
@@ -95,6 +95,11 @@ export interface UnitListIn extends PageIn {
 export interface ProductRefIn {
   id?: string;
   product?: string;
+}
+
+/** INVENTORY-F29: true marks it sold out («86»), false puts it back on sale. */
+export interface ProductSoldOutIn extends ProductRefIn {
+  sold_out: boolean;
 }
 
 export interface ProductIn {
@@ -261,6 +266,9 @@ export interface ProductOut {
   /** Whether stock control applies to it now. */
   tracks_stock: boolean;
   is_active: boolean;
+  /** Sold out («86», INVENTORY-F29): active, but the till does not offer it. The server always sends it;
+   *  optional only so that the products other apps' tests typed before it still compile. */
+  is_sold_out?: boolean;
   category_ids: string[];
   created_at: string;
   updated_at: string;
@@ -405,6 +413,7 @@ declare module '@erplora/ui/sdk' {
     'inventory.product.bulk_create': { input: ProductImportIn; output: ImportReportOut };
     'inventory.product.update': { input: ProductPatchIn; output: ProductOut };
     'inventory.product.delete': { input: ProductRefIn; output: DeletedOut };
+    'inventory.product.set_sold_out': { input: ProductSoldOutIn; output: ProductOut };
     'inventory.product_category.list': { input: ProductCategoryListIn; output: Page<ProductCategoryOut> };
     'inventory.product_category.add': { input: ProductCategoryIn; output: ProductCategoryLinkOut };
     'inventory.product_category.remove': { input: ProductCategoryIn; output: ProductCategoryLinkOut };
