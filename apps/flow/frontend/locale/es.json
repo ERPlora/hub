@@ -400,7 +400,7 @@
     },
     "permissions": {
       "intro": "Una automatización se ejecuta con sus propios permisos, nunca con los tuyos. Nada de lo de abajo ocurre hasta que lo autorices.",
-      "missing": "Pendiente de tu permiso",
+      "missing": "Falta tu permiso",
       "granted": "Autorizado",
       "withdraw": "Retirar",
       "grantAll": "Autorizar todo lo que necesita",

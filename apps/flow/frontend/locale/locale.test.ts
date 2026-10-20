@@ -121,7 +121,7 @@ describe('flow catalogues (en source + es)', () => {
       ['flow.editor.save', 'Save', 'Guardar'],
       ['flow.editor.saving', 'Saving…', 'Guardando…'],
       ['flow.permissions.grantAll', 'Allow everything it needs', 'Autorizar todo lo que necesita'],
-      ['flow.permissions.missing', 'Waiting for your permission', 'Pendiente de tu permiso'],
+      ['flow.permissions.missing', 'Waiting for your permission', 'Falta tu permiso'],
       ['flow.permissions.granted', 'Allowed', 'Autorizado'],
       ['flow.history.empty', 'It has not run yet.', 'Todavía no se ha ejecutado.'],
       ['flow.gallery.use', 'Use this one', 'Usar esta'],

@@ -23,15 +23,18 @@ Una automatización es **una columna**: arriba, **cuándo arranca** (algo que pa
 horario, una fecha o solo a mano); debajo, sus **pasos**, que se hacen en orden: **Hacer algo** (una
 acción de otra app, por ejemplo crear una tarea), **Consultar algo** (leer un dato de otra app),
 **Solo sigue si…** (una condición: si no se cumple, la automatización termina ahí sin error) y
-**Esperar** (minutos, horas o días).
+**Esperar** (minutos, horas o días). Hoy arrancan solas las de horario y las de fecha; las que arrancan
+cuando pasa algo en el negocio se ejecutan con **Ejecutar ahora** hasta que les llegue el aviso
+(FLOW-F21).
 
 Solo la usan el **propietario** y el **administrador**: una automatización actúa en nombre del negocio
 sin nadie delante. El responsable y el empleado no la ven.
 
-El asistente la usa por voz o por texto con la sesión de quien habla: «crea un flujo que al completar
-una venta de más de 100 € me cree una tarea» (lo deja como **borrador**, apagado, para que lo revises),
-«activa la automatización de bienvenida», «pausa la de la caja», «¿qué automatizaciones tengo?»,
-«ejecuta ahora la revisión semanal», «¿por qué falló la de bienvenida?».
+Cuando el Hub tenga su asistente (hoy no lo tiene: FLOW-F17), la usará por voz o por texto con la
+sesión de quien habla: «crea un flujo que al completar una venta de más de 100 € me cree una tarea» (lo
+deja como **borrador**, apagado, para que lo revises), «activa la automatización de bienvenida», «pausa
+la de la caja», «¿qué automatizaciones tengo?», «ejecuta ahora la revisión semanal», «¿por qué falló la
+de bienvenida?».
 
 ## Referencia adoptada
 
@@ -122,7 +125,7 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
   automatización.»
 - **Probar**: lo que haría con lo último que pasó, sin hacer nada (FLOW-F13).
 - **Permisos**: «Una automatización se ejecuta con sus propios permisos, nunca con los tuyos. Nada de
-  lo de abajo ocurre hasta que lo autorices.», las filas «Pendiente de tu permiso» o «Autorizado» y
+  lo de abajo ocurre hasta que lo autorices.», las filas «Falta tu permiso» o «Autorizado» y
   **Autorizar todo lo que necesita** (FLOW-F12).
 - **Historial**: las ejecuciones, las más recientes primero y las paradas por error arriba (FLOW-F16).
 
@@ -164,7 +167,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F14 | Guardar y encender desde el editor | hecho |
 | FLOW-F15 | Ejecutar a mano | hecho |
 | FLOW-F16 | Ver qué hizo y por qué falló | hecho |
-| FLOW-F17 | Pedirle al asistente una automatización | hecho |
+| FLOW-F17 | Pedirle al asistente una automatización | parcial |
 | FLOW-F18 | Revisar un borrador del asistente y crearlo | hecho |
 | FLOW-F19 | Descartar un borrador del asistente | hecho |
 | FLOW-F20 | Otra app pregunta si una automatización ya está montada | hecho |
@@ -173,6 +176,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Automatizaciones
@@ -182,9 +186,12 @@ Pasos:
 Entra: la sesión.
 Sale: nada guardado.
 Si falla: sin permiso, «No tienes permiso»; con la app apagada, «Esta app no está activa en este
-negocio»; cualquier otro fallo, en rojo con **Reintentar**.
+negocio»; cualquier otro fallo, en rojo con **Reintentar**. Lo ven el propietario y el administrador; el
+resto del equipo no tiene la entrada en el menú.
+Implicados: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 Ver, buscar y ordenar las automatizaciones
+<!-- origen: old-hub:HUB-F81 old:flows/workflow/lista-y-galeria.md#flows-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
@@ -197,8 +204,12 @@ Pasos:
 4. Toca una fila para abrirla en el editor.
 Entra: las automatizaciones del negocio, en páginas de hasta 100.
 Sale: nada guardado. La lista se actualiza sola cuando alguien cambia una o termina una ejecución.
+Si falla: si no se puede leer la lista, el mensaje en rojo arriba con **Reintentar**; lo que ya estaba
+pintado se queda.
+Implicados: FLOW-F01, FLOW-F03, FLOW-F06, FLOW-F07
 
 ### FLOW-F03 Encender o pausar desde la lista, una o varias
+<!-- origen: old-hub:HUB-F87 old:flows/workflow/lista-y-galeria.md#flows-f03 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
@@ -213,9 +224,11 @@ una ejecución que espera se cancela al despertar si sigue en pausa (si se vuelv
 sigue). Un horario que se enciende cuenta desde ese momento: no recupera lo que pasó mientras estaba
 en pausa.
 Si falla: el mensaje en rojo arriba; la fila sigue como estaba.
+Implicados: FLOW-F12, FLOW-F14, FLOW-F22, FLOW-F23
 
 ### FLOW-F04 Crear una automatización desde una tarjeta de la galería
-Estado: hecho (pantalla; crea por `flow.flow.create`)
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f04 -->
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Automatizaciones
 Pasos:
@@ -227,15 +240,17 @@ Pasos:
 4. Se abre el editor de la nueva, en pausa, en la pestaña **Permisos**. Sigue por FLOW-F12, FLOW-F13 y
    FLOW-F14.
 5. Si el negocio ya la tiene, la tarjeta lleva «Activa», «En pausa» o «Sin terminar» (sin permisos) y
-   el primer botón es **Verla**; **Usar esta** sigue disponible y crea una segunda.
+   el primer botón es **Verla**; **Usar esta** sigue disponible y crea una segunda. Una tarjeta de
+   horario se reconoce por su horario y lo que hace, aunque se le haya cambiado el nombre.
 Entra: las diez tarjetas: siete de «Cualquier negocio», dos de «Peluquería y estética» y una de «Bares
 y restaurantes». Una tarjeta se esconde si falta una app de las que usa, y debajo de la galería se dice
 cuál.
 Sale: una automatización nueva, **en pausa y sin permisos**, con el nombre y los valores de la tarjeta
 (esperar un día, 100,00 €, seis personas…).
 Si falla: el mensaje en rojo dentro de la tarjeta; no se crea nada.
+Implicados: FLOW-F05, FLOW-F08, FLOW-F12, FLOW-F13, FLOW-F14
 
-Las tarjetas:
+Las diez tarjetas de la galería, con su sector, cuándo arrancan y qué hacen.
 
 | Tarjeta | Sector | Arranca | Hace |
 |---|---|---|---|
@@ -251,16 +266,22 @@ Las tarjetas:
 | Avisar de una venta grande | cualquiera | Se cobra una venta | Solo si pasa de 100,00 €: deja una tarea |
 
 ### FLOW-F05 Llegar a una tarjeta desde otro sitio
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f07 -->
 Estado: hecho (pantalla)
 Actor: propietario, administrador
 Pantalla: Automatizaciones
 Pasos:
-1. Un enlace a `/flow/automations?template=<tarjeta>` abre esa tarjeta de la galería y la trae a la
-   vista.
-2. Un enlace a una tarjeta que no existe o está escondida enseña la galería sin abrir nada.
+1. Desde otra pantalla del Hub, toca el atajo a una automatización de la galería: se abre
+   **Automatizaciones** con esa tarjeta desplegada y a la vista.
+2. Si vuelve a tocar un atajo con la pantalla ya abierta, se despliega la tarjeta nueva.
+3. Un atajo a una tarjeta que no existe o está escondida enseña la galería sin abrir nada.
+Entra: la tarjeta que nombra el atajo.
 Sale: nada guardado.
+Si falla: lo mismo que FLOW-F01; una tarjeta que no se puede usar aquí no se abre.
+Implicados: FLOW-F04, FLOW-F20
 
 ### FLOW-F06 Hacer una copia
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f08 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
@@ -269,31 +290,43 @@ Pasos:
 2. Sale «Copia de …» (o «Copia de … (2)») en la lista, en pausa, y el aviso «Copiada, y la copia está en
    pausa. No lleva ninguno de los permisos de la original: concédele lo que necesite antes de
    encenderla.».
+Entra: la automatización que se copia (por voz, por su nombre).
 Sale: una automatización nueva con los mismos pasos, en pausa, sin permisos y sin historial
 (`flow.flow.created`).
 Si falla: el mensaje en rojo arriba; no se crea nada.
+Implicados: FLOW-F02, FLOW-F12
 
 ### FLOW-F07 Borrar una automatización
+<!-- origen: old-hub:HUB-F88 old:flows/workflow/lista-y-galeria.md#flows-f09 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
 1. En la fila, pulsa **Borrar**.
 2. Confirma: «¿Borrar «…»? Esto no se puede deshacer.» con **Sí, bórrala** o **Déjala**.
+Entra: la automatización que se borra (por voz, por su nombre, y siempre con la confirmación).
 Sale: la automatización deja de arrancar al momento y sale de la lista; lo que esperaba se cancela al
 momento; su historial se conserva (`flow.flow.deleted`).
 Si falla: el mensaje en rojo arriba; la fila sigue.
+Implicados: FLOW-F02, FLOW-F16, FLOW-F23
 
 ### FLOW-F08 Leer la guía
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f10 -->
 Estado: hecho (pantalla)
 Actor: propietario, administrador
 Pantalla: Guía
 Pasos:
 1. En la galería, pulsa **¿Cómo funciona esto?**.
-2. Lee los cinco apartados; **Volver a las automatizaciones** regresa.
+2. Lee los cinco apartados. «Lo que todavía no puede hacer» empieza por «Arrancar sola cuando pasa algo
+   en el negocio»: por ahora una automatización de «Pasa algo» solo se ejecuta con **Ejecutar ahora**.
+3. **Volver a las automatizaciones** regresa.
 Entra: nada; los textos van dentro de la app.
+Sale: nada guardado.
+Si falla: no lee nada del negocio; sin permiso, «No tienes permiso».
+Implicados: FLOW-F04, FLOW-F21
 
 ### FLOW-F09 Crear una automatización desde cero
+<!-- origen: old-hub:HUB-F80 old:flows/workflow/editor.md#flows-f12 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Editor de automatización
@@ -304,12 +337,16 @@ Pasos:
 3. Escribe el nombre, elige cuándo arranca (FLOW-F10) y añade los pasos (FLOW-F11).
 4. Pulsa **Guardar**: sale «Guardada.» y el editor sigue abierto sobre ella; ya se le pueden conceder
    permisos (FLOW-F12).
+Entra: lo que escribe en el editor y lo que pueden usar las automatizaciones del negocio (avisos y
+acciones de sus apps activas).
 Sale: una automatización nueva, en pausa salvo que se haya encendido el interruptor antes de guardar, y
 sin permisos (`flow.flow.created`). Sin nombre se guarda como «Automatización sin nombre».
 Si falla: lo que no encaja, en rojo y junto al paso que lo tiene («Elige qué tiene que hacer este
 paso.», «Este aviso no existe en tu negocio.», «Esa fecha y hora ya ha pasado.»…); no se guarda nada.
+Implicados: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Elegir cuándo arranca
+<!-- origen: old-hub:HUB-F108 old:flows/workflow/editor.md#flows-f13 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Editor de automatización
@@ -318,7 +355,8 @@ Pasos:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…) y con
      buscador. Debajo, **Solo cuando…**: condiciones sobre los datos del aviso («el total es mayor que
-     10000»); sin ellas arranca con cada aviso.
+     10000»); sin ellas arranca con cada aviso. Avisa: «Por ahora no arranca sola cuando pasa esto:
+     ejecútala con «Ejecutar ahora». Un horario o una fecha sí arrancan solos.» (FLOW-F21).
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
      en abril) se salta ese mes.
@@ -330,8 +368,10 @@ Sale: el disparador, al **Guardar**.
 Si falla: un aviso que no existe en el negocio, un horario sin hora o una fecha pasada los rechaza el
 servidor al guardar, junto al campo. La fecha solo se mira si cambia: una automatización «Una vez» que ya
 se disparó se puede renombrar o pausar.
+Implicados: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Añadir, ordenar y rellenar los pasos
+<!-- origen: old-hub:HUB-F109 old-hub:HUB-F89 old-hub:HUB-F90 old-hub:HUB-F91 old:flows/workflow/editor.md#flows-f14 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Editor de automatización
@@ -347,36 +387,46 @@ Pasos:
      automatización sigue; para pararla, se añade después un «Solo sigue si…» sobre «Encontró algo».
    - **Solo sigue si…**: una o varias filas «Dato», «Es» («igual a», «distinto de», «uno de», «está
      presente», «contiene», «mayor que», «mayor o igual que», «menor que», «menor o igual que») y
-     «Valor», con **Añadir una condición**. Si no se cumplen todas, la automatización termina ahí sin
-     error.
+     «Valor», con **Añadir una condición**. El «Valor» se escribe o, con **Insertar un dato**, es otro
+     dato de la automatización (el total del aviso frente al mínimo que leyó una consulta), y entonces
+     sale como pastilla con «Quitar este dato». Si no se cumplen todas, la automatización termina ahí
+     sin error.
    - **Esperar**: «Cuánto» y la unidad (minutos, horas o días), contado desde el paso anterior; de un
      minuto a 30 días.
 3. En cada valor, **Insertar un dato** abre «¿Qué dato?», con los datos del aviso y un ejemplo real del
    negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores; se elige,
    no se escribe. Un dato elegido se ve como una pastilla; el resto del valor es texto.
+Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
+pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
+cliente»), nunca con su nombre interno.
 Sale: los pasos, al **Guardar**. Cada acción o consulta que se nombra pasa a pedir su permiso (FLOW-F12).
 Si falla: el servidor rechaza al guardar una acción o una consulta que no existe en el negocio, un dato
 de un paso que no va antes, una condición vacía o una espera fuera de rango, junto al paso.
+Implicados: FLOW-F12, FLOW-F13, FLOW-F16
 
 ### FLOW-F12 Conceder y retirar los permisos
+<!-- origen: old-hub:HUB-F98 old:flows/workflow/editor.md#flows-f19 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Editor de automatización
 Pasos:
 1. Abre **Permisos** (se abre sola al crear desde la galería).
 2. Lee la lista, sacada de los pasos **guardados**: cada acción y cada consulta, dichas en palabras. Lo
-   que falta sale como «Pendiente de tu permiso»; lo concedido, «Autorizado» con **Retirar**. Con cambios
+   que falta sale como «Falta tu permiso»; lo concedido, «Autorizado» con **Retirar**. Con cambios
    sin guardar avisa: «Guárdala primero: lo que autorices es lo guardado.».
 3. Pulsa **Autorizar todo lo que necesita**: sale «Permisos actualizados.».
 Entra: los pasos guardados y los permisos que tiene.
 Sale: la lista completa de permisos de la automatización (`flow.flow.granted`). Antes del primer
 guardado no hay nada que autorizar: la pestaña lo dice y pide guardar.
 Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesita a una persona delante
-(anular, devolver, borrar datos, enviar a Hacienda…: `flow.high_risk`), se rechaza entera y se dice qué.
-Nadie concede lo que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».»
-(también una API key con `flow:write`).
+(anular, devolver, borrar datos, enviar a Hacienda…), se rechaza entera y se dice qué. Nadie concede lo
+que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
+integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
+de quien la montó.
+Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16
 
 ### FLOW-F13 Probar sin que haga nada
+<!-- origen: old:flows/workflow/editor.md#flows-f20 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Editor de automatización
@@ -392,8 +442,12 @@ Pasos:
    permitido …»).
 Entra: lo que hay en el editor, aunque no esté guardado, y el último aviso real de ese tipo.
 Sale: nada: no ejecuta, no guarda.
+Si falla: lo que no encaja en el documento se dice junto al paso; sin permiso para leer los avisos
+reales, «No tienes permiso».
+Implicados: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F14 Guardar y encender desde el editor
+<!-- origen: old-hub:HUB-F80 old-hub:HUB-F86 old:flows/workflow/editor.md#flows-f21 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Editor de automatización
@@ -401,13 +455,18 @@ Pasos:
 1. Mueve el interruptor de la cabecera: la etiqueta pasa a «Activa». Si le faltan permisos avisa como en
    FLOW-F03; si no se ha abierto **Probar**, «Todavía no la has probado…». No impide encenderla.
 2. Pulsa **Guardar** («Guardando…» y después «Guardada.»): se guarda el documento y, si el interruptor
-   cambió, después se enciende o se pausa (`flow.flow.set_enabled`, la única puerta del interruptor).
+   cambió, después se enciende o se pausa.
+Entra: lo que hay en el editor y sus cambios sin guardar.
 Sale: la automatización guardada (`flow.flow.updated`; `flow.flow.enabled` o `flow.flow.paused` si
 cambió el interruptor). Cambiar el disparador o los pasos sube su versión: lo que ya estaba en marcha
 sigue con la versión con la que empezó.
-Si falla: el mensaje en rojo, junto al paso que no encaja; no se guarda nada.
+Si falla: el mensaje en rojo, junto al paso que no encaja; no se guarda nada. Un fallo que el Hub no
+explica (sin conexión) dice «No se ha podido hacer ahora. Vuelve a intentarlo en un momento.», nunca un
+texto técnico; lo escrito sigue en el editor.
+Implicados: FLOW-F03, FLOW-F12, FLOW-F13, FLOW-F15
 
 ### FLOW-F15 Ejecutar a mano
+<!-- origen: old-hub:HUB-F85 old:flows/workflow/editor.md#flows-f22 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Editor de automatización
@@ -423,6 +482,7 @@ un aviso, lo que lee del aviso sale vacío.
 Si falla: en pausa, «Esta automatización está en pausa: enciéndela para ejecutarla.»; sin guardar,
 el botón no sale; con cambios sin guardar está desactivado: «Guárdala primero: «Ejecutar ahora» ejecuta lo
 guardado.».
+Implicados: FLOW-F14, FLOW-F16, FLOW-F21
 
 ### FLOW-F16 Ver qué hizo y por qué falló
 <!-- origen: old-hub:HUB-F102 old:flows/workflow/editor.md#flows-f23 -->
@@ -450,7 +510,9 @@ Si falla: si no se puede leer el historial, el mensaje en rojo con **Reintentar*
 Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
 
 ### FLOW-F17 Pedirle al asistente una automatización
-Estado: hecho (servidor)
+<!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f26 -->
+Estado: parcial — el borrador, su forma y su bandeja están hechos y probados (FLOW-F18, FLOW-F19), pero el
+Hub todavía no tiene asistente: hoy nadie puede pedirlo hablando ni escribiendo.
 Actor: propietario, administrador, asistente
 Pantalla: asistente
 Pasos:
@@ -459,12 +521,15 @@ Pasos:
 2. El asistente escribe un **borrador**: nombre, cuándo arranca, de uno a ocho pasos de «hacer algo»,
    «solo sigue si» o «esperar», y las notas de lo que no supo decidir.
 3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas.
+Entra: lo que se pide, en palabras, y lo que pueden usar las automatizaciones del negocio.
 Sale: un borrador pendiente (`flow.draft.proposed`). **No** crea ninguna automatización, no concede
 permisos y no ejecuta nada.
 Si falla: un borrador que no sigue la forma pedida, o con un paso que lee lo que no deja ningún paso
 anterior, se rechaza antes de guardarlo.
+Implicados: FLOW-F18, FLOW-F19
 
 ### FLOW-F18 Revisar un borrador del asistente y crearlo
+<!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f27 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Automatizaciones
@@ -476,22 +541,29 @@ Pasos:
 2. Corrige y completa los pasos (FLOW-F10, FLOW-F11).
 3. Pulsa **Guardar**: se crea la automatización (en pausa si no se ha tocado el interruptor) y el
    borrador sale de la bandeja como usado, **en la misma operación**: no se puede crear dos veces.
+Entra: el borrador pendiente, tal como lo dejó el asistente, con sus notas.
 Sale: una automatización nueva sin permisos y el borrador usado, con el enlace a ella
 (`flow.flow.created`, `flow.draft.used`). Salir sin guardar deja el borrador en la bandeja.
 Si falla: si no encaja (una acción que no existe aquí), el mensaje junto al paso y no se crea nada; un
 borrador ya decidido, «Ese borrador ya se decidió.».
+Implicados: FLOW-F17, FLOW-F19, FLOW-F12
 
 ### FLOW-F19 Descartar un borrador del asistente
+<!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f28 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Automatizaciones
 Pasos:
-1. En **Propuestas por el asistente**, pulsa × («Descartar»).
+1. En **Propuestas por el asistente**, pulsa × («Descartar») en el borrador que no quiere.
+2. Sale «Descartado.» y el borrador desaparece de la bandeja; los demás siguen.
+Entra: el borrador pendiente.
 Sale: el borrador descartado (`flow.draft.dismissed`), que se conserva como registro.
 Si falla: uno ya decidido no se puede volver a decidir: «Ese borrador ya se decidió.».
+Implicados: FLOW-F17, FLOW-F18
 
 ### FLOW-F20 Otra app pregunta si una automatización ya está montada
-Estado: hecho (servidor)
+<!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f29 -->
+Estado: hecho
 Actor: otra app, asistente
 Pantalla: ninguna
 Pasos:
@@ -499,7 +571,11 @@ Pasos:
 2. Recibe tres números: cuántas automatizaciones arrancan con ese aviso y pueden hacer esa acción,
    cuántas de ellas están encendidas y cuántas escuchan ese aviso pero todavía no tienen ningún permiso
    (a medio montar).
-Sale: tres números; ningún nombre ni contenido.
+Entra: el aviso y la acción por los que pregunta; pide el permiso de ver automatizaciones.
+Sale: tres números; ningún nombre ni contenido. Hoy ninguna app la usa todavía; el asistente también
+puede preguntarla.
+Si falla: sin el permiso de ver automatizaciones, se rechaza.
+Implicados: FLOW-F05
 
 ### FLOW-F21 Cuando pasa algo en el negocio, la automatización arranca
 <!-- origen: old-hub:HUB-F110 old-hub:HUB-F82 -->
