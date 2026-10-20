@@ -141,7 +141,7 @@ máximas», la casilla «Se puede elegir la misma opción más de una vez» y «
 | COMBO-F10 | Bajar el stock de cada plato al cobrar | contrato probado con Inventario real; el aviso lo manda Ventas (pedido a Ventas) |
 | COMBO-F11 | Mandar el menú a cocina | contrato hecho; la comanda la arma Ventas y la pinta Cocina (pedido a Ventas y a Cocina) |
 | COMBO-F12 | Marcar una elección como agotada | hecho |
-| COMBO-F13 | Cuando un producto deja el catálogo | hecho — la reacción está declarada; la entrega entre apps la hace el relay del outbox (fase 2); mientras, la elección se ve y se trata como huérfana al leerla |
+| COMBO-F13 | Cuando un producto deja el catálogo | parcial — quitar solas de todos los menús las elecciones de un producto eliminado llega con el reparto de avisos entre apps (fase 2); hasta entonces se quedan marcadas, no se ofrecen ni se cobran y se quitan a mano |
 
 ### COMBO-F01 Consultar y buscar los menús
 Estado: hecho
@@ -402,20 +402,22 @@ en el TPV y el aviso del constructor lo dice.
 Implicados: COMBO-F07
 
 ### COMBO-F13 Cuando un producto deja el catálogo
-Estado: hecho — la reacción está declarada; el aviso de Inventario se lo entrega el relay del outbox
-(fase 2). Mientras tanto, y siempre, la elección de un producto desactivado o eliminado no se ofrece
-ni se cobra.
-Actor: sistema
+<!-- origen: old:combos/WORKFLOW.md#combos-f06 old:combos/WORKFLOW.md#combos-f09 -->
+Estado: parcial — quitar solas de todos los menús las elecciones de un producto eliminado llega con el reparto de avisos entre apps (fase 2); hasta entonces se quedan marcadas, no se ofrecen ni se cobran y se quitan a mano
+Actor: sistema, propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
 Pasos:
 1. Alguien desactiva un producto en Inventario: sus elecciones siguen en los menús, marcadas
    «Desactivado en Inventario», y el TPV no las ofrece hasta que se reactive.
-2. Alguien elimina un producto en Inventario: Menús quita sus elecciones de todos los menús (es
-   definitivo: un producto eliminado no vuelve).
-Entra: el aviso de producto eliminado de Inventario.
-Sale: las elecciones quitadas (avisa: elección quitada, con el motivo).
-Si falla: la quita es idempotente: el mismo aviso dos veces no hace nada más.
-Implicados: INVENTORY-F04
+2. Alguien elimina un producto en Inventario: sus elecciones siguen en los menús, marcadas «Ya no está
+   en el catálogo», y el TPV no las ofrece ni se pueden cobrar (es definitivo: un producto eliminado no
+   vuelve).
+3. En el constructor del menú, quita cada una con su papelera, como cualquier otra elección (COMBO-F06).
+Entra: el producto desactivado o eliminado en Inventario.
+Sale: las elecciones marcadas y, al quitarlas, fuera del menú (avisa: elección quitada).
+Si falla: si un plato obligatorio se queda sin bastantes elecciones que ofrecer, el menú deja de salir
+en el TPV y el aviso del constructor dice por qué.
+Implicados: INVENTORY-F04, COMBO-F06
 
 ## Servicios: lo que entra y lo que sale
 
@@ -468,7 +470,7 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 
 | Aviso de | Qué hace Menús | Flujos | Servicio que escucha |
 |---|---|---|---|
-| Inventario: producto eliminado | Quita sus elecciones de todos los menús | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
+| Inventario: producto eliminado | Quita sus elecciones de todos los menús (cuando llegue el reparto de avisos entre apps, fase 2; hasta entonces se quitan a mano) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
 
 Además, los cambios de producto de Inventario (`inventory.product.updated`, `.deleted`) vuelven a
 leer en vivo el constructor y el catálogo del TPV: el nombre, el precio y si está activo son de
@@ -537,7 +539,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
   `test_integration_tax.py` y `test_concurrency.py`.
 - `requires = ["inventory", "tax"]`: `ChoiceOption.product` es FK a `inventory.Product` (`CASCADE`;
-  Inventario borra lógicamente, así que en la práctica la quita la reacción de F13) y
+  Inventario borra lógicamente, así que la quitará la reacción de F13 cuando el relay del outbox la
+  entregue, fase 2; hasta entonces, la papelera del constructor) y
   `Combo.tax_category` FK a `tax.TaxCategory` (`PROTECT`; Impuestos nunca borra una categoría). La
   migración depende de `inventory 0001` y `tax 0005`.
 - Modelos: `Combo` (precio en céntimos ≥ 0; `supply_kind` `service` | `goods`; restricción: `service`
@@ -611,7 +614,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   NO hace»); un producto de tipo servicio de Inventario sí.
 - **Solo productos activos y que se venden por unidades** al añadir (antes, cualquier id).
 - **Agotado** (COMBO-F12) es nuevo: antes había que quitar la elección y volver a ponerla.
-- **Producto eliminado** (COMBO-F13) es nuevo: antes la elección quedaba colgando.
+- **Producto eliminado** (COMBO-F13): la elección se marca «Ya no está en el catálogo» y el TPV no la
+  ofrece ni la cobra; antes quedaba colgando. Que se quite sola de todos los menús llega con el relay
+  del outbox (fase 2): la reacción ya está escrita y probada entregando el aviso real.
 - **Un plato obligatorio sin elecciones bloquea el menú en el TPV**: antes no llegaba a Ventas y el
   menú se vendía sin él. El constructor dice por qué un menú no sale en el TPV.
 - **Cambiar solo lo enviado**: editar un plato ya no lo manda al primer puesto ni pone mínimo y máximo
