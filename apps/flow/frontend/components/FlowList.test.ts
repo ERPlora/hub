@@ -59,6 +59,15 @@ async function setup(rows: FlowOut[] = [flow('f1'), flow('f2', { enabled: false,
 }
 
 describe('FlowList', () => {
+  it('says once when its first page is painted, so a link can bring a card below into view (FLOW-F05)', async () => {
+    const m = await mountFlow(FlowList, { props: { catalog: CATALOG, allTotal: 1 } });
+    await m.live();
+    expect(m.wrapper.emitted('ready')).toBeUndefined();
+    await m.result(OP, page([flow('f1')], 1));
+    await m.result(OP, page([flow('f1'), flow('f2')], 2));
+    expect(m.wrapper.emitted('ready')).toHaveLength(1);
+  });
+
   it('follows the list live, the last touched first, 50 a page', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ sort: '-updated_at', limit: 50, offset: 0 }]);

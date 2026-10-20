@@ -30,6 +30,15 @@ async function setup(rows: DraftOut[], answer: [number, unknown] = [200, { ...dr
 }
 
 describe('DraftTray', () => {
+  it('says once when its first answer is painted (FLOW-F05)', async () => {
+    const m = await mountFlow(DraftTray);
+    await m.live();
+    expect(m.wrapper.emitted('ready')).toBeUndefined();
+    await m.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
+    await m.result(OP, { rows: [draft('d1', 'x')], total: 1, limit: 50, offset: 0 });
+    expect(m.wrapper.emitted('ready')).toHaveLength(1);
+  });
+
   it('hides itself when nothing waits', async () => {
     const m = await setup([]);
     expect(m.find('flow-drafts').exists()).toBe(false);

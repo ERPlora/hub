@@ -56,8 +56,23 @@ describe('AutomationsPage', () => {
     expect(m.router.currentRoute.value.fullPath).toBe('/flow/automations/f1');
   });
 
+  it('a link opens its card only once what is above the gallery is painted, so it stays in view (FLOW-F05)', async () => {
+    const m = await setup('/flow/automations?template=noShow', [flow('f1')]);
+    const gallery = () => m.wrapper.findComponent(FlowGallery).props('openCard');
+    expect(gallery()).toBeNull();
+    m.wrapper.findComponent(DraftTray).vm.$emit('ready');
+    await settle();
+    expect(gallery()).toBeNull();
+    m.wrapper.findComponent(FlowList).vm.$emit('ready');
+    await settle();
+    expect(gallery()).toBe('noShow');
+  });
+
   it('a link opens its card of the gallery; the guide is a page of its own', async () => {
     const m = await setup('/flow/automations?template=noShow');
+    expect(m.wrapper.findComponent(FlowGallery).props('openCard')).toBeNull();
+    m.wrapper.findComponent(DraftTray).vm.$emit('ready');
+    await settle();
     expect(m.wrapper.findComponent(FlowGallery).props('openCard')).toBe('noShow');
     m.wrapper.findComponent(FlowGallery).vm.$emit('guide');
     await settle();

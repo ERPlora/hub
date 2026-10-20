@@ -27,7 +27,7 @@ import { describeTrigger, runStatusPill, statePill } from '../lib/phrasing';
 import type { CatalogOut, FlowListIn, FlowOut, TriggerKind } from '../operations';
 
 defineProps<{ catalog: CatalogOut | null; /** Automations of the business, unfiltered. */ allTotal: number }>();
-const emit = defineEmits<{ open: [flow: FlowOut] }>();
+const emit = defineEmits<{ open: [flow: FlowOut]; ready: [] }>();
 const phrasing = usePhrasing();
 const { confirm } = useConfirm();
 
@@ -48,6 +48,18 @@ const query = computed<Omit<FlowListIn, 'limit' | 'offset'>>(() => ({
 }));
 const { data: result, status, error: listError, refresh } = useLiveList('flow.flow.list', () => query.value, () => table.windows.value);
 table.followResult(result);
+// Its first page (or failure) is painted: the page opens a linked card of the gallery below only then.
+let told = false;
+watch(
+  () => result.value ?? listError.value,
+  (answer) => {
+    if (answer && !told) {
+      told = true;
+      emit('ready');
+    }
+  },
+  { immediate: true },
+);
 
 const selected = ref<string[]>([]);
 const error = shallowRef<ApiError | null>(null);

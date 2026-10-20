@@ -9,7 +9,7 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import DraftTray from '../components/DraftTray.vue';
@@ -29,7 +29,16 @@ const all = useLive('flow.flow.list', { limit: 100 });
 const flows = computed(() => all.data.value?.rows ?? []);
 const total = computed(() => all.data.value?.total ?? 0);
 const blocked = computed(() => blockingError(all.error.value));
-const openCard = computed(() => (typeof route.query.template === 'string' ? route.query.template : null));
+// A link's card opens once what is above the gallery has its first answer — the drafts, and the list
+// when there is one —: opened earlier, the list would push it out of view (FLOW-F05).
+const draftsReady = ref(false);
+const listReady = ref(false);
+const aboveReady = computed(
+  () => draftsReady.value && !!(all.data.value || all.error.value) && (total.value === 0 || listReady.value),
+);
+const openCard = computed(() =>
+  aboveReady.value && typeof route.query.template === 'string' ? route.query.template : null,
+);
 
 function openFlow(flow: FlowOut, tab?: string): void {
   void router.push(tab ? `/flow/automations/${flow.id}?tab=${tab}` : `/flow/automations/${flow.id}`);
@@ -59,12 +68,13 @@ function openFlow(flow: FlowOut, tab?: string): void {
       v-if="!blocked"
       class="flow-page"
     >
-      <DraftTray />
+      <DraftTray @ready="draftsReady = true" />
       <FlowList
         v-if="total > 0"
         :catalog="catalog"
         :all-total="total"
         @open="openFlow($event)"
+        @ready="listReady = true"
       />
       <InlineFeedback
         v-if="catalogError"
