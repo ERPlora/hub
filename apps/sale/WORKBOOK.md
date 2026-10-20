@@ -244,10 +244,11 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F34 | Ajustar el TPV | común | hecho |
 | SALE-F35 | Dar de alta y ordenar las secciones del precio libre | común | hecho |
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
-| SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | parcial |
+| SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
+<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f11 wf:restaurante-dia#rec_restaurante-f17 wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal fi:modules/sales#command-sales-complete_sale-handler-wasm-complete_sale fi:modules/sales#event-emitidos-consumidos fi:modules/sales#navigation old:sales/workflow/vender-y-cobrar.md#sales-f01 qa:modules/sales/cash-payment-with-change qa:modules/sales/quick-counter-sale -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -285,6 +286,7 @@ otra cantidad u otro descuento del que guarda la cuenta.
 Implicados: INVENTORY-F21, CUSTOMER-F20, TAX-F18
 
 ### SALE-F02 Cobrar con tarjeta u otro medio sin cambio
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 fi:modules/sales#query-sales-payment_methods old:sales/workflow/vender-y-cobrar.md#sales-f02 qa:modules/sales/card-payment -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -305,6 +307,7 @@ disponible en este negocio.».
 Implicados: ninguno
 
 ### SALE-F03 Repartir el cobro entre varios medios de pago
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 fi:modules/sales#command-sales-complete_sale-handler-wasm-complete_sale old:sales/workflow/vender-y-cobrar.md#sales-f03 qa:modules/sales/mixed-payment -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -328,6 +331,7 @@ párrafo 2): en una cuenta de 1.000 € o más ningún cobro parcial puede lleva
 Implicados: ninguno
 
 ### SALE-F04 Elegir tique o factura y los datos del cliente
+<!-- origen: wf:restaurante-dia#rec_restaurante-f12 wf:peluqueria-dia#rec_peluqueria-f11 wf:cadena-fiscal#rec_fiscal-f03 qa:verticals/restaurant/07-payment-and-fiscal fi:modules/sales#command-sales-set_document_type-sql-transaccional old:sales/workflow/vender-y-cobrar.md#sales-f04 qa:modules/sales/sale-with-identified-customer -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -363,6 +367,7 @@ corrigen: nunca queda una factura «pendiente» que no se podría emitir.
 Implicados: CUSTOMER-F17, INVOICE-F02
 
 ### SALE-F05 Cobrar cuando el negocio exige cliente
+<!-- origen: qa:modules/sales/sale-with-identified-customer old:sales/workflow/vender-y-cobrar.md#sales-f05 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -380,6 +385,7 @@ venta.».
 Implicados: CUSTOMER-F17, CUSTOMER-F18
 
 ### SALE-F06 Recuperar un cobro que se quedó sin respuesta
+<!-- origen: old:sales/workflow/vender-y-cobrar.md#sales-f06 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -426,6 +432,7 @@ libre sigue disponible. Si VeriFactu no se puede leer, no hay aviso: el propio c
 Implicados: INVENTORY-F04, VERIFACTU-F08
 
 ### SALE-F08 Cobrar sin la caja abierta
+<!-- origen: old:sales/workflow/vender-y-cobrar.md#sales-f08 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -447,6 +454,7 @@ el bloqueo cede antes que parar las ventas, y Caja enseña ese cobro entre los d
 Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Vender a precio libre por sección
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f09 -->
 Estado: hecho
 Vertical: común
 Actor: responsable (empleado con el permiso de precio libre)
@@ -466,6 +474,7 @@ un responsable» y el servidor rechaza la línea por cualquier vía (también al
 Implicados: TAX-F18
 
 ### SALE-F10 Vender por peso, tecleando la cantidad
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f10 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -553,6 +562,7 @@ uno pedido por la API se rechaza («Menús y combos no está activa en este nego
 Implicados: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22
 
 ### SALE-F13 Poner una nota en una línea
+<!-- origen: wf:restaurante-dia#rec_restaurante-f06 old:sales/workflow/la-cuenta.md#sales-f13 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -571,6 +581,7 @@ como estaba.». Una línea ya enviada a cocina no tiene botón de nota.
 Implicados: ninguno
 
 ### SALE-F14 Aplicar un descuento a una línea o a la cuenta
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f14 qa:modules/sales/apply-discount -->
 Estado: parcial — sin el PIN del encargado en el dispositivo del empleado (elevación de la plataforma): el descuento por encima del máximo lo aplica un responsable desde su sesión
 Vertical: común
 Actor: empleado, responsable
@@ -596,6 +607,7 @@ Pendiente: el PIN del encargado sobre el dispositivo del empleado llega con la e
 plataforma; mientras, el empleado le pasa el dispositivo o el responsable lo aplica desde el suyo.
 
 ### SALE-F15 Invitar una línea
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f15 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -611,6 +623,7 @@ línea ya enviada a cocina no se puede invitar.
 Implicados: INVENTORY-F21
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
+<!-- origen: fi:modules/sales#query-sales-by_staff old:sales/workflow/la-cuenta.md#sales-f16 wf:peluqueria-dia#rec_peluqueria-f15 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -631,6 +644,7 @@ cocina no se reasigna.
 Implicados: STAFF-F21
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
+<!-- origen: fi:modules/sales#command-sales-cart-save-sql-transaccional fi:modules/sales#command-sales-park_ticket-sql-transaccional fi:modules/sales#command-sales-retrieve_ticket-sql-transaccional fi:modules/sales#query-sales-cart-get fi:modules/sales#query-sales-parked_tickets old:sales/workflow/la-cuenta.md#sales-f17 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -652,6 +666,7 @@ apagado no hay botón de aparcar en ningún sitio.
 Implicados: CUSTOMER-F19
 
 ### SALE-F18 Eliminar una cuenta abierta
+<!-- origen: wf:restaurante-dia#rec_restaurante-f14 fi:modules/sales#command-sales-cart-clear-sql-transaccional old:sales/workflow/la-cuenta.md#sales-f18 qa:modules/sales/void-sale -->
 Estado: hecho
 Vertical: común
 Actor: responsable; una cuenta vacía, también el empleado
@@ -673,6 +688,7 @@ permiso de anular (403).
 Implicados: TABLE-F20, TABLE-F21
 
 ### SALE-F19 Abrir la cuenta de una mesa y dejarla en la mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old:sales/workflow/sala-y-cocina.md#sales-f19 -->
 Estado: hecho — sin preguntar los comensales en el TPV (ver «Lo que queda fuera»)
 Vertical: restaurante
 Actor: empleado, responsable
@@ -736,6 +752,7 @@ cobra como siempre.
 Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F29
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
+<!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->
 Estado: hecho — imprime con el diálogo de impresión del dispositivo hasta que exista Impresión
 Vertical: restaurante
 Actor: empleado, responsable
@@ -753,6 +770,7 @@ Pendiente: la impresora de tiques en red llega con Impresión; hasta entonces se
 diálogo de impresión del dispositivo.
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 old:sales/workflow/sala-y-cocina.md#sales-f22 qa:modules/sales/split-bill -->
 Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
@@ -775,6 +793,7 @@ hoja y avisa; no queda una cuenta fantasma.
 Implicados: ninguno
 
 ### SALE-F23 Dividir la cuenta de una mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/split-bill old:sales/workflow/sala-y-cocina.md#sales-f23 qa:modules/sales/transfer-lines-between-tables -->
 Estado: hecho — el botón «Dividir cuenta» es del control de mesa de Mesas (TABLE-F17)
 Vertical: restaurante
 Actor: empleado, responsable
@@ -790,6 +809,7 @@ Si falla: si otro dispositivo está cobrando esa cuenta, la división espera y, 
 Implicados: TABLE-F17
 
 ### SALE-F24 Juntar las cuentas de dos mesas
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 old:sales/workflow/sala-y-cocina.md#sales-f24 -->
 Estado: hecho — el botón «Fusionar» es del control de mesa de Mesas (TABLE-F16)
 Vertical: restaurante
 Actor: empleado, responsable
@@ -805,6 +825,7 @@ Si falla: si una de las dos ya no está abierta, se rechaza sin mover nada.
 Implicados: TABLE-F16, KITCHEN-F28
 
 ### SALE-F25 Pasar la cuenta a otra mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/transfer-lines-between-tables old:sales/workflow/sala-y-cocina.md#sales-f25 -->
 Estado: hecho en Mesas (TABLE-F15): la cuenta no cambia
 Vertical: restaurante
 Actor: empleado, responsable
@@ -818,6 +839,7 @@ Si falla: lo dirá Mesas.
 Implicados: TABLE-F15
 
 ### SALE-F26 Cobrar una cita desde la agenda
+<!-- origen: qa:modules/appointments/convert-appointment-to-sale qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 old:sales/workflow/peluqueria.md#sales-f26 -->
 Estado: hecho — el botón «Cobrar» de la agenda es de Citas (APPOINTMENT-F17)
 Vertical: peluquería
 Actor: empleado, responsable
@@ -838,6 +860,7 @@ dice («Esa cuenta ya no está abierta…») y sigue como estaba.
 Implicados: APPOINTMENTS-F17
 
 ### SALE-F27 Pagar una línea con un bono
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:sales/workflow/peluqueria.md#sales-f27 qa:modules/sales/voucher-or-session-package -->
 Estado: hecho
 Vertical: peluquería
 Actor: empleado, responsable
@@ -912,6 +935,7 @@ puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo
 Implicados: STAFF-F21
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
+<!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
 Estado: hecho — sin el QR de VeriFactu, que llega con su app
 Vertical: común
 Actor: empleado, responsable
@@ -945,6 +969,7 @@ Pendiente: el QR de VeriFactu llega con su app; el A4 de una factura con los dat
 imprime Facturación (INVOICE-F18).
 
 ### SALE-F30 Anular una venta cobrada
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 wf:cadena-fiscal#rec_fiscal-f13 qa:modules/sales/void-sale fi:modules/sales#command-sales-void-sql-transaccional old:sales/workflow/historial-y-correcciones.md#sales-f30 -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -968,6 +993,7 @@ dentro de la ventana, que sigue abierta. Sin permiso no aparece «Anular».
 Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 old:sales/workflow/historial-y-correcciones.md#sales-f31 qa:modules/sales/refund-sale -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -1003,6 +1029,7 @@ Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUS
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
 
 ### SALE-F32 Devolver la sesión de un bono
+<!-- origen: old:sales/workflow/historial-y-correcciones.md#sales-f32 -->
 Estado: hecho
 Vertical: peluquería
 Actor: responsable
@@ -1027,6 +1054,7 @@ tests.
 Implicados: SERVICE-F26, SERVICE-F27
 
 ### SALE-F33 Unir las ventas de dos fichas de cliente
+<!-- origen: old:sales/workflow/historial-y-correcciones.md#sales-f33 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -1040,6 +1068,7 @@ Si falla: no hay pantalla; repetirlo no cambia nada.
 Implicados: CUSTOMER-F13
 
 ### SALE-F34 Ajustar el TPV
+<!-- origen: old-hub:HUB_SHELL-F76 fi:modules/sales#command-sales-settings-update-sql-transaccional fi:modules/sales#permission-role_permissions fi:modules/sales#query-sales-settings-get old:sales/workflow/configuracion.md#sales-f34 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador
@@ -1064,6 +1093,7 @@ aceptar todos los medios activos.
 Implicados: ninguno
 
 ### SALE-F35 Dar de alta y ordenar las secciones del precio libre
+<!-- origen: old:sales/workflow/configuracion.md#sales-f35 -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -1083,6 +1113,7 @@ borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a 
 Implicados: TAX-F01
 
 ### SALE-F36 Preparar las notas rápidas
+<!-- origen: old:sales/workflow/configuracion.md#sales-f36 -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -1100,10 +1131,11 @@ no está en este negocio. Recarga la lista y vuelve a intentarlo.».
 Implicados: ninguno
 
 ### SALE-F37 Añadir un medio de pago (Bizum, transferencia…)
-Estado: hecho — sin pantalla, como el producto actual (asistente o API)
+<!-- origen: fi:modules/sales#query-sales-payment_methods fi:modules/sales#command-sales-create_payment_method-sql-transaccional old:sales/workflow/configuracion.md#sales-f37 -->
+Estado: hecho
 Vertical: común
 Actor: responsable, asistente
-Pantalla: ninguna (asistente o API)
+Pantalla: ninguna (asistente o API), como el producto actual
 Pasos:
 1. Pide al asistente que añada el medio y di de qué tipo es («añade Bizum como forma de pago, de tipo
    otro»): sin tipo se crea como efectivo.
@@ -1115,6 +1147,7 @@ Si falla: un nombre repetido se rechaza: «Ya hay una forma de pago con ese nomb
 Implicados: ninguno
 
 ### SALE-F38 Vender un servicio de Servicios
+<!-- origen: gh:sales#89 gh:sales#146 -->
 Estado: hecho
 Vertical: peluquería
 Actor: empleado, responsable
