@@ -123,6 +123,19 @@ describe('the gallery', () => {
     );
   });
 
+  it('a card on the clock is known by its schedule and its actions, whatever it is called (flows#68)', () => {
+    const weekly = templateById('weekReview')!;
+    const morning = templateById('morning')!;
+    const onFridays = { kind: 'schedule' as const, every: 'week' as const, weekday: 4, time: '19:30' };
+    // Renamed, or made in Spanish and looked at in English: still the business's own.
+    expect(existingFor(weekly, [flow({ name: 'Viernes: repaso', trigger: onFridays })], phrasing())?.id).toBe('f1');
+    expect(existingFor(weekly, [flow({ name: 'Repasar la semana el viernes', trigger: onFridays })], phrasing())?.id).toBe('f1');
+    // Every day is another card; without its actions it is not this one.
+    expect(existingFor(weekly, [flow({ name: 'Mine', trigger: { kind: 'schedule', every: 'day', time: '18:00' } })], phrasing())).toBeUndefined();
+    expect(existingFor(morning, [flow({ name: 'Mine', trigger: { kind: 'schedule', every: 'day', time: '08:30' }, steps: [] })], phrasing())).toBeUndefined();
+    expect(existingFor(morning, [flow({ name: 'Mine', trigger: { kind: 'schedule', every: 'day', time: '08:30' } })], phrasing())?.id).toBe('f1');
+  });
+
   it('warns that another automation already starts with the same thing', () => {
     const welcome = templateById('welcome')!;
     expect(alreadyFires(welcome, [flow({ name: 'Mine', steps: [] })])?.name).toBe('Mine');

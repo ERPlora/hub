@@ -159,9 +159,13 @@ export function cardGrants(card: FlowTemplate): string[] {
   return requiredGrants(card.build(neutral).steps);
 }
 
-function cardEvent(card: FlowTemplate): string | null {
+function cardTrigger(card: FlowTemplate): Trigger {
   const neutral: Phrasing = { t: (key) => key, te: () => false, locale: 'en' };
-  const trigger = card.build(neutral).trigger;
+  return card.build(neutral).trigger;
+}
+
+function cardEvent(card: FlowTemplate): string | null {
+  const trigger = cardTrigger(card);
   return trigger.kind === 'event' ? trigger.event : null;
 }
 
@@ -186,17 +190,19 @@ export function missingApps(cards: readonly FlowTemplate[], catalog: CatalogOut)
   return [...new Set(cards.flatMap((card) => lacking(card, catalog)))].sort();
 }
 
-/** The automation of the business that is this card: same event and its actions, or (a card on the
- *  clock) the same name. */
+/** The automation of the business that is this card: same event and its actions; a card on the clock,
+ *  the same name or the same «every day / week / month» with its actions, whatever it was renamed to
+ *  or the language it was made in (flows#68). */
 export function existingFor(card: FlowTemplate, flows: readonly FlowOut[], p: Phrasing): FlowOut | undefined {
   const name = cardEvent(card);
+  const clock = cardTrigger(card);
   const operations = cardGrants(card);
   return flows.find((flow) => {
-    if (name) {
-      const has = flow.steps.map((step) => ('operation' in step ? step.operation : ''));
-      return flow.trigger.kind === 'event' && flow.trigger.event === name && operations.every((operation) => has.includes(operation));
-    }
-    return flow.name === cardName(card, p);
+    const has = flow.steps.map((step) => ('operation' in step ? step.operation : ''));
+    const doesWhatItDoes = operations.every((operation) => has.includes(operation));
+    if (name) return flow.trigger.kind === 'event' && flow.trigger.event === name && doesWhatItDoes;
+    if (flow.name === cardName(card, p)) return true;
+    return clock.kind === 'schedule' && flow.trigger.kind === 'schedule' && flow.trigger.every === clock.every && doesWhatItDoes;
   });
 }
 
