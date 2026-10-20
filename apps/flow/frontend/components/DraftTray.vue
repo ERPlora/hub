@@ -11,6 +11,7 @@ import { computed, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useT } from '../composables/useT';
+import { wording } from '../lib/refusal';
 
 const t = useT();
 const router = useRouter();
@@ -47,7 +48,7 @@ async function discard(id: string): Promise<void> {
       tone="danger"
       data-testid="flow-drafts-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.action')) }}
     </InlineFeedback>
     <div
       v-for="draft in rows"

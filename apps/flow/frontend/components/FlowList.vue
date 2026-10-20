@@ -21,6 +21,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import { useServerTable } from '../composables/useServerTable';
 import { describeTrigger, runStatusPill, statePill } from '../lib/phrasing';
 import type { CatalogOut, FlowListIn, FlowOut, TriggerKind } from '../operations';
@@ -125,7 +126,7 @@ const actions = computed<DataTableAction<FlowOut>[]>(() => [
   { id: 'delete', label: phrasing.value.t('flow.list.delete'), icon: 'ion:trash-outline', color: 'danger' },
 ]);
 
-const tableError = computed(() => (status.value === 'error' && listError.value ? listError.value.message : undefined));
+const tableError = computed(() => (status.value === 'error' && listError.value ? wording(listError.value, phrasing.value.t('flow.errors.read')) : undefined));
 </script>
 
 <template>
@@ -141,7 +142,7 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
       tone="danger"
       data-testid="flow-list-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.action')) }}
     </InlineFeedback>
     <DataTable
       v-model:search="table.search.value"

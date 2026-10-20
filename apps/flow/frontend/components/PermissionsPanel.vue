@@ -12,6 +12,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import { missingGrants, requiredGrants } from '../lib/document';
 import { actionLabel } from '../lib/phrasing';
 import type { CatalogOut, FlowOut } from '../operations';
@@ -52,7 +53,7 @@ async function send(operations: string[]): Promise<void> {
       tone="danger"
       data-testid="flow-perm-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.action')) }}
     </InlineFeedback>
     <InlineFeedback
       v-if="flow && dirty"

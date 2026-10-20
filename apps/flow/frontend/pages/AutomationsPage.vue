@@ -17,6 +17,7 @@ import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useCatalog } from '../composables/useCatalog';
+import { wording } from '../lib/refusal';
 import type { FlowOut } from '../operations';
 
 const route = useRoute();
@@ -70,7 +71,7 @@ function openFlow(flow: FlowOut, tab?: string): void {
         tone="danger"
         data-testid="flow-catalog-error"
       >
-        {{ $t('flow.catalogError') }} {{ catalogError.message }}
+        {{ $t('flow.catalogError') }} {{ wording(catalogError, '') }}
         <IonButton
           size="small"
           fill="clear"

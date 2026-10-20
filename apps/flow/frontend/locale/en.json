@@ -2382,6 +2382,10 @@
       "zone_name": "Zone name",
       "zones": "Zones"
     },
-    "catalogError": "What automations can use here could not be read."
+    "catalogError": "What automations can use here could not be read.",
+    "errors": {
+      "action": "It could not be done right now. Try again in a moment.",
+      "read": "It could not be read right now. Try again in a moment."
+    }
   }
 }

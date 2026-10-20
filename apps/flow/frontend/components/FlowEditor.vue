@@ -15,6 +15,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useCatalog } from '../composables/useCatalog';
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import {
   addStep,
   type DataChoice,
@@ -203,7 +204,7 @@ async function save(): Promise<void> {
     emit('saved', flow);
   } catch (failure) {
     const refused = failure as ApiError;
-    problem.value = refused.message;
+    problem.value = wording(refused, phrasing.value.t('flow.errors.action'));
     errors.value = fieldErrors(refused.fields);
     openFirstError(errors.value);
   }
@@ -226,7 +227,7 @@ async function run(): Promise<void> {
     if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
     else void toastSuccess(t(ran.status === 'waiting' ? 'flow.editor.ranWaiting' : 'flow.editor.ran'));
   } catch (failure) {
-    problem.value = (failure as ApiError).message;
+    problem.value = wording(failure, phrasing.value.t('flow.errors.action'));
   }
 }
 
@@ -316,7 +317,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
         tone="danger"
         data-testid="flow-catalog-error"
       >
-        {{ $t('flow.catalogError') }} {{ catalogError.message }}
+        {{ $t('flow.catalogError') }} {{ wording(catalogError, '') }}
         <IonButton
           size="small"
           fill="clear"

@@ -13,6 +13,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import { toPayload } from '../lib/document';
 import { actionLabel, statePill } from '../lib/phrasing';
 import {
@@ -177,7 +178,7 @@ const T = (card: FlowTemplate, key: string): string => phrasing.value.t(`flow.ga
               tone="danger"
               :data-testid="`flow-card-error-${card.id}`"
             >
-              {{ errors[card.id].message }}
+              {{ wording(errors[card.id], $t('flow.errors.action')) }}
             </InlineFeedback>
             <div class="flow-gallery__actions">
               <IonButton

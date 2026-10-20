@@ -2382,6 +2382,10 @@
       "zone_name": "Nombre de la zona",
       "zones": "Zonas"
     },
-    "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones."
+    "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
+    "errors": {
+      "action": "No se ha podido hacer ahora. Vuelve a intentarlo en un momento.",
+      "read": "No se ha podido leer ahora. Vuelve a intentarlo en un momento."
+    }
   }
 }
