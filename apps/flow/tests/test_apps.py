@@ -36,6 +36,8 @@ COMMANDS = {
     "flow.run.retry",
     "flow.secret.set",
     "flow.secret.delete",
+    "flow.run.claim_call",
+    "flow.run.record_call",
 }
 # What the assistant confirms before running: turning on or off, granting, running by hand or resuming
 # a failed run, deleting.
@@ -49,7 +51,14 @@ HIGH_RISK = {
     "flow.secret.delete",
 }
 # Run only by the platform: the reaction to every event and the three scheduled tasks.
-SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due", "flow.run.prune"}
+SYSTEM = {
+    "flow.run.react",
+    "flow.schedule.fire_due",
+    "flow.run.resume_due",
+    "flow.run.prune",
+    "flow.run.claim_call",
+    "flow.run.record_call",
+}
 
 
 def flow_app():

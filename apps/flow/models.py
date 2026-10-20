@@ -92,6 +92,10 @@ class FlowRun(UUIDModel):
     class Status(models.TextChoices):
         RUNNING = "running", pgettext_lazy("run status", "Running")
         WAITING = "waiting", pgettext_lazy("run status", "Waiting")
+        # A «Call another system» step is out (FLOW-F27): the call goes after the COMMIT.
+        CALLING = "calling", pgettext_lazy("run status", "Calling another system")
+        # A «Ask somebody first» step waits for its answer (FLOW-F28).
+        ASKING = "asking", pgettext_lazy("run status", "Waiting for an answer")
         SUCCEEDED = "succeeded", pgettext_lazy("run status", "Finished well")
         STOPPED = "stopped", pgettext_lazy("run status", "Stopped by a condition")
         FAILED = "failed", pgettext_lazy("run status", "Stopped by an error")
@@ -124,6 +128,7 @@ class FlowRun(UUIDModel):
     outputs = models.JSONField(_("outputs"), default=dict, blank=True)
     error_code = models.CharField(_("error code"), max_length=96, blank=True)
     error_message = models.TextField(_("error"), blank=True)
+    # When a wait ends; for a call (``calling``), when it may be sent (again): a lease of CALL_LEASE_MINUTES.
     resume_at = models.DateTimeField(_("resumes at"), null=True, blank=True)
     # The automations whose steps caused the event that started this one (loop guard).
     chain = models.JSONField(_("chain"), default=list, blank=True)
@@ -144,6 +149,8 @@ class FlowRun(UUIDModel):
                     status__in=[
                         "running",
                         "waiting",
+                        "calling",
+                        "asking",
                         "succeeded",
                         "stopped",
                         "failed",

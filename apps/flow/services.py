@@ -20,18 +20,20 @@ started by an event that a run of the same automation caused, or by a chain of m
 import datetime as dt
 import logging
 import uuid
+from functools import partial
 from typing import Any
 
 import pydantic
+from django.db import transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import Operation, operation
+from live.operations import Operation, get, operation
 from live.outbox import record_event
 
-from apps.flow import document, events, vault
+from apps.flow import document, events, http, vault
 from apps.flow.models import Draft, Flow, FlowRun, Secret
 from apps.flow.queries import (
     HIGH_RISK,
@@ -58,6 +60,7 @@ from apps.flow.queries import (
     validation_fields,
 )
 from apps.flow.schemas import (
+    ClaimCallOut,
     CreateIn,
     DeletedOut,
     DraftOut,
@@ -71,6 +74,7 @@ from apps.flow.schemas import (
     GrantIn,
     ReactIn,
     ReactOut,
+    RecordCallIn,
     RunIn,
     RunOut,
     RunRefIn,
@@ -120,6 +124,21 @@ RUN_IF_UNREADABLE = _(
     "The «Only if…» of this step can no longer be read, so it stopped. Open the automation, check this step "
     "and save it again."
 )
+HTTP_STATUS = _("«%(host)s» answered %(status)s, so it stopped.")
+HTTP_BLOCKED = _("«%(host)s» is inside a private network, so it was not called.")
+HTTP_FAILED = _("It could not reach «%(host)s», so it stopped.")
+HTTP_TIMEOUT = _("«%(host)s» did not answer within %(seconds)s seconds, so it stopped.")
+HTTP_INVALID = _("The address of this step is not a plain https address, so it was not called.")
+SECRET_GONE = _(
+    "The secret «%(name)s» no longer exists, so it stopped before calling. Save it again in this step."
+)
+SECRET_UNREADABLE = _(
+    "The secret «%(name)s» cannot be opened with this server's key, so it stopped before calling. Save it "
+    "again in this step."
+)
+SECRETS_KEY_GONE = _(
+    "This server cannot use secrets (its encryption key is missing), so it stopped before calling."
+)
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
 RUN_NOT_FOUND = _("That run does not exist in this business.")
@@ -142,6 +161,20 @@ FINISHED = (
 
 #: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
 RUN_ACTOR = "flow_run:"
+#: A call's ``Idempotency-Key`` is ``uuid5(IDEMPOTENCY_NAMESPACE, "<run id>:<step id>")``: the same in every
+#: attempt of a run's step, another in every run (hub#2659, hub#2675).
+IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
+#: How long a call that left holds its run: after it, a call that never answered is sent again, with the
+#: same key (at least once; the old hub's 5 minutes).
+CALL_LEASE_MINUTES = 5
+#: How a call that did not answer 2xx ends: code and message.
+_CALL_FAILURES = {
+    http.STATUS: ("flow.http_status", HTTP_STATUS),
+    http.BLOCKED: ("flow.http_blocked", HTTP_BLOCKED),
+    http.FAILED: ("flow.http_failed", HTTP_FAILED),
+    http.TIMEOUT: ("flow.http_timeout", HTTP_TIMEOUT),
+    http.INVALID: ("flow.http_url_invalid", HTTP_INVALID),
+}
 
 
 def _actor(ctx: OperationContext) -> str:
@@ -405,7 +438,7 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     now = timezone.now()
     with translation.override(flow.language):
         for waiting in FlowRun.objects.select_for_update().filter(
-            flow=flow, status=FlowRun.Status.WAITING
+            flow=flow, status__in=[FlowRun.Status.WAITING, FlowRun.Status.CALLING]
         ):
             _finish(
                 ctx,
@@ -457,12 +490,13 @@ def grant(ctx: OperationContext, data: GrantIn) -> dict:
                 code = HIGH_RISK_CODE
     if problems:
         raise InvalidPayload(next(iter(problems.values())), code=code, fields=problems)
-    # Nobody grants more than they may do themselves (an API key with flow:write included).
+    # Nobody grants more than they may do themselves (an API key with flow:write included); a call's
+    # origin is the automation's own permission, which whoever manages it already holds.
     offered = catalog_operations()
     beyond = {
         f"operations.{index}": str(GRANT_BEYOND_CALLER) % {"name": name}
         for index, name in enumerate(data.operations)
-        if not ctx.has(offered[name].permission)
+        if not name.startswith(document.HTTP_GRANT) and not ctx.has(offered[name].permission)
     }
     if beyond:
         raise PermissionDenied(next(iter(beyond.values())), fields=beyond)
@@ -737,13 +771,16 @@ def _operation_step(
     return output, "done", {}
 
 
-def _fail(ctx: OperationContext, run: FlowRun, step: dict, failure: StepFailed, now: dt.datetime) -> bool:
-    """Writes a step's failure; ``True`` when the run goes on (``on_error: continue``, FLOW-F25)."""
+def _fail(
+    ctx: OperationContext, run: FlowRun, step: dict, failure: StepFailed, now: dt.datetime, left: dict | None = None
+) -> bool:
+    """Writes a step's failure; ``True`` when the run goes on (``on_error: continue``, FLOW-F25), leaving
+    ``failed``, ``error_code``, ``error_message`` and ``left`` (a call's ``status``) for later steps."""
     if step.get("on_error") == "continue":
         _log(run, step, "failed", now, error=failure.entry(), continued=True)
         run.outputs = {
             **run.outputs,
-            step["id"]: {"failed": True, "error_code": failure.code, "error_message": failure.message},
+            step["id"]: {"failed": True, "error_code": failure.code, "error_message": failure.message, **(left or {})},
         }
         run.step_index += 1
         return True
@@ -821,6 +858,10 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
                 _log(run, step, "passed", now)
                 run.step_index += 1
                 continue
+            if step["kind"] == "http":
+                if _park_call(ctx, run, flow, step, now):
+                    return
+                continue
             try:
                 left, outcome, extras = _operation_step(ctx, run, flow, step, data)
             except StepFailed as failure:
@@ -835,6 +876,180 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
             _log(run, step, outcome, now, **extras)
             run.step_index += 1
         _finish(ctx, run, FlowRun.Status.SUCCEEDED, now)
+
+
+# --- Calls to another system (FLOW-F27) ------------------------------------------------------------
+
+
+def _call_allowed(run: FlowRun, flow: Flow, step: dict) -> StepFailed | None:
+    """Why the automation may not make this call (its origin not granted), or ``None``."""
+    grant = document.http_grant(str(step.get("url") or ""))
+    if grant is None:
+        return StepFailed("flow.http_url_invalid", str(HTTP_INVALID))
+    if grant not in flow.grants:
+        return StepFailed("flow.not_allowed", str(NOT_ALLOWED) % {"name": document.host_of(step["url"])})
+    return None
+
+
+def _park_call(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> bool:
+    """Parks the run on a call, which goes out after the COMMIT (``dispatch_call``); ``True`` when the run
+    stops here (parked, or failed), ``False`` when it goes on (a refusal with «If it fails, carry on»)."""
+    refused = _call_allowed(run, flow, step)
+    if refused is not None:
+        return not _fail(ctx, run, step, refused, now)
+    _log(run, step, "calling", now, host=document.host_of(step["url"]))
+    run.status = FlowRun.Status.CALLING
+    run.resume_at = now
+    run.save()
+    record_event(
+        ctx, events.RUN_PARKED, {"id": str(run.id), "flow_id": str(flow.id), "resume_at": now.isoformat()}
+    )
+    transaction.on_commit(partial(dispatch_call, ctx.scope, run.id), robust=True)
+    return True
+
+
+def _go_on(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:
+    run.status = FlowRun.Status.RUNNING
+    run.resume_at = None
+    record_event(ctx, events.RUN_RESUMED, {"id": str(run.id), "flow_id": str(flow.id)})
+    _advance(ctx, run, flow, now)
+
+
+def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:
+    run.resume_at = None
+    if _fail(ctx, run, step, failure, now, left):
+        _go_on(ctx, run, flow, now)
+
+
+def dispatch_call(scope: Scope, run_id: uuid.UUID) -> None:
+    """Makes a run's call, with no transaction and no lock around it, and records how it ended in a
+    transaction of its own: ``flow.run.claim_call`` → ``http.call`` → ``flow.run.record_call``. A call
+    another process holds, or that ended meanwhile, is left alone."""
+    system = system_context(scope)
+    claimed = get("flow.run.claim_call")(system, RunRefIn(id=run_id))
+    if not claimed.claimed:
+        return
+    reply = http.call(claimed.method, claimed.url, claimed.headers, claimed.body, claimed.timeout)
+    get("flow.run.record_call")(
+        system,
+        RecordCallIn(
+            id=run_id,
+            kind=reply.kind,
+            status=reply.status,
+            body=vault.mask_any(reply.body, claimed.masks),
+            truncated=reply.truncated,
+            detail=vault.mask(reply.detail, claimed.masks)[:2000],
+        ),
+    )
+
+
+@operation(
+    "flow.run.claim_call",
+    kind="command",
+    permission=SYSTEM,
+    input=RunRefIn,
+    output=ClaimCallOut,
+    ai={
+        "description": "Platform only: takes a run's call to another system to make it (nobody else holds it), "
+        "with its data and secrets filled in, for CALL_LEASE_MINUTES.",
+        "risk": "normal",
+    },
+)
+def claim_call(ctx: OperationContext, data: RunRefIn) -> dict:
+    now = timezone.now()
+    run = (
+        FlowRun.objects.select_for_update(skip_locked=True, of=("self",))
+        .select_related("flow")
+        .filter(pk=data.id, status=FlowRun.Status.CALLING, resume_at__lte=now)
+        .first()
+    )
+    if run is None:
+        return {"claimed": False}
+    flow = run.flow
+    step = run.definition["steps"][run.step_index]
+    with translation.override(flow.language):
+        if flow.deleted_at is not None:
+            _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.deleted", str(CANCELLED_DELETED))
+            return {"claimed": False}
+        refused = _call_allowed(run, flow, step)
+        if refused is None:
+            secrets, refused = _open_secrets(document.secret_names(step))
+        if refused is not None:
+            _call_failed(ctx, run, flow, step, refused, now)
+            return {"claimed": False}
+    key = str(uuid.uuid5(IDEMPOTENCY_NAMESPACE, f"{run.id}:{step['id']}"))
+    url, headers, body = document.render_call(step, {"input": run.input, "steps": run.outputs}, secrets, key)
+    if not any(name.lower() == "idempotency-key" for name in headers):
+        headers["Idempotency-Key"] = key
+    run.resume_at = now + dt.timedelta(minutes=CALL_LEASE_MINUTES)
+    run.save(update_fields=["resume_at"])
+    return {
+        "claimed": True,
+        "method": step.get("method", "POST"),
+        "url": url,
+        "headers": headers,
+        "body": body,
+        "timeout": int(step.get("timeout", 10)),
+        "masks": list(secrets.values()),
+    }
+
+
+def _open_secrets(names: list[str]) -> tuple[dict[str, str], StepFailed | None]:
+    """The values of the secrets a call reads, or why it cannot make it."""
+    if not names:
+        return {}, None
+    if not vault.available():
+        return {}, StepFailed("flow.secrets_key_missing", str(SECRETS_KEY_GONE))
+    kept = dict(Secret.objects.filter(name__in=names).values_list("name", "ciphertext"))
+    opened: dict[str, str] = {}
+    for name in names:
+        if name not in kept:
+            return {}, StepFailed("flow.secret_not_found", str(SECRET_GONE) % {"name": name})
+        try:
+            opened[name] = vault.open_value(kept[name])
+        except vault.Unreadable:
+            return {}, StepFailed("flow.secret_unreadable", str(SECRET_UNREADABLE) % {"name": name})
+    return opened, None
+
+
+@operation(
+    "flow.run.record_call",
+    kind="command",
+    permission=SYSTEM,
+    input=RecordCallIn,
+    output=DueOut,
+    ai={
+        "description": "Platform only: records how a run's call to another system ended and goes on with the run "
+        "(or stops it with the reason); an answer for a run that is no longer calling changes nothing.",
+        "risk": "normal",
+    },
+)
+def record_call(ctx: OperationContext, data: RecordCallIn) -> dict:
+    now = timezone.now()
+    run = FlowRun.objects.select_for_update(of=("self",)).select_related("flow").filter(pk=data.id).first()
+    if run is None or run.status != FlowRun.Status.CALLING:
+        return {"count": 0}
+    flow = run.flow
+    step = run.definition["steps"][run.step_index]
+    host = document.host_of(step["url"])
+    with translation.override(flow.language):
+        if data.kind == http.OK:
+            run.outputs = {
+                **run.outputs,
+                step["id"]: {"ok": True, "status": data.status, "body": data.body, "truncated": data.truncated},
+            }
+            _log(run, step, "called", now, host=host, status=data.status)
+            run.step_index += 1
+            _go_on(ctx, run, flow, now)
+            return {"count": 1}
+        code, message = _CALL_FAILURES[data.kind]
+        failure = StepFailed(
+            code,
+            str(message) % {"host": host, "status": data.status, "seconds": step.get("timeout", 10)},
+            technical=data.detail,
+        )
+        _call_failed(ctx, run, flow, step, failure, now, {"status": data.status})
+    return {"count": 1}
 
 
 def _parent_chain(actor: str) -> list[str]:
@@ -1033,6 +1248,16 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
             ctx, events.RUN_RESUMED, {"id": str(run.id), "flow_id": str(flow.id)}
         )
         _advance(ctx, run, flow, now)
+        resumed += 1
+    # A call whose lease ran out never answered (the process died): it goes again, with the same key.
+    stuck = (
+        FlowRun.objects.filter(status=FlowRun.Status.CALLING, resume_at__lte=now)
+        .select_for_update(skip_locked=True)
+        .order_by("resume_at", "id")
+        .values_list("pk", flat=True)
+    )
+    for run_id in stuck:
+        transaction.on_commit(partial(dispatch_call, ctx.scope, run_id), robust=True)
         resumed += 1
     return {"count": resumed}
 

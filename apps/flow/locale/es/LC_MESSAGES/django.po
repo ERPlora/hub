@@ -342,3 +342,47 @@ msgstr "secretos"
 
 msgid "sealed value"
 msgstr "valor cifrado"
+
+msgctxt "run status"
+msgid "Calling another system"
+msgstr "Llamando a otro sistema"
+
+msgctxt "run status"
+msgid "Waiting for an answer"
+msgstr "Esperando una respuesta"
+
+msgid "Step %(n)s reads «%(path)s»: a secret or the call's key only go in «Call another system»."
+msgstr "El paso %(n)s lee «%(path)s»: un secreto o la clave de la llamada solo van en «Llamar a otro sistema»."
+
+msgid "Write the address by hand, starting with https:// and its server's name, without a user or a password; data can only go after the name, in the path or the query."
+msgstr "Escribe la dirección a mano, empezando por https:// y el nombre de su servidor, sin usuario ni contraseña; los datos solo pueden ir después del nombre, en la ruta o en la consulta."
+
+msgid "«%(name)s» is no header this step can send."
+msgstr "«%(name)s» no es una cabecera que este paso pueda enviar."
+
+msgid "«%(name)s» is no address this automation can be allowed to call."
+msgstr "«%(name)s» no es una dirección a la que se pueda permitir llamar a esta automatización."
+
+msgid "«%(host)s» answered %(status)s, so it stopped."
+msgstr "«%(host)s» respondió %(status)s, así que se ha parado."
+
+msgid "«%(host)s» is inside a private network, so it was not called."
+msgstr "«%(host)s» está dentro de una red privada, así que no se ha llamado."
+
+msgid "It could not reach «%(host)s», so it stopped."
+msgstr "No ha podido llegar a «%(host)s», así que se ha parado."
+
+msgid "«%(host)s» did not answer within %(seconds)s seconds, so it stopped."
+msgstr "«%(host)s» no respondió en %(seconds)s segundos, así que se ha parado."
+
+msgid "The address of this step is not a plain https address, so it was not called."
+msgstr "La dirección de este paso no es una dirección https normal, así que no se ha llamado."
+
+msgid "The secret «%(name)s» no longer exists, so it stopped before calling. Save it again in this step."
+msgstr "El secreto «%(name)s» ya no existe, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
+
+msgid "The secret «%(name)s» cannot be opened with this server's key, so it stopped before calling. Save it again in this step."
+msgstr "El secreto «%(name)s» no se puede abrir con la llave de este servidor, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
+
+msgid "This server cannot use secrets (its encryption key is missing), so it stopped before calling."
+msgstr "Este servidor no puede usar secretos (le falta su llave de cifrado), así que se ha parado antes de llamar."

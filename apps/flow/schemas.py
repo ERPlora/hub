@@ -50,6 +50,12 @@ STEP_READS_NOTHING = _(
     "Step %(n)s reads «%(path)s», which is no data of this automation."
 )
 STEP_READS_LATER = _("Step %(n)s reads «%(path)s», which no earlier step leaves.")
+CALL_ONLY = _("Step %(n)s reads «%(path)s»: a secret or the call's key only go in «Call another system».")
+BAD_URL = _(
+    "Write the address by hand, starting with https:// and its server's name, without a user or a password; "
+    "data can only go after the name, in the path or the query."
+)
+BAD_HEADER = _("«%(name)s» is no header this step can send.")
 
 TriggerKind = Literal["event", "schedule", "at", "manual"]
 RunStatus = Literal[*FlowRun.Status.values]
@@ -301,8 +307,49 @@ class DelayStep(In):
     )
 
 
+HeaderName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$")]
+#: Headers the Hub writes itself (or that HTTP forbids a caller to set).
+OWN_HEADERS = frozenset({"host", "content-length", "transfer-encoding", "connection"})
+
+
+class HttpStep(In):
+    id: StepId = Field(description="The step's id; later steps read `steps.<id>.status` and `steps.<id>.body`.")
+    kind: Literal["http"] = Field(description="Call another system: an https request, after the step's permission.")
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = Field("POST", description="The HTTP method.")
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)] = Field(
+        description="The address: https:// and its host written by hand; `{{…}}` data only in the path or the "
+        "query (percent-encoded). Its origin is the permission it asks for (`http:https://host`)."
+    )
+    headers: dict[HeaderName, Annotated[str, StringConstraints(max_length=4000)]] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="Headers to send; a value may read `{{secret.NAME}}` and `{{run.idempotency_key}}`.",
+    )
+    body: Annotated[str, StringConstraints(max_length=65536)] = Field(
+        "", description="What to send, as text (a datum inserted in a JSON body is JSON-escaped)."
+    )
+    timeout: int = Field(10, ge=1, le=30, description="Seconds to wait for the answer, 1 to 30.")
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+    on_error: Literal["stop", "continue"] | None = Field(None, description=D_ON_ERROR)
+
+    @field_validator("url")
+    @classmethod
+    def _plain_https(cls, value: str) -> str:
+        if document.literal_origin(value) is None:
+            raise ValueError(str(BAD_URL))
+        return value
+
+    @field_validator("headers")
+    @classmethod
+    def _own_headers(cls, value: dict[str, str]) -> dict[str, str]:
+        for name in value:
+            if name.lower() in OWN_HEADERS:
+                raise ValueError(str(BAD_HEADER) % {"name": name})
+        return value
+
+
 Step = Annotated[
-    CommandStep | QueryStep | ConditionStep | DelayStep, Field(discriminator="kind")
+    CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep, Field(discriminator="kind")
 ]
 DraftStep = Annotated[
     CommandStep | ConditionStep | DelayStep, Field(discriminator="kind")
@@ -320,7 +367,18 @@ def _reads(step: Any) -> list[str]:
         return reads + document.references(step.params)
     if step.kind == "condition":
         return _condition_reads(step.when)
+    if step.kind == "http":
+        texts = document.references([step.url, *step.headers.values(), step.body])
+        return reads + [path for path in texts if not document.CALL_ONLY_RE.match(path)]
     return reads
+
+
+def _call_only(step: Any) -> list[str]:
+    """What a step that is no call reads of what only a call may read (a secret, the call's key)."""
+    if step.kind == "http":
+        return []
+    found = document.references(step.params) if step.kind in ("command", "query") else []
+    return [path for path in found if path.startswith(("secret.", "run."))]
 
 
 def document_problems(steps: list[Any]) -> list[str]:
@@ -334,12 +392,16 @@ def document_problems(steps: list[Any]) -> list[str]:
         seen.add(step.id)
     leaves: set[str] = set()
     for number, step in enumerate(steps, start=1):
+        for path in _call_only(step):
+            problems.append(str(CALL_ONLY) % {"n": number, "path": path})
         for path in _reads(step):
+            if path.startswith(("secret.", "run.")) and step.kind != "http":
+                continue
             if not document.is_path(path):
                 problems.append(str(STEP_READS_NOTHING) % {"n": number, "path": path})
             elif path.startswith("steps.") and path.split(".")[1] not in leaves:
                 problems.append(str(STEP_READS_LATER) % {"n": number, "path": path})
-        if step.kind in ("command", "query"):
+        if step.kind in ("command", "query", "http"):
             leaves.add(step.id)
     return problems
 
@@ -456,6 +518,17 @@ class StatusIn(In):
 
 class RunRefIn(In):
     id: UUID = Field(description="The run's id (its reference in the history).")
+
+
+class RecordCallIn(In):
+    """How a call of a run ended (``apps.flow.http.Reply``), its secrets already hidden."""
+
+    id: UUID = Field(description="The run's id.")
+    kind: Literal["ok", "status", "blocked", "invalid", "failed", "timeout"] = Field(description="How it ended.")
+    status: int | None = Field(None, description="The HTTP status it answered.")
+    body: Any = Field(None, description="What it answered: data for JSON, text otherwise.")
+    truncated: bool = Field(False, description="Whether the answer was cut at 1 MiB.")
+    detail: str = Field("", max_length=2000, description="What went wrong, technically.")
 
 
 class RunListIn(PageIn):
@@ -690,6 +763,7 @@ class TestStepOut(Schema):
         "unavailable",
         "not_reached",
         "skipped",
+        "would_call",
     ]
     operation: str = ""
     params: dict[str, Any] = {}
@@ -718,6 +792,19 @@ class DueOut(Schema):
 
 class DeletedOut(Schema):
     id: UUID
+
+
+class ClaimCallOut(Schema):
+    """A call a run is about to make, for the process that makes it (never a route: it carries the opened
+    secrets, which only travel in memory)."""
+
+    claimed: bool
+    method: str = ""
+    url: str = ""
+    headers: dict[str, str] = {}
+    body: str = ""
+    timeout: int = 10
+    masks: list[str] = []
 
 
 class SecretOut(Schema):

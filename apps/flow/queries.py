@@ -65,6 +65,8 @@ NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
 HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
 #: The code of a refusal of an action that needs a person, when it is saved, granted or run.
 HIGH_RISK_CODE = "flow.high_risk"
+NO_SECRET = _("There is no secret called «%(name)s».")
+BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
 
 #: How many names an ambiguous reference lists.
 AMBIGUOUS_SHOWN = 5
@@ -222,7 +224,13 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
 
 def operation_problem(name: str, kind: str | None = None) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
-    ``kind``, when given), or ``None`` when it may."""
+    ``kind``, when given), or ``None`` when it may. A call's origin (``http:https://host``) is checked as
+    an address."""
+    if name.startswith(document.HTTP_GRANT) and kind is None:
+        address = name[len(document.HTTP_GRANT) :]
+        if document.origin(address) != address:
+            return "invalid_payload", str(BAD_HTTP_GRANT) % {"name": name}
+        return None
     op = grantable_operations().get(name)
     if op is None:
         return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
@@ -243,7 +251,20 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
     code = "invalid_payload"
     if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events():
         problems["trigger.event"] = str(UNKNOWN_EVENT) % {"name": trigger.event}
+    kept = None
     for index, step in enumerate(steps):
+        if step.kind == "http":
+            # A call names kept secrets: each must exist (FLOW-F26), named next to the field that reads it.
+            kept = set(Secret.objects.values_list("name", flat=True)) if kept is None else kept
+            for name in document.secret_names(step.model_dump()):
+                if name not in kept:
+                    field = next(
+                        part
+                        for part, text in (("url", step.url), ("headers", " ".join(step.headers.values())), ("body", step.body))
+                        if f"secret.{name}" in text
+                    )
+                    problems.setdefault(f"steps.{index}.{field}", str(NO_SECRET) % {"name": name})
+            continue
         if step.kind not in ("command", "query"):
             continue
         problem = operation_problem(step.operation, step.kind)
@@ -458,7 +479,7 @@ NOT_RESUMABLE = frozenset(
     }
 )
 #: The kinds of step whose output later steps read (``steps.<id>``).
-LEAVES = ("command", "query")
+LEAVES = ("command", "query", "http")
 RUN_NOT_RESUMABLE = _("Only a run that stopped by an error at one of its steps can be resumed.")
 BEFORE_ANY_STEP = _(
     "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it "
@@ -686,6 +707,23 @@ def _clauses(failed: list[dict]) -> list[dict]:
     ]
 
 
+def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str]) -> dict:
+    """What «Try it» says of a call: where it would go and with what — every secret as ``vault.MASK`` and
+    the call's key as «…» (it is known when it runs) —, never calling."""
+    reads = [
+        path
+        for path in document.references([step.url, *step.headers.values(), step.body])
+        if path.startswith("steps.") and path.split(".")[1] in unknown_steps
+    ]
+    if reads:
+        return {"outcome": "cannot_tell", "unknown": reads}
+    masked = dict.fromkeys(document.secret_names(step.model_dump()), vault.MASK)
+    url, headers, body = document.render_call(step.model_dump(), values, masked, "…")
+    params = {"method": step.method, "url": url, "headers": headers, "body": body, "host": document.host_of(step.url)}
+    granted = document.http_grant(step.url) in grants
+    return {"outcome": "would_call" if granted else "not_allowed", "params": params}
+
+
 @operation(
     "flow.flow.test",
     kind="query",
@@ -741,6 +779,10 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
                 continue
         if step.kind == "delay":
             steps.append(out | {"outcome": "waits", "seconds": step.seconds})
+            continue
+        if step.kind == "http":
+            steps.append(out | _try_call(step, values, grants, unknown_steps))
+            unknown_steps.add(step.id)
             continue
         if step.kind == "condition":
             reads = list(step.when)
