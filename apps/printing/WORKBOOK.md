@@ -485,9 +485,9 @@ Implicados: CASH_REGISTER-F16
 
 ### PRINTING-F18 Sacar el papel: el dispositivo recoge y confirma los trabajos
 <!-- origen: fi:hub/tauri-packages#camino-de-hardware-handlers-invoke-de-perifericos-erplora-peripherals old-hub:HUB_APP-F19 old-hub:HUB_APP-F18 old-hub:HUB_SHELL-F73 old-hub:HUB_SHELL-F74 qa:verticals/restaurant/10-hardware-offline-and-recovery fi:modules/printing#integracion-bridge-hardware-client-side-no-es-command-query-del-manifest old-hub:HUB-F196 old-hub:HUB-F197 old-hub:HUB-F198 old-hub:HUB-F199 old-hub:HUB-F200 old-hub:HUB_PERIPHERALS-F06 old-hub:HUB_PERIPHERALS-F07 old-hub:HUB_PERIPHERALS-F08 -->
-Estado: parcial — recoger, confirmar y avisar del fallo están hechos como operaciones
-(`printing.job.claim`, `printing.job.complete`, `printing.job.fail`); el canal `/ws/print` y la app
-que las llama son de `base` y de la app nativa (bloque 6). Contrato en «Contrato con la plataforma».
+Estado: parcial — recoger, confirmar y avisar del fallo están hechos en Impresión; falta el canal por el
+que el dispositivo los pide (de la plataforma: hoy el servidor no lo sirve), quien recoge en la app del
+dispositivo y el vínculo de esa app con el negocio. Contrato en «Contrato con la plataforma».
 Vertical: común
 Actor: sistema (la app del dispositivo)
 Pantalla: ninguna

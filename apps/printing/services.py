@@ -614,6 +614,7 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
             "copy_document": _copy_of(job),
             "open_drawer": job.open_drawer,
             "attempts": job.attempts,
+            "leased_until": job.leased_until,
         }
     }
 

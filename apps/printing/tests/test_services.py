@@ -398,6 +398,8 @@ def test_a_device_takes_the_oldest_job_of_its_printers():
     sent = PrintJob.objects.get(pk=first.id)
     assert (sent.status, sent.device, sent.attempts) == ("sent", "Till 1", 1)
     assert sent.leased_until > timezone.now() + dt.timedelta(seconds=80)
+    # The device is told how long it has to answer (WORKBOOK «Contrato con la plataforma», claim).
+    assert taken.leased_until == sent.leased_until
     assert claim(till).id == second.id
     assert claim(till) is None
     assert events("printing.job.claimed")[0] == {"id": str(first.id), "printer_id": str(till.id)}

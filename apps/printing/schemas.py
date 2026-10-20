@@ -400,6 +400,9 @@ class HostJobOut(Schema):
     copies: int = Field(description="Times to print it.")
     open_drawer: bool = Field(description="Open the drawer after printing.")
     attempts: int = Field(description="Times it has been handed out, this one included.")
+    leased_until: datetime = Field(
+        description="When the device's time to answer runs out: past it, the job goes back to the queue."
+    )
 
 
 class JobClaimOut(Schema):

@@ -235,6 +235,8 @@ export interface HostJobOut {
   copies: number;
   open_drawer: boolean;
   attempts: number;
+  /** When the device's time to answer runs out (90 s after it took the job). */
+  leased_until: string;
 }
 
 export interface JobAckOut {
