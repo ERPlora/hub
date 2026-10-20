@@ -120,3 +120,10 @@ def test_support_can_repair_a_row_through_the_admin(client, superuser):
     assert response.status_code == 302, response.content[:2000]
     category.refresh_from_db()
     assert (category.name, category.slug) == ("Drinks", "drinks")
+
+
+def test_support_sees_and_filters_the_sold_out_mark():
+    # INVENTORY-F29: support finds which articles the till does not offer and can put one back on sale.
+    assert "is_sold_out" in ProductAdmin.list_display
+    assert "is_sold_out" in ProductAdmin.list_filter
+    assert "is_sold_out" in ProductAdmin.fields

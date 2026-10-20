@@ -29,7 +29,7 @@ SAY_WHICH_CATEGORY = _("Say which category: its id, or its name.")
 UnitCode = Literal["ud", "kg", "g", "t", "l", "ml", "min", "h"]
 ProductType = Literal["physical", "service"]
 MovementType = Literal["initial", "reception", "sale", "void", "count", "write_off", "refund"]
-ProductStatus = Literal["active", "inactive", "needs_tax_setup"]
+ProductStatus = Literal["active", "inactive", "needs_tax_setup", "sold_out"]
 ProductSort = Literal[
     "name",
     "-name",
@@ -147,6 +147,12 @@ class ProductRefIn(Schema):
         return self
 
 
+class ProductSoldOutIn(ProductRefIn):
+    sold_out: bool = Field(
+        description="True: sold out («86»), the till stops offering it; false: back on sale."
+    )
+
+
 class CategoryRefIn(Schema):
     id: UUID | None = Field(None, description="The category's id.")
     category: Said | None = Field(
@@ -193,10 +199,13 @@ class ProductFiltersIn(Schema):
     stock_max: Quantity | None = Field(None, description="Highest stock.")
     status: ProductStatus | None = Field(
         None,
-        description="active or inactive (with a tax category), or needs_tax_setup (no tax category: cannot be sold).",
+        description="active or inactive (with a tax category), needs_tax_setup (no tax category: cannot be sold), "
+        "or sold_out (marked sold out: the till does not offer it).",
     )
     is_active: bool | None = Field(
-        None, description="Only active (true) or inactive (false) products."
+        None,
+        description="Only the products on sale in the till (true: active and not sold out) or the rest "
+        "(false: inactive or sold out).",
     )
     needs_tax_setup: bool | None = Field(
         None, description="Only products without (true) or with (false) a tax category."
@@ -265,10 +274,10 @@ class CategoryFiltersIn(Schema):
         None, max_length=7, description="This exact colour (#rrggbb)."
     )
     product_count_min: int | None = Field(
-        None, ge=0, description="At least this many active products."
+        None, ge=0, description="At least this many products on sale (active, not sold out)."
     )
     product_count_max: int | None = Field(
-        None, ge=0, description="At most this many active products."
+        None, ge=0, description="At most this many products on sale (active, not sold out)."
     )
     sort: CategorySort = Field("name", description="Order; a leading '-' reverses it.")
 
@@ -650,7 +659,10 @@ class ProductOut(Schema):
         description="Its own decision on stock control; null follows the business."
     )
     tracks_stock: bool = Field(description="Whether stock control applies to it now.")
-    is_active: bool = Field(description="Active: sold in the till.")
+    is_active: bool = Field(description="Active: sold in the till, unless it is sold out.")
+    is_sold_out: bool = Field(
+        description="Sold out («86»): still active, but the till does not offer it until it is back on sale."
+    )
     category_ids: list[UUID] = Field(description="Its categories.")
     created_at: datetime = Field(description="When it was created.")
     updated_at: datetime = Field(description="When it last changed.")
@@ -726,7 +738,7 @@ class CategoryOut(Schema):
     order: int = Field(description="Position.")
     tax_category_id: UUID | None = Field(description="Its tax category, if any.")
     tax_category_key: str | None = Field(description="Key of its tax category, if any.")
-    product_count: int = Field(description="Active products in it.")
+    product_count: int = Field(description="Products on sale in it (active, not sold out).")
 
 
 CategoryPage = Page[CategoryOut]

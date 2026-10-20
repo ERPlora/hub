@@ -212,6 +212,7 @@ def test_a_row_has_everything_the_screen_and_the_form_show(general):
         "track_stock": None,
         "tracks_stock": True,
         "is_active": True,
+        "is_sold_out": False,
         "category_ids": [drinks.id],
     }
 
@@ -434,6 +435,53 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
     assert page.rows[2].needs_tax_setup is True
     # The till neither shows nor checks availability: the sale catalog carries no stock.
     assert "stock" not in page.rows[0].model_dump()
+
+
+def test_the_sale_catalog_leaves_out_a_sold_out_article(general):
+    product("Coffee", tax=general)
+    product("Croquettes", tax=general, is_sold_out=True)
+    assert names(run("inventory.product.list_for_sale", ForSaleListIn())) == ["Coffee"]
+
+
+# A sold-out article (INVENTORY-F29) stays in Products and leaves what the till offers (INVENTORY-F27)
+
+
+def test_a_sold_out_article_stays_in_products_and_leaves_what_the_till_offers(general):
+    product("Coffee", tax=general)
+    product("Croquettes", tax=general, is_sold_out=True)
+    product("Off", tax=general, is_active=False)
+
+    def listed(**filters):
+        return names(run("inventory.product.list", ProductListIn(**filters)))
+
+    # The till asks for what is on sale (SALE-F01 reads `is_active: true`): active and not sold out.
+    assert listed(is_active=True) == ["Coffee"]
+    assert listed(is_active=False) == ["Croquettes", "Off"]
+    # Products shows it, its switch still on («Yes») and its mark, and filters by the mark.
+    rows = run("inventory.product.list", ProductListIn()).rows
+    assert [(row.name, row.is_active, row.is_sold_out) for row in rows] == [
+        ("Coffee", True, False),
+        ("Croquettes", True, True),
+        ("Off", False, False),
+    ]
+    assert listed(status="active") == ["Coffee", "Croquettes"]
+    assert listed(status="sold_out") == ["Croquettes"]
+
+
+def test_the_detail_of_a_sold_out_article_says_so(general):
+    croquettes = product("Croquettes", tax=general, is_sold_out=True)
+    # What Sales reads by name when it freezes a line (SALE-F01): still the product, marked.
+    detail = run("inventory.product.get", ProductRefIn(product="croquettes"), role="hub_employee")
+    assert (detail.id, detail.is_active, detail.is_sold_out) == (croquettes.id, True, True)
+
+
+def test_a_category_counts_the_products_the_till_offers(general):
+    drinks = Category.objects.create(name="Drinks")
+    for name, sold_out in (("Coffee", False), ("Tea", True)):
+        link(product(name, tax=general, is_sold_out=sold_out), drinks)
+    [row] = run("inventory.category.list", CategoryListIn()).rows
+    # The till's category strip shows this count next to a grid without the sold-out tea.
+    assert (row.name, row.product_count) == ("Drinks", 1)
 
 
 # inventory.product.list_low_stock
