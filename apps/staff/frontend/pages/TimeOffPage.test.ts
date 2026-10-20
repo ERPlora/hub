@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TimeOffDetailOut, TimeOffOut } from '../operations';
-import { EMPLOYEE, flush, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
+import { EMPLOYEE, errorFrame, flush, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -232,6 +232,23 @@ describe('TimeOffPage: «+» and «My time off» (STAFF-F08, F17, F24)', () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
     expect(s.cells(0).slice(1, 5)).toEqual(['Vacaciones', '02/11/2026', '06/11/2026', 'Pendiente']);
+  });
+});
+
+describe('TimeOffPage: today’s time off (STAFF-G05, STAFF-F20)', () => {
+  it('lists who is away today above the list, also for an employee', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(s.params('staff.time_off.today')).toEqual([{ limit: 100 }]);
+    const card = s.find('staff-away-today');
+    expect(card.exists()).toBe(true);
+    expect(card.element.compareDocumentPosition(s.table().element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('goes away with the list when the app is not active here', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'app_inactive'));
+    await flush();
+    expect(s.find('staff-away-today').exists()).toBe(false);
   });
 });
 

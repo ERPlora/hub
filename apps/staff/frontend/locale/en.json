@@ -300,6 +300,20 @@
     "picker": {
       "search": "Search…",
       "cancel": "Cancel"
+    },
+    "figures": {
+      "label": "Figures",
+      "active": "Active staff",
+      "away": "On leave today",
+      "pending": "Pending time off",
+      "loadError": "The figures could not be loaded"
+    },
+    "awayToday": {
+      "title": "Today’s time off",
+      "count": "{n} away | {n} away",
+      "allDay": "All day",
+      "empty": "Nobody is away today.",
+      "loadError": "Who is away today could not be loaded"
     }
   }
 }
