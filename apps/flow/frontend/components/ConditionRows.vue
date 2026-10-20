@@ -4,7 +4,8 @@
 // automation has (`choices`), never typed; «present» asks yes or no; «one of» takes values separated
 // by commas; a number or a yes/no typed is sent as one. A row without its data does not count yet. The
 // value may also be another datum (hub#1712: «the total is what the event brought»), picked with the
-// editor's picker and shown as a pill in words.
+// editor's picker and shown as a pill in words. What a step leaves as yes or no («Failed», «Skipped»,
+// «Approved», «Expired», «Found»; FLOW-F25, F28) is compared with Yes / No chosen: a «yes» typed is text.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -42,6 +43,23 @@ const paths = computed(() => {
   for (const row of rows.value) if (row.path && !offered.includes(row.path)) offered.push(row.path);
   return offered;
 });
+
+/** The data a step leaves as yes or no (FLOW-F25, F28, and a read's «found»). */
+const YES_NO = /^steps\.[A-Za-z_][A-Za-z0-9_]*\.(failed|skipped|approved|expired|found)$/;
+
+/** Whether the row's value is a Yes / No to choose: «present», or equal to a yes-or-no datum. */
+function asksYesNo(row: ConditionRow): boolean {
+  return row.op === 'exists' || ((row.op === 'eq' || row.op === 'neq') && YES_NO.test(row.path));
+}
+
+/** A new datum for row `index`: one of yes or no starts at Yes; leaving one for another datum drops its Yes / No. */
+function setPath(index: number, path: string): void {
+  const row = rows.value[index];
+  let value = row.value;
+  if (row.op !== 'exists' && YES_NO.test(path) && typeof value !== 'boolean') value = true;
+  else if (row.op !== 'exists' && !YES_NO.test(path) && YES_NO.test(row.path) && typeof value === 'boolean') value = '';
+  patch(index, { path, value });
+}
 
 function scalar(text: string): unknown {
   return partsToValue([{ kind: 'text', text }]);
@@ -112,7 +130,7 @@ function remove(index: number): void {
         fill="outline"
         mode="md"
         interface="popover"
-        @ion-change="patch(index, { path: String($event.detail.value) })"
+        @ion-change="setPath(index, String($event.detail.value))"
       >
         <IonSelectOption
           v-for="path in paths"
@@ -142,7 +160,7 @@ function remove(index: number): void {
       </IonSelect>
       <div class="flow-conditions__value">
         <IonSelect
-          v-if="row.op === 'exists'"
+          v-if="asksYesNo(row)"
           :data-testid="`${testid}-value-${index}`"
           :value="String(row.value)"
           :label="$t('flow.steps.value')"
@@ -185,7 +203,7 @@ function remove(index: number): void {
           @ion-input="setText(index, String($event.detail.value ?? ''))"
         />
         <button
-          v-if="pick && row.op !== 'exists' && row.op !== 'in'"
+          v-if="pick && !asksYesNo(row) && row.op !== 'in'"
           type="button"
           class="flow-conditions__insert"
           :data-testid="`${testid}-insert-${index}`"

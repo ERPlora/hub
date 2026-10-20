@@ -125,6 +125,12 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
     expect(text).toContain('Would call api.example.com');
     expect(text).toContain('Bearer ••••');
     expect(text).not.toContain('Host');
+    // In words: the address, each header as «Name: value», and nothing empty.
+    expect(text).toContain('Address');
+    expect(text).not.toContain('Url');
+    expect(text).toContain('Authorization: Bearer ••••');
+    expect(text).not.toContain('{');
+    expect(text).not.toContain('Body');
     const refused = await mountFlow(TestPanel, {
       props: { document: { ...DOC, steps: [call] }, flowId: 'f1', catalog: CATALOG },
       answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [{ ...step, outcome: 'not_allowed' }] }] },

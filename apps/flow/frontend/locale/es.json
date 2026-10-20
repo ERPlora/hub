@@ -2436,7 +2436,9 @@
       "zones": "Zonas",
       "approved": "Aprobada",
       "answered_by": "Contestada por",
-      "details": "Detalles"
+      "details": "Detalles",
+      "url": "Dirección",
+      "headers": "Cabeceras"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

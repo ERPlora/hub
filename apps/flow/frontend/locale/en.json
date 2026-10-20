@@ -2436,7 +2436,9 @@
       "zones": "Zones",
       "approved": "Approved",
       "answered_by": "Answered by",
-      "details": "Details"
+      "details": "Details",
+      "url": "Address",
+      "headers": "Headers"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {
