@@ -267,6 +267,34 @@ def test_a_task_that_does_not_exist_is_a_404():
         run("task.task.set_status", {"task": "ghost", "status": "done"})
 
 
+GHOST_WRITES = [
+    ("task.task.update", {"priority": "urgent"}),
+    ("task.task.set_status", {"status": "blocked"}),
+    ("task.task.complete", {}),
+    ("task.task.assign", {"member": "Ana"}),
+    ("task.task.assign", {}),
+    ("task.task.delete", {}),
+    ("task.comment.add", {"text": "Seen it"}),
+]
+
+
+@pytest.mark.parametrize("by", ["id", "number", "title"])
+@pytest.mark.parametrize(("name", "extra"), GHOST_WRITES)
+def test_a_write_on_a_task_that_does_not_exist_is_refused_and_says_nothing(team, name, extra, by):
+    """tasks#22 and tasks#24: the old module reported an assignment of a missing task as done, and the
+    database's own words for a comment on one; here every write is a «does not exist», with no event."""
+    real = make_task("Real one", number="TSK-20261014-0001")
+    key = "task_id" if name.startswith("task.comment.") else "id"
+    reference = {"id": {key: "0190c1d2-0000-7000-8000-000000000000"}, "number": {"task": "TSK-20261014-0999"}}
+    reference["title"] = {"task": "ghost"}
+    with pytest.raises(NotFound) as caught:
+        run(name, {**reference[by], **extra}, ctx=as_manager(team))
+    assert caught.value.message == "That task does not exist in this business."
+    assert events() == [] and not Comment.objects.exists()
+    real.refresh_from_db()
+    assert (real.status, real.priority, real.assigned_to_id) == ("todo", "medium", None)
+
+
 def test_an_employee_completes_their_own(team):
     task = make_task(assigned_to=team["worker_member"])
     assert run("task.task.complete", {"id": str(task.id)}, ctx=as_employee(team)).status == "done"
