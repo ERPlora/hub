@@ -434,7 +434,8 @@
         "stopped": "Se paró aquí porque no se cumplió esto: {clauses}. Eso es la automatización funcionando.",
         "waiting": "Esperando hasta el {date}",
         "waited": "Esperó {duration}",
-        "failed": "{action}: {message}"
+        "failed": "{action}: {message}",
+        "resumed": "Reanudada aquí, desde el paso que había fallado"
       },
       "advice": {
         "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",
@@ -445,7 +446,15 @@
         "flow__high_risk": "Hazlo a mano, desde su app."
       },
       "attentionOne": "{n} ejecución se paró por un problema",
-      "attentionMany": "{n} ejecuciones se pararon por un problema"
+      "attentionMany": "{n} ejecuciones se pararon por un problema",
+      "retry": "Reanudar desde el paso que falló",
+      "retryTitle": "¿Reanudarla desde el paso que falló?",
+      "retryMessage": "Los pasos que ya hizo no se repiten: sigue con los pasos con los que empezó. Hará de verdad lo que dicen.",
+      "retryYes": "Sí, reanúdala",
+      "retryNo": "Cancelar",
+      "retried": "Reanudada: terminó bien.",
+      "retriedWaiting": "Reanudada: está esperando. Mira aquí cómo sigue.",
+      "retriedFailed": "Se reanudó y volvió a pararse por un error: {message}"
     },
     "events": {
       "customer__customer__created": "se crea una ficha de cliente",

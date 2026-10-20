@@ -129,8 +129,10 @@ export interface LogEntry {
   step: string;
   kind: StepKind;
   operation?: string;
-  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed';
+  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed' | 'resumed';
   at: string;
+  /** Who resumed it (`resumed`). */
+  by?: string;
   count?: number;
   seconds?: number;
   until?: string;
@@ -155,6 +157,12 @@ export interface RunOut {
   started_at: string;
   finished_at: string | null;
   started_by: string;
+  /** It stopped by an error at a step and can still be resumed there (`flow.run.retry`). */
+  resumable: boolean;
+}
+
+export interface RunRefIn {
+  id: string;
 }
 
 export interface RunListIn {
@@ -306,6 +314,7 @@ declare module '@erplora/ui/sdk' {
     'flow.flow.grant': { input: GrantIn; output: FlowOut };
     'flow.flow.run': { input: RunIn; output: RunOut };
     'flow.run.list': { input: RunListIn; output: RunPageOut };
+    'flow.run.retry': { input: RunRefIn; output: RunOut };
     'flow.draft.list': { input: DraftListIn; output: Page<DraftOut> };
     'flow.draft.propose': { input: DraftProposeIn; output: DraftOut };
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };

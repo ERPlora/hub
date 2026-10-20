@@ -32,12 +32,15 @@ COMMANDS = {
     "flow.schedule.fire_due",
     "flow.run.resume_due",
     "flow.run.prune",
+    "flow.run.retry",
 }
-# What the assistant confirms before running: turning on or off, granting, running by hand, deleting.
+# What the assistant confirms before running: turning on or off, granting, running by hand or resuming
+# a failed run, deleting.
 HIGH_RISK = {
     "flow.flow.set_enabled",
     "flow.flow.grant",
     "flow.flow.run",
+    "flow.run.retry",
     "flow.flow.delete",
 }
 # Run only by the platform: the reaction to every event and the three scheduled tasks.

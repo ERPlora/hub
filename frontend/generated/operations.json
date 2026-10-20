@@ -464,6 +464,7 @@
   "flow.flow.grant": { "method": "post", "path": "/api/flow/flows/grant" },
   "flow.flow.run": { "method": "post", "path": "/api/flow/flows/run" },
   "flow.run.list": { "method": "get", "path": "/api/flow/runs" },
+  "flow.run.retry": { "method": "post", "path": "/api/flow/runs/retry" },
   "flow.draft.list": { "method": "get", "path": "/api/flow/drafts" },
   "flow.draft.propose": { "method": "post", "path": "/api/flow/drafts" },
   "flow.draft.dismiss": { "method": "post", "path": "/api/flow/drafts/dismiss" },

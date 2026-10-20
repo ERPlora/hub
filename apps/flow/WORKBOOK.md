@@ -127,7 +127,8 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
 - **Permisos**: «Una automatización se ejecuta con sus propios permisos, nunca con los tuyos. Nada de
   lo de abajo ocurre hasta que lo autorices.», las filas «Falta tu permiso» o «Autorizado» y
   **Autorizar todo lo que necesita** (FLOW-F12).
-- **Historial**: las ejecuciones, las más recientes primero y las paradas por error arriba (FLOW-F16).
+- **Historial**: las ejecuciones, las más recientes primero y las paradas por error arriba (FLOW-F16);
+  una parada por un error en un paso lleva **Reanudar desde el paso que falló** (FLOW-F24).
 
 ### Guía
 Botón **¿Cómo funciona esto?** de la galería. «Cómo funcionan las automatizaciones», con cinco
@@ -174,6 +175,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F21 | Cuando pasa algo en el negocio, la automatización arranca | parcial |
 | FLOW-F22 | Cuando llega la hora, la automatización arranca | hecho |
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
+| FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
@@ -505,7 +507,8 @@ Pasos:
 Entra: las ejecuciones de esa automatización de los últimos 90 días, y todas las que siguen esperando.
 Sale: nada. El historial guarda cada ejecución terminada **90 días** y después la olvida; una que
 espera o está en marcha no se borra nunca. Lo que leyeron sus pasos (la ficha de un cliente) no se
-guarda al terminar: solo los ids y los importes del aviso que la arrancó.
+guarda al terminar: solo los ids y los importes del aviso que la arrancó; una parada por un error lo
+guarda 7 días, para poder reanudarla (FLOW-F24).
 Si falla: si no se puede leer el historial, el mensaje en rojo con **Reintentar**; sin ejecuciones,
 «Todavía no se ha ejecutado.».
 Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
@@ -636,6 +639,32 @@ automatización se puso en pausa mientras esperaba.»); si está borrada, tambi�
 automatización se borró.»).
 Implicados: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
 
+### FLOW-F24 Reanudar una ejecución desde el paso que falló
+<!-- origen: old-hub:HUB-F103 gh:hub#952 -->
+Estado: hecho
+Actor: propietario, administrador, asistente
+Pantalla: Editor de automatización
+Pasos:
+1. En **Historial**, una ejecución que se paró por un error en uno de sus pasos lleva **Reanudar desde el
+   paso que falló**. Antes, arregla la causa: concede el permiso que faltaba, vuelve a encender la app o
+   espera a que el otro sistema responda.
+2. Pulsa el botón y confirma: «¿Reanudarla desde el paso que falló?» con **Sí, reanúdala** o **Cancelar**.
+3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
+   pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
+   «Reanudada aquí, desde el paso que había fallado».
+Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»).
+Sale: la misma ejecución sigue en el paso que falló, sin repetir los que ya hicieron efecto y con los
+pasos con los que empezó, aunque la automatización haya cambiado después (`flow.run.resumed`,
+`flow.run.finished`). Una ejecución parada por un error guarda lo que dejaron sus pasos **7 días** para
+poder reanudarse; después lo olvida y ya no se reanuda.
+Si falla: con la automatización en pausa, «Esta automatización está en pausa: enciéndela para
+ejecutarla.»; borrada, «Esa automatización no existe en este negocio.»; una que se paró antes de hacer
+ningún paso (una cadena, un «Solo cuando…» ilegible) o en algo que necesita a una persona delante, «Esta
+ejecución no se puede reanudar…: ejecútala de nuevo entera»; pasados 7 días, «…ya no se puede reanudar…»;
+una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un error…»: nunca se reanuda dos
+veces. Ninguna se reanuda sola.
+Implicados: FLOW-F12, FLOW-F15, FLOW-F16
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -671,6 +700,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Arranca las automatizaciones de un aviso | solo la plataforma | F21 | `flow.run.react` |
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
+| Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
 
 ### Lo que avisa
 
@@ -684,7 +714,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Borrada | Borrarla | `id` | `flow.flow.deleted` |
 | Ejecución empezada | Arranca una ejecución | `id`, `flow_id` | `flow.run.started` |
 | Ejecución en espera | Llega a un «Esperar» | `id`, `flow_id`, `resume_at` | `flow.run.parked` |
-| Ejecución reanudada | Termina la espera | `id`, `flow_id` | `flow.run.resumed` |
+| Ejecución reanudada | Termina la espera o se reanuda desde el paso que falló | `id`, `flow_id` | `flow.run.resumed` |
 | Ejecución terminada | Termina bien, por una condición, por un error o cancelada | `id`, `flow_id`, `status` | `flow.run.finished` |
 | Borrador propuesto | El asistente deja un borrador | `id` | `flow.draft.proposed` |
 | Borrador usado | Se crea la automatización desde él | `id`, `flow_id` | `flow.draft.used` |
@@ -761,8 +791,17 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   outbox (fase 2, en `base/`) ejecute cada reacción con el actor del aviso que entrega; no se hace desde
   esta app ni tocando `packages/`.
 - **Lo que leyeron los pasos** (`outputs`: la ficha de un cliente…) solo se guarda mientras la ejecución
-  puede seguir (esperando); al terminar se vacía, así que un historial terminado no guarda copias de
-  datos de otras apps. Lo que trajo el aviso (`input`) sí se queda con la ejecución.
+  puede seguir: esperando, o parada por un error durante `RESUME_DAYS` (7) para reanudarla (FLOW-F24);
+  al terminar bien, por una condición o cancelada se vacía, y la poda de cada hora vacía la de un fallo de
+  más de 7 días, así que un historial terminado no guarda copias de datos de otras apps. Lo que trajo el
+  aviso (`input`) sí se queda con la ejecución.
+- **Reanudar** (`flow.run.retry`, FLOW-F24): bloquea la automatización y después la ejecución (el mismo
+  orden que toda escritura) y solo sigue si está `failed` en un paso (su última entrada del log es
+  `failed` en `step_index`), guarda lo que dejó cada paso anterior que deja algo, tiene menos de 7 días y la
+  automatización está encendida; nunca tras `flow.loop_stopped`, `flow.filter_unreadable`,
+  `flow.condition_unreadable` ni `flow.high_risk`. Sigue con su `definition` (la versión con la que
+  empezó) y deja en el log `resumed` con quién. Dos a la vez: la segunda espera el bloqueo y ve que ya no
+  está `failed`.
 - **Retención** (hub#699, la del Hub viejo: 90 días fijos, sin ajuste por hub): la tarea programada
   `flow.run.prune` (cada hora, en el minuto 17) borra como mucho `PRUNE_BATCH` (500) ejecuciones
   terminadas (`succeeded`, `stopped`, `failed`, `cancelled`) cuya hora de fin —o de inicio, si no la
@@ -815,7 +854,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **No automatiza lo que necesita a una persona delante**: anular o devolver una venta, borrar los datos
   de un cliente, enviar o anular registros en Hacienda… no salen en la lista de acciones.
 - **No ejecuta en pausa**: para eso está Probar.
-- **No reintenta sola** una ejecución que falló.
+- **No reintenta sola** una ejecución que falló: se reanuda a mano desde el paso que falló (FLOW-F24).
 
 ## Cambios frente al producto actual
 
@@ -905,7 +944,6 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   WhatsApp: ninguna app del Hub publica recetas todavía; la tarjeta «Contestar los WhatsApp» vuelve
   cuando la Bandeja de WhatsApp declare su aviso.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
-- **Reintentar una ejecución fallida** desde el paso que falló.
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
   (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
   conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide

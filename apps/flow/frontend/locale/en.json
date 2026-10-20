@@ -434,7 +434,8 @@
         "stopped": "It stopped here because this was not met: {clauses}. That is the automation working.",
         "waiting": "Waiting until {date}",
         "waited": "Waited {duration}",
-        "failed": "{action}: {message}"
+        "failed": "{action}: {message}",
+        "resumed": "Resumed here, from the step that had failed"
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -445,7 +446,15 @@
         "flow__high_risk": "Do it by hand, from its app."
       },
       "attentionOne": "{n} run stopped by a problem",
-      "attentionMany": "{n} runs stopped by a problem"
+      "attentionMany": "{n} runs stopped by a problem",
+      "retry": "Resume from the step that failed",
+      "retryTitle": "Resume it from the step that failed?",
+      "retryMessage": "The steps it already did are not repeated: it goes on with the steps it started with. It will really do what they say.",
+      "retryYes": "Yes, resume it",
+      "retryNo": "Cancel",
+      "retried": "Resumed: it finished well.",
+      "retriedWaiting": "Resumed: it is waiting. See how it goes here.",
+      "retriedFailed": "It was resumed and stopped by an error again: {message}"
     },
     "events": {
       "customer__customer__created": "a customer card is created",

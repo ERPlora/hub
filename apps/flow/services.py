@@ -37,6 +37,7 @@ from apps.flow.queries import (
     HIGH_RISK,
     HIGH_RISK_CODE,
     MANAGE,
+    RESUME_DAYS,
     SYSTEM,
     catalog_operations,
     catalog_problems,
@@ -44,6 +45,7 @@ from apps.flow.queries import (
     needs_a_person,
     operation_problem,
     read_permissions,
+    resume_problem,
     draft_row,
     flow_row,
     live_flows,
@@ -69,6 +71,7 @@ from apps.flow.schemas import (
     ReactOut,
     RunIn,
     RunOut,
+    RunRefIn,
     UpdateIn,
 )
 
@@ -110,6 +113,7 @@ CONDITION_UNREADABLE = _(
 )
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
+RUN_NOT_FOUND = _("That run does not exist in this business.")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -574,8 +578,10 @@ def _finish(
     run.status = status
     run.finished_at = now
     run.resume_at = None
-    # What the steps read (a customer's card…) is only needed while the run may go on: none is kept.
-    run.outputs = {}
+    # What the steps read (a customer's card…) is only needed while the run may go on: none is kept,
+    # except by one that stopped by an error, which may be resumed for RESUME_DAYS (FLOW-F24).
+    if status != FlowRun.Status.FAILED:
+        run.outputs = {}
     run.error_code = code
     run.error_message = message
     run.save()
@@ -970,6 +976,44 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
 
 
 @operation(
+    "flow.run.retry",
+    kind="command",
+    permission=MANAGE,
+    input=RunRefIn,
+    output=RunOut,
+    ai={
+        "description": "Resume a run that stopped by an error at the step that failed, once its cause is fixed "
+        "(a permission granted, an app turned on, the other system back): the steps before it are not "
+        "repeated and it goes on with the steps it started with. Only within 7 days, with the automation on. "
+        "It does things for real: confirm it first.",
+        "risk": "high",
+    },
+)
+def retry_run(ctx: OperationContext, data: RunRefIn) -> dict:
+    run = FlowRun.objects.filter(pk=data.id).values("flow_id").first()
+    if run is None:
+        raise NotFound(str(RUN_NOT_FOUND))
+    # The automation first, as every write does: a save, a delete or a run wait for this one.
+    flow = resolve_flow(run["flow_id"], None, lock=True)
+    failed = FlowRun.objects.select_for_update().get(pk=data.id)
+    now = timezone.now()
+    with translation.override(ctx.language):
+        problem = resume_problem(failed, now)
+        if problem is not None:
+            raise Conflict(problem[1], code=problem[0])
+        if not flow.enabled:
+            raise Conflict(str(DISABLED), code="flow.disabled")
+    step = failed.definition["steps"][failed.step_index]
+    _log(failed, step, "resumed", now, by=_actor(ctx))
+    failed.status = FlowRun.Status.RUNNING
+    failed.finished_at = None
+    failed.error_code = failed.error_message = ""
+    record_event(ctx, events.RUN_RESUMED, {"id": str(failed.id), "flow_id": str(flow.id)})
+    _advance(ctx, failed, flow, now)
+    return run_row(failed)
+
+
+@operation(
     "flow.run.prune",
     kind="command",
     permission=SYSTEM,
@@ -990,6 +1034,11 @@ def prune_runs(ctx: OperationContext, data: DueIn) -> dict:
         .order_by("ended", "id")
         .values_list("pk", flat=True)[:PRUNE_BATCH]
     )
+    # A failure older than RESUME_DAYS can no longer be resumed: what its steps read goes (FLOW-F24).
+    FlowRun.objects.filter(
+        status=FlowRun.Status.FAILED,
+        finished_at__lt=timezone.now() - dt.timedelta(days=RESUME_DAYS),
+    ).exclude(outputs={}).update(outputs={})
     if doomed:
         FlowRun.objects.filter(pk__in=doomed).delete()
         # Counted: a silent prune cannot be told from lost data the day somebody looks for an old run.

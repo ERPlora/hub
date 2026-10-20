@@ -432,6 +432,10 @@ class StatusIn(In):
     )
 
 
+class RunRefIn(In):
+    id: UUID = Field(description="The run's id (its reference in the history).")
+
+
 class RunListIn(PageIn):
     limit: int = Field(
         20, ge=1, le=100, description="How many runs to return (1 to 100)."
@@ -552,6 +556,9 @@ class RunOut(Schema):
     started_at: dt.datetime
     finished_at: dt.datetime | None
     started_by: str
+    resumable: bool = Field(
+        description="Whether it stopped by an error at a step and can still be resumed there (`flow.run.retry`)."
+    )
 
 
 class RunPageOut(Page[RunOut]):

@@ -9,6 +9,11 @@ import HistoryPanel from './HistoryPanel.vue';
 
 const toastSuccess = vi.hoisted(() => vi.fn<(message: string) => Promise<void>>(async () => undefined));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({ ...(await importOriginal<typeof import('@erplora/ui/shell')>()), toastSuccess }));
+const confirm = vi.hoisted(() => vi.fn<(options: unknown) => Promise<boolean>>());
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  useConfirm: () => ({ confirm }),
+}));
 
 const OP = 'flow.run.list';
 const CATALOG = { events: [], actions: [{ name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: [] }] } as unknown as CatalogOut;
@@ -31,6 +36,7 @@ const run = (id: string, over: Partial<RunOut> = {}): RunOut => ({
   started_at: '2026-10-15T10:00:00+02:00',
   finished_at: '2026-10-15T10:00:00+02:00',
   started_by: 'system',
+  resumable: false,
   ...over,
 });
 
@@ -111,5 +117,58 @@ describe('HistoryPanel', () => {
     await click(m.find('flow-history-more').element);
     await m.reopen();
     expect(m.params(OP)).toEqual([{ flow_id: 'f1', limit: 40, offset: 0 }]);
+  });
+
+  // FLOW-F24: a run stopped by an error at a step resumes there, after a confirmation.
+  it('a run that can be resumed offers it, asks first and resumes it at the step that failed', async () => {
+    toastSuccess.mockClear();
+    confirm.mockResolvedValue(true);
+    const m = await setup([{ ...FAILED, resumable: true }], 1);
+    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status: 'succeeded' })] });
+    await click(m.find('flow-run-retry-r2').element);
+    await settle();
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Resume it from the step that failed?', confirmLabel: 'Yes, resume it' }));
+    expect(m.sent().filter((call) => call.path === '/api/flow/runs/retry').map((call) => call.body)).toEqual([{ id: 'r2' }]);
+    expect(toastSuccess).toHaveBeenCalledWith('Resumed: it finished well.');
+  });
+
+  it('cancelling the question resumes nothing', async () => {
+    confirm.mockResolvedValue(false);
+    const m = await setup([{ ...FAILED, resumable: true }], 1);
+    await click(m.find('flow-run-retry-r2').element);
+    await settle();
+    expect(m.sent().filter((call) => call.path === '/api/flow/runs/retry')).toEqual([]);
+  });
+
+  it('a resumed run that stops again, or a refusal, is said next to the run', async () => {
+    confirm.mockResolvedValue(true);
+    const m = await setup([{ ...FAILED, resumable: true }], 1);
+    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status: 'failed', error_message: 'Not allowed yet.' })] });
+    await click(m.find('flow-run-retry-r2').element);
+    await settle();
+    expect(m.find('flow-run-retry-problem-r2').text()).toBe('It was resumed and stopped by an error again: Not allowed yet.');
+    m.answerBy({ '/api/flow/runs/retry': [409, { error: { code: 'flow.disabled', message: 'This automation is paused: turn it on to run it.' } }] });
+    await click(m.find('flow-run-retry-r2').element);
+    await settle();
+    expect(m.find('flow-run-retry-problem-r2').text()).toBe('This automation is paused: turn it on to run it.');
+  });
+
+  it('a run that cannot be resumed offers nothing', async () => {
+    const m = await setup([FAILED, run('r1')], 1);
+    expect(m.find('flow-run-retry-r2').exists()).toBe(false);
+    expect(m.find('flow-run-retry-r1').exists()).toBe(false);
+  });
+
+  it('says in its steps where it was resumed', async () => {
+    const resumed = run('r3', {
+      log: [
+        { step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'failed', at: '2026-10-15T11:00:00+02:00', error: { code: 'flow.not_allowed', message: 'Not allowed.' } },
+        { step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'resumed', at: '2026-10-15T12:00:00+02:00', by: 'ana' },
+        { step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'done', at: '2026-10-15T12:00:00+02:00' },
+      ],
+    });
+    const m = await setup([resumed]);
+    await click(m.find('flow-run-toggle-r3').element);
+    expect(m.find('flow-run-steps-r3').text()).toContain('Resumed here, from the step that had failed');
   });
 });

@@ -11,6 +11,7 @@
   executes nothing: it validates each action's data against the action's own schema.
 """
 
+import datetime as dt
 import importlib
 from importlib.util import find_spec
 from typing import Any
@@ -18,7 +19,7 @@ from typing import Any
 import pydantic
 from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Lower
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -441,8 +442,61 @@ def flow_status(ctx: OperationContext, data: StatusIn) -> dict:
 # --- Runs and drafts --------------------------------------------------------------------------------
 
 
+#: How long a run that stopped by an error keeps what its steps left, to be resumed (FLOW-F24); after
+#: that, the hourly prune forgets it (what a step read is never kept longer than a wait could).
+RESUME_DAYS = 7
+#: Failures that happened before any step ran, or that the same steps would hit again for sure.
+NOT_RESUMABLE = frozenset(
+    {
+        "flow.loop_stopped",
+        "flow.filter_unreadable",
+        "flow.condition_unreadable",
+        HIGH_RISK_CODE,
+    }
+)
+#: The kinds of step whose output later steps read (``steps.<id>``).
+LEAVES = ("command", "query")
+RUN_NOT_RESUMABLE = _("Only a run that stopped by an error at one of its steps can be resumed.")
+BEFORE_ANY_STEP = _(
+    "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it "
+    "again whole."
+)
+RESUME_EXPIRED = _(
+    "This run can no longer be resumed: it stopped more than %(days)s days ago and no longer keeps what "
+    "its steps did. Run it again whole."
+)
+
+
+def resume_problem(run: FlowRun, now) -> tuple[str, str] | None:
+    """``(code, message)`` of why ``run`` cannot be resumed at the step that failed, or ``None``.
+
+    It must have stopped by an error at a step (its last entry), still keep what every earlier step left
+    and have stopped less than ``RESUME_DAYS`` ago.
+    """
+    steps = run.definition.get("steps", [])
+    if run.status != FlowRun.Status.FAILED:
+        return "flow.run_not_resumable", str(RUN_NOT_RESUMABLE)
+    last = run.log[-1] if run.log else {}
+    at_a_step = (
+        run.step_index < len(steps)
+        and last.get("outcome") == "failed"
+        and last.get("step") == steps[run.step_index].get("id")
+    )
+    if not at_a_step or run.error_code in NOT_RESUMABLE:
+        return "flow.run_not_resumable", str(BEFORE_ANY_STEP)
+    ended = run.finished_at or run.started_at
+    lost = any(
+        step.get("kind") in LEAVES and step.get("id") not in run.outputs
+        for step in steps[: run.step_index]
+    )
+    if lost or ended < now - dt.timedelta(days=RESUME_DAYS):
+        return "flow.resume_expired", str(RESUME_EXPIRED) % {"days": RESUME_DAYS}
+    return None
+
+
 def run_row(run: FlowRun) -> dict[str, Any]:
     return {
+        "resumable": resume_problem(run, timezone.now()) is None,
         "id": run.id,
         "flow_id": run.flow_id,
         "flow_version": run.flow_version,

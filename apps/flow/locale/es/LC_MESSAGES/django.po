@@ -312,3 +312,15 @@ msgstr "Cancelada: la automatización se puso en pausa mientras esperaba."
 
 msgid "Cancelled: the automation was deleted."
 msgstr "Cancelada: la automatización se borró."
+
+msgid "Only a run that stopped by an error at one of its steps can be resumed."
+msgstr "Solo se puede reanudar una ejecución que se paró por un error en uno de sus pasos."
+
+msgid "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it again whole."
+msgstr "Esta ejecución no se puede reanudar: se paró antes de hacer ningún paso, o volvería a pararse ahí. Ejecútala de nuevo entera."
+
+msgid "This run can no longer be resumed: it stopped more than %(days)s days ago and no longer keeps what its steps did. Run it again whole."
+msgstr "Esta ejecución ya no se puede reanudar: se paró hace más de %(days)s días y ya no guarda lo que hicieron sus pasos. Ejecútala de nuevo entera."
+
+msgid "That run does not exist in this business."
+msgstr "Esa ejecución no existe en este negocio."

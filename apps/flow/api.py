@@ -21,6 +21,7 @@ from apps.flow.schemas import (
     GrantIn,
     RunIn,
     RunListIn,
+    RunRefIn,
     SampleIn,
     StatusIn,
     TestIn,
@@ -94,6 +95,11 @@ async def flow_run(request, data: RunIn):
 @bind(router, "flow.run.list", "/flow/runs")
 async def run_list(request, params: Query[RunListIn]):
     return await run_operation(request, queries.list_runs, params)
+
+
+@bind(router, "flow.run.retry", "/flow/runs/retry")
+async def run_retry(request, data: RunRefIn):
+    return await run_operation(request, services.retry_run, data)
 
 
 @bind(router, "flow.draft.list", "/flow/drafts")

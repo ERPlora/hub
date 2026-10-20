@@ -180,6 +180,8 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
       return p.t('flow.history.log.waiting', { date: formatDate(entry.until ?? entry.at, p.locale) });
     case 'waited':
       return p.t('flow.history.log.waited', { duration: describeDuration(entry.seconds ?? 0, p) });
+    case 'resumed':
+      return p.t('flow.history.log.resumed');
     default:
       return p.t('flow.history.log.failed', { action: action || entry.step, message: entry.error?.message ?? '' });
   }
