@@ -185,7 +185,7 @@
         "fixedPrice": "Precio cerrado",
         "fixedPriceHelp": "Déjalo vacío para que valga la suma de sus líneas menos el descuento.",
         "validity": "Vigencia (días)",
-        "validityHelp": "Días canjeable desde la COMPRA; vacío = no caduca.",
+        "validityHelp": "Días canjeables desde la compra; vacío = no caduca.",
         "uses": "Usos",
         "usesHelp": "Usos que concede el bono; vacío = ilimitados.",
         "lines": "Servicios incluidos",

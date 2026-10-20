@@ -185,7 +185,7 @@
         "fixedPrice": "Closed price",
         "fixedPriceHelp": "Leave empty to price it as the sum of its lines minus the discount.",
         "validity": "Validity (days)",
-        "validityHelp": "Days redeemable from the PURCHASE; empty = never expires.",
+        "validityHelp": "Days redeemable from the purchase; empty = never expires.",
         "uses": "Uses",
         "usesHelp": "Uses the voucher grants; empty = unlimited.",
         "lines": "Services included",
