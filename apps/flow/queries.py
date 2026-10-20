@@ -483,6 +483,10 @@ NOT_RESUMABLE = frozenset(
         "flow.condition_unreadable",
         "flow.run_if_unreadable",
         HIGH_RISK_CODE,
+        # A call to an address that is not plain https, or inside a private network: the same steps would
+        # be refused again (FLOW-F27); the step has to change, and a resumed run keeps the steps it started with.
+        "flow.http_url_invalid",
+        "flow.http_blocked",
     }
 )
 #: The kinds of step whose output later steps read (``steps.<id>``).

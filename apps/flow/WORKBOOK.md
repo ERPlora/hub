@@ -672,8 +672,9 @@ pasos con los que empezó, aunque la automatización haya cambiado después (`fl
 poder reanudarse; después lo olvida y ya no se reanuda.
 Si falla: con la automatización en pausa, «Esta automatización está en pausa: enciéndela para
 ejecutarla.»; borrada, «Esa automatización no existe en este negocio.»; una que se paró antes de hacer
-ningún paso (una cadena, un «Solo cuando…» ilegible) o en algo que necesita a una persona delante, «Esta
-ejecución no se puede reanudar…: ejecútala de nuevo entera»; pasados 7 días, «…ya no se puede reanudar…»;
+ningún paso (una cadena, un «Solo cuando…» ilegible), en algo que necesita a una persona delante o en una
+llamada a una dirección privada o mal escrita (los mismos pasos volverían a fallar), «Esta ejecución no se
+puede reanudar…: ejecútala de nuevo entera»; pasados 7 días, «…ya no se puede reanudar…»;
 una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un error…»: nunca se reanuda dos
 veces. Ninguna se reanuda sola.
 Implicados: FLOW-F12, FLOW-F15, FLOW-F16
@@ -755,8 +756,9 @@ antes del nombre, no se guarda («Escribe la dirección a mano…»); tampoco la
 (Host, Content-Length…). Al llamar: una dirección de una red privada, del propio servidor o de los datos
 internos de la nube no se llama («…está dentro de una red privada, así que no se llamó.»); sin permiso, «…no
 le has dejado hacer…»; si responde un error, no contesta a tiempo o no se puede llegar, la ejecución se para
-con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue». No sigue
-redirecciones. Una ejecución que se borra o se pausa mientras llama se cancela.
+con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue»; una dirección
+privada no se reanuda: hay que cambiar el paso y ejecutarla de nuevo. No sigue
+redirecciones. Una ejecución cuya automatización se borra mientras llama se cancela.
 Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
 
 ### FLOW-F28 Preguntar antes a alguien
