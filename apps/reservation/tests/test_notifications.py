@@ -30,8 +30,25 @@ def listen(db_dsn):
         session.close()
 
 
-def received(session, timeout=WAIT, stop_after=None):
-    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
+def received(session, timeout=WAIT):
+    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
+
+
+def events_of(notes) -> set[str]:
+    return {event for _, payload in notes for event in payload["events"]}
+
+
+def received_until(session, expected: set[str], timeout=WAIT):
+    """The notifications up to the one that completes ``expected``. Booking creates the guest's card
+    first (``customer.customer.create`` nested in ``reservation.reservation.create``), which notifies on
+    its own after the same COMMIT, and the two notifications may arrive in separate packets: stopping
+    after the first one only sees the reservation's when they happen to share a packet."""
+    notes = []
+    for note in session.notifies(timeout=timeout):
+        notes.append((note.channel, json.loads(note.payload)))
+        if expected <= events_of(notes):
+            break
+    return notes
 
 
 @pytest.mark.django_db(transaction=True)
@@ -39,9 +56,9 @@ def test_booking_in_hub_b_notifies_the_channel_of_b_only(listen):
     open_week()
     on_a, on_b = listen(A), listen(B)
     book(ctx=ctx_for(scope=B))
-    notes = received(on_b, stop_after=1)
+    notes = received_until(on_b, {"customer.customer.created", "reservation.reservation.created"})
     assert {channel for channel, _ in notes} == {channel_for(B)}
-    assert "reservation.reservation.created" in {event for _, payload in notes for event in payload["events"]}
+    assert {"customer.customer.created", "reservation.reservation.created"} <= events_of(notes)
     assert received(on_a, timeout=QUIET) == []
 
 
