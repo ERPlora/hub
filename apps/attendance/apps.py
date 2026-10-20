@@ -64,8 +64,9 @@ class AttendanceConfig(LiveAppConfig):
             "/attendance/records",
         ),
     ]
-    # ATTENDANCE-F05: the phase-2 worker runs it on every hub as the system (cron in UTC); clocking in
-    # applies it to the person too, so a forgotten day never blocks the next one meanwhile.
+    # ATTENDANCE-F05: the worker runs it as the system every quarter of an hour (cron in UTC; phase 1 on
+    # its one scope, phase 2 on every hub); clocking in applies it to the person too, so a forgotten day
+    # never blocks the next one.
     scheduled_tasks = [
         {
             "name": "review_stale",

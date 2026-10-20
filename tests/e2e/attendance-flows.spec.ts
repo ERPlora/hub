@@ -134,6 +134,7 @@ for (const vp of VIEWPORTS) {
       await snap(page, 'F06', vp.label);
       await rowAction(page, 'attendance-records', day.id, 'history');
       const history = page.locator('ion-modal[data-testid=attendance-history]');
+      await expect(history).toHaveClass(/show-modal/);
       await expect(history.locator('[data-testid=attendance-history-empty]')).toHaveText('This working day has never been corrected.');
       await history.locator('[data-testid=attendance-history-close-button]').click();
       await expect(history).toBeHidden();
@@ -224,6 +225,7 @@ for (const vp of VIEWPORTS) {
       // F08: a manager closes it with a clock-out and a reason; a short reason is refused first.
       await rowAction(page, 'attendance-records', cidDay.id, 'correct');
       const dialog = page.locator('ion-modal[data-testid=attendance-correct]');
+      await expect(dialog).toHaveClass(/show-modal/);
       await expect(dialog.locator('[data-testid=attendance-correct-clock_in] input')).toHaveValue(businessLocal(cidDay.clock_in_at));
       const out = new Date(Date.parse(cidDay.clock_in_at) + 8 * 3600_000).toISOString();
       await dialog.locator('[data-testid=attendance-correct-clock_out] input').fill(businessLocal(out));
@@ -240,6 +242,8 @@ for (const vp of VIEWPORTS) {
       // F09: who corrected it, before → after and the reason.
       await rowAction(page, 'attendance-records', cidDay.id, 'history');
       const history = page.locator('ion-modal[data-testid=attendance-history]');
+      // Ionic's sheet slides in after its content is there: the person sees it once it shows.
+      await expect(history).toHaveClass(/show-modal/);
       const item = history.locator('[data-testid=attendance-history-item]');
       await expect(item).toHaveCount(1);
       await expect(item).toContainText('Forgot to clock out');
