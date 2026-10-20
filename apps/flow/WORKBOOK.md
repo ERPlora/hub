@@ -425,7 +425,8 @@ el botón no sale; con cambios sin guardar está desactivado: «Guárdala primer
 guardado.».
 
 ### FLOW-F16 Ver qué hizo y por qué falló
-Estado: hecho (servidor y pantalla)
+<!-- origen: old-hub:HUB-F102 old:flows/workflow/editor.md#flows-f23 -->
+Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Editor de automatización
 Pasos:
@@ -440,8 +441,13 @@ Pasos:
 4. Una parada por error dice qué pasó y qué hacer («Ha intentado hacer algo que no le has autorizado,
    así que ha parado. Abre Permisos y concédele lo que necesita.»); si el error es de la app que hizo la
    acción, sale su frase tal cual, con el texto técnico plegado.
-Entra: las ejecuciones de esa automatización.
-Sale: nada.
+Entra: las ejecuciones de esa automatización de los últimos 90 días, y todas las que siguen esperando.
+Sale: nada. El historial guarda cada ejecución terminada **90 días** y después la olvida; una que
+espera o está en marcha no se borra nunca. Lo que leyeron sus pasos (la ficha de un cliente) no se
+guarda al terminar: solo los ids y los importes del aviso que la arrancó.
+Si falla: si no se puede leer el historial, el mensaje en rojo con **Reintentar**; sin ejecuciones,
+«Todavía no se ha ejecutado.».
+Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
 
 ### FLOW-F17 Pedirle al asistente una automatización
 Estado: hecho (servidor)
@@ -680,6 +686,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Lo que leyeron los pasos** (`outputs`: la ficha de un cliente…) solo se guarda mientras la ejecución
   puede seguir (esperando); al terminar se vacía, así que un historial terminado no guarda copias de
   datos de otras apps. Lo que trajo el aviso (`input`) sí se queda con la ejecución.
+- **Retención** (hub#699, la del Hub viejo: 90 días fijos, sin ajuste por hub): la tarea programada
+  `flow.run.prune` (cada hora, en el minuto 17) borra como mucho `PRUNE_BATCH` (500) ejecuciones
+  terminadas (`succeeded`, `stopped`, `failed`, `cancelled`) cuya hora de fin —o de inicio, si no la
+  tienen— pasa de `HISTORY_DAYS` (90), las más viejas primero, y deja en el log cuántas borró. Una
+  ejecución que espera o está en marcha no caduca. No deja aviso: borrar historial no es un hecho del
+  negocio, y la red de seguridad de 300 s de las consultas vivas pone la lista al día.
 - **Horarios**: `python-dateutil` (`rrule`, ya dependencia del Hub), en la zona del negocio; `fire_due`
   barre con `SKIP LOCKED`, arranca una vez aunque se hayan perdido varias horas y avanza
   `next_fire_at` desde ahora en la misma transacción.
@@ -817,5 +829,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   cuando la Bandeja de WhatsApp declare su aviso.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
 - **Reintentar una ejecución fallida** desde el paso que falló.
-- **Ocultar datos personales** en los ejemplos de Probar y del selector de datos: se ven tal cual
-  llegaron en el aviso, solo para el propietario y el administrador.
+- **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
+  (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
+  conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide
+  reaccionar al aviso del borrado, que llega con el relay del outbox (fase 2).

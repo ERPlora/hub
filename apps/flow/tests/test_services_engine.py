@@ -603,3 +603,49 @@ def test_a_condition_it_cannot_read_stops_the_run_with_its_reason(clock):
     assert failed.log[-1]["outcome"] == "failed"
     assert failed.log[-1]["error"]["code"] == "flow.condition_unreadable"
     assert Task.objects.count() == 0
+
+
+# The history keeps 90 days (FLOW-F16, hub#699; the old Hub's `retention.rs`, Ioan 2026-08-10): a
+# finished run older than that is deleted, in bounded passes, counted; live work is never touched.
+
+
+def test_the_history_forgets_finished_runs_after_90_days_but_never_live_ones(clock, caplog):
+    clock(NOON)
+    flow = make_flow()
+    old = NOON - dt.timedelta(days=91)
+    recent = NOON - dt.timedelta(days=89)
+    gone = [
+        make_run(flow, status=status, started_at=old, finished_at=old)
+        for status in (
+            FlowRun.Status.SUCCEEDED,
+            FlowRun.Status.STOPPED,
+            FlowRun.Status.FAILED,
+            FlowRun.Status.CANCELLED,
+        )
+    ]
+    kept = [
+        make_run(flow, status=FlowRun.Status.SUCCEEDED, started_at=recent, finished_at=recent),
+        make_run(flow, status=FlowRun.Status.WAITING, started_at=old, resume_at=NOON + dt.timedelta(days=1)),
+        make_run(flow, status=FlowRun.Status.RUNNING, started_at=old),
+    ]
+    with caplog.at_level("INFO", logger="apps.flow.services"):
+        assert run("flow.run.prune", {}, _system()).count == len(gone)
+    assert set(FlowRun.objects.values_list("pk", flat=True)) == {r.pk for r in kept}
+    assert "4 finished runs older than 90 days" in caplog.text
+    assert run("flow.run.prune", {}, _system()).count == 0
+
+
+def test_the_prune_goes_in_bounded_passes(clock, monkeypatch):
+    from apps.flow import services
+
+    clock(NOON)
+    flow = make_flow()
+    old = NOON - dt.timedelta(days=120)
+    for days in range(3):
+        moment = old - dt.timedelta(days=days)
+        make_run(flow, started_at=moment, finished_at=moment)
+    monkeypatch.setattr(services, "PRUNE_BATCH", 2)
+    assert run("flow.run.prune", {}, _system()).count == 2
+    # The oldest go first.
+    assert FlowRun.objects.get().finished_at == old
+    assert run("flow.run.prune", {}, _system()).count == 1

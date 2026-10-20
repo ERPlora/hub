@@ -294,6 +294,18 @@ def test_the_sample_is_the_newest_event_of_this_business():
     assert (nothing.found, nothing.payload, nothing.at) == (False, {}, None)
 
 
+def test_the_sample_of_a_real_customer_carries_no_personal_data():
+    # hub#826, hub#2525: the example beside each datum is what the event brought, and an event brings
+    # ids, never a customer's name, city or notes (the real Customers app, not a hand-made outbox row).
+    created = run(
+        "customer.customer.create",
+        {"name": "Berta Segunda", "city": "Madrid", "notes": "Allergic to latex"},
+    )
+    sample = run("flow.event.sample", {"event": "customer.customer.created"})
+    assert sample.payload == {"id": str(created.id)}
+    assert "Berta" not in json.dumps(sample.payload)
+
+
 def test_the_sample_needs_manage():
     with pytest.raises(PermissionDenied):
         run(

@@ -30,6 +30,7 @@ COMMANDS = {
     "flow.run.react",
     "flow.schedule.fire_due",
     "flow.run.resume_due",
+    "flow.run.prune",
 }
 # What the assistant confirms before running: turning on or off, granting, running by hand, deleting.
 HIGH_RISK = {
@@ -38,8 +39,8 @@ HIGH_RISK = {
     "flow.flow.run",
     "flow.flow.delete",
 }
-# Run only by the platform: the reaction to every event and the two scheduled tasks.
-SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due"}
+# Run only by the platform: the reaction to every event and the three scheduled tasks.
+SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due", "flow.run.prune"}
 
 
 def flow_app():
@@ -110,7 +111,7 @@ def test_navigation_is_the_one_entry_of_the_old_module():
     ]
 
 
-def test_the_two_scheduled_tasks_run_every_minute_as_the_platform():
+def test_the_scheduled_tasks_run_as_the_platform_two_every_minute_and_the_prune_every_hour():
     assert flow_app().scheduled_tasks == [
         {
             "name": "fire_due",
@@ -122,6 +123,12 @@ def test_the_two_scheduled_tasks_run_every_minute_as_the_platform():
             "name": "resume_due",
             "operation": "flow.run.resume_due",
             "cron": "* * * * *",
+            "catch_up": "collapse",
+        },
+        {
+            "name": "prune",
+            "operation": "flow.run.prune",
+            "cron": "17 * * * *",
             "catch_up": "collapse",
         },
     ]

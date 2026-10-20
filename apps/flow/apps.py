@@ -65,4 +65,11 @@ class FlowConfig(LiveAppConfig):
             "cron": "* * * * *",
             "catch_up": "collapse",
         },
+        # FLOW-F16: the history forgets the finished runs older than 90 days, once an hour.
+        {
+            "name": "prune",
+            "operation": "flow.run.prune",
+            "cron": "17 * * * *",
+            "catch_up": "collapse",
+        },
     ]
