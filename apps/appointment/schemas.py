@@ -604,6 +604,32 @@ class CountOut(Schema):
     )
 
 
+class NoticesIn(In):
+    since: dt.datetime | None = Field(
+        None, description="Only what happened from this instant on; empty = the last 24 hours."
+    )
+    limit: int = Field(20, ge=1, le=50, description="How many notices, the newest first (1 to 50).")
+
+
+class NoticeOut(Schema):
+    kind: Literal["booked", "cancelled"] = Field(
+        description="booked: the customer booked it herself; cancelled: she cancelled it herself."
+    )
+    at: dt.datetime = Field(description="When she did it.")
+    id: UUID
+    number: str
+    customer_name: str = Field(description="Empty once the customer's data was erased.")
+    service_names: str
+    staff_name: str
+    start: dt.datetime
+    start_date_label: str = Field(description="Its day ready to say, in the caller's language.")
+    start_time_label: str = Field(description="Its hour ready to say, 24-hour on the business's clock.")
+
+
+class NoticesOut(Schema):
+    rows: list[NoticeOut] = Field(description="The notices, the newest first.")
+
+
 class LaneOut(Schema):
     staff_id: UUID
     name: str
