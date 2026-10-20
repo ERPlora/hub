@@ -38,7 +38,7 @@ describe('TriggerCard', () => {
     const s = await setup({ kind: 'event', event: '' });
     const combo = s.wrapper.findComponent(Combo);
     expect(combo.props('options')).toEqual([
-      { id: 'customer.group.deleted', label: 'Customers: group deleted', hint: 'Customers · customer.group.deleted' },
+      { id: 'customer.group.deleted', label: 'a customer group is deleted', hint: 'Customers · customer.group.deleted' },
       { id: 'sale.sale.completed', label: 'a sale is charged', hint: 'Sales · sale.sale.completed' },
     ]);
     combo.vm.$emit('update:modelValue', { id: 'sale.sale.completed', label: 'a sale is charged' });

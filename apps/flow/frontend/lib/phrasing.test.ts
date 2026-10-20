@@ -41,22 +41,34 @@ const CATALOG = {
 } as CatalogOut;
 
 describe('events and actions in words', () => {
+  it('every event and action of the Hub today has its phrase in Spanish, never English words (flows#41)', () => {
+    const p = phrasing('es');
+    expect(eventLabel('cart_checkout.cart.abandoned', CATALOG, p)).toBe('se abandona un carrito online');
+    expect(eventLabel('kitchen.ticket.ready', CATALOG, p)).toBe('una comanda está lista');
+    expect(actionLabel('table.session.open', CATALOG, p)).toBe('Abrir una mesa');
+    expect(actionLabel('reservation.waitlist.convert', CATALOG, phrasing())).toBe('Give a table to somebody on the waiting list');
+    const flow = (es as { flow: { events: Record<string, string>; actions: Record<string, string> } }).flow;
+    expect(Object.keys(flow.events).length).toBeGreaterThan(300);
+    expect(Object.keys(flow.actions).length).toBeGreaterThan(450);
+  });
+
   it('a known event has its phrase, in each language', () => {
     expect(eventLabel('sale.sale.completed', CATALOG, phrasing())).toBe('a sale is charged');
     expect(eventLabel('sale.sale.completed', CATALOG, phrasing('es'))).toBe('se cobra una venta');
   });
 
   it('another one is composed from its app, its subject and what happened', () => {
-    expect(eventLabel('customer.group.deleted', CATALOG, phrasing())).toBe('Customers: group deleted');
-    expect(eventLabel('customer.group.deleted', CATALOG, phrasing('es'))).toBe('Customers: group borrado');
+    // An event born after these words were written (none of the Hub's today) is composed.
+    expect(eventLabel('customer.badge.deleted', CATALOG, phrasing())).toBe('Customers: badge deleted');
+    expect(eventLabel('customer.badge.deleted', CATALOG, phrasing('es'))).toBe('Customers: badge borrado');
     expect(eventLabel('spa.sauna.overheated', CATALOG, phrasing())).toBe('spa: sauna overheated');
   });
 
   it('a known action has its phrase; another says its verb, app and subject', () => {
     expect(actionLabel('task.task.create', CATALOG, phrasing())).toBe('Create a task');
     expect(actionLabel('task.task.create', CATALOG, phrasing('es'))).toBe('Crear una tarea');
-    expect(actionLabel('reservation.waitlist.convert', CATALOG, phrasing())).toBe('convert · Reservations (waitlist)');
-    expect(actionLabel('reservation.waitlist.create', CATALOG, phrasing('es'))).toBe('Crear · Reservations (waitlist)');
+    expect(actionLabel('reservation.waitlist.promote', CATALOG, phrasing())).toBe('promote · Reservations (waitlist)');
+    expect(actionLabel('reservation.waitlist_badge.create', CATALOG, phrasing('es'))).toBe('Crear · Reservations (waitlist badge)');
   });
 
   it('a field has its word or is made readable', () => {
