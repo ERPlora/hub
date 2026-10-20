@@ -12,6 +12,8 @@ import datetime as dt
 from collections.abc import Iterable
 from decimal import Decimal
 from fractions import Fraction
+from itertools import groupby
+from operator import attrgetter
 from uuid import UUID
 
 import pydantic
@@ -1687,36 +1689,53 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
 def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
     """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents.
 
-    A refund's money goes to the lines it returned, by what the units that came back were worth; when it
-    returned none worth anything (money only, a comp, a voucher's session), to all its sale's lines by what
-    they charged. Each refund is shared out whole, to the cent (``pricing.allocate``): with the lines no
-    professional served, the rows square with the period's revenue, which takes refunds off on the day of
-    their sale too (``sale.sale.stats``)."""
+    The refunds of a sale are taken in the order they were made, against what each line has left to give
+    back (what it charged minus what earlier refunds already took off it). A refund's money goes first to
+    the lines it returned, by what the units that came back were worth (never more than a line has left);
+    the rest (all of it for money only, a comp or a voucher's session) goes to the sale's lines by what
+    each has left. No line gives back more than it charged, so no professional's revenue falls below 0.
+    Each refund is shared out whole, to the cent (``pricing.allocate``): with the lines no professional
+    served, the rows square with the period's revenue, which takes refunds off on the day of their sale
+    too (``sale.sale.stats``)."""
     sales = _period(Sale.objects.filter(status__in=COUNTED), params)
     refunds = (
         Refund.objects.filter(total__gt=0, sale__in=sales)
         .select_related("sale")
         .prefetch_related("sale__lines", "lines")
+        .order_by("sale_id", "created_at", "id")
     )
     given: dict[UUID, int] = {}
-    for refund in refunds:
-        lines = list(refund.sale.lines.all())
-        returned = {back.sale_line_id: back.quantity for back in refund.lines.all()}
-        weights = [
-            pricing.half_up(
-                Fraction(line.line_total) * Fraction(returned[line.id]) / Fraction(line.quantity)
-            )
-            if line.id in returned
-            else 0
-            for line in lines
-        ]
-        if not any(weights):
-            weights = [line.line_total for line in lines]
-        for line, share in zip(lines, pricing.allocate(refund.total, weights), strict=True):
-            served_by = line.staff_id or refund.sale.staff_id
+    for _sale_id, of_sale in groupby(refunds, key=attrgetter("sale_id")):
+        of_sale = list(of_sale)
+        sale = of_sale[0].sale
+        lines = list(sale.lines.all())
+        left = [line.line_total for line in lines]
+        for refund in of_sale:
+            returned = {back.sale_line_id: back.quantity for back in refund.lines.all()}
+            worth = [
+                min(
+                    have,
+                    pricing.half_up(
+                        Fraction(line.line_total) * Fraction(returned[line.id]) / Fraction(line.quantity)
+                    ),
+                )
+                if line.id in returned
+                else 0
+                for line, have in zip(lines, left, strict=True)
+            ]
+            on_returned = min(refund.total, sum(worth))
+            left = _take_off(left, pricing.allocate(on_returned, worth))
+            left = _take_off(left, pricing.allocate(refund.total - on_returned, left))
+        for line, have in zip(lines, left, strict=True):
+            served_by = line.staff_id or sale.staff_id
             if served_by is not None:
-                given[served_by] = given.get(served_by, 0) + share
+                given[served_by] = given.get(served_by, 0) + line.line_total - have
     return given
+
+
+def _take_off(left: list[int], shares: list[int]) -> list[int]:
+    """What each line has left to give back once ``shares`` came off it."""
+    return [have - share for have, share in zip(left, shares, strict=True)]
 
 
 # ── Refunds ──────────────────────────────────────────────────────────────────────────────────────

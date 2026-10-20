@@ -845,9 +845,10 @@ Pasos:
 Entra: nada de otras apps.
 Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
 la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
-valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que cobró
-cada uno. Cada devolución cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió,
-suma los «Ingresos» del periodo.
+valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
+uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
+cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
+periodo.
 Si falla: «Error cargando métricas» (las cifras salen como «—»). Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no

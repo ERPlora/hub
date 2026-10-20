@@ -435,16 +435,59 @@ def test_by_professional_several_refunds_of_one_sale_add_up_and_square_with_the_
     )
     steaks = next(line for line in sale.lines if line.sku == "STK")
     give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
-    give_back(sale, 100)  # money only: shared 36.00 : 1.21, so 0.97 and 0.03
+    give_back(sale, 100)  # money only, over what is left (18.00 : 1.21): 0.94 and 0.06
+    # The last steak back for 18.00: its line only has 17.06 left, so the 0.94 over goes to the coffee.
     give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
     rows = run("sale.sale.by_staff", {}).rows
     assert [(row.staff_id, row.refunded_total, row.total_revenue) for row in rows] == [
-        (ana, 3, 118),
-        (luis, 3697, -97),
+        (ana, 100, 21),
+        (luis, 3600, 0),
     ]
     stats = run("sale.sale.stats", {})
     assert sum(row.refunded_total for row in rows) == stats.refunded_total == 3700
     assert sum(row.total_revenue for row in rows) == stats.total_revenue == 21
+
+
+def test_by_professional_money_back_after_a_line_came_back_whole_never_takes_it_below_zero(catalog, product):
+    # Orchestrator finding (hub#93, round 1): money only, after another refund returned a line whole, is
+    # shared by what each line has left to give back, never by what it charged.
+    product("Cut", "CUT", 1000, "product.generic")
+    x, y = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0013",
+        lines=[{"product": "CUT", "staff_id": str(x)}, {"product": "CUT", "staff_id": str(y)}],
+        payments=[{"method": "card"}],
+    )
+    first = sale.lines[0]
+    give_back(sale, 1000, {"line_id": str(first.id)})
+    give_back(sale, 500)
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (y, 1000, 500, 500),
+        (x, 1000, 1000, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 500
+
+
+def test_by_professional_money_only_after_two_partial_refunds_of_a_line_weighs_what_is_left(catalog):
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0014",
+        lines=[{"product": "STK", "quantity": "3", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    steaks = next(line for line in sale.lines if line.sku == "STK")
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    # 10.00 of money only, over what is left: 18.00 of steak and 1.21 of coffee → 9.37 and 0.63.
+    give_back(sale, 1000)
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.refunded_total, row.total_revenue) for row in rows] == [
+        (luis, 4537, 863),
+        (ana, 63, 58),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 921
 
 
 def test_by_professional_lines_nobody_served_keep_their_refund_out_of_the_rows(catalog):
