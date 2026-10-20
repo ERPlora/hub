@@ -56,6 +56,12 @@ describe('PackagesPage', () => {
     expect(s.cells(1).slice(1, 5)).toEqual(['€5.00', '—', '1', 'Archived']);
   });
 
+  it('a voucher with no discount says «—», never «-0 %» or «€0.00» (services#166)', async () => {
+    const s = await setup();
+    await s.show(page([pkg({ discount_percent_bp: 0 }), pkg({ id: 'p3', name: 'Bono uñas', discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 0 })]));
+    expect([s.cells(0)[1], s.cells(1)[1]]).toEqual(['—', '—']);
+  });
+
   it('keeps the column filters behind «Filters», as the old screen\'s funnel', async () => {
     const s = await setup();
     expect(s.prop('filterable')).toBe(true);
