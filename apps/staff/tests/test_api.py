@@ -401,6 +401,23 @@ def test_settings_and_bulk_over_http(boss, client):
 
 
 @pytest.mark.django_db
+def test_a_field_the_batch_does_not_know_never_brings_it_down(boss, client):
+    # gh:services#152 (STAFF-F07): the old batch was refused whole for a field it did not know, and a
+    # row past the hundredth was lost without a word; now that field is left out and 101 rows are a 422.
+    bulk = post(
+        client,
+        "/staff/members/bulk_create",
+        {"members": [{"first_name": "Ana", "last_name": "B", "nickname": "Anita"}]},
+    )
+    assert bulk.status_code == 201
+    assert (len(bulk.json()["created"]), bulk.json()["skipped"]) == (1, [])
+    rows = [{"first_name": f"P{n}", "last_name": "Q"} for n in range(101)]
+    too_many = post(client, "/staff/members/bulk_create", {"members": rows})
+    assert too_many.status_code == 422
+    assert Member.objects.count() == 1
+
+
+@pytest.mark.django_db
 def test_my_record_over_http(employee, client):
     member = make_member("Ana", user=employee, hourly_rate=1200)
     assert get(client, "/staff/members/mine").json()["member"]["hourly_rate"] == 1200
