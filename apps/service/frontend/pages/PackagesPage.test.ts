@@ -56,6 +56,11 @@ describe('PackagesPage', () => {
     expect(s.cells(1).slice(1, 5)).toEqual(['€5.00', '—', '1', 'Archived']);
   });
 
+  it('keeps the column filters behind «Filters», as the old screen\'s funnel', async () => {
+    const s = await setup();
+    expect(s.prop('filterable')).toBe(true);
+  });
+
   it('none at all says «No packages.»; the Status filter on Deleted is the deleted view', async () => {
     const s = await setup();
     await s.show(page([]));

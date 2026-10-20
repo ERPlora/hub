@@ -1,7 +1,8 @@
 // Shared steps of the service e2e (service-*.spec.ts): an owner's page in English, the apps' APIs for
 // setup and server-side evidence (never the check itself), a Combo pick, a row action (a button, or
-// inside «⋮» when the row folds them) and the cleanup every spec runs before and after it: what a run
-// creates is named «E2E Svc …» and deleted from the hub's database (phase 1: hubs `a` and `b` share it).
+// inside «⋮» when the row folds them), a column filter through the table's «Filters» panel and the
+// cleanup every spec runs before and after it: what a run creates is named «E2E Svc …» and deleted from
+// the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { A, api, login, psql, shown } from './helpers';
@@ -54,14 +55,42 @@ export async function rowAction(page: Page, table: string, id: string, action: s
   await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }
 
-/** Deletes everything a service spec created, its customers and professionals included. */
+/** Picks `option` in the column filter `filter` of `table`, through its «Filters» panel, and applies it. */
+export async function filterBy(page: Page, table: string, filter: string, option: string): Promise<void> {
+  await shown(page).locator(`[data-testid=${table}-filters-toggle]`).click();
+  const panel = shown(page).locator(`[data-testid=${table}-filters-panel]`);
+  await expect(panel).toBeVisible();
+  await panel.locator(`[data-testid=${table}-filter-${filter}]`).click();
+  await page.locator('ion-popover.select-popover ion-radio').filter({ hasText: new RegExp(`^\\s*${option}\\s*$`) }).click();
+  await page.locator('ion-popover.select-popover').waitFor({ state: 'detached' });
+  await panel.locator(`[data-testid=${table}-filters-apply]`).click();
+  await expect(panel).toBeHidden();
+}
+
+/** Lifts every column filter of `table` from its «Filters» panel. */
+export async function clearFilters(page: Page, table: string): Promise<void> {
+  await shown(page).locator(`[data-testid=${table}-filters-toggle]`).click();
+  const panel = shown(page).locator(`[data-testid=${table}-filters-panel]`);
+  await panel.locator(`[data-testid=${table}-filters-clear]`).click();
+  await expect(shown(page).locator(`[data-testid=${table}-filters-count]`)).toHaveCount(0);
+  await panel.locator(`[data-testid=${table}-filters-close]`).click();
+  await expect(panel).toBeHidden();
+}
+
+/** Deletes everything a service spec created, its customers, professionals and appointments included. */
 export function cleanUp(): void {
   const packages = `select id from service_package where name like '${TAG}%'`;
   const services = `select id from service_service where name like '${TAG}%'`;
   const grants = `select id from service_grant where package_id in (${packages})`;
   const customers = `select id from customer_customer where name like '${TAG}%'`;
+  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
   psql(
     [
+      `delete from appointment_history where appointment_id in (${appointments})`,
+      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
+      `delete from appointment_appointment where id in (${appointments})`,
+      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
+      `delete from schedule_specialday where name like '${TAG}%'`,
       `delete from service_redemption where grant_id in (${grants})`,
       `delete from service_grantadjustment where grant_id in (${grants})`,
       `delete from service_grant where package_id in (${packages}) or customer_id in (${customers})`,

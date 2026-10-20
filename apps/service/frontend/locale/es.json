@@ -71,6 +71,7 @@
       "archive": {
         "title": "Archivar servicio",
         "message": "{name} — dejará de ofrecerse y de poder reservarse. Se conservan su histórico y las citas ya reservadas.",
+        "upcoming": "{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.",
         "confirm": "Archivar",
         "error": "No se pudo archivar el servicio"
       },

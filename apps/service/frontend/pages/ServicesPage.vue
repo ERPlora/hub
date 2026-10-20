@@ -15,7 +15,7 @@ import {
   InlineFeedback,
   StatusPill,
 } from '@erplora/ui/components';
-import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
+import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
@@ -39,6 +39,8 @@ const locale = useLocale();
 const canAdd = computed(() => session.can('service.add_service'));
 const canChange = computed(() => session.can('service.change_service'));
 const canArchive = computed(() => session.can('service.delete_service'));
+// Appointments' permission only exists while that app is on: without it there is no agenda to ask.
+const readsAgenda = computed(() => session.can('appointment.view_own_appointment'));
 
 const table = useServerTable({ sort: 'name' });
 const filters = ref<DataTableFilters>({});
@@ -148,6 +150,26 @@ const restore = useCommand('service.service.restore');
 const archiving = ref<ServiceOut | null>(null);
 const archiveOpen = ref(false);
 const rowError = ref<ApiError | null>(null);
+const client = useLiveClient();
+/** Upcoming appointments that keep using the service being archived (Appointments' count). */
+const upcoming = ref(0);
+const archiveConsequences = computed(() =>
+  upcoming.value > 0 ? [t('service.services.archive.upcoming', { count: upcoming.value })] : [],
+);
+
+/** Asks Appointments how many upcoming appointments carry `row`. The line is advice, never a gate: when the
+ *  agenda cannot answer, the dialog goes without it (WORKBOOK SERVICE-F04). */
+async function countUpcoming(row: ServiceOut): Promise<void> {
+  upcoming.value = 0;
+  if (!readsAgenda.value) return;
+  let count = 0;
+  try {
+    count = (await client.api.call('appointment.appointment.count_active_for_service', { service_id: row.id })).count;
+  } catch {
+    count = 0;
+  }
+  if (archiving.value?.id === row.id) upcoming.value = count;
+}
 
 async function confirmArchive(): Promise<void> {
   if (!archiving.value) return;
@@ -166,6 +188,7 @@ async function onAction({ actionId, row }: { actionId: string; row: ServiceOut }
     archive.error.value = null;
     archiving.value = row;
     archiveOpen.value = true;
+    await countUpcoming(row);
   }
   if (actionId === 'restore') {
     try {
@@ -211,6 +234,7 @@ function onRowClick(row: ServiceOut): void {
       server-side
       searchable
       :filters="filters"
+      filterable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -272,6 +296,7 @@ function onRowClick(row: ServiceOut): void {
       tone="danger"
       :title="t('service.services.archive.title')"
       :message="archiving ? t('service.services.archive.message', { name: archiving.name }) : ''"
+      :consequences="archiveConsequences"
       :confirm-label="t('service.services.archive.confirm')"
       :cancel-label="t('service.cancel')"
       :pending="archive.pending.value"

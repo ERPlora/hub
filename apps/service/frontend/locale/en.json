@@ -71,6 +71,7 @@
       "archive": {
         "title": "Archive service",
         "message": "{name} — it will no longer be offered or bookable. Its history and the appointments already booked are kept.",
+        "upcoming": "{count} upcoming appointment(s) still use this service. They keep their booking, price and length; only new bookings stop.",
         "confirm": "Archive",
         "error": "Could not archive the service"
       },
