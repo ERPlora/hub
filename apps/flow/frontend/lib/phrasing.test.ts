@@ -62,6 +62,19 @@ describe('events and actions in words', () => {
   it('a field has its word or is made readable', () => {
     expect(fieldLabel('title', phrasing('es'))).toBe('Título');
     expect(fieldLabel('party_size', phrasing())).toBe('Party size');
+    expect(fieldLabel('some_new_field', phrasing())).toBe('Some new field');
+  });
+
+  it('the data the Hub offers today are named in Spanish with the screen in Spanish (flows#164)', () => {
+    const p = phrasing('es');
+    expect(fieldLabel('customer_phone', p)).toBe('Teléfono del cliente');
+    expect(fieldLabel('sale_number', p)).toBe('Número de venta');
+    expect(fieldLabel('party_size', p)).toBe('Personas');
+    expect(fieldLabel('assigned_to_id', p)).toBe('Asignada a');
+    expect(fieldLabel('appointment_id', phrasing())).toBe('Appointment');
+    // Every word of the dictionary has its Spanish, and the Spanish is never the English left as is.
+    const words = (es as { flow: { fields: Record<string, string> } }).flow.fields;
+    expect(Object.keys(words).length).toBeGreaterThan(1100);
   });
 
   it('a path says where it comes from', () => {

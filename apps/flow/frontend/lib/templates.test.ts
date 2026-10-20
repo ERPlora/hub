@@ -130,3 +130,29 @@ describe('the gallery', () => {
     expect(alreadyFires(templateById('weekReview')!, [flow({})])).toBeUndefined();
   });
 });
+
+describe('the words of the cards (flows#164)', () => {
+  it('every datum a card fills or reads has its word in Spanish', () => {
+    const p = phrasing('es');
+    const words = (es as { flow: { fields: Record<string, string> } }).flow.fields;
+    for (const card of TEMPLATES) {
+      const { trigger, steps } = card.build(p);
+      const names = new Set<string>();
+      const read = (value: unknown): void => {
+        if (typeof value !== 'string') return;
+        for (const match of value.matchAll(/(?:^|\{\{\s*)(?:input|steps\.\w+)\.(\w+)/g)) names.add(match[1]);
+      };
+      if (trigger.kind === 'event') for (const path of Object.keys(trigger.filter ?? {})) read(path);
+      for (const step of steps) {
+        if (step.kind === 'condition') for (const path of Object.keys(step.when)) read(path);
+        if (step.kind === 'command' || step.kind === 'query') {
+          for (const [name, value] of Object.entries(step.params)) {
+            names.add(name);
+            read(value);
+          }
+        }
+      }
+      for (const name of names) expect(words[name], `${card.id}: ${name}`).toBeTruthy();
+    }
+  });
+});
