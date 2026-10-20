@@ -164,6 +164,28 @@ def test_without_the_servers_key_a_call_with_a_secret_fails_visibly(trusted, set
     assert Handler.seen == []
 
 
+def test_without_the_servers_key_a_call_without_secrets_is_saved_tried_and_goes_out(
+    trusted, settings, clock, django_capture_on_commit_callbacks
+):
+    # FLOW-F27 does not depend on FLOW-F26: a server without FLOW_SECRETS_KEY (prod until it is set) still
+    # saves, tries and makes a call that names no secret; only a secret is refused.
+    clock(NOON)
+    settings.FLOW_SECRETS_KEY = ""
+    plain = _call(trusted, headers={"Content-Type": "application/json"})
+    assert run("flow.flow.create", {"steps": [plain]}).required_grants == [_grant(trusted)]
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=[plain, TASK_STEP | {"id": "s2"}], grants=[_grant(trusted), "task.task.create"])
+    tried = run("flow.flow.test", {"id": str(flow.id), "document": json.dumps({"trigger": {"kind": "manual"}, "steps": flow.steps})})
+    assert tried.steps[0].outcome == "would_call"
+    _, done = _run_now(flow, {"name": "Ana", "note": "hi"}, django_capture_on_commit_callbacks)
+    assert (done.status, done.error_code) == (FlowRun.Status.SUCCEEDED, "")
+    seen = Handler.seen[-1]
+    assert (seen["method"], seen["path"]) == ("POST", "/orders?customer=Ana")
+    assert "Authorization" not in seen["headers"]
+    assert seen["headers"]["Idempotency-Key"] == str(uuid.uuid5(services.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))
+    assert Task.objects.count() == 1
+    assert run("flow.secret.list", {}).available is False
+
+
 def test_a_call_left_half_way_is_sent_again_with_the_same_key(trusted, clock, django_capture_on_commit_callbacks):
     clock(NOON)
     flow = _manual(trusted, [_call(trusted)])

@@ -329,7 +329,7 @@ msgid "The «Only if…» of this step can no longer be read, so it stopped. Ope
 msgstr "Ya no se puede leer el «Solo si…» de este paso, así que se ha parado. Abre la automatización, revisa este paso y vuelve a guardarla."
 
 msgid "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
-msgstr "Este servidor todavía no puede guardar secretos: le falta su llave de cifrado. No se ha guardado nada."
+msgstr "Este servidor todavía no puede guardar secretos: le falta su clave de cifrado. No se ha guardado nada."
 
 msgid "There is no secret called «%(name)s»."
 msgstr "No hay ningún secreto llamado «%(name)s»."
@@ -382,10 +382,10 @@ msgid "The secret «%(name)s» no longer exists, so it stopped before calling. S
 msgstr "El secreto «%(name)s» ya no existe, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
 
 msgid "The secret «%(name)s» cannot be opened with this server's key, so it stopped before calling. Save it again in this step."
-msgstr "El secreto «%(name)s» no se puede abrir con la llave de este servidor, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
+msgstr "El secreto «%(name)s» no se puede abrir con la clave de este servidor, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
 
 msgid "This server cannot use secrets (its encryption key is missing), so it stopped before calling."
-msgstr "Este servidor no puede usar secretos (le falta su llave de cifrado), así que se ha parado antes de llamar."
+msgstr "Este servidor no puede usar secretos (le falta su clave de cifrado), así que se ha parado antes de llamar."
 
 msgid "Cancelled: %(who)s answered no to «%(title)s»."
 msgstr "Cancelada: %(who)s contestó que no a «%(title)s»."

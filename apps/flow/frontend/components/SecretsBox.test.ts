@@ -16,8 +16,8 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({ ...(await importOrigin
 const OP = 'flow.secret.list';
 const ROW = { id: 'x1', name: 'STRIPE_KEY', created_at: '2026-10-15T10:00:00+02:00', updated_at: '2026-10-15T10:00:00+02:00', updated_by: 'ana' };
 
-async function setup(rows = [ROW], available = true) {
-  const m = await mountFlow(SecretsBox, { props: { testid: 'flow-secrets' } });
+async function setup(rows = [ROW], available = true, locale: 'en' | 'es' = 'en') {
+  const m = await mountFlow(SecretsBox, { props: { testid: 'flow-secrets' }, locale });
   await m.live();
   await m.result(OP, { rows, available });
   return m;
@@ -68,5 +68,14 @@ describe('SecretsBox', () => {
     const m = await setup([], false);
     expect(m.find('flow-secrets-unavailable').text()).toBe('This server cannot keep secrets yet: its encryption key is missing.');
     expect(m.find('flow-secrets-save').exists()).toBe(false);
+  });
+
+  it('without the key it says so in Spanish as soon as it opens, before anything is pressed', async () => {
+    const m = await setup([ROW], false, 'es');
+    expect(m.find('flow-secrets-unavailable').text()).toBe('Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.');
+    expect(m.find('flow-secrets-name').exists()).toBe(false);
+    expect(m.find('flow-secrets-value').exists()).toBe(false);
+    expect(m.find('flow-secrets-name-STRIPE_KEY').text()).toBe('STRIPE_KEY');
+    expect(m.sent().filter((call) => call.path === '/api/flow/secrets')).toEqual([]);
   });
 });

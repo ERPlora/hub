@@ -182,7 +182,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 | FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
 | FLOW-F25 | «Solo si…» y «Si falla, sigue» en cada paso | hecho |
-| FLOW-F26 | Guardar secretos que no se pueden volver a leer | hecho |
+| FLOW-F26 | Guardar secretos que no se pueden volver a leer | parcial |
 | FLOW-F27 | Llamar a otro sistema | hecho |
 | FLOW-F28 | Preguntar antes a alguien | hecho |
 | FLOW-F29 | Contestar lo que pregunta una automatización | hecho |
@@ -707,7 +707,7 @@ Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F26 Guardar secretos que no se pueden volver a leer
 <!-- origen: old-hub:HUB-F99 -->
-Estado: hecho
+Estado: parcial — en este servidor todavía no se pueden guardar secretos; llegará cuando se active su clave
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
@@ -725,7 +725,8 @@ solo se abre en el momento de llamar y nunca sale: ni en la lista, ni en **Proba
 en el historial, ni en un fallo; lo que el otro sistema responda con el secreto dentro también sale tapado.
 Si falla: un nombre con minúsculas al principio, cifras primero o símbolos: «Usa mayúsculas, cifras y _,
 empezando por una letra (STRIPE_KEY).», y lo escrito se queda; sin la clave de cifrado del servidor, la caja
-dice «Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.» y no deja guardar.
+dice «Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.» en cuanto se abre, en
+lugar de los campos, y no deja guardar.
 Guardar un paso que nombra un secreto que no existe: «No hay ningún secreto llamado «X».» junto al campo.
 Una ejecución cuyo secreto se borró o ya no se puede abrir se para antes de llamar, con el motivo y qué hacer.
 Un secreto solo se puede insertar en **Llamar a otro sistema**: en cualquier otro paso no se guarda.
@@ -757,7 +758,9 @@ antes del nombre, no se guarda («Escribe la dirección a mano…»); tampoco la
 internos de la nube no se llama («…está dentro de una red privada, así que no se llamó.»); sin permiso, «…no
 le has dejado hacer…»; si responde un error, no contesta a tiempo o no se puede llegar, la ejecución se para
 con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue»; una dirección
-privada no se reanuda: hay que cambiar el paso y ejecutarla de nuevo. No sigue
+privada no se reanuda: hay que cambiar el paso y ejecutarla de nuevo. Mientras el servidor no pueda guardar
+secretos (FLOW-F26), una llamada que no usa ninguno se guarda, se prueba y sale igual; la que usa uno se
+para antes de llamar («Este servidor no puede usar secretos…»). No sigue
 redirecciones. Una ejecución cuya automatización se borra mientras llama se cancela.
 Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
 
@@ -1183,6 +1186,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Qué queda fuera
 
+- **Guardar secretos en los servidores de ERPlora** (FLOW-F26, parcial): la caja, el sellado y su uso en
+  una llamada están hechos y probados, pero producción y pre todavía no tienen su clave de cifrado; hasta
+  que se active, la caja lo dice al abrirse y las llamadas sin secretos funcionan igual.
 - **Paso «Enviar un mensaje»** y la cabecera multimedia de un WhatsApp (FLOW-F31, FLOW-F32, parciales):
   dependen del envío de WhatsApp y de correo a clientes, que todavía no existe en el Hub ni en el SaaS.
 - **Paso «Pedírselo al asistente»** y las propuestas del asistente en **Esperan tu respuesta**: dependen del
