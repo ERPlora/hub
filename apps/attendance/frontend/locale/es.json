@@ -55,11 +55,6 @@
       "unlinked": {
         "title": "Tu usuario no está vinculado a ninguna ficha de Personal",
         "message": "Pide a un responsable que la vincule en Personal para poder fichar."
-      },
-      "status": {
-        "open": "En curso",
-        "closed": "Cerrada",
-        "needs_review": "Por revisar"
       }
     },
     "records": {

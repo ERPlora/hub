@@ -606,7 +606,7 @@ def test_the_file_name_follows_the_dates():
 
 
 # A forgotten day (open longer than the settings' hours) reads as waiting for review, whether or not
-# the scheduled review has run yet (phase 1 has no worker): it never counts «until now» (review of
+# the worker's review has run yet (every quarter of an hour): it never counts «until now» (review of
 # 2026-10-15, findings 1–3).
 
 
