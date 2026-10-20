@@ -160,7 +160,14 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(archive).toBeHidden();
       await expect(row).toHaveCount(0);
 
-      // SERVICE-F05: the archived view (behind «Filters») offers only Restore.
+      // SERVICE-F05: the archived view (behind «Filters», where each range names its column) offers only Restore.
+      await shown(page).locator('[data-testid=service-services-filters-toggle]').click();
+      const panel = shown(page).locator('[data-testid=service-services-filters-panel]');
+      await expect(panel.locator('.data-table__drawer-label', { hasText: 'Price' })).toBeVisible();
+      await expect(panel.locator('.data-table__drawer-label', { hasText: 'Duration (min)' })).toBeVisible();
+      await capture('SERVICE-F05-filters');
+      await panel.locator('[data-testid=service-services-filters-close]').click();
+      await expect(panel).toBeHidden();
       await filterBy(page, 'service-services', 'status', 'Archived');
       await expect(row).toContainText('Archived');
       await capture('SERVICE-F05');

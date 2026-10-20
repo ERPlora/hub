@@ -81,9 +81,9 @@ no aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 Tabla con buscador «Buscar servicio…», columnas **Nombre, Categoría, Tarifa** (Precio fijo, Por hora,
 Desde, Variable, Gratis), **Precio, Duración (min)** y **Estado**: **Activo**, **Sin configurar** (con
 el motivo debajo, «Sin categoría fiscal: no se puede cobrar») o **Archivado**. Se ordena por
-cualquier columna y se filtra por Nombre, Categoría, Tarifa, Precio (desde–hasta), Duración y Estado
-(el filtro de Estado en **Archivado** cambia a la vista de archivados); vista de lista o de
-tarjetas; 50 por página.
+cualquier columna y, con el botón **Filtros**, se filtra por Nombre, Categoría, Tarifa, Precio
+(desde–hasta), Duración y Estado (el filtro de Estado en **Archivado** cambia a la vista de
+archivados); vista de lista o de tarjetas; 50 por página.
 
 **Nuevo servicio** abre el formulario: **Nombre, Tarifa, Precio** (en euros, «22,50»; al salir del
 campo se reescribe con la notación del idioma), **Duración (min)**, **Categoría** («Sin categoría» o
@@ -92,7 +92,9 @@ botón **Crear servicio**. Tocar una fila (o su **Editar**) abre «Editando serv
 botón **Guardar cambios** y, debajo, **Profesionales que lo hacen** (SERVICE-F31, F32). Por fila:
 **Editar** y **Archivar**; en la vista de archivados, **Restaurar**. **Archivar** pide confirmar:
 «Archivar servicio» — «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
-histórico y las citas ya reservadas.».
+histórico y las citas ya reservadas.» y, si Citas tiene citas próximas con él, «{count} cita(s)
+próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de
+admitirse reservas nuevas.».
 
 ### Categorías
 Tabla con buscador «Buscar categoría…» y columnas **Nombre, Categoría padre, Orden** y **Servicios**
@@ -105,13 +107,13 @@ categoría desaparece; los servicios que contiene se conservan, sin categoría.�
 ### Bonos y paquetes
 Arriba, **Bonos sin cliente** (solo responsable, propietario y administrador). Tabla con buscador
 «Buscar paquete…», columnas **Nombre, Descuento, Precio cerrado, Líneas** y **Estado** (Activo,
-Archivado o Eliminado). El filtro de Estado en **Eliminado** cambia a la vista de los bonos
+Archivado o Eliminado). En **Filtros**, el filtro de Estado en **Eliminado** cambia a la vista de los bonos
 eliminados del catálogo que alguien compró: por fila solo **Movimientos** y **Bonos vendidos**.
 **Nuevo paquete** abre el formulario: **Nombre, Tipo de descuento** (Porcentaje o Importe fijo),
 **Descuento (%)** o **Descuento (importe)**, **Precio cerrado** («Déjalo vacío para que valga la suma
 de sus líneas menos el descuento.»), **Vigencia (días)** («Días canjeable desde la compra; vacío = no
 caduca.»), **Usos** («Usos que concede el bono; vacío = ilimitados.») y **Servicios incluidos**: una
-fila por servicio con **Servicio** y **Sesiones**, «Quitar línea» y **Añadir servicio**; botón **Crear
+fila por servicio con **Servicio** y, debajo, **Sesiones** y «Quitar línea»; **Añadir servicio**; botón **Crear
 paquete**. Al editar, en lugar de las líneas sale «Los servicios incluidos no se cambian una vez
 creado: elimina este paquete y crea uno nuevo.». Por fila: **Editar, Movimientos, Bonos vendidos** y
 **Eliminar** (con «Eliminar paquete»: «<nombre> — el paquete y sus {count} línea(s) salen del catálogo
@@ -160,7 +162,7 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F01 | Dar de alta un servicio | hecho |
 | SERVICE-F02 | Editar un servicio | hecho |
 | SERVICE-F03 | Poner un servicio a precio abierto | hecho |
-| SERVICE-F04 | Archivar un servicio | hecho (el aviso de citas próximas, cuando exista Citas) |
+| SERVICE-F04 | Archivar un servicio | hecho |
 | SERVICE-F05 | Ver y restaurar los servicios archivados | hecho |
 | SERVICE-F06 | Dar de alta muchos servicios de golpe | hecho (asistente y API) |
 | SERVICE-F07 | Crear y editar categorías | hecho |
@@ -181,17 +183,18 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F22 | Pagar una línea con un bono | hecho (con Ventas, SALE-F27) |
 | SERVICE-F23 | Soltar la sesión si la línea o la cuenta desaparecen | hecho |
 | SERVICE-F24 | Dar por gastadas las sesiones al cobrar | hecho (conceder los bonos vendidos en el tique, no: ver «Lo que queda fuera») |
-| SERVICE-F25 | La sesión retenida que nadie cobra vuelve sola | hecho (al leer y con la tarea de cada hora, que corre el worker: `base/scheduler.py`, 2026-10-15) |
+| SERVICE-F25 | La sesión retenida que nadie cobra vuelve sola | hecho (al leer y con la tarea de cada hora) |
 | SERVICE-F26 | Devolver la sesión al devolver la venta | hecho (con Ventas, SALE-F32) |
 | SERVICE-F27 | Devolver la sesión al anular la venta | hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera») |
-| SERVICE-F28 | Unir dos fichas: los bonos pasan a la que queda | servidor hecho; la entrega del aviso espera al relay del outbox (fase 2) |
-| SERVICE-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | hecho (la lista); vaciar los textos al anonimizar, servidor hecho, entrega pendiente del relay (fase 2) |
+| SERVICE-F28 | Unir dos fichas: los bonos pasan a la que queda | parcial |
+| SERVICE-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | parcial |
 | SERVICE-F30 | Rescatar los bonos sin cliente | hecho (la lista) |
 | SERVICE-F31 | Asignar un profesional a un servicio | hecho |
-| SERVICE-F32 | Cambiar o quitar un profesional de un servicio | hecho; quitar a quien se da de baja, servidor hecho, entrega pendiente del relay (fase 2) |
+| SERVICE-F32 | Cambiar o quitar un profesional de un servicio | parcial |
 | SERVICE-F33 | Saber quién puede hacer un servicio | hecho |
 
 ### SERVICE-F01 Dar de alta un servicio
+<!-- origen: qa:verticals/beauty/01-services-professionals-and-schedules wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-services-create-sql-transaccional fi:modules/services#navigation fi:modules/services#permission-role_permissions fi:modules/services#query-services-services-list fi:modules/services#validation-declarativa-bloque-validates old:services/workflow/catalogo.md#services-f01 qa:modules/services/create-service-with-duration-and-price -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Servicios
@@ -215,6 +218,7 @@ tecleado se conserva.
 Implicados: TAX-F01
 
 ### SERVICE-F02 Editar un servicio
+<!-- origen: fi:modules/services#command-services-services-update-sql-transaccional fi:modules/services#query-services-services-get old:services/workflow/catalogo.md#services-f02 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -230,6 +234,7 @@ negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se
 Implicados: SERVICE-F31
 
 ### SERVICE-F03 Poner un servicio a precio abierto
+<!-- origen: old:services/workflow/catalogo.md#services-f03 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -245,28 +250,34 @@ Si falla: una tarifa fuera de las cinco o un mínimo por encima del máximo se r
 Implicados: SALE-F09
 
 ### SERVICE-F04 Archivar un servicio
-Estado: hecho (el aviso de citas próximas sale cuando exista Citas)
+<!-- origen: fi:modules/services#command-services-services-delete-sql-transaccional old:services/workflow/catalogo.md#services-f04 -->
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Servicios
 Pasos:
 1. En la fila del servicio pulsa **Archivar**.
 2. Lee «Archivar servicio»: «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
-   histórico y las citas ya reservadas.».
+   histórico y las citas ya reservadas.» y, si Citas está activa y tiene citas próximas con ese
+   servicio, «{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y
+   duración; solo dejan de admitirse reservas nuevas.».
 3. Pulsa **Archivar** (o **Cancelar**). La fila desaparece de la lista.
-Entra: el servicio.
+Entra: el servicio y, si Citas está activa y quien archiva ve citas, cuántas citas pendientes o
+confirmadas lo usan desde ahora.
 Sale: el servicio fuera de oferta, no borrado (`service.service.archived`): deja de salir en la
 agenda, en el TPV, en WhatsApp y en el selector de líneas de un bono. Las citas ya reservadas, los
 bonos que lo incluyen y los profesionales asignados no cambian.
 Si falla: en la confirmación, «No se pudo archivar el servicio» o «Ese servicio no existe en este
-negocio.». Archivar uno ya archivado no cambia nada.
-Implicados: APPOINTMENT-F01
+negocio.». Archivar uno ya archivado no cambia nada. El aviso de citas es un consejo: nunca impide
+archivar, y si Citas no contesta la confirmación sale sin esa línea.
+Implicados: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 Ver y restaurar los servicios archivados
+<!-- origen: old:services/workflow/catalogo.md#services-f05 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Servicios
 Pasos:
-1. En el filtro de Estado elige **Archivado**: la tabla enseña solo los archivados.
+1. En **Filtros**, elige **Archivado** en Estado y pulsa **Aplicar**: la tabla enseña solo los archivados.
 2. En la fila pulsa **Restaurar** (no pide confirmación).
 3. El servicio vuelve a la lista como antes, con su nombre, precio, duración y categoría.
 Entra: los servicios archivados.
@@ -274,8 +285,10 @@ Sale: el servicio otra vez en oferta y reservable (`service.service.restored`).
 Si falla: encima de la tabla, «No se pudo restaurar el servicio» o «Ese servicio no existe en este
 negocio.». Restaurar uno que ya está en oferta no cambia nada. En la vista de archivados la fila no
 ofrece Editar ni Archivar y tocarla no abre nada.
+Implicados: SERVICE-F04
 
 ### SERVICE-F06 Dar de alta muchos servicios de golpe
+<!-- origen: fi:modules/services#command-services-services-bulk_create-handler-wasm-bulk_create_services old:services/workflow/catalogo.md#services-f06 -->
 Estado: hecho (asistente y API; no hay importador en pantalla)
 Actor: responsable, asistente
 Pantalla: ninguna
@@ -287,9 +300,12 @@ Entra: la lista de servicios.
 Sale: los servicios, todos o ninguno, cada uno con su aviso (`service.service.created`). Lo que una
 línea no dice toma los Ajustes, como el alta suelta.
 Si falla: una línea mal formada, con una categoría o una categoría fiscal que no existen, rechaza el
-lote entero antes de crear nada, con el motivo de cada línea en su campo (`services.3.price`).
+lote entero antes de crear nada, con el motivo de cada línea en su campo (por ejemplo, el precio
+de la cuarta línea).
+Implicados: SERVICE-F01, SERVICE-F11
 
 ### SERVICE-F07 Crear y editar categorías
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-categories-create-sql-transaccional fi:modules/services#command-services-categories-update-sql-transaccional fi:modules/services#query-services-categories-list old:services/workflow/catalogo.md#services-f07 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Categorías
@@ -307,8 +323,10 @@ sale debajo del campo: «Ya hay una categoría con ese nombre. Elige otro nombre
 puede ser su propio padre ni colgar de una de sus hijas: «Una categoría no puede colgar de sí misma
 ni de una de sus subcategorías.». Un padre eliminado: «Esa categoría padre no está disponible: no
 existe en este negocio o se ha eliminado.».
+Implicados: SERVICE-F01, SERVICE-F08
 
 ### SERVICE-F08 Eliminar una categoría
+<!-- origen: fi:modules/services#command-services-categories-delete-sql-transaccional old:services/workflow/catalogo.md#services-f08 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Categorías
@@ -321,8 +339,10 @@ Sale: la categoría eliminada, no borrada (`service.category.deleted`); su nombr
 servicios se quedan **sin categoría** y sus subcategorías pasan a colgar de su padre (o a ser raíz).
 Si falla: en la confirmación, «No se pudo eliminar la categoría» o «Esa categoría no existe en este
 negocio.».
+Implicados: SERVICE-F07, SERVICE-F02
 
 ### SERVICE-F09 Vender un servicio en el TPV
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
 Estado: hecho — lo hace Ventas: Servicios le da `service.service.list_for_sale` y `service.service.get`
 (ver «Contrato con Ventas» y SALE-F38)
 Actor: empleado
@@ -338,6 +358,7 @@ Si falla: lo dice Ventas (SALE-F38).
 Implicados: SALE-F01, SALE-F38
 
 ### SERVICE-F10 Dar el catálogo a Citas, Ventas, WhatsApp y Menús
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 fi:modules/services#event-emitidos old:services/workflow/catalogo.md#services-f10 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
@@ -353,6 +374,7 @@ Si falla: cada lector decide.
 Implicados: APPOINTMENT-F01, SALE-F01, WHATSAPP_INBOX-F21, COMBO-F06
 
 ### SERVICE-F11 Cambiar los ajustes de Servicios
+<!-- origen: fi:modules/services#command-services-settings-update-sql-transaccional fi:modules/services#query-services-settings-get old:services/workflow/catalogo.md#services-f11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes de Servicios
@@ -367,8 +389,10 @@ asistente, API y alta de golpe); el formulario trae elegida la categoría fiscal
 «Mostrar precios» y «Mostrar duración» los leerá la reserva online cuando exista.
 Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (una duración de 0, una
 categoría fiscal que no existe).
+Implicados: SERVICE-F01, SERVICE-F06
 
 ### SERVICE-F12 Crear un bono
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 wf:peluqueria-dia#rec_peluqueria-f13 fi:modules/services#command-services-packages-create-handler-wasm-create_package fi:modules/services#query-services-package_items-list fi:modules/services#query-services-packages-list old:services/workflow/bonos.md#services-f12 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -388,8 +412,10 @@ Si falla: sin ningún servicio, «Añade al menos un servicio: un paquete sin l�
 canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible o negativo, debajo de
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
 nombre.».
+Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono
+<!-- origen: fi:modules/services#command-services-packages-delete-sql-transaccional fi:modules/services#command-services-packages-update-sql-transaccional fi:modules/services#query-services-packages-get old:services/workflow/bonos.md#services-f13 -->
 Estado: hecho
 Actor: responsable (editar), propietario y administrador (eliminar)
 Pantalla: Bonos y paquetes
@@ -397,7 +423,7 @@ Pasos:
 1. Toca la fila o su **Editar** («Editando paquete — <nombre>»): cambia Nombre, Descuento, Precio
    cerrado, Vigencia o Usos; las líneas no se cambian. Pulsa **Guardar cambios**.
 2. Para quitarlo del catálogo pulsa **Eliminar** y confirma.
-3. Para ver lo vendido de un bono eliminado, filtra Estado por **Eliminado**.
+3. Para ver lo vendido de un bono eliminado, en **Filtros** elige **Eliminado** en Estado.
 Entra: el bono del catálogo.
 Sale: al editar, el bono cambiado (`service.package.updated`); «Usos» y «Vigencia» valen para las
 ventas futuras, los bonos vendidos conservan lo que se vendió; el nombre nuevo se ve también en ellos.
@@ -405,8 +431,10 @@ Al eliminar (`service.package.deleted`), el bono sale del catálogo y ya no se p
 vendidos se siguen gastando, ajustando y anulando igual. Un bono eliminado que nadie compró no sale
 en ninguna vista.
 Si falla: «No se pudo guardar el paquete» o «Ese paquete no existe en este negocio.».
+Implicados: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Vender un bono a una clienta
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f14 -->
 Estado: hecho la concesión (asistente y API); la venta en el TPV, no (ver «Lo que queda fuera»)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
@@ -426,16 +454,22 @@ para elegir (`customer.customer_ambiguous`).
 Implicados: CUSTOMER-F01
 
 ### SERVICE-F15 Consultar los bonos de una clienta
+<!-- origen: fi:modules/services#query-services-packages-balance old:services/workflow/bonos.md#services-f15 -->
 Estado: hecho (asistente y API)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
 Pasos:
-1. Pregunta al asistente por los bonos de la clienta: responde una fila por compra, con el bono, la
-   fecha, lo pagado, las sesiones usadas y las que quedan, cuándo caduca y si ya caducó o se anuló.
+1. Pregunta al asistente por los bonos de la clienta, por su nombre o su teléfono.
+2. Responde una fila por compra, con el bono, la fecha, lo pagado, las sesiones usadas y las que
+   quedan, cuándo caduca y si ya caducó o se anuló; también los de una ficha unida a la suya.
 Entra: la clienta (Clientes) y sus bonos vendidos.
 Sale: nada; solo lectura.
+Si falla: si el nombre vale para varias clientas, el asistente dice cuáles y pide que elija; si no
+la encuentra, lo dice.
+Implicados: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 Ver quién ha comprado un bono
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f16 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Bonos y paquetes
@@ -446,8 +480,12 @@ Pasos:
 Entra: las compras de ese bono y el nombre de cada clienta (Clientes); de una ficha eliminada, su
 identificador.
 Sale: nada; solo lectura. **Ajustar** y **Anular** salen donde proceden y para quien puede.
+Si falla: vacía, «Nadie ha comprado este bono todavía.»; si no se puede leer, «No se han podido
+cargar los bonos vendidos» con el motivo.
+Implicados: SERVICE-F17, SERVICE-F18
 
 ### SERVICE-F17 Anular un bono vendido por error
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f17 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -464,8 +502,10 @@ Sale: el bono deja de poder gastarse y queda como rastro, con quién, cuándo y 
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica
 por qué se anula este bono: el motivo queda en su registro.». Si otra caja gasta una sesión a la vez,
 la anulación espera y recibe el motivo real.
+Implicados: SERVICE-F16, SALE-F32
 
 ### SERVICE-F18 Regalar sesiones, alargar la caducidad o corregir el saldo
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/bonos.md#services-f18 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -482,18 +522,25 @@ o agotado.
 Si falla: «Indica por qué se ajusta este bono…», «Añade o quita al menos una sesión, o añade al menos
 un día.», «No puedes quitar más sesiones de las que le quedan al cliente.», «Ese bono no tiene límite
 de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.».
+Implicados: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 Ver los movimientos de un bono
+<!-- origen: old:services/workflow/bonos.md#services-f19 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Movimientos**.
-2. Sale cada sesión entregada y cada ajuste, el más reciente primero (ver «Pantallas»).
+2. Sale cada sesión entregada y cada ajuste, el más reciente primero (ver «Pantallas»); **Cargar
+   más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
 Entra: las sesiones y los ajustes de ese bono.
 Sale: nada; solo lectura.
+Si falla: vacía, «Este bono aún no se ha usado.»; si no se puede leer, «No se han podido cargar los
+movimientos» con el motivo.
+Implicados: SERVICE-F18, SERVICE-F21, SERVICE-F22
 
 ### SERVICE-F20 Un bono caduca
+<!-- origen: old:services/workflow/bonos.md#services-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -504,15 +551,18 @@ Pasos:
    y **Ajustar** lo revive.
 Entra: la fecha de compra, la vigencia vendida y los días regalados.
 Sale: nada se escribe al caducar.
+Si falla: nada falla al caducar; gastarlo después se rechaza con «Este bono ha caducado.».
+Implicados: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Gastar una sesión fuera del cobro
+<!-- origen: fi:modules/services#command-services-packages-redeem-sql-transaccional fi:modules/services#query-services-packages-redeem_check old:services/workflow/bonos.md#services-f21 -->
 Estado: hecho (asistente y API)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
 Pasos:
-1. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
-   qué servicio se hizo y la enlace a la cita o a la venta. Antes puede preguntarse si se podría y
-   por qué no.
+1. Si quieres, pregunta antes al asistente si se podría gastar una sesión de ese bono y por qué no.
+2. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
+   qué servicio se hizo y la enlace a la cita o a la venta.
 Entra: la compra del bono; el servicio, la cita y la venta, como referencia.
 Sale: una sesión **Entregada** al momento (`service.grant.redeemed`), que cuenta contra los «Usos».
 No emite documento fiscal.
@@ -520,8 +570,10 @@ Si falla: «Este bono está anulado: ya no se puede usar.», «Este bono ya no t
 disponibles.», «Este bono ha caducado.», «Este bono no cubre ese servicio. Un bono de cortes paga
 cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». Dos cajas que gastan la
 última sesión a la vez van en fila y la segunda recibe el motivo real.
+Implicados: SERVICE-F19, SERVICE-F20
 
 ### SERVICE-F22 Pagar una línea con un bono
+<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f10 wf:peluqueria-dia#rec_peluqueria-f11 old:services/workflow/cobro-y-devolucion.md#services-f22 -->
 Estado: hecho (con Ventas, SALE-F27)
 Actor: empleado, responsable
 Pantalla: Ventas: Cobro
@@ -554,6 +606,7 @@ sesiones, el hueco no aparece.
 Implicados: SALE-F27, CUSTOMER-F17
 
 ### SERVICE-F23 Soltar la sesión si la línea o la cuenta desaparecen
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f23 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender, Cobro
@@ -570,6 +623,7 @@ la línea se quita igual y la sesión vuelve sola al cabo de un día (SERVICE-F2
 Implicados: SALE-F18, SALE-F20, SALE-F27
 
 ### SERVICE-F24 Dar por gastadas las sesiones al cobrar
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f24 -->
 Estado: hecho (conceder los bonos vendidos en el tique, no: ver «Lo que queda fuera»)
 Actor: empleado, responsable
 Pantalla: Ventas: Cobro
@@ -586,13 +640,13 @@ el cobro con la misma clave no gasta dos veces.
 Si falla: nada se cobra y la cuenta sigue igual si una sesión ya no está reservada («La sesión
 reservada de «{name}» ya no está reservada (pasó su día o se soltó). Quita el bono de la línea y vuelve
 a aplicarlo.»), si la venta no es de la titular del bono («El bono «{name}» es de otro cliente: cobra la
-venta a nombre de su titular o quita el bono de la línea.»). Pendiente de fase 2 (activación por hub):
-si Servicios no está activa, tampoco se cobra; hoy la plataforma no apaga apps por hub y ese camino
-solo se prueba en los tests.
+venta a nombre de su titular o quita el bono de la línea.»). Si Servicios no está activa en el
+negocio, tampoco se cobra (hoy Servicios no se apaga por negocio: llega en la fase 2).
 Implicados: SALE-F01, SALE-F22, SALE-F27
 
 ### SERVICE-F25 La sesión retenida que nadie cobra vuelve sola
-Estado: hecho (al leer y con la tarea de cada hora, que corre el worker: `base/scheduler.py`, 2026-10-15)
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f25 -->
+Estado: hecho (al leer y con la tarea de cada hora)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -603,11 +657,13 @@ Pasos:
 3. Si se vuelve a esa cuenta, la línea sigue marcada, pero cobrarla se rechaza (SERVICE-F24): se
    deshace el bono y se vuelve a aplicar.
 Entra: las sesiones reservadas sin cobrar y su plazo.
-Sale: la sesión de vuelta en el bono (`service.session.expired` cuando la tarea las marca).
+Sale: la sesión de vuelta en el bono (`service.session.expired`, uno por sesión, cuando la tarea las
+marca).
 Si falla: si la tarea no corre, la sesión vuelve igual en cuanto pasa el plazo: el saldo no la cuenta.
 Implicados: SALE-F17
 
 ### SERVICE-F26 Devolver la sesión al devolver la venta
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/cobro-y-devolucion.md#services-f26 qa:verticals/beauty/08-edge-cases -->
 Estado: hecho (con Ventas, SALE-F32)
 Actor: responsable
 Pantalla: Ventas: Devolver
@@ -621,12 +677,12 @@ Sale: la sesión de vuelta en el bono, con quién, cuándo y el documento de dev
 (`service.session.returned`); en **Movimientos**, **Devuelta**. No mueve dinero ni emite documento;
 si el bono ya caducó, la sesión consta pero no se puede gastar hasta alargarlo (SERVICE-F18). La
 misma devolución repetida devuelve una sola sesión.
-Si falla: «Esa sesión ya se devolvió en otra devolución.». Pendiente de fase 2 (activación por hub): si
-Servicios no está activa, la devolución se rechaza entera; hoy la plataforma no apaga apps por hub y ese
-camino solo se prueba en los tests.
+Si falla: «Esa sesión ya se devolvió en otra devolución.». Si Servicios no está activa en el negocio,
+la devolución se rechaza entera (hoy Servicios no se apaga por negocio: llega en la fase 2).
 Implicados: SALE-F31, SALE-F32
 
 ### SERVICE-F27 Devolver la sesión al anular la venta
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/cobro-y-devolucion.md#services-f27 -->
 Estado: hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera»)
 Actor: responsable
 Pantalla: Ventas: Anular venta
@@ -637,14 +693,16 @@ Pasos:
 Entra: la venta anulada, quién y el motivo; las sesiones gastadas en esa venta.
 Sale: las sesiones de vuelta en su bono (`service.session.returned`). No mueve dinero ni emite
 documento fiscal.
-Si falla: repetir la anulación no devuelve dos veces. Pendiente de fase 2 (activación por hub): si
-Servicios no está activa, la venta no se anula (se avisa en la ventana); hoy la plataforma no apaga apps
-por hub y ese camino solo se prueba en los tests.
+Si falla: repetir la anulación no devuelve dos veces. Si Servicios no está activa en el negocio, la
+venta no se anula y se avisa en la ventana (hoy Servicios no se apaga por negocio: llega en la fase 2).
 Implicados: SALE-F30
 
 ### SERVICE-F28 Unir dos fichas: los bonos pasan a la que queda
-Estado: servidor hecho; la entrega del aviso espera al relay del outbox (fase 2). Mientras tanto, los bonos de una clienta (SERVICE-F15) incluyen los de la ficha unida
-a la suya, así que ninguno queda invisible
+<!-- origen: old:services/workflow/fichas-de-clienta.md#services-f28 -->
+Estado: parcial — Servicios sabe mover los bonos, pero en esta fase el aviso de Clientes al unir dos
+fichas aún no le llega (fase 2), así que no se mueven. Mientras tanto, los bonos de una clienta
+(SERVICE-F15) incluyen los de la ficha unida a la suya y el cobro los acepta, así que ninguno queda
+invisible ni sin poder gastarse
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -655,11 +713,12 @@ Entra: la ficha que queda y la absorbida (avisa Clientes: `customer.customer.mer
 Sale: los bonos apuntando a la ficha que queda (`service.grant.reassigned`); si dos compras son del
 mismo bono, quedan dos, cada una con su saldo y su caducidad.
 Si falla: repetir el aviso no cambia nada.
-Implicados: CUSTOMER-F13
+Implicados: CUSTOMER-F13, SERVICE-F15, SERVICE-F22
 
 ### SERVICE-F29 Eliminar o anonimizar una ficha: sus bonos quedan sin cliente
-Estado: hecho (la lista se calcula al leer); vaciar los textos libres al anonimizar, servidor hecho, la
-entrega del aviso espera al relay del outbox (fase 2)
+<!-- origen: old-hub:HUB-F250 old:services/workflow/fichas-de-clienta.md#services-f29 -->
+Estado: parcial — la lista de bonos sin cliente se calcula al leer y está hecha; vaciar los textos
+libres al anonimizar una ficha espera a que le llegue el aviso de Clientes (fase 2)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -676,6 +735,7 @@ Si falla: repetir el aviso no cambia nada.
 Implicados: CUSTOMER-F07, CUSTOMER-F16
 
 ### SERVICE-F30 Rescatar los bonos sin cliente
+<!-- origen: old:services/workflow/fichas-de-clienta.md#services-f30 -->
 Estado: hecho (la lista; pasar un bono a otra ficha no existe, ADR-0390)
 Actor: responsable
 Pantalla: Bonos y paquetes
@@ -687,8 +747,12 @@ Pasos:
    no se usó, ábrelo desde **Bonos vendidos** de ese bono, donde sale con su referencia.
 Entra: los bonos vivos de fichas eliminadas o anonimizadas.
 Sale: nada; solo lectura.
+Si falla: vacía, «Ningún bono se ha quedado sin cliente.»; si no se puede leer, «No se han podido
+cargar los bonos sin cliente.».
+Implicados: SERVICE-F29, SERVICE-F17
 
 ### SERVICE-F31 Asignar un profesional a un servicio
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 old:staff/workflow/disponibilidad.md#staff-f10 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
@@ -707,21 +771,26 @@ varios (`staff.ambiguous_member`) o el importe ilegible o negativo.
 Implicados: STAFF-F01
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
-Estado: hecho; quitar a quien se da de baja en Personal, servidor hecho, la entrega del aviso espera al
-relay del outbox (fase 2). Mientras tanto, quien está de baja ya no sale en las listas ni en «quién puede
-hacerlo» (SERVICE-F33)
+<!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
+Estado: parcial — cambiar, marcar como principal, apagar y quitar están hechos; quitar de sus servicios
+a quien se da de baja en Personal espera a que le llegue el aviso de Personal (fase 2). Mientras
+tanto, quien está de baja ya no sale en las listas ni en «quién puede hacerlo» (SERVICE-F33)
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
 Pasos:
-1. En «Profesionales que lo hacen», cambia los minutos o el precio de una persona y guárdalo, marca la
-   estrella («Servicio principal»; uno por persona, el anterior deja de serlo), apágalo o pulsa
-   «Quitar».
+1. En «Profesionales que lo hacen», cambia los «Minutos (opcional)» o el «Precio (opcional)» de una
+   persona y pulsa **Guardar**.
+2. Pulsa «Hacerlo su servicio principal»: sale «Servicio principal» (uno por persona, el anterior deja
+   de serlo).
+3. Apaga «Lo hace» para que deje de hacerlo sin quitarla, o pulsa «Quitar».
 Entra: la asignación.
 Sale: el cambio (`service.assignment.updated`, `service.assignment.removed`). Dar de baja a una
 persona en Personal la quita de todos los servicios que hacía.
 Si falla: «Esa asignación no existe en este negocio.».
+Implicados: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Saber quién puede hacer un servicio
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 old:staff/workflow/disponibilidad.md#staff-f12 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
@@ -733,6 +802,8 @@ Pasos:
 Entra: el servicio.
 Sale: la lista, de solo lectura. Vacía quiere decir «nadie declarado» o «quien lo tiene no está
 activo y reservable»: la regla «entonces lo hace todo el equipo reservable» es de Citas.
+Si falla: un servicio que no existe, «Ese servicio no existe en este negocio.».
+Implicados: SERVICE-F31, APPOINTMENT-F01
 
 ## Servicios: lo que entra y lo que sale
 
@@ -975,7 +1046,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
   categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
-- **El aviso de citas próximas al archivar (F04)**: llega con Citas.
 - **La entrega de los avisos de otras apps** (F28, F29 al anonimizar, F32 al dar de baja): las
   reacciones están hechas y probadas con los avisos reales; las ejecuta el relay del outbox, que llega
   en la fase 2. Mientras tanto se resuelve al leer (fichas unidas, personas dadas de baja).
