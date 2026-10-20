@@ -29,7 +29,13 @@ function cleanup(): void {
   );
 }
 
-test.beforeAll(cleanup);
+test.beforeAll(async ({ browser }) => {
+  cleanup();
+  // The employee's account exists in the hub only after their first sign-in (the SaaS creates it on the
+  // way in): F03 picks it, and F08 and F24 link a record to it before the employee opens anything.
+  const employee = await signedIn(browser, '/staff/members', EMPLOYEE);
+  await employee.context.close();
+});
 test.afterAll(cleanup);
 
 const stamp = (): string => Date.now().toString(36);
