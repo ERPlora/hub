@@ -234,7 +234,15 @@
         "booked": "{booked} appointments booked · {skipped} could not be booked",
         "pendingFrom": "The dates from {date} on are not booked yet: tap «Book appointments» on the series to book them.",
         "upcoming": "Nothing to book yet: the next date of this series, {date}, is further ahead than the maximum advance booking. Tap «Book appointments» on the series when it gets closer.",
-        "updated": "{moved} appointments moved · {cancelled} cancelled because they no longer fit the pattern · {locked} left alone because they are already charged"
+        "moved": "{moved} appointments moved",
+        "handed": "{moved} appointments now with {staff}",
+        "servicesChanged": "{moved} appointments now for {services}",
+        "handedWithServices": "{moved} appointments now with {staff} for {services}",
+        "newDates": "{booked} new dates booked",
+        "cancelled": "{cancelled} cancelled because they no longer fit the pattern",
+        "locked": "{locked} left alone because they are already charged",
+        "notMoved": "{skipped} could not be moved and keep their time:",
+        "unchanged": "Saved: no appointment had to change."
       },
       "frequency": {
         "daily": "Every day",

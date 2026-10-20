@@ -234,7 +234,15 @@
         "booked": "{booked} citas reservadas · {skipped} no se han podido reservar",
         "pendingFrom": "Las fechas desde el {date} aún no están reservadas: pulsa «Reservar citas» en la serie para reservarlas.",
         "upcoming": "Aún no hay nada que reservar: la próxima fecha de esta serie, el {date}, queda más lejos que la antelación máxima. Pulsa «Reservar citas» en la serie cuando se acerque.",
-        "updated": "{moved} citas movidas · {cancelled} canceladas porque ya no caen en la repetición · {locked} sin tocar porque ya están cobradas"
+        "moved": "{moved} citas movidas",
+        "handed": "{moved} citas pasan a {staff}",
+        "servicesChanged": "{moved} citas cambian a {services}",
+        "handedWithServices": "{moved} citas pasan a {staff} con {services}",
+        "newDates": "{booked} fechas nuevas reservadas",
+        "cancelled": "{cancelled} canceladas porque ya no caen en la repetición",
+        "locked": "{locked} sin tocar porque ya están cobradas",
+        "notMoved": "{skipped} no se han podido mover y se quedan a su hora:",
+        "unchanged": "Guardado: no ha hecho falta cambiar ninguna cita."
       },
       "frequency": {
         "daily": "Cada día",

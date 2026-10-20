@@ -32,7 +32,10 @@ const props = withDefaults(
   { fromDate: null, ownStaff: null },
 );
 
-const emit = defineEmits<{ outcome: [outcome: MaterializeOut]; updated: [outcome: RecurringUpdatedOut] }>();
+const emit = defineEmits<{
+  outcome: [outcome: MaterializeOut];
+  updated: [outcome: RecurringUpdatedOut, change: RecurringUpdateIn];
+}>();
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
@@ -169,7 +172,10 @@ function changes(series: RecurringOut): RecurringUpdateIn {
 
 async function save(): Promise<void> {
   try {
-    if (props.series) emit('updated', await update.run(changes(props.series)));
+    if (props.series) {
+      const change = changes(props.series);
+      emit('updated', await update.run(change), change);
+    }
     else emit('outcome', await create.run(newSeries()));
   } catch {
     return; // The panel says why; what was typed stays.
