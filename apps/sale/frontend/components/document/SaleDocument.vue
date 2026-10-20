@@ -4,13 +4,17 @@
 // server's words and Retry) when either fails, then the paper — above it, out of what prints, «Fiscal
 // document pending» with «Issue now» while a document of the sale waits. The host is told when the
 // paper is painted (`ready`, with its element, what `printPaper` copies) or that it could not be
-// (`failed`).
+// (`failed`). With VeriFactu on and readable, a sale with a fiscal document waits for that document's record
+// too (VERIFACTU-F19): the paper carries its QR, a reprint included, and a record that cannot be read fails the
+// document like the sale would — never a paper without its QR.
 // Mount it only while it is wanted: its subscriptions live as long as it does.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
+import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, useTemplateRef, watch } from 'vue';
+import { computed, shallowRef, useTemplateRef, watch } from 'vue';
 
+import FiscalRecordFollower, { type FiscalRecordState } from './FiscalRecordFollower.vue';
 import PendingDocuments from './PendingDocuments.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
 
@@ -29,10 +33,30 @@ const emit = defineEmits<{
 
 const sale = useLive('sale.sale.get', () => ({ sale_id: props.saleId }));
 const settings = useLive('sale.pos_settings.get', {});
+const session = useSession();
 
-const error = computed(() => sale.error.value ?? settings.error.value);
-/** The asked sale's document is here (another sale's, still on screen while the new one comes, is not). */
-const loaded = computed(() => !error.value && sale.data.value?.id === props.saleId && !!settings.data.value);
+/** VeriFactu on in this business and the right to read its records. */
+const verifactuOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
+);
+/** The asked sale's fiscal document whose record the paper waits for; none without VeriFactu or a document. */
+const recordOf = computed(() => (verifactuOn.value && sale.data.value?.id === props.saleId ? sale.data.value.invoice_id : null) ?? null);
+const fiscal = shallowRef<FiscalRecordState>({ record: undefined, error: null });
+watch(recordOf, () => {
+  fiscal.value = { record: undefined, error: null };
+});
+
+const error = computed(() => sale.error.value ?? settings.error.value ?? (recordOf.value ? fiscal.value.error : null));
+/** The asked sale's document is here (another sale's, still on screen while the new one comes, is not), with its
+ *  fiscal record when it waits for one. */
+const loaded = computed(
+  () =>
+    !error.value &&
+    sale.data.value?.id === props.saleId &&
+    !!settings.data.value &&
+    (!recordOf.value || fiscal.value.record !== undefined),
+);
+const record = computed(() => (recordOf.value ? (fiscal.value.record ?? null) : null));
 
 const paper = useTemplateRef<InstanceType<typeof ReceiptPaper>>('paper');
 
@@ -55,6 +79,12 @@ function retry(): void {
 
 <template>
   <div class="sale-document">
+    <FiscalRecordFollower
+      v-if="recordOf"
+      :key="recordOf"
+      :invoice-id="recordOf"
+      @change="fiscal = $event"
+    />
     <InlineFeedback
       v-if="error"
       tone="danger"
@@ -83,6 +113,7 @@ function retry(): void {
         :sale="sale.data.value"
         :settings="settings.data.value"
         :duplicate="duplicate"
+        :record="record"
       />
     </template>
     <div

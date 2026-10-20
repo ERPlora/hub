@@ -109,6 +109,104 @@ describe('useTill: adding products', () => {
   });
 });
 
+describe('useTill: the options of Modifiers (SALE-F11)', () => {
+  const WITH_CHEESE = order({
+    id: 'o1',
+    version: 1,
+    lines: [line({ id: 'l1', product_id: 'p1', modifiers: [pick('cheese')] })],
+  });
+
+  function pick(option_id: string) {
+    return { option_id, group_id: 'g1', group_name: 'Extras', name: option_id, kitchen_name: option_id, price_delta: 100, tax_category_key: null, own_line: false };
+  }
+
+  it('opens the check with the options chosen, in the order chosen, and sends only their ids', async () => {
+    const s = await setup();
+    s.reply(WITH_CHEESE);
+    await s.till().addProduct(product({ id: 'p1' }), null, ['cheese', 'rare', 'cheese']);
+    expect(s.calls()).toEqual([['', { lines: [{ product_id: 'p1', option_ids: ['cheese', 'rare', 'cheese'] }] }]]);
+  });
+
+  it('a line with options never raises another, and a tap without options does not raise one with them', async () => {
+    const s = await setup();
+    s.reply(WITH_CHEESE);
+    await s.till().addProduct(product({ id: 'p1' }), null, ['cheese']);
+    await s.till().addProduct(product({ id: 'p1' }), null, ['cheese']);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    expect(s.calls().slice(1)).toEqual([
+      ['/add_line', { order_id: 'o1', product_id: 'p1', option_ids: ['cheese'] }],
+      ['/add_line', { order_id: 'o1', product_id: 'p1' }],
+    ]);
+  });
+});
+
+describe('useTill: the menus of Menus (SALE-F12)', () => {
+  const MENU_CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: null, name: 'Menu of the day' })] });
+  const PICKS = [
+    { option_id: 'lentils', quantity: 1 },
+    { option_id: 'hake', quantity: 1 },
+  ];
+
+  it('opens the check with the menu and its dishes; only the choices travel, Menus prices them', async () => {
+    const s = await setup();
+    s.reply(MENU_CHECK);
+    const result = await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    expect(result).toEqual({ ok: true });
+    expect(s.calls()).toEqual([['', { combo_lines: [{ combo_id: 'm1', choices: PICKS }] }]]);
+  });
+
+  it('adds every menu as a line of its own, never raising the one before', async () => {
+    const s = await setup();
+    s.reply(MENU_CHECK);
+    await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    await s.till().addComboLine({ id: 'm1' }, 'st1', PICKS);
+    expect(s.calls().slice(1)).toEqual([
+      ['/add_combo_line', { order_id: 'o1', combo_id: 'm1', choices: PICKS, staff_id: 'st1' }],
+    ]);
+  });
+
+  it('hands Menus’ refusal back to the sheet instead of a toast', async () => {
+    const s = await setup();
+    s.reply(MENU_CHECK);
+    await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    s.net.onApi(() => refused('combo.option_sold_out', '«Flan» is sold out.'));
+    const result = await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    expect(result).toEqual({ ok: false, message: '«Flan» is sold out.' });
+  });
+});
+
+describe('useTill: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', () => {
+  const SENT = order({ id: 'o1', version: 3, lines: [line({ id: 'l1', product_id: 'p1', round_no: 1, fired_at: '2026-10-20T12:00:00Z' })] });
+  const TICKET = { id: 't1', number: 'K-0001', short_number: '1', round_no: 1 };
+  const answer = (s: Awaited<ReturnType<typeof setup>>) =>
+    s.net.onApi((call) => Response.json(call.url.startsWith('/api/kitchen/tickets/send') ? TICKET : SENT));
+
+  it('asks Kitchen to send what is pending, normal or rush, then reads the check back with its round', async () => {
+    const s = await setup();
+    s.reply(CHECK);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    answer(s);
+    expect(await s.till().sendToKitchen(true)).toEqual({ ok: true, round: 1 });
+    const sent = s.sent().filter((c) => c.path === '/api/kitchen/tickets/send');
+    expect(sent.map((c) => c.body)).toEqual([{ order_id: 'o1', priority: 'rush' }]);
+    expect(s.till().order.value?.lines[0].round_no).toBe(1);
+    await s.till().sendToKitchen(false);
+    expect(s.sent().filter((c) => c.path === '/api/kitchen/tickets/send').at(-1)?.body).toEqual({ order_id: 'o1', priority: 'normal' });
+  });
+
+  it('hands the refusal back in the server’s words', async () => {
+    const s = await setup();
+    s.reply(CHECK);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    s.net.onApi(() => refused('sale.nothing_to_fire', 'There is nothing new to send to the kitchen.'));
+    expect(await s.till().sendToKitchen(false)).toEqual({
+      ok: false,
+      message: 'There is nothing new to send to the kitchen.',
+      code: 'sale.nothing_to_fire',
+    });
+  });
+});
+
 describe('useTill: services of Services (SALE-F38)', () => {
   const SERVICE_CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: null, service_id: 's1', is_service: true })] });
 

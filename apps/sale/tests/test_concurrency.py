@@ -36,20 +36,7 @@ from apps.sale.models import (
 )
 from apps.sale.tests.conftest import A, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-@pytest.fixture(autouse=True)
-def factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and the factory
-    payment methods are planted again, as their migrations do (idempotent)."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    with connection.schema_editor() as editor:
-        for module in ("apps.tax.migrations.0002_factory_catalogue", "apps.tax.migrations.0005_retail_alcohol", "apps.sale.migrations.0002_factory_payment_methods"):
-            import_module(module).plant(registry, editor)
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.usefixtures("factory_data")]
 
 
 def at_once(*calls):

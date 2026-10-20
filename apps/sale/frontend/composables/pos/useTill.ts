@@ -14,7 +14,7 @@ import { computed, type ComputedRef, type Ref, shallowRef } from 'vue';
 
 import { mergeableLine, mergeableServiceLine, plusOne } from '../../components/pos/till';
 import { refusal } from '../../lib/refusal';
-import type { OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
+import type { ComboChoiceIn, OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
 import { useT } from '../useT';
 import { useCurrentCheck } from './useCurrentCheck';
 
@@ -39,10 +39,19 @@ export interface Till {
   busy: ComputedRef<boolean>;
   /** The title typed before the check exists: it opens with it. */
   pendingLabel: Readonly<Ref<string>>;
-  addProduct(product: { id: string }, staffId: string | null): Promise<void>;
+  /** A product of the catalogue, with the options of Modifiers chosen for it (SALE-F11), in the order chosen;
+   *  a refusal is a toast. */
+  addProduct(product: { id: string }, staffId: string | null, optionIds?: readonly string[]): Promise<void>;
+  /** The same, for a sheet: the refusal's words come back instead of a toast. */
+  addProductLine(product: { id: string }, staffId: string | null, optionIds?: readonly string[]): Promise<WriteResult>;
   addOpenLine(line: OpenLine, staffId: string | null): Promise<WriteResult>;
   /** A service of Services: its own price, or `unitPrice` (cents) when it has no fixed price. */
   addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult>;
+  /** A menu of Menus with the dishes picked (SALE-F12): always a line of its own; Menus prices it. */
+  addComboLine(combo: { id: string }, staffId: string | null, choices: readonly ComboChoiceIn[]): Promise<WriteResult>;
+  /** Kitchen sends what is pending as a new round, normal or rush (SALE-F20, KITCHEN-F18); the check is read
+   *  back with its round. */
+  sendToKitchen(rush: boolean): Promise<WriteResult & { round?: number; code?: string }>;
   setQuantity(line: OrderLineOut, quantity: string): Promise<void>;
   toggleGift(line: OrderLineOut): Promise<void>;
   setNote(line: OrderLineOut, notes: string): Promise<WriteResult>;
@@ -84,6 +93,9 @@ export function useTill(options: TillOptions): Till {
   const addLine = useCommand('sale.order.add_line');
   const addOpen = useCommand('sale.order.add_open_line');
   const addServiceLine = useCommand('sale.order.add_service_line');
+  const addCombo = useCommand('sale.order.add_combo_line');
+  const kitchenSend = useCommand('kitchen.ticket.send');
+  const readCheck = useCommand('sale.order.get');
   const updateLine = useCommand('sale.order.update_line');
   const removeLine = useCommand('sale.order.remove_line');
   const lineStaff = useCommand('sale.order.set_line_staff');
@@ -154,28 +166,32 @@ export function useTill(options: TillOptions): Till {
     options.onOpened?.(created.id);
   }
 
-  function addProduct(product: { id: string }, staffId: string | null): Promise<void> {
-    return toast(
-      serial(async () => {
-        try {
-          const id = order.value?.id ?? check.id.value;
-          if (!id) {
-            await opened(() => open.run({ ...labelOf(), lines: [{ product_id: product.id, ...staffOf(staffId) }] }));
-            return { ok: true } as const;
-          }
-          const merge = order.value ? mergeableLine(order.value.lines, product.id, staffId) : undefined;
-          accept(
-            merge
-              ? await updateLine.run({ order_id: id, line_id: merge.id, quantity: plusOne(merge.quantity) })
-              : await addLine.run({ order_id: id, product_id: product.id, ...staffOf(staffId) }),
-          );
+  function addProductLine(product: { id: string }, staffId: string | null, optionIds: readonly string[] = []): Promise<WriteResult> {
+    // Only the ids travel: Modifiers values them on the server (a price from the browser buys nothing).
+    const options = optionIds.length ? { option_ids: [...optionIds] } : {};
+    return serial(async () => {
+      try {
+        const id = order.value?.id ?? check.id.value;
+        if (!id) {
+          await opened(() => open.run({ ...labelOf(), lines: [{ product_id: product.id, ...staffOf(staffId), ...options }] }));
           return { ok: true } as const;
-        } catch (error) {
-          return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') } as const;
         }
-      }),
-    );
+        // A line with options is a dish of its own: it never raises another, nor is raised.
+        const merge = order.value && !optionIds.length ? mergeableLine(order.value.lines, product.id, staffId) : undefined;
+        accept(
+          merge
+            ? await updateLine.run({ order_id: id, line_id: merge.id, quantity: plusOne(merge.quantity) })
+            : await addLine.run({ order_id: id, product_id: product.id, ...staffOf(staffId), ...options }),
+        );
+        return { ok: true } as const;
+      } catch (error) {
+        return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') } as const;
+      }
+    });
   }
+
+  const addProduct = (product: { id: string }, staffId: string | null, optionIds: readonly string[] = []) =>
+    toast(addProductLine(product, staffId, optionIds));
 
   function addOpenLine(line: OpenLine, staffId: string | null): Promise<WriteResult> {
     return serial(async () => {
@@ -208,6 +224,40 @@ export function useTill(options: TillOptions): Till {
         return { ok: true };
       } catch (error) {
         return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') };
+      }
+    });
+  }
+
+  function addComboLine(combo: { id: string }, staffId: string | null, choices: readonly ComboChoiceIn[]): Promise<WriteResult> {
+    // Only the choices travel: Menus prices the menu on the server. Each menu is a line of its own (its dishes
+    // differ), so a second one never raises the first.
+    const menu = { combo_id: combo.id, choices: [...choices], ...staffOf(staffId) };
+    return serial(async () => {
+      try {
+        const id = order.value?.id ?? check.id.value;
+        if (!id) {
+          await opened(() => open.run({ ...labelOf(), combo_lines: [menu] }));
+          return { ok: true };
+        }
+        accept(await addCombo.run({ order_id: id, ...menu }));
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') };
+      }
+    });
+  }
+
+  function sendToKitchen(rush: boolean): Promise<WriteResult & { round?: number; code?: string }> {
+    return serial(async () => {
+      const id = order.value?.id ?? check.id.value;
+      if (!id) return { ok: false, message: t('sale.pos.kitchen.notSent') };
+      try {
+        const ticket = await kitchenSend.run({ order_id: id, priority: rush ? 'rush' : 'normal' });
+        accept(await readCheck.run({ order_id: id }));
+        return { ok: true, round: ticket.round_no };
+      } catch (error) {
+        const code = refusal(error, '')?.code;
+        return { ok: false, message: wordsOf(error, 'sale.pos.kitchen.notSent'), ...(code ? { code } : {}) };
       }
     });
   }
@@ -331,8 +381,11 @@ export function useTill(options: TillOptions): Till {
     busy: computed(() => inFlight.value > 0),
     pendingLabel,
     addProduct,
+    addProductLine,
     addOpenLine,
     addService,
+    addComboLine,
+    sendToKitchen,
     setQuantity,
     toggleGift,
     setNote,

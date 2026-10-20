@@ -88,6 +88,23 @@ describe('PrebillModal', () => {
     expect(paper.find('.pos-bill__notice').text()).toBe('Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.');
   });
 
+  it('names the dishes of a menu under it, as the ticket will (SALE-F12)', async () => {
+    const dish = (product_name: string) => ({ option_id: product_name, group_name: 'Mains', product_id: product_name, product_name, category_id: null, is_service: false, quantity: 1, price_delta: 0, tax_category_key: null, amount: null });
+    const combo = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [dish('Lentils'), dish('Hake')] };
+    const menu = line({ id: 'l3', name: 'Menu of the day', product_id: null, unit_price: 1350, line_total: 1350, combo });
+    const m = await setup({ order: { ...CHECK, lines: [menu] } }, 'es');
+    await m.result('sale.checkout.preview', VALUED);
+    expect(m.find('pos-prebill-paper').find('.pos-bill__options').text()).toBe('Lentils, Hake');
+  });
+
+  it('names the options of a dish under it, as the ticket will (SALE-F11)', async () => {
+    const pick = (name: string) => ({ option_id: name, group_id: 'g1', group_name: 'Extras', name, kitchen_name: name, price_delta: 100, tax_category_key: null, own_line: false });
+    const burger = line({ id: 'l3', name: 'Burger', unit_price: 900, line_total: 900, modifiers: [pick('Cheese'), pick('Rare')] });
+    const m = await setup({ order: { ...CHECK, lines: [burger] } }, 'es');
+    await m.result('sale.checkout.preview', VALUED);
+    expect(m.find('pos-prebill-paper').find('.pos-bill__options').text()).toBe('Cheese, Rare');
+  });
+
   it('names each tax by its kind in the reader’s language; a named component keeps its own name', async () => {
     const m = await setup();
     await m.result(

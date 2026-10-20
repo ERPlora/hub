@@ -212,6 +212,39 @@
         "remove": "Quitar de la mesa",
         "seatFailed": "No se pudo sentar la cuenta en esa mesa.",
         "removeFailed": "No se pudo quitar la mesa de la cuenta."
+      },
+      "options": {
+        "choose": "Elige {n}",
+        "upTo": "Hasta {n}",
+        "optional": "Opcional",
+        "add": "Añadir · {price}",
+        "chooseToContinue": "Elige una opción para continuar",
+        "full": "«{group}» está completo: quita una para elegir otra.",
+        "less": "Una menos de {name}",
+        "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo."
+      },
+      "menu": {
+        "badge": "Menú",
+        "chooseIn": "Elige {n} en «{course}»",
+        "loadFailed": "No se han podido leer los menús. Inténtalo de nuevo."
+      },
+      "kitchen": {
+        "accountTab": "Cuenta",
+        "roundTab": "Comanda actual",
+        "roundTabPendingOne": "Comanda actual, 1 artículo por enviar",
+        "roundTabPending": "Comanda actual, {count} artículos por enviar",
+        "roundHint": "Revisa cantidades y quién atiende. Al enviar, estas líneas van a cocina como una comanda que puedes seguir.",
+        "allSent": "Todo está enviado",
+        "allSentHint": "Añade productos para preparar una nueva comanda.",
+        "send": "Enviar comanda ({count})",
+        "sendRush": "Enviar URGENTE ({count})",
+        "rush": "Marcar la comanda como urgente",
+        "sent": "Comanda {n} enviada a cocina.",
+        "notSent": "No se ha podido enviar la comanda a cocina. Inténtalo de nuevo."
+      },
+      "fiscal": {
+        "title": "Ahora no se pueden cobrar ventas.",
+        "review": "Revisar VeriFactu"
       }
     },
     "checkout": {
@@ -358,6 +391,13 @@
         "issued": "Documentos fiscales emitidos.",
         "failed": "No se han podido emitir los documentos. Inténtalo de nuevo."
       },
+      "qr": {
+        "label": "QR tributario:",
+        "alt": "Código QR de VeriFactu",
+        "checkReceipt": "Escanéalo para cotejar este tique en la AEAT",
+        "checkInvoice": "Escanéalo para cotejar esta factura en la AEAT",
+        "csv": "CSV: {csv}"
+      },
       "paperPending": "Documento fiscal pendiente"
     },
     "sales": {
@@ -379,6 +419,10 @@
         "discounts": "Descuentos",
         "voided": "Anuladas",
         "error": "Error cargando métricas"
+      },
+      "week": {
+        "title": "Últimos 7 días",
+        "loadFailed": "No se han podido leer los últimos 7 días."
       },
       "columns": {
         "date": "Fecha",

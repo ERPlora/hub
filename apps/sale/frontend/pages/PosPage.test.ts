@@ -19,7 +19,7 @@ import ServicePriceSheet from '../components/pos/ServicePriceSheet.vue';
 import StaffPicker from '../components/pos/StaffPicker.vue';
 import TableButton from '../components/pos/TableButton.vue';
 import TablePicker from '../components/pos/TablePicker.vue';
-import { line, memoryStorage, order, page, preview, product, service, settings } from '../components/pos/__tests__/fixtures';
+import { line, memoryStorage, order, page, preview, product, refused, service, settings } from '../components/pos/__tests__/fixtures';
 import { CURRENT_CHECK_KEY } from '../composables/pos/useCurrentCheck';
 import { plain } from '../lib/format';
 import PosPage from './PosPage.vue';
@@ -525,6 +525,19 @@ describe('PosPage: the table of the check (SALE-F19)', () => {
     expect(s.find('pos-check-context-empty').exists()).toBe(false);
   });
 
+  it('the check’s follower and the table’s never share a key: the duplicate broke the till once a check opened', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const s = await setup({ session: WITH_TABLES });
+      await s.addProduct();
+      expect(s.params('table.session.by_order')).toEqual([{ order_id: 'o1' }]);
+      const duplicates = warn.mock.calls.filter((call) => String(call[0]).includes('Duplicate keys'));
+      expect(duplicates).toEqual([]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('without the right to see the table checks, the button stays but no table is followed', async () => {
     const s = await setup({ session: without('table.view_session') });
     await s.addProduct();
@@ -614,5 +627,200 @@ describe('PosPage: the phone', () => {
     expect(s.find('pos-till').classes()).toContain('pos-till--cart-open');
     await click(s.find('pos-cart-backdrop').element);
     expect(s.find('pos-till').classes()).not.toContain('pos-till--cart-open');
+  });
+});
+
+describe('PosPage: the options of Modifiers (SALE-F11)', () => {
+  /** Modifiers is on in this business and the person reads its groups. */
+  const WITH_MODIFIERS = { ...MANAGER, permissions: [...MANAGER.permissions, 'modifier.view'], apps: [{ label: 'modifier', state: 'on' as const }] };
+  const EXTRAS = {
+    product_id: 'p1',
+    product_name: 'Burger',
+    groups: [
+      {
+        id: 'g1',
+        name: 'Extras',
+        kitchen_name: '',
+        min_choices: 0,
+        max_choices: 0,
+        allow_repeat: false,
+        is_required: false,
+        options: [{ id: 'cheese', name: 'Cheese', kitchen_name: '', price_delta: 100, tax_category_key: null, is_default: false }],
+      },
+    ],
+  };
+  const forTarget = (s: Awaited<ReturnType<typeof setup>>) => s.sent().filter((c) => c.path === '/api/modifier/groups/for_target');
+
+  it('without Modifiers on (or without the right to read it) a product goes straight to the check, nothing asked', async () => {
+    for (const session of [MANAGER, { ...WITH_MODIFIERS, permissions: MANAGER.permissions }]) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      await s.addProduct();
+      expect(forTarget(s)).toEqual([]);
+      expect(s.writes()).toEqual([['/api/sale/orders', { lines: [{ product_id: 'p1' }] }]]);
+    }
+  });
+
+  it('a product with groups opens the sheet and adds nothing until «Add»; then the line carries the ids', async () => {
+    const s = await setup({ session: WITH_MODIFIERS });
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Response.json(EXTRAS) : Response.json(CHECK)));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1', name: 'Burger', price: 800 }));
+    await settle();
+    expect(forTarget(s).map((c) => c.query)).toEqual([{ product_id: 'p1' }]);
+    expect(s.writes()).toEqual([]);
+    expect(s.inDoc('pos-options-title')?.textContent).toContain('Burger');
+    await click(s.inDoc('pos-option-cheese'));
+    await click(s.inDoc('pos-options-add'));
+    await settle();
+    expect(s.writes()).toEqual([['/api/sale/orders', { lines: [{ product_id: 'p1', option_ids: ['cheese'] }] }]]);
+  });
+
+  it('a product without groups goes straight to the check', async () => {
+    const s = await setup({ session: WITH_MODIFIERS });
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Response.json({ ...EXTRAS, groups: [] }) : Response.json(CHECK)));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
+    await settle();
+    expect(s.writes()).toEqual([['/api/sale/orders', { lines: [{ product_id: 'p1' }] }]]);
+    expect(s.inDoc('pos-options-title')).toBeNull();
+  });
+
+  it('when the groups cannot be read nothing is added and the till says so', async () => {
+    const s = await setup({ session: WITH_MODIFIERS, locale: 'es' });
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Promise.reject(new TypeError('Failed to fetch')) : Response.json(CHECK)));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
+    await settle();
+    expect(s.writes()).toEqual([]);
+    expect(toastError).toHaveBeenCalledWith('No se han podido leer los suplementos de este producto. Inténtalo de nuevo.');
+  });
+});
+
+describe('PosPage: the menus of Menus (SALE-F12)', () => {
+  /** Menus is on in this business and the person reads it. */
+  const WITH_MENUS = { ...MANAGER, permissions: [...MANAGER.permissions, 'combo.view'], apps: [{ label: 'combo', state: 'on' as const }] };
+  const MENU = {
+    id: 'm1',
+    name: 'Menu of the day',
+    kitchen_name: 'MENU',
+    price: 1350,
+    supply_kind: 'service' as const,
+    sort_order: 0,
+    groups: [
+      {
+        id: 'mains',
+        name: 'Mains',
+        min_choices: 1,
+        max_choices: 1,
+        allow_repeat: false,
+        options: [{ id: 'hake', product_id: 'p9', product_name: 'Hake', sku: '', price_delta: 0 }],
+      },
+    ],
+  };
+
+  it('without Menus on (or without the right to read it) the till offers no menus', async () => {
+    for (const session of [MANAGER, { ...WITH_MENUS, permissions: MANAGER.permissions }]) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCatalog).props('showCombos')).toBe(false);
+    }
+  });
+
+  it('a menu tapped opens its sheet and adds nothing until «Add»; then the check opens with the menu and its dishes', async () => {
+    const s = await setup({ session: WITH_MENUS });
+    expect(s.wrapper.findComponent(PosCatalog).props('showCombos')).toBe(true);
+    s.reply(CHECK);
+    s.wrapper.findComponent(PosCatalog).vm.$emit('combo', MENU);
+    await settle();
+    expect(s.writes()).toEqual([]);
+    expect(s.inDoc('pos-menu-title')?.textContent).toContain('Menu of the day');
+    await click(s.inDoc('pos-menu-dish-hake'));
+    await click(s.inDoc('pos-menu-add'));
+    await settle();
+    expect(s.writes()).toEqual([['/api/sale/orders', { combo_lines: [{ combo_id: 'm1', choices: [{ option_id: 'hake', quantity: 1 }] }] }]]);
+    expect(s.inDoc('pos-menu-title')).toBeNull();
+  });
+
+  it('Menus’ refusal stays on the sheet, over its button', async () => {
+    const s = await setup({ session: WITH_MENUS });
+    s.net.onApi(() => refused('combo.option_sold_out', '«Hake» is sold out.'));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('combo', MENU);
+    await settle();
+    await click(s.inDoc('pos-menu-dish-hake'));
+    await click(s.inDoc('pos-menu-add'));
+    await settle();
+    expect(s.inDoc('pos-menu-error')?.textContent).toContain('«Hake» is sold out.');
+  });
+});
+
+describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', () => {
+  /** Kitchen is on in this business and the person may send to it. */
+  const WITH_KITCHEN = { ...MANAGER, permissions: [...MANAGER.permissions, 'kitchen.add_ticket'], apps: [{ label: 'kitchen', state: 'on' as const }] };
+  const SENT = order({ id: 'o1', version: 2, lines: [line({ id: 'l1', product_id: 'p1', round_no: 1, fired_at: '2026-10-20T12:00:00Z' })] });
+  const kitchenAnswers = (s: Awaited<ReturnType<typeof setup>>, send: () => Response | Promise<Response>) =>
+    s.net.onApi((call) => (call.url.startsWith('/api/kitchen/tickets/send') ? send() : Response.json(SENT)));
+  const sends = (s: Awaited<ReturnType<typeof setup>>) => s.sent().filter((c) => c.path === '/api/kitchen/tickets/send').map((c) => c.body);
+  const checkout = (s: Awaited<ReturnType<typeof setup>>) => s.wrapper.findComponent({ name: 'CheckoutSheet' });
+
+  it('without Kitchen on (or without the right to send to it) the cart has no «Current order»', async () => {
+    for (const session of [MANAGER, { ...WITH_KITCHEN, permissions: MANAGER.permissions }]) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCart).props('kitchen')).toBe(false);
+    }
+  });
+
+  it('«Send order» asks Kitchen for the round, rush when armed, and says which order went', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    expect(s.wrapper.findComponent(PosCart).props('kitchen')).toBe(true);
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
+    s.wrapper.findComponent(PosCart).vm.$emit('send', true);
+    await settle();
+    expect(sends(s)).toEqual([{ order_id: 'o1', priority: 'rush' }]);
+    expect(toastSuccess).toHaveBeenCalledWith('Comanda 1 enviada a cocina.');
+  });
+
+  it('charging with lines not sent sends them first, then opens the charge', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(sends(s)).toEqual([{ order_id: 'o1', priority: 'normal' }]);
+    expect(checkout(s).props('open')).toBe(true);
+  });
+
+  it('when the round cannot be sent nothing is charged and the till says why', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await s.addProduct();
+    kitchenAnswers(s, () => refused('internal_error', 'The kitchen did not answer.', 500));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(checkout(s).props('open')).toBe(false);
+    expect(toastError).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.');
+  });
+
+  it('a round another device already sent does not stop the charge', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await s.addProduct();
+    kitchenAnswers(s, () => refused('sale.nothing_to_fire', 'There is nothing new to send to the kitchen.'));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(checkout(s).props('open')).toBe(true);
+  });
+});
+
+describe('PosPage: the VeriFactu notice (SALE-F07)', () => {
+  const WITH_VERIFACTU = { ...MANAGER, permissions: [...MANAGER.permissions, 'verifactu.view_record'], apps: [{ label: 'verifactu', state: 'on' as const }] };
+
+  it('the catalogue follows VeriFactu only with it on and the right to read it', async () => {
+    for (const [session, on] of [
+      [MANAGER, false],
+      [{ ...WITH_VERIFACTU, permissions: MANAGER.permissions }, false],
+      [WITH_VERIFACTU, true],
+    ] as const) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCatalog).props('fiscal')).toBe(on);
+    }
   });
 });

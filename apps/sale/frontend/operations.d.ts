@@ -152,6 +152,8 @@ interface LineFields {
 export interface ProductLineIn extends LineFields {
   product_id?: string;
   product?: string;
+  /** SALE-F11: the options of Modifiers chosen, in the order chosen (one chosen twice, twice). */
+  option_ids?: string[];
 }
 
 /** An open-price line: the amount typed and a department (or a tax category without departments). */
@@ -175,6 +177,22 @@ export interface ServiceLineIn extends LineFields {
   booked_price?: number;
 }
 
+/** SALE-F12: a dish picked in a menu of Menus, by the choice's id (or its product and course). */
+export interface ComboChoiceIn {
+  option_id?: string;
+  product?: string;
+  group?: string;
+  /** Picks of it in one menu. */
+  quantity?: number;
+}
+
+/** SALE-F12: a menu of Menus with its dishes; Menus checks and prices it on the server. */
+export interface ComboLineIn extends LineFields {
+  combo_id?: string;
+  combo?: string;
+  choices: ComboChoiceIn[];
+}
+
 export interface OrderOpenIn {
   label?: string;
   notes?: string;
@@ -182,6 +200,7 @@ export interface OrderOpenIn {
   lines?: ProductLineIn[];
   open_lines?: OpenLineIn[];
   service_lines?: ServiceLineIn[];
+  combo_lines?: ComboLineIn[];
 }
 
 export interface OrderRefIn {
@@ -197,6 +216,10 @@ export interface OrderAddOpenLineIn extends OpenLineIn {
 }
 
 export interface OrderAddServiceLineIn extends ServiceLineIn {
+  order_id: string;
+}
+
+export interface OrderAddComboLineIn extends ComboLineIn {
   order_id: string;
 }
 
@@ -309,6 +332,58 @@ export interface OrderLineOut {
   /** Kitchen round; 0 = pending. */
   round_no: number;
   fired_at: string | null;
+  /** SALE-F11: the options chosen, frozen when it was ordered, in the order chosen. */
+  modifiers: ModifierPickOut[];
+  /** The options of another tax category, each charged on a child line of its own. */
+  modifier_lines: ModifierLineOut[];
+  /** What the kitchen reads under the dish. */
+  kitchen_text: string;
+  /** SALE-F12: a menu of Menus, its dishes and how it is charged, frozen when it was ordered. */
+  combo: ComboLineOut | null;
+}
+
+export interface ComboDishOut {
+  option_id: string;
+  group_name: string;
+  product_id: string;
+  product_name: string;
+  category_id: string | null;
+  is_service: boolean;
+  /** Picks of it in one menu. */
+  quantity: number;
+  price_delta: number;
+  tax_category_key: string | null;
+  /** Its part of one menu's amount, in cents, when the menu is split. */
+  amount: number | null;
+}
+
+export interface ComboLineOut {
+  combo_id: string;
+  kitchen_name: string;
+  supply_kind: 'service' | 'goods';
+  /** Charged as one line per dish, each at its own VAT. */
+  split: boolean;
+  components: ComboDishOut[];
+}
+
+export interface ModifierPickOut {
+  option_id: string;
+  group_id: string;
+  group_name: string;
+  name: string;
+  kitchen_name: string;
+  price_delta: number;
+  tax_category_key: string | null;
+  own_line: boolean;
+}
+
+export interface ModifierLineOut {
+  option_id: string;
+  name: string;
+  tax_category_key: string;
+  unit_price: number;
+  /** How many per unit of the dish. */
+  quantity: number;
 }
 
 export interface OrderOut {
@@ -368,6 +443,7 @@ export interface ChargeLinesIn {
   lines?: ProductLineIn[];
   open_lines?: OpenLineIn[];
   service_lines?: ServiceLineIn[];
+  combo_lines?: ComboLineIn[];
   /** Counter sale only. */
   discount_percent?: string | number;
   /** Counter sale only, cents. */
@@ -441,6 +517,14 @@ export interface PreviewLineOut {
   net_amount: number;
   tax_amount: number;
   line_total: number;
+  /** The options charged inside the line. */
+  modifiers: string[];
+  /** An option of another tax category, charged on a line of its own under its dish. */
+  is_child: boolean;
+  /** SALE-F12: the menu this line charges, or a dish of (split per dish); empty otherwise. */
+  combo_name: string;
+  /** The dishes of a menu charged in one line. */
+  components: string[];
 }
 
 export interface PreviewOut {
@@ -499,6 +583,21 @@ export interface SaleLineOut {
   tax_amount: number;
   line_total: number;
   returned_quantity: string;
+  /** The options charged inside the line (the receipt prints them under it). */
+  modifiers: string[];
+  /** The dish line an option of another tax category hangs from. */
+  parent_line_id: string | null;
+  /** SALE-F12: the menu this line charges, or a dish of; its name heads its dishes on the receipt. */
+  combo_id: string | null;
+  combo_name: string;
+  components: SaleDishOut[];
+}
+
+export interface SaleDishOut {
+  product_id: string;
+  product_name: string;
+  /** How many in one menu. */
+  quantity: number;
 }
 
 export interface SalePaymentOut {
@@ -783,6 +882,7 @@ declare module '@erplora/ui/sdk' {
     'sale.order.add_line': { input: OrderAddLineIn; output: OrderOut };
     'sale.order.add_open_line': { input: OrderAddOpenLineIn; output: OrderOut };
     'sale.order.add_service_line': { input: OrderAddServiceLineIn; output: OrderOut };
+    'sale.order.add_combo_line': { input: OrderAddComboLineIn; output: OrderOut };
     'sale.order.apply_voucher': { input: OrderApplyVoucherIn; output: OrderOut };
     'sale.order.remove_voucher': { input: OrderLineRefIn; output: OrderOut };
     'sale.order.update_line': { input: OrderUpdateLineIn; output: OrderOut };

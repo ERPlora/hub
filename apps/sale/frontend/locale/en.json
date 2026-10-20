@@ -212,6 +212,39 @@
         "remove": "Remove from table",
         "seatFailed": "The check could not be seated at that table.",
         "removeFailed": "The table could not be taken off the check."
+      },
+      "options": {
+        "choose": "Choose {n}",
+        "upTo": "Up to {n}",
+        "optional": "Optional",
+        "add": "Add · {price}",
+        "chooseToContinue": "Choose an option to continue",
+        "full": "«{group}» is full: take one out to choose another.",
+        "less": "One less {name}",
+        "loadFailed": "The options of this product could not be read. Try again."
+      },
+      "menu": {
+        "badge": "Menu",
+        "chooseIn": "Choose {n} in «{course}»",
+        "loadFailed": "The menus could not be read. Try again."
+      },
+      "kitchen": {
+        "accountTab": "Check",
+        "roundTab": "Current order",
+        "roundTabPendingOne": "Current order, 1 item to send",
+        "roundTabPending": "Current order, {count} items to send",
+        "roundHint": "Check quantities and who serves. When sent, these lines go to the kitchen as one order you can follow.",
+        "allSent": "Everything is sent",
+        "allSentHint": "Add products to prepare a new order.",
+        "send": "Send order ({count})",
+        "sendRush": "Send RUSH ({count})",
+        "rush": "Mark the order as rush",
+        "sent": "Order {n} sent to the kitchen.",
+        "notSent": "The order could not be sent to the kitchen. Try again."
+      },
+      "fiscal": {
+        "title": "Sales cannot be charged right now.",
+        "review": "Review VeriFactu"
       }
     },
     "checkout": {
@@ -358,6 +391,13 @@
         "issued": "Fiscal documents issued.",
         "failed": "The documents could not be issued. Try again."
       },
+      "qr": {
+        "label": "Tax QR:",
+        "alt": "VeriFactu QR code",
+        "checkReceipt": "Scan it to check this receipt at the AEAT",
+        "checkInvoice": "Scan it to check this invoice at the AEAT",
+        "csv": "CSV: {csv}"
+      },
       "paperPending": "Fiscal document pending"
     },
     "sales": {
@@ -379,6 +419,10 @@
         "discounts": "Discounts",
         "voided": "Voided",
         "error": "Error loading metrics"
+      },
+      "week": {
+        "title": "Last 7 days",
+        "loadFailed": "The last 7 days could not be read."
       },
       "columns": {
         "date": "Date",

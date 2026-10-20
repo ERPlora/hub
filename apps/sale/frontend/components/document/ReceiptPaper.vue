@@ -8,15 +8,18 @@
 // («qty × unit price», a gift «(On the house)», a line a voucher paid «Already paid · <voucher>»
 // (SALE-F27), the note), «Subtotal», a VAT row per fiscal key from the sale's breakdown (an
 // exempt key names its cause), «TOTAL», the payment rows and «Change», the discount already applied and
-// the footer. Every figure is the server's; this only lays them out. No fiscal QR yet: it arrives with
-// VeriFactu. `printPaper` prints a copy of this very element.
+// the fiscal QR and the footer. Every figure is the server's; this only lays them out. The fiscal QR is
+// VeriFactu's (VERIFACTU-F19, sales#411): «Tax QR:» over it, «VERI*FACTU» under it and how to check the ticket or
+// the invoice at the AEAT — its CSV once the AEAT answered. `printPaper` prints a copy of this very element.
 import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
+import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { SaleOut, SettingsOut } from '../../operations';
+import type { FiscalRecord } from './FiscalRecordFollower.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -25,8 +28,10 @@ const props = withDefaults(
     settings?: Pick<SettingsOut, 'receipt_header' | 'receipt_footer'> | null;
     /** A reprint: «DUPLICATE» on top. */
     duplicate?: boolean;
+    /** VeriFactu's record of its fiscal document; none = no fiscal QR. */
+    record?: Pick<FiscalRecord, 'qr_svg' | 'qr_url' | 'csv'> | null;
   }>(),
-  { settings: null, duplicate: false },
+  { settings: null, duplicate: false, record: null },
 );
 
 const t = useT();
@@ -51,10 +56,22 @@ const numberLabel = computed(() => {
   return fiscalNumber.value ? t('sale.document.invoice') : t('sale.document.number');
 });
 
+/** A dish of a menu split per dish (SALE-F12): the menu's lines carry its product; one in one line does not. */
+const isDishPart = (line: SaleOut['lines'][number]) => !!line.combo_id && line.product_id !== null;
+const menuOf = (line: SaleOut['lines'][number]) => `${line.order_line_id}:${line.combo_id}`;
+
 const lines = computed(() =>
-  props.sale.lines.map((line) => ({
+  props.sale.lines.map((line, index) => ({
     id: line.id,
-    name: line.is_gift ? `${line.name} ${t('sale.document.gift')}` : line.name,
+    // An option of another tax category hangs under its dish (SALE-F11): «+ <option>».
+    name: `${line.parent_line_id ? '+ ' : ''}${line.is_gift ? `${line.name} ${t('sale.document.gift')}` : line.name}`,
+    // The dishes of a split menu hang under its name, printed once over the first of them (SALE-F12).
+    child: !!line.parent_line_id || isDishPart(line),
+    head:
+      isDishPart(line) && (index === 0 || menuOf(props.sale.lines[index - 1]) !== menuOf(line)) ? line.combo_name : '',
+    // A menu in one line prints each of its dishes on a line of its own under it (hub#1165).
+    dishes: line.combo_id && !isDishPart(line) ? line.components.map(dishLabel) : [],
+    options: line.modifiers.join(', '),
     detail: `${formatQuantity(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,
     note: line.notes.trim(),
     voucher: line.paid_by_voucher ? t('sale.document.paidWithVoucher', { name: line.voucher_name }) : '',
@@ -78,6 +95,13 @@ const payments = computed(() =>
 );
 /** Change is given in cash: a cash tender always says it, 0 included. */
 const showsChange = computed(() => props.sale.payments.some((payment) => payment.method_type === 'cash'));
+
+/** Under the QR: the AEAT's CSV once it answered, else how to check what the customer holds. */
+const qrHint = computed(() => {
+  if (!props.record) return '';
+  if (props.record.csv) return t('sale.document.qr.csv', { csv: props.record.csv });
+  return isInvoice.value ? t('sale.document.qr.checkInvoice') : t('sale.document.qr.checkReceipt');
+});
 
 const footer = computed(() =>
   [
@@ -153,34 +177,64 @@ const footer = computed(() =>
         </tr>
       </thead>
       <tbody>
-        <tr
+        <template
           v-for="line in lines"
           :key="line.id"
-          data-testid="sale-receipt-line"
         >
-          <td class="sale-receipt__line-name">
-            <div>{{ line.name }}</div>
-            <div class="sale-receipt__detail">
-              {{ line.detail }}
-            </div>
-            <div
-              v-if="line.voucher"
-              class="sale-receipt__detail"
-              data-testid="sale-receipt-voucher"
+          <tr
+            v-if="line.head"
+            data-testid="sale-receipt-menu-head"
+          >
+            <td
+              class="sale-receipt__line-name"
+              colspan="2"
             >
-              {{ line.voucher }}
-            </div>
-            <div
-              v-if="line.note"
-              class="sale-receipt__note"
+              {{ line.head }}
+            </td>
+          </tr>
+          <tr data-testid="sale-receipt-line">
+            <td
+              class="sale-receipt__line-name"
+              :class="{ 'sale-receipt__line-name--child': line.child }"
             >
-              {{ line.note }}
-            </div>
-          </td>
-          <td class="sale-receipt__num">
-            {{ line.amount }}
-          </td>
-        </tr>
+              <div>{{ line.name }}</div>
+              <div class="sale-receipt__detail">
+                {{ line.detail }}
+              </div>
+              <div
+                v-for="(dish, at) in line.dishes"
+                :key="at"
+                class="sale-receipt__detail sale-receipt__dish"
+                data-testid="sale-receipt-dish"
+              >
+                {{ dish }}
+              </div>
+              <div
+                v-if="line.options"
+                class="sale-receipt__detail"
+                data-testid="sale-receipt-options"
+              >
+                {{ line.options }}
+              </div>
+              <div
+                v-if="line.voucher"
+                class="sale-receipt__detail"
+                data-testid="sale-receipt-voucher"
+              >
+                {{ line.voucher }}
+              </div>
+              <div
+                v-if="line.note"
+                class="sale-receipt__note"
+              >
+                {{ line.note }}
+              </div>
+            </td>
+            <td class="sale-receipt__num">
+              {{ line.amount }}
+            </td>
+          </tr>
+        </template>
       </tbody>
     </table>
     <div
@@ -241,6 +295,31 @@ const footer = computed(() =>
         </tr>
       </tbody>
     </table>
+    <template v-if="record">
+      <hr class="sale-receipt__rule">
+      <div
+        class="sale-receipt__qr"
+        data-testid="sale-receipt-qr"
+      >
+        <div class="sale-receipt__center">
+          {{ $t('sale.document.qr.label') }}
+        </div>
+        <img
+          class="sale-receipt__qr-image"
+          :src="record.qr_svg"
+          :alt="$t('sale.document.qr.alt')"
+        >
+        <div class="sale-receipt__center sale-receipt__qr-mark">
+          VERI*FACTU
+        </div>
+        <div
+          class="sale-receipt__center sale-receipt__qr-hint"
+          data-testid="sale-receipt-qr-hint"
+        >
+          {{ qrHint }}
+        </div>
+      </div>
+    </template>
     <template v-if="footer.length">
       <hr class="sale-receipt__rule">
       <div
@@ -310,6 +389,12 @@ const footer = computed(() =>
   gap: 0.5rem;
   font-size: 10px;
 }
+.sale-receipt__line-name--child {
+  padding-left: 0.75rem;
+}
+.sale-receipt__dish {
+  padding-left: 0.75rem;
+}
 .sale-receipt__lines,
 .sale-receipt__totals {
   width: 100%;
@@ -351,6 +436,23 @@ const footer = computed(() =>
 }
 .sale-receipt__pay td {
   font-size: 10px;
+}
+.sale-receipt__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+/* The AEAT asks for a QR between 30 and 40 mm a side. */
+.sale-receipt__qr-image {
+  width: 35mm;
+  height: 35mm;
+}
+.sale-receipt__qr-mark {
+  font-weight: 700;
+}
+.sale-receipt__qr-hint {
+  font-size: 0.85em;
 }
 .sale-receipt__footer {
   font-size: 10px;

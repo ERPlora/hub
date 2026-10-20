@@ -228,3 +228,39 @@ describe('PosCatalog: the services of Services (SALE-F38)', () => {
     expect(s.wrapper.findComponent(ProductSearch).exists()).toBe(false);
   });
 });
+
+describe('PosCatalog: the menus of Menus (SALE-F12)', () => {
+  const MENUS = 'combo.combo.for_sale';
+  const MENU = { id: 'm1', name: 'Menu of the day', kitchen_name: '', price: 1350, supply_kind: 'service' as const, sort_order: 0, groups: [] };
+
+  it('without menus nothing of Menus is asked nor shown', async () => {
+    const s = await setup();
+    expect(s.params(MENUS)).toEqual([]);
+  });
+
+  it('with menus, «All» shows them first in the grid, before the products', async () => {
+    const s = await setup({ showCombos: true });
+    await s.result(MENUS, page([MENU]));
+    await s.result(PRODUCTS, page([product()]), GRID);
+    const tiles = s.wrapper.findAll('.pos-grid > button').map((tile) => tile.attributes('data-testid'));
+    expect(tiles.slice(0, 2)).toEqual(['pos-menu-m1', 'pos-product-p1']);
+  });
+
+  it('a category of products leaves the menus out; a menu tapped is handed up', async () => {
+    const s = await setup({ showCombos: true });
+    await s.result(MENUS, page([MENU]));
+    await click(s.find('pos-menu-m1').element);
+    expect(s.wrapper.emitted('combo')).toEqual([[MENU]]);
+    await s.result(CATEGORIES, page([category({ id: 'c1' })]));
+    s.wrapper.findComponent(CategoryStrip).vm.$emit('update:modelValue', 'c1');
+    await s.reopen();
+    expect(s.find('pos-menu-m1').exists()).toBe(false);
+  });
+});
+
+describe('PosCatalog: the VeriFactu notice (SALE-F07)', () => {
+  it('asks VeriFactu only when the page says it is on and readable', async () => {
+    expect((await setup()).params('verifactu.config.get')).toEqual([]);
+    expect((await setup({ fiscal: true })).params('verifactu.config.get')).toEqual([{}]);
+  });
+});

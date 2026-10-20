@@ -70,6 +70,7 @@ from apps.sale.queries import (
     business_country,
     call_app,
     call_services,
+    charge_parts,
     check_grid,
     current_settings,
     department_rates,
@@ -80,12 +81,17 @@ from apps.sale.queries import (
     find_quick_note,
     find_sale,
     find_tax_category,
+    combo_name,
+    dishes_of,
+    folded_names,
+    freeze_combo_line,
     freeze_open_line,
     freeze_product_line,
     freeze_service_line,
     held_methods,
     hold_departments,
     inventory_units,
+    is_child,
     lines_to_charge,
     loose_lines,
     method_display_name,
@@ -95,6 +101,7 @@ from apps.sale.queries import (
     provisional_total,
     quick_note_row,
     ratio_of,
+    refresh_combos,
     returned_by_line,
     sale_detail,
     sessions_to_return,
@@ -115,6 +122,7 @@ from apps.sale.schemas import (
     DepartmentUpdateIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
+    OrderAddComboLineIn,
     OrderAddServiceLineIn,
     OrderApplyVoucherIn,
     OrderFireIn,
@@ -599,6 +607,7 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
         data.service_lines,
         Booking(data.appointment_id),
         hold=True,
+        combo_lines=data.combo_lines,
     )
     try:
         with transaction.atomic():
@@ -684,6 +693,29 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
     line = freeze_service_line(
         ctx, data, Booking(find_order(data.order_id).appointment_id)
     )
+    order = _open_order(data.order_id)
+    _save_lines(order, [line])
+    _touch(ctx, order)
+    return _out(order)
+
+
+@operation(
+    "sale.order.add_combo_line",
+    kind="command",
+    permission="sale.add_sale",
+    input=OrderAddComboLineIn,
+    output=OrderOut,
+    expose_api=True,
+    ai={
+        "description": "Add a menu of Menus (by id or name) to an open check with the dishes picked in each course "
+        "(«menu of the day with lentils, hake and flan»). Menus checks the courses and prices it: its closed price plus "
+        "the supplements, frozen on the line; the kitchen receives its dishes.",
+        "risk": "normal",
+    },
+)
+def add_combo_line(ctx: OperationContext, data: OrderAddComboLineIn) -> dict:
+    find_order(data.order_id)
+    line = freeze_combo_line(ctx, data)
     order = _open_order(data.order_id)
     _save_lines(order, [line])
     _touch(ctx, order)
@@ -1038,6 +1070,17 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
                     "is_service": line.is_service,
                     "category_id": str(line.category_id) if line.category_id else None,
                     "staff_id": str(line.staff_id) if line.staff_id else None,
+                    "modifiers": line.kitchen_text,
+                    "kitchen_name": line.combo.get("kitchen_name", "") if line.combo_id else "",
+                    "components": [
+                        {
+                            "product_id": dish["product_id"],
+                            "product_name": dish["product_name"],
+                            "category_id": dish["category_id"],
+                            "quantity": f"{dish['quantity'] * line.quantity:.3f}",
+                        }
+                        for dish in (line.combo.get("components", []) if line.combo_id else [])
+                    ],
                 }
                 for line in pending
             ],
@@ -1762,6 +1805,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         ):
             raise Conflict(str(ORDER_CHANGED), code="sale.order_changed")
         lines, closes = lines_to_charge(order, data.line_ids)
+        refresh_combos(ctx, lines)
         percent = order.discount_percent
         amount = order.discount_amount if closes else 0
         approved = bool(order.discount_approved_by)
@@ -1774,7 +1818,13 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         booking = Booking(data.appointment_id, card.id if card else None)
         lines, closes = (
             loose_lines(
-                ctx, data.lines, data.open_lines, data.service_lines, booking, hold=True
+                ctx,
+                data.lines,
+                data.open_lines,
+                data.service_lines,
+                booking,
+                hold=True,
+                combo_lines=data.combo_lines,
             ),
             True,
         )
@@ -1807,8 +1857,9 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
 
     now = timezone.now()
     day = timezone.localdate(now)
+    parts = charge_parts(lines)
     valuation = valuate(
-        lines,
+        parts,
         discount_percent=percent,
         discount_amount=amount,
         tax_included=settings.default_tax_included,
@@ -1896,53 +1947,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
             },
         )
     sale_lines = SaleLine.objects.bulk_create(
-        [
-            SaleLine(
-                sale=sale,
-                position=position,
-                order_line_id=line.id,
-                product_id=line.product_id,
-                department_id=line.department_id,
-                name=line.name,
-                sku=line.sku,
-                is_service=line.is_service,
-                category_id=line.category_id,
-                unit=line.unit,
-                quantity=line.quantity,
-                unit_price=line.unit_price,
-                price_quantity=line.price_quantity,
-                pricing_unit=line.pricing_unit,
-                cost=line.cost,
-                discount_percent=line.discount_percent,
-                is_gift=line.is_gift,
-                gift_reason=line.gift_reason,
-                notes=line.notes,
-                staff_id=line.staff_id,
-                service_id=line.service_id,
-                voucher_session_id=line.voucher_session_id,
-                voucher_grant_id=line.voucher_grant_id,
-                voucher_name=line.voucher_name,
-                tax_category_key=out.tax_category_key,
-                tax_rate=out.tax_rate,
-                tax_country_code=out.tax_country_code,
-                tax_region_code=out.tax_region_code or "",
-                tax_rule_id=out.tax_rule_id,
-                net_amount=out.net_amount,
-                tax_amount=out.tax_amount,
-                line_total=out.line_total,
-                tax_components=[
-                    {
-                        **c,
-                        "rule_id": str(c["rule_id"]) if c["rule_id"] else None,
-                        "rate_pct": str(c["rate_pct"]),
-                    }
-                    for c in out.tax_components
-                ],
-            )
-            for position, (line, out) in enumerate(
-                zip(lines, valuation.lines, strict=True), start=1
-            )
-        ]
+        _sale_lines(sale, parts, valuation)
     )
     payments = SalePayment.objects.bulk_create(
         [
@@ -2015,6 +2020,66 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         return sale_detail(sale)
 
 
+def _sale_lines(sale: Sale, parts: list[OrderLine], valuation) -> list[SaleLine]:
+    """The fiscal copy of each part charged (``charge_parts``): a line of the check with the names of the
+    options charged inside it, and a child line of an option under the line of its dish."""
+    rows: list[SaleLine] = []
+    of_line: dict = {}
+    for position, (line, out) in enumerate(zip(parts, valuation.lines, strict=True), start=1):
+        child = is_child(line)
+        row = SaleLine(
+            sale=sale,
+            position=position,
+            order_line_id=line.origin.id,
+            parent_line_id=of_line[line.origin.id] if child else None,
+            modifiers=[] if child else folded_names(line),
+            combo_id=line.combo_id,
+            combo_name=combo_name(line),
+            components=dishes_of(line),
+            product_id=line.product_id,
+            department_id=line.department_id,
+            name=line.name,
+            sku=line.sku,
+            is_service=line.is_service,
+            category_id=line.category_id,
+            unit=line.unit,
+            quantity=line.quantity,
+            unit_price=line.unit_price,
+            price_quantity=line.price_quantity,
+            pricing_unit=line.pricing_unit,
+            cost=line.cost,
+            discount_percent=line.discount_percent,
+            is_gift=line.is_gift,
+            gift_reason=line.gift_reason,
+            notes=line.notes,
+            staff_id=line.staff_id,
+            service_id=line.service_id,
+            voucher_session_id=line.voucher_session_id,
+            voucher_grant_id=line.voucher_grant_id,
+            voucher_name=line.voucher_name,
+            tax_category_key=out.tax_category_key,
+            tax_rate=out.tax_rate,
+            tax_country_code=out.tax_country_code,
+            tax_region_code=out.tax_region_code or "",
+            tax_rule_id=out.tax_rule_id,
+            net_amount=out.net_amount,
+            tax_amount=out.tax_amount,
+            line_total=out.line_total,
+            tax_components=[
+                {
+                    **c,
+                    "rule_id": str(c["rule_id"]) if c["rule_id"] else None,
+                    "rate_pct": str(c["rate_pct"]),
+                }
+                for c in out.tax_components
+            ],
+        )
+        if not child:
+            of_line[line.id] = row.id
+        rows.append(row)
+    return rows
+
+
 def _completed_payload(
     sale, lines, payments, tax_id, address, country, id_type
 ) -> dict:
@@ -2076,7 +2141,17 @@ def _completed_payload(
                 "service_id": str(line.service_id) if line.service_id else None,
                 "paid_by_voucher": line.paid_by_voucher,
                 "category_id": str(line.category_id) if line.category_id else None,
-                "components": [],
+                "modifiers": line.modifiers,
+                "parent_line_id": str(line.parent_line_id) if line.parent_line_id else None,
+                "components": [
+                    {
+                        "product_id": str(dish["product_id"]),
+                        "product_name": dish["product_name"],
+                        "quantity": f"{dish['quantity'] * line.quantity:.3f}",
+                        "is_service": dish["is_service"],
+                    }
+                    for dish in line.components
+                ],
             }
             for line in lines
         ],
@@ -2455,13 +2530,17 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
                 }
                 for leg in legs
             ],
+            # A menu gives back each of its dishes, times the menus that come back (COMBO-F10).
             "lines": [
                 {
                     "line_id": str(line.id),
-                    "product_id": str(line.product_id) if line.product_id else None,
-                    "quantity": f"{quantity:.3f}",
+                    "product_id": str(unit["product_id"]) if unit["product_id"] else None,
+                    "quantity": f"{unit['quantity'] * quantity:.3f}",
                 }
                 for line, quantity in returning
+                for unit in (
+                    line.components or [{"product_id": line.product_id, "quantity": 1}]
+                )
             ],
         },
     )
