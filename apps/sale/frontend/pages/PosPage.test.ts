@@ -795,3 +795,19 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(checkout(s).props('open')).toBe(true);
   });
 });
+
+describe('PosPage: the VeriFactu notice (SALE-F07)', () => {
+  const WITH_VERIFACTU = { ...MANAGER, permissions: [...MANAGER.permissions, 'verifactu.view_record'], apps: [{ label: 'verifactu', state: 'on' as const }] };
+
+  it('the catalogue follows VeriFactu only with it on and the right to read it', async () => {
+    for (const [session, on] of [
+      [MANAGER, false],
+      [{ ...WITH_VERIFACTU, permissions: MANAGER.permissions }, false],
+      [WITH_VERIFACTU, true],
+    ] as const) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCatalog).props('fiscal')).toBe(on);
+    }
+  });
+});

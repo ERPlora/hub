@@ -241,6 +241,10 @@
         "rush": "Marcar la comanda como urgente",
         "sent": "Comanda {n} enviada a cocina.",
         "notSent": "No se ha podido enviar la comanda a cocina. Inténtalo de nuevo."
+      },
+      "fiscal": {
+        "title": "Ahora no se pueden cobrar ventas.",
+        "review": "Revisar VeriFactu"
       }
     },
     "checkout": {

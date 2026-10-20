@@ -214,7 +214,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F04 | Elegir tique o factura y los datos del cliente | común | hecho |
 | SALE-F05 | Cobrar cuando el negocio exige cliente | común | hecho |
 | SALE-F06 | Recuperar un cobro que se quedó sin respuesta | común | hecho |
-| SALE-F07 | El TPV avisa de lo que hoy no se puede vender | común | parcial |
+| SALE-F07 | El TPV avisa de lo que hoy no se puede vender | común | hecho |
 | SALE-F08 | Cobrar sin la caja abierta | común | hecho |
 | SALE-F09 | Vender a precio libre por sección | común | hecho |
 | SALE-F10 | Vender por peso, tecleando la cantidad | común | hecho |
@@ -404,7 +404,8 @@ Si falla: ver los pasos 3 y 4; nunca dice «no se ha cobrado» sin saberlo.
 Implicados: ninguno
 
 ### SALE-F07 El TPV avisa de lo que hoy no se puede vender
-Estado: parcial — el aviso de que el negocio ya factura con VeriFactu y sus tiques no llegarían a Hacienda llega con VeriFactu
+<!-- origen: old-hub:HUB_SHELL-F28 old:sales/workflow/vender-y-cobrar.md#sales-f07 wf:cadena-fiscal#rec_fiscal-f01 -->
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
@@ -414,13 +415,15 @@ Pasos:
    lleva a Inventario.
 2. Esos artículos salen en la rejilla marcados «Falta el IVA» y no entran en la cuenta.
 3. Si Inventario no está activo, la rejilla lo explica y se vende a precio libre.
-Entra: el catálogo de venta de Inventario.
+4. Con VeriFactu activa, si ahora mismo no deja emitir tiques ni facturas (el negocio ya factura en
+   producción y sus registros no tendrían cómo llegar a Hacienda), sale arriba de la rejilla «Ahora no se
+   pueden cobrar ventas.» con el motivo que da VeriFactu y, a quien puede configurarla, «Revisar VeriFactu».
+   El aviso se va solo en cuanto se arregla.
+Entra: el catálogo de venta de Inventario y la configuración de VeriFactu.
 Sale: nada.
 Si falla: si el catálogo no carga, «No se ha podido cargar el catálogo.» con «Reintentar»; el precio
-libre sigue disponible.
-Implicados: INVENTORY-F04
-Pendiente: el aviso de que el negocio ya factura con VeriFactu y sus tiques no llegarían a Hacienda
-llega con VeriFactu.
+libre sigue disponible. Si VeriFactu no se puede leer, no hay aviso: el propio cobro dice por qué no sale.
+Implicados: INVENTORY-F04, VERIFACTU-F08
 
 ### SALE-F08 Cobrar sin la caja abierta
 Estado: hecho

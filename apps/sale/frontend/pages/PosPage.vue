@@ -455,6 +455,10 @@ const documentSaleId = shallowRef<string | null>(null);
 let chargingLines: string[] = [];
 
 // ── The round to the kitchen (SALE-F20; Kitchen's KITCHEN-F18) ────────────────────────────────────
+/** The VeriFactu notice of the catalogue (SALE-F07): VeriFactu on in this business and the right to read it. */
+const verifactuOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
+);
 /** «Current order» and its send: Kitchen on in this business and the right to send to it. */
 const kitchenOn = computed(
   () => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on') && session.can('kitchen.add_ticket'),
@@ -579,6 +583,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
           :can-open-price="session.can('sale.sell_open_price')"
           :show-services="showServices"
           :show-combos="combosOn"
+          :fiscal="verifactuOn"
           @add="pickProduct"
           @combo="pickCombo"
           @service="pickService"

@@ -241,6 +241,10 @@
         "rush": "Mark the order as rush",
         "sent": "Order {n} sent to the kitchen.",
         "notSent": "The order could not be sent to the kitchen. Try again."
+      },
+      "fiscal": {
+        "title": "Sales cannot be charged right now.",
+        "review": "Review VeriFactu"
       }
     },
     "checkout": {

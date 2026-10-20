@@ -257,3 +257,10 @@ describe('PosCatalog: the menus of Menus (SALE-F12)', () => {
     expect(s.find('pos-menu-m1').exists()).toBe(false);
   });
 });
+
+describe('PosCatalog: the VeriFactu notice (SALE-F07)', () => {
+  it('asks VeriFactu only when the page says it is on and readable', async () => {
+    expect((await setup()).params('verifactu.config.get')).toEqual([]);
+    expect((await setup({ fiscal: true })).params('verifactu.config.get')).toEqual([{}]);
+  });
+});

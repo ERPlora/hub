@@ -9,6 +9,7 @@
 // `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
 // hidden; «All» keeps the open price); a sellable service goes up (`service`), the search finds them too.
 // With the menus of Menus (SALE-F12, `showCombos`), «All» shows them first in the grid; a tap goes up (`combo`).
+// With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, toast } from '@erplora/ui/shell';
@@ -23,6 +24,7 @@ import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
 import CatalogNotices from './CatalogNotices.vue';
 import CategoryStrip from './CategoryStrip.vue';
+import FiscalNotice from './FiscalNotice.vue';
 import ComboTiles from './ComboTiles.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
@@ -39,8 +41,10 @@ const props = withDefaults(
     showServices?: boolean;
     /** Menus on and readable (SALE-F12). */
     showCombos?: boolean;
+    /** VeriFactu on and readable (SALE-F07). */
+    fiscal?: boolean;
   }>(),
-  { showServices: false, showCombos: false },
+  { showServices: false, showCombos: false, fiscal: false },
 );
 const emit = defineEmits<{
   add: [product: ProductOut];
@@ -151,6 +155,7 @@ function pickService(service: ServiceSaleOut): void {
       @pick-service="pickService"
       @close="searching = false"
     />
+    <FiscalNotice v-if="fiscal" />
     <CatalogNotices :tap-notice="tapNotice" />
     <InlineFeedback
       v-if="failure && !servicesMode"
