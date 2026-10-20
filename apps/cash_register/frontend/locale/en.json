@@ -144,7 +144,15 @@
       "checking": "Checking what is still pending…",
       "openChecks": "Open checks: {count}",
       "unavailable": "What is still pending could not be checked, so this review may be incomplete.",
-      "confirm": "The shift will be closed anyway. Press again to confirm."
+      "confirm": "The shift will be closed anyway. Press again to confirm.",
+      "unserved": "Kitchen tickets not served: {count}",
+      "prints": "Prints not out yet: {count}",
+      "usages": {
+        "receipt": "Receipts",
+        "kitchen": "Kitchen",
+        "bar": "Bar",
+        "label": "Labels"
+      }
     },
     "unassignedList": {
       "title": "Sale lines in no shift",
@@ -285,6 +293,15 @@
         "created": "Drawer created",
         "renamed": "Drawer renamed"
       }
+    },
+    "figures": {
+      "current": "Current session",
+      "expected": "Expected in the drawer",
+      "noSession": "No open session.",
+      "recent": "Recent discrepancies",
+      "noClosed": "No closed sessions yet.",
+      "loading": "Loading the cash figures…",
+      "loadError": "The cash figures could not be loaded."
     }
   }
 }

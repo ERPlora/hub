@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCash, words } from '../__tests__/mount-cash-register';
+import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
 import MovementModal from '../components/MovementModal.vue';
@@ -64,14 +65,25 @@ async function setup(options: MountOptions = {}) {
     await m.find(`cash-register-sessions-row-${id}-${actionId}`).trigger('click');
     await flush();
   };
+  /** The table's subscriptions to the list (the figures above it read the closed ones apart: no offset). */
+  const tableParams = () => m.params(LIST).filter((params) => 'offset' in params);
   const ready = async (current: unknown = { ...NONE, session: OPEN }, page: unknown = PAGE) => {
     await m.result(CURRENT, current);
     await m.result(LIST, page, { offset: 0 });
   };
-  return { ...m, table, rows, cells, action, ready };
+  return { ...m, table, rows, cells, action, ready, tableParams };
 }
 
 describe('SessionsPage: the screen', () => {
+  it('shows the drawer\'s figures above the sessions (CASH_REGISTER-F12)', async () => {
+    const s = await setup();
+    await s.ready();
+    const figures = s.wrapper.findComponent(CashFigures);
+    expect(figures.exists()).toBe(true);
+    const table = s.table().element;
+    expect(figures.element.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('is «Cash register», with its tabs and «Open session»', async () => {
     const s = await setup();
     const page = s.wrapper.findComponent(AppPage);
@@ -83,7 +95,7 @@ describe('SessionsPage: the screen', () => {
 
   it('follows the sessions newest first, 50 from the first, and the open one', async () => {
     const s = await setup();
-    expect(s.params(LIST)).toEqual([{ sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.tableParams()).toEqual([{ sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
     expect(s.params(CURRENT)).toEqual([{}]);
     await s.ready();
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, total: 2, pageSize: 50, rowClickable: true });
@@ -173,11 +185,11 @@ describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-F
     set('difference_max', 'ionInput', '-0,01');
     await flush();
     await s.reopen();
-    expect(s.params(LIST), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.tableParams(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
     await panel.get('[data-testid="cash-register-sessions-filters-apply"]').trigger('click');
     await flush();
     await s.reopen();
-    expect(s.params(LIST)).toEqual([
+    expect(s.tableParams()).toEqual([
       {
         number: 'S-261014-0001',
         status: 'closed',
@@ -206,11 +218,11 @@ describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-F
     await flush();
     await s.reopen();
     expect(prop(s, 'filterErrors')).toEqual({ counted_min: 'This is not an amount.' });
-    expect(s.params(LIST)).toEqual([{ status: 'open', sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.tableParams()).toEqual([{ status: 'open', sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
     s.table().vm.$emit('update:filters', { counted_min: 'abc' });
     await flush();
     await s.reopen();
-    await s.result(LIST, { rows: [], total: 0, limit: 50, offset: 0 });
+    await s.result(LIST, { rows: [], total: 0, limit: 50, offset: 0 }, { offset: 0 });
     expect(s.find('cash-register-sessions-empty').text()).toContain('No cash sessions.');
     const es = await setup({ locale: 'es' });
     await es.ready();
@@ -227,7 +239,7 @@ describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-F
     await s.reopen();
     await s.result(LIST, PAGE, { opening_max: 9999999900 });
     const refused = { code: 'invalid_payload', message: 'Some fields are not valid.', fields: { opening_max: 'Ensure this value is less than or equal to 9999999999.' } };
-    s.net.lastStream().push(`event: error\ndata: ${JSON.stringify({ id: s.subId(LIST), error: refused })}\n\n`);
+    s.net.lastStream().push(`event: error\ndata: ${JSON.stringify({ id: s.subId(LIST, { opening_max: 9999999900 }), error: refused })}\n\n`);
     await flush();
     expect(prop(s, 'filterErrors')).toEqual({ opening_max: 'Ensure this value is less than or equal to 9999999999.' });
     expect(prop(s, 'error')).toBeUndefined();
@@ -301,7 +313,7 @@ describe('SessionsPage: states', () => {
 
   it('the app off here replaces the list with a notice', async () => {
     const s = await setup();
-    s.net.lastStream().push(errorFrame(s.subId(LIST), 'app_inactive'));
+    s.net.lastStream().push(errorFrame(s.subId(LIST, { offset: 0 }), 'app_inactive'));
     await flush();
     expect(s.find('cash-register-sessions-inactive').text()).toContain('Cash register is not active in this business.');
     expect(s.table().exists()).toBe(false);

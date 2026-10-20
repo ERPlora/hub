@@ -7,8 +7,9 @@
 // number, the filters behind the table's funnel (Session, Status and the four amounts on their columns,
 // the amounts typed in euros), table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on
 // the open session, «Movement», «Count» and «Close», each by its permission; a closing count opens the
-// close. The cash charged with no session open is said, with its list. Every action comes back through
-// the stream by itself: nothing here refetches.
+// close. The cash charged with no session open is said, with its list. Above the table, the drawer's figures
+// (CASH_REGISTER-F12: the open session's expected cash and the recent discrepancies). Every action comes back
+// through the stream by itself: nothing here refetches.
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -24,6 +25,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
+import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
 import MovementModal from '../components/MovementModal.vue';
@@ -198,6 +200,8 @@ function onCounted(count: { type: CountType; total: number }): void {
         {{ $t('cash_register.sessions.open') }}
       </ion-button>
     </header>
+
+    <CashFigures v-if="!blocked" />
 
     <InlineFeedback
       v-if="status === 'reconnecting'"
