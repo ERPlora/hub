@@ -754,7 +754,8 @@ pueden leer su «Estado» y su «Texto» (hasta 1 MiB). Si el proceso se cae a m
 **Probar** dice «Llamaría a… con esto» con lo que enviaría y los secretos tapados, sin llamar.
 Si falla: una dirección que no empieza por «https» y su servidor, con usuario o contraseña, o con datos
 antes del nombre, no se guarda («Escribe la dirección a mano…»); tampoco las cabeceras que pone el sistema
-(Host, Content-Length…). Al llamar: una dirección de una red privada, del propio servidor o de los datos
+(Host, Content-Length…). Al llamar: una cabecera con un dato que no se puede enviar (una tilde, una «ñ») para la
+ejecución con el motivo y el nombre de la cabecera, sin llamar; una dirección de una red privada, del propio servidor o de los datos
 internos de la nube no se llama («…está dentro de una red privada, así que no se llamó.»); sin permiso, «…no
 le has dejado hacer…»; si responde un error, no contesta a tiempo o no se puede llegar, la ejecución se para
 con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue»; una dirección

@@ -158,3 +158,13 @@ def test_the_origin_of_an_address():
     assert http.origin("https://api.example.com:443/x") == "https://api.example.com"
     assert http.origin("http://api.example.com/x") is None
     assert http.origin("https://u:p@api.example.com/x") is None
+
+
+def test_a_header_the_wire_cannot_carry_is_a_failure_never_a_crash(trusted):
+    # A datum inserted in a header («Ana López») is not ASCII, so the request cannot even be built: that is
+    # a failure the run records (and the person reads), never an exception, which would leave the run
+    # «calling» for ever, sent again every lease and crashing the same way each time.
+    reply = http.call("GET", f"{trusted}/ok", {"X-Customer": "Ana López"}, "", 5)
+    assert reply.kind == "failed"
+    assert "X-Customer" in reply.detail
+    assert Handler.seen == []

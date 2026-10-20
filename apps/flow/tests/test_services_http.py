@@ -299,3 +299,15 @@ def test_a_call_from_a_scheduled_run_goes_out_too(trusted, clock, django_capture
         run("flow.schedule.fire_due", {}, system_context(A))
     assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
     assert len(Handler.seen) == 1
+
+
+def test_a_header_with_a_datum_the_wire_cannot_carry_stops_the_run_visibly(trusted, clock, django_capture_on_commit_callbacks):
+    # A customer's name with an accent in a header: the call cannot be sent. The run stops by an error that
+    # says so (and can be resumed once the step is fixed); it never stays «calling» with its lease, to be
+    # sent again every five minutes and crash the same way each time.
+    clock(NOON)
+    flow = _manual(trusted, [_call(trusted, headers={"X-Customer": "{{input.name}}"})])
+    _, failed = _run_now(flow, {"name": "Ana López", "note": ""}, django_capture_on_commit_callbacks)
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.http_failed")
+    assert "X-Customer" in failed.log[-1]["error"]["technical"]  # the technical text names the header
+    assert Handler.seen == []

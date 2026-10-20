@@ -113,6 +113,13 @@ def call(method: str, url: str, headers: dict[str, str], body: str, timeout: flo
     target = urlunsplit(("https", netloc, parts.path or "/", parts.query, ""))
     sent = {name: value for name, value in headers.items() if name.lower() != "host"}
     sent["Host"] = parts.netloc.rsplit("@", 1)[-1]
+    for name, value in sent.items():
+        # A header carries ASCII only: a datum with an accent inserted in one cannot be sent (httpx would
+        # raise, and a crash here would leave the run «calling» for ever).
+        try:
+            f"{name}: {value}".encode("ascii")
+        except UnicodeEncodeError:
+            return Reply(FAILED, detail=f"The header «{name}» has a character that cannot be sent: only ASCII goes in a header.")
     deadline = time.monotonic() + timeout
     try:
         with httpx.Client(verify=_verify(), trust_env=False, follow_redirects=False, timeout=httpx.Timeout(timeout)) as client:
@@ -135,6 +142,10 @@ def call(method: str, url: str, headers: dict[str, str], body: str, timeout: flo
     except httpx.TimeoutException:
         return Reply(TIMEOUT, detail=f"It did not answer within {timeout:g} seconds.")
     except httpx.HTTPError as failure:
+        return Reply(FAILED, detail=f"{type(failure).__name__}: {failure}")
+    except Exception as failure:  # noqa: BLE001 — never raises: a crash here would leave the run «calling» for ever
+        # What the wire cannot carry (a header with a datum that is not ASCII, an address httpx refuses):
+        # a failure the run records and the person reads, like any other.
         return Reply(FAILED, detail=f"{type(failure).__name__}: {failure}")
     answer = _decoded(bytes(raw), response.headers.get("content-type", ""), truncated)
     kind = OK if 200 <= response.status_code < 300 else STATUS
