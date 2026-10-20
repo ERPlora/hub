@@ -7,8 +7,9 @@
 // number, the filters behind the table's funnel (Session, Status and the four amounts on their columns,
 // the amounts typed in euros), table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on
 // the open session, «Movement», «Count» and «Close», each by its permission; a closing count opens the
-// close. The cash charged with no session open is said, with its list. Every action comes back through
-// the stream by itself: nothing here refetches.
+// close. The cash charged with no session open is said, with its list. Above the table, the drawer's figures
+// (CASH_REGISTER-F12: the open session's expected cash and the recent discrepancies). Every action comes back
+// through the stream by itself: nothing here refetches.
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -24,6 +25,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
+import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
 import MovementModal from '../components/MovementModal.vue';
@@ -95,7 +97,7 @@ const columns = computed<DataTableColumn<SessionRow>[]>(() => [
     width: 'minmax(7rem,1fr)',
     filter: { type: 'text', maxlength: 24 },
   },
-  { key: 'opened_at', label: t('cash_register.sessions.columns.openedAt'), sortable: true, format: (_, row) => formatDateTime(row.opened_at, locale.value) },
+  { key: 'opened_at', label: t('cash_register.sessions.columns.openedAt'), sortable: true, width: 'minmax(11rem,1fr)', format: (_, row) => formatDateTime(row.opened_at, locale.value) },
   {
     key: 'status',
     label: t('cash_register.sessions.columns.status'),
@@ -199,6 +201,8 @@ function onCounted(count: { type: CountType; total: number }): void {
       </ion-button>
     </header>
 
+    <CashFigures v-if="!blocked" />
+
     <InlineFeedback
       v-if="status === 'reconnecting'"
       class="cash-sessions__notice"
@@ -225,7 +229,7 @@ function onCounted(count: { type: CountType; total: number }): void {
       data-testid="cash-register-unassigned"
       :heading="$t('cash_register.sessions.unassigned.heading')"
     >
-      {{ $t('cash_register.sessions.unassigned.body', { count: unassignedCount, cash: formatMoney(unassignedCash, locale) }) }}
+      {{ $t('cash_register.sessions.unassigned.body', { count: unassignedCount, cash: formatMoney(unassignedCash, locale) }, unassignedCount) }}
       <template #actions>
         <ion-button
           size="small"

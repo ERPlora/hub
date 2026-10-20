@@ -42,7 +42,7 @@ describe('PackageFormModal: New package', () => {
       'Leave empty to price it as the sum of its lines minus the discount.',
     ]);
     expect([s.field('validity_days').helperText, s.field('max_uses').helperText]).toEqual([
-      'Days redeemable from the PURCHASE; empty = never expires.',
+      'Days redeemable from the purchase; empty = never expires.',
       'Uses the voucher grants; empty = unlimited.',
     ]);
     expect(s.lines().map((line) => line.props('label'))).toEqual(['Service']);
@@ -181,5 +181,7 @@ describe('PackageFormModal: Editing package — {name}', () => {
     expect(s.inDoc('service-package-form')?.getAttribute('aria-label')).toBe('Editando paquete — Bono 5 cortes');
     expect(s.field('validity_days').label).toBe('Vigencia (días)');
     expect(s.field('discount_percent').value).toBe('10,5');
+    // No word shouts in the help: «compra» as the old panel said it, not «COMPRA».
+    expect(s.field('validity_days').helperText).toBe('Días canjeables desde la compra; vacío = no caduca.');
   });
 });

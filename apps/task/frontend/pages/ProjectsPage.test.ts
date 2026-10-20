@@ -71,6 +71,16 @@ describe('ProjectsPage', () => {
     expect(s.params(OP)).toEqual([{ code: 'open', name: 'grand', is_active: false, search: 'op', sort: 'name', limit: 50, offset: 0 }]);
   });
 
+  it('keeps the filters behind the toolbar funnel, as the old table did, until it is pressed', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    expect(s.wrapper.find('[data-testid="task-projects-filter-is_active"]').exists()).toBe(false);
+    await s.wrapper.find('[data-testid="task-projects-filters-toggle"]').trigger('click');
+    await flush();
+    expect(s.wrapper.find('[data-testid="task-projects-filters-panel"] [data-testid="task-projects-filter-is_active"]').exists()).toBe(true);
+  });
+
   it('no project at all says «No projects.»', async () => {
     const s = await setup();
     await s.show(page([]));

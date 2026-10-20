@@ -8,7 +8,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, shot, shown } from './helpers';
-import { cleanUp, named, ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
+import { cleanUp, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -92,8 +92,7 @@ test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; s
     await page.locator('[data-testid=service-packages-delete-submit]').click();
     await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toBeHidden();
     await expect(row).toHaveCount(0);
-    await view.locator('[data-testid=service-packages-filter-status]').click();
-    await page.locator('ion-popover').getByText('Deleted', { exact: true }).click();
+    await filterBy(page, 'service-packages', 'status', 'Deleted');
     await expect(row).toContainText('Deleted');
     await page.screenshot({ path: shot('service-packages-desktop') });
 

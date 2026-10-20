@@ -1,9 +1,13 @@
 """Read operations of the cash register app (F01, F02, F03, F07, F11, F12): READ ONLY, paginated with a
 stable order, and the blind count applied to every reading. The sale lines are test_integration_sale.py."""
 
+import datetime as dt
+
 import pytest
+from django.utils import timezone
 from live.errors import NotFound, PermissionDenied
 
+from apps.cash_register.models import Session
 from apps.cash_register.queries import DENOMINATIONS, count_total, currency_decimals
 from apps.cash_register.tests.conftest import ctx_for, open_session, run
 
@@ -365,3 +369,46 @@ def test_a_blind_count_hides_the_sale_lines_and_the_totals_of_the_open_session_f
     # Once closed, there is nothing left to hide.
     run("cash_register.session.close", {"closing_balance": 9800})
     assert run("cash_register.movement.list", query, employee).total == 2
+
+
+def test_the_recent_discrepancies_are_the_last_eight_closed_by_their_close():
+    # cash_register#119: the panel of the last closed sessions showed none, because the hub refused the
+    # filter it asked for. The figures of Cash register (F12) ask for exactly this, and it is answered.
+    base = timezone.now() - dt.timedelta(days=20)
+    for day in range(10):
+        session = open_session(1000)
+        Session.objects.filter(pk=session.id).update(opened_at=base + dt.timedelta(days=day))
+        run(
+            "cash_register.session.close",
+            {"session_id": str(session.id), "closing_balance": 1000 - day},
+        )
+        # Closed in the reverse order they opened: the newest close is the oldest opening.
+        Session.objects.filter(pk=session.id).update(
+            closed_at=base + dt.timedelta(days=30 - day)
+        )
+    open_session(500)
+    page = run(
+        "cash_register.session.list",
+        {"status": "closed", "sort": "closed_at", "dir": "desc", "limit": 8},
+    )
+    assert [row.difference for row in page.rows] == [0, -1, -2, -3, -4, -5, -6, -7]
+    assert page.total == 10
+
+
+def test_the_session_list_takes_every_filter_its_screen_sends():
+    # module-toolkit#382: a screen offered a filter its list did not take. The funnel of Cash register
+    # (sessionFilters.ts) sends these, and the list takes each one.
+    sent = {
+        "number": "S-261014-0001",
+        "status": "closed",
+        "opening_min": 10000,
+        "opening_max": 20000,
+        "expected_min": 5000,
+        "expected_max": 125050,
+        "counted_min": 50,
+        "counted_max": 30000,
+        "difference_min": -500,
+        "difference_max": -1,
+    }
+    for name, value in sent.items():
+        assert run("cash_register.session.list", {name: value}).total == 0, name

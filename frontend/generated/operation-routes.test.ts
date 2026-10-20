@@ -281,13 +281,14 @@ describe('OPERATION_ROUTES', () => {
       'cash_register.session.open': { method: 'post', path: '/api/cash_register/sessions/open' },
       'cash_register.session.close': { method: 'post', path: '/api/cash_register/sessions/close' },
       'cash_register.session.auto_close': { method: 'post', path: '/api/cash_register/sessions/auto_close' },
+      'cash_register.session.print': { method: 'post', path: '/api/cash_register/sessions/print' },
       'cash_register.movement.list': { method: 'get', path: '/api/cash_register/movements' },
       'cash_register.movement.add': { method: 'post', path: '/api/cash_register/movements' },
       'cash_register.count.list': { method: 'get', path: '/api/cash_register/counts' },
       'cash_register.count.add': { method: 'post', path: '/api/cash_register/counts' },
       'cash_register.currency.get': { method: 'get', path: '/api/cash_register/currency' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(16);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(17);
   });
 
   it('binds the twenty routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {

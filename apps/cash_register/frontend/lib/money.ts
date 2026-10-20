@@ -36,6 +36,20 @@ export function formatMoney(cents: number | null | undefined, locale: string, cu
   return formatter(locale, `money-${currency}`, { style: 'currency', currency }).format((cents as number) / 10 ** currencyDecimals(currency));
 }
 
+/** A note or coin of the count as money of `currency` («500 €», «0,50 €»): a whole face value without decimals
+ *  (the old count, Square and Lightspeed), a coin of cents with the currency's own. */
+export function formatFace(face: string, locale: string, currency = CURRENCY): string {
+  const value = Number(face);
+  const whole = Number.isInteger(value);
+  const decimals = whole ? 0 : currencyDecimals(currency);
+  return formatter(locale, `face-${currency}-${decimals}`, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
 /** A difference with its sign: «+5,10 €» over, «-4,90 €» short, zero without sign. */
 export function formatSignedMoney(cents: number | null | undefined, locale: string, currency = CURRENCY): string {
   if (missing(cents)) return '—';

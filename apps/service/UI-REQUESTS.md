@@ -24,9 +24,3 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
 
 - **Qué**: el panel lateral del `ok-data-table` del producto actual, donde se abrían «Nuevo servicio»,
   «Editando servicio — …», la categoría y el bono. **Hoy**: un `FormModal` (como `inventory` y `staff`).
-
-## Filtros de rango de `DataTable` con su columna a la vista
-
-- **Qué**: con dos columnas de rango (Precio y Duración en Servicios) los cuatro campos dicen solo
-  «Desde» y «Hasta»; la columna está en su `aria-label`, no a la vista. **Propuesta**: el marcador
-  «Precio desde» / «Precio hasta» (o la columna encima del par). **Hoy**: el `aria-label` lo dice.

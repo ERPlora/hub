@@ -291,6 +291,22 @@ def test_my_tasks_are_my_open_ones_dated_first_then_the_newest(team):
     assert [row.id for row in page.rows] == [sooner.id, soon.id, undated_new.id, undated_old.id]
 
 
+def test_writing_a_task_does_not_move_its_card_in_my_tasks(team):
+    """tasks#45: «My tasks» ordered by due date alone, so starting a card sent it to the bottom."""
+    me = team["worker_member"]
+    for title in ("Oldest", "Middle", "Newest"):
+        make_task(title, assigned_to=me)
+    make_task("Dated", assigned_to=me, due_date=TODAY)
+    ctx = as_employee(team)
+    before = titles(run("task.task.mine", ctx=ctx))
+    assert before == ["Dated", "Newest", "Middle", "Oldest"]
+    for title in ("Oldest", "Middle", "Dated"):
+        run("task.task.set_status", {"task": title, "status": "in_progress"}, ctx=ctx)
+        run("task.task.update", {"task": title, "priority": "high"}, ctx=ctx)
+        run("task.comment.add", {"task": title, "text": "On it"}, ctx=ctx)
+        assert titles(run("task.task.mine", ctx=ctx)) == before
+
+
 def test_my_tasks_within_a_horizon_leave_the_undated_out(team):
     me = team["worker_member"]
     make_task("This week", assigned_to=me, due_date=TODAY + dt.timedelta(days=6))

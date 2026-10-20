@@ -366,10 +366,15 @@ async function save(): Promise<void> {
   margin: 0;
   padding-left: 1.2rem;
 }
+/* Each line: its service on a row of its own, so the name reads whole in the dialog's width; its Sessions
+   and «Remove line» below. */
 .service-package-form__line {
   display: grid;
-  grid-template-columns: minmax(10rem, 2fr) minmax(6rem, 1fr) auto;
+  grid-template-columns: minmax(6rem, 1fr) auto;
   align-items: center;
   gap: 8px;
+}
+.service-package-form__line > :first-child {
+  grid-column: 1 / -1;
 }
 </style>

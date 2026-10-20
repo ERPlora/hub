@@ -172,6 +172,48 @@ def test_a_card_sale_voided_moves_no_cash(coffee):
     assert summary(session).expected_cash == 10000
 
 
+def test_a_sale_refunded_in_part_cannot_be_voided_so_the_drawer_never_pays_twice(coffee):
+    # cash_register#63: voiding a sale already refunded in part reverted the WHOLE sale, so the drawer was
+    # short by what had been refunded. Sales refuses that void: the refund is the only way back.
+    session = open_session(10000)
+    sale = charge("2")
+    refund(sale, 100)
+    with pytest.raises(Conflict) as refused:
+        void(sale)
+    assert refused.value.code == "sale.sale_already_refunded"
+    assert [(line.type, line.amount) for line in lines(session)] == [
+        ("sale", 300),
+        ("refund", 100),
+    ]
+    assert summary(session).expected_cash == 10200
+
+
+def test_a_card_sale_voided_with_the_drawer_closed_is_out_of_every_shift_and_moves_no_cash(
+    coffee,
+):
+    # cash_register#82: a card void with no shift open, end to end against the real Sales: it is not lost,
+    # it is said as unassigned, and it takes no cash out of any drawer.
+    open_session(10000)
+    sale = charge("1", payments=[{"method": "card"}])
+    close(10000)
+    void(sale)
+    current = run("cash_register.session.current")
+    assert (current.session, current.unassigned_count, current.unassigned_cash) == (
+        None,
+        1,
+        0,
+    )
+    (line,) = run("cash_register.movement.list", {"unassigned": True}).rows
+    assert (line.type, line.method_type, line.amount, line.sale_id) == (
+        "void",
+        "card",
+        150,
+        sale.id,
+    )
+    second = open_session(5000)
+    assert summary(second).expected_cash == 5000
+
+
 def test_a_sale_voided_after_its_shift_closed_takes_the_cash_out_of_the_open_shift(
     coffee,
 ):

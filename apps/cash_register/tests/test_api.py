@@ -24,6 +24,7 @@ ROUTES = {
     ("POST", "/cash_register/sessions/open", "cash_register.session.open"),
     ("POST", "/cash_register/sessions/close", "cash_register.session.close"),
     ("POST", "/cash_register/sessions/auto_close", "cash_register.session.auto_close"),
+    ("POST", "/cash_register/sessions/print", "cash_register.session.print"),
     ("GET", "/cash_register/movements", "cash_register.movement.list"),
     ("POST", "/cash_register/movements", "cash_register.movement.add"),
     ("GET", "/cash_register/counts", "cash_register.count.list"),
