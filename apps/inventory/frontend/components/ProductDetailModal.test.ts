@@ -99,7 +99,8 @@ describe('ProductDetailModal', () => {
     expect(s.el('inventory-product-detail-error')?.textContent).toContain('This product does not exist in this hub.');
     unmount(s);
     const employee = await setup({}, { session: EMPLOYEE });
-    expect([employee.el('inventory-product-detail-sold-out'), employee.el('inventory-product-detail-back-on-sale')]).toEqual([null, null]);
+    expect(employee.el('inventory-product-detail-sold-out')).toBeNull();
+    expect(employee.el('inventory-product-detail-back-on-sale')).toBeNull();
   });
 
   it('speaks Spanish', async () => {
