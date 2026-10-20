@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // Tasks → Tasks (WORKBOOK «Pantallas · Tareas»; TASK-F01 to F07). «All»: the live `task.task.list` in a
 // server-side DataTable — No., Title, Status, Priority (a coloured chip with its name), Due (red
-// «Overdue», amber «Due today»; a closed task is never late), Assignee and Project (hidden) —, the
-// newest first, «Search no. or title…», column filters, list or cards, 50 a page. «My tasks», only for
-// whoever has a staff record: the live `task.task.mine`, dated first; a task completed from its card
-// stays in its slot, as done, until the person leaves the tab (tasks#45). A row offers Detail, Start
-// and Complete where they apply; Start and Complete confirm with a short notice; the row and Detail open
-// the task's sheet; «+» opens «New task». A refused row action is said above the table.
+// «Overdue», amber «Due today»; a closed task is never late), Assignee and Project (hidden) —, the newest
+// first, «Search no. or title…», column filters behind the toolbar funnel, list or cards, 50 a page. «My
+// tasks», only for whoever has a staff record: the live `task.task.mine`, dated first; a task completed
+// from its card stays in its slot, as done, until the person leaves the tab (tasks#45). A row offers
+// Detail, Start and Complete where they apply; Start and Complete confirm with a short notice; the row and
+// Detail open the task's sheet; «+» opens «New task». A refused row action is said above the table.
 import {
   DataTable,
   type DataTableAction,
@@ -258,6 +258,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       fill
       server-side
       searchable
+      filterable
       :filters="filters"
       :rows="all.data.value?.rows ?? []"
       :total="all.data.value?.total ?? 0"

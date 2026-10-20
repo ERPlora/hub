@@ -211,7 +211,8 @@ test('CASH_REGISTER-F11, F16: the detail of the closed shift names the ticket an
     await shown(p).locator('[data-testid=cash-register-summary]').waitFor({ state: 'visible' });
   });
 
-  // «Print»: the Z report alone, through the browser's dialog (stubbed: a headless browser has none).
+  // «Print» without a receipt printer: the Z report alone, through the browser's dialog once the server
+  // says it queued nothing (stubbed: a headless browser has none).
   await page.evaluate(() => {
     (window as unknown as { printed: string[] }).printed = [];
     window.print = () => {
@@ -220,9 +221,9 @@ test('CASH_REGISTER-F11, F16: the detail of the closed shift names the ticket an
     };
   });
   await detail.locator('[data-testid=cash-register-detail-print]').click();
-  const printed = await page.evaluate(() => (window as unknown as { printed: string[] }).printed);
-  expect(printed).toHaveLength(1);
-  expect(printed[0]).toMatch(/Cash closing \(Z\)|Cierre de caja \(Z\)/);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { printed: string[] }).printed.length)).toBe(1);
+  const printed = await page.evaluate(() => (window as unknown as { printed: string[] }).printed[0]);
+  expect(printed).toMatch(/Cash closing \(Z\)|Cierre de caja \(Z\)/);
 });
 
 /** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk (two

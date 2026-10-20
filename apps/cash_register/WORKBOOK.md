@@ -71,7 +71,8 @@ Configuración inicial, paso a paso:
 
 ### Caja
 Menú **Caja**. Arriba, el título «Caja» y el botón «Abrir sesión» (apagado mientras haya una sesión
-abierta: «Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra.»). Debajo, la tabla de
+abierta: «Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra.»). Debajo, las cifras de la
+caja: «Sesión actual» y «Descuadres recientes» (CASH_REGISTER-F12). Después, la tabla de
 sesiones, de la más reciente a la más antigua, 50 por página: Sesión, Abierta el, Estado («Abierta»,
 «Cerrada»), Apertura, Esperado, Contado, Diferencia. Buscador «Buscar sesión…» (por número), filtros
 (estado, número y los cuatro importes) y vista de tabla o tarjetas. Por fila: «Detalle» siempre y,
@@ -125,6 +126,17 @@ Quien no puede cambiar los ajustes los ve bloqueados con «No tienes permiso par
 ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los ajustes.» con
 «Reintentar»; al guardar, «No se pudieron guardar los ajustes.». Guardado: «Ajustes guardados.».
 
+## Estados de cada pantalla
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando…» (o el texto de su pantalla: «Cargando ajustes…», «Cargando las cifras de la caja…») mientras llega el primer resultado. |
+| Vacío | «Sin sesiones de caja.», «Sin movimientos en esta sesión.», «Sin arqueos en esta sesión.», «Todavía no hay sesiones cerradas.». |
+| Error | El aviso con «Reintentar»; un rechazo de una acción sale dentro de su ventana, junto a su campo. |
+| Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
+| App inactiva | «Caja no está activa en este negocio.» en lugar de la lista. |
+| Sin permiso | No aparece lo que no puede hacer («Abrir sesión», «Movimiento», «Arqueo», «Cerrar», «Guardar»); si llega por otra puerta, «No tienes permiso». |
+
 ## Flujos
 
 | ID | Flujo | Vertical | Estado |
@@ -136,11 +148,11 @@ ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar lo
 | CASH_REGISTER-F05 | Registrar una entrada o una salida de efectivo | común | hecho |
 | CASH_REGISTER-F06 | Contar el cajón por billetes y monedas | común | hecho |
 | CASH_REGISTER-F07 | Contar a ciegas: quién ve el efectivo esperado | común | hecho |
-| CASH_REGISTER-F08 | Revisar lo que queda pendiente antes de cerrar | común | parcial |
+| CASH_REGISTER-F08 | Revisar lo que queda pendiente antes de cerrar | común | hecho |
 | CASH_REGISTER-F09 | Cerrar el turno: esperado, contado y diferencia | común | hecho |
 | CASH_REGISTER-F10 | Cerrar sola la caja olvidada al final del día | común | hecho |
 | CASH_REGISTER-F11 | Consultar una sesión y revisar un descuadre | común | hecho |
-| CASH_REGISTER-F12 | Ver la caja en los paneles del inicio | común | no hecho: inicio del Hub |
+| CASH_REGISTER-F12 | Ver la caja en los paneles del inicio | común | hecho |
 | CASH_REGISTER-F13 | Anotar en la caja cada cobro de una venta | común | hecho |
 | CASH_REGISTER-F14 | Compensar en la caja una venta anulada | común | hecho |
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
@@ -148,6 +160,7 @@ ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar lo
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
+<!-- origen: fi:modules/cash_register#command-cash_register-settings-update fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#navigation-settings fi:modules/cash_register#permission-role_permissions fi:modules/cash_register#query-cash_register-settings-get old:cash_register/WORKFLOW.md#cash_register-f01 -->
 Estado: hecho
 Vertical: común
 Actor: administrador
@@ -169,6 +182,7 @@ y ofrece «Reintentar». Sin el permiso de ajustes, los campos salen bloqueados 
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 
 ### CASH_REGISTER-F02 Dar de alta, renombrar y desactivar un cajón
+<!-- origen: fi:modules/cash_register#command-cash_register-registers-create fi:modules/cash_register#query-cash_register-registers-list old:cash_register/WORKFLOW.md#cash_register-f02 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, asistente
@@ -186,6 +200,7 @@ distinguir mayúsculas), «Ya hay un cajón con ese nombre.».
 Implicados: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Abrir el turno de caja con el fondo inicial
+<!-- origen: fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#command-cash_register-session-open fi:modules/cash_register#query-cash_register-current_session old:cash_register/WORKFLOW.md#cash_register-f03 qa:modules/cash_register/open-register qa:modules/cash_register/shift-change wf:peluqueria-dia#rec_peluqueria-f01 wf:restaurante-dia#rec_restaurante-f01 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -209,6 +224,7 @@ negativo o ambiguo («1.250») se para antes de enviar.
 Implicados: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f01 wf:restaurante-dia#rec_restaurante-f01 old:cash_register/WORKFLOW.md#cash_register-f04 -->
 Estado: hecho — lo aplica Ventas al cobrar (SALE-F08): pregunta a Caja si la caja está abierta (ver
 «Contrato con Ventas»). Lo que se cobra en efectivo sin turno porque Caja estaba apagada o no
 respondió sale en «Cobros fuera de turno» (F17), sin perder nada.
@@ -227,6 +243,7 @@ aparece en F17.
 Implicados: SALE-F08
 
 ### CASH_REGISTER-F05 Registrar una entrada o una salida de efectivo
+<!-- origen: fi:modules/cash_register#command-cash_register-movement-add fi:modules/cash_register#query-cash_register-movements-list old:cash_register/WORKFLOW.md#cash_register-f05 qa:modules/cash_register/cash-count-and-movements -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -251,6 +268,7 @@ qué.
 Implicados: ninguno
 
 ### CASH_REGISTER-F06 Contar el cajón por billetes y monedas
+<!-- origen: qa:modules/cash_register/cash-count-and-movements fi:modules/cash_register#command-cash_register-count-add-handler-wasm fi:modules/cash_register#query-cash_register-counts-list old:cash_register/WORKFLOW.md#cash_register-f06 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -274,6 +292,7 @@ total, «Cuenta el cajón: indica los billetes y monedas o el total.».
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Contar a ciegas: quién ve el efectivo esperado
+<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f07 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
@@ -296,25 +315,31 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F08 Revisar lo que queda pendiente antes de cerrar
-Estado: parcial — mira las cuentas abiertas de Ventas; las comandas sin servir de Cocina y las
-impresiones pendientes llegarán con esas apps
+<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f08 wf:peluqueria-dia#rec_peluqueria-f16 wf:restaurante-dia#rec_restaurante-f16 -->
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
 Pantalla: Caja
 Pasos:
 1. Al abrir «Cerrar sesión» sale «Comprobando lo que queda pendiente…».
-2. Si hay cuentas abiertas en Ventas, sale «Revisión del turno» con «Cuentas abiertas: N» y sus
-   títulos. Sin nada pendiente no sale nada.
+2. Si queda algo, sale «Revisión del turno» con cada cosa pendiente: «Cuentas abiertas: N» y sus
+   títulos (Ventas), «Comandas sin servir: N» y sus mesas o números (Cocina: por preparar, en
+   preparación o listas para servir) e «Impresiones sin salir: N» y sus funciones («Recibos», «Cocina»,
+   «Barra», «Etiquetas»; Impresión: lo que espera en la cola y lo que falló). Sin nada pendiente no sale
+   nada.
 3. El primer «Cerrar sesión» no cierra: avisa «El turno se cerrará igualmente. Pulsa otra vez para
    confirmar.» y el botón pasa a «Cerrar de todos modos».
 4. El segundo clic cierra (F09).
-Entra: las cuentas abiertas de Ventas (`sale.order.list`).
+Entra: las cuentas abiertas de Ventas, las comandas en marcha de Cocina y la cola de Impresión. Si Cocina
+o Impresión no están encendidas en el negocio, no tienen nada pendiente.
 Sale: nada; avisa, nunca impide.
-Si falla: si la lectura no se puede hacer, «No se ha podido comprobar lo que queda pendiente, así que
-esta revisión puede estar incompleta.» y se cierra con un solo clic.
-Implicados: SALE-F17, SALE-F18
+Si falla: si una lectura no se puede hacer, «No se ha podido comprobar lo que queda pendiente, así que
+esta revisión puede estar incompleta.»; si las otras encontraron algo, sale dentro del aviso y se pide
+igual la confirmación; si no, se cierra con un solo clic.
+Implicados: SALE-F17, SALE-F18, KITCHEN-F31, PRINTING-F01
 
 ### CASH_REGISTER-F09 Cerrar el turno: esperado, contado y diferencia
+<!-- origen: fi:modules/cash_register#query-cash_register-current_session qa:modules/cash_register/shift-change wf:peluqueria-dia#rec_peluqueria-f16 wf:restaurante-dia#rec_restaurante-f16 fi:modules/cash_register#command-cash_register-session-close old:cash_register/WORKFLOW.md#cash_register-f09 qa:modules/cash_register/close-register-z-report -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -341,8 +366,9 @@ error: se abre otra con el efectivo real como fondo.
 Implicados: CASH_REGISTER-F06, F08
 
 ### CASH_REGISTER-F10 Cerrar sola la caja olvidada al final del día
-Estado: hecho — el cierre se aplica al abrir la siguiente sesión y el pase cada 5 minutos lo corre el worker
-(`base/scheduler.py`, 2026-10-15; en la fase 1, sobre un solo hub, `WORKER_SCOPE_SLUG`)
+<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f10 -->
+Estado: hecho — el cierre se aplica al abrir la siguiente sesión, y el pase cada 5 minutos lo hace el Hub
+por su cuenta
 Vertical: común
 Actor: sistema
 Pantalla: ninguna
@@ -365,6 +391,7 @@ cierra entonces).» (409 `cash_register.session_auto_close_due`).
 Implicados: CASH_REGISTER-F17
 
 ### CASH_REGISTER-F11 Consultar una sesión y revisar un descuadre
+<!-- origen: fi:modules/cash_register#query-cash_register-movements-list fi:modules/cash_register#query-cash_register-session-summary fi:modules/cash_register#query-cash_register-sessions-list old:cash_register/WORKFLOW.md#cash_register-f11 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -384,21 +411,27 @@ Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabl
 Implicados: SALE-F28
 
 ### CASH_REGISTER-F12 Ver la caja en los paneles del inicio
-Estado: no hecho — el inicio del Hub es la rejilla de apps y todavía no tiene paneles; las consultas
-existen (`cash_register.session.current` para «Caja (sesión actual)» y `cash_register.session.list`
-cerradas, por fecha de cierre, para «Descuadres recientes»)
+<!-- origen: fi:modules/cash_register#widget-cash_register-current_session-kpi fi:modules/cash_register#widget-cash_register-recent_sessions-bar-list old:cash_register/WORKFLOW.md#cash_register-f12 -->
+Estado: hecho — dentro de **Caja**, encima de la tabla de sesiones (el Inicio del Hub es la rejilla de
+apps, sin paneles; las cifras de cada app van en su pantalla, como las de Ventas)
 Vertical: común
 Actor: responsable, administrador, empleado
-Pantalla: Paneles del inicio
+Pantalla: Caja
 Pasos:
-1. En el Inicio, «Caja (sesión actual)» enseña el efectivo esperado de la sesión abierta y
-   «Descuadres recientes», la diferencia de las ocho últimas sesiones cerradas.
-Entra: la sesión abierta y las cerradas.
+1. Abre **Caja**: encima de la tabla salen dos tarjetas.
+2. «Sesión actual» enseña el «Esperado en el cajón» de la sesión abierta y su número, y se mueve solo
+   con cada cobro y cada movimiento; sin sesión abierta, «No hay ninguna sesión abierta.».
+3. «Descuadres recientes» enseña la diferencia de las ocho últimas sesiones cerradas, de la que se cerró
+   más tarde a la más antigua, con su signo y sus céntimos y una barra tan larga como la diferencia:
+   roja si faltó, verde si sobró. Una sesión cerrada sola, sin recuento, sale «—».
+Entra: la sesión abierta, las sesiones cerradas y la moneda del negocio.
 Sale: nada.
-Si falla: lo dirá el inicio.
-Implicados: ninguno
+Si falla: «No se pudieron cargar las cifras de la caja.» con «Reintentar». Con el arqueo ciego, quien no
+puede ver el esperado lo ve «—» (F07). Sin sesiones cerradas, «Todavía no hay sesiones cerradas.».
+Implicados: CASH_REGISTER-F07, F09
 
 ### CASH_REGISTER-F13 Anotar en la caja cada cobro de una venta
+<!-- origen: fi:modules/cash_register#command-cash_register-record_sale-handler-wasm fi:modules/cash_register#event-listen-sale-completed-cash_register-record_sale old:cash_register/WORKFLOW.md#cash_register-f13 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -420,6 +453,7 @@ Si falla: sin sesión abierta, el cobro no se pierde: sale en F17.
 Implicados: SALE-F01, SALE-F02, SALE-F03, SALE-F15
 
 ### CASH_REGISTER-F14 Compensar en la caja una venta anulada
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 fi:modules/cash_register#command-cash_register-_reverse_sale-interno fi:modules/cash_register#event-listen-sale-voided-cash_register-_reverse_sale old:cash_register/WORKFLOW.md#cash_register-f14 wf:restaurante-dia#rec_restaurante-f15 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -437,6 +471,7 @@ emitido (SALE-F30).
 Implicados: SALE-F30
 
 ### CASH_REGISTER-F15 Anotar en la caja una devolución
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 old:cash_register/WORKFLOW.md#cash_register-f15 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -452,23 +487,32 @@ Si falla: sin sesión abierta, la devolución sale en F17.
 Implicados: SALE-F31
 
 ### CASH_REGISTER-F16 Imprimir el informe de la sesión (X o Z)
+<!-- origen: qa:modules/cash_register/close-register-z-report old-hub:HUB_PERIPHERALS-F13 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
 Pantalla: Detalle de la sesión
 Pasos:
 1. En el detalle de una sesión, pulsa «Imprimir».
-2. Sale el diálogo de impresión del navegador con el informe: número de sesión, cajón, quién y cuándo
-   abrió y cerró, el fondo, las ventas por forma de pago, devoluciones, entradas, salidas,
-   invitaciones, esperado, contado, diferencia y notas. Con la sesión abierta es el «Informe parcial
-   (X)»; cerrada, el «Cierre de caja (Z)».
+2. Con **Impresión** encendida y una impresora de recibos activa, el informe va a su cola y sale «Informe
+   enviado a la impresora …» (o «… a la impresora de recibos» si no hay una elegida); el dispositivo con
+   esa impresora lo saca en papel. Con la sesión abierta es el «Informe parcial (X)»; cerrada, el «Cierre de
+   caja (Z)».
+3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
+   se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
+   entradas, salidas, invitaciones, el esperado y, en el Z, el contado y el descuadre.
+4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
+   navegador con el mismo informe (en la cola esperaría para siempre).
 Entra: el resumen de la sesión, el mismo que enseña la pantalla.
-Sale: el papel.
-Si falla: «No se pudo imprimir.»; con el arqueo ciego, el empleado no puede imprimir el esperado de una
-sesión abierta (sale «—»).
-Implicados: CASH_REGISTER-F11
+Sale: un trabajo en la cola de recibos de Impresión (o el papel del navegador). Cada «Imprimir» es un papel
+nuevo.
+Si falla: «No se pudo imprimir.» con el motivo de Impresión (por ejemplo, sin permiso de imprimir). Con el
+arqueo ciego, quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el
+esperado); en una cerrada sí.
+Implicados: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
+<!-- origen: nuevo (Caja de ERPlora: lo cobrado sin turno no se pierde) -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -501,12 +545,12 @@ caja», «apunta una salida de 20 €»); un cajón, por su nombre.
 |---|---|---|---|
 | Los ajustes de caja (los de fábrica si nunca se guardaron) | ver sesiones | F01 | `cash_register.settings.get` |
 | Los cajones, con búsqueda por nombre, filtro de activos y páginas (hasta 100) | ver sesiones | F02, F03 | `cash_register.register.list` |
-| Las sesiones, de la más reciente a la más antigua, con búsqueda por número, filtros (estado, número, cajón, fechas e importes) y páginas | ver sesiones | F03, F09, F12 | `cash_register.session.list` |
+| Las sesiones, de la más reciente a la más antigua (o por cuándo se cerraron), con búsqueda por número, filtros (estado, número, cajón, fechas e importes) y páginas | ver sesiones | F03, F09, F12 | `cash_register.session.list` |
 | La sesión abierta con su esperado (si quien pregunta puede verlo), si la caja está activada y los cobros fuera de turno (cuántos y su efectivo) | ver sesiones | F04, F10, F12, F17 | `cash_register.session.current` |
 | Una sesión (por id o número) con su resumen: ventas por forma de pago, devoluciones, entradas, salidas, invitaciones, esperado, contado y diferencia | ver sesiones | F11, F16 | `cash_register.session.get` |
 | Los movimientos de una sesión (o los cobros fuera de turno), con búsqueda, filtros y páginas; con el arqueo ciego, a quien no puede ver el esperado, solo los apuntados a mano de la sesión abierta | ver movimientos | F07, F11, F17 | `cash_register.movement.list` |
 | Los arqueos de una sesión, con páginas | ver arqueos | F06, F09, F11 | `cash_register.count.list` |
-| La moneda del negocio, sus decimales y sus billetes y monedas | ver sesiones | F06 | `cash_register.currency.get` |
+| La moneda del negocio, sus decimales y sus billetes y monedas | ver sesiones | F06, F12 | `cash_register.currency.get` |
 
 Todas se pueden seguir en vivo.
 
@@ -522,6 +566,7 @@ Todas se pueden seguir en vivo.
 | Cierra las sesiones olvidadas al corte del día | cerrar | F10 | `cash_register.session.auto_close` |
 | Apunta una entrada o una salida | apuntar | F05 | `cash_register.movement.add` |
 | Registra un arqueo | contar | F06 | `cash_register.count.add` |
+| Imprime el informe X o Z de una sesión en la impresora de recibos | ver sesiones | F16 | `cash_register.session.print` |
 
 ### Lo que avisa
 
@@ -543,9 +588,12 @@ momento en que se miran; las pantallas se refrescan con `sale.sale.completed`, `
 
 ### Lo que necesita de otras apps
 
-- **Ventas** (requisito): los cobros (`Sale`, `SalePayment`), las anulaciones (la venta anulada y
-  cuándo) y las devoluciones (`Refund`, `RefundPayment`), leídos de sus modelos; las cuentas abiertas
-  para la revisión del turno (`sale.order.list`).
+- **Ventas** (requisito): los cobros, las anulaciones (la venta anulada y cuándo) y las devoluciones,
+  leídos de Ventas; las cuentas abiertas para la revisión del turno.
+- **Cocina** (sin requisito; solo si está encendida): las comandas en marcha para la revisión del turno
+  (KITCHEN-F31).
+- **Impresión** (sin requisito; solo si está encendida): lo que espera o falló en la cola, para la revisión
+  del turno (PRINTING-F01), y la cola de recibos para el informe X o Z (PRINTING-F17).
 - **Índices de Ventas para estas lecturas** (hecho, `sale/0005_cash_register_indexes`): parciales en
   `sale_sale(voided_at)` y `sale_refund(created_at)`, para que las lecturas por ventana de tiempo de
   anulaciones y devoluciones no recorran la tabla entera.
@@ -553,8 +601,7 @@ momento en que se miran; las pantallas se refrescan con `sale.sale.completed`, `
 ### Contrato con Ventas (CASH_REGISTER-F04)
 
 Caja no puede tocar Ventas, y Ventas no requiere Caja (sería un ciclo). El bloqueo de cobrar en
-efectivo con la caja cerrada lo hace Ventas así (hecho; `_check_drawer` de `apps/sale/services.py`,
-probado contra esta app en `tests/test_integration_sale.py`):
+efectivo con la caja cerrada lo hace Ventas así (hecho; probado contra esta app con ventas reales):
 
 1. Antes de cobrar con un medio de tipo efectivo, Ventas llama a la operación
    `cash_register.session.current` por su nombre (`live.operations.get`; CLAUDE.md «Apps»: operaciones
@@ -675,8 +722,8 @@ cajero del producto actual es un empleado.
    siempre las de Ventas.
 10. **Una anulación de otro turno sale por cada forma de pago**, también la de tarjeta (sin tocar el
     esperado), con el tipo «Anulación».
-11. **La revisión del turno mira las cuentas abiertas de Ventas** (Toast); las comandas de Cocina y la
-    cola de impresión llegarán con esas apps.
+11. **La revisión del turno mira también las cuentas abiertas de Ventas** (Toast), además de las comandas
+    sin servir de Cocina y la cola de Impresión; las impresiones que fallaron cuentan como pendientes.
 12. **El número de sesión toma el día de negocio** (hora del negocio), no el de UTC.
 13. **El estado «Suspendida» desaparece**: nada llevaba a él.
 14. **Permiso «ver informes» desaparece**: ninguna operación lo pedía (era el del panel «Descuadres
@@ -689,12 +736,14 @@ cajero del producto actual es un empleado.
     todas y una cerrada respondía «La sesión S-… no está abierta»).
 17. **Quién abrió o cerró** se guarda como lo lee una persona (su nombre o su correo), no como el
     identificador interno del usuario.
+18. **Las cifras de la caja están en Caja**: la sesión actual y los descuadres recientes salen encima de la
+    tabla de sesiones, no en el Inicio, que es la rejilla de apps.
 
 ### Lo que NO hace, a propósito
 
 - No cobra ni factura: Ventas, Facturación y VeriFactu.
-- No abre el cajón físico ni imprime en la impresora de tiques: Impresión (el informe sale por el
-  diálogo del navegador).
+- No abre el cajón físico: Impresión. El informe X o Z lo imprime Impresión, en su cola de recibos (sin
+  Impresión o sin impresora de recibos, el diálogo del navegador).
 - No lleva varios cajones abiertos a la vez: una sesión por negocio.
 - No reabre turnos ni edita o borra movimientos o arqueos: se corrige con otro movimiento.
 - No gestiona propinas, banco ni caja fuerte más allá de una salida de efectivo.

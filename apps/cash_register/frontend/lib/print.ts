@@ -1,8 +1,8 @@
 // `printPaper(source)`: prints the session's report (CASH_REGISTER-F16) through the browser. The app runs
 // with Trusted Types and a strict CSP, so no HTML string is ever built: a deep copy of the paper's own
 // nodes goes into a body-level root, the browser prints, and the copy leaves on `afterprint`. print.css
-// (bundled with this module) hides everything else on paper and the copy on screen. The network printer
-// arrives with the Printing app; until then the browser's dialog is the way out.
+// (bundled with this module) hides everything else on paper and the copy on screen. With Printing on in the
+// business the report goes to the receipt printer's queue instead; this is the way out without it.
 import './print.css';
 
 /** The class of the body-level container the copy is printed from (print.css). */

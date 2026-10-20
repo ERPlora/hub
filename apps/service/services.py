@@ -1463,14 +1463,23 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
     },
 )
 def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
-    expired = Redemption.objects.filter(
-        status=HELD, hold_until__lte=timezone.now()
-    ).update(
-        status=Redemption.Status.EXPIRED, ended_at=F("hold_until"), ended_by="system"
+    # Locked in id order, as every other step of a session takes them; one notice per session, saying which
+    # session of which voucher (hub#2681), and none when nothing lapsed.
+    lapsed = list(
+        Redemption.objects.select_for_update()
+        .filter(status=HELD, hold_until__lte=timezone.now())
+        .order_by("id")
+        .values_list("id", "grant_id")
     )
-    if expired:
-        record_event(ctx, events.SESSION_EXPIRED, {"count": expired})
-    return {"expired": expired}
+    if lapsed:
+        Redemption.objects.filter(id__in=[session_id for session_id, _ in lapsed]).update(
+            status=Redemption.Status.EXPIRED, ended_at=F("hold_until"), ended_by="system"
+        )
+    for session_id, grant_id in lapsed:
+        record_event(
+            ctx, events.SESSION_EXPIRED, {"id": str(session_id), "grant_id": str(grant_id)}
+        )
+    return {"expired": len(lapsed)}
 
 
 @operation(

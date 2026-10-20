@@ -45,7 +45,8 @@ describe('CountModal', () => {
     expect(s.inDoc('cash-register-count-loading')).not.toBeNull();
     await s.result(CURRENCY, EUR);
     expect(prop(s.inDoc('cash-register-count-type'), 'value')).toBe('closing');
-    expect(plain(String(prop(s.box('50'), 'label')))).toBe('50,00 €');
+    // A whole note or coin without decimals, as the old count printed it («500 €», not «500,00 €»).
+    expect(plain(String(prop(s.box('50'), 'label')))).toBe('50 €');
     expect(plain(String(prop(s.box('0.05'), 'label')))).toBe('0,05 €');
     expect(s.inDoc('cash-register-count-bills')?.querySelectorAll('ion-input')).toHaveLength(7);
     expect(s.inDoc('cash-register-count-coins')?.querySelectorAll('ion-input')).toHaveLength(8);

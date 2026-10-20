@@ -14,6 +14,11 @@ function pluginNames(options: PluginOption[] | undefined): string[] {
 }
 
 describe('vite.config', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
   it('serves from the hub-next directory under /static/spa/ (dev and build alike)', () => {
     expect(config.root).toBe(HUB_DIR);
     expect(config.base).toBe('/static/spa/');
@@ -34,9 +39,13 @@ describe('vite.config', () => {
     expect(build.rollupOptions?.input).toBe('frontend/main.ts');
   });
 
-  it('runs the dev server on localhost:5173 only, with absolute asset URLs and HMR there', () => {
+  it('runs the dev server on localhost:5173 only, with absolute asset URLs and HMR there', async () => {
     // live/spa.py points DEBUG pages at http://localhost:5173/static/spa/{@vite/client,frontend/main.ts}.
-    expect(config.server).toMatchObject({
+    // Without VITE_DEV_PORT, whatever the shell exports (the e2e recipe of parallel stacks exports it).
+    vi.stubEnv('VITE_DEV_PORT', undefined);
+    vi.resetModules();
+    const { default: unmoved } = await import('./vite.config');
+    expect(unmoved.server).toMatchObject({
       host: 'localhost',
       port: 5173,
       strictPort: true,
@@ -46,11 +55,6 @@ describe('vite.config', () => {
   });
 
   describe('VITE_DEV_PORT (a second checkout beside another runserver, as the e2e of a branch)', () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
-      vi.resetModules();
-    });
-
     it('moves the dev server, its asset URLs and HMR to that port, the one Django reads too', async () => {
       vi.stubEnv('VITE_DEV_PORT', '5183');
       vi.resetModules();

@@ -187,6 +187,7 @@ function onRowClick(row: PackageOut): void {
       server-side
       searchable
       :filters="filters"
+      filterable
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"

@@ -76,7 +76,7 @@
       },
       "unassigned": {
         "heading": "Cobros fuera de turno",
-        "body": "{count} líneas de venta no entraron en ninguna sesión · {cash} en efectivo.",
+        "body": "{count} línea de venta no entró en ninguna sesión · {cash} en efectivo. | {count} líneas de venta no entraron en ninguna sesión · {cash} en efectivo.",
         "view": "Ver"
       },
       "autoCloseDue": {
@@ -144,7 +144,15 @@
       "checking": "Comprobando lo que queda pendiente…",
       "openChecks": "Cuentas abiertas: {count}",
       "unavailable": "No se ha podido comprobar lo que queda pendiente, así que esta revisión puede estar incompleta.",
-      "confirm": "El turno se cerrará igualmente. Pulsa otra vez para confirmar."
+      "confirm": "El turno se cerrará igualmente. Pulsa otra vez para confirmar.",
+      "unserved": "Comandas sin servir: {count}",
+      "prints": "Impresiones sin salir: {count}",
+      "usages": {
+        "receipt": "Recibos",
+        "kitchen": "Cocina",
+        "bar": "Barra",
+        "label": "Etiquetas"
+      }
     },
     "unassignedList": {
       "title": "Cobros fuera de turno",
@@ -161,7 +169,9 @@
       "counts": "Arqueos",
       "noMovements": "Sin movimientos en esta sesión.",
       "noCounts": "Sin arqueos en esta sesión.",
-      "loading": "Cargando…"
+      "loading": "Cargando…",
+      "printQueued": "Informe enviado a la impresora {printer}.",
+      "printQueuedDefault": "Informe enviado a la impresora de recibos."
     },
     "summary": {
       "status": "Estado",
@@ -285,6 +295,15 @@
         "created": "Cajón creado",
         "renamed": "Cajón renombrado"
       }
+    },
+    "figures": {
+      "current": "Sesión actual",
+      "expected": "Esperado en el cajón",
+      "noSession": "No hay ninguna sesión abierta.",
+      "recent": "Descuadres recientes",
+      "noClosed": "Todavía no hay sesiones cerradas.",
+      "loading": "Cargando las cifras de la caja…",
+      "loadError": "No se pudieron cargar las cifras de la caja."
     }
   }
 }

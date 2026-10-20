@@ -460,9 +460,27 @@ def test_the_hourly_task_marks_the_holds_past_their_deadline(cut, lucia):
         lapsed.hold_until,
     )
     assert alive.status == "held"
-    assert events("service.session.expired") == [{"count": 1}]
+    # hub#2681: one notice per session the task marks, saying which session of which voucher (WORKBOOK
+    # «Lo que avisa»), so whatever follows it knows what changed; a pass that marks nothing says nothing.
+    assert events("service.session.expired") == [
+        {"id": str(lapsed.id), "grant_id": str(grant.id)}
+    ]
     assert op(system_context(A), NoIn()).expired == 0
     assert len(events("service.session.expired")) == 1
+
+
+def test_the_hourly_task_tells_each_session_it_marks(cut, lucia):
+    grant = make_grant(make_package("Bono", [cut], max_uses=9), lucia)
+    other = make_grant(make_package("Other", [cut], max_uses=9), make_customer("Marta"))
+    past = timezone.now() - dt.timedelta(minutes=5)
+    lapsed = [
+        make_redemption(g, cut, status="held", order_line_id=uuid.uuid7(), hold_until=past)
+        for g in (grant, grant, other)
+    ]
+    assert get("service.session.expire")(system_context(A), NoIn()).expired == 3
+    assert sorted(
+        (e["id"], e["grant_id"]) for e in events("service.session.expired")
+    ) == sorted((str(r.id), str(r.grant_id)) for r in lapsed)
 
 
 def test_only_the_platform_runs_the_hourly_task():
