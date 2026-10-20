@@ -525,6 +525,19 @@ describe('PosPage: the table of the check (SALE-F19)', () => {
     expect(s.find('pos-check-context-empty').exists()).toBe(false);
   });
 
+  it('the check’s follower and the table’s never share a key: the duplicate broke the till once a check opened', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const s = await setup({ session: WITH_TABLES });
+      await s.addProduct();
+      expect(s.params('table.session.by_order')).toEqual([{ order_id: 'o1' }]);
+      const duplicates = warn.mock.calls.filter((call) => String(call[0]).includes('Duplicate keys'));
+      expect(duplicates).toEqual([]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('without the right to see the table checks, the button stays but no table is followed', async () => {
     const s = await setup({ session: without('table.view_session') });
     await s.addProduct();

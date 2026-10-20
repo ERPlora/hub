@@ -667,22 +667,30 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         </div>
       </div>
 
-      <CheckFollower
-        v-if="till.orderId.value"
-        :key="till.orderId.value"
-        :order-id="till.orderId.value"
-        :valued="lines.length > 0"
-        @order="onOrder"
-        @preview="preview = $event"
-        @gone="till.gone()"
-      />
-      <TableFollower
-        v-if="followsTable && till.orderId.value"
-        :key="till.orderId.value"
-        :order-id="till.orderId.value"
-        @seat="tableSeat = $event"
-        @parked="tableParked = $event"
-      />
+      <!-- The followers mount once a check opens, often from a sheet still on screen: in a box of their own, never
+           inserted next to an ion-modal that Ionic moved out when it presented it (SALE-F09: the first line of a
+           check from «Open price» broke the till). Siblings keyed apart: a shared key broke Vue's patch too. -->
+      <div
+        class="pos-followers"
+        hidden
+      >
+        <CheckFollower
+          v-if="till.orderId.value"
+          :key="`check-${till.orderId.value}`"
+          :order-id="till.orderId.value"
+          :valued="lines.length > 0"
+          @order="onOrder"
+          @preview="preview = $event"
+          @gone="till.gone()"
+        />
+        <TableFollower
+          v-if="followsTable && till.orderId.value"
+          :key="`table-${till.orderId.value}`"
+          :order-id="till.orderId.value"
+          @seat="tableSeat = $event"
+          @parked="tableParked = $event"
+        />
+      </div>
 
       <OpenPriceSheet
         v-model:open="pricing"
