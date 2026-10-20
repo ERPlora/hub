@@ -5,9 +5,11 @@
 // No header: the paper on a light background (centred when short, scrolling when long), a floating ✕
 // and a full-width print button in the footer. The document is a v-if child: nothing is subscribed
 // while the window is closed. Every print from Sales is a «DUPLICATE» (the default); the till passes
-// `false` for the first paper after charging. Printing goes through the browser (`printPaper`) until
-// the Printing app brings the network printer.
-import { HubIcon, toastError } from '@erplora/ui/shell';
+// `false` for the first paper after charging. «Print» asks the printing queue first (`sale.sale.print`,
+// PRINTING-F08): queued, a toast names the printer; not queued (Printing off, no receipt printer, a fiscal
+// document pending) or the queue out of reach, the browser prints the screen's paper (`printPaper`).
+import { useCommand } from '@erplora/ui/sdk';
+import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonContent, IonFooter, IonModal, IonToolbar } from '@ionic/vue';
 import { shallowRef, watch } from 'vue';
 
@@ -36,10 +38,27 @@ watch([open, () => props.saleId], ([now], [, before]) => {
   if (!now || props.saleId !== before) paper.value = null;
 });
 
-function print(): void {
-  if (!paper.value) return;
+const queue = useCommand('sale.sale.print');
+/** A print on its way: a second press waits for it. */
+const sending = shallowRef(false);
+
+async function print(): Promise<void> {
+  const element = paper.value;
+  if (!element || !props.saleId || sending.value) return;
+  sending.value = true;
   try {
-    printPaper(paper.value);
+    const sent = await queue.run({ sale_id: props.saleId, duplicate: props.duplicate });
+    if (sent.queued) {
+      void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+      return;
+    }
+  } catch {
+    // The queue could not be asked: the screen's paper still prints (below).
+  } finally {
+    sending.value = false;
+  }
+  try {
+    printPaper(element);
   } catch {
     void toastError(t('sale.document.printFailed'));
   }
@@ -83,7 +102,7 @@ function print(): void {
       <ion-toolbar>
         <ion-button
           expand="block"
-          :disabled="!paper"
+          :disabled="!paper || sending"
           :aria-label="$t('sale.document.print')"
           data-testid="sale-document-print"
           @click="print"
