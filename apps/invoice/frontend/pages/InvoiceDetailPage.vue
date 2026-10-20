@@ -5,12 +5,14 @@
 // Customer, Customer tax ID, Address, Issuer, Source, Sale, Rectifies / Replaces / Replaced by / Rectifying
 // invoices (each opens), Paid on and Notes (a rectifying invoice's note says what it rectifies and why, in
 // the reader's language); the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full
-// invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» prints the
-// A4 paper through the browser (a document of a sale is a copy: its original was the till's paper). It
-// follows `invoice.invoice.get` live: a payment or a rectification made elsewhere shows by itself.
+// invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» asks the
+// printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
+// it; not queued (Printing off, no system printer) or the queue out of reach, the browser prints the A4
+// paper (a document of a sale is a copy: its original was the till's paper). It follows
+// `invoice.invoice.get` live: a payment or a rectification made elsewhere shows by itself.
 import { formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, toastError, useSession } from '@erplora/ui/shell';
+import { useCommand, useLive } from '@erplora/ui/sdk';
+import { AppPage, HubIcon, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
@@ -95,9 +97,25 @@ const rectifyOpen = shallowRef(false);
 const substituteOpen = shallowRef(false);
 const paper = shallowRef<{ $el: HTMLElement } | null>(null);
 
-function print(): void {
+const queue = useCommand('invoice.invoice.print');
+/** A print on its way: a second press waits for it. */
+const sending = shallowRef(false);
+
+async function print(): Promise<void> {
   const element = paper.value?.$el;
-  if (!element) return;
+  if (!element || sending.value) return;
+  sending.value = true;
+  try {
+    const sent = await queue.run({ invoice_id: props.id, duplicate: duplicate.value });
+    if (sent.queued) {
+      void toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
+      return;
+    }
+  } catch {
+    // The queue could not be asked: the screen's paper still prints (below).
+  } finally {
+    sending.value = false;
+  }
   try {
     printPaper(element);
   } catch {
@@ -150,6 +168,7 @@ function onSubstituted(full: InvoiceOut): void {
         </div>
         <div class="invoice-detail__header-actions">
           <ion-button
+            :disabled="sending"
             data-testid="invoice-detail-print"
             @click="print"
           >

@@ -104,6 +104,7 @@
       "loadError": "The invoice could not be loaded",
       "print": "Print / PDF",
       "printFailed": "Could not print the invoice",
+      "queued": "Sent to {printer}.",
       "missingTaxId": "This invoice has no customer tax ID: the ticket printer cannot print it as a full invoice.",
       "fields": {
         "type": "Type",
