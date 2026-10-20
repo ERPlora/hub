@@ -212,6 +212,7 @@
       "limits": {
         "title": "Lo que todavía no puede hacer",
         "items": [
+          "Arrancar sola cuando pasa algo en el negocio: por ahora una automatización de «Pasa algo» solo se ejecuta con «Ejecutar ahora»; las de horario o fecha sí arrancan solas.",
           "Bifurcaciones: una automatización es una columna; «Solo sigue si…» la termina cuando no se cumple. Dos desenlaces son dos automatizaciones.",
           "Contar hacia atrás desde una fecha del aviso («el día antes de la cita»): una espera cuenta desde el paso anterior.",
           "Enviar mensajes, llamar a otro sistema o preguntar al asistente o a una persona: llegan en una versión posterior.",
@@ -293,7 +294,8 @@
         "month": "Todos los meses el día {day} a las {time}",
         "at": "Una vez, el {date}",
         "noDate": "Una vez, en la fecha que elijas"
-      }
+      },
+      "eventNotYet": "Por ahora no arranca sola cuando pasa esto: ejecútala con «Ejecutar ahora». Un horario o una fecha sí arrancan solos."
     },
     "steps": {
       "none": "Todavía no hay pasos. Añade lo primero que debe hacer esta automatización.",

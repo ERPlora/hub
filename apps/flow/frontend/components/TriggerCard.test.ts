@@ -47,6 +47,15 @@ describe('TriggerCard', () => {
     expect(s.emitted().at(-1)).toEqual({ kind: 'event', event: '', filter: { 'input.total': { gt: 10000 } } });
   });
 
+  it('«Something happens» says it does not start on its own yet (FLOW-F21, phase 2); a schedule does not', async () => {
+    const s = await setup({ kind: 'event', event: 'sale.sale.completed' });
+    expect(s.find('flow-trigger-event-notice').text()).toBe(
+      'For now it does not start on its own when this happens: run it with «Run now». A schedule or a date does start on its own.',
+    );
+    const clock = await setup({ kind: 'schedule', every: 'day', time: '09:00' });
+    expect(clock.find('flow-trigger-event-notice').exists()).toBe(false);
+  });
+
   it('a schedule: how often, which day and what time', async () => {
     const s = await setup({ kind: 'manual' });
     await ionValue(s.find('flow-trigger-kind').element, 'schedule');
