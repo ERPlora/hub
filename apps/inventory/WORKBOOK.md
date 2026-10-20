@@ -36,10 +36,15 @@ obligatorio para vender**: sin él, el TPV cobra servicios y líneas a precio li
 
 ERPlora no inventa flujos: adopta los que el mercado ya probó. De la referencia del restaurante se
 adopta la carta por categorías, el control de stock por artículo y el recuento con motivo
-([Lightspeed — Practice run checklist](https://resto-support.lightspeedhq.com/hc/en-us/article_attachments/360044738513));
-no el «agotado» ni la cantidad restante en el TPV
+([Lightspeed — Practice run checklist](https://resto-support.lightspeedhq.com/hc/en-us/article_attachments/360044738513))
+y el «agotado» del artículo
 ([Square — disponibilidad](https://squareup.com/help/us/en/article/8495-beta-item-availability)),
-que aquí no existen. Además:
+pero no la cantidad restante en el TPV, que aquí no existe. Además:
+
+- **Agotado («86») aparte de activo**: el artículo sigue en la carta con su interruptor encendido, el
+  TPV deja de ofrecerlo y vuelve con un toque cuando hay otra vez: Square «Sold out», Toast «86»,
+  Lightspeed «Unavailable», TouchBistro y Revel. Lo pone y lo quita una persona; ninguno lo quita solo
+  al recibir mercancía.
 
 - **Control de stock por artículo, con un valor por defecto del negocio**: Square «Track stock»,
   Odoo «Track Inventory», Business Central, Shopify «Track quantity», WooCommerce «Manage stock?».
@@ -101,14 +106,16 @@ métricas del inventario.» y el aviso de la tabla con «Reintentar».
 ### Productos
 Tabla con Nombre, SKU, Precio, Stock («—» en un artículo sin control de stock) y Estado: un
 interruptor activo/inactivo, «Sí»/«No» para quien no puede cambiar productos, o la marca «Sin
-configurar · Falta la categoría fiscal». Buscador «Buscar producto…» por nombre o SKU; orden por
-columna; filtros por nombre, SKU, precio desde/hasta, stock desde/hasta y estado («Sí», «No»,
-«Sin configurar»); 50 por página; vista de tabla o de tarjetas.
+configurar · Falta la categoría fiscal»; a su lado, la insignia roja «Agotado» si el artículo está
+agotado. Buscador «Buscar producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU,
+precio desde/hasta, stock desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por
+página; vista de tabla o de tarjetas.
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila: «Detalles», «Recibir stock» y «Contar stock» (con permiso de stock y
 solo en productos físicos), «Dar de baja stock» (además, solo en artículos con control de stock),
-«Editar» y «Eliminar». Tocar la fila abre la ficha.
+«Editar», «Marcar agotado» o, si ya lo está, «Volver a poner a la venta» (en el menú «⋮», para quien
+puede cambiar productos) y «Eliminar». Tocar la fila abre la ficha.
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
 SKU es la identidad del producto: no se edita»), Precio, «Coste (EUR)», «Stock inicial» (solo al
@@ -121,10 +128,11 @@ Vacía: «Sin productos». Cargando: «Cargando…». Error: el aviso de la tabl
 rechazo del formulario sale dentro del panel; el de una acción de fila, encima de la tabla.
 
 ### Ficha del producto
-Ventana con el nombre del producto: SKU, Precio, Stock y Estado; el código de barras del SKU en una
-placa blanca con el SKU debajo; «Imprimir código de barras» y, con permiso de stock y en un
-producto físico, «Recibir stock» y «Contar stock», y «Dar de baja stock» si el artículo controla su
-stock. Un fallo al imprimir sale dentro de la ventana.
+Ventana con el nombre del producto: SKU, Precio, Stock y Estado («Sí · Agotado» si está agotado); el
+código de barras del SKU en una placa blanca con el SKU debajo; «Imprimir código de barras» y, con
+permiso de stock y en un producto físico, «Recibir stock» y «Contar stock», y «Dar de baja stock» si
+el artículo controla su stock; con permiso para cambiar productos, «Marcar agotado» o «Volver a poner
+a la venta». Un fallo al imprimir o al marcar sale dentro de la ventana.
 
 ### Recepción
 Ventana «Recepción — <producto>»: «Stock actual», «Cantidad recibida», «Coste unitario (EUR)» y
@@ -193,6 +201,7 @@ fueran los del negocio.
 | INVENTORY-F06 | Crear y editar una categoría | servidor hecho |
 | INVENTORY-F07 | Eliminar una categoría | servidor hecho |
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | servidor hecho |
+| INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | servidor hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | servidor hecho |
@@ -214,7 +223,7 @@ fueran los del negocio.
 | INVENTORY-F24 | Reponer el stock de una devolución | servidor hecho; la entrega entre apps espera al relay del outbox (fase 2) |
 | INVENTORY-F25 | Imprimir la etiqueta del código de barras | por construir — necesita la app Impresión (`printing`), que aún no existe |
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | servidor hecho |
-| INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | servidor hecho |
+| INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API), y Menús lo sigue ofreciendo como opción |
 | INVENTORY-F28 | Completar el primer paso «Tu catálogo» | servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo) |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
@@ -785,12 +794,13 @@ Implicados: SALE-F10
 Pendiente de enlazar: core — leer la báscula y mandar el peso al TPV (no existe)
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
-Estado: servidor hecho
+<!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 fi:modules/inventory#query-inventory-products-list old:inventory/workflow/con-otros-modulos.md#inventory-f27 -->
+Estado: parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API), y Menús lo sigue ofreciendo como opción
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al abrir el TPV, Ventas pide a Inventario los productos, las categorías, qué categorías tiene
-   cada producto y las unidades. Al cobrar, pide el catálogo de venta entero: precio, coste,
+1. Al abrir el TPV, Ventas pide a Inventario los productos a la venta, las categorías, qué categorías
+   tiene cada producto y las unidades. Al cobrar, pide el catálogo de venta entero: precio, coste,
    categoría fiscal, unidad y si cada artículo lleva control de stock.
 2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
 3. Menús pide los productos que se pueden poner como componente.
@@ -798,13 +808,15 @@ Pasos:
    de productos. Puedes cobrar servicios y ventas a precio libre; …») y vende servicios y precio
    libre.
 Entra: nada: lo piden las demás apps (ver [Servicios](#servicios-lo-que-entra-y-lo-que-sale)).
-Sale: las lecturas. En el catálogo de venta y en el mapa de categorías solo salen productos activos
-y no eliminados. El catálogo de venta no lleva stock: el TPV no enseña ni comprueba
-disponibilidad.
+Sale: las lecturas. En la rejilla y el buscador del TPV, en el catálogo de venta y en la cifra de
+cada categoría solo salen los productos a la venta: activos, no agotados (INVENTORY-F29) y no
+eliminados; el mapa de categorías lleva los activos. Un artículo que se marca agotado con el TPV
+abierto desaparece de su rejilla al momento, sin recargar, y vuelve igual. El catálogo de venta no
+lleva stock: el TPV no enseña ni comprueba cuántas unidades quedan.
 Si falla: lo decide quien pide. Ventas rechaza una línea de catálogo si no puede leer el catálogo de
 venta y avisa en el TPV si Inventario está activo y no contesta; Cocina se queda sin opciones de
 reparto.
-Implicados: COMBO-F06, KITCHEN-F04, SALE-F01
+Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
 Estado: servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo)
@@ -820,6 +832,32 @@ Sale: el paso hecho o pendiente. Lo ve quien puede dar de alta productos.
 Si falla: si se desactivan o eliminan todos los productos, el paso vuelve a pendiente.
 Implicados: ninguno
 Pendiente de enlazar: core — lista «Termina de configurar tu negocio» (su WORKBOOK aún no existe)
+
+### INVENTORY-F29 Marcar un artículo como agotado
+<!-- origen: qa:modules/sales/sold-out-item-86 -->
+Estado: hecho
+Actor: administrador, responsable
+Pantalla: Productos; Ficha del producto
+Pasos:
+1. Se acaba un plato o un artículo a media jornada: en **Inventario → Productos**, búscalo y, en el
+   menú «⋮» de su fila, toca «Marcar agotado». También desde su ficha, con «Marcar agotado», o
+   diciéndoselo al asistente («las croquetas se han acabado»).
+2. La fila enseña la insignia «Agotado» junto a su interruptor, que sigue encendido: el artículo no
+   se desactiva ni pierde nada. El TPV deja de ofrecerlo al momento, en la rejilla y en el buscador,
+   también en los TPV que ya estaban abiertos.
+3. Para ver todo lo agotado, filtra Estado por «Agotado».
+4. Cuando vuelve a haber, toca «Volver a poner a la venta» en el menú «⋮» o en la ficha: la insignia
+   desaparece y el TPV lo vuelve a ofrecer.
+Entra: el artículo (por la pantalla, o por su SKU o su nombre desde el asistente o la API) y si está
+agotado o vuelve a la venta.
+Sale: el artículo marcado o desmarcado; Inventario avisa del cambio (`inventory.product.updated`).
+Marcarlo dos veces no cambia nada. Desactivarlo, activarlo o editarlo no le quita la marca. Un
+artículo agotado deja de contar en su categoría del TPV (INVENTORY-F27) y no sale en el catálogo de
+venta.
+Si falla: el motivo sale encima de la tabla o dentro de la ficha («No se pudo cambiar si el producto
+está agotado» o el que dé la app). Quien no puede cambiar productos ve la insignia, pero no las
+acciones. Un artículo que ya no existe da «Este producto no existe en este hub».
+Implicados: SALE-F01, INVENTORY-F27
 
 ## Qué comparten los verticales
 
@@ -855,12 +893,12 @@ buscar y va por páginas de hasta 100.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Los productos con su stock, con búsqueda, filtros (nombre, SKU, precio, stock, estado) y páginas | ver productos | F03, F05, F27 | `inventory.product.list` |
+| Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
-| El catálogo de venta entero: productos activos con precio, coste, categoría fiscal, unidad y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
+| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
-| Las categorías, con cuántos productos activos tiene cada una | ver categorías | F06, F27 | `inventory.category.list` |
+| Las categorías, con cuántos productos a la venta tiene cada una | ver categorías | F06, F27 | `inventory.category.list` |
 | El libro de movimientos: fecha, producto, tipo, cantidad, saldo, motivo, referencia y quién lo hizo | ver stock | F16 | `inventory.movement.list` |
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
@@ -874,6 +912,7 @@ buscar y va por páginas de hasta 100.
 | Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09 | `inventory.product.bulk_create` |
 | Cambia un producto: datos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
+| Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
 | Añade un producto a una categoría | cambiar productos | un clic | F08 | `inventory.product_category.add` |
 | Quita un producto de una categoría | cambiar productos | un clic | F08 | `inventory.product_category.remove` |
 | Crea una categoría | crear categorías | un clic | F06 | `inventory.category.create` |
@@ -892,7 +931,7 @@ buscar y va por páginas de hasta 100.
 | Aviso | Cuándo | Qué lleva | Quién lo usa | Servicio |
 |---|---|---|---|---|
 | Producto nuevo | Alta por pantalla, importación, plantilla, asistente o API | El producto y sus categorías | Flujos; paneles del Inicio | `inventory.product.created` |
-| Producto cambiado | Cambio, activar o desactivar | El producto como queda | Flujos; paneles del Inicio | `inventory.product.updated` |
+| Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta | El producto como queda, también si está agotado | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
 | Producto eliminado | Eliminar | Cuál era (SKU y nombre) | Flujos; paneles del Inicio | `inventory.product.deleted` |
 | Producto añadido a una categoría | Alta, cambio o enlace suelto | Producto y categoría | Flujos | `inventory.product.categorized` |
 | Producto quitado de una categoría | Cambio, enlace suelto o categoría eliminada | Producto y categoría | Flujos | `inventory.product.uncategorized` |
@@ -956,7 +995,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`) llegan en la fase de frontend, iguales a las del módulo viejo.
-- **29 operaciones** (12 consultas y 17 acciones), todas con `ai` (descripción y, en las acciones,
+- **30 operaciones** (12 consultas y 18 acciones), todas con `ai` (descripción y, en las acciones,
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada.
 - **Requiere `tax`**: producto y categoría tienen FK a `tax.TaxCategory` (`PROTECT`, sin acceso inverso).
@@ -991,6 +1030,14 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   SKU repetidos entre trozos. La adivinanza de cabeceras y la ventana fiscal son de la página.
 - **Exportar**: CSV con los formatos CLDR del idioma de la petición (librería `babel`), `;` donde la
   coma es el decimal (Excel en español) y BOM UTF-8. El Hub aún no tiene moneda configurada: euros.
+- **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
+  añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
+  agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (el TPV
+  pide `is_active: true`; `false` da el resto, inactivos o agotados), `list_for_sale` y la cifra de cada
+  categoría; `status=sold_out` filtra la marca y la fila lleva `is_sold_out`. `inventory.product.set_sold_out`
+  (permiso de cambiar productos) reutiliza `inventory.product.updated`, con `is_sold_out` en la carga:
+  el TPV, Cocina y Menús re-ejecutan sus consultas sin tocar `live.py`. La ficha (`inventory.product.get`)
+  sigue dando el artículo, marcado: es lo que lee Ventas al congelar una línea.
 - **Avisos añadidos** a la lista del producto: `inventory.category.*` e `inventory.config.updated`, solo
   para refrescar las consultas vivas.
 - **Administrador de Django**: CRUD completo de todas las tablas para soporte (ronda 12, PLAN §17), el
@@ -1078,7 +1125,8 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 | Historial de movimientos con quién y cuándo | parcial: se guarda quién, la pantalla no lo enseña ni filtra por fecha o producto (duda 11) | F16 |
 | Alerta de stock bajo | parcial: panel, paneles del Inicio y aviso para Flujos, sin notificación (duda 13) | F17, F18 |
 | No vender lo que no hay, o vender en negativo, según el ajuste | parcial: el TPV no lo impide; apagado, la venta no baja nada (duda 1) | F19, F21 |
-| Agotado y cantidad restante en el TPV | no, a propósito por ahora | F27 |
+| Agotado («86»): el TPV deja de ofrecer el artículo | sí: «Marcar agotado» en Productos y en la ficha, el asistente y la API | F29, F27 |
+| Cantidad restante en el TPV («quedan 3») | no, a propósito por ahora | F27 |
 | La venta baja el stock, una sola vez | sí | F21 |
 | Menú o pack baja sus componentes | sí | F22 |
 | La anulación repone exactamente lo que salió | sí | F23 |
@@ -1152,7 +1200,9 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - No crea unidades de medida: usa las ocho de fábrica.
 - No cambia el tipo de un producto (físico o servicio) después de crearlo.
 - No imprime por sí misma: entrega la etiqueta a Impresión.
-- No enseña «agotado» ni la cantidad restante en el TPV.
+- No enseña en el TPV cuántas unidades quedan, ni marca un artículo agotado sola cuando su stock llega
+  a cero, ni lo vuelve a poner a la venta al recibir mercancía: la marca «Agotado» la pone y la quita
+  una persona (F29).
 
 ## Dudas abiertas
 
