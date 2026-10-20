@@ -5,6 +5,8 @@ from decimal import Decimal
 from uuid import uuid7
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
 
@@ -398,6 +400,90 @@ def test_by_professional_a_refund_belongs_to_the_day_of_its_sale(catalog):
     assert (row.gross_total, row.refunded_total, row.total_revenue) == (121, 0, 121)
     [row] = run("sale.sale.by_staff", {"date_to": yesterday}).rows
     assert (row.gross_total, row.refunded_total, row.total_revenue) == (1800, 500, 1300)
+
+
+def test_by_professional_a_weighed_line_partly_back_weighs_the_quantity_returned(catalog, product):
+    # Reviewer regression (hub#93): a decimal quantity (by weight) shares the money by what came back.
+    product("Prawns", "PRW", 1200, "restaurant.food", unit="kg")
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0009",
+        lines=[{"product": "PRW", "quantity": "1.5", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    prawns = next(line for line in sale.lines if line.sku == "PRW")
+    coffee = next(line for line in sale.lines if line.sku == "COF")
+    # 0.5 kg of 1.5 kg (6.00 of 18.00) and the coffee (1.21) come back for 7.21: 6.00 and 1.21.
+    give_back(sale, 721, {"line_id": str(prawns.id), "quantity": "0.5"}, {"line_id": str(coffee.id)})
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (luis, 1800, 600, 1200),
+        (ana, 121, 121, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 1200
+
+
+def test_by_professional_several_refunds_of_one_sale_add_up_and_square_with_the_revenue(catalog):
+    # Reviewer regression (hub#93): three refunds of one sale, one of them money only.
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0010",
+        lines=[{"product": "STK", "quantity": "2", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    steaks = next(line for line in sale.lines if line.sku == "STK")
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    give_back(sale, 100)  # money only: shared 36.00 : 1.21, so 0.97 and 0.03
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.refunded_total, row.total_revenue) for row in rows] == [
+        (ana, 3, 118),
+        (luis, 3697, -97),
+    ]
+    stats = run("sale.sale.stats", {})
+    assert sum(row.refunded_total for row in rows) == stats.refunded_total == 3700
+    assert sum(row.total_revenue for row in rows) == stats.total_revenue == 21
+
+
+def test_by_professional_lines_nobody_served_keep_their_refund_out_of_the_rows(catalog):
+    # Reviewer regression (hub#93): what nobody served is neither a row nor a refund of anyone, and the
+    # rows plus it still square with the period's revenue.
+    ana = uuid7()
+    nobody = charge("refund-staff-0011", lines=[{"product": "STK"}], payments=[{"method": "card"}])
+    give_back(nobody, 500)
+    mixed = charge(
+        "refund-staff-0012",
+        lines=[{"product": "STK"}, {"product": "COF", "staff_id": str(ana)}],
+        payments=[{"method": "card"}],
+    )
+    give_back(mixed, 1921)  # all of it: 18.00 to nobody, 1.21 to Ana
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (ana, 121, 121, 0),
+    ]
+    unattributed_revenue = (1800 - 500) + (1800 - 1800)
+    revenue = run("sale.sale.stats", {}).total_revenue
+    assert sum(row.total_revenue for row in rows) + unattributed_revenue == revenue == 1300
+
+
+def test_by_professional_reads_a_fixed_number_of_queries_whatever_the_refunds(catalog):
+    # Reviewer regression (hub#93): no query per refund or per sale (the rows, the refunds and two prefetches).
+    ana = uuid7()
+    for i in range(6):
+        sale = charge(
+            f"refund-staff-n1-{i}",
+            lines=[{"product": "STK"}, {"product": "COF"}],
+            staff_id=str(ana),
+            payments=[{"method": "card"}],
+        )
+        give_back(sale, 100)
+        give_back(sale, 50)
+    with CaptureQueriesContext(connection) as captured:
+        [row] = run("sale.sale.by_staff", {}).rows
+    assert row.refunded_total == 900
+    assert len(captured) <= 12, [query["sql"][:80] for query in captured]
 
 
 def test_the_business_day():
