@@ -205,6 +205,27 @@ def test_a_read_that_counts_keeps_only_how_many():
     assert Task.objects.get().title == "There are 3"
 
 
+def test_a_read_that_counts_counts_every_row_not_just_the_page_it_reads():
+    for name in ("Ana", "Luis", "Eva"):
+        Customer.objects.create(name=name)
+    make_flow(
+        steps=[
+            {
+                "id": "s1",
+                "kind": "query",
+                "operation": "customer.customer.list",
+                "params": {"limit": 1},
+                "result": "count",
+            },
+            TASK_STEP
+            | {"id": "s2", "params": {"title": "There are {{steps.s1.count}}"}},
+        ],
+        grants=["customer.customer.list", "task.task.create"],
+    )
+    deliver()
+    assert Task.objects.get().title == "There are 3"
+
+
 def test_a_condition_that_does_not_hold_ends_the_run_without_error():
     make_flow(
         steps=[

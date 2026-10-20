@@ -45,6 +45,15 @@ def test_the_catalog_lists_the_events_of_the_active_apps_but_its_own():
     assert (created.app, created.app_name) == ("customer", "Customers")
 
 
+def test_an_event_an_app_lists_in_another_apps_name_stays_out_of_the_catalog(monkeypatch):
+    from apps.customer import events as customer_events
+
+    monkeypatch.setattr(customer_events, "ALL", [*customer_events.ALL, "ghost.thing.happened"])
+    names = {event.name for event in run("flow.catalog.read").events}
+    assert "customer.customer.created" in names
+    assert "ghost.thing.happened" not in names
+
+
 def test_the_catalog_names_the_apps_in_the_callers_language():
     with translation.override("es"):
         catalog = run("flow.catalog.read", ctx=ctx_for(language="es"))
