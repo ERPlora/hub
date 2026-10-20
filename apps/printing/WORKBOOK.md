@@ -160,8 +160,8 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F07 | Imprimir el tique al cobrar | común | parcial: falta que Ventas lo pida |
 | PRINTING-F08 | Reimprimir un tique o una factura | común | parcial: falta que Ventas y Facturación lo pidan |
 | PRINTING-F09 | Imprimir la cuenta de la mesa | restaurante | parcial: falta que Ventas lo pida |
-| PRINTING-F10 | Imprimir la comanda en cocina y barra | restaurante | no hecho: Cocina no existe |
-| PRINTING-F11 | Reimprimir una comanda | restaurante | no hecho: Cocina no existe |
+| PRINTING-F10 | Imprimir la comanda en cocina y barra | restaurante | hecho |
+| PRINTING-F11 | Reimprimir una comanda | restaurante | hecho |
 | PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | parcial: falta que Inventario lo pida |
 | PRINTING-F13 | Abrir el cajón al cobrar | común | parcial: falta que Ventas lo pida |
 | PRINTING-F14 | Sacar del atasco un trabajo de impresión | común | hecho |
@@ -352,32 +352,36 @@ Implicados: SALE-F15
 
 ### PRINTING-F10 Imprimir la comanda en cocina y barra
 <!-- origen: old-hub:HUB_PERIPHERALS-F10 wf:restaurante-dia#rec_restaurante-f07 old-hub:HUB_SHELL-F72 qa:verticals/restaurant/06-service-orders-and-kitchen old:printing/workflow/cocina-y-cola.md#printing-f10 -->
-Estado: no hecho — Cocina no existe todavía en la plataforma; Impresión ya acepta la comanda
-(`kitchen_order`, función Cocina o Barra)
+Estado: hecho
 Vertical: restaurante
 Actor: empleado
 Pantalla: Vender (de Ventas)
 Pasos:
-1. El camarero dispara el pedido.
-2. Cocina pide una comanda por estación (función Cocina o Barra).
-Entra: la comanda (`kitchen_order`) con su mesa, camarero y líneas.
-Sale: un trabajo por estación.
-Si falla: la comanda no se desvía a la impresora de tiques; espera en su función.
-Implicados: PRINTING-F04
+1. En **Ventas → Vender**, con la cuenta abierta, el camarero pulsa «Enviar comanda» (o «Enviar
+   URGENTE»).
+2. Cocina abre la comanda y pide a Impresión una hoja por impresora: los platos de cada estación, por su
+   función («Cocina» o «Barra») o por la impresora concreta de la estación (KITCHEN-F08).
+3. Cada hoja entra en la cola de la impresora de su función con la mesa, el número, la ronda, el
+   camarero y sus platos; el dispositivo la saca (PRINTING-F18).
+Entra: la comanda de Cocina (mesa, camarero, ronda y platos).
+Sale: un trabajo por impresora en la cola de Impresión.
+Si falla: la comanda no se desvía a la impresora de tiques: sin impresora con su función, espera en la
+cola («En cola, sin impresora») y sale en cuanto una la tenga. El papel nunca bloquea al camarero.
+Implicados: KITCHEN-F08, KITCHEN-F18, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F11 Reimprimir una comanda
 <!-- origen: old:printing/workflow/cocina-y-cola.md#printing-f11 -->
-Estado: no hecho — llega con Cocina
+Estado: hecho
 Vertical: restaurante
-Actor: empleado
-Pantalla: Cocina
+Actor: empleado, responsable
+Pantalla: Comandas (de Cocina)
 Pasos:
-1. En **Cocina**, abre la comanda y pulsa «Reimprimir».
-2. Cocina pide a Impresión otra comanda, marcada como copia, por la impresora de su estación.
+1. En **Cocina → Comandas**, en la fila de la comanda, «⋮ → Reimprimir».
+2. Cocina pide a Impresión otra hoja por cada impresora de sus platos, marcada como copia (KITCHEN-F09).
 Entra: la comanda.
-Sale: un trabajo nuevo con otra clave.
-Si falla: como F10.
-Implicados: PRINTING-F10
+Sale: un trabajo nuevo con otra clave cada vez, en la cola de la impresora de su función.
+Si falla: como PRINTING-F10; si Impresión la rechaza, Cocina dice su motivo.
+Implicados: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Imprimir la etiqueta de un código de barras
 <!-- origen: old-hub:HUB_PERIPHERALS-F12 old:printing/workflow/documentos.md#printing-f12 -->
@@ -583,6 +587,7 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Facturación | Factura en térmica o A4 (cuando lo adopte) | `printing.job.create` |
 | Caja | Informe X y Z (cuando lo adopte) | `printing.job.create` |
 | Inventario | Etiqueta de código de barras (cuando lo adopte) | `printing.job.create` |
+| Cocina | La comanda de cada estación y su reimpresión | `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 
 ### Quién puede qué
@@ -674,13 +679,15 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 - **Caja** (`cash_register`): «Imprimir» del detalle → `cash_session_report`.
 - **Inventario** (`inventory`, INVENTORY-F25): «Imprimir código de barras» → `barcode_label` con
   `product_name`, `barcode` = SKU y `price`.
-- **Cocina** (cuando exista): `kitchen_order` por estación, `usage` `kitchen` o `bar`.
+- **Cocina** (`kitchen`): ya lo hace — `kitchen_order` por estación, `usage` `kitchen` o `bar` o la impresora
+  de la estación, en un savepoint de su transacción (KITCHEN-F08, F09).
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
   vocabulario y las comprobaciones del documento), `queries.py`, `services.py`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `templates/printing/`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (una venta real de Ventas
-  encolada por nombre).
+  encolada por nombre) y `tests/test_integration_kitchen.py` (la comanda y la reimpresión reales de
+  Cocina, por estación).
 - **`requires = []`**: Impresión no lee modelos de nadie. Quien imprime compone el documento.
 - **Modelos**: `Settings` (una fila; sin ella valen los de fábrica), `Printer` (nunca se borra: la
   cola la nombra; nombre único sin distinguir mayúsculas) y `PrintJob` (la cola: clave única
