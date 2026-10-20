@@ -139,6 +139,7 @@ export interface LineChange {
 
 export interface Order {
   id: string;
+  cart_id: string;
   order_number: string;
   status: string;
   total_amount: number;
