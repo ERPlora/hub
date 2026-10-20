@@ -7,7 +7,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import type { SettingsOut } from '../operations';
-import { click, EMPLOYEE, ionChecked, ionValue, type MountOptions, mountStaff, settle } from '../__tests__/mount-staff';
+import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountStaff, settle } from '../__tests__/mount-staff';
 import SettingsPage from './SettingsPage.vue';
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; type?: string; helperText?: string; errorText?: string; disabled?: boolean };
@@ -111,6 +111,20 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.save().disabled).toBe(false);
     await ionValue(s.field('max_daily_hours'), '12', 'ionInput');
     expect(s.save().disabled).toBe(true);
+  });
+
+  // gh:hub#2541: a read that failed never passes for the business's settings (no proposed values to save).
+  it('a read that fails says so with «Retry» instead of «Loading…», with no form; «Retry» asks again', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId('staff.settings.get'), 'boom'));
+    await flush();
+    expect(s.find('staff-settings-load-error').text()).toContain('msg boom');
+    expect(s.find('staff-settings-loading').exists()).toBe(false);
+    expect(s.find('staff-settings-form').exists()).toBe(false);
+    const streams = s.net.streams.length;
+    await click(s.find('staff-settings-retry').element);
+    await s.clock.advance(3000);
+    expect(s.net.streams.length).toBeGreaterThan(streams);
   });
 
   it('whoever may not save them is told so, and sees no form', async () => {

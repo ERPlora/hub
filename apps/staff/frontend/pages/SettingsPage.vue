@@ -3,14 +3,15 @@
 // for whoever may save them. The values come live (`staff.settings.get`: the proposed ones until the
 // business saves): a change saved elsewhere repaints every field the person has not touched, and «Save»
 // sends only the fields the person touched and changed (`staff.settings.update`), so it never undoes
-// someone else's change. The server judges the ranges: its 422 goes under each field.
+// someone else's change. The server judges the ranges: its 422 goes under each field. A read that fails
+// before any value came says so with «Retry» and shows no form: nothing unread is ever offered to save.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import PageNotices from '../components/PageNotices.vue';
+import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import type { SettingsIn, SettingsOut } from '../operations';
 import { staffTabs } from '../tabs';
 
@@ -31,10 +32,12 @@ type Form = Record<Field, string> & Record<(typeof SWITCHES)[number], boolean>;
 const session = useSession();
 const canManage = computed(() => session.can('staff.manage_settings'));
 
-const { data, status, error } = useLive('staff.settings.get', {});
+const { data, status, error, refresh } = useLive('staff.settings.get', {});
 const { run, pending, error: saveError } = useCommand('staff.settings.update');
 
 const form = ref<Form | null>(null);
+/** The read failed before any value came (not a block): there is nothing to show or save, only «Retry». */
+const loadFailed = computed(() => !form.value && status.value === 'error' && !!error.value && !blockingError(error.value));
 /** What the server has (the last result of the stream, or of a save). */
 const original = ref<Form | null>(null);
 /** The fields the person typed in or switched since the last save: only these are sent. */
@@ -133,15 +136,29 @@ async function save(): Promise<void> {
         :error="error"
       />
       <InlineFeedback
-        v-if="status === 'error' && error && error.code !== 'app_inactive' && error.code !== 'permission_denied'"
+        v-if="status === 'error' && error && !blockingError(error)"
         tone="danger"
         data-testid="staff-settings-load-error"
         :heading="$t('staff.settings.loadError')"
       >
         {{ error.message }}
+        <template
+          v-if="loadFailed"
+          #actions
+        >
+          <ion-button
+            size="small"
+            fill="outline"
+            color="danger"
+            data-testid="staff-settings-retry"
+            @click="refresh()"
+          >
+            {{ $t('staff.live.retry') }}
+          </ion-button>
+        </template>
       </InlineFeedback>
       <p
-        v-if="!form"
+        v-if="!form && !loadFailed"
         class="staff-settings__loading"
         data-testid="staff-settings-loading"
       >
@@ -149,7 +166,7 @@ async function save(): Promise<void> {
         {{ $t('staff.loading') }}
       </p>
       <form
-        v-else
+        v-else-if="form"
         class="staff-settings"
         data-testid="staff-settings-form"
         @submit.prevent="save"
