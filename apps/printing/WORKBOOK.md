@@ -237,9 +237,10 @@ Pasos:
 Entra: el nombre, la conexión, la dirección, el papel y la función.
 Sale: la impresora del negocio (avisa: `printing.printer.created`).
 Si falla: el campo marcado con el motivo: «Ya hay una impresora con ese nombre.», «Escribe una IP o un
-nombre de red válido (por ejemplo 192.168.1.100).», «El puerto va de 1 a 65535.», «Escribe la MAC
-como AA:BB:CC:DD:EE:FF.», «Escribe el nombre de la cola tal como lo da el sistema (letras, números,
-punto, guion y guion bajo).», «La impresora del sistema imprime páginas A4: dale la función Recibo.».
+nombre de red válidos (por ejemplo 192.168.1.100).», «El puerto va de 1 a 65535.», «Escribe la MAC
+como AA:BB:CC:DD:EE:FF.», «Escribe el nombre de la cola de impresión tal como lo da el sistema (sin
+espacios, barras ni #).», «La impresora del sistema imprime páginas A4: dale la función Recibo.». Sin
+nombre, «Ponle un nombre a la impresora.».
 Implicados: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Asignar qué sale por cada impresora
