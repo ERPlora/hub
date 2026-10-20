@@ -474,16 +474,18 @@ Implicados: PRINTING-F05, PRINTING-F14, PRINTING-F19
 
 ### PRINTING-F17 Imprimir el cierre de caja
 <!-- origen: old-hub:HUB_PERIPHERALS-F13 old:printing/workflow/documentos.md#printing-f17 -->
-Estado: parcial — Impresión acepta el informe (`cash_session_report`); falta que Caja lo pida al
-imprimir el informe X o Z (hoy sale por el diálogo del navegador)
+Estado: hecho
 Vertical: común
 Actor: empleado
 Pantalla: Detalle de la sesión (de Caja)
 Pasos:
 1. En el detalle de la sesión, «Imprimir».
-2. Caja pide el informe a la función Recibo.
+2. Caja pide a Impresión el informe X (sesión abierta) o Z (cerrada) para la función Recibo, y dice a qué
+   impresora fue.
+3. Sin Impresión encendida o sin una impresora de tiques activa, no se encola nada: lo imprime el diálogo
+   del dispositivo, como antes.
 Entra: el informe (sesión, cajero, fondo, cierre y movimientos).
-Sale: un trabajo en la cola de Recibo.
+Sale: un trabajo en la cola de Recibo; cada pulsación, un papel.
 Si falla: como F07.
 Implicados: CASH_REGISTER-F16
 
