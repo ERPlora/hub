@@ -83,6 +83,30 @@ describe('ItemDetailPage: the item, live', () => {
     expect(banner.text()).toContain('msg not_found');
   });
 
+  it.each(['not_found', 'permission_denied'])(
+    'a failure after a result (%s: deleted elsewhere, permission taken away) drops what was painted: no item, no action (DEMO-F03/F06)',
+    async (code) => {
+      const s = await setup();
+      await s.show(ITEM);
+      s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), code));
+      await flush();
+      expect(s.banner('demo-detail-error').text()).toContain(`msg ${code}`);
+      for (const id of ['demo-detail-status', 'demo-note', 'demo-line-form', 'demo-detail-edit', 'demo-detail-toggle', 'demo-detail-delete']) {
+        expect(s.testid(id).exists(), id).toBe(false);
+      }
+      expect(s.wrapper.findComponent(ItemLines).exists()).toBe(false);
+      expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Item');
+    },
+  );
+
+  it('says «You do not have permission» when the permission was taken away (DEMO-F06)', async () => {
+    const s = await setup();
+    await s.show(ITEM);
+    s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'permission_denied'));
+    await flush();
+    expect(s.banner('demo-detail-error').props('heading')).toBe('You do not have permission');
+  });
+
   it('says when the app is not active in this business', async () => {
     const s = await setup();
     s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'app_inactive'));

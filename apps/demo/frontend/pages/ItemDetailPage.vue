@@ -22,6 +22,14 @@ const router = useRouter();
 const session = useSession();
 const canManage = computed(() => session.can('demo.manage'));
 const { data: item, status, error } = useLive('demo.item.detail', () => ({ id: props.id }));
+// A failed query means the painted item is gone for this person (deleted elsewhere, permission taken
+// away, app turned off): it is no longer shown, nor are its actions; only why.
+const shown = computed(() => (status.value === 'error' ? undefined : item.value));
+const ERROR_HEADINGS: Record<string, string> = {
+  app_inactive: 'demo.live.appInactive',
+  permission_denied: 'demo.form.noPermission',
+};
+const errorHeading = computed(() => ERROR_HEADINGS[error.value?.code ?? ''] ?? 'demo.detail.loadError');
 
 // ── Note: local state, never overwritten while it is being written ─────────────────────────────
 const note = ref('');
@@ -119,12 +127,12 @@ async function onDeleteDismissed(event: CustomEvent<{ role?: string }>): Promise
 
 <template>
   <AppPage
-    :title="item?.name ?? $t('demo.detail.title')"
+    :title="shown?.name ?? $t('demo.detail.title')"
     back-href="/demo/items"
     content-layout="detail"
   >
     <template
-      v-if="canManage && item"
+      v-if="canManage && shown"
       #actions
     >
       <ion-button
@@ -138,7 +146,7 @@ async function onDeleteDismissed(event: CustomEvent<{ role?: string }>): Promise
         :disabled="updating"
         @click="toggleDone"
       >
-        {{ item.status === 'done' ? $t('demo.detail.reopen') : $t('demo.detail.markDone') }}
+        {{ shown.status === 'done' ? $t('demo.detail.reopen') : $t('demo.detail.markDone') }}
       </ion-button>
       <ion-button
         color="danger"
@@ -160,7 +168,7 @@ async function onDeleteDismissed(event: CustomEvent<{ role?: string }>): Promise
       v-if="status === 'error'"
       tone="warning"
       data-testid="demo-detail-error"
-      :heading="error?.code === 'app_inactive' ? $t('demo.live.appInactive') : $t('demo.detail.loadError')"
+      :heading="$t(errorHeading)"
     >
       {{ error?.message }}
     </InlineFeedback>
@@ -171,12 +179,12 @@ async function onDeleteDismissed(event: CustomEvent<{ role?: string }>): Promise
       <ion-spinner data-testid="demo-detail-loading" />
     </div>
 
-    <template v-if="item">
+    <template v-if="shown">
       <ion-badge
         data-testid="demo-detail-status"
-        :color="item.status === 'done' ? 'success' : 'primary'"
+        :color="shown.status === 'done' ? 'success' : 'primary'"
       >
-        {{ item.status === 'done' ? $t('demo.status.done') : $t('demo.status.open') }}
+        {{ shown.status === 'done' ? $t('demo.status.done') : $t('demo.status.open') }}
       </ion-badge>
 
       <section class="demo-section">
@@ -219,7 +227,7 @@ async function onDeleteDismissed(event: CustomEvent<{ role?: string }>): Promise
       </section>
 
       <h2>{{ $t('demo.detail.lines') }}</h2>
-      <ItemLines :lines="item.lines" />
+      <ItemLines :lines="shown.lines" />
       <form
         v-if="canManage"
         class="demo-line-form"
