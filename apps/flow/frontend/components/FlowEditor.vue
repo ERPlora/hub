@@ -48,6 +48,8 @@ const props = defineProps<{
   initial: FlowDocument;
   draft: DraftOut | null;
   tab: string;
+  /** Opened right after it was created: it starts saying «Saved.». */
+  savedNow?: boolean;
 }>();
 const emit = defineEmits<{ saved: [flow: FlowOut]; back: []; dirty: [dirty: boolean] }>();
 
@@ -89,7 +91,7 @@ const openStep = ref<string | null>(null);
 const errors = ref<Record<string, string>>({});
 /** The refusal or failure said above the tab. */
 const problem = ref('');
-const notice = ref('');
+const notice = ref(props.savedNow ? phrasing.value.t('flow.editor.saved') : '');
 
 // ── The last real event, for the picker and «Only when…» ──
 const sample = shallowRef<Record<string, unknown> | null>(null);

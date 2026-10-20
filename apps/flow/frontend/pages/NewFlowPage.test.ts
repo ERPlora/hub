@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DraftOut, FlowOut } from '../operations';
 import { mountFlow, page, settle } from '../__tests__/mount-flow';
 import FlowEditor from '../components/FlowEditor.vue';
+import { takeSaved } from '../lib/justSaved';
 import NewFlowPage from './NewFlowPage.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -63,5 +64,6 @@ describe('NewFlowPage', () => {
     m.wrapper.findComponent(FlowEditor).vm.$emit('saved', { id: 'f9' } as FlowOut);
     await settle();
     expect(m.router.currentRoute.value.fullPath).toBe('/flow/automations/f9');
+    expect(takeSaved('f9')).toBe(true);
   });
 });

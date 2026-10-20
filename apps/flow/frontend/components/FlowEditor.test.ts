@@ -85,6 +85,11 @@ describe('FlowEditor: a new automation', () => {
     expect(s.find('flow-editor-run').exists()).toBe(false);
   });
 
+  it('opened right after being created, it says «Saved.» (FLOW-F09)', async () => {
+    const s = await setup({ flow: FLOW, initial: fromFlow(FLOW), savedNow: true });
+    expect(s.find('flow-editor-notice').text()).toBe('Saved.');
+  });
+
   it('«Save» says its word, never an empty button (flows#144)', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     expect(s.find('flow-editor-save').text()).toBe('Save');
