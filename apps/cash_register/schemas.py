@@ -365,6 +365,20 @@ class AutoCloseOut(Schema):
     )
 
 
+class SessionPrintOut(Schema):
+    report: Literal["x", "z"] = Field(
+        description="Which report: x (partial, the session is open) or z (the closing, the session is closed)."
+    )
+    queued: bool = Field(
+        description="It went to the receipt printer's queue. False = Printing is not on in this business: the "
+        "screen prints it through the browser."
+    )
+    job_id: UUID | None = Field(description="Its print job, when queued.")
+    printer: str | None = Field(
+        description="The printer that will print it; none = the first device with a receipt printer."
+    )
+
+
 # ── Movements ─────────────────────────────────────────────────────────────────────────────────────
 
 

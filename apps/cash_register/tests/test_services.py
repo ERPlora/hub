@@ -419,6 +419,21 @@ def test_with_the_auto_close_off_nothing_closes():
     assert Session.objects.get().status == "open"
 
 
+def test_the_auto_close_says_a_session_closed_once_and_nothing_when_nothing_was_due():
+    # cash_register#145, hub#2612: the task runs every 5 minutes and used to announce «drawer closed» on
+    # every pass. Only a pass that closes a session says so, once per session.
+    settings(auto_close_enabled=True, auto_close_time="04:00")
+    assert run("cash_register.session.auto_close").closed == []
+    assert events("cash_register.session.closed") == []
+    session = open_session()
+    _opened_days_ago(session, 2)
+    assert len(run("cash_register.session.auto_close").closed) == 1
+    assert run("cash_register.session.auto_close").closed == []
+    assert [event["session_id"] for event in events("cash_register.session.closed")] == [
+        str(session.id)
+    ]
+
+
 def test_a_session_open_since_before_the_cut_off_closes_by_itself_at_the_cut_off():
     session = open_session(10000)
     _opened_days_ago(session, 2)

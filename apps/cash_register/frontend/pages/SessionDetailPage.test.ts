@@ -1,8 +1,8 @@
 // Cash register → the detail of a session (CASH_REGISTER-F11, F16; the old `erp-cashregister-session-
 // detail`): «Session detail · S-…» with Back, the summary, the session's movements and counts, and
-// «Print» (the X or Z report through the browser). A session that does not exist says so; a failed read
-// offers to retry. Everything re-runs by itself.
-import { AppPage } from '@erplora/ui/shell';
+// «Print» (the X or Z report to the receipt printer's queue, or through the browser when Printing is not
+// on). A session that does not exist says so; a failed read offers to retry. Everything re-runs by itself.
+import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, flush, mountCash } from '../__tests__/mount-cash-register';
@@ -16,7 +16,19 @@ import SessionDetailPage from './SessionDetailPage.vue';
 
 const OP = 'cash_register.session.get';
 
-afterEach(() => vi.restoreAllMocks());
+vi.mock('@erplora/ui/shell', async (importOriginal) => ({
+  ...((await importOriginal()) as object),
+  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(() => Promise.resolve()),
+}));
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.mocked(toastSuccess).mockClear();
+  vi.mocked(toastError).mockClear();
+});
+
+const QUEUED = { report: 'z', queued: true, job_id: 'j1', printer: 'Counter' };
+const BROWSER = { report: 'z', queued: false, job_id: null, printer: null };
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountCash(SessionDetailPage, { path: '/cash_register/sessions/s1', props: { id: 's1' }, locale });
@@ -44,13 +56,63 @@ describe('SessionDetailPage', () => {
     expect(m.wrapper.findComponent(ClosingReport).props('session')).toEqual(SESSION);
   });
 
-  it('«Print» prints the report alone; a print the browser refuses is said', async () => {
+  it('«Print» sends the report to the receipt printer and says where (CASH_REGISTER-F16)', async () => {
     const m = await setup();
     await m.result(OP, SESSION);
     const printed = vi.spyOn(print, 'printPaper').mockImplementation(() => {});
+    m.answer(200, QUEUED);
+    await click(m.find('cash-register-detail-print').element);
+    expect(m.sent()).toEqual([{ method: 'POST', path: '/api/cash_register/sessions/print', query: {}, body: { session_id: 's1' } }]);
+    expect(vi.mocked(toastSuccess)).toHaveBeenCalledWith('Report sent to the printer Counter.');
+    expect(printed).not.toHaveBeenCalled();
+  });
+
+  it('with no printer chosen it goes to the first receipt printer', async () => {
+    const m = await setup();
+    await m.result(OP, SESSION);
+    m.answer(200, { ...QUEUED, printer: null });
+    await click(m.find('cash-register-detail-print').element);
+    expect(vi.mocked(toastSuccess)).toHaveBeenCalledWith('Report sent to the receipt printer.');
+  });
+
+  it('without Printing on in the business the browser prints the report alone', async () => {
+    const m = await setup();
+    await m.result(OP, SESSION);
+    const printed = vi.spyOn(print, 'printPaper').mockImplementation(() => {});
+    m.answer(200, BROWSER);
     await click(m.find('cash-register-detail-print').element);
     expect(printed).toHaveBeenCalledOnce();
     expect((printed.mock.calls[0][0] as HTMLElement).dataset.testid).toBe('cash-register-report');
+    expect(vi.mocked(toastSuccess)).not.toHaveBeenCalled();
+  });
+
+  it('a refusal says «Could not print» with the server\'s words, and nothing prints', async () => {
+    const m = await setup();
+    await m.result(OP, SESSION);
+    const printed = vi.spyOn(print, 'printPaper').mockImplementation(() => {});
+    m.answer(409, { error: { code: 'printing.no_printer', message: 'There is no receipt printer.' } });
+    await click(m.find('cash-register-detail-print').element);
+    expect(vi.mocked(toastError)).toHaveBeenCalledWith('Could not print. There is no receipt printer.');
+    expect(printed).not.toHaveBeenCalled();
+  });
+
+  it('a print the browser refuses is said', async () => {
+    const m = await setup();
+    await m.result(OP, SESSION);
+    vi.spyOn(print, 'printPaper').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    m.answer(200, BROWSER);
+    await click(m.find('cash-register-detail-print').element);
+    expect(vi.mocked(toastError)).toHaveBeenCalledWith('Could not print.');
+  });
+
+  it('a blind count hides «Print» on an open session from whoever may not see the expected', async () => {
+    const m = await setup();
+    await m.result(OP, { ...SESSION, status: 'open', expected_hidden: true });
+    expect(m.find('cash-register-detail-print').exists()).toBe(false);
+    await m.result(OP, { ...SESSION, status: 'open', expected_hidden: false }, {}, 2);
+    expect(m.find('cash-register-detail-print').exists()).toBe(true);
   });
 
   it('the paper says the time it was printed, not the time the page opened', async () => {
@@ -64,6 +126,7 @@ describe('SessionDetailPage', () => {
       vi.spyOn(print, 'printPaper').mockImplementation((paper) => {
         printed = paper.textContent ?? '';
       });
+      m.answer(200, BROWSER);
       await click(m.find('cash-register-detail-print').element);
       expect(printed).toMatch(/9:45\s?PM/);
     } finally {

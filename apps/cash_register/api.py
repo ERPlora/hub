@@ -90,6 +90,11 @@ async def session_auto_close(request):
     return await run_operation(request, services.auto_close)
 
 
+@bind(router, "cash_register.session.print", "/cash_register/sessions/print")
+async def session_print(request, data: SessionGetIn):
+    return await run_operation(request, services.print_session, data)
+
+
 # Movements and counts
 
 

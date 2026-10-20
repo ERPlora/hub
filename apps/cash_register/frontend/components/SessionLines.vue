@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The lines of a session (CASH_REGISTER-F11; the old detail's «Movements» table) — or, over another query,
 // the lines that fell in no session (F17) — in a server-side DataTable, newest first, 50 a page, table or
-// cards (titled by their date and time): When, Type, Amount with its sign, Method and Concept. The sale
+// cards (titled by their date and time): When, Type, Amount with its sign, Method and Concept (the document
+// a sale line is: none of the columns drops in a narrow box, which turns the list to cards). The sale
 // lines are Sales' own, read by the server; they re-run by themselves on a sale, a movement or a close.
 import { type DataTableColumn, DataTable, EmptyState, formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
@@ -46,7 +47,7 @@ const columns = computed<DataTableColumn<MovementRow>[]>(() => [
     format: (_, row) => formatSignedMoney(row.signed_amount, locale.value),
   },
   { key: 'method_type', label: t('cash_register.lines.columns.method'), sortable: true, format: (_, row) => methodOf(row, t) },
-  { key: 'description', label: t('cash_register.lines.columns.concept'), priority: 'low', format: (_, row) => conceptOf(row, t) },
+  { key: 'description', label: t('cash_register.lines.columns.concept'), format: (_, row) => conceptOf(row, t) },
 ]);
 </script>
 

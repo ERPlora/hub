@@ -19,11 +19,24 @@ Al registrarlos, cambiar `frontend/pages/SessionsPage.vue` (acciones), `frontend
 - **Qué**: un formateador de dinero (`formatMoney(cents, locale, currency)`, con signo explícito para
   las diferencias) y un lector de importes tecleados («150,50», «1.250,50», «1.250» ambiguo) con su motivo
   de rechazo, los dos en la moneda del negocio.
-- **Hoy**: `frontend/lib/money.ts` (`formatMoney`, `formatSignedMoney`, `moneyFieldText`, `readMoney`,
-  `moneyRefusal`). Ventas tiene el suyo en `apps/sale/frontend/lib/format.ts`: los dos se borran cuando
+- **Hoy**: `frontend/lib/money.ts` (`formatMoney`, `formatSignedMoney`, `formatFace` —un billete o moneda
+  entera sin decimales, «500 €»—, `moneyFieldText`, `readMoney`, `moneyRefusal`). Ventas tiene el suyo en `apps/sale/frontend/lib/format.ts`: los dos se borran cuando
   llegue el compartido.
 
 ## Lista de detalle (`ok-detail-list`)
 
 - **Qué**: la lista de etiqueta/valor en dos columnas del producto actual (resumen de la sesión).
 - **Hoy**: `frontend/components/SessionSummary.vue` (un `<dl>` en rejilla de dos columnas).
+
+## Lista de barras (`ok-bar-list`)
+
+- **Qué**: la lista de barras horizontales con su etiqueta y su valor del panel «Sesiones recientes» del
+  producto actual, con color por signo (falta en rojo, sobra en verde).
+- **Hoy**: `frontend/components/CashFigures.vue` («Descuadres recientes»: las barras con su propio CSS, ancho
+  proporcional al mayor descuadre de las ocho).
+
+## Ventana de solo lectura (`FormModal` sin envío)
+
+- **Qué**: una ventana que solo enseña una lista, con un único botón para cerrarla.
+- **Hoy**: `frontend/components/UnassignedModal.vue` («Cobros fuera de turno») usa `FormModal`, que pinta
+  «Cancelar» y «Cerrar», los dos con el mismo efecto.
