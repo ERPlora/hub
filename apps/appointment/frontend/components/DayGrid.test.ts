@@ -101,6 +101,19 @@ describe('DayGrid', () => {
     expect(s.wrapper.findAll('[data-testid="appointment-grid-block"]')).toHaveLength(3);
   });
 
+  // outfitkit#71 · appointments#77: two appointments of the same professional at once share the row side by
+  // side (a track each, as Google Calendar), never one on top of the other; one that follows takes the row back.
+  it('appointments at the same time share the row, each in its own track', async () => {
+    const s = await setup([row('a1', 's1', '10:00', 60), row('a2', 's1', '10:30', 30), row('a3', 's1', '11:00', 30)]);
+    const box = (id: string) => {
+      const style = s.block(id).attributes('style') ?? '';
+      return { top: Number(/top: ([\d.]+)px/.exec(style)?.[1]), height: Number(/height: ([\d.]+)px/.exec(style)?.[1]) };
+    };
+    const [first, second, third] = [box('a1'), box('a2'), box('a3')];
+    expect(second.top).toBeGreaterThanOrEqual(first.top + first.height);
+    expect(third.top).toBe(first.top);
+  });
+
   it('tapping a free slot books there; on a row that takes no bookings, only the time', async () => {
     const s = await setup([row('a1', 's3', '10:00')]);
     await click(s.wrapper.find('[data-testid="appointment-grid-slot"][data-lane="s2"][data-time="16:30"]').element);
