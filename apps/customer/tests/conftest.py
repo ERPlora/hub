@@ -118,12 +118,9 @@ def writes(table: str) -> Callable[[str], bool]:
     return lambda sql: sql.lstrip().startswith((f'INSERT INTO "{table}"', f'UPDATE "{table}"'))
 
 
-@contextmanager
-def card_deleted_on_screen(card, how: str, before: Callable[[str], bool]):
-    """The platform staff delete the customer ``card`` in the Hub admin, from its delete page (``page``) or
-    with the list's «Delete selected» (``list``), in another session started right before the first statement
-    of this one for which ``before`` holds; this one goes on once the deletion waits for what it holds (or
-    has ended). Yields the answers they got (a 500 is the error raised)."""
+def _card_deletion(card, how: str, also=()):
+    """The platform staff's «Delete» of the customer ``card`` in the Hub admin, from its delete page (``page``) or
+    with the list's «Delete selected» (``list``, with the cards ``also``); calling it returns their answer."""
     staff = get_user_model().objects.create_superuser(
         username="card-deleter", password="pw", email="card-deleter@example.com"
     )
@@ -134,16 +131,29 @@ def card_deleted_on_screen(card, how: str, before: Callable[[str], bool]):
     else:
         url, data = "/admin/customer/customer/", {
             "action": "delete_selected",
-            "_selected_action": [str(card.pk)],
+            "_selected_action": [str(row.pk) for row in (card, *also)],
             "post": "yes",
         }
+    return lambda: client.post(url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en")
+
+
+def delete_card(card, how: str):
+    """The platform staff delete the customer ``card`` in the Hub admin (see ``_card_deletion``); their answer."""
+    return _card_deletion(card, how)()
+
+
+@contextmanager
+def card_deleted_on_screen(card, how: str, before: Callable[[str], bool], also=()):
+    """The platform staff delete the customer ``card`` in the Hub admin (see ``_card_deletion``) in another
+    session started right before the first statement of this one for which ``before`` holds; this one goes on
+    once the deletion waits for what it holds (or has ended). Yields the answers they got (a 500 is the error
+    raised)."""
+    delete = _card_deletion(card, how, also)
     answers: list = []
 
     def deletion():
         try:
-            answers.append(
-                client.post(url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en")
-            )
+            answers.append(delete())
         except Exception as error:  # a 500, reported to the test
             answers.append(error)
         finally:

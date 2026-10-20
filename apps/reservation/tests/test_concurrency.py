@@ -11,12 +11,10 @@ import pytest
 from django.db import connection
 from live.errors import OperationError
 
-from django.contrib.auth import get_user_model
-from django.test import Client
 from live.context import system_context
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
+from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, delete_card, reads, writes
 from apps.reservation.models import Reservation, WaitlistEntry
 
 from .conftest import (
@@ -241,14 +239,7 @@ def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_reservations_to_
 @pytest.mark.parametrize("how", HOW)
 def test_a_merge_into_a_card_the_hub_admin_deleted_moves_no_reservation(how):
     ana, booked, entry, marta, move = _merged_into_marta()
-    staff = get_user_model().objects.create_superuser(username="root", password="pw", email="root@example.com")
-    client = Client()
-    client.force_login(staff)
-    if how == "page":
-        url, data = f"/admin/customer/customer/{marta.pk}/delete/", {"post": "yes"}
-    else:
-        url, data = "/admin/customer/customer/", {"action": "delete_selected", "_selected_action": [str(marta.pk)], "post": "yes"}
-    assert client.post(url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en").status_code == 302
+    assert delete_card(marta, how).status_code == 302
     assert move().changed == 0
     booked.refresh_from_db()
     entry.refresh_from_db()
