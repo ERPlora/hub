@@ -429,6 +429,9 @@ def test_a_reaction_that_fails_is_retried_with_a_growing_wait_then_given_up_and_
         worker_loop(at=moment)
         broken.refresh_from_db()
         assert broken.attempts == attempt
+        if attempt < relay.MAX_ATTEMPTS:
+            # The wait grows with the attempts of this delivery: 4 s after the second, 8 s after the third…
+            assert broken.next_attempt_at == moment + relay.backoff(attempt)
     assert broken.status == "dead"
     worker_loop(at=moment + dt.timedelta(days=1))
     broken.refresh_from_db()
