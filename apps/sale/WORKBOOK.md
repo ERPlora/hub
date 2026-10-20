@@ -1637,6 +1637,8 @@ administrador y responsable, los mismos que anulan y devuelven).
 - No mueve stock ni cuadra la caja: Inventario al oír la venta; Caja lee las ventas de cada turno.
 - No habla con el datáfono ni con la báscula.
 - No tiene propinas, ni comensal por línea, ni cursos con retención.
+- No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV deja de ofrecer lo
+  que el catálogo no tiene a la venta.
 - No reabre una venta cobrada ni cambia su tipo de documento.
 - No reprecia una cuenta abierta: si el catálogo cambia, la cuenta conserva el precio con que se
   pidió.
