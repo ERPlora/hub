@@ -360,6 +360,18 @@ def test_the_system_printer_tests_with_an_a4_page():
     assert "Office" in queued.html and "<script" not in queued.html
 
 
+def test_the_a4_test_page_is_signed_by_the_business_in_the_callers_language():
+    """hub#1735, hub#1803: never «ERPlora Bridge», a product that is gone; the business's name once invoicing
+    knows it (ERPlora until then), in the language of whoever tests."""
+    printer("Office", kind="system", address="")
+    unnamed = PrintJob.objects.get(pk=run("printing.printer.test", {"printer": "Office"}).id).html
+    assert "<h1>ERPlora</h1>" in unnamed and "Bridge" not in unnamed
+    run("invoice.issuer.update", {"legal_name": "Salón Ana SL", "tax_id": "B12345674", "address": "Calle Mayor 1"})
+    out = run("printing.printer.test", {"printer": "Office"}, ctx_for(language="es"))
+    named = PrintJob.objects.get(pk=out.id).html
+    assert "<h1>Salón Ana SL</h1>" in named and '<html lang="es">' in named and "Impresora OK" in named
+
+
 def test_an_inactive_printer_is_not_tested():
     printer("Till", is_active=False)
     with pytest.raises(Conflict) as refused:
