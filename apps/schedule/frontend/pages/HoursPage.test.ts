@@ -88,6 +88,13 @@ describe('HoursPage', () => {
     expect(s.prop('addable')).toBe(false);
   });
 
+  it('keeps the old toolbar: «Columns» beside the table/cards switch (SCHEDULE-F01, reference shot)', async () => {
+    const s = await setup();
+    await s.show(WEEK);
+    expect(s.prop('columnPicker')).toBe(true);
+    expect(s.prop('views')).toEqual(['table', 'cards']);
+  });
+
   it('the rows come in the order the server gives (the week starts on Sunday)', async () => {
     const s = await setup();
     await s.show({ ...WEEK, week_starts_on: 7, days: [WEEK.days[6], ...WEEK.days.slice(0, 6)] });
@@ -151,6 +158,16 @@ describe('HoursPage', () => {
     await flush();
     expect(off.wrapper.findComponent(DataTable as unknown as Component).exists()).toBe(false);
     expect(off.wrapper.findAllComponents(InlineFeedback).map((b) => b.attributes('data-testid'))).toContain('schedule-hours-inactive');
+  });
+
+  it('a table that does not load names what failed, then the cause, never the generic text (pm#610)', async () => {
+    const s = await setup({ locale: 'es' });
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
+    await flush();
+    const box = s.wrapper.find('.data-table__error');
+    expect(box.find('.data-table__error-title').text()).toBe('No se ha podido cargar el horario.');
+    expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
+    expect(box.text()).not.toContain('No se han podido cargar los datos');
   });
 
   it('speaks Spanish with the old words', async () => {

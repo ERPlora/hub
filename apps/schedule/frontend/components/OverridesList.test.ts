@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { OverrideOut } from '../operations';
-import { EMPLOYEE, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
+import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
 import OverrideFormModal from './OverrideFormModal.vue';
 import OverridesList from './OverridesList.vue';
 
@@ -158,6 +158,16 @@ describe('OverridesList', () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page(ROWS));
     expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);
+  });
+
+  it('a list that does not load names itself, then the cause, never the generic text (pm#610)', async () => {
+    const s = await setup({ locale: 'es' });
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
+    await flush();
+    const box = s.wrapper.find('.data-table__error');
+    expect(box.find('.data-table__error-title').text()).toBe('No se han podido cargar los cambios temporales.');
+    expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
+    expect(box.text()).not.toContain('No se han podido cargar los datos');
   });
 
   it('speaks Spanish', async () => {

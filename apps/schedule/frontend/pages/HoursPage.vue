@@ -112,7 +112,6 @@ async function confirmWeek(): Promise<void> {
       :rows="week?.days ?? []"
       :page-size="7"
       :page-size-options="[]"
-      :column-picker="false"
       :views="['table', 'cards']"
       :card-title="(row: WeekDayOut) => dayName(row.weekday)"
       :card-icon="() => 'time-outline'"

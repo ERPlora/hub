@@ -202,6 +202,16 @@ describe('SpecialDaysList', () => {
     expect(s.prop('error')).toBe('msg boom');
   });
 
+  it('a list that does not load names itself, then the cause, never the generic text (pm#610)', async () => {
+    const s = await setup({ locale: 'es' });
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
+    await flush();
+    const box = s.wrapper.find('.data-table__error');
+    expect(box.find('.data-table__error-title').text()).toBe('No se han podido cargar los días especiales.');
+    expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
+    expect(box.text()).not.toContain('No se han podido cargar los datos');
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
