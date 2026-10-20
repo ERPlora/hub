@@ -171,8 +171,37 @@ def test_the_failed_comparisons_are_named():
     ]
 
 
+def test_a_comparison_can_read_another_datum():
+    # hub#1712: «only if the total is what the event brought» — the value is a path or a template, read
+    # like any other value; a datum that is not there never matches.
+    data = {
+        "input": {"total": 12500, "paid": 12500, "name": "Ana", "greeting": "Hola Ana"},
+        "steps": {"s1": {"total": 9000}},
+    }
+    assert doc.holds({"input.total": {"eq": "input.paid"}}, data) is True
+    assert doc.holds({"input.total": {"gt": "steps.s1.total"}}, data) is True
+    assert doc.holds({"input.greeting": {"eq": "Hola {{input.name}}"}}, data) is True
+    assert doc.holds({"input.total": {"in": ["steps.s1.total", "input.paid"]}}, data) is True
+    assert doc.failed_clauses({"input.total": {"lt": "steps.s1.total"}}, data) == [
+        {"path": "input.total", "op": "lt", "value": "steps.s1.total"}
+    ]
+    assert doc.holds({"input.total": {"eq": "input.missing"}}, data) is False
+    assert doc.holds({"input.total": {"neq": "input.missing"}}, data) is False
+
+
 def test_an_empty_condition_always_holds():
     assert doc.holds({}, DATA) is True
+
+
+def test_a_condition_is_readable_only_with_paths_to_known_comparisons():
+    # hub#1766: what the engine cannot read is said, never evaluated as «does not hold».
+    assert doc.readable({}) is True
+    assert doc.readable({"input.total": {"gt": 100, "lte": 500}}) is True
+    assert doc.readable({"input.total": {"bigger": 100}}) is False
+    assert doc.readable({"total": {"gt": 100}}) is False
+    assert doc.readable({"input.total": {}}) is False
+    assert doc.readable({"input.total": 100}) is False
+    assert doc.readable(["input.total"]) is False
 
 
 def test_number_reads_numbers_and_numeric_text_but_not_booleans():

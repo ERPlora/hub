@@ -13,6 +13,7 @@ import { useRoute, useRouter } from 'vue-router';
 import FlowEditor from '../components/FlowEditor.vue';
 import { useLeaveGuard } from '../composables/useLeaveGuard';
 import { emptyDocument, type FlowDocument } from '../lib/document';
+import { markSaved } from '../lib/justSaved';
 import type { DraftOut, FlowOut } from '../operations';
 
 const route = useRoute();
@@ -42,6 +43,7 @@ useLeaveGuard(dirty);
 
 function onSaved(flow: FlowOut): void {
   dirty.value = false;
+  markSaved(flow.id);
   void router.replace(`/flow/automations/${flow.id}`);
 }
 </script>

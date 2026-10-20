@@ -11,6 +11,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import { cleanTrigger, type FlowDocument } from '../lib/document';
 import { actionLabel, describeClause, describeDuration, describeStep, eventLabel, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, TestOut, TestStepOut } from '../operations';
@@ -86,7 +87,7 @@ const names = (fields: readonly string[]): string => fields.map((field) => field
       tone="danger"
       data-testid="flow-test-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.read')) }}
     </InlineFeedback>
     <template v-if="result">
       <p

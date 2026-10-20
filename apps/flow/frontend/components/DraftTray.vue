@@ -7,15 +7,29 @@ import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, shallowRef } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useT } from '../composables/useT';
+import { wording } from '../lib/refusal';
 
 const t = useT();
 const router = useRouter();
+const emit = defineEmits<{ ready: [] }>();
 const drafts = useLive('flow.draft.list', {});
 const rows = computed(() => drafts.data.value?.rows ?? []);
+// Its first answer (or failure) is painted: the page opens a linked card of the gallery below only then.
+let told = false;
+watch(
+  () => drafts.data.value ?? drafts.error.value,
+  (answer) => {
+    if (answer && !told) {
+      told = true;
+      emit('ready');
+    }
+  },
+  { immediate: true },
+);
 const dismiss = useCommand('flow.draft.dismiss');
 const error = shallowRef<ApiError | null>(null);
 
@@ -47,7 +61,7 @@ async function discard(id: string): Promise<void> {
       tone="danger"
       data-testid="flow-drafts-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.action')) }}
     </InlineFeedback>
     <div
       v-for="draft in rows"

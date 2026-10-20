@@ -7,7 +7,7 @@
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type { CatalogOut, ClauseOut, LogEntry, RunStatus, Step, Trigger } from '../operations';
-import { delayParts } from './document';
+import { delayParts, isPath } from './document';
 
 /** The translator the phrasing needs: `t` and `te` of the app, and its language. */
 export interface Phrasing {
@@ -120,7 +120,10 @@ export function describeClause(clause: Pick<ClauseOut, 'path' | 'op' | 'value'>,
   const what = pathLabel(clause.path, steps, catalog, p);
   const op = p.t(`flow.steps.operators.${clause.op}`);
   if (clause.op === 'exists') return `${what} ${op}: ${valueText(clause.value, p)}`;
-  return `${what} ${op} ${valueText(clause.value, p)}`;
+  // Another datum is named in words, never by its path (hub#1712).
+  const named = (value: unknown): unknown => (isPath(value) ? pathLabel(String(value), steps, catalog, p) : value);
+  const value = Array.isArray(clause.value) ? clause.value.map(named) : named(clause.value);
+  return `${what} ${op} ${valueText(value, p)}`;
 }
 
 /** What a step does, in one line (the card's title). */

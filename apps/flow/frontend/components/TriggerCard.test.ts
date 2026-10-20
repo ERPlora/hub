@@ -38,13 +38,22 @@ describe('TriggerCard', () => {
     const s = await setup({ kind: 'event', event: '' });
     const combo = s.wrapper.findComponent(Combo);
     expect(combo.props('options')).toEqual([
-      { id: 'customer.group.deleted', label: 'Customers: group deleted', hint: 'Customers · customer.group.deleted' },
+      { id: 'customer.group.deleted', label: 'a customer group is deleted', hint: 'Customers · customer.group.deleted' },
       { id: 'sale.sale.completed', label: 'a sale is charged', hint: 'Sales · sale.sale.completed' },
     ]);
     combo.vm.$emit('update:modelValue', { id: 'sale.sale.completed', label: 'a sale is charged' });
     expect(s.emitted()).toEqual([{ kind: 'event', event: 'sale.sale.completed' }]);
     s.wrapper.findComponent(ConditionRows).vm.$emit('update:modelValue', { 'input.total': { gt: 10000 } });
     expect(s.emitted().at(-1)).toEqual({ kind: 'event', event: '', filter: { 'input.total': { gt: 10000 } } });
+  });
+
+  it('«Something happens» says it does not start on its own yet (FLOW-F21, phase 2); a schedule does not', async () => {
+    const s = await setup({ kind: 'event', event: 'sale.sale.completed' });
+    expect(s.find('flow-trigger-event-notice').text()).toBe(
+      'For now it does not start on its own when this happens: run it with «Run now». A schedule or a date does start on its own.',
+    );
+    const clock = await setup({ kind: 'schedule', every: 'day', time: '09:00' });
+    expect(clock.find('flow-trigger-event-notice').exists()).toBe(false);
   });
 
   it('a schedule: how often, which day and what time', async () => {

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FlowOut } from '../operations';
 import { errorFrame, mountFlow, settle } from '../__tests__/mount-flow';
 import FlowEditor from '../components/FlowEditor.vue';
+import { markSaved } from '../lib/justSaved';
 import FlowEditorPage from './FlowEditorPage.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -31,6 +32,16 @@ describe('FlowEditorPage', () => {
     expect(editor.props()).toMatchObject({ flow: FLOW, tab: 'permissions', draft: null });
     expect(editor.props('initial')).toEqual({ name: 'Big sale', enabled: false, trigger: { kind: 'manual' }, steps: [] });
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Big sale');
+  });
+
+  it('just created, it opens saying «Saved.», once (FLOW-F09)', async () => {
+    markSaved('f1');
+    const s = await setup();
+    await s.result('flow.flow.detail', FLOW);
+    expect(s.wrapper.findComponent(FlowEditor).props('savedNow')).toBe(true);
+    const again = await setup();
+    await again.result('flow.flow.detail', FLOW);
+    expect(again.wrapper.findComponent(FlowEditor).props('savedNow')).toBe(false);
   });
 
   it('one that does not exist says so', async () => {

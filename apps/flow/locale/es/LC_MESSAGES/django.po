@@ -18,11 +18,11 @@ msgstr ""
 msgid "Automations"
 msgstr "Automatizaciones"
 
-msgid "Rules that run on their own: when something happens in your business, do something else."
-msgstr "Reglas que se cumplen solas: cuando pasa algo en tu negocio, haz otra cosa."
+msgid "Rules that run on their own, on a schedule or when you run them: the repetitive work, done for you."
+msgstr "Reglas que se cumplen solas, con un horario o cuando las ejecutas: el trabajo repetitivo, hecho por ti."
 
-msgid "Automations runs the repetitive work for you: when a sale is charged, a customer is created or a till is closed, or every day at a time, it does what you told it, such as leaving a task or a note on a customer's card. Start from a ready-made card, allow it only what it needs, try it without effects against something that really happened, turn it on and read in plain words what it did each time. The assistant can draft one for you, and it waits for you to review it."
-msgstr "Automatizaciones hace por ti el trabajo repetitivo: cuando se cobra una venta, se crea un cliente o se cierra una caja, o cada día a una hora, hace lo que le dijiste, como dejar una tarea o una nota en la ficha de un cliente. Empieza por una tarjeta hecha, permítele solo lo que necesita, pruébala sin efectos con algo que pasó de verdad, enciéndela y lee en palabras qué hizo cada vez. El asistente puede escribirte una, y espera a que la revises."
+msgid "Automations runs the repetitive work for you: every day, week or month at a time, on a date, or when you run it, it does what you told it, such as leaving a task or a note on a customer's card. Start from a ready-made card, allow it only what it needs, try it without effects, turn it on and read in plain words what it did each time. Starting on its own when something happens in your business comes in a later version."
+msgstr "Automatizaciones hace por ti el trabajo repetitivo: cada día, semana o mes a una hora, en una fecha, o cuando la ejecutas, hace lo que le dijiste, como dejar una tarea o una nota en la ficha de un cliente. Empieza por una tarjeta hecha, permítele solo lo que necesita, pruébala sin efectos, enciéndela y lee en palabras qué hizo cada vez. Arrancar sola cuando pasa algo en tu negocio llega en una versión posterior."
 
 msgid "Something happens"
 msgstr "Pasa algo"
@@ -300,6 +300,12 @@ msgstr "La arrancó algo que hicieron sus propios pasos, así que ha parado ante
 
 msgid "A chain of %(count)s automations started it, more than the %(max)s allowed, so it stopped before doing anything."
 msgstr "La arrancó una cadena de %(count)s automatizaciones, más de las %(max)s permitidas, así que ha parado antes de hacer nada."
+
+msgid "Its «Only when…» can no longer be read, so it did not go on. Open it, check «Only when…» and save it again."
+msgstr "Ya no se puede leer su «Solo cuando…», así que no ha seguido. Ábrela, revisa «Solo cuando…» y vuelve a guardarla."
+
+msgid "This «Only continue if…» can no longer be read, so it stopped. Open the automation, check this step and save it again."
+msgstr "Ya no se puede leer este «Solo sigue si…», así que ha parado. Abre la automatización, revisa este paso y vuelve a guardarla."
 
 msgid "Cancelled: the automation was paused while it waited."
 msgstr "Cancelada: la automatización se puso en pausa mientras esperaba."

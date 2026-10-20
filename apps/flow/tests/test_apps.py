@@ -3,6 +3,7 @@ scheduled tasks and the assistant's contract of every operation (``ai`` and desc
 
 import pytest
 from django.apps import apps
+from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import registry
 
@@ -30,6 +31,7 @@ COMMANDS = {
     "flow.run.react",
     "flow.schedule.fire_due",
     "flow.run.resume_due",
+    "flow.run.prune",
 }
 # What the assistant confirms before running: turning on or off, granting, running by hand, deleting.
 HIGH_RISK = {
@@ -38,8 +40,8 @@ HIGH_RISK = {
     "flow.flow.run",
     "flow.flow.delete",
 }
-# Run only by the platform: the reaction to every event and the two scheduled tasks.
-SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due"}
+# Run only by the platform: the reaction to every event and the three scheduled tasks.
+SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due", "flow.run.prune"}
 
 
 def flow_app():
@@ -110,7 +112,7 @@ def test_navigation_is_the_one_entry_of_the_old_module():
     ]
 
 
-def test_the_two_scheduled_tasks_run_every_minute_as_the_platform():
+def test_the_scheduled_tasks_run_as_the_platform_two_every_minute_and_the_prune_every_hour():
     assert flow_app().scheduled_tasks == [
         {
             "name": "fire_due",
@@ -122,6 +124,12 @@ def test_the_two_scheduled_tasks_run_every_minute_as_the_platform():
             "name": "resume_due",
             "operation": "flow.run.resume_due",
             "cron": "* * * * *",
+            "catch_up": "collapse",
+        },
+        {
+            "name": "prune",
+            "operation": "flow.run.prune",
+            "cron": "17 * * * *",
             "catch_up": "collapse",
         },
     ]
@@ -183,3 +191,21 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
             assert op.permission == "flow.view", name
         else:
             assert op.permission == "flow.manage", name
+
+
+def test_the_store_card_promises_only_what_phase_1_does():
+    # FLOW-F21 and FLOW-F17 are partial: nothing starts an automation on an event of another app, and
+    # the Hub has no assistant. The store's card says what it does today and what comes later, like the
+    # guide and the WORKBOOK.
+    config = flow_app()
+    expected = {
+        "en": ("when something happens", "assistant", "when a sale is charged", "comes in a later version"),
+        "es": ("cuando pasa algo", "asistente", "cuando se cobra una venta", "llega en una versión posterior"),
+    }
+    for language, (happens, assistant, sale, later) in expected.items():
+        with translation.override(language):
+            summary, description = str(config.summary).lower(), str(config.description).lower()
+        assert happens not in summary, summary
+        assert assistant not in summary and assistant not in description
+        assert sale not in description, description
+        assert later in description, description
