@@ -5,7 +5,8 @@
 // they apply: «Approve» and «Reject» a pending request and «Cancel» (confirmed) a pending or approved
 // one for whoever manages time off; an employee cancels only their own pending request. «+» registers
 // anyone's (managers) or asks for one's own. «My time off» (`staff.time_off.mine`, with the reason) for
-// whoever has a linked record. Every change comes back through the stream: nothing here refetches.
+// whoever has a linked record. Above the list, «Today's time off» (the old Home panel, STAFF-G05). Every
+// change comes back through the stream: nothing here refetches.
 import {
   ConfirmDialog,
   type DataTableAction,
@@ -23,6 +24,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import AwayToday from '../components/AwayToday.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -258,6 +260,7 @@ function add(): void {
     >
       {{ pageError }}
     </InlineFeedback>
+    <AwayToday v-if="!blocked" />
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"

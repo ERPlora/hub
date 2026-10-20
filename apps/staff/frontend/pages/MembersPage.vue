@@ -4,7 +4,8 @@
 // the pay, Rate/h (`staff.member.compensation`, the same rows page by page); Phone starts hidden —, «Search
 // member…», sort by any column, the old column filters behind the table's funnel, 50 a page. «+» opens «New»; a row or «Edit»
 // opens «Edit · {name}»; «Deactivate» (confirmed) and «Terminate» (its dialog) for the owner and the
-// admin. «My record» opens one's own record. Nothing here refetches: changes come through the stream.
+// admin. «My record» opens one's own record. Above the list, the figures of the old Home panels
+// (STAFF-G02–G04). Nothing here refetches: changes come through the stream.
 import {
   ConfirmDialog,
   type DataTableAction,
@@ -24,6 +25,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import StaffFigures from '../components/StaffFigures.vue';
 import TerminateDialog from '../components/TerminateDialog.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
@@ -210,6 +212,7 @@ async function deactivate(): Promise<void> {
     >
       {{ pageError }}
     </InlineFeedback>
+    <StaffFigures v-if="!blocked" />
     <DataTable
       v-if="!blocked"
       v-model:search="table.search.value"

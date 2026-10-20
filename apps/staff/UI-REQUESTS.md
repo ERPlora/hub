@@ -34,3 +34,13 @@ en `packages/ui` (8c30c2a) y lo usan el menú (`apps/staff/apps.py`) y la barra 
 - **Y un formateador** `formatDate(iso, locale)` en `@erplora/ui/components/format` para los días de
   calendario (en UTC, sin desplazar un día), junto a `formatDateTime`; staff lo tiene en
   `frontend/lib/format.ts`.
+
+### Tarjeta de cifra (el `ok-kpi` del producto actual)
+
+- **Para qué:** las cifras de Personal (STAFF-F23: «Plantilla activa», «Ausentes hoy», «Ausencias
+  pendientes») son los paneles del Inicio viejo dentro de la app. `frontend/components/StaffFigures.vue`
+  rehace la tarjeta (etiqueta en mayúsculas sobre la cifra grande, «…» mientras llega), igual que
+  `CustomerStats.vue` de Clientes: con una compartida se borran las dos copias.
+- **API propuesta:** `KpiCard` con `label`, `value` (texto ya formateado; `undefined` = «…») y
+  `testid`, y un `KpiGroup` (rejilla, `role="group"`, `aria-busy`) que en el móvil ponga hasta tres en
+  una línea.

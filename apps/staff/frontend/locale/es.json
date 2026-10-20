@@ -300,6 +300,20 @@
     "picker": {
       "search": "Buscar…",
       "cancel": "Cancelar"
+    },
+    "figures": {
+      "label": "Cifras",
+      "active": "Plantilla activa",
+      "away": "Ausentes hoy",
+      "pending": "Ausencias pendientes",
+      "loadError": "No se pudieron cargar las cifras"
+    },
+    "awayToday": {
+      "title": "Ausencias de hoy",
+      "count": "{n} ausente | {n} ausentes",
+      "allDay": "Todo el día",
+      "empty": "Nadie falta hoy.",
+      "loadError": "No se pudo cargar quién falta hoy"
     }
   }
 }

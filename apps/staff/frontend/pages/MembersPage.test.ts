@@ -375,6 +375,23 @@ describe('MembersPage: my record (STAFF-F08)', () => {
   });
 });
 
+describe('MembersPage: the figures (STAFF-G02, G03, G04)', () => {
+  it('shows the old Home panels above the list, for everyone who reads the directory', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    expect(s.params('staff.member.stats')).toEqual([{}]);
+    const figures = s.find('staff-figures');
+    expect(figures.exists()).toBe(true);
+    expect(figures.element.compareDocumentPosition(s.table().element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('go away with the list when the app is not active here', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'app_inactive'));
+    await flush();
+    expect(s.find('staff-figures').exists()).toBe(false);
+  });
+});
+
 describe('MembersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();

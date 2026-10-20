@@ -482,9 +482,11 @@ def test_empty_stats():
 
 def test_absent_today_is_the_business_day(frozen_now):
     frozen_now(LATE_EVENING_UTC)
-    starts, ended = make_member("Ana"), make_member("Bea")
+    starts, ended, also_ended = make_member("Ana"), make_member("Bea"), make_member("Carla")
     make_time_off(starts, "2026-08-19", "2026-08-25", status=TimeOff.Status.APPROVED)
+    # Two people ended yesterday: the server's UTC date would count them (2), the business's day counts Ana.
     make_time_off(ended, "2026-08-10", "2026-08-18", status=TimeOff.Status.APPROVED)
+    make_time_off(also_ended, "2026-08-18", status=TimeOff.Status.APPROVED)
     assert run("staff.member.stats", MemberStatsIn()).absent_today == 1
 
 
