@@ -86,6 +86,24 @@ describe('SettingsCard', () => {
     expect(s.find('cash-register-settings-read-only').text()).toContain('You do not have permission');
   });
 
+  it('every switch has its name, there is no URL field and the heading speaks the page\'s language (cash_register#28)', async () => {
+    const s = await setup(true, 'es');
+    await s.result(OP, FACTORY);
+    const toggles = [...s.wrapper.element.querySelectorAll('ion-toggle')];
+    expect(toggles).toHaveLength(6);
+    expect(toggles.map((toggle) => toggle.getAttribute('aria-label'))).toEqual([
+      'Activar caja',
+      'Exigir fondo de apertura',
+      'Exigir recuento al cierre',
+      'Permitir saldo negativo',
+      'Arqueo ciego',
+      'Cierre automático diario',
+    ]);
+    expect(s.wrapper.element.querySelectorAll('ion-input')).toHaveLength(0);
+    expect(s.wrapper.text()).not.toMatch(/URL|POS/);
+    expect(s.find('cash-register-settings-heading').text()).toBe('Caja');
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup(true, 'es');
     await s.result(OP, FACTORY);
