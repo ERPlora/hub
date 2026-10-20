@@ -63,4 +63,14 @@ describe('StepOptions', () => {
     expect(set.find('flow-step-options-s2').exists()).toBe(true);
     expect(set.find('flow-step-options-toggle-s2').attributes('aria-expanded')).toBe('true');
   });
+
+  // FLOW-F27: a call can carry on when it fails, like an action.
+  it('a call can carry on with the next steps when it fails', async () => {
+    const call: Step = { id: 's3', kind: 'http', method: 'GET', url: 'https://api.example.com', headers: {}, body: '', timeout: 10 };
+    const s = await setup(call);
+    await click(s.find('flow-step-options-toggle-s3').element);
+    await ionChecked(s.find('flow-step-onerror-s3').element, true);
+    expect(s.emitted().at(-1)).toEqual({ ...call, on_error: 'continue' });
+  });
 });
+

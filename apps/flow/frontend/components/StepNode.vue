@@ -4,8 +4,9 @@
 // searchable — and fill what it asks for: the required fields always, the rest with «Add
 // information», each value composed of text and picked data. «Only continue if…» is a dashed chip
 // that narrows the line; «Wait» is a label on it. Each step has its handle (`ion-reorder`, the
-// finger's gesture) and its ×. An action, a read and a wait carry «More options» (`StepOptions`, FLOW-F25),
-// and say them under their title when closed.
+// finger's gesture) and its ×. «Call another system» is a card named by its host that opens to its form
+// (`HttpStepPanel`, FLOW-F27). An action, a read, a call and a wait carry «More options» (`StepOptions`,
+// FLOW-F25), and say them under their title when closed.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonInput, IonReorder, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -16,6 +17,7 @@ import { type DataChoice, delayParts, type DelayUnit, secondsOf } from '../lib/d
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
 import ConditionRows from './ConditionRows.vue';
+import HttpStepPanel from './HttpStepPanel.vue';
 import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
 
@@ -31,6 +33,8 @@ const props = defineProps<{
   choices: readonly DataChoice[];
   /** Opens the editor's picker for this step; the chosen path, or `null`. */
   pick: () => Promise<string | null>;
+  /** The picker of a call's values, which also offers the secrets and the call's key (FLOW-F27). */
+  pickCall?: () => Promise<string | null>;
 }>();
 const emit = defineEmits<{ 'update:step': [step: Step]; remove: []; toggle: [] }>();
 const phrasing = usePhrasing();
@@ -138,7 +142,7 @@ const summary = computed(() => {
     );
     parts.push(t('flow.steps.options.summaryRunIf', { clauses: clauses.join('; ') }));
   }
-  if ((step.kind === 'command' || step.kind === 'query') && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
+  if (step.kind !== 'delay' && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
   return parts.join(' · ');
 });
 </script>
@@ -280,6 +284,67 @@ const summary = computed(() => {
         >{{ error('when') }}</span>
       </div>
     </template>
+
+    <!-- A call to another system: a card named by its host. -->
+    <div
+      v-else-if="step.kind === 'http'"
+      class="flow-card"
+    >
+      <div class="flow-card__row">
+        <IonReorder
+          class="flow-handle"
+          :aria-label="$t('flow.steps.reorder')"
+        >
+          ⠿
+        </IonReorder>
+        <button
+          type="button"
+          class="flow-card__open"
+          :aria-expanded="open ? 'true' : 'false'"
+          :data-testid="`flow-step-open-${id}`"
+          @click="emit('toggle')"
+        >
+          <span class="flow-card__title"><HubIcon name="ion:globe-outline" /> {{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-icon-btn"
+          :aria-label="$t('flow.steps.remove')"
+          :data-testid="`flow-step-remove-${id}`"
+          @click="emit('remove')"
+        >
+          <HubIcon name="ion:close-outline" />
+        </button>
+      </div>
+      <div
+        v-if="open"
+        class="flow-card__panel"
+        :data-testid="`flow-step-panel-${id}`"
+      >
+        <HttpStepPanel
+          :step="step"
+          :index="index"
+          :steps="steps"
+          :catalog="catalog"
+          :errors="errors"
+          :pick="pickCall ?? pick"
+          @update:step="emit('update:step', $event)"
+        />
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+      </div>
+    </div>
 
     <!-- An action or a read: a card. -->
     <div

@@ -171,4 +171,20 @@ describe('HistoryPanel', () => {
     await click(m.find('flow-run-toggle-r3').element);
     expect(m.find('flow-run-steps-r3').text()).toContain('Resumed here, from the step that had failed');
   });
+
+  // FLOW-F26/F27: what to do when a call or a secret stopped the run.
+  it('says what to do when a call or a secret stopped it', async () => {
+    const codes: Record<string, string> = {
+      'flow.http_blocked': 'Use the public address of the other system',
+      'flow.http_status': 'Check in the other system why it refused',
+      'flow.http_timeout': 'Try again later',
+      'flow.secret_not_found': 'Save the secret again',
+      'flow.secrets_key_missing': 'encryption key',
+    };
+    for (const [code, words] of Object.entries(codes)) {
+      const m = await setup([run('r9', { status: 'failed', error_code: code, error_message: 'It stopped.' })]);
+      expect(m.find('flow-run-trouble-r9').text()).toContain(words);
+    }
+  });
 });
+

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogOut, Step } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
+import HttpStepPanel from './HttpStepPanel.vue';
 import StepNode from './StepNode.vue';
 import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
@@ -127,5 +128,18 @@ describe('StepNode', () => {
     expect(s.find('flow-step-summary-s1').text()).toBe('Only if: Total greater than 10000 · If it fails, it carries on');
     const plain = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: {} }, false);
     expect(plain.find('flow-step-summary-s1').exists()).toBe(false);
+  });
+
+  // FLOW-F27: «Call another system» is a card named by its host; open, its form and its options.
+  it('a call is a card named by its host that opens to its form and its options', async () => {
+    const call: Step = { id: 's1', kind: 'http', method: 'POST', url: 'https://api.example.com/v1/x', headers: {}, body: '', timeout: 10, on_error: 'continue' };
+    const closed = await setup(call, false);
+    expect(closed.find('flow-step-open-s1').text()).toContain('Call api.example.com');
+    expect(closed.find('flow-step-summary-s1').text()).toBe('If it fails, it carries on');
+    const s = await setup(call);
+    expect(s.wrapper.findComponent(HttpStepPanel).exists()).toBe(true);
+    expect(s.wrapper.findComponent(StepOptions).exists()).toBe(true);
+    s.wrapper.findComponent(HttpStepPanel).vm.$emit('update:step', { ...call, method: 'PUT' });
+    expect(s.emitted().at(-1)).toMatchObject({ method: 'PUT' });
   });
 });

@@ -252,7 +252,8 @@
       "notFound": "That automation does not exist in this business.",
       "ranFailed": "It ran and stopped by an error: {message}",
       "ranWaiting": "It ran and is waiting: see it in History.",
-      "runSaveFirst": "Save it first: «Run now» runs what is saved."
+      "runSaveFirst": "Save it first: «Run now» runs what is saved.",
+      "ranCalling": "It ran and is calling another system: see it in History."
     },
     "trigger": {
       "when": "When this happens…",
@@ -303,7 +304,8 @@
         "command": "Do something",
         "query": "Look something up",
         "condition": "Only continue if…",
-        "delay": "Wait"
+        "delay": "Wait",
+        "http": "Call another system"
       },
       "remove": "Remove this step",
       "reorder": "Drag to reorder",
@@ -364,7 +366,9 @@
         "noCondition": "nothing yet",
         "query": "Look up: {action}",
         "found": "Found something",
-        "count": "How many"
+        "count": "How many",
+        "http": "Call {host}",
+        "noHttp": "Call another system"
       },
       "options": {
         "toggle": "More options",
@@ -383,7 +387,11 @@
       "none": "There is no data to insert here yet: choose what happens first, or add an action before.",
       "example": "e.g. {value}",
       "noExample": "no example yet",
-      "close": "Close"
+      "close": "Close",
+      "secret": "Secret «{name}»",
+      "idempotencyKey": "No-repeat key",
+      "secrets": "Secrets",
+      "run": "This call"
     },
     "test": {
       "banner": "None of this is real. Nothing is sent, nothing is charged and nothing is written down: this is only what your automation WOULD do.",
@@ -401,7 +409,8 @@
         "unavailable": "«{action}» is not available in this business",
         "not_reached": "Would not get here",
         "high_risk": "«{action}» needs a person in front: an automation cannot do it",
-        "skipped": "Would be skipped: its «Only if…» does not hold"
+        "skipped": "Would be skipped: its «Only if…» does not hold",
+        "would_call": "Would call {host} with this"
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
@@ -434,7 +443,9 @@
         "succeeded": "Finished well",
         "stopped": "Finished: a condition did not hold",
         "failed": "Stopped by an error",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "calling": "Calling another system",
+        "asking": "Waiting for an answer"
       },
       "log": {
         "done": "Did: {action}",
@@ -447,7 +458,9 @@
         "failed": "{action}: {message}",
         "resumed": "Resumed here, from the step that had failed",
         "skipped": "Skipped: its «Only if…» did not hold ({clauses})",
-        "continued": "It carried on with the next steps."
+        "continued": "It carried on with the next steps.",
+        "calling": "Calling {host}…",
+        "called": "Called {host}: it answered {status}"
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -455,7 +468,15 @@
         "flow__invalid_params": "Open the step and fill in what it asks for.",
         "flow__loop_stopped": "Check that its steps do not start it again.",
         "flow__step_crashed": "Try again later; if it happens again, send us the reference.",
-        "flow__high_risk": "Do it by hand, from its app."
+        "flow__high_risk": "Do it by hand, from its app.",
+        "flow__http_blocked": "Use the public address of the other system: private networks are never called.",
+        "flow__http_url_invalid": "Open the step and write its address by hand, starting with https://.",
+        "flow__http_status": "Check in the other system why it refused, then resume it.",
+        "flow__http_failed": "Check that the other system is up, then resume it.",
+        "flow__http_timeout": "Try again later, or give the step more seconds to wait.",
+        "flow__secret_not_found": "Save the secret again in the step, with the same name.",
+        "flow__secret_unreadable": "Save the secret again in the step: it was sealed with another key.",
+        "flow__secrets_key_missing": "This server has no encryption key for secrets yet; send us the reference."
       },
       "attentionOne": "{n} run stopped by a problem",
       "attentionMany": "{n} runs stopped by a problem",
@@ -2409,6 +2430,41 @@
     "errors": {
       "action": "It could not be done right now. Try again in a moment.",
       "read": "It could not be read right now. Try again in a moment."
+    },
+    "http": {
+      "method": "Method",
+      "url": "Address",
+      "willAsk": "This step will ask your permission to call {host}.",
+      "byHand": "Write it by hand: https:// and the server's name first; data only after it.",
+      "headers": "Headers",
+      "headerName": "Name",
+      "headerValue": "Value",
+      "addHeader": "Add a header",
+      "removeHeader": "Remove this header",
+      "body": "What it sends",
+      "bodyHint": "Text; a datum inserted in JSON is escaped for you.",
+      "keyHint": "Insert «No-repeat key» in a header (as Idempotency-Key) so the other system can tell a retry: it is the same in every attempt of this call.",
+      "timeout": "Seconds to wait (1 to 30)"
+    },
+    "secrets": {
+      "title": "Secrets",
+      "intro": "Keys and passwords of other systems. Insert them by name; once saved, nobody can read a value again, not even you.",
+      "loading": "Loading the secrets…",
+      "loadError": "The secrets could not be loaded. Try again in a moment.",
+      "empty": "No secrets yet.",
+      "unavailable": "This server cannot keep secrets yet: its encryption key is missing.",
+      "name": "Name",
+      "value": "Value",
+      "save": "Save secret",
+      "fillBoth": "Write a name and a value.",
+      "badName": "Use capitals, digits and _, starting with a letter (STRIPE_KEY).",
+      "saved": "{name} saved. Its value can no longer be shown.",
+      "delete": "Delete {name}",
+      "deleteTitle": "Delete {name}?",
+      "deleteMessage": "The steps that use it will stop before calling until you save it again.",
+      "deleteYes": "Yes, delete it",
+      "deleteNo": "Keep it",
+      "deleted": "{name} deleted."
     }
   }
 }

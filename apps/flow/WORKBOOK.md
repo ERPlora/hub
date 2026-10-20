@@ -178,6 +178,8 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 | FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
 | FLOW-F25 | «Solo si…» y «Si falla, sigue» en cada paso | hecho |
+| FLOW-F26 | Guardar secretos que no se pueden volver a leer | hecho |
+| FLOW-F27 | Llamar a otro sistema | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
@@ -693,6 +695,61 @@ puede leer (escrito en crudo en la administración) para la ejecución con «Ya 
 si…» de este paso…», y esa ejecución no se reanuda: hay que corregir el paso.
 Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
 
+### FLOW-F26 Guardar secretos que no se pueden volver a leer
+<!-- origen: old-hub:HUB-F99 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. Abre un paso de **Llamar a otro sistema**. Debajo está **Secretos**: «Claves y contraseñas de otros
+   sistemas. Insértalas por su nombre; una vez guardado, nadie puede volver a leer un valor, ni siquiera tú.».
+2. Escribe un **Nombre** (en mayúsculas, como «STRIPE_KEY») y su **Valor**, que se escribe tapado, y pulsa
+   **Guardar secreto**. Sale «STRIPE_KEY guardado. Su valor ya no se puede mostrar.» y los dos campos se
+   vacían. Guardar otra vez el mismo nombre cambia su valor.
+3. La lista enseña solo los nombres. Para usar uno, en un valor del paso pulsa **Insertar un dato** y elige
+   «Secreto «STRIPE_KEY»» en **Secretos**.
+4. Para borrarlo, pulsa su **×** y confirma «¿Borrar STRIPE_KEY?» con **Sí, borrarlo** o **Conservarlo**.
+Entra: el nombre y el valor de cada secreto (por voz, por su nombre: «guarda la clave de Stripe»).
+Sale: el secreto sellado con la clave del servidor (`flow.secret.saved`, `flow.secret.deleted`). Su valor
+solo se abre en el momento de llamar y nunca sale: ni en la lista, ni en **Probar** (que enseña «••••»), ni
+en el historial, ni en un fallo; lo que el otro sistema responda con el secreto dentro también sale tapado.
+Si falla: un nombre con minúsculas al principio, cifras primero o símbolos: «Usa mayúsculas, cifras y _,
+empezando por una letra (STRIPE_KEY).», y lo escrito se queda; sin la clave de cifrado del servidor, la caja
+dice «Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.» y no deja guardar.
+Guardar un paso que nombra un secreto que no existe: «No hay ningún secreto llamado «X».» junto al campo.
+Una ejecución cuyo secreto se borró o ya no se puede abrir se para antes de llamar, con el motivo y qué hacer.
+Un secreto solo se puede insertar en **Llamar a otro sistema**: en cualquier otro paso no se guarda.
+Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F27
+
+### FLOW-F27 Llamar a otro sistema
+<!-- origen: old-hub:HUB-F94 old:flows/workflow/editor.md#flows-f16 gh:hub#2648 gh:hub#2659 gh:hub#2675 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. En **Pasos**, pulsa **Llamar a otro sistema**. Se abre su tarjeta.
+2. Elige el **Método** y escribe la **Dirección** a mano, empezando por «https» y el nombre del servidor:
+   «Este paso te pedirá permiso para llamar a» y ese nombre. Después del nombre se pueden insertar datos.
+3. Añade las **Cabeceras** que pida el otro sistema (**Añadir una cabecera**: **Nombre** y **Valor**) y **Qué
+   envía**. En cualquier valor, **Insertar un dato** ofrece lo que trajo el aviso, lo que dejaron los pasos
+   anteriores, los **Secretos** (FLOW-F26) y la «Clave de no repetición» de esta llamada.
+4. Ajusta los **Segundos de espera** (de 1 a 30) y, si quieres, **Más opciones** (FLOW-F25).
+5. **Guardar** y, en **Permisos**, concede «Llamar a» ese servidor.
+Entra: el método, la dirección, las cabeceras, el texto que envía y la espera.
+Sale: al ejecutarse, la llamada sale cuando la ejecución ya está guardada, nunca dentro de ella; el historial
+dice «Llamando a…» con el nombre del servidor y luego «Llamó a…: respondió 201», y los pasos siguientes
+pueden leer su «Estado» y su «Texto» (hasta 1 MiB). Si el proceso se cae a mitad, la llamada se repite a los
+5 minutos con la **misma** «Clave de no repetición», para que el otro sistema no la haga dos veces.
+**Probar** dice «Llamaría a… con esto» con lo que enviaría y los secretos tapados, sin llamar.
+Si falla: una dirección que no empieza por «https» y su servidor, con usuario o contraseña, o con datos
+antes del nombre, no se guarda («Escribe la dirección a mano…»); tampoco las cabeceras que pone el sistema
+(Host, Content-Length…). Al llamar: una dirección de una red privada, del propio servidor o de los datos
+internos de la nube no se llama («…está dentro de una red privada, así que no se llamó.»); sin permiso, «…no
+le has dejado hacer…»; si responde un error, no contesta a tiempo o no se puede llegar, la ejecución se para
+con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue». No sigue
+redirecciones. Una ejecución que se borra o se pausa mientras llama se cancela.
+Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -711,6 +768,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
+| Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26 | `flow.secret.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -729,6 +787,10 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
 | Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
+| Guarda (o cambia) un secreto, sellado | gestionar | F26 | `flow.secret.set` |
+| Borra un secreto | gestionar | F26 | `flow.secret.delete` |
+| Toma la llamada de una ejecución para hacerla | solo la plataforma | F27 | `flow.run.claim_call` |
+| Apunta cómo acabó la llamada y sigue la ejecución | solo la plataforma | F27 | `flow.run.record_call` |
 
 ### Lo que avisa
 
@@ -747,6 +809,8 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Borrador propuesto | El asistente deja un borrador | `id` | `flow.draft.proposed` |
 | Borrador usado | Se crea la automatización desde él | `id`, `flow_id` | `flow.draft.used` |
 | Borrador descartado | Se descarta | `id` | `flow.draft.dismissed` |
+| Secreto guardado | Guardar o cambiar un secreto | `id` | `flow.secret.saved` |
+| Secreto borrado | Borrarlo | `id` | `flow.secret.deleted` |
 
 Los avisos llevan ids, nunca nombres ni contenidos.
 
@@ -776,10 +840,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `trigger_filter`, `schedule`, `run_at`, `next_fire_at`—, `steps`, `grants`, `version`, `language`,
   `search_text`, borrado lógico `deleted_at`), `FlowRun` (versión y copia de los pasos con que empezó,
   `trigger_key` único por automatización, `input`, `status`, `step_index`, `log`, `outputs`, error,
-  `resume_at`, `chain`) y `Draft`. UUIDv7, sin `hub_id`.
+  `resume_at`, `chain`), `Draft` y `Secret` (nombre único y valor sellado, FLOW-F26). UUIDv7, sin `hub_id`.
 - **El documento**: `trigger` = `{kind: event, event, filter}` · `{kind: schedule, every: day|week|month,
   weekday 0–6 (lunes 0), day 1–31, time "HH:MM"}` · `{kind: at, at}` · `{kind: manual}`; `steps` = lista
-  de `{id, kind: command|query|condition|delay, …}`. Un valor es un literal, una **ruta**
+  de `{id, kind: command|query|condition|delay|http, …}`; `http` = `{method, url, headers, body, timeout}`
+  (FLOW-F27), cuyos textos pueden leer además `secret.<NOMBRE>` y `run.idempotency_key` (ningún otro paso). Un valor es un literal, una **ruta**
   (`input.total`, `steps.s1.id`: conserva el tipo) o un texto con `{{ruta}}` (siempre texto). Raíces:
   `input` (lo que trajo el aviso o la ejecución a mano) y `steps.<id>` de un paso anterior. Sin índices
   de lista. Condición: `{ruta: {eq|neq|in|exists|contains|gt|gte|lt|lte: valor}}`, todas a la vez; un
@@ -835,6 +900,23 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `flow.condition_unreadable` ni `flow.high_risk`. Sigue con su `definition` (la versión con la que
   empezó) y deja en el log `resumed` con quién. Dos a la vez: la segunda espera el bloqueo y ve que ya no
   está `failed`.
+- **Secretos** (`vault.py`, FLOW-F26): Fernet de `cryptography` con la clave `FLOW_SECRETS_KEY` del
+  entorno (Secrets Manager en AWS; nunca en el código); sin ella, `flow.secret.list` dice `available: false`
+  y guardar da `flow.secrets_key_missing`. El valor entra como `SecretStr` (un 422 nunca lo repite), solo se
+  abre al hacer la llamada y se tapa (`vault.mask`) en todo lo que se guarda o se enseña de ella: log,
+  errores, lo que respondió y **Probar**. Ni la API, ni `live.py`, ni el admin (solo ver el nombre y borrar)
+  lo devuelven. En la fase 1, como toda tabla de `flow`, los secretos se comparten entre los negocios de
+  la misma base de datos hasta la BD por hub de la fase 2.
+- **Llamadas** (`http.py`, FLOW-F27): solo `https` con el nombre del servidor escrito a mano (es el permiso,
+  `http:https://host`); el nombre se resuelve **una** vez, se rechaza toda dirección que no sea pública
+  (privada, del propio equipo, de enlace local —metadatos de la nube—, multicast o reservada) y se conecta
+  a esa misma IP con su nombre en TLS (sin cambio de DNS entre medias); sin redirecciones ni proxies del
+  entorno, con tiempo total y como mucho 1 MiB de respuesta. El paso deja la ejecución en `calling`; la
+  llamada sale tras el COMMIT (`dispatch_call`, sin transacción ni bloqueo alrededor):
+  `flow.run.claim_call` la toma con un plazo de `CALL_LEASE_MINUTES` (5) en `resume_at` y
+  `flow.run.record_call` apunta cómo acabó y sigue. Si el proceso se cae, `resume_due` la vuelve a lanzar
+  al vencer el plazo con la misma `Idempotency-Key` (uuid5 de ejecución y paso). Los tests llaman a un
+  servidor HTTPS local de verdad (`tests/local_https.py`), nunca a un `patch` del cliente.
 - **Retención** (hub#699, la del Hub viejo: 90 días fijos, sin ajuste por hub): la tarea programada
   `flow.run.prune` (cada hora, en el minuto 17) borra como mucho `PRUNE_BATCH` (500) ejecuciones
   terminadas (`succeeded`, `stopped`, `failed`, `cancelled`) cuya hora de fin —o de inicio, si no la
@@ -860,8 +942,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `flow.condition_unreadable` y las demás automatizaciones del aviso siguen (`document.readable`).
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`.
-- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos; una escritura cruda del admin
-  no deja aviso.
+- El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun` y `Draft`; de `Secret`, solo
+  ver el nombre y borrar (un valor no se escribe ni se lee desde el admin). Una escritura cruda del admin no
+  deja aviso.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -929,7 +1012,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | `PUT /api/hub/flows/{id}/grants` | `flow.flow.grant` | permisos por acción o consulta; sin límites de campo (ver «Qué queda fuera») |
 | `POST /api/hub/flows/{id}/run` | `flow.flow.run` | ahora con botón |
 | motor del núcleo (eventos, cron, `at`, esperas) | `flow.run.react`, `flow.schedule.fire_due`, `flow.run.resume_due` | — |
-| `…/flows/secrets`, `…/approvals`, `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
+| `…/flows/secrets` | `flow.secret.list`, `flow.secret.set`, `flow.secret.delete` | solo el nombre: el valor no se vuelve a leer nunca |
+| paso `http` del motor | paso «Llamar a otro sistema» (`flow.run.claim_call`, `flow.run.record_call`) | la llamada sale tras guardar la ejecución, con su clave de no repetición |
+| `…/approvals`, `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
 
 ### Paridad: consultas
 
@@ -949,7 +1034,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | Producto actual | Aquí | Motivo si cambia |
 |---|---|---|
 | Automatizaciones (lista, borradores, galería) | `/flow/automations` | la lista es la `DataTable` del Hub (mismos controles: buscador, filtros, orden, casillas, interruptor, copiar, borrar) |
-| Editor (Pasos, Probar, Permisos, Historial) | `/flow/automations/:id` y `/new` | la misma columna; los pasos de mensaje, otro sistema, asistente y pregunta, fuera |
+| Editor (Pasos, Probar, Permisos, Historial) | `/flow/automations/:id` y `/new` | la misma columna; los pasos de mensaje, asistente y pregunta, fuera |
 | Guía | `/flow/guide` | — |
 | Bandeja «Pendiente de ti» | — | fuera |
 | Bandeja «Necesita tu atención» (eventos caídos) | — | fuera: es la administración del outbox, de la plataforma |
@@ -967,10 +1052,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Qué queda fuera
 
-- **Pasos «Enviar un mensaje», «Llamar a otro sistema» (con sus secretos), «Pedírselo al asistente» y
-  «Preguntar antes a alguien»**, con la bandeja **Pendiente de ti**: dependen del envío de WhatsApp y
-  correo, de guardar secretos cifrados, del asistente en el Hub y de una bandeja de preguntas por rol,
-  que no existen todavía en el Hub. Volverán como pasos nuevos de esta misma columna.
+- **Pasos «Enviar un mensaje», «Pedírselo al asistente» y «Preguntar antes a alguien»**, con la bandeja
+  **Pendiente de ti**: dependen del envío de WhatsApp y correo, del asistente en el Hub y de una bandeja de
+  preguntas por rol, que no existen todavía en el Hub. Volverán como pasos nuevos de esta misma columna.
 - **«Necesita tu atención»** (eventos que no se entregaron): es la administración del outbox (PLAN-HUB
   bloque 7), de la plataforma, con el relay de la fase 2.
 - **Recetas que traen otras apps** («Viene con …», restaurar la de fábrica) y la reparación de las de

@@ -8,16 +8,17 @@
 // step, which opens. «Insert data» opens the one picker with what the last real event brought and
 // what the earlier steps leave. The page holds the route: this component says when it is dirty.
 import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
-import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
+import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonLabel, IonReorderGroup, IonSegment, IonSegmentButton, IonToggle } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, effectScope, type EffectScope, onScopeDispose, ref, shallowRef, watch } from 'vue';
 
 import { useCatalog } from '../composables/useCatalog';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import {
   addStep,
+  callChoices,
   type DataChoice,
   dataChoices,
   fieldErrors,
@@ -63,7 +64,7 @@ const runNow = useCommand('flow.flow.run');
 const switching = useCommand('flow.flow.set_enabled');
 
 const TABS: readonly Tab[] = ['steps', 'test', 'permissions', 'history'];
-const ADDERS: readonly StepKind[] = ['command', 'query', 'condition', 'delay'];
+const ADDERS: readonly StepKind[] = ['command', 'query', 'condition', 'delay', 'http'];
 
 /** What is compared to know whether something is unsaved: the document and its switch. */
 const snapshot = (value: FlowDocument): string => JSON.stringify({ ...toPayload(value), enabled: value.enabled });
@@ -113,17 +114,40 @@ watch(
 const triggerChoices = computed(() => dataChoices([], 0, sample.value, catalog.value));
 const choicesFor = (index: number): DataChoice[] => dataChoices(doc.value.steps, index, sample.value, catalog.value);
 
+// ── The secrets a call can insert (FLOW-F27): followed only while the column has a call ──
+const secretNames = shallowRef<string[]>([]);
+let secretsScope: EffectScope | null = null;
+watch(
+  () => doc.value.steps.some((step) => step.kind === 'http'),
+  (hasCall) => {
+    if (hasCall && !secretsScope) {
+      secretsScope = effectScope();
+      secretsScope.run(() => {
+        const secrets = useLive('flow.secret.list', {}, { client });
+        watch(() => secrets.data.value?.rows, (rows) => (secretNames.value = (rows ?? []).map((row) => row.name)), { immediate: true });
+      });
+    } else if (!hasCall && secretsScope) {
+      secretsScope.stop();
+      secretsScope = null;
+      secretNames.value = [];
+    }
+  },
+  { immediate: true },
+);
+onScopeDispose(() => secretsScope?.stop());
+
 // ── The picker: one for the whole editor ──
 const pickerOpen = ref(false);
 const pickerChoices = ref<DataChoice[]>([]);
 let answerPick: ((path: string | null) => void) | null = null;
 
-function pickFor(index: number): () => Promise<string | null> {
+/** The picker of step `index`; a call's values (`call`) may insert the secrets and the call's key too. */
+function pickFor(index: number, call = false): () => Promise<string | null> {
   return () =>
     new Promise((resolve) => {
       answerPick?.(null);
       answerPick = resolve;
-      pickerChoices.value = choicesFor(index);
+      pickerChoices.value = call ? [...choicesFor(index), ...callChoices(secretNames.value)] : choicesFor(index);
       pickerOpen.value = true;
     });
 }
@@ -227,7 +251,7 @@ async function run(): Promise<void> {
   try {
     const ran = await runNow.run({ id: props.flow.id });
     if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
-    else void toastSuccess(t(ran.status === 'waiting' ? 'flow.editor.ranWaiting' : 'flow.editor.ran'));
+    else void toastSuccess(t(ran.status === 'waiting' ? 'flow.editor.ranWaiting' : ran.status === 'calling' ? 'flow.editor.ranCalling' : 'flow.editor.ran'));
   } catch (failure) {
     problem.value = wording(failure, phrasing.value.t('flow.errors.action'));
   }
@@ -413,6 +437,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
             :errors="errors"
             :choices="choicesFor(index)"
             :pick="pickFor(index)"
+            :pick-call="step.kind === 'http' ? pickFor(index, true) : undefined"
             @update:step="updateStep(index, $event)"
             @remove="remove(index)"
             @toggle="toggleStep(step.id)"

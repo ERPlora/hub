@@ -2,7 +2,7 @@
 // The options of a step (WORKBOOK FLOW-F25; the old engine's `run_if` and `on_error`), folded under
 // «More options»: «Only if…» on every step but «Only continue if…» — when it does not hold the step is
 // skipped and the automation goes on — and «If it fails, carry on with the next steps» on an action or
-// a read. Off, the step keeps no option at all (the document stays as it was).
+// a read or a call (FLOW-F27). Off, the step keeps no option at all (the document stays as it was).
 import { IonCheckbox } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
@@ -23,8 +23,8 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:step': [step: Step] }>();
 
 const id = computed(() => props.step.id);
-const canFail = computed(() => props.step.kind === 'command' || props.step.kind === 'query');
-const onError = computed(() => (props.step.kind === 'command' || props.step.kind === 'query' ? props.step.on_error === 'continue' : false));
+const canFail = computed(() => props.step.kind === 'command' || props.step.kind === 'query' || props.step.kind === 'http');
+const onError = computed(() => (props.step.kind === 'delay' ? false : props.step.on_error === 'continue'));
 const open = ref(!!props.step.run_if || onError.value);
 
 function without<T extends object>(value: T, key: string): T {
@@ -42,7 +42,7 @@ function setCondition(runIf: Condition): void {
 }
 
 function setOnError(on: boolean): void {
-  if (props.step.kind !== 'command' && props.step.kind !== 'query') return;
+  if (props.step.kind === 'delay') return;
   emit('update:step', on ? { ...props.step, on_error: 'continue' } : without(props.step, 'on_error'));
 }
 </script>
