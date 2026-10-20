@@ -14,12 +14,15 @@ Then it schedules the apps' tasks once (``scheduler.sync``: a failure is fatal, 
 (5 s), runs the ones that are due (``scheduler.run_due``): the VeriFactu queue every minute
 (VERIFACTU-F20) and every other ``scheduled_tasks`` an app declares, each claimed with ``SKIP LOCKED``.
 A tick that fails (the database went away) is logged and the next one tries again; a stop request
-ends the loop at once. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
+ends the loop at once. Every tick, after the tasks and whatever they did, it relays the outbox
+(``base.relay``, round 2026-10-20 of PLAN-HUB): each new event to the reactions of the apps that listen
+to it, exactly once, in the scope of the hub that recorded it; a pass that fails is logged and the next
+tick tries again. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
 pass that fails is logged and the next one tries again, and the worker never stops for it. Every pass
-releases its connection. Phase 1 runs them on one fixed scope (``WORKER_SCOPE_SLUG``); phase 2 adds, in
-this loop, the hubs whose ``hub_due`` has come (each under ``use_hub``), the outbox relay and the hubs'
-provisioning and purge.
+releases its connection. Phase 1 runs the tasks on one fixed scope (``WORKER_SCOPE_SLUG``) and relays the
+one database every hub shares; phase 2 adds, in this loop, the hubs whose ``hub_due`` has come (each under
+``use_hub``, for its tasks and its outbox) and the hubs' provisioning and purge.
 """
 
 import datetime as dt
@@ -30,7 +33,7 @@ from collections.abc import Callable
 from django.db import close_old_connections
 from django.utils import timezone
 
-from base import catalog, scheduler
+from base import catalog, relay, scheduler
 from base.services import reap_demos
 
 logger = logging.getLogger(__name__)
@@ -97,6 +100,7 @@ def run(
     while not stop.is_set():
         now = clock()
         _tick(now)
+        _relay(now)
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
@@ -117,6 +121,21 @@ def _reap(now: dt.datetime) -> None:
     finally:
         # The reaper's connection is not kept open while the worker idles, nor a broken one taken further.
         close_old_connections()
+
+
+def _relay(now: dt.datetime) -> None:
+    """Relay the outbox at ``now``; a failure is logged and the next tick tries again."""
+    try:
+        done = relay.run(now)
+    except Exception:
+        logger.exception("worker: the outbox relay failed; the next tick tries again.")
+        # A broken connection is not taken into the next tick.
+        close_old_connections()
+        return
+    if done.taken or done.delivered or done.failed:
+        logger.debug(
+            "worker: relayed %d event(s): %d delivery(ies) done, %d failed.", done.taken, done.delivered, done.failed
+        )
 
 
 def _tick(now: dt.datetime) -> None:
