@@ -9,7 +9,7 @@ admin form would neither seal it nor ever show it.
 
 from django.contrib import admin
 
-from apps.flow.models import Draft, Flow, FlowRun, Secret
+from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 
 
 class FlowRunInline(admin.TabularInline):
@@ -61,6 +61,15 @@ class DraftAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     raw_id_fields = ("flow",)
     readonly_fields = ("id", "created_at")
+
+
+@admin.register(Question)
+class QuestionAdmin(admin.ModelAdmin):
+    list_display = ("title", "flow", "role", "status", "expires_at", "decided_by", "decided_at")
+    list_filter = ("status", "role")
+    search_fields = ("title", "flow__name", "decided_by")
+    raw_id_fields = ("run", "flow")
+    readonly_fields = ("id",)
 
 
 @admin.register(Secret)

@@ -34,11 +34,12 @@ from live.operations import Operation, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, http, vault
-from apps.flow.models import Draft, Flow, FlowRun, Secret
+from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     HIGH_RISK,
     HIGH_RISK_CODE,
     LEAVES,
+    ANSWER,
     MANAGE,
     RESUME_DAYS,
     SYSTEM,
@@ -58,8 +59,11 @@ from apps.flow.queries import (
     resolve_flow,
     run_row,
     validation_fields,
+    can_answer,
 )
 from apps.flow.schemas import (
+    AnsweredOut,
+    AnswerIn,
     ClaimCallOut,
     CreateIn,
     DeletedOut,
@@ -146,6 +150,13 @@ SECRETS_KEY_MISSING = _(
     "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
 )
 SECRET_NOT_FOUND = _("There is no secret called «%(name)s».")
+QUESTION_NOT_FOUND = _("That question does not exist in this business.")
+QUESTION_NOT_YOURS = _("This question was asked of someone else: you cannot answer it.")
+QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.")
+QUESTION_CLOSED = _("This question is closed: its automation no longer waits for it.")
+QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
+ANSWERED_NO = _("Cancelled: %(who)s answered no to «%(title)s».")
+NOBODY_ANSWERED = _("Cancelled: nobody answered «%(title)s» in time.")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -438,8 +449,11 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     now = timezone.now()
     with translation.override(flow.language):
         for waiting in FlowRun.objects.select_for_update().filter(
-            flow=flow, status__in=[FlowRun.Status.WAITING, FlowRun.Status.CALLING]
+            flow=flow, status__in=[FlowRun.Status.WAITING, FlowRun.Status.CALLING, FlowRun.Status.ASKING]
         ):
+            Question.objects.filter(run=waiting, status=Question.Status.PENDING).update(
+                status=Question.Status.CANCELLED, decided_at=now
+            )
             _finish(
                 ctx,
                 waiting,
@@ -862,6 +876,9 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
                 if _park_call(ctx, run, flow, step, now):
                     return
                 continue
+            if step["kind"] == "ask":
+                _ask(ctx, run, flow, step, data, now)
+                return
             try:
                 left, outcome, extras = _operation_step(ctx, run, flow, step, data)
             except StepFailed as failure:
@@ -919,6 +936,156 @@ def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, fa
     run.resume_at = None
     if _fail(ctx, run, step, failure, now, left):
         _go_on(ctx, run, flow, now)
+
+
+# --- Asking someone first (FLOW-F28 to F30) ---------------------------------------------------------
+
+
+def _who(ctx: OperationContext) -> str:
+    """The name of whoever answers, as the history says it («Marta»)."""
+    actor = ctx.actor
+    if hasattr(actor, "get_username"):
+        return (actor.get_full_name() or actor.get_username())[:128]
+    return _actor(ctx)
+
+
+def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:
+    """Leaves the step's question, its texts filled in now, in «Waiting for you» and parks the run on it. A
+    question the run already asked at this step (a run resumed onto it) is not asked twice."""
+    expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
+    question, _created = Question.objects.get_or_create(
+        run=run,
+        step_id=step["id"],
+        defaults={
+            "flow": flow,
+            "title": document.fill(step["title"], data)[:300],
+            "details": document.fill(step.get("details", ""), data),
+            "role": step.get("role", ""),
+            "on_no": step.get("on_no", "stop"),
+            "on_timeout": step.get("on_timeout", "no"),
+            "expires_at": expires,
+            "created_at": now,
+        },
+    )
+    _log(run, step, "asking", now, role=question.role, until=question.expires_at.isoformat())
+    run.status = FlowRun.Status.ASKING
+    run.resume_at = question.expires_at
+    run.save()
+    record_event(
+        ctx, events.QUESTION_ASKED, {"id": str(question.id), "run_id": str(run.id), "flow_id": str(flow.id)}
+    )
+    record_event(
+        ctx,
+        events.RUN_PARKED,
+        {"id": str(run.id), "flow_id": str(flow.id), "resume_at": question.expires_at.isoformat()},
+    )
+
+
+def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:
+    run.outputs = {**run.outputs, step["id"]: left}
+    run.step_index += 1
+    _go_on(ctx, run, flow, now)
+
+
+@operation(
+    "flow.question.answer",
+    kind="command",
+    permission=ANSWER,
+    input=AnswerIn,
+    output=AnsweredOut,
+    ai={
+        "description": "Answer yes or no, with an optional note, to a question an automation asked and is waiting "
+        "on (from `flow.question.list`): a yes carries it on, a no does what its step says. Only the role it was "
+        "asked of, or whoever runs the business. It is the person's decision: confirm it with them first.",
+        "risk": "high",
+    },
+)
+def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
+    now = timezone.now()
+    found = Question.objects.filter(pk=data.id).values_list("flow_id", "run_id").first()
+    with translation.override(ctx.language):
+        if found is None:
+            raise NotFound(str(QUESTION_NOT_FOUND), code="flow.question_not_found")
+        # The order of every write: the automation, then its run, then the question.
+        flow = Flow.objects.select_for_update().filter(pk=found[0]).first()
+        run = FlowRun.objects.select_for_update().filter(pk=found[1]).first()
+        question = Question.objects.select_for_update().filter(pk=data.id).first()
+        if flow is None or run is None or question is None:
+            raise NotFound(str(QUESTION_NOT_FOUND), code="flow.question_not_found")
+        if not can_answer(ctx, question.role):
+            raise PermissionDenied(str(QUESTION_NOT_YOURS), code="flow.question_not_yours")
+        pending = question.status == Question.Status.PENDING
+        if question.status == Question.Status.EXPIRED or (pending and question.expires_at <= now):
+            raise Conflict(str(QUESTION_TOO_LATE), code="flow.question_expired")
+        if not pending or run.status != FlowRun.Status.ASKING:
+            closed = question.status == Question.Status.CANCELLED or run.status != FlowRun.Status.ASKING
+            raise Conflict(str(QUESTION_CLOSED if closed else QUESTION_DECIDED), code="flow.question_decided")
+        goes_on = data.approve or question.on_no == "continue"
+        if goes_on and not flow.enabled:
+            raise Conflict(str(DISABLED), code="flow.disabled")
+    who = _who(ctx)
+    question.status = Question.Status.APPROVED if data.approve else Question.Status.REJECTED
+    question.decided_by, question.decided_at, question.note = who, now, data.note
+    question.save(update_fields=["status", "decided_by", "decided_at", "note"])
+    record_event(ctx, events.QUESTION_ANSWERED, {"id": str(question.id), "run_id": str(run.id)})
+    step = run.definition["steps"][run.step_index]
+    with translation.override(flow.language):
+        _log(run, step, "answered", now, approved=data.approve, by=who, note=data.note)
+        if goes_on:
+            left = {"approved": data.approve, "expired": False, "note": data.note, "answered_by": who}
+            _carry_on(ctx, run, flow, step, left, now)
+        else:
+            message = str(ANSWERED_NO) % {"who": who, "title": question.title}
+            _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.question_rejected", message)
+    return {"id": question.id, "run_id": run.id, "status": run.status}
+
+
+@operation(
+    "flow.question.expire_due",
+    kind="command",
+    permission=SYSTEM,
+    input=DueIn,
+    output=DueOut,
+    ai={
+        "description": "Platform only, every minute: closes the questions nobody answered in time and does what "
+        "each step says for silence (what a no does, stop, or carry on).",
+        "risk": "normal",
+    },
+)
+def expire_questions(ctx: OperationContext, data: DueIn) -> dict:
+    now = timezone.now()
+    # The run first, with SKIP LOCKED: one being answered (its automation and run locked) is left to it.
+    due = (
+        FlowRun.objects.filter(status=FlowRun.Status.ASKING, resume_at__lte=now)
+        .select_related("flow")
+        .select_for_update(skip_locked=True, of=("self",))
+        .order_by("resume_at", "id")
+    )
+    closed = 0
+    for run in due:
+        flow = run.flow
+        step = run.definition["steps"][run.step_index]
+        question = Question.objects.select_for_update().filter(run=run, step_id=step["id"]).first()
+        if question is None or question.status != Question.Status.PENDING:
+            continue
+        question.status, question.decided_at = Question.Status.EXPIRED, now
+        question.save(update_fields=["status", "decided_at"])
+        record_event(ctx, events.QUESTION_EXPIRED, {"id": str(question.id), "run_id": str(run.id)})
+        closed += 1
+        policy = question.on_no if question.on_timeout == "no" else question.on_timeout
+        with translation.override(flow.language):
+            _log(run, step, "expired", now)
+            if policy != "continue":
+                message = str(NOBODY_ANSWERED) % {"title": question.title}
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.question_expired", message)
+            elif flow.deleted_at is not None:
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.deleted", str(CANCELLED_DELETED))
+            elif not flow.enabled:
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.paused", str(CANCELLED_PAUSED))
+            else:
+                left = {"approved": False, "expired": True, "note": "", "answered_by": ""}
+                _carry_on(ctx, run, flow, step, left, now)
+    return {"count": closed}
 
 
 def dispatch_call(scope: Scope, run_id: uuid.UUID) -> None:

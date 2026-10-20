@@ -11,6 +11,7 @@ from ninja import Query, Router
 
 from apps.flow import queries, services
 from apps.flow.schemas import (
+    AnswerIn,
     CreateIn,
     DraftListIn,
     DraftProposeIn,
@@ -148,3 +149,16 @@ async def secret_set(request, data: SecretSetIn):
 @bind(router, "flow.secret.delete", "/flow/secrets/delete")
 async def secret_delete(request, data: SecretRefIn):
     return await run_operation(request, services.delete_secret, data)
+
+
+# «Waiting for you» (FLOW-F29)
+
+
+@bind(router, "flow.question.list", "/flow/questions")
+async def question_list(request):
+    return await run_operation(request, queries.list_questions)
+
+
+@bind(router, "flow.question.answer", "/flow/questions/answer")
+async def question_answer(request, data: AnswerIn):
+    return await run_operation(request, services.answer_question, data)

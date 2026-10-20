@@ -108,6 +108,11 @@ def _text(value: Any) -> str:
     return str(value)
 
 
+def fill(text: str, data: dict) -> str:
+    """``text`` with its ``{{…}}`` data filled in, always text (a path alone is its value as text)."""
+    return _text(resolve(text, data))
+
+
 # --- Conditions -------------------------------------------------------------------------------------
 
 

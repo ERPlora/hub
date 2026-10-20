@@ -28,7 +28,7 @@ from live.models import OutboxEvent
 from live.operations import Operation, operation, registry
 
 from apps.flow import document, vault
-from apps.flow.models import Draft, Flow, FlowRun, Secret
+from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.schemas import (
     CatalogIn,
     CatalogOut,
@@ -38,6 +38,8 @@ from apps.flow.schemas import (
     FlowOut,
     FlowRefIn,
     Page,
+    QuestionListIn,
+    QuestionPageOut,
     RunListIn,
     RunPageOut,
     SampleIn,
@@ -55,6 +57,11 @@ VIEW = "flow.view"
 MANAGE = "flow.manage"
 #: Run only by the platform (events.py and the scheduled tasks): no role holds it.
 SYSTEM = "flow.system"
+#: FLOW-F29: answering what is asked of employees, and of managers; whoever manages answers everything.
+ANSWER = "flow.answer"
+ANSWER_MANAGER = "flow.answer_manager"
+#: The permission each role of «Ask someone first» asks for ('' = whoever runs the business).
+ROLE_PERMISSION = {"": MANAGE, "manager": ANSWER_MANAGER, "employee": ANSWER}
 
 FLOW_NOT_FOUND = _("That automation does not exist in this business.")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
@@ -479,7 +486,7 @@ NOT_RESUMABLE = frozenset(
     }
 )
 #: The kinds of step whose output later steps read (``steps.<id>``).
-LEAVES = ("command", "query", "http")
+LEAVES = ("command", "query", "http", "ask")
 RUN_NOT_RESUMABLE = _("Only a run that stopped by an error at one of its steps can be resumed.")
 BEFORE_ANY_STEP = _(
     "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it "
@@ -784,6 +791,12 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
             steps.append(out | _try_call(step, values, grants, unknown_steps))
             unknown_steps.add(step.id)
             continue
+        if step.kind == "ask":
+            # Nothing is asked; what the person would answer is not known here.
+            texts = {"title": document.fill(step.title, values), "details": document.fill(step.details, values)}
+            steps.append(out | {"outcome": "would_ask", "params": texts | {"role": step.role, "hours": step.hours}})
+            unknown_steps.add(step.id)
+            continue
         if step.kind == "condition":
             reads = list(step.when)
             if any(
@@ -832,6 +845,53 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         "trigger_failed": _clauses(trigger_failed),
         "steps": steps,
     }
+
+
+# --- Questions (FLOW-F29) ----------------------------------------------------------------------------
+
+
+def can_answer(ctx: OperationContext, role: str) -> bool:
+    """Whether ``ctx`` may answer a question asked of ``role``: that role's people, and whoever runs the
+    business, always."""
+    return ctx.has(ROLE_PERMISSION.get(role, MANAGE)) or ctx.has(MANAGE)
+
+
+def question_row(question: Question) -> dict[str, Any]:
+    return {
+        "id": question.id,
+        "flow_id": question.flow_id,
+        "flow_name": question.flow.name,
+        "run_id": question.run_id,
+        "title": question.title,
+        "details": question.details,
+        "role": question.role,
+        "on_no": question.on_no,
+        "on_timeout": question.on_timeout,
+        "expires_at": question.expires_at,
+        "created_at": question.created_at,
+    }
+
+
+@operation(
+    "flow.question.list",
+    kind="query",
+    permission=ANSWER,
+    input=QuestionListIn,
+    output=QuestionPageOut,
+    ai={
+        "description": "«Waiting for you»: the questions automations asked and are waiting on that this person may "
+        "answer (their role's, or all of them for whoever runs the business), the soonest to expire first, "
+        "up to 100."
+    },
+)
+def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
+    roles = [role for role in ROLE_PERMISSION if can_answer(ctx, role)]
+    pending = (
+        Question.objects.select_related("flow")
+        .filter(status=Question.Status.PENDING, role__in=roles, run__status=FlowRun.Status.ASKING)
+        .order_by("expires_at", "id")[:100]
+    )
+    return {"rows": [question_row(question) for question in pending]}
 
 
 # --- Secrets (FLOW-F26) ------------------------------------------------------------------------------

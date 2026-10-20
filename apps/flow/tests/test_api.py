@@ -41,6 +41,8 @@ ROUTES = {
     ("GET", "/flow/secrets", "flow.secret.list"),
     ("POST", "/flow/secrets", "flow.secret.set"),
     ("POST", "/flow/secrets/delete", "flow.secret.delete"),
+    ("GET", "/flow/questions", "flow.question.list"),
+    ("POST", "/flow/questions/answer", "flow.question.answer"),
 }
 
 

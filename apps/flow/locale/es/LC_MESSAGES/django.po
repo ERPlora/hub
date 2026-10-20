@@ -386,3 +386,80 @@ msgstr "El secreto «%(name)s» no se puede abrir con la llave de este servidor,
 
 msgid "This server cannot use secrets (its encryption key is missing), so it stopped before calling."
 msgstr "Este servidor no puede usar secretos (le falta su llave de cifrado), así que se ha parado antes de llamar."
+
+msgid "Cancelled: %(who)s answered no to «%(title)s»."
+msgstr "Cancelada: %(who)s contestó que no a «%(title)s»."
+
+msgid "Cancelled: nobody answered «%(title)s» in time."
+msgstr "Cancelada: nadie contestó a tiempo «%(title)s»."
+
+msgctxt "question status"
+msgid "Waiting for an answer"
+msgstr "Esperando una respuesta"
+
+msgctxt "question status"
+msgid "Yes"
+msgstr "Sí"
+
+msgctxt "question status"
+msgid "No"
+msgstr "No"
+
+msgctxt "question status"
+msgid "Nobody answered in time"
+msgstr "Nadie contestó a tiempo"
+
+msgctxt "question status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgid "Someone already answered this one. Nothing was done twice."
+msgstr "Alguien ya contestó a esta. No se ha hecho nada dos veces."
+
+msgid "That question does not exist in this business."
+msgstr "Esa pregunta no existe en este negocio."
+
+msgid "This question is closed: its automation no longer waits for it."
+msgstr "Esta pregunta está cerrada: su automatización ya no la espera."
+
+msgid "This question was asked of someone else: you cannot answer it."
+msgstr "Esta pregunta se le hizo a otra persona: tú no puedes contestarla."
+
+msgid "Too late: nobody answered it in time, so it was closed. Nothing was done."
+msgstr "Demasiado tarde: nadie la contestó a tiempo y se cerró. No se ha hecho nada."
+
+msgid "answer before"
+msgstr "contestar antes de"
+
+msgid "answered at"
+msgstr "contestada el"
+
+msgid "answered by"
+msgstr "contestada por"
+
+msgid "asked at"
+msgstr "preguntada el"
+
+msgid "asked of"
+msgstr "preguntada a"
+
+msgid "details"
+msgstr "detalles"
+
+msgid "if nobody answers"
+msgstr "si nadie contesta"
+
+msgid "if they say no"
+msgstr "si dicen que no"
+
+msgid "note"
+msgstr "nota"
+
+msgid "question"
+msgstr "pregunta"
+
+msgid "questions"
+msgstr "preguntas"
+
+msgid "step"
+msgstr "paso"

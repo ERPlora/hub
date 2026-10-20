@@ -45,6 +45,9 @@ def test_the_events_of_the_workbook():
         "DRAFT_DISMISSED": "flow.draft.dismissed",
         "SECRET_SAVED": "flow.secret.saved",
         "SECRET_DELETED": "flow.secret.deleted",
+        "QUESTION_ASKED": "flow.question.asked",
+        "QUESTION_ANSWERED": "flow.question.answered",
+        "QUESTION_EXPIRED": "flow.question.expired",
     }
 
 
@@ -56,7 +59,7 @@ def test_every_event_is_app_entity_fact_in_the_past():
 
 def test_all_lists_every_event_once_and_the_groups_cover_them():
     assert events.ALL == list(declared().values())
-    assert events.FLOW_EVENTS + events.RUN_EVENTS + events.DRAFT_EVENTS + events.SECRET_EVENTS == events.ALL
+    assert events.FLOW_EVENTS + events.RUN_EVENTS + events.DRAFT_EVENTS + events.SECRET_EVENTS + events.QUESTION_EVENTS == events.ALL
 
 
 def test_it_reacts_to_every_event():

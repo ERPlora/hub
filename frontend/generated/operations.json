@@ -473,6 +473,8 @@
   "flow.secret.list": { "method": "get", "path": "/api/flow/secrets" },
   "flow.secret.set": { "method": "post", "path": "/api/flow/secrets" },
   "flow.secret.delete": { "method": "post", "path": "/api/flow/secrets/delete" },
+  "flow.question.list": { "method": "get", "path": "/api/flow/questions" },
+  "flow.question.answer": { "method": "post", "path": "/api/flow/questions/answer" },
   "table.zone.list": { "method": "get", "path": "/api/table/zones" },
   "table.zone.get": { "method": "get", "path": "/api/table/zones/detail" },
   "table.zone.create": { "method": "post", "path": "/api/table/zones" },

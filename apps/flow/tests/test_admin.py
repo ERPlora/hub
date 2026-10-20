@@ -9,12 +9,12 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
-from apps.flow.admin import DraftAdmin, FlowAdmin, FlowRunAdmin, FlowRunInline
-from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow.admin import DraftAdmin, FlowAdmin, FlowRunAdmin, FlowRunInline, QuestionAdmin
+from apps.flow.models import Draft, Flow, FlowRun, Question
 
 from .conftest import make_draft, make_flow, make_run
 
-MODELS = {Flow: FlowAdmin, FlowRun: FlowRunAdmin, Draft: DraftAdmin}
+MODELS = {Flow: FlowAdmin, FlowRun: FlowRunAdmin, Draft: DraftAdmin, Question: QuestionAdmin}
 
 
 @pytest.fixture
@@ -98,3 +98,16 @@ def test_a_secret_shows_only_its_name_and_can_only_be_deleted(client, superuser)
     page = client.get(f"/admin/flow/secret/{secret.pk}/change/", HTTP_HOST="hubs.localhost")
     assert page.status_code == 200
     assert b"STRIPE_KEY" in page.content and b"gAAAA-sealed" not in page.content
+
+
+# FLOW-F28: a question is a row of the business like any other; the staff sees and fixes it from the admin.
+
+
+@pytest.mark.django_db
+def test_a_question_opens_in_the_admin(client, superuser):
+    flow = make_flow("Refunds")
+    run_ = make_run(flow, status="asking")
+    question = Question.objects.create(run=run_, flow=flow, step_id="s1", title="Refund?", expires_at=run_.started_at)
+    client.force_login(superuser)
+    for path in ("/admin/flow/question/", f"/admin/flow/question/{question.pk}/change/"):
+        assert client.get(path, HTTP_HOST="hubs.localhost").status_code == 200, path

@@ -29,7 +29,7 @@ from pydantic import (
 )
 
 from apps.flow import document
-from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, SECRET_NAME_RE, Draft, FlowRun
+from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, QUESTION_ROLES, SECRET_NAME_RE, Draft, FlowRun
 
 T = TypeVar("T")
 
@@ -60,6 +60,7 @@ BAD_HEADER = _("«%(name)s» is no header this step can send.")
 TriggerKind = Literal["event", "schedule", "at", "manual"]
 RunStatus = Literal[*FlowRun.Status.values]
 DraftStatus = Literal[*Draft.Status.values]
+QuestionRole = Literal[*QUESTION_ROLES]
 
 
 def _text(max_length: int, min_length: int = 0):
@@ -97,7 +98,9 @@ D_STEPS = (
     "counted from the previous step). A value in `params` is a literal, a path that keeps its type "
     "(`input.customer_id`) or text with `{{input.name}}` inside. Money is in cents. Every step but a "
     "condition may carry `run_if` (skipped when it does not hold) and an action or a read `on_error` "
-    "(`continue`: its failure does not stop the run)."
+    "(`continue`: its failure does not stop the run). `ask` asks a person first (`title`, `details`, `role` "
+    "'' / manager / employee, `hours` 1 to 720, `on_no` stop / continue, `on_timeout` no / stop / continue) "
+    "and leaves `approved`, `expired`, `note` and `answered_by`."
 )
 D_CONDITION = (
     "Comparisons, all at once: `{path: {operator: value}}` with eq, neq, in, exists, contains, gt, gte, "
@@ -348,8 +351,24 @@ class HttpStep(In):
         return value
 
 
+class AskStep(In):
+    id: StepId = Field(description="The step's id; later steps read `steps.<id>.approved`, `.expired`, `.note`.")
+    kind: Literal["ask"] = Field(description="Ask someone first: the run waits for a person's yes or no.")
+    title: _text(300, 1) = Field(description="The question, with `{{…}}` data filled in when it is asked.")
+    details: _text(2000) = Field("", description="More words under the question, with `{{…}}` data.")
+    role: QuestionRole = Field(
+        "", description="Who answers: '' whoever runs the business, `manager` or `employee` (they always can too)."
+    )
+    hours: int = Field(72, ge=1, le=720, description="How long to wait for the answer: 1 hour to 30 days.")
+    on_no: Literal["stop", "continue"] = Field("stop", description="A no: `stop` the run here or `continue`.")
+    on_timeout: Literal["no", "stop", "continue"] = Field(
+        "no", description="Nobody answered in time: `no` (what a no does), `stop` or `continue`."
+    )
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+
+
 Step = Annotated[
-    CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep, Field(discriminator="kind")
+    CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep, Field(discriminator="kind")
 ]
 DraftStep = Annotated[
     CommandStep | ConditionStep | DelayStep, Field(discriminator="kind")
@@ -370,14 +389,21 @@ def _reads(step: Any) -> list[str]:
     if step.kind == "http":
         texts = document.references([step.url, *step.headers.values(), step.body])
         return reads + [path for path in texts if not document.CALL_ONLY_RE.match(path)]
+    if step.kind == "ask":
+        return reads + document.references([step.title, step.details])
     return reads
 
 
 def _call_only(step: Any) -> list[str]:
-    """What a step that is no call reads of what only a call may read (a secret, the call's key)."""
-    if step.kind == "http":
-        return []
-    found = document.references(step.params) if step.kind in ("command", "query") else []
+    """What a step reads of what only a call's texts may read (a secret, the call's key): anything in a
+    condition, an «Only if…» (a call's own included) or the values of any other step."""
+    found = _condition_reads(step.run_if) if getattr(step, "run_if", None) else []
+    if step.kind in ("command", "query"):
+        found += document.references(step.params)
+    elif step.kind == "condition":
+        found += _condition_reads(step.when)
+    elif step.kind == "ask":
+        found += document.references([step.title, step.details])
     return [path for path in found if path.startswith(("secret.", "run."))]
 
 
@@ -401,7 +427,7 @@ def document_problems(steps: list[Any]) -> list[str]:
                 problems.append(str(STEP_READS_NOTHING) % {"n": number, "path": path})
             elif path.startswith("steps.") and path.split(".")[1] not in leaves:
                 problems.append(str(STEP_READS_LATER) % {"n": number, "path": path})
-        if step.kind in ("command", "query", "http"):
+        if step.kind in ("command", "query", "http", "ask"):
             leaves.add(step.id)
     return problems
 
@@ -631,6 +657,19 @@ class SecretRefIn(In):
     name: SecretName = Field(description=D_SECRET_NAME)
 
 
+# --- Questions (FLOW-F28 to F30) ----------------------------------------------------------------------
+
+
+class QuestionListIn(In):
+    pass
+
+
+class AnswerIn(In):
+    id: UUID = Field(description="The question's id, from `flow.question.list`.")
+    approve: bool = Field(description="true: yes, the automation goes on; false: no, it does what its step says.")
+    note: _text(500) = Field("", description="A note for the history, optional.")
+
+
 # --- Outputs ----------------------------------------------------------------------------------------
 
 
@@ -764,6 +803,7 @@ class TestStepOut(Schema):
         "not_reached",
         "skipped",
         "would_call",
+        "would_ask",
     ]
     operation: str = ""
     params: dict[str, Any] = {}
@@ -813,6 +853,30 @@ class SecretOut(Schema):
     created_at: dt.datetime
     updated_at: dt.datetime
     updated_by: str
+
+
+class QuestionOut(Schema):
+    id: UUID
+    flow_id: UUID
+    flow_name: str
+    run_id: UUID
+    title: str
+    details: str
+    role: str = Field(description="Who it was asked of: '' whoever runs the business, `manager` or `employee`.")
+    on_no: str
+    on_timeout: str
+    expires_at: dt.datetime
+    created_at: dt.datetime
+
+
+class QuestionPageOut(Schema):
+    rows: list[QuestionOut]
+
+
+class AnsweredOut(Schema):
+    id: UUID = Field(description="The question's id.")
+    run_id: UUID
+    status: RunStatus = Field(description="How its run is after the answer.")
 
 
 class SecretPageOut(Schema):
