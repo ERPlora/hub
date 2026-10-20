@@ -1,7 +1,7 @@
 # Workbook — Personal (app)
 Prefijo: STAFF
 Alcance MVP: transversal (lo usa sobre todo la peluquería; el restaurante lee su directorio)
-Estado de la app: hecha (servidor y páginas); faltan los paneles del inicio (ver «Lo que queda fuera»)
+Estado de la app: hecha (servidor y páginas)
 
 > Manual de usuario y especificación de la app `staff`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -74,7 +74,8 @@ Personal se abre desde el menú **Personal** y tiene cuatro pestañas: **Persona
 app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Personal
-Tabla con buscador «Buscar miembro…» (nombre, apellidos, email, teléfono, nº de empleado o rol),
+Encima de la tabla, tres cifras: **Plantilla activa**, **Ausentes hoy** y **Ausencias pendientes**
+(STAFF-F23). Debajo, la tabla con buscador «Buscar miembro…» (nombre, apellidos, email, teléfono, nº de empleado o rol),
 columnas **Nombre, Rol, Email, Estado** y, solo para quien puede ver la compensación, **Tarifa/h**;
 **Teléfono** existe pero sale oculto. Se ordena por cualquier columna y se filtra por Nombre,
 Apellidos, Email, Teléfono, Rol, Estado (**Activo**, **De baja**, **Inactivo**), Reservable, fecha de
@@ -93,7 +94,8 @@ Tabla con buscador «Buscar rol…» y columnas **Rol, Descripción, Miembros** 
 **Editar**, donde además se **retira** el rol (deja de ofrecerse) o se vuelve a activar.
 
 ### Ausencias
-Tabla con buscador por nombre y columnas **Miembro, Tipo, Desde, Hasta, Estado**, con filtros por
+Encima de la tabla, **Ausencias de hoy**: quién falta hoy, con el tipo y, si es solo una parte del día,
+sus horas (STAFF-F20). Debajo, la tabla con buscador por nombre y columnas **Miembro, Tipo, Desde, Hasta, Estado**, con filtros por
 miembro, tipo, estado y fechas. Acciones de fila: **Aprobar**, **Rechazar** y **Cancelar**, donde
 valen. **+** abre el formulario: **Miembro** (solo para quien gestiona ausencias; el empleado la pide
 para sí), **Tipo** (Vacaciones, Baja por enfermedad, Asuntos propios, Formación u Otros), **Desde,
@@ -115,16 +117,18 @@ profesional», «Avisar de nueva cita», «Avisar de cancelación» y **Guardar*
 ha guardado nunca, salen los valores propuestos.
 
 ### Paneles del inicio
-**Plantilla activa**, **Ausentes hoy**, **Ausencias de hoy**, **Ausencias pendientes** y
-**Empleados por rol**, con los datos de STAFF-F20 y STAFF-F23.
+El Hub todavía no tiene un Inicio con paneles. Mientras tanto, los cinco paneles del producto actual
+salen dentro de Personal: **Plantilla activa**, **Ausentes hoy** y **Ausencias pendientes** encima de
+la tabla de Personal, **Ausencias de hoy** encima de la de Ausencias y **Empleados por rol** en la
+columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
 
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | «Cargando…» mientras llega el primer resultado. |
-| Vacío | «Sin miembros del staff.», «Sin roles definidos.», «Sin solicitudes de ausencia.» o «Este miembro aún no tiene horarios.»; con búsqueda o filtro, «Sin resultados». |
-| Error | El aviso de la tabla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
+| Cargando | «Cargando…» mientras llega el primer resultado; cada cifra enseña «…». |
+| Vacío | «Sin miembros del staff.», «Sin roles definidos.», «Sin solicitudes de ausencia.» o «Este miembro aún no tiene horarios.»; con búsqueda o filtro, «Sin resultados». «Ausencias de hoy» sin nadie: «Nadie falta hoy.». |
+| Error | El aviso de la tabla con «Reintentar»; en Ajustes, «No se pudieron cargar los ajustes» con «Reintentar» y sin formulario. Las cifras dicen «No se pudieron cargar las cifras» y «Ausencias de hoy», «No se pudo cargar quién falta hoy», y la tabla sigue funcionando. Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
@@ -139,7 +143,7 @@ ha guardado nunca, salen los valores propuestos.
 | STAFF-F04 | Crear, editar y retirar un rol | hecho |
 | STAFF-F05 | Desactivar a un profesional | hecho |
 | STAFF-F06 | Dar de baja a un profesional | hecho |
-| STAFF-F07 | Dar de alta a varios profesionales de golpe | hecho (asistente y API; sin pantalla) |
+| STAFF-F07 | Dar de alta a varios profesionales de golpe | hecho (asistente y API) |
 | STAFF-F08 | Ver mi propia ficha y mis ausencias | hecho |
 | STAFF-F09 | Dar el equipo a otras apps | hecho (sin pantalla) |
 | STAFF-F13 | Crear el horario semanal de un profesional | hecho |
@@ -149,16 +153,17 @@ ha guardado nunca, salen los valores propuestos.
 | STAFF-F17 | Registrar una ausencia | hecho |
 | STAFF-F18 | Aprobar o rechazar una ausencia | hecho |
 | STAFF-F19 | Cancelar una ausencia | hecho |
-| STAFF-F20 | Ver quién falta hoy | hecho (pantalla Ausencias); panel del inicio pendiente |
+| STAFF-F20 | Ver quién falta hoy | hecho |
 | STAFF-F21 | Dar la tarifa y la comisión de cada profesional | hecho |
 | STAFF-F22 | Cambiar los ajustes de Personal | hecho |
-| STAFF-F23 | Ver las cifras de la plantilla y por rol | hecho (columna «Miembros» de Roles); paneles del inicio pendientes |
+| STAFF-F23 | Ver las cifras de la plantilla y por rol | hecho |
 | STAFF-F24 | Pedir mi propia ausencia | hecho |
 
 Los servicios que hace cada profesional (STAFF-F10, F11 y F12 del producto actual) no están en esta
 app: ver «Cambios frente al producto actual».
 
 ### STAFF-F01 Dar de alta a un profesional
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 old-hub:HUB_SHELL-F81 old-hub:HUB_SHELL-F82 fi:modules/staff#command-staff-members-create fi:modules/staff#permission-role_permissions fi:modules/staff#query-staff-members-list old-hub:HUB-F145 old:staff/workflow/ficha.md#staff-f01 qa:modules/staff/create-employee -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
@@ -182,6 +187,7 @@ de empleado se aceptan.
 Implicados: ninguno
 
 ### STAFF-F02 Editar la ficha de un profesional
+<!-- origen: fi:modules/staff#command-staff-members-update fi:modules/staff#query-staff-members-get old:staff/workflow/ficha.md#staff-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
@@ -201,6 +207,7 @@ Resuélvelas primero.».
 Implicados: ninguno
 
 ### STAFF-F03 Vincular la ficha con una cuenta del negocio
+<!-- origen: old-hub:HUB_SHELL-F80 old-hub:HUB_SHELL-F84 old-hub:HUB_SHELL-F85 old-hub:HUB_SHELL-F88 old-hub:HUB-F146 old-hub:HUB-F148 old-hub:HUB-F149 old-hub:HUB-F158 old:staff/workflow/ficha.md#staff-f03 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Personal
@@ -220,6 +227,7 @@ tiene acceso a este negocio.».
 Implicados: ninguno
 
 ### STAFF-F04 Crear, editar y retirar un rol
+<!-- origen: fi:modules/staff#command-staff-roles-create fi:modules/staff#query-staff-roles-list old:staff/workflow/ficha.md#staff-f04 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Roles
@@ -237,6 +245,7 @@ Si falla: «Ya existe un rol con ese nombre.» (sin distinguir mayúsculas, `sta
 Implicados: ninguno
 
 ### STAFF-F05 Desactivar a un profesional
+<!-- origen: fi:modules/staff#command-handler-wasm-staff-members-deactivate-deactivate_staff_member old:staff/workflow/ficha.md#staff-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Personal
@@ -254,6 +263,7 @@ miembro del personal ya está inactivo.»; «Ese miembro del personal no existe 
 Implicados: ninguno
 
 ### STAFF-F06 Dar de baja a un profesional
+<!-- origen: fi:modules/staff#command-staff-members-delete old:staff/workflow/ficha.md#staff-f06 qa:modules/staff/offboard-employee -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Personal
@@ -270,7 +280,8 @@ Si falla: «Ese miembro del personal no existe en este negocio.» si ya estaba d
 Implicados: ninguno
 
 ### STAFF-F07 Dar de alta a varios profesionales de golpe
-Estado: hecho (asistente y API; sin pantalla)
+<!-- origen: fi:modules/staff#command-handler-wasm-staff-members-bulk_create-bulk_create_staff_members old:staff/workflow/ficha.md#staff-f07 -->
+Estado: hecho (asistente y API)
 Actor: asistente, API
 Pantalla: asistente
 Pasos:
@@ -289,6 +300,7 @@ rechaza entero.
 Implicados: ninguno
 
 ### STAFF-F08 Ver mi propia ficha y mis ausencias
+<!-- origen: old:staff/workflow/ficha.md#staff-f08 -->
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquier persona con ficha vinculada), asistente
 Pantalla: Personal (vista propia) y Ausencias
@@ -302,6 +314,7 @@ Si falla: sin ficha o sin ausencias, vacío.
 Implicados: ninguno
 
 ### STAFF-F09 Dar el equipo a otras apps
+<!-- origen: wf:whatsapp-cita#rec_wa_cita-f04 old-hub:HUB_SHELL-F72 fi:modules/staff#event-emit-staff-member-created-updated-deactivated-terminated-staff-role-created-staff-time_off-created-status_changed-staff-schedule-created-staff-settings-updated old:staff/workflow/ficha.md#staff-f09 -->
 Estado: hecho (sin pantalla)
 Actor: sistema
 Pantalla: ninguna
@@ -317,6 +330,7 @@ Si falla: cada app lo trata a su manera.
 Implicados: ninguno
 
 ### STAFF-F13 Crear el horario semanal de un profesional
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 qa:verticals/beauty/01-services-professionals-and-schedules fi:modules/staff#command-handler-wasm-staff-schedules-create-create_schedule fi:modules/staff#query-staff-schedules-list_for_member old:staff/workflow/disponibilidad.md#staff-f13 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horarios
@@ -339,6 +353,7 @@ en este negocio.». Un turno que cruza la medianoche no se admite.
 Implicados: ninguno
 
 ### STAFF-F14 Editar un horario
+<!-- origen: old:staff/workflow/disponibilidad.md#staff-f14 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Horarios
@@ -354,6 +369,7 @@ Si falla: los mismos rechazos que al crear, o «Ese horario no existe en este ne
 Implicados: ninguno
 
 ### STAFF-F15 Activar, desactivar o eliminar un horario
+<!-- origen: old:staff/workflow/disponibilidad.md#staff-f15 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Horarios
@@ -368,6 +384,7 @@ Si falla: «Ese horario no existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F16 Saber cuándo puede trabajar un profesional
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 old:staff/workflow/disponibilidad.md#staff-f16 -->
 Estado: hecho (sin pantalla)
 Actor: sistema (Citas), asistente
 Pantalla: ninguna
@@ -385,6 +402,7 @@ al revés o de más de 731 días se rechaza en el campo.
 Implicados: ninguno
 
 ### STAFF-F17 Registrar una ausencia
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 fi:modules/staff#command-handler-wasm-staff-time_off-create-create_time_off fi:modules/staff#query-staff-time_off-list old:staff/workflow/ausencias.md#staff-f17 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ausencias
@@ -405,6 +423,7 @@ canceladas no cuentan. «Ese miembro del personal no existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F18 Aprobar o rechazar una ausencia
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 fi:modules/staff#command-staff-time_off-set_status old:staff/workflow/ausencias.md#staff-f18 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Ausencias
@@ -421,6 +440,7 @@ solicitud de ausencia no existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F19 Cancelar una ausencia
+<!-- origen: old:staff/workflow/ausencias.md#staff-f19 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable; el empleado, solo la suya pendiente
 Pantalla: Ausencias
@@ -435,19 +455,24 @@ cancela): «Solo puedes cancelar tus propias solicitudes pendientes.».
 Implicados: ninguno
 
 ### STAFF-F20 Ver quién falta hoy
-Estado: hecho (pantalla Ausencias); panel del inicio pendiente
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 qa:verticals/beauty/02-opening-and-daily-agenda fi:modules/staff#query-staff-time_off-today old:staff/workflow/ausencias.md#staff-f20 fi:modules/staff#widget-staff-time_off_today-timeline -->
+Estado: hecho
 Actor: todos
-Pantalla: Ausencias y paneles del inicio
+Pantalla: Ausencias y Personal
 Pasos:
-1. «Ausencias de hoy» lista a quien tiene una ausencia **aprobada** que cubre hoy (en el día del
-   negocio), de día entero primero y luego por nombre; «Ausentes hoy» los cuenta.
-2. Para el detalle, **Ausencias** con sus filtros.
+1. Abre **Ausencias**: encima de la tabla, «Ausencias de hoy» lista a quien tiene una ausencia
+   **aprobada** que cubre hoy (en el día del negocio), de día entero primero y luego por nombre, con el
+   tipo y, si es solo una parte del día, sus horas, y dice cuántas son.
+2. En **Personal**, la cifra «Ausentes hoy» cuenta las personas distintas que faltan hoy.
+3. Para el detalle, la tabla de **Ausencias** con sus filtros.
 Entra: las ausencias aprobadas y las fichas.
-Sale: solo lectura; sin el motivo.
-Si falla: sin ausencias, vacío.
+Sale: solo lectura; sin el motivo. Cambia sola cuando se aprueba o se cancela una ausencia.
+Si falla: sin ausencias, «Nadie falta hoy.»; si no se puede leer, «No se pudo cargar quién falta hoy»
+en su sitio, y la tabla sigue funcionando.
 Implicados: ninguno
 
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/staff#query-staff-commissions-summary old:staff/workflow/pago-y-ajustes.md#staff-f21 qa:modules/staff/commission-per-professional qa:verticals/beauty/07-closing-per-professional -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable; sistema (el cierre del día)
 Pantalla: Personal (columna Tarifa/h y formulario)
@@ -465,6 +490,7 @@ Si falla: sin permiso de compensación, «Se necesita el permiso…».
 Implicados: ninguno
 
 ### STAFF-F22 Cambiar los ajustes de Personal
+<!-- origen: old-hub:HUB_SHELL-F43 old-hub:HUB_SHELL-F44 fi:modules/staff#command-staff-settings-update fi:modules/staff#query-staff-settings-get fi:modules/staff#settings-bloque old:staff/workflow/pago-y-ajustes.md#staff-f22 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Ajustes de Personal
@@ -479,25 +505,34 @@ Pasos:
 Entra: lo enviado; lo demás se queda como estaba.
 Sale: los ajustes del negocio (`staff.settings.updated`), con las horas siempre en HH:MM. Hoy ningún
 comportamiento los lee (como en el producto actual).
-Si falla: un valor fuera de su rango sale debajo de su campo y no se guarda nada.
+Si falla: un valor fuera de su rango sale debajo de su campo y no se guarda nada. Si los ajustes no se
+pueden leer, «No se pudieron cargar los ajustes» con «Reintentar», sin formulario: nunca se ofrecen
+para guardar unos valores que no son los del negocio.
 Implicados: ninguno
 
 ### STAFF-F23 Ver las cifras de la plantilla y por rol
-Estado: hecho (columna «Miembros» de Roles); paneles del inicio pendientes
+<!-- origen: fi:modules/staff#query-staff-members-stats old:staff/workflow/pago-y-ajustes.md#staff-f23 fi:modules/staff#widget-staff-headcount-kpi fi:modules/staff#widget-staff-on_leave_today-stat fi:modules/staff#widget-staff-pending_time_off-kpi fi:modules/staff#widget-staff-by_role-bar-list -->
+Estado: hecho
 Actor: todos
-Pantalla: paneles del inicio y Roles
+Pantalla: Personal y Roles
 Pasos:
-1. Las cifras dan cuántas fichas hay, cuántas personas están **Activas**, **De baja** e
-   **Inactivas**, cuántas faltan hoy (personas distintas con una ausencia aprobada que cubre hoy) y
-   cuántas solicitudes esperan respuesta.
-2. «Miembros» de **Roles** da cuántas personas **Activas** lleva cada rol (el panel «Empleados por
-   rol»).
-Entra: las fichas, los roles y las ausencias.
+1. Abre **Personal**: encima de la tabla salen tres cifras: «Plantilla activa» (cuántas personas
+   están **Activas**), «Ausentes hoy» (personas distintas con una ausencia aprobada que cubre hoy) y
+   «Ausencias pendientes» (cuántas solicitudes esperan respuesta). En el móvil van en una sola línea,
+   para que la tabla se siga viendo debajo.
+2. Las cifras cambian solas, sin recargar, cuando alguien da de alta, desactiva o da de baja una ficha
+   o pide, aprueba, rechaza o cancela una ausencia.
+3. «Miembros» de **Roles** da cuántas personas **Activas** lleva cada rol (el panel «Empleados por
+   rol» del producto actual).
+Entra: las fichas, los roles y las ausencias. Por el asistente o la API, las cifras dan además
+cuántas fichas hay y cuántas están **De baja** e **Inactivas**.
 Sale: solo lectura. Las fichas dadas de baja y sus ausencias no cuentan.
-Si falla: sin datos, ceros.
+Si falla: sin datos, ceros; si no se pueden leer, «No se pudieron cargar las cifras» en su sitio, y la
+tabla sigue funcionando. Mientras llegan, cada cifra enseña «…».
 Implicados: ninguno
 
 ### STAFF-F24 Pedir mi propia ausencia
+<!-- origen: gh:staff#3 -->
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquier persona con ficha vinculada), asistente
 Pantalla: Ausencias
@@ -644,11 +679,11 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 
 ## Lo que queda fuera (páginas)
 
-- **Paneles del inicio** («Plantilla activa», «Ausentes hoy», «Ausencias de hoy», «Ausencias pendientes»,
-  «Empleados por rol»): el Hub aún no tiene tablero de inicio con paneles; las consultas
-  (`staff.member.stats`, `staff.time_off.today`, `staff.role.list`) ya están y se siguen en vivo.
 - **Alta en lote (STAFF-F07)**: es del asistente y de la API, como en el producto actual; no tiene
-  pantalla.
+  pantalla. Importar el equipo desde un fichero CSV (staff de services#152 del producto actual) no
+  existía y no se porta: el alta a mano o por el asistente cubre a un equipo de peluquería o de sala.
+- **Los paneles en el Inicio**: cuando el Hub tenga un Inicio con paneles, las cifras y «Ausencias de
+  hoy» podrán salir también allí; hoy salen dentro de Personal.
 - **Fechas y horas en el orden del idioma del negocio** (staff#86, staff#87 del producto actual): los
   campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga el suyo (`UI-REQUESTS.md`).
 
@@ -667,6 +702,12 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   ausencias» es el selector «Todas / Mis ausencias» de Ausencias (con el motivo).
 - Los selectores de listas largas (miembro, rol, usuario del Hub) buscan en el servidor
   (`frontend/components/SearchSelect.vue`).
+- Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
+  hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) son los paneles del Inicio viejo
+  (STAFF-G01…G05) dentro de la app, como las cifras de Clientes y «Fichados ahora» de Control horario;
+  sus tarjetas rehacen el `ok-kpi` hasta que `@erplora/ui` tenga una (`UI-REQUESTS.md`).
+- El formulario de la ficha retira la lectura de una apertura anterior: cerrarlo mientras carga no
+  deja el siguiente en «Cargando…».
 
 ## Lo que NO hace, a propósito
 
@@ -710,4 +751,6 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **Ajustes**: las horas salen siempre en HH:MM; se guarda solo lo enviado.
 - **Foto** de la ficha y **orden** de la ficha: no se portan; ninguna pantalla ni comando los escribía.
 - Las cifras ya no cuentan las ausencias pendientes de una ficha dada de baja.
+- **Los paneles del Inicio** (Plantilla activa, Ausentes hoy, Ausencias pendientes, Ausencias de hoy y
+  Empleados por rol) salen dentro de Personal mientras el Hub no tenga un Inicio con paneles.
 - Las listas paginan con hasta 100 por página.
