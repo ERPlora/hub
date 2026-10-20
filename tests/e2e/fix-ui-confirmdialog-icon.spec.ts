@@ -5,7 +5,8 @@
 // `HubIcon slot="start"` lost it (the DataTable puts its own back). Measured in the page at 390×844, 834×1112 and
 // 1440×900 (the shell pins Ionic's ios mode, ADR-0143; md has the same rule): from the icon's right edge to the
 // label's first letter, Ionic's 0.3em of the icon, and the same gap from the spinner while the confirmation runs.
-// What the run creates is deleted.
+// Only the gap comes back: the outer side (`margin-inline-start`) stays `0px`, as on main, or every SaaS button
+// that sets only its own gap pulled its icon into the padding (saas#54). What the run creates is deleted.
 // flow: ui:ConfirmDialog
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -40,6 +41,8 @@ interface Gap {
   startFontSize: number;
   /** What sits in `slot="start"`. */
   start: string;
+  /** Its margin on the outer side (`margin-inline-start`), as computed. */
+  outer: string;
 }
 
 /** The gap between a button's start icon (or spinner) and its label, measured on the laid-out page. */
@@ -56,13 +59,15 @@ function startGap(button: Locator): Promise<Gap> {
       gap: range.getBoundingClientRect().left - start.getBoundingClientRect().right,
       startFontSize: parseFloat(getComputedStyle(start).fontSize),
       start: start.tagName.toLowerCase(),
+      outer: getComputedStyle(start).marginInlineStart,
     };
   });
 }
 
-/** Ionic's own gap: 0.3em of the icon (1.35em of its button), never under 4px. */
+/** Ionic's own gap: 0.3em of the icon (1.35em of its button), never under 4px; the outer side as on main. */
 function expectIonicGap(measured: Gap, what: string): void {
   expect(measured.start, what).toBe('ion-icon');
+  expect(measured.outer, `${what}: ${JSON.stringify(measured)}`).toBe('0px');
   expect(measured.gap, `${what}: ${JSON.stringify(measured)}`).toBeGreaterThanOrEqual(4);
   expect(Math.abs(measured.gap - 0.3 * measured.startFontSize), `${what}: ${JSON.stringify(measured)}`).toBeLessThanOrEqual(0.5);
 }
@@ -125,6 +130,7 @@ test('ui:ConfirmDialog — the confirm button keeps its icon apart from «Deacti
     await expect(submit.locator(':scope > ion-spinner[slot="start"]')).toBeVisible();
     const pending = await startGap(submit);
     expect(pending.start).toBe('ion-spinner');
+    expect(pending.outer, `«Deactivate» pending: ${JSON.stringify(pending)}`).toBe('0px');
     expect(Math.abs(pending.gap - iconGap), `«Deactivate» pending: ${JSON.stringify(pending)}, icon ${iconGap}`).toBeLessThanOrEqual(0.5);
     release();
     await expect(dialog).toBeHidden();
