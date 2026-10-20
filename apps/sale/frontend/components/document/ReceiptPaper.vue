@@ -8,8 +8,9 @@
 // («qty × unit price», a gift «(On the house)», a line a voucher paid «Already paid · <voucher>»
 // (SALE-F27), the note), «Subtotal», a VAT row per fiscal key from the sale's breakdown (an
 // exempt key names its cause), «TOTAL», the payment rows and «Change», the discount already applied and
-// the footer. Every figure is the server's; this only lays them out. No fiscal QR yet: it arrives with
-// VeriFactu. `printPaper` prints a copy of this very element.
+// the fiscal QR and the footer. Every figure is the server's; this only lays them out. The fiscal QR is
+// VeriFactu's (VERIFACTU-F19, sales#411): «Tax QR:» over it, «VERI*FACTU» under it and how to check the ticket or
+// the invoice at the AEAT — its CSV once the AEAT answered. `printPaper` prints a copy of this very element.
 import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
@@ -18,6 +19,7 @@ import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { SaleOut, SettingsOut } from '../../operations';
+import type { FiscalRecord } from './FiscalRecordFollower.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -26,8 +28,10 @@ const props = withDefaults(
     settings?: Pick<SettingsOut, 'receipt_header' | 'receipt_footer'> | null;
     /** A reprint: «DUPLICATE» on top. */
     duplicate?: boolean;
+    /** VeriFactu's record of its fiscal document; none = no fiscal QR. */
+    record?: Pick<FiscalRecord, 'qr_svg' | 'qr_url' | 'csv'> | null;
   }>(),
-  { settings: null, duplicate: false },
+  { settings: null, duplicate: false, record: null },
 );
 
 const t = useT();
@@ -91,6 +95,13 @@ const payments = computed(() =>
 );
 /** Change is given in cash: a cash tender always says it, 0 included. */
 const showsChange = computed(() => props.sale.payments.some((payment) => payment.method_type === 'cash'));
+
+/** Under the QR: the AEAT's CSV once it answered, else how to check what the customer holds. */
+const qrHint = computed(() => {
+  if (!props.record) return '';
+  if (props.record.csv) return t('sale.document.qr.csv', { csv: props.record.csv });
+  return isInvoice.value ? t('sale.document.qr.checkInvoice') : t('sale.document.qr.checkReceipt');
+});
 
 const footer = computed(() =>
   [
@@ -284,6 +295,31 @@ const footer = computed(() =>
         </tr>
       </tbody>
     </table>
+    <template v-if="record">
+      <hr class="sale-receipt__rule">
+      <div
+        class="sale-receipt__qr"
+        data-testid="sale-receipt-qr"
+      >
+        <div class="sale-receipt__center">
+          {{ $t('sale.document.qr.label') }}
+        </div>
+        <img
+          class="sale-receipt__qr-image"
+          :src="record.qr_svg"
+          :alt="$t('sale.document.qr.alt')"
+        >
+        <div class="sale-receipt__center sale-receipt__qr-mark">
+          VERI*FACTU
+        </div>
+        <div
+          class="sale-receipt__center sale-receipt__qr-hint"
+          data-testid="sale-receipt-qr-hint"
+        >
+          {{ qrHint }}
+        </div>
+      </div>
+    </template>
     <template v-if="footer.length">
       <hr class="sale-receipt__rule">
       <div
@@ -400,6 +436,23 @@ const footer = computed(() =>
 }
 .sale-receipt__pay td {
   font-size: 10px;
+}
+.sale-receipt__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+/* The AEAT asks for a QR between 30 and 40 mm a side. */
+.sale-receipt__qr-image {
+  width: 35mm;
+  height: 35mm;
+}
+.sale-receipt__qr-mark {
+  font-weight: 700;
+}
+.sale-receipt__qr-hint {
+  font-size: 0.85em;
 }
 .sale-receipt__footer {
   font-size: 10px;

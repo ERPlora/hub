@@ -2,8 +2,8 @@
 // settings (first line = the name, else «My business»; the rest = the address), «DUPLICATE» on every
 // reprint, the number and the date and time, the customer, the lines («qty × unit price», a gift
 // «(On the house)», the note), «Subtotal», the VAT rows by rate from the sale's breakdown, «TOTAL», the
-// payment rows and «Change», the discount already applied and the footer. No fiscal QR: the invoice
-// number and the VeriFactu QR arrive with Invoicing and VeriFactu.
+// payment rows and «Change», the discount already applied and the footer. With VeriFactu's record of its
+// fiscal document, the fiscal QR: «Tax QR:» over it, «VERI*FACTU» under it and how to check it, or the AEAT's CSV.
 import { formatDateTime } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
@@ -224,9 +224,49 @@ describe('ReceiptPaper', () => {
     expect(original.find('sale-receipt-duplicate').exists()).toBe(false);
   });
 
-  it('carries no fiscal QR (VeriFactu arrives with its app) and no OutfitKit', () => {
+  it('carries no OutfitKit', () => {
     expect(source).not.toMatch(/<ok[-]/);
-    expect(source).not.toMatch(/VERI\*FACTU|QR tributario/);
+  });
+
+  describe('the fiscal QR (VERIFACTU-F19, sales#411)', () => {
+    const RECORD = {
+      qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+',
+      qr_url: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=TICKET-2026-000031',
+      csv: '',
+    };
+
+    it('with VeriFactu’s record: «QR tributario:» over it, «VERI*FACTU» under it and how to check the ticket, before the footer', async () => {
+      const s = await paper({ sale: saleOut({ discount_amount: 0 }), settings: SETTINGS, record: RECORD });
+      const qr = s.find('sale-receipt-qr');
+      expect(words(qr.element)).toBe('QR tributario: VERI*FACTU Escanéalo para cotejar este tique en la AEAT');
+      const image = qr.find('img');
+      expect(image.attributes('src')).toBe(RECORD.qr_svg);
+      expect(image.attributes('alt')).toBe('Código QR de VeriFactu');
+      const footer = s.find('sale-receipt-footer').element;
+      expect(qr.element.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const totals = s.all('sale-receipt-total-row');
+      expect(totals.length).toBeGreaterThan(0);
+    });
+
+    it('an invoice says so, and once the AEAT answered its CSV takes the place of the hint', async () => {
+      const invoice = await paper({ sale: saleOut({ document_type: 'invoice', invoice_number: 'FACT-2026-000012' }), record: RECORD });
+      expect(invoice.text('sale-receipt-qr-hint')).toBe('Escanéalo para cotejar esta factura en la AEAT');
+      const accepted = await paper({ sale: saleOut(), record: { ...RECORD, csv: 'A-YDSW8NLFLANWPM' } });
+      expect(accepted.text('sale-receipt-qr-hint')).toBe('CSV: A-YDSW8NLFLANWPM');
+    });
+
+    it('no record, no QR', async () => {
+      const s = await paper({ sale: saleOut(), settings: SETTINGS });
+      expect(s.find('sale-receipt-qr').exists()).toBe(false);
+      const none = await paper({ sale: saleOut(), settings: SETTINGS, record: null });
+      expect(none.find('sale-receipt-qr').exists()).toBe(false);
+    });
+
+    it('speaks English', async () => {
+      const s = await paper({ sale: saleOut(), record: RECORD }, 'en');
+      expect(words(s.find('sale-receipt-qr').element)).toBe('Tax QR: VERI*FACTU Scan it to check this receipt at the AEAT');
+      expect(s.find('sale-receipt-qr').find('img').attributes('alt')).toBe('VeriFactu QR code');
+    });
   });
 
   it('speaks English', async () => {

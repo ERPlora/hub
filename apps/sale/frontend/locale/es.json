@@ -391,6 +391,13 @@
         "issued": "Documentos fiscales emitidos.",
         "failed": "No se han podido emitir los documentos. Inténtalo de nuevo."
       },
+      "qr": {
+        "label": "QR tributario:",
+        "alt": "Código QR de VeriFactu",
+        "checkReceipt": "Escanéalo para cotejar este tique en la AEAT",
+        "checkInvoice": "Escanéalo para cotejar esta factura en la AEAT",
+        "csv": "CSV: {csv}"
+      },
       "paperPending": "Documento fiscal pendiente"
     },
     "sales": {

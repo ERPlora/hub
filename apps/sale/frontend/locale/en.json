@@ -391,6 +391,13 @@
         "issued": "Fiscal documents issued.",
         "failed": "The documents could not be issued. Try again."
       },
+      "qr": {
+        "label": "Tax QR:",
+        "alt": "VeriFactu QR code",
+        "checkReceipt": "Scan it to check this receipt at the AEAT",
+        "checkInvoice": "Scan it to check this invoice at the AEAT",
+        "csv": "CSV: {csv}"
+      },
       "paperPending": "Fiscal document pending"
     },
     "sales": {

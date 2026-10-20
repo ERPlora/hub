@@ -97,7 +97,7 @@ Configuración inicial, paso a paso:
    documento por defecto, cabecera y pie del tique (SALE-F34).
 2. **Secciones**, si se cobra a precio libre (frutería, varios) (SALE-F35).
 3. **Notas rápidas**, si la cocina recibe instrucciones repetidas (SALE-F36).
-4. Haz una venta de prueba con cada medio y comprueba el tique (SALE-F01, SALE-F02, SALE-F29).
+4. Haz una venta de prueba con cada medio y comprueba el tique y su QR fiscal (SALE-F01, SALE-F02, SALE-F29).
 
 ## Pantallas
 
@@ -936,7 +936,7 @@ Implicados: STAFF-F21
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 <!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
-Estado: hecho — sin el QR de VeriFactu, que llega con su app
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Documento de venta
@@ -947,12 +947,17 @@ Pasos:
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
    de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
-   cambio, y el pie. Si su documento fiscal no se pudo emitir al cobrar, el papel lo dice bajo el
-   número («Documento fiscal pendiente») y, encima del papel (fuera de lo que se imprime), el aviso
+   cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
+   «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
+   factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
+   no tiene registro de ese documento, el papel sale sin QR. Si su documento fiscal no se pudo emitir
+   al cobrar, el papel lo dice bajo el número («Documento fiscal pendiente») y, encima del papel (fuera
+   de lo que se imprime), el aviso
    «Documento fiscal pendiente — Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso).
    Cuando esté resuelto, emítelo ahora.» con «Emitir ahora».
 3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Toda impresión desde
-   **Ventas** sale con «DUPLICADO»; solo el primer papel justo tras cobrar es el original.
+   **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo tras cobrar es el
+   original.
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
    rectificativa de su anulación o la de una devolución) lleva la pastilla «Documento pendiente» bajo
    su estado y la acción «Emitir ahora» (quien cobra). «Emitir ahora» pide a Facturación, por nombre y
@@ -961,12 +966,12 @@ Pasos:
 Entra: la venta, con el número de su documento fiscal (que Facturación le dio en el mismo cobro).
 Sale: el papel; reimprimir no crea venta ni documento fiscal. «Emitir ahora» emite los documentos que
 esperaban (avisa: venta con su documento, uno por documento).
-Si falla: «Cargando documento…» y «Error cargando el documento». «No se pudo imprimir». «Emitir ahora»
+Si falla: «Cargando documento…» y «Error cargando el documento» (también si no se puede leer el QR
+fiscal: el papel nunca sale sin él). «No se pudo imprimir». «Emitir ahora»
 rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin palabras del
 servidor, «No se han podido emitir los documentos. Inténtalo de nuevo.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06
-Pendiente: el QR de VeriFactu llega con su app; el A4 de una factura con los datos del destinatario lo
-imprime Facturación (INVOICE-F18).
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, VERIFACTU-F19
+Pendiente: el A4 de una factura con los datos del destinatario lo imprime Facturación (INVOICE-F18).
 
 ### SALE-F30 Anular una venta cobrada
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 wf:cadena-fiscal#rec_fiscal-f13 qa:modules/sales/void-sale fi:modules/sales#command-sales-void-sql-transaccional old:sales/workflow/historial-y-correcciones.md#sales-f30 -->
