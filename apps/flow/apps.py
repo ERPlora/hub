@@ -20,14 +20,15 @@ class FlowConfig(LiveAppConfig):
     premium = False
     # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
     summary = _(
-        "Rules that run on their own: when something happens in your business, do something else."
+        "Rules that run on their own, on a schedule or when you run them: the repetitive work, done for you."
     )
+    # FLOW-F21 and FLOW-F17 are partial (phase 1): the card promises only what it does today.
     description = _(
-        "Automations runs the repetitive work for you: when a sale is charged, a customer is created or "
-        "a till is closed, or every day at a time, it does what you told it, such as leaving a task or a "
-        "note on a customer's card. Start from a ready-made card, allow it only what it needs, try it "
-        "without effects against something that really happened, turn it on and read in plain words "
-        "what it did each time. The assistant can draft one for you, and it waits for you to review it."
+        "Automations runs the repetitive work for you: every day, week or month at a time, on a date, or "
+        "when you run it, it does what you told it, such as leaving a task or a note on a customer's card. "
+        "Start from a ready-made card, allow it only what it needs, try it without effects, turn it on and "
+        "read in plain words what it did each time. Starting on its own when something happens in your "
+        "business comes in a later version."
     )
     # A salon and a restaurant both automate their follow-ups and their opening and closing chores.
     verticals = ["hair_salon", "restaurant"]

@@ -26,6 +26,11 @@ describe('wording', () => {
   });
 
   it('a live error frame the server worded keeps its sentence', () => {
+    // The SDK hands a live query's error frame as an `ApiError` with status 0 (`LIVE_ERROR_STATUS`): the
+    // server's sentence is kept the same as over HTTP; only its own breakdown says the screen's.
+    expect(wording(new ApiError(0, 'permission_denied', 'You do not have permission.'), FALLBACK)).toBe('You do not have permission.');
+    expect(wording(new ApiError(0, 'app_inactive', 'Automations is off.'), FALLBACK)).toBe('Automations is off.');
+    expect(wording(new ApiError(0, 'internal_error', 'Internal error'), FALLBACK)).toBe(FALLBACK);
     expect(wording({ code: 'permission_denied', message: 'You do not have permission.' }, FALLBACK)).toBe('You do not have permission.');
     expect(wording({ code: 'internal_error', message: 'boom' }, FALLBACK)).toBe(FALLBACK);
   });

@@ -3,6 +3,7 @@ scheduled tasks and the assistant's contract of every operation (``ai`` and desc
 
 import pytest
 from django.apps import apps
+from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import registry
 
@@ -190,3 +191,21 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
             assert op.permission == "flow.view", name
         else:
             assert op.permission == "flow.manage", name
+
+
+def test_the_store_card_promises_only_what_phase_1_does():
+    # FLOW-F21 and FLOW-F17 are partial: nothing starts an automation on an event of another app, and
+    # the Hub has no assistant. The store's card says what it does today and what comes later, like the
+    # guide and the WORKBOOK.
+    config = flow_app()
+    expected = {
+        "en": ("when something happens", "assistant", "when a sale is charged", "comes in a later version"),
+        "es": ("cuando pasa algo", "asistente", "cuando se cobra una venta", "llega en una versión posterior"),
+    }
+    for language, (happens, assistant, sale, later) in expected.items():
+        with translation.override(language):
+            summary, description = str(config.summary).lower(), str(config.description).lower()
+        assert happens not in summary, summary
+        assert assistant not in summary and assistant not in description
+        assert sale not in description, description
+        assert later in description, description

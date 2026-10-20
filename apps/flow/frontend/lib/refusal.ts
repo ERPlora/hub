@@ -7,12 +7,13 @@ import { ApiError } from '@erplora/ui/sdk';
 /** Codes of failures that carry no sentence for a person: the SDK's, and the server's own breakdown. */
 const UNWORDED = new Set(['client_error', 'network_error', 'unexpected_response', 'internal_error']);
 
-/** The sentence to show for `error`, or `''` when nothing failed. Also takes a live query's error frame
- *  (`{code, message}`), which the server always words unless it broke. */
+/** The sentence to show for `error`, or `''` when nothing failed. A live query's error frame reaches
+ *  here as an `ApiError` with status 0 (the SDK's `LIVE_ERROR_STATUS`), worded by the server like any
+ *  refusal unless it broke; a bare `{code, message}` is read the same way. */
 export function wording(error: unknown, fallback: string): string {
   if (error === null || error === undefined) return '';
   if (error instanceof ApiError) {
-    const worded = !UNWORDED.has(error.code) && error.status > 0 && error.status < 500 && error.message.trim() !== '';
+    const worded = !UNWORDED.has(error.code) && error.status < 500 && error.message.trim() !== '';
     return worded ? error.message : fallback;
   }
   if (error instanceof Error || typeof error !== 'object') return fallback;
