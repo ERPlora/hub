@@ -17,8 +17,17 @@ export async function flowShots(page: Page, key: string, ready: (page: Page) => 
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await ready(page);
-    // The table refits to its box: a frame, not a fixed wait.
+    // The table refits to its box and a sheet slides to its new size: a frame, then every animation that
+    // ends (a spinner never does), not a fixed wait.
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)))
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+    );
     await page.screenshot({ path: shot(`APP-PRINTING-${key}-${viewport.label}`) });
   }
   await page.setViewportSize(restore);

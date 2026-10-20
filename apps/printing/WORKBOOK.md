@@ -534,7 +534,7 @@ Implicados: PRINTING-F01
 Estado: hecho
 Vertical: común
 Actor: sistema
-Pantalla: Cola
+Pantalla: ninguna
 Pasos:
 1. Un trabajo se queda en la cola mientras espera, mientras el dispositivo lo imprime y después de
    acabar («Impreso», «Cancelado» o «Fallido»), con su número, su función, su impresora y sus sellos; al
