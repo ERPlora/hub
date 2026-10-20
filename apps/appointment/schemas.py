@@ -556,6 +556,11 @@ class AppointmentOut(AppointmentRow):
     charged_at: dt.datetime | None
     created_at: dt.datetime
     updated_at: dt.datetime
+    start_date_label: str = Field(
+        description="Its day ready to say, in the caller's language on the business's clock (e.g. martes, 5 de "
+        "marzo de 2030)."
+    )
+    start_time_label: str = Field(description="Its hour ready to say, 24-hour on the business's clock (e.g. 10:30).")
 
 
 class AppointmentPage(Page[AppointmentRow]):

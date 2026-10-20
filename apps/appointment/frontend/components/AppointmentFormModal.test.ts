@@ -53,6 +53,8 @@ const BOOKED: AppointmentOut = {
   charged_at: null,
   created_at: '2026-10-14T10:00:00+02:00',
   updated_at: '2026-10-14T10:00:00+02:00',
+  start_date_label: 'Monday, October 19, 2026',
+  start_time_label: '10:00',
 };
 
 const SERVICES = page([
@@ -306,7 +308,8 @@ describe('AppointmentFormModal: Edit appointment', () => {
         body: { id: 'r1', from_date: '2026-10-19', time: '12:00' },
       },
     ]);
-    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 0 cancelled because they no longer fit the pattern · 1 left alone because they are already charged']);
+    // appointments#293: only what happened, never «0 cancelled».
+    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because they are already charged']);
   });
 });
 

@@ -263,6 +263,30 @@ def test_a_caller_who_is_not_a_person_reads_a_visit_without_the_salons_notes_nor
     assert not set(agenda.rows[0].model_dump()) & set(private)
 
 
+# gh:appointments#151 — a flow's template prints a value as it comes, with no clock nor formatter: an
+# automation confirming a booking says «el martes a las 10:30» because the appointment gives its day and its
+# hour ready to read, in the language of whoever asks, on the business's clock (24 hours, like the agenda;
+# the year kept: a booking can be months away).
+def test_an_appointment_gives_its_day_and_hour_ready_to_read_in_the_callers_language(salon):
+    tuesday = dt.date(2030, 3, 5)
+    late = make_appointment(salon.lucia, salon.ana, [salon.cut], at(tuesday, "00:30"))
+    spanish = run("appointment.appointment.get", {"id": str(late.id)}, language="es")
+    assert (spanish.start_date_label, spanish.start_time_label) == ("martes, 5 de marzo de 2030", "00:30")
+    english = run("appointment.appointment.get", {"id": str(late.id)}, language="en")
+    assert (english.start_date_label, english.start_time_label) == ("Tuesday, March 5, 2030", "00:30")
+    booked = run(
+        "appointment.appointment.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "start": wall(MONDAY, "16:05"),
+        },
+        language="es",
+    )
+    assert booked.start_time_label == "16:05" and booked.start_date_label.startswith("lunes, ")
+
+
 # Counters
 
 

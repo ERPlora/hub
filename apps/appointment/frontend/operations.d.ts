@@ -83,6 +83,10 @@ export interface AppointmentOut extends AppointmentRow {
   charged_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Its day ready to say, in the caller's language («martes, 5 de marzo de 2030»). */
+  start_date_label: string;
+  /** Its hour ready to say, 24-hour on the business's clock («10:30»). */
+  start_time_label: string;
 }
 
 export interface AppointmentPage extends Page<AppointmentRow> {

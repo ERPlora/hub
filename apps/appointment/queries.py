@@ -19,7 +19,7 @@ from dataclasses import replace
 from uuid import UUID
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet
-from django.utils import timezone
+from django.utils import formats, timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -327,6 +327,15 @@ def for_caller(ctx: OperationContext, answer: dict) -> dict:
     return {name: "" if name in PRIVATE else value for name, value in answer.items()}
 
 
+def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
+    """``start``'s day and hour ready to say (a flow's template has no clock nor formatter, appointments#151):
+    the weekday and the date in the caller's language, and the hour in 24 hours as the agenda paints it."""
+    wall = start.astimezone(business_zone())
+    with translation.override(ctx.language):
+        day = f"{formats.date_format(wall, 'l')}, {formats.date_format(wall, 'DATE_FORMAT')}"
+    return {"start_date_label": day, "start_time_label": f"{wall:%H:%M}"}
+
+
 def detail(ctx: OperationContext, appointment: Appointment) -> dict:
     """An ``AppointmentOut``: everything, contact and notes included (for a person; ``for_caller``)."""
     return for_caller(
@@ -343,6 +352,7 @@ def detail(ctx: OperationContext, appointment: Appointment) -> dict:
             "charged_at": appointment.charged_at,
             "created_at": appointment.created_at,
             "updated_at": appointment.updated_at,
+            **start_labels(ctx, appointment.start),
         },
     )
 
