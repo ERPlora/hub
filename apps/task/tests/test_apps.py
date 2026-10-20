@@ -114,7 +114,7 @@ def test_navigation_is_the_two_tabs_of_the_old_module_with_registered_icons():
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.icon, entry.path) for entry in entries] == [
         ("tasks", "Tasks", "ion:checkmark-circle-outline", "/task/tasks"),
-        ("projects", "Projects", "ion:file-tray-outline", "/task/projects"),
+        ("projects", "Projects", "ion:folder-outline", "/task/projects"),
     ]
 
 
