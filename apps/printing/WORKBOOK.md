@@ -155,7 +155,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F02 | Encontrar una impresora de la red sin escribir su dirección | común | parcial: la app solo busca para el negocio al que está vinculada |
 | PRINTING-F03 | Añadir una impresora por su dirección | común | hecho |
 | PRINTING-F04 | Asignar qué sale por cada impresora | común | hecho |
-| PRINTING-F05 | Hacer una prueba de impresión | común | parcial: el papel sale con `/ws/print` |
+| PRINTING-F05 | Hacer una prueba de impresión | común | parcial: el papel sale cuando el dispositivo pueda recoger |
 | PRINTING-F06 | Elegir cómo imprime el negocio | común | hecho |
 | PRINTING-F07 | Imprimir el tique al cobrar | común | parcial: falta que Ventas lo pida |
 | PRINTING-F08 | Reimprimir un tique o una factura | común | parcial: falta que Ventas y Facturación lo pidan |
@@ -165,10 +165,10 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | parcial: falta que Inventario lo pida |
 | PRINTING-F13 | Abrir el cajón al cobrar | común | parcial: falta que Ventas lo pida |
 | PRINTING-F14 | Sacar del atasco un trabajo de impresión | común | hecho |
-| PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | retirado |
+| PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | hecho |
 | PRINTING-F16 | Mandar imprimir desde el asistente | común | hecho |
 | PRINTING-F17 | Imprimir el cierre de caja | común | parcial: falta que Caja lo pida |
-| PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: la recogida está hecha; el canal `/ws/print` es de `base` |
+| PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: falta el canal del dispositivo |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
 
@@ -267,8 +267,8 @@ Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
 ### PRINTING-F05 Hacer una prueba de impresión
 <!-- origen: old-hub:HUB_APP-F20 old-hub:HUB_PERIPHERALS-F14 old:printing/workflow/impresoras.md#printing-f05 -->
-Estado: parcial — la prueba se encola y la recoge el dispositivo (PRINTING-F18); el papel sale cuando
-`base` sirva `/ws/print` (bloque 6)
+Estado: parcial — la prueba entra en la cola y es la del dispositivo de esa impresora (PRINTING-F18); el
+papel no sale hasta que la plataforma sirva el canal por el que el dispositivo recoge los trabajos
 Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Impresoras
@@ -304,8 +304,8 @@ Implicados: PRINTING-F07, PRINTING-F13
 
 ### PRINTING-F07 Imprimir el tique al cobrar
 <!-- origen: old-hub:HUB_PERIPHERALS-F09 wf:restaurante-dia#rec_restaurante-f12 fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_APP-F19 old-hub:HUB_SHELL-F70 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/11-races-and-concurrency old-hub:HUB-F190 old-hub:HUB-F192 old:printing/workflow/documentos.md#printing-f07 qa:modules/printing/print-receipt qa:verticals/restaurant/07-payment-and-fiscal -->
-Estado: parcial — Impresión lo hace en cuanto se le pide (`printing.job.create` con `automatic`);
-falta que Ventas lo pida al cobrar (pedido al worker de `sale`) y el papel, con `/ws/print`
+Estado: parcial — Impresión lo hace en cuanto se le pide (con «automático»); falta que Ventas lo pida al
+cobrar (hoy imprime con el diálogo del dispositivo) y que el papel salga (PRINTING-F18)
 Vertical: común
 Actor: empleado
 Pantalla: Vender (de Ventas)
@@ -323,8 +323,9 @@ Implicados: SALE-F08, PRINTING-F13, PRINTING-F18
 
 ### PRINTING-F08 Reimprimir un tique o una factura
 <!-- origen: old-hub:HUB_PERIPHERALS-F09 old-hub:HUB_APP-F22 old-hub:HUB_SHELL-F77 qa:modules/printing/print-receipt qa:verticals/restaurant/07-payment-and-fiscal old:printing/workflow/documentos.md#printing-f08 -->
-Estado: parcial — Impresión acepta el tique (`receipt` con `duplicate`) y la factura (`invoice`, o la
-página A4 de Facturación para la impresora del sistema); falta que Ventas y Facturación lo pidan
+Estado: parcial — Impresión acepta el tique marcado como copia y la factura (en térmica, o la página A4
+para la impresora del sistema); falta que Ventas y Facturación lo pidan (hoy imprimen con el diálogo del
+dispositivo)
 Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Ventas, Facturas (de esas apps)
@@ -338,8 +339,8 @@ Implicados: SALE-F31
 
 ### PRINTING-F09 Imprimir la cuenta de la mesa
 <!-- origen: old-hub:HUB_PERIPHERALS-F11 qa:verticals/restaurant/07-payment-and-fiscal old:printing/workflow/documentos.md#printing-f09 qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 -->
-Estado: parcial — Impresión acepta la cuenta (`prebill`) y rechaza una sin líneas; falta que Ventas la
-pida
+Estado: parcial — Impresión acepta la cuenta y rechaza una sin líneas; falta que Ventas la pida (hoy la
+imprime con el diálogo del dispositivo)
 Vertical: restaurante
 Actor: empleado
 Pantalla: Vender (de Ventas)
@@ -386,8 +387,8 @@ Implicados: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Imprimir la etiqueta de un código de barras
 <!-- origen: old-hub:HUB_PERIPHERALS-F12 old:printing/workflow/documentos.md#printing-f12 -->
-Estado: parcial — Impresión acepta la etiqueta (`barcode_label`, función Etiqueta: nombre, código y
-precio; el código lo dibuja la impresora); falta que Inventario la pida (INVENTORY-F25)
+Estado: parcial — Impresión acepta la etiqueta (función Etiqueta: nombre, código y precio; el código lo
+dibuja la impresora); falta que Inventario la pida (INVENTORY-F25)
 Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Ficha del producto (de Inventario)
@@ -403,7 +404,8 @@ Implicados: INVENTORY-F25, PRINTING-F04
 ### PRINTING-F13 Abrir el cajón al cobrar
 <!-- origen: old-hub:HUB_APP-F21 old-hub:HUB_SHELL-F71 wf:restaurante-dia#rec_restaurante-f17 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/10-hardware-offline-and-recovery qa:verticals/restaurant/07-payment-and-fiscal old-hub:HUB-F207 old-hub:HUB_PERIPHERALS-F15 old:printing/workflow/documentos.md#printing-f13 qa:modules/printing/open-cash-drawer -->
 Estado: parcial — el trabajo del tique lleva la orden de abrir el cajón (o, con el tique apagado, un
-trabajo solo de cajón); falta que Ventas lo pida (F07)
+trabajo solo de cajón); falta que Ventas lo pida al cobrar (PRINTING-F07) y que el papel salga
+(PRINTING-F18)
 Vertical: común
 Actor: empleado
 Pantalla: Vender (de Ventas)
@@ -440,8 +442,8 @@ Implicados: PRINTING-F01
 
 ### PRINTING-F15 Llevar el texto antiguo del tique a Ventas
 <!-- origen: old-hub:HUB_SHELL-F76 old:printing/workflow/impresoras.md#printing-f15 -->
-Estado: retirado — la plataforma nueva no tiene cabecera ni pie de tique en Impresión que llevar: el
-texto del tique vive en los ajustes de Ventas desde el principio
+Estado: hecho — no hay texto antiguo que llevar: el encabezado y el pie del tique viven en los ajustes de
+Ventas desde el principio, y la nota de Ajustes lleva allí
 Vertical: común
 Actor: administrador
 Pantalla: Ajustes
@@ -450,8 +452,8 @@ Pasos:
 2. La nota del encabezado y el pie lleva, con «Abrir los ajustes del tique», a los ajustes de Ventas,
    donde se escribe el texto del tique.
 Entra: nada.
-Sale: nada.
-Si falla: no aplica.
+Sale: nada: el texto del tique se guarda en los ajustes de Ventas.
+Si falla: con Ventas apagada, la nota sale sin el enlace.
 Implicados: SALE-F02
 
 ### PRINTING-F16 Mandar imprimir desde el asistente
