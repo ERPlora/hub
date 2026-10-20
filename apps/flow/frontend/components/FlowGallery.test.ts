@@ -70,6 +70,9 @@ describe('Gallery', () => {
     expect(m.find('flow-card-open-welcome').text()).toContain('Unfinished');
     await click(m.find('flow-card-open-welcome').element);
     expect(m.find('flow-card-panel-welcome').text()).toContain('Careful: «Mine» already starts with the same thing.');
+    // flows#141: «Use this one» stays, second to «See it», and makes a second one.
+    expect((m.find('flow-card-use-welcome').element as unknown as { fill?: string }).fill).toBe('outline');
+    expect(m.find('flow-card-panel-welcome').exists()).toBe(true);
     await click(m.find('flow-card-see-welcome').element);
     expect(m.wrapper.emitted('openFlow')).toEqual([[mine]]);
   });

@@ -23,6 +23,7 @@ import uuid
 from typing import Any
 
 import pydantic
+from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -99,8 +100,28 @@ CHAIN_TOO_LONG = _(
     "A chain of %(count)s automations started it, more than the %(max)s allowed, so it stopped before doing "
     "anything."
 )
+FILTER_UNREADABLE = _(
+    "Its «Only when…» can no longer be read, so it did not go on. Open it, check «Only when…» and save it "
+    "again."
+)
+CONDITION_UNREADABLE = _(
+    "This «Only continue if…» can no longer be read, so it stopped. Open the automation, check this step "
+    "and save it again."
+)
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
+
+#: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
+HISTORY_DAYS = 90
+#: At most this many runs go per pass: bounded, never one mass delete at the busiest hour.
+PRUNE_BATCH = 500
+#: The runs that can no longer go on: what the history may forget (waiting and running ones never).
+FINISHED = (
+    FlowRun.Status.SUCCEEDED,
+    FlowRun.Status.STOPPED,
+    FlowRun.Status.FAILED,
+    FlowRun.Status.CANCELLED,
+)
 
 #: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
 RUN_ACTOR = "flow_run:"
@@ -674,6 +695,15 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
                 )
                 return
             if step["kind"] == "condition":
+                if not document.readable(step.get("when")):
+                    failure = StepFailed(
+                        "flow.condition_unreadable", str(CONDITION_UNREADABLE)
+                    )
+                    _log(run, step, "failed", now, error=failure.entry())
+                    _finish(
+                        ctx, run, FlowRun.Status.FAILED, now, failure.code, failure.message
+                    )
+                    return
                 failed = document.failed_clauses(step["when"], data)
                 if failed:
                     _log(run, step, "stopped", now, failed=failed)
@@ -751,6 +781,29 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         )
         if flow is None or FlowRun.objects.filter(flow=flow, trigger_key=key).exists():
             skipped += 1
+            continue
+        if not document.readable(flow.trigger_filter):
+            # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
+            run = _start(
+                ctx,
+                flow,
+                kind=Flow.Trigger.EVENT,
+                key=key,
+                input=data.payload,
+                now=now,
+                event_name=data.event,
+                chain=chain,
+            )
+            started += 1
+            with translation.override(flow.language):
+                _finish(
+                    ctx,
+                    run,
+                    FlowRun.Status.FAILED,
+                    now,
+                    "flow.filter_unreadable",
+                    str(FILTER_UNREADABLE),
+                )
             continue
         if not document.holds(
             flow.trigger_filter, {"input": data.payload, "steps": {}}
@@ -915,3 +968,32 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
     _advance(ctx, started, flow, now)
     return run_row(started)
 
+
+@operation(
+    "flow.run.prune",
+    kind="command",
+    permission=SYSTEM,
+    input=DueIn,
+    output=DueOut,
+    ai={
+        "description": "Scheduled task, every hour: deletes the finished runs older than 90 days (the history "
+        "keeps 90 days); a run that is waiting or running is never touched.",
+        "risk": "normal",
+    },
+)
+def prune_runs(ctx: OperationContext, data: DueIn) -> dict:
+    cutoff = timezone.now() - dt.timedelta(days=HISTORY_DAYS)
+    doomed = list(
+        FlowRun.objects.filter(status__in=FINISHED)
+        .annotate(ended=Coalesce("finished_at", "started_at"))
+        .filter(ended__lt=cutoff)
+        .order_by("ended", "id")
+        .values_list("pk", flat=True)[:PRUNE_BATCH]
+    )
+    if doomed:
+        FlowRun.objects.filter(pk__in=doomed).delete()
+        # Counted: a silent prune cannot be told from lost data the day somebody looks for an old run.
+        logger.info(
+            "flow: deleted %d finished runs older than %d days", len(doomed), HISTORY_DAYS
+        )
+    return {"count": len(doomed)}

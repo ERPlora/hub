@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CatalogOut, RunOut, Step } from '../operations';
-import { click, mountFlow, settle } from '../__tests__/mount-flow';
+import { click, errorFrame, mountFlow, settle } from '../__tests__/mount-flow';
 import HistoryPanel from './HistoryPanel.vue';
 
 const toastSuccess = vi.hoisted(() => vi.fn<(message: string) => Promise<void>>(async () => undefined));
@@ -53,6 +53,23 @@ describe('HistoryPanel', () => {
     const m = await setup([]);
     expect(m.params(OP)).toEqual([{ flow_id: 'f1', limit: 20, offset: 0 }]);
     expect(m.find('flow-history-empty').text()).toBe('It has not run yet.');
+  });
+
+  it('a history that could not be read says the screen\'s sentence when the server did not word it (hub#2320)', async () => {
+    const m = await mountFlow(HistoryPanel, { props: { flowId: 'f1', steps: STEPS, catalog: CATALOG } });
+    const call = await m.live();
+    call.push(errorFrame(m.subId(OP, { flow_id: 'f1' }), 'internal_error'));
+    await settle();
+    expect(m.find('flow-history-error').text()).toContain('It could not be read right now. Try again in a moment.');
+    expect(m.find('flow-history-error').text()).not.toContain('msg internal_error');
+  });
+
+  it('a refusal the server worded is shown as it came', async () => {
+    const m = await mountFlow(HistoryPanel, { props: { flowId: 'f1', steps: STEPS, catalog: CATALOG } });
+    const call = await m.live();
+    call.push(errorFrame(m.subId(OP, { flow_id: 'f1' }), 'permission_denied'));
+    await settle();
+    expect(m.find('flow-history-error').text()).toContain('msg permission_denied');
   });
 
   it('puts the ones that stopped by an error on top, with how many', async () => {

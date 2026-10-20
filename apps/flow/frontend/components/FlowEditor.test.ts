@@ -85,6 +85,16 @@ describe('FlowEditor: a new automation', () => {
     expect(s.find('flow-editor-run').exists()).toBe(false);
   });
 
+  it('opened right after being created, it says «Saved.» (FLOW-F09)', async () => {
+    const s = await setup({ flow: FLOW, initial: fromFlow(FLOW), savedNow: true });
+    expect(s.find('flow-editor-notice').text()).toBe('Saved.');
+  });
+
+  it('«Save» says its word, never an empty button (flows#144)', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    expect(s.find('flow-editor-save').text()).toBe('Save');
+  });
+
   it('adds steps with the four buttons, open, and saves the whole document', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() }, { '/api/flow/flows': [201, { ...FLOW, id: 'f9' }] });
     for (const kind of ['command', 'query', 'condition', 'delay']) await click(s.find(`flow-editor-add-${kind}`).element);
@@ -143,6 +153,14 @@ describe('FlowEditor: a saved automation', () => {
     expect(s.find('flow-editor-error').text()).toContain('Choose what this step does.');
     expect(s.wrapper.findComponent(StepNode).props('errors')).toEqual({ 'steps.0.operation': 'Choose what this step does.' });
     expect(s.wrapper.findComponent(StepNode).props('open')).toBe(true);
+  });
+
+  it('a save the Hub did not answer says so in words, never the technical text (hub#2320)', async () => {
+    const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) }, { '/api/flow/flows/update': [502, { detail: 'Bad gateway' }] });
+    await click(s.find('flow-editor-save').element);
+    await settle();
+    expect(s.find('flow-editor-error').text()).toContain('It could not be done right now. Try again in a moment.');
+    expect(s.find('flow-editor-error').text()).not.toContain('Unexpected response');
   });
 
   it('turning it on warns of the permissions it lacks and that it was not tried', async () => {
@@ -250,6 +268,7 @@ describe('FlowEditor: review 2026-10-15', () => {
   it('a catalog that could not be read is said, with «Retry» (item 5)', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) }, { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] });
     expect(s.find('flow-catalog-error').text()).toContain('What automations can use here could not be read.');
+    expect(s.find('flow-catalog-error').text()).not.toContain('Internal error');
     s.answerBy({ ...BASE_ANSWERS });
     await click(s.find('flow-catalog-retry').element);
     await settle();

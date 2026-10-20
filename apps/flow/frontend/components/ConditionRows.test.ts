@@ -11,8 +11,8 @@ const CHOICES = [
   { path: 'input.customer_id', group: 'input', example: 'c-1' },
 ];
 
-async function setup(modelValue: Record<string, Record<string, unknown>>) {
-  const m = await mountFlow(ConditionRows, { props: { modelValue, choices: CHOICES, steps: [], catalog: null, testid: 'cond' } });
+async function setup(modelValue: Record<string, Record<string, unknown>>, pick?: () => Promise<string | null>) {
+  const m = await mountFlow(ConditionRows, { props: { modelValue, choices: CHOICES, steps: [], catalog: null, testid: 'cond', pick } });
   const emitted = () => (m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value);
   const el = (testid: string) => m.find(testid).element;
   return { ...m, emitted, el };
@@ -52,5 +52,31 @@ describe('ConditionRows', () => {
     expect(s.emitted().at(-1)).toEqual({ 'input.total': { gte: 1 }, 'input.customer_id': { eq: '' } });
     await click(s.el('cond-remove-0'));
     expect(s.emitted().at(-1)).toEqual({ 'input.customer_id': { eq: '' } });
+  });
+
+  it('compares with another datum: picked, shown in words as a pill and taken out again (hub#1712)', async () => {
+    let asked = 0;
+    const s = await setup({ 'input.total': { gte: 10000 } }, async () => {
+      asked += 1;
+      return 'input.customer_id';
+    });
+    await click(s.el('cond-insert-0'));
+    expect(asked).toBe(1);
+    expect(s.emitted().at(-1)).toEqual({ 'input.total': { gte: 'input.customer_id' } });
+    expect(s.find('cond-pill-0').text()).toContain('Customer');
+    expect(s.wrapper.find('[data-testid="cond-value-0"]').exists()).toBe(false);
+    await click(s.el('cond-unpill-0'));
+    expect(s.emitted().at(-1)).toEqual({ 'input.total': { gte: '' } });
+    expect(s.wrapper.find('[data-testid="cond-value-0"]').exists()).toBe(true);
+  });
+
+  it('a datum it was saved with is a pill even without a picker; «present» and «one of» insert none', async () => {
+    const s = await setup({ 'input.total': { eq: 'input.customer_id' }, 'input.customer_id': { exists: true } });
+    expect(s.find('cond-pill-0').text()).toContain('Customer');
+    expect(s.wrapper.find('[data-testid="cond-insert-0"]').exists()).toBe(false);
+    const picking = await setup({ 'input.customer_id': { exists: true } }, async () => 'input.total');
+    expect(picking.wrapper.find('[data-testid="cond-insert-0"]').exists()).toBe(false);
+    await ionValue(picking.el('cond-op-0'), 'in');
+    expect(picking.wrapper.find('[data-testid="cond-insert-0"]').exists()).toBe(false);
   });
 });

@@ -164,15 +164,37 @@ def _compare(found: bool, actual: Any, operator: str, expected: Any) -> bool:
     return _order(actual, expected, operator)
 
 
+def _compared_with(expected: Any, data: dict) -> tuple[bool, Any]:
+    """``(there, value)`` of what a comparison compares with: a literal itself; another datum (a path, a
+    template, a list of them) read like any value — a path to a datum that is not there is not there."""
+    if is_path(expected):
+        return lookup(expected, data)
+    return True, resolve(expected, data)
+
+
 def failed_clauses(condition: dict, data: dict) -> list[dict]:
-    """The comparisons of ``condition`` that do not hold for ``data``, as ``{path, op, value}``."""
+    """The comparisons of ``condition`` that do not hold for ``data``, as ``{path, op, value}`` (the value
+    as written: a path stays a path, for the words that name it)."""
     failed = []
     for path, comparisons in condition.items():
         found, actual = lookup(path, data)
         for operator, expected in comparisons.items():
-            if not _compare(found, actual, operator, expected):
+            there, value = _compared_with(expected, data)
+            if not (there and _compare(found, actual, operator, value)):
                 failed.append({"path": path, "op": operator, "value": expected})
     return failed
+
+
+def readable(condition: Any) -> bool:
+    """Whether ``condition`` is one the engine can evaluate: paths to non-empty known comparisons (one
+    written raw, from the admin or by an older version, may not be)."""
+    return isinstance(condition, dict) and all(
+        is_path(path)
+        and isinstance(comparisons, dict)
+        and bool(comparisons)
+        and all(operator in OPERATORS for operator in comparisons)
+        for path, comparisons in condition.items()
+    )
 
 
 def holds(condition: dict, data: dict) -> bool:

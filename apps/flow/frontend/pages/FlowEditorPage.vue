@@ -14,6 +14,7 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLeaveGuard } from '../composables/useLeaveGuard';
 import { useT } from '../composables/useT';
 import { type FlowDocument, fromFlow } from '../lib/document';
+import { takeSaved } from '../lib/justSaved';
 
 const route = useRoute();
 const router = useRouter();
@@ -21,6 +22,7 @@ const t = useT();
 // The route's `:id` (the last segment of the address, as the tests' catch-all route gives it too).
 const id = String(route.params.id ?? route.path.split('/').filter(Boolean).at(-1) ?? '');
 const tab = typeof route.query.tab === 'string' ? route.query.tab : 'steps';
+const savedNow = takeSaved(id);
 
 const detail = useLive('flow.flow.detail', { id });
 const flow = computed(() => detail.data.value ?? null);
@@ -75,6 +77,7 @@ const title = computed(() => flow.value?.name || t('flow.unnamed'));
       :initial="initial"
       :draft="null"
       :tab="tab"
+      :saved-now="savedNow"
       @dirty="dirty = $event"
       @back="router.push('/flow/automations')"
     />

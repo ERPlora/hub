@@ -21,12 +21,13 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import { useServerTable } from '../composables/useServerTable';
 import { describeTrigger, runStatusPill, statePill } from '../lib/phrasing';
 import type { CatalogOut, FlowListIn, FlowOut, TriggerKind } from '../operations';
 
 defineProps<{ catalog: CatalogOut | null; /** Automations of the business, unfiltered. */ allTotal: number }>();
-const emit = defineEmits<{ open: [flow: FlowOut] }>();
+const emit = defineEmits<{ open: [flow: FlowOut]; ready: [] }>();
 const phrasing = usePhrasing();
 const { confirm } = useConfirm();
 
@@ -47,6 +48,18 @@ const query = computed<Omit<FlowListIn, 'limit' | 'offset'>>(() => ({
 }));
 const { data: result, status, error: listError, refresh } = useLiveList('flow.flow.list', () => query.value, () => table.windows.value);
 table.followResult(result);
+// Its first page (or failure) is painted: the page opens a linked card of the gallery below only then.
+let told = false;
+watch(
+  () => result.value ?? listError.value,
+  (answer) => {
+    if (answer && !told) {
+      told = true;
+      emit('ready');
+    }
+  },
+  { immediate: true },
+);
 
 const selected = ref<string[]>([]);
 const error = shallowRef<ApiError | null>(null);
@@ -125,7 +138,7 @@ const actions = computed<DataTableAction<FlowOut>[]>(() => [
   { id: 'delete', label: phrasing.value.t('flow.list.delete'), icon: 'ion:trash-outline', color: 'danger' },
 ]);
 
-const tableError = computed(() => (status.value === 'error' && listError.value ? listError.value.message : undefined));
+const tableError = computed(() => (status.value === 'error' && listError.value ? wording(listError.value, phrasing.value.t('flow.errors.read')) : undefined));
 </script>
 
 <template>
@@ -141,7 +154,7 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
       tone="danger"
       data-testid="flow-list-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.action')) }}
     </InlineFeedback>
     <DataTable
       v-model:search="table.search.value"

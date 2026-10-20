@@ -11,6 +11,7 @@ import { computed, ref } from 'vue';
 
 import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import { describeLog, runStatusPill } from '../lib/phrasing';
 import type { CatalogOut, RunOut, RunPageOut, Step } from '../operations';
 
@@ -82,7 +83,7 @@ const attentionText = computed(() => {
       tone="danger"
       data-testid="flow-history-error"
     >
-      {{ error.message }}
+      {{ wording(error, $t('flow.errors.read')) }}
       <IonButton
         size="small"
         fill="clear"

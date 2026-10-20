@@ -4,7 +4,7 @@
 // the events of this business (`flow.catalog.read`), in words, grouped by app and searchable, with
 // «Only when…» on what it brings —; a schedule (every day, week or month at a time, in the business's
 // time zone); once at a date and time; or only by hand. The server's refusals show by their field.
-import { Combo, type ComboOption } from '@erplora/ui/components';
+import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
@@ -23,6 +23,8 @@ const props = defineProps<{
   steps: readonly Step[];
   /** The server's refusals by field (`trigger.event`, `trigger.at`, `trigger.time`, `trigger`). */
   errors: Readonly<Record<string, string>>;
+  /** Opens the editor's picker on what the event brings, for a comparison with another datum. */
+  pick?: () => Promise<string | null>;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: Trigger]; toggle: [] }>();
 const phrasing = usePhrasing();
@@ -132,6 +134,13 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
         </IonSelect>
 
         <template v-if="trigger.kind === 'event'">
+          <!-- FLOW-F21: until the platform delivers the events of other apps (phase 2), nothing starts it. -->
+          <InlineFeedback
+            tone="info"
+            data-testid="flow-trigger-event-notice"
+          >
+            {{ $t('flow.trigger.eventNotYet') }}
+          </InlineFeedback>
           <Combo
             testid="flow-trigger-event"
             :model-value="chosenEvent"
@@ -149,6 +158,7 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
               testid="flow-trigger-filter"
               :model-value="trigger.filter"
               :choices="choices"
+              :pick="pick"
               :steps="steps"
               :catalog="catalog"
               @update:model-value="setFilter"

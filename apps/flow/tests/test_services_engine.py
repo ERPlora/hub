@@ -205,6 +205,27 @@ def test_a_read_that_counts_keeps_only_how_many():
     assert Task.objects.get().title == "There are 3"
 
 
+def test_a_read_that_counts_counts_every_row_not_just_the_page_it_reads():
+    for name in ("Ana", "Luis", "Eva"):
+        Customer.objects.create(name=name)
+    make_flow(
+        steps=[
+            {
+                "id": "s1",
+                "kind": "query",
+                "operation": "customer.customer.list",
+                "params": {"limit": 1},
+                "result": "count",
+            },
+            TASK_STEP
+            | {"id": "s2", "params": {"title": "There are {{steps.s1.count}}"}},
+        ],
+        grants=["customer.customer.list", "task.task.create"],
+    )
+    deliver()
+    assert Task.objects.get().title == "There are 3"
+
+
 def test_a_condition_that_does_not_hold_ends_the_run_without_error():
     make_flow(
         steps=[
@@ -507,3 +528,163 @@ def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
     waiting.refresh_from_db()
     assert (waiting.status, waiting.outputs) == (FlowRun.Status.SUCCEEDED, {})
     assert Task.objects.get().title == "Call Ana López"
+
+
+# The phase-1 worker (FLOW-F22, FLOW-F23): `run_worker` calls `base.scheduler.run_due` every tick, on
+# one fixed scope; these tests go through that same scheduler, with the tasks flow declares.
+
+
+def _flow_tasks():
+    from base import scheduler
+
+    return [task for task in scheduler.tasks() if task.app_label == "flow"]
+
+
+def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, settings, monkeypatch):
+    from base import scheduler
+
+    # The worker releases its connection after each task; the test's transaction must stay open.
+    monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
+    settings.WORKER_SCOPE_SLUG = "a"
+    clock(NOON - dt.timedelta(minutes=1))
+    scheduler.sync(NOON - dt.timedelta(minutes=1), declared=_flow_tasks())
+    daily = make_flow(
+        "Every day at noon",
+        trigger_kind=Flow.Trigger.SCHEDULE,
+        trigger_event="",
+        schedule={"every": "day", "time": "12:00"},
+        next_fire_at=NOON,
+    )
+    waits = make_flow(
+        "Wait two minutes",
+        steps=[{"id": "s1", "kind": "delay", "seconds": 120}, TASK_STEP | {"id": "s2"}],
+    )
+    deliver()
+    assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
+
+    clock(NOON)
+    assert sorted(scheduler.run_due(NOON)) == ["flow.fire_due", "flow.resume_due"]
+    fired = FlowRun.objects.get(flow=daily)
+    assert (fired.trigger_kind, fired.status) == ("schedule", FlowRun.Status.SUCCEEDED)
+    assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
+
+    clock(NOON + dt.timedelta(minutes=1))
+    assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1))) == [
+        "flow.fire_due",
+        "flow.resume_due",
+    ]
+    assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.SUCCEEDED
+    assert FlowRun.objects.filter(flow=daily).count() == 1
+    assert Task.objects.count() == 2
+
+
+def test_a_tick_with_nothing_due_records_and_announces_nothing(clock):
+    # hub#2612: a scheduled task that finds nothing to do leaves no event, so no live list re-runs.
+    flow = make_flow(
+        trigger_kind=Flow.Trigger.SCHEDULE,
+        trigger_event="",
+        schedule={"every": "day", "time": "09:00"},
+        next_fire_at=dt.datetime(2026, 10, 16, 9, 0, tzinfo=MADRID),
+    )
+    make_run(flow, status=FlowRun.Status.WAITING, resume_at=NOON + dt.timedelta(hours=1))
+    clock(NOON)
+    before = OutboxEvent.objects.count()
+    assert run("flow.schedule.fire_due", {}, _system()).count == 0
+    assert run("flow.run.resume_due", {}, _system()).count == 0
+    assert OutboxEvent.objects.count() == before
+
+
+# A document the engine can no longer read (hub#1766: written raw from the admin, or by an older
+# version): it fails visibly in its own history, and the other automations still run.
+
+
+def test_a_filter_it_cannot_read_fails_its_run_visibly_and_the_others_still_start(clock):
+    clock(NOON)
+    fine = make_flow("Fine")
+    broken = make_flow("Broken", trigger_filter={"input.total": {"bigger": 10}})
+    assert deliver().started == 2
+    failed = FlowRun.objects.get(flow=broken)
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.filter_unreadable")
+    assert "«Only when…»" in failed.error_message
+    assert FlowRun.objects.get(flow=fine).status == FlowRun.Status.SUCCEEDED
+    assert Task.objects.count() == 1
+
+
+def test_a_condition_it_cannot_read_stops_the_run_with_its_reason(clock):
+    clock(NOON)
+    make_flow(
+        steps=[
+            {"id": "s1", "kind": "condition", "when": {"input.total": {"bigger": 10}}},
+            TASK_STEP | {"id": "s2"},
+        ]
+    )
+    deliver(payload={"total": 20})
+    failed = FlowRun.objects.get()
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.condition_unreadable")
+    assert failed.log[-1]["outcome"] == "failed"
+    assert failed.log[-1]["error"]["code"] == "flow.condition_unreadable"
+    assert Task.objects.count() == 0
+
+
+# The history keeps 90 days (FLOW-F16, hub#699; the old Hub's `retention.rs`, Ioan 2026-08-10): a
+# finished run older than that is deleted, in bounded passes, counted; live work is never touched.
+
+
+def test_the_history_forgets_finished_runs_after_90_days_but_never_live_ones(clock, caplog):
+    clock(NOON)
+    flow = make_flow()
+    old = NOON - dt.timedelta(days=91)
+    recent = NOON - dt.timedelta(days=89)
+    gone = [
+        make_run(flow, status=status, started_at=old, finished_at=old)
+        for status in (
+            FlowRun.Status.SUCCEEDED,
+            FlowRun.Status.STOPPED,
+            FlowRun.Status.FAILED,
+            FlowRun.Status.CANCELLED,
+        )
+    ]
+    kept = [
+        make_run(flow, status=FlowRun.Status.SUCCEEDED, started_at=recent, finished_at=recent),
+        make_run(flow, status=FlowRun.Status.WAITING, started_at=old, resume_at=NOON + dt.timedelta(days=1)),
+        make_run(flow, status=FlowRun.Status.RUNNING, started_at=old),
+    ]
+    with caplog.at_level("INFO", logger="apps.flow.services"):
+        assert run("flow.run.prune", {}, _system()).count == len(gone)
+    assert set(FlowRun.objects.values_list("pk", flat=True)) == {r.pk for r in kept}
+    assert "4 finished runs older than 90 days" in caplog.text
+    assert run("flow.run.prune", {}, _system()).count == 0
+
+
+def test_the_prune_goes_in_bounded_passes(clock, monkeypatch):
+    from apps.flow import services
+
+    clock(NOON)
+    flow = make_flow()
+    old = NOON - dt.timedelta(days=120)
+    for days in range(3):
+        moment = old - dt.timedelta(days=days)
+        make_run(flow, started_at=moment, finished_at=moment)
+    monkeypatch.setattr(services, "PRUNE_BATCH", 2)
+    assert run("flow.run.prune", {}, _system()).count == 2
+    # The oldest go first.
+    assert FlowRun.objects.get().finished_at == old
+    assert run("flow.run.prune", {}, _system()).count == 1
+
+
+def test_a_condition_compares_two_data_of_the_run(clock):
+    # hub#1712: saved well and then never matching is what the old engine did with a datum as the value.
+    clock(NOON)
+    make_flow(
+        steps=[
+            {"id": "s1", "kind": "condition", "when": {"input.total": {"eq": "input.expected"}}},
+            TASK_STEP | {"id": "s2"},
+        ]
+    )
+    deliver(payload={"total": 12500, "expected": 12500})
+    deliver(payload={"total": 12500, "expected": 9900})
+    assert sorted(FlowRun.objects.values_list("status", flat=True)) == [
+        FlowRun.Status.STOPPED,
+        FlowRun.Status.SUCCEEDED,
+    ]
+    assert Task.objects.count() == 1

@@ -15,6 +15,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useCatalog } from '../composables/useCatalog';
 import { usePhrasing } from '../composables/usePhrasing';
+import { wording } from '../lib/refusal';
 import {
   addStep,
   type DataChoice,
@@ -47,6 +48,8 @@ const props = defineProps<{
   initial: FlowDocument;
   draft: DraftOut | null;
   tab: string;
+  /** Opened right after it was created: it starts saying «Saved.». */
+  savedNow?: boolean;
 }>();
 const emit = defineEmits<{ saved: [flow: FlowOut]; back: []; dirty: [dirty: boolean] }>();
 
@@ -88,7 +91,7 @@ const openStep = ref<string | null>(null);
 const errors = ref<Record<string, string>>({});
 /** The refusal or failure said above the tab. */
 const problem = ref('');
-const notice = ref('');
+const notice = ref(props.savedNow ? phrasing.value.t('flow.editor.saved') : '');
 
 // ── The last real event, for the picker and «Only when…» ──
 const sample = shallowRef<Record<string, unknown> | null>(null);
@@ -203,7 +206,7 @@ async function save(): Promise<void> {
     emit('saved', flow);
   } catch (failure) {
     const refused = failure as ApiError;
-    problem.value = refused.message;
+    problem.value = wording(refused, phrasing.value.t('flow.errors.action'));
     errors.value = fieldErrors(refused.fields);
     openFirstError(errors.value);
   }
@@ -226,7 +229,7 @@ async function run(): Promise<void> {
     if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
     else void toastSuccess(t(ran.status === 'waiting' ? 'flow.editor.ranWaiting' : 'flow.editor.ran'));
   } catch (failure) {
-    problem.value = (failure as ApiError).message;
+    problem.value = wording(failure, phrasing.value.t('flow.errors.action'));
   }
 }
 
@@ -316,7 +319,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
         tone="danger"
         data-testid="flow-catalog-error"
       >
-        {{ $t('flow.catalogError') }} {{ catalogError.message }}
+        {{ $t('flow.catalogError') }} {{ wording(catalogError, '') }}
         <IonButton
           size="small"
           fill="clear"
@@ -390,6 +393,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
           :choices="triggerChoices"
           :steps="doc.steps"
           :errors="errors"
+          :pick="pickFor(0)"
           @update:model-value="setTrigger"
           @toggle="toggleStep('trigger')"
         />

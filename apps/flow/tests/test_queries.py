@@ -45,6 +45,15 @@ def test_the_catalog_lists_the_events_of_the_active_apps_but_its_own():
     assert (created.app, created.app_name) == ("customer", "Customers")
 
 
+def test_an_event_an_app_lists_in_another_apps_name_stays_out_of_the_catalog(monkeypatch):
+    from apps.customer import events as customer_events
+
+    monkeypatch.setattr(customer_events, "ALL", [*customer_events.ALL, "ghost.thing.happened"])
+    names = {event.name for event in run("flow.catalog.read").events}
+    assert "customer.customer.created" in names
+    assert "ghost.thing.happened" not in names
+
+
 def test_the_catalog_names_the_apps_in_the_callers_language():
     with translation.override("es"):
         catalog = run("flow.catalog.read", ctx=ctx_for(language="es"))
@@ -292,6 +301,18 @@ def test_the_sample_is_the_newest_event_of_this_business():
     )
     nothing = run("flow.event.sample", {"event": "task.task.created"})
     assert (nothing.found, nothing.payload, nothing.at) == (False, {}, None)
+
+
+def test_the_sample_of_a_real_customer_carries_no_personal_data():
+    # hub#826, hub#2525: the example beside each datum is what the event brought, and an event brings
+    # ids, never a customer's name, city or notes (the real Customers app, not a hand-made outbox row).
+    created = run(
+        "customer.customer.create",
+        {"name": "Berta Segunda", "city": "Madrid", "notes": "Allergic to latex"},
+    )
+    sample = run("flow.event.sample", {"event": "customer.customer.created"})
+    assert sample.payload == {"id": str(created.id)}
+    assert "Berta" not in json.dumps(sample.payload)
 
 
 def test_the_sample_needs_manage():
