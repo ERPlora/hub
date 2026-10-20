@@ -490,6 +490,31 @@ def test_by_professional_money_only_after_two_partial_refunds_of_a_line_weighs_w
     assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 921
 
 
+def test_by_professional_refunds_of_two_sales_interleaved_in_time_keep_each_sale_apart(catalog):
+    # Reviewer regression (hub#93, round 1): the refunds of a sale are taken together, in their order,
+    # even when another sale's refund was made between them; a group split by time would start that
+    # sale over from what it charged and share money only on a line already given back whole.
+    ana, luis, bea = uuid7(), uuid7(), uuid7()
+    first = charge(
+        "refund-staff-0015",
+        lines=[{"product": "STK", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    other = charge("refund-staff-0016", staff_id=str(bea), payments=[{"method": "card"}])
+    steak = next(line for line in first.lines if line.sku == "STK")
+    give_back(first, 1800, {"line_id": str(steak.id)})
+    give_back(other, 50)
+    give_back(first, 100)  # money only: all of it to the coffee, the steak has nothing left
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (bea, 121, 50, 71),
+        (ana, 121, 100, 21),
+        (luis, 1800, 1800, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 92
+
+
 def test_by_professional_lines_nobody_served_keep_their_refund_out_of_the_rows(catalog):
     # Reviewer regression (hub#93): what nobody served is neither a row nor a refund of anyone, and the
     # rows plus it still square with the period's revenue.
