@@ -5,9 +5,17 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
+
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/BookingsPage.vue', () => ({ default: { name: 'BookingsPage' } }));
+vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
+vi.mock('./pages/PreviewPage.vue', () => ({ default: { name: 'PreviewPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(join(HERE, 'routes.ts'), 'utf8');
@@ -43,11 +51,11 @@ describe('online booking routes.ts', () => {
     expect(SOURCE).toMatch(/import\.meta\.env\.DEV\s*\?/);
   });
 
-  it('loads each page on demand (one chunk per page), not at boot', { timeout: 30_000 }, async () => {
+  it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
-    expect(await load(route('/online_booking/bookings'))).toBe((await import('./pages/BookingsPage.vue')).default);
-    expect(await load(route('/online_booking/settings'))).toBe((await import('./pages/SettingsPage.vue')).default);
-    expect(await load(route('/online_booking/preview'))).toBe((await import('./pages/PreviewPage.vue')).default);
+    expect(await load(route('/online_booking/bookings'))).toEqual({ name: 'BookingsPage' });
+    expect(await load(route('/online_booking/settings'))).toEqual({ name: 'SettingsPage' });
+    expect(await load(route('/online_booking/preview'))).toEqual({ name: 'PreviewPage' });
   });
 
   it('imports types only at the top, so main.ts can glob it before the shell boots', () => {

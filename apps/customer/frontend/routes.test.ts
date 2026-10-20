@@ -9,6 +9,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
 
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/CustomerListPage.vue', () => ({ default: { name: 'CustomerListPage' } }));
+vi.mock('./pages/CustomerDetailPage.vue', () => ({ default: { name: 'CustomerDetailPage' } }));
+vi.mock('./pages/GroupListPage.vue', () => ({ default: { name: 'GroupListPage' } }));
+vi.mock('./pages/TagListPage.vue', () => ({ default: { name: 'TagListPage' } }));
+vi.mock('./pages/FieldListPage.vue', () => ({ default: { name: 'FieldListPage' } }));
+vi.mock('./pages/CustomerSearchPreviewPage.vue', () => ({ default: { name: 'CustomerSearchPreviewPage' } }));
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(join(HERE, 'routes.ts'), 'utf8');
 const APPS_PY = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
@@ -42,17 +53,14 @@ describe('customer routes.ts', () => {
     for (const path of menu) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
 
-  // Importing every page (and Ionic with them) takes a few seconds on a cold run.
-  it('loads each page on demand (one chunk per page), not at boot', { timeout: 30_000 }, async () => {
+  it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
-    expect(await load(route('/customer/customers'))).toBe((await import('./pages/CustomerListPage.vue')).default);
-    expect(await load(route('/customer/customers/:id'))).toBe((await import('./pages/CustomerDetailPage.vue')).default);
-    expect(await load(route('/customer/groups'))).toBe((await import('./pages/GroupListPage.vue')).default);
-    expect(await load(route('/customer/tags'))).toBe((await import('./pages/TagListPage.vue')).default);
-    expect(await load(route('/customer/fields'))).toBe((await import('./pages/FieldListPage.vue')).default);
-    expect(await load(route('/customer/preview/customer-search'))).toBe(
-      (await import('./pages/CustomerSearchPreviewPage.vue')).default,
-    );
+    expect(await load(route('/customer/customers'))).toEqual({ name: 'CustomerListPage' });
+    expect(await load(route('/customer/customers/:id'))).toEqual({ name: 'CustomerDetailPage' });
+    expect(await load(route('/customer/groups'))).toEqual({ name: 'GroupListPage' });
+    expect(await load(route('/customer/tags'))).toEqual({ name: 'TagListPage' });
+    expect(await load(route('/customer/fields'))).toEqual({ name: 'FieldListPage' });
+    expect(await load(route('/customer/preview/customer-search'))).toEqual({ name: 'CustomerSearchPreviewPage' });
   });
 
   it('hands the customer id to the card as a prop (Ionic keeps one view per URL)', () => {

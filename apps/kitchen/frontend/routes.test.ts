@@ -4,10 +4,20 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
 import { KITCHEN_TABS } from './tabs';
+
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/DisplayPage.vue', () => ({ default: { name: 'DisplayPage' } }));
+vi.mock('./pages/TicketsPage.vue', () => ({ default: { name: 'TicketsPage' } }));
+vi.mock('./pages/StationsPage.vue', () => ({ default: { name: 'StationsPage' } }));
+vi.mock('./pages/HistoryPage.vue', () => ({ default: { name: 'HistoryPage' } }));
+vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -27,15 +37,15 @@ describe('kitchen routes.ts', () => {
     ]);
   });
 
-  it('loads each page on demand (one chunk per page), not at boot', { timeout: 60_000 }, async () => {
+  it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
     const pages = await Promise.all(routes.map(load));
     expect(pages).toEqual([
-      (await import('./pages/DisplayPage.vue')).default,
-      (await import('./pages/TicketsPage.vue')).default,
-      (await import('./pages/StationsPage.vue')).default,
-      (await import('./pages/HistoryPage.vue')).default,
-      (await import('./pages/SettingsPage.vue')).default,
+      { name: 'DisplayPage' },
+      { name: 'TicketsPage' },
+      { name: 'StationsPage' },
+      { name: 'HistoryPage' },
+      { name: 'SettingsPage' },
     ]);
   });
 
