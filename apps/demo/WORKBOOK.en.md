@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a4d3331ef4ffeff766769742dfd03625dc0ff9bf73c62cccca56303e6431a08e -->
+<!-- generated from WORKBOOK.md sha256:df13dfd434f8f81d77f45bc1b2a1dd79931b46291f23b67b5decb5350e9a5107 -->
 
 ## What it is for and who it is for
 
@@ -25,54 +25,55 @@ It is the list-and-detail pattern of any back office on the market (Odoo, Shopif
 a paginated list with a search box and a status filter, a detail page with its lines, a form with
 the error next to each field, and deletion with confirmation. The line that appears instantly and is
 undone if the server rejects it is the "optimistic update" of Linear, Trello or Google Docs. Safely
-repeating a request with an identifier set by the client is Stripe's idempotency key.
+repeating a request with an identifier set by the client is Stripe's idempotency key. An item page
+that is deleted elsewhere, or that the person can no longer see, stops showing it and says why, like
+Odoo's "record that no longer exists".
 
 ## Before you start
 
-- You need to sign in with a user who has a role in that business. The Hub has no login of its own:
-  without a session, the page sends you to the SaaS's login (`http://localhost:8001/hub-login/?hub=a`),
-  which comes back with a one-time code and the role in that business (in development, the SaaS
-  account `owner@example.com` / `owner`, owner of `a` and `b`). The Hub's Django admin belongs to the
-  platform and only lives at `http://hubs.localhost:8000/admin/` (at `a.localhost:8000/admin/`,
-  404): the staff come in from the "Hubs" page of the SaaS admin (`platform@example.com` /
-  `platform`); no business role gets into it.
-- In phase 1 the business is the **first part of the address**: `a.localhost:8000` is business `a`
-  and `b.localhost:8000` is business `b`. In phase 2 each business will be a hub with its own
-  database.
-- ⚠️ In phase 1 both businesses **share the items** (a single database, no tenancy). What is already
-  kept apart is the **live notice**: saving in `a` only refreshes the screens open in `a`. Those in
-  `b` see the change when they reload or with the next notice of `b`.
+- You need to sign in with an account that has a role in that business. Demo has no sign-in of its
+  own: without a session, it takes you to the ERPlora sign-in, which comes back to the business with
+  your role.
+- In phase 1 the business is the **first part of the address** (business `a` and business `b`). In
+  phase 2 each business will have its own data.
+- ⚠️ In phase 1 both businesses **share the items**. What is already kept apart is the **live
+  notice**: saving in `a` only refreshes the screens open in `a`. Those in `b` see the change when they
+  reload or with the next notice of `b`.
 
 ## Screens
 
-Demo opens from the **Demo** menu and has two screens and a form.
+Demo opens from **"My apps"**, at the top right, and has two screens and two forms.
 
 ### Items (list)
 A table with Name, Status ("Open" / "Done"), Lines (how many it has) and Updated. A "Search…" box by
-name (not case-sensitive); a status filter ("All", "Open", "Done"); 50 per page, from the most
-recently changed to the oldest. A **+** (create) button only for those who can manage. Tapping a row
-opens the item page. Above it, the figures "Open", "Done" and "Lines", only for those who can manage.
+name (not case-sensitive); the funnel opens "Filters", with the status one ("All", "Open", "Done"); 50
+per page (it can be changed), from the most recently changed to the oldest, as a table or as cards; on
+a phone, "Load more". A **"New item"** button only for those who can manage. Tapping a row opens the
+item page. Above it, the figures "Open", "Done" and "Lines", only for those who can manage.
 
-![The list of items on a phone, with the figures, the search box and the status filter](docs/img/items-list.png)
+![The list of items on a phone, with the figures, the search box, the filters funnel and "New item"](docs/img/items-list.png)
 
 ### Item page
 Name, status, note and the list of lines (text and quantity, in the order they were added). Actions
-for those who can manage: "Edit", "Delete" and "Add line". If someone else changes the item while
-you are editing the note, your note **is not overwritten** and "Updated elsewhere" is shown.
+for those who can manage: "Edit", "Mark done" (or "Reopen"), "Delete", "Save note" and "Add line". If
+someone else changes the note while you are writing it, your note **is not overwritten** and "Updated
+elsewhere" is shown, with "Reload" to take the other person's. If the item is deleted elsewhere, or
+the person can no longer see it, the page stops showing it and says why.
 
-### Form (create and edit)
+### New item and Edit item (forms)
 Fields Name (required, up to 120 characters), Status and Note. "Save". A value that is not valid is
-shown under its field and nothing is saved.
+shown under its field and nothing is saved. Those who cannot manage see "You do not have permission"
+instead of the form.
 
 ## States of each screen
 
 | State | What the person sees |
 |---|---|
-| Loading | "Loading…" while the first result arrives. |
-| Empty | "No items yet" (or "No results" if there is a search or a filter), with **+** if they can create. |
-| Error | "The items could not be loaded" with "Retry". |
+| Loading | "Loading…" on the list and a spinner on the item page while the first result arrives. |
+| Empty | "No items yet" (or "No results" if there is a search or a filter), with "New item" if they can create; an item page without lines, "No lines yet". |
+| Error | "The items could not be loaded" with "Retry"; on the item page, "The item could not be loaded" with the reason. |
 | Reconnecting | What is on screen stays; a banner says "Reconnecting…" until the connection is back. |
-| App inactive (`app_inactive`) | "This app is not active in this business". It does not retry on its own: it comes back when the app is activated. |
+| App inactive | "This app is not active in this business". It does not retry on its own: it comes back when the app is activated. |
 | No permission | What they cannot do does not appear; if they get there another way, "You do not have permission". |
 
 ## Flows
@@ -91,9 +92,9 @@ Status: done
 Actor: administrator, manager
 Screen: Items
 Steps:
-1. In **Items**, tap **+**: the form opens.
+1. In **Items**, tap "New item": the "New item" form opens.
 2. Type the Name; Status ("Open" to begin with) and Note are optional.
-3. Tap "Save". The form closes and the item comes first in the list, with 0 lines.
+3. Tap "Save". You are back on the list and the item comes first, with "no lines".
 In: nothing from other apps.
 Out: the item, in a single step; Demo announces a new item (`demo.item.created`) and the list and
 the figures refresh.
@@ -106,9 +107,11 @@ Status: done
 Actor: administrator, manager
 Screen: Item page
 Steps:
-1. On the item page, tap "Edit" (or change the status or the note).
-2. Change what you need and save. Only what is sent changes; the rest stays as it was.
-3. The item page and the list show the new data and the item moves to the top of the list.
+1. On the item page, tap "Edit": "Edit item" opens with the saved data.
+2. Change what you need and tap "Save". Only what you touched changes; the rest stays as it was.
+3. You are back on the item page with the new data, and the item moves to the top of the list.
+4. Without opening the form, on the same page: "Mark done" (or "Reopen") changes the status, and
+   "Save note" saves the note written.
 In: the item as it is saved.
 Out: the changed item; Demo announces the change (`demo.item.updated`). Saving without changing
 anything notifies nobody.
@@ -121,11 +124,12 @@ Status: done
 Actor: administrator, manager
 Screen: Item page
 Steps:
-1. On the item page, tap "Delete".
-2. Confirm in the "Delete item" window. The item and its lines disappear.
+1. On the item page, tap "Delete": "Delete this item and its lines?" is shown.
+2. Tap "Delete" to confirm ("Cancel" deletes nothing). You are back on the list and the item is no
+   longer there, nor its lines.
 In: the chosen item.
 Out: the item and its lines, deleted; Demo announces it (`demo.item.deleted`). The other tablets that
-have its page open see "This item no longer exists."
+have its page open see "This item no longer exists.", without the item or its buttons.
 If it fails: "This item no longer exists." if someone else deleted it first.
 Involved: none
 
@@ -139,15 +143,15 @@ Steps:
 3. When it answers, the provisional line is swapped for the saved one without anyone noticing.
 In: the item, its status and its lines.
 Out: the line, at the end (the position after the last one), and the item as just changed; Demo
-announces it (`demo.item.line_added`).
-Repeating is safe: each line carries an identifier set by the tablet. If the same request arrives
-twice (a retry because of poor coverage), the second one returns the item page as it is, **without
-duplicating the line or notifying again**. With the same identifier, the first line saved wins. A
-retry of a line that already went in is accepted even if the item was closed afterwards.
+announces it (`demo.item.line_added`). Repeating is safe: each line carries an identifier set by the
+tablet, and if the same line arrives twice (a retry because of poor coverage), the second one returns
+the item page as it is, **without duplicating the line or notifying again**; with the same
+identifier, the first line saved wins, and a retry of a line that already went in is accepted even if
+the item was closed afterwards.
 If it fails: if the item is "Done", the provisional line **is undone** and "This item is closed: open
-it to add lines." is shown (409 `demo.item_done`). An empty text or one longer than 200 characters,
-or a quantity that is not greater than zero (up to 3 decimals), is shown next to its field. If the
-item no longer exists: "This item no longer exists."
+it to add lines." is shown. Without text, "Add line" cannot be tapped, and the text does not go past
+200 characters; a quantity that is not greater than zero (up to 3 decimals) is shown under its field.
+If the item no longer exists: "This item no longer exists."
 Involved: none
 
 ### DEMO-F05 See the change on another tablet in under a second
@@ -171,14 +175,15 @@ Status: done
 Actor: employee
 Screen: Items and Item page
 Steps:
-1. An employee opens **Demo**: they see the list and the item page, without **+**, "Edit",
-   "Delete", "Add line" or figures.
-2. If they try through the API or the assistant, it is rejected.
+1. An employee opens **Demo**: they see the list and the item page, without "New item", "Edit",
+   "Mark done", "Delete", "Save note", "Add line" or figures; the note is read-only.
+2. If they open the create or edit form by hand, they see "You do not have permission"; if they try
+   through the API or the assistant, it is rejected.
 In: their role in that business.
 Out: nothing changes.
-If it fails: "You do not have permission" (403 `permission_denied`). Without a session, 401
-`unauthorized` and the sign-in screen. If their permission is removed with the screen open, the
-subscription is cut with the error at the next refresh.
+If it fails: "You do not have permission". Without a session, it takes them to the sign-in. If their
+permission is removed with the screen open, at the next refresh the item page stops showing the item
+and says "You do not have permission".
 Involved: none
 
 ## Services: what goes in and what comes out
@@ -225,11 +230,6 @@ Nothing: Demo depends on no app.
 | View items | yes | yes | yes | yes | `demo.view` |
 | Manage items and see the figures | yes | yes | yes | no | `demo.manage` |
 
-Business roles arrive from the SaaS as they are and are stored with a prefix: `hub_owner`,
-`hub_admin`, `hub_manager` and `hub_employee` (the keys of `role_permissions`); on screen only their
-translated name is shown. The owner and the administrator always have every permission of every app;
-the manager and the employee, those each app declares. A role without the prefix is rejected at
-sign-in. No business role grants `is_staff`: the platform roles (superuser and the `support` group)
-only reach the Hub through the `hub-admin` audience (the Hub admin at `hubs`), on a local copy of
-their own for the staff, `saas-staff:<id>`, kept apart from the customer copy `saas:<id>` and with no
-role in any hub.
+The owner and the administrator always have every permission of every app; the manager and the
+employee, those each app declares. The platform roles (the ERPlora team) have no role in any
+business.
