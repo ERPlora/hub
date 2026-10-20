@@ -470,14 +470,15 @@ Actor: responsable, administrador, empleado
 Pantalla: Detalle de la sesión
 Pasos:
 1. En el detalle de una sesión, pulsa «Imprimir».
-2. Con **Impresión** encendida, el informe va a la cola de la impresora de recibos y sale «Informe enviado
-   a la impresora …» (o «… a la impresora de recibos» si no hay una elegida); el dispositivo con esa
-   impresora lo saca en papel. Con la sesión abierta es el «Informe parcial (X)»; cerrada, el «Cierre de
+2. Con **Impresión** encendida y una impresora de recibos activa, el informe va a su cola y sale «Informe
+   enviado a la impresora …» (o «… a la impresora de recibos» si no hay una elegida); el dispositivo con
+   esa impresora lo saca en papel. Con la sesión abierta es el «Informe parcial (X)»; cerrada, el «Cierre de
    caja (Z)».
 3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
    se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
    entradas, salidas, invitaciones, el esperado y, en el Z, el contado y el descuadre.
-4. Sin Impresión encendida en el negocio, sale el diálogo de impresión del navegador con el mismo informe.
+4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
+   navegador con el mismo informe (en la cola esperaría para siempre).
 Entra: el resumen de la sesión, el mismo que enseña la pantalla.
 Sale: un trabajo en la cola de recibos de Impresión (o el papel del navegador). Cada «Imprimir» es un papel
 nuevo.
@@ -718,7 +719,7 @@ cajero del producto actual es un empleado.
 
 - No cobra ni factura: Ventas, Facturación y VeriFactu.
 - No abre el cajón físico: Impresión. El informe X o Z lo imprime Impresión, en su cola de recibos (sin
-  Impresión, el diálogo del navegador).
+  Impresión o sin impresora de recibos, el diálogo del navegador).
 - No lleva varios cajones abiertos a la vez: una sesión por negocio.
 - No reabre turnos ni edita o borra movimientos o arqueos: se corrige con otro movimiento.
 - No gestiona propinas, banco ni caja fuerte más allá de una salida de efectivo.

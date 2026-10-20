@@ -6,7 +6,7 @@ index): two opens at once open one. Closing, recording and counting lock the ses
 (``select_for_update``), so two closes at once close it once and nothing lands in a session being closed.
 Closing copies the shift's sale lines into the session: a closed session never moves again. Printing a
 session's report puts it in Printing's queue by its operation's name (``printing.job.create``): Printing off
-or absent is nothing queued, and the screen prints through the browser.
+or absent, or no active receipt printer in it, is nothing queued, and the screen prints through the browser.
 """
 
 import datetime as dt
@@ -620,7 +620,8 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
     ai={
         "description": "Print the report of a cash session (by its id or number) on the receipt printer: the partial "
         "report (X) while it is open, the closing (Z) once closed, with its float, sales by payment method, refunds, "
-        "cash in and out, comps, expected, counted and difference. Without Printing on, nothing is queued. A blind "
+        "cash in and out, comps, expected, counted and difference. Without Printing on or an active receipt printer, "
+        "nothing is queued. A blind "
         "count keeps an open session's report from whoever may not see the expected cash.",
         "risk": "normal",
     },
@@ -632,8 +633,13 @@ def print_session(ctx: OperationContext, data: SessionGetIn) -> dict:
     report = "x" if session.is_open else "z"
     nothing = {"report": report, "queued": False, "job_id": None, "printer": None}
     try:
+        summary = operation_named("printing.job.summary")
         create = operation_named("printing.job.create")
-    except UnknownOperation:
+        printing = summary(ctx, summary.input.model_validate({}))
+    except (UnknownOperation, AppInactive):
+        return nothing
+    # Without an active receipt printer the paper would wait in the queue for ever: the browser prints it.
+    if not any(row.usage == "receipt" and row.printers for row in printing.usages):
         return nothing
     request = {
         "job_key": f"cash-session-{session.id}-{report}-{uuid.uuid7()}",

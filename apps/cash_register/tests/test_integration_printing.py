@@ -1,8 +1,8 @@
 """The X and Z reports through the Hub's print queue (CASH_REGISTER-F16; Printing's PRINTING-F17), against the
 real printing app: «Print» puts a ``cash_session_report`` in the queue of the receipt printer, with the
-session's figures as the paper shows them. Without Printing in the business nothing is queued and the
-screen prints through the browser; a blind count does not print an open session's figures to whoever may
-not see the expected cash."""
+session's figures as the paper shows them. Without Printing in the business, or without an active receipt
+printer in it (the paper would wait for ever), nothing is queued and the screen prints through the browser;
+a blind count does not print an open session's figures to whoever may not see the expected cash."""
 
 import datetime as dt
 
@@ -32,8 +32,17 @@ def lines(job: PrintJob) -> list[tuple[str, float]]:
 
 
 @pytest.fixture
-def shift(coffee):
-    """A shift of 100.00 € with a 1.50 € coffee charged in cash and 0.50 € taken out."""
+def till(db):
+    """The business's receipt printer, made by Printing."""
+    return run(
+        "printing.printer.create",
+        {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"},
+    )
+
+
+@pytest.fixture
+def shift(coffee, till):
+    """A shift of 100.00 € with a 1.50 € coffee charged in cash and 0.50 € taken out, and a receipt printer."""
     session = open_session(10000)
     charge()
     run(
@@ -108,6 +117,23 @@ def test_every_print_is_a_paper_of_its_own(shift):
     first, second = print_report(shift), print_report(shift)
     assert first.job_id != second.job_id
     assert PrintJob.objects.filter(source_app="cash_register").count() == 2
+
+
+def test_without_an_active_receipt_printer_nothing_is_queued_and_the_screen_prints(shift, till):
+    run("printing.printer.update", {"printer": str(till.id), "is_active": False})
+    printed = print_report(shift)
+    assert (printed.queued, printed.job_id) == (False, None)
+    assert not PrintJob.objects.exists()
+    run(
+        "printing.printer.create",
+        {"name": "Bar", "kind": "network", "address": "192.168.1.51", "usage": "kitchen"},
+    )
+    assert print_report(shift).queued is False
+
+
+def test_the_receipt_printer_named_is_said(shift):
+    run("printing.settings.update", {"receipt_printer": "Till"})
+    assert print_report(shift).printer == "Till"
 
 
 def test_without_printing_in_the_business_nothing_is_queued_and_the_screen_prints(shift, monkeypatch):
