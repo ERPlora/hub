@@ -222,6 +222,11 @@
         "full": "«{group}» is full: take one out to choose another.",
         "less": "One less {name}",
         "loadFailed": "The options of this product could not be read. Try again."
+      },
+      "menu": {
+        "badge": "Menu",
+        "chooseIn": "Choose {n} in «{course}»",
+        "loadFailed": "The menus could not be read. Try again."
       }
     },
     "checkout": {

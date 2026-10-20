@@ -2,8 +2,8 @@
 // what the line carries and when «Add» waits.
 import { describe, expect, it } from 'vitest';
 
+import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import {
-  type ChoiceGroup,
   addedCents,
   choose,
   chosenIds,
@@ -23,7 +23,7 @@ const option = (id: string, price_delta = 0, is_default = false) => ({
   is_default,
 });
 
-const group = (id: string, min: number, max: number, ids: string[], more: Partial<ChoiceGroup> = {}): ChoiceGroup => ({
+const group = (id: string, min: number, max: number, ids: string[], more: Partial<TargetGroupOut> = {}): TargetGroupOut => ({
   id,
   name: id,
   kitchen_name: '',

@@ -31,6 +31,8 @@ MAX_OPTIONS = 100
 
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
+SAY_WHICH_MENU = _("Say which menu: its id, or its name.")
+SAY_WHICH_DISH = _("Say which dish: the choice's id, or its product's SKU or name.")
 SAY_WHICH_DEPARTMENT = _(
     "Say which section (or tax category) the open price is charged at."
 )
@@ -398,6 +400,50 @@ class ProductLineIn(LineFields):
         return self
 
 
+class ComboChoiceIn(Closed):
+    """A dish picked in a menu of Menus (COMBO-F08): by the choice's id, or by its product (and course)."""
+
+    option_id: UUID | None = Field(None, description="The choice's id (combo.combo.for_sale).")
+    product: Said | None = Field(
+        None, description="The SKU or name of the product picked, when the choice's id is not known."
+    )
+    group: Said | None = Field(
+        None, description="The course it is picked in, when the product is in several."
+    )
+    quantity: int = Field(
+        1, ge=1, le=MAX_OPTIONS, description="How many times it is picked in one menu (two coffees: 2)."
+    )
+
+    @model_validator(mode="after")
+    def _named(self):
+        if self.option_id is None and self.product is None:
+            raise ValueError(str(SAY_WHICH_DISH))
+        return self
+
+
+class ComboLineFields(LineFields):
+    """A menu of Menus with the dishes picked: Menus checks it and prices it, and the line keeps its answer."""
+
+    combo_id: UUID | None = Field(None, description="The menu's id (combo.combo.for_sale).")
+    combo: Said | None = Field(None, description="The menu's name, when its id is not known.")
+    choices: list[ComboChoiceIn] = Field(
+        default_factory=list,
+        max_length=MAX_OPTIONS,
+        description="The dishes picked, course by course. Menus checks each course (its minimum, maximum and "
+        "repeats) and prices the menu: its closed price plus the supplements, frozen on the line.",
+    )
+
+    @model_validator(mode="after")
+    def _named(self):
+        if self.combo_id is None and self.combo is None:
+            raise ValueError(str(SAY_WHICH_MENU))
+        return self
+
+
+class ComboLineIn(ComboLineFields):
+    pass
+
+
 class OpenLineFields(LineFields):
     """A line at an open price: typed amount, charged at a department's (or a tax category's) VAT."""
 
@@ -482,6 +528,11 @@ class OrderOpenIn(Closed):
         max_length=MAX_LINES,
         description="Lines of services of the Services app to start with.",
     )
+    combo_lines: list[ComboLineIn] = Field(
+        default_factory=list,
+        max_length=MAX_LINES,
+        description="Menus of the Menus app to start with, each with its dishes.",
+    )
 
 
 class OrderRefIn(Closed):
@@ -501,6 +552,12 @@ class OrderAddOpenLineIn(OpenLineFields):
 
 
 class OrderAddServiceLineIn(ServiceLineFields):
+    model_config = ConfigDict(extra="forbid")
+
+    order_id: UUID = Field(description="The open check's id.")
+
+
+class OrderAddComboLineIn(ComboLineFields):
     model_config = ConfigDict(extra="forbid")
 
     order_id: UUID = Field(description="The open check's id.")
@@ -627,6 +684,29 @@ class ModifierLineOut(Schema):
     quantity: int = Field(description="How many per unit of the dish.")
 
 
+class ComboDishOut(Schema):
+    option_id: UUID = Field(description="The choice of Menus picked.")
+    group_name: str = Field(description="Its course, when it was ordered.")
+    product_id: UUID = Field(description="Its product (Inventory).")
+    product_name: str = Field(description="Its name.")
+    category_id: UUID | None = Field(description="Its product's first category (the kitchen's routing).")
+    is_service: bool = Field(description="A service product never moves stock.")
+    quantity: int = Field(description="Picks of it in one menu.")
+    price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.")
+    tax_category_key: str | None = Field(description="Its tax category when the menu is split.")
+    amount: int | None = Field(description="Its part of one menu's amount, in cents, when the menu is split.")
+
+
+class ComboLineOut(Schema):
+    combo_id: UUID = Field(description="The menu of Menus.")
+    kitchen_name: str = Field(description="What the kitchen reads as the menu's name.")
+    supply_kind: str = Field(description="service (eaten in) or goods (to take away).")
+    split: bool = Field(
+        description="True: charged as one line per dish, each at its own tax category and part of the amount."
+    )
+    components: list[ComboDishOut] = Field(description="Its dishes, course by course.")
+
+
 class OrderLineOut(Schema):
     id: UUID = Field(description="The line's id.")
     position: int = Field(description="Its place in the check.")
@@ -680,6 +760,9 @@ class OrderLineOut(Schema):
         description="The options of another tax category: each one charged on a child line of its own."
     )
     kitchen_text: str = Field(description="What the kitchen reads under the dish (+CHEESE, -ONION).")
+    combo: ComboLineOut | None = Field(
+        description="A menu of Menus: its dishes and how it is charged, frozen when it was ordered."
+    )
 
 
 class OrderOut(Schema):
@@ -769,6 +852,11 @@ class ChargeLinesIn(Schema):
         max_length=MAX_LINES,
         description="Loose lines of services of the Services app (a counter sale).",
     )
+    combo_lines: list[ComboLineIn] = Field(
+        default_factory=list,
+        max_length=MAX_LINES,
+        description="Loose menus of the Menus app, each with its dishes (a counter sale).",
+    )
     discount_percent: Percent = Field(
         Decimal("0"), description="Counter sale only: ticket discount in %."
     )
@@ -778,7 +866,7 @@ class ChargeLinesIn(Schema):
 
     @model_validator(mode="after")
     def _one_source(self):
-        loose = bool(self.lines or self.open_lines or self.service_lines)
+        loose = bool(self.lines or self.open_lines or self.service_lines or self.combo_lines)
         if (self.order_id is None) == (not loose) or (
             self.order_id is not None and loose
         ):
@@ -917,6 +1005,10 @@ class PreviewLineOut(Schema):
     is_child: bool = Field(
         description="An option of another tax category, charged on a line of its own under its dish."
     )
+    combo_name: str = Field(
+        description="The menu this line charges, or a dish of (a menu split per dish); empty otherwise."
+    )
+    components: list[str] = Field(description="The dishes of a menu charged in one line.")
 
 
 class PreviewOut(Schema):
@@ -947,6 +1039,12 @@ class PreviewOut(Schema):
     ticket_limit: int | None = Field(
         description="Above this total, only an invoice (Spain: 300000); empty = no limit."
     )
+
+
+class SaleDishOut(Schema):
+    product_id: UUID = Field(description="The dish's product (Inventory).")
+    product_name: str = Field(description="Its name.")
+    quantity: int = Field(description="How many in one menu.")
 
 
 class SaleLineOut(Schema):
@@ -990,6 +1088,9 @@ class SaleLineOut(Schema):
     parent_line_id: UUID | None = Field(
         description="The line of the dish an option of another tax category hangs from."
     )
+    combo_id: UUID | None = Field(description="The menu of Menus this line charges, or a dish of.")
+    combo_name: str = Field(description="That menu's name: the receipt's header of its dishes.")
+    components: list[SaleDishOut] = Field(description="The dishes of the menu charged in this line.")
 
 
 class SalePaymentOut(Schema):

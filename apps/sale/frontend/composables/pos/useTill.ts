@@ -14,7 +14,7 @@ import { computed, type ComputedRef, type Ref, shallowRef } from 'vue';
 
 import { mergeableLine, mergeableServiceLine, plusOne } from '../../components/pos/till';
 import { refusal } from '../../lib/refusal';
-import type { OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
+import type { ComboChoiceIn, OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
 import { useT } from '../useT';
 import { useCurrentCheck } from './useCurrentCheck';
 
@@ -47,6 +47,8 @@ export interface Till {
   addOpenLine(line: OpenLine, staffId: string | null): Promise<WriteResult>;
   /** A service of Services: its own price, or `unitPrice` (cents) when it has no fixed price. */
   addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult>;
+  /** A menu of Menus with the dishes picked (SALE-F12): always a line of its own; Menus prices it. */
+  addComboLine(combo: { id: string }, staffId: string | null, choices: readonly ComboChoiceIn[]): Promise<WriteResult>;
   setQuantity(line: OrderLineOut, quantity: string): Promise<void>;
   toggleGift(line: OrderLineOut): Promise<void>;
   setNote(line: OrderLineOut, notes: string): Promise<WriteResult>;
@@ -88,6 +90,7 @@ export function useTill(options: TillOptions): Till {
   const addLine = useCommand('sale.order.add_line');
   const addOpen = useCommand('sale.order.add_open_line');
   const addServiceLine = useCommand('sale.order.add_service_line');
+  const addCombo = useCommand('sale.order.add_combo_line');
   const updateLine = useCommand('sale.order.update_line');
   const removeLine = useCommand('sale.order.remove_line');
   const lineStaff = useCommand('sale.order.set_line_staff');
@@ -220,6 +223,25 @@ export function useTill(options: TillOptions): Till {
     });
   }
 
+  function addComboLine(combo: { id: string }, staffId: string | null, choices: readonly ComboChoiceIn[]): Promise<WriteResult> {
+    // Only the choices travel: Menus prices the menu on the server. Each menu is a line of its own (its dishes
+    // differ), so a second one never raises the first.
+    const menu = { combo_id: combo.id, choices: [...choices], ...staffOf(staffId) };
+    return serial(async () => {
+      try {
+        const id = order.value?.id ?? check.id.value;
+        if (!id) {
+          await opened(() => open.run({ ...labelOf(), combo_lines: [menu] }));
+          return { ok: true };
+        }
+        accept(await addCombo.run({ order_id: id, ...menu }));
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') };
+      }
+    });
+  }
+
   const setQuantity = (line: OrderLineOut, quantity: string) =>
     toast(
       attempt(
@@ -342,6 +364,7 @@ export function useTill(options: TillOptions): Till {
     addProductLine,
     addOpenLine,
     addService,
+    addComboLine,
     setQuantity,
     toggleGift,
     setNote,

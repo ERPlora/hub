@@ -5,9 +5,16 @@
 // full, one without a ceiling never fills, an option that may be repeated has a counter. The sheet never closes
 // on its own. The money shown is a preview: Modifiers values the line on the server and the browser only sends
 // the ids.
-import type { TargetGroupOut } from '../../../modifier/frontend/operations';
-
-export type ChoiceGroup = TargetGroupOut;
+/** What the rules read of a group: Modifiers' groups of a product and Menus' courses of a menu (SALE-F12) both
+ *  are one. */
+export interface ChoiceGroup {
+  readonly id: string;
+  readonly min_choices: number;
+  /** 0 = no ceiling. */
+  readonly max_choices: number;
+  readonly allow_repeat: boolean;
+  readonly options: readonly { readonly id: string; readonly price_delta: number; readonly is_default?: boolean }[];
+}
 
 export interface Choice {
   /** The ids chosen, in the order chosen; a repeated option appears once per time. */

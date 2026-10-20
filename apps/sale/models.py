@@ -362,6 +362,13 @@ class OrderLine(UUIDModel):
     kitchen_text = models.CharField(
         _("kitchen text"), max_length=500, blank=True, default="", db_default=""
     )
+    # A menu of Menus (SALE-F12): its id and what Menus answered when it was ordered (COMBO-F08) —
+    # ``choices`` as picked, ``kitchen_name``, ``supply_kind``, ``split``, ``tax_category_key`` and the
+    # ``components`` in order. ``unit_price`` is the amount ordered; charging asks Menus again with it.
+    combo_id = models.UUIDField(_("menu"), null=True, blank=True)
+    combo = models.JSONField(
+        _("menu as ordered"), default=dict, blank=True, db_default={}, encoder=DjangoJSONEncoder
+    )
     line_total = models.BigIntegerField(_("line total"), default=0)
     round_no = models.PositiveIntegerField(_("round"), default=0)
     fired_at = models.DateTimeField(_("sent to the kitchen at"), null=True, blank=True)
@@ -612,6 +619,15 @@ class SaleLine(UUIDModel):
     )
     parent_line_id = models.UUIDField(
         _("line it hangs from"), null=True, blank=True
+    )
+    # SALE-F12: the menu a line charges (or, split per dish, a part of), its name for the receipt's header
+    # and its dishes ``[{product_id, product_name, quantity (per menu), is_service, category_id}]``.
+    combo_id = models.UUIDField(_("menu"), null=True, blank=True)
+    combo_name = models.CharField(
+        _("menu name"), max_length=200, blank=True, default="", db_default=""
+    )
+    components = models.JSONField(
+        _("dishes"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
     )
     tax_category_key = models.CharField(_("tax category"), max_length=80)
     tax_rate = models.DecimalField(_("rate (%)"), max_digits=6, decimal_places=2)

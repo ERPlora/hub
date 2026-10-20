@@ -19,7 +19,7 @@ import ServicePriceSheet from '../components/pos/ServicePriceSheet.vue';
 import StaffPicker from '../components/pos/StaffPicker.vue';
 import TableButton from '../components/pos/TableButton.vue';
 import TablePicker from '../components/pos/TablePicker.vue';
-import { line, memoryStorage, order, page, preview, product, service, settings } from '../components/pos/__tests__/fixtures';
+import { line, memoryStorage, order, page, preview, product, refused, service, settings } from '../components/pos/__tests__/fixtures';
 import { CURRENT_CHECK_KEY } from '../composables/pos/useCurrentCheck';
 import { plain } from '../lib/format';
 import PosPage from './PosPage.vue';
@@ -678,5 +678,62 @@ describe('PosPage: the options of Modifiers (SALE-F11)', () => {
     await settle();
     expect(s.writes()).toEqual([]);
     expect(toastError).toHaveBeenCalledWith('No se han podido leer los suplementos de este producto. Inténtalo de nuevo.');
+  });
+});
+
+describe('PosPage: the menus of Menus (SALE-F12)', () => {
+  /** Menus is on in this business and the person reads it. */
+  const WITH_MENUS = { ...MANAGER, permissions: [...MANAGER.permissions, 'combo.view'], apps: [{ label: 'combo', state: 'on' as const }] };
+  const MENU = {
+    id: 'm1',
+    name: 'Menu of the day',
+    kitchen_name: 'MENU',
+    price: 1350,
+    supply_kind: 'service' as const,
+    sort_order: 0,
+    groups: [
+      {
+        id: 'mains',
+        name: 'Mains',
+        min_choices: 1,
+        max_choices: 1,
+        allow_repeat: false,
+        options: [{ id: 'hake', product_id: 'p9', product_name: 'Hake', sku: '', price_delta: 0 }],
+      },
+    ],
+  };
+
+  it('without Menus on (or without the right to read it) the till offers no menus', async () => {
+    for (const session of [MANAGER, { ...WITH_MENUS, permissions: MANAGER.permissions }]) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCatalog).props('showCombos')).toBe(false);
+    }
+  });
+
+  it('a menu tapped opens its sheet and adds nothing until «Add»; then the check opens with the menu and its dishes', async () => {
+    const s = await setup({ session: WITH_MENUS });
+    expect(s.wrapper.findComponent(PosCatalog).props('showCombos')).toBe(true);
+    s.reply(CHECK);
+    s.wrapper.findComponent(PosCatalog).vm.$emit('combo', MENU);
+    await settle();
+    expect(s.writes()).toEqual([]);
+    expect(s.inDoc('pos-menu-title')?.textContent).toContain('Menu of the day');
+    await click(s.inDoc('pos-menu-dish-hake'));
+    await click(s.inDoc('pos-menu-add'));
+    await settle();
+    expect(s.writes()).toEqual([['/api/sale/orders', { combo_lines: [{ combo_id: 'm1', choices: [{ option_id: 'hake', quantity: 1 }] }] }]]);
+    expect(s.inDoc('pos-menu-title')).toBeNull();
+  });
+
+  it('Menus’ refusal stays on the sheet, over its button', async () => {
+    const s = await setup({ session: WITH_MENUS });
+    s.net.onApi(() => refused('combo.option_sold_out', '«Hake» is sold out.'));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('combo', MENU);
+    await settle();
+    await click(s.inDoc('pos-menu-dish-hake'));
+    await click(s.inDoc('pos-menu-add'));
+    await settle();
+    expect(s.inDoc('pos-menu-error')?.textContent).toContain('«Hake» is sold out.');
   });
 });

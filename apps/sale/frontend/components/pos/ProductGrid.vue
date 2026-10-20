@@ -3,7 +3,8 @@
 // last (SALE-F09; without the permission it says a manager has to do it, and the page answers the
 // tap), «Load more» while the server has more rows than the windows asked, «No products.» (or the
 // reason the page passes) when there is nothing, and a spinner until the first answer. The grid
-// scrolls inside its column, so the cart's footer never leaves the screen.
+// scrolls inside its column, so the cart's footer never leaves the screen. The `lead` slot goes first in the
+// grid (the menus of Menus in «All», SALE-F12).
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSpinner } from '@ionic/vue';
 
@@ -23,6 +24,7 @@ const emit = defineEmits<{ pick: [product: ProductOut]; openPrice: []; loadMore:
 
 <template>
   <div class="pos-grid">
+    <slot name="lead" />
     <ProductTile
       v-for="item in products"
       :key="item.id"

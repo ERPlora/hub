@@ -12,6 +12,7 @@ import { computed } from 'vue';
 
 import type { OrderLineOut } from '../../operations';
 import { useLocale, useT } from '../../composables/useT';
+import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatPercent, formatQuantity } from '../../lib/format';
 import QtyStepper from './QtyStepper.vue';
 
@@ -112,7 +113,16 @@ function onRow(): void {
         v-if="line.modifiers.length"
         class="pos-line__options"
         :data-testid="`pos-line-${line.id}-options`"
-      >{{ line.modifiers.map((pick) => pick.name).join(', ') }}</p>
+      >
+        {{ line.modifiers.map((pick) => pick.name).join(', ') }}
+      </p>
+      <p
+        v-if="line.combo?.components.length"
+        class="pos-line__options"
+        :data-testid="`pos-line-${line.id}-dishes`"
+      >
+        {{ line.combo.components.map(dishLabel).join(', ') }}
+      </p>
       <p
         v-if="line.notes"
         class="pos-line__note"

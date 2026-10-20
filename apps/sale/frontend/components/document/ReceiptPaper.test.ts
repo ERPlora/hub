@@ -114,6 +114,49 @@ describe('ReceiptPaper', () => {
     expect(s.all('sale-receipt-line')).toEqual(['Corte 1 × 25,00 € Ya pagado · Bono 5 cortes 0,00 €']);
   });
 
+  it('prints a menu with each of its dishes on a line of its own under it (SALE-F12, hub#1165)', async () => {
+    const sale = saleOut();
+    const dish = (product_name: string, quantity = 1) => ({ product_id: product_name, product_name, quantity });
+    const menu = {
+      ...sale.lines[0],
+      id: 'm1',
+      product_id: null,
+      name: 'Menú del día',
+      quantity: '2.000',
+      unit_price: 1350,
+      notes: '',
+      line_total: 2700,
+      combo_id: 'c1',
+      combo_name: 'Menú del día',
+      components: [dish('Lentejas'), dish('Café', 2)],
+    };
+    const s = await paper({ sale: { ...sale, lines: [menu] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-line')).toEqual(['Menú del día 2 × 13,50 € Lentejas 2× Café 27,00 €']);
+    expect(s.all('sale-receipt-dish')).toEqual(['Lentejas', '2× Café']);
+  });
+
+  it('a menu split per dish prints its name once as a head and each dish at its own VAT under it (SALE-F12)', async () => {
+    const sale = saleOut();
+    const part = (id: string, name: string, line_total: number) => ({
+      ...sale.lines[0],
+      id,
+      order_line_id: 'ol1',
+      product_id: `p-${name}`,
+      name,
+      quantity: '1.000',
+      unit_price: line_total,
+      notes: '',
+      line_total,
+      combo_id: 'c1',
+      combo_name: 'Bocadillo y caña',
+      components: [{ product_id: `p-${name}`, product_name: name, quantity: 1 }],
+    });
+    const s = await paper({ sale: { ...sale, lines: [part('d1', 'Bocadillo', 415), part('d2', 'Caña', 185)] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-menu-head')).toEqual(['Bocadillo y caña']);
+    expect(s.all('sale-receipt-line')).toEqual(['Bocadillo 1 × 4,15 € 4,15 €', 'Caña 1 × 1,85 € 1,85 €']);
+    expect(s.all('sale-receipt-dish')).toEqual([]);
+  });
+
   it('prints the options of a dish under it and an option of another tax as its own line under the dish (SALE-F11)', async () => {
     const sale = saleOut();
     const burger = { ...sale.lines[0], id: 'b1', name: 'Hamburguesa', quantity: '2.000', unit_price: 900, notes: '', line_total: 1800, modifiers: ['Queso', 'Poco hecha'] };

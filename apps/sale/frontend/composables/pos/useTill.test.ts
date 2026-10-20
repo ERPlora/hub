@@ -140,6 +140,41 @@ describe('useTill: the options of Modifiers (SALE-F11)', () => {
   });
 });
 
+describe('useTill: the menus of Menus (SALE-F12)', () => {
+  const MENU_CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: null, name: 'Menu of the day' })] });
+  const PICKS = [
+    { option_id: 'lentils', quantity: 1 },
+    { option_id: 'hake', quantity: 1 },
+  ];
+
+  it('opens the check with the menu and its dishes; only the choices travel, Menus prices them', async () => {
+    const s = await setup();
+    s.reply(MENU_CHECK);
+    const result = await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    expect(result).toEqual({ ok: true });
+    expect(s.calls()).toEqual([['', { combo_lines: [{ combo_id: 'm1', choices: PICKS }] }]]);
+  });
+
+  it('adds every menu as a line of its own, never raising the one before', async () => {
+    const s = await setup();
+    s.reply(MENU_CHECK);
+    await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    await s.till().addComboLine({ id: 'm1' }, 'st1', PICKS);
+    expect(s.calls().slice(1)).toEqual([
+      ['/add_combo_line', { order_id: 'o1', combo_id: 'm1', choices: PICKS, staff_id: 'st1' }],
+    ]);
+  });
+
+  it('hands Menus’ refusal back to the sheet instead of a toast', async () => {
+    const s = await setup();
+    s.reply(MENU_CHECK);
+    await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    s.net.onApi(() => refused('combo.option_sold_out', '«Flan» is sold out.'));
+    const result = await s.till().addComboLine({ id: 'm1' }, null, PICKS);
+    expect(result).toEqual({ ok: false, message: '«Flan» is sold out.' });
+  });
+});
+
 describe('useTill: services of Services (SALE-F38)', () => {
   const SERVICE_CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: null, service_id: 's1', is_service: true })] });
 

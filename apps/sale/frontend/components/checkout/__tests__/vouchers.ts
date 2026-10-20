@@ -39,5 +39,7 @@ export const previewLine = (id: string, over: Partial<PreviewLineOut> = {}): Pre
   line_total: 2500,
   modifiers: [],
   is_child: false,
+  combo_name: '',
+  components: [],
   ...over,
 });

@@ -81,7 +81,10 @@ from apps.sale.queries import (
     find_quick_note,
     find_sale,
     find_tax_category,
+    combo_name,
+    dishes_of,
     folded_names,
+    freeze_combo_line,
     freeze_open_line,
     freeze_product_line,
     freeze_service_line,
@@ -98,6 +101,7 @@ from apps.sale.queries import (
     provisional_total,
     quick_note_row,
     ratio_of,
+    refresh_combos,
     returned_by_line,
     sale_detail,
     sessions_to_return,
@@ -118,6 +122,7 @@ from apps.sale.schemas import (
     DepartmentUpdateIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
+    OrderAddComboLineIn,
     OrderAddServiceLineIn,
     OrderApplyVoucherIn,
     OrderFireIn,
@@ -602,6 +607,7 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
         data.service_lines,
         Booking(data.appointment_id),
         hold=True,
+        combo_lines=data.combo_lines,
     )
     try:
         with transaction.atomic():
@@ -687,6 +693,29 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
     line = freeze_service_line(
         ctx, data, Booking(find_order(data.order_id).appointment_id)
     )
+    order = _open_order(data.order_id)
+    _save_lines(order, [line])
+    _touch(ctx, order)
+    return _out(order)
+
+
+@operation(
+    "sale.order.add_combo_line",
+    kind="command",
+    permission="sale.add_sale",
+    input=OrderAddComboLineIn,
+    output=OrderOut,
+    expose_api=True,
+    ai={
+        "description": "Add a menu of Menus (by id or name) to an open check with the dishes picked in each course "
+        "(«menu of the day with lentils, hake and flan»). Menus checks the courses and prices it: its closed price plus "
+        "the supplements, frozen on the line; the kitchen receives its dishes.",
+        "risk": "normal",
+    },
+)
+def add_combo_line(ctx: OperationContext, data: OrderAddComboLineIn) -> dict:
+    find_order(data.order_id)
+    line = freeze_combo_line(ctx, data)
     order = _open_order(data.order_id)
     _save_lines(order, [line])
     _touch(ctx, order)
@@ -1042,6 +1071,16 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
                     "category_id": str(line.category_id) if line.category_id else None,
                     "staff_id": str(line.staff_id) if line.staff_id else None,
                     "modifiers": line.kitchen_text,
+                    "kitchen_name": line.combo.get("kitchen_name", "") if line.combo_id else "",
+                    "components": [
+                        {
+                            "product_id": dish["product_id"],
+                            "product_name": dish["product_name"],
+                            "category_id": dish["category_id"],
+                            "quantity": f"{dish['quantity'] * line.quantity:.3f}",
+                        }
+                        for dish in (line.combo.get("components", []) if line.combo_id else [])
+                    ],
                 }
                 for line in pending
             ],
@@ -1766,6 +1805,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         ):
             raise Conflict(str(ORDER_CHANGED), code="sale.order_changed")
         lines, closes = lines_to_charge(order, data.line_ids)
+        refresh_combos(ctx, lines)
         percent = order.discount_percent
         amount = order.discount_amount if closes else 0
         approved = bool(order.discount_approved_by)
@@ -1778,7 +1818,13 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         booking = Booking(data.appointment_id, card.id if card else None)
         lines, closes = (
             loose_lines(
-                ctx, data.lines, data.open_lines, data.service_lines, booking, hold=True
+                ctx,
+                data.lines,
+                data.open_lines,
+                data.service_lines,
+                booking,
+                hold=True,
+                combo_lines=data.combo_lines,
             ),
             True,
         )
@@ -1987,6 +2033,9 @@ def _sale_lines(sale: Sale, parts: list[OrderLine], valuation) -> list[SaleLine]
             order_line_id=line.origin.id,
             parent_line_id=of_line[line.origin.id] if child else None,
             modifiers=[] if child else folded_names(line),
+            combo_id=line.combo_id,
+            combo_name=combo_name(line),
+            components=dishes_of(line),
             product_id=line.product_id,
             department_id=line.department_id,
             name=line.name,
@@ -2094,7 +2143,15 @@ def _completed_payload(
                 "category_id": str(line.category_id) if line.category_id else None,
                 "modifiers": line.modifiers,
                 "parent_line_id": str(line.parent_line_id) if line.parent_line_id else None,
-                "components": [],
+                "components": [
+                    {
+                        "product_id": str(dish["product_id"]),
+                        "product_name": dish["product_name"],
+                        "quantity": f"{dish['quantity'] * line.quantity:.3f}",
+                        "is_service": dish["is_service"],
+                    }
+                    for dish in line.components
+                ],
             }
             for line in lines
         ],
@@ -2473,13 +2530,17 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
                 }
                 for leg in legs
             ],
+            # A menu gives back each of its dishes, times the menus that come back (COMBO-F10).
             "lines": [
                 {
                     "line_id": str(line.id),
-                    "product_id": str(line.product_id) if line.product_id else None,
-                    "quantity": f"{quantity:.3f}",
+                    "product_id": str(unit["product_id"]) if unit["product_id"] else None,
+                    "quantity": f"{unit['quantity'] * quantity:.3f}",
                 }
                 for line, quantity in returning
+                for unit in (
+                    line.components or [{"product_id": line.product_id, "quantity": 1}]
+                )
             ],
         },
     )

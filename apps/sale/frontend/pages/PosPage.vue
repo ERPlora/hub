@@ -24,6 +24,7 @@ import CheckoutSheet from '../components/checkout/CheckoutSheet.vue';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import CartFab from '../components/pos/CartFab.vue';
 import CheckFollower from '../components/pos/CheckFollower.vue';
+import ComboSheet from '../components/pos/ComboSheet.vue';
 import DirtyCheckDialog from '../components/pos/DirtyCheckDialog.vue';
 import DiscountSheet from '../components/pos/DiscountSheet.vue';
 import LineNoteSheet from '../components/pos/LineNoteSheet.vue';
@@ -43,10 +44,11 @@ import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
 import { useLocale, useT } from '../composables/useT';
+import type { SaleComboOut } from '../../../combo/frontend/operations';
 import type { ProductOut } from '../../../inventory/frontend/operations';
 import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
-import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
+import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
 import { refusal } from '../lib/refusal';
 import { saleTabs } from '../tabs';
 
@@ -240,6 +242,30 @@ const addWithOptions = (optionIds: string[]) => {
   void fromSheet(
     () => till.addProductLine(chosen.product, staff.value.id, optionIds),
     () => (optioning.value = null),
+  );
+};
+
+// ── The menus of Menus (SALE-F12; Menus' operations only) ────────────────────────────────────────
+/** The till offers menus: Menus on in this business and the right to read it. */
+const combosOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'combo' && app.state === 'on') && session.can('combo.view'),
+);
+const composing = shallowRef<SaleComboOut | null>(null);
+const menuOpen = computed({
+  get: () => !!composing.value,
+  set: (open: boolean) => {
+    if (!open) composing.value = null;
+  },
+});
+
+const pickCombo = (combo: SaleComboOut) => openSheet(() => (composing.value = combo));
+
+const addCombo = (choices: ComboChoiceIn[]) => {
+  const combo = composing.value;
+  if (!combo) return;
+  void fromSheet(
+    () => till.addComboLine(combo, staff.value.id, choices),
+    () => (composing.value = null),
   );
 };
 
@@ -531,7 +557,9 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
           :show-products="settings.show_products"
           :can-open-price="session.can('sale.sell_open_price')"
           :show-services="showServices"
+          :show-combos="combosOn"
           @add="pickProduct"
+          @combo="pickCombo"
           @service="pickService"
           @open-price="openPrice"
         >
@@ -640,6 +668,13 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         :pending="sheetPending"
         :error="sheetError"
         @add="addPricedService"
+      />
+      <ComboSheet
+        v-model:open="menuOpen"
+        :combo="composing"
+        :pending="sheetPending"
+        :error="sheetError"
+        @add="addCombo"
       />
       <ModifierSheet
         v-model:open="optionsOpen"

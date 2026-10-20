@@ -144,6 +144,7 @@
   "sale.order.add_line": { "method": "post", "path": "/api/sale/orders/add_line" },
   "sale.order.add_open_line": { "method": "post", "path": "/api/sale/orders/add_open_line" },
   "sale.order.add_service_line": { "method": "post", "path": "/api/sale/orders/add_service_line" },
+  "sale.order.add_combo_line": { "method": "post", "path": "/api/sale/orders/add_combo_line" },
   "sale.order.apply_voucher": { "method": "post", "path": "/api/sale/orders/apply_voucher" },
   "sale.order.remove_voucher": { "method": "post", "path": "/api/sale/orders/remove_voucher" },
   "sale.order.update_line": { "method": "post", "path": "/api/sale/orders/update_line" },

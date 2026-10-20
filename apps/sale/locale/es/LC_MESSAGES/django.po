@@ -777,3 +777,24 @@ msgstr "línea de la que cuelga"
 
 msgid "Modifiers is not active in this business: this product cannot take options. Add it without them."
 msgstr "Suplementos no está activa en este negocio: este producto no admite suplementos. Añádelo sin ellos."
+
+msgid "Say which menu: its id, or its name."
+msgstr "Di qué menú: su id o su nombre."
+
+msgid "Say which dish: the choice's id, or its product's SKU or name."
+msgstr "Di qué plato: el id de la elección, o el SKU o el nombre de su producto."
+
+msgid "Menus and combos is not active in this business: menus cannot be sold. Sell their dishes on their own."
+msgstr "Menús y combos no está activa en este negocio: no se pueden vender menús. Vende sus platos sueltos."
+
+msgid "menu"
+msgstr "menú"
+
+msgid "menu as ordered"
+msgstr "menú tal como se pidió"
+
+msgid "menu name"
+msgstr "nombre del menú"
+
+msgid "dishes"
+msgstr "platos"

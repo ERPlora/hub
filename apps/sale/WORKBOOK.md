@@ -8,9 +8,8 @@ Estado de la app: hecha (servidor y páginas); lo que depende de apps que aún n
 > (servidor y páginas). Parte del `WORKFLOW.md` del módulo Ventas / TPV del producto actual
 > (`modules-workspace/modules/sales`, `origin/main` `c6cf4af`, v2.16.169) y de sus ficheros
 > `workflow/*.md`. La app hace lo mismo y se ve igual; los números de flujo se conservan
-> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Lo que todavía depende de una app que no
-> existe en esta plataforma (Cocina, Suplementos, Menús, VeriFactu, Impresión) lo dice su flujo
-> en la línea `Estado:`.
+> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Lo que todavía depende de otra app (o de
+> la plataforma) y no está completo lo dice su flujo en la línea `Estado:`.
 
 ## Para qué sirve y para quién
 
@@ -220,7 +219,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F09 | Vender a precio libre por sección | común | hecho |
 | SALE-F10 | Vender por peso, tecleando la cantidad | común | hecho |
 | SALE-F11 | Elegir los suplementos de un artículo | común | hecho |
-| SALE-F12 | Componer un menú | restaurante | no hecho: Menús |
+| SALE-F12 | Componer un menú | restaurante | hecho |
 | SALE-F13 | Poner una nota en una línea | común | hecho |
 | SALE-F14 | Aplicar un descuento a una línea o a la cuenta | común | parcial |
 | SALE-F15 | Invitar una línea | común | hecho |
@@ -513,18 +512,42 @@ entra como siempre.
 Implicados: MODIFIER-F06, MODIFIER-F07, MODIFIER-F08
 
 ### SALE-F12 Componer un menú
-Estado: no hecho — los menús son de la app Menús, que todavía no existe en esta plataforma
+<!-- origen: wf:restaurante-dia#rec_restaurante-f06 old:sales/workflow/la-cuenta.md#sales-f12 -->
+Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En «Todos», los menús salen primero con la etiqueta «Menú». Toca uno y elige los platos de cada
-   grupo.
-2. Pulsa «Añadir · <total>»; al cobrar el menú se reparte en tantas líneas como tipos de IVA tenga.
-Entra: los menús de Menús.
-Sale: una línea de menú; el aviso de venta lleva sus componentes para que Inventario baje cada plato.
-Si falla: lo dirá Menús.
-Implicados: COMBOS-F09, INVENTORY-F22
+1. Con Menús y combos activa, en «Todos» los menús a la venta salen primero, cada uno con la etiqueta «Menú» y
+   su precio cerrado. Toca uno: se abre una hoja con su nombre y todos sus platos a la vez.
+2. Cada plato dice su regla («Elige 1», «Hasta 2», «Opcional») y sus elecciones, con el suplemento con su signo
+   si no es cero («+2,00 €»). Al abrir no hay nada elegido.
+3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
+   siguiente toque dice «Café está completo: quita una para elegir otra»; una elección que se puede repetir
+   lleva su contador y su «−».
+4. Mientras falte algo, el botón dice qué («Elige 1 en «Segundos»») y tocarlo señala ese plato; cuando cada
+   plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los suplementos.
+   Púlsalo: el menú entra en la cuenta como una línea, con sus platos debajo del nombre. Cada menú es una
+   línea propia; su cantidad se cambia por unidades enteras.
+5. Cobra como siempre (SALE-F01): el menú cobra el importe que tenía al pedirlo aunque después suba de precio
+   o se agote un plato. «En el local» sale en una línea al IVA del menú; «para llevar» con platos de distinto
+   IVA sale en una línea por plato, con el importe repartido según el precio de catálogo de cada uno (6,00 €
+   de bocadillo y caña: 4,15 € al 10 % y 1,85 € al 21 %), y sin línea del menú con dinero.
+Entra: los menús de Menús y combos; Menús comprueba los platos elegidos y pone el precio al añadir la línea y
+otra vez al cobrar, con el importe pedido.
+Sale: la línea del menú con sus platos y su importe congelados (avisa: cuenta cambiada); la comanda de cocina la
+lleva con su nombre de cocina y cada plato con su cantidad (avisa: comanda enviada); al cobrar, el tique pone el
+nombre del menú y debajo cada plato en su propia línea, o, partido, el nombre como cabecera y cada plato con su
+importe y su IVA; el aviso de venta lleva cada plato por el número de menús, para que Inventario baje el stock
+de cada plato y nunca el del menú (avisa: venta cobrada); una devolución devuelve cada plato por los menús
+devueltos (avisa: venta devuelta).
+Si falla: los motivos de Menús dentro de la hoja («Al menú le falta elegir en «Segundos»: elige 1.», ««Flan»
+está agotado.»…), también por el asistente o la API, que no pasan por la hoja: un menú a medias no entra en la
+cuenta, así que nunca llega a cocina sin sus platos. Una cantidad con decimales: «La cantidad no encaja con el
+escalón del producto (1 ud).». Si no se pueden leer los menús, encima de la rejilla «No se han podido leer los menús. Inténtalo de
+nuevo.» con «Reintentar», y los productos se venden igual. Sin Menús y combos activa, el TPV no ofrece menús y
+uno pedido por la API se rechaza («Menús y combos no está activa en este negocio…»).
+Implicados: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22
 
 ### SALE-F13 Poner una nota en una línea
 Estado: hecho
@@ -1572,6 +1595,9 @@ administrador y responsable, los mismos que anulan y devuelven).
 
 ### Lo que queda fuera
 
+- **Marcar una cuenta «para llevar» en el TPV** (F12): la cuenta no tiene canal; un menú se cobra según
+  su propio ajuste en Menús y combos («en el local» o «para llevar», COMBO-F09). Un menú «en el local»
+  que el cliente se lleva no se parte por plato.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
   devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
   actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea

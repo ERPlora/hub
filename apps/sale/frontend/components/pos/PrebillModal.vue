@@ -14,6 +14,7 @@ import { computed, useTemplateRef } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
+import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
@@ -155,6 +156,10 @@ function print(): void {
               v-if="line.modifiers.length"
               class="pos-bill__options"
             >{{ line.modifiers.map((pick) => pick.name).join(', ') }}</span>
+            <span
+              v-if="line.combo?.components.length"
+              class="pos-bill__options"
+            >{{ line.combo.components.map(dishLabel).join(', ') }}</span>
             <span
               v-if="line.notes"
               class="pos-bill__note"

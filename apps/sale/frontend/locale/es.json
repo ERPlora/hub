@@ -222,6 +222,11 @@
         "full": "«{group}» está completo: quita una para elegir otra.",
         "less": "Una menos de {name}",
         "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo."
+      },
+      "menu": {
+        "badge": "Menú",
+        "chooseIn": "Elige {n} en «{course}»",
+        "loadFailed": "No se han podido leer los menús. Inténtalo de nuevo."
       }
     },
     "checkout": {

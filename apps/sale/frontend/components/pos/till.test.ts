@@ -44,6 +44,7 @@ const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
   modifiers: [],
   modifier_lines: [],
   kitchen_text: '',
+  combo: null,
   ...over,
 });
 

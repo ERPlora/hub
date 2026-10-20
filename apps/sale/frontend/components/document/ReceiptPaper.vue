@@ -15,6 +15,7 @@ import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
+import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity } from '../../lib/format';
 import type { SaleOut, SettingsOut } from '../../operations';
 
@@ -51,12 +52,21 @@ const numberLabel = computed(() => {
   return fiscalNumber.value ? t('sale.document.invoice') : t('sale.document.number');
 });
 
+/** A dish of a menu split per dish (SALE-F12): the menu's lines carry its product; one in one line does not. */
+const isDishPart = (line: SaleOut['lines'][number]) => !!line.combo_id && line.product_id !== null;
+const menuOf = (line: SaleOut['lines'][number]) => `${line.order_line_id}:${line.combo_id}`;
+
 const lines = computed(() =>
-  props.sale.lines.map((line) => ({
+  props.sale.lines.map((line, index) => ({
     id: line.id,
     // An option of another tax category hangs under its dish (SALE-F11): «+ <option>».
     name: `${line.parent_line_id ? '+ ' : ''}${line.is_gift ? `${line.name} ${t('sale.document.gift')}` : line.name}`,
-    child: !!line.parent_line_id,
+    // The dishes of a split menu hang under its name, printed once over the first of them (SALE-F12).
+    child: !!line.parent_line_id || isDishPart(line),
+    head:
+      isDishPart(line) && (index === 0 || menuOf(props.sale.lines[index - 1]) !== menuOf(line)) ? line.combo_name : '',
+    // A menu in one line prints each of its dishes on a line of its own under it (hub#1165).
+    dishes: line.combo_id && !isDishPart(line) ? line.components.map(dishLabel) : [],
     options: line.modifiers.join(', '),
     detail: `${formatQuantity(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,
     note: line.notes.trim(),
@@ -156,44 +166,64 @@ const footer = computed(() =>
         </tr>
       </thead>
       <tbody>
-        <tr
+        <template
           v-for="line in lines"
           :key="line.id"
-          data-testid="sale-receipt-line"
         >
-          <td
-            class="sale-receipt__line-name"
-            :class="{ 'sale-receipt__line-name--child': line.child }"
+          <tr
+            v-if="line.head"
+            data-testid="sale-receipt-menu-head"
           >
-            <div>{{ line.name }}</div>
-            <div class="sale-receipt__detail">
-              {{ line.detail }}
-            </div>
-            <div
-              v-if="line.options"
-              class="sale-receipt__detail"
-              data-testid="sale-receipt-options"
+            <td
+              class="sale-receipt__line-name"
+              colspan="2"
             >
-              {{ line.options }}
-            </div>
-            <div
-              v-if="line.voucher"
-              class="sale-receipt__detail"
-              data-testid="sale-receipt-voucher"
+              {{ line.head }}
+            </td>
+          </tr>
+          <tr data-testid="sale-receipt-line">
+            <td
+              class="sale-receipt__line-name"
+              :class="{ 'sale-receipt__line-name--child': line.child }"
             >
-              {{ line.voucher }}
-            </div>
-            <div
-              v-if="line.note"
-              class="sale-receipt__note"
-            >
-              {{ line.note }}
-            </div>
-          </td>
-          <td class="sale-receipt__num">
-            {{ line.amount }}
-          </td>
-        </tr>
+              <div>{{ line.name }}</div>
+              <div class="sale-receipt__detail">
+                {{ line.detail }}
+              </div>
+              <div
+                v-for="(dish, at) in line.dishes"
+                :key="at"
+                class="sale-receipt__detail sale-receipt__dish"
+                data-testid="sale-receipt-dish"
+              >
+                {{ dish }}
+              </div>
+              <div
+                v-if="line.options"
+                class="sale-receipt__detail"
+                data-testid="sale-receipt-options"
+              >
+                {{ line.options }}
+              </div>
+              <div
+                v-if="line.voucher"
+                class="sale-receipt__detail"
+                data-testid="sale-receipt-voucher"
+              >
+                {{ line.voucher }}
+              </div>
+              <div
+                v-if="line.note"
+                class="sale-receipt__note"
+              >
+                {{ line.note }}
+              </div>
+            </td>
+            <td class="sale-receipt__num">
+              {{ line.amount }}
+            </td>
+          </tr>
+        </template>
       </tbody>
     </table>
     <div
@@ -324,6 +354,9 @@ const footer = computed(() =>
   font-size: 10px;
 }
 .sale-receipt__line-name--child {
+  padding-left: 0.75rem;
+}
+.sale-receipt__dish {
   padding-left: 0.75rem;
 }
 .sale-receipt__lines,
