@@ -16,7 +16,7 @@ from uuid import UUID
 
 import pydantic
 from django.conf import settings as django_settings
-from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, Sum
+from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, QuerySet, Sum
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
@@ -268,6 +268,22 @@ def get_pos_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     return settings_row(current_settings())
 
 
+# ── Rows a write names ───────────────────────────────────────────────────────────────────────────
+
+
+def held(rows: QuerySet) -> list:
+    """``rows``, each held until this transaction ends with a key-share lock taken in the same read, for a write
+    that names them (an open-price line at a department, a tender of a payment method). The Hub admin's «Delete»
+    locks them first (``services.lock_rows``): it waits for this write and then finds what it wrote, so it answers
+    «Cannot delete» instead of either of them failing at its COMMIT. A key share is the lock the foreign key itself
+    takes at the COMMIT, taken earlier: it only stops a deletion, while another write that names the row (every sale
+    names Cash) or changes it (a rename, a deactivation) goes on. One being deleted meanwhile is read once the
+    deletion ends: gone, as one deleted before. The ORM has no ``FOR KEY SHARE``: it is appended to the SQL the ORM
+    wrote, and the rows still come from the hub's database by the router."""
+    sql, params = rows.query.sql_with_params()
+    return list(rows.model.objects.raw(f"{sql} FOR KEY SHARE", params))
+
+
 # ── Payment methods ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -351,6 +367,15 @@ def find_method(method_id: UUID | None, said: str | None) -> PaymentMethod:
             code="sale.payment_method_ambiguous",
         )
     return by_name[0]
+
+
+def held_methods(ids: Iterable[UUID]) -> set[UUID]:
+    """The payment methods ``ids`` still there, each held (``held``) in id order until the write that records a
+    tender of them ends; a write that names several takes them in the order the admin's «Delete selected» does."""
+    ids = set(ids)
+    if not ids:
+        return set()
+    return {method.pk for method in held(PaymentMethod.objects.filter(pk__in=ids).order_by("id"))}
 
 
 @operation(
@@ -440,6 +465,19 @@ def find_department(
         code="department",
         lock=lock,
     )
+
+
+def hold_departments(lines: Iterable[tuple[OpenLineFields, OrderLine]]) -> None:
+    """Holds the departments of the open-price ``lines`` (each with the input that named it) in id order
+    (``held``) until the write that adds them ends; one deleted since it was read is refused as one that never was.
+    The business's own «Delete» only retires one (lines keep it), so a retired one is still there to hold."""
+    named = {line.department_id: data for data, line in lines if line.department_id is not None}
+    if not named:
+        return
+    kept = {row.pk for row in held(Department.objects.filter(pk__in=named).order_by("id"))}
+    for department_id, data in named.items():
+        if department_id not in kept:
+            raise _department_refused(data, str(DEPARTMENT_NOT_FOUND))
 
 
 def find_quick_note(
@@ -849,6 +887,12 @@ def freeze_product_line(
     return line
 
 
+def _department_refused(data: OpenLineFields, message: str) -> InvalidPayload:
+    """The 422 of an open-price line whose department is not there, on the field that named it."""
+    field = "department_id" if data.department_id is not None else "department"
+    return InvalidPayload(message, code="invalid_field", fields={field: message})
+
+
 def freeze_open_line(ctx: OperationContext, data: OpenLineFields) -> OrderLine:
     """An unsaved open-price row: the amount typed, the department's (or a category's) VAT."""
     if not ctx.has("sale.sell_open_price"):
@@ -858,10 +902,7 @@ def freeze_open_line(ctx: OperationContext, data: OpenLineFields) -> OrderLine:
         try:
             department = find_department(data.department_id, data.department)
         except NotFound as missing:
-            field = "department_id" if data.department_id is not None else "department"
-            raise InvalidPayload(
-                missing.message, code="invalid_field", fields={field: missing.message}
-            ) from None
+            raise _department_refused(data, missing.message) from None
         category = department.tax_category
     else:
         category = find_tax_category(data.tax_category_key)
@@ -1112,15 +1153,21 @@ def loose_lines(
     open_lines: list,
     service_lines: list = (),
     booking: Booking | None = None,
+    *,
+    hold: bool = False,
 ) -> list[OrderLine]:
     """Unsaved rows for a counter sale: catalog lines frozen from Inventory, services from Services (at the
-    price ``booking`` booked, when a line brings it), then open-price ones."""
+    price ``booking`` booked, when a line brings it), then open-price ones. A write that adds them ``hold``s the
+    departments of the open-price ones (``hold_departments``)."""
     frozen: list[OrderLine] = []
     if lines:
         units = inventory_units(ctx)
         frozen += [freeze_product_line(ctx, line, units) for line in lines]
     frozen += [freeze_service_line(ctx, line, booking) for line in service_lines]
-    frozen += [freeze_open_line(ctx, line) for line in open_lines]
+    priced = [freeze_open_line(ctx, line) for line in open_lines]
+    if hold:
+        hold_departments(zip(open_lines, priced, strict=True))
+    frozen += priced
     for position, line in enumerate(frozen, start=1):
         line.position = position
     return frozen

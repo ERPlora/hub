@@ -82,6 +82,8 @@ from apps.sale.queries import (
     freeze_open_line,
     freeze_product_line,
     freeze_service_line,
+    held_methods,
+    hold_departments,
     inventory_units,
     lines_to_charge,
     loose_lines,
@@ -484,6 +486,18 @@ def lock_orders(ids) -> list[Order]:
     return list(Order.objects.select_for_update().filter(pk__in=ids).order_by("id"))
 
 
+def lock_rows(model, ids) -> list:
+    """Locks the departments or payment methods ``ids`` in id order; those still there.
+
+    A write that names one (an open-price line at a department, a tender of a payment method) holds it before it
+    writes what points at it (``queries.held``), and the Hub admin's «Delete» (admin.py) locks it here before Django
+    checks what protects it: whichever comes second waits. The deletion then finds what the write wrote and answers
+    «Cannot delete», or the write finds the row gone, instead of either failing at its COMMIT. Several rows are taken
+    in id order, as the writes hold them: the two never wait in a circle.
+    """
+    return list(model.objects.select_for_update().filter(pk__in=ids).order_by("id"))
+
+
 def _open_order(order_id: UUID) -> Order:
     """The check, locked; refused when it is no longer open (it was charged or voided under the screen)."""
     order = find_order(order_id, lock=True)
@@ -578,7 +592,12 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
     if data.appointment_id is not None and (existing := _open_check_of(data.appointment_id)):
         return {**order_detail(existing), "already": True}
     lines = loose_lines(
-        ctx, data.lines, data.open_lines, data.service_lines, Booking(data.appointment_id)
+        ctx,
+        data.lines,
+        data.open_lines,
+        data.service_lines,
+        Booking(data.appointment_id),
+        hold=True,
     )
     try:
         with transaction.atomic():
@@ -639,6 +658,7 @@ def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
 def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
     find_order(data.order_id)
     line = freeze_open_line(ctx, data)
+    hold_departments([(data, line)])
     order = _open_order(data.order_id)
     _save_lines(order, [line])
     _touch(ctx, order)
@@ -1478,6 +1498,12 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
                 "reference": leg.reference if leg else "",
             }
         )
+    # Held until the charge ends: one deleted since it was read is not available, as one never added.
+    named = {leg["method"].id for leg in legs}
+    if held_methods(named) != named:
+        raise Conflict(
+            str(METHOD_NOT_AVAILABLE), code="sale.payment_method_not_available"
+        )
     open_legs = [leg for leg in legs if leg["amount"] is None]
     given = sum(leg["amount"] for leg in legs if leg["amount"] is not None)
     if len(open_legs) > 1 or (open_legs and given >= total):
@@ -1744,7 +1770,9 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         order = claimed
         booking = Booking(data.appointment_id, card.id if card else None)
         lines, closes = (
-            loose_lines(ctx, data.lines, data.open_lines, data.service_lines, booking),
+            loose_lines(
+                ctx, data.lines, data.open_lines, data.service_lines, booking, hold=True
+            ),
             True,
         )
         percent, amount, approved, appointment_id = (
@@ -2285,6 +2313,12 @@ def _refund_legs(sale: Sale, data: RefundIn) -> list[dict]:
                 "method": method,
                 "amount": allocation.amount,
             }
+        )
+    # Held until the refund ends: one deleted since it was read is not available, as one never added.
+    named = {leg["method"].id for leg in legs}
+    if held_methods(named) != named:
+        raise Conflict(
+            str(REFUND_METHOD_UNAVAILABLE), code="sale.refund_method_unavailable"
         )
     return legs
 
