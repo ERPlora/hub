@@ -18,10 +18,12 @@ from django.test import RequestFactory
 from django.utils import timezone
 from live.errors import OperationError
 
+from apps.customer.models import Customer, OrderLink
+from apps.customer.tests.conftest import card_deleted_on_screen, writes
 from apps.sale.models import Order
 from apps.table.models import Table, TableSession, Zone
 
-from .conftest import ctx_for, make_session, make_table, make_zone, open_check, run
+from .conftest import ctx_for, make_customer, make_session, make_table, make_zone, open_check, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -269,3 +271,44 @@ def test_a_row_deleted_between_its_name_and_its_detail_is_not_found(room, detail
     assert deleted(deletions) == ["ok"]
     assert isinstance(outcome, OperationError), outcome
     assert (outcome.status, outcome.code) == (404, missing)
+
+
+# ── The Hub admin's «Delete» of the customer's card while a seating puts it on the check ──────────
+#
+# Seating with a customer puts her on the check through Customers' own link, which locks the card before it
+# writes the link, as the Hub admin's «Delete» of a card does: a deletion that comes after waits and takes the
+# link along with the card; one that came before leaves the table seated without a customer (TABLE-F32). Never a
+# 500 either way: they stay here so that a seating that writes the link itself never comes back without a lock.
+
+
+def _seat_with(ana):
+    table = make_table("4", zone=make_zone())
+    return lambda: as_waiter("table.session.open", {"table_id": str(table.id), "customer_id": str(ana.id)})()
+
+
+@pytest.mark.parametrize("how", ["page", "list"])
+def test_the_hub_admin_deleting_the_card_a_seating_puts_on_the_check_takes_the_link_along(how):
+    ana = Customer.objects.get(pk=make_customer("Ana García", phone="+34600111222").id)
+    seat = _seat_with(ana)
+    with card_deleted_on_screen(ana, how, writes("customer_orderlink")) as answers:
+        session = seat()
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert session.customer_id == ana.id
+    assert not Customer.objects.filter(pk=ana.id).exists()
+    assert not OrderLink.objects.exists()
+
+
+@pytest.mark.parametrize("how", ["page", "list"])
+def test_a_seating_whose_customer_the_hub_admin_deletes_first_seats_without_one(how):
+    ana = Customer.objects.get(pk=make_customer("Ana García", phone="+34600111222").id)
+    seat = _seat_with(ana)
+    card_locked = lambda sql: 'FROM "customer_customer"' in sql and "FOR UPDATE" in sql  # noqa: E731
+    with card_deleted_on_screen(ana, how, card_locked) as answers:
+        session = seat()
+    [answer] = answers
+    assert not isinstance(answer, Exception), answer
+    assert answer.status_code == 302
+    assert session.customer_id is None
+    assert TableSession.objects.filter(status="open").count() == 1
