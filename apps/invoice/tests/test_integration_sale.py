@@ -428,6 +428,63 @@ def test_a_sale_that_is_not_voided_has_no_void_to_rectify(issuer, shelf, charge)
     assert refused.value.code == "invoice.sale_not_voided"
 
 
+# Phase 1, without the outbox relay (INVOICE-F06, F07, F09): nothing hands the till's notices to Invoicing
+# yet, so a document that waits is issued by Sales' «Issue now», or first thing by its sale's next void
+# or refund, never on its own.
+
+
+def test_an_invoice_asked_of_invoicing_by_number_waits_in_sales_until_issue_now_which_issues_no_other(
+    shelf, charge
+):
+    sale = charge("inv-0023")
+    run("invoice.issuer.update", ISSUER)
+    asked = run(
+        "invoice.invoice.create_from_sale",
+        {"sale": sale.number},
+        ctx_for("hub_employee"),
+    )
+    assert asked.issued is True
+    # Sales hears of it only from the relay (its reaction to the issued notice): the sale still waits.
+    assert Sale.objects.get(pk=sale.id).invoice_status == "pending"
+    linked = run("sale.sale.issue_documents", {"sale": sale.number})
+    assert (linked.invoice_status, linked.invoice_number, linked.documents_pending) == (
+        "issued",
+        asked.invoice.number,
+        False,
+    )
+    assert Invoice.objects.filter(source_sale_id=sale.id).count() == 1
+
+
+def test_a_refund_of_a_sale_whose_ticket_waits_issues_the_ticket_first_then_its_rectification(
+    shelf, charge
+):
+    sale = charge("inv-0024")
+    run("invoice.issuer.update", ISSUER)
+    payment = Sale.objects.get(pk=sale.id).payments.get()
+    run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(sale.id),
+            "reason": "Broken",
+            "allocations": [{"payment_id": str(payment.id), "amount": sale.total}],
+        },
+    )
+    sale = Sale.objects.get(pk=sale.id)
+    ticket = Invoice.objects.get(source_sale_id=sale.id, source_type="sale")
+    assert (sale.invoice_status, sale.invoice_number, ticket.invoice_type) == (
+        "issued",
+        ticket.number,
+        "F2",
+    )
+    (record,) = sale.refunds.all()
+    rectification = Invoice.objects.get(number=record.invoice_number)
+    assert (record.invoice_status, rectification.invoice_type, rectification.rectifies_id) == (
+        "issued",
+        "R5",
+        ticket.id,
+    )
+
+
 # What a full invoice says of each line (RD 1619/2012 art. 6.1.f) and of the operation
 
 

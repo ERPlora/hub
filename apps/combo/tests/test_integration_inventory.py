@@ -171,6 +171,28 @@ def test_a_product_deactivated_in_inventory_is_not_offered_until_it_comes_back()
     assert run("combo.combo.for_sale", {}).total == 1
 
 
+def test_without_the_relay_a_deleted_products_choice_is_never_sold_and_is_removed_by_hand():
+    # Phase 1 has no outbox relay (COMBO-F13): nothing hands Inventory's notice over, so the choice stays
+    # in its menu, marked, and neither the till nor a charge takes it until someone removes it.
+    lentils, hake, water = menu_of_the_day()
+    run("inventory.product.delete", {"product": "HAK"})
+    detail = run("combo.combo.get", {"combo": "Menu of the day"})
+    assert detail.groups[1].options[0].status == "product_deleted"
+    assert [b.code for b in detail.blockers] == ["combo.group_short"]
+    assert run("combo.combo.for_sale", {}).total == 0
+    with pytest.raises(Conflict) as caught:
+        run(
+            "combo.combo.resolve",
+            {
+                "combo": "Menu of the day",
+                "choices": [{"product": "LEN"}, {"product": "HAK"}, {"product": "WAT"}],
+            },
+        )
+    assert caught.value.code == "combo.product_unavailable"
+    run("combo.option.delete", {"combo": "Menu of the day", "product": "HAK"})
+    assert not ChoiceOption.objects.filter(product=hake).exists()
+
+
 def test_a_product_deleted_in_inventory_leaves_every_menu_through_its_notice():
     lentils, hake, water = menu_of_the_day()
     run("inventory.product.delete", {"product": "HAK"})
