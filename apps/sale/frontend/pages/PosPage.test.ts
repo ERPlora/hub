@@ -616,3 +616,67 @@ describe('PosPage: the phone', () => {
     expect(s.find('pos-till').classes()).not.toContain('pos-till--cart-open');
   });
 });
+
+describe('PosPage: the options of Modifiers (SALE-F11)', () => {
+  /** Modifiers is on in this business and the person reads its groups. */
+  const WITH_MODIFIERS = { ...MANAGER, permissions: [...MANAGER.permissions, 'modifier.view'], apps: [{ label: 'modifier', state: 'on' as const }] };
+  const EXTRAS = {
+    product_id: 'p1',
+    product_name: 'Burger',
+    groups: [
+      {
+        id: 'g1',
+        name: 'Extras',
+        kitchen_name: '',
+        min_choices: 0,
+        max_choices: 0,
+        allow_repeat: false,
+        is_required: false,
+        options: [{ id: 'cheese', name: 'Cheese', kitchen_name: '', price_delta: 100, tax_category_key: null, is_default: false }],
+      },
+    ],
+  };
+  const forTarget = (s: Awaited<ReturnType<typeof setup>>) => s.sent().filter((c) => c.path === '/api/modifier/groups/for_target');
+
+  it('without Modifiers on (or without the right to read it) a product goes straight to the check, nothing asked', async () => {
+    for (const session of [MANAGER, { ...WITH_MODIFIERS, permissions: MANAGER.permissions }]) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      await s.addProduct();
+      expect(forTarget(s)).toEqual([]);
+      expect(s.writes()).toEqual([['/api/sale/orders', { lines: [{ product_id: 'p1' }] }]]);
+    }
+  });
+
+  it('a product with groups opens the sheet and adds nothing until «Add»; then the line carries the ids', async () => {
+    const s = await setup({ session: WITH_MODIFIERS });
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Response.json(EXTRAS) : Response.json(CHECK)));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1', name: 'Burger', price: 800 }));
+    await settle();
+    expect(forTarget(s).map((c) => c.query)).toEqual([{ product_id: 'p1' }]);
+    expect(s.writes()).toEqual([]);
+    expect(s.inDoc('pos-options-title')?.textContent).toContain('Burger');
+    await click(s.inDoc('pos-option-cheese'));
+    await click(s.inDoc('pos-options-add'));
+    await settle();
+    expect(s.writes()).toEqual([['/api/sale/orders', { lines: [{ product_id: 'p1', option_ids: ['cheese'] }] }]]);
+  });
+
+  it('a product without groups goes straight to the check', async () => {
+    const s = await setup({ session: WITH_MODIFIERS });
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Response.json({ ...EXTRAS, groups: [] }) : Response.json(CHECK)));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
+    await settle();
+    expect(s.writes()).toEqual([['/api/sale/orders', { lines: [{ product_id: 'p1' }] }]]);
+    expect(s.inDoc('pos-options-title')).toBeNull();
+  });
+
+  it('when the groups cannot be read nothing is added and the till says so', async () => {
+    const s = await setup({ session: WITH_MODIFIERS, locale: 'es' });
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Promise.reject(new TypeError('Failed to fetch')) : Response.json(CHECK)));
+    s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
+    await settle();
+    expect(s.writes()).toEqual([]);
+    expect(toastError).toHaveBeenCalledWith('No se han podido leer los suplementos de este producto. Inténtalo de nuevo.');
+  });
+});

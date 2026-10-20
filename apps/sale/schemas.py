@@ -26,6 +26,8 @@ MAX_CENTS = 9_999_999_999_999
 #: Lines of one check, legs of one charge, lines of one refund.
 MAX_LINES = 200
 MAX_PAYMENTS = 10
+#: Options of Modifiers one line may carry (Modifiers' own ceiling, ``modifier.schemas.MAX_PICKS``).
+MAX_OPTIONS = 100
 
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
@@ -381,6 +383,13 @@ class ProductLineIn(LineFields):
     product: Said | None = Field(
         None, description="The product's SKU or name, when its id is not known."
     )
+    option_ids: list[UUID] = Field(
+        default_factory=list,
+        max_length=MAX_OPTIONS,
+        description="The options of Modifiers chosen for the product (modifier.group.for_target), in the order "
+        "they were chosen; one chosen twice is named twice. Modifiers checks and values them: their price comes "
+        "from it and stays frozen on the line.",
+    )
 
     @model_validator(mode="after")
     def _named(self):
@@ -599,6 +608,25 @@ class OrderListIn(PageIn):
     search: str | None = Field(None, max_length=120, description="Part of the title.")
 
 
+class ModifierPickOut(Schema):
+    option_id: UUID = Field(description="The option of Modifiers chosen.")
+    group_id: UUID = Field(description="Its group.")
+    group_name: str = Field(description="Its group's name, when it was ordered.")
+    name: str = Field(description="Its name, as the receipt prints it.")
+    kitchen_name: str = Field(description="What the kitchen reads.")
+    price_delta: int = Field(description="Its supplement in cents, frozen when it was ordered.")
+    tax_category_key: str | None = Field(description="Its own tax category; null = the dish's.")
+    own_line: bool = Field(description="True: charged on a child line of its own (another tax category).")
+
+
+class ModifierLineOut(Schema):
+    option_id: UUID = Field(description="The option charged on a line of its own.")
+    name: str = Field(description="Its name.")
+    tax_category_key: str = Field(description="Its tax category: the child line's.")
+    unit_price: int = Field(description="Its price in cents, frozen when it was ordered.")
+    quantity: int = Field(description="How many per unit of the dish.")
+
+
 class OrderLineOut(Schema):
     id: UUID = Field(description="The line's id.")
     position: int = Field(description="Its place in the check.")
@@ -645,6 +673,13 @@ class OrderLineOut(Schema):
     )
     round_no: int = Field(description="Kitchen round it was sent in; 0 = pending.")
     fired_at: datetime | None = Field(description="When it was sent to the kitchen.")
+    modifiers: list[ModifierPickOut] = Field(
+        description="The options of Modifiers chosen, frozen when it was ordered, in the order chosen."
+    )
+    modifier_lines: list[ModifierLineOut] = Field(
+        description="The options of another tax category: each one charged on a child line of its own."
+    )
+    kitchen_text: str = Field(description="What the kitchen reads under the dish (+CHEESE, -ONION).")
 
 
 class OrderOut(Schema):
@@ -878,6 +913,10 @@ class PreviewLineOut(Schema):
     net_amount: int = Field(description="Base in cents.")
     tax_amount: int = Field(description="Tax in cents.")
     line_total: int = Field(description="Total in cents.")
+    modifiers: list[str] = Field(description="The options charged inside the line.")
+    is_child: bool = Field(
+        description="An option of another tax category, charged on a line of its own under its dish."
+    )
 
 
 class PreviewOut(Schema):
@@ -945,6 +984,12 @@ class SaleLineOut(Schema):
     tax_amount: int = Field(description="Tax in cents.")
     line_total: int = Field(description="Total in cents.")
     returned_quantity: Decimal = Field(description="Units that came back with refunds.")
+    modifiers: list[str] = Field(
+        description="The options charged inside the line, as the receipt prints them under it."
+    )
+    parent_line_id: UUID | None = Field(
+        description="The line of the dish an option of another tax category hangs from."
+    )
 
 
 class SalePaymentOut(Schema):

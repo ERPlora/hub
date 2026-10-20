@@ -152,6 +152,8 @@ interface LineFields {
 export interface ProductLineIn extends LineFields {
   product_id?: string;
   product?: string;
+  /** SALE-F11: the options of Modifiers chosen, in the order chosen (one chosen twice, twice). */
+  option_ids?: string[];
 }
 
 /** An open-price line: the amount typed and a department (or a tax category without departments). */
@@ -309,6 +311,32 @@ export interface OrderLineOut {
   /** Kitchen round; 0 = pending. */
   round_no: number;
   fired_at: string | null;
+  /** SALE-F11: the options chosen, frozen when it was ordered, in the order chosen. */
+  modifiers: ModifierPickOut[];
+  /** The options of another tax category, each charged on a child line of its own. */
+  modifier_lines: ModifierLineOut[];
+  /** What the kitchen reads under the dish. */
+  kitchen_text: string;
+}
+
+export interface ModifierPickOut {
+  option_id: string;
+  group_id: string;
+  group_name: string;
+  name: string;
+  kitchen_name: string;
+  price_delta: number;
+  tax_category_key: string | null;
+  own_line: boolean;
+}
+
+export interface ModifierLineOut {
+  option_id: string;
+  name: string;
+  tax_category_key: string;
+  unit_price: number;
+  /** How many per unit of the dish. */
+  quantity: number;
 }
 
 export interface OrderOut {
@@ -441,6 +469,10 @@ export interface PreviewLineOut {
   net_amount: number;
   tax_amount: number;
   line_total: number;
+  /** The options charged inside the line. */
+  modifiers: string[];
+  /** An option of another tax category, charged on a line of its own under its dish. */
+  is_child: boolean;
 }
 
 export interface PreviewOut {
@@ -499,6 +531,10 @@ export interface SaleLineOut {
   tax_amount: number;
   line_total: number;
   returned_quantity: string;
+  /** The options charged inside the line (the receipt prints them under it). */
+  modifiers: string[];
+  /** The dish line an option of another tax category hangs from. */
+  parent_line_id: string | null;
 }
 
 export interface SalePaymentOut {

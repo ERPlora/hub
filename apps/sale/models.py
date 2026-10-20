@@ -345,6 +345,23 @@ class OrderLine(UUIDModel):
     voucher_hold_until = models.DateTimeField(
         _("voucher session held until"), null=True, blank=True
     )
+    # The options of Modifiers chosen for the line (SALE-F11), frozen as Modifiers valued them when it was
+    # ordered: ``modifiers`` every pick in the order chosen (``unit_price`` already adds the ones taxed as the
+    # dish), ``modifier_lines`` the ones of another tax category, charged on a child line of their own (their
+    # ``quantity`` is per unit of the dish), ``kitchen_text`` what the kitchen reads under the dish.
+    modifiers = models.JSONField(
+        _("options"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
+    )
+    modifier_lines = models.JSONField(
+        _("options on a line of their own"),
+        default=list,
+        blank=True,
+        db_default=[],
+        encoder=DjangoJSONEncoder,
+    )
+    kitchen_text = models.CharField(
+        _("kitchen text"), max_length=500, blank=True, default="", db_default=""
+    )
     line_total = models.BigIntegerField(_("line total"), default=0)
     round_no = models.PositiveIntegerField(_("round"), default=0)
     fired_at = models.DateTimeField(_("sent to the kitchen at"), null=True, blank=True)
@@ -588,6 +605,14 @@ class SaleLine(UUIDModel):
     voucher_session_id = models.UUIDField(_("voucher session"), null=True, blank=True)
     voucher_grant_id = models.UUIDField(_("voucher"), null=True, blank=True)
     voucher_name = models.CharField(_("voucher name"), max_length=200, blank=True)
+    # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
+    # the child line of an option of another tax category, the line of the dish it hangs from.
+    modifiers = models.JSONField(
+        _("options"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
+    )
+    parent_line_id = models.UUIDField(
+        _("line it hangs from"), null=True, blank=True
+    )
     tax_category_key = models.CharField(_("tax category"), max_length=80)
     tax_rate = models.DecimalField(_("rate (%)"), max_digits=6, decimal_places=2)
     tax_country_code = models.CharField(_("tax country"), max_length=2)

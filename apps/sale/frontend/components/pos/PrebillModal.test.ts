@@ -88,6 +88,14 @@ describe('PrebillModal', () => {
     expect(paper.find('.pos-bill__notice').text()).toBe('Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.');
   });
 
+  it('names the options of a dish under it, as the ticket will (SALE-F11)', async () => {
+    const pick = (name: string) => ({ option_id: name, group_id: 'g1', group_name: 'Extras', name, kitchen_name: name, price_delta: 100, tax_category_key: null, own_line: false });
+    const burger = line({ id: 'l3', name: 'Burger', unit_price: 900, line_total: 900, modifiers: [pick('Cheese'), pick('Rare')] });
+    const m = await setup({ order: { ...CHECK, lines: [burger] } }, 'es');
+    await m.result('sale.checkout.preview', VALUED);
+    expect(m.find('pos-prebill-paper').find('.pos-bill__options').text()).toBe('Cheese, Rare');
+  });
+
   it('names each tax by its kind in the reader’s language; a named component keeps its own name', async () => {
     const m = await setup();
     await m.result(

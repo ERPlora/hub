@@ -152,6 +152,10 @@ function print(): void {
             <span class="pos-bill__qty">{{ amount(line) }}</span>
             <span class="pos-bill__amount">{{ formatMoney(line.line_total, locale) }}</span>
             <span
+              v-if="line.modifiers.length"
+              class="pos-bill__options"
+            >{{ line.modifiers.map((pick) => pick.name).join(', ') }}</span>
+            <span
               v-if="line.notes"
               class="pos-bill__note"
             >{{ line.notes }}</span>
@@ -249,6 +253,10 @@ function print(): void {
   grid-row: 1;
   grid-column: 2;
   font-weight: 700;
+}
+.pos-bill__options {
+  grid-column: 1 / -1;
+  color: #555;
 }
 .pos-bill__note {
   grid-column: 1 / -1;

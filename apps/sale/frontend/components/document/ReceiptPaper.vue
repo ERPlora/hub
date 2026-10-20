@@ -54,7 +54,10 @@ const numberLabel = computed(() => {
 const lines = computed(() =>
   props.sale.lines.map((line) => ({
     id: line.id,
-    name: line.is_gift ? `${line.name} ${t('sale.document.gift')}` : line.name,
+    // An option of another tax category hangs under its dish (SALE-F11): «+ <option>».
+    name: `${line.parent_line_id ? '+ ' : ''}${line.is_gift ? `${line.name} ${t('sale.document.gift')}` : line.name}`,
+    child: !!line.parent_line_id,
+    options: line.modifiers.join(', '),
     detail: `${formatQuantity(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,
     note: line.notes.trim(),
     voucher: line.paid_by_voucher ? t('sale.document.paidWithVoucher', { name: line.voucher_name }) : '',
@@ -158,10 +161,20 @@ const footer = computed(() =>
           :key="line.id"
           data-testid="sale-receipt-line"
         >
-          <td class="sale-receipt__line-name">
+          <td
+            class="sale-receipt__line-name"
+            :class="{ 'sale-receipt__line-name--child': line.child }"
+          >
             <div>{{ line.name }}</div>
             <div class="sale-receipt__detail">
               {{ line.detail }}
+            </div>
+            <div
+              v-if="line.options"
+              class="sale-receipt__detail"
+              data-testid="sale-receipt-options"
+            >
+              {{ line.options }}
             </div>
             <div
               v-if="line.voucher"
@@ -309,6 +322,9 @@ const footer = computed(() =>
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 10px;
+}
+.sale-receipt__line-name--child {
+  padding-left: 0.75rem;
 }
 .sale-receipt__lines,
 .sale-receipt__totals {

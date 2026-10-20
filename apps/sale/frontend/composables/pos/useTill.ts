@@ -39,7 +39,11 @@ export interface Till {
   busy: ComputedRef<boolean>;
   /** The title typed before the check exists: it opens with it. */
   pendingLabel: Readonly<Ref<string>>;
-  addProduct(product: { id: string }, staffId: string | null): Promise<void>;
+  /** A product of the catalogue, with the options of Modifiers chosen for it (SALE-F11), in the order chosen;
+   *  a refusal is a toast. */
+  addProduct(product: { id: string }, staffId: string | null, optionIds?: readonly string[]): Promise<void>;
+  /** The same, for a sheet: the refusal's words come back instead of a toast. */
+  addProductLine(product: { id: string }, staffId: string | null, optionIds?: readonly string[]): Promise<WriteResult>;
   addOpenLine(line: OpenLine, staffId: string | null): Promise<WriteResult>;
   /** A service of Services: its own price, or `unitPrice` (cents) when it has no fixed price. */
   addService(service: { id: string }, staffId: string | null, unitPrice?: number): Promise<WriteResult>;
@@ -154,28 +158,32 @@ export function useTill(options: TillOptions): Till {
     options.onOpened?.(created.id);
   }
 
-  function addProduct(product: { id: string }, staffId: string | null): Promise<void> {
-    return toast(
-      serial(async () => {
-        try {
-          const id = order.value?.id ?? check.id.value;
-          if (!id) {
-            await opened(() => open.run({ ...labelOf(), lines: [{ product_id: product.id, ...staffOf(staffId) }] }));
-            return { ok: true } as const;
-          }
-          const merge = order.value ? mergeableLine(order.value.lines, product.id, staffId) : undefined;
-          accept(
-            merge
-              ? await updateLine.run({ order_id: id, line_id: merge.id, quantity: plusOne(merge.quantity) })
-              : await addLine.run({ order_id: id, product_id: product.id, ...staffOf(staffId) }),
-          );
+  function addProductLine(product: { id: string }, staffId: string | null, optionIds: readonly string[] = []): Promise<WriteResult> {
+    // Only the ids travel: Modifiers values them on the server (a price from the browser buys nothing).
+    const options = optionIds.length ? { option_ids: [...optionIds] } : {};
+    return serial(async () => {
+      try {
+        const id = order.value?.id ?? check.id.value;
+        if (!id) {
+          await opened(() => open.run({ ...labelOf(), lines: [{ product_id: product.id, ...staffOf(staffId), ...options }] }));
           return { ok: true } as const;
-        } catch (error) {
-          return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') } as const;
         }
-      }),
-    );
+        // A line with options is a dish of its own: it never raises another, nor is raised.
+        const merge = order.value && !optionIds.length ? mergeableLine(order.value.lines, product.id, staffId) : undefined;
+        accept(
+          merge
+            ? await updateLine.run({ order_id: id, line_id: merge.id, quantity: plusOne(merge.quantity) })
+            : await addLine.run({ order_id: id, product_id: product.id, ...staffOf(staffId), ...options }),
+        );
+        return { ok: true } as const;
+      } catch (error) {
+        return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') } as const;
+      }
+    });
   }
+
+  const addProduct = (product: { id: string }, staffId: string | null, optionIds: readonly string[] = []) =>
+    toast(addProductLine(product, staffId, optionIds));
 
   function addOpenLine(line: OpenLine, staffId: string | null): Promise<WriteResult> {
     return serial(async () => {
@@ -331,6 +339,7 @@ export function useTill(options: TillOptions): Till {
     busy: computed(() => inFlight.value > 0),
     pendingLabel,
     addProduct,
+    addProductLine,
     addOpenLine,
     addService,
     setQuantity,

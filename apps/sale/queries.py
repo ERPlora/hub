@@ -124,6 +124,9 @@ INVOICE_UNAVAILABLE = _(
     "Invoicing is not active in this business: the sale is a ticket without a fiscal document."
 )
 CASH_REGISTER_UNAVAILABLE = _("Cash register is not active in this business.")
+MODIFIER_UNAVAILABLE = _(
+    "Modifiers is not active in this business: this product cannot take options. Add it without them."
+)
 APPOINTMENT_UNAVAILABLE = _("Appointments is not active in this business.")
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
@@ -608,7 +611,11 @@ UNAVAILABLE = {
     "sale.invoice_unavailable": INVOICE_UNAVAILABLE,
     "sale.cash_register_unavailable": CASH_REGISTER_UNAVAILABLE,
     "sale.appointment_unavailable": APPOINTMENT_UNAVAILABLE,
+    "sale.modifier_unavailable": MODIFIER_UNAVAILABLE,
 }
+
+#: Modifiers' check and valuation of the options chosen for a product (MODIFIER-F07), asked by name.
+MODIFIER_RESOLVE = "modifier.selection.resolve"
 
 
 def call_app(ctx: OperationContext, name: str, data: dict, unavailable_code: str):
@@ -815,16 +822,76 @@ def check_grid(quantity: Decimal, increment: Decimal, unit: str) -> None:
 
 
 def provisional_total(line: OrderLine) -> int:
-    """What the row paints: its frozen price by its quantity, with its own discount; a comp, 0; a line a
-    voucher pays, 0."""
+    """What the row paints: its frozen price by its quantity, with its own discount, plus its options of
+    another tax category (each charged on a child line); a comp, 0; a line a voucher pays, 0."""
     if line.voucher_session_id is not None:
         return 0
-    return pricing.line_amount(
-        line.unit_price,
-        ratio_of(line),
-        line_percent=line.discount_percent,
-        is_gift=line.is_gift,
+    return sum(
+        pricing.line_amount(
+            part.unit_price,
+            ratio_of(part),
+            line_percent=part.discount_percent,
+            is_gift=part.is_gift,
+        )
+        for part in charge_parts([line])
     )
+
+
+def charge_parts(lines: Iterable[OrderLine]) -> list[OrderLine]:
+    """What a charge values and records, in order: each line of the check and, right after it, a child line
+    per option of another tax category (SALE-F11, MODIFIER-F07) — unsaved, at the option's frozen price, with
+    the dish's discount and comp, and its count per dish by the dish's quantity. Each part keeps the check's
+    line it comes from in ``origin`` (itself for the line)."""
+    parts: list[OrderLine] = []
+    for line in lines:
+        line.origin = line
+        parts.append(line)
+        for own in line.modifier_lines:
+            child = OrderLine(
+                order_id=line.order_id,
+                position=line.position,
+                name=own["name"],
+                unit="ud",
+                quantity=Decimal(own["quantity"]) * line.quantity,
+                unit_price=own["price_delta"],
+                tax_category_key=own["tax_category_key"],
+                discount_percent=line.discount_percent,
+                discount_approved_by=line.discount_approved_by,
+                is_gift=line.is_gift,
+                gift_reason=line.gift_reason,
+                staff_id=line.staff_id,
+            )
+            child.origin = line
+            parts.append(child)
+    return parts
+
+
+def is_child(part: OrderLine) -> bool:
+    """A child line of an option, not a line of the check."""
+    return getattr(part, "origin", part) is not part
+
+
+def folded_names(line: OrderLine) -> list[str]:
+    """The options charged inside the line (the receipt prints them under it): not the child lines'."""
+    return [pick["name"] for pick in line.modifiers if not pick.get("own_line")]
+
+
+def _options(ctx: OperationContext, product, option_ids: list[UUID]) -> dict | None:
+    """Modifiers' check and valuation of the options chosen for ``product`` (MODIFIER-F07), always asked when
+    Modifiers is on, also with none chosen (it refuses a required group left empty, which the API and the
+    assistant do not go through the sheet for). Modifiers off or absent: ``None`` without options, 409
+    ``sale.modifier_unavailable`` with them. Its refusals reach the seller as they are."""
+    try:
+        return call_app(
+            ctx,
+            MODIFIER_RESOLVE,
+            {"product_id": product.id, "option_ids": option_ids},
+            "sale.modifier_unavailable",
+        )
+    except Conflict as refused:
+        if refused.code == "sale.modifier_unavailable" and not option_ids:
+            return None
+        raise
 
 
 def ratio_of(line: OrderLine | object):
@@ -861,6 +928,8 @@ def freeze_product_line(
     unit = units[product.unit]
     priced_in = units[product.pricing_unit]
     check_grid(data.quantity, unit[2], product.unit)
+    chosen = _options(ctx, product, data.option_ids)
+    picks = [pick.model_dump(mode="json") for pick in chosen.picks] if chosen else []
     line = OrderLine(
         product_id=product.id,
         name=product.name,
@@ -876,9 +945,12 @@ def freeze_product_line(
         pricing_factor_num=priced_in[0],
         pricing_factor_den=priced_in[1],
         quantity=data.quantity,
-        unit_price=product.price,
+        unit_price=product.price + (chosen.folded_delta if chosen else 0),
         cost=product.cost,
         tax_category_key=product.tax_category_key,
+        modifiers=picks,
+        modifier_lines=[own.model_dump(mode="json") for own in chosen.own_lines] if chosen else [],
+        kitchen_text=chosen.kitchen_text[:500] if chosen else "",
         notes=data.notes,
         staff_id=data.staff_id,
         is_gift=data.is_gift,
@@ -976,6 +1048,18 @@ def order_line_row(line: OrderLine) -> dict:
         "line_total": line.line_total,
         "round_no": line.round_no,
         "fired_at": line.fired_at,
+        "modifiers": line.modifiers,
+        "modifier_lines": [
+            {
+                "option_id": own["option_id"],
+                "name": own["name"],
+                "tax_category_key": own["tax_category_key"],
+                "unit_price": own["price_delta"],
+                "quantity": own["quantity"],
+            }
+            for own in line.modifier_lines
+        ],
+        "kitchen_text": line.kitchen_text,
     }
 
 
@@ -1140,7 +1224,7 @@ def operation_total(order: Order | None, closes: bool, valuation: pricing.Valuat
     if closes:
         return charged + valuation.total
     rest = valuate(
-        pending_lines(order),
+        charge_parts(pending_lines(order)),
         discount_percent=order.discount_percent,
         discount_amount=order.discount_amount,
         tax_included=current_settings().default_tax_included,
@@ -1200,8 +1284,9 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
     else:
         lines = loose_lines(ctx, params.lines, params.open_lines, params.service_lines)
         percent, amount, version = params.discount_percent, params.discount_amount, None
+    parts = charge_parts(lines)
     valuation = valuate(
-        lines,
+        parts,
         discount_percent=percent,
         discount_amount=amount,
         tax_included=settings.default_tax_included,
@@ -1222,7 +1307,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "breakdown": breakdown_rows(valuation.breakdown),
         "lines": [
             {
-                "order_line_id": line.id if line.pk and params.order_id else None,
+                "order_line_id": line.origin.id if params.order_id else None,
                 "name": line.name,
                 "quantity": line.quantity,
                 "unit": line.unit,
@@ -1238,8 +1323,10 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
                 "net_amount": out.net_amount,
                 "tax_amount": out.tax_amount,
                 "line_total": out.line_total,
+                "modifiers": [] if is_child(line) else folded_names(line),
+                "is_child": is_child(line),
             }
-            for line, out in zip(lines, valuation.lines, strict=True)
+            for line, out in zip(parts, valuation.lines, strict=True)
         ],
         "operation_total": operation_total(order, closes, valuation),
         "cash_limit": CASH_LIMIT.get(country),
@@ -1303,6 +1390,8 @@ def sale_line_row(line: SaleLine, returned: Decimal) -> dict:
         "tax_amount": line.tax_amount,
         "line_total": line.line_total,
         "returned_quantity": returned,
+        "modifiers": line.modifiers,
+        "parent_line_id": line.parent_line_id,
     }
 
 

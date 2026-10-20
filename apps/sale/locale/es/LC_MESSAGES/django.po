@@ -762,3 +762,18 @@ msgid ""
 msgstr ""
 "No puedes ver esa cita: es de otra profesional o ya no existe. Cóbrala desde "
 "la profesional de la cita o al precio del catálogo."
+
+msgid "options"
+msgstr "suplementos"
+
+msgid "options on a line of their own"
+msgstr "suplementos en línea propia"
+
+msgid "kitchen text"
+msgstr "texto de cocina"
+
+msgid "line it hangs from"
+msgstr "línea de la que cuelga"
+
+msgid "Modifiers is not active in this business: this product cannot take options. Add it without them."
+msgstr "Suplementos no está activa en este negocio: este producto no admite suplementos. Añádelo sin ellos."

@@ -37,5 +37,7 @@ export const previewLine = (id: string, over: Partial<PreviewLineOut> = {}): Pre
   net_amount: 2066,
   tax_amount: 434,
   line_total: 2500,
+  modifiers: [],
+  is_child: false,
   ...over,
 });

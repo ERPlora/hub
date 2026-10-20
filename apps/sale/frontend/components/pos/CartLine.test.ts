@@ -18,6 +18,23 @@ async function setup(over: Parameters<typeof line>[0] = {}, props: Record<string
 }
 
 describe('CartLine: what it shows', () => {
+  it('names its options of Modifiers under it, in the order chosen (SALE-F11)', async () => {
+    const pick = (name: string, own_line = false) => ({
+      option_id: name,
+      group_id: 'g1',
+      group_name: 'Extras',
+      name,
+      kitchen_name: name,
+      price_delta: 100,
+      tax_category_key: null,
+      own_line,
+    });
+    const m = await setup({ modifiers: [pick('Queso'), pick('Refresco', true)] }, {}, 'es');
+    expect(m.find('pos-line-l1-options').text()).toBe('Queso, Refresco');
+    const plainLine = await setup({}, {}, 'es');
+    expect(plainLine.find('pos-line-l1-options').exists()).toBe(false);
+  });
+
   it('the name, the price per unit and the server’s amount for the line', async () => {
     const m = await setup({ quantity: '2.000', line_total: 300 }, {}, 'es');
     const row = m.find('pos-line-l1');

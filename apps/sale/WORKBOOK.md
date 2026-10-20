@@ -219,7 +219,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F08 | Cobrar sin la caja abierta | común | hecho |
 | SALE-F09 | Vender a precio libre por sección | común | hecho |
 | SALE-F10 | Vender por peso, tecleando la cantidad | común | hecho |
-| SALE-F11 | Elegir los suplementos de un artículo | común | no hecho: Suplementos |
+| SALE-F11 | Elegir los suplementos de un artículo | común | hecho |
 | SALE-F12 | Componer un menú | restaurante | no hecho: Menús |
 | SALE-F13 | Poner una nota en una línea | común | hecho |
 | SALE-F14 | Aplicar un descuento a una línea o a la cuenta | común | parcial |
@@ -480,20 +480,37 @@ con el escalón del producto» y la línea queda como estaba. No hay lector de b
 Implicados: INVENTORY-F26
 
 ### SALE-F11 Elegir los suplementos de un artículo
-Estado: no hecho — los suplementos son de la app Suplementos, que todavía no existe en esta
-plataforma; hasta entonces un artículo entra sin suplementos
+<!-- origen: wf:restaurante-dia#rec_restaurante-f06 old:sales/workflow/la-cuenta.md#sales-f11 -->
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. Toca un artículo que tiene grupos de suplementos: se abre una hoja con su nombre; en cada grupo,
-   su regla («Elige 1», «Hasta 3», «Opcional») y sus opciones con su precio extra.
-2. Pulsa «Añadir»: la línea entra con sus suplementos y su precio congelado al pedir.
-Entra: los grupos y opciones de Suplementos.
-Sale: la línea con los suplementos elegidos; un suplemento con otro tipo de IVA sale al cobrar como
-línea propia.
-Si falla: lo dirá Suplementos.
-Implicados: MODIFIERS-F06
+1. Con Suplementos activa, toca un artículo que tiene grupos de suplementos (suyos o de su categoría): se
+   abre una hoja con su nombre. Sin grupos, el artículo entra directo, como siempre.
+2. Cada grupo dice su regla: «Elige N» si es obligatorio, «Hasta N» si tiene techo, «Opcional» si no; cada
+   opción lleva su suplemento con su signo («+1,00 €», «−2,00 €»; nada si es gratis) y las de fábrica ya
+   salen marcadas.
+3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en uno con
+   techo, al llegar a él el siguiente toque dice «Extras está completo: quita una para elegir otra»; una
+   opción que se puede repetir lleva su contador («× 2») y su «−».
+4. Pulsa «Añadir · <precio>»: la línea entra con sus suplementos debajo del nombre y su precio ya sumado.
+   Mientras un grupo obligatorio no esté completo, el botón dice «Elige una opción para continuar» y
+   tocarlo señala ese grupo.
+5. Cobra como siempre (SALE-F01): la línea cobra lo que valía al pedirla aunque el suplemento cambie o se
+   borre después. Un suplemento con otro tipo de IVA (el refresco del menú infantil, al 21 % junto a la
+   hamburguesa al 10 %) sale en el tique como línea propia debajo del plato («+ Refresco»), por cada plato.
+Entra: los grupos y opciones de Suplementos, que comprueba y valora lo elegido al añadir la línea.
+Sale: la línea con sus suplementos congelados (avisa: cuenta cambiada); la comanda de cocina los lleva bajo el
+plato («+QUESO, -CEBOLLA», avisa: comanda enviada); al cobrar, el tique los nombra bajo el plato y cada
+suplemento de otro IVA es una línea propia con su base y su cuota; el stock lo baja solo el plato.
+Si falla: los motivos de Suplementos dentro de la hoja («Elige al menos 1 en «Punto».», «Esta opción no se
+ofrece con este producto.»…), también por el asistente o la API, que no pasan por la hoja: un grupo
+obligatorio sin elegir se rechaza igual. Si no se pueden leer los grupos, «No se han podido leer los
+suplementos de este producto. Inténtalo de nuevo.» y no entra nada. Sin Suplementos activa, un artículo con
+suplementos pedido por la API se rechaza («Suplementos no está activa en este negocio…») y uno sin ellos
+entra como siempre.
+Implicados: MODIFIER-F06, MODIFIER-F07, MODIFIER-F08
 
 ### SALE-F12 Componer un menú
 Estado: no hecho — los menús son de la app Menús, que todavía no existe en esta plataforma

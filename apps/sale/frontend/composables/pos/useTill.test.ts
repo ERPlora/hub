@@ -109,6 +109,37 @@ describe('useTill: adding products', () => {
   });
 });
 
+describe('useTill: the options of Modifiers (SALE-F11)', () => {
+  const WITH_CHEESE = order({
+    id: 'o1',
+    version: 1,
+    lines: [line({ id: 'l1', product_id: 'p1', modifiers: [pick('cheese')] })],
+  });
+
+  function pick(option_id: string) {
+    return { option_id, group_id: 'g1', group_name: 'Extras', name: option_id, kitchen_name: option_id, price_delta: 100, tax_category_key: null, own_line: false };
+  }
+
+  it('opens the check with the options chosen, in the order chosen, and sends only their ids', async () => {
+    const s = await setup();
+    s.reply(WITH_CHEESE);
+    await s.till().addProduct(product({ id: 'p1' }), null, ['cheese', 'rare', 'cheese']);
+    expect(s.calls()).toEqual([['', { lines: [{ product_id: 'p1', option_ids: ['cheese', 'rare', 'cheese'] }] }]]);
+  });
+
+  it('a line with options never raises another, and a tap without options does not raise one with them', async () => {
+    const s = await setup();
+    s.reply(WITH_CHEESE);
+    await s.till().addProduct(product({ id: 'p1' }), null, ['cheese']);
+    await s.till().addProduct(product({ id: 'p1' }), null, ['cheese']);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    expect(s.calls().slice(1)).toEqual([
+      ['/add_line', { order_id: 'o1', product_id: 'p1', option_ids: ['cheese'] }],
+      ['/add_line', { order_id: 'o1', product_id: 'p1' }],
+    ]);
+  });
+});
+
 describe('useTill: services of Services (SALE-F38)', () => {
   const SERVICE_CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: null, service_id: 's1', is_service: true })] });
 

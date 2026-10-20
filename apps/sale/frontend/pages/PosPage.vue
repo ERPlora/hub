@@ -27,6 +27,7 @@ import CheckFollower from '../components/pos/CheckFollower.vue';
 import DirtyCheckDialog from '../components/pos/DirtyCheckDialog.vue';
 import DiscountSheet from '../components/pos/DiscountSheet.vue';
 import LineNoteSheet from '../components/pos/LineNoteSheet.vue';
+import ModifierSheet from '../components/pos/ModifierSheet.vue';
 import OpenPriceSheet from '../components/pos/OpenPriceSheet.vue';
 import ParkSheet from '../components/pos/ParkSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
@@ -42,6 +43,8 @@ import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
 import { useLocale, useT } from '../composables/useT';
+import type { ProductOut } from '../../../inventory/frontend/operations';
+import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
 import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
 import { refusal } from '../lib/refusal';
@@ -202,6 +205,43 @@ const addOpenLine = (line: OpenLine) =>
     () => till.addOpenLine(line, staff.value.id),
     () => (pricing.value = false),
   );
+
+// ── The options of Modifiers (SALE-F11; Modifiers' operations only) ──────────────────────────────
+/** A product may carry options: Modifiers on in this business and the right to read it. */
+const modifiersOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'modifier' && app.state === 'on') && session.can('modifier.view'),
+);
+const groupsOf = useCommand('modifier.group.for_target');
+const optioning = shallowRef<{ product: ProductOut; groups: TargetGroupOut[] } | null>(null);
+const optionsOpen = computed({
+  get: () => !!optioning.value,
+  set: (open: boolean) => {
+    if (!open) optioning.value = null;
+  },
+});
+
+/** A tap on a product: with groups of Modifiers, the sheet asks first; without, it goes to the check. */
+async function pickProduct(product: ProductOut): Promise<void> {
+  if (!modifiersOn.value) return till.addProduct(product, staff.value.id);
+  let groups: TargetGroupOut[];
+  try {
+    groups = (await groupsOf.run({ product_id: product.id })).groups;
+  } catch (error) {
+    void toastError(wordsOf(error, 'sale.pos.options.loadFailed'));
+    return;
+  }
+  if (!groups.length) return till.addProduct(product, staff.value.id);
+  openSheet(() => (optioning.value = { product, groups }));
+}
+
+const addWithOptions = (optionIds: string[]) => {
+  const chosen = optioning.value;
+  if (!chosen) return;
+  void fromSheet(
+    () => till.addProductLine(chosen.product, staff.value.id, optionIds),
+    () => (optioning.value = null),
+  );
+};
 
 // ── Services of Services (SALE-F38) ─────────────────────────────────────────────────────────────
 /** The till sells Services' services: the setting, Services on in this business, and the right to read it. */
@@ -491,7 +531,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
           :show-products="settings.show_products"
           :can-open-price="session.can('sale.sell_open_price')"
           :show-services="showServices"
-          @add="till.addProduct($event, staff.id)"
+          @add="pickProduct"
           @service="pickService"
           @open-price="openPrice"
         >
@@ -600,6 +640,14 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         :pending="sheetPending"
         :error="sheetError"
         @add="addPricedService"
+      />
+      <ModifierSheet
+        v-model:open="optionsOpen"
+        :product="optioning?.product ?? null"
+        :groups="optioning?.groups ?? []"
+        :pending="sheetPending"
+        :error="sheetError"
+        @add="addWithOptions"
       />
       <LineNoteSheet
         :open="!!noting"

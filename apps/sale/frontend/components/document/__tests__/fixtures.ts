@@ -82,6 +82,8 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
         service_id: null,
         paid_by_voucher: false,
         voucher_name: '',
+        modifiers: [],
+        parent_line_id: null,
       },
       {
         id: 'l2',
@@ -114,6 +116,8 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
         service_id: null,
         paid_by_voucher: false,
         voucher_name: '',
+        modifiers: [],
+        parent_line_id: null,
       },
       {
         id: 'l3',
@@ -146,6 +150,8 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
         service_id: null,
         paid_by_voucher: false,
         voucher_name: '',
+        modifiers: [],
+        parent_line_id: null,
       },
     ],
     payments: [

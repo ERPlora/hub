@@ -212,6 +212,16 @@
         "remove": "Remove from table",
         "seatFailed": "The check could not be seated at that table.",
         "removeFailed": "The table could not be taken off the check."
+      },
+      "options": {
+        "choose": "Choose {n}",
+        "upTo": "Up to {n}",
+        "optional": "Optional",
+        "add": "Add · {price}",
+        "chooseToContinue": "Choose an option to continue",
+        "full": "«{group}» is full: take one out to choose another.",
+        "less": "One less {name}",
+        "loadFailed": "The options of this product could not be read. Try again."
       }
     },
     "checkout": {

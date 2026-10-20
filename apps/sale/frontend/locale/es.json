@@ -212,6 +212,16 @@
         "remove": "Quitar de la mesa",
         "seatFailed": "No se pudo sentar la cuenta en esa mesa.",
         "removeFailed": "No se pudo quitar la mesa de la cuenta."
+      },
+      "options": {
+        "choose": "Elige {n}",
+        "upTo": "Hasta {n}",
+        "optional": "Opcional",
+        "add": "Añadir · {price}",
+        "chooseToContinue": "Elige una opción para continuar",
+        "full": "«{group}» está completo: quita una para elegir otra.",
+        "less": "Una menos de {name}",
+        "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo."
       }
     },
     "checkout": {

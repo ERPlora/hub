@@ -114,6 +114,14 @@ describe('ReceiptPaper', () => {
     expect(s.all('sale-receipt-line')).toEqual(['Corte 1 × 25,00 € Ya pagado · Bono 5 cortes 0,00 €']);
   });
 
+  it('prints the options of a dish under it and an option of another tax as its own line under the dish (SALE-F11)', async () => {
+    const sale = saleOut();
+    const burger = { ...sale.lines[0], id: 'b1', name: 'Hamburguesa', quantity: '2.000', unit_price: 900, notes: '', line_total: 1800, modifiers: ['Queso', 'Poco hecha'] };
+    const soda = { ...sale.lines[0], id: 'b2', name: 'Refresco', quantity: '2.000', unit_price: 200, notes: '', line_total: 400, parent_line_id: 'b1' };
+    const s = await paper({ sale: { ...sale, lines: [burger, soda] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-line')).toEqual(['Hamburguesa 2 × 9,00 € Queso, Poco hecha 18,00 €', '+ Refresco 2 × 2,00 € 4,00 €']);
+  });
+
   it('a sale without lines says so', async () => {
     const s = await paper({ sale: saleOut({ lines: [] }), settings: SETTINGS });
     expect(s.text('sale-receipt-no-lines')).toBe('— Sin líneas —');
