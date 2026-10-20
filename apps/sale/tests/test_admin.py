@@ -250,6 +250,19 @@ def test_the_lines_and_payments_of_a_charge_or_a_refund_are_shown_read_only(supe
         assert set(inline.get_fields(request)) <= set(inline.get_readonly_fields(request)), name
 
 
+def test_a_charged_inline_without_fields_shows_every_column_read_only(superuser):
+    """A ``ChargedInline`` that lists no ``fields`` still renders: every column, none typed."""
+    request = request_by(superuser)
+
+    class BareInline(sale_admin.ChargedInline):
+        model = SalePayment
+
+    inline = BareInline(Sale, admin.site)
+    columns = {field.name for field in SalePayment._meta.concrete_fields}
+    assert set(inline.get_readonly_fields(request)) == columns
+    assert set(inline.get_fields(request)) == columns
+
+
 def test_an_open_check_keeps_its_lines_editable(superuser):
     request = request_by(superuser)
     inline = sale_admin.OrderLineInline(Order, admin.site)

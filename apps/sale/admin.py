@@ -65,7 +65,7 @@ class ChargedInline(admin.TabularInline):
     extra = 0
 
     def get_readonly_fields(self, request, obj=None) -> tuple:
-        return tuple(self.fields)
+        return tuple(field.name for field in self.model._meta.concrete_fields)
 
     def has_add_permission(self, request, obj=None) -> bool:
         return False
