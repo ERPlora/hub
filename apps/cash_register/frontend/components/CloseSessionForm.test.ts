@@ -182,6 +182,16 @@ describe('CloseSessionForm', () => {
     expect(s.find('cash-register-review-unavailable').exists()).toBe(true);
   });
 
+  it('a print queue reading refused makes the review incomplete', async () => {
+    const s = await setup();
+    await s.result(DETAIL, detail(10150));
+    await s.result(CHECKS, checks([]));
+    await s.result(KITCHEN, board());
+    s.net.lastStream().push(errorFrame(s.subId(PRINTS), 'permission_denied'));
+    await flush();
+    expect(s.find('cash-register-review-unavailable').exists()).toBe(true);
+  });
+
   it('a review that could not be read is said and does not ask for a second press', async () => {
     const s = await setup();
     await s.result(DETAIL, detail(10150));
