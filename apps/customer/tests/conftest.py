@@ -168,7 +168,7 @@ def card_deleted_on_screen(card, how: str, before: Callable[[str], bool]):
     assert thread.ident is not None, "the deletion never started"
 
 
-def cannot_delete(answer) -> bool:
+def card_protected(answer) -> bool:
     """Whether the Hub admin answered «Cannot delete customer»: something protects the card."""
     assert not isinstance(answer, Exception), answer
     return answer.status_code == 200 and str(answer.context["title"]) == "Cannot delete customer"

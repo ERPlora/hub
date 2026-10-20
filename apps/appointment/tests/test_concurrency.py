@@ -28,7 +28,7 @@ from live.operations import get
 
 from apps.appointment.models import Appointment, Recurring
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import cannot_delete, card_deleted_on_screen, reads, writes
+from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
 from apps.staff.models import Member
 from apps.staff.tests.conftest import WAIT_LIMIT, _waited_for, deleted_on_screen
 
@@ -696,7 +696,7 @@ def test_the_hub_admin_cannot_delete_a_card_a_booking_links_meanwhile(salon, wri
     with card_deleted_on_screen(salon.lucia, how, writes(table)) as answers:
         book(salon)
     [answer] = answers
-    assert cannot_delete(answer)
+    assert card_protected(answer)
     assert Customer.objects.filter(pk=salon.lucia.pk).exists()
     assert Recurring.objects.filter(customer=salon.lucia).exists() == (write == "series")
     assert Appointment.objects.filter(customer=salon.lucia).exists()
@@ -739,7 +739,7 @@ def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_appointments_to_
     with card_deleted_on_screen(marta, how, writes("appointment_appointment")) as answers:
         move()
     [answer] = answers
-    assert cannot_delete(answer)
+    assert card_protected(answer)
     booked.refresh_from_db()
     series.refresh_from_db()
     assert (booked.customer_id, series.customer_id) == (marta.id, marta.id)
