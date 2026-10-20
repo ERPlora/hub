@@ -7,7 +7,7 @@
   the drawer opens at checkout, how many copies, and which printer prints each function.
 - ``PrintJob`` is a job of the print queue: the structured document the app's renderer paints (or the A4
   page for the computer's printer), its function, its printer, its state and who retried or cancelled it.
-  Nothing is ever deleted from the queue.
+  Nobody deletes a job: the platform's hourly prune forgets the ones that ended over 30 days ago.
 """
 
 from django.core.serializers.json import DjangoJSONEncoder
@@ -134,7 +134,8 @@ class Settings(UUIDModel):
 
 
 class PrintJob(UUIDModel):
-    """A job of the print queue. Nothing is deleted: a retry or a cancel stamps who, when and why."""
+    """A job of the print queue. A retry or a cancel stamps who, when and why; it is forgotten 30 days after
+    it ended (``printing.job.prune``)."""
 
     class Kind(models.TextChoices):
         DOCUMENT = "document", _("Document")

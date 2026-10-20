@@ -425,3 +425,8 @@ class JobAckOut(Schema):
         "was retried or cancelled)."
     )
     job: JobOut = Field(description="The job as it is now.")
+
+
+class PruneOut(Schema):
+    count: int = Field(description="The finished jobs this run deleted (printed, cancelled or failed over 30 days ago).")
+

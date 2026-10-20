@@ -170,6 +170,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F17 | Imprimir el cierre de caja | común | parcial: falta que Caja lo pida |
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: la recogida está hecha; el canal `/ws/print` es de `base` |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
+| PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
 
 ### PRINTING-F01 Ver cómo va la impresión
 <!-- origen: wf:restaurante-dia#rec_restaurante-f16 old-hub:HUB_SHELL-F60 old-hub:HUB_SHELL-F63 old-hub:HUB_SHELL-F75 old-hub:HUB-F201 old-hub:HUB-F202 old-hub:HUB-F203 old:printing/workflow/impresoras.md#printing-f01 -->
@@ -430,7 +431,7 @@ Pasos:
    la cola con quién, cuándo y por qué.
 Entra: el trabajo y, al cancelar, el motivo.
 Sale: el trabajo en cola otra vez o cancelado (avisa: `printing.job.retried`, `printing.job.cancelled`).
-Nada se borra.
+Nadie lo borra: la cola lo olvida 30 días después de acabar (PRINTING-F20).
 Si falla: «Solo se reintenta un trabajo fallido o que no contestó; este está …», «Un trabajo que está
 imprimiendo o ya impreso no se cancela; este está …». Sin permiso no se ven los botones.
 Implicados: PRINTING-F01
@@ -524,6 +525,26 @@ error.
 Si falla: «No hay ninguna impresora con ese nombre.».
 Implicados: PRINTING-F01
 
+### PRINTING-F20 Cuánto tiempo guarda el hub los trabajos de impresión
+<!-- origen: old-hub:HUB-F206 -->
+Estado: hecho
+Vertical: común
+Actor: sistema
+Pantalla: Cola
+Pasos:
+1. Un trabajo se queda en la cola mientras espera, mientras el dispositivo lo imprime y después de
+   acabar («Impreso», «Cancelado» o «Fallido»), con su número, su función, su impresora y sus sellos; al
+   imprimirse o cancelarse ya suelta el documento.
+2. Cada hora, la cola olvida los trabajos que acabaron hace más de 30 días; uno en cola o enviado no se
+   toca nunca.
+3. Desde ese momento ya no sale en **Impresión → Cola** ni cuenta en el estado de la impresión.
+Entra: nada: lo hace la plataforma sola.
+Sale: los trabajos terminados hace más de 30 días, borrados (avisa: `printing.job.pruned`, con
+cuántos). Pedir otra vez el mismo documento después vuelve a ponerlo en cola.
+Si falla: si una hora no puede limpiar, lo hace la siguiente; un trabajo nunca se borra antes de su
+plazo.
+Implicados: PRINTING-F01, PRINTING-F14
+
 ## Servicios: lo que entra y lo que sale
 
 Las demás apps y el asistente usan Impresión por estas operaciones, por su nombre; nunca sus tablas.
@@ -567,6 +588,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Trabajo fallido | El dispositivo avisa del error | El trabajo y si ya no se reintenta | `printing.job.failed` |
 | Trabajo devuelto a la cola | Reintentar | El trabajo | `printing.job.retried` |
 | Trabajo cancelado | Cancelar | El trabajo | `printing.job.cancelled` |
+| Trabajos olvidados | La limpieza de cada hora borra lo terminado hace más de 30 días | Cuántos | `printing.job.pruned` |
 
 Los avisos no llevan el documento (puede tener el nombre o el NIF de un cliente): solo ids.
 
@@ -692,7 +714,9 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 - **Modelos**: `Settings` (una fila; sin ella valen los de fábrica), `Printer` (nunca se borra: la
   cola la nombra; nombre único sin distinguir mayúsculas) y `PrintJob` (la cola: clave única
   `job_key`, tipo, documento, HTML, formato, función, impresora, copias, cajón, estado, intentos,
-  plazo, dispositivo, último error y los sellos de quién reintentó o canceló). Nada se borra de la cola.
+  plazo, dispositivo, último error y los sellos de quién reintentó o canceló). Nadie borra un trabajo a
+  mano: la tarea programada `prune` (`printing.job.prune`, cada hora, como sistema y sin ruta) borra los
+  terminados (`done`, `cancelled`, `failed`) 30 días después de acabar, 500 como mucho por pasada.
 - **Estados**: `pending` → (`claim`) `sent` → (`complete`) `done`; `sent` → (`fail`) `pending` hasta 5
   intentos, después `failed`; `sent` con el plazo vencido (90 s) vuelve a `pending` (o `failed` si
   agotó los intentos) en el siguiente `claim`; `failed` o `sent` vencido → (`retry`) `pending` con los
@@ -715,7 +739,11 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
   y se avisa `printing.job.queued`.
 - **RGPD (decidido)**: al pasar a `done` o `cancelled`, el trabajo vacía `document` y `html`; conserva su
   número (`reference`), su función, su impresora y los sellos. Reimprimir es un trabajo nuevo pedido desde
-  la app de origen (Ventas, Facturación…).
+  la app de origen (Ventas, Facturación…). Un `failed` guarda el documento para reintentarlo hasta
+  que se cancela o se olvida: 30 días después de acabar (PRINTING-F20; mercado: PrintNode borra el
+  documento al entregarlo o a las 2 semanas, BarTender Cloud guarda el historial 30 días, Universal Print
+  enseña lo liberado 30 días, CUPS no guarda el fichero y acota el historial; la plataforma guarda 90 días
+  el historial de Automatizaciones, que es lo que se consulta, y la cola no se consulta pasado un mes).
 - **Sin ESC/POS en el servidor**: los bytes los hace la app (`crates/peripherals/src/escpos.rs`), que
   solo acepta documentos estructurados (`erplora_print(printer_id, document_type, data, job_id)`);
   PLAN-HUB §5 y la decisión de Ioan del 08/08/2026 (hub#501: el documento viaja estructurado y no hay
@@ -778,7 +806,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 - No compone documentos: cada app manda el suyo.
 - No genera ESC/POS ni imágenes de códigos de barras: la app del dispositivo.
 - No habla con las impresoras ni busca impresoras: la app del dispositivo.
-- No borra trabajos ni impresoras: se cancelan y se desactivan.
+- Nadie borra trabajos ni impresoras: se cancelan y se desactivan; la cola olvida sola lo terminado a los
+  30 días (PRINTING-F20).
 - No abre el cajón a mano («sin venta»).
 - No enruta por categoría de producto: las estaciones de cocina serán de Cocina.
 
@@ -788,4 +817,4 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    Ventas al pedirlo (`automatic` solo en cobros en efectivo).
 2. ¿Abrir el cajón a mano («sin venta») con permiso y registro, desde Caja o desde Impresión?
 3. ~~¿Cuánto tiempo se guardan los trabajos impresos, con su documento (RGPD)?~~ Decidido: el documento
-   se vacía al imprimirse o cancelarse; el trabajo queda con su número y sus sellos.
+   se vacía al imprimirse o cancelarse, y el trabajo terminado se borra a los 30 días (PRINTING-F20).
