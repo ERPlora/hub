@@ -1,5 +1,6 @@
 {
   "cart_checkout": {
+    "title": "Carrito y pago",
     "tabs": {
       "label": "Secciones de Carrito y pago",
       "carts": "Carritos",
@@ -27,7 +28,6 @@
       "completed": "Completado"
     },
     "carts": {
-      "title": "Carritos",
       "search": "Buscar sesión o email…",
       "empty": "Sin carritos.",
       "loadError": "No se han podido cargar los carritos.",
@@ -66,7 +66,6 @@
       }
     },
     "orders": {
-      "title": "Pedidos",
       "search": "Buscar pedido o email…",
       "empty": "Sin pedidos.",
       "emptyMessage": "Los pedidos se inician desde un carrito con el asistente o la API.",

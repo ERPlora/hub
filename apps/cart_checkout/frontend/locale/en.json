@@ -1,5 +1,6 @@
 {
   "cart_checkout": {
+    "title": "Cart & Checkout",
     "tabs": {
       "label": "Sections of Cart & Checkout",
       "carts": "Carts",
@@ -27,7 +28,6 @@
       "completed": "Completed"
     },
     "carts": {
-      "title": "Carts",
       "search": "Search session or email…",
       "empty": "No carts.",
       "loadError": "The carts could not be loaded.",
@@ -66,7 +66,6 @@
       }
     },
     "orders": {
-      "title": "Orders",
       "search": "Search order or email…",
       "empty": "No orders.",
       "emptyMessage": "Orders are started from a cart with the assistant or the API.",

@@ -85,7 +85,8 @@ describe('CartsPage', () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carts');
+    // The topbar names the app, as the old hub's did; the tabbar says which section.
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Cart & Checkout');
     expect(s.prop('searchPlaceholder')).toBe('Search session or email…');
     expect(s.prop<{ add: string }>('labels').add).toBe('New cart');
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
@@ -276,7 +277,7 @@ describe('CartsPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carritos');
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carrito y pago');
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Buscar sesión o email…', 'Nuevo carrito']);
     expect(s.cells(0).slice(2, 5).map((cell) => cell.replace(/[  ]/g, ' '))).toEqual(['Activo', '2', '31,50 €']);
     expect(s.offered(ACTIVE)).toEqual(['Abandonar', 'Borrar']);

@@ -83,7 +83,8 @@ describe('OrdersPage', () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Orders');
+    // The topbar names the app, as the old hub's did; the tabbar says which section.
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Cart & Checkout');
     expect(s.prop('searchPlaceholder')).toBe('Search order or email…');
     expect(s.prop('addable')).toBe(false);
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
@@ -223,7 +224,7 @@ describe('OrdersPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Pedidos');
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carrito y pago');
     expect(s.prop('searchPlaceholder')).toBe('Buscar pedido o email…');
     expect(s.cells(0).slice(2, 5).map((cell) => cell.replace(/[  ]/g, ' '))).toEqual(['Iniciado', 'Card', '31,50 €']);
     expect(s.offered(INITIATED)).toEqual(['Marcar pagado', 'Fallar']);

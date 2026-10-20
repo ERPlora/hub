@@ -154,7 +154,7 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
 
 <template>
   <AppPage
-    :title="$t('cart_checkout.orders.title')"
+    :title="$t('cart_checkout.title')"
     content-layout="fill"
     :tabs="cartCheckoutTabs($t)"
     :tabs-label="$t('cart_checkout.tabs.label')"
