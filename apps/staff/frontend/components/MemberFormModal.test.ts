@@ -233,6 +233,34 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     ]);
   });
 
+  // gh:staff#70: closing the panel while the record loads drops that read: a late answer never fills the
+  // form opened next.
+  it('a record that answers after the panel closed never fills the next form', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const m = await mountStaff(MemberFormModal, { props: { open: false, member: ROW } });
+    m.net.onApi(async ({ url }) => {
+      const path = new URL(url, 'http://a.localhost').pathname;
+      if (path === '/api/staff/members/detail') await held;
+      const [status, body] = ROUTES[path] ?? [404, { error: { code: 'not_found', message: 'Not found' } }];
+      return Response.json(body, { status });
+    });
+    await m.wrapper.setProps({ open: true });
+    await settle();
+    expect(m.inDoc('staff-member-form-loading')).not.toBeNull();
+    await m.wrapper.setProps({ open: false });
+    await settle();
+    await m.wrapper.setProps({ member: null, open: true });
+    await settle();
+    release();
+    await settle();
+    await settle();
+    const field = (name: string) => m.inDoc(`staff-member-form-${name}`) as Control;
+    expect(m.inDoc('staff-member-form')?.getAttribute('aria-label')).toBe('New');
+    expect([field('first_name').value, field('email').value, field('bio').value]).toEqual(['', '', '']);
+    expect(m.inDoc('staff-member-form-loading')).toBeNull();
+  });
+
   it('a linked account that no longer has access to this business says so, instead of an id', async () => {
     const s = await setup(ROW, { routes: { '/api/staff/accounts': [200, page([])] } });
     expect(s.field('user_id').value).toBe('No access to this business');

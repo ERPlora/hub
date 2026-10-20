@@ -97,6 +97,8 @@ function start(): void {
   creation.error.value = null;
   update.error.value = null;
   loadError.value = '';
+  // A read of a previous opening may still be on its way: it no longer speaks for this one.
+  loading.value = false;
   const member = props.member;
   roleLabel.value = member?.role_name ?? '';
   userLabel.value = '';
