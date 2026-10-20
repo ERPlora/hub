@@ -7,6 +7,9 @@ import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 import { A, api, createItem, decodeSubs, listReady, login, record, rowNames, shot, shown } from './helpers';
 
 const COUNT = 12;
+// Rows the search must leave out: «the search really narrowed something» holds on a fresh database
+// too, without the rows other specs leave behind.
+const OUTSIDE = 2;
 
 type Sub = { op: string; params: Record<string, unknown> };
 
@@ -21,9 +24,9 @@ function trackSubscriptions(page: Page): Sub[][] {
 
 const listParams = (opened: Sub[][]) => opened.at(-1)?.find((s) => s.op === 'demo.item.list')?.params;
 
-async function seed(context: BrowserContext, prefix: string): Promise<string[]> {
+async function seed(context: BrowserContext, prefix: string, count = COUNT): Promise<string[]> {
   const names: string[] = [];
-  for (let i = 1; i <= COUNT; i += 1) {
+  for (let i = 1; i <= count; i += 1) {
     const name = `${prefix} ${String(i).padStart(2, '0')}`;
     await createItem(context, A, name);
     names.push(name);
@@ -41,8 +44,10 @@ const rows = (page: Page) => shown(page).locator('[data-testid=demo-items-row]')
 test('server-side search, page size 10 with prev/next, list ⇄ cards segment, columns and choosers by default', async ({ page, context }) => {
   await login(page, A);
   const prefix = `DT${Date.now().toString(36)}`;
-  const names = await seed(context, prefix);
+  const outside = `DO${Date.now().toString(36)}`;
   try {
+    await seed(context, outside, OUTSIDE);
+    const names = await seed(context, prefix);
     const opened = trackSubscriptions(page);
     await page.goto('/demo/items');
     await listReady(page);
@@ -115,6 +120,7 @@ test('server-side search, page size 10 with prev/next, list ⇄ cards segment, c
     expect(gridInCards).toBe(0);
   } finally {
     await cleanup(context, prefix);
+    await cleanup(context, outside);
   }
 });
 
