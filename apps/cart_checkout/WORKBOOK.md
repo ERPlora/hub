@@ -1,10 +1,7 @@
 # Workbook — Carrito y pago (app)
 Prefijo: CART_CHECKOUT
 Alcance MVP: fuera del MVP (en la tienda; no viene en ninguna plantilla)
-Estado de la app: hecha (pytest y Vitest); e2e pendiente (el spec `tests/e2e/cart-checkout-flow.spec.ts`
-está escrito y espera a que el login del SaaS vuelva a pasar en los e2e). La caducidad sola
-(CART_CHECKOUT-F07) está declarada como tarea programada, que corre el worker de la fase 2; hasta
-entonces un carrito vencido ya se lee como «Expirado»
+Estado de la app: hecha (servidor, pantallas y pruebas de punta a punta en tres tamaños)
 
 > Manual de usuario y especificación de la app `cart_checkout`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -54,8 +51,9 @@ mismo alcance que el producto actual.
 
 ## Pantallas
 
-Carrito y pago se abre desde el menú y tiene dos pestañas: **Carritos** y **Pedidos**. Lo que una
-persona no puede hacer no aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
+Carrito y pago se abre desde el menú y tiene dos pestañas, abajo: **Carritos** y **Pedidos**. La barra
+de arriba dice «Carrito y pago» y la pestaña en la que estás. Lo que una persona no puede hacer no
+aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Carritos
 
@@ -65,7 +63,9 @@ email y el nombre), filtros por columna — sesión y email por un trozo del tex
 los ítems y el total «desde / hasta» —, orden por columna, vista de lista o de tarjetas y 50 filas por
 página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito;
 el filtro de Total se escribe en la moneda del negocio (en euros: «12» son 12,00 €) y compara el importe
-tal cual, sin convertir monedas.
+tal cual, sin convertir monedas. Se puede pegar con sus puntos de miles («1.250,50») o con el símbolo
+(«12,50 €»); un importe que no se entiende («1.250», que puede ser 1.250 € o 1,25 €) se avisa debajo de
+su caja, «Escribe un importe, como 12,50», y no filtra.
 
 El botón **Nuevo carrito** abre el formulario «Nuevo carrito»: **Sesión** (obligatoria; «Guardar» no se
 activa sin ella), **Email** y **Nombre**. Cada fila ofrece **Abandonar** (solo un carrito activo) y
@@ -74,10 +74,10 @@ lo hace el asistente o la API.
 
 ### Pedidos
 
-Una tabla con **Pedido** (su número), **Email**, **Estado** (Iniciado, Pagado, Fallido, Completado),
+Una tabla con **Pedido** (su número, siempre entero), **Email**, **Estado** (Iniciado, Pagado, Fallido, Completado),
 **Pago** (el método de pago, texto) y **Total**, en la moneda del pedido. Buscador «Buscar pedido o
 email…», filtros por columna, orden por columna, vista de lista o de tarjetas y 50 filas por página, el
-más reciente arriba. Un pedido fallido enseña su motivo debajo del estado.
+más reciente arriba. Un pedido fallido enseña su motivo entero debajo del estado.
 
 Cada fila ofrece la acción que le toca: **Marcar pagado** (Iniciado), **Completar** (Pagado) y
 **Fallar** (Iniciado o Pagado), que abre un formulario que pide el **motivo**. Mientras una acción de
@@ -102,23 +102,24 @@ adorno («2», «0,5»).
 
 | ID | Flujo | Estado |
 |---|---|---|
-| CART_CHECKOUT-F01 | Crear un carrito | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F02 | Añadir una línea a un carrito | hecho (pytest y Vitest); e2e pendiente (asistente o API; sin pantalla, como hoy) |
-| CART_CHECKOUT-F03 | Cambiar la cantidad de una línea o quitarla | hecho (pytest y Vitest); e2e pendiente (asistente o API) |
-| CART_CHECKOUT-F04 | Vaciar un carrito | hecho (pytest y Vitest); e2e pendiente (asistente o API) |
-| CART_CHECKOUT-F05 | Abandonar un carrito | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F06 | Borrar un carrito | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F07 | Caducar los carritos vencidos | hecho (pytest y Vitest); e2e pendiente (orden y lectura); la tarea sola, con el worker de la fase 2 |
-| CART_CHECKOUT-F08 | Iniciar el pedido desde un carrito | hecho (pytest y Vitest); e2e pendiente (asistente o API) |
-| CART_CHECKOUT-F09 | Marcar un pedido como pagado | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F10 | Registrar que el pago falló | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F11 | Completar un pedido | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F12 | Consultar carritos, líneas y pedidos | hecho (pytest y Vitest); e2e pendiente |
-| CART_CHECKOUT-F13 | Avisar a otras apps de lo que ocurre | hecho (pytest y Vitest); e2e pendiente; el aviso sale al outbox y nadie lo escucha |
-| CART_CHECKOUT-F14 | Borrar los datos personales de un cliente | hecho (pytest y Vitest); e2e pendiente (asistente, API o admin) |
+| CART_CHECKOUT-F01 | Crear un carrito | hecho |
+| CART_CHECKOUT-F02 | Añadir una línea a un carrito | hecho |
+| CART_CHECKOUT-F03 | Cambiar la cantidad de una línea o quitarla | hecho |
+| CART_CHECKOUT-F04 | Vaciar un carrito | hecho |
+| CART_CHECKOUT-F05 | Abandonar un carrito | hecho |
+| CART_CHECKOUT-F06 | Borrar un carrito | hecho |
+| CART_CHECKOUT-F07 | Caducar los carritos vencidos | hecho |
+| CART_CHECKOUT-F08 | Iniciar el pedido desde un carrito | hecho |
+| CART_CHECKOUT-F09 | Marcar un pedido como pagado | hecho |
+| CART_CHECKOUT-F10 | Registrar que el pago falló | hecho |
+| CART_CHECKOUT-F11 | Completar un pedido | hecho |
+| CART_CHECKOUT-F12 | Consultar carritos, líneas y pedidos | hecho |
+| CART_CHECKOUT-F13 | Avisar a otras apps de lo que ocurre | hecho |
+| CART_CHECKOUT-F14 | Borrar los datos personales de un cliente | hecho |
 
 ### CART_CHECKOUT-F01 Crear un carrito
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-create old:cart_checkout/WORKFLOW.md#cart_checkout-f01 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
 Pasos:
@@ -134,9 +135,11 @@ Sale: un carrito activo en la moneda dicha o, si no se dice, la del negocio
 Si falla: dentro del formulario, debajo de su campo: una sesión vacía; una sesión que ya usa otro
 carrito no borrado («Ya hay un carrito con esa sesión.»); un email que no es un email; una moneda que no
 existe; una caducidad que ya pasó. Lo tecleado se conserva. Sin permiso, se rechaza.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F02 Añadir una línea a un carrito
-Estado: hecho (pytest y Vitest); e2e pendiente (asistente o API; sin pantalla, como hoy)
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-items-add-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f02 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
 Pasos:
@@ -154,9 +157,11 @@ dicho (los nombra y pide cuál); carrito que no está activo, también uno venci
 admite cambios: está Abandonado.»); referencia o nombre vacíos, cantidad cero, negativa o de más de
 1 000 000, precio negativo: cada uno en su campo; un total de la línea, o del carrito con ella, por encima
 de lo que cabe en un carrito (99 999 999 999,99 €), debajo de la cantidad. No se guarda nada.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F03 Cambiar la cantidad de una línea o quitarla
-Estado: hecho (pytest y Vitest); e2e pendiente (asistente o API)
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-items-remove fi:modules/cart_checkout#command-cart_checkout-items-update-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f03 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
 Pasos:
@@ -171,9 +176,11 @@ Sale: la línea cambiada o quitada, los totales del carrito y su última activid
 `cart_checkout.item.removed` sale de «quitar línea»).
 Si falla: línea que no existe; carrito que ya no está activo; cantidad negativa o de más de 1 000 000; un
 total por encima de lo que cabe en un carrito, debajo de la cantidad. No cambia nada.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F04 Vaciar un carrito
-Estado: hecho (pytest y Vitest); e2e pendiente (asistente o API)
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-clear-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f04 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
 Pasos:
@@ -184,9 +191,11 @@ Entra: el carrito.
 Sale: el carrito sin líneas, totales a cero (`cart_checkout.cart.cleared`). Vaciar uno que ya estaba
 vacío no cambia nada ni avisa.
 Si falla: carrito que no existe o que no está activo. No cambia nada.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F05 Abandonar un carrito
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-mark_abandoned old:cart_checkout/WORKFLOW.md#cart_checkout-f05 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
 Pasos:
@@ -197,9 +206,11 @@ Entra: el carrito y un motivo opcional (hasta 500 caracteres).
 Sale: estado Abandonado (`cart_checkout.cart.abandoned`).
 Si falla: solo se abandona un carrito activo; en otro estado se rechaza diciendo en cuál está, encima de
 la tabla, y no cambia nada.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F06 Borrar un carrito
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-delete old:cart_checkout/WORKFLOW.md#cart_checkout-f06 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
 Pasos:
@@ -210,9 +221,11 @@ Entra: el carrito.
 Sale: el carrito borrado en cualquier estado, también Convertido (`cart_checkout.cart.deleted`). Sus
 pedidos siguen existiendo y su sesión queda libre para otro carrito.
 Si falla: un carrito que no existe (o ya borrado) se rechaza; no cambia nada.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F07 Caducar los carritos vencidos
-Estado: hecho (pytest y Vitest); e2e pendiente (orden y lectura); la tarea sola, con el worker de la fase 2
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-cleanup_expired-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f07 -->
+Estado: hecho
 Actor: sistema (tarea programada), administrador, asistente
 Pantalla: Carritos (el estado)
 Pasos:
@@ -226,10 +239,13 @@ Sale: los carritos vencidos pasan a Expirado y la orden dice cuántos
 Si falla: sin carritos vencidos contesta «0» y no avisa. Un carrito sin caducidad no caduca nunca. Con la
 lista ya abierta, un carrito que vence en ese momento sigue pintado «Activo» hasta que la lista se vuelve a
 leer: con el siguiente cambio, al volver a abrirla o con la relectura de seguridad del Hub (cada 5
-minutos); hasta la tarea de la fase 2 no hay aviso que la refresque en el instante.
+minutos). Cuando la orden la da alguien del negocio, por el asistente o la API, la lista abierta se pone
+al día en ese momento.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F08 Iniciar el pedido desde un carrito
-Estado: hecho (pytest y Vitest); e2e pendiente (asistente o API)
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-checkout-initiate-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f08 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
 Pasos:
@@ -241,13 +257,15 @@ Pasos:
 Entra: el carrito; el email del cliente (sin él, el del carrito); direcciones (si falta la de
 facturación se copia la de envío); métodos de envío y de pago (texto) y notas.
 Sale: un pedido Iniciado con el total del carrito en ese instante (`cart_checkout.checkout.initiated`).
-El carrito sigue activo: se pueden cambiar sus líneas e iniciar otro pedido; el total del pedido ya no
-cambia.
+El carrito sigue activo, así que se pueden cambiar sus líneas e iniciar otro pedido, con el número
+siguiente; el total del pedido ya no cambia.
 Si falla: carrito que no existe, que no está activo (también vencido) o sin líneas; email que falta o
 que no es un email. No se crea pedido, **no se gasta número** y no avisa.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F09 Marcar un pedido como pagado
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-mark_paid old:cart_checkout/WORKFLOW.md#cart_checkout-f09 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
 Pasos:
@@ -260,25 +278,29 @@ ni justificante, y no se crea venta, factura, registro fiscal, movimiento de caj
 asistente pide confirmación reforzada.
 Si falla: solo se marca un pedido Iniciado; en otro estado se rechaza diciendo en cuál está. El
 empleado no puede.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F10 Registrar que el pago falló
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-fail old:cart_checkout/WORKFLOW.md#cart_checkout-f10 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
 Pasos:
 1. En **Pedidos**, en la fila de un pedido Iniciado o Pagado, pulsa **Fallar**.
 2. Escribe el **motivo** (obligatorio; «Fallar pedido» no se activa sin él) y pulsa **Fallar pedido**;
    **Mantener** lo deja como estaba.
-3. El pedido pasa a **Fallido** y enseña su motivo.
+3. El pedido pasa a **Fallido** y enseña su motivo entero debajo del estado.
 Entra: el pedido y el motivo (hasta 500 caracteres).
 Sale: estado Fallido, el motivo y la hora (`cart_checkout.order.failed`). Un pedido ya Pagado también
 puede fallar, como hoy: **no deja rastro de devolución** (no hay devoluciones en esta app). El carrito
 sigue como estaba. El asistente pide confirmación reforzada.
 Si falla: un pedido Completado o ya Fallido se rechaza; un motivo vacío, debajo de su campo, sin perder
 lo escrito.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F11 Completar un pedido
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-complete-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f11 -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
 Pasos:
@@ -288,25 +310,30 @@ Entra: el pedido.
 Sale: pedido Completado con su hora y carrito Convertido (`cart_checkout.order.completed`). Nada
 fiscal ni de stock. Si el carrito ya estaba borrado, el pedido se completa igual.
 Si falla: solo se completa un pedido Pagado; en otro estado se rechaza diciendo en cuál está.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F12 Consultar carritos, líneas y pedidos
-Estado: hecho (pytest y Vitest); e2e pendiente
+<!-- origen: fi:modules/cart_checkout#navigation fi:modules/cart_checkout#query-cart_checkout-carts-get fi:modules/cart_checkout#query-cart_checkout-carts-list fi:modules/cart_checkout#query-cart_checkout-items-list fi:modules/cart_checkout#query-cart_checkout-orders-get fi:modules/cart_checkout#query-cart_checkout-orders-list old:cart_checkout/WORKFLOW.md#cart_checkout-f12 -->
+Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Carritos, Pedidos
 Pasos:
 1. Abre **Carritos** o **Pedidos**.
 2. Busca por sesión, email o nombre (carritos) o por número de pedido o email (pedidos), filtra por
-   columna y ordena.
+   columna (el Total, como se escribe o se pega: «12», «12,50», «1.250,50») y ordena.
 3. Las líneas de un carrito y el detalle de un pedido (direcciones, métodos, fechas, notas) se leen con
    el asistente o la API: un carrito por su sesión o por el email o el nombre de su cliente, un pedido
    por su número.
 Entra: permiso «ver carritos» (el empleado lo tiene).
 Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en céntimos
 con la moneda de la fila.
-Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso».
+Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso»; un importe de Total que no
+se entiende, «Escribe un importe, como 12,50» debajo de su caja, sin filtrar.
+Implicados: ninguno
 
 ### CART_CHECKOUT-F13 Avisar a otras apps de lo que ocurre
-Estado: hecho (pytest y Vitest); e2e pendiente; el aviso sale al outbox y nadie lo escucha
+<!-- origen: fi:modules/cart_checkout#events-emitidos-catalogo old:cart_checkout/WORKFLOW.md#cart_checkout-f13 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -318,9 +345,11 @@ Sale: trece avisos: los doce del producto actual (`cart.created`, `cart.abandone
 `order.paid`, `order.failed`, `order.completed`) y `customer.erased`, con el prefijo `cart_checkout.`.
 Ninguna app del Hub los escucha.
 Si falla: un cambio rechazado no deja ni el cambio ni el aviso.
+Implicados: ninguno (ninguna app del Hub escucha estos avisos)
 
 ### CART_CHECKOUT-F14 Borrar los datos personales de un cliente
-Estado: hecho (pytest y Vitest); e2e pendiente (asistente, API o admin)
+<!-- origen: nuevo (el borrado de datos personales de Shopify y WooCommerce, «erase personal data»: el derecho de supresión del RGPD) -->
+Estado: hecho
 Actor: responsable, administrador, propietario, asistente; el personal de la plataforma desde el admin
 Pantalla: asistente; admin del Hub (acción «Borrar los datos personales de sus clientes»)
 Pasos:
@@ -335,6 +364,7 @@ motivo de fallo. Número, importes, estados y fechas se quedan. Dice cuántos ca
 (`cart_checkout.customer.erased`, con los dos números y nunca el email; si no había nada, no avisa).
 Si falla: un email vacío o que no es un email, en su campo. Sin permiso «gestionar carritos», se rechaza.
 En el admin, sin hub elegido no hace nada y lo dice.
+Implicados: ninguno
 
 ## Carrito y pago: lo que entra y lo que sale
 
@@ -411,7 +441,9 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 - **Caducidad**: el estado efectivo se calcula al leer (activo + `expires_at` pasado = `expired`), en
   las listas, el detalle, el filtro y las guardas de las acciones. `cart_checkout.cart.cleanup_expired`
   lo guarda; la tarea `expire_overdue_carts` (cada 15 min, en UTC, `catch_up: collapse`) la declara
-  `apps.py` para el worker de la fase 2.
+  `apps.py` y la corre el worker del Hub (`base.scheduler`; `tests/test_scheduled_expiry.py`). En la fase
+  1 corre sobre su ámbito fijo (`WORKER_SCOPE_SLUG`): su aviso no llega a las listas abiertas en otro
+  negocio, que se ponen al día con la relectura de 5 minutos.
 - **Numeración sin huecos**: `OS-AAAAMMDD-NNNN` con el día del negocio (Europe/Madrid), del contador del
   día subido con `UPDATE … RETURNING` dentro de la transacción del pedido; nunca una secuencia. Todas las
   comprobaciones van antes, así que un rechazo no gasta número. Probado con hilos y sesiones reales.
@@ -447,7 +479,18 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `payment`),
   formularios en `FormModal` (`CartFormModal`, `FailOrderModal`), confirmación de borrar con
   `useConfirm`, importes y cantidades con `lib/format.ts`.
-- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos).
+- La barra de arriba lleva el nombre de la app (`cart_checkout.title`), como el hub viejo; la pestaña la
+  añade el shell.
+- Los importes agrupan los millares también con cuatro cifras (`useGrouping: 'always'`: el CLDR del
+  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }`: `toMinor`
+  lee lo que se pega («1.250,50», «12,50 €»; lo ambiguo, «1.250», no se adivina) y `unreadableTotals` da
+  los `filterErrors` (pm#521).
+- La columna del número de pedido tiene ancho mínimo (`minmax(10.5rem, 1fr)`) y el motivo de un pedido
+  fallido parte en líneas dentro de su celda: cortados, dos pedidos del día se leían iguales.
+- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos y piezas copiadas).
+- e2e: `tests/e2e/cart-checkout-flows.spec.ts` (las pantallas, en 390, 834 y 1440), `-api.spec.ts` (los
+  flujos sin pantalla, por la API real) y `-employee.spec.ts` (el empleado solo mira), con
+  `cart-checkout-helpers.ts`.
 
 ### Tablas de paridad con el producto actual
 
@@ -498,14 +541,12 @@ Tests:
 
 ## Lo que queda fuera
 
-- **La tarea programada que caduca sola** (CART_CHECKOUT-F07): declarada en `apps.py`; la corre el
-  worker de la fase 2. Mientras, la lectura ya enseña Expirado y las acciones ya lo respetan, pero una
-  lista abierta no se entera en el instante en que un carrito vence (sigue «Activo» hasta el siguiente
-  cambio, hasta que se vuelve a abrir o hasta la relectura de seguridad de cada 5 minutos).
-- **El e2e en Chrome** (`tests/e2e/cart-checkout-flow.spec.ts`): escrito, pendiente de pasar en verde
-  mientras el login del SaaS pida el código por email que el ayudante de los e2e todavía no sabe meter.
-- **La entrega de avisos entre apps** (CART_CHECKOUT-F13): salen al outbox; el relay llega con la fase
-  2 y ninguna app los escucha.
+- **El aviso al instante de un carrito que vence solo** (CART_CHECKOUT-F07): la tarea de cada 15
+  minutos corre en la fase 1 sobre el ámbito del worker, así que una lista abierta en el negocio no se
+  entera hasta el siguiente cambio, hasta que se vuelve a abrir o hasta la relectura de 5 minutos. Con la
+  tenencia de la fase 2 la tarea corre en cada hub y avisa a los suyos.
+- **La entrega de avisos entre apps** (CART_CHECKOUT-F13): salen al outbox en la misma transacción y
+  ninguna app los escucha, así que no hay nada que entregar.
 - **Iconos propios** (`ion:bag-check-outline` del producto actual): pedidos en `UI-REQUESTS.md`.
 
 ## Lo que NO hace, a propósito
