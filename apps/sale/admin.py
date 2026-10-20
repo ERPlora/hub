@@ -5,8 +5,9 @@ full CRUD. What was charged is a fiscal document (PLAN-HUB §3.2, round 2026-10-
 simplified invoice's and the day's counter gives it, so sales, their lines and payments, the counter, and
 refunds with their lines and payments are shown whole and never added nor deleted; only the notes of a sale
 and of a refund can change. A charge is corrected by its void or its refunds, as at the till. What the admin
-saves does not go through the operations (no event, no check of the open check); an open check's «Delete»
-locks it first (``lock_orders``), as every write on it does.
+saves does not go through the operations (no event, no check of the open check). The «Delete» of an open check
+locks it first (``lock_orders``), as every write on it does, and so does that of a department or a payment method
+(``lock_rows``), which a write naming it holds.
 """
 
 from django.contrib import admin
@@ -27,7 +28,7 @@ from apps.sale.models import (
     SalePayment,
     Settings,
 )
-from apps.sale.services import lock_orders
+from apps.sale.services import lock_orders, lock_rows
 
 AUDIT = ("id", "created_at", "updated_at")
 
@@ -35,6 +36,29 @@ AUDIT = ("id", "created_at", "updated_at")
 def _readonly(model, extra=()) -> tuple:
     names = {field.name for field in model._meta.get_fields()}
     return tuple(name for name in AUDIT if name in names) + tuple(extra)
+
+
+class LockedDeletion:
+    """«Delete» (the row's page and the list's «Delete selected») locks the rows before Django checks what protects
+    them and gathers what goes with them. A write under way holds an open check while it adds to it, moves lines in
+    or out or charges it, and holds the department or the payment method it names while it writes the line or the
+    tender that points at it: the deletion waits for it and then takes what it left, or answers «Cannot delete» once
+    what the write wrote protects the row, instead of failing at its COMMIT or waiting for it in a circle."""
+
+    def lock(self, ids) -> list:
+        """Locks the rows ``ids`` of this admin's table in id order (``lock_rows``)."""
+        return lock_rows(self.model, ids)
+
+    def get_deleted_objects(self, objs, request):
+        # Only the confirmed deletion (a POST, in its transaction) locks: the confirmation page does not wait.
+        if request.method == "POST":
+            self.lock([obj.pk for obj in objs])
+        return super().get_deleted_objects(objs, request)
+
+    # The actions run outside a transaction; the lock above lasts until the deletion ends.
+    def response_action(self, request, queryset, *args, **kwargs):
+        with transaction.atomic():
+            return super().response_action(request, queryset, *args, **kwargs)
 
 
 class ChargedAdmin(admin.ModelAdmin):
@@ -78,7 +102,7 @@ class ChargedInline(admin.TabularInline):
 
 
 @admin.register(PaymentMethod)
-class PaymentMethodAdmin(admin.ModelAdmin):
+class PaymentMethodAdmin(LockedDeletion, admin.ModelAdmin):
     list_display = ("name", "type", "is_system", "is_active", "sort_order")
     list_filter = ("type", "is_system", "is_active")
     search_fields = ("name",)
@@ -98,7 +122,7 @@ class SettingsAdmin(admin.ModelAdmin):
 
 
 @admin.register(Department)
-class DepartmentAdmin(admin.ModelAdmin):
+class DepartmentAdmin(LockedDeletion, admin.ModelAdmin):
     list_display = ("name", "tax_category", "sort_order", "is_deleted")
     list_filter = ("is_deleted",)
     search_fields = ("name",)
@@ -133,7 +157,8 @@ class OrderLineInline(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(LockedDeletion, admin.ModelAdmin):
+    lock = staticmethod(lock_orders)
     list_display = (
         "__str__",
         "status",
@@ -146,20 +171,6 @@ class OrderAdmin(admin.ModelAdmin):
     search_fields = ("label", "id")
     readonly_fields = _readonly(Order)
     inlines = [OrderLineInline]
-
-    # «Delete» (the check's page and the list's «Delete selected») locks the checks before Django checks what
-    # protects them and gathers their lines. A write under way holds a check while it adds a line, moves lines
-    # in or out, or charges it: the deletion waits for it and then takes what it left, or answers «Cannot
-    # delete» once a sale charged it, instead of failing at its COMMIT or waiting for it in a circle.
-    def get_deleted_objects(self, objs, request):
-        if request.method == "POST":
-            lock_orders([obj.pk for obj in objs])
-        return super().get_deleted_objects(objs, request)
-
-    # The actions run outside a transaction; the lock above lasts until the deletion ends.
-    def response_action(self, request, queryset, *args, **kwargs):
-        with transaction.atomic():
-            return super().response_action(request, queryset, *args, **kwargs)
 
 
 @admin.register(OrderLine)
