@@ -175,6 +175,17 @@ def test_an_empty_condition_always_holds():
     assert doc.holds({}, DATA) is True
 
 
+def test_a_condition_is_readable_only_with_paths_to_known_comparisons():
+    # hub#1766: what the engine cannot read is said, never evaluated as «does not hold».
+    assert doc.readable({}) is True
+    assert doc.readable({"input.total": {"gt": 100, "lte": 500}}) is True
+    assert doc.readable({"input.total": {"bigger": 100}}) is False
+    assert doc.readable({"total": {"gt": 100}}) is False
+    assert doc.readable({"input.total": {}}) is False
+    assert doc.readable({"input.total": 100}) is False
+    assert doc.readable(["input.total"]) is False
+
+
 def test_number_reads_numbers_and_numeric_text_but_not_booleans():
     assert doc.number(5) == Decimal(5)
     assert doc.number(2.5) == Decimal("2.5")

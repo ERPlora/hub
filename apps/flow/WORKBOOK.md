@@ -168,9 +168,9 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F18 | Revisar un borrador del asistente y crearlo | hecho |
 | FLOW-F19 | Descartar un borrador del asistente | hecho |
 | FLOW-F20 | Otra app pregunta si una automatización ya está montada | hecho |
-| FLOW-F21 | Cuando pasa algo en el negocio, la automatización arranca | hecho — el motor está; la entrega del aviso la hace el relay del outbox (fase 2) |
-| FLOW-F22 | Cuando llega la hora, la automatización arranca | hecho — la tarea programada está declarada; la corre el worker (fase 2) |
-| FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho — la tarea programada está declarada; la corre el worker (fase 2) |
+| FLOW-F21 | Cuando pasa algo en el negocio, la automatización arranca | parcial |
+| FLOW-F22 | Cuando llega la hora, la automatización arranca | hecho |
+| FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
 Estado: hecho (servidor y pantalla)
@@ -496,38 +496,62 @@ Pasos:
 Sale: tres números; ningún nombre ni contenido.
 
 ### FLOW-F21 Cuando pasa algo en el negocio, la automatización arranca
-Estado: hecho — el motor está y se prueba con avisos reales; la entrega la hace el relay del outbox
-(fase 2)
+<!-- origen: old-hub:HUB-F110 old-hub:HUB-F82 -->
+Estado: parcial — el motor está hecho y probado con avisos reales de Clientes, Ventas y Tareas, pero
+el aviso de otra app le llega con el relay del outbox, que es de la plataforma (fase 2). Hasta
+entonces una automatización que arranca con «Pasa algo» no se dispara sola en el negocio: se puede
+ejecutar a mano (FLOW-F15) o montar con un horario (FLOW-F22).
 Actor: la plataforma
 Pantalla: ninguna (se ve en Historial)
 Pasos:
 1. Otra app deja un aviso (por ejemplo, «se cobra una venta»).
 2. Cada automatización **encendida** que arranca con ese aviso y cuyo «Solo cuando…» se cumple empieza
    una ejecución con los datos del aviso, y hace sus pasos en orden.
+3. Si su «Solo cuando…» ya no se puede leer (porque se escribió a mano en la administración o con una
+   versión anterior), no se queda callada: empieza una ejecución que se para con «Ya no se puede leer
+   su «Solo cuando…»…», visible en Historial, y las demás automatizaciones de ese aviso siguen.
+Entra: el aviso de otra app, con sus datos (ids, importes y estados; nunca nombres ni textos).
 Sale: una ejecución (`flow.run.started`, `flow.run.finished` o `flow.run.parked` si espera). Un mismo
 aviso entregado dos veces arranca **una sola** ejecución por automatización.
 Si falla: cada paso que falla para la ejecución con su motivo, visible en Historial; los pasos
 anteriores se quedan hechos. Una automatización que se dispararía a sí misma en cadena se para (ver
-«Para quien lo mantiene»).
+«Para quien lo mantiene»). Un «Solo sigue si…» que ya no se puede leer para la ejecución con «Ya no se
+puede leer este «Solo sigue si…»…».
+Implicados: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16
 
 ### FLOW-F22 Cuando llega la hora, la automatización arranca
-Estado: hecho — la tarea programada `fire_due` está declarada y probada; la corre el worker (fase 2)
+<!-- origen: old-hub:HUB-F229 old-hub:HUB-F83 old-hub:HUB-F84 -->
+Estado: hecho
 Actor: la plataforma
 Pantalla: ninguna (se ve en Historial)
 Pasos:
-1. Cada minuto, las automatizaciones encendidas con horario o fecha cuya hora ha llegado arrancan una
-   vez.
-Sale: una ejecución; la siguiente hora del horario (una fecha, una sola vez). Si el sistema estuvo
-parado y se perdieron varias horas, arranca **una vez** y sigue desde ahora.
+1. Cada minuto, la plataforma mira las automatizaciones encendidas con horario o fecha.
+2. Las que han llegado a su hora (en la hora del negocio) arrancan una vez y hacen sus pasos.
+3. La siguiente hora del horario se cuenta desde ahora; una fecha arranca una sola vez.
+Entra: los horarios y las fechas de las automatizaciones encendidas.
+Sale: una ejecución (`flow.run.started`, `flow.run.finished`); la siguiente hora del horario. Si el
+sistema estuvo parado y se perdieron varias horas, arranca **una vez** y sigue desde ahora. Una pasada
+sin nada que hacer no deja ningún aviso.
+Si falla: un paso que falla para esa ejecución con su motivo, visible en Historial; la siguiente hora
+del horario sigue en pie.
+Implicados: FLOW-F03, FLOW-F10, FLOW-F16
 
 ### FLOW-F23 Cuando acaba una espera, la automatización sigue
-Estado: hecho — la tarea programada `resume_due` está declarada y probada; la corre el worker (fase 2)
+<!-- origen: old-hub:HUB-F92 -->
+Estado: hecho
 Actor: la plataforma
 Pantalla: ninguna (se ve en Historial)
 Pasos:
-1. Cada minuto, las ejecuciones que esperaban y cuya espera ha terminado siguen por el paso siguiente.
-Sale: la ejecución sigue (`flow.run.resumed`) con la versión de la automatización con la que empezó.
-Si la automatización está en pausa o borrada, se cancela.
+1. Cada minuto, la plataforma mira las ejecuciones que esperaban («Esperar»).
+2. Las que han terminado su espera siguen por el paso siguiente, con la versión de la automatización
+   con la que empezaron.
+Entra: las ejecuciones que esperan y la hora a la que despiertan.
+Sale: la ejecución sigue (`flow.run.resumed`) y termina o vuelve a esperar. Una pasada sin nada que
+hacer no deja ningún aviso.
+Si falla: si la automatización está en pausa al despertar, la ejecución se cancela («Cancelada: la
+automatización se puso en pausa mientras esperaba.»); si está borrada, también («Cancelada: la
+automatización se borró.»).
+Implicados: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
 
 ## Servicios: lo que entra y lo que sale
 
@@ -662,10 +686,17 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Reintentos**: declarados y no ejecutados en la fase 1. Una ejecución fallida no se reintenta sola;
   el relay del outbox (fase 2) reintentará la **entrega** de un aviso cuya reacción no llegó a
   confirmarse, y la idempotencia por `trigger_key` hace que un reintento no ejecute dos veces.
-- **Fase 1**: sin relay del outbox ni worker que corra tareas programadas. El motor se prueba entregando
-  a `events.react` (o `events.deliver`) avisos **reales** del outbox, hechos por las operaciones reales de
-  otras apps, y llamando a `fire_due` y `resume_due` con el reloj fijado en el test. El relay debe
-  entregar a `flow` **todos** los avisos (`REACTIONS = {"*": "flow.run.react"}`), con su id y su actor.
+- **Fase 1**: el worker (`run_worker`) corre cada minuto las dos tareas programadas (`fire_due`,
+  `resume_due`) como el sistema, en un único ámbito fijo (`WORKER_SCOPE_SLUG`); como en la fase 1 todos
+  los hubs comparten tablas, ve todas las automatizaciones (FLOW-F22 y F23, probado pasando por
+  `base.scheduler.run_due`). **No** hay relay del outbox: nada llama a `flow.run.react` fuera de los tests
+  (FLOW-F21 parcial). El motor se prueba entregando a `events.react` (o `events.deliver`) avisos
+  **reales** del outbox, hechos por las operaciones reales de otras apps. El relay debe entregar a
+  `flow` **todos** los avisos (`REACTIONS = {"*": "flow.run.react"}`), con su id y su actor.
+- **Lo que ya no se puede leer** (hub#1766): un «Solo cuando…» o un «Solo sigue si…» guardado con una
+  forma que el motor no entiende (escrito en crudo desde el admin o por una versión anterior) nunca se
+  evalúa como «no se cumple»: la ejecución se para con `flow.filter_unreadable` o
+  `flow.condition_unreadable` y las demás automatizaciones del aviso siguen (`document.readable`).
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos; una escritura cruda del admin

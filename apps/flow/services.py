@@ -99,6 +99,14 @@ CHAIN_TOO_LONG = _(
     "A chain of %(count)s automations started it, more than the %(max)s allowed, so it stopped before doing "
     "anything."
 )
+FILTER_UNREADABLE = _(
+    "Its «Only when…» can no longer be read, so it did not go on. Open it, check «Only when…» and save it "
+    "again."
+)
+CONDITION_UNREADABLE = _(
+    "This «Only continue if…» can no longer be read, so it stopped. Open the automation, check this step "
+    "and save it again."
+)
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
 
@@ -674,6 +682,15 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
                 )
                 return
             if step["kind"] == "condition":
+                if not document.readable(step.get("when")):
+                    failure = StepFailed(
+                        "flow.condition_unreadable", str(CONDITION_UNREADABLE)
+                    )
+                    _log(run, step, "failed", now, error=failure.entry())
+                    _finish(
+                        ctx, run, FlowRun.Status.FAILED, now, failure.code, failure.message
+                    )
+                    return
                 failed = document.failed_clauses(step["when"], data)
                 if failed:
                     _log(run, step, "stopped", now, failed=failed)
@@ -751,6 +768,29 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         )
         if flow is None or FlowRun.objects.filter(flow=flow, trigger_key=key).exists():
             skipped += 1
+            continue
+        if not document.readable(flow.trigger_filter):
+            # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
+            run = _start(
+                ctx,
+                flow,
+                kind=Flow.Trigger.EVENT,
+                key=key,
+                input=data.payload,
+                now=now,
+                event_name=data.event,
+                chain=chain,
+            )
+            started += 1
+            with translation.override(flow.language):
+                _finish(
+                    ctx,
+                    run,
+                    FlowRun.Status.FAILED,
+                    now,
+                    "flow.filter_unreadable",
+                    str(FILTER_UNREADABLE),
+                )
             continue
         if not document.holds(
             flow.trigger_filter, {"input": data.payload, "steps": {}}

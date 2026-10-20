@@ -301,6 +301,12 @@ msgstr "La arrancó algo que hicieron sus propios pasos, así que ha parado ante
 msgid "A chain of %(count)s automations started it, more than the %(max)s allowed, so it stopped before doing anything."
 msgstr "La arrancó una cadena de %(count)s automatizaciones, más de las %(max)s permitidas, así que ha parado antes de hacer nada."
 
+msgid "Its «Only when…» can no longer be read, so it did not go on. Open it, check «Only when…» and save it again."
+msgstr "Ya no se puede leer su «Solo cuando…», así que no ha seguido. Ábrela, revisa «Solo cuando…» y vuelve a guardarla."
+
+msgid "This «Only continue if…» can no longer be read, so it stopped. Open the automation, check this step and save it again."
+msgstr "Ya no se puede leer este «Solo sigue si…», así que ha parado. Abre la automatización, revisa este paso y vuelve a guardarla."
+
 msgid "Cancelled: the automation was paused while it waited."
 msgstr "Cancelada: la automatización se puso en pausa mientras esperaba."
 

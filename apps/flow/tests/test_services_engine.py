@@ -507,3 +507,99 @@ def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
     waiting.refresh_from_db()
     assert (waiting.status, waiting.outputs) == (FlowRun.Status.SUCCEEDED, {})
     assert Task.objects.get().title == "Call Ana López"
+
+
+# The phase-1 worker (FLOW-F22, FLOW-F23): `run_worker` calls `base.scheduler.run_due` every tick, on
+# one fixed scope; these tests go through that same scheduler, with the tasks flow declares.
+
+
+def _flow_tasks():
+    from base import scheduler
+
+    return [task for task in scheduler.tasks() if task.app_label == "flow"]
+
+
+def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, settings, monkeypatch):
+    from base import scheduler
+
+    # The worker releases its connection after each task; the test's transaction must stay open.
+    monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
+    settings.WORKER_SCOPE_SLUG = "a"
+    clock(NOON - dt.timedelta(minutes=1))
+    scheduler.sync(NOON - dt.timedelta(minutes=1), declared=_flow_tasks())
+    daily = make_flow(
+        "Every day at noon",
+        trigger_kind=Flow.Trigger.SCHEDULE,
+        trigger_event="",
+        schedule={"every": "day", "time": "12:00"},
+        next_fire_at=NOON,
+    )
+    waits = make_flow(
+        "Wait two minutes",
+        steps=[{"id": "s1", "kind": "delay", "seconds": 120}, TASK_STEP | {"id": "s2"}],
+    )
+    deliver()
+    assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
+
+    clock(NOON)
+    assert sorted(scheduler.run_due(NOON)) == ["flow.fire_due", "flow.resume_due"]
+    fired = FlowRun.objects.get(flow=daily)
+    assert (fired.trigger_kind, fired.status) == ("schedule", FlowRun.Status.SUCCEEDED)
+    assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
+
+    clock(NOON + dt.timedelta(minutes=1))
+    assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1))) == [
+        "flow.fire_due",
+        "flow.resume_due",
+    ]
+    assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.SUCCEEDED
+    assert FlowRun.objects.filter(flow=daily).count() == 1
+    assert Task.objects.count() == 2
+
+
+def test_a_tick_with_nothing_due_records_and_announces_nothing(clock):
+    # hub#2612: a scheduled task that finds nothing to do leaves no event, so no live list re-runs.
+    flow = make_flow(
+        trigger_kind=Flow.Trigger.SCHEDULE,
+        trigger_event="",
+        schedule={"every": "day", "time": "09:00"},
+        next_fire_at=dt.datetime(2026, 10, 16, 9, 0, tzinfo=MADRID),
+    )
+    make_run(flow, status=FlowRun.Status.WAITING, resume_at=NOON + dt.timedelta(hours=1))
+    clock(NOON)
+    before = OutboxEvent.objects.count()
+    assert run("flow.schedule.fire_due", {}, _system()).count == 0
+    assert run("flow.run.resume_due", {}, _system()).count == 0
+    assert OutboxEvent.objects.count() == before
+
+
+# A document the engine can no longer read (hub#1766: written raw from the admin, or by an older
+# version): it fails visibly in its own history, and the other automations still run.
+
+
+def test_a_filter_it_cannot_read_fails_its_run_visibly_and_the_others_still_start(clock):
+    clock(NOON)
+    fine = make_flow("Fine")
+    broken = make_flow("Broken", trigger_filter={"input.total": {"bigger": 10}})
+    assert deliver().started == 2
+    failed = FlowRun.objects.get(flow=broken)
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.filter_unreadable")
+    assert "«Only when…»" in failed.error_message
+    assert FlowRun.objects.get(flow=fine).status == FlowRun.Status.SUCCEEDED
+    assert Task.objects.count() == 1
+
+
+def test_a_condition_it_cannot_read_stops_the_run_with_its_reason(clock):
+    clock(NOON)
+    make_flow(
+        steps=[
+            {"id": "s1", "kind": "condition", "when": {"input.total": {"bigger": 10}}},
+            TASK_STEP | {"id": "s2"},
+        ]
+    )
+    deliver(payload={"total": 20})
+    failed = FlowRun.objects.get()
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.condition_unreadable")
+    assert failed.log[-1]["outcome"] == "failed"
+    assert failed.log[-1]["error"]["code"] == "flow.condition_unreadable"
+    assert Task.objects.count() == 0

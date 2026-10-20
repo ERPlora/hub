@@ -175,6 +175,18 @@ def failed_clauses(condition: dict, data: dict) -> list[dict]:
     return failed
 
 
+def readable(condition: Any) -> bool:
+    """Whether ``condition`` is one the engine can evaluate: paths to non-empty known comparisons (one
+    written raw, from the admin or by an older version, may not be)."""
+    return isinstance(condition, dict) and all(
+        is_path(path)
+        and isinstance(comparisons, dict)
+        and bool(comparisons)
+        and all(operator in OPERATORS for operator in comparisons)
+        for path, comparisons in condition.items()
+    )
+
+
 def holds(condition: dict, data: dict) -> bool:
     """Whether every comparison of ``condition`` holds for ``data`` (an empty one always does)."""
     return not failed_clauses(condition, data)
