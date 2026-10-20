@@ -85,6 +85,11 @@ describe('FlowEditor: a new automation', () => {
     expect(s.find('flow-editor-run').exists()).toBe(false);
   });
 
+  it('«Save» says its word, never an empty button (flows#144)', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    expect(s.find('flow-editor-save').text()).toBe('Save');
+  });
+
   it('adds steps with the four buttons, open, and saves the whole document', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() }, { '/api/flow/flows': [201, { ...FLOW, id: 'f9' }] });
     for (const kind of ['command', 'query', 'condition', 'delay']) await click(s.find(`flow-editor-add-${kind}`).element);
