@@ -23,7 +23,7 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, ORDER_TONE, toMinor } from '../lib/format';
+import { formatMoney, ORDER_TONE, toMinor, unreadableTotals } from '../lib/format';
 import type { OrderListIn, OrderOut, OrderStatus } from '../operations';
 import { cartCheckoutTabs } from '../tabs';
 
@@ -55,6 +55,11 @@ const query = computed<Partial<OrderListIn>>(() => {
   return out;
 });
 
+/** An end of «Total» it cannot read as an amount, said under its box (it filters nothing). */
+const filterErrors = computed<Record<string, string>>(() =>
+  Object.fromEntries(unreadableTotals(filters.value).map((name) => [name, t('cart_checkout.amountInvalid')])),
+);
+
 function onFilters(now: DataTableFilters): void {
   filters.value = now;
   table.restart({ narrowed: Object.keys(now).length > 0 });
@@ -69,7 +74,15 @@ table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 
 const columns = computed<DataTableColumn<OrderOut>[]>(() => [
-  { key: 'order_number', label: t('cart_checkout.orders.columns.order'), sortable: true, priority: 'high', filter: { type: 'text' } },
+  {
+    key: 'order_number',
+    label: t('cart_checkout.orders.columns.order'),
+    sortable: true,
+    priority: 'high',
+    // A whole «OS-AAAAMMDD-NNNN» at any width: cut, two orders of a day read the same.
+    width: 'minmax(10.5rem, 1fr)',
+    filter: { type: 'text' },
+  },
   { key: 'customer_email', label: t('cart_checkout.orders.columns.email'), sortable: true, filter: { type: 'text' } },
   {
     key: 'status',
@@ -91,7 +104,8 @@ const columns = computed<DataTableColumn<OrderOut>[]>(() => [
     sortable: true,
     align: 'right',
     format: (_, row) => formatMoney(row.total_amount, locale.value, row.currency),
-    filter: { type: 'range' },
+    // Typed as an amount (pm#521): a text box with the decimal keyboard, so «1.250,50» can be pasted.
+    filter: { type: 'range', amount: true },
   },
 ]);
 
@@ -182,6 +196,7 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
       server-side
       searchable
       :filters="filters"
+      :filter-errors="filterErrors"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -246,10 +261,15 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+  max-width: 100%;
 }
 
+/* A failed order's reason wraps inside its cell: cut, it read «Card declin» at 834 px. */
 .cart-checkout-status__reason {
+  max-width: 100%;
   color: var(--ion-color-medium);
   font-size: 0.8em;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 </style>

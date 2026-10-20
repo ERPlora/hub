@@ -161,6 +161,21 @@ describe('CartsPage', () => {
     ]);
   });
 
+  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box (pm#521)', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const total = s.prop<Array<{ key: string; filter?: unknown }>>('columns').find((c) => c.key === 'total_amount');
+    expect(total?.filter).toEqual({ type: 'range', amount: true });
+    s.table().vm.$emit('filtersChange', { total_amount_from: '1.250,50', total_amount_to: '1.250' });
+    await flush();
+    // «1.250» is 1.250 € or 1,25 €: it filters nothing and says why, never the wrong amount.
+    expect(s.list()).toEqual([{ total_amount_min: 125050, sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Type an amount, like 12.50' });
+    s.table().vm.$emit('filtersChange', { total_amount_from: '12' });
+    await flush();
+    expect(s.prop('filterErrors')).toEqual({});
+  });
+
   it('a bound that is not a number is left out, never «from 0»', async () => {
     const s = await setup();
     s.table().vm.$emit('filtersChange', { total_amount_from: 'abc', total_items_to: 'two' });

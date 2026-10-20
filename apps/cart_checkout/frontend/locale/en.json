@@ -9,6 +9,7 @@
     "loading": "Loading…",
     "noResults": "No results",
     "noResultsMessage": "Nothing matches the search or the filters.",
+    "amountInvalid": "Type an amount, like 12.50",
     "noPermission": "You do not have permission",
     "live": {
       "reconnecting": "Reconnecting…",

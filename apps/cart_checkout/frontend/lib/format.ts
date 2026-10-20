@@ -93,6 +93,17 @@ export function toMinor(text: string | undefined, currency: string = CURRENCY): 
 }
 
 
+/** The two ends of the Total filter, as the table names them. */
+export const TOTAL_BOUNDS = ['total_amount_from', 'total_amount_to'] as const;
+
+/** The ends of the Total filter typed but not readable as an amount: they filter nothing and say so. */
+export function unreadableTotals(filters: Readonly<Record<string, unknown>>): string[] {
+  return TOTAL_BOUNDS.filter((name) => {
+    const text = filters[name];
+    return typeof text === 'string' && text.trim() !== '' && toMinor(text) === undefined;
+  });
+}
+
 /** A quantity bound typed by a person («2», «0,5») → the decimal the server reads; nothing when it is
  *  not a quantity of at most three decimals. */
 export function toQuantity(text: string | undefined): string | undefined {

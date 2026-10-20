@@ -5,7 +5,7 @@
 // decorative zeros; «Total from 12» means twelve euros (1200 cents) and «Items from 2» two units.
 import { describe, expect, it } from 'vitest';
 
-import { CART_TONE, currencyDecimals, formatMoney, formatQuantity, ORDER_TONE, toMinor, toQuantity } from './format';
+import { CART_TONE, currencyDecimals, formatMoney, formatQuantity, ORDER_TONE, toMinor, toQuantity, unreadableTotals } from './format';
 
 const nbsp = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -89,6 +89,14 @@ describe('toMinor: a money range filter in the unit the column shows', () => {
     expect(toMinor('12.5', 'JPY')).toBeUndefined();
     expect(toMinor('1.23.456')).toBeUndefined();
     expect(toMinor('1.234,5.6')).toBeUndefined();
+  });
+});
+
+describe('unreadableTotals: the ends of the Total filter that are not an amount', () => {
+  it('names the typed ends it cannot read, never an empty one or another filter', () => {
+    expect(unreadableTotals({ total_amount_from: '1.250', total_amount_to: '12,5', total_items_from: 'two' })).toEqual(['total_amount_from']);
+    expect(unreadableTotals({ total_amount_from: ' ', total_amount_to: 'abc' })).toEqual(['total_amount_to']);
+    expect(unreadableTotals({})).toEqual([]);
   });
 });
 
