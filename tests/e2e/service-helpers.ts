@@ -20,6 +20,30 @@ export const VIEWPORTS = {
   phone: { width: 390, height: 844 },
 } as const;
 
+/** The three sizes every flow with a screen is walked and captured at (brief APP-SERVICE). */
+export const FLOW_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** Waits until no finite animation runs (a modal opening, a popover closing): the capture shows the state
+ *  the flow reached, not a frame of Ionic's transition; spinners (infinite) do not count. */
+export async function settled(page: Page): Promise<void> {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((animation) => animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity),
+  );
+}
+
+/** The page does not scroll sideways: everything fits its width. */
+export async function noHorizontalScroll(page: Page, label: string): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
+    .toBeLessThanOrEqual(0);
+}
+
 export async function ownerPage(browser: Browser, next: string, viewport: { width: number; height: number } = VIEWPORTS.desktop) {
   const context = await browser.newContext({ baseURL: A, viewport, locale: 'en-US' });
   const page = await context.newPage();
@@ -34,12 +58,13 @@ export async function post<T>(context: BrowserContext, path: string, body: unkno
   return res.data;
 }
 
-/** Picks the option of a `Combo` whose text holds `text`, searching it by `query`. */
+/** Picks the option of a `Combo` whose text holds `text`, searching it by `query`; its list closes. */
 export async function pick(page: Page, testid: string, query: string, text: string): Promise<void> {
   const input = page.locator(`[data-testid=${testid}] input`);
   await input.click();
   await input.fill(query);
   await page.locator(`[data-testid^=${testid}-option-]`, { hasText: text }).first().click();
+  await expect(page.locator(`[data-testid^=${testid}-option-]`)).toHaveCount(0);
 }
 
 /** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
