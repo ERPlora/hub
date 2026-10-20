@@ -365,6 +365,15 @@
         "query": "Consultar: {action}",
         "found": "Encontró algo",
         "count": "Cuántas"
+      },
+      "options": {
+        "toggle": "Más opciones",
+        "runIf": "Solo si…",
+        "runIfHint": "Si no se cumple, este paso se salta y la automatización sigue.",
+        "onError": "Si falla, sigue con los pasos siguientes",
+        "onErrorHint": "El fallo queda escrito en este paso y los siguientes pueden mirar si falló.",
+        "summaryRunIf": "Solo si: {clauses}",
+        "summaryOnError": "Si falla, sigue"
       }
     },
     "picker": {
@@ -391,7 +400,8 @@
         "not_allowed": "Se lo rechazarían: todavía no le has permitido «{action}»",
         "unavailable": "«{action}» no está disponible en este negocio",
         "not_reached": "No llegaría aquí",
-        "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo"
+        "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo",
+        "skipped": "Se saltaría: no se cumple su «Solo si…»"
       },
       "empty": "Saldría vacío: {fields}",
       "unknown": "Sale de un paso anterior que no ha corrido: {fields}",
@@ -435,7 +445,9 @@
         "waiting": "Esperando hasta el {date}",
         "waited": "Esperó {duration}",
         "failed": "{action}: {message}",
-        "resumed": "Reanudada aquí, desde el paso que había fallado"
+        "resumed": "Reanudada aquí, desde el paso que había fallado",
+        "skipped": "Se saltó: no se cumplía su «Solo si…» ({clauses})",
+        "continued": "Siguió con los pasos siguientes."
       },
       "advice": {
         "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",

@@ -182,7 +182,13 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
       return p.t('flow.history.log.waited', { duration: describeDuration(entry.seconds ?? 0, p) });
     case 'resumed':
       return p.t('flow.history.log.resumed');
-    default:
-      return p.t('flow.history.log.failed', { action: action || entry.step, message: entry.error?.message ?? '' });
+    case 'skipped':
+      return p.t('flow.history.log.skipped', {
+        clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),
+      });
+    default: {
+      const failed = p.t('flow.history.log.failed', { action: action || entry.step, message: entry.error?.message ?? '' });
+      return entry.continued ? `${failed} ${p.t('flow.history.log.continued')}` : failed;
+    }
   }
 }

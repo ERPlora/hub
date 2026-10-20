@@ -188,5 +188,11 @@ describe('a line of the history', () => {
     expect(
       describeLog(entry({ operation: 'task.task.create', outcome: 'failed', error: { code: 'invalid_field', message: 'No such project.' } }), steps, CATALOG, p),
     ).toBe('Create a task: No such project.');
+    expect(
+      describeLog(entry({ operation: 'task.task.create', outcome: 'skipped', failed: [{ path: 'input.total', op: 'gte', value: 10000 }] }), steps, CATALOG, p),
+    ).toBe('Skipped: its «Only if…» did not hold (Total greater than or equal to 10000)');
+    expect(
+      describeLog(entry({ operation: 'task.task.create', outcome: 'failed', continued: true, error: { code: 'flow.not_allowed', message: 'Not allowed.' } }), steps, CATALOG, p),
+    ).toBe('Create a task: Not allowed. It carried on with the next steps.');
   });
 });

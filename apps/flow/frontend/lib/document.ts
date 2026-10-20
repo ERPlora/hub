@@ -224,6 +224,11 @@ export function dataChoices(steps: readonly Step[], index: number, sample: Recor
     if (step.kind !== 'command' && step.kind !== 'query') continue;
     const action = catalog?.actions.find((candidate) => candidate.name === step.operation);
     for (const field of action?.outputs ?? []) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
+    // FLOW-F25: whether it was skipped, or failed and carried on.
+    if (step.run_if) out.push({ path: `steps.${step.id}.skipped`, group: step.id, example: undefined });
+    if (step.on_error === 'continue') {
+      for (const field of ['failed', 'error_code']) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
+    }
   }
   return out;
 }

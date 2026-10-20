@@ -88,7 +88,9 @@ D_STEPS = (
     "row's fields and `count` only how many; both leave `found` and `count`), `condition` (`when`: every "
     "comparison must hold, or the run ends there without error) or `delay` (`seconds`, 60 to 2592000, "
     "counted from the previous step). A value in `params` is a literal, a path that keeps its type "
-    "(`input.customer_id`) or text with `{{input.name}}` inside. Money is in cents."
+    "(`input.customer_id`) or text with `{{input.name}}` inside. Money is in cents. Every step but a "
+    "condition may carry `run_if` (skipped when it does not hold) and an action or a read `on_error` "
+    "(`continue`: its failure does not stop the run)."
 )
 D_CONDITION = (
     "Comparisons, all at once: `{path: {operator: value}}` with eq, neq, in, exists, contains, gt, gte, "
@@ -220,10 +222,23 @@ Trigger = Annotated[
 # --- The document: its steps ------------------------------------------------------------------------
 
 
+D_RUN_IF = (
+    "«Only if…»: when these comparisons do not all hold the step is skipped (later steps read "
+    "`steps.<id>.skipped`) and the run goes on. " + D_CONDITION
+)
+D_ON_ERROR = (
+    "What a failure of this step does: `stop` (none: the run stops with its reason) or `continue` (the "
+    "failure is written in the step, later steps read `steps.<id>.failed` and `steps.<id>.error_code`, and "
+    "the run goes on)."
+)
+
+
 class _OperationStep(In):
     id: StepId = Field(
         description="The step's id; later steps read what it leaves as `steps.<id>.<field>`."
     )
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+    on_error: Literal["stop", "continue"] | None = Field(None, description=D_ON_ERROR)
     operation: str = Field(
         max_length=96, description="The operation of another app, by its name."
     )
@@ -276,6 +291,7 @@ class ConditionStep(In):
 
 class DelayStep(In):
     id: StepId = Field(description="The step's id.")
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
     kind: Literal["delay"] = Field(description="Wait, counted from the previous step.")
     seconds: int = Field(
         ge=document.MIN_DELAY_SECONDS,
@@ -292,13 +308,18 @@ DraftStep = Annotated[
 ]
 
 
+def _condition_reads(condition: dict) -> list[str]:
+    # The data it looks at and the data it compares with (hub#1712).
+    return [*condition, *document.references(list(condition.values()))]
+
+
 def _reads(step: Any) -> list[str]:
+    reads = _condition_reads(step.run_if) if getattr(step, "run_if", None) else []
     if step.kind in ("command", "query"):
-        return document.references(step.params)
+        return reads + document.references(step.params)
     if step.kind == "condition":
-        # The data it looks at and the data it compares with (hub#1712).
-        return [*step.when, *document.references(list(step.when.values()))]
-    return []
+        return _condition_reads(step.when)
+    return reads
 
 
 def document_problems(steps: list[Any]) -> list[str]:
@@ -643,6 +664,7 @@ class TestStepOut(Schema):
         "not_allowed",
         "unavailable",
         "not_reached",
+        "skipped",
     ]
     operation: str = ""
     params: dict[str, Any] = {}

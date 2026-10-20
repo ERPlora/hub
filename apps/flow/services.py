@@ -36,6 +36,7 @@ from apps.flow.models import Draft, Flow, FlowRun
 from apps.flow.queries import (
     HIGH_RISK,
     HIGH_RISK_CODE,
+    LEAVES,
     MANAGE,
     RESUME_DAYS,
     SYSTEM,
@@ -109,6 +110,10 @@ FILTER_UNREADABLE = _(
 )
 CONDITION_UNREADABLE = _(
     "This «Only continue if…» can no longer be read, so it stopped. Open the automation, check this step "
+    "and save it again."
+)
+RUN_IF_UNREADABLE = _(
+    "The «Only if…» of this step can no longer be read, so it stopped. Open the automation, check this step "
     "and save it again."
 )
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
@@ -233,7 +238,7 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
         name = data.name or str(UNTITLED)
     flow = Flow(
         name=name,
-        steps=[step.model_dump(mode="json") for step in data.steps],
+        steps=[step.model_dump(mode="json", exclude_none=True) for step in data.steps],
         language=ctx.language,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
@@ -292,7 +297,7 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
     else:
         changed_trigger = False
     if data.steps is not None:
-        steps = [step.model_dump(mode="json") for step in data.steps]
+        steps = [step.model_dump(mode="json", exclude_none=True) for step in data.steps]
         changed_document |= steps != flow.steps
         flow.steps = steps
     if changed_document:
@@ -669,6 +674,40 @@ def _operation_step(
     return output, "done", {}
 
 
+def _fail(ctx: OperationContext, run: FlowRun, step: dict, failure: StepFailed, now: dt.datetime) -> bool:
+    """Writes a step's failure; ``True`` when the run goes on (``on_error: continue``, FLOW-F25)."""
+    if step.get("on_error") == "continue":
+        _log(run, step, "failed", now, error=failure.entry(), continued=True)
+        run.outputs = {
+            **run.outputs,
+            step["id"]: {"failed": True, "error_code": failure.code, "error_message": failure.message},
+        }
+        run.step_index += 1
+        return True
+    _log(run, step, "failed", now, error=failure.entry())
+    _finish(ctx, run, FlowRun.Status.FAILED, now, failure.code, failure.message)
+    return False
+
+
+def _skipped(ctx: OperationContext, run: FlowRun, step: dict, data: dict, now: dt.datetime) -> bool | None:
+    """Applies a step's «Only if…» (FLOW-F25): ``True`` when it is skipped (and the run goes on),
+    ``None`` when it cannot be read (the run stopped), ``False`` when the step runs."""
+    run_if = step.get("run_if")
+    if not run_if:
+        return False
+    if not document.readable(run_if):
+        _fail(ctx, run, {**step, "on_error": "stop"}, StepFailed("flow.run_if_unreadable", str(RUN_IF_UNREADABLE)), now)
+        return None
+    failed = document.failed_clauses(run_if, data)
+    if not failed:
+        return False
+    _log(run, step, "skipped", now, failed=failed)
+    if step["kind"] in LEAVES:
+        run.outputs = {**run.outputs, step["id"]: {"skipped": True}}
+    run.step_index += 1
+    return True
+
+
 def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:
     """Runs ``run``'s steps from ``step_index`` until it ends, waits or fails."""
     steps = run.definition.get("steps", [])
@@ -676,6 +715,12 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
         while run.step_index < len(steps):
             step = steps[run.step_index]
             data = {"input": run.input, "steps": run.outputs}
+            if step["kind"] != "condition":
+                skipped = _skipped(ctx, run, step, data, now)
+                if skipped is None:
+                    return
+                if skipped:
+                    continue
             if step["kind"] == "delay":
                 until = now + dt.timedelta(seconds=step["seconds"])
                 _log(
@@ -702,13 +747,8 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
                 return
             if step["kind"] == "condition":
                 if not document.readable(step.get("when")):
-                    failure = StepFailed(
-                        "flow.condition_unreadable", str(CONDITION_UNREADABLE)
-                    )
-                    _log(run, step, "failed", now, error=failure.entry())
-                    _finish(
-                        ctx, run, FlowRun.Status.FAILED, now, failure.code, failure.message
-                    )
+                    failure = StepFailed("flow.condition_unreadable", str(CONDITION_UNREADABLE))
+                    _fail(ctx, run, {**step, "on_error": "stop"}, failure, now)
                     return
                 failed = document.failed_clauses(step["when"], data)
                 if failed:
@@ -721,22 +761,12 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
             try:
                 left, outcome, extras = _operation_step(ctx, run, flow, step, data)
             except StepFailed as failure:
-                _log(run, step, "failed", now, error=failure.entry())
-                _finish(
-                    ctx, run, FlowRun.Status.FAILED, now, failure.code, failure.message
-                )
+                if _fail(ctx, run, step, failure, now):
+                    continue
                 return
             except OperationError as refused:
-                _log(
-                    run,
-                    step,
-                    "failed",
-                    now,
-                    error={"code": refused.code, "message": refused.message},
-                )
-                _finish(
-                    ctx, run, FlowRun.Status.FAILED, now, refused.code, refused.message
-                )
+                if _fail(ctx, run, step, StepFailed(refused.code, refused.message), now):
+                    continue
                 return
             run.outputs = {**run.outputs, step["id"]: left}
             _log(run, step, outcome, now, **extras)

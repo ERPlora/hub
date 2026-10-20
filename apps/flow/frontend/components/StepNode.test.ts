@@ -8,6 +8,7 @@ import type { CatalogOut, Step } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
 import StepNode from './StepNode.vue';
+import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
 
 const CATALOG = {
@@ -107,5 +108,24 @@ describe('StepNode', () => {
     expect(s.find('flow-step-panel-s1').exists()).toBe(false);
     await click(s.find('flow-step-open-s1').element);
     expect(s.wrapper.emitted('toggle')).toHaveLength(1);
+  });
+
+  // FLOW-F25: the options of a step, inside it, and what they say when it is closed.
+  it('an action, a read and a wait carry «More options»; a condition does not', async () => {
+    const command = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'x' } });
+    expect(command.wrapper.findComponent(StepOptions).exists()).toBe(true);
+    command.wrapper.findComponent(StepOptions).vm.$emit('update:step', { id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'x' }, on_error: 'continue' });
+    expect(command.emitted().at(-1)).toEqual({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'x' }, on_error: 'continue' });
+    const wait = await setup({ id: 's1', kind: 'delay', seconds: 60 });
+    expect(wait.wrapper.findComponent(StepOptions).exists()).toBe(true);
+    const condition = await setup({ id: 's1', kind: 'condition', when: {} });
+    expect(condition.wrapper.findComponent(StepOptions).exists()).toBe(false);
+  });
+
+  it('a closed step says its «Only if…» and that it carries on if it fails', async () => {
+    const s = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: {}, run_if: { 'input.total': { gt: 10000 } }, on_error: 'continue' }, false);
+    expect(s.find('flow-step-summary-s1').text()).toBe('Only if: Total greater than 10000 · If it fails, it carries on');
+    const plain = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: {} }, false);
+    expect(plain.find('flow-step-summary-s1').exists()).toBe(false);
   });
 });

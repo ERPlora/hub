@@ -324,3 +324,6 @@ msgstr "Esta ejecución ya no se puede reanudar: se paró hace más de %(days)s 
 
 msgid "That run does not exist in this business."
 msgstr "Esa ejecución no existe en este negocio."
+
+msgid "The «Only if…» of this step can no longer be read, so it stopped. Open the automation, check this step and save it again."
+msgstr "Ya no se puede leer el «Solo si…» de este paso, así que se ha parado. Abre la automatización, revisa este paso y vuelve a guardarla."

@@ -32,13 +32,18 @@ export interface ManualTrigger {
 }
 export type Trigger = EventTrigger | ScheduleTrigger | AtTrigger | ManualTrigger;
 
-export interface CommandStep {
+/** «Only if…» and «If it fails, carry on» (FLOW-F25): absent, the step always runs and a failure stops the run. */
+export interface StepOptions {
+  run_if?: Condition;
+  on_error?: 'stop' | 'continue';
+}
+export interface CommandStep extends StepOptions {
   id: string;
   kind: 'command';
   operation: string;
   params: Record<string, unknown>;
 }
-export interface QueryStep {
+export interface QueryStep extends StepOptions {
   id: string;
   kind: 'query';
   operation: string;
@@ -54,6 +59,7 @@ export interface DelayStep {
   id: string;
   kind: 'delay';
   seconds: number;
+  run_if?: Condition;
 }
 export type Step = CommandStep | QueryStep | ConditionStep | DelayStep;
 export type StepKind = Step['kind'];
@@ -129,7 +135,9 @@ export interface LogEntry {
   step: string;
   kind: StepKind;
   operation?: string;
-  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed' | 'resumed';
+  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed' | 'resumed' | 'skipped';
+  /** A failure of a step with «If it fails, carry on»: the run went on. */
+  continued?: boolean;
   at: string;
   /** Who resumed it (`resumed`). */
   by?: string;
@@ -266,6 +274,7 @@ export interface ClauseOut {
 }
 
 export type TestOutcome =
+  | 'skipped'
   | 'high_risk'
   | 'would_run'
   | 'stops_here'

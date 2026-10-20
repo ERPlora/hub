@@ -120,7 +120,8 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
 
 - **Pasos**: la tarjeta del disparador («Cuando pase esto…»), los pasos en columna, cada uno con su asa
   para arrastrar y × (las esperas y los «Solo sigue si…» son tiras estrechas; el resto, tarjetas que se
-  despliegan al tocarlas), y los botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
+  despliegan al tocarlas; dentro, **Más opciones**: «Solo si…» y «Si falla, sigue», FLOW-F25), y los
+  botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
   si…** y **Esperar**. Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
   automatización.»
 - **Probar**: lo que haría con lo último que pasó, sin hacer nada (FLOW-F13).
@@ -176,6 +177,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F22 | Cuando llega la hora, la automatización arranca | hecho |
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 | FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
+| FLOW-F25 | «Solo si…» y «Si falla, sigue» en cada paso | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
@@ -665,6 +667,32 @@ una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un er
 veces. Ninguna se reanuda sola.
 Implicados: FLOW-F12, FLOW-F15, FLOW-F16
 
+### FLOW-F25 «Solo si…» y «Si falla, sigue» en cada paso
+<!-- origen: old-hub:HUB-F97 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. Abre un paso de **Hacer algo**, **Consultar algo** o **Esperar** y pulsa **Más opciones**.
+2. Marca **Solo si…** y escribe sus condiciones, como en un «Solo sigue si…» («Total mayor que 10000»):
+   «Si no se cumple, este paso se salta y la automatización sigue.».
+3. En **Hacer algo** y **Consultar algo**, marca **Si falla, sigue con los pasos siguientes**: «El fallo queda
+   escrito en este paso y los siguientes pueden mirar si falló.».
+4. Cerrado, el paso lo dice debajo de su título («Solo si: Total mayor que 10000 · Si falla, sigue»). Un paso
+   posterior puede mirar, con **Insertar un dato**, si ese paso «Se saltó» o «Falló» y su «Código del fallo».
+5. Pulsa **Guardar**.
+Entra: las condiciones y la casilla de cada paso.
+Sale: el paso con sus opciones, al **Guardar**. Al ejecutarse, un paso cuyo «Solo si…» no se cumple no se
+hace y el historial dice «Se saltó: no se cumplía su «Solo si…» (…)»; uno que falla con «Si falla, sigue»
+deja «…: el motivo. Siguió con los pasos siguientes.» y la ejecución termina bien si el resto va bien.
+**Probar** dice «Se saltaría: no se cumple su «Solo si…»». Sin opciones, un paso que falla para la
+ejecución, como siempre.
+Si falla: un «Solo si…» que lee un dato que no deja ningún paso anterior, con una comparación que no
+existe, o un «Si falla» en una espera o en un «Solo sigue si…», no se guarda. Un «Solo si…» que ya no se
+puede leer (escrito en crudo en la administración) para la ejecución con «Ya no se puede leer el «Solo
+si…» de este paso…», y esa ejecución no se reanuda: hay que corregir el paso.
+Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -755,7 +783,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`input.total`, `steps.s1.id`: conserva el tipo) o un texto con `{{ruta}}` (siempre texto). Raíces:
   `input` (lo que trajo el aviso o la ejecución a mano) y `steps.<id>` de un paso anterior. Sin índices
   de lista. Condición: `{ruta: {eq|neq|in|exists|contains|gt|gte|lt|lte: valor}}`, todas a la vez; un
-  dato que no está nunca cumple salvo `exists: false`.
+  dato que no está nunca cumple salvo `exists: false`. Todo paso salvo `condition` admite `run_if` (una
+  condición: si no se cumple, se salta, queda `skipped` en el log y, en una acción o consulta,
+  `steps.<id>.skipped`), y `command`/`query` admiten `on_error: continue` (el fallo queda en el log con
+  `continued`, deja `steps.<id>.failed` y `error_code`/`error_message`, y la ejecución sigue). Sin ellos el
+  paso se guarda como antes (`exclude_none`); un `run_if` ilegible para con `flow.run_if_unreadable`, que no
+  se reanuda (FLOW-F25).
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
   el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:

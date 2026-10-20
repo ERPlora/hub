@@ -4,7 +4,8 @@
 // searchable — and fill what it asks for: the required fields always, the rest with «Add
 // information», each value composed of text and picked data. «Only continue if…» is a dashed chip
 // that narrows the line; «Wait» is a label on it. Each step has its handle (`ion-reorder`, the
-// finger's gesture) and its ×.
+// finger's gesture) and its ×. An action, a read and a wait carry «More options» (`StepOptions`, FLOW-F25),
+// and say them under their title when closed.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonInput, IonReorder, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -12,9 +13,10 @@ import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import { type DataChoice, delayParts, type DelayUnit, secondsOf } from '../lib/document';
-import { actionLabel, describeStep, fieldLabel } from '../lib/phrasing';
+import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
 import ConditionRows from './ConditionRows.vue';
+import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
 
 const props = defineProps<{
@@ -123,6 +125,22 @@ function helper(field: FieldOut): string | undefined {
 }
 
 const title = computed(() => describeStep(props.step, props.steps, props.catalog, phrasing.value));
+
+/** «Only if: … · If it fails, it carries on», for a closed step that has options. */
+const summary = computed(() => {
+  const step = props.step;
+  if (step.kind === 'condition') return '';
+  const parts: string[] = [];
+  const t = phrasing.value.t;
+  if (step.run_if && Object.keys(step.run_if).length) {
+    const clauses = Object.entries(step.run_if).flatMap(([path, comparisons]) =>
+      Object.entries(comparisons ?? {}).map(([op, value]) => describeClause({ path, op: op as never, value }, props.steps, props.catalog, phrasing.value)),
+    );
+    parts.push(t('flow.steps.options.summaryRunIf', { clauses: clauses.join('; ') }));
+  }
+  if ((step.kind === 'command' || step.kind === 'query') && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
+  return parts.join(' · ');
+});
 </script>
 
 <template>
@@ -159,6 +177,11 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
           <HubIcon name="ion:close-outline" />
         </button>
       </div>
+      <span
+        v-if="summary && !open"
+        class="flow-card__hint flow-step__summary"
+        :data-testid="`flow-step-summary-${id}`"
+      >{{ summary }}</span>
       <div
         v-if="open"
         class="flow-detached-panel"
@@ -197,6 +220,14 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
             </IonSelectOption>
           </IonSelect>
         </div>
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
       </div>
     </template>
 
@@ -271,6 +302,11 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
           @click="emit('toggle')"
         >
           <span class="flow-card__title">{{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
         </button>
         <button
           type="button"
@@ -373,6 +409,14 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
             </IonSelectOption>
           </IonSelect>
         </div>
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
       </div>
     </div>
   </div>

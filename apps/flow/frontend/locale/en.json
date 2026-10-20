@@ -365,6 +365,15 @@
         "query": "Look up: {action}",
         "found": "Found something",
         "count": "How many"
+      },
+      "options": {
+        "toggle": "More options",
+        "runIf": "Only if…",
+        "runIfHint": "When it does not hold, this step is skipped and the automation goes on.",
+        "onError": "If it fails, carry on with the next steps",
+        "onErrorHint": "Its failure is written in this step and the next steps can check whether it failed.",
+        "summaryRunIf": "Only if: {clauses}",
+        "summaryOnError": "If it fails, it carries on"
       }
     },
     "picker": {
@@ -391,7 +400,8 @@
         "not_allowed": "They would refuse it: you have not allowed it «{action}» yet",
         "unavailable": "«{action}» is not available in this business",
         "not_reached": "Would not get here",
-        "high_risk": "«{action}» needs a person in front: an automation cannot do it"
+        "high_risk": "«{action}» needs a person in front: an automation cannot do it",
+        "skipped": "Would be skipped: its «Only if…» does not hold"
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
@@ -435,7 +445,9 @@
         "waiting": "Waiting until {date}",
         "waited": "Waited {duration}",
         "failed": "{action}: {message}",
-        "resumed": "Resumed here, from the step that had failed"
+        "resumed": "Resumed here, from the step that had failed",
+        "skipped": "Skipped: its «Only if…» did not hold ({clauses})",
+        "continued": "It carried on with the next steps."
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",

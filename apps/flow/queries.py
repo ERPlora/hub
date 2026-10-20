@@ -451,6 +451,7 @@ NOT_RESUMABLE = frozenset(
         "flow.loop_stopped",
         "flow.filter_unreadable",
         "flow.condition_unreadable",
+        "flow.run_if_unreadable",
         HIGH_RISK_CODE,
     }
 )
@@ -727,6 +728,15 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         if stopped:
             steps.append(out | {"outcome": "not_reached"})
             continue
+        run_if = getattr(step, "run_if", None)
+        if run_if and not any(
+            path.startswith("steps.") and path.split(".")[1] in unknown_steps
+            for path in [*run_if, *document.references(list(run_if.values()))]
+        ):
+            skipped = document.failed_clauses(run_if, values)
+            if skipped:
+                steps.append(out | {"outcome": "skipped", "failed": _clauses(skipped)})
+                continue
         if step.kind == "delay":
             steps.append(out | {"outcome": "waits", "seconds": step.seconds})
             continue

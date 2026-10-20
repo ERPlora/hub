@@ -219,4 +219,15 @@ describe('the data a step can insert', () => {
       { path: 'steps.s3.number', group: 's3', example: undefined },
     ]);
   });
+
+  it('a step that may be skipped or carry on after failing also leaves whether it did (FLOW-F25)', () => {
+    const steps: Step[] = [{ ...CMD, id: 's1', run_if: { 'input.total': { gt: 1 } }, on_error: 'continue' }];
+    expect(dataChoices(steps, 1, {}, catalog).map((choice) => choice.path)).toEqual([
+      'steps.s1.id',
+      'steps.s1.number',
+      'steps.s1.skipped',
+      'steps.s1.failed',
+      'steps.s1.error_code',
+    ]);
+  });
 });
