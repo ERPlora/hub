@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogOut, Step } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
+import AskStepPanel from './AskStepPanel.vue';
 import HttpStepPanel from './HttpStepPanel.vue';
 import StepNode from './StepNode.vue';
 import StepOptions from './StepOptions.vue';
@@ -141,5 +142,17 @@ describe('StepNode', () => {
     expect(s.wrapper.findComponent(StepOptions).exists()).toBe(true);
     s.wrapper.findComponent(HttpStepPanel).vm.$emit('update:step', { ...call, method: 'PUT' });
     expect(s.emitted().at(-1)).toMatchObject({ method: 'PUT' });
+  });
+
+  // FLOW-F28: «Ask someone first» is a card named by its question; open, its form and «Only if…» (it never fails).
+  it('a question is a card named by what it asks that opens to its form', async () => {
+    const question: Step = { id: 's1', kind: 'ask', title: 'Refund?', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' };
+    const closed = await setup(question, false);
+    expect(closed.find('flow-step-open-s1').text()).toContain('Ask: Refund?');
+    const s = await setup(question);
+    expect(s.wrapper.findComponent(AskStepPanel).exists()).toBe(true);
+    s.wrapper.findComponent(AskStepPanel).vm.$emit('update:step', { ...question, hours: 5 });
+    expect(s.emitted().at(-1)).toMatchObject({ hours: 5 });
+    expect(s.find('flow-step-onerror-s1').exists()).toBe(false);
   });
 });

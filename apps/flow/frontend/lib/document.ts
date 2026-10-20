@@ -81,6 +81,8 @@ function blankStep(id: string, kind: StepKind): Step {
   // An hour: long enough to read as «later», short enough that a first try needs no patience.
   if (kind === 'delay') return { id, kind, seconds: 3600 };
   if (kind === 'http') return { id, kind, method: 'POST', url: '', headers: {}, body: '', timeout: 10 };
+  // Whoever runs the business, three days, and a no stops it: the old module's defaults.
+  if (kind === 'ask') return { id, kind, title: '', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' };
   return { id, kind: 'command', operation: '', params: {} };
 }
 
@@ -237,7 +239,7 @@ export function rowsToCondition(rows: readonly ConditionRow[]): Condition {
 export function fieldErrors(fields: Readonly<Record<string, string>> | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, message] of Object.entries(fields ?? {})) {
-    let normal = key.replace(/^steps\.(\d+)\.(command|query|condition|delay|http)\./, 'steps.$1.');
+    let normal = key.replace(/^steps\.(\d+)\.(command|query|condition|delay|http|ask)\./, 'steps.$1.');
     normal = normal === 'trigger.schedule' ? 'trigger' : normal.replace(/^trigger\.(event|schedule|at|manual)\./, 'trigger.');
     out[normal] = message;
   }
@@ -262,12 +264,17 @@ export function dataChoices(steps: readonly Step[], index: number, sample: Recor
   const out: DataChoice[] = [];
   flatten(sample ?? {}, 'input', out);
   for (const step of steps.slice(0, index)) {
-    if (step.kind !== 'command' && step.kind !== 'query' && step.kind !== 'http') continue;
-    const outputs = step.kind === 'http' ? ['status', 'body'] : (catalog?.actions.find((candidate) => candidate.name === step.operation)?.outputs ?? []);
+    if (step.kind === 'condition' || step.kind === 'delay') continue;
+    const outputs =
+      step.kind === 'http'
+        ? ['status', 'body']
+        : step.kind === 'ask'
+          ? ['approved', 'expired', 'note', 'answered_by']
+          : (catalog?.actions.find((candidate) => candidate.name === step.operation)?.outputs ?? []);
     for (const field of outputs) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
     // FLOW-F25: whether it was skipped, or failed and carried on.
     if (step.run_if) out.push({ path: `steps.${step.id}.skipped`, group: step.id, example: undefined });
-    if (step.on_error === 'continue') {
+    if (step.kind !== 'ask' && step.on_error === 'continue') {
       for (const field of ['failed', 'error_code']) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
     }
   }

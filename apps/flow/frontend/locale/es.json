@@ -253,7 +253,8 @@
       "ranFailed": "Se ejecutó y se paró por un error: {message}",
       "ranWaiting": "Se ejecutó y está esperando: mírala en Historial.",
       "runSaveFirst": "Guárdala primero: «Ejecutar ahora» ejecuta lo guardado.",
-      "ranCalling": "Se ejecutó y está llamando a otro sistema: mírala en Historial."
+      "ranCalling": "Se ejecutó y está llamando a otro sistema: mírala en Historial.",
+      "ranAsking": "Se ejecutó y espera una respuesta en «Esperan tu respuesta»."
     },
     "trigger": {
       "when": "Cuando pase esto…",
@@ -305,7 +306,8 @@
         "query": "Consultar algo",
         "condition": "Solo sigue si…",
         "delay": "Esperar",
-        "http": "Llamar a otro sistema"
+        "http": "Llamar a otro sistema",
+        "ask": "Preguntar antes a alguien"
       },
       "remove": "Quitar este paso",
       "reorder": "Arrastra para ordenar",
@@ -368,7 +370,9 @@
         "found": "Encontró algo",
         "count": "Cuántas",
         "http": "Llamar a {host}",
-        "noHttp": "Llamar a otro sistema"
+        "noHttp": "Llamar a otro sistema",
+        "ask": "Preguntar: {title}",
+        "noAsk": "Preguntar antes a alguien"
       },
       "options": {
         "toggle": "Más opciones",
@@ -410,7 +414,8 @@
         "not_reached": "No llegaría aquí",
         "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo",
         "skipped": "Se saltaría: no se cumple su «Solo si…»",
-        "would_call": "Llamaría a {host} con esto"
+        "would_call": "Llamaría a {host} con esto",
+        "would_ask": "Preguntaría a {who} y esperaría hasta {hours} horas"
       },
       "empty": "Saldría vacío: {fields}",
       "unknown": "Sale de un paso anterior que no ha corrido: {fields}",
@@ -460,7 +465,11 @@
         "skipped": "Se saltó: no se cumplía su «Solo si…» ({clauses})",
         "continued": "Siguió con los pasos siguientes.",
         "calling": "Llamando a {host}…",
-        "called": "Llamó a {host}: respondió {status}"
+        "called": "Llamó a {host}: respondió {status}",
+        "asking": "Preguntó a {who}; espera una respuesta hasta el {date}",
+        "answeredYes": "{who} contestó que sí",
+        "answeredNo": "{who} contestó que no",
+        "expired": "Nadie contestó a tiempo"
       },
       "advice": {
         "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",
@@ -2424,7 +2433,10 @@
       "zone": "Zona",
       "zone_id": "Zona",
       "zone_name": "Nombre de la zona",
-      "zones": "Zonas"
+      "zones": "Zonas",
+      "approved": "Aprobada",
+      "answered_by": "Contestada por",
+      "details": "Detalles"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {
@@ -2465,6 +2477,53 @@
       "deleteYes": "Sí, borrarlo",
       "deleteNo": "Conservarlo",
       "deleted": "{name} borrado."
+    },
+    "ask": {
+      "roles": {
+        "admin": "quien lleva el negocio",
+        "manager": "los responsables",
+        "employee": "los empleados"
+      },
+      "title": "La pregunta",
+      "details": "Detalles (opcional)",
+      "role": "Quién tiene que contestar",
+      "roleOptions": {
+        "admin": "Quien lleva el negocio",
+        "manager": "Un responsable",
+        "employee": "Un empleado"
+      },
+      "whoNames": {
+        "admin": "Quien lleva el negocio",
+        "manager": "Los responsables",
+        "employee": "Los empleados"
+      },
+      "whoAdmin": "{who} la contesta en Automatizaciones, en «Esperan tu respuesta».",
+      "whoRole": "{who} la contestan en Automatizaciones, en «Esperan tu respuesta»; quien lleva el negocio también puede.",
+      "hours": "Cuánto esperar la respuesta (horas, hasta 720)",
+      "onNo": "Si dicen que no",
+      "onTimeout": "Si nadie contesta a tiempo",
+      "stop": "Parar la automatización aquí",
+      "continue": "Seguir con los pasos siguientes",
+      "asNo": "Contarlo como un no",
+      "continueHint": "Para actuar según la respuesta, añade después de este paso un «Solo sigue si…» sobre «Aprobada» (o «Caducado»)."
+    },
+    "inbox": {
+      "heading": "Esperan tu respuesta",
+      "loading": "Cargando lo que espera tu respuesta…",
+      "empty": "No hay nada esperando tu respuesta.",
+      "from": "De «{name}»",
+      "askedOf": "Preguntado a {who}. Quien lleva el negocio también puede contestar.",
+      "askedOfAdmin": "Preguntado a quien lleva el negocio.",
+      "silenceNo": "Si nadie contesta antes del {date}, cuenta como un no.",
+      "silenceStop": "Si nadie contesta antes del {date}, la automatización se para aquí.",
+      "silenceContinue": "Si nadie contesta antes del {date}, la automatización sigue igualmente.",
+      "noStops": "Un no para la automatización aquí.",
+      "noContinues": "Tras un no, la automatización sigue.",
+      "note": "Añadir una nota (opcional)",
+      "approve": "Aprobar",
+      "reject": "No",
+      "approved": "Aprobada: la automatización sigue.",
+      "rejected": "Contestada que no."
     }
   }
 }

@@ -267,3 +267,23 @@ describe('a call to another system', () => {
   });
 });
 
+// FLOW-F28: «Ask someone first».
+describe('a question before going on', () => {
+  it('starts asking whoever runs the business, waiting three days, stopping on a no', () => {
+    expect(addStep(emptyDocument(), 'ask').steps).toEqual([
+      { id: 's1', kind: 'ask', title: '', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' },
+    ]);
+  });
+
+  it('asks no permission and leaves the answer for the next steps', () => {
+    const steps: Step[] = [{ id: 's1', kind: 'ask', title: 'Go?', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' }];
+    expect(requiredGrants(steps)).toEqual([]);
+    expect(dataChoices(steps, 1, null, null).map((choice) => choice.path)).toEqual([
+      'steps.s1.approved',
+      'steps.s1.expired',
+      'steps.s1.note',
+      'steps.s1.answered_by',
+    ]);
+  });
+});
+

@@ -250,7 +250,7 @@ QUESTION_ROLES = ("", "manager", "employee")
 
 
 class Question(UUIDModel):
-    """What a run's «Ask someone first» step asked (FLOW-F28), waiting in «Waiting for you» (FLOW-F29) until a
+    """What a run's «Ask someone first» step asked (FLOW-F28), waiting in «Waiting for your answer» (FLOW-F29) until a
     person of its role answers it or its time runs out (FLOW-F30). Its texts were filled in when asked, and
     what to do with a no and with silence travels in the row: editing the automation changes neither."""
 

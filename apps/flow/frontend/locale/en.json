@@ -253,7 +253,8 @@
       "ranFailed": "It ran and stopped by an error: {message}",
       "ranWaiting": "It ran and is waiting: see it in History.",
       "runSaveFirst": "Save it first: «Run now» runs what is saved.",
-      "ranCalling": "It ran and is calling another system: see it in History."
+      "ranCalling": "It ran and is calling another system: see it in History.",
+      "ranAsking": "It ran and is waiting for an answer in «Waiting for your answer»."
     },
     "trigger": {
       "when": "When this happens…",
@@ -305,7 +306,8 @@
         "query": "Look something up",
         "condition": "Only continue if…",
         "delay": "Wait",
-        "http": "Call another system"
+        "http": "Call another system",
+        "ask": "Ask someone first"
       },
       "remove": "Remove this step",
       "reorder": "Drag to reorder",
@@ -368,7 +370,9 @@
         "found": "Found something",
         "count": "How many",
         "http": "Call {host}",
-        "noHttp": "Call another system"
+        "noHttp": "Call another system",
+        "ask": "Ask: {title}",
+        "noAsk": "Ask someone first"
       },
       "options": {
         "toggle": "More options",
@@ -410,7 +414,8 @@
         "not_reached": "Would not get here",
         "high_risk": "«{action}» needs a person in front: an automation cannot do it",
         "skipped": "Would be skipped: its «Only if…» does not hold",
-        "would_call": "Would call {host} with this"
+        "would_call": "Would call {host} with this",
+        "would_ask": "Would ask {who} and wait up to {hours} hours"
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
@@ -460,7 +465,11 @@
         "skipped": "Skipped: its «Only if…» did not hold ({clauses})",
         "continued": "It carried on with the next steps.",
         "calling": "Calling {host}…",
-        "called": "Called {host}: it answered {status}"
+        "called": "Called {host}: it answered {status}",
+        "asking": "Asked {who}; waiting for an answer until {date}",
+        "answeredYes": "{who} answered yes",
+        "answeredNo": "{who} answered no",
+        "expired": "Nobody answered in time"
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -2424,7 +2433,10 @@
       "zone": "Zone",
       "zone_id": "Zone",
       "zone_name": "Zone name",
-      "zones": "Zones"
+      "zones": "Zones",
+      "approved": "Approved",
+      "answered_by": "Answered by",
+      "details": "Details"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {
@@ -2465,6 +2477,53 @@
       "deleteYes": "Yes, delete it",
       "deleteNo": "Keep it",
       "deleted": "{name} deleted."
+    },
+    "ask": {
+      "roles": {
+        "admin": "whoever runs the business",
+        "manager": "the managers",
+        "employee": "the employees"
+      },
+      "title": "The question",
+      "details": "Details (optional)",
+      "role": "Who has to answer",
+      "roleOptions": {
+        "admin": "Whoever runs the business",
+        "manager": "A manager",
+        "employee": "An employee"
+      },
+      "whoNames": {
+        "admin": "Whoever runs the business",
+        "manager": "The managers",
+        "employee": "The employees"
+      },
+      "whoAdmin": "{who} answers it in Automations, under «Waiting for your answer».",
+      "whoRole": "{who} answer it in Automations, under «Waiting for your answer»; whoever runs the business can too.",
+      "hours": "How long to wait for the answer (hours, up to 720)",
+      "onNo": "If they say no",
+      "onTimeout": "If nobody answers in time",
+      "stop": "Stop the automation here",
+      "continue": "Carry on with the next steps",
+      "asNo": "Count it as a no",
+      "continueHint": "To act on the answer, add «Only continue if…» on «Approved» (or «Expired») after this step."
+    },
+    "inbox": {
+      "heading": "Waiting for your answer",
+      "loading": "Loading what waits for you…",
+      "empty": "Nothing is waiting for your answer.",
+      "from": "From «{name}»",
+      "askedOf": "Asked of {who}. Whoever runs the business can answer too.",
+      "askedOfAdmin": "Asked of whoever runs the business.",
+      "silenceNo": "If nobody answers before {date}, it counts as a no.",
+      "silenceStop": "If nobody answers before {date}, the automation stops here.",
+      "silenceContinue": "If nobody answers before {date}, the automation carries on anyway.",
+      "noStops": "A no stops the automation here.",
+      "noContinues": "After a no, the automation carries on.",
+      "note": "Add a note (optional)",
+      "approve": "Approve",
+      "reject": "No",
+      "approved": "Approved: the automation carries on.",
+      "rejected": "Answered no."
     }
   }
 }

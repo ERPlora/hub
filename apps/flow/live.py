@@ -12,5 +12,5 @@ live("flow.run.list", on=RUN_EVENTS)
 live("flow.draft.list", on=DRAFT_EVENTS)
 # The names of the secrets (never their values: FLOW-F26).
 live("flow.secret.list", on=SECRET_EVENTS)
-# «Waiting for you» (FLOW-F29): a question comes, is answered or expires; one whose run is cancelled leaves.
+# «Waiting for your answer» (FLOW-F29): a question comes, is answered or expires; one whose run is cancelled leaves.
 live("flow.question.list", on=[*QUESTION_EVENTS, *RUN_EVENTS])

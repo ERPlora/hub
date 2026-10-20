@@ -112,7 +112,7 @@ def test_a_run_by_hand_in_b_is_heard_in_b_only(listen):
 
 @pytest.mark.django_db(transaction=True)
 def test_a_question_asked_and_answered_in_b_is_heard_in_b_only(listen):
-    # FLOW-F28/F29: «Waiting for you» of A never hears what an automation asked in B.
+    # FLOW-F28/F29: «Waiting for your answer» of A never hears what an automation asked in B.
     from apps.flow.models import Question
 
     on_a, on_b = listen(A), listen(B)

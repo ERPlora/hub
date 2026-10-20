@@ -71,7 +71,23 @@ export interface HttpStep extends StepOptions {
   body: string;
   timeout: number;
 }
-export type Step = CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep;
+/** «Ask someone first» (FLOW-F28): the run waits for a person's yes or no. */
+export interface AskStep {
+  id: string;
+  kind: 'ask';
+  /** The question; `{{…}}` data are filled in when it is asked. */
+  title: string;
+  details: string;
+  /** Who answers: '' whoever runs the business, `manager` or `employee`. */
+  role: QuestionRole;
+  /** How long to wait: 1 to 720 hours. */
+  hours: number;
+  on_no: 'stop' | 'continue';
+  on_timeout: 'no' | 'stop' | 'continue';
+  run_if?: Condition;
+}
+export type QuestionRole = '' | 'manager' | 'employee';
+export type Step = CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep;
 export type StepKind = Step['kind'];
 
 export type RunStatus = 'running' | 'waiting' | 'calling' | 'asking' | 'succeeded' | 'stopped' | 'failed' | 'cancelled';
@@ -145,7 +161,27 @@ export interface LogEntry {
   step: string;
   kind: StepKind;
   operation?: string;
-  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed' | 'resumed' | 'skipped' | 'calling' | 'called';
+  outcome:
+    | 'done'
+    | 'found'
+    | 'not_found'
+    | 'passed'
+    | 'stopped'
+    | 'waiting'
+    | 'waited'
+    | 'failed'
+    | 'resumed'
+    | 'skipped'
+    | 'calling'
+    | 'called'
+    | 'asking'
+    | 'answered'
+    | 'expired';
+  /** Who a question was asked of (`asking`). */
+  role?: QuestionRole;
+  /** The answer (`answered`) and its note. */
+  approved?: boolean;
+  note?: string;
   /** The host a call went to (`calling`, `called`). */
   host?: string;
   /** What a call answered (`called`). */
@@ -153,7 +189,7 @@ export interface LogEntry {
   /** A failure of a step with «If it fails, carry on»: the run went on. */
   continued?: boolean;
   at: string;
-  /** Who resumed it (`resumed`). */
+  /** Who resumed it (`resumed`) or answered it (`answered`). */
   by?: string;
   count?: number;
   seconds?: number;
@@ -185,6 +221,34 @@ export interface RunOut {
 
 export interface RunRefIn {
   id: string;
+}
+
+/** A question an automation asked and waits on (FLOW-F29), as «Waiting for your answer» shows it. */
+export interface QuestionOut {
+  id: string;
+  flow_id: string;
+  flow_name: string;
+  run_id: string;
+  title: string;
+  details: string;
+  role: QuestionRole;
+  on_no: 'stop' | 'continue';
+  on_timeout: 'no' | 'stop' | 'continue';
+  expires_at: string;
+  created_at: string;
+}
+export interface QuestionPageOut {
+  rows: QuestionOut[];
+}
+export interface AnswerIn {
+  id: string;
+  approve: boolean;
+  note?: string;
+}
+export interface AnsweredOut {
+  id: string;
+  run_id: string;
+  status: RunStatus;
 }
 
 /** A secret (FLOW-F26): its name, never its value. */
@@ -311,6 +375,7 @@ export interface ClauseOut {
 export type TestOutcome =
   | 'skipped'
   | 'would_call'
+  | 'would_ask'
   | 'high_risk'
   | 'would_run'
   | 'stops_here'
@@ -363,6 +428,8 @@ declare module '@erplora/ui/sdk' {
     'flow.secret.list': { input: Record<string, never>; output: SecretPageOut };
     'flow.secret.set': { input: SecretSetIn; output: SecretOut };
     'flow.secret.delete': { input: SecretRefIn; output: DeletedOut };
+    'flow.question.list': { input: Record<string, never>; output: QuestionPageOut };
+    'flow.question.answer': { input: AnswerIn; output: AnsweredOut };
     'flow.draft.list': { input: DraftListIn; output: Page<DraftOut> };
     'flow.draft.propose': { input: DraftProposeIn; output: DraftOut };
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };

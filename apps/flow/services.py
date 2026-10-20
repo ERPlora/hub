@@ -950,7 +950,7 @@ def _who(ctx: OperationContext) -> str:
 
 
 def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:
-    """Leaves the step's question, its texts filled in now, in «Waiting for you» and parks the run on it. A
+    """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
     question, _created = Question.objects.get_or_create(

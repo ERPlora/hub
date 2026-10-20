@@ -151,7 +151,7 @@ async def secret_delete(request, data: SecretRefIn):
     return await run_operation(request, services.delete_secret, data)
 
 
-# «Waiting for you» (FLOW-F29)
+# «Waiting for your answer» (FLOW-F29)
 
 
 @bind(router, "flow.question.list", "/flow/questions")

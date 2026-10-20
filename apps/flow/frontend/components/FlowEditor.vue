@@ -64,7 +64,13 @@ const runNow = useCommand('flow.flow.run');
 const switching = useCommand('flow.flow.set_enabled');
 
 const TABS: readonly Tab[] = ['steps', 'test', 'permissions', 'history'];
-const ADDERS: readonly StepKind[] = ['command', 'query', 'condition', 'delay', 'http'];
+/** What «Run now» says of a run that did not end at once. */
+const RAN_NOTICE: Partial<Record<string, string>> = {
+  waiting: 'flow.editor.ranWaiting',
+  calling: 'flow.editor.ranCalling',
+  asking: 'flow.editor.ranAsking',
+};
+const ADDERS: readonly StepKind[] = ['command', 'query', 'condition', 'delay', 'http', 'ask'];
 
 /** What is compared to know whether something is unsaved: the document and its switch. */
 const snapshot = (value: FlowDocument): string => JSON.stringify({ ...toPayload(value), enabled: value.enabled });
@@ -251,7 +257,7 @@ async function run(): Promise<void> {
   try {
     const ran = await runNow.run({ id: props.flow.id });
     if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
-    else void toastSuccess(t(ran.status === 'waiting' ? 'flow.editor.ranWaiting' : ran.status === 'calling' ? 'flow.editor.ranCalling' : 'flow.editor.ran'));
+    else void toastSuccess(t(RAN_NOTICE[ran.status] ?? 'flow.editor.ran'));
   } catch (failure) {
     problem.value = wording(failure, phrasing.value.t('flow.errors.action'));
   }

@@ -7,7 +7,7 @@
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type { CatalogOut, ClauseOut, LogEntry, RunStatus, Step, Trigger } from '../operations';
-import { callOrigin, delayParts, isPath } from './document';
+import { callOrigin, delayParts, isPath, valueToParts } from './document';
 
 /** The translator the phrasing needs: `t` and `te` of the app, and its language. */
 export interface Phrasing {
@@ -77,14 +77,15 @@ export function pathLabel(path: string, steps: readonly Step[], catalog: Catalog
   if (root === 'steps' && rest.length >= 2) {
     const index = steps.findIndex((step) => step.id === rest[0]);
     const step = steps[index];
-    if (!step || (step.kind !== 'command' && step.kind !== 'query' && step.kind !== 'http')) return path;
-    const what = step.kind === 'http' ? describeStep(step, steps, catalog, p) : actionLabel(step.operation, catalog, p);
+    if (!step || step.kind === 'condition' || step.kind === 'delay') return path;
+    const what = step.kind === 'http' || step.kind === 'ask' ? describeStep(step, steps, catalog, p) : actionLabel(step.operation, catalog, p);
     return `${index + 1}. ${what} › ${rest.slice(1).map((part) => fieldLabel(part, p)).join(' › ')}`;
   }
   return path;
 }
 
-function formatDate(iso: string, locale: string): string {
+/** A date and time in the business's zone, in the person's language. */
+export function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Madrid' }).format(date);
@@ -150,6 +151,14 @@ export function describeStep(step: Step, steps: readonly Step[], catalog: Catalo
     const host = callHost(step.url);
     return host ? p.t('flow.steps.describe.http', { host }) : p.t('flow.steps.describe.noHttp');
   }
+  if (step.kind === 'ask') {
+    // A datum in the question is named by its words («Amount»), never by its path.
+    const title = valueToParts(step.title)
+      .map((part) => (part.kind === 'field' ? `«${pathLabel(part.path, steps, catalog, p)}»` : part.text))
+      .join('')
+      .trim();
+    return title ? p.t('flow.steps.describe.ask', { title }) : p.t('flow.steps.describe.noAsk');
+  }
   if (!step.operation) return p.t('flow.steps.noAction');
   const action = actionLabel(step.operation, catalog, p);
   return step.kind === 'query' ? p.t('flow.steps.describe.query', { action }) : action;
@@ -203,6 +212,14 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
       return p.t('flow.history.log.calling', { host: entry.host ?? '' });
     case 'called':
       return p.t('flow.history.log.called', { host: entry.host ?? '', status: entry.status ?? '' });
+    case 'asking':
+      return p.t('flow.history.log.asking', { who: p.t(`flow.ask.roles.${entry.role || 'admin'}`), date: formatDate(entry.until ?? entry.at, p.locale) });
+    case 'answered': {
+      const said = p.t(entry.approved ? 'flow.history.log.answeredYes' : 'flow.history.log.answeredNo', { who: entry.by ?? '' });
+      return entry.note ? `${said}: «${entry.note}»` : said;
+    }
+    case 'expired':
+      return p.t('flow.history.log.expired');
     case 'skipped':
       return p.t('flow.history.log.skipped', {
         clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),

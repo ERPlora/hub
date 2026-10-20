@@ -303,5 +303,19 @@ describe('FlowEditor: review 2026-10-15', () => {
     await settle();
     expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is calling another system: see it in History.');
   });
-});
 
+  it('«Ask someone first» has its own button (FLOW-F28)', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    expect(s.find('flow-editor-add-ask').text()).toBe('Ask someone first');
+    await click(s.find('flow-editor-add-ask').element);
+    expect(s.wrapper.findAllComponents(StepNode)[0].props('step')).toMatchObject({ kind: 'ask', role: '', hours: 72 });
+  });
+
+  it('a run left waiting for an answer says so (FLOW-F28)', async () => {
+    const s = await setup({ flow: { ...FLOW, enabled: true }, initial: fromFlow({ ...FLOW, enabled: true }) }, { '/api/flow/flows/run': [200, { id: 'r1', status: 'asking' }] });
+    mocks.confirm.mockResolvedValue(true);
+    await click(s.find('flow-editor-run').element);
+    await settle();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is waiting for an answer in «Waiting for your answer».');
+  });
+});

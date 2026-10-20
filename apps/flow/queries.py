@@ -879,7 +879,7 @@ def question_row(question: Question) -> dict[str, Any]:
     input=QuestionListIn,
     output=QuestionPageOut,
     ai={
-        "description": "«Waiting for you»: the questions automations asked and are waiting on that this person may "
+        "description": "«Waiting for your answer»: the questions automations asked and are waiting on that this person may "
         "answer (their role's, or all of them for whoever runs the business), the soonest to expire first, "
         "up to 100."
     },

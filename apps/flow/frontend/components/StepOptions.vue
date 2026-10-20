@@ -24,7 +24,7 @@ const emit = defineEmits<{ 'update:step': [step: Step] }>();
 
 const id = computed(() => props.step.id);
 const canFail = computed(() => props.step.kind === 'command' || props.step.kind === 'query' || props.step.kind === 'http');
-const onError = computed(() => (props.step.kind === 'delay' ? false : props.step.on_error === 'continue'));
+const onError = computed(() => (props.step.kind === 'delay' || props.step.kind === 'ask' ? false : props.step.on_error === 'continue'));
 const open = ref(!!props.step.run_if || onError.value);
 
 function without<T extends object>(value: T, key: string): T {
@@ -42,7 +42,7 @@ function setCondition(runIf: Condition): void {
 }
 
 function setOnError(on: boolean): void {
-  if (props.step.kind === 'delay') return;
+  if (props.step.kind === 'delay' || props.step.kind === 'ask') return;
   emit('update:step', on ? { ...props.step, on_error: 'continue' } : without(props.step, 'on_error'));
 }
 </script>

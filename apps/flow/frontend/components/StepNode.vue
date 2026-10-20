@@ -5,8 +5,9 @@
 // information», each value composed of text and picked data. «Only continue if…» is a dashed chip
 // that narrows the line; «Wait» is a label on it. Each step has its handle (`ion-reorder`, the
 // finger's gesture) and its ×. «Call another system» is a card named by its host that opens to its form
-// (`HttpStepPanel`, FLOW-F27). An action, a read, a call and a wait carry «More options» (`StepOptions`,
-// FLOW-F25), and say them under their title when closed.
+// (`HttpStepPanel`, FLOW-F27); «Ask someone first», one named by its question (`AskStepPanel`, FLOW-F28).
+// Every step but a condition carries «More options» (`StepOptions`, FLOW-F25), and says them under its
+// title when closed.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonInput, IonReorder, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -16,6 +17,7 @@ import { usePhrasing } from '../composables/usePhrasing';
 import { type DataChoice, delayParts, type DelayUnit, secondsOf } from '../lib/document';
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
+import AskStepPanel from './AskStepPanel.vue';
 import ConditionRows from './ConditionRows.vue';
 import HttpStepPanel from './HttpStepPanel.vue';
 import StepOptions from './StepOptions.vue';
@@ -142,7 +144,7 @@ const summary = computed(() => {
     );
     parts.push(t('flow.steps.options.summaryRunIf', { clauses: clauses.join('; ') }));
   }
-  if (step.kind !== 'delay' && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
+  if ((step.kind === 'command' || step.kind === 'query' || step.kind === 'http') && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
   return parts.join(' · ');
 });
 </script>
@@ -333,6 +335,67 @@ const summary = computed(() => {
           :catalog="catalog"
           :errors="errors"
           :pick="pickCall ?? pick"
+          @update:step="emit('update:step', $event)"
+        />
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+      </div>
+    </div>
+
+    <!-- A question to someone (FLOW-F28): a card named by what it asks. -->
+    <div
+      v-else-if="step.kind === 'ask'"
+      class="flow-card"
+    >
+      <div class="flow-card__row">
+        <IonReorder
+          class="flow-handle"
+          :aria-label="$t('flow.steps.reorder')"
+        >
+          ⠿
+        </IonReorder>
+        <button
+          type="button"
+          class="flow-card__open"
+          :aria-expanded="open ? 'true' : 'false'"
+          :data-testid="`flow-step-open-${id}`"
+          @click="emit('toggle')"
+        >
+          <span class="flow-card__title"><HubIcon name="ion:help-circle-outline" /> {{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-icon-btn"
+          :aria-label="$t('flow.steps.remove')"
+          :data-testid="`flow-step-remove-${id}`"
+          @click="emit('remove')"
+        >
+          <HubIcon name="ion:close-outline" />
+        </button>
+      </div>
+      <div
+        v-if="open"
+        class="flow-card__panel"
+        :data-testid="`flow-step-panel-${id}`"
+      >
+        <AskStepPanel
+          :step="step"
+          :index="index"
+          :steps="steps"
+          :catalog="catalog"
+          :errors="errors"
+          :pick="pick"
           @update:step="emit('update:step', $event)"
         />
         <StepOptions

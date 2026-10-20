@@ -132,5 +132,19 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
     await settle();
     expect(refused.find('flow-test-step-s4').text()).toContain('you have not allowed it «Call api.example.com» yet');
   });
-});
 
+  // FLOW-F28: a question says who it would ask and what, never asking.
+  it('a question says who it would ask, for how long, and what', async () => {
+    const question = { id: 's5', kind: 'ask' as const, title: 'Refund {{input.total}}?', details: '', role: 'manager' as const, hours: 24, on_no: 'stop' as const, on_timeout: 'no' as const };
+    const step = { ...ANSWER.steps[2], id: 's5', kind: 'ask', outcome: 'would_ask' as const, operation: '', empty: [], errors: {}, params: { title: 'Refund 12500?', details: '', role: 'manager', hours: 24 } };
+    const m = await mountFlow(TestPanel, {
+      props: { document: { ...DOC, steps: [question] }, flowId: 'f1', catalog: CATALOG },
+      answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
+    });
+    await settle();
+    const text = m.find('flow-test-step-s5').text();
+    expect(text).toContain('Would ask the managers and wait up to 24 hours');
+    expect(text).toContain('Refund 12500?');
+    expect(text).not.toContain('Hours');
+  });
+});
