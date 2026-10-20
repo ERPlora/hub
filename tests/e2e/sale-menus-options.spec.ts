@@ -77,6 +77,27 @@ async function tillReady(page: Page): Promise<void> {
 
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
 
+/** The buttons on top of the check (park, table, customer, open checks, close), each with its box: none may sit on
+ *  another, or a tap meant for one lands on the other. */
+async function toolbarOverlaps(page: Page): Promise<string[]> {
+  const ids = ['pos-park', 'pos-table-trigger', 'customer-search-trigger', 'pos-open-checks', 'pos-cart-close'];
+  const boxes: { id: string; x: number; right: number }[] = [];
+  for (const id of ids) {
+    const button = shown(page).locator(`[data-testid=pos-cart] [data-testid=${id}]`);
+    if (!(await button.isVisible())) continue;
+    const box = await button.boundingBox();
+    if (box) boxes.push({ id, x: box.x, right: box.x + box.width });
+  }
+  const span = (box: { x: number; right: number }) => `[${Math.round(box.x)}–${Math.round(box.right)}]`;
+  const overlaps: string[] = [];
+  for (const [i, a] of boxes.entries()) {
+    for (const b of boxes.slice(i + 1)) {
+      if (a.x < b.right - 0.5 && b.x < a.right - 0.5) overlaps.push(`${a.id} ${span(a)} over ${b.id} ${span(b)}`);
+    }
+  }
+  return overlaps;
+}
+
 test.beforeAll(async ({ browser }) => {
   cleanRun();
   const context = await browser.newContext({ baseURL: A });
@@ -200,6 +221,9 @@ test('SALE-F20: «Current order» says what waits and sends it to the kitchen as
     const fab = page.locator('[data-testid=pos-cart-fab]');
     if (await fab.isVisible()) await fab.click();
     await expect(shown(page).locator('[data-testid=pos-kitchen-send]')).toBeVisible();
+    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    // The check's bar fits each width: «Assign customer» once sat on «Open checks» on a phone.
+    expect(await toolbarOverlaps(page), `the check's bar at ${page.viewportSize()?.width}px`).toEqual([]);
   });
   await send.click();
   await expect(page.locator('ion-toast').filter({ hasText: /Order \d+ sent to the kitchen\./ })).toBeVisible();
