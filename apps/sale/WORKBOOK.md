@@ -1428,8 +1428,12 @@ administrador y responsable, los mismos que anulan y devuelven).
   `customer_id`, `sale_id`, `total`, `currency`, `purchased_at`); el de anulada, lo de
   `inventory.stock.restore_sale` y `customer.purchase.void` (`sale_id`, `reason`). Hay tests que dan
   el aviso real a esas reacciones reales.
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com`. Lo
-  que guarda no pasa por las operaciones ni deja aviso.
+- **Administrador de Django**, solo en `hubs.erplora.com` (PLAN §17–§18). CRUD completo en lo abierto
+  (formas de pago, ajustes, departamentos, notas rápidas, cuentas abiertas y sus líneas). Lo cobrado es
+  documento fiscal (PLAN-HUB §3.2, ronda 2026-10-20): ventas, sus líneas y cobros, el contador del día,
+  devoluciones y sus líneas y cobros se ven enteros, sin «Añadir» ni «Eliminar»; solo cambian las notas de
+  la venta y de la devolución. Una venta se corrige con su anulación o sus devoluciones, como en caja
+  (`tests/test_admin.py`). Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en cobrar,
   anular, devolver y descuentos) y cada campo de `schemas.py` su `description`.
 
