@@ -12,7 +12,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { countTotal, pieces } from '../lib/count';
-import { formatMoney, moneyRefusal, readMoney } from '../lib/money';
+import { formatFace, formatMoney, moneyRefusal, readMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import type { CountType } from '../operations';
 import MoneyField from './MoneyField.vue';
@@ -50,7 +50,7 @@ const hasTable = computed(() => !!table.value && table.value.bills.length + tabl
 const decimals = computed(() => table.value?.decimals ?? 2);
 
 /** What each note or coin reads as: money of the business («50,00 €»). */
-const faceLabel = (face: string): string => formatMoney(Math.round(Number(face) * 10 ** decimals.value), locale.value, table.value?.currency);
+const faceLabel = (face: string): string => formatFace(face, locale.value, table.value?.currency);
 
 const typedRead = computed(() => readMoney(typedTotal.value, decimals.value));
 const typedError = computed(() => moneyRefusal(typedRead.value, t, locale.value, table.value?.currency));

@@ -7,7 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, psql, shot, shown } from './helpers';
-import { cleanUp, named, ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
+import { cleanUp, clearFilters, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -76,13 +76,12 @@ test('Categories and services: create, a duplicate refused, a professional assig
     await page.locator('[data-testid=service-services-archive-submit]').click();
     await expect(page.locator('ion-modal[data-testid=service-services-archive]')).toBeHidden();
     await expect(row).toHaveCount(0);
-    await view.locator('[data-testid=service-services-filter-status]').click();
-    await page.locator('ion-popover').getByText('Archived', { exact: true }).click();
+    await filterBy(page, 'service-services', 'status', 'Archived');
     await expect(row).toContainText('Archived');
     await rowAction(page, 'service-services', serviceId, 'restore');
     await expect(row).toHaveCount(0);
     expect(psql(`select is_active from service_service where id = '${serviceId}'`)).toBe('t');
-    await view.locator('[data-testid=service-services-filters-clear]').click();
+    await clearFilters(page, 'service-services');
     await expect(row).toContainText('Active');
     await page.screenshot({ path: shot('service-services-desktop') });
   } finally {

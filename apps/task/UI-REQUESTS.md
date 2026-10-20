@@ -8,8 +8,6 @@ parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 - `ion:checkbox-outline` — icono del módulo, de la entrada de menú y de la pestaña **Tareas**
   (`apps.py` `icon` y `navigation`, `frontend/tabs.ts`). Es el del producto actual. Hoy:
   `ion:checkmark-circle-outline`.
-- `ion:folder-outline` — entrada de menú y pestaña **Proyectos**. Es el del producto actual. Hoy:
-  `ion:file-tray-outline`.
 - `ion:open-outline` — acciones de fila **Detalle** (Tareas) y **Abrir** (Proyectos), las del producto
   actual. Hoy: `ion:chevron-forward-outline`.
 - `ion:play-circle-outline` — acción de fila **Iniciar**. Hoy: `ion:time-outline`.

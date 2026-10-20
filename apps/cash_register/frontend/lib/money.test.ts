@@ -3,7 +3,7 @@
 // or why it is not one (garbage, negative, or «1.250», which reads two ways).
 import { describe, expect, it } from 'vitest';
 
-import { formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, plain, readMoney } from './money';
+import { formatFace, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, plain, readMoney } from './money';
 
 describe('formatMoney', () => {
   it('writes cents as money of the business in the reader’s language; nothing is «—»', () => {
@@ -25,6 +25,19 @@ describe('formatMoney', () => {
     expect(moneyFieldText(125050, 'es')).toBe('1250,50');
     expect(moneyFieldText(125050, 'en')).toBe('1250.50');
     expect(moneyFieldText(700, 'es')).toBe('7,00');
+  });
+});
+
+describe('formatFace', () => {
+  // The old count printed «500 €», not «500,00 €» (Square and Lightspeed: «$100», «20 KWD»): a note or coin
+  // of whole units prints without decimals, a coin of cents with them; in the currency of the business.
+  it('a whole face value prints without decimals, a coin of cents with them', () => {
+    expect(plain(formatFace('500', 'es'))).toBe('500 €');
+    expect(plain(formatFace('2', 'en'))).toBe('€2');
+    expect(plain(formatFace('0.50', 'es'))).toBe('0,50 €');
+    expect(plain(formatFace('0.05', 'en'))).toBe('€0.05');
+    expect(plain(formatFace('10000', 'en', 'JPY'))).toBe('¥10,000');
+    expect(plain(formatFace('0.005', 'en', 'KWD'))).toBe('KWD 0.005');
   });
 });
 
