@@ -61,11 +61,13 @@ export function toggleNoteChip(note: string, chip: string): string {
   return (current.includes(text) ? current.filter((part) => part !== text) : [...current, text]).join(', ');
 }
 
-/** The pending line a second tap on `productId` raises: same professional, no note, discount or comp. */
+/** The pending line a second tap on `productId` raises: same professional, no note, discount, comp or options
+ *  (a line with options of Modifiers is a dish of its own, SALE-F11). */
 export function mergeableLine(lines: readonly OrderLineOut[], productId: string, staffId: string | null): OrderLineOut | undefined {
   return lines.find(
     (line) =>
       line.product_id === productId &&
+      !line.modifiers.length &&
       !line.fired_at &&
       !line.notes &&
       !line.is_gift &&

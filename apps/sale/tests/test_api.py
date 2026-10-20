@@ -34,6 +34,7 @@ ROUTES = {
     ("POST", "/sale/orders/add_line", "sale.order.add_line"),
     ("POST", "/sale/orders/add_open_line", "sale.order.add_open_line"),
     ("POST", "/sale/orders/add_service_line", "sale.order.add_service_line"),
+    ("POST", "/sale/orders/add_combo_line", "sale.order.add_combo_line"),
     ("POST", "/sale/orders/apply_voucher", "sale.order.apply_voucher"),
     ("POST", "/sale/orders/remove_voucher", "sale.order.remove_voucher"),
     ("POST", "/sale/orders/update_line", "sale.order.update_line"),

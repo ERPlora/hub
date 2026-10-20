@@ -119,6 +119,23 @@ def customer(db):
 
 
 @pytest.fixture
+def factory_data(transactional_db):
+    """A transactional test starts from a flushed database: tax's factory catalogue and the factory
+    payment methods are planted again, as their migrations do (idempotent)."""
+    from importlib import import_module
+
+    from django.apps import apps as registry
+
+    with connections["default"].schema_editor() as editor:
+        for module in (
+            "apps.tax.migrations.0002_factory_catalogue",
+            "apps.tax.migrations.0005_retail_alcohol",
+            "apps.sale.migrations.0002_factory_payment_methods",
+        ):
+            import_module(module).plant(registry, editor)
+
+
+@pytest.fixture
 def db_dsn(django_db_setup):
     """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
     params = connections["default"].settings_dict

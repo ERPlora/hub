@@ -8,9 +8,8 @@ Estado de la app: hecha (servidor y páginas); lo que depende de apps que aún n
 > (servidor y páginas). Parte del `WORKFLOW.md` del módulo Ventas / TPV del producto actual
 > (`modules-workspace/modules/sales`, `origin/main` `c6cf4af`, v2.16.169) y de sus ficheros
 > `workflow/*.md`. La app hace lo mismo y se ve igual; los números de flujo se conservan
-> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Lo que todavía depende de una app que no
-> existe en esta plataforma (Cocina, Suplementos, Menús, VeriFactu, Impresión) lo dice su flujo
-> en la línea `Estado:`.
+> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Lo que todavía depende de otra app (o de
+> la plataforma) y no está completo lo dice su flujo en la línea `Estado:`.
 
 ## Para qué sirve y para quién
 
@@ -98,7 +97,7 @@ Configuración inicial, paso a paso:
    documento por defecto, cabecera y pie del tique (SALE-F34).
 2. **Secciones**, si se cobra a precio libre (frutería, varios) (SALE-F35).
 3. **Notas rápidas**, si la cocina recibe instrucciones repetidas (SALE-F36).
-4. Haz una venta de prueba con cada medio y comprueba el tique (SALE-F01, SALE-F02, SALE-F29).
+4. Haz una venta de prueba con cada medio y comprueba el tique y su QR fiscal (SALE-F01, SALE-F02, SALE-F29).
 
 ## Pantallas
 
@@ -215,12 +214,12 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F04 | Elegir tique o factura y los datos del cliente | común | hecho |
 | SALE-F05 | Cobrar cuando el negocio exige cliente | común | hecho |
 | SALE-F06 | Recuperar un cobro que se quedó sin respuesta | común | hecho |
-| SALE-F07 | El TPV avisa de lo que hoy no se puede vender | común | parcial |
+| SALE-F07 | El TPV avisa de lo que hoy no se puede vender | común | hecho |
 | SALE-F08 | Cobrar sin la caja abierta | común | hecho |
 | SALE-F09 | Vender a precio libre por sección | común | hecho |
 | SALE-F10 | Vender por peso, tecleando la cantidad | común | hecho |
-| SALE-F11 | Elegir los suplementos de un artículo | común | no hecho: Suplementos |
-| SALE-F12 | Componer un menú | restaurante | no hecho: Menús |
+| SALE-F11 | Elegir los suplementos de un artículo | común | hecho |
+| SALE-F12 | Componer un menú | restaurante | hecho |
 | SALE-F13 | Poner una nota en una línea | común | hecho |
 | SALE-F14 | Aplicar un descuento a una línea o a la cuenta | común | parcial |
 | SALE-F15 | Invitar una línea | común | hecho |
@@ -228,7 +227,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F17 | Aparcar una cuenta y recuperarla | común | hecho |
 | SALE-F18 | Eliminar una cuenta abierta | común | hecho |
 | SALE-F19 | Abrir la cuenta de una mesa y dejarla en la mesa | restaurante | hecho |
-| SALE-F20 | Enviar la comanda a cocina y anular una línea enviada | restaurante | parcial |
+| SALE-F20 | Enviar la comanda a cocina y anular una línea enviada | restaurante | hecho |
 | SALE-F21 | Imprimir la cuenta para la mesa (precuenta) | restaurante | hecho |
 | SALE-F22 | Cobrar solo una parte de la cuenta | restaurante | hecho |
 | SALE-F23 | Dividir la cuenta de una mesa | restaurante | hecho |
@@ -245,10 +244,11 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F34 | Ajustar el TPV | común | hecho |
 | SALE-F35 | Dar de alta y ordenar las secciones del precio libre | común | hecho |
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
-| SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | parcial |
+| SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
+<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f11 wf:restaurante-dia#rec_restaurante-f17 wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal fi:modules/sales#command-sales-complete_sale-handler-wasm-complete_sale fi:modules/sales#event-emitidos-consumidos fi:modules/sales#navigation old:sales/workflow/vender-y-cobrar.md#sales-f01 qa:modules/sales/cash-payment-with-change qa:modules/sales/quick-counter-sale -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -286,6 +286,7 @@ otra cantidad u otro descuento del que guarda la cuenta.
 Implicados: INVENTORY-F21, CUSTOMER-F20, TAX-F18
 
 ### SALE-F02 Cobrar con tarjeta u otro medio sin cambio
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 fi:modules/sales#query-sales-payment_methods old:sales/workflow/vender-y-cobrar.md#sales-f02 qa:modules/sales/card-payment -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -306,6 +307,7 @@ disponible en este negocio.».
 Implicados: ninguno
 
 ### SALE-F03 Repartir el cobro entre varios medios de pago
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 fi:modules/sales#command-sales-complete_sale-handler-wasm-complete_sale old:sales/workflow/vender-y-cobrar.md#sales-f03 qa:modules/sales/mixed-payment -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -329,6 +331,7 @@ párrafo 2): en una cuenta de 1.000 € o más ningún cobro parcial puede lleva
 Implicados: ninguno
 
 ### SALE-F04 Elegir tique o factura y los datos del cliente
+<!-- origen: wf:restaurante-dia#rec_restaurante-f12 wf:peluqueria-dia#rec_peluqueria-f11 wf:cadena-fiscal#rec_fiscal-f03 qa:verticals/restaurant/07-payment-and-fiscal fi:modules/sales#command-sales-set_document_type-sql-transaccional old:sales/workflow/vender-y-cobrar.md#sales-f04 qa:modules/sales/sale-with-identified-customer -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -364,6 +367,7 @@ corrigen: nunca queda una factura «pendiente» que no se podría emitir.
 Implicados: CUSTOMER-F17, INVOICE-F02
 
 ### SALE-F05 Cobrar cuando el negocio exige cliente
+<!-- origen: qa:modules/sales/sale-with-identified-customer old:sales/workflow/vender-y-cobrar.md#sales-f05 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -381,6 +385,7 @@ venta.».
 Implicados: CUSTOMER-F17, CUSTOMER-F18
 
 ### SALE-F06 Recuperar un cobro que se quedó sin respuesta
+<!-- origen: old:sales/workflow/vender-y-cobrar.md#sales-f06 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -405,7 +410,8 @@ Si falla: ver los pasos 3 y 4; nunca dice «no se ha cobrado» sin saberlo.
 Implicados: ninguno
 
 ### SALE-F07 El TPV avisa de lo que hoy no se puede vender
-Estado: parcial — el aviso de que el negocio ya factura con VeriFactu y sus tiques no llegarían a Hacienda llega con VeriFactu
+<!-- origen: old-hub:HUB_SHELL-F28 old:sales/workflow/vender-y-cobrar.md#sales-f07 wf:cadena-fiscal#rec_fiscal-f01 -->
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
@@ -415,15 +421,18 @@ Pasos:
    lleva a Inventario.
 2. Esos artículos salen en la rejilla marcados «Falta el IVA» y no entran en la cuenta.
 3. Si Inventario no está activo, la rejilla lo explica y se vende a precio libre.
-Entra: el catálogo de venta de Inventario.
+4. Con VeriFactu activa, si ahora mismo no deja emitir tiques ni facturas (el negocio ya factura en
+   producción y sus registros no tendrían cómo llegar a Hacienda), sale arriba de la rejilla «Ahora no se
+   pueden cobrar ventas.» con el motivo que da VeriFactu y, a quien puede configurarla, «Revisar VeriFactu».
+   El aviso se va solo en cuanto se arregla.
+Entra: el catálogo de venta de Inventario y la configuración de VeriFactu.
 Sale: nada.
 Si falla: si el catálogo no carga, «No se ha podido cargar el catálogo.» con «Reintentar»; el precio
-libre sigue disponible.
-Implicados: INVENTORY-F04
-Pendiente: el aviso de que el negocio ya factura con VeriFactu y sus tiques no llegarían a Hacienda
-llega con VeriFactu.
+libre sigue disponible. Si VeriFactu no se puede leer, no hay aviso: el propio cobro dice por qué no sale.
+Implicados: INVENTORY-F04, VERIFACTU-F08
 
 ### SALE-F08 Cobrar sin la caja abierta
+<!-- origen: old:sales/workflow/vender-y-cobrar.md#sales-f08 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -445,6 +454,7 @@ el bloqueo cede antes que parar las ventas, y Caja enseña ese cobro entre los d
 Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Vender a precio libre por sección
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f09 -->
 Estado: hecho
 Vertical: común
 Actor: responsable (empleado con el permiso de precio libre)
@@ -464,6 +474,7 @@ un responsable» y el servidor rechaza la línea por cualquier vía (también al
 Implicados: TAX-F18
 
 ### SALE-F10 Vender por peso, tecleando la cantidad
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f10 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -480,36 +491,79 @@ con el escalón del producto» y la línea queda como estaba. No hay lector de b
 Implicados: INVENTORY-F26
 
 ### SALE-F11 Elegir los suplementos de un artículo
-Estado: no hecho — los suplementos son de la app Suplementos, que todavía no existe en esta
-plataforma; hasta entonces un artículo entra sin suplementos
+<!-- origen: wf:restaurante-dia#rec_restaurante-f06 old:sales/workflow/la-cuenta.md#sales-f11 -->
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. Toca un artículo que tiene grupos de suplementos: se abre una hoja con su nombre; en cada grupo,
-   su regla («Elige 1», «Hasta 3», «Opcional») y sus opciones con su precio extra.
-2. Pulsa «Añadir»: la línea entra con sus suplementos y su precio congelado al pedir.
-Entra: los grupos y opciones de Suplementos.
-Sale: la línea con los suplementos elegidos; un suplemento con otro tipo de IVA sale al cobrar como
-línea propia.
-Si falla: lo dirá Suplementos.
-Implicados: MODIFIERS-F06
+1. Con Suplementos activa, toca un artículo que tiene grupos de suplementos (suyos o de su categoría): se
+   abre una hoja con su nombre. Sin grupos, el artículo entra directo, como siempre.
+2. Cada grupo dice su regla: «Elige N» si es obligatorio, «Hasta N» si tiene techo, «Opcional» si no; cada
+   opción lleva su suplemento con su signo («+1,00 €», «−2,00 €»; nada si es gratis) y las de fábrica ya
+   salen marcadas.
+3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en uno con
+   techo, al llegar a él el siguiente toque dice «Extras está completo: quita una para elegir otra»; una
+   opción que se puede repetir lleva su contador («× 2») y su «−».
+4. Pulsa «Añadir · <precio>»: la línea entra con sus suplementos debajo del nombre y su precio ya sumado.
+   Mientras un grupo obligatorio no esté completo, el botón dice «Elige una opción para continuar» y
+   tocarlo señala ese grupo.
+5. Cobra como siempre (SALE-F01): la línea cobra lo que valía al pedirla aunque el suplemento cambie o se
+   borre después. Un suplemento con otro tipo de IVA (el refresco del menú infantil, al 21 % junto a la
+   hamburguesa al 10 %) sale en el tique como línea propia debajo del plato («+ Refresco»), por cada plato.
+Entra: los grupos y opciones de Suplementos, que comprueba y valora lo elegido al añadir la línea.
+Sale: la línea con sus suplementos congelados (avisa: cuenta cambiada); la comanda de cocina los lleva bajo el
+plato («+QUESO, -CEBOLLA», avisa: comanda enviada); al cobrar, el tique los nombra bajo el plato y cada
+suplemento de otro IVA es una línea propia con su base y su cuota; el stock lo baja solo el plato.
+Si falla: los motivos de Suplementos dentro de la hoja («Elige al menos 1 en «Punto».», «Esta opción no se
+ofrece con este producto.»…), también por el asistente o la API, que no pasan por la hoja: un grupo
+obligatorio sin elegir se rechaza igual. Si no se pueden leer los grupos, «No se han podido leer los
+suplementos de este producto. Inténtalo de nuevo.» y no entra nada. Sin Suplementos activa, un artículo con
+suplementos pedido por la API se rechaza («Suplementos no está activa en este negocio…») y uno sin ellos
+entra como siempre.
+Implicados: MODIFIER-F06, MODIFIER-F07, MODIFIER-F08
 
 ### SALE-F12 Componer un menú
-Estado: no hecho — los menús son de la app Menús, que todavía no existe en esta plataforma
+<!-- origen: wf:restaurante-dia#rec_restaurante-f06 old:sales/workflow/la-cuenta.md#sales-f12 -->
+Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En «Todos», los menús salen primero con la etiqueta «Menú». Toca uno y elige los platos de cada
-   grupo.
-2. Pulsa «Añadir · <total>»; al cobrar el menú se reparte en tantas líneas como tipos de IVA tenga.
-Entra: los menús de Menús.
-Sale: una línea de menú; el aviso de venta lleva sus componentes para que Inventario baje cada plato.
-Si falla: lo dirá Menús.
-Implicados: COMBOS-F09, INVENTORY-F22
+1. Con Menús y combos activa, en «Todos» los menús a la venta salen primero, cada uno con la etiqueta «Menú» y
+   su precio cerrado. Toca uno: se abre una hoja con su nombre y todos sus platos a la vez.
+2. Cada plato dice su regla («Elige 1», «Hasta 2», «Opcional») y sus elecciones, con el suplemento con su signo
+   si no es cero («+2,00 €»). Al abrir no hay nada elegido.
+3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
+   siguiente toque dice «Café está completo: quita una para elegir otra»; una elección que se puede repetir
+   lleva su contador y su «−».
+4. Mientras falte algo, el botón dice qué («Elige 1 en «Segundos»») y tocarlo señala ese plato; cuando cada
+   plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los suplementos.
+   Púlsalo: el menú entra en la cuenta como una línea, con sus platos debajo del nombre. Cada menú es una
+   línea propia; su cantidad se cambia por unidades enteras.
+5. Cobra como siempre (SALE-F01): el menú cobra el importe que tenía al pedirlo aunque después suba de precio,
+   se agote un plato o el menú se retire (también con Menús y combos apagada: cobra lo que congeló). «En el
+   local» sale en una línea al IVA del menú; «para llevar» con platos de distinto
+   IVA sale en una línea por plato, con el importe repartido según el precio de catálogo de cada uno (6,00 €
+   de bocadillo y caña: 4,15 € al 10 % y 1,85 € al 21 %), y sin línea del menú con dinero.
+Entra: los menús de Menús y combos; Menús comprueba los platos elegidos y pone el precio al añadir la línea y
+otra vez al cobrar, con el importe pedido.
+Sale: la línea del menú con sus platos y su importe congelados (avisa: cuenta cambiada); la comanda de cocina la
+lleva con su nombre de cocina y cada plato con su cantidad (avisa: comanda enviada); al cobrar, el tique pone el
+nombre del menú y debajo cada plato en su propia línea, o, partido, el nombre como cabecera y cada plato con su
+importe y su IVA; el aviso de venta lleva cada plato por el número de menús, para que Inventario baje el stock
+de cada plato y nunca el del menú (avisa: venta cobrada); una devolución devuelve cada plato por los menús
+devueltos (avisa: venta devuelta).
+Si falla: los motivos de Menús dentro de la hoja («Al menú le falta elegir en «Segundos»: elige 1.», ««Flan»
+está agotado.»…), también por el asistente o la API, que no pasan por la hoja: un menú a medias no entra en la
+cuenta, así que nunca llega a cocina sin sus platos. Una cantidad con decimales: «La cantidad no encaja con el
+escalón del producto (1 ud).». Si no se pueden leer los menús, encima de la rejilla «No se han podido leer los menús. Inténtalo de
+nuevo.» con «Reintentar», y los productos se venden igual. Sin Menús y combos activa, el TPV no ofrece menús y
+uno pedido por la API se rechaza («Menús y combos no está activa en este negocio…»).
+Implicados: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22
 
 ### SALE-F13 Poner una nota en una línea
+<!-- origen: wf:restaurante-dia#rec_restaurante-f06 old:sales/workflow/la-cuenta.md#sales-f13 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -528,6 +582,7 @@ como estaba.». Una línea ya enviada a cocina no tiene botón de nota.
 Implicados: ninguno
 
 ### SALE-F14 Aplicar un descuento a una línea o a la cuenta
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f14 qa:modules/sales/apply-discount -->
 Estado: parcial — sin el PIN del encargado en el dispositivo del empleado (elevación de la plataforma): el descuento por encima del máximo lo aplica un responsable desde su sesión
 Vertical: común
 Actor: empleado, responsable
@@ -553,6 +608,7 @@ Pendiente: el PIN del encargado sobre el dispositivo del empleado llega con la e
 plataforma; mientras, el empleado le pasa el dispositivo o el responsable lo aplica desde el suyo.
 
 ### SALE-F15 Invitar una línea
+<!-- origen: old:sales/workflow/la-cuenta.md#sales-f15 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -568,6 +624,7 @@ línea ya enviada a cocina no se puede invitar.
 Implicados: INVENTORY-F21
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
+<!-- origen: fi:modules/sales#query-sales-by_staff old:sales/workflow/la-cuenta.md#sales-f16 wf:peluqueria-dia#rec_peluqueria-f15 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -588,6 +645,7 @@ cocina no se reasigna.
 Implicados: STAFF-F21
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
+<!-- origen: fi:modules/sales#command-sales-cart-save-sql-transaccional fi:modules/sales#command-sales-park_ticket-sql-transaccional fi:modules/sales#command-sales-retrieve_ticket-sql-transaccional fi:modules/sales#query-sales-cart-get fi:modules/sales#query-sales-parked_tickets old:sales/workflow/la-cuenta.md#sales-f17 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable
@@ -609,6 +667,7 @@ apagado no hay botón de aparcar en ningún sitio.
 Implicados: CUSTOMER-F19
 
 ### SALE-F18 Eliminar una cuenta abierta
+<!-- origen: wf:restaurante-dia#rec_restaurante-f14 fi:modules/sales#command-sales-cart-clear-sql-transaccional old:sales/workflow/la-cuenta.md#sales-f18 qa:modules/sales/void-sale -->
 Estado: hecho
 Vertical: común
 Actor: responsable; una cuenta vacía, también el empleado
@@ -630,6 +689,7 @@ permiso de anular (403).
 Implicados: TABLE-F20, TABLE-F21
 
 ### SALE-F19 Abrir la cuenta de una mesa y dejarla en la mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old:sales/workflow/sala-y-cocina.md#sales-f19 -->
 Estado: hecho — sin preguntar los comensales en el TPV (ver «Lo que queda fuera»)
 Vertical: restaurante
 Actor: empleado, responsable
@@ -658,32 +718,42 @@ sentar, no hay botón ni se pregunta nada a Mesas.
 Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24
 
 ### SALE-F20 Enviar la comanda a cocina y anular una línea enviada
-Estado: parcial — servidor hecho (envío por rondas y anulación de una línea enviada, también en la pantalla); la pestaña «Comanda actual» con el botón de envío la pone Cocina, que todavía no existe
+<!-- origen: wf:restaurante-dia#rec_restaurante-f07 wf:restaurante-dia#rec_restaurante-f17 wf:restaurante-dia#rec_restaurante-f08 qa:modules/sales/take-order-by-courses wf:restaurante-dia#rec_restaurante-f14 qa:modules/sales/modify-order-after-sending old:sales/workflow/sala-y-cocina.md#sales-f20 -->
+Estado: hecho
 Vertical: restaurante
 Actor: empleado (enviar), responsable (anular)
 Pantalla: Vender
 Pasos:
-1. Enviar a cocina marca las líneas pendientes de la cuenta con una ronda nueva («Comanda N») y la
-   hora de envío; un doble envío no manda nada dos veces.
-2. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
-3. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
+1. Con Cocina activa, la cuenta tiene dos pestañas: «Cuenta», con todas sus líneas, y «Comanda actual»,
+   con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
+   enviar»). Sin nada pendiente, «Todo está enviado».
+2. En «Comanda actual», revisa cantidades y quién atiende y pulsa «Enviar comanda (N)». Para que salga
+   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale «Comanda N enviada a
+   cocina.»; las líneas quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma.
+   Un doble envío no manda nada dos veces.
+3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
+   un plato que no se va a preparar. Si el envío falla, no se abre el cobro y se dice por qué.
+4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
+5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
    «Agotado», «Pedido dos veces») y «O escribe el motivo…». «Anular artículo» no se puede pulsar sin
    motivo.
-4. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
+6. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
 Entra: las líneas pendientes de la cuenta.
-Sale: las líneas con su ronda (avisa: comanda enviada, con las líneas, sus notas y quién atiende); al
-anular una línea enviada, avisa de la línea anulada con su motivo.
-Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.». Pedir que se quite una línea
-ya enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un
-motivo), ya está cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada,
-ya anulada o sin motivo se rechaza con «Esa línea no se puede anular…».
-Implicados: KITCHEN-F29
-Pendiente: la pestaña «Comanda actual» con el botón de envío la pone Cocina; hasta que exista, el envío
-se hace por el asistente o la API.
+Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
+enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
+línea enviada, avisa de la línea anulada con su motivo.
+Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
+podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Pedir que se quite una línea ya
+enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está
+cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
+se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
+cobra como siempre.
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F29
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
+<!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->
 Estado: hecho — imprime con el diálogo de impresión del dispositivo hasta que exista Impresión
 Vertical: restaurante
 Actor: empleado, responsable
@@ -701,6 +771,7 @@ Pendiente: la impresora de tiques en red llega con Impresión; hasta entonces se
 diálogo de impresión del dispositivo.
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 old:sales/workflow/sala-y-cocina.md#sales-f22 qa:modules/sales/split-bill -->
 Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
@@ -723,6 +794,7 @@ hoja y avisa; no queda una cuenta fantasma.
 Implicados: ninguno
 
 ### SALE-F23 Dividir la cuenta de una mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/split-bill old:sales/workflow/sala-y-cocina.md#sales-f23 qa:modules/sales/transfer-lines-between-tables -->
 Estado: hecho — el botón «Dividir cuenta» es del control de mesa de Mesas (TABLE-F17)
 Vertical: restaurante
 Actor: empleado, responsable
@@ -738,6 +810,7 @@ Si falla: si otro dispositivo está cobrando esa cuenta, la división espera y, 
 Implicados: TABLE-F17
 
 ### SALE-F24 Juntar las cuentas de dos mesas
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 old:sales/workflow/sala-y-cocina.md#sales-f24 -->
 Estado: hecho — el botón «Fusionar» es del control de mesa de Mesas (TABLE-F16)
 Vertical: restaurante
 Actor: empleado, responsable
@@ -753,6 +826,7 @@ Si falla: si una de las dos ya no está abierta, se rechaza sin mover nada.
 Implicados: TABLE-F16, KITCHEN-F28
 
 ### SALE-F25 Pasar la cuenta a otra mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/transfer-lines-between-tables old:sales/workflow/sala-y-cocina.md#sales-f25 -->
 Estado: hecho en Mesas (TABLE-F15): la cuenta no cambia
 Vertical: restaurante
 Actor: empleado, responsable
@@ -766,6 +840,7 @@ Si falla: lo dirá Mesas.
 Implicados: TABLE-F15
 
 ### SALE-F26 Cobrar una cita desde la agenda
+<!-- origen: qa:modules/appointments/convert-appointment-to-sale qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 old:sales/workflow/peluqueria.md#sales-f26 -->
 Estado: hecho — el botón «Cobrar» de la agenda es de Citas (APPOINTMENT-F17)
 Vertical: peluquería
 Actor: empleado, responsable
@@ -786,6 +861,7 @@ dice («Esa cuenta ya no está abierta…») y sigue como estaba.
 Implicados: APPOINTMENTS-F17
 
 ### SALE-F27 Pagar una línea con un bono
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:sales/workflow/peluqueria.md#sales-f27 qa:modules/sales/voucher-or-session-package -->
 Estado: hecho
 Vertical: peluquería
 Actor: empleado, responsable
@@ -823,7 +899,7 @@ negocio…»); hoy la plataforma no apaga apps por hub y ese camino solo se prue
 Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
-<!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 -->
+<!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 fi:modules/sales#widget-sales-last_7_days fi:modules/sales#widget-sales-recent_activity fi:modules/sales#widget-sales-tickets_today fi:modules/sales#widget-sales-today -->
 Estado: hecho
 Vertical: común
 Actor: empleado (historial), responsable (cifras)
@@ -836,7 +912,10 @@ Pasos:
    declararon las ventas del periodo: «IVA», «IGIC» si todas se cobraron con IGIC (Canarias) o «IPSI»
    (Ceuta y Melilla). Si en el periodo hay ventas de dos impuestos (porque el negocio cambió de
    territorio a mitad, por ejemplo), se llama «Impuestos». Sin ventas en el periodo, lleva el impuesto del
-   territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio.
+   territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
+   debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
+   Lo que el Inicio del producto actual enseñaba en paneles está aquí: lo de hoy y sus tickets son las
+   cifras de «Hoy», la actividad reciente es la tabla, y los últimos 7 días, esa fila.
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
    <importe>» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
    estado, pago, fecha o total, u ordena.
@@ -849,14 +928,16 @@ valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
 periodo.
-Si falla: «Error cargando métricas» (las cifras salen como «—»). Vacía: «Aún no hay ventas.». Quien
+Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
+«No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
 puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo.
 Implicados: STAFF-F21
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
-Estado: hecho — sin el QR de VeriFactu, que llega con su app
+<!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Documento de venta
@@ -867,12 +948,17 @@ Pasos:
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
    de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
-   cambio, y el pie. Si su documento fiscal no se pudo emitir al cobrar, el papel lo dice bajo el
-   número («Documento fiscal pendiente») y, encima del papel (fuera de lo que se imprime), el aviso
+   cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
+   «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
+   factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
+   no tiene registro de ese documento, el papel sale sin QR. Si su documento fiscal no se pudo emitir
+   al cobrar, el papel lo dice bajo el número («Documento fiscal pendiente») y, encima del papel (fuera
+   de lo que se imprime), el aviso
    «Documento fiscal pendiente — Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso).
    Cuando esté resuelto, emítelo ahora.» con «Emitir ahora».
 3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Toda impresión desde
-   **Ventas** sale con «DUPLICADO»; solo el primer papel justo tras cobrar es el original.
+   **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo tras cobrar es el
+   original.
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
    rectificativa de su anulación o la de una devolución) lleva la pastilla «Documento pendiente» bajo
    su estado y la acción «Emitir ahora» (quien cobra). «Emitir ahora» pide a Facturación, por nombre y
@@ -881,14 +967,15 @@ Pasos:
 Entra: la venta, con el número de su documento fiscal (que Facturación le dio en el mismo cobro).
 Sale: el papel; reimprimir no crea venta ni documento fiscal. «Emitir ahora» emite los documentos que
 esperaban (avisa: venta con su documento, uno por documento).
-Si falla: «Cargando documento…» y «Error cargando el documento». «No se pudo imprimir». «Emitir ahora»
+Si falla: «Cargando documento…» y «Error cargando el documento» (también si no se puede leer el QR
+fiscal: el papel nunca sale sin él). «No se pudo imprimir». «Emitir ahora»
 rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin palabras del
 servidor, «No se han podido emitir los documentos. Inténtalo de nuevo.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06
-Pendiente: el QR de VeriFactu llega con su app; el A4 de una factura con los datos del destinatario lo
-imprime Facturación (INVOICE-F18).
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, VERIFACTU-F19
+Pendiente: el A4 de una factura con los datos del destinatario lo imprime Facturación (INVOICE-F18).
 
 ### SALE-F30 Anular una venta cobrada
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 wf:cadena-fiscal#rec_fiscal-f13 qa:modules/sales/void-sale fi:modules/sales#command-sales-void-sql-transaccional old:sales/workflow/historial-y-correcciones.md#sales-f30 -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -912,6 +999,7 @@ dentro de la ventana, que sigue abierta. Sin permiso no aparece «Anular».
 Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 old:sales/workflow/historial-y-correcciones.md#sales-f31 qa:modules/sales/refund-sale -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -947,6 +1035,7 @@ Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUS
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
 
 ### SALE-F32 Devolver la sesión de un bono
+<!-- origen: old:sales/workflow/historial-y-correcciones.md#sales-f32 -->
 Estado: hecho
 Vertical: peluquería
 Actor: responsable
@@ -971,6 +1060,7 @@ tests.
 Implicados: SERVICE-F26, SERVICE-F27
 
 ### SALE-F33 Unir las ventas de dos fichas de cliente
+<!-- origen: old:sales/workflow/historial-y-correcciones.md#sales-f33 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -984,6 +1074,7 @@ Si falla: no hay pantalla; repetirlo no cambia nada.
 Implicados: CUSTOMER-F13
 
 ### SALE-F34 Ajustar el TPV
+<!-- origen: old-hub:HUB_SHELL-F76 fi:modules/sales#command-sales-settings-update-sql-transaccional fi:modules/sales#permission-role_permissions fi:modules/sales#query-sales-settings-get old:sales/workflow/configuracion.md#sales-f34 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador
@@ -1008,6 +1099,7 @@ aceptar todos los medios activos.
 Implicados: ninguno
 
 ### SALE-F35 Dar de alta y ordenar las secciones del precio libre
+<!-- origen: old:sales/workflow/configuracion.md#sales-f35 -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -1027,6 +1119,7 @@ borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a 
 Implicados: TAX-F01
 
 ### SALE-F36 Preparar las notas rápidas
+<!-- origen: old:sales/workflow/configuracion.md#sales-f36 -->
 Estado: hecho
 Vertical: común
 Actor: responsable
@@ -1044,10 +1137,11 @@ no está en este negocio. Recarga la lista y vuelve a intentarlo.».
 Implicados: ninguno
 
 ### SALE-F37 Añadir un medio de pago (Bizum, transferencia…)
-Estado: hecho — sin pantalla, como el producto actual (asistente o API)
+<!-- origen: fi:modules/sales#query-sales-payment_methods fi:modules/sales#command-sales-create_payment_method-sql-transaccional old:sales/workflow/configuracion.md#sales-f37 -->
+Estado: hecho
 Vertical: común
 Actor: responsable, asistente
-Pantalla: ninguna (asistente o API)
+Pantalla: ninguna (asistente o API), como el producto actual
 Pasos:
 1. Pide al asistente que añada el medio y di de qué tipo es («añade Bizum como forma de pago, de tipo
    otro»): sin tipo se crea como efectivo.
@@ -1059,6 +1153,7 @@ Si falla: un nombre repetido se rechaza: «Ya hay una forma de pago con ese nomb
 Implicados: ninguno
 
 ### SALE-F38 Vender un servicio de Servicios
+<!-- origen: gh:sales#89 gh:sales#146 -->
 Estado: hecho
 Vertical: peluquería
 Actor: empleado, responsable
@@ -1548,6 +1643,8 @@ administrador y responsable, los mismos que anulan y devuelven).
 - No mueve stock ni cuadra la caja: Inventario al oír la venta; Caja lee las ventas de cada turno.
 - No habla con el datáfono ni con la báscula.
 - No tiene propinas, ni comensal por línea, ni cursos con retención.
+- No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV deja de ofrecer lo
+  que el catálogo no tiene a la venta.
 - No reabre una venta cobrada ni cambia su tipo de documento.
 - No reprecia una cuenta abierta: si el catálogo cambia, la cuenta conserva el precio con que se
   pidió.
@@ -1555,6 +1652,9 @@ administrador y responsable, los mismos que anulan y devuelven).
 
 ### Lo que queda fuera
 
+- **Marcar una cuenta «para llevar» en el TPV** (F12): la cuenta no tiene canal; un menú se cobra según
+  su propio ajuste en Menús y combos («en el local» o «para llevar», COMBO-F09). Un menú «en el local»
+  que el cliente se lleva no se parte por plato.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
   devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
   actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea

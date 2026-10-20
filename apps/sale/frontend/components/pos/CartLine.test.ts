@@ -18,6 +18,43 @@ async function setup(over: Parameters<typeof line>[0] = {}, props: Record<string
 }
 
 describe('CartLine: what it shows', () => {
+  it('names the dishes of a menu under it, in course order, with how many of each (SALE-F12)', async () => {
+    const dish = (product_name: string, quantity = 1) => ({
+      option_id: product_name,
+      group_name: 'Primeros',
+      product_id: `p-${product_name}`,
+      product_name,
+      category_id: null,
+      is_service: false,
+      quantity,
+      price_delta: 0,
+      tax_category_key: null,
+      amount: null,
+    });
+    const combo = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [dish('Lentejas'), dish('Café', 2)] };
+    const m = await setup({ name: 'Menú del día', product_id: null, combo }, {}, 'es');
+    expect(m.find('pos-line-l1-dishes').text()).toBe('Lentejas, 2× Café');
+    const plainLine = await setup({}, {}, 'es');
+    expect(plainLine.find('pos-line-l1-dishes').exists()).toBe(false);
+  });
+
+  it('names its options of Modifiers under it, in the order chosen (SALE-F11)', async () => {
+    const pick = (name: string, own_line = false) => ({
+      option_id: name,
+      group_id: 'g1',
+      group_name: 'Extras',
+      name,
+      kitchen_name: name,
+      price_delta: 100,
+      tax_category_key: null,
+      own_line,
+    });
+    const m = await setup({ modifiers: [pick('Queso'), pick('Refresco', true)] }, {}, 'es');
+    expect(m.find('pos-line-l1-options').text()).toBe('Queso, Refresco');
+    const plainLine = await setup({}, {}, 'es');
+    expect(plainLine.find('pos-line-l1-options').exists()).toBe(false);
+  });
+
   it('the name, the price per unit and the server’s amount for the line', async () => {
     const m = await setup({ quantity: '2.000', line_total: 300 }, {}, 'es');
     const row = m.find('pos-line-l1');

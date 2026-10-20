@@ -40,6 +40,9 @@ const label = computed(() =>
 <style scoped>
 .pos-table-trigger {
   width: 2.6rem;
+  /* Ionic's icon-only button grows to 2.125em of its icon (60px here), past this width: on a phone the bar
+     overflowed and «Assign customer» sat on «Open checks». */
+  min-width: 2.6rem;
   height: 2.6rem;
   margin: 0;
   font-size: var(--pos-hdr-icon-size, 1.75rem);

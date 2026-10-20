@@ -2,8 +2,8 @@
 // settings (first line = the name, else «My business»; the rest = the address), «DUPLICATE» on every
 // reprint, the number and the date and time, the customer, the lines («qty × unit price», a gift
 // «(On the house)», the note), «Subtotal», the VAT rows by rate from the sale's breakdown, «TOTAL», the
-// payment rows and «Change», the discount already applied and the footer. No fiscal QR: the invoice
-// number and the VeriFactu QR arrive with Invoicing and VeriFactu.
+// payment rows and «Change», the discount already applied and the footer. With VeriFactu's record of its
+// fiscal document, the fiscal QR: «Tax QR:» over it, «VERI*FACTU» under it and how to check it, or the AEAT's CSV.
 import { formatDateTime } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
@@ -114,6 +114,57 @@ describe('ReceiptPaper', () => {
     expect(s.all('sale-receipt-line')).toEqual(['Corte 1 × 25,00 € Ya pagado · Bono 5 cortes 0,00 €']);
   });
 
+  it('prints a menu with each of its dishes on a line of its own under it (SALE-F12, hub#1165)', async () => {
+    const sale = saleOut();
+    const dish = (product_name: string, quantity = 1) => ({ product_id: product_name, product_name, quantity });
+    const menu = {
+      ...sale.lines[0],
+      id: 'm1',
+      product_id: null,
+      name: 'Menú del día',
+      quantity: '2.000',
+      unit_price: 1350,
+      notes: '',
+      line_total: 2700,
+      combo_id: 'c1',
+      combo_name: 'Menú del día',
+      components: [dish('Lentejas'), dish('Café', 2)],
+    };
+    const s = await paper({ sale: { ...sale, lines: [menu] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-line')).toEqual(['Menú del día 2 × 13,50 € Lentejas 2× Café 27,00 €']);
+    expect(s.all('sale-receipt-dish')).toEqual(['Lentejas', '2× Café']);
+  });
+
+  it('a menu split per dish prints its name once as a head and each dish at its own VAT under it (SALE-F12)', async () => {
+    const sale = saleOut();
+    const part = (id: string, name: string, line_total: number) => ({
+      ...sale.lines[0],
+      id,
+      order_line_id: 'ol1',
+      product_id: `p-${name}`,
+      name,
+      quantity: '1.000',
+      unit_price: line_total,
+      notes: '',
+      line_total,
+      combo_id: 'c1',
+      combo_name: 'Bocadillo y caña',
+      components: [{ product_id: `p-${name}`, product_name: name, quantity: 1 }],
+    });
+    const s = await paper({ sale: { ...sale, lines: [part('d1', 'Bocadillo', 415), part('d2', 'Caña', 185)] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-menu-head')).toEqual(['Bocadillo y caña']);
+    expect(s.all('sale-receipt-line')).toEqual(['Bocadillo 1 × 4,15 € 4,15 €', 'Caña 1 × 1,85 € 1,85 €']);
+    expect(s.all('sale-receipt-dish')).toEqual([]);
+  });
+
+  it('prints the options of a dish under it and an option of another tax as its own line under the dish (SALE-F11)', async () => {
+    const sale = saleOut();
+    const burger = { ...sale.lines[0], id: 'b1', name: 'Hamburguesa', quantity: '2.000', unit_price: 900, notes: '', line_total: 1800, modifiers: ['Queso', 'Poco hecha'] };
+    const soda = { ...sale.lines[0], id: 'b2', name: 'Refresco', quantity: '2.000', unit_price: 200, notes: '', line_total: 400, parent_line_id: 'b1' };
+    const s = await paper({ sale: { ...sale, lines: [burger, soda] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-line')).toEqual(['Hamburguesa 2 × 9,00 € Queso, Poco hecha 18,00 €', '+ Refresco 2 × 2,00 € 4,00 €']);
+  });
+
   it('a sale without lines says so', async () => {
     const s = await paper({ sale: saleOut({ lines: [] }), settings: SETTINGS });
     expect(s.text('sale-receipt-no-lines')).toBe('— Sin líneas —');
@@ -173,9 +224,49 @@ describe('ReceiptPaper', () => {
     expect(original.find('sale-receipt-duplicate').exists()).toBe(false);
   });
 
-  it('carries no fiscal QR (VeriFactu arrives with its app) and no OutfitKit', () => {
+  it('carries no OutfitKit', () => {
     expect(source).not.toMatch(/<ok[-]/);
-    expect(source).not.toMatch(/VERI\*FACTU|QR tributario/);
+  });
+
+  describe('the fiscal QR (VERIFACTU-F19, sales#411)', () => {
+    const RECORD = {
+      qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+',
+      qr_url: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=TICKET-2026-000031',
+      csv: '',
+    };
+
+    it('with VeriFactu’s record: «QR tributario:» over it, «VERI*FACTU» under it and how to check the ticket, before the footer', async () => {
+      const s = await paper({ sale: saleOut({ discount_amount: 0 }), settings: SETTINGS, record: RECORD });
+      const qr = s.find('sale-receipt-qr');
+      expect(words(qr.element)).toBe('QR tributario: VERI*FACTU Escanéalo para cotejar este tique en la AEAT');
+      const image = qr.find('img');
+      expect(image.attributes('src')).toBe(RECORD.qr_svg);
+      expect(image.attributes('alt')).toBe('Código QR de VeriFactu');
+      const footer = s.find('sale-receipt-footer').element;
+      expect(qr.element.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const totals = s.all('sale-receipt-total-row');
+      expect(totals.length).toBeGreaterThan(0);
+    });
+
+    it('an invoice says so, and once the AEAT answered its CSV takes the place of the hint', async () => {
+      const invoice = await paper({ sale: saleOut({ document_type: 'invoice', invoice_number: 'FACT-2026-000012' }), record: RECORD });
+      expect(invoice.text('sale-receipt-qr-hint')).toBe('Escanéalo para cotejar esta factura en la AEAT');
+      const accepted = await paper({ sale: saleOut(), record: { ...RECORD, csv: 'A-YDSW8NLFLANWPM' } });
+      expect(accepted.text('sale-receipt-qr-hint')).toBe('CSV: A-YDSW8NLFLANWPM');
+    });
+
+    it('no record, no QR', async () => {
+      const s = await paper({ sale: saleOut(), settings: SETTINGS });
+      expect(s.find('sale-receipt-qr').exists()).toBe(false);
+      const none = await paper({ sale: saleOut(), settings: SETTINGS, record: null });
+      expect(none.find('sale-receipt-qr').exists()).toBe(false);
+    });
+
+    it('speaks English', async () => {
+      const s = await paper({ sale: saleOut(), record: RECORD }, 'en');
+      expect(words(s.find('sale-receipt-qr').element)).toBe('Tax QR: VERI*FACTU Scan it to check this receipt at the AEAT');
+      expect(s.find('sale-receipt-qr').find('img').attributes('alt')).toBe('VeriFactu QR code');
+    });
   });
 
   it('speaks English', async () => {

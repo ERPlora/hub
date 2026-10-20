@@ -142,3 +142,40 @@ describe('PosCart', () => {
     expect(m.cart().emitted('park')).toHaveLength(1);
   });
 });
+
+describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () => {
+  const SENT = line({ id: 'l3', product_id: 'p3', round_no: 1, fired_at: '2026-10-20T12:00:00Z' });
+  const WITH_ROUND = order({ lines: [line({ id: 'l1' }), line({ id: 'l2', product_id: 'p2' }), SENT] });
+
+  it('without Kitchen there are no tabs: the check is all there is', async () => {
+    const m = await setup();
+    expect(m.find('pos-cart-tabs').exists()).toBe(false);
+  });
+
+  it('says how many items wait to be sent, also to a screen reader', async () => {
+    const m = await setup({ kitchen: true, order: WITH_ROUND }, 'es');
+    const tab = m.find('pos-cart-tab-round');
+    expect(tab.attributes('aria-label')).toBe('Comanda actual, 2 artículos por enviar');
+    expect(m.find('pos-cart-tab-round-badge').text()).toBe('2');
+    expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
+    expect(m.wrapper.findComponent(CartLines).props('lines')).toHaveLength(3);
+  });
+
+  it('«Current order» shows only what is pending, with the send bar; a send goes up with its rush', async () => {
+    const m = await setup({ kitchen: true, order: WITH_ROUND }, 'es');
+    await click(m.find('pos-cart-tab-round').element);
+    expect(m.find('pos-cart-tab-round').attributes('aria-selected')).toBe('true');
+    expect(m.wrapper.findComponent(CartLines).props('lines').map((l: { id: string }) => l.id)).toEqual(['l1', 'l2']);
+    expect(m.find('pos-cart-round-hint').text()).toContain('Revisa cantidades');
+    await click(m.find('pos-kitchen-send').element);
+    expect(m.cart().emitted('send')).toEqual([[false]]);
+  });
+
+  it('with everything sent «Current order» says so and offers no send', async () => {
+    const m = await setup({ kitchen: true, order: order({ lines: [SENT] }) }, 'es');
+    expect(m.find('pos-cart-tab-round').attributes('aria-label')).toBe('Comanda actual');
+    await click(m.find('pos-cart-tab-round').element);
+    expect(m.find('pos-cart-round-empty').text()).toContain('Todo está enviado');
+    expect(m.find('pos-kitchen-send').exists()).toBe(false);
+  });
+});

@@ -8,12 +8,15 @@
 // till settings, only the open price is offered. With the services of Services (SALE-F38,
 // `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
 // hidden; «All» keeps the open price); a sellable service goes up (`service`), the search finds them too.
+// With the menus of Menus (SALE-F12, `showCombos`), «All» shows them first in the grid; a tap goes up (`combo`).
+// With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, toast } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import type { CategoryOut, ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useLiveWindows } from '../../composables/useLiveWindows';
@@ -21,6 +24,8 @@ import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
 import CatalogNotices from './CatalogNotices.vue';
 import CategoryStrip from './CategoryStrip.vue';
+import FiscalNotice from './FiscalNotice.vue';
+import ComboTiles from './ComboTiles.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ScreenMenu from './ScreenMenu.vue';
@@ -34,10 +39,19 @@ const props = withDefaults(
     canOpenPrice: boolean;
     /** «Show services in the till», with Services on and readable (SALE-F38). */
     showServices?: boolean;
+    /** Menus on and readable (SALE-F12). */
+    showCombos?: boolean;
+    /** VeriFactu on and readable (SALE-F07). */
+    fiscal?: boolean;
   }>(),
-  { showServices: false },
+  { showServices: false, showCombos: false, fiscal: false },
 );
-const emit = defineEmits<{ add: [product: ProductOut]; service: [service: ServiceSaleOut]; openPrice: [] }>();
+const emit = defineEmits<{
+  add: [product: ProductOut];
+  service: [service: ServiceSaleOut];
+  combo: [combo: SaleComboOut];
+  openPrice: [];
+}>();
 
 const t = useT();
 const taxName = useTaxName();
@@ -141,6 +155,7 @@ function pickService(service: ServiceSaleOut): void {
       @pick-service="pickService"
       @close="searching = false"
     />
+    <FiscalNotice v-if="fiscal" />
     <CatalogNotices :tap-notice="tapNotice" />
     <InlineFeedback
       v-if="failure && !servicesMode"
@@ -175,7 +190,14 @@ function pickService(service: ServiceSaleOut): void {
       @pick="pick"
       @open-price="emit('openPrice')"
       @load-more="products.loadMore()"
-    />
+    >
+      <template
+        v-if="showCombos && !productCategory"
+        #lead
+      >
+        <ComboTiles @pick="emit('combo', $event)" />
+      </template>
+    </ProductGrid>
     <slot />
   </section>
 </template>

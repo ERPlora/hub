@@ -15,6 +15,7 @@ from apps.sale.schemas import (
     DepartmentListIn,
     DepartmentRefIn,
     DepartmentUpdateIn,
+    OrderAddComboLineIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
     OrderAddServiceLineIn,
@@ -157,6 +158,11 @@ async def order_add_open_line(request, data: OrderAddOpenLineIn):
 @bind(router, "sale.order.add_service_line", "/sale/orders/add_service_line")
 async def order_add_service_line(request, data: OrderAddServiceLineIn):
     return await run_operation(request, services.add_service_line, data)
+
+
+@bind(router, "sale.order.add_combo_line", "/sale/orders/add_combo_line")
+async def order_add_combo_line(request, data: OrderAddComboLineIn):
+    return await run_operation(request, services.add_combo_line, data)
 
 
 @bind(router, "sale.order.apply_voucher", "/sale/orders/apply_voucher")

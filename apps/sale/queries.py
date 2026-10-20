@@ -51,6 +51,7 @@ from apps.sale.models import (
 from apps.sale.schemas import (
     BusinessDayOut,
     ByStaffOut,
+    ComboLineFields,
     DepartmentListIn,
     DepartmentPage,
     EmptyIn,
@@ -124,6 +125,12 @@ INVOICE_UNAVAILABLE = _(
     "Invoicing is not active in this business: the sale is a ticket without a fiscal document."
 )
 CASH_REGISTER_UNAVAILABLE = _("Cash register is not active in this business.")
+MODIFIER_UNAVAILABLE = _(
+    "Modifiers is not active in this business: this product cannot take options. Add it without them."
+)
+MENUS_UNAVAILABLE = _(
+    "Menus and combos is not active in this business: menus cannot be sold. Sell their dishes on their own."
+)
 APPOINTMENT_UNAVAILABLE = _("Appointments is not active in this business.")
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
@@ -608,7 +615,16 @@ UNAVAILABLE = {
     "sale.invoice_unavailable": INVOICE_UNAVAILABLE,
     "sale.cash_register_unavailable": CASH_REGISTER_UNAVAILABLE,
     "sale.appointment_unavailable": APPOINTMENT_UNAVAILABLE,
+    "sale.modifier_unavailable": MODIFIER_UNAVAILABLE,
+    "sale.combo_unavailable": MENUS_UNAVAILABLE,
 }
+
+#: Modifiers' check and valuation of the options chosen for a product (MODIFIER-F07), asked by name.
+MODIFIER_RESOLVE = "modifier.selection.resolve"
+#: Menus' check and pricing of a menu line (COMBO-F08, F09), asked by name.
+COMBO_RESOLVE = "combo.combo.resolve"
+#: A menu is sold in whole units.
+WHOLE = Decimal("1")
 
 
 def call_app(ctx: OperationContext, name: str, data: dict, unavailable_code: str):
@@ -815,16 +831,208 @@ def check_grid(quantity: Decimal, increment: Decimal, unit: str) -> None:
 
 
 def provisional_total(line: OrderLine) -> int:
-    """What the row paints: its frozen price by its quantity, with its own discount; a comp, 0; a line a
-    voucher pays, 0."""
+    """What the row paints: its frozen price by its quantity, with its own discount, plus its options of
+    another tax category (each charged on a child line); a comp, 0; a line a voucher pays, 0."""
     if line.voucher_session_id is not None:
         return 0
-    return pricing.line_amount(
-        line.unit_price,
-        ratio_of(line),
-        line_percent=line.discount_percent,
-        is_gift=line.is_gift,
+    return sum(
+        pricing.line_amount(
+            part.unit_price,
+            ratio_of(part),
+            line_percent=part.discount_percent,
+            is_gift=part.is_gift,
+        )
+        for part in charge_parts([line])
     )
+
+
+def charge_parts(lines: Iterable[OrderLine]) -> list[OrderLine]:
+    """What a charge values and records, in order: each line of the check and, right after it, a child line
+    per option of another tax category (SALE-F11, MODIFIER-F07) — unsaved, at the option's frozen price, with
+    the dish's discount and comp, and its count per dish by the dish's quantity. A menu Menus splits (SALE-F12,
+    COMBO-F09) is not a part itself: each of its dishes is, at its share of the amount and its own tax
+    category, with no parent line carrying money. Each part keeps the check's line it comes from in
+    ``origin`` (itself for the line)."""
+    parts: list[OrderLine] = []
+    for line in lines:
+        line.origin = line
+        if line.combo_id is not None and line.combo.get("split"):
+            parts += [_dish_part(line, dish) for dish in line.combo["components"]]
+            continue
+        parts.append(line)
+        for own in line.modifier_lines:
+            child = OrderLine(
+                order_id=line.order_id,
+                position=line.position,
+                name=own["name"],
+                unit="ud",
+                quantity=Decimal(own["quantity"]) * line.quantity,
+                unit_price=own["price_delta"],
+                tax_category_key=own["tax_category_key"],
+                discount_percent=line.discount_percent,
+                discount_approved_by=line.discount_approved_by,
+                is_gift=line.is_gift,
+                gift_reason=line.gift_reason,
+                staff_id=line.staff_id,
+            )
+            child.origin = line
+            parts.append(child)
+    return parts
+
+
+def _dish_part(line: OrderLine, dish: dict) -> OrderLine:
+    """A dish of a split menu as a part of the charge: one per menu of the line, at its share of one menu's
+    amount and its tax category, with the menu's discount and comp."""
+    part = OrderLine(
+        order_id=line.order_id,
+        position=line.position,
+        combo_id=line.combo_id,
+        product_id=dish["product_id"],
+        name=dish["product_name"],
+        sku=dish["sku"],
+        is_service=dish["is_service"],
+        category_id=dish["category_id"],
+        unit="ud",
+        increment=WHOLE,
+        quantity=line.quantity,
+        unit_price=dish["amount"],
+        tax_category_key=dish["tax_category_key"],
+        discount_percent=line.discount_percent,
+        discount_approved_by=line.discount_approved_by,
+        is_gift=line.is_gift,
+        gift_reason=line.gift_reason,
+        notes=line.notes,
+        staff_id=line.staff_id,
+    )
+    part.origin = line
+    part.dish = dish
+    return part
+
+
+def is_child(part: OrderLine) -> bool:
+    """A child line of an option, not a line of the check (nor a dish of a split menu)."""
+    return getattr(part, "origin", part) is not part and getattr(part, "dish", None) is None
+
+
+def combo_name(part: OrderLine) -> str:
+    """The menu a part charges, or is a dish of: the receipt's header of its dishes."""
+    origin = getattr(part, "origin", part)
+    return origin.name if origin.combo_id is not None else ""
+
+
+def dishes_of(part: OrderLine) -> list[dict]:
+    """The dishes a part charges: all the menu's when it goes in one line, its own when it is a dish of a
+    split menu, none otherwise."""
+    if getattr(part, "dish", None) is not None:
+        dishes = [part.dish]
+    elif part.combo_id is not None and not is_child(part):
+        dishes = part.combo["components"]
+    else:
+        return []
+    return [
+        {
+            "product_id": dish["product_id"],
+            "product_name": dish["product_name"],
+            "quantity": dish["quantity"],
+            "is_service": dish["is_service"],
+            "category_id": dish["category_id"],
+        }
+        for dish in dishes
+    ]
+
+
+def _dish_label(dish: dict) -> str:
+    return dish["product_name"] if dish["quantity"] == 1 else f"{dish['quantity']}× {dish['product_name']}"
+
+
+def _resolved_menu(ctx: OperationContext, request: dict) -> dict:
+    """Menus' answer for a menu line (COMBO-F08), as JSON. Menus off or absent: 409
+    ``sale.combo_unavailable``; its refusals (a course short, a dish sold out…) reach the seller as they are."""
+    return call_app(ctx, COMBO_RESOLVE, request, "sale.combo_unavailable").model_dump(mode="json")
+
+
+def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine:
+    """An unsaved row for a menu of Menus (SALE-F12): Menus checks the dishes picked and prices it; the line
+    keeps its answer, and its amount as the price ordered. A menu is sold in whole units."""
+    check_grid(data.quantity, WHOLE, "ud")
+    answer = _resolved_menu(
+        ctx,
+        {
+            "id": data.combo_id,
+            "combo": data.combo,
+            "choices": [choice.model_dump(exclude_none=True) for choice in data.choices],
+        },
+    )
+    line = OrderLine(
+        combo_id=answer["combo_id"],
+        combo=answer,
+        name=answer["name"],
+        unit="ud",
+        increment=WHOLE,
+        quantity=data.quantity,
+        unit_price=answer["amount"],
+        tax_category_key=answer["tax_category_key"] or "",
+        kitchen_text=", ".join(_dish_label(dish) for dish in answer["components"])[:500],
+        notes=data.notes,
+        staff_id=data.staff_id,
+        is_gift=data.is_gift,
+        gift_reason=data.gift_reason if data.is_gift else "",
+        created_by=actor(ctx),
+    )
+    line.line_total = provisional_total(line)
+    return line
+
+
+def refresh_combos(ctx: OperationContext, lines: Iterable[OrderLine]) -> None:
+    """Charging an open check asks Menus again for each of its menus with the amount ordered (COMBO-F08):
+    it does not ask for the dishes to be on offer again, only checks the courses, the portions and the tax
+    data, and splits that amount (or not, and at which tax category) as it says today. Only the charge's copy
+    of each line changes: the line of the check keeps what it froze. A menu Menus no longer knows (withdrawn
+    since) or Menus off since: the check charges what it froze, as a ticket already issued keeps its copy."""
+    for line in lines:
+        if line.combo_id is None:
+            continue
+        try:
+            answer = _resolved_menu(
+                ctx,
+                {
+                    "id": line.combo_id,
+                    "choices": [
+                        {"option_id": dish["option_id"], "quantity": dish["quantity"]}
+                        for dish in line.combo["components"]
+                    ],
+                    "amount": line.unit_price,
+                },
+            )
+        except Conflict as refused:
+            if refused.code in ("combo.combo_missing", "sale.combo_unavailable"):
+                continue
+            raise
+        line.combo = answer
+        line.tax_category_key = answer["tax_category_key"] or ""
+
+
+def folded_names(line: OrderLine) -> list[str]:
+    """The options charged inside the line (the receipt prints them under it): not the child lines'."""
+    return [pick["name"] for pick in line.modifiers if not pick.get("own_line")]
+
+
+def _options(ctx: OperationContext, product, option_ids: list[UUID]) -> dict | None:
+    """Modifiers' check and valuation of the options chosen for ``product`` (MODIFIER-F07), always asked when
+    Modifiers is on, also with none chosen (it refuses a required group left empty, which the API and the
+    assistant do not go through the sheet for). Modifiers off or absent: ``None`` without options, 409
+    ``sale.modifier_unavailable`` with them. Its refusals reach the seller as they are."""
+    try:
+        return call_app(
+            ctx,
+            MODIFIER_RESOLVE,
+            {"product_id": product.id, "option_ids": option_ids},
+            "sale.modifier_unavailable",
+        )
+    except Conflict as refused:
+        if refused.code == "sale.modifier_unavailable" and not option_ids:
+            return None
+        raise
 
 
 def ratio_of(line: OrderLine | object):
@@ -861,6 +1069,8 @@ def freeze_product_line(
     unit = units[product.unit]
     priced_in = units[product.pricing_unit]
     check_grid(data.quantity, unit[2], product.unit)
+    chosen = _options(ctx, product, data.option_ids)
+    picks = [pick.model_dump(mode="json") for pick in chosen.picks] if chosen else []
     line = OrderLine(
         product_id=product.id,
         name=product.name,
@@ -876,9 +1086,12 @@ def freeze_product_line(
         pricing_factor_num=priced_in[0],
         pricing_factor_den=priced_in[1],
         quantity=data.quantity,
-        unit_price=product.price,
+        unit_price=product.price + (chosen.folded_delta if chosen else 0),
         cost=product.cost,
         tax_category_key=product.tax_category_key,
+        modifiers=picks,
+        modifier_lines=[own.model_dump(mode="json") for own in chosen.own_lines] if chosen else [],
+        kitchen_text=chosen.kitchen_text[:500] if chosen else "",
         notes=data.notes,
         staff_id=data.staff_id,
         is_gift=data.is_gift,
@@ -976,6 +1189,19 @@ def order_line_row(line: OrderLine) -> dict:
         "line_total": line.line_total,
         "round_no": line.round_no,
         "fired_at": line.fired_at,
+        "modifiers": line.modifiers,
+        "modifier_lines": [
+            {
+                "option_id": own["option_id"],
+                "name": own["name"],
+                "tax_category_key": own["tax_category_key"],
+                "unit_price": own["price_delta"],
+                "quantity": own["quantity"],
+            }
+            for own in line.modifier_lines
+        ],
+        "kitchen_text": line.kitchen_text,
+        "combo": {"combo_id": line.combo_id, **line.combo} if line.combo_id else None,
     }
 
 
@@ -1140,7 +1366,7 @@ def operation_total(order: Order | None, closes: bool, valuation: pricing.Valuat
     if closes:
         return charged + valuation.total
     rest = valuate(
-        pending_lines(order),
+        charge_parts(pending_lines(order)),
         discount_percent=order.discount_percent,
         discount_amount=order.discount_amount,
         tax_included=current_settings().default_tax_included,
@@ -1157,14 +1383,16 @@ def loose_lines(
     booking: Booking | None = None,
     *,
     hold: bool = False,
+    combo_lines: Iterable = (),
 ) -> list[OrderLine]:
-    """Unsaved rows for a counter sale: catalog lines frozen from Inventory, services from Services (at the
-    price ``booking`` booked, when a line brings it), then open-price ones. A write that adds them ``hold``s the
-    departments of the open-price ones (``hold_departments``)."""
+    """Unsaved rows for a counter sale: catalog lines frozen from Inventory, menus from Menus, services from
+    Services (at the price ``booking`` booked, when a line brings it), then open-price ones. A write that adds
+    them ``hold``s the departments of the open-price ones (``hold_departments``)."""
     frozen: list[OrderLine] = []
     if lines:
         units = inventory_units(ctx)
         frozen += [freeze_product_line(ctx, line, units) for line in lines]
+    frozen += [freeze_combo_line(ctx, line) for line in combo_lines]
     frozen += [freeze_service_line(ctx, line, booking) for line in service_lines]
     priced = [freeze_open_line(ctx, line) for line in open_lines]
     if hold:
@@ -1195,13 +1423,17 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         if order.status != Order.Status.OPEN:
             raise Conflict(str(ORDER_CHANGED), code="sale.order_changed")
         lines, closes = lines_to_charge(order, params.line_ids)
+        refresh_combos(ctx, lines)
         percent, amount = order.discount_percent, order.discount_amount if closes else 0
         version = order.version
     else:
-        lines = loose_lines(ctx, params.lines, params.open_lines, params.service_lines)
+        lines = loose_lines(
+            ctx, params.lines, params.open_lines, params.service_lines, combo_lines=params.combo_lines
+        )
         percent, amount, version = params.discount_percent, params.discount_amount, None
+    parts = charge_parts(lines)
     valuation = valuate(
-        lines,
+        parts,
         discount_percent=percent,
         discount_amount=amount,
         tax_included=settings.default_tax_included,
@@ -1222,7 +1454,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "breakdown": breakdown_rows(valuation.breakdown),
         "lines": [
             {
-                "order_line_id": line.id if line.pk and params.order_id else None,
+                "order_line_id": line.origin.id if params.order_id else None,
                 "name": line.name,
                 "quantity": line.quantity,
                 "unit": line.unit,
@@ -1238,8 +1470,14 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
                 "net_amount": out.net_amount,
                 "tax_amount": out.tax_amount,
                 "line_total": out.line_total,
+                "modifiers": [] if is_child(line) else folded_names(line),
+                "is_child": is_child(line),
+                "combo_name": combo_name(line),
+                "components": [
+                    dish["product_name"] for dish in dishes_of(line) if getattr(line, "dish", None) is None
+                ],
             }
-            for line, out in zip(lines, valuation.lines, strict=True)
+            for line, out in zip(parts, valuation.lines, strict=True)
         ],
         "operation_total": operation_total(order, closes, valuation),
         "cash_limit": CASH_LIMIT.get(country),
@@ -1303,6 +1541,11 @@ def sale_line_row(line: SaleLine, returned: Decimal) -> dict:
         "tax_amount": line.tax_amount,
         "line_total": line.line_total,
         "returned_quantity": returned,
+        "modifiers": line.modifiers,
+        "parent_line_id": line.parent_line_id,
+        "combo_id": line.combo_id,
+        "combo_name": line.combo_name,
+        "components": line.components,
     }
 
 

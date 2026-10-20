@@ -12,6 +12,7 @@ import { computed } from 'vue';
 
 import type { OrderLineOut } from '../../operations';
 import { useLocale, useT } from '../../composables/useT';
+import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatPercent, formatQuantity } from '../../lib/format';
 import QtyStepper from './QtyStepper.vue';
 
@@ -107,6 +108,20 @@ function onRow(): void {
           v-if="discounted"
           class="pos-line__discount"
         >−{{ formatPercent(line.discount_percent, locale) }}</span>
+      </p>
+      <p
+        v-if="line.modifiers.length"
+        class="pos-line__options"
+        :data-testid="`pos-line-${line.id}-options`"
+      >
+        {{ line.modifiers.map((pick) => pick.name).join(', ') }}
+      </p>
+      <p
+        v-if="line.combo?.components.length"
+        class="pos-line__options"
+        :data-testid="`pos-line-${line.id}-dishes`"
+      >
+        {{ line.combo.components.map(dishLabel).join(', ') }}
       </p>
       <p
         v-if="line.notes"
@@ -307,6 +322,12 @@ function onRow(): void {
   color: var(--ion-color-warning-contrast, #000);
   background: var(--ion-color-warning, #ffc409);
   border-radius: 6px;
+}
+.pos-line__options {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  color: var(--ion-color-medium-shade, #636469);
 }
 .pos-line__note {
   display: flex;

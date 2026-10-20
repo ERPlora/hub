@@ -8,6 +8,8 @@ Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cam
 - `ion:storefront` (relleno) — entrada de menú **Vender** (`apps.py`), el icono del producto actual.
   Hoy: `ion:storefront-outline`.
 - `ion:chatbubble-ellipses-outline` — entrada de menú **Notas rápidas**. Hoy: `ion:chatbubbles-outline`.
+- `ion:flame` y `ion:flame-outline` — la llama de urgencia junto a «Enviar comanda» en «Comanda actual»
+  (SALE-F20, KITCHEN-F18), el icono del producto actual. Hoy: `ion:alert-circle` / `ion:alert-circle-outline`.
 
 ## Plataforma
 

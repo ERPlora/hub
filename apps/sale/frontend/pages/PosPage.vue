@@ -24,9 +24,11 @@ import CheckoutSheet from '../components/checkout/CheckoutSheet.vue';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import CartFab from '../components/pos/CartFab.vue';
 import CheckFollower from '../components/pos/CheckFollower.vue';
+import ComboSheet from '../components/pos/ComboSheet.vue';
 import DirtyCheckDialog from '../components/pos/DirtyCheckDialog.vue';
 import DiscountSheet from '../components/pos/DiscountSheet.vue';
 import LineNoteSheet from '../components/pos/LineNoteSheet.vue';
+import ModifierSheet from '../components/pos/ModifierSheet.vue';
 import OpenPriceSheet from '../components/pos/OpenPriceSheet.vue';
 import ParkSheet from '../components/pos/ParkSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
@@ -42,8 +44,11 @@ import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
 import { useLocale, useT } from '../composables/useT';
+import type { SaleComboOut } from '../../../combo/frontend/operations';
+import type { ProductOut } from '../../../inventory/frontend/operations';
+import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
-import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
+import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
 import { refusal } from '../lib/refusal';
 import { saleTabs } from '../tabs';
 
@@ -202,6 +207,67 @@ const addOpenLine = (line: OpenLine) =>
     () => till.addOpenLine(line, staff.value.id),
     () => (pricing.value = false),
   );
+
+// ── The options of Modifiers (SALE-F11; Modifiers' operations only) ──────────────────────────────
+/** A product may carry options: Modifiers on in this business and the right to read it. */
+const modifiersOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'modifier' && app.state === 'on') && session.can('modifier.view'),
+);
+const groupsOf = useCommand('modifier.group.for_target');
+const optioning = shallowRef<{ product: ProductOut; groups: TargetGroupOut[] } | null>(null);
+const optionsOpen = computed({
+  get: () => !!optioning.value,
+  set: (open: boolean) => {
+    if (!open) optioning.value = null;
+  },
+});
+
+/** A tap on a product: with groups of Modifiers, the sheet asks first; without, it goes to the check. */
+async function pickProduct(product: ProductOut): Promise<void> {
+  if (!modifiersOn.value) return till.addProduct(product, staff.value.id);
+  let groups: TargetGroupOut[];
+  try {
+    groups = (await groupsOf.run({ product_id: product.id })).groups;
+  } catch (error) {
+    void toastError(wordsOf(error, 'sale.pos.options.loadFailed'));
+    return;
+  }
+  if (!groups.length) return till.addProduct(product, staff.value.id);
+  openSheet(() => (optioning.value = { product, groups }));
+}
+
+const addWithOptions = (optionIds: string[]) => {
+  const chosen = optioning.value;
+  if (!chosen) return;
+  void fromSheet(
+    () => till.addProductLine(chosen.product, staff.value.id, optionIds),
+    () => (optioning.value = null),
+  );
+};
+
+// ── The menus of Menus (SALE-F12; Menus' operations only) ────────────────────────────────────────
+/** The till offers menus: Menus on in this business and the right to read it. */
+const combosOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'combo' && app.state === 'on') && session.can('combo.view'),
+);
+const composing = shallowRef<SaleComboOut | null>(null);
+const menuOpen = computed({
+  get: () => !!composing.value,
+  set: (open: boolean) => {
+    if (!open) composing.value = null;
+  },
+});
+
+const pickCombo = (combo: SaleComboOut) => openSheet(() => (composing.value = combo));
+
+const addCombo = (choices: ComboChoiceIn[]) => {
+  const combo = composing.value;
+  if (!combo) return;
+  void fromSheet(
+    () => till.addComboLine(combo, staff.value.id, choices),
+    () => (composing.value = null),
+  );
+};
 
 // ── Services of Services (SALE-F38) ─────────────────────────────────────────────────────────────
 /** The till sells Services' services: the setting, Services on in this business, and the right to read it. */
@@ -388,12 +454,37 @@ const documentSaleId = shallowRef<string | null>(null);
 /** The lines of the check when «Charge» opened the sheet: what a charge of all of them means. */
 let chargingLines: string[] = [];
 
-function charge(): void {
+// ── The round to the kitchen (SALE-F20; Kitchen's KITCHEN-F18) ────────────────────────────────────
+/** The VeriFactu notice of the catalogue (SALE-F07): VeriFactu on in this business and the right to read it. */
+const verifactuOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
+);
+/** «Current order» and its send: Kitchen on in this business and the right to send to it. */
+const kitchenOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on') && session.can('kitchen.add_ticket'),
+);
+/** Nothing new to send (another device sent it, or only services wait): not a failure. */
+const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
+
+async function sendRound(rush: boolean): Promise<boolean> {
+  const sent = await till.sendToKitchen(rush);
+  if (sent.ok) {
+    void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
+    return true;
+  }
+  if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
+  void toastError(sent.message);
+  return false;
+}
+
+async function charge(): Promise<void> {
   if (!order.value || !lines.value.length) return;
   if (needsCustomer.value) {
     askCustomer();
     return;
   }
+  // sales#439: what is pending goes to the kitchen before the charge, or the customer pays for a dish nobody cooks.
+  if (kitchenOn.value && lines.value.some((line) => !line.fired_at && !line.is_service) && !(await sendRound(false))) return;
   chargingLines = lines.value.map((line) => line.id);
   heldWhileCharging = null;
   charging.value = true;
@@ -491,7 +582,10 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
           :show-products="settings.show_products"
           :can-open-price="session.can('sale.sell_open_price')"
           :show-services="showServices"
-          @add="till.addProduct($event, staff.id)"
+          :show-combos="combosOn"
+          :fiscal="verifactuOn"
+          @add="pickProduct"
+          @combo="pickCombo"
           @service="pickService"
           @open-price="openPrice"
         >
@@ -536,6 +630,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             :drawer="phone"
             :open-checks="openChecks"
             :table-number="seatOfCheck?.table_number ?? null"
+            :kitchen="kitchenOn"
             @park="openSheet(() => (parking = true))"
             @close="cartOpen = false"
             @rename="till.rename($event)"
@@ -551,6 +646,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             @ticket-discount="openSheet(() => (discounting = 'ticket'))"
             @prebill="prebillOpen = true"
             @charge="charge"
+            @send="sendRound"
             @resume="resume"
           >
             <template #table>
@@ -571,22 +667,30 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         </div>
       </div>
 
-      <CheckFollower
-        v-if="till.orderId.value"
-        :key="till.orderId.value"
-        :order-id="till.orderId.value"
-        :valued="lines.length > 0"
-        @order="onOrder"
-        @preview="preview = $event"
-        @gone="till.gone()"
-      />
-      <TableFollower
-        v-if="followsTable && till.orderId.value"
-        :key="till.orderId.value"
-        :order-id="till.orderId.value"
-        @seat="tableSeat = $event"
-        @parked="tableParked = $event"
-      />
+      <!-- The followers mount once a check opens, often from a sheet still on screen: in a box of their own, never
+           inserted next to an ion-modal that Ionic moved out when it presented it (SALE-F09: the first line of a
+           check from «Open price» broke the till). Siblings keyed apart: a shared key broke Vue's patch too. -->
+      <div
+        class="pos-followers"
+        hidden
+      >
+        <CheckFollower
+          v-if="till.orderId.value"
+          :key="`check-${till.orderId.value}`"
+          :order-id="till.orderId.value"
+          :valued="lines.length > 0"
+          @order="onOrder"
+          @preview="preview = $event"
+          @gone="till.gone()"
+        />
+        <TableFollower
+          v-if="followsTable && till.orderId.value"
+          :key="`table-${till.orderId.value}`"
+          :order-id="till.orderId.value"
+          @seat="tableSeat = $event"
+          @parked="tableParked = $event"
+        />
+      </div>
 
       <OpenPriceSheet
         v-model:open="pricing"
@@ -600,6 +704,21 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
         :pending="sheetPending"
         :error="sheetError"
         @add="addPricedService"
+      />
+      <ComboSheet
+        v-model:open="menuOpen"
+        :combo="composing"
+        :pending="sheetPending"
+        :error="sheetError"
+        @add="addCombo"
+      />
+      <ModifierSheet
+        v-model:open="optionsOpen"
+        :product="optioning?.product ?? null"
+        :groups="optioning?.groups ?? []"
+        :pending="sheetPending"
+        :error="sheetError"
+        @add="addWithOptions"
       />
       <LineNoteSheet
         :open="!!noting"

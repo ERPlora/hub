@@ -41,6 +41,10 @@ const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
   line_total: 150,
   round_no: 0,
   fired_at: null,
+  modifiers: [],
+  modifier_lines: [],
+  kitchen_text: '',
+  combo: null,
   ...over,
 });
 
@@ -100,6 +104,11 @@ describe('mergeableLine', () => {
       expect(mergeableLine([line(over)], 'p1', null), JSON.stringify(over)).toBeUndefined();
     }
     expect(mergeableLine([line({ staff_id: 's2' })], 'p1', 's2')?.id).toBe('l1');
+  });
+
+  it('never a line with options of Modifiers: a dish of its own, a plain tap of the same product is another line (SALE-F11)', () => {
+    const cheese = { option_id: 'o1', group_id: 'g1', group_name: 'Extras', name: 'Cheese', kitchen_name: '+CHEESE', price_delta: 100, tax_category_key: null, own_line: false };
+    expect(mergeableLine([line({ modifiers: [cheese] })], 'p1', null)).toBeUndefined();
   });
 });
 

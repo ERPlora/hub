@@ -95,6 +95,10 @@ export const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
   line_total: 150,
   round_no: 0,
   fired_at: null,
+  modifiers: [],
+  modifier_lines: [],
+  kitchen_text: '',
+  combo: null,
   ...over,
 });
 
