@@ -138,6 +138,17 @@ describe('SessionsPage: the screen', () => {
     expect(s.wrapper.findComponent(UnassignedModal).props('open')).toBe(true);
     expect(s.wrapper.findComponent(OpenSessionModal).props('unassignedCash')).toBe(300);
   });
+
+  it('one line out of every shift is said in the singular, in both languages', async () => {
+    const s = await setup();
+    await s.ready({ ...NONE, unassigned_count: 1, unassigned_cash: 1210 });
+    expect(words(s.find('cash-register-unassigned').element)).toContain('1 sale line fell in no session · €12.10 in cash.');
+    const es = await setup({ locale: 'es' });
+    await es.ready({ ...NONE, unassigned_count: 1, unassigned_cash: 1210 });
+    expect(words(es.find('cash-register-unassigned').element).replace(/\u00a0/g, ' ')).toContain('1 línea de venta no entró en ninguna sesión · 12,10 € en efectivo.');
+    await es.result(CURRENT, { ...NONE, unassigned_count: 3, unassigned_cash: 1210 }, {}, 2);
+    expect(words(es.find('cash-register-unassigned').element).replace(/\u00a0/g, ' ')).toContain('3 líneas de venta no entraron en ninguna sesión');
+  });
 });
 
 describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {

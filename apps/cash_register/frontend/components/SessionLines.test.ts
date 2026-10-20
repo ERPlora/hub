@@ -66,6 +66,13 @@ describe('SessionLines', () => {
     expect(s.cells(3).slice(1)).toEqual(['Cash out', '-€5.00', 'Cash', 'Bread supplier']);
   });
 
+  it('no column a narrow box gives up hides the document a line is: a narrow table turns to cards (F11, F17)', async () => {
+    const s = await setup({ unassigned: true });
+    const columns = s.table().props('columns') as { key: string; priority?: string }[];
+    expect(columns.filter((column) => column.priority === 'low').map((column) => column.key)).toEqual([]);
+    expect(s.table().props('views')).toEqual(['table', 'cards']);
+  });
+
   it('the unassigned lines are the same table over another query', async () => {
     const s = await setup({ unassigned: true });
     expect(s.params(OP)).toEqual([{ unassigned: true, sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);

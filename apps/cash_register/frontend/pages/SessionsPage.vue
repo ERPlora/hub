@@ -229,7 +229,7 @@ function onCounted(count: { type: CountType; total: number }): void {
       data-testid="cash-register-unassigned"
       :heading="$t('cash_register.sessions.unassigned.heading')"
     >
-      {{ $t('cash_register.sessions.unassigned.body', { count: unassignedCount, cash: formatMoney(unassignedCash, locale) }) }}
+      {{ $t('cash_register.sessions.unassigned.body', { count: unassignedCount, cash: formatMoney(unassignedCash, locale) }, unassignedCount) }}
       <template #actions>
         <ion-button
           size="small"

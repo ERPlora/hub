@@ -76,7 +76,7 @@
       },
       "unassigned": {
         "heading": "Sale lines in no shift",
-        "body": "{count} sale lines fell in no session · {cash} in cash.",
+        "body": "{count} sale line fell in no session · {cash} in cash. | {count} sale lines fell in no session · {cash} in cash.",
         "view": "View"
       },
       "autoCloseDue": {

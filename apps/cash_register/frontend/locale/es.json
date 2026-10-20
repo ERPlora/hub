@@ -76,7 +76,7 @@
       },
       "unassigned": {
         "heading": "Cobros fuera de turno",
-        "body": "{count} líneas de venta no entraron en ninguna sesión · {cash} en efectivo.",
+        "body": "{count} línea de venta no entró en ninguna sesión · {cash} en efectivo. | {count} líneas de venta no entraron en ninguna sesión · {cash} en efectivo.",
         "view": "Ver"
       },
       "autoCloseDue": {
