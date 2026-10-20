@@ -95,6 +95,23 @@ const figures = computed(() => {
   line-height: 1.1;
 }
 
+/* On a phone the three share one line (smaller), so the list still shows below them. */
+@media (max-width: 575px) {
+  .staff-figures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .staff-figure {
+    padding: 0.75rem;
+  }
+  .staff-figure__label {
+    font-size: 0.625rem;
+    letter-spacing: 0.03em;
+  }
+  .staff-figure__value {
+    font-size: 1.375rem;
+  }
+}
+
 .staff-figures__error {
   margin: 0;
   color: var(--ion-color-danger);
