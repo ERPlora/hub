@@ -196,3 +196,31 @@ describe('a line of the history', () => {
     ).toBe('Create a task: Not allowed. It carried on with the next steps.');
   });
 });
+
+// FLOW-F27: what a call is called on the screen.
+describe('a call in words', () => {
+  const call: Step = { id: 's1', kind: 'http', method: 'GET', url: 'https://api.example.com/v1/x', headers: {}, body: '', timeout: 10 };
+
+  it('names the call by its host, and its permission too', () => {
+    const p = phrasing();
+    expect(describeStep(call, [call], CATALOG, p)).toBe('Call api.example.com');
+    expect(describeStep({ ...call, url: '' }, [call], CATALOG, p)).toBe('Call another system');
+    expect(actionLabel('http:https://api.example.com', CATALOG, p)).toBe('Call api.example.com');
+    expect(actionLabel('http:https://api.example.com', CATALOG, phrasing('es'))).toBe('Llamar a api.example.com');
+  });
+
+  it('names a secret, the key and what a call leaves', () => {
+    const p = phrasing();
+    expect(pathLabel('secret.STRIPE_KEY', [call], CATALOG, p)).toBe('Secret «STRIPE_KEY»');
+    expect(pathLabel('run.idempotency_key', [call], CATALOG, p)).toBe('No-repeat key');
+    expect(pathLabel('steps.s1.status', [call], CATALOG, p)).toBe('1. Call api.example.com › Status');
+  });
+
+  it('says in the history what the call did', () => {
+    const p = phrasing();
+    const at = '2026-10-15T10:00:00+02:00';
+    expect(describeLog({ step: 's1', kind: 'http', outcome: 'calling', host: 'api.example.com', at }, [call], CATALOG, p)).toBe('Calling api.example.com…');
+    expect(describeLog({ step: 's1', kind: 'http', outcome: 'called', host: 'api.example.com', status: 201, at }, [call], CATALOG, p)).toBe('Called api.example.com: it answered 201');
+  });
+});
+

@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogOut, FlowOut, Step } from '../operations';
 import {
   addStep,
+  asCallText,
+  callChoices,
   conditionRows,
   dataChoices,
   delayParts,
@@ -231,3 +233,37 @@ describe('the data a step can insert', () => {
     ]);
   });
 });
+
+// FLOW-F27: «Call another system».
+describe('a call to another system', () => {
+  it('starts as a POST with nothing filled in', () => {
+    expect(addStep(emptyDocument(), 'http').steps).toEqual([{ id: 's1', kind: 'http', method: 'POST', url: '', headers: {}, body: '', timeout: 10 }]);
+  });
+
+  it('asks for the permission of its origin, written by hand', () => {
+    const call = (url: string): Step => ({ id: 's1', kind: 'http', method: 'GET', url, headers: {}, body: '', timeout: 10 });
+    expect(requiredGrants([call('https://API.example.com/v1/{{input.id}}?q=1')])).toEqual(['http:https://api.example.com']);
+    expect(requiredGrants([call('https://{{input.host}}/x'), call('http://api.example.com'), call('')])).toEqual([]);
+  });
+
+  it('leaves its status and its answer to the steps after it', () => {
+    const steps: Step[] = [{ id: 's1', kind: 'http', method: 'GET', url: 'https://api.example.com', headers: {}, body: '', timeout: 10 }];
+    expect(dataChoices(steps, 1, {}, null).map((choice) => choice.path)).toEqual(['steps.s1.status', 'steps.s1.body']);
+  });
+
+  it('offers the secrets and its own key to insert, never their values', () => {
+    expect(callChoices(['STRIPE_KEY'])).toEqual([
+      { path: 'secret.STRIPE_KEY', group: 'secret', example: undefined },
+      { path: 'run.idempotency_key', group: 'run', example: undefined },
+    ]);
+  });
+
+  it('every value of a call is text: a datum alone becomes {{…}}', () => {
+    expect(asCallText('secret.STRIPE_KEY')).toBe('{{secret.STRIPE_KEY}}');
+    expect(asCallText('input.total')).toBe('{{input.total}}');
+    expect(asCallText('Bearer {{secret.K}}')).toBe('Bearer {{secret.K}}');
+    expect(asCallText(12)).toBe('12');
+    expect(asCallText('')).toBe('');
+  });
+});
+

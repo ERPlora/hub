@@ -61,10 +61,20 @@ export interface DelayStep {
   seconds: number;
   run_if?: Condition;
 }
-export type Step = CommandStep | QueryStep | ConditionStep | DelayStep;
+/** «Call another system» (FLOW-F27): its texts may read `{{secret.NAME}}` and `{{run.idempotency_key}}`. */
+export interface HttpStep extends StepOptions {
+  id: string;
+  kind: 'http';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url: string;
+  headers: Record<string, string>;
+  body: string;
+  timeout: number;
+}
+export type Step = CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep;
 export type StepKind = Step['kind'];
 
-export type RunStatus = 'running' | 'waiting' | 'succeeded' | 'stopped' | 'failed' | 'cancelled';
+export type RunStatus = 'running' | 'waiting' | 'calling' | 'asking' | 'succeeded' | 'stopped' | 'failed' | 'cancelled';
 
 export interface FlowRefIn {
   id?: string;
@@ -135,7 +145,11 @@ export interface LogEntry {
   step: string;
   kind: StepKind;
   operation?: string;
-  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed' | 'resumed' | 'skipped';
+  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed' | 'resumed' | 'skipped' | 'calling' | 'called';
+  /** The host a call went to (`calling`, `called`). */
+  host?: string;
+  /** What a call answered (`called`). */
+  status?: number;
   /** A failure of a step with «If it fails, carry on»: the run went on. */
   continued?: boolean;
   at: string;
@@ -171,6 +185,27 @@ export interface RunOut {
 
 export interface RunRefIn {
   id: string;
+}
+
+/** A secret (FLOW-F26): its name, never its value. */
+export interface SecretOut {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  updated_by: string;
+}
+export interface SecretPageOut {
+  rows: SecretOut[];
+  /** Whether this server can keep secrets (it has its key). */
+  available: boolean;
+}
+export interface SecretSetIn {
+  name: string;
+  value: string;
+}
+export interface SecretRefIn {
+  name: string;
 }
 
 export interface RunListIn {
@@ -275,6 +310,7 @@ export interface ClauseOut {
 
 export type TestOutcome =
   | 'skipped'
+  | 'would_call'
   | 'high_risk'
   | 'would_run'
   | 'stops_here'
@@ -324,6 +360,9 @@ declare module '@erplora/ui/sdk' {
     'flow.flow.run': { input: RunIn; output: RunOut };
     'flow.run.list': { input: RunListIn; output: RunPageOut };
     'flow.run.retry': { input: RunRefIn; output: RunOut };
+    'flow.secret.list': { input: Record<string, never>; output: SecretPageOut };
+    'flow.secret.set': { input: SecretSetIn; output: SecretOut };
+    'flow.secret.delete': { input: SecretRefIn; output: DeletedOut };
     'flow.draft.list': { input: DraftListIn; output: Page<DraftOut> };
     'flow.draft.propose': { input: DraftProposeIn; output: DraftOut };
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };
