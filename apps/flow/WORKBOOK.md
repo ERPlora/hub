@@ -271,8 +271,9 @@ Estado: hecho (pantalla)
 Actor: propietario, administrador
 Pantalla: Automatizaciones
 Pasos:
-1. Desde otra pantalla del Hub, toca el atajo a una automatización de la galería: se abre
-   **Automatizaciones** con esa tarjeta desplegada y a la vista.
+1. Abre un atajo a una automatización de la galería (un enlace guardado o el que ofrezca otra app; hoy
+   ninguna app del Hub lo ofrece todavía): se abre **Automatizaciones** con esa tarjeta desplegada y a
+   la vista.
 2. Si vuelve a tocar un atajo con la pantalla ya abierta, se despliega la tarjeta nueva.
 3. Un atajo a una tarjeta que no existe o está escondida enseña la galería sin abrir nada.
 Entra: la tarjeta que nombra el atajo.
