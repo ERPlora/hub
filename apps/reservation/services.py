@@ -33,6 +33,7 @@ from live.outbox import record_event
 
 from apps.customer.models import Customer
 from apps.customer.queries import find_customer
+from apps.customer.services import lock_customers
 from apps.reservation import engine, events
 from apps.reservation.models import (
     ACTOR_MAX_LENGTH,
@@ -340,10 +341,14 @@ CARD_SOURCES = {"phone": "phone", "in_person": "walk_in", "whatsapp": "whatsapp"
 
 
 def chosen_card(customer_id, customer_said: str | None) -> Customer | None:
-    """The card the caller chose (by id, or by name, phone or email), or ``None``."""
+    """The card the caller chose (by id, or by name, phone or email), or ``None``.
+
+    A card a write links is locked when it is found, as Customers' writes and the Hub admin's «Delete» of a card
+    take it: a deletion under way is waited for and the card is gone (404), and one that comes after waits for
+    the write and finds the row that protects the card."""
     if customer_id is None and not customer_said:
         return None
-    return find_customer(customer_id, customer_said)
+    return find_customer(customer_id, customer_said, lock=True)
 
 
 def card_for_phone(
@@ -357,7 +362,7 @@ def card_for_phone(
         match = next(
             (row for row in matches if _folded(row.name) == wanted), matches[0]
         )
-        return Customer.objects.get(pk=match.id)
+        return find_customer(match.id, None, lock=True)  # locked, as ``chosen_card``
     try:
         created = call_app(
             ctx,
@@ -1153,6 +1158,9 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
 )
 def reassign_customer(ctx: OperationContext, data: MergedIn) -> dict:
     if data.id is None or data.absorbed_id is None or data.id == data.absorbed_id:
+        return {"changed": 0}
+    # The card that stays before the rows that move to it; one the Hub admin deleted takes nothing.
+    if not lock_customers([data.id]):
         return {"changed": 0}
     moved = Reservation.objects.filter(customer_id=data.absorbed_id).update(
         customer_id=data.id

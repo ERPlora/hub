@@ -23,6 +23,8 @@ from django.utils import timezone
 from live.context import system_context
 from live.errors import OperationError
 
+from apps.customer.models import Customer
+from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
 from apps.sale.models import (
     Department,
     Order,
@@ -894,3 +896,88 @@ def test_the_hub_admin_delete_page_of_a_row_a_write_holds_does_not_wait(coffee, 
     assert not isinstance(answer, Exception), answer
     assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
     assert type(row).objects.filter(pk=row.pk).exists()
+
+
+# ── The Hub admin's «Delete» of the customer's card while a charge links it ──────────────────────
+#
+# A charge with a customer finds the card and then writes the sale that points at it. The Hub admin's «Delete» of
+# that card between the two found nothing protecting it and deleted it: the charge then failed at its COMMIT (an
+# IntegrityError, a 500, and nothing charged). The charge locks the card when it finds it, before the check, as
+# the deletion does: the deletion waits for it and answers «Cannot delete», since the sale protects the card; a
+# charge that comes second waits for the deletion and is told the card is gone, with nothing charged.
+
+
+def counter_charge(card):
+    data = {"idempotency_key": "card-counter", "lines": [{"product": "COF"}]}
+    return lambda: run("sale.sale.complete", {**data, "customer_id": str(card.id)})
+
+
+def check_charge(card):
+    order = run("sale.order.open", {"lines": [{"product": "COF"}]})
+    data = {"idempotency_key": "card-check", "order_id": str(order.id), "order_version": order.version}
+    return lambda: run("sale.sale.complete", {**data, "customer_id": str(card.id)})
+
+
+#: A counter sale, and the charge of an open check.
+CARD_CHARGES = {"counter": counter_charge, "check": check_charge}
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("charge_of", sorted(CARD_CHARGES))
+def test_the_hub_admin_cannot_delete_a_card_a_charge_links_meanwhile(coffee, charge_of, how):
+    card = Customer.objects.create(name="Ana García")
+    charge_it = CARD_CHARGES[charge_of](card)
+    with card_deleted_on_screen(card, how, writes("sale_sale")) as answers:
+        charge_it()
+    [answer] = answers
+    assert card_protected(answer)
+    assert Sale.objects.get().customer_id == card.id
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("charge_of", sorted(CARD_CHARGES))
+def test_a_charge_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(coffee, charge_of, how):
+    card = Customer.objects.create(name="Ana García")
+    charge_it = CARD_CHARGES[charge_of](card)
+    with card_deleted_on_screen(card, how, reads("customer_customer")) as answers:
+        with pytest.raises(OperationError) as refused:
+            charge_it()
+    [answer] = answers
+    assert answer.status_code == 302
+    assert (refused.value.status, refused.value.code) == (404, "customer.customer_unavailable")
+    assert not Customer.objects.filter(pk=card.pk).exists()
+    assert not Sale.objects.exists()
+
+
+# The merge of two cards moves the absorbed card's sales to the card that stays, later, as a reaction: the Hub
+# admin may have deleted that card in between (nothing protected it), or delete it while the reaction moves them.
+# The reaction locks the card that stays first: gone, nothing moves (the sales keep the card they were charged
+# to) instead of failing for ever at its COMMIT; there, the deletion waits and answers «Cannot delete».
+
+
+def _merged_into_marta(coffee):
+    ana = Customer.objects.create(name="Ana García")
+    sale = counter_charge(ana)()
+    marta = Customer.objects.create(name="Marta Gil")
+    data = {"id": str(marta.id), "absorbed_id": str(ana.id)}
+    return ana, Sale.objects.get(pk=sale.id), marta, lambda: run("sale.customer.reassign", data, system_context(A))
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_sales_to_meanwhile(coffee, how):
+    _, sale, marta, move = _merged_into_marta(coffee)
+    with card_deleted_on_screen(marta, how, writes("sale_sale")) as answers:
+        move()
+    [answer] = answers
+    assert card_protected(answer)
+    sale.refresh_from_db()
+    assert sale.customer_id == marta.id
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_a_merge_into_a_card_the_hub_admin_deleted_moves_no_sale(coffee, hub_staff, how):
+    ana, sale, marta, move = _merged_into_marta(coffee)
+    assert admin_delete(hub_staff, how, marta)().status_code == 302
+    assert move().moved == 0
+    sale.refresh_from_db()
+    assert sale.customer_id == ana.id

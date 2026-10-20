@@ -13,6 +13,8 @@ from django.db import connection
 from django.utils import timezone
 from live.errors import OperationError
 
+from apps.customer.models import Customer
+from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
 from apps.invoice.tests.conftest import ISSUER, deliver, run
 from apps.sale.models import Sale
@@ -172,3 +174,78 @@ def test_the_same_refund_delivered_twice_at_once_is_one_rectification(product, c
     assert sorted(outcome(result) for result in results) == ["already", "ok"]
     assert Invoice.objects.filter(invoice_type__startswith="R").count() == 1
     assert InvoiceSeries.objects.get(code="RECT", year=TODAY.year).current_number == 1
+
+
+# ── The Hub admin's «Delete» of the customer's card while a document names it ────────────────────
+#
+# An invoice by hand and the full invoice that replaces a ticket find the recipient's card and then write the
+# document that points at it. The Hub admin's «Delete» of that card between the two found nothing protecting it
+# and deleted it: the document then failed at its COMMIT (an IntegrityError, a 500; its number was not spent).
+# The document locks the card when it finds it, before its ticket and its series' number, as a charge does: the
+# deletion waits for it and answers «Cannot delete», since the document protects the card; a document that comes
+# second waits for the deletion and is told the card is gone, spending no number.
+
+HOW = ["page", "list"]
+
+
+def by_hand(card):
+    data = {
+        "lines": [{"description": "Course", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+        "customer_id": str(card.id),
+    }
+    return lambda: run("invoice.invoice.create", data)
+
+
+def full_for_a_ticket(card):
+    simplified = run(
+        "invoice.invoice.create",
+        {
+            "series_code": "TICKET",
+            "lines": [{"description": "Coffee", "quantity": "2", "unit_price": 150, "tax_rate": "10"}],
+        },
+    )
+    data = {"number": simplified.number, "customer_id": str(card.id)}
+    return lambda: run("invoice.invoice.substitute", data)
+
+
+#: The documents that name a card, and the series that numbers them.
+CARD_DOCUMENTS = {"by hand": by_hand, "full for a ticket": full_for_a_ticket}
+
+
+def a_card() -> Customer:
+    return Customer.objects.create(
+        name="Talleres Pérez SL", tax_id="B12345674", address="Calle Luna 3", city="Madrid"
+    )
+
+
+def fact_numbers() -> int:
+    series = InvoiceSeries.objects.filter(code="FACT", year=TODAY.year).first()
+    return series.current_number if series else 0
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("document", sorted(CARD_DOCUMENTS))
+def test_the_hub_admin_cannot_delete_a_card_a_document_names_meanwhile(document, how):
+    card = a_card()
+    issue = CARD_DOCUMENTS[document](card)
+    with card_deleted_on_screen(card, how, writes("invoice_invoice")) as answers:
+        issue()
+    [answer] = answers
+    assert card_protected(answer)
+    assert Invoice.objects.get(customer=card).number == f"FACT-{TODAY.year}-000001"
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("document", sorted(CARD_DOCUMENTS))
+def test_a_document_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(document, how):
+    card = a_card()
+    issue = CARD_DOCUMENTS[document](card)
+    with card_deleted_on_screen(card, how, reads("customer_customer")) as answers:
+        with pytest.raises(OperationError) as refused:
+            issue()
+    [answer] = answers
+    assert answer.status_code == 302
+    assert (refused.value.status, refused.value.code) == (404, "customer.customer_unavailable")
+    assert not Customer.objects.filter(pk=card.pk).exists()
+    assert not Invoice.objects.filter(invoice_type__in=["F1", "F3"]).exists()
+    assert fact_numbers() == 0

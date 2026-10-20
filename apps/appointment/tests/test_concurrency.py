@@ -27,6 +27,8 @@ from live.errors import OperationError
 from live.operations import get
 
 from apps.appointment.models import Appointment, Recurring
+from apps.customer.models import Customer
+from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
 from apps.staff.models import Member
 from apps.staff.tests.conftest import WAIT_LIMIT, _waited_for, deleted_on_screen
 
@@ -634,3 +636,120 @@ def test_a_write_on_a_series_and_its_appointments_and_an_edit_of_it_never_wait_i
         SERIES_THEN_APPOINTMENTS[write](salon, rows)
     [outcome] = edited
     assert not isinstance(outcome, Exception), outcome
+
+
+# ── The Hub admin's «Delete» of the customer's card while a write links it ───────────────────────
+#
+# A booking, a batch of bookings and a series find the customer's card and then write the row that points at it.
+# The Hub admin's «Delete» of that card between the two found nothing protecting it and deleted it: the write then
+# failed at its COMMIT (an IntegrityError, a 500). The write locks the card when it finds it, as the deletion does:
+# the deletion waits for it and answers «Cannot delete», since the new row protects the card; a write that comes
+# second waits for the deletion and is told the card is gone.
+
+
+def _book(salon):
+    return run("appointment.appointment.create", booking_data(salon, "10:00"))
+
+
+def _book_a_batch(salon):
+    data = booking_data(salon, "10:00")
+    data["starts"] = [data.pop("start"), wall(MONDAY, "12:00")]
+    return run("appointment.appointment.bulk_create", data)
+
+
+def _book_a_series(salon):
+    return run(
+        "appointment.recurring.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "frequency": "weekly",
+            "start_date": MONDAY.isoformat(),
+            "time": "10:00",
+            "max_occurrences": 2,
+        },
+    )
+
+
+def booking_data(salon, start: str) -> dict:
+    return {
+        "customer_id": str(salon.lucia.id),
+        "services": [{"service_id": str(salon.cut.id)}],
+        "staff_id": str(salon.ana.id),
+        "start": wall(MONDAY, start),
+    }
+
+
+#: The writes that link a card, and the table of the row that points at it.
+CARD_LINKS = {
+    "booking": (_book, "appointment_appointment"),
+    "batch": (_book_a_batch, "appointment_appointment"),
+    "series": (_book_a_series, "appointment_recurring"),
+}
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(CARD_LINKS))
+def test_the_hub_admin_cannot_delete_a_card_a_booking_links_meanwhile(salon, write, how):
+    book, table = CARD_LINKS[write]
+    with card_deleted_on_screen(salon.lucia, how, writes(table)) as answers:
+        book(salon)
+    [answer] = answers
+    assert card_protected(answer)
+    assert Customer.objects.filter(pk=salon.lucia.pk).exists()
+    assert Recurring.objects.filter(customer=salon.lucia).exists() == (write == "series")
+    assert Appointment.objects.filter(customer=salon.lucia).exists()
+
+
+@pytest.mark.parametrize("how", HOW)
+@pytest.mark.parametrize("write", sorted(CARD_LINKS))
+def test_a_booking_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(salon, write, how):
+    book, _ = CARD_LINKS[write]
+    with card_deleted_on_screen(salon.lucia, how, reads("customer_customer")) as answers:
+        with pytest.raises(OperationError) as refused:
+            book(salon)
+    [answer] = answers
+    assert answer.status_code == 302
+    assert (refused.value.status, refused.value.code) == (404, "customer.customer_unavailable")
+    assert not Customer.objects.filter(pk=salon.lucia.pk).exists()
+    assert not Appointment.objects.exists() and not Recurring.objects.exists()
+
+
+# The merge of two cards moves the absorbed card's appointments and series to the card that stays, later, as a
+# reaction: the Hub admin may have deleted that card in between (nothing protected it), or delete it while the
+# reaction moves them. The reaction locks the card that stays first: gone, nothing moves (they stay with the card
+# they were booked with) instead of failing for ever at its COMMIT; there, the deletion waits and answers «Cannot
+# delete».
+
+
+def _merged_into_marta(salon):
+    booked = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"))
+    series = make_series(salon)
+    marta = make_customer("Marta Gil", phone="+34600999888")
+    move = lambda: system(  # noqa: E731
+        "appointment.customer.reassign", {"id": str(marta.id), "absorbed_id": str(salon.lucia.id)}
+    )
+    return booked, series, marta, move
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_appointments_to_meanwhile(salon, how):
+    booked, series, marta, move = _merged_into_marta(salon)
+    with card_deleted_on_screen(marta, how, writes("appointment_appointment")) as answers:
+        move()
+    [answer] = answers
+    assert card_protected(answer)
+    booked.refresh_from_db()
+    series.refresh_from_db()
+    assert (booked.customer_id, series.customer_id) == (marta.id, marta.id)
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_a_merge_into_a_card_the_hub_admin_deleted_moves_nothing(salon, hub_staff, how):
+    booked, series, marta, move = _merged_into_marta(salon)
+    assert admin_delete(hub_staff, how, marta)().status_code == 302
+    assert move().changed == 0
+    booked.refresh_from_db()
+    series.refresh_from_db()
+    assert (booked.customer_id, series.customer_id) == (salon.lucia.id, salon.lucia.id)

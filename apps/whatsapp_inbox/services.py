@@ -36,6 +36,7 @@ from live.outbox import record_event
 from apps.customer.models import Consent, Customer
 from apps.customer.phones import InvalidPhone
 from apps.customer.queries import find_customer
+from apps.customer.services import lock_customers
 from apps.whatsapp_inbox import clock, events, gateway
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.queries import (
@@ -203,12 +204,28 @@ def _only_card_of(phone: str) -> UUID | None:
     return ids[0] if len(ids) == 1 else None
 
 
-def _link_by_phone(ctx: OperationContext, conversation: Conversation) -> None:
-    """Join a conversation without a live card to the one live card of its number (WHATSAPP_INBOX-F04)."""
-    if not conversation.phone or _live_card_id(conversation) is not None:
-        return
-    card_id = _only_card_of(conversation.phone)
-    if card_id is None or card_id == conversation.customer_id:
+def _locked_cards_of(phones) -> dict[str, UUID]:
+    """The one live card of each number of ``phones`` (none for a number with none or several), locked in id order
+    before the conversations they join.
+
+    Customers' writes and the Hub admin's «Delete» of a card lock the card before what points at it (the deletion
+    then leaves its conversations without it): a deletion under way is waited for and its card is no longer there
+    to join; one that comes after waits for the join and then leaves the conversation without the card. Each card
+    is read again once locked: the write it waited for may have changed its number or taken it out of use.
+    """
+    wanted = {phone: _only_card_of(phone) for phone in phones if phone}
+    lock_customers([card_id for card_id in wanted.values() if card_id is not None])
+    return {
+        phone: card_id
+        for phone, card_id in wanted.items()
+        if card_id is not None and _only_card_of(phone) == card_id
+    }
+
+
+def _link_by_phone(ctx: OperationContext, conversation: Conversation, card_id: UUID | None) -> None:
+    """Join a conversation without a live card to ``card_id``, the one live card of its number, locked before the
+    conversation (``_locked_cards_of``; WHATSAPP_INBOX-F04)."""
+    if card_id is None or _live_card_id(conversation) is not None or card_id == conversation.customer_id:
         return
     conversation.customer_id = card_id
     _save(conversation, "customer")
@@ -290,6 +307,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
     if existing is not None:
         return _redelivered(ctx, existing, data)
     inbound = data.direction == Message.Direction.INBOUND
+    card_id = _locked_cards_of([phone]).get(phone)
     conversation = _conversation_for(phone, data.contact_name if inbound else "")
     # A twin delivered at the same time committed while this one waited for the conversation's lock.
     existing = (
@@ -350,7 +368,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
             conversation.last_message_kind = kind
             conversation.last_message_direction = message.direction
         conversation.save()
-    _link_by_phone(ctx, conversation)
+    _link_by_phone(ctx, conversation, card_id)
     record_event(
         ctx,
         events.MESSAGE_RECEIVED,
@@ -608,8 +626,9 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
                     code="whatsapp_inbox.marketing_consent_missing",
                 )
     if conversation is None:
+        card_id = _locked_cards_of([phone]).get(phone)
         conversation = _conversation_for(phone)
-        _link_by_phone(ctx, conversation)
+        _link_by_phone(ctx, conversation, card_id)
     variables = list(data.template.variables) if template else []
     body = data.text if template is None else _rendered(template.body, variables)
     try:
@@ -1007,6 +1026,10 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
     },
 )
 def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
+    # The card chosen before the conversation (``_locked_cards_of``): one the Hub admin deletes is waited for and gone.
+    chosen = None
+    if not (data.unlink or data.create):
+        chosen = find_customer(data.customer_id, data.customer, lock=True)
     conversation = find_conversation(data.id, data.conversation, lock=True)
     if data.unlink:
         card = None
@@ -1024,7 +1047,7 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
         )
         card = Customer.objects.get(pk=made.id)
     else:
-        card = find_customer(data.customer_id, data.customer)
+        card = chosen
     if conversation.customer_id != (card.id if card else None):
         conversation.customer = card
         _save(conversation, "customer")
@@ -1242,6 +1265,9 @@ def delete_note(ctx: OperationContext, data: NoteRefIn) -> dict:
     },
 )
 def claim_for_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
+    # The card before its number's conversations (``_locked_cards_of``); one the Hub admin deleted claims nothing.
+    if not lock_customers([data.id]):
+        return {"count": 0}
     card = Customer.objects.live().filter(pk=data.id).first()
     if card is None or not card.phone or _only_card_of(card.phone) != card.id:
         return {"count": 0}
@@ -1277,7 +1303,8 @@ def claim_for_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
     },
 )
 def move_customer(ctx: OperationContext, data: MergedEventIn) -> dict:
-    if data.id == data.absorbed_id:
+    # The card that stays before the conversations that move to it; one the Hub admin deleted takes nothing.
+    if data.id == data.absorbed_id or not lock_customers([data.id]):
         return {"count": 0}
     rows = list(
         Conversation.objects.select_for_update().filter(customer_id=data.absorbed_id)
@@ -1306,6 +1333,8 @@ def move_customer(ctx: OperationContext, data: MergedEventIn) -> dict:
     },
 )
 def release_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
+    phones = live_conversations().filter(customer_id=data.id).values_list("phone", flat=True)
+    claims = _locked_cards_of(sorted(set(phones)))
     rows = list(live_conversations().select_for_update().filter(customer_id=data.id))
     for conversation in rows:
         conversation.customer = None
@@ -1315,7 +1344,7 @@ def release_customer(ctx: OperationContext, data: CustomerEventIn) -> dict:
             events.CUSTOMER_LINKED,
             {"id": str(conversation.id), "customer_id": None},
         )
-        _link_by_phone(ctx, conversation)
+        _link_by_phone(ctx, conversation, claims.get(conversation.phone))
     return {"count": len(rows)}
 
 
