@@ -2,6 +2,8 @@
 // them, each with «Add» (the draft of «New printer») or «Already added»; it says why it found nothing —
 // a browser cannot look, the device denied the permission, the app is not linked to this business, the
 // scan failed, or nothing answered — and always offers «Add by its address» (hub#1924).
+import { HubIcon } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, flush, mountPrinting } from '../__tests__/mount-printing';
@@ -66,6 +68,14 @@ describe('DiscoverPrintersModal', () => {
     await click(s.inDoc('printing-discover-again'));
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).toHaveBeenCalledWith('erplora_discover_printers');
+  });
+
+  it('«Search again» reads as a button, never as loose text: outlined, with its icon', async () => {
+    inApp(async () => ({ status: 'scanned', printers: [] }));
+    const s = await setup();
+    const again = s.wrapper.findAllComponents(IonButton).find((button) => button.attributes('data-testid') === 'printing-discover-again')!;
+    expect(again.props('fill')).toBe('outline');
+    expect(again.findComponent(HubIcon).props('name')).toBe('ion:refresh-outline');
   });
 
   it('says the device denied the permission, never «no printers» (hub#1773)', async () => {

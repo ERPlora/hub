@@ -6,6 +6,7 @@
 // the scan failed, or nothing answered, with «Search again» where searching again can help. «Add by its
 // address» is always there: the way in when the scan cannot see the printer (hub#1924).
 import { EmptyState, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote, IonSpinner } from '@ionic/vue';
 import { shallowRef, watch } from 'vue';
 
@@ -139,12 +140,16 @@ const canSearchAgain = (r: DiscoveryResult | null) => !!r && r.kind !== 'browser
         </ion-list>
         <ion-button
           v-if="canSearchAgain(result)"
-          fill="clear"
+          fill="outline"
           size="small"
           class="printing-discover__again"
           data-testid="printing-discover-again"
           @click="search()"
         >
+          <HubIcon
+            slot="start"
+            name="ion:refresh-outline"
+          />
           {{ $t('printing.discover.again') }}
         </ion-button>
       </template>
