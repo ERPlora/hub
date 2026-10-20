@@ -4,6 +4,7 @@
 // says so; the sheet comments, adds a subtask, opens it and comes Back, and completes the task; the
 // project's sheet lists both tasks, is deactivated and deleted, and its tasks stay. Both screens are
 // captured in the three viewports. Everything is named «E2E Task …» and removed after it.
+// flow: TASK-F01 TASK-F02 TASK-F04 TASK-F05 TASK-F06 TASK-F09 TASK-F10 TASK-F12 TASK-F13 TASK-F14
 import { expect, test } from '@playwright/test';
 
 import { api, A, shot, shown } from './helpers';

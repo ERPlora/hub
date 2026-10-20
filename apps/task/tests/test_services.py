@@ -174,14 +174,19 @@ def test_creating_needs_the_add_permission():
 def test_an_edit_changes_only_what_was_sent(team):
     project = make_project()
     task = make_task("Old", description="keep", project=project, due_date=dt.date(2026, 10, 1), tags=["a"])
-    row = run("task.task.update", {"id": str(task.id), "title": "New", "due_date": None, "tags": ["b"]})
-    assert (row.title, row.description, row.due_date, row.project_id, row.tags) == (
+    row = run(
+        "task.task.update", {"id": str(task.id), "title": "New", "priority": "high", "due_date": None, "tags": ["b"]}
+    )
+    assert (row.title, row.description, row.priority, row.due_date, row.project_id, row.tags) == (
         "New",
         "keep",
+        "high",
         None,
         project.id,
         ["b"],
     )
+    task.refresh_from_db()
+    assert (task.title, task.priority, task.due_date, task.tags) == ("New", "high", None, ["b"])
     assert events() == [("task.task.updated", {"id": str(task.id)})]
     row = run("task.task.update", {"id": str(task.id), "project_id": None})
     assert row.project_id is None
@@ -267,6 +272,34 @@ def test_a_task_that_does_not_exist_is_a_404():
         run("task.task.set_status", {"task": "ghost", "status": "done"})
 
 
+GHOST_WRITES = [
+    ("task.task.update", {"priority": "urgent"}),
+    ("task.task.set_status", {"status": "blocked"}),
+    ("task.task.complete", {}),
+    ("task.task.assign", {"member": "Ana"}),
+    ("task.task.assign", {}),
+    ("task.task.delete", {}),
+    ("task.comment.add", {"text": "Seen it"}),
+]
+
+
+@pytest.mark.parametrize("by", ["id", "number", "title"])
+@pytest.mark.parametrize(("name", "extra"), GHOST_WRITES)
+def test_a_write_on_a_task_that_does_not_exist_is_refused_and_says_nothing(team, name, extra, by):
+    """tasks#22 and tasks#24: the old module reported an assignment of a missing task as done, and the
+    database's own words for a comment on one; here every write is a «does not exist», with no event."""
+    real = make_task("Real one", number="TSK-20261014-0001")
+    key = "task_id" if name.startswith("task.comment.") else "id"
+    reference = {"id": {key: "0190c1d2-0000-7000-8000-000000000000"}, "number": {"task": "TSK-20261014-0999"}}
+    reference["title"] = {"task": "ghost"}
+    with pytest.raises(NotFound) as caught:
+        run(name, {**reference[by], **extra}, ctx=as_manager(team))
+    assert caught.value.message == "That task does not exist in this business."
+    assert events() == [] and not Comment.objects.exists()
+    real.refresh_from_db()
+    assert (real.status, real.priority, real.assigned_to_id) == ("todo", "medium", None)
+
+
 def test_an_employee_completes_their_own(team):
     task = make_task(assigned_to=team["worker_member"])
     assert run("task.task.complete", {"id": str(task.id)}, ctx=as_employee(team)).status == "done"
@@ -337,6 +370,8 @@ def test_a_comment_is_signed_by_the_caller(team):
     task = make_task(assigned_to=team["worker_member"])
     comment = run("task.comment.add", {"task_id": str(task.id), "text": " On it "}, ctx=as_employee(team))
     assert (comment.text, comment.author_id, comment.author_name) == ("On it", team["worker"].pk, "Bea Ruiz")
+    # What is kept, not only what the command answers: the thread is a record signed in the database.
+    assert Comment.objects.get(pk=comment.id).author_id == team["worker"].pk
     assert events() == [("task.comment.added", {"id": str(comment.id), "task_id": str(task.id)})]
 
 
@@ -372,8 +407,10 @@ def test_a_project_edit_changes_only_what_was_sent(team):
     project = make_project(color="#000000")
     row = run("task.project.update", {"project": "opening", "is_active": False})
     assert (row.is_active, row.name, row.color, row.code) == (False, "Opening", "#000000", "opening")
-    row = run("task.project.update", {"id": str(project.id), "name": "Grand opening", "owner": "Ana"})
-    assert (row.name, row.owner_name) == ("Grand opening", "Ana López")
+    row = run("task.project.update", {"id": str(project.id), "name": "Grand opening", "owner": "Ana", "color": "#FF8800"})
+    assert (row.name, row.color, row.owner_name) == ("Grand opening", "#FF8800", "Ana López")
+    project.refresh_from_db()
+    assert (project.name, project.color) == ("Grand opening", "#FF8800")
     row = run("task.project.update", {"id": str(project.id), "owner_id": None})
     assert row.owner_id is None
     run("task.project.update", {"id": str(project.id), "name": "Grand opening"})

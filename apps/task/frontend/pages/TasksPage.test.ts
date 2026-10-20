@@ -1,7 +1,7 @@
-// Tasks → Tasks (WORKBOOK «Pantallas · Tareas»; TASK-F01 to F07): «All» follows the live
-// `task.task.list` in a server-side DataTable — No., Title, Status, Priority (a coloured chip), Due (red
-// «Overdue», amber «Due today»), Assignee and Project (hidden) —, the newest first, «Search no. or
-// title…», column filters, list or cards, 50 a page. «My tasks» (only with a staff record) follows
+// Tasks → Tasks (WORKBOOK «Pantallas · Tareas»; TASK-F01 to F07): «All» follows the live `task.task.list`
+// in a server-side DataTable — No., Title, Status, Priority (a coloured chip), Due (red «Overdue», amber
+// «Due today»), Assignee and Project (hidden) —, the newest first, «Search no. or title…», column filters
+// behind the toolbar funnel, list or cards, 50 a page. «My tasks» (only with a staff record) follows
 // `task.task.mine`, and a task completed from its card stays in its slot as done. A row offers Detail,
 // Start and Complete where they apply; the row and Detail open the sheet; «+» opens «New task».
 import { DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
@@ -107,6 +107,17 @@ describe('TasksPage · All', () => {
         offset: 0,
       },
     ]);
+  });
+
+  it('keeps the filters behind the toolbar funnel, as the old table did, until it is pressed', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    expect(s.wrapper.find('[data-testid="task-tasks-filters-toggle"]').exists()).toBe(true);
+    expect(s.wrapper.find('[data-testid="task-tasks-filter-priority"]').exists()).toBe(false);
+    await s.wrapper.find('[data-testid="task-tasks-filters-toggle"]').trigger('click');
+    await flush();
+    expect(s.wrapper.find('[data-testid="task-tasks-filters-panel"] [data-testid="task-tasks-filter-priority"]').exists()).toBe(true);
   });
 
   it('sorts and searches on the server; no task at all says «No tasks.»', async () => {

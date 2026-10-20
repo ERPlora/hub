@@ -81,7 +81,8 @@ Arriba, el selector **Todas / Mis tareas** («Mis tareas» solo sale a quien tie
 proyecto), columnas **Nº, Título, Estado, Prioridad, Vence** y **Responsable**; **Proyecto** existe
 pero sale oculta. Se ordena por cualquier columna (por defecto, las más nuevas primero) y se filtra
 por Nº, Título, Estado, Prioridad (las dos eligiendo de su lista), Vence (un día), Responsable y
-Proyecto; 50 por página. El empleado solo ve las suyas.
+Proyecto: los filtros esperan tras el embudo de la barra, que se pone en color con el número de
+filtros puestos; 50 por página. El empleado solo ve las suyas.
 
 - La **prioridad** sale como etiqueta de color con su nombre: Baja (gris), Media (azul), Alta
   (ámbar), Urgente (rojo).
@@ -115,8 +116,8 @@ Se abre sobre la lista con: **TSK-AAAAMMDD-NNNN — Título**, su estado y su pr
 
 ### Proyectos
 Tabla con buscador «Buscar código o nombre…», columnas **Código, Nombre, Color** y **Activo** (Sí /
-No, filtro de lista; Código, Nombre y Color se filtran por «contiene»); orden por cualquier columna, 50
-por página. Los contadores de tareas de un proyecto cuentan solo las que quien mira puede ver. **+** abre **Nuevo proyecto**:
+No, filtro de lista; Código, Nombre y Color se filtran por «contiene»; los filtros, tras el embudo de la
+barra); orden por cualquier columna, 50 por página. Los contadores de tareas de un proyecto cuentan solo las que quien mira puede ver. **+** abre **Nuevo proyecto**:
 **Código** (obligatorio, único: «q3-audit»), **Nombre** (obligatorio) y **Color** (opcional,
 #RRGGBB). Acción de fila **Abrir**; pulsar la fila hace lo mismo. Crear, editar y borrar es del
 responsable; el empleado ve la lista.
@@ -157,9 +158,10 @@ la crea dentro del proyecto.
 | TASK-F12 | Crear un proyecto | hecho |
 | TASK-F13 | Abrir y cambiar un proyecto | hecho |
 | TASK-F14 | Borrar un proyecto | hecho |
-| TASK-F15 | Cuando alguien deja el equipo | hecho — la reacción está declarada; la entrega entre apps la hace el relay del outbox (fase 2) |
+| TASK-F15 | Cuando alguien deja el equipo | parcial: la baja le llega con el envío de avisos entre apps (fase 2) |
 
 ### TASK-F01 Crear una tarea
+<!-- origen: fi:modules/tasks#command-handler-wasm-tasks-tasks-create-create_task old:tasks/WORKFLOW.md#que-hay-hoy -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tareas
@@ -182,12 +184,13 @@ está activa en el equipo.» o, por nombre, varias personas o proyectos que enca
 Implicados: Personal (la ficha del responsable)
 
 ### TASK-F02 Ver y buscar las tareas
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos; el empleado ve solo las suyas
 Pantalla: Tareas → Todas
 Pasos:
 1. Abre **Tareas**: la tabla sale con las más nuevas primero.
-2. Busca, filtra u ordena por cualquier columna.
+2. Busca, ordena por cualquier columna o pulsa el embudo, elige los filtros y pulsa **Aplicar**.
 Entra: búsqueda y filtros: nº, título, estado, prioridad, abiertas o cerradas, vencidas, proyecto (id,
 código o nombre), responsable (id o nombre), sin responsable, tarea madre, solo las de primer nivel,
 etiqueta, y rangos de vencimiento, de completada y de creación. Hasta 100 por página.
@@ -197,6 +200,7 @@ Si falla: un filtro que no existe, «422».
 Implicados: Personal (el nombre del responsable)
 
 ### TASK-F03 Ver mis tareas
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-my -->
 Estado: hecho (servidor y pantalla)
 Actor: quien tiene ficha vinculada a su cuenta, asistente
 Pantalla: Tareas → Mis tareas
@@ -211,6 +215,7 @@ Si falla: nada propio.
 Implicados: Personal (mi ficha)
 
 ### TASK-F04 Abrir una tarea
+<!-- origen: fi:modules/tasks#query-tasks-tasks-get -->
 Estado: hecho (servidor y pantalla)
 Actor: quien la ve
 Pantalla: Tarea (hoja)
@@ -224,6 +229,7 @@ ve); varias tareas que encajan con el título: se dicen cuáles.
 Implicados: ninguno
 
 ### TASK-F05 Iniciar o cambiar el estado
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-update_status-update_status -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla (el empleado, las suyas)
 Pantalla: Tareas (acción **Iniciar**), Tarea (selector **Estado**)
@@ -238,11 +244,14 @@ Si falla: «Esa tarea no existe en este negocio.», «No tienes permiso» (la de
 Implicados: ninguno
 
 ### TASK-F06 Completar una tarea
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-complete-complete_task -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tareas (acción **Completar**), Tarea (botón **Completar**)
 Pasos:
-1. Pulsa **Completar**: la tarea pasa a **Hecha** con la fecha de ahora.
+1. En la fila de la tarea, o en su hoja, pulsa **Completar**.
+2. La tarea pasa a **Hecha** con la fecha de ahora: la lista lo dice al momento y ya no sale como
+   vencida.
 Entra: la tarea.
 Sale: la tarea (`task.task.status_changed` y `task.task.completed`).
 Si falla: si ya estaba hecha o cancelada, «Esa tarea ya está cerrada, así que se ha dejado como
@@ -251,11 +260,14 @@ se cambia el estado.
 Implicados: ninguno
 
 ### TASK-F07 Asignar, reasignar o desasignar
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-assign -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
 Pasos:
-1. Elige la persona en **Asignar a** y pulsa **Asignar**; o **Asignármela**; o **Desasignar**.
+1. Abre la tarea, busca a la persona por su nombre en **Asignar a** y pulsa **Asignar**; o pulsa
+   **Asignármela**.
+2. Para dejarla sin responsable, pulsa **Desasignar**: la hoja dice «Sin asignar».
 Entra: la tarea y la persona (id, nombre o «a mí»); sin persona, se desasigna. Solo personas
 activas o de baja temporal; nunca una ficha dada de baja o inactiva.
 Sale: la tarea (`task.task.assigned`, con el responsable nuevo o vacío). Asignar a quien ya la tiene
@@ -265,53 +277,62 @@ equipo.», «No tienes ficha en Personal: no se te puede asignar.» (asignármel
 Implicados: Personal
 
 ### TASK-F08 Editar una tarea
+<!-- origen: nuevo (el producto actual no editaba una tarea) -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea → **Editar**
 Pasos:
-1. Cambia el título, la descripción, la prioridad, la fecha límite, el proyecto o las etiquetas;
-   **Guardar** envía solo lo que cambió.
+1. Abre la tarea y pulsa **Editar**: se abre «Editando tarea — TSK-…» con sus datos.
+2. Cambia el título, la descripción, la prioridad, la fecha límite, el proyecto o las etiquetas y
+   pulsa **Guardar**: se envía solo lo que cambió.
 Entra: lo enviado; vacío en Vence o Proyecto los quita.
 Sale: la tarea (`task.task.updated`). Guardar sin cambios no avisa.
 Si falla: los mismos rechazos que al crear.
 Implicados: ninguno
 
 ### TASK-F09 Añadir una subtarea
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-subtasks -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede crear tareas y ve la madre
 Pantalla: Tarea
 Pasos:
-1. Escribe el título en «Nueva subtarea…» y pulsa **Añadir subtarea**: sale en la lista al momento,
-   con su número, en el proyecto de la madre.
+1. Abre la tarea, escribe el título en «Nueva subtarea…» y pulsa **Añadir subtarea**: sale en la
+   lista al momento, con su número, en el proyecto de la madre.
+2. **Abrir** en la subtarea entra en ella, con la ruta de números arriba; **Volver** sale a la madre.
 Entra: el título y la madre.
 Sale: la subtarea (`task.task.created`).
 Si falla: el motivo dentro de la hoja; el título tecleado se queda.
 Implicados: ninguno
 
 ### TASK-F10 Comentar una tarea
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-add_comment fi:modules/tasks#query-tasks-tasks-comments -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
 Pasos:
-1. Escribe en «Añadir comentario…» y pulsa **Comentar**: el comentario entra arriba del hilo con mi
-   nombre y la hora; la caja se vacía (lo que tecleé mientras se enviaba se queda).
+1. Abre la tarea y escribe en «Añadir comentario…».
+2. Pulsa **Comentar**: el comentario entra arriba del hilo con mi nombre y la hora; la caja se vacía
+   (lo que tecleé mientras se enviaba se queda).
 Entra: la tarea y el texto (obligatorio, hasta 5000). El autor sale siempre de la sesión.
 Sale: el comentario (`task.comment.added`). El hilo es un registro: no se edita ni se borra.
 Si falla: texto vacío; «Esa tarea no existe en este negocio.».
 Implicados: ninguno
 
 ### TASK-F11 Borrar una tarea
+<!-- origen: nuevo (el producto actual describía el borrado sin acción) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Tarea → **Borrar**
 Pasos:
-1. Pulsa **Borrar** y confirma: la tarea desaparece **con sus subtareas y sus comentarios**.
+1. Abre la tarea y pulsa **Borrar**: se pide confirmación.
+2. Pulsa **Borrar** en el aviso: la tarea desaparece **con sus subtareas y sus comentarios**.
 Entra: la tarea.
 Sale: `task.task.deleted`.
 Si falla: «Esa tarea no existe en este negocio.».
 Implicados: ninguno
 
 ### TASK-F12 Crear un proyecto
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-projects-create -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Proyectos
@@ -320,11 +341,13 @@ Pasos:
    200); si quieres, **Color** (#RRGGBB). Por la API o el asistente, también un dueño (una persona
    del equipo).
 2. Pulsa **Crear**: el proyecto sale **Activo**.
+Entra: el código, el nombre y, si quieres, el color; por la API o el asistente, también el dueño.
 Sale: el proyecto (`task.project.created`).
 Si falla: «Ya hay un proyecto con ese código.» bajo el campo; un color que no es #RRGGBB.
 Implicados: Personal (el dueño)
 
 ### TASK-F13 Abrir y cambiar un proyecto
+<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-projects-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos lo abren; lo cambian el propietario, el administrador y el responsable
 Pantalla: Proyecto (hoja)
@@ -340,24 +363,34 @@ vacío no se envía.
 Implicados: ninguno
 
 ### TASK-F14 Borrar un proyecto
+<!-- origen: nuevo (el producto actual no borraba proyectos) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Proyecto → **Borrar**
 Pasos:
-1. Pulsa **Borrar** y confirma: el proyecto desaparece; **sus tareas siguen**, sin proyecto.
+1. Abre el proyecto y pulsa **Borrar**: se pide confirmación.
+2. Pulsa **Borrar** en el aviso: el proyecto desaparece; **sus tareas siguen**, sin proyecto.
+Entra: el proyecto.
 Sale: `task.project.deleted`.
 Si falla: «Ese proyecto no existe en este negocio.».
 Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
-Estado: hecho — la reacción está declarada (`events.REACTIONS`, `events.react`); la entrega entre apps la
-hace el relay del outbox (fase 2). Sin pantalla.
-Actor: la plataforma
+<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
+Estado: parcial — la reacción está hecha y probada contra Personal real, pero el aviso de la baja le
+llega con el envío de avisos entre apps, que es de la plataforma (fase 2). Hasta entonces, las tareas
+abiertas de quien se da de baja siguen a su nombre y un responsable las reasigna (TASK-F07).
+Actor: sistema
+Pantalla: ninguna
 Pasos:
-1. Al dar de baja a una persona en **Personal** (`staff.member.terminated`), sus tareas **abiertas**
-   se quedan **sin asignar**, para que el responsable las reparta. Las cerradas conservan su nombre.
+1. Un responsable da de baja en **Personal** a una persona que tiene tareas abiertas (STAFF-F06).
+2. Sus tareas **abiertas** se quedan **sin asignar**, para que el responsable las reparta; las
+   cerradas conservan su nombre.
+Entra: la baja de la persona en Personal.
 Sale: un `task.task.assigned` (responsable vacío) por tarea.
-Implicados: Personal
+Si falla: si la persona no tenía tareas abiertas, no se hace nada; una segunda entrega del mismo aviso
+tampoco cambia nada.
+Implicados: Personal (STAFF-F06), TASK-F07
 
 ## Servicios: lo que entra y lo que sale
 
