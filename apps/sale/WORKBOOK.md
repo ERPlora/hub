@@ -541,8 +541,9 @@ Pasos:
    plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los suplementos.
    Púlsalo: el menú entra en la cuenta como una línea, con sus platos debajo del nombre. Cada menú es una
    línea propia; su cantidad se cambia por unidades enteras.
-5. Cobra como siempre (SALE-F01): el menú cobra el importe que tenía al pedirlo aunque después suba de precio
-   o se agote un plato. «En el local» sale en una línea al IVA del menú; «para llevar» con platos de distinto
+5. Cobra como siempre (SALE-F01): el menú cobra el importe que tenía al pedirlo aunque después suba de precio,
+   se agote un plato o el menú se retire (también con Menús y combos apagada: cobra lo que congeló). «En el
+   local» sale en una línea al IVA del menú; «para llevar» con platos de distinto
    IVA sale en una línea por plato, con el importe repartido según el precio de catálogo de cada uno (6,00 €
    de bocadillo y caña: 4,15 € al 10 % y 1,85 € al 21 %), y sin línea del menú con dinero.
 Entra: los menús de Menús y combos; Menús comprueba los platos elegidos y pone el precio al añadir la línea y

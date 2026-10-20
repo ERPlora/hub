@@ -987,22 +987,29 @@ def refresh_combos(ctx: OperationContext, lines: Iterable[OrderLine]) -> None:
     """Charging an open check asks Menus again for each of its menus with the amount ordered (COMBO-F08):
     it does not ask for the dishes to be on offer again, only checks the courses, the portions and the tax
     data, and splits that amount (or not, and at which tax category) as it says today. Only the charge's copy
-    of each line changes: the line of the check keeps what it froze."""
+    of each line changes: the line of the check keeps what it froze. A menu Menus no longer knows (withdrawn
+    since) or Menus off since: the check charges what it froze, as a ticket already issued keeps its copy."""
     for line in lines:
         if line.combo_id is None:
             continue
-        line.combo = _resolved_menu(
-            ctx,
-            {
-                "id": line.combo_id,
-                "choices": [
-                    {"option_id": dish["option_id"], "quantity": dish["quantity"]}
-                    for dish in line.combo["components"]
-                ],
-                "amount": line.unit_price,
-            },
-        )
-        line.tax_category_key = line.combo["tax_category_key"] or ""
+        try:
+            answer = _resolved_menu(
+                ctx,
+                {
+                    "id": line.combo_id,
+                    "choices": [
+                        {"option_id": dish["option_id"], "quantity": dish["quantity"]}
+                        for dish in line.combo["components"]
+                    ],
+                    "amount": line.unit_price,
+                },
+            )
+        except Conflict as refused:
+            if refused.code in ("combo.combo_missing", "sale.combo_unavailable"):
+                continue
+            raise
+        line.combo = answer
+        line.tax_category_key = answer["tax_category_key"] or ""
 
 
 def folded_names(line: OrderLine) -> list[str]:

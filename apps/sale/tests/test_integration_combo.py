@@ -350,3 +350,31 @@ def test_a_menu_on_the_house_is_on_the_house_in_every_dish(takeaway):
         ("Sandwich", True, 0),
         ("Beer", True, 0),
     ]
+
+
+def test_a_menu_withdrawn_after_ordering_is_charged_as_it_was_ordered(takeaway):
+    """A menu deleted in Menus after a table ordered it («tickets already issued keep their copy», COMBO's
+    delete): the check still charges, with the split and the dishes frozen when it was ordered."""
+    order_id = str(
+        run(
+            "sale.order.open",
+            {"combo_lines": [{"combo": "Sandwich and beer", "choices": [{"product": "SAN"}, {"product": "BEE"}]}]},
+        ).id
+    )
+    setup("combo.combo.delete", {"combo": "Sandwich and beer"})
+    sale = charge("combo-gone-0001", order_id=order_id)
+    assert sale.total == 600
+    assert [(row.name, row.tax_category_key, row.line_total) for row in sale.lines] == [
+        ("Sandwich", FOOD, 415),
+        ("Beer", "retail.alcohol", 185),
+    ]
+
+
+def test_with_menus_off_at_the_charge_a_menu_ordered_is_charged_as_it_was_ordered(menu, monkeypatch):
+    """Menus switched off after a table ordered a menu: the check still charges what it froze."""
+    order_id = open_check()
+    add_menu(order_id, choices(menu["LEN"], menu["HAK"]))
+    monkeypatch.setattr("apps.sale.queries.COMBO_RESOLVE", "combo.combo.not_installed")
+    sale = charge("combo-off-0001", order_id=order_id)
+    assert sale.total == 1350
+    assert [(row.name, row.tax_category_key, row.line_total) for row in sale.lines] == [("Menu of the day", FOOD, 1350)]
