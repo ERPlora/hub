@@ -2,13 +2,15 @@
 // The comparisons of «Only continue if…» and of the trigger's «Only when…» (WORKBOOK FLOW-F10, F11): one
 // row per comparison — Data, Is, Value — and every one must hold. The data are chosen from what the
 // automation has (`choices`), never typed; «present» asks yes or no; «one of» takes values separated
-// by commas; a number or a yes/no typed is sent as one. A row without its data does not count yet.
+// by commas; a number or a yes/no typed is sent as one. A row without its data does not count yet. The
+// value may also be another datum (hub#1712: «the total is what the event brought»), picked with the
+// editor's picker and shown as a pill in words.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
-import { type ConditionRow, conditionRows, type DataChoice, OPERATORS, partsToValue, rowsToCondition } from '../lib/document';
+import { type ConditionRow, conditionRows, type DataChoice, isPath, OPERATORS, partsToValue, rowsToCondition } from '../lib/document';
 import { pathLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, Operator, Step } from '../operations';
 
@@ -17,8 +19,11 @@ const props = defineProps<{
   choices: readonly DataChoice[];
   steps: readonly Step[];
   catalog: CatalogOut | null;
-  /** Prefix of the hooks: `<testid>-row-<n>`, `-path-<n>`, `-op-<n>`, `-value-<n>`, `-remove-<n>`, `-add`. */
+  /** Prefix of the hooks: `<testid>-row-<n>`, `-path-<n>`, `-op-<n>`, `-value-<n>`, `-pill-<n>`, `-unpill-<n>`,
+   *  `-insert-<n>`, `-remove-<n>`, `-add`. */
   testid: string;
+  /** Opens the editor's picker; the chosen path, or `null`. Without it a datum cannot be picked as the value. */
+  pick?: () => Promise<string | null>;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: Condition] }>();
 const phrasing = usePhrasing();
@@ -70,6 +75,16 @@ function setText(index: number, text: string): void {
 function shown(row: ConditionRow): string {
   if (Array.isArray(row.value)) return row.value.join(', ');
   return row.value === undefined || row.value === null ? '' : String(row.value);
+}
+
+/** Whether the value is another datum (a single path), painted as a pill instead of a box to type in. */
+function comparesWithDatum(row: ConditionRow): boolean {
+  return row.op !== 'exists' && row.op !== 'in' && isPath(row.value);
+}
+
+async function insert(index: number): Promise<void> {
+  const path = await props.pick?.();
+  if (path) patch(index, { value: path });
 }
 
 function add(): void {
@@ -144,6 +159,21 @@ function remove(index: number): void {
             {{ $t('flow.steps.no') }}
           </IonSelectOption>
         </IonSelect>
+        <span
+          v-else-if="comparesWithDatum(row)"
+          class="flow-conditions__pill"
+        >
+          <span :data-testid="`${testid}-pill-${index}`">{{ pathLabel(String(row.value), steps, catalog, phrasing) }}</span>
+          <button
+            type="button"
+            class="flow-conditions__unpill"
+            :aria-label="$t('flow.steps.removeData')"
+            :data-testid="`${testid}-unpill-${index}`"
+            @click="patch(index, { value: '' })"
+          >
+            <HubIcon name="ion:close-outline" />
+          </button>
+        </span>
         <IonInput
           v-else
           :data-testid="`${testid}-value-${index}`"
@@ -154,6 +184,15 @@ function remove(index: number): void {
           mode="md"
           @ion-input="setText(index, String($event.detail.value ?? ''))"
         />
+        <button
+          v-if="pick && row.op !== 'exists' && row.op !== 'in'"
+          type="button"
+          class="flow-conditions__insert"
+          :data-testid="`${testid}-insert-${index}`"
+          @click="insert(index)"
+        >
+          <HubIcon name="ion:add-outline" />{{ $t('flow.steps.insert') }}
+        </button>
         <span
           v-if="row.op === 'in'"
           class="flow-conditions__hint"
@@ -211,6 +250,44 @@ function remove(index: number): void {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+.flow-conditions__pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.2rem;
+  max-width: 100%;
+  min-height: 2.6rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ion-color-primary) 14%, transparent);
+  color: var(--ion-color-primary-shade, var(--ion-color-primary));
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.flow-conditions__unpill,
+.flow-conditions__insert {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 2rem;
+}
+.flow-conditions__unpill {
+  min-width: 2rem;
+  justify-content: center;
+  border-radius: 999px;
+}
+.flow-conditions__insert {
+  align-self: flex-start;
+  font-size: 0.82rem;
+  color: var(--ion-color-primary);
+  padding: 0 0.2rem;
 }
 .flow-conditions__hint {
   font-size: 0.78rem;

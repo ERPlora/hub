@@ -114,6 +114,13 @@ describe('steps', () => {
     expect(describeClause({ path: 'input.customer_id', op: 'exists', value: true }, [], CATALOG, p)).toBe('Customer present: yes');
     expect(describeClause({ path: 'input.party_size', op: 'in', value: [6, 8] }, [], CATALOG, p)).toBe('Party size one of 6, 8');
   });
+
+  it('a comparison with another datum names that datum, never its path (hub#1712)', () => {
+    const clause = describeClause({ path: 'input.total', op: 'eq', value: 'input.customer_id' }, [], CATALOG, p);
+    expect(clause).toContain('Customer');
+    expect(clause).not.toContain('input.');
+    expect(describeClause({ path: 'input.total', op: 'in', value: ['input.customer_id', 5] }, [], CATALOG, p)).not.toContain('input.');
+  });
 });
 
 describe('pills', () => {

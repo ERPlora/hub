@@ -238,6 +238,7 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
           :testid="`flow-step-cond-${id}`"
           :model-value="step.when"
           :choices="choices"
+          :pick="pick"
           :steps="steps"
           :catalog="catalog"
           @update:model-value="setCondition"

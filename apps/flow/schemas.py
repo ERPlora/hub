@@ -296,7 +296,8 @@ def _reads(step: Any) -> list[str]:
     if step.kind in ("command", "query"):
         return document.references(step.params)
     if step.kind == "condition":
-        return list(step.when)
+        # The data it looks at and the data it compares with (hub#1712).
+        return [*step.when, *document.references(list(step.when.values()))]
     return []
 
 

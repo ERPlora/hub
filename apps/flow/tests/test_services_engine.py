@@ -649,3 +649,21 @@ def test_the_prune_goes_in_bounded_passes(clock, monkeypatch):
     # The oldest go first.
     assert FlowRun.objects.get().finished_at == old
     assert run("flow.run.prune", {}, _system()).count == 1
+
+
+def test_a_condition_compares_two_data_of_the_run(clock):
+    # hub#1712: saved well and then never matching is what the old engine did with a datum as the value.
+    clock(NOON)
+    make_flow(
+        steps=[
+            {"id": "s1", "kind": "condition", "when": {"input.total": {"eq": "input.expected"}}},
+            TASK_STEP | {"id": "s2"},
+        ]
+    )
+    deliver(payload={"total": 12500, "expected": 12500})
+    deliver(payload={"total": 12500, "expected": 9900})
+    assert sorted(FlowRun.objects.values_list("status", flat=True)) == [
+        FlowRun.Status.STOPPED,
+        FlowRun.Status.SUCCEEDED,
+    ]
+    assert Task.objects.count() == 1

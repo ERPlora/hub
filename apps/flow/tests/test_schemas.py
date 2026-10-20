@@ -225,6 +225,22 @@ def test_a_step_reads_only_what_an_earlier_step_left():
     )
 
 
+def test_a_condition_compares_only_with_data_it_already_has():
+    # hub#1712: the second datum of a comparison is a reference like any other.
+    later = [
+        {"id": "s1", "kind": "condition", "when": {"input.total": {"gt": "steps.s2.total"}}},
+        COMMAND | {"id": "s2"},
+    ]
+    assert errors(schemas.CreateIn, {"name": "A", "steps": later}) == {
+        "steps": "Value error, Step 1 reads «steps.s2.total», which no earlier step leaves."
+    }
+    earlier = [
+        COMMAND,
+        {"id": "s2", "kind": "condition", "when": {"input.total": {"gt": "steps.s1.total"}}},
+    ]
+    schemas.CreateIn.model_validate({"name": "A", "steps": earlier})
+
+
 def test_a_template_reads_only_paths():
     found = errors(
         schemas.CreateIn,

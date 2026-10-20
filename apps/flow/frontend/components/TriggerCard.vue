@@ -23,6 +23,8 @@ const props = defineProps<{
   steps: readonly Step[];
   /** The server's refusals by field (`trigger.event`, `trigger.at`, `trigger.time`, `trigger`). */
   errors: Readonly<Record<string, string>>;
+  /** Opens the editor's picker on what the event brings, for a comparison with another datum. */
+  pick?: () => Promise<string | null>;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: Trigger]; toggle: [] }>();
 const phrasing = usePhrasing();
@@ -149,6 +151,7 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
               testid="flow-trigger-filter"
               :model-value="trigger.filter"
               :choices="choices"
+              :pick="pick"
               :steps="steps"
               :catalog="catalog"
               @update:model-value="setFilter"

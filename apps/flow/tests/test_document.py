@@ -171,6 +171,24 @@ def test_the_failed_comparisons_are_named():
     ]
 
 
+def test_a_comparison_can_read_another_datum():
+    # hub#1712: «only if the total is what the event brought» — the value is a path or a template, read
+    # like any other value; a datum that is not there never matches.
+    data = {
+        "input": {"total": 12500, "paid": 12500, "name": "Ana", "greeting": "Hola Ana"},
+        "steps": {"s1": {"total": 9000}},
+    }
+    assert doc.holds({"input.total": {"eq": "input.paid"}}, data) is True
+    assert doc.holds({"input.total": {"gt": "steps.s1.total"}}, data) is True
+    assert doc.holds({"input.greeting": {"eq": "Hola {{input.name}}"}}, data) is True
+    assert doc.holds({"input.total": {"in": ["steps.s1.total", "input.paid"]}}, data) is True
+    assert doc.failed_clauses({"input.total": {"lt": "steps.s1.total"}}, data) == [
+        {"path": "input.total", "op": "lt", "value": "steps.s1.total"}
+    ]
+    assert doc.holds({"input.total": {"eq": "input.missing"}}, data) is False
+    assert doc.holds({"input.total": {"neq": "input.missing"}}, data) is False
+
+
 def test_an_empty_condition_always_holds():
     assert doc.holds({}, DATA) is True
 

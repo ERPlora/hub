@@ -390,6 +390,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
           :choices="triggerChoices"
           :steps="doc.steps"
           :errors="errors"
+          :pick="pickFor(0)"
           @update:model-value="setTrigger"
           @toggle="toggleStep('trigger')"
         />
