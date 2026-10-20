@@ -5,9 +5,17 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
+
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/SessionsPage.vue', () => ({ default: { name: 'SessionsPage' } }));
+vi.mock('./pages/SessionDetailPage.vue', () => ({ default: { name: 'SessionDetailPage' } }));
+vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -31,10 +39,10 @@ describe('cash register routes.ts', () => {
 
   it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
-    expect(await load(routes[0])).toBe((await import('./pages/SessionsPage.vue')).default);
-    expect(await load(routes[1])).toBe((await import('./pages/SessionDetailPage.vue')).default);
-    expect(await load(routes[2])).toBe((await import('./pages/SettingsPage.vue')).default);
-  }, 30_000);
+    expect(await load(routes[0])).toEqual({ name: 'SessionsPage' });
+    expect(await load(routes[1])).toEqual({ name: 'SessionDetailPage' });
+    expect(await load(routes[2])).toEqual({ name: 'SettingsPage' });
+  });
 
   it('imports types only: Vite hoists the eager glob of main.ts above the shell boot hooks', () => {
     const source = readFileSync(join(HERE, 'routes.ts'), 'utf8');

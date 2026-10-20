@@ -4,9 +4,18 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
+
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/AutomationsPage.vue', () => ({ default: { name: 'AutomationsPage' } }));
+vi.mock('./pages/NewFlowPage.vue', () => ({ default: { name: 'NewFlowPage' } }));
+vi.mock('./pages/FlowEditorPage.vue', () => ({ default: { name: 'FlowEditorPage' } }));
+vi.mock('./pages/GuidePage.vue', () => ({ default: { name: 'GuidePage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -25,14 +34,14 @@ describe('flow routes.ts', () => {
     ]);
   });
 
-  it('loads each page on demand (one chunk per page), not at boot', { timeout: 60_000 }, async () => {
+  it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
     const pages = await Promise.all(routes.map(load));
     expect(pages).toEqual([
-      (await import('./pages/AutomationsPage.vue')).default,
-      (await import('./pages/NewFlowPage.vue')).default,
-      (await import('./pages/FlowEditorPage.vue')).default,
-      (await import('./pages/GuidePage.vue')).default,
+      { name: 'AutomationsPage' },
+      { name: 'NewFlowPage' },
+      { name: 'FlowEditorPage' },
+      { name: 'GuidePage' },
     ]);
   });
 

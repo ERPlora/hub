@@ -4,10 +4,20 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
 import { SALE_TABS } from './tabs';
+
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/PosPage.vue', () => ({ default: { name: 'PosPage' } }));
+vi.mock('./pages/SalesPage.vue', () => ({ default: { name: 'SalesPage' } }));
+vi.mock('./pages/QuickNotesPage.vue', () => ({ default: { name: 'QuickNotesPage' } }));
+vi.mock('./pages/DepartmentsPage.vue', () => ({ default: { name: 'DepartmentsPage' } }));
+vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -16,12 +26,13 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
   return (await loader()).default;
 }
 
-const PAGES: Record<string, () => Promise<{ default: RouteComponent }>> = {
-  '/sale/pos': () => import('./pages/PosPage.vue'),
-  '/sale/sales': () => import('./pages/SalesPage.vue'),
-  '/sale/quick-notes': () => import('./pages/QuickNotesPage.vue'),
-  '/sale/departments': () => import('./pages/DepartmentsPage.vue'),
-  '/sale/settings': () => import('./pages/SettingsPage.vue'),
+/** Path → its page. */
+const PAGES: Record<string, string> = {
+  '/sale/pos': 'PosPage',
+  '/sale/sales': 'SalesPage',
+  '/sale/quick-notes': 'QuickNotesPage',
+  '/sale/departments': 'DepartmentsPage',
+  '/sale/settings': 'SettingsPage',
 };
 
 describe('sale routes.ts', () => {
@@ -32,10 +43,9 @@ describe('sale routes.ts', () => {
   it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) {
       expect(typeof r.component).toBe('function');
-      expect(await load(r)).toBe((await PAGES[r.path]()).default);
+      expect(await load(r), r.path).toEqual({ name: PAGES[r.path] });
     }
-    // Transforming the pages with their sheets takes a while when the whole suite runs at once.
-  }, 60_000);
+  });
 
   it('imports types only: Vite hoists the eager glob of main.ts above the shell boot hooks', () => {
     const source = readFileSync(join(HERE, 'routes.ts'), 'utf8');

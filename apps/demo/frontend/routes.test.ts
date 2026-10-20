@@ -3,9 +3,18 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
+
+// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
+// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
+// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
+// this file does not stub.
+vi.mock('./pages/ItemListPage.vue', () => ({ default: { name: 'ItemListPage' } }));
+vi.mock('./pages/ItemCreatePage.vue', () => ({ default: { name: 'ItemCreatePage' } }));
+vi.mock('./pages/ItemDetailPage.vue', () => ({ default: { name: 'ItemDetailPage' } }));
+vi.mock('./pages/ItemEditPage.vue', () => ({ default: { name: 'ItemEditPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -32,10 +41,10 @@ describe('demo routes.ts', () => {
 
   it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
-    expect(await load(route('/demo/items'))).toBe((await import('./pages/ItemListPage.vue')).default);
-    expect(await load(route('/demo/items/new'))).toBe((await import('./pages/ItemCreatePage.vue')).default);
-    expect(await load(route('/demo/items/:id'))).toBe((await import('./pages/ItemDetailPage.vue')).default);
-    expect(await load(route('/demo/items/:id/edit'))).toBe((await import('./pages/ItemEditPage.vue')).default);
+    expect(await load(route('/demo/items'))).toEqual({ name: 'ItemListPage' });
+    expect(await load(route('/demo/items/new'))).toEqual({ name: 'ItemCreatePage' });
+    expect(await load(route('/demo/items/:id'))).toEqual({ name: 'ItemDetailPage' });
+    expect(await load(route('/demo/items/:id/edit'))).toEqual({ name: 'ItemEditPage' });
   });
 
   it('hands the item id to the detail and edit pages as a prop (Ionic keeps one view per URL)', () => {
