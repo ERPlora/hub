@@ -97,7 +97,7 @@ const columns = computed<DataTableColumn<SessionRow>[]>(() => [
     width: 'minmax(7rem,1fr)',
     filter: { type: 'text', maxlength: 24 },
   },
-  { key: 'opened_at', label: t('cash_register.sessions.columns.openedAt'), sortable: true, format: (_, row) => formatDateTime(row.opened_at, locale.value) },
+  { key: 'opened_at', label: t('cash_register.sessions.columns.openedAt'), sortable: true, width: 'minmax(11rem,1fr)', format: (_, row) => formatDateTime(row.opened_at, locale.value) },
   {
     key: 'status',
     label: t('cash_register.sessions.columns.status'),

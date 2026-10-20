@@ -467,6 +467,12 @@ test('CASH_REGISTER-F12: the drawer’s figures above the sessions, short in red
     expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+  // CASH_REGISTER-F11: on a desk the list says when each session opened in full, time included.
+  const cells = rowOf(page, open).locator('[role=cell] > span');
+  await expect(cells.first()).toBeVisible();
+  for (const cell of await cells.all()) {
+    expect(await cell.evaluate((el) => [el.textContent, el.scrollWidth <= el.clientWidth])).toEqual([await cell.textContent(), true]);
+  }
   await closeByApi(context, open, 18405);
 });
 
