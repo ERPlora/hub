@@ -211,6 +211,26 @@ def test_the_exact_date_beats_a_yearly_one_and_a_yearly_one_holds_every_year_eve
     assert rule_for(Calendar(special_days=[once]), d("2027-08-15")).source == "none"
 
 
+def test_a_yearly_special_day_beats_a_temporary_change_covering_it():
+    christmas = special("2020-12-25", "Christmas", yearly=True)
+    winter = override(
+        "2026-12-20",
+        "2026-12-31",
+        "Winter",
+        closed=False,
+        intervals=[iv("10:00", "14:00")],
+    )
+    calendar = Calendar(special_days=[christmas], overrides=[winter])
+    rule = rule_for(calendar, d("2026-12-25"))
+    assert (rule.source, rule.rule_id, rule.name, rule.is_closed) == (
+        "special_day",
+        christmas.id,
+        "Christmas",
+        True,
+    )
+    assert rule_for(calendar, d("2026-12-24")).rule_id == winter.id
+
+
 def test_a_yearly_29_february_only_exists_in_leap_years():
     leap = special("2024-02-29", "Leap day", yearly=True)
     calendar = Calendar(special_days=[leap])

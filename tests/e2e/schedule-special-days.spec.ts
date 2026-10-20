@@ -3,64 +3,13 @@
 // open day with hours, and deletes it after confirming; then adds an override, sees a second one over the
 // same dates refused, and deletes it. «is it open?» answers from what the screen saved. Screenshots in the
 // three viewports. Each list filters behind its own funnel, named after the list, with its count. Everything it creates is named «E2E …» on dates of 2099 and removed after the file.
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { cleanupExceptions, listsReady, noHorizontalScroll, rowAction, TAG, VIEWPORTS } from './schedule-helpers';
 
-const TAG = 'E2E';
-
-function cleanup(): void {
-  psql(
-    [
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from schedule_overrideinterval where override_id in (select id from schedule_override where reason like '${TAG}%')`,
-      `delete from schedule_override where reason like '${TAG}%'`,
-    ].join('; '),
-  );
-}
-
-test.beforeAll(cleanup);
-test.afterAll(cleanup);
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
- *  (two columns), as the SaaS panel's `VIEWPORTS`. */
-const FILTER_VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-async function listsReady(page: Page): Promise<void> {
-  const view = shown(page);
-  await view.locator('[data-testid=schedule-special-days-row], [data-testid=schedule-special-days-empty]').first().waitFor({ state: 'visible' });
-  await view.locator('[data-testid=schedule-overrides-row], [data-testid=schedule-overrides-empty]').first().waitFor({ state: 'visible' });
-}
-
-/** A row action: its button, or the «⋮» menu when the row folded its actions (waits for either). */
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await expect(button.or(menu).first()).toBeVisible();
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
-}
-
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
+test.beforeAll(cleanupExceptions);
+test.afterAll(cleanupExceptions);
 
 test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, corrected with hours, deleted', async ({ page, context }) => {
   const name = `${TAG} Christmas ${Date.now().toString(36)}`;
@@ -167,7 +116,7 @@ test('FIX-DATATABLE-HUB-FILTERS-1: Special days filter by Name behind their own 
     expect(res.status, JSON.stringify(res.data)).toBe(201);
   }
   const days = (name: string) => shown(page).locator('[data-testid=schedule-special-days-row]', { hasText: name });
-  for (const vp of FILTER_VIEWPORTS) {
+  for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/schedule/special-days`);
     await listsReady(page);

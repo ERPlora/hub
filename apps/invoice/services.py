@@ -521,14 +521,21 @@ def _without_tax_id(recipient: dict, why: str) -> dict:
     return {**recipient, "customer_tax_id": "", "customer_id_type": ""}
 
 
+def _chosen_card(data):
+    """The customer's card the recipient names (by id or reference), or ``None``; locked before the document's
+    ticket and its series' number, as a charge takes them, and as Customers' writes and the Hub admin's «Delete»
+    of a card do: a deletion under way is waited for and the card is gone (404, no number spent), and one that
+    comes after waits for the document and finds it protecting the card."""
+    if getattr(data, "customer_id", None) is None and not getattr(data, "customer", None):
+        return None
+    return find_customer(data.customer_id, data.customer, lock=True)
+
+
 def _recipient(data, *, full: bool, fallback_name: str = "", card=None) -> dict:
     """The recipient: what was sent, else the customer card's (named by id or reference). A full invoice
     needs name, tax ID and address (409 with the missing fields); a tax ID taken from the card is checked."""
-    if card is None and (
-        getattr(data, "customer_id", None) is not None
-        or getattr(data, "customer", None)
-    ):
-        card = find_customer(data.customer_id, data.customer)
+    if card is None:
+        card = _chosen_card(data)
     name = (
         data.customer_name
         or (card.company_name or card.name if card else "")
@@ -660,10 +667,11 @@ def _rule_key(category_key: str, *, field: str, on: dt.date) -> fiscal.FiscalKey
     },
 )
 def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
+    card = _chosen_card(data)
     issuer = _configured_issuer()
     today = _today()
     series = _manual_series(data, today.year, ctx)
-    recipient = _recipient(data, full=series.invoice_type == "F1")
+    recipient = _recipient(data, full=series.invoice_type == "F1", card=card)
     lines, values = [], []
     # A rate typed without a category is of the business's territory (TAX-F11): IGIC in the Canary Islands.
     typed_kind = business_tax_kind()
@@ -942,6 +950,7 @@ def create_from_sale(ctx: OperationContext, data: FromSaleIn) -> dict:
     },
 )
 def substitute(ctx: OperationContext, data: SubstituteIn) -> dict:
+    card = _chosen_card(data)
     ticket = find_invoice(data.invoice_id, data.number, lock=True)
     if ticket.invoice_type != "F2":
         raise Conflict(str(NOT_A_TICKET), code="invoice.not_a_ticket")
@@ -952,7 +961,7 @@ def substitute(ctx: OperationContext, data: SubstituteIn) -> dict:
         raise Conflict(str(TICKET_CANCELLED), code="invoice.already_cancelled")
     if ticket.rectifications.exists():
         raise Conflict(str(TICKET_RECTIFIED), code="invoice.ticket_rectified")
-    recipient = _recipient(data, full=True)
+    recipient = _recipient(data, full=True, card=card)
     _configured_issuer()
     series = series_of_year(FULL, _today().year, ctx)
     invoice = _issue(
