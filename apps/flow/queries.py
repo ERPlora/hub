@@ -27,8 +27,8 @@ from live.meta import LiveAppConfig, module_configs
 from live.models import OutboxEvent
 from live.operations import Operation, operation, registry
 
-from apps.flow import document
-from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow import document, vault
+from apps.flow.models import Draft, Flow, FlowRun, Secret
 from apps.flow.schemas import (
     CatalogIn,
     CatalogOut,
@@ -42,6 +42,8 @@ from apps.flow.schemas import (
     RunPageOut,
     SampleIn,
     SampleOut,
+    SecretListIn,
+    SecretPageOut,
     StatusIn,
     StatusOut,
     TestDocumentIn,
@@ -787,4 +789,36 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         "starts": not trigger_failed,
         "trigger_failed": _clauses(trigger_failed),
         "steps": steps,
+    }
+
+
+# --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
+
+
+def secret_row(secret: Secret) -> dict[str, Any]:
+    """What is ever shown of a secret: its name and who changed it when; never its value."""
+    return {
+        "id": secret.id,
+        "name": secret.name,
+        "created_at": secret.created_at,
+        "updated_at": secret.updated_at,
+        "updated_by": secret.updated_by,
+    }
+
+
+@operation(
+    "flow.secret.list",
+    kind="query",
+    permission=MANAGE,
+    input=SecretListIn,
+    output=SecretPageOut,
+    ai={
+        "description": "The NAMES of the secrets the automations' calls to other systems can use (never their "
+        "values, which nothing gives back), and whether this server can keep secrets."
+    },
+)
+def list_secrets(ctx: OperationContext, data: SecretListIn) -> dict:
+    return {
+        "rows": [secret_row(secret) for secret in Secret.objects.order_by("name", "id")[:100]],
+        "available": vault.available(),
     }

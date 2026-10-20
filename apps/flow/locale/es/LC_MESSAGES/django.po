@@ -327,3 +327,18 @@ msgstr "Esa ejecución no existe en este negocio."
 
 msgid "The «Only if…» of this step can no longer be read, so it stopped. Open the automation, check this step and save it again."
 msgstr "Ya no se puede leer el «Solo si…» de este paso, así que se ha parado. Abre la automatización, revisa este paso y vuelve a guardarla."
+
+msgid "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
+msgstr "Este servidor todavía no puede guardar secretos: le falta su llave de cifrado. No se ha guardado nada."
+
+msgid "There is no secret called «%(name)s»."
+msgstr "No hay ningún secreto llamado «%(name)s»."
+
+msgid "secret"
+msgstr "secreto"
+
+msgid "secrets"
+msgstr "secretos"
+
+msgid "sealed value"
+msgstr "valor cifrado"

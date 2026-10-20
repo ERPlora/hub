@@ -31,8 +31,8 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.operations import Operation, operation
 from live.outbox import record_event
 
-from apps.flow import document, events
-from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow import document, events, vault
+from apps.flow.models import Draft, Flow, FlowRun, Secret
 from apps.flow.queries import (
     HIGH_RISK,
     HIGH_RISK_CODE,
@@ -47,6 +47,7 @@ from apps.flow.queries import (
     operation_problem,
     read_permissions,
     resume_problem,
+    secret_row,
     draft_row,
     flow_row,
     live_flows,
@@ -73,6 +74,9 @@ from apps.flow.schemas import (
     RunIn,
     RunOut,
     RunRefIn,
+    SecretOut,
+    SecretRefIn,
+    SecretSetIn,
     UpdateIn,
 )
 
@@ -119,6 +123,10 @@ RUN_IF_UNREADABLE = _(
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
 RUN_NOT_FOUND = _("That run does not exist in this business.")
+SECRETS_KEY_MISSING = _(
+    "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
+)
+SECRET_NOT_FOUND = _("There is no secret called «%(name)s».")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -463,6 +471,61 @@ def grant(ctx: OperationContext, data: GrantIn) -> dict:
     flow.save(update_fields=["grants", "updated_by", "updated_at"])
     record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
     return flow_row(flow)
+
+
+# --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
+
+
+@operation(
+    "flow.secret.set",
+    kind="command",
+    permission=MANAGE,
+    input=SecretSetIn,
+    output=SecretOut,
+    ai={
+        "description": "Save a secret (an API key, a token) by name for the automations' calls to other systems; "
+        "saving a name again replaces its value. NEVER ask anybody for a secret's value in a conversation: the "
+        "person types it in the automation's step, on the screen. Its value is never shown again.",
+        "risk": "high",
+    },
+)
+def set_secret(ctx: OperationContext, data: SecretSetIn) -> dict:
+    try:
+        sealed = vault.seal(data.value.get_secret_value())
+    except vault.Unavailable:
+        with translation.override(ctx.language):
+            raise Conflict(str(SECRETS_KEY_MISSING), code="flow.secrets_key_missing") from None
+    secret = Secret.objects.select_for_update().filter(name=data.name).first()
+    if secret is None:
+        secret = Secret(name=data.name, created_by=_actor(ctx))
+    secret.ciphertext = sealed
+    secret.updated_by = _actor(ctx)
+    secret.save()
+    record_event(ctx, events.SECRET_SAVED, {"id": str(secret.id)})
+    return secret_row(secret)
+
+
+@operation(
+    "flow.secret.delete",
+    kind="command",
+    permission=MANAGE,
+    input=SecretRefIn,
+    output=DeletedOut,
+    ai={
+        "description": "Delete a secret by its name: the automations whose calls use it will fail with "
+        "`flow.secret_not_found` until it is saved again. Confirm it first.",
+        "risk": "high",
+    },
+)
+def delete_secret(ctx: OperationContext, data: SecretRefIn) -> dict:
+    secret = Secret.objects.select_for_update().filter(name=data.name).first()
+    if secret is None:
+        with translation.override(ctx.language):
+            raise NotFound(str(SECRET_NOT_FOUND) % {"name": data.name})
+    gone = secret.id
+    secret.delete()
+    record_event(ctx, events.SECRET_DELETED, {"id": str(gone)})
+    return {"id": gone}
 
 
 # --- The assistant's drafts -------------------------------------------------------------------------

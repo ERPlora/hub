@@ -17,6 +17,7 @@ QUERIES = {
     "flow.draft.list",
     "flow.catalog.read",
     "flow.event.sample",
+    "flow.secret.list",
 }
 COMMANDS = {
     "flow.flow.create",
@@ -33,6 +34,8 @@ COMMANDS = {
     "flow.run.resume_due",
     "flow.run.prune",
     "flow.run.retry",
+    "flow.secret.set",
+    "flow.secret.delete",
 }
 # What the assistant confirms before running: turning on or off, granting, running by hand or resuming
 # a failed run, deleting.
@@ -42,6 +45,8 @@ HIGH_RISK = {
     "flow.flow.run",
     "flow.run.retry",
     "flow.flow.delete",
+    "flow.secret.set",
+    "flow.secret.delete",
 }
 # Run only by the platform: the reaction to every event and the three scheduled tasks.
 SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due", "flow.run.prune"}
@@ -187,8 +192,8 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
     for name, op in flow_operations.items():
         if name in SYSTEM:
             continue
-        if name in {"flow.flow.test", "flow.event.sample"}:
-            # They read the outbox's payloads as they came: only who manages.
+        if name in {"flow.flow.test", "flow.event.sample", "flow.secret.list"}:
+            # They read the outbox's payloads as they came, or the secrets' names: only who manages.
             assert op.permission == "flow.manage", name
         elif op.kind == "query":
             assert op.permission == "flow.view", name

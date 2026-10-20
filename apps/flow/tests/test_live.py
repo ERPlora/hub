@@ -23,7 +23,13 @@ def test_the_registry_is_valid():
 
 
 def test_the_lists_and_the_detail_can_be_followed_live():
-    assert set(flow_queries()) == {"flow.flow.list", "flow.flow.detail", "flow.run.list", "flow.draft.list"}
+    assert set(flow_queries()) == {
+        "flow.flow.list",
+        "flow.flow.detail",
+        "flow.run.list",
+        "flow.draft.list",
+        "flow.secret.list",
+    }
 
 
 def test_each_query_and_its_events():
@@ -34,6 +40,8 @@ def test_each_query_and_its_events():
     assert queries["flow.run.list"] == events.RUN_EVENTS
     # A draft leaves the tray when it is used or dismissed.
     assert queries["flow.draft.list"] == events.DRAFT_EVENTS
+    # A secret's name comes and goes; never its value (FLOW-F26).
+    assert queries["flow.secret.list"] == events.SECRET_EVENTS
 
 
 # What a run does in a business is heard by that business only (review 2026-10-15, item 7)

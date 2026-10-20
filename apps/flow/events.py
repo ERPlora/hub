@@ -29,6 +29,8 @@ RUN_FINISHED = "flow.run.finished"
 DRAFT_PROPOSED = "flow.draft.proposed"
 DRAFT_USED = "flow.draft.used"
 DRAFT_DISMISSED = "flow.draft.dismissed"
+SECRET_SAVED = "flow.secret.saved"
+SECRET_DELETED = "flow.secret.deleted"
 
 FLOW_EVENTS = [
     FLOW_CREATED,
@@ -40,7 +42,8 @@ FLOW_EVENTS = [
 ]
 RUN_EVENTS = [RUN_STARTED, RUN_PARKED, RUN_RESUMED, RUN_FINISHED]
 DRAFT_EVENTS = [DRAFT_PROPOSED, DRAFT_USED, DRAFT_DISMISSED]
-ALL = [*FLOW_EVENTS, *RUN_EVENTS, *DRAFT_EVENTS]
+SECRET_EVENTS = [SECRET_SAVED, SECRET_DELETED]
+ALL = [*FLOW_EVENTS, *RUN_EVENTS, *DRAFT_EVENTS, *SECRET_EVENTS]
 
 #: Any event, as ``live.live_registry.ALL_EVENTS`` names it.
 ANY_EVENT = "*"

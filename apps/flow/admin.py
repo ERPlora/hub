@@ -1,13 +1,15 @@
-"""Django admin of the flow app: full CRUD on every model, for the platform's staff.
+"""Django admin of the flow app: full CRUD on every model, for the platform's staff, but the secrets.
 
 Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
 tables. A raw admin write records no event and checks nothing against the active apps: to run, grant
-or switch an automation with its rules, use its operations (services.py).
+or switch an automation with its rules, use its operations (services.py). A secret (FLOW-F26) shows only
+its name and can only be deleted: its value is sealed with the server's key by ``flow.secret.set``, and an
+admin form would neither seal it nor ever show it.
 """
 
 from django.contrib import admin
 
-from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow.models import Draft, Flow, FlowRun, Secret
 
 
 class FlowRunInline(admin.TabularInline):
@@ -59,3 +61,17 @@ class DraftAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     raw_id_fields = ("flow",)
     readonly_fields = ("id", "created_at")
+
+
+@admin.register(Secret)
+class SecretAdmin(admin.ModelAdmin):
+    list_display = ("name", "updated_by", "updated_at")
+    search_fields = ("name",)
+    fields = ("id", "name", "created_by", "updated_by", "created_at", "updated_at")
+    readonly_fields = fields
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False

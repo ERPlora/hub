@@ -23,6 +23,8 @@ from apps.flow.schemas import (
     RunListIn,
     RunRefIn,
     SampleIn,
+    SecretRefIn,
+    SecretSetIn,
     StatusIn,
     TestIn,
     UpdateIn,
@@ -128,3 +130,21 @@ async def catalog_read(request):
 @bind(router, "flow.event.sample", "/flow/events/sample")
 async def event_sample(request, params: Query[SampleIn]):
     return await run_operation(request, queries.event_sample, params)
+
+
+# Secrets (FLOW-F26): names only; a value goes in and never comes out.
+
+
+@bind(router, "flow.secret.list", "/flow/secrets")
+async def secret_list(request):
+    return await run_operation(request, queries.list_secrets)
+
+
+@bind(router, "flow.secret.set", "/flow/secrets")
+async def secret_set(request, data: SecretSetIn):
+    return await run_operation(request, services.set_secret, data)
+
+
+@bind(router, "flow.secret.delete", "/flow/secrets/delete")
+async def secret_delete(request, data: SecretRefIn):
+    return await run_operation(request, services.delete_secret, data)

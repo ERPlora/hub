@@ -38,6 +38,9 @@ ROUTES = {
     ("POST", "/flow/drafts/dismiss", "flow.draft.dismiss"),
     ("GET", "/flow/catalog", "flow.catalog.read"),
     ("GET", "/flow/events/sample", "flow.event.sample"),
+    ("GET", "/flow/secrets", "flow.secret.list"),
+    ("POST", "/flow/secrets", "flow.secret.set"),
+    ("POST", "/flow/secrets/delete", "flow.secret.delete"),
 }
 
 

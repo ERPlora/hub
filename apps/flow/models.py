@@ -1,5 +1,5 @@
-"""Models of the flow app: the automation (``Flow``), each time it ran (``FlowRun``) and what the assistant
-proposed (``Draft``).
+"""Models of the flow app: the automation (``Flow``), each time it ran (``FlowRun``), what the assistant
+proposed (``Draft``) and the secrets its calls to other systems use (``Secret``).
 
 Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
 per scope. Phase 2 moves them to each hub's database. An automation names other apps' operations and
@@ -199,6 +199,36 @@ class Draft(UUIDModel):
             models.CheckConstraint(
                 condition=Q(status__in=["pending", "used", "dismissed"]),
                 name="flow_draft_status_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+#: A secret's name: upper case, digits and ``_``, up to 64 characters (the old hub's rule).
+SECRET_NAME_RE = r"^[A-Z][A-Z0-9_]{0,63}$"
+
+
+class Secret(UUIDModel):
+    """A value a «Call another system» step sends (an API key, a token), kept sealed (``vault``): only its
+    name is ever shown again (FLOW-F26). Shared by every automation of the business."""
+
+    name = models.CharField(_("name"), max_length=64, unique=True)
+    # Fernet token under settings.FLOW_SECRETS_KEY; never the value.
+    ciphertext = models.TextField(_("sealed value"))
+    created_by = models.CharField(_("created by"), max_length=128, blank=True)
+    updated_by = models.CharField(_("updated by"), max_length=128, blank=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("secret")
+        verbose_name_plural = _("secrets")
+        ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(name__regex=SECRET_NAME_RE), name="flow_secret_name_valid"
             ),
         ]
 
