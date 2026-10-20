@@ -1043,3 +1043,33 @@ def test_the_movements_show_every_state_of_a_session(tax):
     ) == ("returned", 0, "did not come", "boss")
     # Each row is dated by its last step (released, expired, given back, held), the latest first.
     assert [row.id for row in page.rows] == [lapsed.id, returned.id, held.id, released.id]
+
+
+def test_the_movements_page_through_sessions_at_the_same_instant_each_once(tax):
+    # services#76 (SERVICE-F19): sessions spent at the same instant (a bulk grant, an import) tie on their
+    # date; page after page every movement shows exactly once and the total is the whole set's, not the page's.
+    cut = make_service("Cut", tax=tax)
+    package = make_package("Bono", [cut], max_uses=None)
+    grant = make_grant(package, make_customer("Lucía"), days_ago=1)
+    instant = timezone.now() - dt.timedelta(hours=1)
+    # Sessions and adjustments made one after the other, so that every page needs some of each.
+    made = []
+    for turn in range(7):
+        if turn % 2:
+            made.append(
+                GrantAdjustment.objects.create(
+                    grant=grant, days_delta=1, reason="closed", actor="boss", created_at=instant
+                ).id
+            )
+        else:
+            made.append(make_redemption(grant, cut, redeemed_at=instant).id)
+    seen = []
+    for offset in range(0, 8, 2):
+        page = run(
+            "service.movement.list",
+            MovementListIn(package_id=package.id, limit=2, offset=offset),
+        )
+        assert page.total == 7
+        seen += [row.id for row in page.rows]
+    # The tie is broken the same way on every page: the newest id first.
+    assert seen == made[::-1]

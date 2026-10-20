@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { ServiceOut } from '../operations';
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page } from '../__tests__/mount-service';
+import { EMPLOYEE, flush, MANAGER, type MountOptions, mountService, OWNER, page } from '../__tests__/mount-service';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import ServicesPage from './ServicesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -80,6 +80,8 @@ describe('ServicesPage', () => {
     expect(s.list()).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'service-services', total: 2, views: ['table', 'cards'] });
+    // The column filters live behind «Filters» (the old screen's funnel), not in a row that pushes the list down.
+    expect(s.prop('filterable')).toBe(true);
     expect(s.prop('searchPlaceholder')).toBe('Search service…');
     expect(s.prop<{ add: string }>('labels').add).toBe('New service');
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Services');
@@ -157,6 +159,79 @@ describe('ServicesPage', () => {
     dialog.vm.$emit('confirm');
     await flush();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/service/services/archive', query: {}, body: { id: 's1' } }]);
+  });
+
+  // SERVICE-F04: with Appointments on (its permission only exists then), the confirmation warns of the upcoming
+  // appointments that keep using the service; the warning is advice and never stops the archive.
+  describe('the upcoming appointments of the service being archived', () => {
+    const COUNT = '/api/appointment/appointments/count_for_service';
+    const WITH_AGENDA = { ...OWNER, permissions: [...OWNER.permissions, 'appointment.view_own_appointment'] };
+    const LINE = '2 upcoming appointment(s) still use this service. They keep their booking, price and length; only new bookings stop.';
+
+    async function archiving(session = WITH_AGENDA, answers: Record<string, [number, unknown]> = {}) {
+      const s = await setup({ session });
+      await s.show(page(ROWS));
+      s.answerBy({ '/api/service/services/archive': [200, { ...ROWS[0], status: 'archived' }], ...answers });
+      s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[0] });
+      await flush();
+      await flush();
+      return { ...s, dialog: () => s.wrapper.findComponent(ConfirmDialog) };
+    }
+
+    it('says how many upcoming appointments still use it', async () => {
+      const s = await archiving(WITH_AGENDA, { [COUNT]: [200, { count: 2, earliest: '2026-10-22T10:00:00+02:00' }] });
+      expect(s.sent()[0]).toEqual({ method: 'GET', path: COUNT, query: { service_id: 's1' }, body: undefined });
+      expect(s.dialog().props('consequences')).toEqual([LINE]);
+    });
+
+    it('in Spanish', async () => {
+      const s = await setup({ session: WITH_AGENDA, locale: 'es' });
+      await s.show(page(ROWS));
+      s.answerBy({ [COUNT]: [200, { count: 1, earliest: null }] });
+      s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[0] });
+      await flush();
+      await flush();
+      expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([
+        '1 cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.',
+      ]);
+    });
+
+    it('says nothing when none uses it', async () => {
+      const s = await archiving(WITH_AGENDA, { [COUNT]: [200, { count: 0, earliest: null }] });
+      expect(s.dialog().props('consequences')).toEqual([]);
+    });
+
+    it('does not ask without Appointments, and a failed answer leaves the line out but the archive works', async () => {
+      const off = await archiving(OWNER);
+      expect(off.sent()).toEqual([]);
+      expect(off.dialog().props('consequences')).toEqual([]);
+      const s = await archiving(WITH_AGENDA, { [COUNT]: [404, { error: { code: 'app_inactive', message: 'Not active' } }] });
+      expect(s.dialog().props('consequences')).toEqual([]);
+      s.dialog().vm.$emit('confirm');
+      await flush();
+      expect(s.sent().map((c) => c.path)).toEqual([COUNT, '/api/service/services/archive']);
+    });
+
+    it('a late answer for another service never lands on this one', async () => {
+      const s = await setup({ session: WITH_AGENDA });
+      await s.show(page(ROWS));
+      let late: (r: Response) => void = () => undefined;
+      s.net.onApi(({ url }) =>
+        url.includes('service_id=s1')
+          ? new Promise<Response>((resolve) => (late = resolve))
+          : Response.json({ count: 0, earliest: null }),
+      );
+      s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[0] });
+      await flush();
+      s.wrapper.findComponent(ConfirmDialog).vm.$emit('cancel');
+      s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[1] });
+      await flush();
+      late(Response.json({ count: 2, earliest: null }));
+      await flush();
+      await flush();
+      expect(s.wrapper.findComponent(ConfirmDialog).props('message')).toContain('Beard');
+      expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([]);
+    });
   });
 
   it('restores from the archived view and says a refusal above the table', async () => {

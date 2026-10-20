@@ -695,6 +695,17 @@ def test_a_package_name_is_taken_while_the_other_lives():
     }
 
 
+def test_renaming_a_package_to_a_name_already_taken_is_refused_under_name():
+    # SERVICE-F13: the check on edit is the one of the create (same code, same field), not a database error.
+    make_package("Bono 5")
+    other = make_package("Bono 10")
+    with pytest.raises(Conflict) as taken:
+        run("service.package.update", {"id": str(other.id), "name": " BONO 5 "})
+    assert taken.value.code == "service.package_name_taken"
+    assert taken.value.fields == {"name": "There is already a package with that name. Pick another name."}
+    assert Package.objects.get(pk=other.pk).name == "Bono 10"
+
+
 def test_editing_a_package_never_touches_what_was_sold_and_null_removes_limits(tax):
     package = make_package(
         "Bono",

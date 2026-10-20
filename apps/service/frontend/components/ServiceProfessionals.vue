@@ -308,11 +308,15 @@ const setDraft = (id: string, part: Partial<Draft>) => {
 .service-professionals__own {
   color: var(--ion-color-medium-shade, #5f5f5f);
 }
+/* Wide enough for «Minutes (optional)» to read whole; whoever is being added gets a row of their own. */
 .service-professionals__edit,
 .service-professionals__add {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   align-items: center;
   gap: 8px;
+}
+.service-professionals__add > :first-child {
+  grid-column: 1 / -1;
 }
 </style>
