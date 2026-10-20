@@ -1,8 +1,8 @@
 # Workbook — Impresión (app)
 Prefijo: PRINTING
 Alcance MVP: núcleo
-Estado de la app: servidor y páginas hechos; el papel sale cuando `base` sirva `/ws/print` (fase 2,
-bloque 6) y cuando cada app productora llame a `printing.job.create` (lo dice cada flujo)
+Estado de la app: servidor y páginas hechos; Ventas, Facturación, Cocina y Caja ya piden su papel a la
+cola (falta Inventario, PRINTING-F12); el papel sale cuando `base` sirva `/ws/print` (PRINTING-F18)
 
 > Manual de usuario y especificación de la app `printing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -157,17 +157,17 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F04 | Asignar qué sale por cada impresora | común | hecho |
 | PRINTING-F05 | Hacer una prueba de impresión | común | parcial: el papel sale cuando el dispositivo pueda recoger |
 | PRINTING-F06 | Elegir cómo imprime el negocio | común | hecho |
-| PRINTING-F07 | Imprimir el tique al cobrar | común | parcial: falta que Ventas lo pida |
-| PRINTING-F08 | Reimprimir un tique o una factura | común | parcial: falta que Ventas y Facturación lo pidan |
-| PRINTING-F09 | Imprimir la cuenta de la mesa | restaurante | parcial: falta que Ventas lo pida |
+| PRINTING-F07 | Imprimir el tique al cobrar | común | hecho |
+| PRINTING-F08 | Reimprimir un tique o una factura | común | hecho |
+| PRINTING-F09 | Imprimir la cuenta de la mesa | restaurante | hecho |
 | PRINTING-F10 | Imprimir la comanda en cocina y barra | restaurante | hecho |
 | PRINTING-F11 | Reimprimir una comanda | restaurante | hecho |
 | PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | parcial: falta que Inventario lo pida |
-| PRINTING-F13 | Abrir el cajón al cobrar | común | parcial: falta que Ventas lo pida |
+| PRINTING-F13 | Abrir el cajón al cobrar | común | hecho |
 | PRINTING-F14 | Sacar del atasco un trabajo de impresión | común | hecho |
 | PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | hecho |
 | PRINTING-F16 | Mandar imprimir desde el asistente | común | hecho |
-| PRINTING-F17 | Imprimir el cierre de caja | común | parcial: falta que Caja lo pida |
+| PRINTING-F17 | Imprimir el cierre de caja | común | hecho |
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: falta el canal del dispositivo |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
@@ -304,49 +304,59 @@ Implicados: PRINTING-F07, PRINTING-F13
 
 ### PRINTING-F07 Imprimir el tique al cobrar
 <!-- origen: old-hub:HUB_PERIPHERALS-F09 wf:restaurante-dia#rec_restaurante-f12 fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_APP-F19 old-hub:HUB_SHELL-F70 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/11-races-and-concurrency old-hub:HUB-F190 old-hub:HUB-F192 old:printing/workflow/documentos.md#printing-f07 qa:modules/printing/print-receipt qa:verticals/restaurant/07-payment-and-fiscal -->
-Estado: parcial — Impresión lo hace en cuanto se le pide (con «automático»); falta que Ventas lo pida al
-cobrar (hoy imprime con el diálogo del dispositivo) y que el papel salga (PRINTING-F18)
+Estado: hecho
 Vertical: común
 Actor: empleado
 Pantalla: Vender (de Ventas)
 Pasos:
 1. El empleado cobra en **Ventas → Vender**.
-2. En la misma transacción del cobro, Ventas pide a Impresión el tique (`automatic: true`).
+2. En la misma transacción del cobro, Ventas pide a Impresión el tique por el nombre de su operación
+   (`automatic: true`): el tique simplificado o la factura completa, con el QR de VeriFactu.
 3. Si «Imprimir ticket al cobrar» está encendido, el tique entra en la cola de la función Recibo
-   con las copias de los ajustes y, si «Abrir cajón al cobrar» está encendido, con la orden de abrir
-   el cajón; el dispositivo lo saca.
+   con las copias de los ajustes y, si «Abrir cajón al cobrar» está encendido y entró efectivo, con la
+   orden de abrir el cajón (PRINTING-F13); el dispositivo lo saca (PRINTING-F18). Tras cobrar, Ventas dice
+   a qué impresora fue.
+4. Sin Impresión encendida, sin una impresora de tiques activa o con el documento fiscal aún pendiente,
+   no se encola nada: el tique sale por el diálogo del dispositivo, como antes. Repetir el mismo cobro
+   no saca otro tique.
 Entra: el tique compuesto por Ventas (`receipt`).
 Sale: un trabajo en la cola, o nada si el negocio no imprime al cobrar.
-Si falla: una venta **nunca se cae** por la impresión: si Impresión no está encendida o la petición
-falla, Ventas cobra igual y lo dice. Un trabajo que no sale queda en la cola (PRINTING-F14).
+Si falla: una venta **nunca se cae** por la impresión: si Impresión no está encendida, rechaza el tique o
+falla, Ventas cobra igual y el tique sale por el diálogo del dispositivo. Un trabajo que no sale queda en
+la cola (PRINTING-F14).
 Implicados: SALE-F08, PRINTING-F13, PRINTING-F18
 
 ### PRINTING-F08 Reimprimir un tique o una factura
 <!-- origen: old-hub:HUB_PERIPHERALS-F09 old-hub:HUB_APP-F22 old-hub:HUB_SHELL-F77 qa:modules/printing/print-receipt qa:verticals/restaurant/07-payment-and-fiscal old:printing/workflow/documentos.md#printing-f08 -->
-Estado: parcial — Impresión acepta el tique marcado como copia y la factura (en térmica, o la página A4
-para la impresora del sistema); falta que Ventas y Facturación lo pidan (hoy imprimen con el diálogo del
-dispositivo)
+Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Ventas, Facturas (de esas apps)
 Pasos:
-1. En la ficha de la venta o de la factura, pulsa «Imprimir».
-2. La app pide a Impresión el documento marcado como copia («DUPLICADO»).
+1. En la ficha de la venta o de la factura, pulsa «Imprimir» («Imprimir / PDF» en Facturas).
+2. Ventas pide a Impresión el tique (o la factura completa) marcado como copia («DUPLICADO»); Facturación
+   pide la página A4 de la factura, en el idioma de quien imprime y con su QR de VeriFactu, para la
+   impresora del sistema. La pantalla dice a qué impresora fue.
+3. Sin Impresión encendida, sin una impresora que lo acepte (de tiques para el tique; del sistema para la
+   página A4) o con el documento fiscal aún pendiente, no se encola nada: sale por el diálogo del
+   dispositivo, como antes.
 Entra: el documento con `duplicate: true`.
-Sale: un trabajo en la cola de Recibo; una factura A4 va a la impresora del sistema.
+Sale: un trabajo en la cola de Recibo; una factura A4 va a la impresora del sistema. Cada pulsación, un
+papel.
 Si falla: como F07.
 Implicados: SALE-F31
 
 ### PRINTING-F09 Imprimir la cuenta de la mesa
 <!-- origen: old-hub:HUB_PERIPHERALS-F11 qa:verticals/restaurant/07-payment-and-fiscal old:printing/workflow/documentos.md#printing-f09 qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 -->
-Estado: parcial — Impresión acepta la cuenta y rechaza una sin líneas; falta que Ventas la pida (hoy la
-imprime con el diálogo del dispositivo)
+Estado: hecho
 Vertical: restaurante
 Actor: empleado
 Pantalla: Vender (de Ventas)
 Pasos:
 1. Con la cuenta abierta, pulsa «Imprimir cuenta».
-2. Ventas pide la cuenta (sin número, sin QR, sin pago y con el aviso de que no es factura).
+2. Ventas pide la cuenta (sin número, sin QR, sin pago y con el aviso de que no es factura) y la pantalla
+   dice a qué impresora fue; sin Impresión encendida o sin una impresora de tiques activa, sale por el
+   diálogo del dispositivo, como antes.
 Entra: la cuenta (`prebill`) con sus líneas.
 Sale: un trabajo en la cola de Recibo. Cada pulsación saca una cuenta.
 Si falla: «Una cuenta lleva líneas que cobrar: esta no tiene ninguna.» (422).
@@ -403,19 +413,19 @@ Implicados: INVENTORY-F25, PRINTING-F04
 
 ### PRINTING-F13 Abrir el cajón al cobrar
 <!-- origen: old-hub:HUB_APP-F21 old-hub:HUB_SHELL-F71 wf:restaurante-dia#rec_restaurante-f17 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/10-hardware-offline-and-recovery qa:verticals/restaurant/07-payment-and-fiscal old-hub:HUB-F207 old-hub:HUB_PERIPHERALS-F15 old:printing/workflow/documentos.md#printing-f13 qa:modules/printing/open-cash-drawer -->
-Estado: parcial — el trabajo del tique lleva la orden de abrir el cajón (o, con el tique apagado, un
-trabajo solo de cajón); falta que Ventas lo pida al cobrar (PRINTING-F07) y que el papel salga
-(PRINTING-F18)
+Estado: hecho
 Vertical: común
 Actor: empleado
 Pantalla: Vender (de Ventas)
 Pasos:
-1. Con «Abrir cajón al cobrar» encendido en **Impresión → Ajustes**, cobra en **Ventas → Vender**, con
-   cualquier forma de pago.
+1. Con «Abrir cajón al cobrar» encendido en **Impresión → Ajustes**, cobra en **Ventas → Vender** con
+   efectivo (solo o en un pago mixto).
 2. El cobro (F07) pide el tique con la orden de abrir el cajón conectado a la impresora de tiques; con
-   el tique apagado, un trabajo solo de cajón.
-Entra: el ajuste.
-Sale: la orden de abrir el cajón, en el mismo trabajo que el tique.
+   el tique apagado, un trabajo solo de cajón. Un cobro sin efectivo (tarjeta, Bizum…) no abre el cajón,
+   como en Square, Toast, Odoo, Shopify y Lightspeed: no hay nada que guardar en él.
+Entra: el ajuste y si el cobro llevó efectivo (`open_drawer`).
+Sale: la orden de abrir el cajón, en el mismo trabajo que el tique; el dispositivo la manda al cajón
+cuando saca el trabajo (PRINTING-F18).
 Si falla: si el tique no sale, el cajón tampoco; el trabajo queda en la cola (PRINTING-F14).
 Implicados: PRINTING-F06, PRINTING-F07
 
@@ -611,9 +621,9 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 
 | App | Para qué | Servicio |
 |---|---|---|
-| Ventas | Tique al cobrar, reimpresión, cuenta de la mesa (cuando lo adopte) | `printing.job.create` |
-| Facturación | Factura en térmica o A4 (cuando lo adopte) | `printing.job.create` |
-| Caja | Informe X y Z (cuando lo adopte) | `printing.job.create` |
+| Ventas | Tique al cobrar (con el cajón si entró efectivo), reimpresión y cuenta de la mesa | `printing.job.create` |
+| Facturación | La página A4 de una factura, para la impresora del sistema | `printing.job.create` |
+| Caja | Informe X y Z | `printing.job.create` |
 | Inventario | Etiqueta de código de barras (cuando lo adopte) | `printing.job.create` |
 | Cocina | La comanda de cada estación y su reimpresión | `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
