@@ -165,7 +165,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 53 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
+  it('binds the 54 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -185,6 +185,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.order.open': { method: 'post', path: '/api/sale/orders' },
       'sale.order.get': { method: 'get', path: '/api/sale/orders/detail' },
       'sale.order.add_line': { method: 'post', path: '/api/sale/orders/add_line' },
+      'sale.order.add_combo_line': { method: 'post', path: '/api/sale/orders/add_combo_line' },
       'sale.order.add_open_line': { method: 'post', path: '/api/sale/orders/add_open_line' },
       'sale.order.add_service_line': { method: 'post', path: '/api/sale/orders/add_service_line' },
       'sale.order.apply_voucher': { method: 'post', path: '/api/sale/orders/apply_voucher' },
