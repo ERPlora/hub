@@ -120,10 +120,10 @@ Quien no puede cambiar impresoras no ve «Buscar impresoras», «Añadir impreso
 Menú **Impresión → Cola**. Título «Cola de impresión». La tabla de trabajos, del más reciente al más
 antiguo, 50 por página: Documento («Tique T-000123», o «Tique · 14/10/26 23:05» si no trae número),
 Función, Impresora, Estado («Pendiente», «Enviado», «Impreso», «Fallido», «Cancelado»), Intentos, Pedido el
-y Detalle («Último error: …», «Cancelado por Ana · motivo», «Reenviado por Ana»). Filtros por estado,
-función e impresora, y buscador por número de documento. Quien puede gestionar la cola ve en cada fila
-«Reintentar» (un trabajo fallido, o enviado y sin respuesta pasado su plazo) y «Cancelar» (en cola,
-fallido o sin respuesta); «Cancelar» abre una ventana con «Motivo (opcional)», «Sí, cancelar» y
+y Detalle («Último error: …», «El dispositivo no contestó», «Cancelado por Ana · Motivo: …», «Reenviado
+por Ana»). Filtros por estado, función e impresora, y buscador por número de documento. Quien puede
+gestionar la cola ve en cada fila «Reintentar» y «Cancelar» en un trabajo en cola, fallido, o enviado y
+sin respuesta pasado su plazo; «Cancelar» abre una ventana con «Motivo (opcional)», «Sí, cancelar» y
 «Volver». Vacía: «No hay trabajos de impresión.». Error al cargar: el mensaje con «Reintentar».
 
 ### Ajustes
@@ -424,16 +424,18 @@ Vertical: común
 Actor: propietario, administrador
 Pantalla: Cola
 Pasos:
-1. En **Impresión → Cola**, busca el trabajo «Fallido» (o «Enviado» que no contestó).
+1. En **Impresión → Cola**, busca el trabajo «Fallido», el «Enviado» que no contestó («El dispositivo no
+   contestó») o el que sigue «Pendiente».
 2. «Reintentar» lo devuelve a la cola con los intentos a cero, hacia la impresora que toque ahora:
-   «Devuelto a la cola: el próximo dispositivo que se conecte lo imprimirá.».
+   «Devuelto a la cola: lo imprimirá el próximo dispositivo que se conecte.».
 3. «Cancelar» pide un motivo (opcional) y lo retira: «Trabajo cancelado. No se imprimirá.». Queda en
    la cola con quién, cuándo y por qué.
 Entra: el trabajo y, al cancelar, el motivo.
 Sale: el trabajo en cola otra vez o cancelado (avisa: `printing.job.retried`, `printing.job.cancelled`).
 Nadie lo borra: la cola lo olvida 30 días después de acabar (PRINTING-F20).
-Si falla: «Solo se reintenta un trabajo fallido o que no contestó; este está …», «Un trabajo que está
-imprimiendo o ya impreso no se cancela; este está …». Sin permiso no se ven los botones.
+Si falla: «Solo vuelve a la cola un trabajo pendiente o fallido, o uno enviado que no contestó; este está
+…», «Un trabajo que se está imprimiendo o ya se imprimió no se cancela; este está …». Sin permiso no se
+ven los botones.
 Implicados: PRINTING-F01
 
 ### PRINTING-F15 Llevar el texto antiguo del tique a Ventas
