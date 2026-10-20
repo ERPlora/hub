@@ -112,6 +112,7 @@ from apps.appointment.schemas import (
 )
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries import business_country, find_customer
+from apps.customer.services import lock_customers
 from apps.service.models import Service
 from apps.service.queries import needs_tax_setup
 from apps.staff.models import Member
@@ -256,6 +257,13 @@ def _lock_members(*members: Member | None) -> None:
             .order_by("pk")
             .values_list("pk", flat=True)
         )
+
+
+def _locked_card(data):
+    """The customer's card a booking or a series is for, locked as Customers' writes and the Hub admin's
+    «Delete» of a card take it: a deletion under way is waited for and the card is gone (404), and one that
+    comes after waits for the booking and finds the row that protects the card."""
+    return find_customer(data.customer_id, data.customer, lock=True)
 
 
 def lock_appointments(ids) -> list[UUID]:
@@ -442,7 +450,7 @@ def _member_for_booking(
     },
 )
 def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer)
+    customer = _locked_card(data)
     services = resolve_services(data.services)
     member = _member_for_booking(ctx, data.staff_id, data.staff, services)
     lines = lines_for(member, services)
@@ -487,7 +495,7 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
     },
 )
 def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer)
+    customer = _locked_card(data)
     services = resolve_services(data.services)
     member = _member_for_booking(ctx, data.staff_id, data.staff, services)
     lines = lines_for(member, services)
@@ -1324,7 +1332,7 @@ def _materialize_out(series: Recurring, report: dict) -> dict:
     },
 )
 def create_series(ctx: OperationContext, data: RecurringCreateIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer)
+    customer = _locked_card(data)
     services = resolve_services(data.services)
     member = _member_for_booking(ctx, data.staff_id, data.staff, services)
     minutes = data.duration_minutes or sum(
@@ -1810,6 +1818,9 @@ def release_check(ctx: OperationContext, data: OrderVoidedIn) -> dict:
     },
 )
 def reassign_customer(ctx: OperationContext, data: MergedIn) -> dict:
+    # The card that stays before the rows that move to it; one the Hub admin deleted takes nothing.
+    if not lock_customers([data.id]):
+        return {"changed": 0}
     series = Recurring.objects.filter(customer_id=data.absorbed_id)
     lock_series(series.values_list("id", flat=True))
     appointments = Appointment.objects.filter(customer_id=data.absorbed_id)
