@@ -3,9 +3,12 @@
 // exists while the window is open, so it only reads then: the session (its expected cash, which the server
 // leaves empty when a blind count hides it from this person), its counts (the counted cash starts from the
 // last CLOSING count — counting the same drawer twice is how a fake difference is made; never an opening
-// one) and Sales' open checks for the shift review. The expected and the difference follow what is typed.
-// The counted cash is always asked for. With open checks the first press warns, the second closes
-// («Close anyway»): it warns, it never prevents. Success says the three figures and tells the window.
+// one) and, for the shift review, Sales' open checks, the kitchen tickets not served yet (Kitchen's
+// `kitchen.ticket.board`, KITCHEN-F31) and the prints that did not come out (Printing's queue). An app that
+// is off in this hub has nothing pending; a reading refused makes the review incomplete. The expected and
+// the difference follow what is typed. The counted cash is always asked for. With something pending the
+// first press warns, the second closes («Close anyway»): it warns, it never prevents. Success says the
+// three figures and tells the window.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -26,6 +29,8 @@ const locale = useLocale();
 const detail = useLive('cash_register.session.get', () => ({ session_id: props.session.id }));
 const counts = useLive('cash_register.count.list', () => ({ session_id: props.session.id, limit: 20 }));
 const checks = useLive('sale.order.list', { status: 'open', limit: 20 });
+const kitchen = useLive('kitchen.ticket.board', {});
+const prints = useLive('printing.job.summary', {});
 const command = useCommand('cash_register.session.close');
 
 const counted = shallowRef('');
@@ -53,16 +58,33 @@ const expected = computed(() => detail.data.value?.summary.expected_cash ?? null
 const read = computed(() => readMoney(counted.value));
 const difference = computed(() => (expected.value !== null && read.value.ok && read.value.cents !== null ? read.value.cents - expected.value : null));
 
+/** A reading of the review: answered, refused (the review is incomplete), off in this hub (nothing pending)
+ *  or still on its way. */
+function reading<T>(live: { data: { value: T | undefined }; error: { value: { code: string } | null } }) {
+  const error = live.error.value;
+  const off = error?.code === 'app_inactive';
+  return { answer: off ? undefined : live.data.value, failed: !!error && !off, waiting: !error && live.data.value === undefined };
+}
+
 const review = computed(() => {
-  const answer = checks.data.value;
-  const failed = !!checks.error.value;
+  const open = reading(checks);
+  const board = reading(kitchen);
+  const queue = reading(prints);
+  const tickets = [...(board.answer?.cooking ?? []), ...(board.answer?.ready ?? [])];
+  const stuck = (queue.answer?.usages ?? []).filter((row) => row.pending + row.failed > 0);
   return {
-    checking: !answer && !failed,
-    incomplete: failed,
-    openChecks: answer?.total ?? 0,
-    labels: (answer?.rows ?? []).map((order) => order.label).filter((label) => !!label),
+    checking: open.waiting || board.waiting || queue.waiting,
+    incomplete: open.failed || board.failed || queue.failed,
+    openChecks: open.answer?.total ?? 0,
+    labels: (open.answer?.rows ?? []).map((order) => order.label).filter((label) => !!label),
+    unserved: (board.answer?.cooking_count ?? 0) + (board.answer?.ready_count ?? 0),
+    unservedLabels: tickets.map((ticket) => ticket.label || `#${ticket.short_number}`),
+    prints: stuck.reduce((sum, row) => sum + row.pending + row.failed, 0),
+    printUsages: stuck.map((row) => row.usage),
   };
 });
+/** Something is still open at the close: the first press only warns. */
+const pending = computed(() => review.value.openChecks + review.value.unserved + review.value.prints > 0);
 
 const error = computed(() => refusal(command.error.value, t('cash_register.close.failed')));
 const countedError = computed(() => countedRefusal.value ?? error.value?.fields?.closing_balance ?? null);
@@ -71,7 +93,7 @@ async function confirm(): Promise<void> {
   const value = read.value;
   countedRefusal.value = value.ok ? (value.cents === null ? t('cash_register.close.countedRequired') : null) : moneyRefusal(value, t, locale.value);
   if (!value.ok || value.cents === null) return;
-  if (review.value.openChecks > 0 && !acknowledged.value) {
+  if (pending.value && !acknowledged.value) {
     acknowledged.value = true;
     return;
   }
