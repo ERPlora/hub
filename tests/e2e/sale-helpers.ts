@@ -29,7 +29,19 @@ export interface SaleOut {
   change_total: number;
   customer_id: string | null;
   customer_name: string;
-  lines: { id: string; name: string; sku: string; tax_rate: string; net_amount: number; tax_amount: number; line_total: number }[];
+  /** Its fiscal document in Invoicing (none while it waits or without Invoicing) and that document's number. */
+  invoice_id: string | null;
+  invoice_number: string;
+  lines: {
+    id: string;
+    name: string;
+    sku: string;
+    quantity: string;
+    tax_rate: string;
+    net_amount: number;
+    tax_amount: number;
+    line_total: number;
+  }[];
   payments: { id: string; method_type: string; amount: number; tendered: number; change: number }[];
 }
 
