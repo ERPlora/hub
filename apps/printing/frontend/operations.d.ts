@@ -198,6 +198,8 @@ export interface UsageSummary {
   usage: Usage;
   printers: number;
   default_printer: string | null;
+  /** The printer its next job goes to now (the chosen one if active, else the first active one). */
+  prints_on: string | null;
   pending: number;
   oldest_pending_at: string | null;
   sent: number;

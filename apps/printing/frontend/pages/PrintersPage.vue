@@ -7,7 +7,7 @@
 // Every change comes back through the stream by itself.
 import { DataTable, type DataTableAction, type DataTableColumn, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
+import { AppPage, toastError, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
 import PrinterModal from '../components/PrinterModal.vue';
@@ -23,6 +23,12 @@ const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
 const canPrint = computed(() => session.can('printing.print'));
 const t = useT();
+// Inside the installed app nobody is told about a browser (printing#37); the account the app opens in the
+// system browser is a browser.
+const { surface } = useSurface();
+const appNote = computed(() =>
+  surface.value === 'desktop' || surface.value === 'mobile' ? t('printing.printers.appNoteInApp') : t('printing.printers.appNote'),
+);
 /** «Waiting» comes from the clock: it turns by itself, without another result. */
 const now = useNow();
 
@@ -149,7 +155,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
           icon="information-circle-outline"
           data-testid="printing-printers-app-note"
         >
-          {{ $t('printing.printers.appNote') }}
+          {{ appNote }}
         </InlineFeedback>
         <InlineFeedback
           v-if="blocked"

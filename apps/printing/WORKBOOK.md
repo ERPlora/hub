@@ -86,17 +86,21 @@ di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este o
 
 - **Estado de la impresión**: una tarjeta por cada función que tenga alguna impresora o trabajos
   esperando (un negocio nuevo no ve ninguna), con su nombre («Recibo», «Cocina», «Barra»,
-  «Etiqueta»), su estado («Lista», «En cola, sin impresora», «Con errores») y «En cola: N · el más
-  antiguo lleva 3 min» o «Nada en cola». Una función con trabajos esperando y sin ninguna impresora
-  activa saca el aviso naranja «N trabajos de Cocina llevan 3 min esperando. Ninguna impresora activa
-  tiene esta función: añade una o dale esta función a una de abajo.». Con todo vacío: «Todo al día: no
-  hay nada en cola.». Error de lectura: «No se pudo leer la cola de impresión.» con «Reintentar».
+  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Con errores»), «En cola: N · el más
+  antiguo lleva 3 min» o «Nada en cola», los fallidos («Fallidos: N») y por qué impresora sale ahora:
+  «Imprime en: Caja.» (la elegida en los ajustes o, si no, la primera activa con esa función). Una
+  función con trabajos esperando más de un minuto y sin ninguna impresora activa saca el aviso naranja
+  «3 trabajos de impresión de Cocina llevan 3 min esperando. Ninguna impresora activa tiene esta
+  función: añade una abajo o dale esta función a una de ellas.» («1 trabajo … lleva …» si es uno). Con
+  todo vacío: «Todo al día: no hay nada en cola.». Error de lectura: «No se pudo leer la cola de
+  impresión.» con «Reintentar».
 - **Impresoras**: la tabla (o tarjetas en el móvil) con Nombre, Función, Conexión, Dirección, Papel,
   Estado y Activa. El estado es «Lista», «Esperando» (tiene trabajos que no salen desde hace más de un
   minuto), «Con errores» (el último intento falló: debajo, «Último error: …») o «Inactiva». Por fila:
   «Editar», «Probar» y «Desactivar»/«Activar». Arriba, «Añadir impresora». Vacía: «Todavía no hay
   impresoras. Añade la de tu caja con su dirección.». Una nota recuerda que el papel lo saca la app de
-  ERPlora del dispositivo que está junto a la impresora.
+  ERPlora del dispositivo que está junto a la impresora; en un navegador añade «un navegador no llega a
+  las impresoras», y dentro de la app no habla de navegadores.
 
 La ventana **Nueva impresora / Editar impresora** tiene «Nombre», «Conexión» («Red», «USB», «Bluetooth»,
 «Impresora del sistema (A4)»), «Dirección IP o nombre» y «Puerto» (red; 9100 de fábrica), «MAC de
@@ -169,8 +173,8 @@ Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Impresoras, Cola
 Pasos:
-1. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora, cuánto
-   espera y desde cuándo.
+1. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
+   la imprime, cuánto espera y desde cuándo.
 2. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
 3. Si una función sale «En cola, sin impresora» o hay un aviso naranja, el papel no está saliendo:
    sigue por PRINTING-F04 (dar la función a una impresora) o PRINTING-F14 (sacar el trabajo del
@@ -515,7 +519,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Una impresora por id o por nombre | ver | F04 | `printing.printer.get` |
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
-| El resumen de la cola por función | ver | F01 | `printing.job.summary` |
+| El resumen de la cola por función, con la impresora por la que sale cada una | ver | F01 | `printing.job.summary` |
 
 ### Lo que ofrece: acciones (cambian datos)
 

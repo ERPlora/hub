@@ -164,3 +164,23 @@ def test_the_summary_by_function():
     assert (by_usage["kitchen"].printers, by_usage["kitchen"].default_printer, by_usage["kitchen"].pending) == (1, "Kitchen", 0)
     assert (by_usage["label"].printers, by_usage["label"].failed) == (0, 1)
     assert (out.pending, out.failed) == (2, 1)
+
+
+def test_the_summary_names_the_printer_each_function_prints_on():
+    # hub#1527: the card says WHERE a function prints, never only how many printers it has.
+    def prints_on() -> dict:
+        return {row.usage: row.prints_on for row in run("printing.job.summary").usages}
+
+    printer("Till 2", address="10.0.0.9")
+    printer("till")
+    printer("Office", kind="system", address="")
+    printer("Bar", usage="bar", address="10.0.0.3", is_active=False)
+    # Nothing chosen: the first active receipt printer by name, whatever its case; a function with no active one, none.
+    assert prints_on() == {"receipt": "till", "kitchen": None, "bar": None, "label": None}
+    run("printing.settings.update", {"receipt_printer": "Till 2"})
+    assert prints_on()["receipt"] == "Till 2"
+    # The chosen one goes inactive: its function prints on the first active one again.
+    run("printing.printer.update", {"printer": "Till 2", "is_active": False})
+    run("printing.printer.update", {"printer": "till", "is_active": False})
+    # Only the computer's printer is left: receipts come out there (on A4).
+    assert prints_on()["receipt"] == "Office"

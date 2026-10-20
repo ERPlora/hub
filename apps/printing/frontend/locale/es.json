@@ -58,6 +58,7 @@
       "heading": "Impresoras",
       "intro": "Da de alta las impresoras del negocio, di qué sale por cada una y comprueba que el papel sale.",
       "appNote": "El papel lo saca la app de ERPlora del dispositivo que está junto a la impresora: un navegador no llega a las impresoras.",
+      "appNoteInApp": "El papel lo saca la app de ERPlora del dispositivo que está junto a la impresora.",
       "add": "Añadir impresora",
       "empty": "Todavía no hay impresoras. Añade la de tu caja con su dirección.",
       "loading": "Cargando…",
@@ -127,7 +128,6 @@
       "nothing": "Nada en cola",
       "failed": "Fallidos: {n}",
       "printsOn": "Imprime en: {name}.",
-      "printers": "{n} impresoras activas.",
       "alert": "{n} trabajos de impresión de {usage} llevan {age} esperando.",
       "alertOne": "1 trabajo de impresión de {usage} lleva {age} esperando.",
       "alertCause": "Ninguna impresora activa tiene esta función: añade una abajo o dale esta función a una de ellas."
