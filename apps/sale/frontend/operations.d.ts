@@ -650,7 +650,17 @@ export interface LastDaysOut {
 }
 
 export interface ByStaffOut {
-  rows: { staff_id: string; sales_count: number; gross_total: number; net_total: number; tax_total: number }[];
+  /** `refunded_total`: what refunds gave back on their lines; `total_revenue`: gross minus that, what a
+   *  commission is on. One row per professional, the most revenue first. */
+  rows: {
+    staff_id: string;
+    sales_count: number;
+    gross_total: number;
+    net_total: number;
+    tax_total: number;
+    refunded_total: number;
+    total_revenue: number;
+  }[];
 }
 
 export interface BusinessDayOut {

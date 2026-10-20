@@ -5,6 +5,8 @@ from decimal import Decimal
 from uuid import uuid7
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
 
@@ -284,6 +286,272 @@ def test_by_professional_the_lines_staff_wins_over_the_sales(catalog):
         (ana, 2, 242),
     ]
     assert all(row.net_total + row.tax_total == row.gross_total for row in rows)
+
+
+def give_back(sale, amount: int, *lines: dict):
+    """A refund of ``amount`` cents on the sale's first tender, returning ``lines`` (SALE-F31)."""
+    return run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(sale.id),
+            "reason": "returned",
+            "allocations": [{"payment_id": str(sale.payments[0].id), "amount": amount}],
+            "lines": list(lines),
+        },
+    )
+
+
+def test_by_professional_a_refund_comes_off_who_sold_what_came_back(catalog):
+    # flow: ninguno — FIX sale/cash_register (de STAFF-F21 y REC_PELUQUERIA-F15): what each one sold
+    # squares with the period's revenue to the cent, refunds taken off, so a commission is never paid
+    # on money that went back.
+    ana, luis, bea = uuid7(), uuid7(), uuid7()
+    card = [{"method": "card"}]
+    # 1 of Luis's 2 steaks comes back for 10.00: all of it comes off Luis, nothing off Ana.
+    first = charge(
+        "refund-staff-0001",
+        lines=[{"product": "STK", "quantity": "2", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=card,
+    )
+    steaks = next(line for line in first.lines if line.sku == "STK")
+    give_back(first, 1000, {"line_id": str(steaks.id), "quantity": "1"})
+    # Money only, all of it: Bea's sale is refunded whole.
+    second = charge(
+        "refund-staff-0002", lines=[{"product": "STK"}], staff_id=str(bea), payments=card
+    )
+    give_back(second, 1800)
+    # Money only, a part: shared by what each one's lines charged (1.21 and 1.10 → 0.52 and 0.48).
+    third = charge(
+        "refund-staff-0003",
+        lines=[{"product": "COF"}, {"product": "WAT", "staff_id": str(luis)}],
+        staff_id=str(ana),
+        payments=card,
+    )
+    give_back(third, 100)
+    charge("refund-staff-0004", staff_id=str(ana))
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [
+        (row.staff_id, row.sales_count, row.gross_total, row.refunded_total, row.total_revenue)
+        for row in rows
+    ] == [
+        (luis, 2, 3710, 1048, 2662),
+        (ana, 3, 363, 52, 311),
+        (bea, 1, 1800, 1800, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 2973
+
+
+def test_by_professional_money_back_on_a_line_worth_nothing_is_shared_by_what_charged(catalog):
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0005",
+        lines=[{"product": "COF", "is_gift": True}, {"product": "STK", "staff_id": str(luis)}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    comp = next(line for line in sale.lines if line.is_gift)
+    # The comp comes back with 10.00: it charged nothing, so the money comes off what did charge.
+    give_back(sale, 1000, {"line_id": str(comp.id)})
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (luis, 1800, 1000, 800),
+        (ana, 0, 0, 0),
+    ]
+
+
+def test_by_professional_several_lines_back_share_the_money_by_what_came_back(catalog):
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0007",
+        lines=[
+            {"product": "STK", "quantity": "2", "staff_id": str(luis)},
+            {"product": "COF", "quantity": "3"},
+        ],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    steaks, coffees = sorted(sale.lines, key=lambda line: line.sku != "STK")
+    # 1 steak of 2 (18.00) and the 3 coffees (3.63) come back for 10.00: 8.32 and 1.68.
+    give_back(
+        sale,
+        1000,
+        {"line_id": str(steaks.id), "quantity": "1"},
+        {"line_id": str(coffees.id)},
+    )
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.refunded_total, row.total_revenue) for row in rows] == [
+        (luis, 832, 2768),
+        (ana, 168, 195),
+    ]
+
+
+def test_by_professional_a_refund_belongs_to_the_day_of_its_sale(catalog):
+    ana = uuid7()
+    today = timezone.localdate()
+    yesterday = today - dt.timedelta(days=1)
+    sale = charge(
+        "refund-staff-0006", lines=[{"product": "STK"}], staff_id=str(ana), payments=[{"method": "card"}]
+    )
+    give_back(sale, 500)
+    set_day(sale, yesterday)
+    charge("refund-staff-0008", staff_id=str(ana))
+    [row] = run("sale.sale.by_staff", {"date_from": today}).rows
+    assert (row.gross_total, row.refunded_total, row.total_revenue) == (121, 0, 121)
+    [row] = run("sale.sale.by_staff", {"date_to": yesterday}).rows
+    assert (row.gross_total, row.refunded_total, row.total_revenue) == (1800, 500, 1300)
+
+
+def test_by_professional_a_weighed_line_partly_back_weighs_the_quantity_returned(catalog, product):
+    # Reviewer regression (hub#93): a decimal quantity (by weight) shares the money by what came back.
+    product("Prawns", "PRW", 1200, "restaurant.food", unit="kg")
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0009",
+        lines=[{"product": "PRW", "quantity": "1.5", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    prawns = next(line for line in sale.lines if line.sku == "PRW")
+    coffee = next(line for line in sale.lines if line.sku == "COF")
+    # 0.5 kg of 1.5 kg (6.00 of 18.00) and the coffee (1.21) come back for 7.21: 6.00 and 1.21.
+    give_back(sale, 721, {"line_id": str(prawns.id), "quantity": "0.5"}, {"line_id": str(coffee.id)})
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (luis, 1800, 600, 1200),
+        (ana, 121, 121, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 1200
+
+
+def test_by_professional_several_refunds_of_one_sale_add_up_and_square_with_the_revenue(catalog):
+    # Reviewer regression (hub#93): three refunds of one sale, one of them money only.
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0010",
+        lines=[{"product": "STK", "quantity": "2", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    steaks = next(line for line in sale.lines if line.sku == "STK")
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    give_back(sale, 100)  # money only, over what is left (18.00 : 1.21): 0.94 and 0.06
+    # The last steak back for 18.00: its line only has 17.06 left, so the 0.94 over goes to the coffee.
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.refunded_total, row.total_revenue) for row in rows] == [
+        (ana, 100, 21),
+        (luis, 3600, 0),
+    ]
+    stats = run("sale.sale.stats", {})
+    assert sum(row.refunded_total for row in rows) == stats.refunded_total == 3700
+    assert sum(row.total_revenue for row in rows) == stats.total_revenue == 21
+
+
+def test_by_professional_money_back_after_a_line_came_back_whole_never_takes_it_below_zero(catalog, product):
+    # Orchestrator finding (hub#93, round 1): money only, after another refund returned a line whole, is
+    # shared by what each line has left to give back, never by what it charged.
+    product("Cut", "CUT", 1000, "product.generic")
+    x, y = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0013",
+        lines=[{"product": "CUT", "staff_id": str(x)}, {"product": "CUT", "staff_id": str(y)}],
+        payments=[{"method": "card"}],
+    )
+    first = sale.lines[0]
+    give_back(sale, 1000, {"line_id": str(first.id)})
+    give_back(sale, 500)
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (y, 1000, 500, 500),
+        (x, 1000, 1000, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 500
+
+
+def test_by_professional_money_only_after_two_partial_refunds_of_a_line_weighs_what_is_left(catalog):
+    ana, luis = uuid7(), uuid7()
+    sale = charge(
+        "refund-staff-0014",
+        lines=[{"product": "STK", "quantity": "3", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    steaks = next(line for line in sale.lines if line.sku == "STK")
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    give_back(sale, 1800, {"line_id": str(steaks.id), "quantity": "1"})
+    # 10.00 of money only, over what is left: 18.00 of steak and 1.21 of coffee → 9.37 and 0.63.
+    give_back(sale, 1000)
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.refunded_total, row.total_revenue) for row in rows] == [
+        (luis, 4537, 863),
+        (ana, 63, 58),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 921
+
+
+def test_by_professional_refunds_of_two_sales_interleaved_in_time_keep_each_sale_apart(catalog):
+    # Reviewer regression (hub#93, round 1): the refunds of a sale are taken together, in their order,
+    # even when another sale's refund was made between them; a group split by time would start that
+    # sale over from what it charged and share money only on a line already given back whole.
+    ana, luis, bea = uuid7(), uuid7(), uuid7()
+    first = charge(
+        "refund-staff-0015",
+        lines=[{"product": "STK", "staff_id": str(luis)}, {"product": "COF"}],
+        staff_id=str(ana),
+        payments=[{"method": "card"}],
+    )
+    other = charge("refund-staff-0016", staff_id=str(bea), payments=[{"method": "card"}])
+    steak = next(line for line in first.lines if line.sku == "STK")
+    give_back(first, 1800, {"line_id": str(steak.id)})
+    give_back(other, 50)
+    give_back(first, 100)  # money only: all of it to the coffee, the steak has nothing left
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (bea, 121, 50, 71),
+        (ana, 121, 100, 21),
+        (luis, 1800, 1800, 0),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue == 92
+
+
+def test_by_professional_lines_nobody_served_keep_their_refund_out_of_the_rows(catalog):
+    # Reviewer regression (hub#93): what nobody served is neither a row nor a refund of anyone, and the
+    # rows plus it still square with the period's revenue.
+    ana = uuid7()
+    nobody = charge("refund-staff-0011", lines=[{"product": "STK"}], payments=[{"method": "card"}])
+    give_back(nobody, 500)
+    mixed = charge(
+        "refund-staff-0012",
+        lines=[{"product": "STK"}, {"product": "COF", "staff_id": str(ana)}],
+        payments=[{"method": "card"}],
+    )
+    give_back(mixed, 1921)  # all of it: 18.00 to nobody, 1.21 to Ana
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [(row.staff_id, row.gross_total, row.refunded_total, row.total_revenue) for row in rows] == [
+        (ana, 121, 121, 0),
+    ]
+    unattributed_revenue = (1800 - 500) + (1800 - 1800)
+    revenue = run("sale.sale.stats", {}).total_revenue
+    assert sum(row.total_revenue for row in rows) + unattributed_revenue == revenue == 1300
+
+
+def test_by_professional_reads_a_fixed_number_of_queries_whatever_the_refunds(catalog):
+    # Reviewer regression (hub#93): no query per refund or per sale (the rows, the refunds and two prefetches).
+    ana = uuid7()
+    for i in range(6):
+        sale = charge(
+            f"refund-staff-n1-{i}",
+            lines=[{"product": "STK"}, {"product": "COF"}],
+            staff_id=str(ana),
+            payments=[{"method": "card"}],
+        )
+        give_back(sale, 100)
+        give_back(sale, 50)
+    with CaptureQueriesContext(connection) as captured:
+        [row] = run("sale.sale.by_staff", {}).rows
+    assert row.refunded_total == 900
+    assert len(captured) <= 12, [query["sql"][:80] for query in captured]
 
 
 def test_the_business_day():
