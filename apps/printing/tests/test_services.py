@@ -328,6 +328,19 @@ def test_with_the_receipt_off_at_checkout_only_the_drawer_opens():
     )
 
 
+def test_a_checkout_without_cash_keeps_the_drawer_shut():
+    """PRINTING-F13: the drawer opens when cash comes in (Square, Toast, Odoo, Shopify, Lightspeed); the till
+    says when it did not, and the settings still decide when it did."""
+    run("printing.settings.update", {"open_drawer_on_sale": True})
+    assert enqueue(automatic=True, open_drawer=False).job.open_drawer is False
+    assert enqueue(automatic=True, open_drawer=True).job.open_drawer is True
+    run("printing.settings.update", {"print_receipt_on_sale": False})
+    out = enqueue(automatic=True, open_drawer=False)
+    assert (out.job, out.skipped) == (None, "print_on_sale_off")
+    run("printing.settings.update", {"open_drawer_on_sale": False})
+    assert enqueue(automatic=True, open_drawer=True).job is None
+
+
 def test_whoever_prints_asks_for_a_print_and_nobody_else():
     assert enqueue().job is not None
     assert run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx_for("hub_employee")).job

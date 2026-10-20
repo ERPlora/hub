@@ -130,6 +130,8 @@ export interface JobCreateIn {
   printer?: string;
   copies?: number;
   automatic?: boolean;
+  /** With `automatic`: false keeps the drawer shut whatever the settings (a checkout with no cash). */
+  open_drawer?: boolean;
   /** ISO 4217, for the amounts' decimals; EUR without it. */
   currency?: string;
   source_app?: string;

@@ -260,6 +260,10 @@ class JobCreateIn(Closed):
         description="The print by itself at checkout: it follows «print the receipt at checkout» and «open the drawer "
         "at checkout» of the settings.",
     )
+    open_drawer: bool = Field(
+        True,
+        description="With automatic: false keeps the drawer shut whatever the settings (a checkout with no cash).",
+    )
     source_app: _text(32) | None = Field(None, description="The app that asks for it (sale).")
     source_ref: _text(64) | None = Field(None, description="The document it is, as a person reads it (T-000123).")
 

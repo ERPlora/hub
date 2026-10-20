@@ -451,9 +451,11 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
         "source_app": data.source_app or "",
     }
     skipped = None
+    # The drawer opens at checkout when the settings say so and the till took cash.
+    drawer = data.automatic and data.open_drawer and settings.open_drawer_on_sale
     if data.automatic and not settings.print_receipt_on_sale:
         skipped = "print_on_sale_off"
-        if not settings.open_drawer_on_sale:
+        if not drawer:
             return {"job": None, "duplicate": False, "skipped": skipped}
         # The receipt stays in the drawer's printer's tray: only the kick travels.
         job = _new_job(ctx, kind=PrintJob.Kind.DRAWER, open_drawer=True, **common)
@@ -471,7 +473,7 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
             html=data.html or "",
             format=data.format,
             copies=copies,
-            open_drawer=data.automatic and settings.open_drawer_on_sale,
+            open_drawer=drawer,
             **common,
         )
     if getattr(job, "duplicate", False):
