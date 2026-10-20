@@ -1,10 +1,12 @@
-"""Django admin of the sale app: full CRUD over its tables, for the platform's staff only.
+"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com, PLAN §17–§18).
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com and
-has full CRUD over every table, fiscal ones included. What it saves does not go through the operations
-(no event, no numbering, no check of the tenders); the database still refuses a negative amount, a line
-that does not square, a payment whose change is not tendered − amount and a refund over the total. An open
-check's «Delete» locks it first (``lock_orders``), as every write on it does.
+The open tables (payment methods, settings, departments, quick notes, open checks and their lines) have
+full CRUD. What was charged is a fiscal document (PLAN-HUB §3.2, round 2026-10-20): a sale's number is its
+simplified invoice's and the day's counter gives it, so sales, their lines and payments, the counter, and
+refunds with their lines and payments are shown whole and never added nor deleted; only the notes of a sale
+and of a refund can change. A charge is corrected by its void or its refunds, as at the till. What the admin
+saves does not go through the operations (no event, no check of the open check); an open check's «Delete»
+locks it first (``lock_orders``), as every write on it does.
 """
 
 from django.contrib import admin
@@ -33,6 +35,46 @@ AUDIT = ("id", "created_at", "updated_at")
 def _readonly(model, extra=()) -> tuple:
     names = {field.name for field in model._meta.get_fields()}
     return tuple(name for name in AUDIT if name in names) + tuple(extra)
+
+
+class ChargedAdmin(admin.ModelAdmin):
+    """What was charged: every column shown and none typed but ``editable``; nothing added nor deleted."""
+
+    editable: tuple[str, ...] = ()
+
+    def get_readonly_fields(self, request, obj=None) -> tuple:
+        return tuple(
+            field.name
+            for field in self.model._meta.concrete_fields
+            if field.name not in self.editable
+        )
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return bool(self.editable) and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
+
+
+class ChargedInline(admin.TabularInline):
+    """The lines or the payments of what was charged, shown read-only."""
+
+    extra = 0
+
+    def get_readonly_fields(self, request, obj=None) -> tuple:
+        return tuple(field.name for field in self.model._meta.concrete_fields)
+
+    def has_add_permission(self, request, obj=None) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
 
 
 @admin.register(PaymentMethod)
@@ -137,9 +179,8 @@ class OrderLineAdmin(admin.ModelAdmin):
     raw_id_fields = ("order", "sale", "department")
 
 
-class SaleLineInline(admin.TabularInline):
+class SaleLineInline(ChargedInline):
     model = SaleLine
-    extra = 0
     fields = (
         "position",
         "name",
@@ -152,9 +193,8 @@ class SaleLineInline(admin.TabularInline):
     )
 
 
-class SalePaymentInline(admin.TabularInline):
+class SalePaymentInline(ChargedInline):
     model = SalePayment
-    extra = 0
     fields = (
         "position",
         "method",
@@ -168,7 +208,7 @@ class SalePaymentInline(admin.TabularInline):
 
 
 @admin.register(Sale)
-class SaleAdmin(admin.ModelAdmin):
+class SaleAdmin(ChargedAdmin):
     list_display = (
         "number",
         "business_day",
@@ -180,21 +220,18 @@ class SaleAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "document_type", "business_day")
     search_fields = ("number", "customer_name", "idempotency_key")
-    readonly_fields = _readonly(Sale)
-    raw_id_fields = ("order", "customer")
+    editable = ("notes",)
     inlines = [SaleLineInline, SalePaymentInline]
 
 
 @admin.register(SaleLine)
-class SaleLineAdmin(admin.ModelAdmin):
+class SaleLineAdmin(ChargedAdmin):
     list_display = ("name", "sale", "quantity", "tax_rate", "line_total")
     search_fields = ("name", "sku", "sale__number")
-    readonly_fields = _readonly(SaleLine)
-    raw_id_fields = ("sale",)
 
 
 @admin.register(SalePayment)
-class SalePaymentAdmin(admin.ModelAdmin):
+class SalePaymentAdmin(ChargedAdmin):
     list_display = (
         "sale",
         "method_name",
@@ -204,19 +241,15 @@ class SalePaymentAdmin(admin.ModelAdmin):
         "change",
     )
     search_fields = ("sale__number", "reference")
-    readonly_fields = _readonly(SalePayment)
-    raw_id_fields = ("sale",)
 
 
 @admin.register(SaleCounter)
-class SaleCounterAdmin(admin.ModelAdmin):
+class SaleCounterAdmin(ChargedAdmin):
     list_display = ("day", "last")
-    readonly_fields = _readonly(SaleCounter)
 
 
-class RefundPaymentInline(admin.TabularInline):
+class RefundPaymentInline(ChargedInline):
     model = RefundPayment
-    extra = 0
     fields = (
         "position",
         "sale_payment",
@@ -225,34 +258,26 @@ class RefundPaymentInline(admin.TabularInline):
         "method_type",
         "amount",
     )
-    raw_id_fields = ("sale_payment",)
 
 
-class RefundLineInline(admin.TabularInline):
+class RefundLineInline(ChargedInline):
     model = RefundLine
-    extra = 0
     fields = ("sale_line", "quantity")
-    raw_id_fields = ("sale_line",)
 
 
 @admin.register(Refund)
-class RefundAdmin(admin.ModelAdmin):
+class RefundAdmin(ChargedAdmin):
     list_display = ("sale", "total", "reason", "created_at", "created_by")
     search_fields = ("sale__number", "reason", "idempotency_key")
-    readonly_fields = _readonly(Refund)
-    raw_id_fields = ("sale",)
+    editable = ("note",)
     inlines = [RefundPaymentInline, RefundLineInline]
 
 
 @admin.register(RefundPayment)
-class RefundPaymentAdmin(admin.ModelAdmin):
+class RefundPaymentAdmin(ChargedAdmin):
     list_display = ("refund", "method_name", "amount")
-    readonly_fields = _readonly(RefundPayment)
-    raw_id_fields = ("refund", "sale_payment")
 
 
 @admin.register(RefundLine)
-class RefundLineAdmin(admin.ModelAdmin):
+class RefundLineAdmin(ChargedAdmin):
     list_display = ("refund", "sale_line", "quantity")
-    readonly_fields = _readonly(RefundLine)
-    raw_id_fields = ("refund", "sale_line")
