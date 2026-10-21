@@ -1,7 +1,7 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: en uso; parciales F12 y F28 (esperan al núcleo) y F27 (espera a Ventas)
+Estado de la app: en uso; parciales F12 y F28 (esperan al núcleo)
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -235,7 +235,7 @@ fueran los del negocio.
 | INVENTORY-F24 | Reponer el stock de una devolución | hecho |
 | INVENTORY-F25 | Imprimir la etiqueta del código de barras | hecho |
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | hecho |
-| INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API) |
+| INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | hecho |
 | INVENTORY-F28 | Completar el primer paso «Tu catálogo» | parcial — la cifra de productos activos está; falta la lista «Termina de configurar tu negocio», que es del núcleo y el Hub todavía no tiene |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
@@ -835,7 +835,7 @@ Implicados: SALE-F10
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
 <!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 fi:modules/inventory#query-inventory-products-list old:inventory/workflow/con-otros-modulos.md#inventory-f27 -->
-Estado: parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API)
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -849,12 +849,14 @@ Pasos:
    de productos. Puedes cobrar servicios y ventas a precio libre; …») y vende servicios y precio
    libre.
 Entra: nada: lo piden las demás apps (ver [Servicios](#servicios-lo-que-entra-y-lo-que-sale)).
-Sale: las lecturas. En la rejilla y el buscador del TPV, en el catálogo de venta y en la cifra de
-cada categoría solo salen los productos a la venta: activos, no agotados (INVENTORY-F29) y no
-eliminados; el mapa de categorías lleva los activos. Un artículo que se marca agotado con el TPV
-abierto desaparece de su rejilla al momento, sin recargar, y vuelve igual; con él, el menú que no se
-puede completar sin ese artículo (COMBO-F12). El catálogo de venta no
-lleva stock: el TPV no enseña ni comprueba cuántas unidades quedan.
+Sale: las lecturas. En el catálogo de venta y en la cifra de cada categoría solo salen los productos
+a la venta: activos, no agotados (INVENTORY-F29) y no eliminados; el mapa de categorías lleva los
+activos. La rejilla y el buscador del TPV enseñan también lo agotado, en gris con «Agotado», y no lo
+dejan pedir: tocarlo no añade nada y dice «… está agotado.», y una línea nueva de un agotado que llega
+por el asistente o la API se rechaza sin escribir nada (SALE-F07). Un artículo que se marca agotado
+con el TPV abierto pasa a gris al momento, sin recargar, y vuelve igual; el menú que no se puede
+completar sin ese artículo sale del TPV (COMBO-F12). El catálogo de venta no lleva stock: el TPV no
+enseña ni comprueba cuántas unidades quedan.
 Si falla: lo decide quien pide. Ventas rechaza una línea de catálogo si no puede leer el catálogo de
 venta y avisa en el TPV si Inventario está activo y no contesta; Cocina se queda sin opciones de
 reparto.
@@ -885,12 +887,12 @@ Pasos:
    menú «⋮» de su fila, toca «Marcar agotado». También desde su ficha, con «Marcar agotado», o
    diciéndoselo al asistente («las croquetas se han acabado»).
 2. La fila enseña la insignia «Agotado» junto a su interruptor, que sigue encendido: el artículo no
-   se desactiva ni pierde nada. El TPV deja de ofrecerlo al momento, en la rejilla y en el buscador,
-   también en los TPV que ya estaban abiertos, y en los menús sale «Agotado en Inventario»: el menú
-   que solo se completaba con él deja de ofrecerse.
+   se desactiva ni pierde nada. El TPV deja de venderlo al momento: en la rejilla y en el buscador sale
+   en gris con «Agotado» y no se puede pedir, también en los TPV que ya estaban abiertos, y en los
+   menús sale «Agotado en Inventario»: el menú que solo se completaba con él deja de ofrecerse.
 3. Para ver todo lo agotado, filtra Estado por «Agotado».
 4. Cuando vuelve a haber, toca «Volver a poner a la venta» en el menú «⋮» o en la ficha: la insignia
-   desaparece y el TPV lo vuelve a ofrecer.
+   desaparece y el TPV lo vuelve a vender.
 Entra: el artículo (por la pantalla, o por su SKU o su nombre desde el asistente o la API) y si está
 agotado o vuelve a la venta.
 Sale: el artículo marcado o desmarcado; Inventario avisa del cambio (`inventory.product.updated`).
@@ -1184,7 +1186,7 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 | Historial de movimientos con quién y cuándo | parcial: se guarda quién, la pantalla no lo enseña ni filtra por fecha o producto (duda 11) | F16 |
 | Alerta de stock bajo | parcial: panel, paneles del Inicio y aviso para Flujos, sin notificación (duda 13) | F17, F18 |
 | No vender lo que no hay, o vender en negativo, según el ajuste | parcial: el TPV no lo impide; apagado, la venta no baja nada (duda 1) | F19, F21 |
-| Agotado («86»): el TPV deja de ofrecer el artículo | sí: «Marcar agotado» en Productos y en la ficha, el asistente y la API | F29, F27 |
+| Agotado («86»): el TPV lo enseña en gris y no lo vende | sí: «Marcar agotado» en Productos y en la ficha, el asistente y la API | F29, F27 |
 | Cantidad restante en el TPV («quedan 3») | no, a propósito por ahora | F27 |
 | La venta baja el stock, una sola vez | sí | F21 |
 | Menú o pack baja sus componentes | sí | F22 |

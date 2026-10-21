@@ -1,11 +1,11 @@
-// flow: INVENTORY-F29, INVENTORY-F27 — an article marked sold out («86») in Inventory leaves the till
-// (apps/inventory/WORKBOOK.md; the old QA flow qa:modules/sales/sold-out-item-86), against the real
-// Sales and Taxes apps, no doubles:
+// flow: INVENTORY-F29, INVENTORY-F27 — an article marked sold out («86») in Inventory stops being sold in
+// the till (apps/inventory/WORKBOOK.md; the old QA flow qa:modules/sales/sold-out-item-86), against the
+// real Sales and Taxes apps, no doubles:
 //   - «Mark sold out» in the row's menu: the «Sold out» mark beside the switch, which stays on, and the
-//     till open in another tab stops offering it without a reload (its grid and its search), while the
-//     article next to it is still there; «Put back on sale» brings it back the same way;
+//     till open in another tab greys it out with «Sold out» without a reload (its grid and its search,
+//     SALE-F07), while the article next to it sells as always; «Put back on sale» brings it back the same way;
 //   - the product sheet marks and unmarks it too, and says so beside its status;
-//   - a menu whose only starter is sold out leaves the till too (COMBO-F06), its editor says «Sold out in
+//   - a menu whose only dessert is sold out leaves the till (COMBO-F06), its editor says «Sold out in
 //     Inventory» on that choice, and the menu comes back with it;
 //   - screenshots of Products with the mark and of the menu's editor at 390, 834 and 1440.
 // What this file creates is deleted after it; the cash register goes back as it was.
@@ -77,6 +77,19 @@ test.afterAll(() => {
 
 const tile = (page: Page, product: Product): Locator => shown(page).locator(`[data-testid=pos-product-${product.id}]`);
 
+/** The till greys a sold-out article out with «Sold out» and will not take it (SALE-F07); on sale, it is a plain tile. */
+async function expectSoldOutTile(page: Page, product: Product, soldOut: boolean): Promise<void> {
+  const shownTile = tile(page, product);
+  await expect(shownTile).toHaveCount(1);
+  if (soldOut) {
+    await expect(shownTile).toHaveAttribute('aria-disabled', 'true');
+    await expect(shownTile).toContainText(/Sold out|Agotado/);
+  } else {
+    await expect(shownTile).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(shownTile).not.toContainText(/Sold out|Agotado/);
+  }
+}
+
 /** The till on «All»: the article that stays on sale is in its grid. */
 async function tillReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
@@ -95,7 +108,7 @@ async function searchTill(page: Page): Promise<Locator> {
 const soldOutMark = (page: Page, product: Product): Locator =>
   shown(page).locator(`[data-testid=inventory-products-sold-out-${product.id}]`);
 
-test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» takes the article off the till live; «Put back on sale» brings it back', async ({
+test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in the till live; «Put back on sale» brings it back', async ({
   page,
   context,
 }) => {
@@ -103,7 +116,7 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» takes the article off the
   await login(page, A, '/sale/pos');
   const till = page;
   await tillReady(till);
-  await expect(tile(till, croquettes)).toHaveCount(1);
+  await expectSoldOutTile(till, croquettes, false);
 
   // The manager, in another tab of the same session, marks it sold out from the row's menu.
   const office = await context.newPage();
@@ -127,12 +140,13 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» takes the article off the
   }
   await office.setViewportSize({ width: 1440, height: 900 });
 
-  // The till, open all along, stops offering it without a reload: neither its grid nor its search.
+  // The till, open all along, greys it out without a reload, in its grid and in its search; the bread sells.
   await till.bringToFront();
-  await expect(tile(till, croquettes)).toHaveCount(0);
-  await expect(tile(till, bread)).toHaveCount(1);
+  await expectSoldOutTile(till, croquettes, true);
+  await expectSoldOutTile(till, bread, false);
   const search = await searchTill(till);
-  await expect(search.locator(`[data-testid=pos-search-${croquettes.id}]`)).toHaveCount(0);
+  await expect(search.locator(`[data-testid=pos-search-${croquettes.id}]`)).toHaveAttribute('aria-disabled', 'true');
+  await expect(search.locator(`[data-testid=pos-search-${croquettes.id}]`)).toContainText(/Sold out|Agotado/);
   await search.locator('[data-testid=pos-search-close]').click();
   await expect(search).toBeHidden();
   await till.screenshot({ path: shot('inventory-sold-out-till-1440') });
@@ -143,9 +157,10 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» takes the article off the
   await expect(soldOutMark(office, croquettes)).toHaveCount(0);
   expect((await productBySku(context, croquettes.sku)).is_sold_out).toBe(false);
   await till.bringToFront();
-  await expect(tile(till, croquettes)).toHaveCount(1);
+  await expectSoldOutTile(till, croquettes, false);
   const again = await searchTill(till);
   await expect(again.locator(`[data-testid=pos-search-${croquettes.id}]`)).toBeVisible();
+  await expect(again.locator(`[data-testid=pos-search-${croquettes.id}]`)).not.toHaveAttribute('aria-disabled', 'true');
 });
 
 test('INVENTORY-F29: the product sheet marks it sold out, says so beside its status and puts it back on sale', async ({ page, context }) => {
@@ -182,10 +197,10 @@ test('INVENTORY-F29 / COMBO-F06: a menu whose only dessert is sold out leaves th
 
   const sold = await api<Product>(context, A, 'POST', '/inventory/products/sold_out', { id: flan.id, sold_out: true });
   expect([sold.status, sold.data.is_sold_out]).toEqual([200, true]);
-  // Live, without a reload: the flan and the menu it completes leave the till; the bread stays.
-  await expect(tile(page, flan)).toHaveCount(0);
+  // Live, without a reload: the flan greys out, the menu it completes leaves the till; the bread sells.
+  await expectSoldOutTile(page, flan, true);
   await expect(tileOfMenu).toHaveCount(0);
-  await expect(tile(page, bread)).toHaveCount(1);
+  await expectSoldOutTile(page, bread, false);
 
   // The menu's editor says which choice and why, as a warning: it comes back.
   const editor = await context.newPage();
@@ -204,5 +219,5 @@ test('INVENTORY-F29 / COMBO-F06: a menu whose only dessert is sold out leaves th
   await expect(status).toHaveCount(0);
   await page.bringToFront();
   await expect(tileOfMenu).toHaveCount(1);
-  await expect(tile(page, flan)).toHaveCount(1);
+  await expectSoldOutTile(page, flan, false);
 });
