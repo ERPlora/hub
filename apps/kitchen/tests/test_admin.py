@@ -152,3 +152,22 @@ def test_support_can_repair_a_station_through_the_admin(client, superuser):
     station.refresh_from_db()
     assert (station.name, station.destination) == ("Charcoal grill", "printer")
     assert KitchenSettings.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_a_dish_shows_its_options_and_its_menu_in_its_ticket(client, superuser):
+    """KITCHEN-F06, F07: the staff sees on each dish the options chosen and the menu it is a dish of."""
+    ticket = make_ticket(label="Table 4")
+    TicketItem.objects.create(
+        ticket=ticket,
+        position=1,
+        name="Steak",
+        quantity=1,
+        modifiers=["+CHEESE", "-ONION"],
+        menu_name="MENU OF THE DAY",
+        menu_dish=1,
+    )
+    client.force_login(superuser)
+    response = client.get(f"/admin/kitchen/ticket/{ticket.pk}/change/", HTTP_HOST="hubs.localhost")
+    assert response.status_code == 200
+    assert b"+CHEESE" in response.content and b"MENU OF THE DAY" in response.content

@@ -176,6 +176,30 @@ def test_a_line_of_sales_is_one_dish_at_most():
     )
 
 
+def test_a_menu_line_of_sales_is_one_dish_per_dish_of_the_menu_at_most():
+    """KITCHEN-F06: a menu is one line of Sales and one dish per dish chosen (``menu_dish`` 1, 2…); saving
+    the same round twice is still refused."""
+    from apps.kitchen.models import TicketItem
+
+    ticket = make_ticket()
+    line = uuid.uuid7()
+    for dish, name in enumerate(("Lentils", "Steak"), start=1):
+        TicketItem.objects.create(
+            ticket=ticket,
+            sale_line_id=line,
+            menu_dish=dish,
+            menu_name="MENU",
+            position=dish,
+            name=name,
+            quantity=1,
+        )
+    assert refused(
+        lambda: TicketItem.objects.create(
+            ticket=ticket, sale_line_id=line, menu_dish=2, position=3, name="Steak", quantity=1
+        )
+    )
+
+
 def test_a_dish_status_is_a_closed_list_and_its_quantity_positive():
     from apps.kitchen.models import TicketItem
 

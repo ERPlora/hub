@@ -92,6 +92,9 @@ HIGH_RISK = {
     "whatsapp_inbox.conversation.erase",
     "whatsapp_inbox.note.delete",
     "whatsapp_inbox.conversation.erase_for_customer",
+    "whatsapp_inbox.template.create",
+    "whatsapp_inbox.template.update",
+    "whatsapp_inbox.template.delete",
 }
 NOT_FOR_API_KEYS = {
     # Personal data of the team, an irreversible erasure and the system's doors.
@@ -109,6 +112,10 @@ NOT_FOR_API_KEYS = {
     "whatsapp_inbox.conversation.claim_erasure",
     "whatsapp_inbox.conversation.record_erasure",
     "whatsapp_inbox.delivery.resume",
+    "whatsapp_inbox.template.claim_submit",
+    "whatsapp_inbox.template.record_submit",
+    "whatsapp_inbox.template.claim_delete",
+    "whatsapp_inbox.template.record_delete",
 }
 
 
@@ -118,7 +125,7 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
     from live.operations import registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("whatsapp_inbox.")}
-    assert len(ops) == 30
+    assert len(ops) == 38
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and len(str(op.ai.get("description", ""))) > 20, name
         if op.kind == "command":

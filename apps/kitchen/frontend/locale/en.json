@@ -128,7 +128,9 @@
       "voided": "Voided",
       "paperOnly": "Paper only",
       "tapToBump": "Tap to mark ready",
-      "tapToRecall": "Tap to recall"
+      "tapToRecall": "Tap to recall",
+      "menuDishes": "{n} dish | {n} dishes",
+      "bumpMenu": "Mark this menu's dishes ready"
     },
     "tickets": {
       "search": "Search ticket or destination…",

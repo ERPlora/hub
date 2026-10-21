@@ -32,3 +32,12 @@ icono.
   `media-src` (en `config/settings.py`, como ya hace con `form-action`), o `packages/live` añadir
   `media-src 'self' blob:` si se sirven por el Hub.
 - **Hoy**: el adjunto se abre en una pestaña nueva servida por erplora.com («Abrir el adjunto»).
+
+## Muestra de la cabecera de una plantilla (archivo)
+
+- **Qué**: para crear desde el Hub plantillas con foto, vídeo o documento en la cabecera
+  (WHATSAPP_INBOX-F29; el producto actual lo hacía), la plataforma tiene que ofrecer subir un archivo
+  (almacenamiento y una ruta de subida fuera de una operación con transacción) que erplora.com entregue a
+  Meta como muestra.
+- **Hoy**: esas plantillas se hacen en WhatsApp Manager; en **Ajustes → Plantillas de Meta** se ven, pero
+  no se editan ni se ofrecen para enviar.

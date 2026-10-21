@@ -55,6 +55,12 @@ export interface ItemOut {
   quantity: string;
   unit: string;
   notes: string;
+  /** The options chosen in the till, by the names the cook reads, in the order chosen (KITCHEN-F07). */
+  modifiers: string[];
+  /** The header of the menu it is a dish of; `''` out of a menu (KITCHEN-F06). */
+  menu_name: string;
+  /** The menu's line of the check: the dishes of one menu share it; `null` out of a menu. */
+  menu_line_id: string | null;
   station_id: string | null;
   station_name: string;
   station_color: string;

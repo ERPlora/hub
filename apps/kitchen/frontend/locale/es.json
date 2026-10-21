@@ -128,7 +128,9 @@
       "voided": "Anulado",
       "paperOnly": "Solo papel",
       "tapToBump": "Toca para marcar listo",
-      "tapToRecall": "Toca para recuperar"
+      "tapToRecall": "Toca para recuperar",
+      "menuDishes": "{n} plato | {n} platos",
+      "bumpMenu": "Marcar listos los platos de este menú"
     },
     "tickets": {
       "search": "Buscar comanda o destino…",
