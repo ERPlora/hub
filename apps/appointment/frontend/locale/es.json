@@ -177,7 +177,7 @@
         "rescheduled": "Cambio de hora",
         "staff_changed": "Cambio de profesional",
         "service_changed": "Cambio de servicio",
-        "unassigned": "Profesional dado de baja: pendiente de reasignar",
+        "unassigned": "Profesional dado de baja: hay que reasignarla",
         "charged": "Cobrada",
         "uncharged": "Venta anulada",
         "deleted": "Borrada"

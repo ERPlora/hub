@@ -46,3 +46,17 @@ Al registrarlos, cambiar `frontend/components/AppointmentList.vue` (`ICONS`) y
   `appointment.agenda.lanes`).
 - **Hoy**: Citas reacciona a `staff.member.terminated` pasando sus citas futuras a «Sin asignar» con un
   aviso en la agenda (APPOINTMENT-F25): nada se pierde ni se cancela en silencio.
+
+## Campana del shell (`packages/ui/src/shell`): avisar al equipo de una cita nueva o cancelada
+
+- **Qué** (APPOINTMENT-F28, la campana del producto actual, old-hub:HUB_SHELL-F66): una campana en la barra
+  de arriba que cuenta lo que declaran los módulos y, con permiso del dispositivo, un aviso del sistema por
+  cada aviso nuevo. Para Citas: suscribirse a `appointment.appointment.notices` (las reservas y
+  cancelaciones que la clienta hizo ella misma, de la agenda que ve quien mira, lo más nuevo primero, cada
+  una con `kind`, `at`, el número, la clienta, los servicios, el día y la hora listos para decir y con
+  quién) y contar `appointment.appointment.count_to_confirm`; un aviso por fila nueva (por `at`), tocarlo
+  abre la agenda en ese día.
+- **Hoy**: la lectura viva existe y está probada; la agenda enseña **N por confirmar**. No hay campana ni
+  aviso del sistema: APPOINTMENT-F28 queda `parcial` con ese motivo.
+- Al llegar: el flujo pasa a `hecho` con su e2e (una reserva por la API con origen WhatsApp hace sonar la
+  campana del equipo, una del mostrador no).
