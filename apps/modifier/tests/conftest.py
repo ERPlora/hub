@@ -152,8 +152,22 @@ def tick(db, monkeypatch):
 
 
 @pytest.fixture
-def listen(transactional_db, db_dsn):
-    """``listen(scope)``: a raw session LISTENing on the channel of ``scope`` (it hears only what is committed)."""
+def factory_data(transactional_db):
+    """A transactional test starts from a flushed database: Taxes' factory catalogue is planted again, as its
+    migrations do (idempotent)."""
+    from importlib import import_module
+
+    from django.apps import apps as registry
+
+    with connections["default"].schema_editor() as editor:
+        for module in ("apps.tax.migrations.0002_factory_catalogue", "apps.tax.migrations.0005_retail_alcohol"):
+            import_module(module).plant(registry, editor)
+
+
+@pytest.fixture
+def listen(factory_data, db_dsn):
+    """``listen(scope)``: a raw session LISTENing on the channel of ``scope`` (it hears only what is committed),
+    on committed data with Taxes' factory catalogue."""
     sessions = []
 
     def open_session(scope):
