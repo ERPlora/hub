@@ -158,7 +158,7 @@ def test_the_till_sells_a_service_of_services_at_its_price(haircut):
     } == {(str(haircut.id), True, False)}
 
 
-# ── The professional's own price (SALE-F38, SERVICE-F05): Fresha, Phorest and Timely charge it ──
+# ── The professional's own price (SALE-F38, SERVICE-F31): Fresha, Phorest and Timely charge it ──
 
 
 @pytest.fixture
