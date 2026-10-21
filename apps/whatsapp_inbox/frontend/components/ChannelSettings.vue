@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The body of «Channel settings» (WHATSAPP_INBOX-F01, F02, F13, F27…F31), mounted only for whoever
-// configures. The number is erplora.com's (the WhatsApp Business account lives there): this shows what it
-// reported and leads there to change it. «Your number» — connected with the number and the name, not
-// connected or to reconnect —, «Manage in erplora.com»; «This month» — messages sent against the plan's,
+// configures. The number lives in erplora.com (the WhatsApp Business account and Meta's permission): «Your
+// number» shows what it reports — connected with the number and the name, not connected or to reconnect — and
+// connects, reconnects or disconnects it through erplora.com (NumberConnection); «This month» — messages sent against the plan's,
 // the cap when reached, or no limit —; «Meta templates» — the live `whatsapp_inbox.template.list` with
 // Name, Language, Category, Status in Meta (Meta's reason, and where it is on its way to Meta) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
@@ -14,21 +14,18 @@ import {
   DataTable,
   EmptyState,
   InlineFeedback,
-  StatusPill,
   UsageMeter,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
 
+import NumberConnection from './NumberConnection.vue';
 import TemplateFormModal from './TemplateFormModal.vue';
 
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { TemplateListIn, TemplateOut } from '../operations';
-
-const NUMBER_TONES = { connected: 'success', not_connected: 'neutral', reconnect_needed: 'warning' } as const;
-const NUMBER_LABELS = { connected: 'connected', not_connected: 'notConnected', reconnect_needed: 'reconnectNeeded' } as const;
 
 const t = useT();
 const { data: channel, error: channelError } = useLive('whatsapp_inbox.channel.get', {});
@@ -123,37 +120,10 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
       data-testid="whatsapp-inbox-settings-number"
     >
       <h2>{{ $t('whatsapp_inbox.settings.number') }}</h2>
-      <template v-if="channel">
-        <p class="wa-settings__line">
-          <StatusPill
-            size="sm"
-            :tone="NUMBER_TONES[channel.status]"
-            :label="t(`whatsapp_inbox.settings.${NUMBER_LABELS[channel.status]}`)"
-          />
-          <strong v-if="channel.phone_number">{{ channel.phone_number }}</strong>
-          <span v-if="channel.display_name">{{ channel.display_name }}</span>
-        </p>
-        <p
-          v-if="channel.status === 'not_connected'"
-          class="wa-settings__hint"
-        >
-          {{ $t('whatsapp_inbox.settings.notConnectedHint') }}
-        </p>
-        <p
-          v-else-if="channel.status === 'reconnect_needed'"
-          class="wa-settings__hint"
-        >
-          {{ $t('whatsapp_inbox.settings.reconnectHint') }}
-        </p>
-        <a
-          v-if="channel.manage_url"
-          class="wa-settings__link"
-          data-testid="whatsapp-inbox-settings-manage"
-          :href="channel.manage_url"
-          target="_blank"
-          rel="noopener"
-        >{{ $t('whatsapp_inbox.settings.manage') }}</a>
-      </template>
+      <NumberConnection
+        v-if="channel"
+        :channel="channel"
+      />
       <p
         v-else
         class="wa-settings__hint"
@@ -271,23 +241,12 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
   margin: 0 0 0.5rem;
   font-size: 1.05rem;
 }
-.wa-settings__line {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0 0 0.5rem;
-}
 .wa-settings__hint {
   color: var(--ion-color-medium-shade);
   margin: 0 0 0.5rem;
 }
 .wa-settings__warning {
   color: var(--ion-color-warning-shade);
-  font-weight: 600;
-}
-.wa-settings__link {
-  color: var(--ion-color-primary);
   font-weight: 600;
 }
 </style>

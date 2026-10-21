@@ -46,9 +46,9 @@
         "allRead": "All read"
       },
       "open": "Open",
-      "notConnected": "WhatsApp is not connected. Connect the business's number in erplora.com to receive and send messages.",
-      "reconnectNeeded": "WhatsApp asks to reconnect the number in erplora.com: until then nothing can be sent.",
-      "goToSaas": "Go to erplora.com",
+      "notConnected": "WhatsApp is not connected. Connect the business’s number in Settings to receive and send messages.",
+      "reconnectNeeded": "WhatsApp asks to reconnect the number in Settings: until then nothing can be sent.",
+      "goToSettings": "Go to Settings",
       "capReached": "You have used all the WhatsApp messages of your plan this month. Messages keep arriving here, but nothing can be sent until next month or until you upgrade the plan.",
       "erased": "The data of this number has been erased."
     },
@@ -227,16 +227,38 @@
       "connected": "Connected",
       "notConnected": "Not connected",
       "reconnectNeeded": "Needs reconnecting",
-      "notConnectedHint": "Connect the business's WhatsApp number in erplora.com: messages will arrive here.",
-      "reconnectHint": "WhatsApp withdrew the permission: reconnect the number in erplora.com.",
-      "manage": "Manage in erplora.com",
+      "notConnectedHint": "Connect the business’s WhatsApp number: messages will arrive here.",
+      "reconnectHint": "WhatsApp withdrew the permission: reconnect the number. Until then nothing can be sent.",
       "month": "This month",
       "sent": "Messages sent",
       "usage": "{used} of {limit} messages sent",
       "noLimit": "No limit: {used} messages sent",
       "capReached": "You have used all the messages of your plan this month.",
       "templatesTitle": "Meta templates",
-      "loadError": "Could not load the channel."
+      "loadError": "Could not load the channel.",
+      "connection": {
+        "checking": "Checking with erplora.com…",
+        "connect": "Connect WhatsApp",
+        "reconnect": "Reconnect",
+        "hint": "Meta’s window opens: sign in with Facebook and choose or add the business’s number. If it is already in the WhatsApp Business app, scan the code with that phone: you keep using WhatsApp on it as always.",
+        "notConfigured": "WhatsApp is not available in ERPlora yet.",
+        "notYet": "Connecting the number from here is not available yet.",
+        "retry": "Retry",
+        "waiting": "Finish in Meta’s window…",
+        "connecting": "Connecting…",
+        "connected": "WhatsApp connected: {number}.",
+        "connectedHistory": "WhatsApp connected: {number}. Its contacts and chats arrive in the inbox in a few minutes.",
+        "blocked": "The browser did not let Meta’s window open. Allow pop-up windows for this site and try again.",
+        "closed": "Meta’s window was closed before finishing: nothing was connected.",
+        "metaFailed": "Meta did not finish the connection: {reason}",
+        "noAccount": "Meta did not say which WhatsApp Business account was chosen: nothing was connected. Try again.",
+        "disconnect": "Disconnect",
+        "disconnectTitle": "Disconnect the WhatsApp number?",
+        "disconnectMessage": "{number} stops receiving and sending messages in the inbox until it is connected again.",
+        "disconnectStays": "The conversations kept stay.",
+        "disconnected": "WhatsApp disconnected.",
+        "noNumber": "erplora.com had no number connected for this business."
+      }
     }
   }
 }

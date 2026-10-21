@@ -601,6 +601,8 @@ def test_without_a_connected_number_nothing_is_kept():
     with pytest.raises(Conflict) as excinfo:
         send({"id": str(conv().id), "text": "Hola"})
     assert excinfo.value.code == "whatsapp_inbox.channel_not_connected"
+    # The number is connected from the inbox's Settings (WHATSAPP_INBOX-F01), not in erplora.com.
+    assert "in Settings" in excinfo.value.message and "erplora.com" not in excinfo.value.message
     connect(version=1, status="reconnect_needed")
     with pytest.raises(Conflict) as excinfo:
         send({"id": str(conv().id), "text": "Hola"})

@@ -1,6 +1,6 @@
 // WhatsApp inbox → Settings («Ajustes del canal»; WHATSAPP_INBOX-F01, F02, F13, F27, F28), owner and admin
-// only: «Your number» (connected with the number and the name, not connected, or to reconnect) and
-// «Manage in erplora.com»; «This month» (messages sent against the plan's, or no limit); «Meta templates»
+// only: «Your number» (connected with the number and the name, not connected, or to reconnect), connected,
+// reconnected and disconnected here (components/NumberConnection.vue); «This month» (messages sent against the plan's, or no limit); «Meta templates»
 // — Name, Language, Category, Status in Meta and Text, «Search template…», Meta's reason on a rejected
 // one, «No templates.» with where they are made. Whoever may not configure reads «You do not have permission».
 import { DataTable, EmptyState, UsageMeter } from '@erplora/ui/components';
@@ -70,13 +70,15 @@ async function setup(options: MountOptions = {}, channel: ChannelOut = CONNECTED
 }
 
 describe('SettingsPage: the number and the month', () => {
-  it('is «Channel settings»: the number connected, its name and «Manage in erplora.com»', async () => {
+  it('is «Channel settings»: the number connected, its name and «Disconnect», here and not in erplora.com', async () => {
     const s = await setup();
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Channel settings');
     expect(s.find('whatsapp-inbox-settings-number').text()).toContain('Connected');
     expect(s.find('whatsapp-inbox-settings-number').text()).toContain('+34910000000');
     expect(s.find('whatsapp-inbox-settings-number').text()).toContain('Peluquería Ana');
-    expect(s.find('whatsapp-inbox-settings-manage').attributes()).toMatchObject({ href: 'http://localhost:8001', target: '_blank' });
+    expect(s.find('whatsapp-inbox-number-disconnect').exists()).toBe(true);
+    // erplora.com has no WhatsApp screen: nothing leads there any more.
+    expect(s.find('whatsapp-inbox-settings-manage').exists()).toBe(false);
   });
 
   it('not connected, or to reconnect, says what to do', async () => {

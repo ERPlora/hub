@@ -391,8 +391,8 @@ msgstr "Esto no es un número de teléfono."
 msgid "More than 24 hours have passed since the customer's last message: WhatsApp only lets you write to them with an approved template."
 msgstr "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada."
 
-msgid "WhatsApp is not connected. Connect the business's number in erplora.com to receive and send messages."
-msgstr "WhatsApp no está conectado. Conecta el número del negocio en erplora.com para recibir y enviar mensajes."
+msgid "WhatsApp is not connected. Connect the business's number in Settings to receive and send messages."
+msgstr "WhatsApp no está conectado. Conecta el número del negocio en Ajustes para recibir y enviar mensajes."
 
 msgid "This server cannot reach erplora.com, so nothing can be sent from it."
 msgstr "Este servidor no llega a erplora.com, así que desde él no se puede enviar nada."

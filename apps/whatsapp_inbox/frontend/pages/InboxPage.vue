@@ -5,7 +5,8 @@
 // «Filter contact or phone…» (a number typed any way), column filters by status, assignment and unread,
 // 50 a page, the latest activity first. «Open» (or the row) opens the conversation in a panel above the
 // list, kept in the address (`?conversation=`). Above it: «Reconnecting…», the number not connected or to
-// reconnect («Go to erplora.com» for whoever configures), the month's messages spent, a number erased.
+// reconnect («Go to Settings», where it is connected, for whoever configures), the month's messages spent, a number
+// erased.
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -33,6 +34,8 @@ const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
 const session = useSession();
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
+/** Where the number is connected, reconnected or disconnected (WHATSAPP_INBOX-F01, F02). */
+const SETTINGS = '/whatsapp_inbox/settings';
 const t = useT();
 const locale = useLocale();
 const route = useRoute();
@@ -170,16 +173,15 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
       >
         {{ $t('whatsapp_inbox.inbox.notConnected') }}
         <template
-          v-if="canConfigure && channel.manage_url"
+          v-if="canConfigure"
           #actions
         >
           <a
             class="wa-inbox__link"
-            data-testid="whatsapp-inbox-go-to-saas"
-            :href="channel.manage_url"
-            target="_blank"
-            rel="noopener"
-          >{{ $t('whatsapp_inbox.inbox.goToSaas') }}</a>
+            data-testid="whatsapp-inbox-go-to-settings"
+            :href="SETTINGS"
+            @click.prevent="router.push(SETTINGS)"
+          >{{ $t('whatsapp_inbox.inbox.goToSettings') }}</a>
         </template>
       </InlineFeedback>
       <InlineFeedback
@@ -188,6 +190,17 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
         data-testid="whatsapp-inbox-reconnect"
       >
         {{ $t('whatsapp_inbox.inbox.reconnectNeeded') }}
+        <template
+          v-if="canConfigure"
+          #actions
+        >
+          <a
+            class="wa-inbox__link"
+            data-testid="whatsapp-inbox-go-to-settings"
+            :href="SETTINGS"
+            @click.prevent="router.push(SETTINGS)"
+          >{{ $t('whatsapp_inbox.inbox.goToSettings') }}</a>
+        </template>
       </InlineFeedback>
       <InlineFeedback
         v-if="channel?.cap_reached"

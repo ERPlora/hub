@@ -122,7 +122,7 @@ WINDOW_CLOSED = _(
     "them with an approved template."
 )
 NOT_CONNECTED = _(
-    "WhatsApp is not connected. Connect the business's number in erplora.com to receive and send messages."
+    "WhatsApp is not connected. Connect the business's number in Settings to receive and send messages."
 )
 SAAS_UNCONFIGURED = _(
     "This server cannot reach erplora.com, so nothing can be sent from it."
