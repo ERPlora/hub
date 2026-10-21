@@ -807,6 +807,23 @@ def test_the_channel_reads_the_printers_of_the_device_that_says_hello():
     assert run("printing.device.get", {"device": "never-set-up"}, ctx=ctx_for(EMPLOYEE)).device is None
 
 
+def test_the_channel_tells_a_retired_device_from_one_never_set_up():
+    # A device new here is paired by the session of whoever sets up the printers; a retired one is not: retiring it
+    # was a decision, and only setting it up again brings it back. The channel reads which one it is at the hello.
+    till = printer("Till")
+    device = register(till)
+    never = run("printing.device.get", {"device": "never-set-up"}, ctx=ctx_for(MANAGER))
+    assert (never.device, never.retired) == (None, False)
+    assert run("printing.device.get", {"device": TILL_ID}, ctx=ctx_for(MANAGER)).retired is False
+    run("printing.device.retire", {"device_id": str(device.id)}, ctx=ctx_for(MANAGER))
+    for role in (EMPLOYEE, MANAGER):
+        gone = run("printing.device.get", {"device": TILL_ID}, ctx=ctx_for(role))
+        assert (gone.device, gone.retired) == (None, True), role
+    register(till)
+    back = run("printing.device.get", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE))
+    assert (back.device.id, back.retired) == (device.id, False)
+
+
 # ── PRINTING-F04 A printer that leaves takes no queued job with it ───────────────────────────────
 
 

@@ -2,6 +2,7 @@
 // two boxes, «Unsent» and «Sent», once the kitchen has some (SALE-F20). Lines can be marked only when
 // there are two or more (SALE-F22). Every action of a line goes up with its line.
 import { describe, expect, it } from 'vitest';
+import { h } from 'vue';
 
 import { mountSale } from '../../__tests__/mount-sale';
 import { line } from './__tests__/fixtures';
@@ -50,6 +51,15 @@ describe('CartLines', () => {
     const ids = (section: typeof pending) => section.findAll('.pos-line').map((row) => row.attributes('data-testid'));
     expect(ids(pending)).toEqual(['pos-line-a', 'pos-line-b']);
     expect(ids(sent)).toEqual(['pos-line-c']);
+  });
+
+  it('the «Sent» head carries what the cart puts beside it (Kitchen’s «Tickets · N», KITCHEN-F19)', async () => {
+    const m = await mountSale(
+      { setup: () => () => h(CartLines, { lines: [A, SENT], marks: [], staffNames: {}, allowDiscounts: true, busy: false }, { sent: () => h('button', { 'data-testid': 'slot-sent' }, 'Tickets · 1') }) },
+      {},
+    );
+    expect(m.find('pos-cart-sent').find('.pos-sec__head [data-testid=slot-sent]').exists()).toBe(true);
+    expect(m.find('pos-cart-pending').find('[data-testid=slot-sent]').exists()).toBe(false);
   });
 
   it('hands every action up with its line', async () => {

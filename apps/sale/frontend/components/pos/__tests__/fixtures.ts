@@ -1,6 +1,7 @@
 // Fixtures of the till's tests: what the server answers (a product of Inventory, an open check with its
 // lines, a preview, the till settings, a page) and the browser's localStorage the test environment lacks.
 import type { CategoryOut, ProductOut } from '../../../../../inventory/frontend/operations';
+import type { ItemOut, TicketOut } from '../../../../../kitchen/frontend/operations';
 import type { ServiceSaleOut } from '../../../../../service/frontend/operations';
 import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SettingsOut } from '../../../operations';
 
@@ -205,3 +206,52 @@ export function deferred<T = Response>() {
 
 /** The server's refusal envelope. */
 export const refused = (code: string, message: string, status = 409) => Response.json({ error: { code, message } }, { status });
+
+/** A dish of a kitchen ticket, as `kitchen.ticket.by_order` answers it (KITCHEN-F19). */
+export const kitchenItem = (over: Partial<ItemOut> = {}): ItemOut => ({
+  id: 'i1',
+  position: 1,
+  product_id: 'p1',
+  name: 'Burger',
+  quantity: '1.000',
+  unit: 'ud',
+  notes: '',
+  modifiers: [],
+  menu_name: '',
+  menu_line_id: null,
+  station_id: null,
+  station_name: '',
+  station_color: '',
+  destination: 'both',
+  printer_usage: 'kitchen',
+  status: 'pending',
+  void_reason: '',
+  ready_at: null,
+  ...over,
+});
+
+/** A kitchen ticket of a check (one round), as `kitchen.ticket.by_order` answers it (KITCHEN-F19, F20). */
+export const kitchenTicket = (over: Partial<TicketOut> = {}): TicketOut => ({
+  id: 't1',
+  number: '20261014-0001',
+  short_number: '0001',
+  label: 'Table 4',
+  order_type: 'dine_in',
+  priority: 'normal',
+  status: 'pending',
+  round_no: 1,
+  waiter: 'Ana',
+  notes: '',
+  order_id: 'o1',
+  received_at: '2026-10-14T11:00:00Z',
+  started_at: null,
+  ready_at: null,
+  served_at: null,
+  cancelled_at: null,
+  rush_count: 0,
+  total: 1200,
+  saved: true,
+  items: [kitchenItem()],
+  print_error: null,
+  ...over,
+});

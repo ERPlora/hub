@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // The lines of the check: «Tap a product to add it.» while it is empty, a flat list, or — once the
 // kitchen has some (SALE-F20) — two boxes, «Unsent» on top (where the waiter works) and «Sent» below,
-// each with its count. A line can be marked for a partial charge only when there are two or more.
-// Every action of a line goes up with the line.
+// each with its count; the cart puts Kitchen's «Tickets · N» beside the «Sent» head (slot `sent`,
+// KITCHEN-F19). A line can be marked for a partial charge only when there are two or more. Every action of
+// a line goes up with the line.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
@@ -60,9 +61,15 @@ const sections = computed(() => sent.value.length > 0);
         :class="`pos-sec--${section.id}`"
         :data-testid="`pos-cart-${section.id}`"
       >
-        <h4 class="pos-sec__h">
-          <HubIcon :name="section.icon" />{{ $t(section.label) }} · {{ section.rows.length }}
-        </h4>
+        <div class="pos-sec__head">
+          <h4 class="pos-sec__h">
+            <HubIcon :name="section.icon" />{{ $t(section.label) }} · {{ section.rows.length }}
+          </h4>
+          <slot
+            v-if="section.id === 'sent'"
+            name="sent"
+          />
+        </div>
         <div class="pos-sec__body">
           <CartLine
             v-for="line in section.rows"
@@ -133,17 +140,23 @@ const sections = computed(() => sent.value.length > 0);
 .pos-sec--pending {
   border-color: var(--ion-color-primary, #0091ce);
 }
+.pos-sec__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--ion-card-background, var(--ion-background-color, #fff));
+}
 .pos-sec__h {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   margin: 0;
-  padding: 0.5rem 0.7rem;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
 }
 .pos-sec--pending .pos-sec__h :deep(ion-icon) {
   color: var(--ion-color-primary, #0091ce);

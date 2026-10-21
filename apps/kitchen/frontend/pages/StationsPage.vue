@@ -282,6 +282,8 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
   font-weight: 600;
 }
 .kitchen-stations__dot {
+  /* A flex item that never shrinks: a long name in a narrow column must not squeeze the colour away. */
+  flex: none;
   display: inline-block;
   width: 0.7rem;
   height: 0.7rem;
