@@ -77,7 +77,8 @@ test('PRICING-F01: the lists, searched and filtered by status, on every screen s
   // flow: PRICING-F01
   const s = stamp();
   await login(page, A, '/pricing/lists');
-  const wholesale = await newList(page, s, 'WHOLESALE');
+  // A long code (up to 50 characters) stays inside its card on a phone.
+  const wholesale = await newList(page, s, 'WHOLESALEMEMBERSSUMMER2026');
   const summer = await newList(page, s, 'SUMMER', { valid_from: '2026-07-01', valid_until: '2026-08-31' });
   await post(page.context(), '/pricing/price_lists/deactivate', { id: summer.id }, 200);
   await ready(page, LISTS);
@@ -106,6 +107,8 @@ test('PRICING-F01: the lists, searched and filtered by status, on every screen s
   const card = row(page, LISTS, wholesale.code);
   await expect(card).toBeVisible();
   await expect(card.getByText(wholesale.name, { exact: true })).toHaveCount(1);
+  const overflow = await card.evaluate((box) => box.scrollWidth - box.clientWidth);
+  expect(overflow, `the card overflows by ${overflow}px`).toBeLessThanOrEqual(0);
 });
 
 test('PRICING-F02: a new list, and a repeated code said under Code in sight on a phone', async ({ page }) => {

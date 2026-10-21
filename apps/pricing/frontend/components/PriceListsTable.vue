@@ -281,7 +281,14 @@ async function onAction({ actionId, row }: { actionId: string; row: PriceListOut
 }
 .pricing-code {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+}
+/* A code of up to 50 characters breaks inside its card on a phone instead of running out of it. */
+.pricing-code > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>
