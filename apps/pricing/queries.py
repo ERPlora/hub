@@ -262,7 +262,7 @@ def rule_row(rule: DiscountRule) -> dict:
         "product_name": rule.product.name if rule.product else None,
         "service_id": rule.service_id,
         "service_name": rule.service_name or None,
-        # Inventory deletes logically: the reaction switches the rule off (relay, phase 2); until then, said.
+        # Inventory deletes logically: the relayed reaction switches the rule off seconds later; until then, said.
         "target_deleted": bool(
             (rule.category and rule.category.is_deleted) or (rule.product and rule.product.is_deleted)
         ),

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2be2ecb84b28e7851c6652d239951de99ae28147ce4be69083989c942f438295 -->
+<!-- generated from WORKBOOK.md sha256:395517856619da028811ca1f4e57edbb4b0b5d3c37285f1ea79688f49d60450f -->
 
 ## What it is for and who it is for
 
@@ -273,8 +273,10 @@ Screen: Sales: Sell
 Steps:
 1. At the till, in "All", the menus on sale come first, each one with the "Menu" label and its
    closed price. Tap one: a sheet opens with its name and all its courses at once.
-2. Each course says its rule ("Choose 1", "Up to 2", "Optional") and its available choices, with the
-   supplement with its sign if it is not zero ("+€2.00"). On opening nothing is chosen.
+2. Each course says its rule: "Choose N" if it asks for exactly N, "Choose N to M" if it asks for a minimum
+   and allows up to a ceiling, "Choose at least N" if it asks for a minimum with no ceiling, "Up to N" if it
+   only has a ceiling, "Optional" if not; and its available choices, with the supplement with its sign if it
+   is not zero ("+€2.00"). On opening nothing is chosen.
 3. Choose: in a course of a single choice, tapping another one changes it; in one with a ceiling, on
    reaching it the next tap says "«Coffee» is full: take one out to choose another."; a choice that can
    be repeated carries its counter and its "−".

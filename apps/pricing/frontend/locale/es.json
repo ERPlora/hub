@@ -21,7 +21,7 @@
       "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
     },
     "state": { "active": "Activa", "inactive": "Inactiva" },
-    "status": { "active": "Activas", "inactive": "Inactivas", "all": "Todas" },
+    "status": { "active": "Activas", "inactive": "Inactivas" },
     "taxBasis": { "business": "Según el negocio", "included": "Impuesto incluido", "excluded": "Impuesto no incluido" },
     "validity": { "always": "Siempre", "from": "Desde {from}", "until": "Hasta {until}", "between": "{from} – {until}" },
     "lists": {

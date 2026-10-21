@@ -75,6 +75,8 @@ describe('ListDetailPage', () => {
   it('filters by type and searches and sorts on the server', async () => {
     const s = await setup();
     await s.result(LIST, VIP);
+    // The Type filter waits behind the toolbar's funnel, as in the old table (PLAN-MIGRATIONS §13).
+    expect(s.prop('filterable')).toBe(true);
     s.table().vm.$emit('filtersChange', { kind: 'service' });
     s.table().vm.$emit('sortChange', { sort: 'price', dir: 'desc' });
     s.table().vm.$emit('update:search', 'hair');

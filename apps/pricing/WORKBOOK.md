@@ -1,8 +1,7 @@
 # Workbook — Tarifas (app)
 Prefijo: PRICING
 Alcance MVP: transversal (peluquería y restaurante: precios por grupo de clientes y descuentos automáticos)
-Estado de la app: hecha (servidor y páginas); Ventas aún no la llama (ver «Contrato con Ventas») y las
-reacciones esperan al relay del outbox (PRICING-F14)
+Estado de la app: hecha (servidor y páginas); Ventas aún no la llama (ver «Contrato con Ventas»)
 
 > Manual de usuario y especificación de la app `pricing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -126,8 +125,9 @@ Dos tablas, una encima de otra, como en el producto actual.
 la general, «—» si no tiene), **Impuesto** («Según el negocio», «Impuesto incluido», «Impuesto no
 incluido»), **Vigencia** («Siempre», «Desde 1 jul 2026», «Hasta…» o las dos fechas), **Precios**
 (cuántos tiene) y **Estado** (Activa o Inactiva). Se ordena por Código, Nombre, Divisa, Grupo e Impuesto
-(por defecto, por nombre) y se filtra por Código, Nombre y Divisa («contiene»), Grupo de clientes,
-Impuesto y Estado (Activas por defecto, Inactivas, Todas); 50 por página, en lista o en tarjetas.
+(por defecto, por nombre) y se filtra, con el embudo de la barra, por Código, Nombre y Divisa
+(«contiene»), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido; **Inactivas**, o
+**Todos** para las dos); 50 por página, en lista o en tarjetas.
 
 - **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (EUR), **Impuesto**
   (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
@@ -141,8 +141,8 @@ Impuesto y Estado (Activas por defecto, Inactivas, Todas); 50 por página, en li
 unidad», «Compra 2, llévate 1», «3+: 10 % · 6+: 15 %»), **Se aplica a** («Todo», «Todos los
 productos», «Todos los servicios», la categoría, el producto o el servicio, con «(borrado)» si
 Inventario lo borró; con el grupo de clientes detrás si lo tiene, o «Grupo borrado»), **Vigencia**, **Prioridad** y **Estado**. Se ordena por Código, Nombre, Tipo y
-Prioridad (Valor no se ordena ni se filtra: sus unidades son distintas); se filtra por Código, Nombre,
-Tipo, Se aplica a y Estado; 50 por página.
+Prioridad (Valor no se ordena ni se filtra: sus unidades son distintas); se filtra, con el embudo, por
+Código, Nombre, Tipo, Se aplica a y Estado (como en las tarifas: **Activas** al abrir); 50 por página.
 
 - **+** abre **Nueva regla de descuento** (PRICING-F10).
 - Acciones de fila: **Editar** (también pulsando la fila), **Desactivar** (pide confirmación) o
@@ -157,7 +157,7 @@ Activar** (lo que corresponda; con las mismas confirmaciones que en la tabla).
 Debajo, **Precios**: buscador «Buscar producto o servicio…», columnas **Artículo** (nombre),
 **Tipo** (Producto o Servicio), **SKU**, **Desde** (la cantidad mínima, con su unidad), **Precio** y
 **Precio de ficha** (el de Inventario; «—» en un servicio). Los precios, en la divisa de la tarifa. Orden
-por Artículo, Desde y Precio; filtro por Tipo; 50 por página.
+por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 
 - **+** abre **Nuevo precio**: **Producto** o **Servicio** (un selector), el buscador del artículo
   (por nombre o SKU), **Desde** (cantidad mínima, 1 por defecto) y **Precio**.
@@ -193,9 +193,10 @@ por Artículo, Desde y Precio; filtro por Tipo; 50 por página.
 | PRICING-F11 | Editar una regla | hecho |
 | PRICING-F12 | Desactivar o reactivar una regla | hecho |
 | PRICING-F13 | Consultar el precio de una línea | hecho — Ventas aún no lo pide (ver «Contrato con Ventas») |
-| PRICING-F14 | Cuando se borra un producto, una categoría o un grupo, o cambia un servicio | declarado; sin relay en la fase 1 (lo entrega el relay del outbox, fase 2) |
+| PRICING-F14 | Cuando se borra un producto, una categoría o un grupo, o cambia un servicio | hecho |
 
 ### PRICING-F01 Ver las tarifas
+<!-- origen: fi:modules/pricing#navigation-lists-erp-pricing-lists fi:modules/pricing#permission-pricing-view_pricing-manage_pricing-apply_pricing fi:modules/pricing#query-pricing-price_lists-list-expose_api old:pricing/WORKFLOW.md#pricing-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifas
@@ -208,6 +209,7 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: Clientes (el nombre del grupo)
 
 ### PRICING-F02 Crear una tarifa
+<!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-create-create_price_list fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated old:pricing/WORKFLOW.md#pricing-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -230,6 +232,7 @@ apaga solo con un grupo o con otra divisa).
 Implicados: Clientes
 
 ### PRICING-F03 Editar una tarifa
+<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -244,6 +247,7 @@ hasta que se le quite o se le elija otro.
 Implicados: Clientes
 
 ### PRICING-F04 Elegir la tarifa general
+<!-- origen: fi:modules/pricing#command-interno-pricing-_unset_default-pricing-_insert_price_list -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -261,6 +265,7 @@ en un instante.» (409 `pricing.default_busy`, nunca un error del servidor).
 Implicados: ninguno
 
 ### PRICING-F05 Desactivar o reactivar una tarifa
+<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -275,6 +280,7 @@ desactivarla.», «Esa tarifa ya está desactivada.», «Esa tarifa ya está act
 Implicados: ninguno
 
 ### PRICING-F06 Ver los precios de una tarifa
+<!-- origen: fi:modules/pricing#query-pricing-price_lists-get-expose_api fi:modules/pricing#query-pricing-price_lists-items-expose_api -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifa (detalle)
@@ -289,6 +295,7 @@ Si falla: «Esta tarifa no existe» con **Volver**.
 Implicados: Inventario, Servicios
 
 ### PRICING-F07 Poner el precio de un producto o un servicio en una tarifa
+<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-price_lists-add_item old:pricing/WORKFLOW.md#pricing-f03 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
@@ -311,6 +318,7 @@ negocio.».
 Implicados: Inventario, Servicios
 
 ### PRICING-F08 Cambiar o quitar un precio
+<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
@@ -327,6 +335,7 @@ está disponible…»): el detalle no ofrece **+** ni **Editar**, solo **Quitar*
 Implicados: ninguno
 
 ### PRICING-F09 Ver las reglas de descuento
+<!-- origen: fi:modules/pricing#query-pricing-rules-list-expose_api old:pricing/WORKFLOW.md#pricing-f04 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifas
@@ -339,6 +348,7 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: Inventario, Clientes
 
 ### PRICING-F10 Crear una regla de descuento
+<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-rules-create old:pricing/WORKFLOW.md#pricing-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -364,6 +374,7 @@ que no existe, «Hasta» antes que «Desde».
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F11 Editar una regla
+<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -376,6 +387,7 @@ Si falla: los mismos rechazos que al crear.
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F12 Desactivar o reactivar una regla
+<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-rules-deactivate old:pricing/WORKFLOW.md#pricing-f06 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -390,6 +402,7 @@ Si falla: «Esa regla ya está desactivada.», «Esa regla ya está activa.» y,
 Implicados: Clientes
 
 ### PRICING-F13 Consultar el precio de una línea
+<!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-get_price-get_price old:pricing/WORKFLOW.md#pricing-f07 -->
 Estado: hecho (no tiene pantalla propia: lo pide quien vende o el asistente)
 Actor: sistema (Ventas), asistente, empleado por la API
 Pantalla: ninguna
@@ -423,8 +436,8 @@ cantidad que no es mayor que 0.
 Implicados: Inventario, Servicios, Clientes, Ventas
 
 ### PRICING-F14 Cuando se borra un producto, una categoría o un grupo, o cambia un servicio
-Estado: declarado; sin relay en la fase 1 — las reacciones existen y se prueban entregándoles el aviso del
-outbox a mano; en producción las entregará el relay del outbox (fase 2)
+<!-- origen: nuevo (lo piden los borrados y cambios de Inventario, Clientes y Servicios sobre lo que señala una tarifa o una regla) -->
+Estado: hecho (no tiene pantalla: lo hace la app sola, unos segundos después del cambio de la otra)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -438,8 +451,9 @@ Pasos:
 Entra: el aviso.
 Sale: `pricing.price_item.removed`, `pricing.rule.deactivated`, `pricing.price_list.updated` o
 `pricing.price_item.updated` y `pricing.rule.updated`. Repetir el aviso no cambia nada.
-Si falla: lo reintenta el relay del outbox. Hasta que llegue la fase 2, un producto o una categoría
-borrados ya no salen en los precios y un grupo borrado no vale para nadie (se mira al leer).
+Si falla: se reintenta solo, cada vez más espaciado (hasta una hora entre intentos), y tras ocho intentos se
+da por perdido y queda anotado. Mientras tanto, un producto o una categoría borrados ya no salen en los precios
+y un grupo borrado no vale para nadie (se mira al leer).
 Implicados: Inventario, Clientes, Servicios
 
 ## Servicios: lo que entra y lo que sale
@@ -549,7 +563,11 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
-  Servicios de verdad y `tests/test_concurrency.py` con hilos.
+  Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
+  a punta: la operación real de la otra app, un tick real del worker y su relay, la reacción una sola vez y
+  el hub B sin tocar al A). En Chrome, `tests/e2e/pricing-flows.spec.ts` (un test por flujo con pantalla,
+  PRICING-F01 a F12, con sus capturas en tres tamaños) y `tests/e2e/pricing-lists.spec.ts` (de la tarifa al
+  precio de una línea, PRICING-F13).
 - **`requires = ["inventory", "customer"]`**: las claves ajenas a `inventory.Product` e
   `inventory.Category` las justifica leer el nombre, el SKU, la unidad y el precio al día; de Clientes se
   leen sus modelos (la ficha, sus grupos y el nombre de un grupo). **Servicios no es requisito**: un
@@ -606,8 +624,6 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   responde igual; `pricing.services_unavailable` solo salta si Servicios no está instalada
   (`UnknownOperation`). El «Servicios no está activa en este negocio» de PRICING-F07 depende de que la
   plataforma compruebe la app activa (fase 2).
-- **PRICING-F14 está declarado, no hecho**: sin relay del outbox en la fase 1, las reacciones no corren
-  solas; mientras tanto, lo borrado se filtra o se marca al leer.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -615,11 +631,15 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `RulesTable`) y `/pricing/lists/:id` (el detalle, `ListDetailPage`, con el id como prop).
 - Las confirmaciones de la tarifa (hacer general, desactivar) viven en `ListConfirm`, que comparten la
   tabla y el detalle.
+- Las tres tablas llevan sus filtros detrás del embudo (`filterable`, como la tabla del producto actual), y
+  las de tarifas y reglas abren con «Activas» elegido: su opción vacía («Todos») pide todas.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas, cada una su suscripción) y `useServerTable`;
   escrituras con `useCommand`; formularios con `FormModal`, confirmaciones con `ConfirmDialog` y
   buscadores con `Combo` (productos y categorías de Inventario, servicios de Servicios, grupos de
   Clientes, por sus consultas).
-- Importes con `MoneyInput` (lo que teclea una persona, en céntimos) y el formato del idioma (`Intl`).
+- Importes con `MoneyInput` (lo que teclea una persona, en céntimos) y el formato del idioma (`Intl`),
+  con los millares agrupados desde cuatro cifras también en español («1.234,56 €»; el CLDR espera a cinco:
+  hub#1090), como Cobro en línea.
 - Icono: `ion:pricetags-outline` (registrado); el `pricetag` del producto actual espera en
   `UI-REQUESTS.md`.
 
