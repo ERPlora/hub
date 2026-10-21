@@ -204,6 +204,16 @@ def test_the_business_status_travels_on_its_own(client, db):
     assert Config.objects.get().hub_status == "past_due"
 
 
+def test_the_photo_that_reactivates_a_suspended_business_opens_it_again(client, db):
+    # BILLING-F17 of the SaaS: the way back of a suspended business is this photo, which its own 402 never blocks.
+    Hub.objects.filter(id=HUB_ID).update(state={"status": "suspended"}, state_version=1)
+    host = "acme.localhost:8000"
+    assert client.get("/api/me", HTTP_HOST=host).status_code == 402
+    body = {"slug": "acme", "version": 2, "status": "active"}
+    assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 2}
+    assert client.get("/api/me", HTTP_HOST=host).status_code == 200  # served again, as any open hub
+
+
 def test_the_photo_tells_the_hub_its_id_in_erplora(client, db):
     # Where the signed authorisation is sent (verifactu.representation.submit): POST /internal/hubs/{id}/representation.
     body = {"slug": "a", "version": 5, "status": "active"}

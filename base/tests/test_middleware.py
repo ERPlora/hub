@@ -470,6 +470,16 @@ class TestTheRegistryGate:
         response = client.get(f"/internal/hubs/{acme.id}", HTTP_HOST="hub.localhost:8000")
         assert response.json()["error"]["code"] == "internal.unsigned"
 
+    def test_the_probes_and_static_files_of_a_suspended_business_still_answer(self, client, hub):
+        # The deploy's probe, the static files and the CSP reports are no business of the 402: they answer first.
+        hub("acme", state={"status": "suspended"})
+        host = "acme.localhost:8000"
+        assert client.get("/readyz", HTTP_HOST=host).status_code == 200
+        missing = browse(client, "/static/nope.js", host)
+        assert (missing.status_code, missing.has_header("Location")) == (404, False)
+        report = client.post("/csp-report/", "{}", content_type="application/csp-report", HTTP_HOST=host)
+        assert report.status_code == 204
+
     @pytest.mark.parametrize("host", ["localhost:8000", "hub.localhost:8000", "hub.erplora.internal", "zzz.localhost"])
     def test_the_internal_door_is_never_the_hosts_404(self, client, settings, host):
         # The SaaS's calls go to the private name (`hub`, reserved): its signature is the door (base.internal).

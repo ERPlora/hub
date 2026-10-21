@@ -277,6 +277,17 @@ async def test_a_host_that_is_no_hub_closes_the_socket_with_its_code(sockets, ho
     assert await socket.closed() == expected
 
 
+async def test_a_suspended_business_closes_the_socket_with_its_402(sockets):
+    # The SaaS's photo says suspended for an unpaid invoice (base.middleware): the print host hears why and is closed.
+    await db(Hub.objects.create, slug="late", status=Hub.Status.READY, state={"status": "suspended"})
+    socket = sockets("late.localhost:8000")
+
+    assert (await socket.connect())["type"] == "websocket.accept"
+    frame = await socket.receive()
+    assert frame["type"] == "error" and frame["code"] == "base.hub_suspended"
+    assert await socket.closed() == 4402
+
+
 # ── Who may drain ─────────────────────────────────────────────────────────────────────────────────
 
 
