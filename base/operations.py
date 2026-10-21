@@ -21,6 +21,7 @@ from typing import Any
 from django.conf import settings
 from django.http import Http404, HttpRequest
 from live.context import OperationContext, Scope
+from live.errors import Unauthorized
 from live.slugs import validate_hub_slug
 
 from base import registry
@@ -85,6 +86,13 @@ def _is_ip_address(host: str) -> bool:
     return True
 
 
+class HostClosed(Unauthorized):
+    """The host stopped serving the app while a live stream or the print socket held its context: the registry's
+    refusal (``base.registry.refusal``), with the gate's status, code and message (402 ``base.hub_suspended``…).
+    An ``Unauthorized`` because that is how live ends a stream whose right to it is gone (``bye``); its
+    reconnection, like any request, then hears the gate itself."""
+
+
 class HubContextBuilder:
     def __init__(self, resolver: HostScopeResolver | None = None) -> None:
         self.resolver = resolver or HostScopeResolver()
@@ -102,7 +110,11 @@ class HubContextBuilder:
         )
 
     def refresh(self, ctx: OperationContext) -> OperationContext:
-        """Re-read the user and its Membership, so a revocation reaches the next live re-run."""
+        """Re-read the registry, the user and its Membership, so a revocation, or a hub that stopped serving the app
+        (suspended, gone, being prepared: ``HostClosed``), reaches the next live re-run."""
         if ctx.actor is None:
             return ctx
+        refusal = registry.refusal(registry.hub_by_slug(ctx.scope.key))
+        if refusal is not None:
+            raise HostClosed(refusal.message, code=refusal.code, status=refusal.status)
         return dataclasses.replace(ctx, permissions=permissions_for(reload_user(ctx.actor), ctx.scope))

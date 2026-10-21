@@ -422,11 +422,76 @@ class TestTheRegistryGate:
         assert '<meta http-equiv="refresh" content="10">' in html
         assert "Your business is being prepared" in html
 
+    @pytest.mark.parametrize(
+        ("fields", "status"),
+        [({"status": "cancelled"}, 410), ({"state": {"status": "suspended"}}, 402)],
+        ids=["gone", "suspended"],
+    )
+    def test_only_a_hub_being_prepared_asks_to_come_back(self, client, hub, fields, status):
+        # Retry-After says «try again soon»: true while it is being prepared, never for a hub gone or suspended.
+        hub("acme", **fields)
+        page = browse(client, "/", "acme.localhost:8000")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
+        assert (page.status_code, api.status_code) == (status, status)
+        assert not page.has_header("Retry-After") and not api.has_header("Retry-After")
+
     def test_the_api_of_a_hub_being_prepared_is_the_503_envelope(self, client, hub):
         hub("acme", status="failed")
         response = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
         assert (response.status_code, response["Retry-After"]) == (503, "30")
         assert response.json()["error"]["code"] == "base.hub_preparing"
+
+    # BILLING-F16 of the SaaS: a business suspended for an unpaid invoice (the SaaS's photo, ``status``) does not
+    # open, with a session or without, until it is paid; in its 7 days of grace (``past_due``) it works.
+    def test_a_suspended_business_is_402_with_the_way_back_to_erplora(self, client, hub):
+        hub("acme", state={"status": "suspended"})
+        response = browse(client, "/", "acme.localhost:8000")
+        assert response.status_code == 402
+        html = response.content.decode()
+        assert "This business is suspended" in html
+        assert 'href="http://localhost:8001/launch"' in html
+
+    def test_a_signed_in_person_of_a_suspended_business_is_stopped_too(self, client, hub, make_user):
+        hub("acme", state={"status": "suspended"})
+        client.force_login(make_user("ana", host="acme", role="hub_employee"))
+        assert browse(client, "/demo/items", "acme.localhost:8000").status_code == 402
+
+    @pytest.mark.parametrize("path", ["/api/me", "/api/live", "/api/demo/items"])
+    def test_the_api_of_a_suspended_business_is_the_402_envelope(self, client, hub, path):
+        hub("acme", state={"status": "suspended"})
+        response = client.get(path, HTTP_HOST="acme.localhost:8000")
+        assert response.status_code == 402
+        assert response.json()["error"]["code"] == "base.hub_suspended"
+
+    def test_the_login_of_a_suspended_business_lets_nobody_in(self, client, hub):
+        hub("acme", state={"status": "suspended"})
+        response = client.post("/auth/callback", {"code": "c1"}, HTTP_HOST="acme.localhost:8000")
+        assert (response.status_code, response.json()["error"]["code"]) == (402, "base.hub_suspended")
+
+    @pytest.mark.parametrize("status", ["active", "past_due"])
+    def test_a_business_in_its_grace_or_paid_up_is_served(self, client, hub, status):
+        hub("acme", state={"status": status})
+        assert browse(client, "/demo/items", "acme.localhost:8000").status_code == 302  # to the SaaS's login
+
+    def test_the_suspended_page_is_translated(self, client, hub):
+        hub("acme", state={"status": "suspended"})
+        response = client.get("/", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")
+        assert "Este negocio está suspendido" in response.content.decode()
+
+    def test_the_saas_still_reaches_a_suspended_business(self, client, hub):
+        acme = hub("acme", state={"status": "suspended"})
+        response = client.get(f"/internal/hubs/{acme.id}", HTTP_HOST="hub.localhost:8000")
+        assert response.json()["error"]["code"] == "internal.unsigned"
+
+    def test_the_probes_and_static_files_of_a_suspended_business_still_answer(self, client, hub):
+        # The deploy's probe, the static files and the CSP reports are no business of the 402: they answer first.
+        hub("acme", state={"status": "suspended"})
+        host = "acme.localhost:8000"
+        assert client.get("/readyz", HTTP_HOST=host).status_code == 200
+        missing = browse(client, "/static/nope.js", host)
+        assert (missing.status_code, missing.has_header("Location")) == (404, False)
+        report = client.post("/csp-report/", "{}", content_type="application/csp-report", HTTP_HOST=host)
+        assert report.status_code == 204
 
     @pytest.mark.parametrize("host", ["localhost:8000", "hub.localhost:8000", "hub.erplora.internal", "zzz.localhost"])
     def test_the_internal_door_is_never_the_hosts_404(self, client, settings, host):

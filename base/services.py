@@ -49,10 +49,11 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
+from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 from live.operations import operation
-from live.outbox import record_event
+from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 
 from base import auth, events, registry, signing
@@ -503,12 +504,23 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     hub = _locked_hub(data.id)
     if data.version <= hub.state_version:
         return {"applied": False, "version": hub.state_version}
+    was_open = not registry.is_suspended(hub)
     hub.state, hub.state_version = data.photo, data.version
     hub.save(update_fields=["state", "state_version", "updated_at"])
     if data.verifactu is not None or data.status is not None:
         _sync_verifactu(hub, data)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
+    if was_open and registry.is_suspended(hub):
+        transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return {"applied": True, "version": data.version}
+
+
+def _wake_open_apps(slug: str) -> None:
+    """The business of ``slug`` just stopped serving the app (suspended, cancelled): every open live stream and print socket
+    of its host re-runs now («*», everything may have changed), hears the host gate again
+    (``base.operations.HubContextBuilder.refresh``) and ends, instead of waiting for the hub's next write or the
+    safety re-run (BILLING-F16 of the SaaS, step 4: the devices with the app open leave for the Hub's page)."""
+    notify(Scope("host", slug), [ALL_EVENTS])
 
 
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
@@ -534,6 +546,7 @@ def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
         hub.status, hub.cancelled_at = Hub.Status.CANCELLED, timezone.now()
         hub.save(update_fields=["status", "cancelled_at", "updated_at"])
         record_event(ctx, events.HUB_CANCELLED, {"id": str(hub.id)})
+        transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return hub_answer(hub)
 
 

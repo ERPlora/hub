@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 02:57+0200\n"
+"POT-Creation-Date: 2026-10-21 04:25+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -58,15 +58,19 @@ msgstr "Base"
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
-#: middleware.py:105 ws_print.py:218 ws_print.py:220
+#: middleware.py:110 ws_print.py:218 ws_print.py:220
 msgid "Not found"
 msgstr "No encontrado."
 
-#: middleware.py:111
+#: middleware.py:116
 msgid "This hub is no longer available."
 msgstr "Este hub ya no está disponible."
 
-#: middleware.py:119
+#: middleware.py:124
+msgid "This business is suspended until its unpaid invoice is paid."
+msgstr "Este negocio está suspendido hasta que se pague su factura pendiente."
+
+#: middleware.py:132
 msgid "This hub is still being prepared; try again in a few seconds."
 msgstr "Este hub aún se está preparando; vuelve a intentarlo en unos segundos."
 
@@ -319,7 +323,7 @@ msgstr "Ningún hub tiene este id."
 msgid "No demo has this address."
 msgstr "Ninguna demo tiene esta dirección."
 
-#: registry.py:54
+#: registry.py:64
 msgid "Only the platform may do this."
 msgstr "Solo la plataforma puede hacer esto."
 
@@ -397,7 +401,7 @@ msgstr ""
 "Su propietario lo cerró en ERPlora. Si es tuyo, puedes recuperarlo desde tu "
 "cuenta."
 
-#: templates/base/hub_gone.html:22
+#: templates/base/hub_gone.html:22 templates/base/hub_suspended.html:17
 msgid "Go to ERPlora"
 msgstr "Ir a ERPlora"
 
@@ -408,6 +412,18 @@ msgstr "Estamos preparando tu negocio"
 #: templates/base/hub_preparing.html:17
 msgid "It takes a few seconds. This page refreshes by itself."
 msgstr "Tarda unos segundos. Esta página se actualiza sola."
+
+#: templates/base/hub_suspended.html:11 templates/base/hub_suspended.html:15
+msgid "This business is suspended"
+msgstr "Este negocio está suspendido"
+
+#: templates/base/hub_suspended.html:16
+msgid ""
+"An invoice of its plan is unpaid. Its data is safe: as soon as whoever pays "
+"it settles the invoice in ERPlora, it works again."
+msgstr ""
+"Hay una factura de su plan sin pagar. Sus datos están a salvo: en cuanto "
+"quien lo paga abone la factura en ERPlora, vuelve a funcionar."
 
 #: templates/base/login_retry.html:10 templates/base/login_retry.html:16
 msgid "Sign in again"
@@ -434,60 +450,69 @@ msgstr "No ha llegado el hello en %(seconds)s segundos."
 msgid "Say hello with a deviceId before draining."
 msgstr "Envía hello con un deviceId antes de recoger trabajos."
 
-#: ws_print.py:325
+#: ws_print.py:328
 msgid ""
 "This channel speaks JSON text frames: hello, claim, done, failed and beat."
-msgstr "Este canal habla con mensajes de texto JSON: hello, claim, done, failed y beat."
+msgstr ""
+"Este canal habla con mensajes de texto JSON: hello, claim, done, failed y "
+"beat."
 
-#: ws_print.py:330
+#: ws_print.py:333
 #, python-format
 msgid "A frame of %(size)s bytes is over this channel's cap of %(cap)s bytes."
-msgstr "Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
+msgstr ""
+"Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
 
-#: ws_print.py:339
+#: ws_print.py:342
 msgid "This channel speaks hello, claim, done, failed and beat."
 msgstr "Este canal habla hello, claim, done, failed y beat."
 
-#: ws_print.py:354
+#: ws_print.py:357
 msgid "This channel drains for one device: send its deviceId."
 msgstr "Este canal recoge trabajos para un dispositivo: envía su deviceId."
 
-#: ws_print.py:358
+#: ws_print.py:361
 msgid "printers is the list of the ids of the printers this device reaches."
-msgstr "printers es la lista de los id de las impresoras a las que llega este dispositivo."
+msgstr ""
+"printers es la lista de los id de las impresoras a las que llega este "
+"dispositivo."
 
-#: ws_print.py:368
+#: ws_print.py:371
 msgid ""
 "This device reaches no active printer of this hub: choose its printers "
 "before printing."
-msgstr "Este dispositivo no llega a ninguna impresora activa de este hub: elige sus impresoras antes de imprimir."
+msgstr ""
+"Este dispositivo no llega a ninguna impresora activa de este hub: elige sus "
+"impresoras antes de imprimir."
 
-#: ws_print.py:379
+#: ws_print.py:382
 #, python-format
 msgid "This device does not print «%(role)s» for this hub."
 msgstr "Este dispositivo no imprime «%(role)s» para este hub."
 
-#: ws_print.py:445
+#: ws_print.py:448
 msgid "Sign in to this hub to print: this connection has no session."
-msgstr "Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
+msgstr ""
+"Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
 
-#: ws_print.py:452
+#: ws_print.py:455
 msgid "This connection's session is not valid on this hub: sign in again."
-msgstr "La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
+msgstr ""
+"La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
 
-#: ws_print.py:554
+#: ws_print.py:557
 msgid "jobId is the id of a job this hub handed out."
 msgstr "jobId es el id de un trabajo que entregó este hub."
 
-#: ws_print.py:582
+#: ws_print.py:585
 msgid "Printing is not on in this hub."
 msgstr "Impresión no está activada en este hub."
 
-#: ws_print.py:593
+#: ws_print.py:596
 msgid "Invalid frame."
 msgstr "Mensaje no válido."
 
-#: ws_print.py:619
+#: ws_print.py:622
 #, python-format
 msgid "%(field)s is text."
 msgstr "%(field)s es un texto."
