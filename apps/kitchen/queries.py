@@ -1,7 +1,8 @@
 """Read operations of the kitchen app (``READ ONLY``): the board, what is left to cook, the tickets, the
 tickets of a check, the stations, the routing, the settings and the history.
 
-Phase 1 has no relay of events, so the kitchen reads what Sales did (WORKBOOK «A qué reacciona»):
+The outbox relay delivers Sales' events a moment after its COMMIT (events.py); until the reaction saves
+them, the kitchen reads what Sales did (WORKBOOK «A qué reacciona»):
 
 - a round Sales fired that the kitchen has not saved yet is read from Sales' lines (``pending_rounds``)
   and shown as a ticket «not saved yet» (``saved = False``), with the id of its first line, the number
@@ -353,7 +354,8 @@ class Round:
 def pending_lines(settings: KitchenSettings, order_ids: Iterable[UUID] | None = None) -> list[OrderLine]:
     """The lines Sales fired (not services) since the kitchen receives, that no dish holds yet, of the
     checks still open or closed within the last day — a kitchen that never writes (on paper) does not read
-    a growing past (phase 2's relay saves every round when it is fired). Two reads: the open checks by
+    a growing past (the relay's reaction saves every round a moment after it is fired, so the window only
+    covers the time until it arrives). Two reads: the open checks by
     their status (Sales' index), the recently closed ones by their closing time."""
     lines = OrderLine.objects.filter(fired_at__isnull=False, is_service=False).filter(
         ~Exists(TicketItem.objects.filter(sale_line_id=OuterRef("pk")))

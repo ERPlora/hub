@@ -2,7 +2,8 @@
 
 The board is live (KITCHEN-F10): every write of the kitchen, a station renamed or recoloured, the routing
 (a round not saved yet follows it), the settings («works from the screen» changes what charging serves)
-and what Sales does to its checks re-run it — phase 1 has no relay: the read itself sees what Sales did.
+and what Sales does to its checks re-run it — Sales' own events, right after its COMMIT, because the read
+itself sees what Sales did before the relay's reaction saves it (events.py).
 """
 
 from live.live_registry import live
