@@ -8,6 +8,7 @@ its id or as a person says it.
 import json
 
 import pytest
+from django.test import Client
 from live.ninja import ensure_api_parity
 
 from apps.table.api import router
@@ -226,6 +227,31 @@ def test_drawing_seating_and_closing_a_table_over_http(admin_client):
         ]
         == "available"
     )
+
+
+@pytest.mark.django_db
+def test_many_tables_are_made_at_once_over_http_or_none_with_the_taken_numbers(admin_client, make_user):
+    # TABLE-F07 (assistant and API: the old module had no screen for it either).
+    post(admin_client, "/table/zones", {"name": "Terrace"})
+    made = post(
+        admin_client,
+        "/table/tables/bulk_create",
+        {"zone": "Terrace", "count": 3, "prefix": "T", "start_number": 11, "capacity": 2},
+    )
+    assert made.status_code == 201
+    assert [(row["number"], row["capacity"]) for row in made.json()["rows"]] == [
+        ("T11", 2),
+        ("T12", 2),
+        ("T13", 2),
+    ]
+    again = post(admin_client, "/table/tables/bulk_create", {"zone": "Terrace", "count": 2, "prefix": "T", "start_number": 12})
+    assert (again.status_code, again.json()["error"]["code"]) == (409, "table.number_taken")
+    assert "T12" in again.json()["error"]["message"]
+    assert len(get(admin_client, "/table/tables").json()["rows"]) == 3
+    waiter = Client()
+    waiter.force_login(make_user("luis", host="a", role="hub_employee"))
+    refused = post(waiter, "/table/tables/bulk_create", {"zone": "Terrace", "count": 1})
+    assert refused.status_code == 403
 
 
 def test_the_spas_route_map_names_every_table_route(settings):
