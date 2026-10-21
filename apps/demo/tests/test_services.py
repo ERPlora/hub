@@ -5,11 +5,13 @@ LISTEN on each scope's channel, outside Django, the way the live broker of anoth
 """
 
 import json
+import threading
 import uuid
 from decimal import Decimal
 
 import psycopg
 import pytest
+from django.db import connection
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
@@ -235,6 +237,39 @@ def test_a_repeated_line_is_accepted_after_the_item_was_closed():
 def test_add_line_to_a_missing_item_is_not_found():
     with pytest.raises(NotFound):
         add_line(uuid.uuid7())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_lines_added_at_once_never_share_a_position(db_dsn):
+    """A line added while another one is being saved waits for the item's row and goes after it."""
+    item_id = create().id
+    added = {}
+
+    def second_line():
+        try:
+            added["detail"] = add_line(item_id, text="Second")
+        finally:
+            connection.close()
+
+    # Another add_line in flight: the item's row locked and its line written, not committed yet.
+    with psycopg.connect(db_dsn) as other:
+        other.execute("SELECT id FROM demo_item WHERE id = %s FOR UPDATE", (item_id,))
+        other.execute(
+            "INSERT INTO demo_itemline (id, item_id, text, qty, position) VALUES (%s, %s, 'First', 1, 1)",
+            (uuid.uuid7(), item_id),
+        )
+        thread = threading.Thread(target=second_line)
+        thread.start()
+        thread.join(QUIET)
+        assert thread.is_alive(), "the second line did not wait for the item's row"
+        other.commit()
+    thread.join(WAIT * 5)
+
+    assert not thread.is_alive()
+    assert [(line.text, line.position) for line in ItemLine.objects.order_by("position", "text")] == [
+        ("First", 1),
+        ("Second", 2),
+    ]
 
 
 # Permissions
