@@ -9,14 +9,20 @@
 // cannot be connected from here yet and offers nothing to press; the inbox's notice leads to Settings. Meta's window
 // itself (lib/metaSignup.ts, composables/useMetaSignup.ts) is proven in Vitest: it cannot open here until erplora.com
 // serves that page and the Hub keeps the windows it opens (COOP, FIX in `base`).
-// F02: the number reported connected is disconnected from Settings, asked first; erplora.com (door 12) answers it had
-// no number for `a`, and «Your number» says «Not connected» at once, without reloading.
+// F02: erplora.com's own test seed gives `a` its number there (whatsapp-helpers.ts, `seedErplora`); disconnecting it from
+// Settings, asked first, has erplora.com (door 12) disconnect it, and «Your number» says «Not connected» at once,
+// without reloading.
 // Each in three sizes (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12[-F02]-390|834|1440). What it creates is deleted.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, pushChannel } from './whatsapp-helpers';
+import { cleanUp, pushChannel, seedErplora } from './whatsapp-helpers';
+
+test.beforeAll(() => {
+  // erplora.com takes `a`'s number (its test seed) and this Hub takes its photo.
+  expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+});
 
 test.afterAll(() => cleanUp());
 
@@ -71,14 +77,12 @@ test('WHATSAPP_INBOX-F02: the number is disconnected from Settings through erplo
   const told = page.waitForResponse((response) => response.url().endsWith('/api/whatsapp_inbox/channel/disconnect'));
   await page.locator('[data-testid=whatsapp-inbox-number-disconnect-dialog-submit]').click();
 
-  // erplora.com (door 12) keeps no number for the local hub `a`: it says so, and the Hub stops believing it has one.
+  // erplora.com (door 12) disconnects the number its seed gave `a`, and the Hub stops having one at once.
   const answer = await told;
   expect(answer.status()).toBe(200);
-  expect(await answer.json()).toEqual({ disconnected: false });
+  expect(await answer.json()).toEqual({ disconnected: true });
   await expect(dialog).toBeHidden();
-  await expect(number(page).locator('[data-testid=whatsapp-inbox-number-done]')).toHaveText(
-    'erplora.com had no number connected for this business.',
-  );
+  await expect(number(page).locator('[data-testid=whatsapp-inbox-number-done]')).toHaveText('WhatsApp disconnected.');
   await expect(number(page)).toContainText('Not connected');
   await expect(number(page)).not.toContainText('+34910000000');
 });

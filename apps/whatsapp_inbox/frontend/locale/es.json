@@ -129,7 +129,7 @@
       "sent": "Mensaje enviado",
       "noteAdded": "Nota añadida",
       "blocked": {
-        "not_connected": "WhatsApp no está conectado: conecta el número en erplora.com para enviar.",
+        "not_connected": "WhatsApp no está conectado: conecta el número en Ajustes para enviar.",
         "cap_reached": "Los mensajes de WhatsApp de tu plan de este mes están gastados: no se puede enviar nada hasta el mes que viene.",
         "unconfigured": "Este Hub no llega a erplora.com, así que desde él no se puede enviar nada."
       }
