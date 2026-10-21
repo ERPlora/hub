@@ -641,3 +641,30 @@ def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(c
     session[ADMIN_HUB_SESSION_KEY] = "a"
     session.save()
     assert needs_it in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+
+
+def test_without_a_hub_drawn_erploras_tax_id_is_no_exemption_and_the_reason_is_said(settings):
+    # saas#2524: «Why it waits» drawn outside a hub's page (no hub chosen: no scope) never takes ERPlora's tax ID as
+    # ERPlora's own hub; it says the authorisation is missing instead of failing.
+    from django.contrib.admin.sites import site
+    from live.context import Scope, system_context
+
+    from apps.verifactu.tests.conftest import ISSUER, ctx_for
+
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    platform = ctx_for(scope=Scope("host", "erplora"))
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform)
+    run("verifactu.config.follow_deployment", {}, system_context(platform.scope))
+    invoice = run(
+        "invoice.invoice.create",
+        {
+            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+            "series_code": "TICKET",
+        },
+        system_context(platform.scope),
+    )
+    sealed = Record.objects.get(invoice_id=invoice.id)
+    assert str(wait_reason_text("representation_not_approved")) in site._registry[Record].why_waiting(sealed)
