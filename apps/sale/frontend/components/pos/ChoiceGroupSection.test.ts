@@ -38,6 +38,15 @@ describe('ChoiceGroupSection', () => {
     expect(s.inDoc('pos-menu-dish-espresso')?.textContent).not.toContain('€');
   });
 
+  it('says the minimum and the ceiling together when they differ, and «at least» without a ceiling', async () => {
+    const range = await setup('menu', { picks: [], refused: null }, null, { ...COFFEE, min_choices: 1, max_choices: 4 });
+    expect(range.inDoc('pos-menu-rule-coffee')?.textContent?.trim()).toBe('Elige de 1 a 4');
+    const open = await setup('options', { picks: [], refused: null }, null, { ...COFFEE, min_choices: 1, max_choices: 0 });
+    expect(open.inDoc('pos-options-rule-coffee')?.textContent?.trim()).toBe('Elige al menos 1');
+    const exact = await setup('menu', { picks: [], refused: null }, null, { ...COFFEE, min_choices: 1, max_choices: 1 });
+    expect(exact.inDoc('pos-menu-rule-coffee')?.textContent?.trim()).toBe('Elige 1');
+  });
+
   it('hands a tap up and counts a repeated choice, with its minus', async () => {
     const s = await setup('options', { picks: ['latte', 'latte'], refused: null });
     expect(s.inDoc('pos-option-latte')?.getAttribute('aria-pressed')).toBe('true');

@@ -8,8 +8,8 @@
 // dish's stock and never the menu's (F10). A menu sent from «Current order» reaches the kitchen dish by dish,
 // under the menu's kitchen name, and the kitchen display shows them under the menu's header (F11; the fire through
 // the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
-// SALE-F12: in a course whose dishes repeat, two of them taken twice keep each name on its line beside its counter
-// and its minus, in the three sizes (`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-<w>`).
+// SALE-F12: in a course of 1 to 4 whose dishes repeat, the rule says both and two dishes taken twice keep each name
+// on its line beside its counter and its minus, in the three sizes (`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-<w>`).
 // What a run makes — products `E2E-CMT-<run>-…`, its menus «e2e Combo …», checks, sales and kitchen tickets — goes.
 import { spawnSync } from 'node:child_process';
 
@@ -332,6 +332,8 @@ test('SALE-F12: two repeatable dishes taken twice keep each name on its line bes
   const picks = await offer(context, coffees);
   await shown(page).locator(`[data-testid=pos-menu-${coffees}]`).click();
   const sheet = page.locator('ion-modal[data-testid=pos-menu]');
+  // A course of 1 to 4 says both, not «Choose 1».
+  await expect(sheet.locator('[data-testid^=pos-menu-rule-]')).toHaveText('Choose 1 to 4');
   for (const code of ['COF', 'COF', 'DEC', 'DEC']) await sheet.locator(`[data-testid=pos-menu-dish-${picks[code]}]`).click();
   // 3,00 + 2 × 0,50 + 2 × 0,30.
   await expect(sheet.locator('[data-testid=pos-menu-add]')).toContainText(/4[.,]60/);
