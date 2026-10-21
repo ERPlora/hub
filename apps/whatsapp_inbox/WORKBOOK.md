@@ -655,10 +655,11 @@ Pasos:
    lista de espera.
 5. Recibe la respuesta: que la mesa está reservada, o que se la ha apuntado y el restaurante se la
    confirma, según F16.
-Entra: el mensaje escrito o la opción tocada; su ficha si ya existe (no se crea).
+Entra: el mensaje escrito o la opción tocada, y la ficha de su teléfono si ya la tiene.
 Sale: hoy, nada. Cuando exista, reserva confirmada o pendiente, o entrada en la lista de espera (Reservas,
 `reservation.reservation.created`), con su teléfono y el nombre que dé en el mensaje (si no da ninguno, su
-teléfono hace de nombre), y respuesta por WhatsApp.
+teléfono hace de nombre), ligada a su ficha o, si su teléfono no tiene, a una nueva de origen WhatsApp
+(Clientes), y respuesta por WhatsApp.
 Si falla: F20; sin plazas o con demasiados comensales, se le explica. Con los mensajes del plan del mes
 gastados no recibe nada (ni acuse, ni respuesta, ni reserva) y su mensaje queda en la bandeja con
 «Necesita atención» (F13).
@@ -1334,6 +1335,10 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
   migración (mercado: Odoo, WATI, Respond.io, Twilio, Gupshup, AiSensy, Interakt y Zoko las crean en su
   propio panel; el producto actual las creaba en el Hub): **se crean, editan y borran en el Hub**
   (Ajustes) y erplora.com solo las registra en Meta (puertas 8 y 9). Falta escribirlo como ronda.
+- F24: el producto actual no creaba ficha a quien pedía mesa por WhatsApp («su ficha si ya existe (no se
+  crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
+  (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; en las
+  citas también se crea (F21, CUSTOMER-F26).
 - Fase 1 sin tenencia: `Channel` es una sola fila compartida por todos los hubs, y las conversaciones de
   `a` y `b` comparten tablas (solo los avisos vivos van por hub), como en todas las apps de la fase 1.
 
