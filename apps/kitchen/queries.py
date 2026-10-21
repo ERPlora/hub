@@ -438,11 +438,9 @@ def menu_dishes(line: OrderLine) -> list[dict]:
 
 
 def cooks(line: OrderLine) -> bool:
-    """A menu whose every dish is a service has nothing to cook, like a service line; a menu with no dishes
-    at all reaches the kitchen as itself, so nothing ordered goes missing."""
-    if line.combo_id is None or not line.combo.get("components"):
-        return True
-    return bool(menu_dishes(line))
+    """A menu is cooked when one of its dishes is not a service (Menus never sells one with nothing picked):
+    a menu of services only has nothing to cook, like a service line."""
+    return line.combo_id is None or bool(menu_dishes(line))
 
 
 def line_options(line: OrderLine) -> list[str]:

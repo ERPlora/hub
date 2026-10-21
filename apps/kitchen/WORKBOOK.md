@@ -295,9 +295,8 @@ categoría), su nombre de cocina, cuántos menús y la nota del menú, que sale 
 Sale: un plato por cada plato del menú, cada uno en su estación, que se marca listo y se entrega por
 separado; el importe del menú cuenta una sola vez en el total de la comanda (avisa: comanda recibida).
 Si falla: un plato del menú que es un servicio no se cocina ni sale; un menú cuyos platos son todos
-servicios no abre comanda. Un menú sin ningún plato llega como una sola línea con su nombre, en «Sin
-estación». El TPV no deja añadir un menú al que le falta una tanda obligatoria, así que nunca llega a
-medias. Anular el menú en el TPV tacha todos sus platos (KITCHEN-F29). Lo ya enviado no cambia aunque
+servicios no abre comanda. El TPV no deja añadir un menú sin elegir nada ni al que le falta una tanda
+obligatoria, así que nunca llega vacío ni a medias. Anular el menú en el TPV tacha todos sus platos (KITCHEN-F29). Lo ya enviado no cambia aunque
 el menú cambie después.
 Implicados: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 

@@ -261,4 +261,3 @@ def test_a_menu_of_services_only_is_not_cooked(menu):
         run("kitchen.ticket.send", {"order_id": str(order.id)}, ctx_for(actor="luis"))
     assert refused.value.code == "kitchen.nothing_to_cook"
     assert Ticket.objects.count() == 0
-
