@@ -14,6 +14,19 @@ SECRET = "test-internal-secret"
 ANA = {"user_id": "42", "email": "ana@example.com", "name": "Ana", "locale": "es", "role": "hub_manager"}
 
 
+@pytest.fixture(autouse=True)
+def no_connection_left_from_an_earlier_test(request):
+    """A test without the database starts with no connection open in its thread.
+
+    pytest-django leaves the connection of a database test (not a transactional one) open after it, and a later test
+    without the database that calls ``close_old_connections()`` (the worker does before it idles) touches it and
+    trips pytest-django's blocker: whether it fails depended on which test xdist ran before it in that process.
+    Closing is not a database access."""
+    marked = request.node.get_closest_marker("django_db") is not None
+    if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
+        connections.close_all()
+
+
 @pytest.fixture
 def make_user(db):
     def make(username: str = "ana", *, host: str | None = None, role: str | None = None, **fields):

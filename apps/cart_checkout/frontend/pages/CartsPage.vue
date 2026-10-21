@@ -25,7 +25,7 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { CART_TONE, formatMoney, formatQuantity, toMinor, toQuantity } from '../lib/format';
+import { CART_TONE, formatMoney, formatQuantity, toMinor, toQuantity, unreadableTotals } from '../lib/format';
 import type { CartListIn, CartOut, CartStatus } from '../operations';
 import { cartCheckoutTabs } from '../tabs';
 
@@ -58,6 +58,11 @@ const query = computed<Partial<CartListIn>>(() => {
   for (const [key, value] of Object.entries(bounds)) if (value !== undefined) Object.assign(out, { [key]: value });
   return out;
 });
+
+/** An end of «Total» it cannot read as an amount, said under its box (it filters nothing). */
+const filterErrors = computed<Record<string, string>>(() =>
+  Object.fromEntries(unreadableTotals(filters.value).map((name) => [name, t('cart_checkout.amountInvalid')])),
+);
 
 function onFilters(now: DataTableFilters): void {
   filters.value = now;
@@ -102,7 +107,8 @@ const columns = computed<DataTableColumn<CartOut>[]>(() => [
     sortable: true,
     align: 'right',
     format: (_, row) => formatMoney(row.total_amount, locale.value, row.currency),
-    filter: { type: 'range' },
+    // Typed as an amount (pm#521): a text box with the decimal keyboard, so «1.250,50» can be pasted.
+    filter: { type: 'range', amount: true },
   },
 ]);
 
@@ -172,7 +178,7 @@ function onCreated(): void {
 
 <template>
   <AppPage
-    :title="$t('cart_checkout.carts.title')"
+    :title="$t('cart_checkout.title')"
     content-layout="fill"
     :tabs="cartCheckoutTabs($t)"
     :tabs-label="$t('cart_checkout.tabs.label')"
@@ -200,6 +206,7 @@ function onCreated(): void {
       searchable
       fill
       :filters="filters"
+      :filter-errors="filterErrors"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"

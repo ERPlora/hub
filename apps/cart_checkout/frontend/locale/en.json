@@ -1,5 +1,6 @@
 {
   "cart_checkout": {
+    "title": "Cart & Checkout",
     "tabs": {
       "label": "Sections of Cart & Checkout",
       "carts": "Carts",
@@ -8,6 +9,7 @@
     "loading": "Loading…",
     "noResults": "No results",
     "noResultsMessage": "Nothing matches the search or the filters.",
+    "amountInvalid": "Type an amount, like 12.50",
     "noPermission": "You do not have permission",
     "live": {
       "reconnecting": "Reconnecting…",
@@ -27,7 +29,6 @@
       "completed": "Completed"
     },
     "carts": {
-      "title": "Carts",
       "search": "Search session or email…",
       "empty": "No carts.",
       "loadError": "The carts could not be loaded.",
@@ -66,7 +67,6 @@
       }
     },
     "orders": {
-      "title": "Orders",
       "search": "Search order or email…",
       "empty": "No orders.",
       "emptyMessage": "Orders are started from a cart with the assistant or the API.",
