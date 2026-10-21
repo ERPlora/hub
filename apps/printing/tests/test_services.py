@@ -5,15 +5,18 @@ settings' factory values) and from the old hub's queue (crates/runtime/src/print
 hand-outs, a 90 s lease, done/failed by the device that took it, retry and discard stamped, nothing
 deleted)."""
 
+import dataclasses
 import datetime as dt
+import json
 
 import pytest
+from django.test import RequestFactory
 from django.utils import timezone
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.context import system_context
 from live.models import OutboxEvent
 
-from apps.printing.models import Printer, PrintJob, Settings
+from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 from apps.printing import services
 from apps.printing.tests.conftest import A, RECEIPT, ctx_for, enqueue, printer, run
 
@@ -421,7 +424,9 @@ def test_a_device_takes_the_oldest_job_of_its_printers():
         "",
     )
     sent = PrintJob.objects.get(pk=first.id)
-    assert (sent.status, sent.device, sent.attempts) == ("sent", "Till 1", 1)
+    # The job names the device by its registration, never by the id it sent (that id is its credential,
+    # hub#2551): whoever sets up printers pairs the device by printing from it, as «Device 1».
+    assert (sent.status, sent.device, sent.print_device.name, sent.attempts) == ("sent", "Device 1", "Device 1", 1)
     assert sent.leased_until > timezone.now() + dt.timedelta(seconds=80)
     # The device is told how long it has to answer (WORKBOOK «Contrato con la plataforma», claim).
     assert taken.leased_until == sent.leased_until
@@ -571,6 +576,205 @@ def test_a_failure_puts_the_job_back_until_five_and_then_it_fails():
     assert (stored.last_error, stored.last_failed_at is not None) == ("out of paper", True)
     assert events("printing.job.failed")[-1] == {"id": str(queued.id), "final": True}
     assert failure(queued.id, "late", attempt=5).confirmed is False
+
+
+# ── PRINTING-F18 Only a device the business set up prints (FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE) ─
+# A session with «print» took the jobs of any printer by naming it, and confirmed or failed them by naming the
+# device that had them (shown in the queue: hub#2551). The device is the one that prints (the old hub's
+# `_print_host`, hub#342): whoever sets up printers registers it with the printers it reaches; then only it,
+# with any session that prints, takes, confirms or fails their jobs.
+
+EMPLOYEE, MANAGER = "hub_employee", "hub_manager"
+#: The devices' own ids (the SPA's X-Device-Id, the `deviceId` of /ws/print's hello): their credential.
+TILL_ID = "3f1c9a52-6b0e-4c1d-9a77-0d2b5f8e4c11"
+SPARE_ID = "9b7d2e40-1a35-4f6c-8e21-5c0a7d3b9f02"
+
+
+def on_device(device: str | None, role: str = MANAGER) -> object:
+    """The context of a person using the device ``device``: the SPA sends its id in ``X-Device-Id``."""
+    headers = {"HTTP_X_DEVICE_ID": device} if device is not None else {}
+    return dataclasses.replace(ctx_for(role), request=RequestFactory().post("/api/printing/devices", **headers))
+
+
+def register(*printers: Printer, device: str | None = TILL_ID, name: str = "Till", role: str = MANAGER):
+    """Sets up the device ``device`` to print on ``printers`` (printing.device.register, from the device)."""
+    return run("printing.device.register", {"name": name, "printers": [str(p.id) for p in printers]}, ctx=on_device(device, role))
+
+
+def take(*printers: Printer, device: str = TILL_ID, role: str = EMPLOYEE):
+    return run("printing.job.claim", {"printers": [str(p.id) for p in printers], "device": device}, ctx=ctx_for(role)).job
+
+
+def answer(operation: str, job_id, device: str = TILL_ID, attempt: int = 1, role: str = EMPLOYEE):
+    extra = {"error": "printer unreachable"} if operation == "printing.job.fail" else {}
+    data = {"job_id": str(job_id), "device": device, "attempt": attempt, **extra}
+    return run(operation, data, ctx=ctx_for(role))
+
+
+def test_an_employee_on_a_device_nobody_set_up_takes_nothing_and_changes_nothing():
+    till = printer("Till")
+    held = enqueue(source_ref="T-1").job
+    claim(till, device="A")  # whoever sets up printers takes it from device A, whose lease then runs out
+    expire(held.id)
+    waiting = enqueue(source_ref="T-2").job
+    devices = PrintDevice.objects.count()
+    with pytest.raises(PermissionDenied) as refused:
+        take(till, device="stranger")
+    assert refused.value.code == "printing.device_not_registered"
+    # Nothing moved: not the job it asked for, not the expired lease a claim puts back, no device paired.
+    assert PrintJob.objects.get(pk=waiting.id).status == "pending"
+    assert PrintJob.objects.get(pk=held.id).status == "sent"
+    assert PrintDevice.objects.count() == devices
+
+
+def test_a_manager_sets_up_this_device_and_an_employee_on_it_prints_its_printers():
+    till = printer("Till")
+    kitchen = printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    device = register(till, kitchen, name="Counter till")
+    assert (device.name, sorted(p.name for p in device.printers), device.this_device) == (
+        "Counter till",
+        ["Kitchen", "Till"],
+        True,
+    )
+    assert (device.registered_by, device.last_seen_at) == ("tester", None)
+    assert events("printing.device.registered") == [{"id": str(device.id)}]
+    queued = enqueue().job
+    taken = take(till)
+    assert taken.id == queued.id
+    stored = PrintJob.objects.get(pk=queued.id)
+    assert (stored.device, stored.print_device_id) == ("Counter till", device.id)
+    assert PrintDevice.objects.get(pk=device.id).last_seen_at is not None
+    ack = answer("printing.job.complete", queued.id)
+    assert (ack.confirmed, ack.job.status, ack.job.device) == (True, "done", "Counter till")
+
+
+def test_an_employee_takes_nothing_of_a_printer_its_device_does_not_reach():
+    till = printer("Till")
+    other = printer("Other", address="10.0.0.9")
+    register(till)
+    queued = enqueue(printer="Other").job
+    with pytest.raises(PermissionDenied) as refused:
+        take(till, other)
+    assert refused.value.code == "printing.printer_not_on_device"
+    assert PrintJob.objects.get(pk=queued.id).status == "pending"
+    assert take(till) is None, "its own printer has nothing: Other's job is not handed to it"
+
+
+def test_only_the_device_that_took_a_job_confirms_or_fails_it():
+    till = printer("Till")
+    register(till)
+    register(till, device=SPARE_ID, name="Spare")
+    queued = enqueue().job
+    take(till)
+    for device in (SPARE_ID, "never-set-up"):
+        for operation in ("printing.job.complete", "printing.job.fail"):
+            with pytest.raises(Conflict) as refused:
+                answer(operation, queued.id, device=device)
+            assert refused.value.code == "printing.job_not_yours", (device, operation)
+    assert PrintJob.objects.get(pk=queued.id).status == "sent"
+    assert answer("printing.job.fail", queued.id).job.status == "pending"
+
+
+def test_whoever_sets_up_printers_pairs_the_device_by_printing_from_it():
+    till = printer("Till")
+    kitchen = printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    queued = enqueue().job
+    assert take(till, device="till-1", role=MANAGER).id == queued.id
+    device = PrintDevice.objects.get()
+    assert (device.name, [p.id for p in device.printers.all()], device.registered_by) == ("Device 1", [till.id], "tester")
+    assert events("printing.device.registered") == [{"id": str(device.id)}]
+    # Printing from it on another printer adds that one; then an employee on it prints on both.
+    take(till, kitchen, device="till-1", role=MANAGER)
+    assert {p.id for p in PrintDevice.objects.get().printers.all()} == {till.id, kitchen.id}
+    assert events("printing.device.updated") == [{"id": str(device.id)}]
+    enqueue("kitchen_order", {"items": [ITEM]})
+    assert take(kitchen, device="till-1") is not None
+    # The next device it pairs is the second one.
+    take(till, device="till-2", role=MANAGER)
+    assert sorted(PrintDevice.objects.values_list("name", flat=True)) == ["Device 1", "Device 2"]
+
+
+def test_a_retired_device_takes_nothing_and_printing_from_it_does_not_bring_it_back():
+    till = printer("Till")
+    device = register(till)
+    retired = run("printing.device.retire", {"device_id": str(device.id)}, ctx=ctx_for(MANAGER))
+    assert retired.id == device.id
+    assert events("printing.device.retired") == [{"id": str(device.id)}]
+    enqueue()
+    for role in (EMPLOYEE, MANAGER):
+        with pytest.raises(PermissionDenied) as refused:
+            take(till, role=role)
+        assert refused.value.code == "printing.device_not_registered", role
+    assert run("printing.device.list", ctx=ctx_for(EMPLOYEE)).rows == []
+    # Setting it up again, from the device, brings back the same registration.
+    again = register(till, name="Till again")
+    assert (again.id, again.name) == (device.id, "Till again")
+    assert take(till) is not None
+
+
+def test_the_devices_id_never_shows_in_the_queue_nor_in_its_registration():
+    # hub#2551: an employee who read the till's id in the queue could print, confirm and fail as the till.
+    till = printer("Till")
+    register(till, name="Till")
+    queued = enqueue().job
+    take(till)
+    shown = [
+        run("printing.job.list", ctx=ctx_for(EMPLOYEE)),
+        run("printing.device.list", ctx=ctx_for(EMPLOYEE)),
+        run("printing.device.list", ctx=on_device(TILL_ID, EMPLOYEE)),
+    ]
+    for out in shown:
+        assert TILL_ID not in json.dumps(out.model_dump(mode="json")), out
+    stored = PrintDevice.objects.get()
+    assert TILL_ID not in stored.key and len(stored.key) == 64, "the database keeps a digest of the id, never the id"
+    assert PrintJob.objects.get(pk=queued.id).device == "Till"
+
+
+def test_setting_up_a_device_takes_its_own_id_and_active_printers_of_the_business():
+    till = printer("Till")
+    with pytest.raises(InvalidPayload) as refused:
+        register(till, device=None)  # the assistant or an API key: no device of its own
+    assert refused.value.code == "printing.device_required"
+    off = printer("Old", address="10.0.0.8", is_active=False)
+    for printers in ([off], []):
+        with pytest.raises(InvalidPayload) as refused:
+            register(*printers)
+        assert set(refused.value.fields) == {"printers"}, printers
+    with pytest.raises(PermissionDenied):
+        register(till, role=EMPLOYEE)
+    assert not PrintDevice.objects.exists()
+
+
+def test_a_manager_renames_a_device_and_changes_its_printers_from_any_device():
+    till = printer("Till")
+    kitchen = printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    device = register(till)
+    changed = run(
+        "printing.device.update",
+        {"device_id": str(device.id), "name": "Kitchen tablet", "printers": [str(kitchen.id)]},
+        ctx=ctx_for(MANAGER),
+    )
+    assert (changed.name, [p.id for p in changed.printers], changed.this_device) == ("Kitchen tablet", [kitchen.id], False)
+    assert events("printing.device.updated") == [{"id": str(device.id)}]
+    enqueue()
+    with pytest.raises(PermissionDenied) as refused:
+        take(till)
+    assert refused.value.code == "printing.printer_not_on_device"
+    with pytest.raises(PermissionDenied):
+        run("printing.device.update", {"device_id": str(device.id), "name": "Mine"}, ctx=ctx_for(EMPLOYEE))
+    with pytest.raises(NotFound) as missing:
+        run("printing.device.update", {"device_id": str(PrintJob().id), "name": "Ghost"}, ctx=ctx_for(MANAGER))
+    assert missing.value.code == "printing.device_not_found"
+
+
+def test_the_channel_reads_the_printers_of_the_device_that_says_hello():
+    # base's /ws/print has the device's id in its hello, not in a header: printing.device.get by that id.
+    till = printer("Till")
+    printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    register(till)
+    found = run("printing.device.get", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE)).device
+    assert (found.name, [(p.id, p.usage) for p in found.printers], found.this_device) == ("Till", [(till.id, "receipt")], True)
+    assert run("printing.device.get", {"device": "never-set-up"}, ctx=ctx_for(EMPLOYEE)).device is None
 
 
 # ── PRINTING-F04 A printer that leaves takes no queued job with it ───────────────────────────────

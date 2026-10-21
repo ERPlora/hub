@@ -9,6 +9,12 @@ cancelled or failed) is forgotten 30 days later by the hourly prune, the platfor
 
 Every app that prints calls ``printing.job.create`` by name inside its own transaction; the job is the
 structured document the app's renderer paints, never bytes (PLAN-HUB §5; hub#501).
+
+Only a device set up to print takes, confirms and fails jobs, and only those of the printers it reaches (the old
+hub's print hosts, hub#342): a session that prints is not enough, or a waiter's phone would drain the till's
+receipts. Whoever sets up the printers sets the device up — from the device («Print from this device»), or by
+printing from it — and changes or retires it from any device. The device is known by the digest of its own id,
+which no screen shows (hub#2551).
 """
 
 import datetime as dt
@@ -25,20 +31,23 @@ from django.utils import timezone, translation
 from babel.numbers import get_currency_precision
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound, OperationError
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import UnknownOperation, operation
 from live.operations import get as operation_named
 from live.outbox import record_event
 
 from apps.printing import documents, events
-from apps.printing.models import Printer, PrintJob, Settings
+from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 from apps.printing.queries import (
     DEFAULT_FIELDS,
     LEASE,
     MAX_ATTEMPTS,
+    active_devices,
     actor,
     cancellable,
     current_settings,
+    device_row,
+    find_device,
     find_job,
     find_printer,
     first_held,
@@ -47,8 +56,13 @@ from apps.printing.queries import (
     printer_row,
     retryable,
     settings_row,
+    this_device_key,
 )
 from apps.printing.schemas import (
+    DeviceOut,
+    DeviceRefIn,
+    DeviceRegisterIn,
+    DeviceUpdateIn,
     EmptyIn,
     JobAckOut,
     JobCancelIn,
@@ -74,6 +88,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_PORT = 9100
 #: Run only by the platform (the scheduled prune): no role is given it, and it has no route.
 SYSTEM = "printing.system"
+#: Who sets up the printers sets up the devices that print for them, and pairs one by printing from it.
+MANAGE_SETTINGS = "printing.manage_settings"
 #: How long the queue keeps a job after it ended — printed, cancelled or failed (PRINTING-F20).
 KEEP_FINISHED = dt.timedelta(days=30)
 #: The most jobs one prune deletes: an hourly run never holds the queue for long.
@@ -100,6 +116,16 @@ NOT_RETRYABLE = _(
 NOT_YOURS = _("That job is not this device's: another device or another hand-out has it now.")
 NOT_CANCELLABLE = _("A job that is printing or has printed is not cancelled; this one is %(status)s.")
 NO_ANSWER = _("No answer from the device.")
+DEVICE_NOT_SET_UP = _(
+    "This device is not set up to print here: someone who manages the printers sets it up in Printing → Devices."
+)
+PRINTER_NOT_ON_DEVICE = _(
+    "This device does not print for %(printers)s: someone who manages the printers adds it to the device."
+)
+DEVICE_UNKNOWN = _("Set a device up from the device itself: this request does not say which device it is.")
+CHOOSE_PRINTERS = _("Choose the printers this device reaches.")
+NOT_ACTIVE_PRINTERS = _("Choose active printers of this business.")
+DEVICE_NUMBER = _("Device %(number)s")
 TEST_PAGE = _("Test page")
 
 #: The amounts' currency when the caller does not say (the one Sales charges in until the Hub keeps its own).
@@ -550,6 +576,53 @@ def _reclaim_expired(ctx: OperationContext, now) -> None:
             _queued(ctx, job)
 
 
+def _claiming_device(ctx: OperationContext, device_id: str, printers: list[Printer], now) -> PrintDevice:
+    """The device set up with ``device_id``, which must print for every printer it names. Whoever sets up the
+    printers pairs it by asking: a device new here is set up, a printer it does not reach yet is added. Anybody
+    else is refused (403), and so is a retired device: retiring it was a decision, not something a claim undoes."""
+    key = PrintDevice.key_of(device_id)
+    device = PrintDevice.objects.select_for_update().filter(key=key).first()
+    pairs = ctx.has(MANAGE_SETTINGS)
+    if (device is None and not pairs) or (device is not None and device.retired_at is not None):
+        raise PermissionDenied(str(DEVICE_NOT_SET_UP), code="printing.device_not_registered")
+    new = device is None
+    if new:
+        device, new = _paired_device(ctx, key)
+    reached = set(device.printers.values_list("id", flat=True))
+    missing = [printer for printer in printers if printer.id not in reached]
+    if missing:
+        if not pairs:
+            names = ", ".join(f"«{printer.name}»" for printer in missing)
+            raise PermissionDenied(str(PRINTER_NOT_ON_DEVICE) % {"printers": names}, code="printing.printer_not_on_device")
+        device.printers.add(*missing)
+        if not new:
+            record_event(ctx, events.DEVICE_UPDATED, {"id": str(device.id)})
+    device.last_seen_at = now
+    device.save(update_fields=["last_seen_at"])
+    return device
+
+
+def _paired_device(ctx: OperationContext, key: str) -> tuple[PrintDevice, bool]:
+    """A device paired by printing from it, named «Device N» until somebody renames it; whether it is new (two
+    of its first claims at once pair it once: the second finds the first one's)."""
+    with translation.override(ctx.language):
+        name = str(DEVICE_NUMBER) % {"number": PrintDevice.objects.count() + 1}
+    try:
+        with transaction.atomic():
+            device = PrintDevice.objects.create(key=key, name=name, registered_by=actor(ctx))
+    except IntegrityError:
+        return PrintDevice.objects.select_for_update().get(key=key), False
+    record_event(ctx, events.DEVICE_REGISTERED, {"id": str(device.id)})
+    return device, True
+
+
+def _holds(job: PrintJob, device_id: str) -> bool:
+    """Whether the device set up with ``device_id`` (and not retired) is the one that took ``job``."""
+    if job.print_device_id is None:
+        return False
+    return active_devices().filter(pk=job.print_device_id, key=PrintDevice.key_of(device_id)).exists()
+
+
 def _copy_of(job: PrintJob) -> dict | None:
     """What the copies after the first print: a receipt or an invoice marked duplicate, never a second
     original (RD 1619/2012 art. 14.4; the renderer prints «DUPLICADO» with ``duplicate``); anything else as is."""
@@ -576,8 +649,10 @@ def _copy_of(job: PrintJob) -> dict | None:
 )
 def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
     now = timezone.now()
-    _reclaim_expired(ctx, now)
     printers = {p.id: p for p in Printer.objects.filter(pk__in=data.printers, is_active=True)}
+    # First who asks, before anything moves: a refusal leaves the queue as it was.
+    device = _claiming_device(ctx, data.device, list(printers.values()), now)
+    _reclaim_expired(ctx, now)
     if not printers:
         return {"job": None}
     mine = Q()
@@ -598,8 +673,8 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
     job.attempts += 1
     job.leased_until = now + LEASE
     job.sent_at = now
-    job.device = data.device
-    job.save(update_fields=["status", "attempts", "leased_until", "sent_at", "device", "printer"])
+    job.print_device, job.device = device, device.name
+    job.save(update_fields=["status", "attempts", "leased_until", "sent_at", "print_device", "device", "printer"])
     record_event(ctx, events.JOB_CLAIMED, {"id": str(job.id), "printer_id": str(printer.id)})
     return {
         "job": {
@@ -637,7 +712,7 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
 )
 def complete_job(ctx: OperationContext, data: JobCompleteIn) -> dict:
     job = find_job(data.job_id, None, lock=True)
-    if job.device != data.device or data.attempt > job.attempts:
+    if not _holds(job, data.device) or data.attempt > job.attempts:
         raise Conflict(str(NOT_YOURS), code="printing.job_not_yours")
     if job.status == PrintJob.Status.DONE:
         return {"confirmed": True, "job": job_row(job)}
@@ -670,7 +745,7 @@ def complete_job(ctx: OperationContext, data: JobCompleteIn) -> dict:
 )
 def fail_job(ctx: OperationContext, data: JobFailIn) -> dict:
     job = find_job(data.job_id, None, lock=True)
-    if job.device != data.device or job.attempts != data.attempt:
+    if not _holds(job, data.device) or job.attempts != data.attempt:
         raise Conflict(str(NOT_YOURS), code="printing.job_not_yours")
     if job.status != PrintJob.Status.SENT:
         return {"confirmed": False, "job": job_row(job)}
@@ -684,6 +759,98 @@ def fail_job(ctx: OperationContext, data: JobFailIn) -> dict:
     Printer.objects.filter(pk=job.printer_id).update(last_failed_at=now, last_error=data.error)
     record_event(ctx, events.JOB_FAILED, {"id": str(job.id), "final": final})
     return {"confirmed": True, "job": job_row(job)}
+
+
+# ── PRINTING-F18 The devices that print ───────────────────────────────────────────────────────────
+
+
+def _reached_printers(ids: list) -> list[Printer]:
+    """The active printers of the business named by ``ids``; a 422 at ``printers`` if none or one is not."""
+    if not ids:
+        raise InvalidPayload(str(CHOOSE_PRINTERS), fields={"printers": str(CHOOSE_PRINTERS)})
+    found = list(Printer.objects.filter(pk__in=ids, is_active=True))
+    if len(found) != len(set(ids)):
+        raise InvalidPayload(str(NOT_ACTIVE_PRINTERS), fields={"printers": str(NOT_ACTIVE_PRINTERS)})
+    return found
+
+
+@operation(
+    "printing.device.register",
+    kind="command",
+    permission=MANAGE_SETTINGS,
+    input=DeviceRegisterIn,
+    output=DeviceOut,
+    expose_api=True,
+    ai={
+        "description": "Set up the device the person is using to print, with its name and the printers it reaches: from "
+        "then on it prints their jobs with anybody's session. Only from the device itself (it says which device it is); "
+        "setting up a retired device again brings it back.",
+        "risk": "high",
+    },
+)
+def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
+    key = this_device_key(ctx)
+    if key is None:
+        raise InvalidPayload(str(DEVICE_UNKNOWN), code="printing.device_required")
+    printers = _reached_printers(data.printers)
+    device = PrintDevice.objects.select_for_update().filter(key=key).first()
+    if device is None:
+        try:
+            with transaction.atomic():
+                device = PrintDevice.objects.create(key=key, name=data.name, registered_by=actor(ctx))
+        except IntegrityError:
+            device = PrintDevice.objects.select_for_update().get(key=key)
+    device.name, device.retired_at, device.retired_by = data.name, None, ""
+    device.save(update_fields=["name", "retired_at", "retired_by"])
+    device.printers.set(printers)
+    record_event(ctx, events.DEVICE_REGISTERED, {"id": str(device.id)})
+    return device_row(device, key)
+
+
+@operation(
+    "printing.device.update",
+    kind="command",
+    permission=MANAGE_SETTINGS,
+    input=DeviceUpdateIn,
+    output=DeviceOut,
+    expose_api=True,
+    ai={
+        "description": "Rename a device that prints, or change the printers it reaches, by its registration id "
+        "(printing.device.list). From any device.",
+        "risk": "high",
+    },
+)
+def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
+    device = find_device(data.device_id, lock=True)
+    if data.name is not None:
+        device.name = data.name
+        device.save(update_fields=["name"])
+    if data.printers is not None:
+        device.printers.set(_reached_printers(data.printers))
+    record_event(ctx, events.DEVICE_UPDATED, {"id": str(device.id)})
+    return device_row(device, this_device_key(ctx))
+
+
+@operation(
+    "printing.device.retire",
+    kind="command",
+    permission=MANAGE_SETTINGS,
+    input=DeviceRefIn,
+    output=DeviceOut,
+    expose_api=True,
+    ai={
+        "description": "Retire a device that prints (a till replaced or lost), by its registration id: it takes, confirms "
+        "and fails no job any more, and printing from it does not set it up again. Its jobs in hand go back to the "
+        "queue when their time to answer runs out.",
+        "risk": "high",
+    },
+)
+def retire_device(ctx: OperationContext, data: DeviceRefIn) -> dict:
+    device = find_device(data.device_id, lock=True)
+    device.retired_at, device.retired_by = timezone.now(), actor(ctx)
+    device.save(update_fields=["retired_at", "retired_by"])
+    record_event(ctx, events.DEVICE_RETIRED, {"id": str(device.id)})
+    return device_row(device, this_device_key(ctx))
 
 
 # ── PRINTING-F14 Retry and cancel ─────────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import json
 
 import pytest
 from django.conf import settings
+from django.test import Client
 from live.ninja import ensure_api_parity
 
 from apps.printing.api import router
@@ -29,15 +30,23 @@ ROUTES = {
     ("POST", "/printing/jobs/fail", "printing.job.fail"),
     ("POST", "/printing/jobs/retry", "printing.job.retry"),
     ("POST", "/printing/jobs/cancel", "printing.job.cancel"),
+    ("GET", "/printing/devices", "printing.device.list"),
+    ("POST", "/printing/devices", "printing.device.register"),
+    ("POST", "/printing/devices/update", "printing.device.update"),
+    ("POST", "/printing/devices/retire", "printing.device.retire"),
 }
+#: The device's own id, as the SPA sends it in X-Device-Id: never in a URL (access logs keep URLs).
+DEVICE = "3f1c9a52-6b0e-4c1d-9a77-0d2b5f8e4c11"
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
+def get(client, path, host="a.localhost", device=None, **params):
+    headers = {"HTTP_X_DEVICE_ID": device} if device else {}
+    return client.get(f"/api{path}", params, HTTP_HOST=host, **headers)
 
 
-def post(client, path, data, host="a.localhost"):
-    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host)
+def post(client, path, data, host="a.localhost", device=None):
+    headers = {"HTTP_X_DEVICE_ID": device} if device else {}
+    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host, **headers)
 
 
 @pytest.fixture
@@ -70,8 +79,9 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
     from live.operations import registry
 
     ops = {name for name in registry if name.startswith("printing.")}
-    # The platform's own (the scheduled prune, PRINTING-F20) has no door: no route, no API key, no assistant.
-    platform = {"printing.job.prune"}
+    # The platform's own have no door: no route, no API key, no assistant — the scheduled prune (PRINTING-F20)
+    # and the read of /ws/print's hello (printing.device.get: the device's id never travels in a URL).
+    platform = {"printing.job.prune", "printing.device.get"}
     assert platform <= ops
     assert all(not registry[name].expose_api and not registry[name].ai for name in platform)
     ops -= platform
@@ -141,3 +151,61 @@ def test_an_unknown_document_type_is_a_422(admin_client):
     response = post(admin_client, "/printing/jobs", {"document_type": "kitchn", "document": {}})
     assert response.status_code == 422
     assert "document_type" in response.json()["error"]["fields"]
+
+
+def session_of(make_user, username, role):
+    client = Client()
+    client.force_login(make_user(username, host="a", role=role))
+    return client
+
+
+@pytest.mark.django_db
+def test_an_employee_takes_no_job_until_a_manager_sets_up_the_device(make_user):
+    # FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE: POST /api/printing/jobs/claim with an employee's session handed
+    # the job of any printer it named.
+    manager = session_of(make_user, "mar", "hub_manager")
+    employee = session_of(make_user, "ana", "hub_employee")
+    till = post(manager, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}).json()
+    post(manager, "/printing/jobs", {"document_type": "receipt", "document": RECEIPT})
+    claim = {"printers": [till["id"]], "device": DEVICE}
+
+    refused = post(employee, "/printing/jobs/claim", claim)
+    assert refused.status_code == 403
+    assert refused.json()["error"]["code"] == "printing.device_not_registered"
+    assert get(manager, "/printing/jobs").json()["rows"][0]["status"] == "pending"
+    assert post(employee, "/printing/devices", {"name": "Till", "printers": [till["id"]]}, device=DEVICE).status_code == 403
+
+    set_up = post(manager, "/printing/devices", {"name": "Till", "printers": [till["id"]]}, device=DEVICE)
+    assert set_up.status_code == 201
+    assert (set_up.json()["name"], set_up.json()["this_device"]) == ("Till", True)
+    taken = post(employee, "/printing/jobs/claim", claim).json()["job"]
+    assert taken is not None
+    done = post(employee, "/printing/jobs/complete", {"job_id": taken["id"], "device": DEVICE, "attempt": 1}).json()
+    assert (done["confirmed"], done["job"]["device"]) == (True, "Till")
+
+    mine = get(employee, "/printing/devices", device=DEVICE).json()
+    theirs = get(employee, "/printing/devices", device="9b7d2e40-1a35-4f6c-8e21-5c0a7d3b9f02").json()
+    assert [(row["name"], row["this_device"]) for row in mine["rows"]] == [("Till", True)]
+    assert [row["this_device"] for row in theirs["rows"]] == [False]
+    assert DEVICE not in json.dumps(mine)
+
+
+@pytest.mark.django_db
+def test_setting_up_a_device_needs_its_own_id(admin_client):
+    till = post(admin_client, "/printing/printers", {"name": "Till", "kind": "system", "usage": "receipt"}).json()
+    response = post(admin_client, "/printing/devices", {"name": "Till", "printers": [till["id"]]})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "printing.device_required"
+
+
+@pytest.mark.django_db
+def test_a_manager_retires_a_device_and_it_takes_nothing_more(make_user):
+    manager = session_of(make_user, "mar", "hub_manager")
+    till = post(manager, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}).json()
+    device = post(manager, "/printing/devices", {"name": "Till", "printers": [till["id"]]}, device=DEVICE).json()
+    renamed = post(manager, "/printing/devices/update", {"device_id": device["id"], "name": "Front till"})
+    assert (renamed.status_code, renamed.json()["name"]) == (200, "Front till")
+    assert post(manager, "/printing/devices/retire", {"device_id": device["id"]}).status_code == 200
+    assert get(manager, "/printing/devices").json()["rows"] == []
+    refused = post(manager, "/printing/jobs/claim", {"printers": [till["id"]], "device": DEVICE})
+    assert (refused.status_code, refused.json()["error"]["code"]) == (403, "printing.device_not_registered")

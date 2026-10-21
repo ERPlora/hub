@@ -184,3 +184,27 @@ def test_the_summary_names_the_printer_each_function_prints_on():
     run("printing.printer.update", {"printer": "till", "is_active": False})
     # Only the computer's printer is left: receipts come out there (on A4).
     assert prints_on()["receipt"] == "Office"
+
+
+# ── The devices that print (PRINTING-F18) ───────────────────────────────────────────────────────
+
+
+def test_the_devices_by_name_with_the_printers_each_one_reaches():
+    from apps.printing.models import PrintDevice
+
+    till = printer("Till")
+    kitchen = printer("Kitchen", usage="kitchen", address="10.0.0.2", is_active=False)
+    counter = PrintDevice.objects.create(name="Counter", key=PrintDevice.key_of("counter"), registered_by="Ana")
+    counter.printers.add(till.id, kitchen.id)
+    PrintDevice.objects.create(name="bar tablet", key=PrintDevice.key_of("bar"))
+    gone = PrintDevice.objects.create(name="Old till", key=PrintDevice.key_of("old"), retired_at=timezone.now())
+    gone.printers.add(till.id)
+
+    out = run("printing.device.list", ctx=ctx_for("hub_employee"))
+    assert (out.total, [row.name for row in out.rows]) == (2, ["bar tablet", "Counter"])
+    row = out.rows[1]
+    assert [(p.name, p.usage, p.is_active) for p in row.printers] == [("Kitchen", "kitchen", False), ("Till", "receipt", True)]
+    assert (row.registered_by, row.last_seen_at, row.this_device) == ("Ana", None, False)
+    assert run("printing.device.list", {"limit": 1, "offset": 1}).rows[0].name == "Counter"
+    with pytest.raises(PermissionDenied):
+        run("printing.device.list", ctx=ctx_for("nobody"))

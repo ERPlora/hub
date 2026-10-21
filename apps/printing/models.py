@@ -8,7 +8,12 @@
 - ``PrintJob`` is a job of the print queue: the structured document the app's renderer paints (or the A4
   page for the computer's printer), its function, its printer, its state and who retried or cancelled it.
   Nobody deletes a job: the platform's hourly prune forgets the ones that ended over 30 days ago.
+- ``PrintDevice`` is a device that prints (the old hub's print host, hub#342): the one with the ERPlora app
+  next to the printers, set up by whoever sets up the printers, with the printers it reaches. Only it takes,
+  confirms and fails their jobs. Never deleted (the queue names it): it is retired.
 """
+
+import hashlib
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -133,6 +138,37 @@ class Settings(UUIDModel):
         return str(_("printing settings"))
 
 
+class PrintDevice(UUIDModel):
+    """A device that prints the jobs of the printers it reaches. It is known by the digest of its own id (the
+    SPA's ``X-Device-Id``, the ``deviceId`` of /ws/print's hello), never by the id itself: that id is what proves
+    the device, and a queue or a screen that showed it let anybody print as the till (hub#2551)."""
+
+    name = models.CharField(_("name"), max_length=100)
+    #: SHA-256 of the device's id (``key_of``); empty (null) only for one added by hand in the admin, which no
+    #: device matches.
+    key = models.CharField(_("key"), max_length=64, unique=True, null=True, blank=True)
+    printers = models.ManyToManyField(Printer, related_name="devices", blank=True, verbose_name=_("printers"))
+    registered_at = models.DateTimeField(_("set up at"), auto_now_add=True)
+    registered_by = models.CharField(_("set up by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    last_seen_at = models.DateTimeField(_("last asked for a job at"), null=True, blank=True)
+    retired_at = models.DateTimeField(_("retired at"), null=True, blank=True)
+    retired_by = models.CharField(_("retired by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+
+    class Meta:
+        verbose_name = _("printing device")
+        verbose_name_plural = _("printing devices")
+        ordering = ["name", "id"]
+        constraints = [models.CheckConstraint(condition=~Q(name=""), name="printing_device_name_given")]
+
+    def __str__(self) -> str:
+        return self.name
+
+    @staticmethod
+    def key_of(device_id: str) -> str:
+        """The digest a device is kept by: its id proves the device, the digest proves nothing."""
+        return hashlib.sha256(device_id.strip().encode()).hexdigest()
+
+
 class PrintJob(UUIDModel):
     """A job of the print queue. A retry or a cancel stamps who, when and why; it is forgotten 30 days after
     it ended (``printing.job.prune``)."""
@@ -168,7 +204,12 @@ class PrintJob(UUIDModel):
     status = models.CharField(_("status"), max_length=16, choices=Status.choices, default=Status.PENDING)
     attempts = models.PositiveSmallIntegerField(_("attempts"), default=0)
     leased_until = models.DateTimeField(_("answer due by"), null=True, blank=True)
-    device = models.CharField(_("device"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    #: The device that took it last: by its registration (what a confirmation is checked against) and by its
+    #: name then (what the queue shows), never by the id it sent.
+    print_device = models.ForeignKey(
+        PrintDevice, on_delete=models.PROTECT, null=True, blank=True, related_name="jobs", verbose_name=_("device")
+    )
+    device = models.CharField(_("device name"), max_length=ACTOR_MAX_LENGTH, blank=True)
     last_error = models.CharField(_("last error"), max_length=ERROR_MAX_LENGTH, blank=True)
     reference = models.CharField(_("reference"), max_length=64, blank=True)
     source_app = models.CharField(_("asked by app"), max_length=32, blank=True)

@@ -9,7 +9,7 @@ puts it back in the queue (services.py).
 import datetime as dt
 import uuid
 
-from django.db.models import Case, Count, IntegerField, Min, Q, QuerySet, Value, When
+from django.db.models import Case, Count, IntegerField, Min, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -17,8 +17,12 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.printing.models import Printer, PrintJob, Settings, Usage
+from apps.printing.models import PrintDevice, Printer, PrintJob, Settings, Usage
 from apps.printing.schemas import (
+    DeviceGetIn,
+    DeviceGetOut,
+    DeviceListIn,
+    DeviceOut,
     EmptyIn,
     JobListIn,
     JobOut,
@@ -44,6 +48,7 @@ DEFAULT_FIELDS = {usage: f"{usage}_printer" for usage in USAGES}
 
 NO_PRINTER = _("There is no printer with that name.")
 NO_JOB = _("There is no print job with that id or number.")
+NO_DEVICE = _("There is no device set up to print with that id.")
 
 PENDING = Q(status=PrintJob.Status.PENDING)
 #: Receipt paper before the computer's printer, the order a job of a function finds its printer in.
@@ -421,3 +426,79 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
         "sent": sum(row["sent"] for row in usages),
         "failed": sum(row["failed"] for row in usages),
     }
+
+
+# ── The devices that print (PRINTING-F18) ────────────────────────────────────────────────────────
+
+#: The header the SPA names its device with (``@erplora/ui``'s ``DEVICE_ID_HEADER``), on every request and stream.
+DEVICE_HEADER = "X-Device-Id"
+#: The printers of a device, by name, read with it.
+_BY_NAME = Prefetch("printers", queryset=Printer.objects.order_by(Lower("name"), "id"))
+
+
+def this_device_key(ctx: OperationContext) -> str | None:
+    """The key of the device the caller uses, from the request's ``X-Device-Id``; none without one (the assistant,
+    an API key, the worker)."""
+    request = ctx.request
+    headers = getattr(request, "headers", None)
+    device_id = (headers.get(DEVICE_HEADER) or "").strip() if headers is not None else ""
+    return PrintDevice.key_of(device_id) if device_id else None
+
+
+def active_devices() -> QuerySet[PrintDevice]:
+    return PrintDevice.objects.filter(retired_at__isnull=True)
+
+
+def find_device(device_id: uuid.UUID, *, lock: bool = False) -> PrintDevice:
+    devices = active_devices().select_for_update() if lock else active_devices()
+    found = devices.filter(pk=device_id).first()
+    if found is None:
+        raise NotFound(str(NO_DEVICE), code="printing.device_not_found")
+    return found
+
+
+def device_row(device: PrintDevice, this_key: str | None) -> dict:
+    """A device as the screens read it: its printers by name, and whether it is the one asking. Never its key."""
+    prefetched = "printers" in getattr(device, "_prefetched_objects_cache", {})
+    printers = device.printers.all() if prefetched else device.printers.order_by(Lower("name"), "id")
+    return {
+        "id": device.id,
+        "name": device.name,
+        "printers": [
+            {"id": printer.id, "name": printer.name, "usage": printer.usage, "is_active": printer.is_active}
+            for printer in printers
+        ],
+        "registered_at": device.registered_at,
+        "registered_by": device.registered_by,
+        "last_seen_at": device.last_seen_at,
+        "this_device": this_key is not None and device.key == this_key,
+    }
+
+
+@operation(
+    "printing.device.list",
+    kind="query",
+    permission="printing.view_settings",
+    input=DeviceListIn,
+    output=Page[DeviceOut],
+    expose_api=True,
+    ai={
+        "description": "List the devices set up to print, by name: the printers each one reaches and prints for, who set "
+        "it up and when it last asked for a job. Only these devices print; their own ids are never shown."
+    },
+)
+def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
+    devices = active_devices()
+    total = devices.count()
+    page = devices.prefetch_related(_BY_NAME).order_by(Lower("name"), "id")[params.offset : params.offset + params.limit]
+    key = this_device_key(ctx)
+    return {"rows": [device_row(device, key) for device in page], "total": total, "limit": params.limit, "offset": params.offset}
+
+
+@operation("printing.device.get", kind="query", permission="printing.print", input=DeviceGetIn, output=DeviceGetOut)
+def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
+    """For base's /ws/print, at the hello: the device set up with the id it says, with its printers. No route (the
+    id never travels in a URL), no API key and no assistant."""
+    key = PrintDevice.key_of(params.device)
+    device = active_devices().prefetch_related(_BY_NAME).filter(key=key).first()
+    return {"device": device_row(device, key) if device is not None else None}
