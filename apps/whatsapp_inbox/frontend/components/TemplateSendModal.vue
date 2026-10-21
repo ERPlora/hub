@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // WHATSAPP_INBOX-F33 (send a template): the only way to write after Meta's 24-hour window, and the way
 // to start a conversation. The templates Meta approved (the local copy erplora.com keeps in step) are
-// offered with their language, category and text; the chosen one asks for its variables and previews
+// offered (only the ones the Hub can fill: no file header) with their language, category and text; the chosen one asks for its variables and previews
 // the text as it will go out. «Send» goes through erplora.com (`whatsapp_inbox.message.send`) with a key
 // of its own, so pressing it again never sends twice; the dialog closes only when it was sent, and a
 // refusal (marketing without consent, erplora.com down) stays on top of it.
@@ -18,7 +18,8 @@ const props = defineProps<{ conversationId: string }>();
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
-const { data: templates } = useLive('whatsapp_inbox.template.list', () => ({ status: 'APPROVED' as const, limit: 100 }));
+// What the Hub can send now: approved, not being deleted, no file header (WHATSAPP_INBOX-F33).
+const { data: templates } = useLive('whatsapp_inbox.template.list', () => ({ sendable: true, limit: 100 }));
 const { run, error, pending } = useCommand('whatsapp_inbox.message.send');
 
 const chosenId = ref('');

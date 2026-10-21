@@ -69,6 +69,13 @@ async function setup(options: MountOptions = {}, channel: ChannelOut = CONNECTED
 }
 
 describe('InboxPage: the live list', () => {
+  it('while the list loads, the table says it is loading, never «0 conversations» (gh:pm#611)', async () => {
+    const s = await setup();
+    expect(s.prop('loading')).toBe(true);
+    await s.result(LIST, PAGE);
+    expect(s.prop('loading')).toBe(false);
+  });
+
   it('follows the conversations, 50 by the latest activity, and paints the old columns', async () => {
     const s = await setup();
     expect(s.params(LIST)).toEqual([{ sort: 'last_message_at', dir: 'desc', limit: 50, offset: 0 }]);
@@ -192,6 +199,15 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     const spent = await setup({}, { ...CONNECTED, cap_reached: true, monthly_usage: 150 });
     expect(spent.find('whatsapp-inbox-cap-reached').text()).toContain('You have used all the WhatsApp messages of your plan this month.');
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
+  });
+
+  it('a number reconnected (or a new month) takes its notice away by itself, without reloading (gh:hub#2064)', async () => {
+    const s = await setup({}, { ...CONNECTED, status: 'reconnect_needed', cap_reached: true });
+    expect(s.find('whatsapp-inbox-reconnect').exists()).toBe(true);
+    expect(s.find('whatsapp-inbox-cap-reached').exists()).toBe(true);
+    await s.result(CHANNEL, CONNECTED);
+    expect(s.find('whatsapp-inbox-reconnect').exists()).toBe(false);
+    expect(s.find('whatsapp-inbox-cap-reached').exists()).toBe(false);
   });
 
   it('speaks Spanish', async () => {
