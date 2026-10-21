@@ -197,6 +197,11 @@ PLAN-DB §7). Por eso, en una migración:
   un `CHECK`, como el de un entero positivo) va en un despliegue posterior al que deja de escribir esos valores. Un
   `db_default` no salva el paso a `NOT NULL`: el código anterior conoce la columna y manda el `NULL` en su `INSERT`.
   Ampliar (más `max_length`, `text`, `smallint` → `integer` → `bigint`, `null=True`) no rompe nada.
+- **Una restricción nueva** sobre una tabla que ya se usa (`AddConstraint` con `UniqueConstraint` o `CheckConstraint`,
+  `AlterUniqueTogether` con un conjunto nuevo, `AlterField` a `unique=True`) va en un despliegue posterior al que deja de
+  escribir las filas que la incumplen: el `INSERT` o el `UPDATE` del código anterior que la incumple falla. `NOT VALID`
+  (`AddConstraintNotValid` + `ValidateConstraint`) y el índice único `CONCURRENTLY` solo evitan el bloqueo de la tabla,
+  no ese fallo, así que también cuentan. Quitar una restricción no rompe nada.
 
 Lo comprueba `base/tests/test_migration_safety.py` sobre todas las migraciones que carga el proyecto (`base`, `live`,
 las apps y las de Django: `hub-migrate` las aplica todas), cada una contra el estado anterior del `MigrationLoader`.

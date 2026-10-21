@@ -2,7 +2,7 @@
 
 The deploy (``.github/scripts/ecs-deploy.sh``) runs ``hub-migrate`` before it replaces the services, and a
 rollback puts the code of before back on the migrated schema: for a while, the code of before reads and writes
-the tables of the new one. Three kinds of operation break it:
+the tables of the new one. Four kinds of operation break it:
 
 - a column added ``NOT NULL`` with only a Python ``default``: Django fills the rows with that default and then
   drops it from the column, so an INSERT of the code of before, which does not know the column, fails with
@@ -12,7 +12,10 @@ the tables of the new one. Three kinds of operation break it:
   ``AlterModelTable``): the code of before still names it. It leaves the state first
   (``SeparateDatabaseAndState``) and the database in a later deploy, or keeps its name (``db_column``/``db_table``);
 - a column narrowed by ``AlterField`` (NOT NULL, shorter, another type, a new CHECK): the code of before still
-  writes what the old one took. It is narrowed in a later deploy, once no code writes such values.
+  writes what the old one took. It is narrowed in a later deploy, once no code writes such values;
+- a constraint added to a table in use (``AddConstraint``, ``NOT VALID`` included, ``AlterUniqueTogether`` with a
+  new set, ``AlterField`` to ``unique=True``): the code of before still writes rows that break it. ``NOT VALID``
+  and a unique index made ``CONCURRENTLY`` only spare the lock; the constraint goes in a later deploy.
 
 The step of a change that only a later deploy may run (the contract) is the one the code cannot tell apart: it
 goes in ``ACCEPTED`` with the PR of its first step as the reason.
@@ -26,10 +29,12 @@ import math
 from typing import NamedTuple
 
 import pytest
+from django.contrib.postgres.operations import AddConstraintNotValid, ValidateConstraint
 from django.db import connection, migrations, models
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.state import ModelState, ProjectState
 from django.db.models import NOT_PROVIDED
+from django.db.models.options import normalize_together
 
 # Already in production before these rules (hub ``main``@00654ae, deployed on 2026-10-21): the deploys that
 # carried them are over and an applied migration is never edited, so the rules cannot reach them. A new entry
@@ -96,6 +101,37 @@ ACCEPTED = {
     ("verifactu", "0002_own_certificate", "RemoveField", "config.own_certificate_uploaded_at"),
     ("verifactu", "0004_multiple_taxpayers_always", "RemoveField", "config.multiple_taxpayers"),
     ("whatsapp_inbox", "0005_channel_per_business", "RemoveField", "channel.slot"),
+    # A constraint added to a table in use, in one deploy, also before these rules.
+    ("customer", "0002_purchase_refunds", "AddConstraint", "purchase.customer_purchase_refund_unique"),
+    ("customer", "0002_purchase_refunds", "AddConstraint", "purchase.customer_purchase_sale_unique"),
+    ("flow", "0003_run_calling_asking", "AddConstraint", "flowrun.flow_run_status_valid"),
+    ("flow", "0005_flow_recipe", "AddConstraint", "flow.flow_flow_one_per_recipe"),
+    ("kitchen", "0004_item_options_and_menu", "AddConstraint", "ticketitem.kitchen_item_one_per_line"),
+    ("sale", "0004_voucher_lines", "AddConstraint", "refund.sale_refund_total_not_negative"),
+    ("sale", "0007_one_open_check_per_appointment", "AddConstraint", "order.sale_order_one_open_per_appointment"),
+    ("service", "0002_redemption_states", "AddConstraint", "redemption.service_redemption_one_per_line"),
+    ("service", "0002_redemption_states", "AddConstraint", "redemption.service_redemption_status"),
+    ("table", "0002_session_table_by_status", "AddConstraint", "tablesession.table_session_table_by_status"),
+    ("tax", "0004_root_natural_key", "AddConstraint", "taxrule.tax_rule_root_natural_key"),
+    (
+        "whatsapp_inbox",
+        "0003_templates_made_in_the_hub",
+        "AddConstraint",
+        "template.whatsapp_inbox_template_live_name_language_unique",
+    ),
+    (
+        "whatsapp_inbox",
+        "0003_templates_made_in_the_hub",
+        "AddConstraint",
+        "template.whatsapp_inbox_template_submit_key_unique",
+    ),
+    ("whatsapp_inbox", "0005_channel_per_business", "AddConstraint", "channel.whatsapp_inbox_channel_one_per_host"),
+    (
+        "whatsapp_inbox",
+        "0006_templates_per_business",
+        "AddConstraint",
+        "template.whatsapp_inbox_template_live_host_name_language_unique",
+    ),
 }
 
 ADD_NOT_NULL = (
@@ -118,6 +154,11 @@ SET_NOT_NULL = (
 NARROW = (
     "{before} → {after}: the code of before still writes what fits {before}. Narrow it in a later deploy, once no "
     "code writes values out of it, listed in ACCEPTED with that reason"
+)
+CONSTRAIN = (
+    "a new constraint on a table the code of before writes: its INSERT or UPDATE that breaks it is refused (NOT "
+    "VALID or a unique index made CONCURRENTLY only spare the lock). Stop writing such rows in one deploy and add "
+    "the constraint in a later one, listed in ACCEPTED with that reason"
 )
 # Changes of the column type that take every value of the old one.
 WIDER = {("smallint", "integer"), ("smallint", "bigint"), ("integer", "bigint")}
@@ -219,9 +260,15 @@ def _why(app_label: str, operation, state) -> tuple[str, str] | None:
         if _table(app_label, model_state) != (operation.table or f"{app_label}_{operation.name_lower}"):
             return operation.name_lower, RENAME
     elif isinstance(operation, migrations.AlterField):
-        old = state.models[app_label, operation.model_name_lower].fields[operation.name]
-        if why := _narrowing(old, operation.field):
+        old, new = state.models[app_label, operation.model_name_lower].fields[operation.name], operation.field
+        if why := _narrowing(old, new) or (CONSTRAIN if new.unique and not old.unique else None):
             return f"{operation.model_name_lower}.{operation.name}", why
+    elif isinstance(operation, migrations.AddConstraint):
+        return f"{operation.model_name_lower}.{operation.constraint.name}", CONSTRAIN
+    elif isinstance(operation, migrations.AlterUniqueTogether):
+        old = state.models[app_label, operation.name_lower].options.get("unique_together", ())
+        if set(operation.unique_together) - set(normalize_together(old)):
+            return f"{operation.name_lower}.unique_together", CONSTRAIN
     return None
 
 
@@ -295,7 +342,9 @@ def _state() -> ProjectState:
                 ("units", models.SmallIntegerField(default=0)),
                 ("title", models.CharField(max_length=20, db_column="heading")),
                 ("brand", models.ForeignKey("shop.Brand", on_delete=models.CASCADE, null=True)),
+                ("code", models.CharField(max_length=20, unique=True)),
             ],
+            options={"unique_together": {("name", "brand")}},
         )
     )
     return state
@@ -438,3 +487,68 @@ def test_an_operation_on_a_table_created_by_the_same_migration_keeps_it_working(
     rename = migrations.RenameField(model_name="item", old_name="id", new_name="key")
 
     assert _keys(create, rename) == []
+
+
+def _constrain(constraint, operation=migrations.AddConstraint):
+    return operation(model_name="product", constraint=constraint)
+
+
+UNITS_POSITIVE = models.CheckConstraint(condition=models.Q(units__gte=0), name="shop_product_units_positive")
+
+
+@pytest.mark.parametrize(
+    "operation, key",
+    [
+        (
+            _constrain(models.UniqueConstraint(fields=["name"], name="shop_product_name_unique")),
+            ("AddConstraint", "product.shop_product_name_unique"),
+        ),
+        (_constrain(UNITS_POSITIVE), ("AddConstraint", "product.shop_product_units_positive")),
+        (
+            _constrain(UNITS_POSITIVE, AddConstraintNotValid),
+            ("AddConstraintNotValid", "product.shop_product_units_positive"),
+        ),
+        (
+            migrations.AlterUniqueTogether(name="product", unique_together={("name", "brand"), ("name", "note")}),
+            ("AlterUniqueTogether", "product.unique_together"),
+        ),
+        (_alter("name", models.CharField(max_length=20, unique=True)), ("AlterField", "product.name")),
+    ],
+    ids=["unique", "check", "check-not-valid", "unique-together", "field-unique"],
+)
+def test_a_new_constraint_on_a_table_the_code_of_before_writes_breaks_it(operation, key):
+    assert _keys(operation) == [("shop", "0002_change", *key)]
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        migrations.AlterUniqueTogether(name="product", unique_together={("name", "brand")}),
+        migrations.AlterUniqueTogether(name="product", unique_together=set()),
+        _alter("code", models.CharField(max_length=40, unique=True)),
+        _alter("code", models.CharField(max_length=20)),
+        ValidateConstraint(model_name="product", name="shop_product_units_positive"),
+        migrations.AddIndex(model_name="product", index=models.Index(fields=["name"], name="shop_product_name_idx")),
+    ],
+    ids=[
+        "same-unique-together",
+        "unique-together-dropped",
+        "already-unique",
+        "unique-dropped",
+        "validate",
+        "plain-index",
+    ],
+)
+def test_a_constraint_kept_or_loosened_keeps_it_working(operation):
+    assert _keys(operation) == []
+
+
+def test_a_constraint_on_a_table_created_by_the_same_migration_keeps_it_working():
+    create = migrations.CreateModel(
+        name="Item", fields=[("id", models.UUIDField(primary_key=True)), ("name", models.CharField(max_length=20))]
+    )
+    unique = migrations.AddConstraint(
+        model_name="item", constraint=models.UniqueConstraint(fields=["name"], name="shop_item_name_unique")
+    )
+
+    assert _keys(create, unique) == []
