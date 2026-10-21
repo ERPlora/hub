@@ -12,6 +12,7 @@ import uuid
 import httpx
 import pytest
 import respx
+from django.utils.translation import override
 from live.errors import Conflict
 
 from apps.whatsapp_inbox.models import Channel, Conversation, Message
@@ -65,6 +66,37 @@ def test_a_send_is_refused_and_nothing_reaches_erplora():
     assert excinfo.value.code == "whatsapp_inbox.cap_reached"
     assert route.call_count == 0
     assert not Message.objects.filter(direction=Message.Direction.OUTBOUND).exists()
+
+
+def refusal(language: str = "en") -> Conflict:
+    """What «Send» (the API, the assistant) answers in this conversation, in the request's ``language``."""
+    with override(language), pytest.raises(Conflict) as excinfo:
+        run(
+            "whatsapp_inbox.message.send",
+            {"id": str(conversation().id), "text": "Hola", "client_message_id": str(uuid.uuid7())},
+        )
+    return excinfo.value
+
+
+def test_the_refusal_says_the_plan_includes_none_never_until_next_month():
+    connect(**NONE)
+    receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=10)).isoformat())
+    # The published code stays: erplora.com refuses a plan without messages with its own cap_reached too.
+    english, spanish = refusal("en"), refusal("es")
+    assert (english.code, spanish.code) == ("whatsapp_inbox.cap_reached", "whatsapp_inbox.cap_reached")
+    assert "does not include WhatsApp messages" in str(english)
+    assert "next month" not in str(english)
+    assert "no incluye mensajes de WhatsApp" in str(spanish)
+    assert "mes que viene" not in str(spanish)
+
+
+def test_a_spent_month_still_says_until_next_month():
+    connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=10)).isoformat())
+    spent = refusal()
+    assert spent.code == "whatsapp_inbox.cap_reached"
+    assert "next month" in str(spent)
+    assert "does not include" not in str(spent)
 
 
 def test_what_customers_write_still_arrives():
