@@ -30,6 +30,13 @@ const mode = ref<'reply' | 'note'>('reply');
 const text = ref('');
 const noteText = ref('');
 const choosing = ref(false);
+/** «Send a template» (and its live list of templates) exists from the first «Template» on: opening a
+ *  conversation never reopens the tab's stream a second time just for it. */
+const templatesUsed = ref(false);
+function chooseTemplate(): void {
+  templatesUsed.value = true;
+  choosing.value = true;
+}
 /** The key of the message being written: kept until the hub takes it (a failed send may still have
  *  reached it, so a retry — even with the text retouched — goes with the same key and is never sent
  *  twice); a new one once it was taken or for another conversation. */
@@ -178,7 +185,7 @@ watch(
           fill="outline"
           data-testid="whatsapp-inbox-composer-template"
           :disabled="!!blocked"
-          @click="choosing = true"
+          @click="chooseTemplate"
         >
           {{ $t('whatsapp_inbox.composer.template') }}
         </ion-button>
@@ -226,6 +233,7 @@ watch(
     </template>
 
     <TemplateSendModal
+      v-if="templatesUsed"
       v-model:open="choosing"
       :conversation-id="conversation.id"
     />
