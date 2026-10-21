@@ -1,7 +1,7 @@
 # Workbook — Suplementos (app)
 Prefijo: MODIFIER
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas); la hoja del TPV y la comanda las pintan Ventas y Cocina (MODIFIER-F06 a F08)
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `modifier`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -81,9 +81,10 @@ Configuración inicial, paso a paso:
 Menú **Suplementos** (una sola entrada). Arriba, el título «Suplementos». Debajo, la tabla de grupos
 con el buscador «Buscar…» (busca por nombre y por nombre de comanda): **Nombre** (se ordena y se
 filtra), **En la comanda** (el nombre de cocina; vacío, el comercial), **Elección** (se ordena por el
-mínimo), **Opciones** (cuántas tiene), **Se aplica a** (a cuántos productos y categorías) y **Orden**
-(se ordena). La columna Elección dice la regla: «Opcional» u «Obligatorio (mín. N)», con « · máx. N» si
-hay techo y « · se repite» si una opción puede repetirse. Por orden y nombre; páginas de 50.
+mínimo y se filtra por Obligatorio u Opcional), **Opciones** (cuántas tiene), **Se aplica a** (a
+cuántos productos y categorías) y **Orden**; las tres últimas también se ordenan. La columna Elección
+dice la regla: «Opcional» u «Obligatorio (mín. N)», con « · máx. N» si hay techo y « · se repite» si
+una opción puede repetirse. Por orden y nombre; páginas de 50.
 
 Quien puede gestionar ve **«Nuevo grupo»** y, en cada fila, **Editar** y **Borrar**. Tocar una fila abre
 la hoja del grupo, a todos.
@@ -106,7 +107,7 @@ De 20 en 20, con «Cargar más».
 - **Grupo** («Nuevo grupo» / «Editando grupo — {nombre}»): Nombre, «Nombre en la comanda», «Mínimo (1 o
   más = obligatorio)», «Máximo (0 = sin techo)», «Se puede repetir una opción» y Orden.
 - **Opción** («Nueva opción» / «Editando opción — {nombre}»): Nombre, «Nombre en la comanda»,
-  «Suplemento» (en euros; negativo descuenta; vacío o 0, gratis), «Categoría fiscal propia» (se busca;
+  «Suplemento (€)» (negativo descuenta; vacío o 0, gratis), «Categoría fiscal propia» (se busca;
   vacía = la del plato), Orden y «Elegida por defecto».
 - **Enganchar** («Aplicar «{grupo}» a…»): Producto o Categoría, y el buscador de cada uno.
 - **Borrar** grupo u opción y **Dejar de aplicar**: piden confirmación diciendo qué se va con ello.
@@ -146,7 +147,7 @@ Pasos:
 2. Lee la tabla: nombre, nombre de comanda, regla de elección, cuántas opciones, a cuántos productos y
    categorías se aplica y orden.
 3. Para encontrar uno, escribe en «Buscar…» (nombre o nombre de comanda), ordena por una columna o
-   filtra por nombre.
+   filtra por nombre o por si es obligatorio u opcional.
 Entra: los grupos del negocio.
 Sale: nada; solo lee.
 Si falla: el aviso de la tabla con «Reintentar»; sin grupos, «Todavía no hay grupos de suplementos.».
@@ -233,7 +234,7 @@ Entra: el grupo y el producto o la categoría, de Inventario (por su id, o por s
 Sale: el enganche (avisa: enganche hecho o soltado). En el TPV, el artículo pregunta sus grupos y los
 de **todas** sus categorías, cada grupo una sola vez.
 Si falla: un producto o una categoría que no existe o está borrado, «Este producto no existe en este
-hub.» o «Esta categoría no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.».
+hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.».
 Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
@@ -428,7 +429,8 @@ cajero del producto actual es un empleado.
   por unidad (`modifier.priced_by_measure`). Hasta 100 elecciones por llamada.
 - **`modifier.group.for_target` no pagina** a propósito: es la respuesta de un solo artículo, en una
   llamada (sin N+1 por grupo), acotada por las 100 opciones como mucho de cada grupo (409
-  `modifier.group_full`). El resto de listas pagina (hasta 100, desempate por `id`).
+  `modifier.group_full`). El resto de listas pagina (hasta 100); los empates de la columna se desempatan por
+  nombre e `id`, siempre en ascendente, también cuando la columna va en descendente (`_ordered`).
 - **Dinero**: céntimos enteros con signo, entre −99.999.999 y 99.999.999. Una opción con categoría
   fiscal propia tiene que valer más de cero (422 en `price_delta`): su línea propia no puede valer cero
   ni menos. Lo comprueba la operación antes y la base de datos después
@@ -450,8 +452,8 @@ cajero del producto actual es un empleado.
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
   ningún papel tiene), sin ruta, idempotentes.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
-  un grupo o una opción) y cada campo de `schemas.py` su `description`. `expose_api` en las consultas
-  que lee Ventas y en las listas.
+  un grupo o una opción) y cada campo de `schemas.py` su `description`. `expose_api` en las seis
+  consultas.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
