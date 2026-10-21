@@ -291,7 +291,8 @@ def relay_deliver_next(
     The claim is ``SKIP LOCKED``, as the scheduler's. ``deliver(app_label, event)`` runs in a savepoint, and the
     events it records (and keeps) are handed over in it, one level deeper: a reaction that raises has its writes
     undone and waits ``backoff(attempts)``; after ``max_attempts`` it is given up (``dead``). Either way it is
-    logged with the event, and the other deliveries go on.
+    logged with the event, and the other deliveries go on: a refusal of the business (an ``OperationError``) as a
+    warning with its code; anything else, and the delivery given up, as an error with its traceback.
     """
     with transaction.atomic():
         delivery = (
@@ -320,25 +321,34 @@ def relay_deliver_next(
         except Exception as error:
             delivered = False
             delivery.last_error = f"{type(error).__name__}: {error}"[:LAST_ERROR_MAX_LENGTH]
+            # A refusal of the business (an ``OperationError``: no issuer yet…) is expected and has its code; a
+            # traceback only for the unexpected, and for the delivery given up.
+            refused = isinstance(error, OperationError)
+            reason = error.code if refused else type(error).__name__
             if delivery.attempts >= max_attempts:
                 delivery.status = EventDelivery.Status.DEAD
                 logger.exception(
-                    "relay: %s gave up on %s (%s) after %d attempts; its writes were undone.",
+                    "relay: %s gave up on %s (%s) after %d attempts (%s); its writes were undone.",
                     delivery.app_label,
                     delivery.event.name,
                     delivery.event_id,
                     delivery.attempts,
+                    reason,
                 )
             else:
                 delivery.next_attempt_at = now + backoff(delivery.attempts)
-                logger.exception(
-                    "relay: %s failed on %s (%s), attempt %d of %d; its writes were undone and it tries again at %s.",
+                logger.log(
+                    logging.WARNING if refused else logging.ERROR,
+                    "relay: %s failed on %s (%s) with %s, attempt %d of %d; its writes were undone and it tries "
+                    "again at %s.",
                     delivery.app_label,
                     delivery.event.name,
                     delivery.event_id,
+                    reason,
                     delivery.attempts,
                     max_attempts,
                     delivery.next_attempt_at.isoformat(),
+                    exc_info=not refused,
                 )
         else:
             delivered = True

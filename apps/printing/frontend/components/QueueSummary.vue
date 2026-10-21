@@ -173,6 +173,8 @@ function alertText(u: UsageSummary): string {
 }
 .printing-summary__card {
   display: grid;
+  /* A card as tall as its row keeps its lines at the top instead of spreading them. */
+  align-content: start;
   gap: 4px;
   padding: 0.75rem 1rem;
   border: 1px solid var(--ion-color-step-150, var(--ion-border-color, #e5e7eb));
