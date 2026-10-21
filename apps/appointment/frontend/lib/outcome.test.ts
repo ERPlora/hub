@@ -1,6 +1,8 @@
-// What booking a series' dates tells the person (APPOINTMENT-F12, F13): «{booked} appointments booked ·
-// {skipped} could not be booked», each skipped date with its reason, the dates still to book from
-// `next_from`, or the series' next date beyond the window when there is nothing to book yet.
+// What booking a series' dates tells the person (APPOINTMENT-F12, F13): only what happened — how many were
+// booked and how many could not be (never «· 0 could not be booked»), or that there was nothing new because
+// the window was already booked (never «0 appointments booked · 0 could not be booked») —, each skipped date
+// with its reason, the dates still to book from `next_from`, or the series' next date beyond the window when
+// there is nothing to book yet.
 import { describe, expect, it } from 'vitest';
 
 import type { MaterializeOut, RecurringUpdatedOut } from '../operations';
@@ -25,9 +27,26 @@ describe('describeOutcome', () => {
       t,
       'en',
     );
-    expect(said.summary).toBe('appointment.series.outcome.booked{"booked":3,"skipped":1}');
+    expect(said.summary).toBe('appointment.series.outcome.booked{"booked":3} · appointment.series.outcome.notBooked{"skipped":1}');
     expect(said.skipped).toEqual(['Monday, October 26, 2026: Closed.']);
     expect(said.more).toBe('');
+  });
+
+  it('says only what happened: no «0 could not be booked», and nothing new when the window was booked', () => {
+    expect(describeOutcome(outcome({}), t, 'en').summary).toBe('appointment.series.outcome.booked{"booked":3}');
+    expect(
+      describeOutcome(
+        outcome({ booked: 0, skipped: [{ occurrence_date: '2026-10-26', code: 'outside_schedule', message: 'Closed.' }] }),
+        t,
+        'en',
+      ).summary,
+    ).toBe('appointment.series.outcome.notBooked{"skipped":1}');
+    expect(describeOutcome(outcome({ booked: 0, already_booked: 3 }), t, 'en').summary).toBe(
+      'appointment.series.outcome.alreadyBooked{"already":3}',
+    );
+    expect(describeOutcome(outcome({ booked: 0, upcoming_date: '2027-03-01' }), t, 'en').summary).toBe(
+      'appointment.series.outcome.none{}',
+    );
   });
 
   it('says what is left to book, or when the next date comes', () => {

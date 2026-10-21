@@ -331,6 +331,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
           />
           <ion-input
             data-testid="series-form-max_occurrences"
+            class="series-form__wide"
             type="number"
             inputmode="numeric"
             min="1"
@@ -357,6 +358,10 @@ const text = (value: unknown): string => (value === null || value === undefined 
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+/* Its label is the longest of the form: on a row of its own it is never cut. */
+.series-form__wide {
+  grid-column: 1 / -1;
 }
 .series-form__label {
   display: block;

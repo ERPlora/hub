@@ -9,7 +9,7 @@
 // (F12), booked again (F13), edited from an occurrence on (F14), paused, reactivated and deleted (F15); the
 // customer's card shows her visits (F20). Each size works on a day of its own; what it creates is «E2E Apf …»,
 // removed before and after, and the settings of Citas are put back at the end.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, ownerPage, pick, post, rowAction, settled } from './service-helpers';
@@ -151,6 +151,21 @@ async function chooseCustomer(page: Page, modal: string, who: Cast): Promise<voi
   await expect(search).toBeHidden();
 }
 
+/** Waits until the agenda's row of appointment `id` shows `status`: the live list has caught up with the change. */
+async function showsStatus(page: Page, id: string, status: string): Promise<void> {
+  await expect(shown(page).locator(`[data-testid=appointment-list-row][data-id="${id}"]`).first()).toContainText(status);
+}
+
+/** The fields of `form` whose label does not fit and is cut with «…» (none should be). */
+async function cutLabels(form: Locator): Promise<string[]> {
+  return form.locator('ion-input, ion-select, ion-textarea').evaluateAll((fields) =>
+    fields.flatMap((field) => {
+      const label = field.shadowRoot?.querySelector('.label-text') ?? field.querySelector('.label-text');
+      return label && label.scrollWidth > label.clientWidth + 1 ? [field.getAttribute('data-testid') ?? field.tagName] : [];
+    }),
+  );
+}
+
 /** The searched word of a name built by `named` («E2E Apf <word> …»). */
 const word = (name: string): string => name.split(' ')[2];
 
@@ -204,6 +219,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await dayInput.press('Tab');
       const free = form.locator('[data-testid=appointment-slots-time]', { hasText: /^10:00\s?AM$/ });
       await expect(free).toBeVisible();
+      expect(await cutLabels(form), `labels cut in the appointment form at ${vp.label}`).toEqual([]);
       await capture(page, 'APPOINTMENT-F02');
       await free.click();
       await form.locator('[data-testid=appointment-form-submit]').click();
@@ -249,14 +265,17 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(view.locator('[data-testid=appointment-toolbar-to-confirm]')).toContainText('to confirm');
       await rowAction(page, 'appointment-list', online.id, 'confirm');
       await expect.poll(() => statusOf(online.id)).toBe('confirmed');
+      await showsStatus(page, online.id, 'Confirmed');
       await capture(page, 'APPOINTMENT-F03');
 
       // APPOINTMENT-F07, F08: the first one starts and is completed.
       await rowAction(page, 'appointment-list', first.id, 'start');
       await expect.poll(() => statusOf(first.id)).toBe('in_progress');
+      await showsStatus(page, first.id, 'In progress');
       await capture(page, 'APPOINTMENT-F07');
       await rowAction(page, 'appointment-list', first.id, 'complete');
       await expect.poll(() => statusOf(first.id)).toBe('completed');
+      await showsStatus(page, first.id, 'Completed');
       await capture(page, 'APPOINTMENT-F08');
 
       // APPOINTMENT-F05, F11: a third one is cancelled with its reason, then deleted (asked first).
@@ -290,6 +309,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await goToDay(page, PAST);
       await rowAction(page, 'appointment-list', past.id, 'no_show');
       await expect.poll(() => statusOf(past.id)).toBe('no_show');
+      await showsStatus(page, past.id, 'No-show');
       await capture(page, 'APPOINTMENT-F09');
     } finally {
       await context.close();
@@ -347,6 +367,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await form.locator('[data-testid=series-form-start_date] input').fill(SERIES_DAY);
       await form.locator('[data-testid=series-form-time] input').fill('16:00');
       await form.locator('[data-testid=series-form-max_occurrences] input').fill('3');
+      expect(await cutLabels(form), `labels cut in the series form at ${vp.label}`).toEqual([]);
       await capture(page, 'APPOINTMENT-F12');
       await form.locator('[data-testid=series-form-submit]').click();
       await expect(form).toBeHidden();
@@ -362,7 +383,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // APPOINTMENT-F13: «Book appointments» books what the window still has (nothing twice).
       const before = booked();
       await rowAction(page, 'appointment-series', series, 'materialize');
-      await expect(outcome).toContainText('appointments booked');
+      await expect(outcome).toContainText('Nothing new to book');
+      await expect(outcome).not.toContainText('could not be booked');
       await capture(page, 'APPOINTMENT-F13');
       expect(booked()).toBe(before);
 
@@ -373,6 +395,9 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await form.locator('[data-testid=series-form-from_date] input').fill(SERIES_DAY);
       await form.locator('[data-testid=series-form-time] input').fill('17:00');
       await expect(form.locator('[data-testid=series-form-scope]')).toContainText('booked appointments');
+      // appointments#293: only what happens; nothing is charged here, so no «0 already charged».
+      await expect(form.locator('[data-testid=series-form-scope]')).not.toContainText('already charged');
+      expect(await cutLabels(form), `labels cut in the series form at ${vp.label}`).toEqual([]);
       await capture(page, 'APPOINTMENT-F14');
       await form.locator('[data-testid=series-form-submit]').click();
       await expect(form).toBeHidden();
@@ -400,6 +425,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await page.goto(`${A}/customer/customers/${who.customer.id}`);
       await expect(shown(page).locator('[data-testid=appointment-visits]')).toContainText('Visit history');
       await expect(shown(page).locator('[data-testid=appointment-visit]').first()).toBeVisible();
+      // On a phone the block sits below the card's fold: bring it into view for the capture.
+      await shown(page).locator('[data-testid=appointment-visits]').scrollIntoViewIfNeeded();
       await capture(page, 'APPOINTMENT-F20');
     } finally {
       await context.close();
