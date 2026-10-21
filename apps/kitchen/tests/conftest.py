@@ -235,3 +235,40 @@ def fired_round(
 
 def now() -> dt.datetime:
     return timezone.now()
+
+
+# ── The worker's relay, as production runs it ────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def relay(monkeypatch, db):
+    """One tick of the worker's real loop (``base.worker.run``): the outbox relay hands each new event to
+    the reactions of the apps (``events.py``), as production does. Without the SaaS (``register_apps``)
+    and, inside the test's transaction, without releasing the connections (that would close its own)."""
+    import threading
+
+    from django.db.backends.base.base import BaseDatabaseWrapper
+
+    from base import catalog, worker
+    from base.catalog import RegisterResult
+
+    monkeypatch.setattr(
+        catalog,
+        "register_apps",
+        lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True),
+    )
+    monkeypatch.setattr(
+        BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None
+    )
+
+    def tick() -> None:
+        stop = threading.Event()
+
+        def wait(seconds: float) -> bool:
+            stop.set()
+            return True
+
+        moment = timezone.now()
+        assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: moment) == 0
+
+    return tick

@@ -414,6 +414,24 @@ def test_firing_sends_the_pending_lines_as_a_round(coffee, steak):
     assert second.round_no == 2 and second.lines_count == 1
 
 
+def test_a_round_says_who_sends_it_by_the_name_a_person_reads(steak, django_user_model):
+    """«Quién atiende» in ``sale.order.fired`` is a person (KITCHEN-F05, F08): their name, else their e-mail;
+    their username (the id of the session) only as the last resort."""
+    people = [
+        django_user_model.objects.create_user("saas:42", email="ana@example.com", first_name="Ana", last_name="García"),
+        django_user_model.objects.create_user("saas:43", email="luis@example.com"),
+        django_user_model.objects.create_user("saas:44"),
+    ]
+    sent = []
+    for person in people:
+        order = open_order({"product": "STK"})
+        OutboxEvent.objects.all().delete()
+        run("sale.order.fire", {"order_id": str(order.id)}, ctx_for(actor=person))
+        ((_, payload), _changed) = events()
+        sent.append(payload["waiter"])
+    assert sent == ["Ana García", "luis@example.com", "saas:44"]
+
+
 def test_a_line_sent_to_the_kitchen_is_not_changed_nor_removed_but_voided(
     steak, coffee
 ):
