@@ -3,8 +3,8 @@
 // as the owner and against the real Tasks app, with one screenshot per flow and size
 // (`APP-FLOW-1-<flow>-<width>`). The guide (F08) and a link to a card (F05, an unknown one opens nothing)
 // come first; a card of the gallery is used (F04), back by the same link lands on it again, and it is
-// allowed and withdrawn (F12). One automation is built from scratch (F09): «Something happens» says it does
-// not start on its own yet and finds an event by its technical name, then a weekly schedule keeps its day
+// allowed and withdrawn (F12). One automation is built from scratch (F09): «Something happens» (which the
+// worker's relay starts on its own, F21) finds an event by its technical name, then a weekly schedule keeps its day
 // when the time changes (F10); a task, a condition that compares two data and a wait that is removed (F11);
 // tried (F13), allowed, turned on and saved (F14), run by hand (F15) and read in its history (F16). The
 // list searches, filters, sorts, switches by its named switch and in bulk (F02, F03), copies and deletes
@@ -88,7 +88,9 @@ for (const viewport of VIEWPORTS) {
       for (const part of ['what', 'first', 'permissions', 'worked', 'limits']) {
         await expect(shown(page).locator(`[data-testid=flow-guide-section-${part}]`)).toBeVisible();
       }
-      await expect(shown(page).locator('[data-testid=flow-guide-section-limits]')).toContainText('Starting on its own when something happens');
+      // What it already does (starting on its own when something happens, FLOW-F21) is no limit any more.
+      await expect(shown(page).locator('[data-testid=flow-guide-section-limits]')).toContainText('Sending messages or asking the assistant');
+      await expect(shown(page).locator('[data-testid=flow-guide-section-limits]')).not.toContainText('Starting on its own');
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F08');
       await shown(page).locator('[data-testid=flow-guide-back]').click();
@@ -137,7 +139,7 @@ for (const viewport of VIEWPORTS) {
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F12');
 
-      // FLOW-F09, F10: from scratch. «Something happens» says it does not start on its own yet, and finds an
+      // FLOW-F09, F10: from scratch. «Something happens» (no «not on its own yet» notice: FLOW-F21) finds an
       // event by its technical name (flows#50); a weekly schedule keeps its day when the time changes
       // (flows#77).
       await page.goto(`${A}/flow/automations/new`);
@@ -147,7 +149,7 @@ for (const viewport of VIEWPORTS) {
       await editor.locator('[data-testid=flow-editor-name] input').fill(name);
       await editor.locator('[data-testid=flow-trigger-open]').click();
       await choose(page, 'flow-trigger-kind', 'Something happens');
-      await expect(editor.locator('[data-testid=flow-trigger-event-notice]')).toContainText('For now it does not start on its own');
+      await expect(editor.locator('[data-testid=flow-trigger-event-notice]')).toHaveCount(0);
       const eventInput = editor.locator('[data-testid=flow-trigger-event] input');
       await eventInput.click();
       await eventInput.fill('task.task.completed');

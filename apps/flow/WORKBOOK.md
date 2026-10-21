@@ -1,7 +1,7 @@
 # Workbook — Automatizaciones (app)
 Prefijo: FLOW
 Alcance MVP: transversal (peluquería y restaurante: reglas «cuando pase esto, haz aquello»)
-Estado de la app: hecha (servidor, motor y páginas); el relay del outbox que entrega los avisos llega en la fase 2
+Estado de la app: hecha (servidor, motor y páginas); los pasos de enviar un mensaje y de pedírselo al asistente esperan a que existan (FLOW-F31, F37 a F39)
 
 > Manual de usuario y especificación de la app `flow`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -23,9 +23,8 @@ Una automatización es **una columna**: arriba, **cuándo arranca** (algo que pa
 horario, una fecha o solo a mano); debajo, sus **pasos**, que se hacen en orden: **Hacer algo** (una
 acción de otra app, por ejemplo crear una tarea), **Consultar algo** (leer un dato de otra app),
 **Solo sigue si…** (una condición: si no se cumple, la automatización termina ahí sin error) y
-**Esperar** (minutos, horas o días). Hoy arrancan solas las de horario y las de fecha; las que arrancan
-cuando pasa algo en el negocio se ejecutan con **Ejecutar ahora** hasta que les llegue el aviso
-(FLOW-F21).
+**Esperar** (minutos, horas o días). Arrancan solas cuando pasa lo que esperan en el negocio, a su hora o
+en su fecha (FLOW-F21, F22), y también con **Ejecutar ahora**.
 
 Solo la usan el **propietario** y el **administrador**: una automatización actúa en nombre del negocio
 sin nadie delante. El responsable y el empleado no la ven.
@@ -345,8 +344,9 @@ Actor: propietario, administrador
 Pantalla: Guía
 Pasos:
 1. En la galería, pulsa **¿Cómo funciona esto?**.
-2. Lee los cinco apartados. «Lo que todavía no puede hacer» empieza por «Arrancar sola cuando pasa algo
-   en el negocio»: por ahora una automatización de «Pasa algo» solo se ejecuta con **Ejecutar ahora**.
+2. Lee los cinco apartados. «Lo que todavía no puede hacer» dice lo que de verdad falta: bifurcaciones,
+   contar hacia atrás desde una fecha del aviso, enviar mensajes o pedírselo al asistente, y que el asistente
+   solo escribe borradores.
 3. **Volver a las automatizaciones** regresa.
 Entra: nada; los textos van dentro de la app.
 Sale: nada guardado.
@@ -383,8 +383,7 @@ Pasos:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…) y con
      buscador. Debajo, **Solo cuando…**: condiciones sobre los datos del aviso («el total es mayor que
-     10000»); sin ellas arranca con cada aviso. Avisa: «Por ahora no arranca sola cuando pasa esto:
-     ejecútala con «Ejecutar ahora». Un horario o una fecha sí arrancan solos.» (FLOW-F21).
+     10000»); sin ellas arranca con cada aviso, sola (FLOW-F21).
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
      en abril) se salta ese mes.
@@ -608,10 +607,7 @@ Implicados: FLOW-F05
 
 ### FLOW-F21 Cuando pasa algo en el negocio, la automatización arranca
 <!-- origen: old-hub:HUB-F110 old-hub:HUB-F82 -->
-Estado: parcial — el motor está hecho y probado con avisos reales de Clientes, Ventas y Tareas, pero
-el aviso de otra app le llega con el relay del outbox, que es de la plataforma (fase 2). Hasta
-entonces una automatización que arranca con «Pasa algo» no se dispara sola en el negocio: se puede
-ejecutar a mano (FLOW-F15) o montar con un horario (FLOW-F22).
+Estado: hecho
 Actor: la plataforma
 Pantalla: ninguna (se ve en Historial)
 Pasos:
@@ -621,9 +617,11 @@ Pasos:
 3. Si su «Solo cuando…» ya no se puede leer (porque se escribió a mano en la administración o con una
    versión anterior), no se queda callada: empieza una ejecución que se para con «Ya no se puede leer
    su «Solo cuando…»…», visible en Historial, y las demás automatizaciones de ese aviso siguen.
-Entra: el aviso de otra app, con sus datos (ids, importes y estados; nunca nombres ni textos).
-Sale: una ejecución (`flow.run.started`, `flow.run.finished` o `flow.run.parked` si espera). Un mismo
-aviso entregado dos veces arranca **una sola** ejecución por automatización.
+Entra: el aviso de otra app, con sus datos (ids, importes y estados; nunca nombres ni textos), que la
+plataforma le entrega a los pocos segundos de pasar, fuera de la petición que lo dejó. Una automatización en
+pausa no recibe lo que pasó mientras lo estaba.
+Sale: una ejecución (`flow.run.started`, `flow.run.finished` o `flow.run.parked` si espera), en el negocio
+donde pasó el aviso. Un mismo aviso entregado dos veces arranca **una sola** ejecución por automatización.
 Si falla: cada paso que falla para la ejecución con su motivo, visible en Historial; los pasos
 anteriores se quedan hechos. Una automatización que se dispararía a sí misma en cadena se para (ver
 «Para quien lo mantiene»). Un «Solo sigue si…» que ya no se puede leer para la ejecución con «Ya no se
@@ -1163,8 +1161,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   fallida con `flow.loop_stopped`, visible en Historial. **Límite**: la cadena solo sigue los avisos que
   graba el propio paso; si el aviso pasa antes por la reacción de otra app (que corre como el sistema),
   los avisos de esa reacción llevan `system` y la cadena empieza de nuevo. Heredarla pide que el relay del
-  outbox (fase 2, en `base/`) ejecute cada reacción con el actor del aviso que entrega; no se hace desde
-  esta app ni tocando `packages/`.
+  outbox (`base/relay.py`, de la plataforma) ejecute la reacción de cada app con el actor del aviso que entrega
+  (hoy solo se lo pasa a esta app); no se hace desde esta app ni tocando `packages/`.
 - **Lo que leyeron los pasos** (`outputs`: la ficha de un cliente…) solo se guarda mientras la ejecución
   puede seguir: esperando, o parada por un error durante `RESUME_DAYS` (7) para reanudarla (FLOW-F24);
   al terminar bien, por una condición o cancelada se vacía, y la poda de cada hora vacía la de un fallo de
@@ -1215,9 +1213,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Horarios**: `python-dateutil` (`rrule`, ya dependencia del Hub), en la zona del negocio; `fire_due`
   barre con `SKIP LOCKED`, arranca una vez aunque se hayan perdido varias horas y avanza
   `next_fire_at` desde ahora en la misma transacción.
-- **Reintentos**: declarados y no ejecutados en la fase 1. Una ejecución fallida no se reintenta sola;
-  el relay del outbox (fase 2) reintentará la **entrega** de un aviso cuya reacción no llegó a
-  confirmarse, y la idempotencia por `trigger_key` hace que un reintento no ejecute dos veces.
+- **Reintentos**: una ejecución fallida no se reintenta sola (se reanuda a mano, FLOW-F24); el relay del
+  outbox reintenta la **entrega** de un aviso cuya reacción falló (2, 4, 8… s, hasta 8 intentos) y la
+  idempotencia por `trigger_key` hace que un reintento no ejecute dos veces. FLOW-F21 se prueba por el relay
+  real (`tests/test_relay.py`: una pasada del worker entrega el aviso de Clientes, la segunda no repite nada, y
+  un aviso del negocio B arranca su ejecución en B y solo B lo oye).
 - **Fase 1**: el worker (`run_worker`) corre cada minuto las dos tareas programadas (`fire_due`,
   `resume_due`) como el sistema, en un único ámbito fijo (`WORKER_SCOPE_SLUG`); como en la fase 1 todos
   los hubs comparten tablas, ve todas las automatizaciones (FLOW-F22 y F23, probado pasando por
@@ -1383,5 +1383,5 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
   (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
-  conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide
-  reaccionar al aviso del borrado, que llega con el relay del outbox (fase 2).
+  conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide que esta app
+  reaccione también al aviso del borrado de un cliente, que hoy solo la arranca como a cualquier otro aviso.
