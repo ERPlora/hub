@@ -14,6 +14,7 @@ const usage = (name: UsageSummary['usage'], more: Partial<UsageSummary> = {}): U
   usage: name,
   printers: 0,
   default_printer: null,
+  prints_on: null,
   pending: 0,
   oldest_pending_at: null,
   sent: 0,
@@ -48,7 +49,7 @@ describe('QueueSummary', () => {
     await s.result(
       OP,
       summary(
-        usage('receipt', { printers: 1, default_printer: 'Till', pending: 2, oldest_pending_at: ago(3) }),
+        usage('receipt', { printers: 1, default_printer: 'Till', prints_on: 'Till', pending: 2, oldest_pending_at: ago(3) }),
         usage('kitchen', { printers: 1, failed: 1 }),
         usage('label', { pending: 1, oldest_pending_at: ago(0) }),
       ),
@@ -62,6 +63,13 @@ describe('QueueSummary', () => {
     expect(words(s.find('printing-summary-card-kitchen').element)).toBe('Kitchen With errors Nothing waiting Failed: 1');
     expect(words(s.find('printing-summary-card-label').element)).toContain('Waiting, no printer');
     expect(s.find('printing-summary-all-clear').exists()).toBe(false);
+  });
+
+  it('names the printer each role prints on even when none was chosen (hub#1527)', async () => {
+    const s = await setup('es');
+    await s.result(OP, summary(usage('receipt', { printers: 2, prints_on: 'Caja' }), usage('kitchen', { printers: 1, prints_on: 'Plancha', default_printer: 'Plancha' })));
+    expect(words(s.find('printing-summary-card-receipt').element)).toBe('Recibo Listo Nada en cola Imprime en: Caja.');
+    expect(words(s.find('printing-summary-card-kitchen').element)).toBe('Cocina Listo Nada en cola Imprime en: Plancha.');
   });
 
   it('warns when a role without printer has waited over a minute', async () => {

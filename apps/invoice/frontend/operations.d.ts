@@ -160,6 +160,13 @@ export interface DocumentOut {
   html: string;
 }
 
+/** The A4 page asked of Printing: queued for the system printer, or not (the device prints the screen's paper). */
+export interface PaperOut {
+  queued: boolean;
+  job_id: string | null;
+  printer: string | null;
+}
+
 /** What a line of a manual invoice starts with when its rate is typed (INVOICE-F03, TAX-F11). */
 export type LineDefaultsIn = Record<string, never>;
 
@@ -380,6 +387,7 @@ declare module '@erplora/ui/sdk' {
     'invoice.invoice.get': { input: InvoiceGetIn; output: InvoiceOut };
     'invoice.invoice.by_source': { input: BySourceIn; output: BySourceOut };
     'invoice.invoice.document': { input: DocumentIn; output: DocumentOut };
+    'invoice.invoice.print': { input: DocumentIn; output: PaperOut };
     'invoice.invoice.line_defaults': { input: LineDefaultsIn; output: LineDefaultsOut };
     'invoice.invoice.create': { input: InvoiceCreateIn; output: InvoiceOut };
     'invoice.invoice.create_from_sale': { input: FromSaleIn; output: IssueOut };

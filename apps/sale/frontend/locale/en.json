@@ -359,6 +359,7 @@
       "print": "Print",
       "printFailed": "Could not print",
       "defaultBusiness": "My business",
+      "queued": "Sent to {printer}.",
       "receipt": "Receipt",
       "invoice": "Invoice",
       "number": "No.",

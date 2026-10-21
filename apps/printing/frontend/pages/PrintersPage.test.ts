@@ -3,15 +3,17 @@
 // Status (with the last error) and Active —, with «Add printer», «Edit», «Test» and «Deactivate»/«Activate»
 // by permission. «Test» queues the test page and says so; a refusal is said in the server's words.
 import { DataTable, type DataTableAction, type DataTableColumn } from '@erplora/ui/components';
-import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
+import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
+import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
 import type { PrinterOut } from '../operations';
 import PrintersPage from './PrintersPage.vue';
+import en from '../locale/en.json';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -147,6 +149,44 @@ describe('PrintersPage', () => {
   });
 });
 
+describe('PrintersPage: search printers (PRINTING-F02)', () => {
+  const FOUND = { name: 'MTP-II', kind: 'bluetooth', address: 'AA:BB:CC:DD:EE:FF', port: null, paper_width: 58 } as const;
+
+  it('whoever sets printers up searches; the employee does not', async () => {
+    const s = await setup();
+    await s.result(LIST, PAGE);
+    expect(s.find('printing-printers-discover').text()).toBe('Search printers');
+    expect(s.wrapper.findComponent(DiscoverPrintersModal).exists()).toBe(true);
+    const manager = await setup({ session: MANAGER });
+    expect(manager.find('printing-printers-discover').exists()).toBe(true);
+    const employee = await setup({ session: EMPLOYEE });
+    expect(employee.find('printing-printers-discover').exists()).toBe(false);
+    expect(employee.wrapper.findComponent(DiscoverPrintersModal).exists()).toBe(false);
+  });
+
+  it('searches knowing the printers already added, and a printer found opens «New printer» filled in', async () => {
+    const s = await setup();
+    await s.result(LIST, PAGE);
+    await s.find('printing-printers-discover').trigger('click');
+    const discover = () => s.wrapper.findComponent(DiscoverPrintersModal);
+    expect(discover().props()).toMatchObject({ open: true, known: [KITCHEN.target, OFFICE.target, TILL.target] });
+    discover().vm.$emit('add', FOUND);
+    await flush();
+    expect(discover().props('open')).toBe(false);
+    expect(s.wrapper.findComponent(PrinterModal).props()).toMatchObject({ open: true, printer: null, draft: FOUND });
+  });
+
+  it('«Add by its address» opens an empty «New printer»', async () => {
+    const s = await setup();
+    await s.result(LIST, PAGE);
+    await s.find('printing-printers-discover').trigger('click');
+    s.wrapper.findComponent(DiscoverPrintersModal).vm.$emit('manual');
+    await flush();
+    expect(s.wrapper.findComponent(DiscoverPrintersModal).props('open')).toBe(false);
+    expect(s.wrapper.findComponent(PrinterModal).props()).toMatchObject({ open: true, printer: null, draft: null });
+  });
+});
+
 describe('PrintersPage by the clock', () => {
   afterEach(() => vi.useRealTimers());
 
@@ -166,5 +206,22 @@ describe('PrintersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('the note says what is true where it is read (printing#37)', () => {
+  afterEach(() => applySurface('web'));
+
+  it('a browser is told it cannot reach printers; inside the app nobody is told about a browser', async () => {
+    const web = await setup();
+    expect(web.find('printing-printers-app-note').text()).toBe(en.printing.printers.appNote);
+    for (const surface of ['desktop', 'mobile'] as const) {
+      applySurface(surface);
+      const app = await setup();
+      expect(app.find('printing-printers-app-note').text()).toBe(en.printing.printers.appNoteInApp);
+    }
+    // The account the app opens in the system browser is a browser: it cannot reach printers either.
+    applySurface('account');
+    expect((await setup()).find('printing-printers-app-note').text()).toBe(en.printing.printers.appNote);
   });
 });

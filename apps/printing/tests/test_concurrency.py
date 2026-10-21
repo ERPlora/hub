@@ -44,11 +44,35 @@ def at_once(*calls):
     return results
 
 
-def test_two_devices_at_once_take_two_different_jobs():
+def test_two_devices_at_once_take_two_different_jobs(monkeypatch):
+    """hub#2029: two tills that reach the kitchen's printer never print the same order twice. The race is made
+    certain, not left to the threads' timing: device A has read its job and holds it when device B asks."""
     till = printer("Till")
     enqueue(source_ref="T-1")
     enqueue(source_ref="T-2")
-    claim = lambda device: lambda: run("printing.job.claim", {"printers": [str(till.id)], "device": device}).job  # noqa: E731
+    a_read, b_done = threading.Event(), threading.Event()
+    save = PrintJob.save
+
+    def held(job, *args, **kwargs):
+        if job.device == "A":
+            a_read.set()
+            b_done.wait(10)
+        return save(job, *args, **kwargs)
+
+    monkeypatch.setattr(PrintJob, "save", held)
+
+    def claim(device):
+        def call():
+            if device == "B":
+                a_read.wait(10)
+            try:
+                return run("printing.job.claim", {"printers": [str(till.id)], "device": device}).job
+            finally:
+                if device == "B":
+                    b_done.set()
+
+        return call
+
     first, second = at_once(claim("A"), claim("B"))
     assert first is not None and second is not None, (first, second)
     assert first.id != second.id

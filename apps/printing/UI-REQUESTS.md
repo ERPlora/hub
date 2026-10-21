@@ -15,11 +15,16 @@ de `frontend/pages/PrintersPage.vue`, `frontend/components/SettingsCard.vue`, su
 
 ## Puente con la app nativa (bloque 6)
 
-- **Qué**: el puente JavaScript de la app Tauri en `packages/ui` (`device.ts`, `bridge-transport.ts`,
-  `print*.ts`): buscar impresoras (`erplora_discover_printers`), añadir por IP (`erplora_add_network_printer`)
-  y el cliente de `/ws/print` que recoge y confirma los trabajos (`printing.job.claim`, `complete`, `fail`).
-- **Uso**: PRINTING-F02 (buscar sin escribir la dirección) y PRINTING-F18 (sacar el papel). El contrato está
-  en `WORKBOOK.md` «Contrato con la plataforma».
+- **Hecho aquí**: buscar impresoras (PRINTING-F02) llama a `erplora_discover_printers` con el puente global
+  de Tauri desde `frontend/lib/discovery.ts`; la impresora encontrada se da de alta en el servidor
+  (`printing.printer.create`), no con `erplora_add_network_printer`. Si el puente de `packages/ui` llega,
+  `discovery.ts` pasa a usarlo sin cambiar lo que ve la persona.
+- **Qué falta**: el cliente de `/ws/print` en `packages/ui` (`device.ts`, `bridge-transport.ts`, `print*.ts`)
+  que recoge y confirma los trabajos (`printing.job.claim`, `complete`, `fail`) y se los pasa a
+  `erplora_print`; y la entrada de las apps por erplora.com que vincula la app al negocio (sin ella, la
+  búsqueda contesta `not_the_linked_hub` y la ventana lo dice).
+- **Uso**: PRINTING-F02 y PRINTING-F18 (sacar el papel). El contrato está en `WORKBOOK.md` «Contrato con la
+  plataforma».
 
 ## App nativa (`app/`, otro carril)
 
@@ -28,4 +33,5 @@ de `frontend/pages/PrintersPage.vue`, `frontend/components/SettingsCard.vue`, su
   tome (o un `columns` en `data`: 32 en 58 mm, 48 en 80 mm) para que una impresora de 80 mm use su ancho.
 - **Nombre del negocio en la hoja de prueba**: no hace falta cambio. `render_test_page` ya pinta
   `business_name` cuando viene en `data` (si no, «ERPlora»); Impresión lo manda desde Facturación
-  (`invoice.issuer.get`). Solo comprobarlo en el bloque 6 con papel real.
+  (`invoice.issuer.get`; la hoja A4 de la impresora del equipo la firma el servidor, con su test). Solo
+  comprobarlo en el bloque 6 con papel real.

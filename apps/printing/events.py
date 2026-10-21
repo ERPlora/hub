@@ -22,6 +22,8 @@ JOB_PRINTED = "printing.job.printed"
 JOB_FAILED = "printing.job.failed"
 JOB_RETRIED = "printing.job.retried"
 JOB_CANCELLED = "printing.job.cancelled"
+#: The hourly prune forgot the jobs that ended over 30 days ago (PRINTING-F20); it carries how many.
+JOB_PRUNED = "printing.job.pruned"
 
 ALL = [
     SETTINGS_UPDATED,
@@ -33,9 +35,10 @@ ALL = [
     JOB_FAILED,
     JOB_RETRIED,
     JOB_CANCELLED,
+    JOB_PRUNED,
 ]
 #: Every change of the queue: what re-runs the screens that show it.
-JOB_EVENTS = [JOB_QUEUED, JOB_CLAIMED, JOB_PRINTED, JOB_FAILED, JOB_RETRIED, JOB_CANCELLED]
+JOB_EVENTS = [JOB_QUEUED, JOB_CLAIMED, JOB_PRINTED, JOB_FAILED, JOB_RETRIED, JOB_CANCELLED, JOB_PRUNED]
 
 #: Event of another app → the operation of this app that reacts to it: none (see above).
 REACTIONS: dict[str, str] = {}
