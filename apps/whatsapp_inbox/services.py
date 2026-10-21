@@ -216,8 +216,10 @@ def _after_commit(ctx: OperationContext, job, *args) -> None:
 
 
 def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
-    """``_after_commit`` for the business in ``host`` (a template's own), whatever business ``ctx`` runs as."""
-    transaction.on_commit(partial(job, Scope(ctx.scope.kind, host), *args), robust=True)
+    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as. A row made
+    before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
+    scope = Scope(ctx.scope.kind, host) if host else ctx.scope
+    transaction.on_commit(partial(job, scope, *args), robust=True)
 
 
 def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
@@ -948,6 +950,7 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
                 client_message_id=data.client_message_id,
                 sent_by=ctx.actor if actor_id(ctx) is not None else None,
                 sent_at=now,
+                host=ctx.scope.key,
             )
     except IntegrityError:
         # The same key at the same time: the other one kept it and hands it over.
@@ -1151,18 +1154,20 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     },
 )
 def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
+    """Hand erplora.com again what was left: every business's, each for its own (phase 1's worker runs on one fixed
+    scope). A message or an erasure made before its business was recorded (0007) goes as ``ctx``'s, as it did."""
     cutoff = clock.now() - STUCK_AFTER
     messages = list(
         Message.objects.select_for_update(skip_locked=True)
         .filter(origin=Message.Origin.HUB, status__in=_ON_ITS_WAY, status_at__lt=cutoff)
         .order_by("status_at", "id")
-        .values_list("id", flat=True)[:RESUME_BATCH]
+        .values_list("id", "host")[:RESUME_BATCH]
     )
     erasures = list(
         Conversation.objects.select_for_update(skip_locked=True)
         .filter(erase_status=Conversation.EraseStatus.PENDING, erased_at__lt=cutoff)
         .order_by("erased_at", "id")
-        .values_list("id", flat=True)[:RESUME_BATCH]
+        .values_list("id", "erase_host")[:RESUME_BATCH]
     )
     # Every business's, each handed over as its own (phase 1's worker runs on one fixed scope).
     templates = list(
@@ -1177,10 +1182,10 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
         .order_by("deleted_at", "id")
         .values_list("id", "host")[:RESUME_BATCH]
     )
-    for message_id in messages:
-        _after_commit(ctx, deliver, message_id)
-    for conversation_id in erasures:
-        _after_commit(ctx, forget, conversation_id)
+    for message_id, host in messages:
+        _after_commit_as(host, ctx, deliver, message_id)
+    for conversation_id, host in erasures:
+        _after_commit_as(host, ctx, forget, conversation_id)
     for template_id, host in templates:
         _after_commit_as(host, ctx, submit_template, template_id)
     for template_id, host in deletions:
@@ -1404,6 +1409,7 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
         conversation.notes.all().delete()
         conversation.erase_phone = conversation.phone
         conversation.erase_status = Conversation.EraseStatus.PENDING
+        conversation.erase_host = ctx.scope.key
         conversation.phone = ""
         conversation.contact_name = ""
         conversation.last_message_preview = ""

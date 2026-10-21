@@ -145,6 +145,9 @@ msgstr "borrado en erplora.com"
 msgid "number to erase at erplora.com"
 msgstr "número que borrar en erplora.com"
 
+msgid "business that erased it"
+msgstr "negocio que lo borró"
+
 msgid "created at"
 msgstr "creado el"
 

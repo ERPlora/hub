@@ -1059,13 +1059,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   (`assigned_to`, FK al usuario), estado, sin leer, último mensaje (hora, extracto, tipo, dirección),
   último mensaje del cliente (`last_inbound_at`: la ventana de 24 h), `erased_at`, y el borrado en
   erplora.com (`erase_status`: vacío, `pending`, `done`; `erase_phone`: el número que erplora.com tiene
-  que olvidar, solo hasta que lo confirma).
+  que olvidar, solo hasta que lo confirma; `erase_host`: el negocio que lo borró, desde la migración `0007`).
 - `Message`: dirección (`inbound`, `outbound`), origen (`customer`, `phone_app`, `hub`), procedencia
   (`live`, `history`), tipo de Meta, texto, adjunto por URL de erplora.com (`media_url`, solo https y de
   su origen; tipo MIME, nombre, pie), estado (`received`; los del Hub: `queued` → `sending` → `sent` →
   `delivered` → `read`, o `failed`) con el código y el motivo del último intento o de Meta,
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
-  obligatoria), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
+  obligatoria), el negocio que lo envió desde el Hub (`host`, fase 1, desde la migración `0007`; vacío en lo que
+  llega), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
   (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id` (la opción
   tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
   `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
@@ -1108,9 +1109,11 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
   `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. En la
-  fase 1 el worker la corre con un solo ámbito fijo (`WORKER_SCOPE_SLUG`, `base/scheduler.py`): retoma las
-  plantillas y los borrados de plantillas de todos los negocios, y cada una se entrega a erplora.com como la
-  de su negocio (`host`), con su contenido; en la fase 2 corre en la BD de cada hub.
+  fase 1 el worker la corre con un solo ámbito fijo (`WORKER_SCOPE_SLUG`, `base/scheduler.py`): retoma lo de
+  todos los negocios, y cada mensaje, plantilla o borrado se entrega a erplora.com como el de su negocio
+  (`Message.host`, `Template.host`, `Conversation.erase_host`), con su contenido; un mensaje o un borrado de
+  número anterior a la migración `0007`, sin negocio guardado, sale con el ámbito del worker, como hasta
+  entonces. En la fase 2 corre en la BD de cada hub.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`, cualquier otro como `whatsapp_inbox.send_refused`); conexión fallida o un
@@ -1434,7 +1437,8 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 - Fase 1 sin tenencia: las conversaciones de `a` y `b` comparten tablas (solo los avisos vivos van por
   hub), como en todas las apps de la fase 1. El número y las plantillas ya no: `Channel` y `Template` son
   de cada negocio (ver «Modelo»), porque la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
-  «Borradas en WhatsApp Manager» las plantillas de `a`.
+  «Borradas en WhatsApp Manager» las plantillas de `a`; y el mensaje que sale del Hub y el número que se
+  pide olvidar guardan su negocio, porque el worker los retomaba con el suyo.
 
 ### Cambios frente al producto actual
 

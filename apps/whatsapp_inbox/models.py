@@ -147,6 +147,16 @@ class Conversation(UUIDModel):
     )
     # The number erplora.com has to forget, kept only until it confirms (then emptied).
     erase_phone = models.CharField(_("number to erase at erplora.com"), max_length=16, blank=True)
+    # Phase 1 shares the tables: the business that erased it, for whom erplora.com forgets the number (empty before
+    # 0007: such an erasure is resumed as the worker's scope, as it was).
+    erase_host = models.CharField(
+        _("business that erased it"),
+        max_length=63,
+        blank=True,
+        default="",
+        editable=False,
+        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -256,6 +266,16 @@ class Message(UUIDModel):
     wa_message_id = models.CharField(_("WhatsApp message id"), max_length=255, null=True, blank=True)
     # The key the Hub sends with a message (Idempotency-Key): a retry never sends it twice.
     client_message_id = models.UUIDField(_("send key"), null=True, blank=True)
+    # Phase 1 shares the tables: the business that sent it from the Hub, for whom erplora.com sends it (empty for
+    # what arrives, and for what the Hub sent before 0007: such a message is resumed as the worker's scope, as it was).
+    host = models.CharField(
+        _("host"),
+        max_length=63,
+        blank=True,
+        default="",
+        editable=False,
+        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
+    )
     reply_to = models.CharField(_("answers"), max_length=255, blank=True)
     # The option the customer tapped (a template's quick reply, an interactive button or list row): its id.
     reply_id = models.CharField(_("option tapped"), max_length=256, blank=True)
