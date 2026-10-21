@@ -106,6 +106,30 @@ def test_a_deleted_group_has_no_name_and_an_inactive_list_is_still_readable():
     assert (row.customer_group_id, row.customer_group_name, row.is_active) == (group_id, None, False)
 
 
+def test_tied_lists_follow_the_list_s_direction_and_empty_values_stay_last():
+    """hub#2355 (the old product's rule, 2026-09-28; Sales, Cash register, Inventory and Tasks follow it): ties on the
+    sorted column come by code in the list's own direction, never always ascending; empty values go last both ways."""
+    from apps.pricing.models import PriceList
+
+    for code in ("A1", "B2", "C3"):
+        make_list(code, "Same name")
+    make_list("Z9", "Same name", tax_included=True)
+    # Postgres writes a touched row's new version after the others: without a tie-break, A1 would come last.
+    PriceList.objects.filter(code="A1").update(name="Same name")
+
+    def codes(sort, direction, **page):
+        return [row.code for row in run("pricing.price_list.list", {"sort": sort, "dir": direction, **page}).rows]
+
+    for column in ("name", "currency", "customer_group_name"):
+        assert codes(column, "asc") == ["A1", "B2", "C3", "Z9"], column
+        assert codes(column, "desc") == ["Z9", "C3", "B2", "A1"], column
+    # Only Z9 has a tax basis: the empty ones come after it both ways, their ties in the list's direction.
+    assert codes("tax_included", "asc") == ["Z9", "A1", "B2", "C3"]
+    assert codes("tax_included", "desc") == ["Z9", "C3", "B2", "A1"]
+    paged = [code for offset in (0, 2) for code in codes("name", "desc", limit=2, offset=offset)]
+    assert paged == ["Z9", "C3", "B2", "A1"]
+
+
 # Prices (F06)
 
 
@@ -146,6 +170,32 @@ def test_the_prices_are_searched_filtered_and_sorted_and_read_across_lists():
     assert [(row.price_list_code, row.price) for row in across.rows] == [("OTHER", 1100), ("VIP", 1200)]
     with pytest.raises(NotFound):
         run("pricing.price_item.list", {"price_list": "missing"})
+
+
+def test_tied_prices_follow_the_list_s_direction():
+    """hub#2355: prices tied on the sorted column come by their from quantity, then by id, in the list's own
+    direction (two products with the same name and price, two breaks each)."""
+    from apps.pricing.models import PriceItem
+
+    price_list = make_list("VIP")
+    first, second = make_product("Shampoo", "SH-1"), make_product("Shampoo", "SH-2")
+    items = [
+        make_item(price_list, product, price=1000, min_quantity=quantity)
+        for quantity in ("1", "5")
+        for product in (first, second)
+    ]
+    # Postgres writes a touched row's new version after the others: without a tie-break, it would come last.
+    PriceItem.objects.filter(pk=items[0].pk).update(price=1000)
+    expected = [item.id for item in sorted(items, key=lambda item: (item.min_quantity, item.id))]
+
+    def ids(sort, direction, **page):
+        params = {"price_list": "VIP", "sort": sort, "dir": direction, **page}
+        return [row.id for row in run("pricing.price_item.list", params).rows]
+
+    for column in ("name", "min_quantity", "price"):
+        assert ids(column, "asc") == expected, column
+        assert ids(column, "desc") == expected[::-1], column
+    assert [row for offset in (0, 2) for row in ids("price", "desc", limit=2, offset=offset)] == expected[::-1]
 
 
 # Rules (F09)
@@ -194,6 +244,24 @@ def test_the_rules_are_searched_filtered_and_sorted():
     assert codes(rule_type="buy_x_get_y") == ["C"]
     assert codes(applies_to="services") == ["C"]
     assert codes(sort="priority") == ["B", "A", "C"]
+
+
+def test_tied_rules_follow_the_list_s_direction():
+    """hub#2355: rules tied on the sorted column come by code in the list's own direction."""
+    from apps.pricing.models import DiscountRule
+
+    for code in ("A1", "B2", "C3"):
+        make_rule(code, name="Same name")
+    # Postgres writes a touched row's new version after the others: without a tie-break, A1 would come last.
+    DiscountRule.objects.filter(code="A1").update(name="Same name")
+
+    def codes(sort, direction, **page):
+        return [row.code for row in run("pricing.rule.list", {"sort": sort, "dir": direction, **page}).rows]
+
+    for column in ("name", "rule_type", "priority"):
+        assert codes(column, "asc") == ["A1", "B2", "C3"], column
+        assert codes(column, "desc") == ["C3", "B2", "A1"], column
+    assert [code for offset in (0, 2) for code in codes("name", "desc", limit=2, offset=offset)] == ["C3", "B2", "A1"]
 
 
 # The price of a line (F13): the lists

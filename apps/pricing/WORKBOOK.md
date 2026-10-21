@@ -624,6 +624,11 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   una tarifa siguen en la unidad propia del producto, que la tabla pinta junto a la cantidad («500 g»).
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
   `demo`; lo que sí se separa son los avisos en vivo.
+- **Orden de las tablas** (`_ordering`, nota vigente del producto actual del 2026-09-28, hub#2355, como Ventas,
+  Caja, Inventario y Tareas): la columna elegida y después el desempate, todo en la dirección de la lista y
+  con los vacíos al final en las dos; `desc` es `asc` leído al revés, empates incluidos. Tarifas y reglas
+  desempatan por código e `id`; los precios, por cantidad mínima e `id`. Lo fijan los tres
+  `test_tied_*` de `tests/test_queries.py` (hasta CLOSE-PRICING desempataba siempre en ascendente).
 
 ## Contradicciones señaladas (no se resuelven aquí)
 
@@ -649,10 +654,6 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   grupo ya es un UUID por eso mismo; lo anotó el «Para PLAN-DB» de
   `docs/plans/2026-10-14-migracion-modulos.md` (Suplementos, Menús, Cocina y Tarifas) y PLAN-DB aún no lo
   recoge.
-- **Desempate de las tablas**: las tres ordenan por su columna y desempatan por código (o cantidad mínima)
-  e `id` **siempre ascendentes** (`_ordering`), también en descendente; la nota vigente del producto actual
-  del 2026-09-28 (hub#2355) manda desempatar en la dirección de la lista. Arreglarlo es la `FIX` de la cola
-  que ya lleva Clientes, Asistencia y Ventas (visto al cerrar, CLOSE-PRICING).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
