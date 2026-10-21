@@ -9,6 +9,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.whatsapp_inbox import queries, services
+from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.schemas import (
     AgentListIn,
     AssignIn,
@@ -120,6 +121,13 @@ async def message_list(request, params: Query[MessageListIn]):
 )
 async def message_send(request, data: SendIn):
     return await run_operation(request, services.send_message, data)
+
+
+@bind(
+    router, "whatsapp_inbox.message.notify", "/whatsapp_inbox/messages/notify", status=201
+)
+async def message_notify(request, data: NotifyIn):
+    return await run_operation(request, services.notify, data)
 
 
 @bind(router, "whatsapp_inbox.message.retry", "/whatsapp_inbox/messages/retry")

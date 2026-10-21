@@ -42,6 +42,7 @@ from apps.customer.queries import find_customer
 from apps.customer.services import lock_customers
 from apps.whatsapp_inbox import clock, events, gateway
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
+from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.queries import (
     actor_id,
     channel,
@@ -173,6 +174,11 @@ SEVERAL_CALLED = _("Several people match “%(reference)s”: choose one from th
 NOT_IN_BUSINESS = _("That person does not work in this business.")
 NOT_A_PERSON = _("Only a person can be assigned a conversation.")
 NOTE_NOT_FOUND = _("That note no longer exists.")
+NOT_INTERNATIONAL = _(
+    "“%(phone)s” is not a number in international format (+34600111222): nothing was sent, so that it never "
+    "reaches the wrong person."
+)
+NO_CONVERSATION = _("There is no WhatsApp conversation with %(phone)s in this business: nothing was sent.")
 NOTE_NOT_YOURS = _("You may only delete your own notes.")
 
 #: How far each delivery status of Meta is; ``failed`` replaces anything but ``read``.
@@ -185,6 +191,8 @@ _STATUS_RANK = {
 }
 _ON_ITS_WAY = (Message.Status.QUEUED, Message.Status.SENDING)
 _VARIABLE = re.compile(r"\{\{\s*(\d+)\s*\}\}")
+#: A number exactly in international format: a plus, the country and its digits, nothing else.
+_INTERNATIONAL = re.compile(r"\+[1-9]\d{6,14}")
 #: erplora.com's 409 codes the Hub knows by name; any other is «erplora.com did not send it».
 _REFUSALS = {"whatsapp.cap_reached": "whatsapp_inbox.cap_reached"}
 #: erplora.com's 409 codes for a template the Hub says in its own words (never blaming ERPlora for Meta:
@@ -933,7 +941,21 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
         conversation = _conversation_for(phone)
         _link_by_phone(ctx, conversation, card_id)
     variables = list(data.template.variables) if template else []
-    body = data.text if template is None else _rendered(template.body, variables)
+    return _queue_message(ctx, conversation, data.text, template, variables, data.client_message_id, now)
+
+
+def _queue_message(
+    ctx: OperationContext,
+    conversation: Conversation,
+    text: str | None,
+    template: Template | None,
+    variables: list[str],
+    key: UUID,
+    now: dt.datetime,
+) -> dict:
+    """Keep the message ``queued`` in ``conversation`` and hand it to erplora.com after the COMMIT (``deliver``):
+    the one way out of the Hub, for the inbox (F32, F33) and for an automation (``notify``)."""
+    body = text if template is None else _rendered(template.body, variables)
     try:
         with transaction.atomic():
             message = Message.objects.create(
@@ -947,14 +969,14 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
                 template_variables=variables,
                 status=Message.Status.QUEUED,
                 status_at=now,
-                client_message_id=data.client_message_id,
+                client_message_id=key,
                 sent_by=ctx.actor if actor_id(ctx) is not None else None,
                 sent_at=now,
                 host=ctx.scope.key,
             )
     except IntegrityError:
         # The same key at the same time: the other one kept it and hands it over.
-        return message_out(_sent_message(data.client_message_id))
+        return message_out(_sent_message(key))
     conversation.last_message_at = now
     conversation.last_message_preview = preview(body)
     conversation.last_message_kind = message.kind
@@ -998,6 +1020,72 @@ def retry_message(ctx: OperationContext, data: MessageRefIn) -> dict:
     message.save(update_fields=["error_code", "error_message"])
     _after_commit_as(message.host, ctx, deliver, message.id)
     return message_out(message)
+
+
+def _exact_number(raw: str, ctx: OperationContext) -> str:
+    """``raw`` when it is a number written exactly in international format; ``InvalidPayload`` otherwise (a
+    national or half-typed number is never guessed: it could be somebody else's, gh:whatsapp_inbox#279)."""
+    text = (raw or "").strip()
+    message = str(NOT_INTERNATIONAL % {"phone": text})
+    if not _INTERNATIONAL.fullmatch(text):
+        raise InvalidPayload(message, fields={"phone": message})
+    try:
+        return e164(text, ctx)
+    except InvalidPhone:
+        raise InvalidPayload(message, fields={"phone": message}) from None
+
+
+def _in_language(ctx: OperationContext, data: NotifyIn) -> NotifyIn:
+    """``data`` with its template's language, when the template exists in several and one is the caller's."""
+    wanted = data.template
+    if wanted is None or wanted.language:
+        return data
+    languages = set(live_templates(ctx.scope).filter(name=wanted.name).values_list("language", flat=True))
+    own = [code for code in languages if code == ctx.language or code.startswith(f"{ctx.language}_")]
+    if len(languages) < 2 or len(own) != 1:
+        return data
+    return data.model_copy(update={"template": wanted.model_copy(update={"language": own[0]})})
+
+
+@operation(
+    "whatsapp_inbox.message.notify",
+    kind="command",
+    permission="whatsapp_inbox.reply",
+    input=NotifyIn,
+    output=MessageOut,
+    expose_api=True,
+    ai={
+        "description": "Tells a customer something by WhatsApp (an appointment or a reservation confirmed…), only in "
+        "the live conversation of exactly that international number (+34600111222): never a new conversation, "
+        "never a number written any other way. Free text within 24 hours of the customer's last message, "
+        "otherwise the approved template given. What an automation is granted to write to a customer.",
+        "risk": "normal",
+    },
+)
+def notify(ctx: OperationContext, data: NotifyIn) -> dict:
+    key = data.client_message_id or uuid7()
+    already = _sent_message(key) if data.client_message_id else None
+    if already is not None:
+        return message_out(already)
+    phone = _exact_number(data.phone, ctx)
+    blocked = send_blocked(channel(ctx.scope))
+    if blocked:
+        raise _blocked_error(blocked)
+    conversation = live_conversations().select_for_update().filter(phone=phone).first()
+    if conversation is None:
+        raise Conflict(str(NO_CONVERSATION % {"phone": phone}), code="whatsapp_inbox.no_conversation")
+    now = clock.now()
+    template = None
+    if not data.text or not conversation.window_open(now):
+        if data.template is None:
+            raise Conflict(str(WINDOW_CLOSED), code="whatsapp_inbox.window_closed")
+        template = _template_for(ctx, _in_language(ctx, data))
+        if template.category == Template.Category.MARKETING and not _marketing_allowed(
+            _live_card_id(conversation) or _only_card_of(phone)
+        ):
+            raise Conflict(str(MARKETING_CONSENT), code="whatsapp_inbox.marketing_consent_missing")
+    variables = list(data.template.variables) if template else []
+    return _queue_message(ctx, conversation, data.text if template is None else None, template, variables, key, now)
 
 
 def deliver(scope: Scope, message_id: UUID) -> None:

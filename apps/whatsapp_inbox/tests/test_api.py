@@ -62,6 +62,7 @@ ROUTES = {
     ("GET", "/whatsapp_inbox/messages", "whatsapp_inbox.message.list"),
     ("POST", "/whatsapp_inbox/messages/send", "whatsapp_inbox.message.send"),
     ("POST", "/whatsapp_inbox/messages/retry", "whatsapp_inbox.message.retry"),
+    ("POST", "/whatsapp_inbox/messages/notify", "whatsapp_inbox.message.notify"),
     ("GET", "/whatsapp_inbox/notes", "whatsapp_inbox.note.list"),
     ("POST", "/whatsapp_inbox/notes", "whatsapp_inbox.note.add"),
     ("POST", "/whatsapp_inbox/notes/delete", "whatsapp_inbox.note.delete"),
