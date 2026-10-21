@@ -140,6 +140,19 @@ def test_a_ticket_whose_fiscal_document_is_pending_is_left_to_the_screen(product
     assert not PrintJob.objects.exists()
 
 
+def test_a_record_that_cannot_be_read_keeps_the_receipt_from_the_queue(bar, till):
+    """Never a paper without its QR (VERIFACTU-F19): VeriFactu sealed the ticket but its record cannot be read, so
+    nothing is queued (the screen's paper says why) and the charge goes on."""
+    seller = ctx_for()
+    blind = dataclasses.replace(seller, permissions=seller.permissions - {"verifactu.view_record"})
+    out = charge(ctx=blind)
+    assert out.invoice_status == "issued"
+    assert out.printed.queued is False
+    assert Sale.objects.filter(pk=out.id, status="completed").exists()
+    assert run("sale.sale.print", {"sale_id": str(out.id)}, blind).queued is False
+    assert not PrintJob.objects.exists()
+
+
 def test_a_reprint_is_a_copy_with_its_own_key_each_time(bar, till):
     out = charge()
     first = run("sale.sale.print", {"sale_id": str(out.id)})
