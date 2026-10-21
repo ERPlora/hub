@@ -16,7 +16,7 @@
 //   - PRICING-F12: «Deactivate» asks first; the rule waits under «Inactive» until «Activate».
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shown } from './helpers';
+import { A, login, psql, shot, shown } from './helpers';
 import {
   choose,
   cleanPricing,
@@ -140,6 +140,9 @@ test('PRICING-F02: a new list, and a repeated code said under Code in sight on a
   );
   await expect(refusal).toBeInViewport();
   await expect(page.locator('[data-testid=pricing-list-form-submit]')).toBeInViewport();
+  // The refused field keeps its label and outline, marked in red (pricing#43).
+  await expect(page.locator('[data-testid=pricing-list-form-code]')).toHaveClass(/ion-invalid/);
+  await page.screenshot({ path: shot('APP-PRICING-PRICING-F02-refused-390') });
   await page.locator('[data-testid=pricing-list-form-cancel]').click();
   expect(psql(`select count(*) from pricing_pricelist where lower(code) = lower('${code}')`)).toBe('1');
 });
