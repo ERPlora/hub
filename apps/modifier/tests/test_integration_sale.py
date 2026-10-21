@@ -104,10 +104,10 @@ def test_the_till_asks_the_groups_of_the_dish_and_its_category_and_the_line_take
     assert defaults == [ids["medium"]]
 
     order_id = open_check()
-    # The waiter keeps the default and adds cheese and then no meat: the line keeps that order.
-    line = add(order_id, "BUR", ids["medium"], ids["cheese"], ids["no_meat"]).lines[0]
-    assert [pick.name for pick in line.modifiers] == ["Medium", "Cheese", "No meat"]
-    assert line.kitchen_text == "Medium, +CHEESE, -MEAT"
+    # The waiter taps no meat, keeps the default and adds cheese: the line keeps that order, not the catalogue's.
+    line = add(order_id, "BUR", ids["no_meat"], ids["medium"], ids["cheese"]).lines[0]
+    assert [pick.name for pick in line.modifiers] == ["No meat", "Medium", "Cheese"]
+    assert line.kitchen_text == "-MEAT, Medium, +CHEESE"
     assert line.unit_price == 800 + 105 - 50
 
 

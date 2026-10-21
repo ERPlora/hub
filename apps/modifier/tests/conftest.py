@@ -1,19 +1,27 @@
 """Fixtures of the modifier tests: contexts per role and scope, users with a role on a host, a raw DSN,
-and the real Inventory and Taxes rows a group is linked to (no doubles).
+the real Inventory and Taxes rows a group is linked to (no doubles), and one tick of the worker's real relay.
 
 The models are imported lazily, so that the tests of apps.py still collect while models.py does not
 exist.
 """
 
+import json
+import threading
+
+import psycopg
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from django.utils import translation
+from django.db.backends.base.base import BaseDatabaseWrapper
+from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
+from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
+from base import catalog, worker
+from base.catalog import RegisterResult
 from base.models import Membership
 
 A = Scope("host", "a")
@@ -113,3 +121,52 @@ def db_dsn(django_db_setup):
         host=params["HOST"],
         port=params["PORT"],
     )
+
+
+# ── The worker's relay, as production runs it ────────────────────────────────────────────────────
+
+#: What ``register_apps`` says when it has nothing to write: the tick runs without the SaaS.
+REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+
+
+def one_tick() -> None:
+    """One tick of the worker's real loop (``base.worker.run``): the outbox relay hands each new event to the
+    reactions of the apps (``events.py``), as production does."""
+    stop = threading.Event()
+
+    def wait(_seconds: float) -> bool:
+        stop.set()
+        return True
+
+    now = timezone.now()
+    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
+
+
+@pytest.fixture
+def tick(db, monkeypatch):
+    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
+    the connections (that would close the test's own)."""
+    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
+    return one_tick
+
+
+@pytest.fixture
+def listen(transactional_db, db_dsn):
+    """``listen(scope)``: a raw session LISTENing on the channel of ``scope`` (it hears only what is committed)."""
+    sessions = []
+
+    def open_session(scope):
+        session = psycopg.connect(db_dsn, autocommit=True)
+        sessions.append(session)
+        session.execute(f"LISTEN {channel_for(scope)}")
+        return session
+
+    yield open_session
+    for session in sessions:
+        session.close()
+
+
+def heard(session, timeout: float = 0.5) -> set[str]:
+    """The event names the notices on ``session`` carried."""
+    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}

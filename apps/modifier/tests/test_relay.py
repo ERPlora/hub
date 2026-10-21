@@ -7,50 +7,19 @@ notice handed over again, changes nothing. Before the tick the reads already lea
 never asks a group of something deleted. A product deleted in hub B lets go of B's links only, heard in B only.
 """
 
-import json
-import threading
-
-import psycopg
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.models import OutboxEvent
-from live.outbox import channel_for
 
 from apps.modifier.models import ModifierLink
-from base import catalog, relay, worker
-from base.catalog import RegisterResult
+from base import catalog, relay
 from base.models import EventDelivery
 
-from .conftest import FOOD, A, B, ctx_for, make_category, make_product, run
-
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+from .conftest import FOOD, REGISTERED, A, B, ctx_for, heard, make_category, make_product, one_tick, run
 
 
 def as_admin_of(scope, name: str, data: dict):
     """Run ``name`` as an admin of ``scope``: Inventory's and Modifiers' own operations, with their permissions."""
     return run(name, data, ctx=ctx_for(scope=scope))
-
-
-def one_tick() -> None:
-    """One tick of the worker's real loop."""
-    stop = threading.Event()
-
-    def wait(_seconds: float) -> bool:
-        stop.set()
-        return True
-
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
-
-
-@pytest.fixture
-def tick(db, monkeypatch):
-    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
-    the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return one_tick
 
 
 def newest(name: str) -> OutboxEvent:
@@ -153,25 +122,6 @@ def test_a_product_never_linked_is_deleted_and_nothing_is_let_go(tick, menu):
 
 
 # ── Two hubs, on committed data ──────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def listen(transactional_db, db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 0.5) -> set[str]:
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
 def linked(scope, sku: str, group: str):
