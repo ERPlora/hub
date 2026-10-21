@@ -1,7 +1,7 @@
 # Workbook — Demo (app)
 Prefijo: DEMO
 Alcance MVP: fase 1 (referencia técnica, no se vende)
-Estado de la app: hecha (servidor y páginas)
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `demo`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -265,7 +265,9 @@ papel en ningún negocio.
   (`ItemDetailPage.vue`, `GONE`); un fallo pasajero (`internal_error`) lo deja a la vista bajo el
   aviso. `permission_denied` se titula «No tienes permiso».
 - El administrador de Django enseña los elementos con sus líneas **solo para leer**: toda escritura
-  pasa por una operación, que es la que deja el aviso. Vive solo en `http://hubs.localhost:8000/admin/`
+  pasa por una operación, que es la que deja el aviso. ⚠️ Choca con PLAN §17 (ronda 12) y PLAN-HUB
+  §3.2, que dan CRUD en el admin a toda tabla de hub salvo las fiscales, como ya tienen las demás apps:
+  señalado en la ronda 2026-10-21 (CLOSE-DEMO) de `PLAN-HUB.md`. Vive solo en `http://hubs.localhost:8000/admin/`
   (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS
   (`platform@example.com` / `platform`); ningún papel de negocio entra en él.
 - Entrada en desarrollo: sin sesión, el Hub manda al login del SaaS
@@ -283,8 +285,9 @@ papel en ningún negocio.
   hub).
 - Pruebas por flujo: `tests/e2e/demo-flows.spec.ts` recorre DEMO-F01 a F06 en 390, 834 y 1440 (capturas
   `APP-DEMO-<flujo>-<ancho>`); las medidas finas siguen en `two-tabs-live`, `optimistic-add-line`,
-  `two-orgs-isolated`, `reconnect`, `delete-item`, `create-edit-pages`, `list-filters-stats`,
-  `datatable` y `employee-permissions`.
+  `two-orgs-isolated`, `reconnect`, `delete-item`, `create-edit-pages`, `edit-keeps-text`,
+  `list-filters-stats`, `datatable` y `employee-permissions`. `tests/e2e/demo.spec.ts` no es de esta
+  app: prueba los negocios de demostración (`demo-<hex>`, el `/demo/` del SaaS; README del Hub, «Demo»).
 
 ## Lo que NO hace, a propósito
 
