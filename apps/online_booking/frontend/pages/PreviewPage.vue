@@ -35,12 +35,15 @@ const asError = (failure: unknown): ApiError =>
 // The page and its services
 const info = ref<PageOut | null>(null);
 const services = ref<PublicServiceOut[]>([]);
+/** The services have arrived: only then does an empty list mean «none booked online». */
+const servicesLoaded = ref(false);
 const loadError = ref<ApiError | null>(null);
 
 onMounted(async () => {
   try {
     info.value = await client.api.call('online_booking.public.page', {});
     services.value = (await client.api.call('online_booking.public.services', { limit: SERVICE_WINDOW })).rows;
+    servicesLoaded.value = true;
   } catch (failure) {
     loadError.value = asError(failure);
   }
@@ -222,6 +225,13 @@ const text = (value: unknown): string => (value === null || value === undefined 
             {{ service.name }}
             <small v-if="priceAndLength(service)">{{ priceAndLength(service) }}</small>
           </ion-checkbox>
+          <p
+            v-if="servicesLoaded && !services.length"
+            data-testid="ob-preview-no-services"
+            class="ob-preview__help"
+          >
+            {{ $t('online_booking.preview.noServices') }}
+          </p>
 
           <ion-select
             v-if="info.allow_staff_selection"
