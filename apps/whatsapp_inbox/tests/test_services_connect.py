@@ -253,6 +253,24 @@ def test_a_lost_answer_is_neither_connected_nor_not():
     assert not Channel.objects.exists()
 
 
+@pytest.mark.parametrize(
+    "answer",
+    [
+        {**CONNECTED, "connected": False},
+        {**CONNECTED, "phone_number": "910000000"},
+        {**CONNECTED, "phone_number": "+34 910 000 000"},
+        {**CONNECTED, "display_name": "x" * 201},
+    ],
+    ids=["not-connected", "not-international", "spaced", "name-too-long"],
+)
+@respx.mock
+def test_a_200_that_is_not_a_connected_e164_number_keeps_nothing(answer):
+    respx.post(CONNECT).mock(return_value=httpx.Response(200, json=answer))
+    error = refusal("whatsapp_inbox.channel.connect", WINDOW)
+    assert (error.status, error.code) == (503, "whatsapp_inbox.connect_unknown")
+    assert not Channel.objects.exists() and not events("whatsapp_inbox.channel.connected")
+
+
 # ── WHATSAPP_INBOX-F02 Disconnecting (door 12) ──────────────────────────────────────────────────
 
 
