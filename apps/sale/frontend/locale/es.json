@@ -242,6 +242,7 @@
         "sendRush": "Enviar URGENTE ({count})",
         "rush": "Marcar la comanda como urgente",
         "sent": "Comanda {n} enviada a cocina.",
+        "sentNotPrinted": "Comanda {n} enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.",
         "notSent": "No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.",
         "tickets": {
           "open": "Comandas · {count}",

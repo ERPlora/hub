@@ -242,6 +242,7 @@
         "sendRush": "Send RUSH ({count})",
         "rush": "Mark the order as rush",
         "sent": "Order {n} sent to the kitchen.",
+        "sentNotPrinted": "Order {n} sent to the kitchen, but it did not print. Check the kitchen printer in Printing.",
         "notSent": "The order could not be sent to the kitchen. Try again.",
         "tickets": {
           "open": "Tickets · {count}",

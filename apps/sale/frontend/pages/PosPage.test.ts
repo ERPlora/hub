@@ -779,6 +779,16 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastSuccess).toHaveBeenCalledWith('Comanda 1 enviada a cocina.');
   });
 
+  it('a round sent whose sheet did not print says so in words, never the raw reason (hub#2257, KITCHEN-F08)', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));
+    s.wrapper.findComponent(PosCart).vm.$emit('send', false);
+    await settle();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.', 'warning', 4500);
+  });
+
   it('charging with lines not sent sends them first, then opens the charge', async () => {
     const s = await setup({ session: WITH_KITCHEN });
     await s.addProduct();

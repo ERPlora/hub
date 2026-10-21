@@ -186,12 +186,22 @@ describe('useTill: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     s.reply(CHECK);
     await s.till().addProduct(product({ id: 'p1' }), null);
     answer(s);
-    expect(await s.till().sendToKitchen(true)).toEqual({ ok: true, round: 1 });
+    expect(await s.till().sendToKitchen(true)).toEqual({ ok: true, round: 1, printed: true });
     const sent = s.sent().filter((c) => c.path === '/api/kitchen/tickets/send');
     expect(sent.map((c) => c.body)).toEqual([{ order_id: 'o1', priority: 'rush' }]);
     expect(s.till().order.value?.lines[0].round_no).toBe(1);
     await s.till().sendToKitchen(false);
     expect(s.sent().filter((c) => c.path === '/api/kitchen/tickets/send').at(-1)?.body).toEqual({ order_id: 'o1', priority: 'normal' });
+  });
+
+  it('says when the round went but its sheet did not print (hub#2257)', async () => {
+    const s = await setup();
+    s.reply(CHECK);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    s.net.onApi((call) =>
+      Response.json(call.url.startsWith('/api/kitchen/tickets/send') ? { ...TICKET, print_error: 'no printer' } : SENT),
+    );
+    expect(await s.till().sendToKitchen(false)).toEqual({ ok: true, round: 1, printed: false });
   });
 
   it('hands the refusal back in the server’s words', async () => {

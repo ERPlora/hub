@@ -11,7 +11,7 @@
 // checks «e2e kbd <run> …» and their tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, collectProblems, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, stamp } from './sale-helpers';
 import { ownerPage, settled } from './service-helpers';
@@ -125,6 +125,7 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
   const { context, page } = await ownerPage(browser, '/kitchen/settings', { width: 1440, height: 900 });
   try {
     await countRings(page);
+    const problems = await collectProblems(page);
     await page.goto('/kitchen/display');
     await page.evaluate(() => localStorage.removeItem('kitchen.display.station'));
     await page.reload();
@@ -144,6 +145,9 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     await expect(view.locator('[data-testid=kitchen-display]')).not.toHaveClass(/kds--fullscreen/);
     // F16: opening the display does not ring for what was already there.
     expect(await rings(page)).toBe(0);
+    // kitchen#164: the display opens without an error, nor a CSP refusal.
+    const opened = await problems();
+    expect([opened.page, opened.console, opened.csp]).toEqual([[], [], []]);
 
     const round = await fireRound(context, 1, [steak, salad]);
     const [steakLine, saladLine] = round.lines;

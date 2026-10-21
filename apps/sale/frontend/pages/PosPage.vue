@@ -473,7 +473,9 @@ const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_coo
 async function sendRound(rush: boolean): Promise<boolean> {
   const sent = await till.sendToKitchen(rush);
   if (sent.ok) {
-    void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
+    // hub#2257: sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
+    if (sent.printed === false) void toast(t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }), 'warning', 4500);
+    else void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
     return true;
   }
   if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
