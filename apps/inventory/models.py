@@ -184,6 +184,9 @@ class Product(UUIDModel):
     # None = follows the business's «Track stock» setting.
     track_stock = models.BooleanField(_("track stock"), null=True, blank=True)
     is_active = models.BooleanField(_("active"), default=True)
+    # Sold out («86»): still active, but the till does not offer it until it is back on sale.
+    # ``db_default``: a process still on the previous code inserts products without it (expand/contract).
+    is_sold_out = models.BooleanField(_("sold out"), default=False, db_default=False)
     is_deleted = models.BooleanField(_("deleted"), default=False)
     deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
     categories = models.ManyToManyField(

@@ -803,6 +803,16 @@ class DocumentOut(Schema):
     )
 
 
+class PaperOut(Schema):
+    queued: bool = Field(
+        description="True: Printing queued the page for the system printer. False: Printing is not on, no system "
+        "printer takes it, its VeriFactu record is not there to be read or Printing refused it — the device prints "
+        "the screen's paper."
+    )
+    job_id: UUID | None = Field(description="Its job in the printing queue.")
+    printer: str | None = Field(description="The printer it went to.")
+
+
 class SeriesOut(Schema):
     id: UUID
     code: str

@@ -3,14 +3,15 @@
 // line of the receipt header, «My business» without one), «Bill», the check's title, now, the customer;
 // each line with its quantity × price, its amount, its note and «(comp)»; the ticket discount, the VAT
 // breakdown and the total — all of it as `sale.checkout.preview` works it out —, and «Bill — this is
-// not an invoice…». No number, no QR, no payment: it consumes nothing. The printer prints this very
-// paper (`printPaper`); a failure says so. It values the check while it is mounted: the page mounts
-// it only while the bill is open.
+// not an invoice…». No number, no QR, no payment: it consumes nothing. «Print» asks the printing queue
+// first (`sale.order.print_bill`, PRINTING-F09): queued, a toast names the printer; not queued (Printing
+// off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`); a
+// failure says so. It values the check while it is mounted: the page mounts it only while the bill is open.
 import { formatDateTime } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, toastError } from '@erplora/ui/shell';
+import { useCommand, useLive } from '@erplora/ui/sdk';
+import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonModal, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
-import { computed, useTemplateRef } from 'vue';
+import { computed, shallowRef, useTemplateRef } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
@@ -52,10 +53,27 @@ const taxes = computed(() =>
 /** A comp says so after its name («Wine (comp)»). */
 const lineName = (line: OrderLineOut) => (line.is_gift ? `${line.name} ${t('sale.pos.giftSuffix')}` : line.name);
 
-function print(): void {
-  if (!paper.value) return;
+const queue = useCommand('sale.order.print_bill');
+/** A print on its way: a second press waits for it. */
+const sending = shallowRef(false);
+
+async function print(): Promise<void> {
+  const element = paper.value;
+  if (!element || sending.value) return;
+  sending.value = true;
   try {
-    printPaper(paper.value);
+    const sent = await queue.run({ order_id: props.order.id });
+    if (sent.queued) {
+      void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+      return;
+    }
+  } catch {
+    // The queue could not be asked: the screen's paper still prints (below).
+  } finally {
+    sending.value = false;
+  }
+  try {
+    printPaper(element);
   } catch {
     void toastError(t('sale.pos.prebillPrintFailed'));
   }
@@ -79,7 +97,7 @@ function print(): void {
           <ion-button
             data-testid="pos-prebill-print"
             :aria-label="$t('sale.pos.print')"
-            :disabled="!valued"
+            :disabled="!valued || sending"
             @click="print"
           >
             <HubIcon

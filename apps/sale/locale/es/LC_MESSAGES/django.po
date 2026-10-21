@@ -798,3 +798,17 @@ msgstr "nombre del menú"
 
 msgid "dishes"
 msgstr "platos"
+
+msgid "My business"
+msgstr "Mi negocio"
+
+msgid "(On the house)"
+msgstr "(Invitación)"
+
+#, python-format
+msgid "Already paid · %(name)s"
+msgstr "Ya pagado · %(name)s"
+
+#, python-format
+msgid "Discount of %(amount)s, already applied to the amounts above."
+msgstr "Descuento de %(amount)s, ya aplicado en los importes de arriba."

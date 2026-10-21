@@ -1107,6 +1107,15 @@ class SalePaymentOut(Schema):
     reference: str = Field(description="Reference.")
 
 
+class PaperOut(Schema):
+    queued: bool = Field(
+        description="True: Printing queued it for its printer. False: Printing is not on, no printer takes it, its "
+        "fiscal document is still pending or Printing refused it — the device prints the screen's paper."
+    )
+    job_id: UUID | None = Field(description="Its job in the printing queue.")
+    printer: str | None = Field(description="The printer it went to.")
+
+
 class SaleOut(Schema):
     id: UUID = Field(description="The sale's id.")
     number: str = Field(description="Its number, AAAAMMDD-NNNN.")
@@ -1165,6 +1174,11 @@ class SaleOut(Schema):
         False,
         description="True: this attempt had already been charged; nothing new was recorded.",
     )
+    printed: PaperOut | None = Field(
+        None,
+        description="The charge only: whether its receipt (or the drawer's order) went to the printing queue, to "
+        "which printer; not queued, the device prints the screen's paper.",
+    )
 
 
 class SaleRefIn(Closed):
@@ -1178,6 +1192,14 @@ class SaleRefIn(Closed):
         if self.sale_id is None and self.sale is None:
             raise ValueError(str(SAY_WHICH_SALE))
         return self
+
+
+class SalePrintIn(SaleRefIn):
+    duplicate: bool = Field(
+        True,
+        description="Print it marked «DUPLICATE»: every print from Sales is a copy; only the till's first paper right "
+        "after charging, when nothing printed it at checkout, is the original.",
+    )
 
 
 class SaleByKeyIn(Closed):

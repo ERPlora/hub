@@ -9,7 +9,7 @@ puts it back in the queue (services.py).
 import datetime as dt
 import uuid
 
-from django.db.models import Count, Min, Q, QuerySet
+from django.db.models import Case, Count, IntegerField, Min, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -46,6 +46,8 @@ NO_PRINTER = _("There is no printer with that name.")
 NO_JOB = _("There is no print job with that id or number.")
 
 PENDING = Q(status=PrintJob.Status.PENDING)
+#: Receipt paper before the computer's printer, the order a job of a function finds its printer in.
+_SYSTEM_LAST = Case(When(kind=Printer.Kind.SYSTEM, then=Value(1)), default=Value(0), output_field=IntegerField())
 
 
 def actor(ctx: OperationContext) -> str:
@@ -390,20 +392,23 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
             failed=Count("id", filter=Q(status=PrintJob.Status.FAILED)),
         )
     }
-    printers = {
-        row["usage"]: row["n"]
-        for row in Printer.objects.filter(is_active=True).values("usage").annotate(n=Count("id"))
-    }
+    active: dict[str, list[Printer]] = {}
+    # Receipt paper first, then the computer's printer; by name within each, as a job is sent (services.py).
+    for printer in Printer.objects.filter(is_active=True).order_by(_SYSTEM_LAST, Lower("name"), "id"):
+        active.setdefault(printer.usage, []).append(printer)
     settings = current_settings()
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
         chosen = getattr(settings, DEFAULT_FIELDS[usage])
+        mine = active.get(usage, [])
+        prints_on = chosen if chosen is not None and chosen.is_active else (mine[0] if mine else None)
         usages.append(
             {
                 "usage": usage,
-                "printers": printers.get(usage, 0),
+                "printers": len(mine),
                 "default_printer": chosen.name if chosen else None,
+                "prints_on": prints_on.name if prints_on else None,
                 "pending": row.get("pending", 0),
                 "oldest_pending_at": row.get("oldest"),
                 "sent": row.get("sent", 0),

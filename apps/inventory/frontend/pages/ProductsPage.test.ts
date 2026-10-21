@@ -4,8 +4,9 @@
 // —, «Search product…», sort by column, the filters behind the table's funnel (name, SKU, price and stock
 // ranges, status), 50 a page.
 // «+», import and export CSV, each for whoever may; per row «Details», «Receive stock», «Count stock»,
-// «Write off stock» (physical products, with the permission to move stock), «Edit» and «Delete». A
-// row opens its sheet. A refused row action is said above the table.
+// «Write off stock» (physical products, with the permission to move stock), «Edit», «Mark sold out» or
+// «Put back on sale» (INVENTORY-F29, the «Sold out» mark beside the switch) and «Delete». A row opens its
+// sheet. A refused row action is said above the table.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { IonToggle } from '@ionic/vue';
@@ -175,6 +176,7 @@ describe('ProductsPage: the list', () => {
       { value: 'active', label: 'Yes' },
       { value: 'inactive', label: 'No' },
       { value: 'needs_tax_setup', label: 'Not configured' },
+      { value: 'sold_out', label: 'Sold out' },
     ]);
     // No control of its own beside the table: the status lives in the funnel, as in the old table.
     expect(s.testid('inventory-products-status-filter').exists()).toBe(false);
@@ -289,6 +291,8 @@ describe('ProductsPage: actions', () => {
       ['count', 'Count stock', false],
       ['write_off', 'Write off stock', true],
       ['edit', 'Edit', false],
+      ['sold_out', 'Mark sold out', true],
+      ['back_on_sale', 'Put back on sale', true],
       ['delete', 'Delete', true],
     ]);
     const stock = actions.filter((a) => ['receive', 'count', 'write_off'].includes(a.id));
@@ -304,6 +308,40 @@ describe('ProductsPage: actions', () => {
       ['count', false],
       ['write_off', true],
     ]);
+  });
+
+  it('INVENTORY-F29: «Mark sold out» on an article on sale, «Put back on sale» on a sold-out one', async () => {
+    const s = await setup();
+    await s.show(LIST);
+    const actions = s.prop<Array<{ id: string; hidden?: (row: unknown) => boolean }>>('actions');
+    const SOLD = product({ is_sold_out: true });
+    expect(actions.filter((a) => ['sold_out', 'back_on_sale'].includes(a.id)).map((a) => [a.id, a.hidden?.(COFFEE), a.hidden?.(SOLD)])).toEqual([
+      ['sold_out', false, true],
+      ['back_on_sale', true, false],
+    ]);
+  });
+
+  it('INVENTORY-F29: the actions mark and unmark it; the list comes back by the stream; a refusal is said above the table', async () => {
+    const s = await setup({}, () => ok(product({ is_sold_out: true })));
+    await s.show(LIST);
+    await s.act('sold_out');
+    expect(s.body(s.calls('/api/inventory/products/sold_out')[0])).toEqual({ id: 'p1', sold_out: true });
+    await s.act('back_on_sale', product({ is_sold_out: true }));
+    expect(s.body(s.calls('/api/inventory/products/sold_out')[1])).toEqual({ id: 'p1', sold_out: false });
+    s.net.onApi(api(() => refusal(403, 'permission_denied', 'You do not have permission.')));
+    await s.act('sold_out');
+    expect(s.testid('inventory-products-page-error').text()).toContain('You do not have permission.');
+  });
+
+  it('INVENTORY-F29: a sold-out article keeps its switch on and shows «Sold out» beside it, also to whoever only views', async () => {
+    const s = await setup();
+    await s.show(page([product({ is_sold_out: true }), MASSAGE, OLD], 3));
+    expect(s.testid('inventory-products-sold-out-p1').text()).toBe('Sold out');
+    expect(s.testid('inventory-products-sold-out-p2').exists()).toBe(false);
+    expect(s.wrapper.findAllComponents(IonToggle)[0].props('modelValue')).toBe(true);
+    const viewer = await setup({ session: EMPLOYEE });
+    await viewer.show(page([product({ is_sold_out: true })], 1));
+    expect([viewer.testid('inventory-products-active-text-p1').text(), viewer.testid('inventory-products-sold-out-p1').text()]).toEqual(['Yes', 'Sold out']);
   });
 
   it('a row and «Details» open the sheet; its stock buttons open their dialog', async () => {
@@ -430,7 +468,11 @@ describe('ProductsPage', () => {
     expect(s.prop('searchPlaceholder')).toBe('Buscar producto…');
     expect(s.testid('inventory-products-unconfigured-p3').find('span').text()).toBe('Sin configurar · Falta la categoría fiscal');
     type Column = { key: string; filter?: { options?: Array<{ label: string }> } };
-    expect(s.prop<Column[]>('columns').find((c) => c.key === 'status')?.filter?.options?.map((o) => o.label)).toEqual(['Sí', 'No', 'Sin configurar']);
+    expect(s.prop<Column[]>('columns').find((c) => c.key === 'status')?.filter?.options?.map((o) => o.label)).toEqual(['Sí', 'No', 'Sin configurar', 'Agotado']);
+    expect(s.prop<Array<{ id: string; label: string }>>('actions').filter((a) => ['sold_out', 'back_on_sale'].includes(a.id)).map((a) => a.label)).toEqual([
+      'Marcar agotado',
+      'Volver a poner a la venta',
+    ]);
     await s.filter({ price_min: 'doce', stock_max: 'x' });
     expect(s.prop('filterErrors')).toEqual({
       price_min: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',

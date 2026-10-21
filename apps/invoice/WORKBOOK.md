@@ -192,7 +192,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F15 | Comprobar que la numeración no tiene huecos | hecho |
 | INVOICE-F16 | Buscar una factura | hecho |
 | INVOICE-F17 | Ver una factura | hecho; el justificante VeriFactu llega con la app de VeriFactu |
-| INVOICE-F18 | Imprimir o guardar en PDF una factura | hecho; la impresora de tiques llega con la app de Impresión |
+| INVOICE-F18 | Imprimir o guardar en PDF una factura | hecho |
 | INVOICE-F19 | Marcar una factura como pagada | hecho |
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
@@ -580,22 +580,24 @@ la ficha cuando exista VeriFactu, con su propia consulta por factura.
 Implicados: ninguno
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
-Estado: hecho; la impresora de tiques llega con la app de Impresión
+Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
 Pasos:
 1. En la ficha, pulsa «Imprimir / PDF».
-2. Se abre el diálogo de impresión del navegador con la factura en A4 (emisor, «Facturar a», líneas,
-   desglose por tipo, totales y la nota de lo que rectifica), en el idioma de la pantalla, desde donde se
-   puede guardar como PDF. Un documento de una venta sale como «Copia» (el original fue el papel del
-   cobro); uno emitido desde Facturación, como original.
+2. Con **Impresión** y una impresora del sistema activa con la función Recibo, Facturación le pide la
+   página A4 (`invoice.invoice.print`, la plantilla `templates/invoice/invoice.html`, con el QR de
+   VeriFactu si la factura tiene su registro) y se lee «Enviado a <impresora>.» (PRINTING-F08).
+3. Si no (sin Impresión encendida, sin impresora del sistema, o sin poder leer su registro de
+   VeriFactu: el papel nunca sale sin su QR), se abre el diálogo de impresión del navegador con la
+   factura en A4 (emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que
+   rectifica), desde donde se puede guardar como PDF.
+4. Siempre en el idioma de quien imprime. Un documento de una venta sale como «Copia» (el original fue
+   el papel del cobro); uno emitido desde Facturación, como original.
 Entra: la factura y sus líneas.
-Sale: el papel; la factura no cambia.
+Sale: el papel; la factura no cambia. Cada pulsación, un papel.
 Si falla: «No se pudo imprimir la factura».
-Pendiente: la impresora de tiques llega con la app de Impresión, que imprimirá el mismo documento
-(`invoice.invoice.document`, la plantilla `templates/invoice/invoice.html`); el QR de VeriFactu llega
-con VeriFactu.
-Implicados: ninguno
+Implicados: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
@@ -726,6 +728,7 @@ Todas se pueden seguir en vivo.
 | Crea una serie | llevar las series | F12 | `invoice.series.create` |
 | Cambia una serie | llevar las series | F13 | `invoice.series.update` |
 | Guarda el emisor | configurar el emisor | F21 | `invoice.issuer.update` |
+| Manda la página A4 de una factura a la cola de Impresión (o dice que no se encoló: la imprime el dispositivo) | ver | F18 | `invoice.invoice.print` |
 | Guarda el emisor que manda la cuenta de ERPlora | solo el sistema | F22 | `invoice.issuer.sync` |
 | Emite una factura de ERPlora con su registro de VeriFactu | solo el sistema | F23 | `invoice.invoice.issue_platform` |
 
@@ -781,6 +784,10 @@ dentro de su cobro, su anulación o su devolución, y el que quedó «pendiente�
   impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
   los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
+- **Impresión** (por nombre, sin requisito): `printing.job.create` con la página A4 de una factura para la
+  impresora del sistema (F18), en un punto de guardado propio; sin Impresión encendida, sin impresora del
+  sistema o si la rechaza, no se encola nada y la imprime el dispositivo.
+- **VeriFactu** (por nombre, sin requisito): `verifactu.record.by_invoice`, el QR que lleva esa página A4.
 
 ### Quién la usa
 
@@ -788,7 +795,6 @@ dentro de su cobro, su anulación o su devolución, y el que quedó «pendiente�
 |---|---|---|
 | VeriFactu | Registrar cada documento emitido y encadenar su huella | `invoice.invoice.issued` + la factura (requiere `invoice`) |
 | Ventas | Poner el número de la factura en el tique | `invoice.invoice.by_source` |
-| Impresión | Imprimir el documento | `invoice.invoice.document` |
 
 ### Quién puede qué
 

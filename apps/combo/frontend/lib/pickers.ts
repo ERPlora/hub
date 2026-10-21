@@ -1,6 +1,6 @@
 // The searches behind the combo pickers (`Combo` of @erplora/ui): each asks the server for what the
 // person types, 20 at a time, and turns every row into an option. A choice is an active product of
-// Inventory (by id, with its SKU and its price); a menu's VAT category, a Taxes key named by its name
+// Inventory, sold out today or not (INVENTORY-F29: only the till hides it) (by id, with its SKU and its price); a menu's VAT category, a Taxes key named by its name
 // and its rate in force. The required apps' lists are read through their own operations.
 import type { ComboOption, ComboSearch } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
@@ -30,7 +30,7 @@ function formatRate(rate: string, locale: string): string {
 
 export function searchProducts(client: LiveClient, locale: string): ComboSearch {
   return async (query) => {
-    const page = await client.api.call('inventory.product.list', { ...search(query), is_active: true, limit: PAGE });
+    const page = await client.api.call('inventory.product.list', { ...search(query), is_active: true, include_sold_out: true, limit: PAGE });
     return page.rows.filter(isPortion).map((row): ComboOption => ({ id: row.id, label: row.name, hint: `${row.sku} · ${formatMoney(row.price, locale)}` }));
   };
 }

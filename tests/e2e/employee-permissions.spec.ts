@@ -3,7 +3,8 @@
 // takes: no «New item», figures, «Edit», «Delete» nor «Add line»; reached by its address, a form says
 // «You do not have permission»; the API refuses every management operation with 403
 // `permission_denied` and nothing changes. Without a session the API answers 401 `unauthorized`;
-// with the permission taken away while the screen is open, the next refresh ends in the error.
+// with the permission taken away while the screen is open, the next refresh ends in «You do not have
+// permission» and the item is no longer on screen.
 // The owner's screens are the positive control: the same hooks are there for who may manage.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
@@ -101,7 +102,12 @@ test('DEMO-F06: an employee sees Demo but cannot manage it, by the screens or by
     psql(`delete from base_membership where host = 'a' and user_id = ${EMPLOYEE_USER}`);
     try {
       await addLine(owner.context, item.id, 'Second owner line');
-      await expect(shown(page).locator('[data-testid=demo-detail-error]')).toBeVisible();
+      const refused = shown(page).locator('[data-testid=demo-detail-error]');
+      await expect(refused).toContainText('You do not have permission');
+      // What it may no longer read is no longer on screen.
+      for (const hook of ['demo-detail-status', 'demo-note', 'demo-line-text']) {
+        await expect(shown(page).locator(`[data-testid=${hook}]`), hook).toHaveCount(0);
+      }
       await page.screenshot({ path: shot('f06-employee-revoked') });
     } finally {
       // What the next sign-in would do: the SaaS still says employee of `a`.

@@ -25,6 +25,7 @@ export interface Product {
   tax_category_key: string | null;
   needs_tax_setup: boolean;
   is_active: boolean;
+  is_sold_out: boolean;
 }
 
 /** Deletes every `E2E` product, movement, category, link and learned text and `e2e.inv_*` tax category. */

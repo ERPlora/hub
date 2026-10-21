@@ -130,6 +130,8 @@ export interface JobCreateIn {
   printer?: string;
   copies?: number;
   automatic?: boolean;
+  /** With `automatic`: false keeps the drawer shut whatever the settings (a checkout with no cash). */
+  open_drawer?: boolean;
   /** ISO 4217, for the amounts' decimals; EUR without it. */
   currency?: string;
   source_app?: string;
@@ -198,6 +200,8 @@ export interface UsageSummary {
   usage: Usage;
   printers: number;
   default_printer: string | null;
+  /** The printer its next job goes to now (the chosen one if active, else the first active one). */
+  prints_on: string | null;
   pending: number;
   oldest_pending_at: string | null;
   sent: number;
@@ -233,6 +237,8 @@ export interface HostJobOut {
   copies: number;
   open_drawer: boolean;
   attempts: number;
+  /** When the device's time to answer runs out (90 s after it took the job). */
+  leased_until: string;
 }
 
 export interface JobAckOut {

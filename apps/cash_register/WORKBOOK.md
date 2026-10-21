@@ -1,7 +1,7 @@
 # Workbook — Caja (app)
 Prefijo: CASH_REGISTER
 Alcance MVP: núcleo
-Estado de la app: hecha (servidor y páginas); lo que depende de apps o piezas que aún no existen lo dice cada flujo
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `cash_register`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -144,7 +144,7 @@ ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar lo
 | CASH_REGISTER-F01 | Configurar cómo funciona la caja | común | hecho |
 | CASH_REGISTER-F02 | Dar de alta, renombrar y desactivar un cajón | común | hecho |
 | CASH_REGISTER-F03 | Abrir el turno de caja con el fondo inicial | común | hecho |
-| CASH_REGISTER-F04 | Vender solo con la caja abierta | común | hecho (lo aplica Ventas) |
+| CASH_REGISTER-F04 | Vender solo con la caja abierta | común | hecho |
 | CASH_REGISTER-F05 | Registrar una entrada o una salida de efectivo | común | hecho |
 | CASH_REGISTER-F06 | Contar el cajón por billetes y monedas | común | hecho |
 | CASH_REGISTER-F07 | Contar a ciegas: quién ve el efectivo esperado | común | hecho |
@@ -659,8 +659,9 @@ cajero del producto actual es un empleado.
   (`RefundPayment` de las devoluciones desde la apertura). Al cerrar, esas líneas se copian en
   `Movement` (con su clave de origen, única por tipo: un pago de venta se copia una vez como venta y
   una como anulación; un pago de devolución, una vez) y la sesión cerrada solo lee sus copias: un
-  turno cerrado nunca cambia. Así funciona sin el relay del outbox (fase 2) y no pierde nada si un
-  aviso no llega. Si una línea ya está copiada se mira por su origen (`sale_payment_id`,
+  turno cerrado nunca cambia. Así no depende del relay del outbox (que el worker reparte desde el
+  2026-10-21, `base/relay.py`: Caja no declara `REACTIONS`) y no pierde nada si un aviso no llega.
+  Si una línea ya está copiada se mira por su origen (`sale_payment_id`,
   `refund_payment_id`, `sale_id`: los índices únicos parciales de `Movement`). Lo que no cayó en ninguna
   sesión (`queries.unassigned_window`: con la caja cerrada, lo de después del corte de una sesión
   olvidada, o las rezagadas confirmadas mientras se cerraba la anterior) sale en `session.current`,
@@ -744,14 +745,18 @@ cajero del producto actual es un empleado.
 - No cobra ni factura: Ventas, Facturación y VeriFactu.
 - No abre el cajón físico: Impresión. El informe X o Z lo imprime Impresión, en su cola de recibos (sin
   Impresión o sin impresora de recibos, el diálogo del navegador).
-- No lleva varios cajones abiertos a la vez: una sesión por negocio.
+- No lleva varios cajones abiertos a la vez: una sesión por negocio, aunque haya varios cajones dados de
+  alta (el índice único parcial de `Session`). Una sesión por cajón, para dos cajas cobrando a la vez, queda
+  fuera de esta versión: el negocio del norte (una peluquería o un restaurante con una sola caja) no la
+  necesita, y cambiarla toca a Ventas (F04 pregunta por «la» sesión abierta).
 - No reabre turnos ni edita o borra movimientos o arqueos: se corrige con otro movimiento.
 - No gestiona propinas, banco ni caja fuerte más allá de una salida de efectivo.
-- No pide aprobación ni nota obligatoria cuando la diferencia pasa de un umbral.
+- No pide aprobación ni nota obligatoria cuando la diferencia pasa de un umbral. Toast y Lightspeed lo
+  ofrecen como opción, no de fábrica; si llega, será una política del dueño (ADR-0476: el número y la
+  consecuencia los pone él) sobre el cierre de F09.
+- No abre el cajón sin venta («no-sale»). El cajón físico lo abre Impresión (PRINTING-F13, al cobrar);
+  abrirlo sin venta, con su permiso y su rastro en la sesión, queda fuera de esta versión.
 
-### Dudas abiertas
-
-1. ¿Aprobación del responsable y nota obligatoria cuando la diferencia pasa de un umbral? (Toast y
-   Lightspeed lo ofrecen como opción.)
-2. ¿Abrir el cajón sin venta («no-sale») con permiso y registro, y de quién es: Caja o Impresión?
-3. ¿Una sesión por cajón cuando un negocio tenga dos cajas cobrando a la vez?
+Las tres salidas de esta lista que el mercado sí ofrece (una sesión por cajón, el umbral del descuadre y
+el «no-sale») se decidieron al cerrar la app (2026-10-21) y van a «Fuera por ahora» (`## 6` de
+`MIGRATION.md`).

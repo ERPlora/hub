@@ -254,13 +254,15 @@ def away_key(product, targets: frozenset[str]) -> str | None:
 
 
 def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:
-    """offered, or why not: the product deleted, deactivated or not sold by units in Inventory; with no
-    rate to bill it at in a menu to take away; or sold out here."""
+    """offered, or why not: the product deleted, deactivated, sold out (INVENTORY-F29) or not sold by
+    units in Inventory; with no rate to bill it at in a menu to take away; or sold out here."""
     product = option.product
     if product.is_deleted:
         return "product_deleted"
     if not product.is_active:
         return "product_inactive"
+    if product.is_sold_out:
+        return "product_sold_out"
     if not sold_by_unit(product):
         return "not_by_unit"
     if option.group.combo.supply_kind == Combo.SupplyKind.GOODS and away_key(product, targets) is None:
@@ -665,7 +667,8 @@ def _check_offer(option: ChoiceOption, charging: bool) -> None:
         return
     if product.is_deleted or not product.is_active:
         raise Conflict(str(PRODUCT_UNAVAILABLE) % {"product": product.name}, code="combo.product_unavailable")
-    if not option.is_available:
+    # Sold out here, or in Inventory for every menu that offers it (INVENTORY-F29).
+    if not option.is_available or product.is_sold_out:
         raise Conflict(str(SOLD_OUT) % {"product": product.name}, code="combo.option_sold_out")
 
 

@@ -1,7 +1,7 @@
 # Workbook — Demo (app)
 Prefijo: DEMO
 Alcance MVP: fase 1 (referencia técnica, no se vende)
-Estado de la app: en construcción (servidor hecho; páginas en V8)
+Estado de la app: hecha (servidor y páginas)
 
 > Manual de usuario y especificación de la app `demo`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -32,55 +32,57 @@ Es el patrón de lista y ficha de cualquier backoffice del mercado (Odoo, Shopif
 lista paginada con buscador y filtro de estado, ficha con sus líneas, formulario con el error junto a
 cada campo y borrado con confirmación. La línea que aparece al instante y se deshace si el servidor
 la rechaza es la «actualización optimista» de Linear, Trello o Google Docs. La repetición segura de
-una petición con un identificador que pone el cliente es la clave de idempotencia de Stripe.
+una petición con un identificador que pone el cliente es la clave de idempotencia de Stripe. Una ficha
+que se borra en otro sitio, o que la persona deja de poder ver, deja de enseñarse y dice por qué, como
+el «registro que ya no existe» de Odoo.
 
 ## Antes de empezar
 
-- Hace falta entrar con un usuario que tenga papel en ese negocio. El Hub no tiene login propio: sin
-  sesión, la página manda al login del SaaS (`http://localhost:8001/hub-login/?hub=a`), que
-  vuelve con un código de un solo uso y el papel en ese negocio (en desarrollo, la cuenta
-  `owner@example.com` / `owner` del SaaS, propietaria de `a` y `b`). El Django admin del Hub es de
-  la plataforma y solo vive en `http://hubs.localhost:8000/admin/` (en `a.localhost:8000/admin/`,
-  404): el staff entra desde la página «Hubs» del admin del SaaS (`platform@example.com` /
-  `platform`); ningún papel de negocio entra en él.
-- En la fase 1 el negocio es la **primera parte de la dirección**: `a.localhost:8000` es el negocio
-  `a` y `b.localhost:8000` el negocio `b`. En la fase 2 cada negocio será un hub con su base de datos.
-- ⚠️ En la fase 1 los dos negocios **comparten los elementos** (una sola base de datos, sin
-  tenencia). Lo que sí se separa ya es el **aviso en vivo**: guardar en `a` solo refresca las
-  pantallas abiertas en `a`. Las de `b` ven el cambio al recargar o con el siguiente aviso de `b`.
+- Hace falta entrar con una cuenta que tenga papel en ese negocio. Demo no tiene entrada propia: sin
+  sesión, lleva a la entrada de ERPlora, que vuelve al negocio ya con su papel.
+- En la fase 1 el negocio es la **primera parte de la dirección** (el negocio `a` y el negocio `b`). En
+  la fase 2 cada negocio tendrá sus propios datos.
+- ⚠️ En la fase 1 los dos negocios **comparten los elementos**. Lo que sí se separa ya es el **aviso
+  en vivo**: guardar en `a` solo refresca las pantallas abiertas en `a`. Las de `b` ven el cambio al
+  recargar o con el siguiente aviso de `b`.
 
 ## Pantallas
 
-Demo se abre desde el menú **Demo** y tiene dos pantallas y un formulario.
+Demo se abre desde **«Mis apps»**, arriba a la derecha, y tiene dos pantallas y dos formularios.
 
 ### Elementos (lista)
 Tabla con Nombre, Estado («Abierto» / «Hecho»), Líneas (cuántas tiene) y Actualizado. Buscador
-«Buscar…» por nombre (sin distinguir mayúsculas); filtro de estado («Todos», «Abierto», «Hecho»);
-50 por página, del cambiado más recientemente al más antiguo. Botón **+** (crear) solo para quien
+«Buscar…» por nombre (sin distinguir mayúsculas); el embudo abre «Filtros», con el de estado («Todos»,
+«Abierto», «Hecho»); 50 por página (se puede cambiar), del cambiado más recientemente al más antiguo,
+como tabla o como tarjetas; en el móvil, «Cargar más». Botón **«Nuevo elemento»** solo para quien
 puede gestionar. Tocar una fila abre la ficha. Encima, las cifras «Abiertos», «Hechos» y «Líneas»,
 solo para quien puede gestionar.
 
-![La lista de elementos en el móvil, con las cifras, el buscador y el filtro de estado](docs/img/items-list.png)
+![La lista de elementos en el móvil, con las cifras, el buscador, el embudo de filtros y «Nuevo elemento»](docs/img/items-list.png)
 
 ### Ficha del elemento
 Nombre, estado, nota y la lista de líneas (texto y cantidad, en el orden en que se añadieron).
-Acciones para quien puede gestionar: «Editar», «Eliminar» y «Añadir línea». Si otra persona cambia
-el elemento mientras se edita la nota, la nota escrita **no se pisa** y sale «Actualizado en otro
-sitio».
+Acciones para quien puede gestionar: «Editar», «Marcar como hecho» (o «Reabrir»), «Eliminar»,
+«Guardar nota» y «Añadir línea»; en el móvil, las tres primeras se abren desde «Más acciones» (⋮),
+arriba a la derecha, para que el nombre se lea entero. Si otra persona cambia la nota mientras se escribe, la nota escrita
+**no se pisa** y sale «Actualizado en otro sitio», con «Recargar» para tomar la de la otra persona. Si
+el elemento se borra en otro sitio, o la persona deja de poder verlo, la ficha deja de enseñarlo y
+dice por qué.
 
-### Formulario (crear y editar)
+### Nuevo elemento y Editar elemento (formularios)
 Campos Nombre (obligatorio, hasta 120 caracteres), Estado y Nota. «Guardar». Un dato que no vale
-sale debajo de su campo y no se guarda nada.
+sale debajo de su campo y no se guarda nada. Quien no puede gestionar ve «No tienes permiso» en lugar
+del formulario.
 
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | «Cargando…» mientras llega el primer resultado. |
-| Vacío | «Todavía no hay elementos» (o «Sin resultados» si hay búsqueda o filtro), con **+** si puede crear. |
-| Error | «No se pudieron cargar los elementos» con «Reintentar». |
+| Cargando | «Cargando…» en la lista y una rueda en la ficha mientras llega el primer resultado. |
+| Vacío | «Todavía no hay elementos» (o «Sin resultados» si hay búsqueda o filtro), con «Nuevo elemento» si puede crear; una ficha sin líneas, «Todavía no hay líneas». |
+| Error | «No se pudieron cargar los elementos» con «Reintentar»; en la ficha, «No se pudo cargar el elemento» con el motivo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
-| App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». No se reintenta solo: vuelve cuando la app se activa. |
+| App inactiva | «Esta app no está activa en este negocio». No se reintenta solo: vuelve cuando la app se activa. |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
 ## Flujos
@@ -95,13 +97,14 @@ sale debajo de su campo y no se guarda nada.
 | DEMO-F06 | Intentarlo sin permiso | hecho |
 
 ### DEMO-F01 Crear un elemento
+<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Elementos
 Pasos:
-1. En **Elementos**, pulsa **+**: se abre el formulario.
+1. En **Elementos**, pulsa «Nuevo elemento»: se abre el formulario «Nuevo elemento».
 2. Escribe el Nombre; Estado («Abierto» de entrada) y Nota son opcionales.
-3. Pulsa «Guardar». El formulario se cierra y el elemento sale el primero de la lista, con 0 líneas.
+3. Pulsa «Guardar». Vuelves a la lista y el elemento sale el primero, «sin líneas».
 Entra: nada de otras apps.
 Sale: el elemento, en un solo paso; Demo avisa de que hay un elemento nuevo
 (`demo.item.created`) y se refrescan la lista y las cifras.
@@ -110,13 +113,17 @@ guarda nada.
 Implicados: ninguno
 
 ### DEMO-F02 Editar un elemento
+<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
 Pasos:
-1. En la ficha, pulsa «Editar» (o cambia el estado o la nota).
-2. Cambia lo que haga falta y guarda. Solo se cambia lo que se envía; lo demás queda como estaba.
-3. La ficha y la lista enseñan los datos nuevos y el elemento sube al principio de la lista.
+1. En la ficha, pulsa «Editar»: se abre «Editar elemento» con los datos guardados.
+2. Cambia lo que haga falta y pulsa «Guardar». Solo se cambia lo que has tocado; lo demás queda como
+   estaba.
+3. Vuelves a la ficha con los datos nuevos, y el elemento sube al principio de la lista.
+4. Sin abrir el formulario, en la misma ficha: «Marcar como hecho» (o «Reabrir») cambia el estado, y
+   «Guardar nota» guarda la nota escrita.
 Entra: el elemento tal como está guardado.
 Sale: el elemento cambiado; Demo avisa del cambio (`demo.item.updated`). Guardar sin cambiar nada
 no avisa a nadie.
@@ -125,19 +132,22 @@ borró): «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F03 Borrar un elemento
+<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
 Pasos:
-1. En la ficha, pulsa «Eliminar».
-2. Confirma en la ventana «Eliminar elemento». El elemento y sus líneas desaparecen.
+1. En la ficha, pulsa «Eliminar»: sale «¿Eliminar este elemento y sus líneas?».
+2. Pulsa «Eliminar» para confirmar («Cancelar» no borra nada). Vuelves a la lista y el elemento ya no
+   está, ni sus líneas.
 Entra: el elemento elegido.
 Sale: el elemento y sus líneas, borrados; Demo avisa (`demo.item.deleted`). Las otras tabletas que
-tengan abierta su ficha ven «Este elemento ya no existe».
+tengan abierta su ficha ven «Este elemento ya no existe», sin el elemento ni sus botones.
 Si falla: «Este elemento ya no existe» si otra persona lo borró antes.
 Implicados: ninguno
 
 ### DEMO-F04 Añadir una línea al instante (optimista e idempotente)
+<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -147,18 +157,19 @@ Pasos:
 3. Cuando contesta, la línea provisional se cambia por la guardada sin que se note.
 Entra: el elemento, su estado y sus líneas.
 Sale: la línea, al final (posición siguiente a la última), y el elemento como recién cambiado; Demo
-avisa (`demo.item.line_added`).
-Repetir es seguro: cada línea lleva un identificador que pone la tableta. Si la misma petición llega
-dos veces (un reintento por mala cobertura), la segunda devuelve la ficha tal cual, **sin duplicar la
-línea ni volver a avisar**. Con el mismo identificador gana la primera línea guardada. Un reintento de
-una línea que ya entró se acepta aunque el elemento se haya cerrado después.
+avisa (`demo.item.line_added`). Repetir es seguro: cada línea lleva un identificador que pone la
+tableta, y si la misma línea llega dos veces (un reintento por mala cobertura), la segunda devuelve la
+ficha tal cual, **sin duplicar la línea ni volver a avisar**; con el mismo identificador gana la
+primera línea guardada, y un reintento de una línea que ya entró se acepta aunque el elemento se haya
+cerrado después.
 Si falla: si el elemento está «Hecho», la línea provisional **se deshace** y sale «Este elemento está
-cerrado: ábrelo para añadir líneas» (409 `demo.item_done`). Texto vacío o de más de 200 caracteres, o
-una cantidad que no sea mayor que cero (hasta 3 decimales), sale junto a su campo. Si el elemento ya
-no existe: «Este elemento ya no existe».
+cerrado: ábrelo para añadir líneas». Sin texto, «Añadir línea» no se puede pulsar, y el texto no pasa
+de 200 caracteres; una cantidad que no sea mayor que cero (hasta 3 decimales) sale debajo de su campo.
+Si el elemento ya no existe: «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F05 Ver el cambio en otra tableta en menos de un segundo
+<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: cualquiera con permiso de ver
 Pantalla: Elementos y Ficha del elemento
@@ -174,18 +185,20 @@ completos. Lo hecho en `a` no avisa a las pantallas de `b` (ni al revés).
 Implicados: ninguno
 
 ### DEMO-F06 Intentarlo sin permiso
+<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: empleado
 Pantalla: Elementos y Ficha del elemento
 Pasos:
-1. Un empleado abre **Demo**: ve la lista y la ficha, sin **+**, «Editar», «Eliminar», «Añadir
-   línea» ni cifras.
-2. Si lo intenta por la API o el asistente, se rechaza.
+1. Un empleado abre **Demo**: ve la lista y la ficha, sin «Nuevo elemento», «Editar», «Marcar como
+   hecho», «Eliminar», «Guardar nota», «Añadir línea» ni cifras; la nota solo se lee.
+2. Si abre a mano el formulario de crear o de editar, ve «No tienes permiso»; si lo intenta por la API
+   o el asistente, se rechaza.
 Entra: su papel en ese negocio.
 Sale: nada cambia.
-Si falla: «No tienes permiso» (403 `permission_denied`). Sin sesión, 401 `unauthorized` y la
-pantalla de entrada. Si le quitan el permiso con la pantalla abierta, la suscripción se corta con
-el error en el siguiente refresco.
+Si falla: «No tienes permiso». Sin sesión, lleva a la entrada. Si le quitan el permiso con la
+pantalla abierta, en el siguiente refresco la ficha deja de enseñar el elemento y dice «No tienes
+permiso».
 Implicados: ninguno
 
 ## Servicios: lo que entra y lo que sale
@@ -232,14 +245,9 @@ Nada: Demo no depende de ninguna app.
 | Ver elementos | sí | sí | sí | sí | `demo.view` |
 | Gestionar elementos y ver las cifras | sí | sí | sí | no | `demo.manage` |
 
-Los papeles de negocio llegan del SaaS tal cual y se guardan con prefijo: `hub_owner`, `hub_admin`,
-`hub_manager` y `hub_employee` (las claves de `role_permissions`); en pantalla solo se ve su nombre
-traducido. El propietario y el administrador tienen siempre todos los permisos de todas las apps; el
-responsable y el empleado, los que declara cada app. Un papel sin el prefijo se rechaza al entrar.
-Ningún papel de negocio da `is_staff`: los papeles de plataforma (superusuario y grupo `support`)
-solo llegan al Hub por la audiencia `hub-admin` (el admin del Hub en `hubs`), sobre una copia local
-propia del staff, `saas-staff:<id>`, separada de la copia de cliente `saas:<id>` y sin papel en ningún
-hub.
+El propietario y el administrador tienen siempre todos los permisos de todas las apps; el responsable y
+el empleado, los que declara cada app. Los papeles de la plataforma (el equipo de ERPlora) no tienen
+papel en ningún negocio.
 
 ## Para quien lo mantiene
 
@@ -249,10 +257,34 @@ hub.
   POST), porque cada ruta toma **un** parámetro igual a la entrada de su operación.
 - La línea es idempotente por `(elemento, client_line_id)` (restricción `demo_line_client_id_unique`);
   `add_line` bloquea la fila del elemento, así que dos líneas a la vez no comparten posición.
+- Errores: 422 `invalid_payload` con `fields` por campo (mensaje en el idioma de la petición); 404
+  `not_found` («Este elemento ya no existe»); 409 `demo.item_done` (línea en un elemento hecho); 403
+  `permission_denied`; 401 `unauthorized`; 404 `app_inactive`. En la ficha, un error de la consulta
+  viva que dice que el elemento ya no es de quien mira (`not_found`, `permission_denied`,
+  `unauthorized`, `app_inactive`, `app_entitlement_blocked`) deja de pintarlo con sus acciones
+  (`ItemDetailPage.vue`, `GONE`); un fallo pasajero (`internal_error`) lo deja a la vista bajo el
+  aviso. `permission_denied` se titula «No tienes permiso».
 - El administrador de Django enseña los elementos con sus líneas **solo para leer**: toda escritura
-  pasa por una operación, que es la que deja el aviso.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`; la fase 2
-  cambia solo `base/operations.py` (ámbito = hub, una BD por hub).
+  pasa por una operación, que es la que deja el aviso. Vive solo en `http://hubs.localhost:8000/admin/`
+  (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS
+  (`platform@example.com` / `platform`); ningún papel de negocio entra en él.
+- Entrada en desarrollo: sin sesión, el Hub manda al login del SaaS
+  (`http://localhost:8001/hub-login/?hub=a`), que vuelve con un código de un solo uso y el papel en
+  ese negocio. Cuentas del SaaS: `owner@example.com` / `owner` (propietario de `a` y `b`) y
+  `employee@example.com` / `employee` (empleado de `a`).
+- Los papeles de negocio llegan del SaaS tal cual y se guardan con prefijo: `hub_owner`, `hub_admin`,
+  `hub_manager` y `hub_employee` (las claves de `role_permissions`); en pantalla solo se ve su nombre
+  traducido. Un papel sin el prefijo se rechaza al entrar. Ningún papel de negocio da `is_staff`: los
+  papeles de plataforma (superusuario y grupo `support`) solo llegan al Hub por la audiencia
+  `hub-admin` (el admin del Hub en `hubs`), sobre una copia local propia del staff, `saas-staff:<id>`,
+  separada de la copia de cliente `saas:<id>` y sin papel en ningún hub.
+- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b` (una sola
+  base de datos, sin tenencia); la fase 2 cambia solo `base/operations.py` (ámbito = hub, una BD por
+  hub).
+- Pruebas por flujo: `tests/e2e/demo-flows.spec.ts` recorre DEMO-F01 a F06 en 390, 834 y 1440 (capturas
+  `APP-DEMO-<flujo>-<ancho>`); las medidas finas siguen en `two-tabs-live`, `optimistic-add-line`,
+  `two-orgs-isolated`, `reconnect`, `delete-item`, `create-edit-pages`, `list-filters-stats`,
+  `datatable` y `employee-permissions`.
 
 ## Lo que NO hace, a propósito
 
