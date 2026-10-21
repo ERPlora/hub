@@ -8,9 +8,9 @@ import type { Page } from '../../../frontend/sdk-types';
 export type SupplyKind = 'service' | 'goods';
 export type SortDir = 'asc' | 'desc';
 export type ComboSort = 'sort_order' | 'name' | 'price' | 'supply_kind' | 'is_active' | 'id';
-/** offered; sold_out (marked here); product_inactive, product_deleted or not_by_unit (in Inventory); untaxed
+/** offered; sold_out (marked here); product_inactive, product_sold_out, product_deleted or not_by_unit (in Inventory); untaxed
  *  (no VAT category to bill it at to take away). */
-export type OptionStatus = 'offered' | 'sold_out' | 'product_inactive' | 'product_deleted' | 'not_by_unit' | 'untaxed';
+export type OptionStatus = 'offered' | 'sold_out' | 'product_inactive' | 'product_sold_out' | 'product_deleted' | 'not_by_unit' | 'untaxed';
 
 interface PageIn {
   limit?: number;

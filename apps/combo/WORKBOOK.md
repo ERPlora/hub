@@ -104,7 +104,8 @@ Después, la sección «Platos» («Un plato es un paso de ESTE menú: Primero, 
 orden es el orden en que se pregunta.») y una tarjeta por plato, en orden: nombre, su regla
 («Obligatorio · elige 1 · hasta 1 · sin repetir») y, con permiso de gestión, el asa de arrastre,
 «Subir», «Bajar», «Editar datos» y «Retirar». Dentro, «Elecciones»: una fila por producto con su
-suplemento, una marca «Agotado» si no está disponible hoy y, si el producto ya no se puede vender, «Desactivado en Inventario», «Ya no está en el
+suplemento, una marca «Agotado» si no está disponible hoy, «Agotado en Inventario» si su producto está agotado
+para todo el negocio y, si el producto ya no se puede vender, «Desactivado en Inventario», «Ya no está en el
 catálogo», «No se vende por unidades en Inventario» o, en un menú «para llevar», «Sin tipo de IVA para
 llevar»; por fila, el asa, subir, bajar, «Agotado / Disponible», editar y quitar. Debajo, el buscador
 «Busca un producto…», «Suplemento», «Añadir elección» y «Añadir varios» (ventana con buscador y
@@ -245,6 +246,7 @@ admite como mucho 20 platos.»). Si el servidor rechaza, el formulario lo dice y
 Implicados: ninguno
 
 ### COMBO-F06 Elegir los productos de cada plato y su suplemento
+<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -258,7 +260,8 @@ Pasos:
 4. Para cambiar el producto o el suplemento de una elección, pulsa su lápiz: el formulario dice
    «Editando «{producto}». Conserva su posición en el plato.». Con el asa, subir o bajar se reordena;
    la papelera la quita, tras confirmarlo.
-Entra: los productos de Inventario (los activos, que se venden por unidades).
+Entra: los productos de Inventario (los activos, que se venden por unidades; también los agotados hoy,
+que se pueden poner en un menú aunque el TPV no los ofrezca hasta que vuelvan).
 Sale: la elección (avisa: elección nueva, cambiada, reordenada o quitada). El suplemento se suma al
 precio cerrado, nunca al precio del producto.
 Si falla: «Elige antes un producto del catálogo.», «Este plato ya ofrece ese producto. Para que se
@@ -270,6 +273,7 @@ el buscador lo dice con «Reintentar».
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
+<!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f07 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 -->
 Estado: servidor hecho; la hoja del TPV es de Ventas (pedido a Ventas, SALE-F12)
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -286,11 +290,12 @@ Entra: los menús a la venta que se pueden completar, con sus platos y sus elecc
 Sale: la línea del menú con lo elegido. El precio que ve el TPV es una vista previa: el que vale lo
 calcula este módulo al cobrar (COMBO-F08).
 Si falla: un menú no sale en el TPV si no está a la venta, si no tiene ningún plato con elecciones o
-si un plato obligatorio no tiene bastantes elecciones disponibles (agotadas, desactivadas o
-eliminadas en Inventario). Un plato opcional sin elecciones disponibles no sale en la hoja.
+si un plato obligatorio no tiene bastantes elecciones disponibles (agotadas aquí o en Inventario,
+desactivadas o eliminadas en Inventario). Un plato opcional sin elecciones disponibles no sale en la hoja.
 Implicados: SALE-F12, MODIFIER-F06
 
 ### COMBO-F08 Cobrar el menú: precio cerrado y suplementos
+<!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f08 wf:restaurante-dia#rec_restaurante-f11 -->
 Estado: servidor hecho; lo llama Ventas al pedir y al cobrar (pedido a Ventas, SALE-F12)
 Actor: sistema
 Pantalla: ninguna
@@ -299,8 +304,8 @@ Pasos:
    pedido: en el local, para llevar o a domicilio; sin canal vale el ajuste del menú)
    (`combo.combo.resolve`).
 2. Menús comprueba cada plato (mínimo, máximo, repetición), que cada elección siga en el menú y siga
-   siendo una ración (se vende por unidades) y, en un pedido nuevo, que esté disponible, con su producto
-   activo, y que el menú siga a la venta.
+   siendo una ración (se vende por unidades) y, en un pedido nuevo, que esté disponible (no agotada aquí
+   ni en Inventario), con su producto activo, y que el menú siga a la venta.
 3. El importe es el precio cerrado más un suplemento por cada elección (también la repetida). En una
    cuenta abierta, Ventas manda el importe que tenía al pedirlo: Menús reparte ese y **no vuelve a
    pedir disponibilidad** (el último flan servido y marcado «Agotado» no impide cobrar la mesa), solo
@@ -395,11 +400,15 @@ Pasos:
 1. En la fila de la elección, pulsa «Agotado» (o di «hoy no hay flan en el menú del día»).
 2. La fila se marca «Agotado» y el TPV deja de ofrecerla; el resto del menú se sigue vendiendo.
 3. Cuando vuelva a haber, pulsa «Disponible».
-Entra: la elección.
+4. Si el producto se marca agotado en Inventario (INVENTORY-F29), todas sus elecciones, en todos los
+   menús, salen «Agotado en Inventario» y el TPV deja de ofrecerlas al momento, sin tocar el menú;
+   vuelven solas cuando Inventario lo pone otra vez a la venta.
+Entra: la elección, o el producto agotado en Inventario.
 Sale: la elección cambiada (avisa: elección cambiada).
 Si falla: si al agotarla un plato obligatorio se queda sin bastantes elecciones, el menú deja de salir
-en el TPV y el aviso del constructor lo dice.
-Implicados: COMBO-F07
+en el TPV y el aviso del constructor lo dice. Una cuenta abierta con un plato ya pedido se cobra igual
+(COMBO-F08).
+Implicados: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 Cuando un producto deja el catálogo
 <!-- origen: old:combos/WORKFLOW.md#combos-f06 old:combos/WORKFLOW.md#combos-f09 -->
@@ -473,14 +482,14 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 | Inventario: producto eliminado | Quita sus elecciones de todos los menús (cuando llegue el reparto de avisos entre apps, fase 2; hasta entonces se quitan a mano) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
 
 Además, los cambios de producto de Inventario (`inventory.product.updated`, `.deleted`) vuelven a
-leer en vivo el constructor y el catálogo del TPV: el nombre, el precio y si está activo son de
-Inventario.
+leer en vivo el constructor y el catálogo del TPV: el nombre, el precio, si está activo y si está
+agotado son de Inventario.
 
 ### Lo que necesita de otras apps
 
 | De | Para qué | Flujos | Servicio |
 |---|---|---|---|
-| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal y si están activos (lectura directa: es una app requerida) | F06, F07, F08, F09 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` |
+| Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
 | Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
 
 ### Contrato con Ventas

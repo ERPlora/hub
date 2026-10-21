@@ -101,4 +101,56 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
     const m = await setup([200, { ...ANSWER, steps: [step] }]);
     expect(m.find('flow-test-step-s3').text()).toContain('needs a person in front: an automation cannot do it');
   });
+
+  // FLOW-F27: a call says where it would go and with what (secrets as ••••), never calling.
+  it('a call says where it would go and with what, and names the call when it is not allowed yet', async () => {
+    const call = { id: 's4', kind: 'http' as const, method: 'POST' as const, url: 'https://api.example.com/v1/x', headers: { Authorization: 'Bearer {{secret.KEY}}' }, body: '', timeout: 10 };
+    const step = {
+      ...ANSWER.steps[2],
+      id: 's4',
+      kind: 'http',
+      outcome: 'would_call' as const,
+      operation: '',
+      empty: [],
+      errors: {},
+      params: { method: 'POST', url: 'https://api.example.com/v1/x', headers: { Authorization: 'Bearer ••••' }, body: '', host: 'api.example.com' },
+    };
+    const m = await mountFlow(TestPanel, {
+      props: { document: { ...DOC, steps: [call] }, flowId: 'f1', catalog: CATALOG },
+      answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
+    });
+    await settle();
+    const text = m.find('flow-test-step-s4').text();
+    expect(text).toContain('Call api.example.com');
+    expect(text).toContain('Would call api.example.com');
+    expect(text).toContain('Bearer ••••');
+    expect(text).not.toContain('Host');
+    // In words: the address, each header as «Name: value», and nothing empty.
+    expect(text).toContain('Address');
+    expect(text).not.toContain('Url');
+    expect(text).toContain('Authorization: Bearer ••••');
+    expect(text).not.toContain('{');
+    expect(text).not.toContain('Body');
+    const refused = await mountFlow(TestPanel, {
+      props: { document: { ...DOC, steps: [call] }, flowId: 'f1', catalog: CATALOG },
+      answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [{ ...step, outcome: 'not_allowed' }] }] },
+    });
+    await settle();
+    expect(refused.find('flow-test-step-s4').text()).toContain('you have not allowed it «Call api.example.com» yet');
+  });
+
+  // FLOW-F28: a question says who it would ask and what, never asking.
+  it('a question says who it would ask, for how long, and what', async () => {
+    const question = { id: 's5', kind: 'ask' as const, title: 'Refund {{input.total}}?', details: '', role: 'manager' as const, hours: 24, on_no: 'stop' as const, on_timeout: 'no' as const };
+    const step = { ...ANSWER.steps[2], id: 's5', kind: 'ask', outcome: 'would_ask' as const, operation: '', empty: [], errors: {}, params: { title: 'Refund 12500?', details: '', role: 'manager', hours: 24 } };
+    const m = await mountFlow(TestPanel, {
+      props: { document: { ...DOC, steps: [question] }, flowId: 'f1', catalog: CATALOG },
+      answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
+    });
+    await settle();
+    const text = m.find('flow-test-step-s5').text();
+    expect(text).toContain('Would ask the managers and wait up to 24 hours');
+    expect(text).toContain('Refund 12500?');
+    expect(text).not.toContain('Hours');
+  });
 });

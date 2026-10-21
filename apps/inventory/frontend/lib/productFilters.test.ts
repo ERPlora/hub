@@ -3,7 +3,7 @@
 // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
 import { describe, expect, it } from 'vitest';
 
-import { filterParams, filtersInUse, unreadableEnds } from './productFilters';
+import { filterParams, filtersInUse, PRODUCT_STATUSES, unreadableEnds } from './productFilters';
 
 describe('productFilters', () => {
   it('sends name and SKU trimmed, the price in cents and the stock exact', () => {
@@ -21,6 +21,11 @@ describe('productFilters', () => {
   it('«from 12» is twelve euros, never twelve cents (inventory#115)', () => {
     expect(filterParams({ price_min: '12' })).toEqual({ price_min: 1200 });
     expect(filterParams({ price_max: '1.250,50' })).toEqual({ price_max: 125050 });
+  });
+
+  it('«Sold out» (INVENTORY-F29) is a status of the funnel, after «Not configured»', () => {
+    expect(PRODUCT_STATUSES).toEqual(['active', 'inactive', 'needs_tax_setup', 'sold_out']);
+    expect(filterParams({ status: 'sold_out' })).toEqual({ status: 'sold_out' });
   });
 
   it('what it cannot read does not filter, and a status it does not know neither', () => {

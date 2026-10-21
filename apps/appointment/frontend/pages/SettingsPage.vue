@@ -169,8 +169,9 @@ async function save(): Promise<void> {
           v-for="field in SWITCHES"
           :key="field"
           :data-testid="`appointment-settings-${field}`"
-          label-placement="end"
-          justify="start"
+          class="appointment-settings__switch"
+          label-placement="start"
+          justify="space-between"
           :checked="form[field]"
           @ion-change="set(field, $event.detail.checked)"
         >
@@ -207,8 +208,13 @@ async function save(): Promise<void> {
 <style scoped>
 .appointment-settings {
   display: grid;
+  /* One column as wide as the page: a long label wraps instead of pushing the form past the screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   max-width: 560px;
+}
+.appointment-settings__switch::part(label) {
+  white-space: normal;
 }
 .appointment-settings__title {
   font-size: 1.1rem;

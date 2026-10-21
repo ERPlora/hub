@@ -75,7 +75,7 @@ describe('combo catalogues (en source + es)', () => {
   });
 
   it('name every course rule, choice state and way of selling the server knows', () => {
-    for (const status of ['sold_out', 'product_inactive', 'product_deleted', 'not_by_unit', 'untaxed']) expect(EN.has(`combo.choices.status.${status}`), status).toBe(true);
+    for (const status of ['sold_out', 'product_inactive', 'product_sold_out', 'product_deleted', 'not_by_unit', 'untaxed']) expect(EN.has(`combo.choices.status.${status}`), status).toBe(true);
     for (const kind of ['service', 'goods']) expect(EN.has(`combo.supply.${kind}`), kind).toBe(true);
   });
 

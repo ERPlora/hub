@@ -36,15 +36,17 @@ class FlowConfig(LiveAppConfig):
     # automation that names an app that is off fails with its reason, visible in its history.
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
-    # The old module's two permissions (module.json), renamed <app>.<action>.
-    permissions = ["flow.view", "flow.manage"]
+    # The old module's two permissions (module.json), renamed <app>.<action>, and answering what an
+    # automation asks (FLOW-F29): what is asked of employees, and what is asked of managers.
+    permissions = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). An automation acts
-    # in the name of the business with nobody watching: only the owner and the admin (old module).
+    # in the name of the business with nobody watching: only the owner and the admin (old module) see,
+    # change or run them; a manager and an employee only answer the questions asked of their role.
     role_permissions = {
         "hub_owner": ["flow.*"],
         "hub_admin": ["flow.*"],
-        "hub_manager": [],
-        "hub_employee": [],
+        "hub_manager": ["flow.answer", "flow.answer_manager"],
+        "hub_employee": ["flow.answer"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
     # as the module's own icon.
@@ -71,6 +73,13 @@ class FlowConfig(LiveAppConfig):
             "name": "prune",
             "operation": "flow.run.prune",
             "cron": "17 * * * *",
+            "catch_up": "collapse",
+        },
+        # FLOW-F30: the questions nobody answered in time, every minute.
+        {
+            "name": "expire_questions",
+            "operation": "flow.question.expire_due",
+            "cron": "* * * * *",
             "catch_up": "collapse",
         },
     ]

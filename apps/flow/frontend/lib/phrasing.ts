@@ -7,7 +7,7 @@
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type { CatalogOut, ClauseOut, LogEntry, RunStatus, Step, Trigger } from '../operations';
-import { delayParts, isPath } from './document';
+import { callOrigin, delayParts, isPath, valueToParts } from './document';
 
 /** The translator the phrasing needs: `t` and `te` of the app, and its language. */
 export interface Phrasing {
@@ -44,8 +44,16 @@ export function eventLabel(name: string, catalog: CatalogOut | null | undefined,
   return `${appName(app, catalog)}: ${humanize(entity)} ${factWord}`.trim();
 }
 
-/** «Create a task», or «Create · Reservations (waitlist)» for an action without a phrase. */
+/** The host of a call's address written by hand (`api.example.com`), or `null`. */
+function callHost(url: string): string | null {
+  const origin = callOrigin(url);
+  return origin ? origin.slice('https://'.length) : null;
+}
+
+/** «Create a task», or «Create · Reservations (waitlist)» for an action without a phrase; a call's
+ *  permission (`http:https://host`) is «Call host». */
 export function actionLabel(name: string, catalog: CatalogOut | null | undefined, p: Phrasing): string {
+  if (name.startsWith('http:')) return p.t('flow.steps.describe.http', { host: callHost(name.slice('http:'.length)) ?? name.slice('http:'.length) });
   const curated = `flow.actions.${key(name)}`;
   if (p.te(curated)) return p.t(curated);
   const [app = name, entity = '', verb = ''] = name.split('.');
@@ -64,16 +72,20 @@ export function fieldLabel(name: string, p: Phrasing): string {
 export function pathLabel(path: string, steps: readonly Step[], catalog: CatalogOut | null | undefined, p: Phrasing): string {
   const [root, ...rest] = path.split('.');
   if (root === 'input' && rest.length) return rest.map((part) => fieldLabel(part, p)).join(' › ');
+  if (root === 'secret' && rest.length === 1) return p.t('flow.picker.secret', { name: rest[0] });
+  if (path === 'run.idempotency_key') return p.t('flow.picker.idempotencyKey');
   if (root === 'steps' && rest.length >= 2) {
     const index = steps.findIndex((step) => step.id === rest[0]);
     const step = steps[index];
-    if (!step || (step.kind !== 'command' && step.kind !== 'query')) return path;
-    return `${index + 1}. ${actionLabel(step.operation, catalog, p)} › ${rest.slice(1).map((part) => fieldLabel(part, p)).join(' › ')}`;
+    if (!step || step.kind === 'condition' || step.kind === 'delay') return path;
+    const what = step.kind === 'http' || step.kind === 'ask' ? describeStep(step, steps, catalog, p) : actionLabel(step.operation, catalog, p);
+    return `${index + 1}. ${what} › ${rest.slice(1).map((part) => fieldLabel(part, p)).join(' › ')}`;
   }
   return path;
 }
 
-function formatDate(iso: string, locale: string): string {
+/** A date and time in the business's zone, in the person's language. */
+export function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Madrid' }).format(date);
@@ -135,6 +147,18 @@ export function describeStep(step: Step, steps: readonly Step[], catalog: Catalo
     );
     return clauses.length ? clauses.join('; ') : p.t('flow.steps.describe.noCondition');
   }
+  if (step.kind === 'http') {
+    const host = callHost(step.url);
+    return host ? p.t('flow.steps.describe.http', { host }) : p.t('flow.steps.describe.noHttp');
+  }
+  if (step.kind === 'ask') {
+    // A datum in the question is named by its words («Amount»), never by its path.
+    const title = valueToParts(step.title)
+      .map((part) => (part.kind === 'field' ? `«${pathLabel(part.path, steps, catalog, p)}»` : part.text))
+      .join('')
+      .trim();
+    return title ? p.t('flow.steps.describe.ask', { title }) : p.t('flow.steps.describe.noAsk');
+  }
   if (!step.operation) return p.t('flow.steps.noAction');
   const action = actionLabel(step.operation, catalog, p);
   return step.kind === 'query' ? p.t('flow.steps.describe.query', { action }) : action;
@@ -145,6 +169,8 @@ export function runStatusPill(status: RunStatus, p: Phrasing): { tone: StatusPil
   const tones: Record<RunStatus, StatusPillTone> = {
     running: 'info',
     waiting: 'warning',
+    calling: 'info',
+    asking: 'warning',
     succeeded: 'success',
     stopped: 'info',
     failed: 'danger',
@@ -180,7 +206,27 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
       return p.t('flow.history.log.waiting', { date: formatDate(entry.until ?? entry.at, p.locale) });
     case 'waited':
       return p.t('flow.history.log.waited', { duration: describeDuration(entry.seconds ?? 0, p) });
-    default:
-      return p.t('flow.history.log.failed', { action: action || entry.step, message: entry.error?.message ?? '' });
+    case 'resumed':
+      return p.t('flow.history.log.resumed');
+    case 'calling':
+      return p.t('flow.history.log.calling', { host: entry.host ?? '' });
+    case 'called':
+      return p.t('flow.history.log.called', { host: entry.host ?? '', status: entry.status ?? '' });
+    case 'asking':
+      return p.t('flow.history.log.asking', { who: p.t(`flow.ask.roles.${entry.role || 'admin'}`), date: formatDate(entry.until ?? entry.at, p.locale) });
+    case 'answered': {
+      const said = p.t(entry.approved ? 'flow.history.log.answeredYes' : 'flow.history.log.answeredNo', { who: entry.by ?? '' });
+      return entry.note ? `${said}: «${entry.note}»` : said;
+    }
+    case 'expired':
+      return p.t('flow.history.log.expired');
+    case 'skipped':
+      return p.t('flow.history.log.skipped', {
+        clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),
+      });
+    default: {
+      const failed = p.t('flow.history.log.failed', { action: action || entry.step, message: entry.error?.message ?? '' });
+      return entry.continued ? `${failed} ${p.t('flow.history.log.continued')}` : failed;
+    }
   }
 }

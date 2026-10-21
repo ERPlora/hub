@@ -68,6 +68,7 @@ from apps.inventory.schemas import (
     ProductOut,
     ProductPatchIn,
     ProductRefIn,
+    ProductSoldOutIn,
     ProductsOut,
     ReceiveIn,
     RefundStockOut,
@@ -332,6 +333,30 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     product.save(update_fields=["is_deleted", "is_active", "deleted_at", "updated_by", "updated_at"])
     record_event(ctx, events.PRODUCT_DELETED, {"id": str(product.id), "sku": product.sku, "name": product.name})
     return {"id": product.id}
+
+
+@operation(
+    "inventory.product.set_sold_out",
+    kind="command",
+    permission="inventory.change_product",
+    input=ProductSoldOutIn,
+    output=ProductOut,
+    expose_api=True,
+    ai={
+        "description": "Mark a product sold out («86»: the till stops offering it, it stays active) or put it "
+        "back on sale, named by its id, SKU or name.",
+        "risk": "normal",
+    },
+)
+def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
+    """INVENTORY-F29: the till's catalog (INVENTORY-F27) re-runs on the event; no change, no event."""
+    product = find_product(data.id, data.product, lock=True)
+    if product.is_sold_out != data.sold_out:
+        product.is_sold_out = data.sold_out
+        product.updated_by = _actor(ctx)
+        product.save(update_fields=["is_sold_out", "updated_by", "updated_at"])
+        record_event(ctx, events.PRODUCT_UPDATED, _product_payload(product))
+    return load_product(product.id)
 
 
 @operation(
@@ -879,6 +904,7 @@ def _product_payload(product: Product) -> dict:
         "unit": product.unit,
         "tax_category_key": product.tax_category.key if product.tax_category else None,
         "is_active": product.is_active,
+        "is_sold_out": product.is_sold_out,
         "track_stock": product.track_stock,
     }
 

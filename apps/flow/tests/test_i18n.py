@@ -9,10 +9,10 @@ from django.utils import translation
 from django.utils.functional import Promise
 
 from apps.flow import queries, schemas, services
-from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 
 LOCALE = Path(apps.get_app_config("flow").path) / "locale" / "es" / "LC_MESSAGES"
-MODELS = (Flow, FlowRun, Draft)
+MODELS = (Flow, FlowRun, Draft, Secret, Question)
 _STRING = re.compile(r'^"(.*)"$')
 _ESCAPE = re.compile(r"\\(.)")
 _ESCAPES = {"n": "\n", "t": "\t"}
@@ -83,7 +83,7 @@ def visible_texts() -> set[str]:
             for field in model._meta.get_fields()
             if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
         ]
-    for choices in (Flow.Trigger, FlowRun.Status, Draft.Status):
+    for choices in (Flow.Trigger, FlowRun.Status, Draft.Status, Question.Status):
         lazies += list(choices.labels)
     with translation.override("en"):
         return {str(text) for text in lazies}

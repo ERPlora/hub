@@ -136,6 +136,7 @@
       "status": {
         "sold_out": "Agotado",
         "product_inactive": "Desactivado en Inventario",
+        "product_sold_out": "Agotado en Inventario",
         "product_deleted": "Ya no está en el catálogo",
         "not_by_unit": "No se vende por unidades en Inventario",
         "untaxed": "Sin tipo de IVA para llevar"

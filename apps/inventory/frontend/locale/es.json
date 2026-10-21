@@ -70,6 +70,8 @@
       "active": "Activo",
       "updateError": "No se pudo actualizar el producto",
       "deleteError": "No se pudo eliminar el producto",
+      "soldOut": "Agotado",
+      "soldOutError": "No se pudo cambiar si el producto está agotado",
       "exportError": "No se pudo exportar el catálogo",
       "filters": {
         "unconfigured": "Sin configurar"
@@ -80,6 +82,8 @@
         "count": "Contar stock",
         "writeOff": "Dar de baja stock",
         "edit": "Editar",
+        "soldOut": "Marcar agotado",
+        "backOnSale": "Volver a poner a la venta",
         "delete": "Eliminar"
       },
       "delete": {

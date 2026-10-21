@@ -136,6 +136,7 @@
       "status": {
         "sold_out": "Sold out",
         "product_inactive": "Deactivated in Inventory",
+        "product_sold_out": "Sold out in Inventory",
         "product_deleted": "No longer in the catalogue",
         "not_by_unit": "Not sold by units in Inventory",
         "untaxed": "No VAT category to take away"

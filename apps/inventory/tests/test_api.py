@@ -25,6 +25,7 @@ ROUTES = {
     ("POST", "/inventory/products/bulk_create", "inventory.product.bulk_create"),
     ("POST", "/inventory/products/update", "inventory.product.update"),
     ("POST", "/inventory/products/delete", "inventory.product.delete"),
+    ("POST", "/inventory/products/sold_out", "inventory.product.set_sold_out"),
     ("GET", "/inventory/product_categories", "inventory.product_category.list"),
     ("POST", "/inventory/product_categories/add", "inventory.product_category.add"),
     ("POST", "/inventory/product_categories/remove", "inventory.product_category.remove"),
@@ -112,6 +113,7 @@ def test_an_employee_reads_but_does_not_write(employee_client):
         get(employee_client, "/inventory/products/export"),
         post(employee_client, "/inventory/products", {"name": "x", "sku": "X", "price": 1, "tax_category_key": TAX}),
         post(employee_client, "/inventory/stock/count", {"product": "x", "stock": 1, "reason": "count"}),
+        post(employee_client, "/inventory/products/sold_out", {"product": "x", "sold_out": True}),
     ):
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "permission_denied"
@@ -165,6 +167,28 @@ def test_a_missing_product_is_404_and_a_product_not_named_is_422(admin_client):
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "not_found")
     unnamed = get(admin_client, "/inventory/products/detail")
     assert unnamed.status_code == 422
+
+
+@pytest.mark.django_db
+def test_a_sold_out_article_leaves_what_the_till_asks_for_until_it_is_back_on_sale(admin_client):
+    product = {"name": "Croquettes", "sku": "CRO", "price": 150, "tax_category_key": TAX}
+    assert post(admin_client, "/inventory/products", product).status_code == 201
+
+    marked = post(admin_client, "/inventory/products/sold_out", {"product": "croquettes", "sold_out": True})
+
+    assert (marked.status_code, marked.json()["is_sold_out"], marked.json()["is_active"]) == (200, True, True)
+    # What the till asks for (SALE-F01): the products on sale.
+    assert get(admin_client, "/inventory/products", is_active="true").json()["total"] == 0
+    assert get(admin_client, "/inventory/products", status="sold_out").json()["total"] == 1
+    back = post(admin_client, "/inventory/products/sold_out", {"product": "CRO", "sold_out": False})
+    assert (back.status_code, back.json()["is_sold_out"]) == (200, False)
+    assert get(admin_client, "/inventory/products", is_active="true").json()["total"] == 1
+
+
+@pytest.mark.django_db
+def test_marking_sold_out_without_saying_which_is_422(admin_client):
+    assert post(admin_client, "/inventory/products/sold_out", {"product": "CRO"}).status_code == 422
+    assert post(admin_client, "/inventory/products/sold_out", {"sold_out": True}).status_code == 422
 
 
 # The whole app over HTTP

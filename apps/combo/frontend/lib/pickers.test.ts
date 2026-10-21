@@ -23,14 +23,15 @@ describe('searchProducts', () => {
       { id: 'p3', name: 'Napkins', sku: 'NAP', price: 37, unit: 'ud', pricing_unit: 'ud', price_quantity: '100.000' },
     ]);
     const options = await searchProducts(c, 'es')('hak');
-    expect(call).toHaveBeenCalledWith('inventory.product.list', { search: 'hak', is_active: true, limit: 20 });
+    // A sold-out article is still a choice to configure (INVENTORY-F29): only the till hides it.
+    expect(call).toHaveBeenCalledWith('inventory.product.list', { search: 'hak', is_active: true, include_sold_out: true, limit: 20 });
     expect(options.map((o) => ({ ...o, hint: plain(o.hint ?? '') }))).toEqual([{ id: 'p1', label: 'Hake', hint: 'HAK · 14,00 €' }]);
   });
 
   it('opening the list asks without a search', async () => {
     const { client: c, call } = client([]);
     await searchProducts(c, 'en')('  ');
-    expect(call).toHaveBeenCalledWith('inventory.product.list', { is_active: true, limit: 20 });
+    expect(call).toHaveBeenCalledWith('inventory.product.list', { is_active: true, include_sold_out: true, limit: 20 });
   });
 });
 

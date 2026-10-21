@@ -252,7 +252,9 @@
       "notFound": "That automation does not exist in this business.",
       "ranFailed": "It ran and stopped by an error: {message}",
       "ranWaiting": "It ran and is waiting: see it in History.",
-      "runSaveFirst": "Save it first: «Run now» runs what is saved."
+      "runSaveFirst": "Save it first: «Run now» runs what is saved.",
+      "ranCalling": "It ran and is calling another system: see it in History.",
+      "ranAsking": "It ran and is waiting for an answer in «Waiting for your answer»."
     },
     "trigger": {
       "when": "When this happens…",
@@ -303,7 +305,9 @@
         "command": "Do something",
         "query": "Look something up",
         "condition": "Only continue if…",
-        "delay": "Wait"
+        "delay": "Wait",
+        "http": "Call another system",
+        "ask": "Ask someone first"
       },
       "remove": "Remove this step",
       "reorder": "Drag to reorder",
@@ -364,7 +368,20 @@
         "noCondition": "nothing yet",
         "query": "Look up: {action}",
         "found": "Found something",
-        "count": "How many"
+        "count": "How many",
+        "http": "Call {host}",
+        "noHttp": "Call another system",
+        "ask": "Ask: {title}",
+        "noAsk": "Ask someone first"
+      },
+      "options": {
+        "toggle": "More options",
+        "runIf": "Only if…",
+        "runIfHint": "When it does not hold, this step is skipped and the automation goes on.",
+        "onError": "If it fails, carry on with the next steps",
+        "onErrorHint": "Its failure is written in this step and the next steps can check whether it failed.",
+        "summaryRunIf": "Only if: {clauses}",
+        "summaryOnError": "If it fails, it carries on"
       }
     },
     "picker": {
@@ -374,7 +391,11 @@
       "none": "There is no data to insert here yet: choose what happens first, or add an action before.",
       "example": "e.g. {value}",
       "noExample": "no example yet",
-      "close": "Close"
+      "close": "Close",
+      "secret": "Secret «{name}»",
+      "idempotencyKey": "No-repeat key",
+      "secrets": "Secrets",
+      "run": "This call"
     },
     "test": {
       "banner": "None of this is real. Nothing is sent, nothing is charged and nothing is written down: this is only what your automation WOULD do.",
@@ -391,7 +412,10 @@
         "not_allowed": "They would refuse it: you have not allowed it «{action}» yet",
         "unavailable": "«{action}» is not available in this business",
         "not_reached": "Would not get here",
-        "high_risk": "«{action}» needs a person in front: an automation cannot do it"
+        "high_risk": "«{action}» needs a person in front: an automation cannot do it",
+        "skipped": "Would be skipped: its «Only if…» does not hold",
+        "would_call": "Would call {host} with this",
+        "would_ask": "Would ask {who} and wait up to {hours} hours"
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
@@ -424,7 +448,9 @@
         "succeeded": "Finished well",
         "stopped": "Finished: a condition did not hold",
         "failed": "Stopped by an error",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "calling": "Calling another system",
+        "asking": "Waiting for an answer"
       },
       "log": {
         "done": "Did: {action}",
@@ -434,7 +460,16 @@
         "stopped": "It stopped here because this was not met: {clauses}. That is the automation working.",
         "waiting": "Waiting until {date}",
         "waited": "Waited {duration}",
-        "failed": "{action}: {message}"
+        "failed": "{action}: {message}",
+        "resumed": "Resumed here, from the step that had failed",
+        "skipped": "Skipped: its «Only if…» did not hold ({clauses})",
+        "continued": "It carried on with the next steps.",
+        "calling": "Calling {host}…",
+        "called": "Called {host}: it answered {status}",
+        "asking": "Asked {who}; waiting for an answer until {date}",
+        "answeredYes": "{who} answered yes",
+        "answeredNo": "{who} answered no",
+        "expired": "Nobody answered in time"
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -442,10 +477,26 @@
         "flow__invalid_params": "Open the step and fill in what it asks for.",
         "flow__loop_stopped": "Check that its steps do not start it again.",
         "flow__step_crashed": "Try again later; if it happens again, send us the reference.",
-        "flow__high_risk": "Do it by hand, from its app."
+        "flow__high_risk": "Do it by hand, from its app.",
+        "flow__http_blocked": "Use the public address of the other system: private networks are never called.",
+        "flow__http_url_invalid": "Open the step and write its address by hand, starting with https://.",
+        "flow__http_status": "Check in the other system why it refused, then resume it.",
+        "flow__http_failed": "Check that the other system is up, then resume it.",
+        "flow__http_timeout": "Try again later, or give the step more seconds to wait.",
+        "flow__secret_not_found": "Save the secret again in the step, with the same name.",
+        "flow__secret_unreadable": "Save the secret again in the step: it was sealed with another key.",
+        "flow__secrets_key_missing": "This server has no encryption key for secrets yet; send us the reference."
       },
       "attentionOne": "{n} run stopped by a problem",
-      "attentionMany": "{n} runs stopped by a problem"
+      "attentionMany": "{n} runs stopped by a problem",
+      "retry": "Resume from the step that failed",
+      "retryTitle": "Resume it from the step that failed?",
+      "retryMessage": "The steps it already did are not repeated: it goes on with the steps it started with. It will really do what they say.",
+      "retryYes": "Yes, resume it",
+      "retryNo": "Cancel",
+      "retried": "Resumed: it finished well.",
+      "retriedWaiting": "Resumed: it is waiting. See how it goes here.",
+      "retriedFailed": "It was resumed and stopped by an error again: {message}"
     },
     "events": {
       "customer__customer__created": "a customer card is created",
@@ -2382,12 +2433,99 @@
       "zone": "Zone",
       "zone_id": "Zone",
       "zone_name": "Zone name",
-      "zones": "Zones"
+      "zones": "Zones",
+      "approved": "Approved",
+      "answered_by": "Answered by",
+      "details": "Details",
+      "url": "Address",
+      "headers": "Headers"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {
       "action": "It could not be done right now. Try again in a moment.",
       "read": "It could not be read right now. Try again in a moment."
+    },
+    "http": {
+      "method": "Method",
+      "url": "Address",
+      "willAsk": "This step will ask your permission to call {host}.",
+      "byHand": "Write it by hand: https:// and the server's name first; data only after it.",
+      "headers": "Headers",
+      "headerName": "Name",
+      "headerValue": "Value",
+      "addHeader": "Add a header",
+      "removeHeader": "Remove this header",
+      "body": "What it sends",
+      "bodyHint": "Text; a datum inserted in JSON is escaped for you.",
+      "keyHint": "Insert «No-repeat key» in a header (as Idempotency-Key) so the other system can tell a retry: it is the same in every attempt of this call.",
+      "timeout": "Seconds to wait (1 to 30)"
+    },
+    "secrets": {
+      "title": "Secrets",
+      "intro": "Keys and passwords of other systems. Insert them by name; once saved, nobody can read a value again, not even you.",
+      "loading": "Loading the secrets…",
+      "loadError": "The secrets could not be loaded. Try again in a moment.",
+      "empty": "No secrets yet.",
+      "unavailable": "This server cannot keep secrets yet: its encryption key is missing.",
+      "name": "Name",
+      "value": "Value",
+      "save": "Save secret",
+      "fillBoth": "Write a name and a value.",
+      "badName": "Use capitals, digits and _, starting with a letter (STRIPE_KEY).",
+      "saved": "{name} saved. Its value can no longer be shown.",
+      "delete": "Delete {name}",
+      "deleteTitle": "Delete {name}?",
+      "deleteMessage": "The steps that use it will stop before calling until you save it again.",
+      "deleteYes": "Yes, delete it",
+      "deleteNo": "Keep it",
+      "deleted": "{name} deleted."
+    },
+    "ask": {
+      "roles": {
+        "admin": "whoever runs the business",
+        "manager": "the managers",
+        "employee": "the employees"
+      },
+      "title": "The question",
+      "details": "Details (optional)",
+      "role": "Who has to answer",
+      "roleOptions": {
+        "admin": "Whoever runs the business",
+        "manager": "A manager",
+        "employee": "An employee"
+      },
+      "whoNames": {
+        "admin": "Whoever runs the business",
+        "manager": "The managers",
+        "employee": "The employees"
+      },
+      "whoAdmin": "{who} answers it in Automations, under «Waiting for your answer».",
+      "whoRole": "{who} answer it in Automations, under «Waiting for your answer»; whoever runs the business can too.",
+      "hours": "How long to wait for the answer (hours, up to 720)",
+      "onNo": "If they say no",
+      "onTimeout": "If nobody answers in time",
+      "stop": "Stop the automation here",
+      "continue": "Carry on with the next steps",
+      "asNo": "Count it as a no",
+      "continueHint": "To act on the answer, add «Only continue if…» on «Approved» (or «Expired») after this step."
+    },
+    "inbox": {
+      "heading": "Waiting for your answer",
+      "loading": "Loading what waits for you…",
+      "empty": "Nothing is waiting for your answer.",
+      "from": "From «{name}»",
+      "askedOf": "Asked of {who}. Whoever runs the business can answer too.",
+      "askedOfAdmin": "Asked of whoever runs the business.",
+      "silenceNo": "If nobody answers before {date}, it counts as a no.",
+      "silenceStop": "If nobody answers before {date}, the automation stops here.",
+      "silenceContinue": "If nobody answers before {date}, the automation carries on anyway.",
+      "noStops": "A no stops the automation here.",
+      "noContinues": "After a no, the automation carries on.",
+      "note": "Add a note (optional)",
+      "approve": "Approve",
+      "reject": "No",
+      "approved": "Approved: the automation carries on.",
+      "rejected": "Answered no."
     }
   }
 }

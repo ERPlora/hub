@@ -7,7 +7,7 @@ from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import registry
 
-PERMISSIONS = ["flow.view", "flow.manage"]
+PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
 QUERIES = {
     "flow.flow.list",
     "flow.flow.detail",
@@ -17,6 +17,8 @@ QUERIES = {
     "flow.draft.list",
     "flow.catalog.read",
     "flow.event.sample",
+    "flow.secret.list",
+    "flow.question.list",
 }
 COMMANDS = {
     "flow.flow.create",
@@ -32,16 +34,39 @@ COMMANDS = {
     "flow.schedule.fire_due",
     "flow.run.resume_due",
     "flow.run.prune",
+    "flow.run.retry",
+    "flow.secret.set",
+    "flow.secret.delete",
+    "flow.run.call",
+    "flow.run.claim_call",
+    "flow.run.record_call",
+    "flow.question.answer",
+    "flow.question.expire_due",
 }
-# What the assistant confirms before running: turning on or off, granting, running by hand, deleting.
+# What the assistant confirms before running: turning on or off, granting, running by hand or resuming
+# a failed run, deleting, a secret, and answering a question a person was asked (FLOW-F29).
 HIGH_RISK = {
     "flow.flow.set_enabled",
     "flow.flow.grant",
     "flow.flow.run",
+    "flow.run.retry",
     "flow.flow.delete",
+    "flow.secret.set",
+    "flow.secret.delete",
+    "flow.question.answer",
 }
-# Run only by the platform: the reaction to every event and the three scheduled tasks.
-SYSTEM = {"flow.run.react", "flow.schedule.fire_due", "flow.run.resume_due", "flow.run.prune"}
+# Run only by the platform: the reactions (to every event, and to a run parked on a call) and the
+# scheduled tasks.
+SYSTEM = {
+    "flow.run.react",
+    "flow.run.call",
+    "flow.schedule.fire_due",
+    "flow.run.resume_due",
+    "flow.run.prune",
+    "flow.run.claim_call",
+    "flow.run.record_call",
+    "flow.question.expire_due",
+}
 
 
 def flow_app():
@@ -88,7 +113,7 @@ def test_permissions():
     assert flow_app().permissions == PERMISSIONS
 
 
-def test_only_the_owner_and_the_admin_get_it():
+def test_only_the_owner_and_the_admin_get_it_the_others_only_answer_what_they_are_asked():
     config = flow_app()
     assert set(config.role_permissions) == {
         "hub_owner",
@@ -98,8 +123,9 @@ def test_only_the_owner_and_the_admin_get_it():
     }
     for role in ("hub_owner", "hub_admin"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    for role in ("hub_manager", "hub_employee"):
-        assert permissions_for_role([config], role) == set(), role
+    # FLOW-F29: a manager answers what is asked of managers and of employees; an employee, of employees.
+    assert permissions_for_role([config], "hub_manager") == {"flow.answer", "flow.answer_manager"}
+    assert permissions_for_role([config], "hub_employee") == {"flow.answer"}
 
 
 def test_navigation_is_the_one_entry_of_the_old_module():
@@ -130,6 +156,13 @@ def test_the_scheduled_tasks_run_as_the_platform_two_every_minute_and_the_prune_
             "name": "prune",
             "operation": "flow.run.prune",
             "cron": "17 * * * *",
+            "catch_up": "collapse",
+        },
+        # FLOW-F30: the questions nobody answered in time.
+        {
+            "name": "expire_questions",
+            "operation": "flow.question.expire_due",
+            "cron": "* * * * *",
             "catch_up": "collapse",
         },
     ]
@@ -184,8 +217,11 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
     for name, op in flow_operations.items():
         if name in SYSTEM:
             continue
-        if name in {"flow.flow.test", "flow.event.sample"}:
-            # They read the outbox's payloads as they came: only who manages.
+        if name in {"flow.question.list", "flow.question.answer"}:
+            # FLOW-F29: whoever may answer something; each question then asks for its own role.
+            assert op.permission == "flow.answer", name
+        elif name in {"flow.flow.test", "flow.event.sample", "flow.secret.list"}:
+            # They read the outbox's payloads as they came, or the secrets' names: only who manages.
             assert op.permission == "flow.manage", name
         elif op.kind == "query":
             assert op.permission == "flow.view", name

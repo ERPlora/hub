@@ -71,8 +71,8 @@ rechaza aunque lo intente por la API o por el asistente.
 ### Agenda
 Una barra con el día (‹ fecha › y **Hoy**, y el botón del calendario para saltar a una fecha),
 **Filtrar por estado**, el aviso **N por confirmar** cuando hay reservas de clientas pendientes, y el
-conmutador **Lista · Por profesional · Periódicas** (en el móvil, solo iconos). En **Por profesional**,
-además, **Día · Semana**.
+conmutador **Lista · Por profesional · Periódicas** (en el móvil, solo iconos). En **Lista** y en **Por
+profesional**, además, **Día · Semana**.
 
 - **Lista**: columnas Hora, Nº, Cliente, Servicio, Profesional y Estado, buscador «Buscar nº, cliente
   o servicio…» y, por fila, **Cobrar, Editar, Confirmar, Iniciar, Completar, No-show, Cancelar,
@@ -80,7 +80,8 @@ además, **Día · Semana**.
   sale en gris si la cita ya está cobrada y se llama **Ir a la cuenta** mientras su cuenta sigue abierta
   en el TPV (entonces No-show, Cancelar y Borrar salen en gris).
 - **Por profesional · Día**: una fila por profesional reservable y una fila «Sin asignar» si hay
-  citas sin profesional; las horas del calendario van en horizontal y lo que el negocio tiene cerrado
+  citas sin profesional (dos citas que se pisan comparten la fila, cada una en su carril); las horas del
+  calendario van en horizontal y lo que el negocio tiene cerrado
   o bloqueado sale sombreado (lo cerrado, según Horarios; ahí no se puede tocar para reservar). Un profesional que ya no admite citas (no reservable, inactivo, de baja)
   conserva su fila, detrás de los reservables, los días en que aún tiene citas, y encima de la rejilla
   un aviso «Ana ya no admite citas nuevas: sus citas del día siguen en su fila para que puedas
@@ -111,9 +112,10 @@ semana · lunes · 11:00»), Empieza, Termina («Sin fin», «Tras {n} citas» o
 botón de añadir abre **Nueva cita periódica** (Cliente, Servicios, Profesional, Repetición, Día de la
 semana, Empieza el, Hora, Min., «Termina el (opcional)», «Número de citas (opcional)») con **Crear
 cita periódica**; editar abre **Editar cita periódica** con «Desde» y **Guardar de esta cita en
-adelante**. Tras reservar o guardar sale «{booked} citas reservadas · {skipped} no se han podido
-reservar:» con cada fecha y su motivo, y si quedan fechas, «Las fechas desde el {date} aún no están
-reservadas: pulsa «Reservar citas» en la serie para reservarlas.».
+adelante**; el buscador es «Buscar cliente o servicio…». Tras reservar sale solo lo que ha pasado: «{n}
+citas reservadas» y, si alguna no cupo, «{n} no se han podido reservar:» con cada fecha y su motivo (si ya
+estaban todas, «Nada nuevo que reservar: sus {n} citas ya estaban reservadas»), y si quedan fechas, «Las
+fechas desde el {date} aún no están reservadas: pulsa «Reservar citas» en la serie para reservarlas.».
 
 ### Ficha de la cita
 Al tocar una cita: número, estado, clienta, servicios con su precio, profesional, hora, notas, si está
@@ -155,7 +157,7 @@ Fechas, horas e importes salen con el formato del idioma de quien mira y en el r
 | APPOINTMENT-F03 | Confirmar una cita pendiente | hecho |
 | APPOINTMENT-F04 | Mover una cita o cambiarle el profesional o los servicios | hecho |
 | APPOINTMENT-F05 | Cancelar una cita desde la agenda | hecho |
-| APPOINTMENT-F06 | La clienta cancela o mueve su propia cita | hecho (API y asistente; la conversación de WhatsApp es de su app) |
+| APPOINTMENT-F06 | La clienta cancela o mueve su propia cita | hecho |
 | APPOINTMENT-F07 | Empezar el servicio | hecho |
 | APPOINTMENT-F08 | Completar la cita | hecho |
 | APPOINTMENT-F09 | Marcar que la clienta no se presentó | hecho |
@@ -165,20 +167,28 @@ Fechas, horas e importes salen con el formato del idioma de quien mira y en el r
 | APPOINTMENT-F13 | Reservar las citas de una serie | hecho |
 | APPOINTMENT-F14 | Editar una serie de esta cita en adelante | hecho |
 | APPOINTMENT-F15 | Pausar, reactivar o borrar una serie | hecho |
-| APPOINTMENT-F16 | Bloquear tiempo en la agenda | hecho (asistente y API; la rejilla lo pinta) |
-| APPOINTMENT-F17 | Cobrar la cita en el TPV | hecho (Citas abre la cuenta; ver «Contrato con Ventas») |
-| APPOINTMENT-F18 | Cita que reserva la clienta (WhatsApp, reserva online) | hecho (API y asistente) |
+| APPOINTMENT-F16 | Bloquear tiempo en la agenda | hecho |
+| APPOINTMENT-F17 | Cobrar la cita en el TPV | hecho |
+| APPOINTMENT-F18 | Cita que reserva la clienta | hecho |
 | APPOINTMENT-F19 | Ajustar las reglas de reserva | hecho |
 | APPOINTMENT-F20 | Ver las citas de una clienta en su ficha | hecho |
-| APPOINTMENT-F21 | Reservar varias citas de golpe (bono o curso) | hecho (asistente y API) |
+| APPOINTMENT-F21 | Reservar varias citas de golpe (bono o curso) | hecho |
 | APPOINTMENT-F22 | Cambiar las notas o el contacto de una cita | hecho |
 | APPOINTMENT-F23 | Unir las citas al fusionar dos fichas de clienta | hecho |
 | APPOINTMENT-F24 | Vaciar los datos de una clienta al borrarla | hecho |
 | APPOINTMENT-F25 | Un profesional se da de baja con citas futuras | hecho |
-| APPOINTMENT-F26 | Un servicio se archiva con series que lo usan | hecho |
+| APPOINTMENT-F26 | Un servicio se archiva con citas o series que lo usan | hecho |
 | APPOINTMENT-F27 | Ver la agenda de la semana | hecho |
+| APPOINTMENT-F28 | Recibir el aviso del sistema de una cita nueva o cancelada | parcial |
+
+Quien pide algo en nombre de la clienta sin ser una persona del equipo (un paso de una automatización, la
+conversación de WhatsApp, la reserva online) se juzga y se contesta **como la clienta**: no tiene las
+excepciones del mostrador (una hora ya pasada, dentro de la antelación mínima, **Reservar igual** sobre un
+solape, cancelar fuera de la política) y no lee el contacto de la clienta, las notas ni el motivo de una
+cancelación (APPOINTMENT-F01, F06, F18 y F20).
 
 ### APPOINTMENT-F01 Reservar una cita desde la agenda
+<!-- origen: fi:modules/appointments#command-appointments-appointments-create-handler-wasm fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:appointments/workflow/agenda.md#appointments-f01 old:online_booking/WORKFLOW.md#online_booking-f01 qa:modules/appointments/chained-services qa:modules/appointments/create-appointment-without-overlap qa:modules/appointments/walk-in qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f03 wf:peluqueria-dia#rec_peluqueria-f06 -->
 Estado: hecho
 Actor: empleado (para sí), responsable, asistente
 Pantalla: Agenda
@@ -198,15 +208,18 @@ profesional y quién hace qué (Personal y Servicios), el horario del negocio (H
 ausencias del profesional (Personal).
 Sale: la cita con el nombre, el teléfono y el email de la clienta y el nombre, precio y duración de
 cada servicio **congelados** (cambiar el catálogo después no cambia la cita), su línea «Reservada» en
-el historial y el aviso de cita creada (`appointment.appointment.created`).
+el historial y el aviso de cita creada (`appointment.appointment.created`), el mismo para una cita
+suelta, una del lote y una de la serie.
 Si falla: el motivo sale dentro del panel, sin perder lo tecleado: fuera del horario del negocio, el
 profesional no trabaja a esa hora, franja bloqueada, el profesional ya tiene una cita
 (`appointment.slot_taken`), demasiado lejos, la clienta, el servicio o el profesional no existen o no
 se pueden reservar. Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
-hora pasada solo avisa antes de guardar). Dos personas que reservan a la vez el mismo hueco del mismo
-profesional: entra una y la otra recibe el rechazo.
+hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Dos personas
+que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
+Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 fi:modules/appointments#query-appointments-availability-check fi:modules/appointments#query-appointments-availability-slots old:appointments/workflow/agenda.md#appointments-f02 old:schedules/WORKFLOW.md#schedules-f11 qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules wf:whatsapp-cita#rec_wa_cita-f04 wf:whatsapp-cita#rec_wa_cita-f08 -->
 Estado: hecho
 Actor: empleado, asistente, clienta
 Pantalla: Agenda (alta y edición)
@@ -227,27 +240,33 @@ Entra: el horario del negocio, el turno y las ausencias, los bloqueos, las citas
 Sale: la lista de horas; no guarda nada.
 Si falla: «No se han podido cargar las horas libres» con **Reintentar**; se puede escribir una hora y
 la reserva se juzga al guardar. Sin horas: «No quedan horas libres ese día…».
+Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente
+<!-- origen: fi:modules/appointments#command-appointments-appointments-confirm old-hub:HUB_SHELL-F61 old:appointments/workflow/agenda.md#appointments-f03 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:peluqueria-dia#rec_peluqueria-f05 wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 wf:whatsapp-cita#rec_wa_cita-f07 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
-1. Entra desde el aviso **N por confirmar** o busca la cita **Pendiente**.
+1. Entra desde el aviso **N por confirmar** (lo pulsas y la lista filtra las pendientes) o busca la cita
+   **Pendiente**.
 2. Pulsa **Confirmar** en su fila.
-3. La cita pasa a **Confirmada** y el historial dice «Confirmada».
+3. La cita pasa a **Confirmada**, el historial dice «Confirmada» y el aviso **N por confirmar** baja.
 Entra: una cita pendiente (la que reservó la clienta con la confirmación automática apagada).
 Sale: la cita confirmada, su línea de historial y el aviso `appointment.appointment.confirmed`.
 Si falla: «Esta cita ya no se puede confirmar: ya no está pendiente.»; no se escribe nada.
+Implicados: ninguno
 
 ### APPOINTMENT-F04 Mover una cita o cambiarle el profesional o los servicios
+<!-- origen: qa:modules/appointments/chained-services qa:verticals/beauty/03-appointments-and-whatsapp fi:modules/appointments#command-appointments-appointments-reschedule fi:modules/appointments#query-appointments-appointments-get old:appointments/workflow/agenda.md#appointments-f04 qa:modules/appointments/reschedule-appointment wf:peluqueria-dia#rec_peluqueria-f08 wf:peluqueria-dia#rec_peluqueria-f12 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Editar** (o toca la cita en «Por profesional»): se abre «Editar la cita».
 2. Cambia Día, Hora, Min., Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
-   serie, elige **Solo esta cita** o **Esta y todas las siguientes** (APPOINTMENT-F14).
+   serie, elige **Solo esta cita** o **Esta y todas las siguientes** (APPOINTMENT-F14). Desde el
+   mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió).
 3. Atajo: en «Por profesional» arrástrala a otra hora, otro día u otra fila. Arrastrando no se lleva a
    una hora ya pasada (eso, desde el panel).
 4. La cita conserva su número y el historial dice «Cambio de hora», «Cambio de profesional» o «Cambio
@@ -258,8 +277,10 @@ del profesional si la tiene; un profesional nuevo conserva el precio y la duraci
 aviso `appointment.appointment.rescheduled`.
 Si falla: el motivo en el panel y en un aviso; un bloque arrastrado vuelve a su sitio. Una cita en
 curso, completada, cancelada o no presentada no se mueve (**Editar** sale en gris).
+Implicados: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancelar una cita desde la agenda
+<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f12 fi:modules/appointments#command-appointments-appointments-cancel old:appointments/workflow/agenda.md#appointments-f05 qa:modules/appointments/cancel-and-no-show -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -268,13 +289,16 @@ Pasos:
 2. «Cancelar la cita de Lucía (martes 14, 10:00)?» con el motivo opcional; pulsa **Cancelar la cita**.
 3. La cita pasa a **Cancelada** (el hueco queda libre) y el historial dice «Cancelada», quién y el
    motivo.
+Entra: una cita pendiente, confirmada o no presentada, sin su cuenta abierta en el TPV.
 Sale: el aviso `appointment.appointment.cancelled`.
 Si falla: «Esta cita ya no se puede cancelar en su estado actual.» (en curso, completada o ya
 cancelada); con su cuenta abierta en el TPV, «Esta cita tiene una cuenta abierta en el TPV: cóbrala o
 anúlala allí primero.» (`appointment.check_open`).
+Implicados: ninguno
 
 ### APPOINTMENT-F06 La clienta cancela o mueve su propia cita
-Estado: hecho (API y asistente)
+<!-- origen: wf:whatsapp-cita#rec_wa_cita-f08 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:peluqueria-dia#rec_peluqueria-f12 old:appointments/workflow/canales.md#appointments-f06 wf:whatsapp-cita#rec_wa_cita-f03 -->
+Estado: hecho
 Actor: clienta (a través de WhatsApp o la reserva online)
 Pantalla: ninguna
 Pasos:
@@ -286,43 +310,58 @@ Pasos:
 4. Para mover se aplican la antelación mínima y las mismas reglas que una reserva de la clienta.
 5. En el historial queda «Lo pidió la clienta» con el motivo, y también quién del equipo lo anotó.
 6. Hacerlo en nombre de la clienta no da más permisos: quien lo anota solo cambia las citas que ya
-   podía cambiar (un empleado, las suyas, y no se las pasa a un compañero).
+   podía cambiar (un empleado, las suyas, y no se las pasa a un compañero). Una persona del equipo
+   puede cancelar fuera de la política; una automatización, nunca.
+Entra: la cita de la clienta y los ajustes de cancelación y de antelación.
+Sale: la cita cancelada o movida, su línea «Lo pidió la clienta» y el aviso
+`appointment.appointment.cancelled` o `appointment.appointment.rescheduled`.
 Si falla: `appointment.customer_cancellation_disabled`, `appointment.cancellation_notice_required`,
 `appointment.too_soon`, `appointment.appointment_not_found` o `permission_denied`.
+Implicados: ninguno
 
 ### APPOINTMENT-F07 Empezar el servicio
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 fi:modules/appointments#command-appointments-appointments-start old:appointments/workflow/agenda.md#appointments-f07 qa:modules/appointments/check-in-and-in-progress wf:whatsapp-cita#rec_wa_cita-f10 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Cuando llega la clienta, pulsa **Iniciar** en su cita pendiente o confirmada.
 2. La cita pasa a **En curso** y el historial dice «Servicio iniciado».
+Entra: una cita pendiente o confirmada.
 Sale: el aviso `appointment.appointment.started`.
 Si falla: «Esta cita no se puede iniciar en su estado actual.»
+Implicados: ninguno
 
 ### APPOINTMENT-F08 Completar la cita
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-complete old:appointments/workflow/agenda.md#appointments-f08 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Al terminar, pulsa **Completar** en la cita en curso (o confirmada).
 2. La cita pasa a **Completada**. Cobrarla también la completa (APPOINTMENT-F17).
+Entra: una cita en curso o confirmada.
 Sale: el aviso `appointment.appointment.completed`.
 Si falla: «Esta cita no se puede completar en su estado actual.»
+Implicados: ninguno
 
 ### APPOINTMENT-F09 Marcar que la clienta no se presentó
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f12 qa:modules/appointments/cancel-and-no-show wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-no_show old:appointments/workflow/agenda.md#appointments-f09 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Pasada la hora de la cita, pulsa **No-show** en una cita pendiente o confirmada.
 2. La cita pasa a **No-show**, el hueco se libera y el historial dice «No se presentó».
+Entra: una cita pendiente o confirmada cuya hora ya ha pasado.
 Sale: el aviso `appointment.appointment.marked_no_show`.
 Si falla: antes de su hora, «Todavía no es la hora de esta cita: no se puede marcar como no
 presentada.»; en otro estado, «Esta cita no se puede marcar como no presentada en su estado actual.»;
 con su cuenta abierta en el TPV, `appointment.check_open`.
+Implicados: ninguno
 
 ### APPOINTMENT-F10 Ver el historial de una cita
+<!-- origen: fi:modules/appointments#query-appointments-appointments-history old:appointments/workflow/agenda.md#appointments-f10 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -330,9 +369,14 @@ Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
 2. Cada cambio con su hora en el reloj del negocio, quién lo hizo («Lo pidió la clienta» si fue ella) y
    qué cambió (de qué profesional o servicio a cuál, y la nueva hora).
+3. Es solo de lectura: un único botón, **Cerrar**.
+Entra: una cita en cualquier estado.
+Sale: nada (solo lee).
 Si falla: «No se pudo cargar el historial de la cita.»
+Implicados: ninguno
 
 ### APPOINTMENT-F11 Borrar una cita
+<!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_delete-handler-wasm fi:modules/appointments#command-appointments-appointments-delete old:appointments/workflow/agenda.md#appointments-f11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Agenda
@@ -344,22 +388,28 @@ Entra: una cita pendiente, confirmada, cancelada o no presentada que no esté co
 Sale: el aviso `appointment.appointment.deleted`.
 Si falla: «Esta cita no se puede borrar: está en curso, completada o cobrada.»; con su cuenta abierta
 en el TPV, `appointment.check_open`.
+Implicados: ninguno
 
 ### APPOINTMENT-F12 Crear una cita periódica
+<!-- origen: fi:modules/appointments#command-appointments-recurring-create fi:modules/appointments#query-appointments-recurring-list old:appointments/workflow/periodicas.md#appointments-f12 -->
 Estado: hecho
 Actor: empleado (para sí), responsable, asistente
 Pantalla: Periódicas
 Pasos:
-1. En **Periódicas**, pulsa añadir: «Nueva cita periódica».
+1. En **Periódicas**, pulsa **Nueva cita periódica**.
 2. Elige la clienta, los servicios, el profesional (solo los que los hacen), la repetición (cada día,
    cada semana, cada dos semanas o cada mes), el día de la semana si aplica, el día de inicio, la hora,
    los minutos y, si quieres, «Termina el» o «Número de citas».
 3. Pulsa **Crear cita periódica**: se crea la serie y se reservan sus citas de la ventana
    (APPOINTMENT-F13).
+Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Personal) y los ajustes de
+Citas.
 Sale: la serie activa, sus citas y el aviso `appointment.recurring.created`.
 Si falla: el motivo en el panel; si la serie se creó y alguna fecha no cupo, se listan con su motivo.
+Implicados: SERVICE-F33
 
 ### APPOINTMENT-F13 Reservar las citas de una serie
+<!-- origen: fi:modules/appointments#command-appointments-recurring-materialize-handler-wasm old:appointments/workflow/periodicas.md#appointments-f13 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Periódicas
@@ -370,12 +420,19 @@ Pasos:
 3. Una fecha que no cabe (cerrado, el profesional no trabaja, bloqueo, otra cita, pasado, demasiado
    pronto) se salta y se lista con su motivo; las demás se reservan. Una fecha que se canceló a mano no
    se vuelve a reservar.
-4. Si la serie aún no tiene ninguna fecha en la ventana: «Aún no hay nada que reservar: la próxima fecha
+4. El aviso dice solo lo que ha pasado: «{n} citas reservadas» y, si alguna no cupo, «{n} no se han
+   podido reservar:» con cada fecha y su motivo. Si ya estaban todas: «Nada nuevo que reservar: sus {n}
+   citas ya estaban reservadas».
+5. Si la serie aún no tiene ninguna fecha en la ventana: «Aún no hay nada que reservar: la próxima fecha
    de esta serie, el {fecha}, queda más lejos que la antelación máxima».
+Entra: una serie activa y la antelación máxima de los ajustes.
+Sale: las citas reservadas, cada una con su aviso `appointment.appointment.created`.
 Si falla: una serie pausada pide reactivarla (`appointment.recurring_inactive`); una sin fechas, «Esta
 cita periódica ya no tiene fechas que reservar.» (`appointment.recurring_ended`).
+Implicados: SCHEDULE-F11, STAFF-F16
 
 ### APPOINTMENT-F14 Editar una serie de esta cita en adelante
+<!-- origen: old:appointments/workflow/periodicas.md#appointments-f14 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas, Agenda
@@ -383,8 +440,8 @@ Pasos:
 1. Pulsa **Editar serie**, o mueve en la Agenda una cita de la serie y elige **Esta y todas las
    siguientes**.
 2. Cambia la hora, los minutos, la repetición, el día de la semana, el profesional o los servicios; el
-   panel dice desde qué fecha se aplica, cuántas citas alcanza y cuántas no se tocarán por estar
-   cobradas.
+   panel dice desde qué fecha se aplica, cuántas citas alcanza y, si hay alguna cobrada, cuántas no se
+   tocarán.
 3. Pulsa **Guardar de esta cita en adelante**.
 4. Lo anterior a hoy, lo cancelado, lo en curso, lo completado y lo cobrado no se toca. Las citas que
    siguen cayendo en la pauta se mueven; las que ya no caen se cancelan; las que no caben se quedan como
@@ -392,12 +449,18 @@ Pasos:
    pausada la deja pausada; la que se pausó porque su profesional se dio de baja vuelve a reservar al
    darle otro). Una cita cancelada por no caer ya en la pauta deja libre su fecha: si la pauta vuelve,
    se reserva otra vez. Lo que tiene su cuenta abierta en el TPV tampoco se toca.
+5. El aviso dice solo lo que ha pasado: cuántas citas se mueven, con quién y con qué servicios van ahora,
+   cuántas fechas nuevas se reservan, cuántas se cancelan y cuáles se quedan a su hora, con su fecha;
+   si no ha hecho falta cambiar ninguna, «Guardado: no ha hecho falta cambiar ninguna cita.».
+Entra: una serie y la fecha desde la que cambia.
 Sale: la serie partida en dos (la vieja termina el día antes) o, si el cambio empieza en su primera
 fecha, la misma serie editada; el aviso `appointment.recurring.updated`.
-Si falla: «Termina el» antes de la fecha del cambio o del inicio de la serie, 422 en ese campo («El
-final no puede ser anterior al inicio.»).
+Si falla: «Termina el» antes de la fecha del cambio o del inicio de la serie, en ese campo («El final no
+puede ser anterior al inicio.»).
+Implicados: ninguno
 
 ### APPOINTMENT-F15 Pausar, reactivar o borrar una serie
+<!-- origen: fi:modules/appointments#command-appointments-recurring-delete old:appointments/workflow/periodicas.md#appointments-f15 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Periódicas
@@ -405,10 +468,14 @@ Pasos:
 1. Apaga el interruptor **Activa** para que deje de reservar; enciéndelo para reactivarla.
 2. **Borrar** pide confirmar «¿Borrar las citas periódicas de {nombre}?»; las citas ya reservadas se
    conservan.
+Entra: una serie.
 Sale: `appointment.recurring.updated` o `appointment.recurring.deleted`.
+Si falla: «No se ha podido cambiar el estado de la cita periódica.» y la serie sigue como estaba.
+Implicados: ninguno
 
 ### APPOINTMENT-F16 Bloquear tiempo en la agenda
-Estado: hecho (asistente y API; la rejilla lo pinta)
+<!-- origen: fi:modules/appointments#command-appointments-blocked_times-create fi:modules/appointments#command-appointments-blocked_times-delete fi:modules/appointments#query-appointments-blocked_times-list old:appointments/workflow/canales.md#appointments-f16 -->
+Estado: hecho
 Actor: responsable, asistente
 Pantalla: Agenda (lo pinta)
 Pasos:
@@ -416,9 +483,15 @@ Pasos:
    mantenimiento u otro), si es de día entero y, si es de un profesional, cuál.
 2. Desde ese momento nadie puede reservar en esa franja; sin profesional, bloquea todo el negocio. Un
    bloqueo de día entero cubre esos días enteros, en la reserva y en las horas libres.
+3. La rejilla de «Por profesional» lo pinta rayado en su fila (o en todas, si es del negocio).
+Entra: el profesional (Personal), si el bloqueo es suyo.
 Sale: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
+Si falla: «El final no puede ser anterior al inicio.»; quitar uno que ya no está,
+`appointment.blocked_time_not_found`.
+Implicados: ninguno
 
 ### APPOINTMENT-F17 Cobrar la cita en el TPV
+<!-- origen: wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-mark_converted fi:modules/appointments#event-listen-sales-sale-created_from_appointment-appointments-appointments-mark_converted old:appointments/workflow/agenda.md#appointments-f17 qa:modules/appointments/convert-appointment-to-sale qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 wf:peluqueria-dia#rec_peluqueria-f14 -->
 Estado: hecho
 Actor: responsable, empleado (sus propias citas), con permiso de vender en Venta
 Pantalla: Agenda
@@ -428,7 +501,7 @@ Pasos:
    línea **de servicio** por cada servicio de la cita (como si se tocara en «Servicios» del TPV,
    SALE-F38), con el profesional que lo hizo y **al precio con que se reservó** (el propio de la
    profesional incluido), aunque el catálogo haya cambiado desde entonces, y lleva a **Venta** con esa
-   cuenta en pantalla (`/sale/pos?order=<cuenta>`).
+   cuenta en pantalla.
 3. En el TPV se añaden productos o descuentos, un servicio se
    puede pagar con un **bono** de la clienta (SALE-F27) y se cobra como cualquier venta.
 4. Una cita tiene **una sola cuenta**: mientras sigue abierta, el botón se llama **Ir a la cuenta** y
@@ -443,14 +516,17 @@ cobrar, el aviso de Venta `sale.sale.created_from_appointment` y aquí `appointm
 al anular la cuenta, `sale.order.voided` y aquí `appointment.appointment.check_closed`.
 Si falla: una cita cancelada o no presentada no se cobra (`appointment.cannot_charge`); ya cobrada,
 también si el TPV la acaba de cobrar y el aviso aún no ha llegado (`appointment.already_charged`); un
-servicio sin
-categoría fiscal (`appointment.service_needs_tax_setup`); Venta apagada (`appointment.sale_unavailable`);
-un servicio que ya no se ofrece o un precio que no es el de la cita, la frase de Venta
-(`sale.service_not_available`, `sale.booked_price_mismatch`); sin permiso de vender, el de Venta.
+servicio sin categoría fiscal (`appointment.service_needs_tax_setup`); Venta apagada
+(`appointment.sale_unavailable`); un servicio que ya no se ofrece o un precio que no es el de la cita,
+la frase de Venta (`sale.service_not_available`, `sale.booked_price_mismatch`); sin permiso de vender,
+el de Venta.
+Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38
 
 ### APPOINTMENT-F18 Cita que reserva la clienta
-Estado: hecho (API y asistente)
+<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f06 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:whatsapp-cita#rec_wa_cita-f06 wf:whatsapp-cita#rec_wa_cita-f03 old:appointments/workflow/canales.md#appointments-f18 qa:modules/appointments/whatsapp-booking-edge-cases-and-races qa:modules/appointments/whatsapp-booking-without-a-human wf:whatsapp-cita#rec_wa_cita-f05 -->
+Estado: hecho
 Actor: clienta (WhatsApp, reserva online)
+Pantalla: ninguna
 Pasos:
 1. La automatización ofrece las horas libres (APPOINTMENT-F02) y reserva con origen «WhatsApp» u
    «Online».
@@ -458,71 +534,122 @@ Pasos:
    **Confirmada**; apagado, nace **Pendiente** y suma en **N por confirmar**. Si un servicio de la cita
    tiene **Requiere confirmación** (Servicios), nace **Pendiente** aunque esté encendido.
 3. Siempre con la antelación mínima, nunca en el pasado ni encima de otra cita del profesional.
+4. La cita da su día y su hora listos para decírselos a la clienta («miércoles, 2 de diciembre de
+   2026», «17:00»), en su idioma y en el reloj del negocio.
+Entra: las horas libres, la ficha de la clienta (la conversación la reconoce por su teléfono) y los
+ajustes de Citas.
+Sale: la cita **Confirmada** o **Pendiente** con su origen y el aviso `appointment.appointment.created`.
+Si falla: demasiado pronto (`appointment.too_soon`), en el pasado (`appointment.in_past`) o la hora ya
+tomada (`appointment.slot_taken`); la automatización ofrece otra hora.
+Implicados: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Ajustar las reglas de reserva
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 fi:modules/appointments#command-appointments-settings-upsert fi:modules/appointments#query-appointments-settings-get fi:modules/appointments#settings-bloque old:appointments/workflow/agenda.md#appointments-f19 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
-1. Cambia los ajustes y pulsa **Guardar**: «Ajustes guardados.» Se guarda solo lo que cambia.
+1. Abre la pestaña **Ajustes** de Citas.
+2. Cambia los ajustes y pulsa **Guardar**: «Ajustes guardados.» Se guarda solo lo que cambia.
+Entra: los ajustes actuales de Citas.
 Sale: `appointment.settings.updated`.
 Si falla: «Revisa los campos marcados y vuelve a guardar.»; «El calendario termina antes de empezar.»
+Implicados: ninguno
 
 ### APPOINTMENT-F20 Ver las citas de una clienta en su ficha
+<!-- origen: old:appointments/workflow/canales.md#appointments-f20 -->
 Estado: hecho
 Actor: quien ve la agenda
 Pantalla: Historial de visitas (ficha de Clientes)
 Pasos:
-1. Abre la ficha en **Clientes**: el bloque **Historial de visitas** enseña sus 10 últimas citas.
+1. Abre la ficha en **Clientes**.
+2. Al final, el bloque **Historial de visitas** enseña sus 10 últimas citas, la más reciente primero,
+   con el día y la hora, los servicios, el profesional, el estado y las notas (la interna primero).
+Entra: las citas de la clienta que quien mira puede ver.
+Sale: nada (solo lee). Una automatización lo lee sin notas ni motivos.
 Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este cliente aún no tiene citas.»
+Implicados: CUSTOMER-F24
 
 ### APPOINTMENT-F21 Reservar varias citas de golpe (bono o curso)
-Estado: hecho (asistente y API)
+<!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_create-handler-wasm old:appointments/workflow/periodicas.md#appointments-f21 -->
+Estado: hecho
+Actor: responsable, asistente
+Pantalla: ninguna
 Pasos:
 1. Pide al asistente varias citas para la misma clienta, servicios y profesional (hasta 50).
 2. Se reservan todas o ninguna: si una no cabe, se dice cuál y por qué.
+Entra: la clienta, los servicios, el profesional y las fechas con su hora.
+Sale: las citas reservadas, cada una con su aviso `appointment.appointment.created`.
+Si falla: «{hora}: {motivo}» de la primera que no cabe; no se reserva ninguna.
+Implicados: ninguno
 
 ### APPOINTMENT-F22 Cambiar las notas o el contacto de una cita
+<!-- origen: fi:modules/appointments#command-appointments-appointments-update old-hub:HUB-F36 old:appointments/workflow/canales.md#appointments-f22 -->
 Estado: hecho
+Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda (Editar) y asistente
 Pasos:
 1. En «Editar la cita» cambia las notas, o pide al asistente corregir el teléfono o el email.
-2. Solo cambia lo que se envía. El teléfono se guarda en formato internacional (`+34600111222`); uno que
-   no es un número válido se rechaza (`appointment.phone_invalid`) y no se guarda nada.
+2. Solo cambia lo que se envía. El teléfono se guarda en formato internacional, con el prefijo del país;
+   uno que no es un número válido se rechaza (`appointment.phone_invalid`) y no se guarda nada.
+Entra: una cita.
 Sale: `appointment.appointment.updated` (sin línea de historial si solo cambian notas o contacto).
+Si falla: el teléfono no válido se rechaza sin guardar nada; una cita que no existe,
+`appointment.appointment_not_found`.
+Implicados: CUSTOMER-F11
 
 ### APPOINTMENT-F23 Unir las citas al fusionar dos fichas de clienta
+<!-- origen: old:appointments/workflow/canales.md#appointments-f23 old:online_booking/WORKFLOW.md#online_booking-f09 -->
 Estado: hecho
 Actor: sistema
+Pantalla: ninguna
 Pasos:
 1. En **Clientes** se fusionan dos fichas (`customer.customer.merged`).
 2. Todas las citas y series de la absorbida pasan a la que se queda; los nombres guardados en cada cita
    no cambian. Repetirlo no cambia nada más.
+Entra: el aviso de Clientes con la ficha que queda y la absorbida.
+Sale: `appointment.appointment.reassigned`.
+Si falla: no se queda a medias (todo o nada) y se reintenta solo.
+Implicados: CUSTOMER-F13, ONLINE_BOOKING-F09
 
 ### APPOINTMENT-F24 Vaciar los datos de una clienta al borrarla
+<!-- origen: old-hub:HUB-F250 old:appointments/workflow/canales.md#appointments-f24 -->
 Estado: hecho
 Actor: sistema
+Pantalla: ninguna
 Pasos:
 1. En **Clientes** se borran los datos personales de una ficha (`customer.customer.erased`).
 2. Sus citas (en cualquier estado, también las borradas) se quedan sin nombre, teléfono, email, notas y
    motivo de cancelación; sus series sin nombre, y pausadas; su historial sin nombres ni motivos.
 3. Donde estaba el nombre, la agenda dice «Cliente borrado». Se quedan la cita, su número, los
    servicios, el precio, el profesional, la hora, el estado y la venta.
+Entra: el aviso de Clientes con la ficha borrada.
+Sale: las citas, las series y el historial vaciados.
+Si falla: no se queda a medias (todo o nada) y se reintenta solo.
+Implicados: CUSTOMER-F16, ONLINE_BOOKING-F12
 
 ### APPOINTMENT-F25 Un profesional se da de baja con citas futuras
+<!-- origen: nuevo (el mercado: Fresha, Square, Phorest, Mindbody y Timely piden reasignar las citas de quien se va; ver «Decisiones de mercado») -->
 Estado: hecho
 Actor: sistema
+Pantalla: ninguna
 Pasos:
 1. En **Personal** se da de baja a alguien (`staff.member.terminated`).
 2. Sus citas futuras pendientes o confirmadas pasan al carril **Sin asignar**, con «Profesional dado de
-   baja: pendiente de reasignar» en su historial, y la agenda avisa «{n} citas sin profesional:
+   baja: hay que reasignarla» en su historial, y la agenda avisa «{n} citas sin profesional:
    asígnalas»; se reasignan editándolas o arrastrándolas a otra fila. Sus series se pausan.
 3. Desactivar a alguien o marcarlo no reservable no toca sus citas: siguen en su fila con el aviso
    «… ya no admite citas nuevas».
+Entra: el aviso de Personal con el profesional dado de baja.
+Sale: `appointment.appointment.unassigned` por cada cita y las series pausadas.
+Si falla: no se queda a medias (todo o nada) y se reintenta solo.
+Implicados: STAFF-F06
 
 ### APPOINTMENT-F26 Un servicio se archiva con citas o series que lo usan
+<!-- origen: nuevo (el mercado: Fresha, Phorest, Acuity y TimeTap conservan lo reservado al archivar un servicio; ver «Decisiones de mercado») -->
 Estado: hecho
 Actor: sistema
+Pantalla: ninguna
 Pasos:
 1. En **Servicios** se archiva un servicio (`service.service.archived`).
 2. Nada se cancela ni se cambia (el mercado: Fresha, Phorest, TimeTap): las citas ya reservadas lo
@@ -531,13 +658,42 @@ Pasos:
    reservar.» (`service_unavailable`) hasta que se edita con otro servicio.
 4. Antes de archivar, Servicios puede preguntar cuántas citas próximas lo usan
    (`appointment.appointment.count_active_for_service`).
+Entra: el servicio archivado (Servicios).
+Sale: nada cambia en Citas.
+Si falla: una reserva nueva con ese servicio se rechaza (`appointment.service_not_bookable`).
+Implicados: SERVICE-F04
 
 ### APPOINTMENT-F27 Ver la agenda de la semana
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 fi:modules/appointments#query-appointments-appointments-list qa:verticals/beauty/02-opening-and-daily-agenda -->
 Estado: hecho
+Actor: empleado (la suya), responsable
 Pantalla: Agenda (Por profesional · Semana)
 Pasos:
 1. En «Por profesional», pulsa **Semana**: una columna por día, de lunes a domingo, y una fila por
    profesional; ‹ › avanza de semana en semana.
+2. Las citas de cada día salen en orden, una debajo de otra. En «Lista», **Semana** enseña las citas de
+   los siete días.
+Entra: las citas de la semana y los profesionales reservables.
+Sale: nada (solo lee).
+Si falla: «No se han podido cargar los profesionales.» con **Reintentar**, en lugar de la rejilla.
+Implicados: ninguno
+
+### APPOINTMENT-F28 Recibir el aviso del sistema de una cita nueva o cancelada
+<!-- origen: old-hub:HUB_SHELL-F66 -->
+Estado: parcial — Citas ya dice qué se avisa y cuándo; falta la campana de la barra de arriba de la app y
+el aviso del dispositivo que lo enseñan, que son del marco común de la app, no de Citas.
+Actor: empleado (las de su agenda), responsable
+Pantalla: ninguna (la campana de la barra de arriba, cuando llegue)
+Pasos:
+1. Una clienta reserva o cancela ella misma (WhatsApp, reserva online).
+2. Al momento, Citas lo cuenta al equipo: qué pasó (reservada o cancelada), quién, qué servicios, el día
+   y la hora listos para decir y con quién, lo más nuevo primero, de las últimas 24 horas.
+3. Lo que hace el mostrador no se avisa (quien lo hace ya lo sabe), y un empleado solo oye lo de su
+   agenda.
+Entra: las reservas y cancelaciones que hizo la clienta.
+Sale: nada (solo lee); lo enseñará la campana.
+Si falla: si se corta la conexión, al volver llegan otra vez los avisos de las últimas 24 horas.
+Implicados: ninguno
 
 ## Servicios: lo que entra y lo que sale
 
@@ -557,6 +713,7 @@ profesional, por su id o su nombre; una hora, como fecha y hora de pared del neg
 | Las últimas citas de una clienta, con notas | ver citas | F20 | `appointment.appointment.list_for_customer` |
 | Cuántas citas próximas usan un servicio | ver citas | F26 | `appointment.appointment.count_active_for_service` |
 | Cuántas reservas de clientas esperan confirmación | ver citas | F03, F18 | `appointment.appointment.count_to_confirm` |
+| Lo que la clienta reservó o canceló ella misma en las últimas 24 horas, lo más nuevo primero | ver citas (todas o las suyas) | F28 | `appointment.appointment.notices` |
 | Las filas de la agenda (profesionales reservables y los que conservan citas) | ver citas | F01, F04, F25, F27 | `appointment.agenda.lanes` |
 | Las horas libres de un día | ver disponibilidad | F02, F18 | `appointment.availability.slots` |
 | Si una hora concreta se puede reservar y por qué no | ver disponibilidad | F02 | `appointment.availability.check` |
@@ -693,8 +850,9 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila), `Counter`, `Appointment`,
   `AppointmentService` (líneas congeladas), `History`, `BlockedTime`, `Recurring` y
   `RecurringService`. Borrar una cita o una serie es lógico (`deleted_at`).
-- Las reacciones (`events.py`) las ejecuta el relay del outbox en la fase 2; aquí están probadas con los
-  avisos reales de cada app.
+- Las reacciones (`events.py`) las reparte el relay del outbox del worker (`base/relay.py`, ya en la fase
+  1, hub#105): `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y los avisos
+  reales de Venta, Clientes y Personal; `test_integration_*.py`, cada reacción con su app.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -708,6 +866,9 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 
 ## Lo que queda fuera
 
+- **La campana y el aviso del dispositivo** de una cita que la clienta reserva o cancela (APPOINTMENT-F28):
+  Citas ya dice qué se avisa; la campana de la barra de arriba es del marco común de la app y está pedida
+  en `UI-REQUESTS.md`.
 - **Recordatorios** («Enviar recordatorios»): el producto actual guardaba el ajuste sin enviar nada; aquí
   no se porta un ajuste que no hace nada. Los mensajes son de la app de WhatsApp y de las
   automatizaciones.

@@ -4,7 +4,10 @@
 // searchable — and fill what it asks for: the required fields always, the rest with «Add
 // information», each value composed of text and picked data. «Only continue if…» is a dashed chip
 // that narrows the line; «Wait» is a label on it. Each step has its handle (`ion-reorder`, the
-// finger's gesture) and its ×.
+// finger's gesture) and its ×. «Call another system» is a card named by its host that opens to its form
+// (`HttpStepPanel`, FLOW-F27); «Ask someone first», one named by its question (`AskStepPanel`, FLOW-F28).
+// Every step but a condition carries «More options» (`StepOptions`, FLOW-F25), and says them under its
+// title when closed.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonInput, IonReorder, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -12,9 +15,12 @@ import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import { type DataChoice, delayParts, type DelayUnit, secondsOf } from '../lib/document';
-import { actionLabel, describeStep, fieldLabel } from '../lib/phrasing';
+import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
+import AskStepPanel from './AskStepPanel.vue';
 import ConditionRows from './ConditionRows.vue';
+import HttpStepPanel from './HttpStepPanel.vue';
+import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
 
 const props = defineProps<{
@@ -29,6 +35,8 @@ const props = defineProps<{
   choices: readonly DataChoice[];
   /** Opens the editor's picker for this step; the chosen path, or `null`. */
   pick: () => Promise<string | null>;
+  /** The picker of a call's values, which also offers the secrets and the call's key (FLOW-F27). */
+  pickCall?: () => Promise<string | null>;
 }>();
 const emit = defineEmits<{ 'update:step': [step: Step]; remove: []; toggle: [] }>();
 const phrasing = usePhrasing();
@@ -123,6 +131,22 @@ function helper(field: FieldOut): string | undefined {
 }
 
 const title = computed(() => describeStep(props.step, props.steps, props.catalog, phrasing.value));
+
+/** «Only if: … · If it fails, it carries on», for a closed step that has options. */
+const summary = computed(() => {
+  const step = props.step;
+  if (step.kind === 'condition') return '';
+  const parts: string[] = [];
+  const t = phrasing.value.t;
+  if (step.run_if && Object.keys(step.run_if).length) {
+    const clauses = Object.entries(step.run_if).flatMap(([path, comparisons]) =>
+      Object.entries(comparisons ?? {}).map(([op, value]) => describeClause({ path, op: op as never, value }, props.steps, props.catalog, phrasing.value)),
+    );
+    parts.push(t('flow.steps.options.summaryRunIf', { clauses: clauses.join('; ') }));
+  }
+  if ((step.kind === 'command' || step.kind === 'query' || step.kind === 'http') && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
+  return parts.join(' · ');
+});
 </script>
 
 <template>
@@ -159,6 +183,11 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
           <HubIcon name="ion:close-outline" />
         </button>
       </div>
+      <span
+        v-if="summary && !open"
+        class="flow-card__hint flow-step__summary"
+        :data-testid="`flow-step-summary-${id}`"
+      >{{ summary }}</span>
       <div
         v-if="open"
         class="flow-detached-panel"
@@ -197,6 +226,14 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
             </IonSelectOption>
           </IonSelect>
         </div>
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
       </div>
     </template>
 
@@ -250,6 +287,128 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
       </div>
     </template>
 
+    <!-- A call to another system: a card named by its host. -->
+    <div
+      v-else-if="step.kind === 'http'"
+      class="flow-card"
+    >
+      <div class="flow-card__row">
+        <IonReorder
+          class="flow-handle"
+          :aria-label="$t('flow.steps.reorder')"
+        >
+          ⠿
+        </IonReorder>
+        <button
+          type="button"
+          class="flow-card__open"
+          :aria-expanded="open ? 'true' : 'false'"
+          :data-testid="`flow-step-open-${id}`"
+          @click="emit('toggle')"
+        >
+          <span class="flow-card__title"><HubIcon name="ion:globe-outline" /> {{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-icon-btn"
+          :aria-label="$t('flow.steps.remove')"
+          :data-testid="`flow-step-remove-${id}`"
+          @click="emit('remove')"
+        >
+          <HubIcon name="ion:close-outline" />
+        </button>
+      </div>
+      <div
+        v-if="open"
+        class="flow-card__panel"
+        :data-testid="`flow-step-panel-${id}`"
+      >
+        <HttpStepPanel
+          :step="step"
+          :index="index"
+          :steps="steps"
+          :catalog="catalog"
+          :errors="errors"
+          :pick="pickCall ?? pick"
+          @update:step="emit('update:step', $event)"
+        />
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+      </div>
+    </div>
+
+    <!-- A question to someone (FLOW-F28): a card named by what it asks. -->
+    <div
+      v-else-if="step.kind === 'ask'"
+      class="flow-card"
+    >
+      <div class="flow-card__row">
+        <IonReorder
+          class="flow-handle"
+          :aria-label="$t('flow.steps.reorder')"
+        >
+          ⠿
+        </IonReorder>
+        <button
+          type="button"
+          class="flow-card__open"
+          :aria-expanded="open ? 'true' : 'false'"
+          :data-testid="`flow-step-open-${id}`"
+          @click="emit('toggle')"
+        >
+          <span class="flow-card__title"><HubIcon name="ion:help-circle-outline" /> {{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-icon-btn"
+          :aria-label="$t('flow.steps.remove')"
+          :data-testid="`flow-step-remove-${id}`"
+          @click="emit('remove')"
+        >
+          <HubIcon name="ion:close-outline" />
+        </button>
+      </div>
+      <div
+        v-if="open"
+        class="flow-card__panel"
+        :data-testid="`flow-step-panel-${id}`"
+      >
+        <AskStepPanel
+          :step="step"
+          :index="index"
+          :steps="steps"
+          :catalog="catalog"
+          :errors="errors"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+      </div>
+    </div>
+
     <!-- An action or a read: a card. -->
     <div
       v-else
@@ -271,6 +430,11 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
           @click="emit('toggle')"
         >
           <span class="flow-card__title">{{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
         </button>
         <button
           type="button"
@@ -373,6 +537,14 @@ const title = computed(() => describeStep(props.step, props.steps, props.catalog
             </IonSelectOption>
           </IonSelect>
         </div>
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
       </div>
     </div>
   </div>

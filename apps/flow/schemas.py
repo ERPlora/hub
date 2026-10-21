@@ -21,6 +21,7 @@ from pydantic import (
     AfterValidator,
     AwareDatetime,
     ConfigDict,
+    SecretStr,
     StringConstraints,
     ValidationInfo,
     field_validator,
@@ -28,7 +29,7 @@ from pydantic import (
 )
 
 from apps.flow import document
-from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, Draft, FlowRun
+from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, QUESTION_ROLES, SECRET_NAME_RE, Draft, FlowRun
 
 T = TypeVar("T")
 
@@ -49,10 +50,17 @@ STEP_READS_NOTHING = _(
     "Step %(n)s reads «%(path)s», which is no data of this automation."
 )
 STEP_READS_LATER = _("Step %(n)s reads «%(path)s», which no earlier step leaves.")
+CALL_ONLY = _("Step %(n)s reads «%(path)s»: a secret or the call's key only go in «Call another system».")
+BAD_URL = _(
+    "Write the address by hand, starting with https:// and its server's name, without a user or a password; "
+    "data can only go after the name, in the path or the query."
+)
+BAD_HEADER = _("«%(name)s» is no header this step can send.")
 
 TriggerKind = Literal["event", "schedule", "at", "manual"]
 RunStatus = Literal[*FlowRun.Status.values]
 DraftStatus = Literal[*Draft.Status.values]
+QuestionRole = Literal[*QUESTION_ROLES]
 
 
 def _text(max_length: int, min_length: int = 0):
@@ -88,7 +96,11 @@ D_STEPS = (
     "row's fields and `count` only how many; both leave `found` and `count`), `condition` (`when`: every "
     "comparison must hold, or the run ends there without error) or `delay` (`seconds`, 60 to 2592000, "
     "counted from the previous step). A value in `params` is a literal, a path that keeps its type "
-    "(`input.customer_id`) or text with `{{input.name}}` inside. Money is in cents."
+    "(`input.customer_id`) or text with `{{input.name}}` inside. Money is in cents. Every step but a "
+    "condition may carry `run_if` (skipped when it does not hold) and an action or a read `on_error` "
+    "(`continue`: its failure does not stop the run). `ask` asks a person first (`title`, `details`, `role` "
+    "'' / manager / employee, `hours` 1 to 720, `on_no` stop / continue, `on_timeout` no / stop / continue) "
+    "and leaves `approved`, `expired`, `note` and `answered_by`."
 )
 D_CONDITION = (
     "Comparisons, all at once: `{path: {operator: value}}` with eq, neq, in, exists, contains, gt, gte, "
@@ -220,10 +232,23 @@ Trigger = Annotated[
 # --- The document: its steps ------------------------------------------------------------------------
 
 
+D_RUN_IF = (
+    "«Only if…»: when these comparisons do not all hold the step is skipped (later steps read "
+    "`steps.<id>.skipped`) and the run goes on. " + D_CONDITION
+)
+D_ON_ERROR = (
+    "What a failure of this step does: `stop` (none: the run stops with its reason) or `continue` (the "
+    "failure is written in the step, later steps read `steps.<id>.failed` and `steps.<id>.error_code`, and "
+    "the run goes on)."
+)
+
+
 class _OperationStep(In):
     id: StepId = Field(
         description="The step's id; later steps read what it leaves as `steps.<id>.<field>`."
     )
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+    on_error: Literal["stop", "continue"] | None = Field(None, description=D_ON_ERROR)
     operation: str = Field(
         max_length=96, description="The operation of another app, by its name."
     )
@@ -276,6 +301,7 @@ class ConditionStep(In):
 
 class DelayStep(In):
     id: StepId = Field(description="The step's id.")
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
     kind: Literal["delay"] = Field(description="Wait, counted from the previous step.")
     seconds: int = Field(
         ge=document.MIN_DELAY_SECONDS,
@@ -284,21 +310,101 @@ class DelayStep(In):
     )
 
 
+HeaderName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$")]
+#: Headers the Hub writes itself (or that HTTP forbids a caller to set).
+OWN_HEADERS = frozenset({"host", "content-length", "transfer-encoding", "connection"})
+
+
+class HttpStep(In):
+    id: StepId = Field(description="The step's id; later steps read `steps.<id>.status` and `steps.<id>.body`.")
+    kind: Literal["http"] = Field(description="Call another system: an https request, after the step's permission.")
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = Field("POST", description="The HTTP method.")
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)] = Field(
+        description="The address: https:// and its host written by hand; `{{…}}` data only in the path or the "
+        "query (percent-encoded). Its origin is the permission it asks for (`http:https://host`)."
+    )
+    headers: dict[HeaderName, Annotated[str, StringConstraints(max_length=4000)]] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="Headers to send; a value may read `{{secret.NAME}}` and `{{run.idempotency_key}}`.",
+    )
+    body: Annotated[str, StringConstraints(max_length=65536)] = Field(
+        "", description="What to send, as text (a datum inserted in a JSON body is JSON-escaped)."
+    )
+    timeout: int = Field(10, ge=1, le=30, description="Seconds to wait for the answer, 1 to 30.")
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+    on_error: Literal["stop", "continue"] | None = Field(None, description=D_ON_ERROR)
+
+    @field_validator("url")
+    @classmethod
+    def _plain_https(cls, value: str) -> str:
+        if document.literal_origin(value) is None:
+            raise ValueError(str(BAD_URL))
+        return value
+
+    @field_validator("headers")
+    @classmethod
+    def _own_headers(cls, value: dict[str, str]) -> dict[str, str]:
+        for name in value:
+            if name.lower() in OWN_HEADERS:
+                raise ValueError(str(BAD_HEADER) % {"name": name})
+        return value
+
+
+class AskStep(In):
+    id: StepId = Field(description="The step's id; later steps read `steps.<id>.approved`, `.expired`, `.note`.")
+    kind: Literal["ask"] = Field(description="Ask someone first: the run waits for a person's yes or no.")
+    title: _text(300, 1) = Field(description="The question, with `{{…}}` data filled in when it is asked.")
+    details: _text(2000) = Field("", description="More words under the question, with `{{…}}` data.")
+    role: QuestionRole = Field(
+        "", description="Who answers: '' whoever runs the business, `manager` or `employee` (they always can too)."
+    )
+    hours: int = Field(72, ge=1, le=720, description="How long to wait for the answer: 1 hour to 30 days.")
+    on_no: Literal["stop", "continue"] = Field("stop", description="A no: `stop` the run here or `continue`.")
+    on_timeout: Literal["no", "stop", "continue"] = Field(
+        "no", description="Nobody answered in time: `no` (what a no does), `stop` or `continue`."
+    )
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+
+
 Step = Annotated[
-    CommandStep | QueryStep | ConditionStep | DelayStep, Field(discriminator="kind")
+    CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep, Field(discriminator="kind")
 ]
 DraftStep = Annotated[
     CommandStep | ConditionStep | DelayStep, Field(discriminator="kind")
 ]
 
 
+def _condition_reads(condition: dict) -> list[str]:
+    # The data it looks at and the data it compares with (hub#1712).
+    return [*condition, *document.references(list(condition.values()))]
+
+
 def _reads(step: Any) -> list[str]:
+    reads = _condition_reads(step.run_if) if getattr(step, "run_if", None) else []
     if step.kind in ("command", "query"):
-        return document.references(step.params)
+        return reads + document.references(step.params)
     if step.kind == "condition":
-        # The data it looks at and the data it compares with (hub#1712).
-        return [*step.when, *document.references(list(step.when.values()))]
-    return []
+        return _condition_reads(step.when)
+    if step.kind == "http":
+        texts = document.references([step.url, *step.headers.values(), step.body])
+        return reads + [path for path in texts if not document.CALL_ONLY_RE.match(path)]
+    if step.kind == "ask":
+        return reads + document.references([step.title, step.details])
+    return reads
+
+
+def _call_only(step: Any) -> list[str]:
+    """What a step reads of what only a call's texts may read (a secret, the call's key): anything in a
+    condition, an «Only if…» (a call's own included) or the values of any other step."""
+    found = _condition_reads(step.run_if) if getattr(step, "run_if", None) else []
+    if step.kind in ("command", "query"):
+        found += document.references(step.params)
+    elif step.kind == "condition":
+        found += _condition_reads(step.when)
+    elif step.kind == "ask":
+        found += document.references([step.title, step.details])
+    return [path for path in found if path.startswith(("secret.", "run."))]
 
 
 def document_problems(steps: list[Any]) -> list[str]:
@@ -312,12 +418,16 @@ def document_problems(steps: list[Any]) -> list[str]:
         seen.add(step.id)
     leaves: set[str] = set()
     for number, step in enumerate(steps, start=1):
+        for path in _call_only(step):
+            problems.append(str(CALL_ONLY) % {"n": number, "path": path})
         for path in _reads(step):
+            if path.startswith(("secret.", "run.")) and step.kind != "http":
+                continue
             if not document.is_path(path):
                 problems.append(str(STEP_READS_NOTHING) % {"n": number, "path": path})
             elif path.startswith("steps.") and path.split(".")[1] not in leaves:
                 problems.append(str(STEP_READS_LATER) % {"n": number, "path": path})
-        if step.kind in ("command", "query"):
+        if step.kind in ("command", "query", "http", "ask"):
             leaves.add(step.id)
     return problems
 
@@ -432,6 +542,21 @@ class StatusIn(In):
     )
 
 
+class RunRefIn(In):
+    id: UUID = Field(description="The run's id (its reference in the history).")
+
+
+class RecordCallIn(In):
+    """How a call of a run ended (``apps.flow.http.Reply``), its secrets already hidden."""
+
+    id: UUID = Field(description="The run's id.")
+    kind: Literal["ok", "status", "blocked", "invalid", "failed", "timeout"] = Field(description="How it ended.")
+    status: int | None = Field(None, description="The HTTP status it answered.")
+    body: Any = Field(None, description="What it answered: data for JSON, text otherwise.")
+    truncated: bool = Field(False, description="Whether the answer was cut at 1 MiB.")
+    detail: str = Field("", max_length=2000, description="What went wrong, technically.")
+
+
 class RunListIn(PageIn):
     limit: int = Field(
         20, ge=1, le=100, description="How many runs to return (1 to 100)."
@@ -508,6 +633,43 @@ class DueIn(In):
     pass
 
 
+# --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
+
+SecretName = Annotated[str, StringConstraints(pattern=SECRET_NAME_RE)]
+D_SECRET_NAME = "The secret's name: upper case letters, digits and _, up to 64 (`STRIPE_KEY`)."
+
+
+class SecretListIn(In):
+    pass
+
+
+class SecretSetIn(In):
+    # A refused value is never echoed in an error (the 422 says why, never what).
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    name: SecretName = Field(description=D_SECRET_NAME)
+    value: Annotated[SecretStr, Field(min_length=1, max_length=4096)] = Field(
+        description="The value, typed by the person on the screen; it is never shown again."
+    )
+
+
+class SecretRefIn(In):
+    name: SecretName = Field(description=D_SECRET_NAME)
+
+
+# --- Questions (FLOW-F28 to F30) ----------------------------------------------------------------------
+
+
+class QuestionListIn(In):
+    pass
+
+
+class AnswerIn(In):
+    id: UUID = Field(description="The question's id, from `flow.question.list`.")
+    approve: bool = Field(description="true: yes, the automation goes on; false: no, it does what its step says.")
+    note: _text(500) = Field("", description="A note for the history, optional.")
+
+
 # --- Outputs ----------------------------------------------------------------------------------------
 
 
@@ -552,6 +714,9 @@ class RunOut(Schema):
     started_at: dt.datetime
     finished_at: dt.datetime | None
     started_by: str
+    resumable: bool = Field(
+        description="Whether it stopped by an error at a step and can still be resumed there (`flow.run.retry`)."
+    )
 
 
 class RunPageOut(Page[RunOut]):
@@ -636,6 +801,9 @@ class TestStepOut(Schema):
         "not_allowed",
         "unavailable",
         "not_reached",
+        "skipped",
+        "would_call",
+        "would_ask",
     ]
     operation: str = ""
     params: dict[str, Any] = {}
@@ -664,3 +832,53 @@ class DueOut(Schema):
 
 class DeletedOut(Schema):
     id: UUID
+
+
+class ClaimCallOut(Schema):
+    """A call a run is about to make, for the process that makes it (never a route: it carries the opened
+    secrets, which only travel in memory)."""
+
+    claimed: bool
+    method: str = ""
+    url: str = ""
+    headers: dict[str, str] = {}
+    body: str = ""
+    timeout: int = 10
+    masks: list[str] = []
+
+
+class SecretOut(Schema):
+    id: UUID
+    name: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    updated_by: str
+
+
+class QuestionOut(Schema):
+    id: UUID
+    flow_id: UUID
+    flow_name: str
+    run_id: UUID
+    title: str
+    details: str
+    role: str = Field(description="Who it was asked of: '' whoever runs the business, `manager` or `employee`.")
+    on_no: str
+    on_timeout: str
+    expires_at: dt.datetime
+    created_at: dt.datetime
+
+
+class QuestionPageOut(Schema):
+    rows: list[QuestionOut]
+
+
+class AnsweredOut(Schema):
+    id: UUID = Field(description="The question's id.")
+    run_id: UUID
+    status: RunStatus = Field(description="How its run is after the answer.")
+
+
+class SecretPageOut(Schema):
+    rows: list[SecretOut]
+    available: bool = Field(description="Whether this server can keep and use secrets (it has its key).")

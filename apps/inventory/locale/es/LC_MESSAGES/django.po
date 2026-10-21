@@ -153,6 +153,9 @@ msgstr "unidad de precio"
 msgid "active"
 msgstr "activo"
 
+msgid "sold out"
+msgstr "agotado"
+
 msgid "product"
 msgstr "producto"
 

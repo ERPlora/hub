@@ -13,7 +13,7 @@ import pytest
 from live.errors import Conflict
 from live.models import OutboxEvent
 
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models import Appointment, History, Recurring
 
 from .conftest import (
     MONDAY,
@@ -177,6 +177,28 @@ def test_editing_from_a_later_date_splits_the_series_and_moves_what_follows(salo
     assert new.max_occurrences == 2
     before = Appointment.objects.get(recurring_id=old.id, occurrence_date=MONDAY)
     assert before.start == at(MONDAY, "10:00")
+
+
+def test_a_long_series_moves_every_appointment_and_each_says_who_had_it(salon):
+    # gh:appointments#251 — handing a long series over moves all of its appointments, not the first fifty;
+    # gh:appointments#253 — each one's history says from whom to whom, not just «rescheduled».
+    make_settings(max_advance_booking=0)
+    out = create(salon, frequency="daily", day_of_week=None)
+    run("appointment.recurring.materialize", {"id": str(out.recurring.id)})
+    booked = len(occurrences(out.recurring.id))
+    assert booked > 50
+    edited = run(
+        "appointment.recurring.update",
+        {"id": str(out.recurring.id), "from_date": MONDAY.isoformat(), "staff": "Bea"},
+    )
+    assert (edited.moved, edited.skipped) == (booked, [])
+    handed = History.objects.filter(
+        appointment__recurring_id=out.recurring.id, action="staff_changed"
+    )
+    assert handed.count() == booked
+    assert {(line.old_value["staff"], line.new_value["staff"]) for line in handed} == {
+        ("Ana López", "Bea Ruiz")
+    }
 
 
 def test_editing_from_the_first_date_edits_the_series_in_place(salon):

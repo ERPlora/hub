@@ -228,6 +228,65 @@ def test_a_customers_visits_come_newest_first_with_their_notes(salon):
     )
 
 
+# gh:appointments#143, #146 · gh:hub#1662 — a model reading a stranger's message (a flow's step gets every
+# read of the app) composes these reads: what is the salon's (its notes, a cancellation's reason) and the
+# customer's contact never reach a caller that is not a person. The team, and its assistant with the person's
+# own session, read them; the day's agenda carries neither, for anybody.
+@pytest.mark.parametrize("actor", ["flow_run:0190a1b2", "system", None])
+def test_a_caller_who_is_not_a_person_reads_a_visit_without_the_salons_notes_nor_the_contact(salon, actor):
+    from apps.appointment.apps import AppointmentConfig
+
+    booked = make_appointment(
+        salon.lucia,
+        salon.ana,
+        [salon.cut],
+        at(MONDAY, "10:00"),
+        notes="Bring photo",
+        internal_notes="7/1 + 6%",
+        cancellation_reason="Allergy",
+    )
+    reads = {p for p in AppointmentConfig.permissions if p.split(".", 1)[-1].startswith("view")}
+    automation = {"actor": actor, "permissions": reads}
+    got = run("appointment.appointment.get", {"number": booked.number}, **automation)
+    assert got.number == booked.number and got.customer_name == "Lucía Pérez"
+    private = ("customer_phone", "customer_email", "notes", "internal_notes", "cancellation_reason")
+    assert {name: getattr(got, name) for name in private} == dict.fromkeys(private, "")
+    visits = run("appointment.appointment.list_for_customer", {"customer_id": str(salon.lucia.id)}, **automation)
+    assert [(visit.id, visit.notes, visit.internal_notes) for visit in visits.rows] == [(booked.id, "", "")]
+    person = run("appointment.appointment.get", {"number": booked.number})
+    assert (person.customer_phone, person.internal_notes, person.cancellation_reason) == (
+        "+34600111222",
+        "7/1 + 6%",
+        "Allergy",
+    )
+    agenda = run("appointment.appointment.list", {"date_from": MONDAY.isoformat()})
+    assert not set(agenda.rows[0].model_dump()) & set(private)
+
+
+# gh:appointments#151 — a flow's template prints a value as it comes, with no clock nor formatter: an
+# automation confirming a booking says «el martes a las 10:30» because the appointment gives its day and its
+# hour ready to read, in the language of whoever asks, on the business's clock (24 hours, as the old
+# product's messages; the year kept: a booking can be months away).
+def test_an_appointment_gives_its_day_and_hour_ready_to_read_in_the_callers_language(salon):
+    tuesday = dt.date(2030, 3, 5)
+    late = make_appointment(salon.lucia, salon.ana, [salon.cut], at(tuesday, "00:30"))
+    spanish = run("appointment.appointment.get", {"id": str(late.id)}, language="es")
+    assert (spanish.start_date_label, spanish.start_time_label) == ("martes, 5 de marzo de 2030", "00:30")
+    english = run("appointment.appointment.get", {"id": str(late.id)}, language="en")
+    assert (english.start_date_label, english.start_time_label) == ("Tuesday, March 5, 2030", "00:30")
+    booked = run(
+        "appointment.appointment.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "start": wall(MONDAY, "16:05"),
+        },
+        language="es",
+    )
+    assert booked.start_time_label == "16:05" and booked.start_date_label.startswith("lunes, ")
+
+
 # Counters
 
 
@@ -263,6 +322,54 @@ def test_the_upcoming_live_appointments_of_a_service_are_counted_with_the_first_
     )
 
 
+# APPOINTMENT-G01 (old-hub:HUB_SHELL-F66) — what the hub tells the team as it happens: a booking or a
+# cancellation the customer made herself (WhatsApp, the online booking), newest first, with what the notice says
+# (who, which services, the day and the hour ready to say, with whom). One given or cancelled at the front desk is
+# not told (who did it knows); an employee hears only her own agenda's; nothing older than the window.
+def test_the_notices_are_the_customers_own_bookings_and_cancellations(salon, make_user):
+    booked = make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), source="whatsapp"
+    )
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "11:00"))
+    make_appointment(
+        salon.lucia,
+        salon.ana,
+        [salon.cut],
+        at(MONDAY, "12:00"),
+        status="cancelled",
+        cancelled_at=timezone.now(),
+    )
+    cancelled = make_appointment(
+        make_customer("Pepa Gil"),
+        salon.bea,
+        [salon.colour],
+        at(TUESDAY, "16:00"),
+        source="online",
+        status="cancelled",
+        cancelled_by_customer=True,
+        cancelled_at=timezone.now() + dt.timedelta(seconds=1),
+    )
+    page = run("appointment.appointment.notices", language="es")
+    assert [(notice.kind, notice.id) for notice in page.rows] == [
+        ("cancelled", cancelled.id),
+        ("booked", cancelled.id),
+        ("booked", booked.id),
+    ]
+    first = page.rows[0]
+    assert (first.number, first.customer_name, first.service_names, first.staff_name) == (
+        cancelled.number,
+        "Pepa Gil",
+        "Colour",
+        "Bea Ruiz",
+    )
+    assert (first.start_time_label, first.start_date_label.split(",")[0]) == ("16:00", "martes")
+    assert first.at == cancelled.cancelled_at
+    own = employee_linked_to(salon.ana, make_user)
+    assert [notice.id for notice in as_ctx(own, "appointment.appointment.notices").rows] == [booked.id]
+    later = (timezone.now() + dt.timedelta(minutes=5)).isoformat()
+    assert run("appointment.appointment.notices", {"since": later}).rows == []
+
+
 def test_the_customers_own_bookings_waiting_for_confirmation_are_counted(salon):
     make_appointment(
         salon.lucia,
@@ -288,7 +395,10 @@ def test_the_customers_own_bookings_waiting_for_confirmation_are_counted(salon):
         status="pending",
         source="online",
     )
-    assert run("appointment.appointment.count_to_confirm").count == 1
+    # Two confirmed bookings ahead: a count of the confirmed ones instead would say 2, never 1.
+    make_appointment(salon.lucia, salon.bea, [salon.colour], at(TUESDAY, "12:00"), status="confirmed", source="online")
+    counted = run("appointment.appointment.count_to_confirm")
+    assert (counted.count, counted.earliest) == (1, at(MONDAY, "10:00"))
 
 
 # The agenda's lanes
