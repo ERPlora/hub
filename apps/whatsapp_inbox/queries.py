@@ -11,7 +11,7 @@ from django.conf import settings
 from django.db.models import Count, F, Q, QuerySet, Value
 from django.db.models.functions import Coalesce, Lower, NullIf
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
@@ -170,8 +170,9 @@ def find_conversation(
     return found
 
 
-def channel() -> Channel | None:
-    return Channel.objects.first()
+def channel(scope: Scope) -> Channel | None:
+    """The number of the business of ``scope`` (phase 1: its host), or ``None`` before erplora.com spoke of it."""
+    return Channel.objects.filter(host=scope.key).first()
 
 
 def send_blocked(row: Channel | None) -> str | None:
@@ -213,8 +214,8 @@ def conversation_out(row: Conversation) -> dict:
     }
 
 
-def conversation_detail(row: Conversation) -> dict:
-    blocked = send_blocked(channel())
+def conversation_detail(ctx: OperationContext, row: Conversation) -> dict:
+    blocked = send_blocked(channel(ctx.scope))
     return {
         **conversation_out(row),
         "window_open": row.window_open(clock.now()),
@@ -371,7 +372,7 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
     },
 )
 def conversation_get(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    return conversation_detail(find_conversation(data.id, data.conversation))
+    return conversation_detail(ctx, find_conversation(data.id, data.conversation))
 
 
 @operation(
@@ -424,7 +425,7 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
             ),
         ),
     )
-    row = channel()
+    row = channel(ctx.scope)
     return {
         **counts,
         "cap_reached": bool(row and row.cap_reached(clock.business_month())),
@@ -581,7 +582,7 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     },
 )
 def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
-    row = channel() or Channel()
+    row = channel(ctx.scope) or Channel(host=ctx.scope.key)
     month = clock.business_month()
     return {
         "status": row.status,

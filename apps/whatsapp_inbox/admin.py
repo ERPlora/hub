@@ -99,6 +99,7 @@ class TemplateAdmin(admin.ModelAdmin):
 @admin.register(Channel)
 class ChannelAdmin(admin.ModelAdmin):
     list_display = (
+        "host",
         "phone_number",
         "display_name",
         "status",
@@ -107,4 +108,5 @@ class ChannelAdmin(admin.ModelAdmin):
         "usage_month",
         "version",
     )
-    readonly_fields = ("updated_at",)
+    search_fields = ("host", "phone_number", "display_name")
+    readonly_fields = ("host", "updated_at")

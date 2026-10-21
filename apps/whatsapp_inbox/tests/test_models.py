@@ -112,9 +112,13 @@ def test_a_client_message_id_is_used_once():
     message(conv, "wamid.4")
 
 
-def test_one_channel_row():
-    Channel.objects.create()
-    assert violates("whatsapp_inbox_channel_singleton", Channel.objects.create)
+def test_one_channel_row_per_business():
+    # Each business (phase 1: its host) keeps its own number; the one row shared by all is gone.
+    Channel.objects.create(host="a")
+    Channel.objects.create(host="b")
+    assert violates(
+        "whatsapp_inbox_channel_one_per_host", lambda: Channel.objects.create(host="a")
+    )
 
 
 def test_one_template_per_name_and_language():

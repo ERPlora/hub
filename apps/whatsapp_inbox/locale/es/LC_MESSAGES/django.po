@@ -43,8 +43,11 @@ msgctxt "whatsapp channel"
 msgid "Needs reconnecting"
 msgstr "Hay que reconectar"
 
-msgid "slot"
-msgstr "hueco"
+msgid "host"
+msgstr "host"
+
+msgid "First label of the host of the business, e.g. “a” for a.localhost."
+msgstr "Primera etiqueta del host del negocio, p. ej. «a» para a.localhost."
 
 msgid "status"
 msgstr "estado"
@@ -75,6 +78,9 @@ msgstr "actualizado el"
 
 msgid "WhatsApp channel"
 msgstr "Canal de WhatsApp"
+
+msgid "WhatsApp channels"
+msgstr "Canales de WhatsApp"
 
 msgctxt "whatsapp conversation"
 msgid "Open"

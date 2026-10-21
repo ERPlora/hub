@@ -32,14 +32,25 @@ def name_key(text: str) -> str:
 
 
 class Channel(UUIDModel):
-    """The business's WhatsApp number as erplora.com reports it: one row, written only by the SaaS."""
+    """The business's WhatsApp number as erplora.com reports it: one row per business, written only by what the SaaS
+    says (its photo, and its answer when the Hub connects or disconnects the number).
+
+    Phase 1 shares the tables, so the business is the row's ``host`` (the first label of its host, as
+    ``base.Membership``): each business's photo applies to its own row with its own version. Phase 2 keeps one row in
+    each hub's database.
+    """
 
     class Status(models.TextChoices):
         NOT_CONNECTED = "not_connected", pgettext_lazy("whatsapp channel", "Not connected")
         CONNECTED = "connected", pgettext_lazy("whatsapp channel", "Connected")
         RECONNECT_NEEDED = "reconnect_needed", pgettext_lazy("whatsapp channel", "Needs reconnecting")
 
-    slot = models.PositiveSmallIntegerField(_("slot"), default=1, editable=False)
+    host = models.CharField(
+        _("host"),
+        max_length=63,
+        editable=False,
+        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
+    )
     status = models.CharField(
         _("status"), max_length=20, choices=Status.choices, default=Status.NOT_CONNECTED
     )
@@ -58,13 +69,10 @@ class Channel(UUIDModel):
 
     class Meta:
         verbose_name = _("WhatsApp channel")
-        verbose_name_plural = _("WhatsApp channel")
+        verbose_name_plural = _("WhatsApp channels")
         constraints = [
             models.UniqueConstraint(
-                fields=["slot"], name="whatsapp_inbox_channel_singleton"
-            ),
-            models.CheckConstraint(
-                condition=Q(slot=1), name="whatsapp_inbox_channel_slot"
+                fields=["host"], name="whatsapp_inbox_channel_one_per_host"
             ),
         ]
 

@@ -528,14 +528,7 @@ def update_status(ctx: OperationContext, data: StatusIn) -> dict:
     },
 )
 def sync_channel(ctx: OperationContext, data: ChannelSyncIn) -> dict:
-    rows = Channel.objects.select_for_update()
-    row = rows.first()
-    if row is None:
-        try:
-            with transaction.atomic():
-                row = Channel.objects.create()
-        except IntegrityError:
-            row = rows.get()
+    row = _locked_channel(ctx)
     if data.version <= row.version:
         return {"applied": False, "version": row.version}
     now = clock.now()
@@ -552,6 +545,20 @@ def sync_channel(ctx: OperationContext, data: ChannelSyncIn) -> dict:
         _sync_templates(data.templates, now)
     record_event(ctx, events.CHANNEL_SYNCED, {"version": data.version})
     return {"applied": True, "version": data.version}
+
+
+def _locked_channel(ctx: OperationContext) -> Channel:
+    """The row of the business of ``ctx``, locked; born the first time erplora.com speaks of it (two at once: one
+    creates it, the other finds it)."""
+    rows = Channel.objects.select_for_update().filter(host=ctx.scope.key)
+    row = rows.first()
+    if row is None:
+        try:
+            with transaction.atomic():
+                row = Channel.objects.create(host=ctx.scope.key)
+        except IntegrityError:
+            row = rows.get()
+    return row
 
 
 def _sync_templates(items, now) -> None:
@@ -693,7 +700,7 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
     if already is not None:
         return message_out(already)
     conversation, phone = _target(ctx, data)
-    blocked = send_blocked(channel())
+    blocked = send_blocked(channel(ctx.scope))
     if blocked:
         raise _blocked_error(blocked)
     now = clock.now()
@@ -1378,8 +1385,8 @@ def _apply(row: Template, content: dict) -> None:
     row.variables = template_variables(row.body)
 
 
-def _no_template_without_a_number() -> None:
-    blocked = send_blocked(channel())
+def _no_template_without_a_number(ctx: OperationContext) -> None:
+    blocked = send_blocked(channel(ctx.scope))
     if blocked in ("not_connected", "unconfigured"):
         raise _blocked_error(blocked)
 
@@ -1412,7 +1419,7 @@ def create_template(ctx: OperationContext, data: TemplateCreateIn) -> dict:
     already = Template.objects.filter(submit_key=data.submit_key).first()
     if already is not None:
         return template_out(already)
-    _no_template_without_a_number()
+    _no_template_without_a_number(ctx)
     exists = Conflict(str(TEMPLATE_EXISTS % {"name": data.name}), code="whatsapp_inbox.template_exists")
     if live_templates().filter(name=data.name, language=data.language).exists():
         raise exists
@@ -1464,7 +1471,7 @@ def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
         raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
     if row.submit_key == data.submit_key:
         return template_out(row)  # the same save again
-    _no_template_without_a_number()
+    _no_template_without_a_number(ctx)
     content = _content(data)
     _changeable(row, content)
     if row.status == Template.Status.DRAFT:

@@ -81,3 +81,11 @@ def test_the_pages_render(client, superuser):
         f"/admin/whatsapp_inbox/channel/{channel.pk}/change/",
     ):
         assert client.get(path, **host).status_code == 200, path
+
+
+def test_the_channels_say_whose_business_they_are():
+    # One row per business (phase 1: its host): the staff tells them apart by it.
+    channels = admin.site._registry[Channel]
+    assert channels.list_display[0] == "host"
+    assert "host" in channels.search_fields
+    assert "host" in channels.readonly_fields
