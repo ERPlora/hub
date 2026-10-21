@@ -492,7 +492,11 @@ class DeviceGetIn(Closed):
 
 
 class DeviceGetOut(Schema):
-    device: DeviceOut | None = Field(description="The device set up with that id; none = not set up here (or retired).")
+    device: DeviceOut | None = Field(description="The device set up with that id; none = not set up here, or retired.")
+    retired: bool = Field(
+        description="It was set up here and retired: it prints nothing, and printing from it does not set it up "
+        "again; only setting it up again from the device brings it back."
+    )
 
 
 class PruneOut(Schema):

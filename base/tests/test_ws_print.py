@@ -470,6 +470,30 @@ async def test_hello_of_a_device_nobody_set_up_is_refused_at_once(sockets, sessi
     assert no_printer["message"] != frame["message"], "«not set up here» and «no printer chosen» are different facts"
 
 
+async def test_hello_of_a_retired_device_is_refused_at_once_also_with_the_session_that_pairs(sockets, session):
+    """A retired device prints nothing until somebody sets it up again: it is refused at its hello like one nobody
+    set up, also with the session of whoever sets up the printers (which pairs a device new here), not with a
+    ``ready`` and then a ``printing.device_not_registered`` at every claim."""
+    cookie = await db(session, "ana")
+    till = await db(printer)
+    registration = await db(set_up, "till-1", till)
+    await db(run, "printing.device.retire", {"device_id": registration})
+    job = await db(enqueue, till)
+    socket = sockets(cookie=cookie)
+    await socket.connect()
+
+    frame = await socket.hello("till-1", [till])
+
+    assert frame["type"] == "error" and frame["code"] == "print.host_not_registered", frame
+    assert await socket.closed() == 4403
+    assert await db(status_of, job.id) == "pending"
+    assert await db(registered_printers, "till-1") is None, "a refused hello set the retired device up again"
+    stranger = sockets(cookie=await db(session, "eva", role=Membership.Role.EMPLOYEE))
+    await stranger.connect()
+    unregistered = await stranger.hello("kiosk-9", [till])
+    assert frame["message"] == unregistered["message"], "retired is told as «not set up here», not «no printer chosen»"
+
+
 @pytest.mark.parametrize("declares", ["nothing", "another printer"])
 async def test_a_device_set_up_in_printing_prints_the_printers_of_its_registration(sockets, session, declares):
     """What a device reaches is its registration, not what its hello names: with anybody's session (an employee's)
@@ -521,10 +545,12 @@ async def test_the_session_of_whoever_sets_up_the_printers_pairs_the_device_by_p
     assert await db(registered_printers, "till-1") == sorted([till, kitchen]), "the printer it named was added"
 
 
-async def test_a_device_retired_while_connected_stops_at_its_next_beat(sockets, session):
+@pytest.mark.parametrize("role", [Membership.Role.EMPLOYEE, Membership.Role.OWNER])
+async def test_a_device_retired_while_connected_stops_at_its_next_beat(sockets, session, role):
     """Retiring a device is printing's decision: at its next beat it prints for nothing (``refreshed 0``, the old
-    hub's «you host nothing here any more»), no job wakes it and a claim is refused."""
-    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
+    hub's «you host nothing here any more»), no job wakes it and a claim is refused, also with the session of
+    whoever sets up the printers (which pairs a device new here, not a retired one)."""
+    cookie = await db(session, "eva", role=role)
     till = await db(printer)
     registration = await db(set_up, "till-1", till)
     socket = await ready_socket(sockets, cookie, [till])

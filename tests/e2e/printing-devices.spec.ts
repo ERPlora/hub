@@ -2,7 +2,8 @@
 // an employee's session took the jobs of any printer by naming it. Now the owner sets up the browser's device
 // from Devices («Print from this device», with its printer), the list marks it as this device and the note says
 // what it prints; the employee's session takes the jobs only from that device (by the API, the device's side of
-// /ws/print), never from another, and once the owner retires it, not from it either. The employee reads the page
+// /ws/print), never from another, and once the owner retires it, not from it either, nor does its hello on /ws/print
+// get in with the owner's session (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED). The employee reads the page
 // without setting anything up. Screenshots of the flow in the three viewports. What is made here is deleted
 // after it.
 // flow: PRINTING-F18
@@ -145,6 +146,41 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
     const after = await claimAs(who, printer, mine);
     expect([after.status, after.data.error?.code]).toEqual([403, 'printing.device_not_registered']);
   }
+  // Nor is it let in by its hello on /ws/print, with the owner's session that pairs a device new here: refused at
+  // once instead of a ready and a refusal at every claim, and not set up again
+  // (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED).
+  const hello = await page.evaluate(
+    ({ printerId, deviceId }) =>
+      new Promise<{ frames: { type: string; code?: string }[]; close: number }>((resolve, reject) => {
+        const socket = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/print`);
+        const frames: { type: string; code?: string }[] = [];
+        socket.onmessage = (event) => {
+          const frame = JSON.parse(String(event.data));
+          frames.push(frame);
+          // Let in: the hub closes nothing, so the page does and the frames tell.
+          if (frame.type === 'ready') socket.close();
+        };
+        socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', session: '', deviceId, printers: [printerId] }));
+        socket.onclose = (event) => resolve({ frames, close: event.code });
+        socket.onerror = () => reject(new Error('the print channel failed'));
+      }),
+    { printerId: printer, deviceId: mine },
+  );
+  expect(hello.frames.map((frame) => [frame.type, frame.code])).toEqual([['error', 'print.host_not_registered']]);
+  expect(hello.close).toBe(4403);
+  const still = await api<{ rows: Device[] }>(context, A, 'GET', '/printing/devices');
+  expect(still.data.rows.map((device) => device.name)).not.toContain(DEVICE_NAME);
+  await page.locator('ion-toast').evaluateAll((toasts) => Promise.all(toasts.map((toast) => (toast as unknown as { dismiss: () => Promise<boolean> }).dismiss())));
+  await expect(page.locator('ion-toast')).toHaveCount(0);
+  for (const viewport of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await devicesReady(page);
+    await expect(shown(page).locator('[data-testid=printing-devices-this]')).toContainText(/does not print yet|todavía no imprime/);
+    await expect(shown(page).locator('[data-testid=printing-devices-add]')).toBeVisible();
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.screenshot({ path: shot(`FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED-${viewport.label}`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
   await employee.context.close();
 });
 

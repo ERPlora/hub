@@ -34,8 +34,9 @@ What the new Hub changed, and nothing else:
   ones of that registration, as in the old hub (``ready``'s roles come from the registry, never from the client). A
   device not set up here (or retired) is refused at its ``hello``. ``printers`` (ids it knows from
   ``printing.printer.list``) is what the session of whoever sets up the printers adds: with it, a device new here
-  or a printer not on its registration is taken, and its first claim of that role pairs them (printing's
-  WORKBOOK, «Lo que hace ``base`` con ``/ws/print``»); with anybody else's, it changes nothing. The ``roles`` of
+  (never a retired one, refused with any session until it is set up again) or a printer not on its registration is
+  taken, and its first claim of that role pairs them (printing's WORKBOOK, «Lo que hace ``base`` con
+  ``/ws/print``»); with anybody else's, it changes nothing. The ``roles`` of
   ``ready`` are the functions of those printers (``receipt``, ``kitchen``, ``bar``, ``label``: the old stations),
   and ``claim`` takes the oldest job of that role's printers. A ``beat`` reads the registration again: a device
   retired, or whose printers were switched off, answers ``refreshed: 0`` and prints for nothing.
@@ -524,15 +525,16 @@ class PrintSocket:
     def _reached(self, ctx: OperationContext, device_id: str, declared: list[str]) -> dict[str, str] | None:
         """The active printers the device prints for: id → function. Those of its registration in printing
         (``printing.device.get``), whatever ``declared`` says; with the session of whoever sets up the printers, the
-        active ones among ``declared`` too, which its claim pairs. ``None``: a device not set up here (or retired)
-        that this session does not pair."""
+        active ones among ``declared`` too, which its claim pairs. ``None``: a device retired, which no session pairs
+        (only setting it up again brings it back), or one not set up here that this session does not pair."""
         op = _operation(DEVICE_GET)
         try:
-            registration = op(ctx, _validated(DEVICE_GET, {"device": device_id})).device
+            answer = op(ctx, _validated(DEVICE_GET, {"device": device_id}))
         except OperationError as exc:
             raise _refusal_of(exc) from exc
+        registration = answer.device
         pairs = ctx.has(PAIRS)
-        if registration is None and not pairs:
+        if registration is None and (answer.retired or not pairs):
             return None
         printers = {} if registration is None else {str(p.id): p.usage for p in registration.printers if p.is_active}
         if pairs:

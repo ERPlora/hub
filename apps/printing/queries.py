@@ -497,8 +497,11 @@ def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
 
 @operation("printing.device.get", kind="query", permission="printing.print", input=DeviceGetIn, output=DeviceGetOut)
 def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
-    """For base's /ws/print, at the hello: the device set up with the id it says, with its printers. No route (the
-    id never travels in a URL), no API key and no assistant."""
+    """For base's /ws/print, at the hello: the device set up with the id it says, with its printers, or whether it
+    was retired (the session that pairs a device new here does not pair a retired one). No route (the id never
+    travels in a URL), no API key and no assistant."""
     key = PrintDevice.key_of(params.device)
-    device = active_devices().prefetch_related(_BY_NAME).filter(key=key).first()
-    return {"device": device_row(device, key) if device is not None else None}
+    device = PrintDevice.objects.prefetch_related(_BY_NAME).filter(key=key).first()
+    if device is None or device.retired_at is not None:
+        return {"device": None, "retired": device is not None}
+    return {"device": device_row(device, key), "retired": False}
