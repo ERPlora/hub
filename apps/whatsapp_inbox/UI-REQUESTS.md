@@ -25,15 +25,6 @@ icono.
   el asistente y cualquier canal (correo, SMS).
 - **Hoy**: `components/ThreadView.vue`, propio de esta app.
 
-## Ventana de Meta para conectar el número (página de vuelta de erplora.com)
-
-- **Qué**: para que la ventana de Meta que abre **Conectar WhatsApp** (WHATSAPP_INBOX-F01, F02) pueda
-  devolver su resultado a Ajustes, erplora.com tiene que servir la página a la que Meta devuelve el código
-  (WORKBOOK, «Contrato con el SaaS», puertas 10 y 11). Las páginas del Hub ya conservan las ventanas que
-  abren (`SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"`, hub#154).
-- **Hoy**: **Tu número** dice «Todavía no se puede conectar el número desde aquí.» en vez de ofrecer
-  **Conectar WhatsApp**; **Desconectar** sí funciona.
-
 ## Muestra de la cabecera de una plantilla (archivo)
 
 - **Qué**: para crear desde el Hub plantillas con foto, vídeo o documento en la cabecera

@@ -5,17 +5,16 @@
 // system, as its door 4 does (whatsapp-helpers.ts), because the run's erplora.com knows the local hub `a` by another id.
 //
 // F01: the owner of `a` opens Settings with the number not connected; the Hub asks erplora.com what opens Meta's
-// window (door 10) and, as erplora.com has no page yet to bring Meta's one-time code back (FIX in the SaaS), says it
-// cannot be connected from here yet and offers nothing to press; the inbox's notice leads to Settings. Meta's window
-// itself (lib/metaSignup.ts, composables/useMetaSignup.ts) is proven in Vitest: it cannot open here until erplora.com
-// serves that page (the Hub keeps the windows it opens since hub#154).
+// window (door 10) and, with erplora.com's own return page (plain http in development, its SAAS_URL's origin),
+// offers «Connect WhatsApp»; the inbox's notice leads to Settings. Pressing it, Meta's window and erplora.com's return
+// page bringing the code back are whatsapp-inbox-connect-return.spec.ts.
 // F02: erplora.com's own test seed gives `a` its number there (whatsapp-helpers.ts, `seedErplora`); disconnecting it from
 // Settings, asked first, has erplora.com (door 12) disconnect it, and «Your number» says «Not connected» at once,
 // without reloading.
 // Each in three sizes (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12[-F02]-390|834|1440). What it creates is deleted.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown } from './helpers';
+import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { cleanUp, pushChannel, seedErplora } from './whatsapp-helpers';
 
@@ -40,23 +39,23 @@ async function shots(page: Page, name: string, ready: (page: Page) => Promise<vo
   await page.setViewportSize({ width: 1280, height: 860 });
 }
 
-test('WHATSAPP_INBOX-F01: Settings asks erplora.com what opens Meta’s window and says why it cannot open yet', async ({ page }) => {
+test('WHATSAPP_INBOX-F01: Settings asks erplora.com what opens Meta’s window and offers «Connect WhatsApp»', async ({ page }) => {
   pushChannel({ status: 'not_connected' });
   const asked = page.waitForResponse((response) => response.url().endsWith('/api/whatsapp_inbox/channel/prepare'));
   await login(page, A, '/whatsapp_inbox/inbox');
   await shown(page).locator('[data-testid=whatsapp-inbox-go-to-settings]').click();
   await expect(page).toHaveURL(/\/whatsapp_inbox\/settings$/);
 
-  // erplora.com answered (200): the window is not offered, and the screen says why, in the user's words.
-  expect((await asked).status()).toBe(200);
+  // erplora.com answered (200) with its return page: the window is offered, and nothing says it cannot open.
+  const answer = await asked;
+  expect(answer.status()).toBe(200);
+  expect(await answer.json()).toMatchObject({ available: true, reason: null, redirect_uri: `${SAAS}/whatsapp/return` });
   await expect(number(page)).toContainText('Not connected');
-  await expect(number(page).locator('[data-testid=whatsapp-inbox-number-unavailable]')).toHaveText(
-    /^(Connecting the number from here is not available yet\.|WhatsApp is not available in ERPlora yet\.)$/,
-  );
-  await expect(number(page).locator('[data-testid=whatsapp-inbox-number-connect]')).toHaveCount(0);
+  await expect(number(page).locator('[data-testid=whatsapp-inbox-number-connect]')).toHaveText('Connect WhatsApp');
+  await expect(number(page).locator('[data-testid=whatsapp-inbox-number-unavailable]')).toHaveCount(0);
   await expect(number(page).locator('[data-testid=whatsapp-inbox-number-disconnect]')).toHaveCount(0);
   await shots(page, TASK, async (p) => {
-    await expect(number(p).locator('[data-testid=whatsapp-inbox-number-unavailable]')).toBeVisible();
+    await expect(number(p).locator('[data-testid=whatsapp-inbox-number-connect]')).toBeVisible();
   });
 });
 
