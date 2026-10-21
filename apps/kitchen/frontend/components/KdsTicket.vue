@@ -316,13 +316,12 @@ function bumpMenu(group: DishGroup): void {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Who sent it is read whole (a name or, without one, an e-mail): it wraps on a narrow card, never cut. */
 .kds-card__waiter {
   font-size: 0.95rem;
   font-weight: 500;
   opacity: 0.72;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .kds-card__num {
   font-variant-numeric: tabular-nums;

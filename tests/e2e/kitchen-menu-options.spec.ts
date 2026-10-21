@@ -2,7 +2,7 @@
 // kitchen display shows it with what the waiter chose, in Chrome with the real Sales, Modifiers, Menus, Kitchen and
 // Inventory apps: a burger with its options sheet («+CHEESE» under the dish, before the note) and a menu composed
 // course by course (its header with how many dishes, each dish indented under it, at its own station: the grill
-// sees only the hake, still under «MENU»). A tap on the menu's header marks its dishes ready. The card in
+// sees only the hake, still under «MENU»); the card names its waiter, never the id of the session. A tap on the menu's header marks its dishes ready. The card in
 // 390×844, 834×1112 and 1440×900. What a run creates — products `E2E-KMO-<run>-…`, the options group
 // «E2E KMO <run>», the menu «e2e KMO Menu <run>», the station «E2E KMO <run> Grill», its checks and tickets — is
 // deleted after it.
@@ -157,6 +157,9 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
     .locator('[data-testid^=kitchen-card-][aria-label]')
     .filter({ has: page.locator(`[data-testid=kitchen-menu-${menuLine}]`) });
   await expect(card.locator(`[data-testid=kitchen-line-${burgerId}]`)).toBeVisible();
+  // Who sent it, by the name a person reads: never the id of the session («saas:…»).
+  await expect(card.locator('[data-testid$=-waiter]')).toContainText('Waiter: ');
+  await expect(card.locator('[data-testid$=-waiter]')).not.toContainText('saas:');
 
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
