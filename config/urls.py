@@ -23,6 +23,9 @@ from base.internal import (
     platform_invoice_get,
     platform_invoice_pdf,
     platform_invoices_health,
+    whatsapp_channel,
+    whatsapp_inbound,
+    whatsapp_status,
 )
 from base.spa import spa
 from config.api import api
@@ -65,5 +68,8 @@ urlpatterns = [
         platform_invoice_pdf,
         name="internal-platform-invoice-pdf",
     ),
+    path("internal/whatsapp/inbound", whatsapp_inbound, name="internal-whatsapp-inbound"),
+    path("internal/whatsapp/status", whatsapp_status, name="internal-whatsapp-status"),
+    path("internal/whatsapp/channel", whatsapp_channel, name="internal-whatsapp-channel"),
     re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),
 ]
