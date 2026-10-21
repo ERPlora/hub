@@ -76,8 +76,9 @@ class TableConfig(LiveAppConfig):
             "table.view_settings",
         ],
     }
-    # TABLE-F29: the holds whose window passed are marked expired, every hour, by the phase-2 worker
-    # on every hub as the system (cron in UTC). Reading the plan already ignores them.
+    # TABLE-F29: the holds whose window passed are marked expired, every hour, by the worker as the
+    # system (cron in UTC). Phase 1 sweeps the one database every hub shares; phase 2 runs it per hub,
+    # each under ``use_hub``. Reading the plan already ignores them.
     scheduled_tasks = [
         {
             "name": "expire_table_holds",
