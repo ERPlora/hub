@@ -13,7 +13,7 @@ from live.ninja import ensure_api_parity
 from apps.pricing.api import router
 from config.api import api
 
-from .conftest import make_group, make_list, make_product
+from .conftest import make_group, make_list, make_product, make_rule
 
 ROUTES = {
     ("GET", "/pricing/price_lists", "pricing.price_list.list"),
@@ -164,7 +164,8 @@ def test_refusals_come_in_the_envelope_with_their_field(admin_client):
 
 @pytest.mark.django_db
 def test_a_refusal_comes_in_the_request_s_language_under_its_field(admin_client):
-    """hub#1570: a business refusal reaches a Spanish caller in Spanish, the message and its field alike."""
+    """hub#1570 (PRICING-F10, also F02 and F05): a business refusal reaches a Spanish caller in Spanish, the
+    message and its field alike."""
     make_list("VIP")
     duplicate = post(admin_client, "/pricing/price_lists", {"code": "vip", "name": "Otra"}, HTTP_ACCEPT_LANGUAGE="es")
     assert duplicate.status_code == 409
@@ -175,6 +176,15 @@ def test_a_refusal_comes_in_the_request_s_language_under_its_field(admin_client)
     assert default.status_code == 200
     refused = post(admin_client, "/pricing/price_lists/deactivate", {"price_list": "VIP"}, HTTP_ACCEPT_LANGUAGE="es")
     assert refused.json()["error"]["message"].startswith("Esta es la tarifa general")
+    make_rule("TEN")
+    rule = post(
+        admin_client,
+        "/pricing/rules",
+        {"code": "ten", "name": "Diez", "rule_type": "percent", "percent": "10"},
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    assert (rule.status_code, rule.json()["error"]["code"]) == (409, "pricing.duplicate_code")
+    assert rule.json()["error"]["fields"]["code"] == "Ya existe una regla con ese código. Elige otro."
     # The positive control: the same refusal to an English caller stays in English.
     english = post(admin_client, "/pricing/price_lists", {"code": "vip", "name": "Again"}, HTTP_ACCEPT_LANGUAGE="en")
     assert english.json()["error"]["message"] == "A price list with that code already exists. Pick a different code."
