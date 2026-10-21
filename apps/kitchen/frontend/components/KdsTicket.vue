@@ -433,11 +433,13 @@ function bumpMenu(group: DishGroup): void {
   font-size: 0.95rem;
   opacity: 0.7;
 }
+/* The dishes of a menu hang from its header along a rule (kitchen#57) drawn inside the line's own left
+   padding: a dish of a menu keeps the width of any other for its name (a caps word never splits there). */
 .kds-line--menu {
   border-top: none;
-  margin-left: 0.75rem;
-  padding-left: 0.6rem;
-  border-left: 3px solid var(--ion-border-color, #e7e2d6);
+  margin-left: 0.375rem;
+  padding-left: 0.25rem;
+  border-left: 2px solid var(--ion-border-color, #e7e2d6);
 }
 .kds-line__meta {
   font-size: 1rem;
