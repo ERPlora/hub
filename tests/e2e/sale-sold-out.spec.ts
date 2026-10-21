@@ -78,9 +78,12 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
   const search = page.locator('[data-testid=pos-search]');
   await search.locator('input').fill(croquettes.sku);
   const row = search.locator(`[data-testid=pos-search-${croquettes.id}]`);
-  await expect(row.locator('p')).toHaveText(/^(Sold out|Agotado)$/);
+  // What the browser keeps, not what Vue wrote: an ion-item drops a hand-set aria-disabled.
+  await expect(row).toHaveAttribute('aria-disabled', 'true');
+  await expect(search.locator(`[data-testid=pos-search-${bread.id}]`)).toHaveCount(0);
+  await expect(row.locator('.pos-search__note')).toHaveText(/^(Sold out|Agotado)$/);
   await page.screenshot({ path: shot('FIX-SALE-SOLD-OUT-LINE-ACCEPTED-search-1440') });
-  await row.click();
+  await row.click({ force: true });
   await expect(search).toBeHidden();
   await expect(notice).toHaveText(new RegExp(`^«${croquettes.name}» (is sold out|está agotado)\\.$`));
   await expect(linesOf(page, croquettes)).toHaveCount(0);

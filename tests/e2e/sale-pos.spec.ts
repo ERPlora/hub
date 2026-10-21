@@ -233,7 +233,10 @@ test('SALE-F07: a product without tax category is marked and never enters the ch
   const result = search.locator(`[data-testid=pos-search-${untaxed.id}]`);
   await expect(result).toBeVisible();
   await expect(result).toContainText(/tax|IVA/);
-  await result.click();
+  // Announced as unavailable in the browser too (an ion-item drops a hand-set aria-disabled).
+  await expect(result).toHaveAttribute('aria-disabled', 'true');
+  // It still takes the tap (to say why), so the mouse clicks it as a finger would.
+  await result.click({ force: true });
   await expect(lineOf(page, untaxed.name)).toHaveCount(0);
   await page.screenshot({ path: shot('sale-pos-untaxed') });
 });

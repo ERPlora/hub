@@ -4,10 +4,11 @@
 // whole catalogue (sold out too, SALE-F07), 20 at a time. A row shows the name, the SKU (or «Sold out», or
 // why it cannot be sold) and the price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
 // (SALE-F38, `withServices`), the services it finds come after them (`pickService`). Mounted only while
-// open.
+// open. A row's tap and its aria-disabled live on a native button inside the ion-item: an ion-item rewrites
+// its own aria-disabled from its `disabled`, which would swallow the tap.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
-import { IonButton, IonItem, IonLabel, IonList, IonNote, IonSearchbar, IonSpinner } from '@ionic/vue';
+import { IonButton, IonItem, IonList, IonSearchbar, IonSpinner } from '@ionic/vue';
 import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
@@ -105,24 +106,23 @@ onMounted(() => void bar.value?.$el.setFocus?.());
       <ion-item
         v-for="item in rows"
         :key="item.id"
-        button
-        :detail="false"
-        :data-testid="`pos-search-${item.id}`"
-        :aria-disabled="item.is_sold_out || item.needs_tax_setup ? 'true' : undefined"
-        @click="emit('pick', item)"
       >
-        <ion-label>
-          <h3>{{ item.name }}</h3>
-          <p :class="{ 'pos-search__warn': item.is_sold_out || item.needs_tax_setup }">
-            {{ note(item) }}
-          </p>
-        </ion-label>
-        <ion-note
-          slot="end"
-          class="pos-search__price"
+        <button
+          type="button"
+          class="pos-search__row"
+          :data-testid="`pos-search-${item.id}`"
+          :aria-disabled="item.is_sold_out || item.needs_tax_setup ? 'true' : undefined"
+          @click="emit('pick', item)"
         >
-          {{ formatMoney(item.price, locale) }}
-        </ion-note>
+          <span class="pos-search__text">
+            <span class="pos-search__name">{{ item.name }}</span>
+            <span
+              class="pos-search__note"
+              :class="{ 'pos-search__warn': item.is_sold_out || item.needs_tax_setup }"
+            >{{ note(item) }}</span>
+          </span>
+          <span class="pos-search__price">{{ formatMoney(item.price, locale) }}</span>
+        </button>
       </ion-item>
     </ion-list>
     <ServiceSearchResults
@@ -158,15 +158,58 @@ onMounted(() => void bar.value?.$el.setFocus?.());
 }
 .pos-search__list ion-item {
   --background: transparent;
+  --padding-start: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --inner-padding-end: 0;
   border-radius: 10px;
 }
-.pos-search__list ion-item[aria-disabled='true'] {
+.pos-search__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0.625rem 1rem;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.pos-search__row:active {
+  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.06));
+}
+.pos-search__row[aria-disabled='true'] {
   opacity: 0.8;
+  cursor: not-allowed;
+}
+.pos-search__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  line-height: 1.25;
+}
+.pos-search__name {
+  overflow: hidden;
+  font-size: 1rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pos-search__note {
+  font-size: 0.875rem;
+  color: var(--ion-color-step-600, #666);
 }
 .pos-search__price {
+  flex: none;
   font-size: 0.95rem;
   font-weight: 800;
-  --color: var(--ion-color-primary, #0091ce);
+  color: var(--ion-color-primary, #0091ce);
 }
 .pos-search__warn {
   white-space: normal;

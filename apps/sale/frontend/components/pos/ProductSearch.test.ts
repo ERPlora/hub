@@ -31,8 +31,8 @@ describe('ProductSearch', () => {
     const coffee = product({ id: 'p1', name: 'Café', sku: 'CAF-1', price: 150 });
     await m.result(OP, page([coffee]));
     const row = m.find('pos-search-p1');
-    expect(row.find('h3').text()).toBe('Café');
-    expect(row.find('p').text()).toBe('CAF-1');
+    expect(row.find('.pos-search__name').text()).toBe('Café');
+    expect(row.find('.pos-search__note').text()).toBe('CAF-1');
     expect(plain(row.find('.pos-search__price').text())).toBe('1,50 €');
     await click(row.element);
     expect(m.wrapper.emitted('pick')).toEqual([[coffee]]);
@@ -44,7 +44,7 @@ describe('ProductSearch', () => {
     await m.result(OP, page([blocked]));
     const row = m.find('pos-search-p2');
     expect(row.attributes('aria-disabled')).toBe('true');
-    expect(row.find('p').text()).toBe('Cannot be sold: no tax category. VAT needs to be set up.');
+    expect(row.find('.pos-search__note').text()).toBe('Cannot be sold: no tax category. VAT needs to be set up.');
     await click(row.element);
     expect(m.wrapper.emitted('pick')).toEqual([[blocked]]);
   });
@@ -55,17 +55,24 @@ describe('ProductSearch', () => {
     await m.result(OP, page([soldOut]));
     const row = m.find('pos-search-p3');
     expect(row.attributes('aria-disabled')).toBe('true');
-    expect(row.find('p').text()).toBe('Agotado');
-    expect(row.find('p').classes()).toContain('pos-search__warn');
+    expect(row.find('.pos-search__note').text()).toBe('Agotado');
+    expect(row.find('.pos-search__note').classes()).toContain('pos-search__warn');
     await click(row.element);
     expect(m.wrapper.emitted('pick')).toEqual([[soldOut]]);
+  });
+
+  it('a row is a native button, so a blocked one keeps its aria-disabled in the browser (an ion-item drops it)', async () => {
+    const m = await setup();
+    await m.result(OP, page([product({ id: 'p1' }), product({ id: 'p2', needs_tax_setup: true }), product({ id: 'p3', is_sold_out: true })]));
+    expect(['p1', 'p2', 'p3'].map((id) => m.find(`pos-search-${id}`).element.tagName)).toEqual(['BUTTON', 'BUTTON', 'BUTTON']);
+    expect(['p1', 'p2', 'p3'].map((id) => m.find(`pos-search-${id}`).attributes('aria-disabled'))).toEqual([undefined, 'true', 'true']);
   });
 
   it('in Ceuta or Melilla a match without its tax names the IPSI', async () => {
     const m = await setup();
     await m.result('tax.settings.get', taxSettings('ipsi'));
     await m.result(OP, page([product({ id: 'p2', name: 'Tea', needs_tax_setup: true })]));
-    expect(m.find('pos-search-p2').find('p').text()).toBe('Cannot be sold: no tax category. IPSI needs to be set up.');
+    expect(m.find('pos-search-p2').find('.pos-search__note').text()).toBe('Cannot be sold: no tax category. IPSI needs to be set up.');
   });
 
   it('says «No products.» when nothing matches and the error when the catalogue cannot be read', async () => {
@@ -99,7 +106,7 @@ describe('ProductSearch: the services of Services (SALE-F38)', () => {
     await m.result(SERVICES, page([cut]));
     expect(m.find('pos-search-services-title').text()).toBe('Servicios');
     const row = m.find('pos-search-service-sv1');
-    expect(row.find('h3').text()).toBe('Corte de pelo');
+    expect(row.find('.pos-search__name').text()).toBe('Corte de pelo');
     expect(plain(row.find('.pos-search__price').text())).toBe('25,00 €');
     await click(row.element);
     expect(m.wrapper.emitted('pickService')).toEqual([[cut]]);
