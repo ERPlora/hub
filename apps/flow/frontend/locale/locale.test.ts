@@ -91,6 +91,16 @@ describe('flow catalogues (en source + es)', () => {
     for (const outcome of ['done', 'found', 'not_found', 'passed', 'stopped', 'waiting', 'waited', 'failed']) expect(EN.has(`flow.history.log.${outcome}`), outcome).toBe(true);
   });
 
+  it('call Cart & Checkout’s carts and orders by its own words: it has no online shop', () => {
+    // apps/cart_checkout/WORKBOOK.md: an internal book of carts and orders, used only by staff with a
+    // session in the Hub, with no shop nor public page; its flow titles are the words.
+    const entries = [...EN, ...ES].filter(([key]) => /^flow\.(events|actions)\.cart_checkout__/.test(key));
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [key, message] of entries) expect(message, key).not.toMatch(/online|en línea|\bweb\b|shop|store|tienda/i);
+    expect(EN.get('flow.actions.cart_checkout__checkout__initiate')).toBe('Start the order from a cart');
+    expect(ES.get('flow.actions.cart_checkout__checkout__initiate')).toBe('Iniciar el pedido desde un carrito');
+  });
+
   it('keep the old screens’ words: list, editor, tabs, steps, permissions, gallery', () => {
     const words: Array<[string, string, string]> = [
       ['flow.title', 'Automations', 'Automatizaciones'],

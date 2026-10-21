@@ -463,3 +463,30 @@ msgstr "preguntas"
 
 msgid "step"
 msgstr "paso"
+
+msgid "factory recipe"
+msgstr "receta de fábrica"
+
+msgid "recipe fingerprint"
+msgstr "huella de la receta"
+
+msgid "This business has not turned that automation on: there is nothing to change."
+msgstr "Este negocio no ha encendido esa automatización: no hay nada que cambiar."
+
+msgid "No app of this business brings that automation."
+msgstr "Ninguna app de este negocio trae esa automatización."
+
+msgid "It needs apps this business does not have: %(apps)s."
+msgstr "Necesita apps que este negocio no tiene: %(apps)s."
+
+msgid "It does not read as an automation: %(problem)s."
+msgstr "No se puede leer como una automatización: %(problem)s."
+
+msgid "Its app brings another automation with the same id."
+msgstr "Su app trae otra automatización con el mismo identificador."
+
+msgid "It asks for permissions its steps do not use: %(names)s."
+msgstr "Pide permisos que sus pasos no usan: %(names)s."
+
+msgid "Its steps use permissions it does not ask for: %(names)s."
+msgstr "Sus pasos usan permisos que no pide: %(names)s."

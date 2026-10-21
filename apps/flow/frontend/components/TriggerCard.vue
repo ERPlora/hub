@@ -4,7 +4,7 @@
 // the events of this business (`flow.catalog.read`), in words, grouped by app and searchable, with
 // «Only when…» on what it brings —; a schedule (every day, week or month at a time, in the business's
 // time zone); once at a date and time; or only by hand. The server's refusals show by their field.
-import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
@@ -134,13 +134,6 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
         </IonSelect>
 
         <template v-if="trigger.kind === 'event'">
-          <!-- FLOW-F21: until the platform delivers the events of other apps (phase 2), nothing starts it. -->
-          <InlineFeedback
-            tone="info"
-            data-testid="flow-trigger-event-notice"
-          >
-            {{ $t('flow.trigger.eventNotYet') }}
-          </InlineFeedback>
           <Combo
             testid="flow-trigger-event"
             :model-value="chosenEvent"

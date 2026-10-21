@@ -485,3 +485,72 @@ def test_try_says_an_action_that_needs_a_person_is_not_for_automations():
         "steps": [{"id": "s1", "kind": "command", "operation": "sale.order.void", "params": {}}],
     }
     assert try_(document, flow).steps[0].outcome == "high_risk"
+
+
+# The ready-made automations the apps bring (FLOW-F33 to F36)
+
+GAP = "appointment/customer_cancelled"
+
+
+def test_the_recipes_the_apps_bring_come_in_the_readers_language_with_why_each_permission():
+    listed = run("flow.recipe.list", {}, ctx_for(language="es"))
+    gap = next(recipe for recipe in listed.recipes if recipe.ref == GAP)
+    assert (gap.app, gap.app_name, gap.id) == ("appointment", "Citas", "customer_cancelled")
+    assert gap.icon.startswith("ion:") or ":" in gap.icon
+    assert (gap.name, gap.summary) == (
+        "Cubrir el hueco cuando un cliente cancela",
+        "Cuando un cliente cancela su cita, te deja una tarea para cubrir el hueco.",
+    )
+    assert gap.trigger == {
+        "kind": "event",
+        "event": "appointment.appointment.cancelled",
+        "filter": {"input.by_customer": {"eq": True}},
+    }
+    assert gap.steps[0]["params"]["title"] == "Cubrir el hueco de la cita {{input.number}}"
+    assert [(grant.operation, grant.reason) for grant in gap.grants] == [
+        ("task.task.create", "Te deja la tarea, para que te acuerdes de ofrecer ese hueco.")
+    ]
+    assert gap.installed is None
+    assert listed.set_aside == []
+
+
+def test_a_recipe_turned_on_says_which_automation_it_is_and_how_it_is():
+    flow_id = run("flow.recipe.enable", {"recipe": GAP}).flow.id
+    gap = next(recipe for recipe in run("flow.recipe.list").recipes if recipe.ref == GAP)
+    assert gap.installed.model_dump() == {
+        "flow_id": flow_id,
+        "name": "Fill the gap when a customer cancels",
+        "enabled": True,
+        "outdated": False,
+        "missing_grants": [],
+        "repair": {},
+    }
+    run("flow.recipe.disable", {"recipe": GAP})
+    Flow.objects.filter(pk=flow_id).update(recipe_digest="0" * 64, trigger_filter={})
+    gap = next(recipe for recipe in run("flow.recipe.list").recipes if recipe.ref == GAP)
+    assert (gap.installed.enabled, gap.installed.outdated) == (False, True)
+    assert gap.installed.repair == {"input.by_customer": {"eq": True}}
+    # The owner's own copy (FLOW-F06) or a deleted one is not the recipe's.
+    run("flow.flow.duplicate", {"id": str(flow_id)})
+    run("flow.flow.delete", {"id": str(flow_id)})
+    gap = next(recipe for recipe in run("flow.recipe.list").recipes if recipe.ref == GAP)
+    assert gap.installed is None
+
+
+def test_a_recipe_this_business_cannot_offer_is_listed_apart_with_its_reason(monkeypatch):
+    active = {label: config for label, config in queries.active_apps().items() if label != "task"}
+    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    listed = run("flow.recipe.list")
+    assert GAP not in {recipe.ref for recipe in listed.recipes}
+    aside = next(item for item in listed.set_aside if item.ref == GAP)
+    assert (aside.code, aside.apps, aside.name, aside.app_name) == (
+        "flow.recipe_needs_apps",
+        ["task"],
+        "Fill the gap when a customer cancels",
+        "Appointments",
+    )
+
+
+def test_only_whoever_may_see_automations_reads_the_recipes():
+    with pytest.raises(PermissionDenied):
+        run("flow.recipe.list", {}, ctx_for("hub_manager"))

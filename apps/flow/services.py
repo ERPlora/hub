@@ -24,7 +24,7 @@ from functools import partial
 from typing import Any
 
 import pydantic
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -33,7 +33,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.operations import Operation, get, operation
 from live.outbox import record_event
 
-from apps.flow import document, events, http, vault
+from apps.flow import document, events, http, recipes, vault
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     HIGH_RISK,
@@ -56,6 +56,7 @@ from apps.flow.queries import (
     live_flows,
     map_params,
     prepared,
+    recipe_flow,
     resolve_flow,
     run_row,
     validation_fields,
@@ -78,6 +79,8 @@ from apps.flow.schemas import (
     GrantIn,
     ReactIn,
     ReactOut,
+    RecipeEnabledOut,
+    RecipeRefIn,
     RecordCallIn,
     RunIn,
     RunOut,
@@ -146,6 +149,7 @@ SECRETS_KEY_GONE = _(
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
 RUN_NOT_FOUND = _("That run does not exist in this business.")
+RECIPE_NOT_ON = _("This business has not turned that automation on: there is nothing to change.")
 SECRETS_KEY_MISSING = _(
     "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
 )
@@ -382,13 +386,19 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
 )
 def set_enabled(ctx: OperationContext, data: EnabledIn) -> dict:
     flow = resolve_flow(data.id, data.flow, lock=True)
-    if flow.enabled != data.enabled:
-        flow.enabled = data.enabled
+    _switch(ctx, flow, data.enabled)
+    return flow_row(flow)
+
+
+def _switch(ctx: OperationContext, flow: Flow, enabled: bool) -> None:
+    """Turns the locked ``flow`` on or pauses it (a schedule counts from now), with its event; nothing when
+    it already is."""
+    if flow.enabled != enabled:
+        flow.enabled = enabled
         flow.next_fire_at = _next_fire(flow, timezone.now())
         flow.updated_by = _actor(ctx)
         flow.save(update_fields=["enabled", "next_fire_at", "updated_by", "updated_at"])
         _record_switch(ctx, flow)
-    return flow_row(flow)
 
 
 @operation(
@@ -518,6 +528,157 @@ def grant(ctx: OperationContext, data: GrantIn) -> dict:
     flow.updated_by = _actor(ctx)
     flow.save(update_fields=["grants", "updated_by", "updated_at"])
     record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
+    return flow_row(flow)
+
+
+# --- The ready-made automations the apps bring (FLOW-F33 to F36) -------------------------------------
+
+
+def _recipe_grants(ctx: OperationContext, recipe: recipes.Recipe) -> list[str]:
+    """The recipe's permissions, which whoever turns it on or restores it must hold themselves (FLOW-F12's
+    rule: nobody allows what they may not do)."""
+    wanted = recipes.grants(recipe)
+    offered = catalog_operations()
+    for name in wanted:
+        if not ctx.has(offered[name].permission):
+            raise PermissionDenied(str(GRANT_BEYOND_CALLER) % {"name": name})
+    return wanted
+
+
+def _recipe_flow(ref: str) -> Flow:
+    flow = recipe_flow(ref, lock=True)
+    if flow is None:
+        raise NotFound(str(RECIPE_NOT_ON), code="flow.recipe_not_on")
+    return flow
+
+
+def _apply_recipe(ctx: OperationContext, flow: Flow, recipe: recipes.Recipe, now: dt.datetime) -> bool:
+    """Writes today's recipe on ``flow`` (its name in ``ctx``'s language, trigger, steps and fingerprint);
+    whether its trigger or steps changed."""
+    built = recipes.build(recipe, ctx.language)
+    parsed = CreateIn.model_validate(built)
+    before = (flow.trigger_kind, flow.trigger_event, flow.trigger_filter, flow.schedule, flow.run_at, flow.steps)
+    flow.name = parsed.name
+    _apply_trigger(flow, parsed.trigger)
+    flow.steps = [step.model_dump(mode="json", exclude_none=True) for step in parsed.steps]
+    flow.recipe_digest = recipes.digest(recipe)
+    flow.next_fire_at = _next_fire(flow, now)
+    flow.language = ctx.language
+    flow.updated_by = _actor(ctx)
+    refresh_search_text(flow)
+    return before != (flow.trigger_kind, flow.trigger_event, flow.trigger_filter, flow.schedule, flow.run_at, flow.steps)
+
+
+@operation(
+    "flow.recipe.enable",
+    kind="command",
+    permission=MANAGE,
+    input=RecipeRefIn,
+    output=RecipeEnabledOut,
+    ai={
+        "description": "Turn on a ready-made automation an app brings (`flow.recipe.list`). The first time it is "
+        "built and left on with exactly the permissions the recipe asks for; afterwards the one already built is "
+        "switched on as the owner left it. Say what it will do and what it may do before turning it on.",
+        "risk": "high",
+    },
+)
+def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
+    recipe = recipes.find(data.recipe)
+    wanted = _recipe_grants(ctx, recipe)
+    now = timezone.now()
+    flow = recipe_flow(recipe.ref, lock=True)
+    if flow is None:
+        flow = Flow(recipe=recipe.ref, grants=wanted, enabled=True, created_by=_actor(ctx))
+        _apply_recipe(ctx, flow, recipe, now)
+        try:
+            with transaction.atomic():
+                flow.save()
+        except IntegrityError:
+            # Turned on at the same time by someone else: theirs is the one (the unique recipe per business).
+            flow = _recipe_flow(recipe.ref)
+        else:
+            for name in (events.FLOW_CREATED, events.FLOW_GRANTED, events.FLOW_ENABLED):
+                record_event(ctx, name, {"id": str(flow.id)})
+            return {"created": True, "flow": flow_row(flow)}
+    if not flow.grants:
+        # Left with no permission at all, it could do nothing: «on» means working, so it gets the recipe's.
+        flow.grants = wanted
+        flow.updated_by = _actor(ctx)
+        flow.save(update_fields=["grants", "updated_by", "updated_at"])
+        record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
+    _switch(ctx, flow, True)
+    return {"created": False, "flow": flow_row(flow)}
+
+
+@operation(
+    "flow.recipe.disable",
+    kind="command",
+    permission=MANAGE,
+    input=RecipeRefIn,
+    output=FlowOut,
+    ai={
+        "description": "Turn off a ready-made automation an app brings: it is paused, never deleted; its permissions "
+        "and its history stay, and turning it on again leaves it as it was.",
+        "risk": "high",
+    },
+)
+def disable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
+    flow = _recipe_flow(data.recipe)
+    _switch(ctx, flow, False)
+    return flow_row(flow)
+
+
+@operation(
+    "flow.recipe.restore",
+    kind="command",
+    permission=MANAGE,
+    input=RecipeRefIn,
+    output=FlowOut,
+    ai={
+        "description": "Give a ready-made automation back the version its app brings today: its name, trigger, steps "
+        "and exactly the recipe's permissions replace the owner's changes; it stays on or paused as it is and keeps "
+        "its history. Confirm it: what the owner changed is lost.",
+        "risk": "high",
+    },
+)
+def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
+    recipe = recipes.find(data.recipe)
+    wanted = _recipe_grants(ctx, recipe)
+    flow = _recipe_flow(recipe.ref)
+    if _apply_recipe(ctx, flow, recipe, timezone.now()):
+        flow.version += 1
+    granted = flow.grants != wanted
+    flow.grants = wanted
+    flow.save()
+    record_event(ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version})
+    if granted:
+        record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
+    return flow_row(flow)
+
+
+@operation(
+    "flow.recipe.repair",
+    kind="command",
+    permission=MANAGE,
+    input=RecipeRefIn,
+    output=FlowOut,
+    ai={
+        "description": "Repair a ready-made automation built from an older version that started in more cases than "
+        "its app meant: only the conditions of «Only when…» its app added since are added; its name, steps, "
+        "permissions and switch stay. Nothing changes when there is nothing to repair.",
+        "risk": "normal",
+    },
+)
+def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
+    recipe = recipes.find(data.recipe)
+    flow = _recipe_flow(recipe.ref)
+    missing = recipes.missing_clauses(recipe, flow)
+    if missing:
+        flow.trigger_filter = {**flow.trigger_filter, **missing}
+        flow.version += 1
+        flow.updated_by = _actor(ctx)
+        flow.save(update_fields=["trigger_filter", "version", "updated_by", "updated_at"])
+        record_event(ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version})
     return flow_row(flow)
 
 

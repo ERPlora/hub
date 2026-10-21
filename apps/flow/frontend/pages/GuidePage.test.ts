@@ -22,13 +22,17 @@ describe('GuidePage', () => {
 
   it('says what it cannot do yet, as it is today', async () => {
     const section = (await setup()).find('flow-guide-section-limits');
-    expect(section.findAll('li')).toHaveLength(5);
+    expect(section.findAll('li')).toHaveLength(4);
     const limits = section.text();
     expect(limits).toContain('The assistant writes drafts');
-    expect(limits).toContain('Sending messages, calling another system or asking the assistant or a person');
-    expect(limits).toContain('Starting on its own when something happens in the business');
+    expect(limits).toContain('Sending messages or asking the assistant: they come in a later version.');
+    // What it already does is no limit: starting on its own when something happens (FLOW-F21), calling another
+    // system (F27) and asking a person first (F28).
+    expect(limits).not.toContain('Starting on its own');
+    expect(limits).not.toContain('calling another system');
     const spanish = (await setup('es')).find('flow-guide-section-limits').text();
-    expect(spanish).toContain('Arrancar sola cuando pasa algo en el negocio');
+    expect(spanish).toContain('Enviar mensajes o pedírselo al asistente: llegan en una versión posterior.');
+    expect(spanish).not.toContain('Arrancar sola');
   });
 
   it('«Back to the automations» goes back', async () => {
