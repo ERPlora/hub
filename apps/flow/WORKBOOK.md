@@ -181,7 +181,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F18 | Revisar un borrador del asistente y crearlo | hecho |
 | FLOW-F19 | Descartar un borrador del asistente | hecho |
 | FLOW-F20 | Otra app pregunta si una automatización ya está montada | hecho |
-| FLOW-F21 | Cuando pasa algo en el negocio, la automatización arranca | parcial |
+| FLOW-F21 | Cuando pasa algo en el negocio, la automatización arranca | hecho |
 | FLOW-F22 | Cuando llega la hora, la automatización arranca | hecho |
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 | FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
@@ -1372,8 +1372,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Paso «Pedírselo al asistente»** (FLOW-F37 a F39, parciales) y las propuestas del asistente en **Esperan tu
   respuesta**: dependen de la app del asistente del Hub y de la pasarela de IA del SaaS, que todavía no existen
   (PLAN-HUB §8, ronda 2026-10-15b).
-- **«Necesita tu atención»** (eventos que no se entregaron): es la administración del outbox (PLAN-HUB
-  bloque 7), de la plataforma, con el relay de la fase 2.
+- **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
+  app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
+  intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
 - **Las recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp y el aviso de cita confirmada) y
   su reparación concreta: las declara esa app en su `recipes.py` sobre este registro (su parte 2 de la
   migración); la tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
