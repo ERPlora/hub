@@ -3,7 +3,8 @@
 // that follows it live and its deletion. Each flow is a step that leaves its capture,
 // `APP-DEMO-<flow>-<width>`, after checking that nothing scrolls sideways. The finer measures (the
 // second under which another tablet is told, the optimistic line before the answer, `a` versus `b`)
-// stay in their own specs: two-tabs-live, optimistic-add-line, two-orgs-isolated, reconnect.
+// stay in their own specs: two-tabs-live, optimistic-add-line, two-orgs-isolated, reconnect. On a phone
+// (≤767 px) the detail's actions are in the bar's «⋮» («More actions»), so its title is read whole.
 // flow: DEMO-F01 DEMO-F02 DEMO-F03 DEMO-F04 DEMO-F05 DEMO-F06
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -61,11 +62,40 @@ async function tablet(
 }
 
 const field = (scope: Locator, testid: string) => scope.locator(`[data-testid=${testid}]`);
+
+/** The width at or below which the bar folds two or more actions into «⋮» (`AppTopbar`). */
+const PHONE_MAX = 767;
+
+/** Runs an action of the detail's bar: from «⋮» on a phone, from the bar itself on wider screens. */
+async function act(page: Page, width: string, testid: string): Promise<void> {
+  if (Number(width) <= PHONE_MAX) {
+    await shown(page).locator('[data-testid=topbar-more]').click();
+    await page.locator(`[data-testid=topbar-more-menu] [data-testid=${testid}]`).click();
+    await expect(page.locator('[data-testid=topbar-more-menu]')).toHaveCount(0);
+  } else {
+    await shown(page).locator(`[data-testid=${testid}]`).click();
+  }
+}
+
+/** The detail's bar: its title read whole (not cut with «…»), and where its actions are. */
+async function expectBar(page: Page, width: string, title: string): Promise<void> {
+  const heading = shown(page).locator('ion-title').first();
+  await expect(heading).toContainText(title);
+  const cut = await heading.evaluate((el) => {
+    const box = (el.shadowRoot?.querySelector('.toolbar-title') ?? el) as HTMLElement;
+    return box.scrollWidth > box.clientWidth;
+  });
+  expect(cut, `the title «${title}» at ${width} is read whole`).toBe(false);
+  const phone = Number(width) <= PHONE_MAX;
+  await expect(shown(page).locator('[data-testid=topbar-more]')).toHaveCount(phone ? 1 : 0);
+  await expect(shown(page).locator('[data-testid=demo-detail-delete]')).toHaveCount(phone ? 0 : 1);
+}
 const errorUnder = (scope: Locator, testid: string) => field(scope, testid).locator('.error-text');
 
 for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
   test(`DEMO-F01 to DEMO-F06, every screen of Demo at ${width} wide`, async ({ browser }) => {
-    const name = uniqueName(`Flows ${width}`);
+    // Short enough for a phone's title: «F390 mvhcvsqr 2».
+    const name = uniqueName(`F${width}`);
     const { context, page } = await tablet(browser, viewport, '/demo/items');
     let id = '';
     try {
@@ -97,11 +127,12 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(rowOf(page, id).locator('[data-testid=demo-item-lines]')).toHaveText('no lines');
       });
 
-      const edited = `${name} edited`;
+      const edited = `${name} 2`;
       await test.step('DEMO-F02 edit an item', async () => {
         await rowOf(page, id).click();
         await page.waitForURL(new RegExp(`/demo/items/${id}$`));
-        await shown(page).locator('[data-testid=demo-detail-edit]').click();
+        await expectBar(page, width, name);
+        await act(page, width, 'demo-detail-edit');
         await page.waitForURL(new RegExp(`/demo/items/${id}/edit$`));
         const form = shown(page).locator('[data-testid=demo-form]');
         await expect(field(form, 'demo-form-name').locator('input')).toHaveValue(name);
@@ -124,7 +155,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(detail.locator('[data-testid=demo-detail-status]')).toHaveText('Done');
         await expect(detail.getByText(edited, { exact: true }).first()).toBeVisible();
         // On the detail itself: «Reopen» and the note, without opening the form.
-        await detail.locator('[data-testid=demo-detail-toggle]').click();
+        await act(page, width, 'demo-detail-toggle');
         await expect(detail.locator('[data-testid=demo-detail-status]')).toHaveText('Open');
         await detail.locator('[data-testid=demo-note] textarea').fill('Changed on the detail');
         await detail.locator('[data-testid=demo-note-save]').click();
@@ -143,6 +174,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await detail.locator('[data-testid=demo-line-add]').click();
         await expect(detail.locator('[data-testid=demo-line-text]')).toHaveText(['Two boxes']);
         await expect(detail.locator('[data-testid=demo-line-pending]')).toHaveCount(0);
+        await expectBar(page, width, edited);
         await snap(page, 'DEMO-F04', width);
         // Si falla: a quantity that is not above zero is refused under its field.
         await detail.locator('[data-testid=demo-line-input-text] input').fill('Nothing');
@@ -151,7 +183,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(errorUnder(detail, 'demo-line-input-qty')).toBeVisible();
         await expect(detail.locator('[data-testid=demo-line-text]')).toHaveText(['Two boxes']);
         // Si falla: on a done item the line is undone and a toast says why.
-        await detail.locator('[data-testid=demo-detail-toggle]').click();
+        await act(page, width, 'demo-detail-toggle');
         await expect(detail.locator('[data-testid=demo-detail-status]')).toHaveText('Done');
         await detail.locator('[data-testid=demo-line-input-qty] input').fill('1');
         await detail.locator('[data-testid=demo-line-input-text] input').fill('Too late');
@@ -161,7 +193,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await toast.evaluate((el) => (el as HTMLElement & { dismiss: () => Promise<boolean> }).dismiss());
         await expect(toast).toHaveCount(0);
         await expect(detail.locator('[data-testid=demo-line-text]')).toHaveText(['Two boxes']);
-        await detail.locator('[data-testid=demo-detail-toggle]').click();
+        await act(page, width, 'demo-detail-toggle');
         await expect(detail.locator('[data-testid=demo-detail-status]')).toHaveText('Open');
       });
 
@@ -201,7 +233,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
       await test.step('DEMO-F03 delete an item', async () => {
         await other.goto(`${A}/demo/items/${id}`);
         await expect(shown(other).locator('[data-testid=demo-detail-status]')).toBeVisible();
-        await shown(page).locator('[data-testid=demo-detail-delete]').click();
+        await act(page, width, 'demo-detail-delete');
         const alert = page.locator('ion-alert');
         await expect(alert.locator('.alert-title')).toHaveText('Delete this item and its lines?');
         await snap(page, 'DEMO-F03', width);
