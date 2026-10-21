@@ -562,7 +562,9 @@ Pasos:
    dispositivos.
 5. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
    un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): ya no imprime nada, y los trabajos que
-   tenía vuelven a la cola cuando vence su plazo.
+   tenía vuelven a la cola cuando vence su plazo. Un dispositivo retirado no vuelve a recibir trabajos, tampoco con
+   la sesión de quien gestiona las impresoras: hay que darlo de alta otra vez desde él («Imprimir desde este
+   dispositivo»).
 Entra: el nombre del dispositivo y las impresoras a las que llega; al pedir, sus impresoras; al confirmar, el
 resultado.
 Sale: el dispositivo dado de alta, cambiado o retirado (avisa: `printing.device.registered`,
@@ -775,7 +777,10 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `printing.manage_settings`; el permiso de las tres operaciones sigue siendo `printing.print`, pero solo vale
    desde un dispositivo dado de alta. El dispositivo se guarda por el SHA-256 de su identificador, nunca por el
    identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` lee las
-   impresoras del dispositivo con `printing.device.get` y rechaza el que no tiene alta (`base`, hub#135).
+   impresoras del dispositivo con `printing.device.get` y rechaza el que no tiene alta (`base`, hub#135) y el
+   retirado (`retired: true`), este con cualquier sesión, también la de quien gestiona las impresoras, que solo
+   empareja un dispositivo nuevo; un `beat` del retirado contesta `refreshed: 0`
+   (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED).
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
