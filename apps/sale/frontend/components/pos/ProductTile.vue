@@ -2,7 +2,8 @@
 // A product tile of the till's grid: the initials over a colour derived from the name, the name, the
 // unit (when it is not «ud») and the price; never the SKU. A product without VAT (SALE-F07) is marked
 // «VAT missing» («IGIC missing», «IPSI missing»: the business territory's tax), looks blocked and still takes the tap (never the native `disabled`: a touchscreen
-// would swallow it and nobody would learn why); the grid answers that tap with the reason.
+// would swallow it and nobody would learn why); the grid answers that tap with the reason. A product sold out
+// in Inventory («86», INVENTORY-F29) is greyed with «Sold out» and takes the tap the same way.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
@@ -19,10 +20,12 @@ const t = useT();
 const locale = useLocale();
 const taxName = useTaxName();
 
-const blocked = computed(() => props.product.needs_tax_setup);
-const label = computed(() =>
-  blocked.value ? `${props.product.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined,
-);
+const soldOut = computed(() => Boolean(props.product.is_sold_out));
+const blocked = computed(() => !soldOut.value && props.product.needs_tax_setup);
+const label = computed(() => {
+  if (soldOut.value) return `${props.product.name} · ${t('sale.pos.soldOutBadge')}`;
+  return blocked.value ? `${props.product.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined;
+});
 const thumbStyle = computed(() => ({ background: tileGradient(props.product.name) }));
 </script>
 
@@ -30,9 +33,9 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
   <button
     type="button"
     class="pos-tile"
-    :class="{ 'pos-tile--blocked': blocked }"
+    :class="{ 'pos-tile--blocked': blocked, 'pos-tile--sold-out': soldOut }"
     :data-testid="`pos-product-${product.id}`"
-    :aria-disabled="blocked ? 'true' : undefined"
+    :aria-disabled="blocked || soldOut ? 'true' : undefined"
     :aria-label="label"
     :title="label"
     @click="emit('pick', product)"
@@ -53,7 +56,11 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
     <span class="pos-tile__info">
       <span class="pos-tile__name">{{ product.name }}</span>
       <span
-        v-if="blocked"
+        v-if="soldOut"
+        class="pos-tile__badge pos-tile__badge--sold-out"
+      >{{ $t('sale.pos.soldOutBadge') }}</span>
+      <span
+        v-else-if="blocked"
         class="pos-tile__badge"
       >{{ $t('sale.pos.notSellableBadge', { tax: taxName }) }}</span>
       <span
@@ -97,6 +104,21 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
 }
 .pos-tile--blocked:hover {
   border-color: var(--ion-color-warning, #ffc409);
+}
+.pos-tile--sold-out {
+  cursor: not-allowed;
+}
+.pos-tile--sold-out:hover {
+  border-color: var(--ion-border-color, #e6e3db);
+}
+.pos-tile--sold-out .pos-tile__thumb {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+.pos-tile--sold-out .pos-tile__name,
+.pos-tile--sold-out .pos-tile__unit,
+.pos-tile--sold-out .pos-tile__price {
+  color: var(--ion-color-medium, #8b897f);
 }
 .pos-tile__thumb {
   position: relative;
@@ -153,6 +175,10 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
   color: var(--ion-color-warning-contrast, #000);
   background: var(--ion-color-warning, #ffc409);
   border-radius: 999px;
+}
+.pos-tile__badge--sold-out {
+  color: var(--ion-color-danger-contrast, #fff);
+  background: var(--ion-color-danger, #c5000f);
 }
 .pos-tile__unit {
   grid-column: 1;

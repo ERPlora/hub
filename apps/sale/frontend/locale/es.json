@@ -47,6 +47,8 @@
       "managerOnly": "Lo tiene que hacer un responsable",
       "notSellableBadge": "Falta el {tax}",
       "notSellableNoTaxCategory": "No se puede vender: sin categoría fiscal. Falta configurar el {tax}.",
+      "soldOutBadge": "Agotado",
+      "soldOut": "«{name}» está agotado.",
       "catalogBlockedOne": "1 artículo no se puede vender: le falta configurar el {tax}.",
       "catalogBlocked": "{count} artículos no se pueden vender: les falta configurar el {tax}.",
       "catalogBlockedFix": "Revisar el catálogo",
