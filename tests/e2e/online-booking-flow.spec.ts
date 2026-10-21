@@ -156,6 +156,17 @@ async function inWindow(page: Page, ...testids: string[]): Promise<void> {
   }
 }
 
+/** Every switch of the settings ends inside the window: a long label wraps instead of pushing the form past a
+ *  phone's edge (ion-toggle's label is one line by default; the same defect Attendance had, hub#94). */
+async function switchesFit(page: Page): Promise<void> {
+  const toggles = shown(page).locator('ion-toggle[data-testid^=ob-settings-]');
+  expect(await toggles.count()).toBeGreaterThan(0);
+  const outside = await toggles.evaluateAll((all, width) =>
+    all.filter((el) => el.getBoundingClientRect().right > width).map((el) => `${el.getAttribute('data-testid')} right=${Math.round(el.getBoundingClientRect().right)}`),
+  page.viewportSize()!.width);
+  expect(outside, 'settings switches pushed past the window').toEqual([]);
+}
+
 /** Every customer's name in the inbox fits its cell or ends in «…»: never cut off mid-letter. */
 async function namesFit(page: Page): Promise<void> {
   const names = shown(page).locator('[data-testid=ob-bookings-customer-name]');
@@ -205,6 +216,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await toggle.click();
       await expect.poll(() => psql(online)).toBe('t');
       await expect(toggle).toBeEnabled();
+      await switchesFit(page);
       await capture('ONLINE_BOOKING-F07');
 
       // ONLINE_BOOKING-F01: the preview of the public page — the service, no preference, the day and a free
