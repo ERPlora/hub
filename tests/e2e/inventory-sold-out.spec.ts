@@ -4,6 +4,8 @@
 //   - «Mark sold out» in the row's menu: the «Sold out» mark beside the switch, which stays on, and the
 //     till open in another tab greys it out with «Sold out» without a reload (its grid and its search,
 //     SALE-F07), while the article next to it sells as always; «Put back on sale» brings it back the same way;
+//   - the counts of the till's strip («All» and the category) count what its grid shows, the greyed tile
+//     included (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS), also on a till opened after the mark;
 //   - the product sheet marks and unmarks it too, and says so beside its status;
 //   - a menu whose only dessert is sold out leaves the till (COMBO-F06), its editor says «Sold out in
 //     Inventory» on that choice, and the menu comes back with it;
@@ -31,6 +33,8 @@ const RUN = stamp();
 let croquettes: Product;
 let bread: Product;
 let flan: Product;
+/** The croquettes and the bread, a category of their own in the till's strip. */
+let starters: { id: string };
 /** A menu whose only starter is the flan: sold out, nothing completes it. */
 let menu: { id: string; optionId: string };
 const MENU_TAG = 'e2e 86';
@@ -48,8 +52,12 @@ test.beforeAll(async ({ browser }) => {
   await login(page, A, '/inventory/products');
   // The till opens without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
   await drawerOff(context);
-  croquettes = await createProduct(context, { name: `E2E Croquettes ${RUN}`, sku: `E2E-86-C-${RUN}`, price: 650 });
-  bread = await createProduct(context, { name: `E2E Bread ${RUN}`, sku: `E2E-86-B-${RUN}`, price: 120 });
+  const category = await api<{ id: string }>(context, A, 'POST', '/inventory/categories', { name: `E2E 86 Starters ${RUN}` });
+  expect(category.status, 'category').toBe(201);
+  starters = category.data;
+  const inStarters = { category_ids: [starters.id] };
+  croquettes = await createProduct(context, { name: `E2E Croquettes ${RUN}`, sku: `E2E-86-C-${RUN}`, price: 650, ...inStarters });
+  bread = await createProduct(context, { name: `E2E Bread ${RUN}`, sku: `E2E-86-B-${RUN}`, price: 120, ...inStarters });
   flan = await createProduct(context, { name: `E2E Flan ${RUN}`, sku: `E2E-86-F-${RUN}`, price: 300 });
   const combo = await api<{ id: string }>(context, A, 'POST', '/combo/combos', { name: `${MENU_TAG} Menu ${RUN}`, price: 1200, tax_category_key: 'product.generic' });
   expect(combo.status, 'menu').toBe(201);
@@ -76,6 +84,9 @@ test.afterAll(() => {
 });
 
 const tile = (page: Page, product: Product): Locator => shown(page).locator(`[data-testid=pos-product-${product.id}]`);
+
+/** The count beside a tab of the till's strip («2 items»): `all` or a category's id. */
+const stripCount = (page: Page, tab: string): Locator => shown(page).locator(`[data-testid=pos-category-${tab}] .pos-cat__count`);
 
 /** The till greys a sold-out article out with «Sold out» and will not take it (SALE-F07); on sale, it is a plain tile. */
 async function expectSoldOutTile(page: Page, product: Product, soldOut: boolean): Promise<void> {
@@ -117,6 +128,9 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
   const till = page;
   await tillReady(till);
   await expectSoldOutTile(till, croquettes, false);
+  await expect(stripCount(till, starters.id)).toHaveText(/^2\b/);
+  await expect(stripCount(till, 'all')).toHaveText(/^\d+\b/);
+  const allBefore = (await stripCount(till, 'all').textContent())!;
 
   // The manager, in another tab of the same session, marks it sold out from the row's menu.
   const office = await context.newPage();
@@ -150,6 +164,14 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
   await search.locator('[data-testid=pos-search-close]').click();
   await expect(search).toBeHidden();
   await till.screenshot({ path: shot('inventory-sold-out-till-1440') });
+
+  // The strip counts what the grid shows, the greyed tile included, on a till opened now as well: the
+  // category keeps its 2 and «All» what it said before the mark.
+  await till.goto(`${A}/sale/pos`);
+  await tillReady(till);
+  await expectSoldOutTile(till, croquettes, true);
+  await expect(stripCount(till, starters.id)).toHaveText(/^2\b/);
+  await expect(stripCount(till, 'all')).toHaveText(allBefore);
 
   // Back on sale: the mark goes and the till offers it again, live.
   await office.bringToFront();

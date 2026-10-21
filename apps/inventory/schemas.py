@@ -744,7 +744,7 @@ class CategoryOut(Schema):
     order: int = Field(description="Position.")
     tax_category_id: UUID | None = Field(description="Its tax category, if any.")
     tax_category_key: str | None = Field(description="Key of its tax category, if any.")
-    product_count: int = Field(description="Products on sale in it (active, not sold out).")
+    product_count: int = Field(description="Active products in it, sold out included (what the till shows).")
 
 
 CategoryPage = Page[CategoryOut]

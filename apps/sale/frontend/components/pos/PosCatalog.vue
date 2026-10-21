@@ -3,8 +3,8 @@
 // magnifier and the ⋮ screen menu, the notices, and the grid. Everything comes from Inventory's own
 // operations: the categories by name, the count of «All», and the articles of the category in use in
 // windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too.
-// The grid and the search show what is sold out in Inventory too, greyed (SALE-F07): the counts are what is
-// on sale (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the
+// The grid and the search show what is sold out in Inventory too, greyed (SALE-F07), and the counts count
+// what the grid shows (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the
 // grid and in a toast, and adds nothing. Inventory off: the grid explains it and the open price stays. With products hidden by the
 // till settings, only the open price is offered. With the services of Services (SALE-F38,
 // `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
@@ -75,7 +75,7 @@ const searching = shallowRef(false);
 const tapNotice = shallowRef<string | null>(null);
 
 const categories = useLiveWindows<'inventory.category.list', CategoryOut>('inventory.category.list', () => ({ sort: 'name' }), 100);
-const allCount = useLive('inventory.product.list', { is_active: true, limit: 1, offset: 0 });
+const allCount = useLive('inventory.product.list', { is_active: true, include_sold_out: true, limit: 1, offset: 0 });
 const products = useLiveWindows<'inventory.product.list', ProductOut>(
   'inventory.product.list',
   () => ({

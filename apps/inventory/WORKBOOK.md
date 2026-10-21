@@ -45,6 +45,16 @@ pero no la cantidad restante en el TPV, que aquí no existe. Además:
   TPV deja de ofrecerlo y vuelve con un toque cuando hay otra vez: Square «Sold out», Toast «86»,
   Lightspeed «Unavailable», TouchBistro y Revel. Lo pone y lo quita una persona; ninguno lo quita solo
   al recibir mercancía.
+- **La cifra de una categoría cuenta lo que se ve, agotados incluidos**: el TPV enseña lo agotado en
+  gris y sin poder pedirlo ([Square](https://squareup.com/help/us/en/article/8430),
+  [Toast](https://support.toasttab.com/en/article/86-an-Item),
+  [Lightspeed](https://o-series-support.lightspeedhq.com/hc/articles/31329314792987),
+  [SumUp](https://help.sumup.com/en-US/articles/WcT1PpyBZHREhzgn7Wstl)), y donde hay cifras siguen a lo
+  que se enseña: WooCommerce solo deja fuera lo agotado de su cifra cuando lo oculta
+  ([wc_recount_after_stock_change](https://wp-kama.com/plugin/woocommerce/function/_wc_term_recount)),
+  y la queja de los foros es siempre una cifra que no cuadra con lo que se ve ([GeneratePress](https://generatepress.com/forums/topic/product-count-wrong-on-category-view/),
+  [WoodMart](https://xtemos.com/forums/topic/out-of-stock-query-and-products-issue/),
+  [Shopify](https://community.shopify.com/t/some-products-only-visible-when-customising-collection-page-not-front-end/373545)).
 
 - **Control de stock por artículo, con un valor por defecto del negocio**: Square «Track stock»,
   Odoo «Track Inventory», Business Central, Shopify «Track quantity», WooCommerce «Manage stock?».
@@ -174,8 +184,8 @@ filtros. Una venta se encuentra por el número de su tique, factura o venta.». 
 tabla con «Reintentar».
 
 ### Categorías
-Tabla con Nombre, Slug y Productos (cuántos a la venta tiene: activos y no agotados, la misma cifra
-que la tira de categorías del TPV); buscador «Buscar categoría…»; 25 por página; importar y
+Tabla con Nombre, Slug y Productos (cuántos activos tiene, agotados incluidos: la misma cifra que la
+tira de categorías del TPV, que también los enseña); buscador «Buscar categoría…»; 25 por página; importar y
 exportar CSV. El **+** y la fila (o «Editar») abren el panel: Nombre, «Slug
 (opcional)», «Tipo de IVA / Impuesto» («— (por defecto)» o una categoría fiscal), «Cancelar
 edición» y «Guardar» / «Guardar cambios». «Eliminar» abre «Eliminar categoría» con lo que va a
@@ -849,10 +859,10 @@ Pasos:
    de productos. Puedes cobrar servicios y ventas a precio libre; …») y vende servicios y precio
    libre.
 Entra: nada: lo piden las demás apps (ver [Servicios](#servicios-lo-que-entra-y-lo-que-sale)).
-Sale: las lecturas. En el catálogo de venta y en la cifra de cada categoría solo salen los productos
-a la venta: activos, no agotados (INVENTORY-F29) y no eliminados; el mapa de categorías lleva los
-activos. La rejilla y el buscador del TPV enseñan también lo agotado, en gris con «Agotado», y no lo
-dejan pedir: tocarlo no añade nada y dice «… está agotado.», y una línea nueva de un agotado que llega
+Sale: las lecturas. En el catálogo de venta solo salen los productos a la venta: activos, no agotados
+(INVENTORY-F29) y no eliminados; el mapa de categorías lleva los activos. La rejilla y el buscador del
+TPV enseñan también lo agotado, en gris con «Agotado», y las cifras de su tira («Todos» y cada
+categoría) cuentan lo que enseña la rejilla: los activos, agotados incluidos. No lo dejan pedir: tocarlo no añade nada y dice «… está agotado.», y una línea nueva de un agotado que llega
 por el asistente o la API se rechaza sin escribir nada (SALE-F07). Un artículo que se marca agotado
 con el TPV abierto pasa a gris al momento, sin recargar, y vuelve igual; el menú que no se puede
 completar sin ese artículo sale del TPV (COMBO-F12). El catálogo de venta no lleva stock: el TPV no
@@ -897,8 +907,8 @@ Entra: el artículo (por la pantalla, o por su SKU o su nombre desde el asistent
 agotado o vuelve a la venta.
 Sale: el artículo marcado o desmarcado; Inventario avisa del cambio (`inventory.product.updated`).
 Marcarlo dos veces no cambia nada. Desactivarlo, activarlo o editarlo no le quita la marca. Un
-artículo agotado deja de contar en su categoría del TPV (INVENTORY-F27) y no sale en el catálogo de
-venta.
+artículo agotado sigue contando en su categoría, porque el TPV lo sigue enseñando en gris
+(INVENTORY-F27), y no sale en el catálogo de venta.
 Si falla: el motivo sale encima de la tabla o dentro de la ficha («No se pudo cambiar si el producto
 está agotado» o el que dé la app). Quien no puede cambiar productos ve la insignia, pero no las
 acciones. Un artículo que ya no existe da «Este producto no existe en este hub».
@@ -943,7 +953,7 @@ buscar y va por páginas de hasta 100.
 | El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
-| Las categorías, con cuántos productos a la venta tiene cada una | ver categorías | F06, F27 | `inventory.category.list` |
+| Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
 | El libro de movimientos: fecha, producto, tipo, cantidad, saldo, motivo, referencia y quién lo hizo | ver stock | F16 | `inventory.movement.list` |
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |

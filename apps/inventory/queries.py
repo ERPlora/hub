@@ -441,7 +441,7 @@ def list_product_categories(
     output=CategoryPage,
     expose_api=True,
     ai={
-        "description": "List the product categories, with how many products on sale each one has."
+        "description": "List the product categories, with how many active products each one has (sold out included)."
     },
 )
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
@@ -766,9 +766,10 @@ def _sale_row(product: Product) -> dict:
 
 
 def _categories():
+    # What the till's strip counts is what its grid shows: the active articles, the sold-out ones greyed
+    # among them (SALE-F07).
     active = Q(
         product_links__product__is_active=True,
-        product_links__product__is_sold_out=False,
         product_links__product__is_deleted=False,
     )
     return (

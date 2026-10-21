@@ -480,13 +480,14 @@ def test_the_detail_of_a_sold_out_article_says_so(general):
     assert (detail.id, detail.is_active, detail.is_sold_out) == (croquettes.id, True, True)
 
 
-def test_a_category_counts_the_products_the_till_offers(general):
+def test_a_category_counts_what_the_till_shows_sold_out_included(general):
     drinks = Category.objects.create(name="Drinks")
     for name, sold_out in (("Coffee", False), ("Tea", True)):
         link(product(name, tax=general, is_sold_out=sold_out), drinks)
     [row] = run("inventory.category.list", CategoryListIn()).rows
-    # The till's category strip shows this count next to a grid without the sold-out tea.
-    assert (row.name, row.product_count) == ("Drinks", 1)
+    # The till's category strip shows this count next to a grid with both tiles, the tea greyed «Sold out»
+    # (SALE-F07): the count says what the person sees (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS).
+    assert (row.name, row.product_count) == ("Drinks", 2)
 
 
 # inventory.product.list_low_stock
