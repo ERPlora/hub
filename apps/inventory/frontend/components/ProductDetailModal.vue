@@ -4,16 +4,19 @@
 // physical product, «Receive stock», «Count stock» and, when it tracks its stock, «Write off stock»
 // (the page opens their dialog). For whoever can change products, «Mark sold out» or «Put back on sale»
 // (INVENTORY-F29): the sheet shows the live row, so the button turns once the stream brings it; a
-// refusal is said inside the sheet. The barcode plate and «Print barcode» (INVENTORY-F25) wait for the
-// Printing app.
+// refusal is said inside the sheet. The SKU's barcode on its white plate and, for whoever sees products,
+// «Print barcode» (INVENTORY-F25): each press asks Printing's queue for one label and the sheet says which
+// printer takes it, or that it waits for a «Label» printer; without the queue, the browser's print dialog.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
-import { type OutputOf, useCommand } from '@erplora/ui/sdk';
+import { ApiError, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
 import { formatMoney, formatQuantity } from '../lib/format';
+import { printInBrowser } from '../lib/print-label';
+import BarcodePlate from './BarcodePlate.vue';
 import type { StockAction } from './StockModal.vue';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
@@ -36,9 +39,34 @@ const status = computed(() => {
 });
 
 const soldOut = useCommand('inventory.product.set_sold_out');
+const printLabel = useCommand('inventory.product.print_label');
 const error = ref('');
-// Another product, or the sheet opened again: an old refusal is not this one's.
-watch([() => props.product?.id, open], () => (error.value = ''));
+const labelSent = ref<{ printer: string | null } | null>(null);
+const plate = ref<InstanceType<typeof BarcodePlate> | null>(null);
+// Another product, or the sheet opened again: an old refusal or label is not this one's.
+watch([() => props.product?.id, open], () => {
+  error.value = '';
+  labelSent.value = null;
+});
+
+async function print(): Promise<void> {
+  const p = props.product;
+  if (!p) return;
+  error.value = '';
+  labelSent.value = null;
+  try {
+    const queued = await printLabel.run({ id: p.id });
+    labelSent.value = { printer: queued.printer_name };
+  } catch (failure) {
+    const svg = plate.value?.svg;
+    if (failure instanceof ApiError && failure.code === 'inventory.label_queue_unavailable' && svg) {
+      printInBrowser(svg, { sku: p.sku, name: p.name });
+      return;
+    }
+    const reason = failure instanceof Error ? failure.message : '';
+    error.value = t('inventory.products.label.error', { reason });
+  }
+}
 
 async function setSoldOut(value: boolean): Promise<void> {
   if (!props.product) return;
@@ -63,6 +91,17 @@ async function setSoldOut(value: boolean): Promise<void> {
       data-testid="inventory-product-detail-error"
     >
       {{ error }}
+    </InlineFeedback>
+    <InlineFeedback
+      v-if="labelSent"
+      :tone="labelSent.printer ? 'success' : 'warning'"
+      data-testid="inventory-product-detail-label"
+    >
+      {{
+        labelSent.printer
+          ? $t('inventory.products.label.sent', { printer: labelSent.printer })
+          : $t('inventory.products.label.queued')
+      }}
     </InlineFeedback>
     <ion-list
       v-if="product"
@@ -96,7 +135,25 @@ async function setSoldOut(value: boolean): Promise<void> {
         </ion-note>
       </ion-item>
     </ion-list>
+    <BarcodePlate
+      v-if="product"
+      ref="plate"
+      :value="product.sku"
+    />
     <template #footer="{ cancel }">
+      <ion-button
+        v-if="product"
+        fill="outline"
+        :disabled="printLabel.pending.value"
+        data-testid="inventory-product-detail-print-label"
+        @click="print"
+      >
+        <HubIcon
+          slot="start"
+          name="ion:pricetag-outline"
+        />
+        {{ printLabel.pending.value ? $t('inventory.products.label.printing') : $t('inventory.products.actions.printLabel') }}
+      </ion-button>
       <template v-if="canMove">
         <ion-button
           fill="outline"

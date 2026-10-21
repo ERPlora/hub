@@ -8,7 +8,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
-import { cleanInventory, createProduct, dialog, fill, productBySku, productRow, productsReady, rowAction, searchProducts, stamp } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, productBySku, productRow, productsReady, rowAction, searchProducts, shootFlow, stamp } from './inventory-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -36,6 +36,7 @@ test('INVENTORY-F13/F14/F16: receiving and counting change the stock and show up
   await fill(receive, 'inventory-stock-qty', '3');
   await fill(receive, 'inventory-stock-cost', '0,75');
   await page.screenshot({ path: shot('inventory-receive-1280') });
+  await shootFlow(page, 'INVENTORY-F13');
   await receive.locator('[data-testid=inventory-stock-form-submit]').click();
   await expect(receive).toBeHidden();
   // The Stock cell, exact: the SKU's random suffix may contain the same figure.
@@ -51,6 +52,7 @@ test('INVENTORY-F13/F14/F16: receiving and counting change the stock and show up
   await expect(count.locator('[data-testid=inventory-stock-form-submit]')).toHaveJSProperty('disabled', true);
   await fill(count, 'inventory-stock-reason', 'E2E monthly count');
   await page.screenshot({ path: shot('inventory-count-1280') });
+  await shootFlow(page, 'INVENTORY-F14');
   await count.locator('[data-testid=inventory-stock-form-submit]').click();
   await expect(count).toBeHidden();
   await expect(productRow(page, sku).locator('[data-testid=inventory-product-stock]')).toHaveText('6');
@@ -80,6 +82,7 @@ test('INVENTORY-F15: writing off stock lowers it with its reason; more than ther
   await fill(form, 'inventory-stock-reason', 'E2E breakage');
   await form.locator('[data-testid=inventory-stock-form-submit]').click();
   await expect(form.locator('[data-testid=inventory-stock-qty] .error-text')).not.toBeEmpty();
+  await shootFlow(page, 'INVENTORY-F15');
   await expect(form).toBeVisible();
   await fill(form, 'inventory-stock-qty', '1');
   await form.locator('[data-testid=inventory-stock-form-submit]').click();
@@ -100,4 +103,5 @@ test('INVENTORY-F17: a product at or under its threshold is in «Low stock produ
   await expect(table.locator('[data-testid=inventory-low-stock-stock]')).toHaveText('1');
   await expect(table.locator('[data-testid=inventory-low-stock-threshold]')).toHaveText('10');
   await page.screenshot({ path: shot('inventory-dashboard-low-stock-1280') });
+  await shootFlow(page, 'INVENTORY-F17');
 });

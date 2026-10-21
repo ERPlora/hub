@@ -3,6 +3,11 @@
 Lo que las páginas de Mesas necesitan de `@erplora/ui` (y de otras apps) y todavía no está. Mientras tanto
 usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
+**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `89eaf98`: no ha llegado ninguno de los
+dos iconos. Ninguno rompe un flujo (los dos tienen su sustituto, dicho abajo), así que pasan a «Fuera por
+ahora» (`## 6` de `MIGRATION.md`) con la clave `table:ui-icons`. Quien los registre en `ui` los borra de aquí y
+cambia el sustituto en la misma PR del puntero.
+
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
 - `ion:restaurant-outline` — icono del módulo en la página de apps y en la tienda (`apps.py` `icon`). Hoy:

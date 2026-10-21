@@ -4,12 +4,13 @@
 // by Reference; sort by Date, Type, Quantity or Balance. An empty ledger says where movements come
 // from; a search that finds nothing says how a sale is found. A new movement (a reception, a count, a
 // sale) arrives through the stream.
-import { DataTable, formatDateTime } from '@erplora/ui/components';
+import { DataTable } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
+import { formatShortDateTime } from '../lib/format';
 import MovementsPage from './MovementsPage.vue';
 import source from './MovementsPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -24,6 +25,7 @@ const movement = (id: string, type: string, qty: string, after: string, override
   stock_after: after,
   reason: '',
   reference: '',
+  reference_label: '',
   unit_cost: null,
   actor: 'u1',
   created_at: '2026-10-13T10:00:00Z',
@@ -32,7 +34,7 @@ const movement = (id: string, type: string, qty: string, after: string, override
 
 const LEDGER = page([
   movement('m2', 'count', '-1.500', '8.500', { reason: 'Broken bottle' }),
-  movement('m1', 'reception', '10.000', '10.000', { reference: 'ALB-2026-0001' }),
+  movement('m1', 'reception', '10.000', '10.000', { reference: 'ALB-2026-0001', reference_label: 'ALB-2026-0001' }),
 ]);
 
 async function setup(options: MountOptions = {}) {
@@ -74,12 +76,21 @@ describe('MovementsPage', () => {
       ['qty', 'Quantity', true],
       ['stock_after', 'Balance', true],
       ['reason', 'Reason', false],
-      ['reference', 'Reference', false],
+      ['reference_label', 'Reference', false],
     ]);
     const cells = (row: number) => s.rows()[row].text();
-    expect(cells(0)).toContain(formatDateTime('2026-10-13T10:00:00Z', 'en'));
+    // The short date with its time (inventory#130, #139): a tablet column keeps the time of day.
+    expect(cells(0)).toContain(formatShortDateTime('2026-10-13T10:00:00Z', 'en'));
     expect(cells(0)).toMatch(/Coffee.*CAF-1.*Count.*-1\.5.*8\.5.*Broken bottle/);
     expect(cells(1)).toMatch(/Reception.*\+10.*10.*ALB-2026-0001/);
+  });
+
+  it('INVENTORY-F16: a sale reads as the number on its ticket, never as its id (inventory#137)', async () => {
+    const s = await setup();
+    const id = '0199a6c0-0000-7000-8000-00000000abcd';
+    await s.show(page([movement('m3', 'sale', '-2.000', '8.000', { reference: id, reference_label: 'TICKET-2026-000007' })]));
+    expect(s.rows()[0].text()).toContain('TICKET-2026-000007');
+    expect(s.rows()[0].text()).not.toContain(id);
   });
 
   it('names every type as the old module did', async () => {

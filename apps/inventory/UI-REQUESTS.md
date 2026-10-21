@@ -15,6 +15,8 @@ Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`
 - `ion:close-circle-outline` — cifra **Agotados** del panel; hoy `ion:close-outline` (`pages/DashboardPage.vue`).
 - `ion:pricetag-outline` — cifra **Valor de existencias**; hoy `ion:wallet-outline`.
 - `ion:cloud-upload-outline` — botón **Importar CSV**; hoy `ion:cloud-outline` (`components/CsvButtons.vue`).
+- `ion:print-outline` — botón **Imprimir código de barras** de la ficha; hoy `ion:pricetag-outline`
+  (`components/ProductDetailModal.vue`).
 
 ## Componentes
 
@@ -43,5 +45,6 @@ Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`
 - **PapaParse** (`papaparse`, MIT; desde 2013, cientos de colaboradores, versiones en 2024–2025) para leer el
   CSV de la importación (comillas, separador `,`/`;`, saltos de línea dentro de una celda). Hoy un lector
   propio mínimo con sus tests: `lib/csv.ts`.
-- Para **INVENTORY-F25** (etiqueta con código de barras, cuando exista `printing`): **JsBarcode** (MIT, desde
-  2013) o **bwip-js** (MIT, desde 2011) para pintar el Code128 del SKU en SVG, en vez de portar `code128.ts`.
+- **INVENTORY-F25** usa **JsBarcode** (MIT, desde 2013; 3.12.3) para el Code 128 del SKU
+  (`lib/barcode.ts`, renderizador a objeto); si otra app necesita un código de barras, la placa
+  (`components/BarcodePlate.vue`) pasa a `@erplora/ui/components`.

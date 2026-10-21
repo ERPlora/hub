@@ -24,6 +24,7 @@ import {
   productsReady,
   searchProducts,
   shoot,
+  shootFlow,
   stamp,
 } from './inventory-helpers';
 
@@ -55,6 +56,7 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   // The picker offers what Taxes seeds, by name and rate («Product — generic · 21%»).
   await pick(page, form.locator('[data-testid=inventory-product-tax]'), /(Product — generic|Producto — general).*21/);
   await page.screenshot({ path: shot('inventory-product-new-1280') });
+  await shootFlow(page, 'INVENTORY-F01');
   await form.locator('[data-testid=inventory-product-form-submit]').click();
   await expect(form).toBeHidden();
 
@@ -120,6 +122,7 @@ test('INVENTORY-F05: a product whose tax category Taxes deactivated is «Not con
     await expect(marker).toBeVisible();
     await expect(marker).toContainText(/Not configured|Sin configurar/);
     await page.screenshot({ path: shot('inventory-products-unconfigured-1280') });
+    await shootFlow(page, 'INVENTORY-F05');
 
     await marker.click();
     const form = dialog(page, 'inventory-product-form');
@@ -144,6 +147,7 @@ test('INVENTORY-F11: the export downloads what the search finds, with the header
   // The search is the server's (debounced): wait until the list holds only what it finds.
   await expect(shown(page).locator('[data-testid=inventory-products-row]')).toHaveCount(1);
   await expect(productRow(page, sku)).toBeVisible();
+  await shootFlow(page, 'INVENTORY-F11');
   const [download] = await Promise.all([page.waitForEvent('download'), shown(page).locator('[data-testid=inventory-products-csv-export]').click()]);
   expect(download.suggestedFilename()).toMatch(/^inventor(y|io)-product(s|os)\.csv$/);
   const path = await download.path();

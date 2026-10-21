@@ -110,8 +110,8 @@ Se abre a pantalla completa de la aplicación; el menú ⋮ de la tira de catego
 completa» / «Salir de pantalla completa» (la del navegador, cuando el dispositivo la permite). Dos
 zonas:
 
-- **Catálogo**: la tira de categorías de Inventario con su número de artículos («Todos» primero y,
-  con Servicios, «Servicios» detrás), la lupa que abre el buscador («Buscar producto…», por nombre o
+- **Catálogo**: la tira de categorías de Inventario con su número de artículos, los que enseña la
+  rejilla, agotados incluidos («Todos» primero y, con Servicios, «Servicios» detrás), la lupa que abre el buscador («Buscar producto…», por nombre o
   SKU, en el servidor; con Servicios busca también sus servicios) y la rejilla: artículos con sus
   iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al final la baldosa «Precio
   libre». En «Servicios», cada servicio

@@ -7,7 +7,7 @@ import { A, api, psql, shot, shown } from './helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
+  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
@@ -107,14 +107,23 @@ export async function shoot(page: Page, name: string, restore = { width: 1280, h
   return files;
 }
 
+/** The screenshots of a flow of the migration (APP-INVENTORY): `APP-INVENTORY-<key>-<390|834|1440>`. */
+export async function shootFlow(page: Page, key: string, restore = { width: 1280, height: 860 }): Promise<string[]> {
+  return shoot(page, `APP-INVENTORY-${key}`, restore);
+}
+
 /** Runs a row action of the products list: its inline button, or the row's «⋮» menu when it folded there. */
 export async function rowAction(page: Page, id: string, action: string): Promise<void> {
   const hook = `inventory-products-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
+  const inline = shown(page).locator(`[data-testid=${hook}]`).first();
+  const menu = shown(page).locator(`[data-testid=inventory-products-row-${id}-menu]`).first();
+  // Right after a search the row may not be painted yet: choosing then took the menu and waited there for an
+  // inline action until the test's time ran out. The row's buttons paint together, so wait for either.
+  await expect(inline.or(menu).first()).toBeVisible();
+  if (await inline.isVisible()) {
+    await inline.click();
     return;
   }
-  await shown(page).locator(`[data-testid=inventory-products-row-${id}-menu]`).first().click();
+  await menu.click();
   await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }

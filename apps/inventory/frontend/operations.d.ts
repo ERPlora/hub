@@ -341,6 +341,8 @@ export interface MovementOut {
   stock_after: string;
   reason: string;
   reference: string;
+  /** INVENTORY-F16: a sale's ticket, invoice or own number; else the reference itself. */
+  reference_label: string;
   unit_cost: number | null;
   actor: string;
   created_at: string;
@@ -402,6 +404,12 @@ export interface DeletedOut {
   id: string;
 }
 
+/** INVENTORY-F25: the label in Printing's queue; `printer_name` null = no printer has the «Label» function. */
+export interface PrintLabelOut {
+  job_id: string;
+  printer_name: string | null;
+}
+
 type NoInput = Record<string, never>;
 
 declare module '@erplora/ui/sdk' {
@@ -416,6 +424,7 @@ declare module '@erplora/ui/sdk' {
     'inventory.product.update': { input: ProductPatchIn; output: ProductOut };
     'inventory.product.delete': { input: ProductRefIn; output: DeletedOut };
     'inventory.product.set_sold_out': { input: ProductSoldOutIn; output: ProductOut };
+    'inventory.product.print_label': { input: ProductRefIn; output: PrintLabelOut };
     'inventory.product_category.list': { input: ProductCategoryListIn; output: Page<ProductCategoryOut> };
     'inventory.product_category.add': { input: ProductCategoryIn; output: ProductCategoryLinkOut };
     'inventory.product_category.remove': { input: ProductCategoryIn; output: ProductCategoryLinkOut };

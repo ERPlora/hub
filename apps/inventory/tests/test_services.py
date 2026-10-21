@@ -2072,6 +2072,22 @@ def _then(holder, release, second):
     return waited
 
 
+def test_inventory_f16_a_sale_keeps_the_number_it_arrived_with_even_one_too_long_for_the_ledger():
+    coffee = create("Coffee", initial_stock="5")
+    sold, long = uuid.uuid7(), uuid.uuid7()
+
+    system("inventory.stock.apply_sale", SaleCompletedIn(sale_id=sold, sale_number="20261021-0099", items=[line(coffee.id, "1")]))
+    system("inventory.stock.apply_sale", SaleCompletedIn(sale_id=long, sale_number="X" * 40, items=[line(coffee.id, "1")]))
+
+    # Sales does not know these sales (they never went through it): no ticket number, and no failure.
+    assert (SaleStock.objects.get(sale_id=sold).sale_number, SaleStock.objects.get(sale_id=sold).document_number) == (
+        "20261021-0099",
+        "",
+    )
+    assert SaleStock.objects.get(sale_id=long).sale_number == "X" * 24
+    assert stock_of(coffee.id) == Decimal("3")
+
+
 @pytest.mark.django_db(transaction=True)
 def test_two_sales_of_the_last_unit_at_once_lower_it_once():
     last = create("Last", initial_stock="1")
@@ -2083,6 +2099,30 @@ def test_two_sales_of_the_last_unit_at_once_lower_it_once():
     assert (held["result"].movements, outcome["result"].movements) == (1, 0)
     assert stock_of(last.id) == Decimal("0")
     assert len(movements(last.id, "sale")) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    ("start", "crosses_on"),
+    [
+        ("11", "the first"),  # each alone would cross: said once, not twice
+        ("12", "the second"),  # neither alone would cross from the balance it started with: never lost
+    ],
+)
+def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, crosses_on):
+    article = create("Article", initial_stock=start, low_stock_threshold="10")
+    holder, held, release = _first_holds(lambda: sell(uuid.uuid7(), line(article.id, "1")))
+
+    second, outcome = _in_thread(lambda: sell(uuid.uuid7(), line(article.id, "1")))
+
+    assert _then(holder, release, second)
+    assert (held["result"].movements, outcome["result"].movements) == (1, 1)
+    assert stock_of(article.id) == Decimal(start) - 2
+    said = [
+        (row.payload["crossing"], row.payload["previous_quantity"], row.payload["current_quantity"])
+        for row in OutboxEvent.objects.filter(name=events.STOCK_THRESHOLD_CROSSED)
+    ]
+    assert said == [("below", "11.000", "10.000")], crosses_on
 
 
 @pytest.mark.django_db(transaction=True)

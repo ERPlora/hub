@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
-import { cleanInventory, createProduct, dialog, fill, pick, productBySku, productsReady, stamp } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, pick, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -52,6 +52,7 @@ test('INVENTORY-F09: a CSV is checked first, its unknown tax text is asked for, 
   await expect(preview.locator('[data-testid=inventory-import-reason]')).toContainText(/(Line|Línea) 4/);
   await expect(preview.locator('[data-testid=inventory-import-skipped]')).toBeVisible();
   await page.screenshot({ path: shot('inventory-import-preview-1280') });
+  await shootFlow(page, 'INVENTORY-F09');
   await preview.locator('[data-testid=inventory-import-preview-submit]').click();
 
   // Taxes reads its key by itself; the new text is asked for and learned.
@@ -88,6 +89,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   await fill(form, 'inventory-category-name', name);
   await pick(page, form.locator('[data-testid=inventory-category-tax]'), /(Restaurant — drink|Restauración — bebida|Restaurante — bebida).*10/);
   await page.screenshot({ path: shot('inventory-category-new-1280') });
+  await shootFlow(page, 'INVENTORY-F06');
   await form.locator('[data-testid=inventory-category-form-submit]').click();
   await expect(form).toBeHidden();
   await shown(page).locator('[data-testid=inventory-categories-search] input').fill(name);
@@ -112,6 +114,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   const confirm = page.locator('ion-modal.ep-form-modal').filter({ hasText: /Delete and unlink|Eliminar y desvincular/ });
   await expect(confirm).toContainText(/0 (product\(s\) will lose|producto\(s\) quedarán)/);
   await page.screenshot({ path: shot('inventory-category-delete-1280') });
+  await shootFlow(page, 'INVENTORY-F07');
   await confirm.locator('.ep-form-modal__submit').click();
   await expect(confirm).toBeHidden();
   await expect(renamed).toHaveCount(0);
@@ -122,6 +125,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   await expect(report).toBeVisible();
   await expect(report.locator('[data-testid=inventory-import-report-count-created] ion-note')).toHaveText('2');
   await expect(report.locator('[data-testid=inventory-import-report-count-failed] ion-note')).toHaveText('0');
+  await shootFlow(page, 'INVENTORY-F10');
   await report.locator('[data-testid=inventory-import-report-close-button]').click();
   await shown(page).locator('[data-testid=inventory-categories-search] input').fill(`${name} t`);
   await expect(shown(page).locator('[data-testid=inventory-categories-row]', { hasText: `${name} two` })).toBeVisible();

@@ -4,7 +4,7 @@
 // Name, SKU, Type, Quantity with its sign, Balance, Reason and Reference —, most recent first, 50 a
 // page, search, filters by Type and Reference and sort by Date, Type, Quantity or Balance. Every
 // movement made anywhere (a reception, a count, a sale) re-runs the query on the server.
-import { type DataTableColumn, DataTable, formatDateTime, InlineFeedback } from '@erplora/ui/components';
+import { type DataTableColumn, DataTable, InlineFeedback } from '@erplora/ui/components';
 import type { InputOf, OutputOf } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -14,7 +14,7 @@ import { useInventoryTabs } from '../composables/useInventoryTabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
-import { formatQuantity, formatSignedQuantity } from '../lib/format';
+import { formatQuantity, formatShortDateTime, formatSignedQuantity } from '../lib/format';
 
 type Row = OutputOf<'inventory.movement.list'>['rows'][number];
 type MovementType = Row['movement_type'];
@@ -67,10 +67,11 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
     key: 'created_at',
     label: t('inventory.movements.columns.date'),
     sortable: true,
-    width: 'minmax(6.75rem,0.9fr)',
-    format: (value) => formatDateTime(String(value), locale.value),
+    // The short date keeps the time of day on a tablet (inventory#130, #139).
+    width: 'minmax(8.5rem,1fr)',
+    format: (value) => formatShortDateTime(String(value), locale.value),
   },
-  { key: 'product_name', label: t('inventory.movements.columns.name'), priority: 'high', width: 'minmax(7.5rem,3.1fr)' },
+  { key: 'product_name', label: t('inventory.movements.columns.name'), priority: 'high', width: 'minmax(7.5rem,2fr)' },
   { key: 'sku', label: t('inventory.movements.columns.sku'), width: 'minmax(4.5rem,0.8fr)' },
   { key: 'movement_type', label: t('inventory.movements.columns.type'), sortable: true, cell: 'type', width: 'minmax(5.5rem,0.8fr)' },
   {
@@ -90,7 +91,9 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
     format: (value) => formatQuantity(String(value), locale.value),
   },
   { key: 'reason', label: t('inventory.movements.columns.reason'), priority: 'low', width: 'minmax(3.25rem,1fr)' },
-  { key: 'reference', label: t('inventory.movements.columns.reference'), priority: 'low', width: 'minmax(4.75rem,1.25fr)' },
+  // INVENTORY-F16: a sale reads as the number on its ticket or invoice (the server's label), never as its id.
+  // Wide enough for a whole ticket number (TICKET-2026-000001), and kept on a tablet: the reason folds first (inventory#144).
+  { key: 'reference_label', label: t('inventory.movements.columns.reference'), width: 'minmax(8.5rem,1.5fr)' },
 ]);
 </script>
 

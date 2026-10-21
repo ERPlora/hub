@@ -1,7 +1,7 @@
 # Workbook — Mesas (app)
 Prefijo: TABLE
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas; la ventana «Elegir mesa» del TPV la monta Ventas, SALE-F19).
+Estado de la app: completa (2026-10-21)
 Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `table`. Se escribe **antes** que el código: no se
@@ -27,7 +27,7 @@ Quién la usa:
 - El **empleado** (camarero, cajero) sienta a la gente, pasa una cuenta a otra mesa, junta o divide
   cuentas, corrige los comensales, quita la mesa a una cuenta y cierra una mesa a mano.
 
-Mesas no cobra (eso es Ventas: la mesa lleva al TPV con su cuenta), no apunta reservas (eso será
+Mesas no cobra (eso es Ventas: la mesa lleva al TPV con su cuenta), no apunta reservas (eso es
 Reservas: Mesas solo aparta la mesa en el plano) y no es la pantalla de cocina.
 
 ## Referencia adoptada
@@ -190,7 +190,7 @@ no está activa en este negocio» y «No tienes permiso».
 | TABLE-F04 | Editar o borrar una mesa | hecho |
 | TABLE-F05 | Sacar una mesa del servicio (bloquearla) y devolverla | hecho |
 | TABLE-F06 | Renombrar o borrar una zona | hecho |
-| TABLE-F07 | Crear muchas mesas de golpe | hecho (asistente y API) |
+| TABLE-F07 | Crear muchas mesas de golpe | hecho |
 | TABLE-F08 | Ajustar la sala: comensales al sentar y avisos de tiempo | hecho |
 | TABLE-F09 | Ver cómo está la sala | hecho |
 | TABLE-F10 | Sentar a un grupo en una mesa libre o reservada | hecho |
@@ -213,7 +213,7 @@ no está activa en este negocio» y «No tienes permiso».
 | TABLE-F27 | Soltar la mesa cuando la reserva se cancela o no se presenta | hecho |
 | TABLE-F28 | Gastar la retención al sentar a la reserva | hecho |
 | TABLE-F29 | Caducar las retenciones vencidas | hecho |
-| TABLE-F30 | Retener o soltar una mesa a mano | hecho (asistente y API) |
+| TABLE-F30 | Retener o soltar una mesa a mano | hecho |
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
 
@@ -249,8 +249,8 @@ Pasos:
 5. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
    primer hueco libre de su zona.
 Entra: número (o ninguno), y en la lista también aforo y zona.
-Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, el paso «Tus mesas» de la puesta
-en marcha queda hecho (`table.floor.status`).
+Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa» del TPV deja de decir
+«Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`).
 Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
 «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
 este negocio.».
@@ -516,8 +516,8 @@ Pasos:
 Entra: las dos cuentas.
 Sale: una sola cuenta abierta en la mesa que se queda (avisa: `table.session.merged` y
 `sale.order.merged`).
-Si falla: «Esa mesa no tiene ninguna cuenta abierta con la que fusionar.» si el destino está libre o
-es la misma mesa.
+Si falla: «Esa mesa no tiene ninguna otra cuenta abierta con la que fusionar.» si el destino está libre
+o es la misma mesa sin otra cuenta.
 Implicados: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Dividir la cuenta de una mesa
@@ -713,8 +713,10 @@ Pasos:
    reserva de la noche.
 4. Al sentar desde Reservas («Sentar» en la reserva, RESERVATION-F11) se gasta solo la retención de esa
    reserva: con Ana a las 19:00 y Bea a las 21:00 en la mesa 5, sentar a Ana a las 20:10 deja la de Bea
-   viva, y cuando Ana se va la mesa vuelve a salir Reservada para Bea. Desde el plano no se sabe de qué
-   reserva es el grupo, y se gastan todas las que ya la pintaban Reservada.
+   viva, y cuando Ana se va la mesa vuelve a salir Reservada para Bea. Si Reservas sienta a un grupo más
+   de una hora antes de su reserva (su retención aún no pinta la mesa), suelta esa retención al sentarlo:
+   la mesa no vuelve a salir Reservada para quien ya se sentó. Desde el plano no se sabe de qué reserva es
+   el grupo, y se gastan todas las que ya la pintaban Reservada.
 Entra: la mesa Reservada (y, desde Reservas, la reserva que se sienta).
 Sale: las retenciones que la pintaban Reservada (desde Reservas, solo la suya), gastadas y sin nombre.
 Si falla: los de TABLE-F10.
@@ -737,9 +739,9 @@ Implicados: TABLE-F09, TABLE-F25
 
 ### TABLE-F30 Retener o soltar una mesa a mano
 <!-- origen: old:tables/workflow/reservas.md#tables-f30 -->
-Estado: hecho (asistente y API, como el producto actual)
+Estado: hecho
 Actor: responsable, empleado, asistente
-Pantalla: asistente
+Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
 Pasos:
 1. Pide al asistente apartar una mesa («guarda la 6 para Pedro de 21:00 a 23:00, 4 personas»).
 2. Desde una hora antes la mesa sale Reservada, con el nombre y la hora; pedirlo otra vez con la misma
@@ -801,9 +803,9 @@ nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 | Una mesa con sus cuentas abiertas | ver mesas | F09–F17 | `table.table.get` |
 | Las cuentas de la sala (abiertas, cerradas, todas), con cobrado, filtros y páginas | ver cuentas | F22 | `table.session.list` |
 | Una cuenta de mesa | ver cuentas | F21, F22 | `table.session.get` |
-| Las cuentas de mesa de una cuenta de Ventas (para Cocina y Ventas) | ver cuentas | F18 | `table.session.by_order` |
+| Las cuentas de mesa de una cuenta de Ventas (para el TPV: la mesa de la cuenta en pantalla) | ver cuentas | F12, F13, F24 | `table.session.by_order` |
 | Los camareros que han abierto cuentas (para el filtro) | ver cuentas | F22 | `table.waiter.list` |
-| Si el plano está montado (mesas en uso) | ver mesas | F02 | `table.floor.status` |
+| Si el plano está montado (mesas en uso y zonas), para «Elegir mesa» del TPV | ver mesas | F02 | `table.floor.status` |
 | Los ajustes de sala | ver ajustes | F08 | `table.settings.get` |
 
 Las zonas, las mesas, las cuentas, los camareros, el estado del plano y los ajustes se pueden seguir
@@ -893,8 +895,12 @@ Lo que Reservas manda al llamar (los mismos nombres que sus avisos `status_chang
 | App | Para qué | Servicio |
 |---|---|---|
 | Ventas | «Elegir mesa» del TPV (SALE-F19): las mesas y su estado, sentar o volver a sentar la cuenta de pantalla, quitarle la mesa y seguir la mesa de una cuenta | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
-| Cocina | La mesa de una comanda | `table.session.by_order` |
 | Reservas | Retener, mover y soltar la mesa de una reserva y sentarla, dentro de su operación | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
+
+Cocina no llama a Mesas: la comanda lleva el título de su cuenta, el que Mesas le pone en Ventas («Mesa 4»).
+Reservas, además, repinta sus pantallas con los avisos de las mesas y las zonas (`table.table.created`,
+`.updated`, `.deleted`, `table.zone.updated`, `.deleted`), y Automatizaciones oye todos los avisos de Mesas,
+como los de cualquier app.
 
 ### Quién puede qué
 
@@ -949,7 +955,9 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   `reservation_id` (opcional; lo manda Reservas al sentar una reserva) gasta solo la retención de esa
   reserva (`source = "reservation"`, `source_ref` = su id) y toma de ella los comensales si no vienen;
   sin él (el plano, el TPV), todas las que ya entraron en su ventana. Trasladar, dividir y volver a
-  sentar no dicen reserva: gastan todas.
+  sentar no dicen reserva: gastan todas. Una reserva sentada más de una hora antes de su hora no gasta
+  nada (su retención aún no pinta la mesa): Reservas la suelta tras sentarla, con `table.hold.release`
+  en la misma operación (`apps/reservation/services.py`, el `seat` de RESERVATION-F11).
 - **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega a `events.REACTIONS`
   lo de Ventas (`sale.order.completed`/`voided` → `table.session.close_by_order`) y lo de Clientes
   (`customer.customer.erased` → `table.hold.forget_customer`, que anota `table.table.held` por retención
@@ -957,7 +965,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   aparcada** cuya `sale.Order` está `completed` o `voided`, con la hora de cierre de la cuenta, y las
   escrituras, antes de nada, cierran esas cuentas (`settle`): el plano no espera al relay. Una cuenta que
   acaba aparcada se cierra sin mesa (restricción `table_session_table_by_status`).
-- **Reservas no es una reacción** (ronda propuesta en la PR de APP-TABLE): la llamada dentro de la operación
+- **Reservas no es una reacción** (ronda 2026-10-21 APP-TABLE de `PLAN-HUB.md`): la llamada dentro de la operación
   de Reservas es la única vía; sus avisos `reservation.reservation.status_changed` y `updated` no se
   escuchan, porque entregados después re-aplicarían una reserva vieja
   (`test_integration_relay.py::test_a_party_seated_long_before_its_time_is_not_held_again_by_a_late_confirmation`).
@@ -1043,10 +1051,15 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- Nada pendiente de esta versión: lo que no entra a propósito está en «Lo que NO hace, a propósito».
+- Ningún flujo a medias: los 32 están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a
+  propósito».
+- Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
+  `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
+  `ion:grid-outline` y el plano `ion:apps-outline`.
 
-### Dudas abiertas
-
-Resueltas en esta versión: 1 (por mercado, «Referencia adoptada»), 5 (Volver a sentar y elegir la
-cuenta de una mesa dividida tienen pantalla; deshacer una división se hace fusionando), 6, 7 (por
-mercado). Siguen fuera del MVP: 2 («por limpiar»), 3 (mesas unidas) y 8 (cambiar el camarero).
+Las dudas del producto actual quedan cerradas: la 1, la 6 y la 7, por mercado («Referencia adoptada» y
+«Cambios frente al producto actual»); la 4 ya estaba resuelta (tables#124, TABLE-F21); la 5, con pantalla
+(Volver a sentar, elegir la cuenta de una mesa dividida y deshacer una división fusionando). La 2 («por
+limpiar»), la 3 (mesas unidas con el aforo sumado) y la 8 (elegir o cambiar el camarero), con los planos
+por turno (pm#121), se decidieron al cerrar la app (2026-10-21) como fuera de esta versión, igual que en
+el producto actual: van a «Fuera por ahora» (`## 6` de `MIGRATION.md`).
