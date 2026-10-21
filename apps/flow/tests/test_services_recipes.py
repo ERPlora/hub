@@ -272,6 +272,16 @@ def test_repairing_adds_only_the_clause_its_app_added_and_keeps_the_rest():
     assert events("flow.flow.updated") == updated + 1
 
 
+def test_repairing_keeps_the_conditions_the_owner_added_and_only_adds_the_missing_one():
+    flow_id = built_from_an_older_version()
+    owners = {"input.staff_id": {"eq": "0199f0a0-0000-7000-8000-000000000001"}}
+    Flow.objects.filter(pk=flow_id).update(trigger_filter=owners)
+
+    run("flow.recipe.repair", {"recipe": REF})
+
+    assert built().trigger_filter == {**owners, **ONLY_THE_CUSTOMER}
+
+
 def test_repairing_what_has_nothing_to_repair_changes_nothing():
     run("flow.recipe.enable", {"recipe": REF})
     before = built()
