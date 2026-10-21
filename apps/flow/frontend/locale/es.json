@@ -331,6 +331,7 @@
         "query": "Consultar algo",
         "condition": "Solo sigue si…",
         "delay": "Esperar",
+        "message": "Enviar un mensaje",
         "http": "Llamar a otro sistema",
         "ask": "Preguntar antes a alguien"
       },
@@ -1290,7 +1291,8 @@
       "whatsapp_inbox__message__list": "Leer los mensajes de una conversación de WhatsApp",
       "whatsapp_inbox__note__add": "Apuntar una nota en una conversación de WhatsApp",
       "whatsapp_inbox__note__list": "Leer las notas de una conversación de WhatsApp",
-      "whatsapp_inbox__template__list": "Buscar plantillas de WhatsApp"
+      "whatsapp_inbox__template__list": "Buscar plantillas de WhatsApp",
+      "whatsapp_inbox__message__notify": "Enviar un WhatsApp a un cliente"
     },
     "facts": {
       "created": "alta",
@@ -2533,6 +2535,20 @@
       "continue": "Seguir con los pasos siguientes",
       "asNo": "Contarlo como un no",
       "continueHint": "Para actuar según la respuesta, añade después de este paso un «Solo sigue si…» sobre «Aprobada» (o «Caducado»)."
+    },
+    "message": {
+      "phone": "A quién (su teléfono)",
+      "phoneHint": "Inserta el teléfono del cliente: solo lo recibe la conversación de WhatsApp de justo ese número internacional. Si no hay ninguna, no se envía nada.",
+      "text": "Mensaje",
+      "textHint": "Sale tal cual si el cliente te escribió en las últimas 24 horas.",
+      "template": "Plantilla",
+      "noTemplate": "Sin plantilla",
+      "templateHint": "Pasadas las 24 horas, WhatsApp solo deja pasar una plantilla aprobada.",
+      "templatesLoading": "Leyendo tus plantillas de WhatsApp…",
+      "templatesError": "No se han podido leer tus plantillas de WhatsApp.",
+      "noTemplates": "Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.",
+      "missing": "«{name}» no está entre tus plantillas de WhatsApp aprobadas: WhatsApp no la enviará.",
+      "variable": "Dato {n}"
     },
     "inbox": {
       "heading": "Esperan tu respuesta",

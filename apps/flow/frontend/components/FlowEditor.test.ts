@@ -45,6 +45,22 @@ const CATALOG: CatalogOut = {
   ],
 };
 
+/** The narrow send of the WhatsApp inbox, as the catalog lists it (FLOW-F31). */
+const NOTIFY_ACTION: CatalogOut['actions'][number] = {
+  name: 'whatsapp_inbox.message.notify',
+  kind: 'command',
+  app: 'whatsapp_inbox',
+  app_name: 'WhatsApp inbox',
+  description: '',
+  fields: [
+    { name: 'phone', type: 'string', required: true, description: '', choices: [] },
+    { name: 'template', type: 'object', required: false, description: '', choices: [] },
+    { name: 'text', type: 'string', required: false, description: '', choices: [] },
+    { name: 'client_message_id', type: 'uuid', required: false, description: '', choices: [] },
+  ],
+  outputs: ['id', 'status'],
+};
+
 const FLOW: FlowOut = {
   id: 'f1',
   name: 'Big sale',
@@ -304,12 +320,26 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is calling another system: see it in History.');
   });
 
-  // FLOW-F31, F37: without the WhatsApp gateway nor an assistant in the Hub or the SaaS, «Send a message» and
-  // «Ask the assistant» are not offered: these are all the steps there are.
+  // FLOW-F31, F37: without the WhatsApp inbox in the business, «Send a message» is not offered, and without an
+  // assistant in the Hub, «Ask the assistant» never is: these are all the steps there are.
   it('offers exactly the steps the Hub can run, none it cannot yet', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     const adders = s.wrapper.findAll('[data-testid^="flow-editor-add-"]').map((button) => button.attributes('data-testid'));
     expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'http', 'ask'].map((kind) => `flow-editor-add-${kind}`));
+  });
+
+  it('with the WhatsApp inbox, «Send a message» adds the narrow send, open (FLOW-F31)', async () => {
+    const withInbox: CatalogOut = { ...CATALOG, actions: [...CATALOG.actions, NOTIFY_ACTION] };
+    const s = await setup({ flow: null, initial: emptyDocument() }, { '/api/flow/catalog': [200, withInbox] });
+    const adders = s.wrapper.findAll('[data-testid^="flow-editor-add-"]').map((button) => button.attributes('data-testid'));
+    expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'message', 'http', 'ask'].map((kind) => `flow-editor-add-${kind}`));
+    expect(s.find('flow-editor-add-message').text()).toBe('Send a message');
+    await click(s.find('flow-editor-add-message').element);
+    const [node] = s.wrapper.findAllComponents(StepNode);
+    expect([node.props('step'), node.props('open')]).toEqual([
+      { id: 's1', kind: 'command', operation: 'whatsapp_inbox.message.notify', params: { phone: '', text: '' } },
+      true,
+    ]);
   });
 
   it('«Ask someone first» has its own button (FLOW-F28)', async () => {
