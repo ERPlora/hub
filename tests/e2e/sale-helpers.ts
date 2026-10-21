@@ -118,7 +118,7 @@ export function cleanDocumentsOf(orders: string): void {
 
 /** Deletes the sales and checks a run made (their lines name an `E2E-` product, an `e2e ` department or
  *  the check's title is `e2e …`), their lines in a cash shift, the paper they asked of Printing (and the
- *  kitchen's sheets of their checks), the fiscal documents Invoicing issued for them in the same charge, void
+ *  kitchen's sheets of their checks), the kitchen tickets of their rounds, the fiscal documents Invoicing issued for them in the same charge, void
  *  or refund (with Invoicing's own cleanup, which gives the series' numbers back), and the `e2e `
  *  departments and quick notes. Run it BEFORE the customer and inventory cleanups: a sale keeps its
  *  customer's card. */
@@ -136,6 +136,14 @@ export function cleanSales(): void {
         union all select 'sale-order-' || id || '-%' from e2e_orders
         union all select 'kitchen-' || ticket_id || '-%' from kitchen_ticketitem
           where sale_line_id in (select id from sale_orderline where order_id in (select id from e2e_orders))))`,
+      // The kitchen tickets of their rounds, their dishes and their History: only the tickets of these checks (by
+      // the check or by one of its lines), never one made by hand or by another spec's check.
+      `create temp table e2e_kitchen as select id from kitchen_ticket where order_id in (select id from e2e_orders)
+        union select ticket_id from kitchen_ticketitem
+          where sale_line_id in (select id from sale_orderline where order_id in (select id from e2e_orders))`,
+      'delete from kitchen_logentry where ticket_id in (select id from e2e_kitchen)',
+      'delete from kitchen_ticketitem where ticket_id in (select id from e2e_kitchen)',
+      'delete from kitchen_ticket where id in (select id from e2e_kitchen)',
       // A sale charged in cash with a drawer open has its line in the shift (a run that stopped before its own
       // cleanup leaves it): it goes first, or it holds its sale, payment and refund.
       `delete from cash_register_movement where sale_id in (select id from e2e_sales)

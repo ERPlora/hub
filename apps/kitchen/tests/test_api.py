@@ -128,6 +128,8 @@ def test_a_cook_moves_tickets_but_does_not_run_the_kitchen(employee_client):
         "/kitchen/tickets",
         "/kitchen/stations",
         "/kitchen/log",
+        # Its settings, read as any other query of the API, with no parameters (they made it a 422).
+        "/kitchen/settings",
     ):
         assert get(employee_client, path).status_code == 200, path
     made = post(

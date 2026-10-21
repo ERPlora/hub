@@ -1070,7 +1070,8 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "channel": data.channel,
             "priority": data.priority,
             "round_no": round_no,
-            "waiter": person_label(ctx),
+            # Who attends the check («Atiende» of the till), else who sends the round (kitchen#82).
+            "waiter": data.waiter or person_label(ctx),
             "items": [
                 {
                     "order_item_id": str(line.id),

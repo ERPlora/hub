@@ -16,7 +16,6 @@ from apps.kitchen.schemas import (
     ItemBumpIn,
     ItemRecallIn,
     LogListIn,
-    NoIn,
     RoutingClearIn,
     RoutingListIn,
     RoutingSetIn,
@@ -172,8 +171,8 @@ async def routing_clear(request, data: RoutingClearIn):
 
 
 @bind(router, "kitchen.settings.get", "/kitchen/settings")
-async def settings_get(request, params: Query[NoIn]):
-    return await run_operation(request, queries.get_settings, params)
+async def settings_get(request):
+    return await run_operation(request, queries.get_settings)
 
 
 @bind(router, "kitchen.settings.update", "/kitchen/settings")

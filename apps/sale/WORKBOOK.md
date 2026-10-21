@@ -652,11 +652,12 @@ Pasos:
    «El profesional de la cuenta».
 4. Al cobrar, el chip vuelve a «yo».
 Entra: el equipo de Personal (fichas activas).
-Sale: la venta y cada línea atribuidas a esa persona (para el cierre por profesional).
+Sale: la venta y cada línea atribuidas a esa persona (para el cierre por profesional), y la comanda de
+cocina que se envíe con su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
 cocina no se reasigna.
-Implicados: STAFF-F21
+Implicados: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
 <!-- origen: fi:modules/sales#command-sales-cart-save-sql-transaccional fi:modules/sales#command-sales-park_ticket-sql-transaccional fi:modules/sales#command-sales-retrieve_ticket-sql-transaccional fi:modules/sales#query-sales-cart-get fi:modules/sales#query-sales-parked_tickets old:sales/workflow/la-cuenta.md#sales-f17 -->
@@ -754,17 +755,22 @@ Pasos:
    «Agotado», «Pedido dos veces») y «O escribe el motivo…». «Anular artículo» no se puede pulsar sin
    motivo.
 6. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
+7. Para seguir lo enviado, en «Cuenta» pulsa «Comandas · N», junto a la cabecera de lo enviado: se abre
+   «Comandas de la cuenta», una tarjeta por ronda (la más reciente arriba) con su estado en cocina, y desde
+   ella se marca urgente una ronda que se cocina (KITCHEN-F19, KITCHEN-F20).
 Entra: las líneas pendientes de la cuenta.
 Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
 línea enviada, avisa de la línea anulada con su motivo.
 Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
-podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Pedir que se quite una línea ya
+podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Si la comanda se envía pero su hoja
+no se imprime, el TPV avisa «Comanda N enviada a cocina, pero no se imprimió. Revisa la impresora de
+cocina en Impresión.». Pedir que se quite una línea ya
 enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F29
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 <!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->

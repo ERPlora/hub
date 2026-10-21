@@ -779,6 +779,38 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastSuccess).toHaveBeenCalledWith('Comanda 1 enviada a cocina.');
   });
 
+  it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it (kitchen#82)', async () => {
+    const s = await setup({ session: WITH_KITCHEN });
+    await click(s.find('pos-staff-chip').element);
+    await settle();
+    s.wrapper.findComponent(StaffPicker).vm.$emit('choose', { id: 's1', name: 'Marta' });
+    await settle();
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
+    s.wrapper.findComponent(PosCart).vm.$emit('send', false);
+    await settle();
+    await click(s.find('pos-staff-chip').element);
+    await settle();
+    s.wrapper.findComponent(StaffPicker).vm.$emit('choose', { id: null, name: null });
+    await settle();
+    s.wrapper.findComponent(PosCart).vm.$emit('send', true);
+    await settle();
+    expect(sends(s)).toEqual([
+      { order_id: 'o1', priority: 'normal', waiter: 'Marta' },
+      { order_id: 'o1', priority: 'rush' },
+    ]);
+  });
+
+  it('a round sent whose sheet did not print says so in words, never the raw reason (hub#2257, KITCHEN-F08)', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));
+    s.wrapper.findComponent(PosCart).vm.$emit('send', false);
+    await settle();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.', 'warning', 4500);
+  });
+
   it('charging with lines not sent sends them first, then opens the charge', async () => {
     const s = await setup({ session: WITH_KITCHEN });
     await s.addProduct();
@@ -797,6 +829,22 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     await settle();
     expect(checkout(s).props('open')).toBe(false);
     expect(toastError).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.');
+  });
+
+  it('the cart follows the check’s kitchen tickets with Kitchen on and the right to see them (KITCHEN-F19)', async () => {
+    const VIEW = { ...MANAGER, permissions: [...MANAGER.permissions, 'kitchen.view_ticket'], apps: [{ label: 'kitchen', state: 'on' as const }] };
+    const cases: [typeof MANAGER, boolean][] = [
+      [MANAGER, false],
+      [{ ...VIEW, apps: [] }, false],
+      [{ ...VIEW, apps: [{ label: 'kitchen', state: 'activating' }] }, false],
+      [{ ...VIEW, permissions: MANAGER.permissions }, false],
+      [VIEW, true],
+    ];
+    for (const [session, on] of cases) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCart).props('kitchenTickets')).toBe(on);
+    }
   });
 
   it('a round another device already sent does not stop the charge', async () => {
