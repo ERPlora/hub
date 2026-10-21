@@ -125,8 +125,9 @@ Dos tablas, una encima de otra, como en el producto actual.
 la general, «—» si no tiene), **Impuesto** («Según el negocio», «Impuesto incluido», «Impuesto no
 incluido»), **Vigencia** («Siempre», «Desde 1 jul 2026», «Hasta…» o las dos fechas), **Precios**
 (cuántos tiene) y **Estado** (Activa o Inactiva). Se ordena por Código, Nombre, Divisa, Grupo e Impuesto
-(por defecto, por nombre) y se filtra por Código, Nombre y Divisa («contiene»), Grupo de clientes,
-Impuesto y Estado (Activas por defecto, Inactivas, Todas); 50 por página, en lista o en tarjetas.
+(por defecto, por nombre) y se filtra, con el embudo de la barra, por Código, Nombre y Divisa
+(«contiene»), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido; **Inactivas**, o
+**Todos** para las dos); 50 por página, en lista o en tarjetas.
 
 - **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (EUR), **Impuesto**
   (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
@@ -140,8 +141,8 @@ Impuesto y Estado (Activas por defecto, Inactivas, Todas); 50 por página, en li
 unidad», «Compra 2, llévate 1», «3+: 10 % · 6+: 15 %»), **Se aplica a** («Todo», «Todos los
 productos», «Todos los servicios», la categoría, el producto o el servicio, con «(borrado)» si
 Inventario lo borró; con el grupo de clientes detrás si lo tiene, o «Grupo borrado»), **Vigencia**, **Prioridad** y **Estado**. Se ordena por Código, Nombre, Tipo y
-Prioridad (Valor no se ordena ni se filtra: sus unidades son distintas); se filtra por Código, Nombre,
-Tipo, Se aplica a y Estado; 50 por página.
+Prioridad (Valor no se ordena ni se filtra: sus unidades son distintas); se filtra, con el embudo, por
+Código, Nombre, Tipo, Se aplica a y Estado (como en las tarifas: **Activas** al abrir); 50 por página.
 
 - **+** abre **Nueva regla de descuento** (PRICING-F10).
 - Acciones de fila: **Editar** (también pulsando la fila), **Desactivar** (pide confirmación) o
@@ -156,7 +157,7 @@ Activar** (lo que corresponda; con las mismas confirmaciones que en la tabla).
 Debajo, **Precios**: buscador «Buscar producto o servicio…», columnas **Artículo** (nombre),
 **Tipo** (Producto o Servicio), **SKU**, **Desde** (la cantidad mínima, con su unidad), **Precio** y
 **Precio de ficha** (el de Inventario; «—» en un servicio). Los precios, en la divisa de la tarifa. Orden
-por Artículo, Desde y Precio; filtro por Tipo; 50 por página.
+por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 
 - **+** abre **Nuevo precio**: **Producto** o **Servicio** (un selector), el buscador del artículo
   (por nombre o SKU), **Desde** (cantidad mínima, 1 por defecto) y **Precio**.

@@ -30,7 +30,10 @@ import PageNotices, { blockingError } from './PageNotices.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 
 const BASES: readonly TaxBasis[] = ['business', 'included', 'excluded'];
-const STATUSES: readonly Status[] = ['active', 'inactive', 'all'];
+// The active ones until the person picks another status; the table's own blank option («All») asks for
+// every one, so there is no second «All» beside it that meant something else (pm#254).
+const STATUSES: readonly Status[] = ['active', 'inactive'];
+const DEFAULT_STATUS = 'active';
 
 const session = useSession();
 const router = useRouter();
@@ -39,7 +42,7 @@ const locale = useLocale();
 const canManage = computed(() => session.can('pricing.manage'));
 
 const table = useServerTable({ sort: 'name' });
-const filters = ref<DataTableFilters>({});
+const filters = ref<DataTableFilters>({ status: DEFAULT_STATUS });
 
 const query = computed<Partial<PriceListListIn>>(() => {
   const f = filters.value;
@@ -49,13 +52,14 @@ const query = computed<Partial<PriceListListIn>>(() => {
     ...(f.currency ? { currency: f.currency } : {}),
     ...(f.customer_group_id ? { customer_group_id: f.customer_group_id } : {}),
     ...(f.tax_basis ? { tax_basis: f.tax_basis as TaxBasis } : {}),
-    ...(f.status ? { status: f.status as Status } : {}),
+    status: (f.status || 'all') as Status,
   };
 });
 
 function onFilters(now: DataTableFilters): void {
   filters.value = now;
-  table.restart({ narrowed: Object.keys(now).length > 0 });
+  // The default status narrows nothing the person asked for: an empty answer is still «No price lists.».
+  table.restart({ narrowed: Object.entries(now).some(([key, value]) => value && !(key === 'status' && value === DEFAULT_STATUS)) });
 }
 
 const { data: result, status, error, refresh } = useLiveList(
@@ -203,6 +207,7 @@ async function onAction({ actionId, row }: { actionId: string; row: PriceListOut
       testid="pricing-lists"
       server-side
       searchable
+      filterable
       :filters="filters"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"

@@ -37,9 +37,11 @@ async function setup(options: MountOptions = {}) {
 describe('RulesTable', () => {
   it('follows the rules by name, 50 from the first', async () => {
     const s = await setup();
-    expect(s.params(OP)).toEqual([{ sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
+    expect(s.params(OP)).toEqual([{ status: 'active', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
     await s.show(page([TEN, FIX]));
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'pricing-rules', total: 2 });
+    // The column filters wait behind the toolbar's funnel, as in the old table (PLAN-MIGRATIONS §13).
+    expect(s.prop('filterable')).toBe(true);
     expect(s.prop<{ add: string }>('labels').add).toBe('New discount rule');
   });
 
@@ -70,6 +72,35 @@ describe('RulesTable', () => {
     expect(s.params(OP)).toEqual([
       { code: 't', rule_type: 'percent', applies_to: 'all', status: 'inactive', search: 'ten', sort: 'priority', dir: 'asc', limit: 50, offset: 0 },
     ]);
+  });
+
+  it('starts on the active ones, its Status filter says so, and its blank option is every rule (pm#254)', async () => {
+    const s = await setup();
+    expect(s.prop('filters')).toEqual({ status: 'active' });
+    const status = s.prop<Array<{ key: string; filter?: { options?: Array<{ value: string; label: string }> } }>>('columns').find(
+      (c) => c.key === 'status',
+    );
+    // The table's own blank option is «All»: no second «All» beside it that means something else.
+    expect(status?.filter?.options).toEqual([
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+    ]);
+    s.table().vm.$emit('filtersChange', { status: '' });
+    await flush();
+    expect(s.params(OP)).toEqual([{ status: 'all', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
+    s.table().vm.$emit('filtersChange', { status: 'inactive' });
+    await flush();
+    expect(s.params(OP)).toEqual([{ status: 'inactive', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
+  });
+
+  it('with only the default filter, an empty answer is «No discount rules.», not a search without results', async () => {
+    const s = await setup();
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No discount rules.');
+    s.table().vm.$emit('filtersChange', { status: 'active' });
+    await flush();
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No discount rules.');
   });
 
   it('no rule at all says «No discount rules.»', async () => {
