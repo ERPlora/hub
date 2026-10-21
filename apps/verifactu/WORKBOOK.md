@@ -1154,8 +1154,13 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   no pasen nunca a la cadena de pruebas; lo usan `record.create` y la factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
   `manage.py create_platform_hub` alinea su configuración con `verifactu.config.follow_deployment` (409
   `verifactu.platform_only` en cualquier otro negocio). El sello de ERPlora presenta sus propios registros sin
-  otorgamiento (`sending_problem`: el emisor de Facturación es `PLATFORM_ISSUER_TAX_ID`): ERPlora no se representa a
-  sí misma. La pasarela del SaaS tendrá que aceptar lo mismo cuando compruebe el otorgamiento (T7b).
+  otorgamiento (`sending_problem`: el hub de plataforma **y** el emisor de Facturación `PLATFORM_ISSUER_TAX_ID`):
+  ERPlora no se representa a sí misma. Un negocio cualquiera que teclee ese NIF como emisor sigue necesitando su
+  otorgamiento aprobado (saas#2524): sin él, en producción no se emite nada nuevo; la pasarela del SaaS lo rechaza
+  igual (`fiscal_gateway`, 409).
+- **Hub de demostración** (PLAN-SAAS §3.5; `base.Hub.is_demo`, que lee `base.operations.is_demo_hub`): nunca pasa a
+  producción (`go_live` → 409 `verifactu.go_live_forbidden`) y todo lo que sella va a la AEAT de pruebas
+  (`queries.effective_environment`), aunque en la fase 1 comparta tablas con un negocio que ya está en producción.
 
 ### La cola y el envío
 
@@ -1283,9 +1288,10 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
    rechaza con el código de la ruta y no se sella, numera ni cobra (VERIFACTU-F08; «Contrato con Facturación»). La
    cola ya no espera por `live_option_unpaid`. Venta reconoce esos tres códigos por nombre (como ya nombra las
    operaciones de Facturación), aunque VeriFactu no está en sus `requires`.
-10. **Hubs demo en la fase 1** — **señalada, para la fase 2**: no hay registro de control ni demos (bloque 7);
-   `base.operations.is_demo_hub` contesta `False` hasta que exista `control.Hub.is_demo`, y entonces es lo único
-   que cambia.
+10. ~~**Hubs demo en la fase 1**~~ — **cerrada (2026-10-21)**: la demo es una fila de `base.Hub` (ronda 2026-10-17)
+   y `base.operations.is_demo_hub` la lee; como en la fase 1 comparte tablas, su entorno no sale de la configuración
+   sino de que es demo: siempre pruebas (`queries.effective_environment`). En la fase 2 lee `control.Hub.is_demo` y
+   no cambia nada más.
 
 ### Decisiones (dudas abiertas del producto actual)
 

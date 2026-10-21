@@ -604,3 +604,40 @@ def test_without_a_chosen_hub_the_route_is_not_changed(client, staff, config):
     assert "Choose a hub first" in response.content.decode()
     config.refresh_from_db()
     assert config.route == "own"
+
+
+def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(client, staff, settings):
+    # saas#2524: the page of a record says why it waits for the hub chosen in the admin session. ERPlora's own hub
+    # needs no authorisation for ERPlora's records; a business with ERPlora's tax ID typed in, the approved one.
+    from live.context import Scope, system_context
+
+    from apps.verifactu.tests.conftest import ISSUER, ctx_for
+
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    platform = ctx_for(scope=Scope("host", "erplora"))
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform)
+    run("verifactu.config.follow_deployment", {}, system_context(platform.scope))
+    invoice = run(
+        "invoice.invoice.create",
+        {
+            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+            "series_code": "TICKET",
+        },
+        system_context(platform.scope),  # ERPlora's invoices are issued by the system (/internal/platform/invoices)
+    )
+    sealed = Record.objects.get(invoice_id=invoice.id)
+    assert sealed.environment == "production"
+    needs_it = escape(wait_reason_text("representation_not_approved"))
+    client.force_login(staff)
+    session = client.session
+
+    session[ADMIN_HUB_SESSION_KEY] = "erplora"
+    session.save()
+    assert needs_it not in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+
+    session[ADMIN_HUB_SESSION_KEY] = "a"
+    session.save()
+    assert needs_it in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()

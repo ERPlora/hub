@@ -14,7 +14,7 @@ from live.context import Scope, system_context
 from live.errors import OperationError
 
 from apps.verifactu import queries
-from apps.verifactu.models import Config, Environment
+from apps.verifactu.models import Config, Environment, Record
 
 from apps.verifactu.tests.conftest import A, ISSUER, ctx_for, run
 
@@ -116,18 +116,20 @@ def test_another_hubs_switch_is_still_its_own(db, platform_slug):
 
 
 def test_erploras_seal_files_erploras_own_records_without_an_authorisation(
-    db, settings
+    db, platform_slug, settings
 ):
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     settings.PLATFORM_ISSUER_TAX_ID = ISSUER["tax_id"]
-    run("invoice.issuer.update", ISSUER)
+    run("invoice.issuer.update", ISSUER, ctx_for(scope=PLATFORM))
     config = Config(
         route=Config.Route.ERPLORA, representation_status=Config.Representation.NONE
     )
 
-    assert queries.sending_problem(config, Environment.PRODUCTION) == ""
+    assert queries.sending_problem(config, Environment.PRODUCTION, PLATFORM) == ""
+    # Only on ERPlora's own hub (saas#2524): the same tax ID on any other business is no exemption.
+    assert queries.sending_problem(config, Environment.PRODUCTION, A) == "representation_not_approved"
 
 
 def test_any_other_issuer_needs_its_approved_authorisation(db, settings):
@@ -138,7 +140,7 @@ def test_any_other_issuer_needs_its_approved_authorisation(db, settings):
     )
 
     assert (
-        queries.sending_problem(config, Environment.PRODUCTION)
+        queries.sending_problem(config, Environment.PRODUCTION, A)
         == "representation_not_approved"
     )
 
@@ -228,3 +230,41 @@ def test_the_gateway_is_told_the_hub_by_its_slug(db, platform_slug, settings, sc
     assert door.call_count == 1
     expected = settings.PLATFORM_HUB_SLUG if scope is PLATFORM else "a"
     assert json.loads(door.calls.last.request.content)["hub"] == expected
+
+
+def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisation(
+    db, platform_slug, settings
+):
+    # saas#2524, the Hub's side: ERPlora's tax ID typed as an ordinary business's issuer is no exemption. Only
+    # ERPlora's own hub files ERPlora's records without an authorisation: anywhere else, once the authorisation is
+    # revoked, a new sale in production is refused before anything is numbered (the gateway would refuse it too, and
+    # the sale would be charged with no way to the AEAT, HUB-F313).
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    run("invoice.issuer.update", ISSUER)
+    run(
+        "verifactu.config.sync",
+        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        system_context(A),
+    )
+    run("verifactu.config.go_live")
+    run(
+        "verifactu.config.sync",
+        {"version": 2, "representation": {"status": "revoked"}},
+        system_context(A),
+    )
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID})
+
+    refused = code_of(
+        lambda: run(
+            "invoice.invoice.create",
+            {
+                "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+                "series_code": "TICKET",
+            },
+        )
+    )
+
+    assert refused == "verifactu.representation_not_approved"
+    assert not Record.objects.exists()

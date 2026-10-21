@@ -112,7 +112,10 @@ def effective_environment(ctx: OperationContext, config: Config) -> str:
     deployment's (``prod``: production; ``pre``: testing), whatever its switch says, but production only once ERPlora
     opens it on the server (``production_open``, working-rules §15: its own invoices skip no lock); once live there, it
     stays in production while the server is closed, its records waiting (``production_closed``), so its real invoices
-    never move to the test chain. Any other business, its configuration's."""
+    never move to the test chain. A demo, always testing (HUB-F315): phase 1 shares the tables, so the configuration
+    it reads may be a business's that went live. Any other business, its configuration's."""
+    if platform.is_demo_hub(ctx.scope):
+        return Environment.TESTING
     if platform.is_platform_hub(ctx.scope):
         if production_open() or (
             settings.ERPLORA_ENVIRONMENT == "prod"
@@ -161,10 +164,11 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
-def _route_sending_problem(config: Config, environment: str) -> str:
+def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
     certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
-    the approved signed authorisation, but for ERPlora's own records."""
+    the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub (``scope``; ``None``, no
+    hub's, never is: saas#2524, a business typing ERPlora's tax ID is no exemption)."""
     production = environment == Environment.PRODUCTION
     if config.route == Config.Route.OWN:
         if not certificate_valid():
@@ -174,7 +178,11 @@ def _route_sending_problem(config: Config, environment: str) -> str:
         return ""
     if not production:
         return ""
-    if issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID:
+    if (
+        scope is not None
+        and platform.is_platform_hub(scope)
+        and issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID
+    ):
         # ERPlora's seal presents ERPlora's own records: it represents nobody (its own hub, PLAN-SAAS §4).
         return ""
     if config.representation_status != Config.Representation.APPROVED:
@@ -194,19 +202,19 @@ def _server_problem(environment: str) -> str:
     return ""
 
 
-def sending_problem(config: Config, environment: str) -> str:
+def sending_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""``: the route's own lack
     first, then the server's in production (no gateway, closed). What keeps the queue waiting, before the gateway is
     ever called; the live option never does (what was sealed reaches the AEAT)."""
-    return _route_sending_problem(config, environment) or _server_problem(environment)
+    return _route_sending_problem(config, environment, scope) or _server_problem(environment)
 
 
-def route_problem(config: Config, environment: str) -> str:
+def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08): what keeps
     it from sending and, on ERPlora's route in production, the live option of the plan (Ioan's model,
     2026-10-15); the route's own lack before the server's. In production it refuses every new sale
     (``verifactu.record.create``) and going live."""
-    problem = _route_sending_problem(config, environment)
+    problem = _route_sending_problem(config, environment, scope)
     if (
         not problem
         and config.route == Config.Route.ERPLORA
@@ -217,11 +225,11 @@ def route_problem(config: Config, environment: str) -> str:
     return problem or _server_problem(environment)
 
 
-def issue_problem(config: Config) -> str:
+def issue_problem(config: Config, scope: Scope | None) -> str:
     """Why no new sale or invoice can be sealed now (production without a way to the AEAT), or ``""``."""
     if config.environment != Environment.PRODUCTION:
         return ""
-    return route_problem(config, config.environment)
+    return route_problem(config, config.environment, scope)
 
 
 def live_problems(config: Config, scope: Scope) -> list[str]:
@@ -256,12 +264,12 @@ def system_for(ctx: OperationContext) -> producer.SystemInfo:
     )
 
 
-def blockers(config: Config, environment: str) -> list[str]:
+def blockers(config: Config, environment: str, scope: Scope | None) -> list[str]:
     """What keeps every record of ``environment`` from leaving now, as wait codes."""
     found = []
     if not gateway.configured():
         found.append("gateway_unavailable")
-    problem = sending_problem(config, environment)
+    problem = sending_problem(config, environment, scope)
     if not problem and not own_certificate_readable(config):
         problem = "own_certificate_unreadable"
     if problem and problem not in found:
@@ -283,11 +291,11 @@ def _local_time(moment: dt.datetime) -> str:
     return timezone.localtime(moment).strftime("%H:%M:%S")
 
 
-def waiting_of(record: Record, config: Config) -> list[dict]:
+def waiting_of(record: Record, config: Config, scope: Scope | None) -> list[dict]:
     """Why ``record`` is not in the AEAT yet; empty when it is, or when the AEAT rejected it."""
     if record.status not in Record.UNSENT:
         return []
-    reasons = [wait(code) for code in blockers(config, record.environment)]
+    reasons = [wait(code) for code in blockers(config, record.environment, scope)]
     control = SendControl.objects.filter(
         issuer_nif=record.issuer_nif, environment=record.environment
     ).first()
@@ -416,7 +424,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     now = timezone.now()
     certificate = own_certificate()
     expires = certificate.expires_at if certificate else None
-    refused = issue_problem(config)
+    refused = issue_problem(config, ctx.scope)
     return ConfigOut(
         environment=config.environment,
         route=config.route,
@@ -453,8 +461,8 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         },
         representation=representation_out(config, nif),
         synced_at=config.synced_at,
-        route_ready=not route_problem(config, config.environment),
-        reasons=[wait(code) for code in blockers(config, config.environment)],
+        route_ready=not route_problem(config, config.environment, ctx.scope),
+        reasons=[wait(code) for code in blockers(config, config.environment, ctx.scope)],
         issue_blocker=wait(refused) if refused else None,
         live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
     )
@@ -603,7 +611,7 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         csv=record.csv,
         aeat_code=record.aeat_code,
         aeat_message=record.aeat_message,
-        waiting=waiting_of(record, config),
+        waiting=waiting_of(record, config, ctx.scope),
         can_transmit=record.status in Record.UNSENT,
         can_correct=can_correct(record),
         can_cancel=can_cancel(record),

@@ -413,12 +413,12 @@ def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_)
 
 def test_erplora_route_in_production_needs_approval_and_the_paid_option(server_ready):
     config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.route_problem(config, "production") == "live_option_unpaid"
+    assert queries.route_problem(config, "production", A) == "live_option_unpaid"
     config.live_paid = True
-    assert queries.route_problem(config, "production") == ""
+    assert queries.route_problem(config, "production", A) == ""
     config.representation_status = "submitted"
-    assert queries.route_problem(config, "production") == "representation_not_approved"
-    assert queries.route_problem(config, "testing") == ""
+    assert queries.route_problem(config, "production", A) == "representation_not_approved"
+    assert queries.route_problem(config, "testing", A) == ""
 
 
 def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
@@ -427,12 +427,12 @@ def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
     # The live option keeps new sales from being sealed (route_problem); what was sealed goes to the AEAT while
     # the route can carry it (every ticket with a QR reaches the AEAT).
     config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.sending_problem(config, "production") == ""
+    assert queries.sending_problem(config, "production", A) == ""
     config.representation_status = "revoked"
-    assert queries.sending_problem(config, "production") == "representation_not_approved"
-    assert queries.sending_problem(config, "testing") == ""
+    assert queries.sending_problem(config, "production", A) == "representation_not_approved"
+    assert queries.sending_problem(config, "testing", A) == ""
     config.route = "own"
-    assert queries.sending_problem(config, "testing") == "own_certificate_missing"
+    assert queries.sending_problem(config, "testing", A) == "own_certificate_missing"
 
 
 def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
@@ -463,13 +463,13 @@ def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
     # certificate, so neither ERPlora's approval nor the live option of the plan applies (Ioan's model,
     # 2026-10-15: «con certificado propio, como en el Hub antiguo»).
     config = Config(route="own", live_paid=False)
-    assert queries.route_problem(config, "production") == "own_certificate_missing"
+    assert queries.route_problem(config, "production", A) == "own_certificate_missing"
     own_certificate(days=-1)
-    assert queries.route_problem(config, "production") == "own_certificate_missing"
+    assert queries.route_problem(config, "production", A) == "own_certificate_missing"
     OwnCertificate.objects.all().delete()
     own_certificate()
-    assert queries.route_problem(config, "production") == ""
-    assert queries.route_problem(config, "testing") == ""
+    assert queries.route_problem(config, "production", A) == ""
+    assert queries.route_problem(config, "testing", A) == ""
 
 
 def test_the_configuration_lists_everything_that_keeps_it_from_going_live(
