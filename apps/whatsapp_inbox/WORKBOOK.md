@@ -2,14 +2,14 @@
 Prefijo: WHATSAPP_INBOX
 Alcance MVP: transversal
 Estado de la app: hecha en el Hub (servidor y páginas), también las plantillas, que se crean, editan y
-borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se desconecta desde Ajustes. Lo que
-entra de erplora.com y lo que sale hacia él está declarado y probado en el Hub, y el Hub ya tiene montadas
-las puertas por las que erplora.com le habla. erplora.com tiene su mitad desde saas#63 (2026-10-21: recibir
-de Meta, enviar, olvidar un número, registrar plantillas y conectar el número), pero los flujos que cruzan
-con erplora.com siguen en parcial hasta probarlos de punta a punta contra él; conectar espera además la
-página de erplora.com a la que Meta devuelve su código (F01). Las respuestas automáticas que reservan cita
-o mesa por WhatsApp (F14–F26) están escritas y esperan al asistente del Hub y a que Automatizaciones pueda
-mandar un mensaje a un cliente.
+borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se desconecta desde Ajustes. erplora.com
+tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están probados de punta a punta contra
+el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
+la opción tocada, contestar, enviar una plantilla, editarla y borrarla, y olvidar un número. Quedan en parcial
+conectar el número (falta la página de erplora.com a la que Meta devuelve su código, F01 y F02), ver fotos y
+audio en el hilo (F06), llegar al tope del mes (F13), la lista de plantillas de Meta (F27, F28) y la cabecera
+con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
+esperan al asistente del Hub y a que Automatizaciones pueda mandar un mensaje a un cliente.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -155,17 +155,17 @@ categoría de una plantilla que ha rechazado.»).
 |---|---|---|---|
 | WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la ventana de Meta aún no puede devolver su código: falta la página de vuelta de erplora.com y que el Hub no corte las ventanas que abre | comun |
 | WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | parcial — desconectar está hecho; volver a conectar abre la ventana de F01, que aún no puede devolver su código | comun |
-| WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | parcial — falta la entrada desde erplora.com | comun |
+| WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | hecho | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
 | WHATSAPP_INBOX-F05 | Leer una conversación | hecho | comun |
-| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial — se abre en una pestaña; sin vista previa en el hilo | comun |
+| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; el hilo no enseña la foto ni reproduce el audio hasta que la política de seguridad del Hub permita el origen de erplora.com (en curso, aún no publicada) | comun |
 | WHATSAPP_INBOX-F07 | Asignar una conversación a alguien del equipo | hecho | comun |
-| WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | parcial — falta la entrada desde erplora.com | comun |
+| WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | hecho | comun |
 | WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho (filtro y recuento; la campana del Hub llegará con la barra superior) | comun |
-| WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | parcial — erplora.com aún no olvida el número | comun |
-| WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | parcial — erplora.com aún no olvida el número | comun |
+| WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | hecho | comun |
+| WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | hecho | comun |
 | WHATSAPP_INBOX-F12 | Unir dos fichas de la misma clienta | hecho | comun |
-| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | parcial — las cifras del mes aún no llegan de erplora.com | comun |
+| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | parcial — el Hub enseña las cifras del mes que manda erplora.com y frena el envío en el tope, pero llegar al tope no se ha visto de punta a punta: erplora.com solo cuenta lo que Meta acepta, y su número de pruebas lleva un permiso inventado que Meta rechaza | comun |
 | WHATSAPP_INBOX-F14 | Activar «Reservar citas» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe la clienta), y su aviso de cita confirmada necesita que Automatizaciones pueda mandar un mensaje a un cliente (FLOW-F31) | peluqueria |
 | WHATSAPP_INBOX-F15 | Activar «Reservar mesa» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe el cliente) | restaurante |
 | WHATSAPP_INBOX-F16 | Decidir si las reservas por WhatsApp se confirman solas | parcial — el interruptor va en la tarjeta de F14 o F15, que todavía no aparece; mientras, la misma decisión se toma en Citas («Ajustar las reglas de reserva») y en Reservas («Elegir si las reservas se confirman solas») | comun |
@@ -173,24 +173,24 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F18 | Actualizar una respuesta automática a su versión mejorada | parcial — sin las tarjetas de F14 y F15, que todavía no aparecen, no hay respuesta automática que actualizar | comun |
 | WHATSAPP_INBOX-F19 | Elegir el hueco escribiendo en vez de tocando | parcial — los huecos los ofrece la respuesta automática de F21 o F24, que necesita el asistente, que aún no está en el Hub | comun |
 | WHATSAPP_INBOX-F20 | Cuando el asistente no puede contestar | parcial — la disculpa y la marca las pone la respuesta automática de F21 o F24, que necesita el asistente, que aún no está en el Hub; hoy el mensaje espera en la bandeja como sin leer (F09) | comun |
-| WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | parcial — el asistente, que lee el mensaje, busca el hueco y redacta la respuesta, todavía no está en el Hub, y erplora.com aún no envía a Meta; hoy el mensaje se contesta a mano desde la bandeja | peluqueria |
-| WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | parcial — el asistente, que entiende qué pide y busca su cita, todavía no está en el Hub, y erplora.com aún no envía a Meta; hoy se anula o se mueve a mano desde la Agenda | peluqueria |
-| WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31) y erplora.com aún no envía a Meta: la clienta no recibe el aviso | peluqueria |
-| WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | parcial — el asistente, que lee el mensaje, busca sitio y redacta la respuesta, todavía no está en el Hub, y erplora.com aún no envía a Meta; hoy la reserva se toma a mano en Reservas | restaurante |
-| WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub, y erplora.com aún no envía a Meta; hoy se cambia o se anula a mano en Reservas | restaurante |
-| WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31) y erplora.com aún no envía a Meta: el cliente no recibe el aviso | restaurante |
-| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | parcial — la lista de Meta aún no llega de erplora.com | comun |
-| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | parcial — la lista de Meta aún no llega de erplora.com | comun |
-| WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — erplora.com aún no la registra en Meta; sin cabecera con archivo | comun |
-| WHATSAPP_INBOX-F30 | Editar una plantilla | parcial — erplora.com aún no registra el cambio en Meta | comun |
-| WHATSAPP_INBOX-F31 | Borrar una plantilla | parcial — erplora.com aún no la borra en Meta | comun |
-| WHATSAPP_INBOX-F32 | Contestar desde la bandeja | parcial — erplora.com aún no envía a Meta | comun |
-| WHATSAPP_INBOX-F33 | Enviar una plantilla | parcial — erplora.com aún no envía a Meta | comun |
-| WHATSAPP_INBOX-F34 | Saber si un mensaje llegó y se leyó | parcial — los estados de Meta aún no llegan de erplora.com | comun |
+| WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | parcial — el asistente, que lee el mensaje, busca el hueco y redacta la respuesta, todavía no está en el Hub; hoy el mensaje se contesta a mano desde la bandeja | peluqueria |
+| WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | parcial — el asistente, que entiende qué pide y busca su cita, todavía no está en el Hub; hoy se anula o se mueve a mano desde la Agenda | peluqueria |
+| WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): la clienta no recibe el aviso | peluqueria |
+| WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | parcial — el asistente, que lee el mensaje, busca sitio y redacta la respuesta, todavía no está en el Hub; hoy la reserva se toma a mano en Reservas | restaurante |
+| WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub; hoy se cambia o se anula a mano en Reservas | restaurante |
+| WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): el cliente no recibe el aviso | restaurante |
+| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | parcial — la tabla enseña lo que el Hub sabe y cambia sola; la lista que llega de erplora.com no se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del número, y el de su número de pruebas es inventado | comun |
+| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | parcial — el Hub guarda lo que le llega; la lista que llega de erplora.com no se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del número, y el de su número de pruebas es inventado | comun |
+| WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se hace en WhatsApp Manager) | comun |
+| WHATSAPP_INBOX-F30 | Editar una plantilla | hecho | comun |
+| WHATSAPP_INBOX-F31 | Borrar una plantilla | hecho | comun |
+| WHATSAPP_INBOX-F32 | Contestar desde la bandeja | hecho | comun |
+| WHATSAPP_INBOX-F33 | Enviar una plantilla | hecho | comun |
+| WHATSAPP_INBOX-F34 | Saber si un mensaje llegó y se leyó | hecho | comun |
 | WHATSAPP_INBOX-F35 | Cambiar el estado de una conversación | hecho | comun |
 | WHATSAPP_INBOX-F36 | Dejar una nota interna | hecho | comun |
 | WHATSAPP_INBOX-F37 | Unir la conversación a una ficha o crear la ficha | hecho | comun |
-| WHATSAPP_INBOX-F38 | Saber a qué pregunta contesta lo que toca la clienta | parcial — falta la entrada desde erplora.com | comun |
+| WHATSAPP_INBOX-F38 | Saber a qué pregunta contesta lo que toca la clienta | hecho | comun |
 
 ### WHATSAPP_INBOX-F01 Conectar el número de WhatsApp del negocio
 <!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
@@ -246,8 +246,7 @@ Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F07 old-saas:SAAS_WHATSAPP_INBOX-F10 fi:modules/whatsapp_inbox#command-sql-multi-stmt-whatsapp_inbox-messages-ingest old-hub:HUB-F263 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f03 wf:whatsapp-cita#rec_wa_cita-f02 wf:whatsapp-mesa#rec_wa_mesa-f02 -->
-Estado: parcial — el Hub ya recibe por su puerta lo que le entrega erplora.com, lo guarda y lo enseña al
-momento; falta el lado de erplora.com que lo recibe de Meta y se lo pasa
+Estado: hecho
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
 Pasos:
@@ -309,9 +308,9 @@ Implicados: Clientes (el nombre de la ficha)
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F15 old-hub:HUB-F267 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f06 -->
-Estado: parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; el hilo no enseña
-la foto ni reproduce el audio (falta permitir el origen de erplora.com en la política de seguridad del
-Hub), y nadie ha visto todavía una nota de voz o un documento reales de punta a punta
+Estado: parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; el hilo no enseña la
+foto ni reproduce el audio hasta que la política de seguridad del Hub permita el origen de erplora.com
+(en curso, aún no publicada)
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -343,8 +342,7 @@ Implicados: el equipo del negocio (las personas con acceso a la bandeja)
 
 ### WHATSAPP_INBOX-F08 Contestar desde la app de WhatsApp Business del móvil
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F08 old-hub:HUB-F264 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f08 -->
-Estado: parcial — el Hub ya recibe por su puerta el eco del móvil y lo guarda como mensaje del negocio;
-falta el lado de erplora.com que lo recibe de Meta y se lo pasa
+Estado: hecho
 Actor: propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -373,9 +371,7 @@ Implicados: la campana de la barra superior (cuando exista)
 
 ### WHATSAPP_INBOX-F10 Borrar los datos de un número sin ficha
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F21 old-hub:HUB-F251 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f10 -->
-Estado: parcial — el Hub lo borra todo al momento y pide a erplora.com que olvide el número; la mitad
-de erplora.com que lo olvida todavía no existe, así que el Hub guarda el número aparte solo para
-volver a pedírselo
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Bandeja de entrada
 Pasos:
@@ -397,8 +393,7 @@ Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F11 Borrar los datos de una clienta desde su ficha
 <!-- origen: old-hub:HUB-F250 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f11 -->
-Estado: parcial — el borrado llega desde Clientes y vacía sus conversaciones como en F10; la mitad de
-erplora.com que olvida el número todavía no existe
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se borra desde la ficha, en Clientes)
 Pasos:
@@ -424,8 +419,9 @@ Implicados: Clientes
 
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
 <!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
-Estado: parcial — el Hub enseña el consumo y frena el envío en el tope, pero las cifras del mes las
-cuenta y las manda erplora.com, que todavía no lo hace (la puerta del Hub por la que llegan ya está)
+Estado: parcial — el Hub enseña las cifras del mes que manda erplora.com y frena el envío en el tope,
+pero llegar al tope no se ha visto de punta a punta: erplora.com solo cuenta lo que Meta acepta, y su
+número de pruebas lleva un permiso inventado que Meta rechaza
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
 Pasos:
@@ -596,7 +592,7 @@ Implicados: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F21, WHATSAPP
 ### WHATSAPP_INBOX-F21 La clienta pide cita por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f21 -->
 Estado: parcial — el asistente, que lee el mensaje, busca el hueco y redacta la respuesta, todavía no está
-en el Hub, y erplora.com aún no envía a Meta; hoy el mensaje se contesta a mano desde la bandeja
+en el Hub; hoy el mensaje se contesta a mano desde la bandeja
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -621,8 +617,7 @@ WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 La clienta anula o mueve su cita por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f22 -->
-Estado: parcial — el asistente, que entiende qué pide y busca su cita, todavía no está en el Hub, y
-erplora.com aún no envía a Meta; hoy se anula o se mueve a mano desde la Agenda
+Estado: parcial — el asistente, que entiende qué pide y busca su cita, todavía no está en el Hub; hoy se anula o se mueve a mano desde la Agenda
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -641,8 +636,7 @@ Implicados: APPOINTMENT-F04, APPOINTMENT-F06, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F23 La clienta recibe el aviso cuando el salón confirma
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f23 -->
-Estado: parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31) y erplora.com
-aún no envía a Meta: la clienta no recibe el aviso
+Estado: parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): la clienta no recibe el aviso
 Actor: responsable, cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -666,7 +660,7 @@ Implicados: APPOINTMENT-F03, APPOINTMENT-F18, CUSTOMER-F11, FLOW-F31, WHATSAPP_I
 ### WHATSAPP_INBOX-F24 El cliente pide mesa por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f24 -->
 Estado: parcial — el asistente, que lee el mensaje, busca sitio y redacta la respuesta, todavía no está en
-el Hub, y erplora.com aún no envía a Meta; hoy la reserva se toma a mano en Reservas
+el Hub; hoy la reserva se toma a mano en Reservas
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -692,8 +686,7 @@ WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F25 El cliente anula o cambia su mesa por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f25 -->
-Estado: parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub, y
-erplora.com aún no envía a Meta; hoy se cambia o se anula a mano en Reservas
+Estado: parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub; hoy se cambia o se anula a mano en Reservas
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -708,8 +701,7 @@ Implicados: RESERVATION-F09, RESERVATION-F18, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F26 El cliente recibe el aviso cuando el restaurante confirma
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f26 -->
-Estado: parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31) y erplora.com
-aún no envía a Meta: el cliente no recibe el aviso
+Estado: parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): el cliente no recibe el aviso
 Actor: responsable, cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -726,8 +718,9 @@ Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, WHATSAPP_INBOX-F15, WHAT
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
-Estado: parcial — la tabla enseña lo que el Hub sabe y cambia sola; el veredicto de Meta lo trae
-erplora.com, que todavía no lo manda (la puerta del Hub por la que llega ya está)
+Estado: parcial — la tabla enseña lo que el Hub sabe y cambia sola; la lista que llega de erplora.com no
+se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el
+permiso del número, y el de su número de pruebas es inventado
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -742,8 +735,9 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
-Estado: parcial — el Hub guarda lo que le llega; la lista la manda erplora.com, que todavía no lo hace
-(la puerta del Hub por la que llega ya está)
+Estado: parcial — el Hub guarda lo que le llega; la lista que llega de erplora.com no se ha visto
+todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del
+número, y el de su número de pruebas es inventado
 Actor: sistema
 Pantalla: Ajustes
 Pasos:
@@ -760,9 +754,8 @@ Implicados: erplora.com, WhatsApp Manager
 
 ### WHATSAPP_INBOX-F29 Crear una plantilla y mandarla a revisión
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f29 -->
-Estado: parcial — el Hub la guarda, la valida con las reglas de Meta y la entrega a erplora.com; falta
-la mitad de erplora.com que la registra en Meta, y la cabecera con foto, vídeo o documento no se ofrece
-(el Hub no guarda archivos: se hace en WhatsApp Manager)
+Estado: parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se
+hace en WhatsApp Manager)
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
 Pasos:
@@ -790,8 +783,7 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F30 Editar una plantilla
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f30 -->
-Estado: parcial — el Hub guarda el cambio y lo entrega a erplora.com; falta la mitad de erplora.com que
-lo registra en Meta
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
 Pasos:
@@ -815,8 +807,7 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F31 Borrar una plantilla
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f31 -->
-Estado: parcial — el Hub la retira al momento y pide a erplora.com que la borre en Meta; falta la mitad
-de erplora.com que la borra
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -836,8 +827,7 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F32 Contestar desde la bandeja
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F12 old-hub:HUB-F266 -->
-Estado: parcial — el Hub guarda, entrega y reintenta con la misma clave (probado contra el contrato);
-falta la puerta de erplora.com que lo envía a Meta
+Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -859,8 +849,7 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Enviar una plantilla
 <!-- origen: old-hub:HUB-F266 -->
-Estado: parcial — el Hub guarda, entrega y reintenta como en F32; falta la puerta de erplora.com que lo
-envía a Meta
+Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -883,8 +872,7 @@ Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F09 -->
-Estado: parcial — el Hub ya recibe por su puerta cada estado, lo guarda y lo enseña; falta el lado de
-erplora.com que los recibe de Meta y se los pasa
+Estado: hecho
 Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
@@ -944,8 +932,7 @@ Implicados: Clientes
 
 ### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
 <!-- origen: old-hub:HUB-F265 -->
-Estado: parcial — el Hub recibe por su puerta la opción que toca, la guarda y dice en el aviso a qué
-mensaje suyo contesta; falta el lado de erplora.com que la recibe de Meta y se la pasa
+Estado: hecho
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
 Pasos:
@@ -1202,8 +1189,8 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
 
 **Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema). Están
 montadas desde hub#127 (`base/internal.py`), probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP
-firmado con la bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; lo que falta es que erplora.com
-las llame:
+firmado con la bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama desde saas#63,
+probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
 
 1. `POST /internal/whatsapp/inbound` → `whatsapp_inbox.message.receive`. Un mensaje del cliente o el eco
    de lo que el dueño escribió en el móvil, en vivo o del historial:
@@ -1395,8 +1382,8 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 F14–F26 son recetas de fábrica de esta app sobre el registro de Automatizaciones (`apps/flow/recipes.py`,
 FLOW-F33 a F36), y las tarjetas de **Ajustes → ¿Para qué lo usas?** las encienden, pausan y restauran por
 sus operaciones (`flow.recipe.list`, `flow.recipe.enable`, `flow.recipe.disable`, `flow.recipe.restore`):
-esta app no lleva recetas propias en su base de datos. Hoy no se puede declarar ninguna, por tres piezas
-que no están en `main` (2026-10-21):
+esta app no lleva recetas propias en su base de datos. Hoy no se puede declarar ninguna, por dos piezas
+que no están en `main` (2026-10-21; la tercera, la puerta de envío de erplora.com, existe desde saas#63):
 
 1. **El asistente en el Hub**: ni la app `assistant` ni un paso de Automatizaciones que lo ejecute con
    herramientas (las operaciones con `ai=`). Las automatizaciones solo tienen pasos `command`, `query`,
@@ -1406,8 +1393,6 @@ que no están en `main` (2026-10-21):
    alto (`ai.risk = "high"`) y una automatización no lo puede usar. Lo piden los avisos de F23 y F26 y toda
    respuesta de F21–F25; FLOW-F31 lo quiere con plantilla aprobada, que es lo que deja Meta fuera de las 24 h
    (el aviso de texto libre del producto actual se perdía ahí).
-3. **La puerta de envío de erplora.com** (`POST /internal/whatsapp/send`, puerta 5): lo que se mande queda
-   «No enviado» hasta que exista.
 
 Cómo encaja cuando lleguen: `apps/whatsapp_inbox/recipes.py` declara «WhatsApp → cita reservada» y su
 acompañante «Cita confirmada → WhatsApp» (disparada por `appointment.appointment.confirmed`; la conversación,

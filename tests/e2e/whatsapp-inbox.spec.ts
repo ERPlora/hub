@@ -145,7 +145,11 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   });
   await templates.locator('[data-testid=whatsapp-inbox-template-form-submit]').click();
   await expect(templates).toBeHidden();
-  await expect(bubbles(page, 'outbound').filter({ hasText: 'e2e_recordatorio' })).toBeVisible();
+  // Handed to erplora.com (door 5) like a reply: Meta refuses the seed's permission, «Not delivered» with the reason.
+  const sentTemplate = bubbles(page, 'outbound').filter({ hasText: 'e2e_recordatorio' });
+  await expect(sentTemplate).toBeVisible();
+  await expect(sentTemplate.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered', { timeout: 30_000 });
+  await expect(sentTemplate.locator('.wa-bubble__error')).toContainText("Meta's reason:");
 
   // F36: an internal note, in the thread.
   await panel(page).locator('[data-testid=whatsapp-inbox-composer-mode-note]').click();
