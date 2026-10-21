@@ -1,7 +1,7 @@
 # Workbook — Carrito y pago (app)
 Prefijo: CART_CHECKOUT
 Alcance MVP: fuera del MVP (en la tienda; no viene en ninguna plantilla)
-Estado de la app: hecha (servidor, pantallas y pruebas de punta a punta en tres tamaños)
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `cart_checkout`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -343,9 +343,10 @@ Entra: el cambio que lo provoca.
 Sale: trece avisos: los doce del producto actual (`cart.created`, `cart.abandoned`, `cart.deleted`,
 `cart.cleared`, `cart.expired`, `item.added`, `item.updated`, `item.removed`, `checkout.initiated`,
 `order.paid`, `order.failed`, `order.completed`) y `customer.erased`, con el prefijo `cart_checkout.`.
-Ninguna app del Hub los escucha.
+Solo los escucha Automatizaciones, que puede arrancar una automatización con cualquiera de ellos; ninguna
+otra app del Hub los escucha.
 Si falla: un cambio rechazado no deja ni el cambio ni el aviso.
-Implicados: ninguno (ninguna app del Hub escucha estos avisos)
+Implicados: FLOW-F21 (Automatizaciones arranca con cualquier aviso del negocio)
 
 ### CART_CHECKOUT-F14 Borrar los datos personales de un cliente
 <!-- origen: nuevo (el borrado de datos personales de Shopify y WooCommerce, «erase personal data»: el derecho de supresión del RGPD) -->
@@ -428,6 +429,25 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   ampliar el alcance: queda fuera.
 - La descripción del asistente dice expresamente que **no es el TPV** y que no cobra: el producto
   actual se describía como «mark payments» y podía elegirse ante «registra el cobro» en vez de Ventas.
+
+### Decisiones al cerrar la app (2026-10-21)
+
+- **Varios pedidos por carrito, a propósito** (cart_checkout#10 pedía uno solo): mientras el carrito
+  está activo se puede iniciar otro pedido, con el número siguiente y el total de ese momento
+  (CART_CHECKOUT-F08). Completar uno convierte el carrito (F11) y, desde entonces, ya no inicia más.
+- **El canal online hacia Ventas sigue aplazado** (cart_checkout#12, el paraguas «el pedido desemboca
+  en una venta»): sin tienda, sin pasarela y sin venta ni factura (ver «Lo que NO hace»). Si vuelve,
+  es una ampliación con su propio flujo, no un arreglo de esta app.
+- **Contradicción señalada con ADR-0380**: el producto actual **retiró** la app de su catálogo
+  (`retired`: cerrada la oferta, no el suministro) porque «Pagado» es una marca a mano que deja el
+  pedido fuera de la cadena fiscal y porque su backlog se había quedado en el paraguas de
+  cart_checkout#12. Aquí sigue `listed = True`, en la Tienda. No se cambia al cerrar: queda escrita en la
+  ronda 2026-10-21 (CLOSE-CART_CHECKOUT) de `PLAN-HUB.md` para decidirla aparte.
+- **ADR del producto actual**: vigentes 0123 (dinero en céntimos enteros, validado en la entrada) y
+  0125 (los filtros de texto buscan por un trozo); sustituidas 0147 en la escala (cantidades `Decimal`
+  con tres decimales, no enteros con escala 10⁶), 0034 (fechas `timestamptz`, no milisegundos) y 0101
+  (migraciones de Django y el migrador del Hub, no el manifiesto); 0141 no aplica (el pedido de esta app
+  no es la cuenta de Ventas).
 
 ### Cómo está hecho
 
@@ -545,9 +565,9 @@ Tests:
   minutos corre en la fase 1 sobre el ámbito del worker, así que una lista abierta en el negocio no se
   entera hasta el siguiente cambio, hasta que se vuelve a abrir o hasta la relectura de 5 minutos. Con la
   tenencia de la fase 2 la tarea corre en cada hub y avisa a los suyos.
-- **La entrega de avisos entre apps** (CART_CHECKOUT-F13): salen al outbox en la misma transacción y
-  ninguna app los escucha, así que no hay nada que entregar.
-- **Iconos propios** (`ion:bag-check-outline` del producto actual): pedidos en `UI-REQUESTS.md`.
+- **Iconos propios** (`ion:bag-check-outline` y `ion:checkmark-done-outline` del producto actual) y las
+  **piezas compartidas** que la app lleva copiadas (tabla de servidor viva, lector de importes): pedidos
+  en `UI-REQUESTS.md`, sin llegar a `@erplora/ui` al cerrar la app.
 
 ## Lo que NO hace, a propósito
 
