@@ -96,8 +96,16 @@ async function drawnWord(dish: Locator, word: string): Promise<{ lines: number; 
   }, word);
 }
 
-test.beforeAll(async ({ browser }) => {
+/** What any run left behind, before this one: its tickets, and also its checks — a round Sales fired and the kitchen
+ *  holds no ticket of comes back on the display as «not saved yet», with the same dish names as this run's. */
+function cleanUp(): void {
   cleanRun();
+  cleanSales();
+  cleanInventory();
+}
+
+test.beforeAll(async ({ browser }) => {
+  cleanUp();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
@@ -122,9 +130,7 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(() => {
-  cleanRun();
-  cleanSales();
-  cleanInventory();
+  cleanUp();
   restoreDrawer();
 });
 
