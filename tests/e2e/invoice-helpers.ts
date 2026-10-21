@@ -6,7 +6,26 @@
 // (`E2E…` codes) or the ids it recorded.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, psql } from './helpers';
+import { A, api, psql, shot } from './helpers';
+
+/** The three sizes of a flow's evidence (the migration's: 390×844, 834×1112, 1440×900). */
+export const FLOW_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** The page in the three sizes, as `APP-INVOICE-<flow>-<size>` in `.artifacts`, each once `ready` says it painted;
+ *  the size the spec had comes back after. */
+export async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void>): Promise<void> {
+  const restore = page.viewportSize() ?? { width: 1280, height: 860 };
+  for (const viewport of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(page);
+    await page.screenshot({ path: shot(`APP-INVOICE-${flow}-${viewport.label}`) });
+  }
+  await page.setViewportSize(restore);
+}
 
 /** The dialog `testid` that is open now: Ionic keeps each page of the stack mounted, with its own (hidden)
  *  copy of the same dialog. */

@@ -14,8 +14,8 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, api, login, shot, shown } from './helpers';
 import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanInvoices, deliver, ensureIssuer, invoiceOf, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, newestSaleOf, shots, stamp } from './sale-helpers';
+import { cleanInvoices, deliver, ensureIssuer, flowShots, invoiceOf, snapshotSeries } from './invoice-helpers';
+import { chargeByApi, cleanSales, newestSaleOf, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let shampoo: Product;
@@ -107,7 +107,7 @@ test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full in
   const row = shown(page).locator('[data-testid=invoice-list-row]', { hasText: invoice.number }).first();
   await expect(row).toContainText(/12[.,]10/);
   await expect(row.locator('[data-testid=invoice-list-status]')).toHaveText('Paid');
-  await shots(page, 'invoice-list', async (p) => {
+  await flowShots(page, 'INVOICE-F02', async (p) => {
     await expect(shown(p).locator('[data-testid=invoice-list-row]', { hasText: invoice.number }).first()).toBeVisible();
   });
 
@@ -120,8 +120,13 @@ test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full in
   await expect(detail.locator('[data-testid=invoice-detail-source]')).toHaveText('POS sale');
   await expect(detail.locator('[data-testid=invoice-detail-sale]')).toHaveText(sale.number);
   await expect(detail.locator('[data-testid=invoice-detail-total]')).toContainText(/12[.,]10/);
-  await shots(page, 'invoice-detail', async (p) => {
-    await expect(shown(p).locator('[data-testid=invoice-detail-title]')).toBeVisible();
+  // Its VeriFactu receipt (VERIFACTU-F19): the record sealed with it, its state at the AEAT and its QR.
+  const sealed = await api<{ record: { qr_url: string; status: string } | null }>(context, A, 'GET', `/verifactu/records/by_invoice?invoice_id=${invoice.id}`);
+  expect(sealed.data.record, 'the invoice was sealed in VeriFactu').not.toBeNull();
+  await expect(detail.locator('[data-testid=invoice-verifactu]')).toBeVisible();
+  await expect(detail.locator('[data-testid=invoice-verifactu-check]')).toHaveAttribute('href', sealed.data.record!.qr_url);
+  await flowShots(page, 'INVOICE-F17', async (p) => {
+    await expect(shown(p).locator('[data-testid=invoice-verifactu]')).toBeVisible();
   });
 
   // «Print / PDF»: with no system printer in the queue, the browser's dialog prints the A4 paper alone
@@ -140,6 +145,12 @@ test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full in
   expect(printed[0]).toContain(invoice.number);
   expect(printed[0]).toContain(`e2e Talleres ${RUN}`);
   expect(printed[0]).toContain('Copy');
+  // The screen's paper carries the record's QR, in the AEAT's words: never without it.
+  expect(printed[0]).toContain('QR tributario:');
+  expect(printed[0]).toContain('VERI*FACTU');
+  await flowShots(page, 'INVOICE-F18', async (p) => {
+    await expect(shown(p).locator('[data-testid=invoice-detail-print]')).toBeVisible();
+  });
 });
 
 test('INVOICE-F01 and F09: a ticket refunded whole in Sales gets its rectifying invoice R5 and is cancelled', async ({ page, context }) => {
@@ -170,7 +181,7 @@ test('INVOICE-F01 and F09: a ticket refunded whole in Sales gets its rectifying 
   await page.waitForURL(new RegExp(`/invoice/invoices/${ticket.id}$`));
   await expect(shown(page).locator('[data-testid=invoice-detail-status]')).toHaveText('Cancelled');
   await expect(shown(page).locator('[data-testid=invoice-detail-rectify]')).toHaveCount(0);
-  await shots(page, 'invoice-cancelled-ticket', async (p) => {
+  await flowShots(page, 'INVOICE-F09', async (p) => {
     await expect(shown(p).locator('[data-testid=invoice-detail-status]')).toHaveText('Cancelled');
   });
 });

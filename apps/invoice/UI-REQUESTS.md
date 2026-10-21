@@ -32,3 +32,11 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
 - **Qué**: `printPaper(element)` (copia del papel en un contenedor del `body`, `window.print()`, se quita en
   `afterprint`) en `@erplora/ui`, para no depender de Ventas.
 - **Hoy**: la ficha importa `apps/sale/frontend/lib/print.ts` (Ventas es requisito de Facturación).
+
+## Seguir el registro VeriFactu de un documento
+
+- **Qué**: un componente sin pantalla que sigue en vivo el registro VeriFactu de un documento
+  (`verifactu.record.by_invoice`) y entrega su estado y su QR, para la ficha de la factura y el documento
+  de venta (INVOICE-F17, F18; VERIFACTU-F19).
+- **Hoy**: la ficha importa `apps/sale/frontend/components/document/FiscalRecordFollower.vue` (Ventas es
+  requisito de Facturación). Se cambia la importación cuando llegue.

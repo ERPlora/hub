@@ -8,15 +8,19 @@
 // invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» asks the
 // printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
 // it; not queued (Printing off, no system printer) or the queue out of reach, the browser prints the A4
-// paper (a document of a sale is a copy: its original was the till's paper). It follows
+// paper (a document of a sale is a copy: its original was the till's paper). With VeriFactu on and its records
+// readable, it follows the invoice's record too (`verifactu.record.by_invoice`, VERIFACTU-F19, by name: Invoicing
+// does not require VeriFactu): the «VeriFactu receipt» card under the invoice and the record's QR on the screen's
+// paper, which waits for it and is never printed without it (a record it cannot read prints nothing). It follows
 // `invoice.invoice.get` live: a payment or a rectification made elsewhere shows by itself.
 import { formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, shallowRef } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import FiscalRecordFollower, { type FiscalRecordState } from '../../../sale/frontend/components/document/FiscalRecordFollower.vue';
 import { printPaper } from '../../../sale/frontend/lib/print';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
@@ -24,6 +28,7 @@ import InvoiceTotals from '../components/InvoiceTotals.vue';
 import PageNotices from '../components/PageNotices.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import SubstituteModal from '../components/SubstituteModal.vue';
+import VerifactuReceipt from '../components/VerifactuReceipt.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/format';
@@ -84,6 +89,21 @@ const links = computed(() => {
 });
 
 const note = computed(() => (invoice.value ? documentNote(invoice.value, t) : ''));
+
+/** VeriFactu on in this business and the right to read its records. */
+const verifactuOn = computed(
+  () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
+);
+/** The invoice whose record is followed, from the start (one stream with the invoice); none without VeriFactu. */
+const recordOf = computed(() => (verifactuOn.value ? props.id : null));
+const fiscal = shallowRef<FiscalRecordState>({ record: undefined, error: null });
+watch(recordOf, () => {
+  fiscal.value = { record: undefined, error: null };
+});
+/** Its record (its receipt and the paper's QR); none without VeriFactu or before VeriFactu has one. */
+const record = computed(() => (recordOf.value ? (fiscal.value.record ?? null) : null));
+/** The screen's paper waits for the record it must carry. */
+const waitingRecord = computed(() => !!recordOf.value && fiscal.value.record === undefined && !fiscal.value.error);
 /** A document of a sale, a refund or a void: its original was the till's paper. */
 const duplicate = computed(() => ['sale', 'refund', 'void'].includes(invoice.value?.source_type ?? ''));
 
@@ -116,6 +136,11 @@ async function print(): Promise<void> {
   } finally {
     sending.value = false;
   }
+  // The screen's paper never goes out without the QR of a record it could not read.
+  if (recordOf.value && fiscal.value.error) {
+    void toastError(t('invoice.detail.printFailed'));
+    return;
+  }
   try {
     printPaper(element);
   } catch {
@@ -138,6 +163,12 @@ function onSubstituted(full: InvoiceOut): void {
       testid="invoice-detail"
       :status="status"
       :error="error"
+    />
+    <FiscalRecordFollower
+      v-if="recordOf"
+      :key="recordOf"
+      :invoice-id="recordOf"
+      @change="fiscal = $event"
     />
     <InlineFeedback
       v-if="loadError"
@@ -168,7 +199,7 @@ function onSubstituted(full: InvoiceOut): void {
         </div>
         <div class="invoice-detail__header-actions">
           <ion-button
-            :disabled="sending"
+            :disabled="sending || waitingRecord"
             data-testid="invoice-detail-print"
             @click="print"
           >
@@ -279,6 +310,11 @@ function onSubstituted(full: InvoiceOut): void {
         </div>
       </section>
 
+      <VerifactuReceipt
+        v-if="record"
+        :record="record"
+      />
+
       <div
         class="invoice-detail__paper"
         hidden
@@ -287,6 +323,7 @@ function onSubstituted(full: InvoiceOut): void {
           ref="paper"
           :invoice="invoice"
           :duplicate="duplicate"
+          :record="record"
         />
       </div>
     </template>

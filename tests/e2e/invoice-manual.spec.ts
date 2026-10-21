@@ -1,5 +1,7 @@
 // Invoicing in Chrome, by hand (apps/invoice/WORKBOOK.md), against the real Sales, Customers and Taxes:
-//   - INVOICE-F21: the owner saves the business's issuer on its page;
+//   - INVOICE-F21: without the issuer, Invoices says nothing can be invoiced; «Set up» opens the issuer page,
+//     the owner saves it and the notice goes;
+//   - INVOICE-F16: the manual invoice found in Invoices by its customer;
 //   - INVOICE-F03, F19, F08: a manual invoice from «New invoice» (the server's VAT and number), marked as
 //     paid, then rectified (R1, its reason): the original is cancelled and links its rectifying one;
 //   - INVOICE-F05: the full invoice (F3) of a ticket, in the customer's name; the ticket links it;
@@ -7,11 +9,11 @@
 // What this file creates is deleted after it, and the hub's issuer and numbering are left as found.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanInvoices, openDialog, deliver, ensureIssuer, invoiceOf, type InvoiceOut, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, shots, stamp } from './sale-helpers';
+import { cleanInvoices, openDialog, deliver, ensureIssuer, flowShots, invoiceOf, type InvoiceOut, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
+import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const ISSUER = {
@@ -53,20 +55,34 @@ async function issuedFor(page: Page, search: string): Promise<InvoiceOut> {
   return invoiceOf(page.context(), res.data.rows[0].id);
 }
 
-test('INVOICE-F21: the owner saves the issuer that every invoice carries', async ({ page, context }) => {
-  await login(page, A, '/invoice/issuer');
-  const form = shown(page);
-  await expect(form.locator('[data-testid=invoice-issuer-legal-name] input')).toBeVisible();
+test('INVOICE-F21: without the issuer Invoices says so; «Set up» opens it, the owner saves it and the notice goes', async ({ page, context }) => {
+  // No issuer: a configured one loses its address (the hub's own comes back after).
+  if (original.configured) psql("update invoice_issuer set address = ''");
   try {
+    await login(page, A, '/invoice/invoices');
+    const notice = shown(page).locator('[data-testid=invoice-issuer-notice]');
+    await expect(notice).toContainText('You cannot invoice yet');
+    await expect(notice).toContainText('No ticket or invoice can be issued until you set this up:');
+    await flowShots(page, 'INVOICE-F21-notice', async (p) => {
+      await expect(shown(p).locator('[data-testid=invoice-issuer-notice]')).toBeVisible();
+    });
+    await notice.locator('[data-testid=invoice-issuer-notice-setup]').click();
+    await page.waitForURL(/\/invoice\/issuer$/);
+    const form = shown(page);
+    await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
     for (const [hook, value] of Object.entries(ISSUER)) await form.locator(`[data-testid=invoice-issuer-${hook}] input`).fill(value);
     await form.locator('[data-testid=invoice-issuer-save]').click();
     await expect(page.locator('ion-toast').filter({ hasText: 'Issuer saved.' })).toBeVisible();
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toHaveCount(0);
     const saved = await issuerNow(context);
     expect([saved.configured, saved.legal_name, saved.tax_id, saved.address, saved.country]).toEqual([true, ISSUER['legal-name'], ISSUER['tax-id'], ISSUER.address, 'ES']);
-    await shots(page, 'invoice-issuer', async (p) => {
+    await flowShots(page, 'INVOICE-F21', async (p) => {
       await expect(shown(p).locator('[data-testid=invoice-issuer-legal-name] input')).toHaveValue(ISSUER['legal-name']);
     });
+    // Back in Invoices, the notice is gone.
+    await page.goto(`${A}/invoice/invoices`);
+    await expect(shown(page).locator('[data-testid=invoice-list-row], [data-testid=invoice-list-empty]').first()).toBeVisible();
+    await expect(shown(page).locator('[data-testid=invoice-issuer-notice]')).toHaveCount(0);
   } finally {
     // The hub's own issuer back; with none before, the run's stays for the next tests and goes at the end.
     await restoreIssuer(context, original);
@@ -91,9 +107,9 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   await dialog.locator('[data-testid=invoice-line-1-price] input').fill('50');
   await expect(dialog.locator('[data-testid=invoice-line-1-tax-rate] input')).toHaveValue('21');
   await dialog.locator('[data-testid=invoice-create-notes] input').fill(`e2e manual ${RUN}`);
-  await shots(page, 'invoice-create', async (p) => {
+  await flowShots(page, 'INVOICE-F03', async (p) => {
     await expect(openDialog(p, 'invoice-create')).toBeVisible();
-  }, { width: 1440, height: 900 });
+  });
   await dialog.locator('[data-testid=invoice-create-submit]').click();
   await expect(dialog).toBeHidden();
 
@@ -105,6 +121,9 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   const row = shown(page).locator('[data-testid=invoice-list-row]', { hasText: invoice.number }).first();
   await expect(row).toContainText(/121[.,]00/);
   await expect(row.locator('[data-testid=invoice-list-status]')).toHaveText('Issued');
+  await flowShots(page, 'INVOICE-F16', async (p) => {
+    await expect(shown(p).locator('[data-testid=invoice-list-row]', { hasText: invoice.number }).first()).toBeVisible();
+  });
 
   // Its card: 100.00 + 21 % VAT 21.00 = 121.00; «Mark as paid», asked first.
   await row.click();
@@ -115,6 +134,9 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   await expect(detail.locator('[data-testid=invoice-detail-total]')).toContainText(/121[.,]00/);
   await detail.locator('[data-testid=invoice-detail-mark-paid]').click();
   const confirm = page.locator('ion-modal').filter({ hasText: `Mark ${invoice.number} as paid?` }).last();
+  await flowShots(page, 'INVOICE-F19', async () => {
+    await expect(confirm).toBeVisible();
+  });
   await confirm.locator('.ep-form-modal__submit').click();
   await expect(confirm).toBeHidden();
   await expect(detail.locator('[data-testid=invoice-detail-status]')).toHaveText('Paid');
@@ -129,9 +151,9 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   await rectify.locator('[data-testid=invoice-rectify-reason] textarea').fill(`e2e wrong amount ${RUN}`);
   await rectify.locator('[data-testid=invoice-rectify-submit]').click();
   await expect(rectify.locator('[data-testid=invoice-rectify-done]')).toContainText(`${invoice.number} is cancelled`);
-  await shots(page, 'invoice-rectify-done', async (p) => {
+  await flowShots(page, 'INVOICE-F08', async (p) => {
     await expect(openDialog(p, 'invoice-rectify').locator('[data-testid=invoice-rectify-done]')).toBeVisible();
-  }, { width: 1440, height: 900 });
+  });
   await rectify.locator('[data-testid=invoice-rectify-close-result]').click();
   await expect(rectify).toBeHidden();
   await expect(detail.locator('[data-testid=invoice-detail-status]')).toHaveText('Cancelled');
@@ -142,7 +164,7 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   const rectified = await invoiceOf(context, rectifying.id);
   expect([after.status, rectified.invoice_type, rectified.total_amount, rectified.rectifies?.number]).toEqual(['cancelled', 'R1', -12100, invoice.number]);
   await expect(detail.locator('[data-testid=invoice-detail-rectifications-link]')).toHaveText(rectifying.number);
-  await shots(page, 'invoice-detail-cancelled', async (p) => {
+  await flowShots(page, 'INVOICE-F08-cancelled', async (p) => {
     await expect(shown(p).locator('[data-testid=invoice-detail-status]')).toHaveText('Cancelled');
   });
 });
@@ -164,7 +186,7 @@ test('INVOICE-F05: the customer asks for the full invoice of their ticket, an F3
   await dialog.locator('[data-testid=invoice-recipient-name] input').fill(`e2e Talleres F3 ${RUN}`);
   await dialog.locator('[data-testid=invoice-recipient-tax-id] input').fill('B12345674');
   await dialog.locator('[data-testid=invoice-recipient-address] input').fill('Calle Luna 3, Madrid');
-  await shots(page, 'invoice-substitute', async (p) => {
+  await flowShots(page, 'INVOICE-F05', async (p) => {
     await expect(openDialog(p, 'invoice-substitute')).toBeVisible();
   });
   await dialog.locator('[data-testid=invoice-substitute-submit]').click();
@@ -180,7 +202,7 @@ test('INVOICE-F05: the customer asks for the full invoice of their ticket, an F3
   await expect(f3.locator('[data-testid=invoice-detail-customer]')).toHaveText(`e2e Talleres F3 ${RUN}`);
   await expect(f3.locator('[data-testid=invoice-detail-total]')).toContainText(/6[.,]05/);
   await expect(f3.locator('[data-testid=invoice-detail-substitutes-link]')).toHaveText(ticket.number);
-  await shots(page, 'invoice-detail-f3', async (p) => {
+  await flowShots(page, 'INVOICE-F05-f3', async (p) => {
     await expect(shown(p).locator('[data-testid=invoice-detail-substitutes-link]')).toBeVisible();
   });
 });
@@ -204,7 +226,7 @@ test('INVOICE-F03 and F19 as an employee: issues and marks paid, never rectifies
   await expect(detail.locator('[data-testid=invoice-detail-rectify]')).toHaveCount(0);
   const refused = await api<{ error: { code: string } }>(context, A, 'POST', '/invoice/invoices/rectify', { invoice_id: created.data.id, reason: 'e2e no' });
   expect([refused.status, refused.data.error.code]).toEqual([403, 'permission_denied']);
-  await shots(page, 'invoice-detail-employee', async (p) => {
+  await flowShots(page, 'INVOICE-F19-employee', async (p) => {
     await expect(shown(p).locator('[data-testid=invoice-detail-mark-paid]')).toBeVisible();
   });
 });
