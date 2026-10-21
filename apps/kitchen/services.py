@@ -782,7 +782,7 @@ def create_ticket(ctx: OperationContext, data: TicketCreateIn) -> dict:
         label=data.label,
         order_type=data.order_type or settings.default_order_type,
         notes=data.notes,
-        waiter=actor(ctx),
+        waiter=person_label(ctx.actor)[:ACTOR_MAX_LENGTH],
         received_at=now,
         created_by=actor(ctx),
     )
