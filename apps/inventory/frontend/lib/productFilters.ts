@@ -11,8 +11,8 @@ import { readQuantity } from './quantity';
 type ProductListIn = InputOf<'inventory.product.list'>;
 export type ProductStatus = NonNullable<ProductListIn['status']>;
 
-/** The «Status» filter's choices, in order: «Yes», «No», «Not configured». */
-export const PRODUCT_STATUSES: readonly ProductStatus[] = ['active', 'inactive', 'needs_tax_setup'];
+/** The «Status» filter's choices, in order: «Yes», «No», «Not configured», «Sold out» (INVENTORY-F29). */
+export const PRODUCT_STATUSES: readonly ProductStatus[] = ['active', 'inactive', 'needs_tax_setup', 'sold_out'];
 
 const MONEY_ENDS = ['price_min', 'price_max'] as const;
 const QUANTITY_ENDS = ['stock_min', 'stock_max'] as const;

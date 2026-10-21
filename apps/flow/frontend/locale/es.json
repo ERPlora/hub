@@ -252,7 +252,9 @@
       "notFound": "Esa automatización no existe en este negocio.",
       "ranFailed": "Se ejecutó y se paró por un error: {message}",
       "ranWaiting": "Se ejecutó y está esperando: mírala en Historial.",
-      "runSaveFirst": "Guárdala primero: «Ejecutar ahora» ejecuta lo guardado."
+      "runSaveFirst": "Guárdala primero: «Ejecutar ahora» ejecuta lo guardado.",
+      "ranCalling": "Se ejecutó y está llamando a otro sistema: mírala en Historial.",
+      "ranAsking": "Se ejecutó y espera una respuesta en «Esperan tu respuesta»."
     },
     "trigger": {
       "when": "Cuando pase esto…",
@@ -303,7 +305,9 @@
         "command": "Hacer algo",
         "query": "Consultar algo",
         "condition": "Solo sigue si…",
-        "delay": "Esperar"
+        "delay": "Esperar",
+        "http": "Llamar a otro sistema",
+        "ask": "Preguntar antes a alguien"
       },
       "remove": "Quitar este paso",
       "reorder": "Arrastra para ordenar",
@@ -364,7 +368,20 @@
         "noCondition": "todavía nada",
         "query": "Consultar: {action}",
         "found": "Encontró algo",
-        "count": "Cuántas"
+        "count": "Cuántas",
+        "http": "Llamar a {host}",
+        "noHttp": "Llamar a otro sistema",
+        "ask": "Preguntar: {title}",
+        "noAsk": "Preguntar antes a alguien"
+      },
+      "options": {
+        "toggle": "Más opciones",
+        "runIf": "Solo si…",
+        "runIfHint": "Si no se cumple, este paso se salta y la automatización sigue.",
+        "onError": "Si falla, sigue con los pasos siguientes",
+        "onErrorHint": "El fallo queda escrito en este paso y los siguientes pueden mirar si falló.",
+        "summaryRunIf": "Solo si: {clauses}",
+        "summaryOnError": "Si falla, sigue"
       }
     },
     "picker": {
@@ -374,7 +391,11 @@
       "none": "Todavía no hay datos que insertar aquí: elige primero qué pasa, o añade antes una acción.",
       "example": "p. ej. {value}",
       "noExample": "aún no hay ejemplo",
-      "close": "Cerrar"
+      "close": "Cerrar",
+      "secret": "Secreto «{name}»",
+      "idempotencyKey": "Clave de no repetición",
+      "secrets": "Secretos",
+      "run": "Esta llamada"
     },
     "test": {
       "banner": "Nada de esto es real. No se envía nada, no se cobra nada y no se apunta nada: esto es solo lo que HARÍA tu automatización.",
@@ -391,7 +412,10 @@
         "not_allowed": "Se lo rechazarían: todavía no le has permitido «{action}»",
         "unavailable": "«{action}» no está disponible en este negocio",
         "not_reached": "No llegaría aquí",
-        "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo"
+        "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo",
+        "skipped": "Se saltaría: no se cumple su «Solo si…»",
+        "would_call": "Llamaría a {host} con esto",
+        "would_ask": "Preguntaría a {who} y esperaría hasta {hours} horas"
       },
       "empty": "Saldría vacío: {fields}",
       "unknown": "Sale de un paso anterior que no ha corrido: {fields}",
@@ -424,7 +448,9 @@
         "succeeded": "Terminó bien",
         "stopped": "Terminó: no se cumplía la condición",
         "failed": "Se paró por un error",
-        "cancelled": "Cancelada"
+        "cancelled": "Cancelada",
+        "calling": "Llamando a otro sistema",
+        "asking": "Esperando una respuesta"
       },
       "log": {
         "done": "Hizo: {action}",
@@ -434,7 +460,16 @@
         "stopped": "Se paró aquí porque no se cumplió esto: {clauses}. Eso es la automatización funcionando.",
         "waiting": "Esperando hasta el {date}",
         "waited": "Esperó {duration}",
-        "failed": "{action}: {message}"
+        "failed": "{action}: {message}",
+        "resumed": "Reanudada aquí, desde el paso que había fallado",
+        "skipped": "Se saltó: no se cumplía su «Solo si…» ({clauses})",
+        "continued": "Siguió con los pasos siguientes.",
+        "calling": "Llamando a {host}…",
+        "called": "Llamó a {host}: respondió {status}",
+        "asking": "Preguntó a {who}; espera una respuesta hasta el {date}",
+        "answeredYes": "{who} contestó que sí",
+        "answeredNo": "{who} contestó que no",
+        "expired": "Nadie contestó a tiempo"
       },
       "advice": {
         "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",
@@ -442,10 +477,26 @@
         "flow__invalid_params": "Abre el paso y rellena lo que pide.",
         "flow__loop_stopped": "Comprueba que sus pasos no la vuelven a arrancar.",
         "flow__step_crashed": "Prueba más tarde; si vuelve a pasar, mándanos la referencia.",
-        "flow__high_risk": "Hazlo a mano, desde su app."
+        "flow__high_risk": "Hazlo a mano, desde su app.",
+        "flow__http_blocked": "Usa la dirección pública del otro sistema: a una red privada nunca se llama.",
+        "flow__http_url_invalid": "Abre el paso y escribe su dirección a mano, empezando por https://.",
+        "flow__http_status": "Mira en el otro sistema por qué lo rechazó y luego reanúdala.",
+        "flow__http_failed": "Comprueba que el otro sistema funciona y luego reanúdala.",
+        "flow__http_timeout": "Prueba más tarde, o dale al paso más segundos de espera.",
+        "flow__secret_not_found": "Vuelve a guardar el secreto en el paso, con el mismo nombre.",
+        "flow__secret_unreadable": "Vuelve a guardar el secreto en el paso: se selló con otra clave.",
+        "flow__secrets_key_missing": "Este servidor todavía no tiene la clave de cifrado de los secretos; mándanos la referencia."
       },
       "attentionOne": "{n} ejecución se paró por un problema",
-      "attentionMany": "{n} ejecuciones se pararon por un problema"
+      "attentionMany": "{n} ejecuciones se pararon por un problema",
+      "retry": "Reanudar desde el paso que falló",
+      "retryTitle": "¿Reanudarla desde el paso que falló?",
+      "retryMessage": "Los pasos que ya hizo no se repiten: sigue con los pasos con los que empezó. Hará de verdad lo que dicen.",
+      "retryYes": "Sí, reanúdala",
+      "retryNo": "Cancelar",
+      "retried": "Reanudada: terminó bien.",
+      "retriedWaiting": "Reanudada: está esperando. Mira aquí cómo sigue.",
+      "retriedFailed": "Se reanudó y volvió a pararse por un error: {message}"
     },
     "events": {
       "customer__customer__created": "se crea una ficha de cliente",
@@ -2382,12 +2433,99 @@
       "zone": "Zona",
       "zone_id": "Zona",
       "zone_name": "Nombre de la zona",
-      "zones": "Zonas"
+      "zones": "Zonas",
+      "approved": "Aprobada",
+      "answered_by": "Contestada por",
+      "details": "Detalles",
+      "url": "Dirección",
+      "headers": "Cabeceras"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {
       "action": "No se ha podido hacer ahora. Vuelve a intentarlo en un momento.",
       "read": "No se ha podido leer ahora. Vuelve a intentarlo en un momento."
+    },
+    "http": {
+      "method": "Método",
+      "url": "Dirección",
+      "willAsk": "Este paso te pedirá permiso para llamar a {host}.",
+      "byHand": "Escríbela a mano: primero https:// y el nombre del servidor; los datos, solo después.",
+      "headers": "Cabeceras",
+      "headerName": "Nombre",
+      "headerValue": "Valor",
+      "addHeader": "Añadir una cabecera",
+      "removeHeader": "Quitar esta cabecera",
+      "body": "Qué envía",
+      "bodyHint": "Texto; un dato insertado en un JSON se escapa solo.",
+      "keyHint": "Inserta «Clave de no repetición» en una cabecera (como Idempotency-Key) para que el otro sistema reconozca un reintento: es la misma en todos los intentos de esta llamada.",
+      "timeout": "Segundos de espera (1 a 30)"
+    },
+    "secrets": {
+      "title": "Secretos",
+      "intro": "Claves y contraseñas de otros sistemas. Insértalas por su nombre; una vez guardado, nadie puede volver a leer un valor, ni siquiera tú.",
+      "loading": "Cargando los secretos…",
+      "loadError": "No se han podido cargar los secretos. Prueba de nuevo en un momento.",
+      "empty": "Todavía no hay secretos.",
+      "unavailable": "Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.",
+      "name": "Nombre",
+      "value": "Valor",
+      "save": "Guardar secreto",
+      "fillBoth": "Escribe un nombre y un valor.",
+      "badName": "Usa mayúsculas, cifras y _, empezando por una letra (STRIPE_KEY).",
+      "saved": "{name} guardado. Su valor ya no se puede mostrar.",
+      "delete": "Borrar {name}",
+      "deleteTitle": "¿Borrar {name}?",
+      "deleteMessage": "Los pasos que lo usan se pararán antes de llamar hasta que lo vuelvas a guardar.",
+      "deleteYes": "Sí, borrarlo",
+      "deleteNo": "Conservarlo",
+      "deleted": "{name} borrado."
+    },
+    "ask": {
+      "roles": {
+        "admin": "quien lleva el negocio",
+        "manager": "los responsables",
+        "employee": "los empleados"
+      },
+      "title": "La pregunta",
+      "details": "Detalles (opcional)",
+      "role": "Quién tiene que contestar",
+      "roleOptions": {
+        "admin": "Quien lleva el negocio",
+        "manager": "Un responsable",
+        "employee": "Un empleado"
+      },
+      "whoNames": {
+        "admin": "Quien lleva el negocio",
+        "manager": "Los responsables",
+        "employee": "Los empleados"
+      },
+      "whoAdmin": "{who} la contesta en Automatizaciones, en «Esperan tu respuesta».",
+      "whoRole": "{who} la contestan en Automatizaciones, en «Esperan tu respuesta»; quien lleva el negocio también puede.",
+      "hours": "Cuánto esperar la respuesta (horas, hasta 720)",
+      "onNo": "Si dicen que no",
+      "onTimeout": "Si nadie contesta a tiempo",
+      "stop": "Parar la automatización aquí",
+      "continue": "Seguir con los pasos siguientes",
+      "asNo": "Contarlo como un no",
+      "continueHint": "Para actuar según la respuesta, añade después de este paso un «Solo sigue si…» sobre «Aprobada» (o «Caducado»)."
+    },
+    "inbox": {
+      "heading": "Esperan tu respuesta",
+      "loading": "Cargando lo que espera tu respuesta…",
+      "empty": "No hay nada esperando tu respuesta.",
+      "from": "De «{name}»",
+      "askedOf": "Preguntado a {who}. Quien lleva el negocio también puede contestar.",
+      "askedOfAdmin": "Preguntado a quien lleva el negocio.",
+      "silenceNo": "Si nadie contesta antes del {date}, cuenta como un no.",
+      "silenceStop": "Si nadie contesta antes del {date}, la automatización se para aquí.",
+      "silenceContinue": "Si nadie contesta antes del {date}, la automatización sigue igualmente.",
+      "noStops": "Un no para la automatización aquí.",
+      "noContinues": "Tras un no, la automatización sigue.",
+      "note": "Añadir una nota (opcional)",
+      "approve": "Aprobar",
+      "reject": "No",
+      "approved": "Aprobada: la automatización sigue.",
+      "rejected": "Contestada que no."
     }
   }
 }

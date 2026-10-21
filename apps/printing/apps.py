@@ -43,6 +43,11 @@ class PrintingConfig(LiveAppConfig):
         "hub_manager": ["printing.view_settings", "printing.manage_settings", "printing.print"],
         "hub_employee": ["printing.view_settings", "printing.print"],
     }
+    # PRINTING-F20: the queue forgets the jobs that ended (printed, cancelled, failed) over 30 days ago,
+    # once an hour, as the platform (cron in UTC).
+    scheduled_tasks = [
+        {"name": "prune", "operation": "printing.job.prune", "cron": "23 * * * *", "catch_up": "collapse"},
+    ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/icons.ts).
     navigation = [

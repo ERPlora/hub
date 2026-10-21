@@ -46,7 +46,7 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('tax.'))).toHaveLength(18);
   });
 
-  it('binds the twenty-six routed inventory operations to apps/inventory/api.py (the two sale reactions have no route)', () => {
+  it('binds the twenty-seven routed inventory operations to apps/inventory/api.py (the two sale reactions have no route)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'inventory.product.list': { method: 'get', path: '/api/inventory/products' },
       'inventory.product.get': { method: 'get', path: '/api/inventory/products/detail' },
@@ -57,6 +57,7 @@ describe('OPERATION_ROUTES', () => {
       'inventory.product.bulk_create': { method: 'post', path: '/api/inventory/products/bulk_create' },
       'inventory.product.update': { method: 'post', path: '/api/inventory/products/update' },
       'inventory.product.delete': { method: 'post', path: '/api/inventory/products/delete' },
+      'inventory.product.set_sold_out': { method: 'post', path: '/api/inventory/products/sold_out' },
       'inventory.product_category.list': { method: 'get', path: '/api/inventory/product_categories' },
       'inventory.product_category.add': { method: 'post', path: '/api/inventory/product_categories/add' },
       'inventory.product_category.remove': { method: 'post', path: '/api/inventory/product_categories/remove' },
@@ -75,7 +76,7 @@ describe('OPERATION_ROUTES', () => {
       'inventory.config.get': { method: 'get', path: '/api/inventory/config' },
       'inventory.config.update': { method: 'post', path: '/api/inventory/config' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('inventory.'))).toHaveLength(26);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('inventory.'))).toHaveLength(27);
   });
 
   it('binds the 41 customer operations that have a route (apps/customer/api.py); purchase.record/void are the system\'s', () => {
@@ -165,7 +166,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 54 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
+  it('binds the 56 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -178,6 +179,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.sale.by_staff': { method: 'get', path: '/api/sale/sales/by_staff' },
       'sale.sale.complete_over_limit': { method: 'post', path: '/api/sale/sales/complete_over_limit' },
       'sale.sale.void': { method: 'post', path: '/api/sale/sales/void' },
+      'sale.sale.print': { method: 'post', path: '/api/sale/sales/print' },
       'sale.sale.refund': { method: 'post', path: '/api/sale/sales/refund' },
       'sale.sale.issue_documents': { method: 'post', path: '/api/sale/sales/issue_documents' },
       'sale.checkout.preview': { method: 'get', path: '/api/sale/checkout/preview' },
@@ -196,6 +198,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.order.remove_line': { method: 'post', path: '/api/sale/orders/remove_line' },
       'sale.order.void_line': { method: 'post', path: '/api/sale/orders/void_line' },
       'sale.order.fire': { method: 'post', path: '/api/sale/orders/fire' },
+      'sale.order.print_bill': { method: 'post', path: '/api/sale/orders/print_bill' },
       'sale.order.split': { method: 'post', path: '/api/sale/orders/split' },
       'sale.order.merge': { method: 'post', path: '/api/sale/orders/merge' },
       'sale.order.void': { method: 'post', path: '/api/sale/orders/void' },
@@ -291,12 +294,13 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(17);
   });
 
-  it('binds the twenty routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
+  it('binds the twenty-one routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'invoice.invoice.list': { method: 'get', path: '/api/invoice/invoices' },
       'invoice.invoice.get': { method: 'get', path: '/api/invoice/invoices/detail' },
       'invoice.invoice.by_source': { method: 'get', path: '/api/invoice/invoices/by_source' },
       'invoice.invoice.document': { method: 'get', path: '/api/invoice/invoices/document' },
+      'invoice.invoice.print': { method: 'post', path: '/api/invoice/invoices/print' },
       'invoice.invoice.line_defaults': { method: 'get', path: '/api/invoice/invoices/line_defaults' },
       'invoice.invoice.create': { method: 'post', path: '/api/invoice/invoices' },
       'invoice.invoice.create_from_sale': { method: 'post', path: '/api/invoice/invoices/from_sale' },
@@ -315,7 +319,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
       'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(21);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(22);
   });
 
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {

@@ -274,4 +274,48 @@ describe('FlowEditor: review 2026-10-15', () => {
     await settle();
     expect(s.find('flow-catalog-error').exists()).toBe(false);
   });
+
+  // FLOW-F27: «Call another system» has its own button; its values may insert the business's secrets and
+  // the call's no-repeat key, which its «Only if…» (and every other step) never offers.
+  it('«Call another system»: its own button, and its picker offers the secrets and the call\'s key', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    expect(s.find('flow-editor-add-http').text()).toBe('Call another system');
+    await click(s.find('flow-editor-add-http').element);
+    await settle();
+    const node = () => s.wrapper.findAllComponents(StepNode)[0];
+    expect(node().props('step')).toMatchObject({ kind: 'http', method: 'POST', url: '', headers: {}, body: '', timeout: 10 });
+    await s.live();
+    await s.result('flow.secret.list', { rows: [{ id: 'x1', name: 'STRIPE_KEY', created_at: '', updated_at: '', updated_by: '' }], available: true });
+    await settle();
+    const picked = (node().props('pickCall') as () => Promise<string | null>)();
+    await settle();
+    const picker = s.wrapper.findComponent(FieldPicker);
+    expect(picker.props('choices').map((choice: { path: string }) => choice.path)).toEqual(['secret.STRIPE_KEY', 'run.idempotency_key']);
+    picker.vm.$emit('pick', 'secret.STRIPE_KEY');
+    await expect(picked).resolves.toBe('secret.STRIPE_KEY');
+    expect(node().props('choices')).toEqual([]);
+  });
+
+  it('a run left calling another system says so (FLOW-F27)', async () => {
+    const s = await setup({ flow: { ...FLOW, enabled: true }, initial: fromFlow({ ...FLOW, enabled: true }) }, { '/api/flow/flows/run': [200, { id: 'r1', status: 'calling' }] });
+    mocks.confirm.mockResolvedValue(true);
+    await click(s.find('flow-editor-run').element);
+    await settle();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is calling another system: see it in History.');
+  });
+
+  it('«Ask someone first» has its own button (FLOW-F28)', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    expect(s.find('flow-editor-add-ask').text()).toBe('Ask someone first');
+    await click(s.find('flow-editor-add-ask').element);
+    expect(s.wrapper.findAllComponents(StepNode)[0].props('step')).toMatchObject({ kind: 'ask', role: '', hours: 72 });
+  });
+
+  it('a run left waiting for an answer says so (FLOW-F28)', async () => {
+    const s = await setup({ flow: { ...FLOW, enabled: true }, initial: fromFlow({ ...FLOW, enabled: true }) }, { '/api/flow/flows/run': [200, { id: 'r1', status: 'asking' }] });
+    mocks.confirm.mockResolvedValue(true);
+    await click(s.find('flow-editor-run').element);
+    await settle();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is waiting for an answer in «Waiting for your answer».');
+  });
 });

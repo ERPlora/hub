@@ -1,5 +1,6 @@
-"""Models of the flow app: the automation (``Flow``), each time it ran (``FlowRun``) and what the assistant
-proposed (``Draft``).
+"""Models of the flow app: the automation (``Flow``), each time it ran (``FlowRun``), what the assistant
+proposed (``Draft``), the secrets its calls to other systems use (``Secret``) and the questions its runs
+ask a person (``Question``).
 
 Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
 per scope. Phase 2 moves them to each hub's database. An automation names other apps' operations and
@@ -92,6 +93,10 @@ class FlowRun(UUIDModel):
     class Status(models.TextChoices):
         RUNNING = "running", pgettext_lazy("run status", "Running")
         WAITING = "waiting", pgettext_lazy("run status", "Waiting")
+        # A «Call another system» step is out (FLOW-F27): the call goes after the COMMIT.
+        CALLING = "calling", pgettext_lazy("run status", "Calling another system")
+        # A «Ask somebody first» step waits for its answer (FLOW-F28).
+        ASKING = "asking", pgettext_lazy("run status", "Waiting for an answer")
         SUCCEEDED = "succeeded", pgettext_lazy("run status", "Finished well")
         STOPPED = "stopped", pgettext_lazy("run status", "Stopped by a condition")
         FAILED = "failed", pgettext_lazy("run status", "Stopped by an error")
@@ -124,6 +129,7 @@ class FlowRun(UUIDModel):
     outputs = models.JSONField(_("outputs"), default=dict, blank=True)
     error_code = models.CharField(_("error code"), max_length=96, blank=True)
     error_message = models.TextField(_("error"), blank=True)
+    # When a wait ends; for a call (``calling``), when it may be sent (again): a lease of CALL_LEASE_MINUTES.
     resume_at = models.DateTimeField(_("resumes at"), null=True, blank=True)
     # The automations whose steps caused the event that started this one (loop guard).
     chain = models.JSONField(_("chain"), default=list, blank=True)
@@ -144,6 +150,8 @@ class FlowRun(UUIDModel):
                     status__in=[
                         "running",
                         "waiting",
+                        "calling",
+                        "asking",
                         "succeeded",
                         "stopped",
                         "failed",
@@ -204,3 +212,88 @@ class Draft(UUIDModel):
 
     def __str__(self) -> str:
         return self.name
+
+
+#: A secret's name: upper case, digits and ``_``, up to 64 characters (the old hub's rule).
+SECRET_NAME_RE = r"^[A-Z][A-Z0-9_]{0,63}$"
+
+
+class Secret(UUIDModel):
+    """A value a «Call another system» step sends (an API key, a token), kept sealed (``vault``): only its
+    name is ever shown again (FLOW-F26). Shared by every automation of the business."""
+
+    name = models.CharField(_("name"), max_length=64, unique=True)
+    # Fernet token under settings.FLOW_SECRETS_KEY; never the value.
+    ciphertext = models.TextField(_("sealed value"))
+    created_by = models.CharField(_("created by"), max_length=128, blank=True)
+    updated_by = models.CharField(_("updated by"), max_length=128, blank=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("secret")
+        verbose_name_plural = _("secrets")
+        ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(name__regex=SECRET_NAME_RE), name="flow_secret_name_valid"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+#: Who a question is asked of (FLOW-F28): «whoever runs the business» (owner and admin), the managers or the
+#: employees; whoever runs the business may always answer.
+QUESTION_ROLES = ("", "manager", "employee")
+
+
+class Question(UUIDModel):
+    """What a run's «Ask someone first» step asked (FLOW-F28), waiting in «Waiting for your answer» (FLOW-F29) until a
+    person of its role answers it or its time runs out (FLOW-F30). Its texts were filled in when asked, and
+    what to do with a no and with silence travels in the row: editing the automation changes neither."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", pgettext_lazy("question status", "Waiting for an answer")
+        APPROVED = "approved", pgettext_lazy("question status", "Yes")
+        REJECTED = "rejected", pgettext_lazy("question status", "No")
+        EXPIRED = "expired", pgettext_lazy("question status", "Nobody answered in time")
+        CANCELLED = "cancelled", pgettext_lazy("question status", "Cancelled")
+
+    run = models.ForeignKey(FlowRun, on_delete=models.CASCADE, related_name="questions", verbose_name=_("run"))
+    flow = models.ForeignKey(Flow, on_delete=models.CASCADE, related_name="+", verbose_name=_("automation"))
+    step_id = models.CharField(_("step"), max_length=32)
+    title = models.CharField(_("question"), max_length=300)
+    details = models.TextField(_("details"), blank=True, default="")
+    role = models.CharField(_("asked of"), max_length=16, blank=True, default="")
+    on_no = models.CharField(_("if they say no"), max_length=16, default="stop")
+    on_timeout = models.CharField(_("if nobody answers"), max_length=16, default="no")
+    expires_at = models.DateTimeField(_("answer before"))
+    status = models.CharField(_("status"), max_length=16, choices=Status.choices, default=Status.PENDING)
+    decided_by = models.CharField(_("answered by"), max_length=128, blank=True, default="")
+    decided_at = models.DateTimeField(_("answered at"), null=True, blank=True)
+    note = models.CharField(_("note"), max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(_("asked at"), default=timezone.now)
+
+    class Meta:
+        verbose_name = _("question")
+        verbose_name_plural = _("questions")
+        ordering = ["expires_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["run", "step_id"], name="flow_question_once_per_step"),
+            models.CheckConstraint(
+                condition=Q(status__in=["pending", "approved", "rejected", "expired", "cancelled"]),
+                name="flow_question_status_valid",
+            ),
+            models.CheckConstraint(condition=Q(role__in=list(QUESTION_ROLES)), name="flow_question_role_valid"),
+            models.CheckConstraint(condition=Q(on_no__in=["stop", "continue"]), name="flow_question_on_no_valid"),
+            models.CheckConstraint(
+                condition=Q(on_timeout__in=["no", "stop", "continue"]), name="flow_question_on_timeout_valid"
+            ),
+        ]
+        indexes = [models.Index(fields=["status", "expires_at"], name="flow_question_due_idx")]
+
+    def __str__(self) -> str:
+        return self.title
+

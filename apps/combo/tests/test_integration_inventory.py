@@ -171,6 +171,38 @@ def test_a_product_deactivated_in_inventory_is_not_offered_until_it_comes_back()
     assert run("combo.combo.for_sale", {}).total == 1
 
 
+def test_a_product_sold_out_in_inventory_is_not_offered_until_it_is_back_on_sale():
+    # INVENTORY-F29: the «86» of the catalogue reaches every menu that offers it (Toast, Square).
+    lentils, hake, water = menu_of_the_day()
+    run("inventory.product.set_sold_out", {"product": "HAK", "sold_out": True})
+    assert "combo.combo.for_sale" in live_registry.affected(["inventory.product.updated"])
+    detail = run("combo.combo.get", {"combo": "Menu of the day"})
+    # Its own switch here is still on: the mark is Inventory's, and the editor says so.
+    assert (detail.groups[1].options[0].status, detail.groups[1].options[0].is_available) == ("product_sold_out", True)
+    # Mains had only the hake: the menu cannot be completed, so the till stops offering it.
+    assert [b.code for b in detail.blockers] == ["combo.group_short"]
+    assert run("combo.combo.for_sale", {}).total == 0
+    choices = [{"product": "LEN"}, {"product": "HAK"}, {"product": "WAT"}]
+    with pytest.raises(Conflict) as caught:
+        run("combo.combo.resolve", {"combo": "Menu of the day", "choices": choices})
+    assert (caught.value.code, caught.value.message) == ("combo.option_sold_out", "“Hake” is sold out.")
+    # A check ordered before the mark is still charged: the last hake served does not stop the table paying.
+    charged = run("combo.combo.resolve", {"combo": "Menu of the day", "choices": choices, "amount": 1350})
+    assert [c.product_id for c in charged.components] == [lentils.id, hake.id, water.id]
+    run("inventory.product.set_sold_out", {"product": "HAK", "sold_out": False})
+    assert run("combo.combo.for_sale", {}).total == 1
+
+
+def test_a_sold_out_choice_leaves_the_till_and_the_menu_stays_with_the_others():
+    menu_of_the_day()
+    product("Salad", "SAL")
+    run("combo.option.create", {"combo": "Menu of the day", "group": "Starters", "product": "SAL"})
+    run("inventory.product.set_sold_out", {"product": "LEN", "sold_out": True})
+    [menu] = run("combo.combo.for_sale", {}).rows
+    starters = next(group for group in menu.groups if group.name == "Starters")
+    assert [option.product_name for option in starters.options] == ["Salad"]
+
+
 def test_without_the_relay_a_deleted_products_choice_is_never_sold_and_is_removed_by_hand():
     # Phase 1 has no outbox relay (COMBO-F13): nothing hands Inventory's notice over, so the choice stays
     # in its menu, marked, and neither the till nor a charge takes it until someone removes it.

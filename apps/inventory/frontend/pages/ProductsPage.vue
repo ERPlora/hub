@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20), the old
-// `erp-inventory-products`: the live `inventory.product.list` in a server-side DataTable — Name, SKU,
+// Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20, F29), the
+// old `erp-inventory-products`: the live `inventory.product.list` in a server-side DataTable — Name, SKU,
 // Price, Stock («—» without stock control) and Status (a switch, «Yes»/«No», or «Not configured ·
-// Missing tax category», which opens the form) —, search, sort, the filters behind the table's funnel
-// (name, SKU, price and stock ranges, status; the old table's), 50 a page. «+», import and
-// export CSV; per row the sheet, the stock dialogs (physical products), edit and delete; each only for
-// whoever may. Writes come back through the stream; nothing here refetches. A refused row action (the
+// Missing tax category», which opens the form; «Sold out» beside it) —, search, sort, the filters behind
+// the table's funnel (name, SKU, price and stock ranges, status; the old table's), 50 a page. «+», import
+// and export CSV; per row the sheet, the stock dialogs (physical products), edit, «Mark sold out» / «Put
+// back on sale» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused row action (the
 // switch, delete, export) is said above the table: no dialog is open then.
 import {
   type DataTableAction,
@@ -19,7 +19,7 @@ import {
 } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonChip, IonLabel, IonProgressBar, IonToggle } from '@ionic/vue';
+import { IonBadge, IonButton, IonChip, IonLabel, IonProgressBar, IonToggle } from '@ionic/vue';
 import { HubIcon } from '@erplora/ui/shell';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -114,7 +114,12 @@ const tableError = computed(() =>
   listStatus.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? error.value?.message : undefined,
 );
 
-const STATUS_LABELS: Record<ProductStatus, string> = { active: 'inventory.common.yes', inactive: 'inventory.common.no', needs_tax_setup: 'inventory.products.filters.unconfigured' };
+const STATUS_LABELS: Record<ProductStatus, string> = {
+  active: 'inventory.common.yes',
+  inactive: 'inventory.common.no',
+  needs_tax_setup: 'inventory.products.filters.unconfigured',
+  sold_out: 'inventory.products.soldOut',
+};
 
 const columns = computed<DataTableColumn<Product>[]>(() => [
   { key: 'name', label: t('inventory.common.name'), sortable: true, priority: 'high', filter: { type: 'text', maxlength: 200 } },
@@ -148,7 +153,14 @@ const actions = computed<DataTableAction<Product>[]>(() => [
         { id: 'write_off', label: t('inventory.products.actions.writeOff'), icon: 'ion:warning-outline', hidden: (row: Product) => isService(row) || !row.tracks_stock, menuOnly: true },
       ]
     : []),
-  ...(canChange.value ? [{ id: 'edit', label: t('inventory.products.actions.edit'), icon: 'ion:create-outline' }] : []),
+  ...(canChange.value
+    ? [
+        { id: 'edit', label: t('inventory.products.actions.edit'), icon: 'ion:create-outline' },
+        // INVENTORY-F29: one or the other, by what the article is now.
+        { id: 'sold_out', label: t('inventory.products.actions.soldOut'), icon: 'ion:ban-outline', hidden: (row: Product) => !!row.is_sold_out, menuOnly: true },
+        { id: 'back_on_sale', label: t('inventory.products.actions.backOnSale'), icon: 'ion:refresh-outline', hidden: (row: Product) => !row.is_sold_out, menuOnly: true },
+      ]
+    : []),
   ...(canDelete.value
     ? [{ id: 'delete', label: t('inventory.products.actions.delete'), icon: 'ion:trash-outline', color: 'danger', menuOnly: true }]
     : []),
@@ -191,6 +203,7 @@ function openStock(kind: StockAction, row: Product | null = focused.value): void
 
 const update = useCommand('inventory.product.update');
 const remove = useCommand('inventory.product.delete');
+const soldOut = useCommand('inventory.product.set_sold_out');
 
 /** Bumped per product when the server refuses its switch: a fresh switch shows the saved state again. */
 const switchRevision = ref<Record<string, number>>({});
@@ -203,6 +216,16 @@ async function setActive(row: Product, active: boolean): Promise<void> {
     pageError.value = failure instanceof Error ? failure.message : t('inventory.products.updateError');
     // The switch flipped under the finger; the product did not change: put it back where it was.
     switchRevision.value = { ...switchRevision.value, [row.id]: (switchRevision.value[row.id] ?? 0) + 1 };
+  }
+}
+
+/** INVENTORY-F29: the till stops offering it (or offers it again); the row comes back by the stream. */
+async function setSoldOut(row: Product, value: boolean): Promise<void> {
+  pageError.value = '';
+  try {
+    await soldOut.run({ id: row.id, sold_out: value });
+  } catch (failure) {
+    pageError.value = failure instanceof Error ? failure.message : t('inventory.products.soldOutError');
   }
 }
 
@@ -227,6 +250,7 @@ function onAction(event: DataTableActionEvent<Product>): void {
   if (actionId === 'detail') openDetail(row);
   else if (actionId === 'receive' || actionId === 'count' || actionId === 'write_off') openStock(actionId, row);
   else if (actionId === 'edit') openForm(row);
+  else if (actionId === 'sold_out' || actionId === 'back_on_sale') void setSoldOut(row, actionId === 'sold_out');
   else if (actionId === 'delete') void askDelete(row);
 }
 
@@ -369,32 +393,39 @@ async function exportFile(): Promise<void> {
         <span data-testid="inventory-product-stock">{{ row.tracks_stock ? formatQuantity(row.stock, locale) : '—' }}</span>
       </template>
       <template #status="{ row }">
-        <ion-chip
-          v-if="row.needs_tax_setup"
-          color="warning"
-          class="inventory-products__unconfigured"
-          :disabled="!canChange"
-          :title="$t('inventory.tax.unconfiguredReason')"
-          :data-testid="`inventory-products-unconfigured-${row.id}`"
-          @click.stop="canChange && openForm(row)"
-        >
-          <HubIcon name="ion:alert-circle-outline" />
-          <ion-label><span>{{ `${$t('inventory.tax.unconfigured')} · ${$t('inventory.tax.unconfiguredReason')}` }}</span></ion-label>
-        </ion-chip>
-        <ion-toggle
-          v-else-if="canChange"
-          :key="`${row.id}-${switchRevision[row.id] ?? 0}`"
-          color="success"
-          :aria-label="$t('inventory.products.active')"
-          :model-value="row.is_active"
-          :data-testid="`inventory-products-active-${row.id}`"
-          @click.stop
-          @update:model-value="setActive(row, !!$event)"
-        />
-        <span
-          v-else
-          :data-testid="`inventory-products-active-text-${row.id}`"
-        >{{ row.is_active ? $t('inventory.common.yes') : $t('inventory.common.no') }}</span>
+        <span class="inventory-products__status">
+          <ion-chip
+            v-if="row.needs_tax_setup"
+            color="warning"
+            class="inventory-products__unconfigured"
+            :disabled="!canChange"
+            :title="$t('inventory.tax.unconfiguredReason')"
+            :data-testid="`inventory-products-unconfigured-${row.id}`"
+            @click.stop="canChange && openForm(row)"
+          >
+            <HubIcon name="ion:alert-circle-outline" />
+            <ion-label><span>{{ `${$t('inventory.tax.unconfigured')} · ${$t('inventory.tax.unconfiguredReason')}` }}</span></ion-label>
+          </ion-chip>
+          <ion-toggle
+            v-else-if="canChange"
+            :key="`${row.id}-${switchRevision[row.id] ?? 0}`"
+            color="success"
+            :aria-label="$t('inventory.products.active')"
+            :model-value="row.is_active"
+            :data-testid="`inventory-products-active-${row.id}`"
+            @click.stop
+            @update:model-value="setActive(row, !!$event)"
+          />
+          <span
+            v-else
+            :data-testid="`inventory-products-active-text-${row.id}`"
+          >{{ row.is_active ? $t('inventory.common.yes') : $t('inventory.common.no') }}</span>
+          <ion-badge
+            v-if="row.is_sold_out"
+            color="danger"
+            :data-testid="`inventory-products-sold-out-${row.id}`"
+          >{{ $t('inventory.products.soldOut') }}</ion-badge>
+        </span>
       </template>
       <template #empty>
         <EmptyState
@@ -452,6 +483,14 @@ async function exportFile(): Promise<void> {
 </template>
 
 <style scoped>
+.inventory-products__status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .inventory-products__unconfigured {
   margin: 0;
   cursor: pointer;

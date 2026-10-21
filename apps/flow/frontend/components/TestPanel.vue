@@ -54,8 +54,27 @@ function stepOf(id: string) {
   return props.document.steps.find((step) => step.id === id);
 }
 
+/** What a step would send; a call's host is already in its verdict. */
+function shownParams(step: TestStepOut): Record<string, unknown> {
+  if (step.outcome === 'would_ask') return Object.fromEntries(Object.entries(step.params).filter(([field]) => field === 'title' || field === 'details'));
+  if (step.kind !== 'http') return step.params;
+  // A call in words: its host is in the verdict, each header is «Name: value», nothing empty.
+  const out: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(step.params)) {
+    const text = field === 'headers' && value && typeof value === 'object' ? Object.entries(value).map(([name, said]) => `${name}: ${String(said)}`).join(' · ') : value;
+    if (field !== 'host' && text !== '' && text !== null && text !== undefined) out[field] = text;
+  }
+  return out;
+}
+
 function outcome(step: TestStepOut): string {
-  const action = step.operation ? actionLabel(step.operation, props.catalog, phrasing.value) : '';
+  const own = stepOf(step.id);
+  const action = own?.kind === 'http' ? describeStep(own, props.document.steps, props.catalog, phrasing.value) : step.operation ? actionLabel(step.operation, props.catalog, phrasing.value) : '';
+  if (step.outcome === 'would_call') return phrasing.value.t('flow.test.outcomes.would_call', { host: String(step.params.host ?? '') });
+  if (step.outcome === 'would_ask') {
+    const who = phrasing.value.t(`flow.ask.roles.${String(step.params.role || 'admin')}`);
+    return phrasing.value.t('flow.test.outcomes.would_ask', { who, hours: Number(step.params.hours ?? 72) });
+  }
   if (step.outcome === 'waits') return phrasing.value.t('flow.test.outcomes.waits', { duration: describeDuration(step.seconds ?? 0, phrasing.value) });
   return phrasing.value.t(`flow.test.outcomes.${step.outcome}`, { action });
 }
@@ -114,7 +133,7 @@ const names = (fields: readonly string[]): string => fields.map((field) => field
         <strong>{{ stepOf(step.id) ? describeStep(stepOf(step.id)!, document.steps, catalog, phrasing) : step.id }}</strong>
         <span class="flow-test__verdict">{{ outcome(step) }}</span>
         <div
-          v-for="(value, field) in step.params"
+          v-for="(value, field) in shownParams(step)"
           :key="field"
           class="flow-test__value"
         >
@@ -192,6 +211,8 @@ const names = (fields: readonly string[]): string => fields.map((field) => field
   background: var(--ep-surface, #fff);
 }
 .flow-test__step[data-outcome='would_run'],
+.flow-test__step[data-outcome='would_call'],
+.flow-test__step[data-outcome='would_ask'],
 .flow-test__step[data-outcome='waits'] {
   border-left-color: var(--ion-color-success);
 }

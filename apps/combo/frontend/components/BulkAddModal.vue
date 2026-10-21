@@ -48,7 +48,8 @@ async function load(): Promise<void> {
   const mine = ++asked;
   loading.value = true;
   try {
-    const page = await client.api.call('inventory.product.list', { ...(text ? { search: text } : {}), is_active: true, limit: PAGE });
+    // Sold out today or not (INVENTORY-F29): only the till hides it, a menu is configured with it.
+    const page = await client.api.call('inventory.product.list', { ...(text ? { search: text } : {}), is_active: true, include_sold_out: true, limit: PAGE });
     if (mine !== asked) return;
     articles.value = page.rows.filter(isPortion).map((row) => ({ id: row.id, name: row.name, sku: row.sku, price: row.price }));
     loadFailed.value = false;

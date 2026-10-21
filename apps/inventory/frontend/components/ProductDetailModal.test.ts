@@ -1,11 +1,12 @@
 // The product sheet (WORKBOOK «Ficha del producto»): a dialog with the product's name and its SKU,
 // Price, Stock («—» for an article without stock control) and Status («Yes», «No» or «Not configured ·
 // Missing tax category»), and, with the permission to move stock and on a physical product, «Receive
-// stock», «Count stock» and «Write off stock». (The barcode and its label, INVENTORY-F25, wait for
-// the Printing app.)
+// stock», «Count stock» and «Write off stock». For whoever can change products, «Mark sold out» or «Put
+// back on sale» (INVENTORY-F29), whose refusal is said inside the sheet. (The barcode and its label,
+// INVENTORY-F25, wait for the Printing app.)
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, flush, mountInventory, product } from '../__tests__/mount-inventory';
+import { EMPLOYEE, flush, mountInventory, ok, product, refusal } from '../__tests__/mount-inventory';
 import { formatMoney } from '../lib/format';
 import ProductDetailModal from './ProductDetailModal.vue';
 
@@ -24,6 +25,12 @@ async function setup(props: Record<string, unknown> = {}, options: Parameters<ty
   const el = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
   const value = (id: string) => el(`inventory-product-detail-${id}`)?.querySelector('ion-note')?.textContent?.trim();
   return { ...m, el, value };
+}
+
+/** A second sheet in the same test: the first one leaves the page (its elements would answer the queries). */
+function unmount(s: Awaited<ReturnType<typeof setup>>): void {
+  s.wrapper.unmount();
+  document.body.innerHTML = '';
 }
 
 describe('ProductDetailModal', () => {
@@ -64,9 +71,46 @@ describe('ProductDetailModal', () => {
     expect(employee.value('status')).toBe('Yes');
   });
 
+  it('INVENTORY-F29: a sold-out article says so beside its status', async () => {
+    const s = await setup({ product: product({ is_sold_out: true }) });
+    expect(s.value('status')).toBe('Yes · Sold out');
+  });
+
+  it('INVENTORY-F29: «Mark sold out» marks it, «Put back on sale» unmarks it; the sheet stays open', async () => {
+    const s = await setup({}, { api: () => ok(product({ is_sold_out: true })) });
+    expect(s.el('inventory-product-detail-back-on-sale')).toBeNull();
+    s.el('inventory-product-detail-sold-out')!.click();
+    await flush();
+    expect(s.body(s.calls('/api/inventory/products/sold_out')[0])).toEqual({ id: 'p1', sold_out: true });
+    expect(s.el('inventory-product-detail')).not.toBeNull();
+
+    unmount(s);
+    const sold = await setup({ product: product({ is_sold_out: true }) }, { api: () => ok(product()) });
+    expect(sold.el('inventory-product-detail-sold-out')).toBeNull();
+    sold.el('inventory-product-detail-back-on-sale')!.click();
+    await flush();
+    expect(sold.body(sold.calls('/api/inventory/products/sold_out')[0])).toEqual({ id: 'p1', sold_out: false });
+  });
+
+  it('INVENTORY-F29: a refusal is said inside the sheet; whoever cannot change products has neither button', async () => {
+    const s = await setup({}, { api: () => refusal(404, 'not_found', 'This product does not exist in this hub.') });
+    s.el('inventory-product-detail-sold-out')!.click();
+    await flush();
+    expect(s.el('inventory-product-detail-error')?.textContent).toContain('This product does not exist in this hub.');
+    unmount(s);
+    const employee = await setup({}, { session: EMPLOYEE });
+    expect(employee.el('inventory-product-detail-sold-out')).toBeNull();
+    expect(employee.el('inventory-product-detail-back-on-sale')).toBeNull();
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ product: product({ is_active: false }) }, { locale: 'es' });
     expect(s.value('status')).toBe('No');
     expect(s.el('inventory-product-detail-receive')?.textContent?.trim()).toBe('Recibir stock');
+    expect(s.el('inventory-product-detail-sold-out')?.textContent?.trim()).toBe('Marcar agotado');
+    unmount(s);
+    const sold = await setup({ product: product({ is_sold_out: true }) }, { locale: 'es' });
+    expect(sold.value('status')).toBe('Sí · Agotado');
+    expect(sold.el('inventory-product-detail-back-on-sale')?.textContent?.trim()).toBe('Volver a poner a la venta');
   });
 });

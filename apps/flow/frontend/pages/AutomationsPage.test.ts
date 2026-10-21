@@ -5,10 +5,11 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { FlowOut } from '../operations';
-import { click, errorFrame, mountFlow, page, settle } from '../__tests__/mount-flow';
+import { click, errorFrame, mountFlow, OWNER, page, settle } from '../__tests__/mount-flow';
 import DraftTray from '../components/DraftTray.vue';
 import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
+import QuestionInbox from '../components/QuestionInbox.vue';
 import AutomationsPage from './AutomationsPage.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -100,5 +101,19 @@ describe('AutomationsPage: review 2026-10-15, item 5', () => {
     await settle();
     expect(m.find('flow-catalog-error').exists()).toBe(false);
     expect(m.wrapper.findComponent(FlowGallery).props('catalog')).toEqual(CATALOG);
+  });
+
+  // FLOW-F29: «Waiting for your answer» sits on top for whoever runs the business; a manager or an employee, who
+  // may only answer, sees only it (no list, no gallery, no «New automation»).
+  it('«Waiting for your answer» on top, and all a person who only answers sees', async () => {
+    const m = await setup();
+    expect(m.wrapper.findComponent(QuestionInbox).props('alone')).toBe(false);
+    const answerer = await mountFlow(AutomationsPage, { session: { ...OWNER, permissions: ['flow.answer'] } });
+    await answerer.live();
+    await settle();
+    expect(answerer.wrapper.findComponent(QuestionInbox).props('alone')).toBe(true);
+    expect(answerer.params('flow.flow.list')).toEqual([]);
+    expect(answerer.wrapper.findComponent(FlowGallery).exists()).toBe(false);
+    expect(answerer.find('flow-new').exists()).toBe(false);
   });
 });

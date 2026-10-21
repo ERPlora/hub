@@ -263,7 +263,12 @@ Pasos:
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
    sale debajo en grande.
 5. Pulsa «Cobrar <total>».
-6. La hoja se cierra, la cuenta queda vacía y se abre el **Documento de venta** con el tique.
+6. La hoja se cierra, la cuenta queda vacía y se abre el **Documento de venta** con el tique. Con
+   **Impresión**, el cobro pide el tique a la cola en su misma transacción, según sus ajustes (y, si
+   entró efectivo, la orden de abrir el cajón: PRINTING-F07, PRINTING-F13): se lee «Enviado a <impresora>.»
+   y el papel en pantalla es ya una copia. Sin Impresión encendida, sin impresora de tiques o con el
+   documento fiscal pendiente, el tique se imprime desde el Documento de venta, como siempre; un fallo
+   de Impresión nunca deshace el cobro.
 Entra: los artículos y precios de Inventario; los tipos de IVA de Impuestos; los ajustes del TPV.
 Sale: la venta cobrada e inmutable, con número `AAAAMMDD-NNNN` del día del negocio, sus líneas, su
 pago y su desglose de IVA (una fila por clave fiscal, cerrada una sola vez: lo mismo que declara la
@@ -754,7 +759,7 @@ Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F29
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 <!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->
-Estado: hecho — imprime con el diálogo de impresión del dispositivo hasta que exista Impresión
+Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Cuenta (precuenta)
@@ -762,13 +767,13 @@ Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
 2. Se abre «Cuenta» con las líneas, notas, descuentos, el desglose de IVA, el total y el título, y el
    aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.».
-3. Pulsa la impresora de arriba: sale por la impresora del dispositivo.
+3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
+   cola y se lee «Enviado a <impresora>.» (PRINTING-F09); si no, sale por el diálogo de impresión del
+   dispositivo.
 Entra: la cuenta abierta y su total calculado por el servidor.
-Sale: un papel sin número fiscal; no consume numeración ni crea venta.
+Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta.
 Si falla: «No se pudo imprimir la cuenta».
-Implicados: ninguno
-Pendiente: la impresora de tiques en red llega con Impresión; hasta entonces se imprime con el
-diálogo de impresión del dispositivo.
+Implicados: PRINTING-F09
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 <!-- origen: wf:restaurante-dia#rec_restaurante-f10 old:sales/workflow/sala-y-cocina.md#sales-f22 qa:modules/sales/split-bill -->
@@ -956,9 +961,11 @@ Pasos:
    de lo que se imprime), el aviso
    «Documento fiscal pendiente — Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso).
    Cuando esté resuelto, emítelo ahora.» con «Emitir ahora».
-3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Toda impresión desde
-   **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo tras cobrar es el
-   original.
+3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Con **Impresión** y una
+   impresora de tiques activa, el papel va a su cola y se lee «Enviado a <impresora>.» (PRINTING-F08); si
+   no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo. Toda
+   impresión desde **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo
+   tras cobrar es el original (y es copia si el cobro ya lo mandó a la cola).
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
    rectificativa de su anulación o la de una devolución) lleva la pastilla «Documento pendiente» bajo
    su estado y la acción «Emitir ahora» (quien cobra). «Emitir ahora» pide a Facturación, por nombre y
@@ -971,8 +978,7 @@ Si falla: «Cargando documento…» y «Error cargando el documento» (también 
 fiscal: el papel nunca sale sin él). «No se pudo imprimir». «Emitir ahora»
 rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin palabras del
 servidor, «No se han podido emitir los documentos. Inténtalo de nuevo.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, VERIFACTU-F19
-Pendiente: el A4 de una factura con los datos del destinatario lo imprime Facturación (INVOICE-F18).
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19
 
 ### SALE-F30 Anular una venta cobrada
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 wf:cadena-fiscal#rec_fiscal-f13 qa:modules/sales/void-sale fi:modules/sales#command-sales-void-sql-transaccional old:sales/workflow/historial-y-correcciones.md#sales-f30 -->

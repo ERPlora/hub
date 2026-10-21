@@ -124,7 +124,8 @@ test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full in
     await expect(shown(p).locator('[data-testid=invoice-detail-title]')).toBeVisible();
   });
 
-  // «Print / PDF»: the browser's dialog prints the A4 paper alone (captured at the moment it prints).
+  // «Print / PDF»: with no system printer in the queue, the browser's dialog prints the A4 paper alone
+  // (captured at the moment it prints, once the queue said «not queued»).
   await page.evaluate(() => {
     const w = window as unknown as { __printed?: string[]; print: () => void };
     w.__printed = [];
@@ -134,8 +135,8 @@ test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full in
     };
   });
   await detail.locator('[data-testid=invoice-detail-print]').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __printed: string[] }).__printed.length)).toBe(1);
   const printed = await page.evaluate(() => (window as unknown as { __printed: string[] }).__printed);
-  expect(printed).toHaveLength(1);
   expect(printed[0]).toContain(invoice.number);
   expect(printed[0]).toContain(`e2e Talleres ${RUN}`);
   expect(printed[0]).toContain('Copy');

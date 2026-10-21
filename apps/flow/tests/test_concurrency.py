@@ -228,3 +228,90 @@ def test_a_command_by_id_locks_its_automation_in_the_read_that_finds_it(how):
     # before it: the edit is never made on an automation that is already gone.
     assert (outcome(deletions), renamed.name) == (["locked"], "Renamed")
     assert [(f.name, f.deleted_at is None) for f in Flow.objects.all()] == [("Renamed", True)]
+
+
+# «Ask someone first» (FLOW-F29, FLOW-F30; hub#2502): whatever decides it at once, it is decided once.
+
+
+def _asking(hours=1):
+    from apps.flow.models import Question
+
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=[{"id": "s1", "kind": "ask", "title": "Go?", "hours": hours}, TASK_STEP | {"id": "s2"}])
+    ran = run("flow.flow.run", {"id": str(flow.id)})
+    return Question.objects.get(run_id=ran.id)
+
+
+def test_two_people_answering_one_question_at_once_carry_the_run_on_once():
+    question = _asking()
+    answer = lambda: run("flow.question.answer", {"id": str(question.id), "approve": True})  # noqa: E731
+    results = at_once(answer, answer)
+    refused = [result for result in results if isinstance(result, Exception)]
+    assert [getattr(error, "code", error) for error in refused] == ["flow.question_decided"], results
+    assert Task.objects.count() == 1
+    assert FlowRun.objects.get(pk=question.run_id).status == FlowRun.Status.SUCCEEDED
+
+
+def test_an_answer_overtaken_by_the_sweep_does_nothing(monkeypatch):
+    from django.utils import timezone
+
+    start = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
+    monkeypatch.setattr(timezone, "now", lambda: start)
+    question = _asking()
+    monkeypatch.setattr(timezone, "now", lambda: start + dt.timedelta(hours=1))
+    answer = lambda: run("flow.question.answer", {"id": str(question.id), "approve": True})  # noqa: E731
+    sweep = lambda: run("flow.question.expire_due", {}, system_context(A))  # noqa: E731
+    results = at_once(answer, sweep)
+    # Past its time the answer is refused whoever goes first; the sweep closes it (now or at the next minute).
+    assert getattr(results[0], "code", results[0]) == "flow.question_expired", results
+    assert not Task.objects.exists()
+    run("flow.question.expire_due", {}, system_context(A))
+    assert FlowRun.objects.get(pk=question.run_id).status == FlowRun.Status.CANCELLED
+
+
+
+def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_middle(monkeypatch):
+    # The answer reads the question a minute before its time; the sweep, a minute after, lands between the
+    # answer's reads and its writes. The answer holds the run and the question, so the sweep leaves them
+    # (SKIP LOCKED, or kept out by the question's lock) and the run is carried on once, never also closed.
+    from django.utils import timezone
+
+    from apps.flow.models import Question
+
+    start = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
+    clock = threading.local()
+    monkeypatch.setattr(timezone, "now", lambda: getattr(clock, "now", start))
+    question = _asking()
+    table = f'"{Question._meta.db_table}"'
+    sweeps: list = []
+
+    def sweep():
+        clock.now = start + dt.timedelta(hours=1, minutes=1)
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL lock_timeout = '300ms'")
+            return run("flow.question.expire_due", {}, system_context(A))
+
+    def answer():
+        clock.now = start + dt.timedelta(minutes=59)
+        reads: list[str] = []
+
+        def wrapper(execute, sql, params, many, context):
+            result = execute(sql, params, many, context)
+            if sql.lstrip().upper().startswith("SELECT") and table in sql:
+                reads.append(sql)
+                if len(reads) == 2:  # the answer's own read of the question, after the automation and its run
+                    sweeps.extend(at_once(sweep))
+            return result
+
+        with connection.execute_wrapper(wrapper):
+            return run("flow.question.answer", {"id": str(question.id), "approve": True})
+
+    before = OutboxEvent.objects.count()
+    answered = at_once(answer)[0]
+    assert not isinstance(answered, Exception), answered
+    assert len(sweeps) == 1
+    assert outcome(sweeps) == ["locked"] or sweeps[0].count == 0, sweeps
+    assert Task.objects.count() == 1
+    assert FlowRun.objects.get(pk=question.run_id).status == FlowRun.Status.SUCCEEDED
+    assert Question.objects.get(pk=question.id).status == Question.Status.APPROVED
+    assert events.QUESTION_EXPIRED not in events_since(before)

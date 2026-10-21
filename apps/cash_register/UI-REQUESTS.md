@@ -3,6 +3,12 @@
 Lo que las páginas de Caja necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
+**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `83aeacc`: no ha llegado ninguna de
+las cinco. Ninguna rompe un flujo (todas tienen su sustituto, dicho abajo), así que pasan a «Fuera por
+ahora» (`## 6` de `MIGRATION.md`) con las claves `cash_register:ui-icons`, `cash_register:ui-money-format`,
+`cash_register:ui-detail-list`, `cash_register:ui-bar-list` y `cash_register:ui-readonly-modal`. Quien
+entregue una en `ui` la borra de aquí y cambia su sustituto en la misma PR del puntero.
+
 ## Iconos
 
 - `ion:document-text-outline` — acción de fila «Detalle» de la tabla de sesiones (el icono del producto

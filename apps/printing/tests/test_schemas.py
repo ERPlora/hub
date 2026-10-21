@@ -111,6 +111,16 @@ def test_a_new_printer():
     assert (printer.name, printer.address, printer.port, printer.paper_width, printer.is_active) == ("Till", "10.0.0.9", None, 80, True)
 
 
+def test_a_role_is_one_of_the_four_never_a_free_word():
+    # hub#457: «Kitchen», «kitchn» or «cocina» would open a queue that no printer ever drains.
+    for usage in ("Kitchen", "kitchn", "cocina", " kitchen", ""):
+        refused(schemas.PrinterIn, {"name": "Till", "kind": "network", "usage": usage})
+        refused(schemas.PrinterUpdateIn, {"printer": "Till", "usage": usage})
+        refused(schemas.JobCreateIn, {"document_type": "receipt", "document": {}, "usage": usage})
+        refused(schemas.SettingsPatchIn, {usage: "Till"})
+    assert schemas.JobCreateIn.model_validate({"document_type": "receipt", "document": {}, "usage": "kitchen"}).usage == "kitchen"
+
+
 def test_a_job_is_named_by_its_id_or_its_document_reference():
     refused(schemas.JobRefIn, {})
     assert schemas.JobRefIn.model_validate({"reference": "T-000123"}).reference == "T-000123"

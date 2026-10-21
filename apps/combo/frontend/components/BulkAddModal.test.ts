@@ -58,7 +58,8 @@ async function setup(locale: 'en' | 'es' = 'en', catalogue: [number, unknown] = 
 describe('BulkAddModal', () => {
   it('lists the active products, the ones already in the course ticked and greyed', async () => {
     const s = await setup();
-    expect(s.sent()[0]).toMatchObject({ method: 'GET', path: '/api/inventory/products', query: { is_active: 'true', limit: '50' } });
+    // A sold-out article can still be added as a choice (INVENTORY-F29): only the till hides it.
+    expect(s.sent()[0]).toMatchObject({ method: 'GET', path: '/api/inventory/products', query: { is_active: 'true', include_sold_out: 'true', limit: '50' } });
     expect(s.inDoc('combo-bulk')?.getAttribute('aria-label')).toBe('Add products to this course');
     expect([s.box('p1').checked, s.box('p1').disabled]).toEqual([true, true]);
     expect(s.inDoc('combo-bulk-item-p1')?.textContent).toContain('Already in this course');
@@ -91,7 +92,7 @@ describe('BulkAddModal', () => {
     // ion-searchbar waits for the typing to stop (its `debounce`) before it says ionInput.
     await ionValue(s.inDoc('combo-bulk-search'), 'sou', 'ionInput');
     await settle();
-    expect(s.sent().at(-1)).toMatchObject({ path: '/api/inventory/products', query: { search: 'sou', is_active: 'true', limit: '50' } });
+    expect(s.sent().at(-1)).toMatchObject({ path: '/api/inventory/products', query: { search: 'sou', is_active: 'true', include_sold_out: 'true', limit: '50' } });
   });
 
   it('a catalogue that fails says so and offers «Retry»', async () => {

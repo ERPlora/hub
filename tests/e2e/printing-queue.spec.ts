@@ -1,12 +1,14 @@
-// Printing → Queue and Settings in Chrome (PRINTING-F01, F06, F14, F18; apps/printing/WORKBOOK.md): a job the
-// device could not print fails after five hand-outs (the device's side by the API: claim and fail), the owner
-// sends it back to the queue and then cancels it with a reason; the owner sets the ticket settings and the
-// kitchen's printer, and the employee reads them blocked. Screenshots of both pages in the three viewports.
-// What is made here is deleted, and the settings put back, after it.
+// Printing → Queue and Settings in Chrome (PRINTING-F01, F06, F14, F15, F18; apps/printing/WORKBOOK.md): a job
+// the device could not print fails after five hand-outs (the device's side by the API: claim and fail), the
+// owner sends it back to the queue and then cancels it with a reason; the owner sets the ticket settings and
+// the kitchen's printer, and follows the note to the receipt's texts in Sales; the employee reads them blocked.
+// Screenshots of both pages, and of each flow, in the three viewports. What is made here is deleted, and the
+// settings put back, after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { dialog, fill, pick } from './inventory-helpers';
+import { flowShots } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
@@ -98,6 +100,9 @@ test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelle
   await expect(row).toContainText(/Failed|Fallido/);
   await expect(row).toContainText('printer unreachable');
   await shots(page, 'printing-queue', jobsReady);
+  await flowShots(page, 'PRINTING-F18', async (p) => {
+    await expect(shown(p).locator('[data-testid=printing-jobs-row]').filter({ hasText: REF })).toBeVisible();
+  });
 
   await rowAction(page, queued.data.job.id, 'retry');
   await expect.poll(async () => (await jobByRef(context)).status).toBe('pending');
@@ -112,6 +117,9 @@ test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelle
   await expect.poll(async () => (await jobByRef(context)).status).toBe('cancelled');
   expect((await jobByRef(context)).cancel_reason).toBe('e2e reason');
   await expect(row).toContainText(/Cancelled by|Cancelado por/);
+  await flowShots(page, 'PRINTING-F14', async (p) => {
+    await expect(shown(p).locator('[data-testid=printing-jobs-row]').filter({ hasText: REF })).toBeVisible();
+  });
 });
 
 test('PRINTING-F06: the owner opens the drawer at checkout and chooses the kitchen’s printer', async ({ page, context }) => {
@@ -129,6 +137,19 @@ test('PRINTING-F06: the owner opens the drawer at checkout and chooses the kitch
     .toMatchObject({ open_drawer_on_sale: !before?.open_drawer_on_sale });
   const kitchen = await api<{ rows: { id: string; name: string }[] }>(context, A, 'GET', `/printing/printers?search=${encodeURIComponent(KITCHEN)}`);
   expect((await api<{ kitchen_printer_id: string | null }>(context, A, 'GET', '/printing/settings')).data.kitchen_printer_id).toBe(kitchen.data.rows[0].id);
+  await flowShots(page, 'PRINTING-F06', settingsReady);
+});
+
+test('PRINTING-F15: the receipt’s texts are the till’s, and the note leads there', async ({ page }) => {
+  await login(page, A, '/printing/settings');
+  await settingsReady(page);
+  await expect(shown(page).locator('[data-testid=printing-settings-receipt-text]')).toContainText(/till settings|ajustes de Ventas/);
+  await flowShots(page, 'PRINTING-F15', async (p) => {
+    await expect(shown(p).locator('[data-testid=printing-settings-receipt-link]')).toBeVisible();
+  });
+  await shown(page).locator('[data-testid=printing-settings-receipt-link]').click();
+  await expect(page).toHaveURL(/\/sale\/settings$/);
+  await expect(shown(page).locator('[data-testid=sale-settings-heading], [data-testid=sale-settings-form]').first()).toBeVisible();
 });
 
 test('PRINTING-F06: the employee reads the settings blocked', async ({ page }) => {
