@@ -20,7 +20,11 @@ describe('HistoryModal', () => {
     expect(m.inDoc('appointment-history-modal')?.getAttribute('aria-label')).toBe('Appointment history');
     expect(m.inDoc('appointment-history-modal')?.textContent).toContain('APT-7');
     expect(m.wrapper.findComponent(AppointmentHistory).props('appointmentId')).toBe('a1');
-    await click(m.inDoc('appointment-history-modal-submit'));
+    // Read only: one «Close», no «Cancel» beside it.
+    expect(m.inDoc('appointment-history-modal-cancel')).toBeNull();
+    expect(m.inDoc('appointment-history-modal-submit')).toBeNull();
+    expect(m.inDoc('appointment-history-close')?.textContent?.trim()).toBe('Close');
+    await click(m.inDoc('appointment-history-close'));
     expect(m.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 });
