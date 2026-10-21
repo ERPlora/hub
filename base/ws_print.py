@@ -20,7 +20,7 @@ working-rules §12)::
       {"type":"done","jobId":…}                                 →  ← {"type":"ack","jobId":…,"confirmed":true}
       {"type":"failed","jobId":…,"error":…}                     →  ← {"type":"ack","jobId":…,"requeued":true}
       {"type":"beat"}                                           →  ← {"type":"beat","refreshed":2,"heartbeatSeconds":30}
-                     ← {"type":"wake","role":"kitchen"}       a job is waiting for a role it prints
+                     ← {"type":"wake","role":"kitchen"}       a job was just queued for a role it prints
                      ← {"type":"error","code":…,"message":…}
 
 What the new Hub changed, and nothing else:
@@ -78,10 +78,14 @@ must be the hub's own (cross-site WebSocket hijacking): anything else is refused
 it 403).
 
 **The wake** opens no ``LISTEN`` of its own: the socket keeps a stream of the process's live broker (the single
-``LISTEN`` on the control database that ``/api/live`` uses) with one subscription per role to that role's first
-waiting job (``printing.job.list``). A job queued, retried or sent back to the queue changes it after the COMMIT,
-and a changed result that still shows a waiting job becomes a ``wake`` for that role: as the device's user (its permissions re-read every time),
-on its hub's channel only, and never carrying the document, which travels only in the answer to ``claim``.
+``LISTEN`` on the control database that ``/api/live`` uses) with one subscription per role to that role's newest
+waiting jobs (``printing.job.list``), re-run after the COMMIT of every change of the queue. The ``wake`` is the old
+hub's «a job was just queued for a role you host»: a result showing a job that the last one did not (queued,
+retried, or sent back to the queue by another device) wakes the device for that role; one that only lost jobs (a
+claim, a confirmation, a cancellation) does not, and neither does the job this device sent back itself with
+``failed``, which waits for a retry, another device or the next wake (a printer out of paper would burn its
+hand-outs). It runs as the device's user (its permissions re-read every time), on its hub's channel only, and never
+carries the document, which travels only in the answer to ``claim``.
 """
 
 import asyncio
@@ -125,6 +129,9 @@ MAX_FRAME_BYTES = 8 * 1024
 HELLO_TIMEOUT_SECONDS = 15.0
 #: How often a connected device beats, told in ``ready`` and ``beat`` (the old hub's ``HEARTBEAT_SECONDS``).
 HEARTBEAT_SECONDS = 30
+#: Waiting jobs of each role the wake watches, newest first: a job just queued is always among them, and 20 of the
+#: longest rows printing lists (about 170 KiB) stay under a live result's cap (``live.sse.MAX_RESULT_BYTES``).
+WAKE_WINDOW = 20
 
 DEVICE_GET = "printing.device.get"
 PRINTER_GET = "printing.printer.get"
@@ -174,6 +181,10 @@ class Device:
     #: Hand-out of each job given on this socket (``failed`` must name the hand-out it answers).
     attempts: dict[str, int] = field(default_factory=dict)
     stream: Stream | None = None
+    #: Per role, the waiting jobs its last wake result showed (``_waiting``): a job not among them is news.
+    waiting: dict[str, set[tuple]] = field(default_factory=dict)
+    #: Jobs this device sent back to the queue itself (``failed``): waiting again, they are no news to it.
+    sent_back: set[tuple] = field(default_factory=set)
 
     @property
     def roles(self) -> list[str]:
@@ -323,10 +334,17 @@ class PrintSocket:
         event, data = _decode_frame(item)
         role = data.get("id")
         if event == "result":
-            # A result that changed because this device took the last job shows no job: no wake (the old hub's
-            # wake is «a job was just queued for a role you host», never a claim → idle).
-            waiting = bool((data.get("data") or {}).get("rows"))
-            if waiting and data.get("rev", 0) > 1 and self.device is not None and role in self.device.roles:
+            # The old hub's wake is «a job was just queued for a role you host»: a job waiting that the last result
+            # did not show. A claim, a confirmation or a failure of this very device queues nothing new for it, and
+            # its wake came late (the re-run is grouped), between a later claim and its idle.
+            device = self.device
+            waiting = {_waiting(row) for row in (data.get("data") or {}).get("rows", [])}
+            known = device.waiting.get(role)
+            device.waiting[role] = waiting
+            news = set() if known is None else waiting - known
+            ours = news & device.sent_back
+            device.sent_back -= ours
+            if news - ours and role in device.roles:
                 await self._send({"type": "wake", "role": role})
             return True
         error = data.get("error") or {}
@@ -449,6 +467,8 @@ class PrintSocket:
             if not _not_taken(exc):
                 raise
             requeued = False
+        if requeued:
+            device.sent_back.add(_waiting(answer["job"]))
         device.attempts.pop(job_id, None)
         return {"type": "ack", "jobId": job_id, "requeued": requeued}
 
@@ -537,14 +557,14 @@ class PrintSocket:
     # ── The wake ──────────────────────────────────────────────────────────────────────────────────
 
     async def _follow(self) -> None:
-        """Subscribe the device's roles to the live broker: one subscription per role, its first waiting job."""
+        """Subscribe the device's roles to the live broker: one subscription per role, its newest waiting jobs."""
         device = self.device
         if not device.roles:
             return
         stream = Stream(device.ctx)
         op = _operation(JOB_LIST)
         for role in device.roles:
-            params = {"status": "pending", "usage": role, "limit": 1, "sort": "created_at", "dir": "asc"}
+            params = {"status": "pending", "usage": role, "limit": WAKE_WINDOW, "sort": "created_at", "dir": "desc"}
             stream.subs[role] = Subscription(id=role, op=op, params=op.input.model_validate(params))
         device.stream = stream
         # Listening before the first run: no COMMIT after ``ready`` is missed (live.broker.Broker.register).
@@ -684,6 +704,12 @@ def _job_frame(job: dict, role: str) -> dict:
         if key != "id":
             frame.setdefault(_CAMEL.sub(lambda match: match.group(1).upper(), key), value)
     return frame
+
+
+def _waiting(job: dict) -> tuple:
+    """A waiting job as the wake tells it apart: the job and its last retry, so somebody retrying a job that was
+    already waiting is news too."""
+    return job["id"], job.get("retried_at")
 
 
 def _decode_frame(item: bytes) -> tuple[str, dict]:

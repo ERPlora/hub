@@ -139,8 +139,10 @@ ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su 
   `printing.job.claim`, `printing.job.complete`, `printing.job.fail` y `printing.job.list`, con la sesión del
   dispositivo (mismos permisos, ámbito y comprobación de app que la API HTTP); no toca modelos.
 - **El `wake`** no abre otro `LISTEN`: el socket tiene un stream del broker de `live` (el `LISTEN` único del proceso
-  en la BD de control, el de `/api/live`) suscrito al primer trabajo en cola de cada función del dispositivo; tras el
-  COMMIT de un trabajo nuevo, solo en el canal de su hub, llega el empujón, sin el documento.
+  en la BD de control, el de `/api/live`) suscrito a los trabajos en cola más nuevos de cada función del dispositivo;
+  tras el COMMIT de un trabajo nuevo, solo en el canal de su hub, llega el empujón, sin el documento. Empuja solo lo
+  que entra en la cola (un trabajo nuevo, uno reintentado o uno que otro dispositivo devolvió), como el `wake` del Hub
+  viejo: el `claim`, el `done` y el `failed` del propio dispositivo no lo despiertan.
 
 Para verlo en local: `curl -i -H 'Host: a.localhost:8000' -H 'Origin: http://a.localhost:8000' -H 'Connection: Upgrade'
 -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=='
