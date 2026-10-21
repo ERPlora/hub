@@ -223,7 +223,9 @@
         "chooseToContinue": "Choose an option to continue",
         "full": "«{group}» is full: take one out to choose another.",
         "less": "One less {name}",
-        "loadFailed": "The options of this product could not be read. Try again."
+        "loadFailed": "The options of this product could not be read. Try again.",
+        "chooseRange": "Choose {n} to {max}",
+        "atLeast": "Choose at least {n}"
       },
       "menu": {
         "badge": "Menu",

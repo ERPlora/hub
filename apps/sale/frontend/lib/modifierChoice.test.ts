@@ -36,10 +36,18 @@ const group = (id: string, min: number, max: number, ids: string[], more: Partia
 });
 
 describe('the rule each group says', () => {
-  it('says «Choose N» when required, «Up to N» with a ceiling and «Optional» otherwise', () => {
-    expect(ruleOf(group('a', 2, 3, ['x']))).toEqual({ key: 'sale.pos.options.choose', n: 2 });
-    expect(ruleOf(group('b', 0, 3, ['x']))).toEqual({ key: 'sale.pos.options.upTo', n: 3 });
-    expect(ruleOf(group('c', 0, 0, ['x']))).toEqual({ key: 'sale.pos.options.optional', n: 0 });
+  it('says «Choose N» when it takes exactly N, «Up to N» with a ceiling and «Optional» otherwise', () => {
+    expect(ruleOf(group('a', 1, 1, ['x']))).toEqual({ key: 'sale.pos.options.choose', n: 1 });
+    expect(ruleOf(group('b', 2, 2, ['x']))).toEqual({ key: 'sale.pos.options.choose', n: 2 });
+    expect(ruleOf(group('c', 0, 3, ['x']))).toEqual({ key: 'sale.pos.options.upTo', n: 3 });
+    expect(ruleOf(group('d', 0, 0, ['x']))).toEqual({ key: 'sale.pos.options.optional', n: 0 });
+  });
+
+  it('says the minimum and the ceiling together when they differ, and «at least» without a ceiling', () => {
+    // A course of 1 to 4 said «Choose 1» and took four (Toast «Choose 1–4», Square «Required · up to 4»).
+    expect(ruleOf(group('a', 1, 4, ['x']))).toEqual({ key: 'sale.pos.options.chooseRange', n: 1, max: 4 });
+    expect(ruleOf(group('b', 2, 3, ['x']))).toEqual({ key: 'sale.pos.options.chooseRange', n: 2, max: 3 });
+    expect(ruleOf(group('c', 1, 0, ['x']))).toEqual({ key: 'sale.pos.options.atLeast', n: 1 });
   });
 });
 

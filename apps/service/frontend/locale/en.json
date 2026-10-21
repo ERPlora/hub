@@ -37,8 +37,7 @@
       "free": "Free"
     },
     "tax": {
-      "exempt": "exempt",
-      "loadError": "The tax categories could not be loaded."
+      "exempt": "exempt"
     },
     "services": {
       "search": "Search service…",
@@ -72,8 +71,7 @@
         "title": "Archive service",
         "message": "{name} — it will no longer be offered or bookable. Its history and the appointments already booked are kept.",
         "upcoming": "{count} upcoming appointment(s) still use this service. They keep their booking, price and length; only new bookings stop.",
-        "confirm": "Archive",
-        "error": "Could not archive the service"
+        "confirm": "Archive"
       },
       "restoreError": "Could not restore the service",
       "form": {
@@ -140,8 +138,7 @@
         "title": "Delete category",
         "message": "{name} — the category disappears; the services in it are kept, without a category.",
         "impact": "{count} service(s) will be left without a category.",
-        "confirm": "Delete",
-        "error": "Could not delete the category"
+        "confirm": "Delete"
       }
     },
     "packages": {
@@ -201,8 +198,7 @@
       "delete": {
         "title": "Delete package",
         "message": "{name} — the package and its {count} line(s) leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.",
-        "confirm": "Delete",
-        "error": "Could not delete the package"
+        "confirm": "Delete"
       }
     },
     "grants": {
