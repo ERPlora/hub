@@ -24,14 +24,26 @@ export interface Choice {
 }
 
 export interface Rule {
-  key: 'sale.pos.options.choose' | 'sale.pos.options.upTo' | 'sale.pos.options.optional';
+  key:
+    | 'sale.pos.options.choose'
+    | 'sale.pos.options.chooseRange'
+    | 'sale.pos.options.atLeast'
+    | 'sale.pos.options.upTo'
+    | 'sale.pos.options.optional';
   n: number;
+  /** The ceiling, when the rule says it beside the minimum. */
+  max?: number;
 }
 
-/** «Choose N» when required (N, its minimum), «Up to N» with a ceiling, «Optional» otherwise. */
+/** What a group asks, minimum and ceiling together when they differ (Toast «Choose 1–4», Square «Required · up
+ *  to 4»): «Choose N» when it takes exactly N, «Choose N to M», «Choose at least N» without a ceiling, «Up to N»
+ *  when nothing is required, «Optional» otherwise. */
 export function ruleOf(group: ChoiceGroup): Rule {
-  if (group.min_choices > 0) return { key: 'sale.pos.options.choose', n: group.min_choices };
-  if (group.max_choices > 0) return { key: 'sale.pos.options.upTo', n: group.max_choices };
+  const { min_choices: min, max_choices: max } = group;
+  if (min > 0 && max === 0) return { key: 'sale.pos.options.atLeast', n: min };
+  if (min > 0 && max > min) return { key: 'sale.pos.options.chooseRange', n: min, max };
+  if (min > 0) return { key: 'sale.pos.options.choose', n: min };
+  if (max > 0) return { key: 'sale.pos.options.upTo', n: max };
   return { key: 'sale.pos.options.optional', n: 0 };
 }
 

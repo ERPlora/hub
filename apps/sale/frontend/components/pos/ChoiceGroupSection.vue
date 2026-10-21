@@ -10,10 +10,14 @@ export interface SectionGroup extends ChoiceGroup {
 
 <script setup lang="ts">
 // One group of a choosing sheet of the till: a group of options of Modifiers (SALE-F11, `kind="options"`) or a
-// course of a menu of Menus (SALE-F12, `kind="menu"`). Its name and rule («Choose N», «Up to N», «Optional»),
+// course of a menu of Menus (SALE-F12, `kind="menu"`). Its name and rule («Choose N», «Choose N to M», «Up to N»…),
 // its choices with their supplement when it is not zero (with its sign), a counter and a minus where a choice
 // may repeat, the warning ring while the sheet points at it and, when its ceiling refused a tap, a line saying
-// it is full. The taps go up; the rules live in `modifierChoice`.
+// it is full. A group whose choices repeat lays them one per line, the counter and the minus to the right of the
+// name (as Square and Toast do): in a tile they left the name a few pixels and it broke letter by letter. The
+// taps go up; the rules live in `modifierChoice`.
+import { computed } from 'vue';
+
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import { type Choice, countOf, ruleOf } from '../../lib/modifierChoice';
@@ -26,10 +30,11 @@ const locale = useLocale();
 
 /** The hooks of each kind: the options sheet keeps the ones it had. */
 const HOOKS = {
-  options: { group: 'pos-options-group', rule: 'pos-options-rule', choice: 'pos-option', count: 'pos-option-count', less: 'pos-option-less' },
-  menu: { group: 'pos-menu-course', rule: 'pos-menu-rule', choice: 'pos-menu-dish', count: 'pos-menu-dish-count', less: 'pos-menu-dish-less' },
+  options: { group: 'pos-options-group', rule: 'pos-options-rule', choice: 'pos-option', name: 'pos-option-name', count: 'pos-option-count', less: 'pos-option-less' },
+  menu: { group: 'pos-menu-course', rule: 'pos-menu-rule', choice: 'pos-menu-dish', name: 'pos-menu-dish-name', count: 'pos-menu-dish-count', less: 'pos-menu-dish-less' },
 } as const;
 const hook = HOOKS[props.kind];
+const rule = computed(() => ruleOf(props.group));
 
 function supplement(cents: number): string {
   if (!cents) return '';
@@ -51,7 +56,7 @@ function supplement(cents: number): string {
         class="pos-options__rule"
         :data-testid="`${hook.rule}-${group.id}`"
       >
-        {{ t(ruleOf(group).key, { n: ruleOf(group).n }) }}
+        {{ t(rule.key, { n: rule.n, max: rule.max ?? 0 }) }}
       </span>
     </header>
     <p
@@ -61,7 +66,10 @@ function supplement(cents: number): string {
     >
       {{ t('sale.pos.options.full', { group: group.name }) }}
     </p>
-    <div class="pos-options__list">
+    <div
+      class="pos-options__list"
+      :class="{ 'pos-options__list--rows': group.allow_repeat }"
+    >
       <div
         v-for="option in group.options"
         :key="option.id"
@@ -75,7 +83,10 @@ function supplement(cents: number): string {
           :data-testid="`${hook.choice}-${option.id}`"
           @click="emit('tap', option.id)"
         >
-          <span class="pos-options__label">{{ option.label }}</span>
+          <span
+            class="pos-options__label"
+            :data-testid="`${hook.name}-${option.id}`"
+          >{{ option.label }}</span>
           <span
             v-if="option.price_delta"
             class="pos-options__delta"
@@ -139,6 +150,9 @@ function supplement(cents: number): string {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
   gap: 0.5rem;
+}
+.pos-options__list--rows {
+  grid-template-columns: 1fr;
 }
 .pos-options__item {
   display: flex;
