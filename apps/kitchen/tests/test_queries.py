@@ -447,7 +447,7 @@ def test_all_day_adds_up_what_is_left_most_first_per_station(clock, product):
     order = open_check("Table 1")
     add_line(order.id, burger, "2")
     add_line(order.id, product("Soup"))
-    fire(order.id)
+    first = fire(order.id).order.lines
     other = open_check("Table 2")
     add_line(other.id, burger)
     lines = fire(other.id).order.lines
@@ -461,6 +461,11 @@ def test_all_day_adds_up_what_is_left_most_first_per_station(clock, product):
         (r.name, r.quantity)
         for r in run("kitchen.ticket.all_day", {"station": "grill"}).rows
     ] == [("Burger", Decimal("2.000"))]
+    # A dish marked ready in a round that still cooks (the soup is left) leaves the count too.
+    run("kitchen.item.bump", {"ticket_id": str(first[0].id), "item_ids": [str(first[0].id)]})
+    assert [(r.name, r.quantity) for r in run("kitchen.ticket.all_day", {}).rows] == [
+        ("Soup", Decimal("1.000"))
+    ]
 
 
 def test_all_day_is_empty_when_nothing_is_left():
