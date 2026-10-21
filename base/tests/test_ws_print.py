@@ -569,6 +569,26 @@ async def test_a_job_queued_after_the_commit_wakes_the_device_of_its_hub_and_no_
     assert await in_a.silent(), "a job of hub B woke a device of hub A"
 
 
+async def test_a_claim_that_empties_the_queue_wakes_nobody(sockets, session):
+    """The wake says a job is waiting (the old hub's: «a job was just queued for a role you host»); the queue
+    changing because this device took its last job is no wake, or every job would end in a claim → idle."""
+    cookie = await db(session)
+    till = await db(printer)
+    queued = await db(enqueue, till)
+    socket = await ready_socket(sockets, cookie, [till])
+
+    await socket.send({"type": "claim", "role": "receipt"})
+    assert (await socket.receive())["jobId"] == str(queued.id)
+    assert await socket.silent(QUIET), "a wake with nothing waiting (the claim emptied the queue)"
+
+    await socket.send({"type": "done", "jobId": str(queued.id)})
+    assert (await socket.receive())["type"] == "ack"
+    assert await socket.silent(QUIET), "a wake with nothing waiting (after the confirmation)"
+
+    await db(enqueue, till)
+    assert await socket.receive() == {"type": "wake", "role": "receipt"}, "a job queued still wakes the device"
+
+
 async def test_the_wake_never_carries_the_document(sockets, session):
     cookie = await db(session)
     till = await db(printer)

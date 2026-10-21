@@ -71,7 +71,7 @@ it 403).
 **The wake** opens no ``LISTEN`` of its own: the socket keeps a stream of the process's live broker (the single
 ``LISTEN`` on the control database that ``/api/live`` uses) with one subscription per role to that role's first
 waiting job (``printing.job.list``). A job queued, retried or sent back to the queue changes it after the COMMIT,
-and a changed result becomes a ``wake`` for that role: as the device's user (its permissions re-read every time),
+and a changed result that still shows a waiting job becomes a ``wake`` for that role: as the device's user (its permissions re-read every time),
 on its hub's channel only, and never carrying the document, which travels only in the answer to ``claim``.
 """
 
@@ -306,7 +306,10 @@ class PrintSocket:
         event, data = _decode_frame(item)
         role = data.get("id")
         if event == "result":
-            if data.get("rev", 0) > 1 and self.device is not None and role in self.device.roles:
+            # A result that changed because this device took the last job shows no job: no wake (the old hub's
+            # wake is «a job was just queued for a role you host», never a claim → idle).
+            waiting = bool((data.get("data") or {}).get("rows"))
+            if waiting and data.get("rev", 0) > 1 and self.device is not None and role in self.device.roles:
                 await self._send({"type": "wake", "role": role})
             return True
         error = data.get("error") or {}
