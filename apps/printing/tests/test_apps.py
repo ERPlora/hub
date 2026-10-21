@@ -67,6 +67,7 @@ def test_what_each_role_gets():
 def test_the_menu_is_its_three_tabs():
     assert [(nav.id, str(nav.label), nav.icon, nav.path) for nav in config().navigation] == [
         ("printers", "Printers", "lucide:receipt", "/printing/printers"),
+        ("devices", "Devices", "lucide:smartphone", "/printing/devices"),
         ("jobs", "Queue", "ion:list-outline", "/printing/jobs"),
         ("settings", "Settings", "ion:settings-outline", "/printing/settings"),
     ]

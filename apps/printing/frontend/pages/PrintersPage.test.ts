@@ -72,7 +72,7 @@ describe('PrintersPage', () => {
     const s = await setup();
     const page = s.wrapper.findComponent(AppPage);
     expect(page.props('title')).toBe('Printing');
-    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['printers', 'jobs', 'settings']);
+    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['printers', 'devices', 'jobs', 'settings']);
     expect(s.find('printing-printers-intro').text()).toBe("Add the business's printers, say what each one prints and check that paper comes out.");
     expect(s.wrapper.findComponent(QueueSummary).exists()).toBe(true);
     expect(s.find('printing-printers-heading').text()).toBe('Printers');

@@ -400,3 +400,6 @@ msgstr "dado de alta el"
 
 msgid "set up by"
 msgstr "dado de alta por"
+
+msgid "Devices"
+msgstr "Dispositivos"
