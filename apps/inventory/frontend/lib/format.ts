@@ -63,3 +63,13 @@ export function formatSignedQuantity(value: string | number, locale: string): st
 export function formatPercent(rate: string | number, locale: string): string {
   return numberFormat(locale, 'percent').format(Number(rate) / 100);
 }
+
+/** The ledger's date as the page language writes it short: numeric day, month and year, and the time
+ *  («7/3/25, 9:05»), so a tablet column keeps the time of day (inventory#130, #139). `timeZone`: the
+ *  page's when not given. Not a date: the text as it came. */
+export function formatShortDateTime(value: string, locale: string, timeZone?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone }).format(date);
+}

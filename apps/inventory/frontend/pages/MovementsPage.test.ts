@@ -4,12 +4,13 @@
 // by Reference; sort by Date, Type, Quantity or Balance. An empty ledger says where movements come
 // from; a search that finds nothing says how a sale is found. A new movement (a reception, a count, a
 // sale) arrives through the stream.
-import { DataTable, formatDateTime } from '@erplora/ui/components';
+import { DataTable } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
+import { formatShortDateTime } from '../lib/format';
 import MovementsPage from './MovementsPage.vue';
 import source from './MovementsPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -78,7 +79,8 @@ describe('MovementsPage', () => {
       ['reference_label', 'Reference', false],
     ]);
     const cells = (row: number) => s.rows()[row].text();
-    expect(cells(0)).toContain(formatDateTime('2026-10-13T10:00:00Z', 'en'));
+    // The short date with its time (inventory#130, #139): a tablet column keeps the time of day.
+    expect(cells(0)).toContain(formatShortDateTime('2026-10-13T10:00:00Z', 'en'));
     expect(cells(0)).toMatch(/Coffee.*CAF-1.*Count.*-1\.5.*8\.5.*Broken bottle/);
     expect(cells(1)).toMatch(/Reception.*\+10.*10.*ALB-2026-0001/);
   });

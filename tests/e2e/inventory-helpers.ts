@@ -7,7 +7,7 @@ import { A, api, psql, shot, shown } from './helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
+  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
@@ -105,6 +105,11 @@ export async function shoot(page: Page, name: string, restore = { width: 1280, h
   }
   await page.setViewportSize(restore);
   return files;
+}
+
+/** The screenshots of a flow of the migration (APP-INVENTORY): `APP-INVENTORY-<key>-<390|834|1440>`. */
+export async function shootFlow(page: Page, key: string): Promise<string[]> {
+  return shoot(page, `APP-INVENTORY-${key}`);
 }
 
 /** Runs a row action of the products list: its inline button, or the row's «⋮» menu when it folded there. */
