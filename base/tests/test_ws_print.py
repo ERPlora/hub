@@ -11,6 +11,7 @@ doors take, and the wake travels on that scope's channel only.
 """
 
 import asyncio
+import dataclasses
 import json
 import uuid
 
@@ -19,7 +20,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.sessions.backends.db import SessionStore
 from django.db import close_old_connections
-from django.test import Client
+from django.test import Client, RequestFactory
 from live.broker import broker
 from live.context import OperationContext, Scope
 from live.errors import AppInactive
@@ -203,6 +204,21 @@ def enqueue(printer_id: str | None = None, scope: Scope = A, **more):
 
 def status_of(job_id) -> str:
     return PrintJob.objects.get(pk=job_id).status
+
+
+def set_up(device_id: str, *printers: str, scope: Scope = A) -> str:
+    """Sets the device ``device_id`` up to print on ``printers`` the way printing does it, from the device itself
+    (``printing.device.register``; the SPA sends its id in ``X-Device-Id``); its registration id."""
+    op = get("printing.device.register")
+    request = RequestFactory().post("/api/printing/devices", HTTP_X_DEVICE_ID=device_id)
+    ctx = dataclasses.replace(owner(scope), request=request)
+    return str(op(ctx, op.input.model_validate({"name": "Till", "printers": list(printers)})).id)
+
+
+def registered_printers(device_id: str, scope: Scope = A) -> list[str] | None:
+    """The printers of the registration of ``device_id`` (``printing.device.get``); none = not set up (or retired)."""
+    device = run("printing.device.get", {"device": device_id}, scope).device
+    return None if device is None else sorted(str(printer.id) for printer in device.printers)
 
 
 async def db(fn, *args, **kwargs):
@@ -396,6 +412,121 @@ async def test_a_device_that_reaches_no_active_printer_of_this_hub_is_refused(so
         assert frame["code"] == "print.host_not_registered", printers
         assert await socket.closed() == 4403
         await socket.disconnect()
+
+
+# ── Who prints: the devices set up in printing (PRINTING-F18) ─────────────────────────────────────
+
+
+async def test_hello_of_a_device_nobody_set_up_is_refused_at_once(sockets, session):
+    """A device nobody set up in printing is no print host here, whatever printers it names: it is told at its
+    hello (the old hub's ``print.host_not_registered``, a refusal it does not retry), not with a ``ready`` and then
+    a ``printing.device_not_registered`` at every claim."""
+    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
+    till = await db(printer)
+    job = await db(enqueue, till)
+    socket = sockets(cookie=cookie)
+    await socket.connect()
+
+    frame = await socket.hello("till-1", [till])
+
+    assert frame["type"] == "error" and frame["code"] == "print.host_not_registered", frame
+    assert await socket.closed() == 4403
+    assert await db(status_of, job.id) == "pending"
+    assert await db(registered_printers, "till-1") is None, "a refused hello set the device up"
+
+    owners = await db(session, "ana")
+    unchosen = sockets(cookie=owners)
+    await unchosen.connect()
+    no_printer = await unchosen.hello("till-1", [])
+    assert no_printer["code"] == "print.host_not_registered"
+    assert no_printer["message"] != frame["message"], "«not set up here» and «no printer chosen» are different facts"
+
+
+@pytest.mark.parametrize("declares", ["nothing", "another printer"])
+async def test_a_device_set_up_in_printing_prints_the_printers_of_its_registration(sockets, session, declares):
+    """What a device reaches is its registration, not what its hello names: with anybody's session (an employee's)
+    it prints for the active printers it was set up with, and a printer that is not on it is not its own."""
+    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
+    till = await db(printer, "Till")
+    kitchen = await db(printer, "Kitchen", "kitchen")
+    bar = await db(printer, "Bar", "bar")
+    await db(set_up, "till-1", till, kitchen)
+    queued = await db(enqueue, till)
+    socket = sockets(cookie=cookie)
+    await socket.connect()
+
+    frame = await socket.hello("till-1", [] if declares == "nothing" else [bar])
+
+    assert frame == {
+        "type": "ready",
+        "deviceId": "till-1",
+        "roles": ["kitchen", "receipt"],
+        "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS,
+    }
+    await socket.send({"type": "claim", "role": "receipt"})
+    assert (await socket.receive())["jobId"] == str(queued.id)
+    await socket.send({"type": "claim", "role": "bar"})
+    assert (await socket.receive())["code"] == "print.role_not_hosted"
+
+
+async def test_the_session_of_whoever_sets_up_the_printers_pairs_the_device_by_printing(sockets, session):
+    """printing's contract: with the session of whoever manages the printers, a device new here is set up (and one
+    set up adds the printer it names) by printing from it, instead of being refused."""
+    cookie = await db(session, "max", role=Membership.Role.MANAGER)
+    till = await db(printer, "Till")
+    kitchen = await db(printer, "Kitchen", "kitchen")
+    receipt = await db(enqueue, till)
+    order = await db(enqueue, kitchen, document_type="kitchen_order", document={"items": []})
+
+    new = await ready_socket(sockets, cookie, [till])
+    await new.send({"type": "claim", "role": "receipt"})
+    assert (await new.receive())["jobId"] == str(receipt.id)
+    assert await db(registered_printers, "till-1") == [till], "the first claim set the device up"
+    await new.disconnect()
+
+    again = sockets(cookie=cookie)
+    await again.connect()
+    ready = await again.hello("till-1", [kitchen])
+    assert ready["type"] == "ready" and ready["roles"] == ["kitchen", "receipt"], "its registration and what it names"
+    await again.send({"type": "claim", "role": "kitchen"})
+    assert (await again.receive())["jobId"] == str(order.id)
+    assert await db(registered_printers, "till-1") == sorted([till, kitchen]), "the printer it named was added"
+
+
+async def test_a_device_retired_while_connected_stops_at_its_next_beat(sockets, session):
+    """Retiring a device is printing's decision: at its next beat it prints for nothing (``refreshed 0``, the old
+    hub's «you host nothing here any more»), no job wakes it and a claim is refused."""
+    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
+    till = await db(printer)
+    registration = await db(set_up, "till-1", till)
+    socket = await ready_socket(sockets, cookie, [till])
+    await socket.send({"type": "beat"})
+    assert (await socket.receive())["refreshed"] == 1
+
+    await db(run, "printing.device.retire", {"device_id": registration})
+    await socket.send({"type": "beat"})
+
+    assert await socket.receive() == {"type": "beat", "refreshed": 0, "heartbeatSeconds": ws_print.HEARTBEAT_SECONDS}
+    await db(enqueue, till)
+    assert await socket.silent(), "a retired device was woken"
+    await socket.send({"type": "claim", "role": "receipt"})
+    assert (await socket.receive())["code"] == "print.role_not_hosted"
+
+
+async def test_a_printer_of_the_registration_switched_off_is_not_reached(sockets, session):
+    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
+    till = await db(printer, "Till")
+    kitchen = await db(printer, "Kitchen", "kitchen")
+    await db(set_up, "till-1", till, kitchen)
+    await db(run, "printing.printer.update", {"printer_id": kitchen, "is_active": False})
+    socket = sockets(cookie=cookie)
+    await socket.connect()
+
+    assert (await socket.hello("till-1", []))["roles"] == ["receipt"]
+
+    await db(run, "printing.printer.update", {"printer_id": till, "is_active": False})
+    await socket.send({"type": "beat"})
+    assert (await socket.receive())["refreshed"] == 0
 
 
 @pytest.mark.parametrize("how", ["absent", "inactive"])
@@ -659,3 +790,11 @@ async def test_the_refusals_speak_the_language_of_the_device(sockets, session):
     assert frame["code"] == "print.host_not_registered"
     assert frame["message"].startswith("Este dispositivo no llega a ninguna impresora activa")
     await socket.closed()
+
+    employees = await db(session, "eva", role=Membership.Role.EMPLOYEE)
+    unknown = sockets(cookie=employees, language="es")
+    await unknown.connect()
+    refused = await unknown.hello("till-1", [])
+    assert refused["code"] == "print.host_not_registered"
+    assert refused["message"].startswith("Este dispositivo no está dado de alta para imprimir")
+    await unknown.closed()

@@ -4,9 +4,9 @@
 The device next to a printer (the ERPlora app) opens ``wss://<hub>/ws/print`` and drains the print queue of the
 printers it reaches: it is told when a job arrives (``wake``), takes it (``claim`` → ``job``), prints it and says
 how it went (``done``/``failed`` → ``ack``). The queue is printing's: this channel only calls its operations by
-name (``printing.printer.get``, ``printing.job.claim``, ``printing.job.complete``, ``printing.job.fail``,
-``printing.job.list``) with the context of the device's session, the same functions, permissions and scope as
-the HTTP doors (``/api/printing/jobs/claim``…), and touches no model itself.
+name (``printing.device.get``, ``printing.printer.get``, ``printing.job.claim``, ``printing.job.complete``,
+``printing.job.fail``, ``printing.job.list``) with the context of the device's session, the same functions,
+permissions and scope as the HTTP doors (``/api/printing/jobs/claim``…), and touches no model itself.
 
 The wire is the old hub's, its messages and fields unchanged (the native app and its print host are published,
 working-rules §12)::
@@ -29,10 +29,16 @@ What the new Hub changed, and nothing else:
   login is the SaaS's and its session an HttpOnly cookie, PLAN-SAAS §3.1): ``hello.session`` is accepted and not
   read. It is checked at ``hello`` and again at every frame, so a session that ended (a logout) closes the socket
   at the device's next beat at the latest.
-- **``hello`` names the printers the device reaches** (``printers``: their ids, which it knows from
-  ``printing.printer.list``), what ``printing.job.claim`` takes (printing's WORKBOOK, «Contrato con la
-  plataforma»). The ``roles`` of ``ready`` are the functions of the active ones (``receipt``, ``kitchen``,
-  ``bar``, ``label``: the old stations), and ``claim`` takes the oldest job of that role's printers.
+- **Who prints is printing's** (``PrintDevice``, the old hub's ``_print_host``, PRINTING-F18): ``hello`` reads the
+  device's registration by its ``deviceId`` (``printing.device.get``), and the printers it reaches are the active
+  ones of that registration, as in the old hub (``ready``'s roles come from the registry, never from the client). A
+  device not set up here (or retired) is refused at its ``hello``. ``printers`` (ids it knows from
+  ``printing.printer.list``) is what the session of whoever sets up the printers adds: with it, a device new here
+  or a printer not on its registration is taken, and its first claim of that role pairs them (printing's
+  WORKBOOK, «Lo que hace ``base`` con ``/ws/print``»); with anybody else's, it changes nothing. The ``roles`` of
+  ``ready`` are the functions of those printers (``receipt``, ``kitchen``, ``bar``, ``label``: the old stations),
+  and ``claim`` takes the oldest job of that role's printers. A ``beat`` reads the registration again: a device
+  retired, or whose printers were switched off, answers ``refreshed: 0`` and prints for nothing.
 - **``job`` keeps every old field** and adds the rest of printing's hand-out, camelCased (``kind``,
   ``printerId``, ``target``, ``paperWidth``, ``copyDocument``, ``copies``, ``openDrawer``, ``html``…), which
   the app's print commands take.
@@ -51,7 +57,8 @@ code                            close  when
 ``print.frame_too_large``       4413   a frame over 8 KiB (before anything is parsed)
 ``unauthenticated``             4401   no session, one that is not valid here, or one that ended
 ``print.device_required``       4400   ``hello`` without ``deviceId``
-``print.host_not_registered``   4403   ``hello`` naming no active printer of this hub
+``print.host_not_registered``   4403   ``hello`` of a device not set up in printing (or retired), or that reaches
+                                       no active printer of this hub
 ``permission_denied``           4403   the user may not print here (a session of another hub's member)
 ``app_inactive``                4404   printing is not on in this hub
 ``invalid_payload``             —      a frame that is not JSON, not of this protocol, or with a bad field
@@ -119,6 +126,7 @@ HELLO_TIMEOUT_SECONDS = 15.0
 #: How often a connected device beats, told in ``ready`` and ``beat`` (the old hub's ``HEARTBEAT_SECONDS``).
 HEARTBEAT_SECONDS = 30
 
+DEVICE_GET = "printing.device.get"
 PRINTER_GET = "printing.printer.get"
 JOB_CLAIM = "printing.job.claim"
 JOB_COMPLETE = "printing.job.complete"
@@ -126,6 +134,9 @@ JOB_FAIL = "printing.job.fail"
 JOB_LIST = "printing.job.list"
 #: The queue's answer when the job is another device's now: a plain no, never an error (as a job it no longer has).
 NOT_YOURS = "printing.job_not_yours"
+#: Whoever sets up the printers pairs a device by printing from it: its claim sets up a device new here, or adds the
+#: printer it names, instead of refusing it (printing's WORKBOOK, PRINTING-F18).
+PAIRS = "printing.manage_settings"
 #: Refusals no retry fixes: the socket is closed after them.
 FATAL_OPERATION_CODES = frozenset({"permission_denied", "app_inactive", "app_entitlement_blocked"})
 #: Close code of a refusal before the handshake: Daphne answers the handshake 403.
@@ -156,9 +167,9 @@ class Device:
 
     ctx: OperationContext
     device_id: str
-    #: The printer ids its ``hello`` named; their functions are re-read on every beat.
+    #: The printer ids its ``hello`` named: what a session that pairs adds to its registration.
     declared: list[str]
-    #: The active ones among them: id → function.
+    #: The active printers it prints for, re-read with its registration on every beat: id → function.
     printers: dict[str, str]
     #: Hand-out of each job given on this socket (``failed`` must name the hand-out it answers).
     attempts: dict[str, int] = field(default_factory=dict)
@@ -370,7 +381,16 @@ class PrintSocket:
         if declared:
             # printing's own input decides what a device and a list of printers are (ids, how many, how long).
             _validated(JOB_CLAIM, {"printers": declared, "device": device_id})
-        printers = self._reached(ctx, declared)
+        printers = self._reached(ctx, device_id, declared)
+        if printers is None:
+            raise Refusal(
+                "print.host_not_registered",
+                gettext(
+                    "This device is not set up to print in this hub: someone who manages the printers sets it up in "
+                    "Printing → Devices."
+                ),
+                status=403,
+            )
         if not printers:
             raise Refusal(
                 "print.host_not_registered",
@@ -439,11 +459,13 @@ class PrintSocket:
             self._unfollow()
             device.printers = printers
             await self._follow()
-        # refreshed 0 = this device prints for no active printer any more: it stops, as when it was never one.
+        # refreshed 0 = this device prints for no active printer any more (or it was retired): it stops, as when it
+        # was never one.
         return {"type": "beat", "refreshed": len(printers), "heartbeatSeconds": HEARTBEAT_SECONDS}
 
     def _still_reached(self) -> dict[str, str]:
-        return self._reached(self._fresh_context(), self.device.declared)
+        device = self.device
+        return self._reached(self._fresh_context(), device.device_id, device.declared) or {}
 
     # ── Session, context and the operations ───────────────────────────────────────────────────────
 
@@ -479,7 +501,25 @@ class PrintSocket:
                 raise refusal from exc
             raise
 
-    def _reached(self, ctx: OperationContext, declared: list[str]) -> dict[str, str]:
+    def _reached(self, ctx: OperationContext, device_id: str, declared: list[str]) -> dict[str, str] | None:
+        """The active printers the device prints for: id → function. Those of its registration in printing
+        (``printing.device.get``), whatever ``declared`` says; with the session of whoever sets up the printers, the
+        active ones among ``declared`` too, which its claim pairs. ``None``: a device not set up here (or retired)
+        that this session does not pair."""
+        op = _operation(DEVICE_GET)
+        try:
+            registration = op(ctx, _validated(DEVICE_GET, {"device": device_id})).device
+        except OperationError as exc:
+            raise _refusal_of(exc) from exc
+        pairs = ctx.has(PAIRS)
+        if registration is None and not pairs:
+            return None
+        printers = {} if registration is None else {str(p.id): p.usage for p in registration.printers if p.is_active}
+        if pairs:
+            printers.update(self._declared(ctx, declared))
+        return printers
+
+    def _declared(self, ctx: OperationContext, declared: list[str]) -> dict[str, str]:
         """The active printers of this hub among ``declared``: id → function."""
         op = _operation(PRINTER_GET)
         printers = {}
