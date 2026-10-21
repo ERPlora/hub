@@ -98,7 +98,7 @@ describe('DevicesPage', () => {
     const cell = (key: string, row: DeviceOut) => columns.find((c) => c.key === key)!.format!(row[key as keyof DeviceOut], row);
     expect([cell('printers', THIS), cell('last_seen_at', THIS), cell('last_seen_at', OTHER)]).toEqual([
       'Till, Kitchen (inactive)',
-      '3 min ago',
+      '3\u00a0min ago',
       'Never',
     ]);
     expect(words(s.find('printing-devices-name-d1').element)).toBe('Counter till This device');

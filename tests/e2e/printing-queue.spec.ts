@@ -1,14 +1,16 @@
-// Printing → Queue and Settings in Chrome (PRINTING-F01, F06, F14, F15, F18; apps/printing/WORKBOOK.md): a job
+// Printing → Queue and Settings in Chrome (PRINTING-F01, F06, F12, F14, F15, F18; apps/printing/WORKBOOK.md): a job
 // the device could not print fails after five hand-outs (the device's side by the API: claim and fail), the
 // owner sends it back to the queue and then cancels it with a reason; the owner sets the ticket settings and
 // the kitchen's printer, and follows the note to the receipt's texts in Sales; the employee reads them blocked.
+// The barcode label asked from Inventory's product sheet waits in the «Label» card, which says it has no printer,
+// until a label printer is added and its device takes it (PRINTING-F12, INVENTORY-F25).
 // Screenshots of both pages, and of each flow, in the three viewports. What is made here is deleted, and the
 // settings put back, after it.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
-import { dialog, fill, pick } from './inventory-helpers';
-import { flowShots, forgetDevices } from './printing-helpers';
+import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { createProduct, dialog, fill, pick, productsReady, rowAction as productAction, searchProducts } from './inventory-helpers';
+import { claim, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
@@ -16,7 +18,11 @@ const KITCHEN = `e2e Kitchen ${RUN}`;
 const REF = `e2e-T-${RUN}`;
 /** The device the API plays (PRINTING-F18): the owner's first claim from it sets it up. */
 const DEVICE = `e2e queue device ${RUN}`;
+/** The product whose label Inventory asks for (PRINTING-F12): a SKU a barcode carries. */
+const LABEL_SKU = `E2E-F12-${RUN}`;
 let before: Record<string, unknown> | undefined;
+/** The label printers PRINTING-F12 switched off, switched back on after it. */
+let switchedOff: string[] = [];
 
 interface Job {
   id: string;
@@ -27,6 +33,10 @@ interface Job {
 }
 
 test.afterAll(() => {
+  switchLabelPrintersBackOn();
+  psql(`delete from printing_printjob where source_app = 'inventory' and reference = '${LABEL_SKU}'`);
+  psql(`delete from inventory_stockmovement where product_id in (select id from inventory_product where sku = '${LABEL_SKU}')`);
+  psql(`delete from inventory_product where sku = '${LABEL_SKU}'`);
   psql(`delete from printing_printjob where reference like 'e2e%' or printer_id in (select id from printing_printer where name like 'e2e %')`);
   if (before && before.updated_at === null) psql('delete from printing_settings');
   else if (before) {
@@ -48,6 +58,48 @@ async function jobsReady(page: Page): Promise<void> {
 
 async function settingsReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=printing-settings-heading]').waitFor({ state: 'visible' });
+}
+
+/**
+ * Switches off, by the API, every active label printer and the one the settings choose for labels, so a label
+ * waits with no printer whatever the database already has. Each one is noted before its call: a failure halfway
+ * still switches the earlier ones back on.
+ */
+async function switchOffLabelPrinters(context: BrowserContext): Promise<void> {
+  const active = await api<{ rows: { id: string; usage: string }[]; total: number }>(context, A, 'GET', '/printing/printers?is_active=true&limit=100');
+  expect(active.status).toBe(200);
+  expect(active.data.total, 'every active printer fits in one page').toBe(active.data.rows.length);
+  const settings = await api<{ label_printer_id: string | null }>(context, A, 'GET', '/printing/settings');
+  expect(settings.status).toBe(200);
+  for (const printer of active.data.rows.filter((p) => p.usage === 'label' || p.id === settings.data.label_printer_id)) {
+    switchedOff.push(printer.id);
+    const res = await api(context, A, 'POST', '/printing/printers/update', { printer_id: printer.id, is_active: false });
+    expect(res.status, `printer ${printer.id} switched off`).toBe(200);
+  }
+}
+
+/** Back on by the database, so it also runs after the test's time ran out and its browser context closed. */
+function switchLabelPrintersBackOn(): void {
+  if (switchedOff.length) psql(`update printing_printer set is_active = true where id in ('${switchedOff.join("','")}')`);
+  switchedOff = [];
+}
+
+/** How far below the top edge of its card the card's title sits, in whole pixels. */
+async function titleOffset(card: Locator): Promise<number> {
+  const [box, title] = await Promise.all([card.boundingBox(), card.locator('header strong').boundingBox()]);
+  if (!box || !title) throw new Error('the card and its title are not painted');
+  return Math.round(title.y - box.y);
+}
+
+/** This task's screenshots (`FIX-PRINTING-F12-INVENTORY-ALREADY-ASKS-<390|834|1440>`), each once `ready` says the page is painted. */
+async function taskShots(page: Page, ready: (page: Page) => Promise<void>): Promise<void> {
+  for (const viewport of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(page);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.screenshot({ path: shot(`FIX-PRINTING-F12-INVENTORY-ALREADY-ASKS-${viewport.label}`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 }
 
 async function jobByRef(context: BrowserContext): Promise<Job> {
@@ -161,4 +213,71 @@ test('PRINTING-F06: the employee reads the settings blocked', async ({ page }) =
   await expect(shown(page).locator('[data-testid=printing-settings-read-only]')).toBeVisible();
   await expect(shown(page).locator('[data-testid=printing-settings-save]')).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=printing-setting-open_drawer_on_sale]')).toBeDisabled();
+});
+
+test('PRINTING-F12: the label asked from the product sheet waits in the «Label» card, which says so, until a label printer takes it', async ({
+  page,
+  context,
+}) => {
+  // flow: PRINTING-F12 (INVENTORY-F25 asks for it; printing#62: the warning of a label with no printer shows)
+  await login(page, A, '/inventory/products');
+  try {
+    await switchOffLabelPrinters(context);
+    const product = await createProduct(context, { name: `E2E Label ${RUN}`, sku: LABEL_SKU, price: 1210 });
+
+    // Inventory: «Print barcode» on the product sheet asks Printing for the label; no printer has the «Label» function.
+    await productsReady(page);
+    await searchProducts(page, LABEL_SKU);
+    await productAction(page, product.id, 'detail');
+    const sheet = dialog(page, 'inventory-product-detail');
+    await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
+    await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/(waiting in the print queue|espera en la cola)/);
+    const mine = psql(
+      `select id from printing_printjob where source_app = 'inventory' and reference = '${LABEL_SKU}' and usage = 'label' and status = 'pending' and printer_id is null`,
+    );
+    expect(mine, 'one label waiting with no printer').toMatch(/^[0-9a-f-]{36}$/);
+
+    // Printing: the «Label» card of the print queue says the label waits with no printer.
+    const till = await api(context, A, 'POST', '/printing/printers', {
+      // Long enough for «Prints on» to take two lines: «Receipt» is the taller card of the row.
+      name: `e2e Till ${RUN} by the front door`,
+      kind: 'network',
+      address: '192.168.1.252',
+      usage: 'receipt',
+    });
+    expect(till.status).toBe(201);
+    await page.goto(`${A}/printing/printers`);
+    const card = shown(page).locator('[data-testid=printing-summary-card-label]');
+    await expect(card).toContainText(/(Waiting, no printer|En cola, sin impresora)/);
+    await expect(card).toContainText(/(Waiting|En cola): [1-9]/);
+    // Side by side, each card starts at its top: the shorter «Label» is not spread to the height of «Receipt».
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const receipt = shown(page).locator('[data-testid=printing-summary-card-receipt]');
+    await expect(receipt.locator('[data-testid=printing-summary-prints-on-receipt]')).toBeVisible();
+    expect(await titleOffset(card)).toBe(await titleOffset(receipt));
+    await taskShots(page, async (p) => {
+      await expect(shown(p).locator('[data-testid=printing-summary-card-label]')).toContainText(/(Waiting, no printer|En cola, sin impresora)/);
+    });
+
+    // A label printer arrives: the card turns ready and names it, and the device next to it takes the label.
+    const labels = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
+      name: `e2e Labels ${RUN}`,
+      kind: 'network',
+      address: '192.168.1.251',
+      usage: 'label',
+    });
+    expect(labels.status).toBe(201);
+    await expect(card).toContainText(/(Ready|Listo)/);
+    await expect(card).toContainText(`e2e Labels ${RUN}`);
+    // The oldest label goes first: one another run left waiting comes out before this one.
+    const waiting = Number(psql(`select count(*) from printing_printjob where usage = 'label' and status = 'pending'`));
+    let taken: string | undefined;
+    for (let turn = 0; turn < waiting && taken !== mine; turn += 1) taken = (await claim(context, labels.data.id, DEVICE))?.id;
+    expect(taken).toBe(mine);
+    expect(psql(`select concat_ws(' ', document->>'product_name', document->>'barcode', document->>'price') from printing_printjob where id = '${mine}'`)).toBe(
+      `E2E Label ${RUN} ${LABEL_SKU} 12.1`,
+    );
+  } finally {
+    switchLabelPrintersBackOn();
+  }
 });

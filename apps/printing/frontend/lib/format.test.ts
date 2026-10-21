@@ -35,10 +35,25 @@ const printer = (more: Partial<PrinterOut> = {}): PrinterOut =>
 
 describe('waited', () => {
   it('says seconds, minutes or hours, rounded down', () => {
-    expect(waited('2026-10-14T21:09:35Z', NOW, t)).toBe('25 s');
-    expect(waited('2026-10-14T21:07:00Z', NOW, t)).toBe('3 min');
-    expect(waited('2026-10-14T18:00:00Z', NOW, t)).toBe('3 h');
-    expect(waited('2026-10-14T21:11:00Z', NOW, t)).toBe('0 s');
+    expect(waited('2026-10-14T21:09:35Z', NOW, t)).toBe('25\u00a0s');
+    expect(waited('2026-10-14T21:07:00Z', NOW, t)).toBe('3\u00a0min');
+    expect(waited('2026-10-14T18:00:00Z', NOW, t)).toBe('3\u00a0h');
+    expect(waited('2026-10-14T21:11:00Z', NOW, t)).toBe('0\u00a0s');
+  });
+
+  it('keeps the number with its unit: a narrow card never breaks «0» from «s»', () => {
+    const inSpanish = (key: string, named?: Record<string, unknown>) => i18n.global.t(key, named ?? {}, { locale: 'es' });
+    for (const [translate, from] of [
+      [t, '2026-10-14T21:09:35Z'],
+      [t, '2026-10-14T21:07:00Z'],
+      [t, '2026-10-14T18:00:00Z'],
+      [inSpanish, '2026-10-14T21:09:35Z'],
+      [inSpanish, '2026-10-14T21:07:00Z'],
+      [inSpanish, '2026-10-14T18:00:00Z'],
+    ] as const) {
+      const age = waited(from, NOW, translate);
+      expect(age, age).toMatch(/^\d+ (s|min|h)$/);
+    }
   });
 });
 
