@@ -67,6 +67,8 @@ export interface MountOptions {
   locale?: 'en' | 'es';
   session?: SessionMe;
   stubs?: Record<string, Component | boolean>;
+  /** How every API call is answered from the start, the ones made while mounting included. */
+  answer?: { status: number; body: unknown };
 }
 
 type Params = Record<string, unknown>;
@@ -81,6 +83,8 @@ export interface SentCall {
 
 export async function mountSale(component: Component, options: MountOptions = {}) {
   const harness = createTestClient({ routes: OPERATION_ROUTES });
+  const first = options.answer;
+  if (first) harness.net.onApi(() => Response.json(first.body, { status: first.status }));
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:path(.*)*', component: { template: '<div />' } }],

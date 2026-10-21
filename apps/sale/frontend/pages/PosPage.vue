@@ -450,6 +450,8 @@ watch(
 // ── Charging ─────────────────────────────────────────────────────────────────────────────────────
 const documentOpen = shallowRef(false);
 const documentSaleId = shallowRef<string | null>(null);
+/** The charge already queued its original for the printer (PRINTING-F07): the paper on screen is a copy. */
+const documentDuplicate = shallowRef(false);
 
 /** The lines of the check when «Charge» opened the sheet: what a charge of all of them means. */
 let chargingLines: string[] = [];
@@ -493,7 +495,8 @@ async function charge(): Promise<void> {
 /**
  * Charged: whole or partial is what the sheet charged (`lineIds`, frozen when it opened; none = the
  * whole check), never the marks now — a live update may have dropped them. Whole: the screen starts
- * afresh. Partial: the check stays with what is left. Either way the sale's document opens.
+ * afresh. Partial: the check stays with what is left. Either way the sale's document opens; a receipt the
+ * charge queued for the printer is said, and the paper on screen is then a copy.
  */
 function onCharged(sale: SaleOut, lineIds: readonly string[]): void {
   const whole = lineIds.length === 0 || chargingLines.every((id) => lineIds.includes(id));
@@ -504,6 +507,8 @@ function onCharged(sale: SaleOut, lineIds: readonly string[]): void {
   } else {
     marks.value = [];
   }
+  if (sale.printed?.queued) void toastSuccess(t('sale.document.queued', { printer: sale.printed.printer ?? '' }));
+  documentDuplicate.value = !!sale.printed?.queued;
   documentSaleId.value = sale.id;
   documentOpen.value = true;
 }
@@ -797,7 +802,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
       <DocumentModal
         v-model:open="documentOpen"
         :sale-id="documentSaleId"
-        :duplicate="false"
+        :duplicate="documentDuplicate"
       />
     </div>
   </AppPage>

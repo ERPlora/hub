@@ -46,6 +46,7 @@ from apps.inventory.schemas import (
     ProductOut,
     ProductPatchIn,
     ProductRefIn,
+    ProductSoldOutIn,
     ProductsOut,
     ReceiveIn,
     SaleCompletedIn,
@@ -175,6 +176,7 @@ def refused(exc_type, action):
         ("inventory.product.bulk_create", "inventory.import_product", ProductImportIn, ImportReportOut, "high"),
         ("inventory.product.update", "inventory.change_product", ProductPatchIn, ProductOut, "normal"),
         ("inventory.product.delete", "inventory.delete_product", ProductRefIn, DeletedOut, "high"),
+        ("inventory.product.set_sold_out", "inventory.change_product", ProductSoldOutIn, ProductOut, "normal"),
         ("inventory.product_category.add", "inventory.change_product", ProductCategoryIn, ProductCategoryLinkOut, "normal"),
         ("inventory.product_category.remove", "inventory.change_product", ProductCategoryIn, ProductCategoryLinkOut, "normal"),
         ("inventory.category.create", "inventory.add_category", CategoryIn, CategoryOut, "normal"),
@@ -599,6 +601,81 @@ def test_an_employee_cannot_delete():
         PermissionDenied,
         lambda: run("inventory.product.delete", ProductRefIn(id=created.id), "hub_employee"),
     )
+
+
+# inventory.product.set_sold_out (INVENTORY-F29)
+
+
+def sold_out(product_id=None, value=True, role="hub_admin", said=None):
+    return run(
+        "inventory.product.set_sold_out",
+        ProductSoldOutIn(id=product_id, product=said, sold_out=value),
+        role,
+    )
+
+
+def test_a_new_product_is_on_sale():
+    assert create().is_sold_out is False
+    assert Product.objects.get().is_sold_out is False
+
+
+def test_mark_a_product_sold_out_and_put_it_back_on_sale():
+    created = create("Croquettes", "CRO-1")
+    clear_outbox()
+
+    marked = sold_out(created.id)
+
+    # Sold out is not inactive: the switch stays on, the till stops offering it (INVENTORY-F27).
+    assert (marked.is_sold_out, marked.is_active) == (True, True)
+    assert Product.objects.get().updated_by == "tester"
+    [(name, payload)] = outbox()
+    assert (name, payload["id"], payload["is_sold_out"], payload["is_active"]) == (
+        events.PRODUCT_UPDATED,
+        str(created.id),
+        True,
+        True,
+    )
+
+    clear_outbox()
+    assert sold_out(created.id, False).is_sold_out is False
+    assert [(name, payload["is_sold_out"]) for name, payload in outbox()] == [
+        (events.PRODUCT_UPDATED, False)
+    ]
+
+
+def test_a_product_is_named_by_its_sku_or_by_its_name_as_said_aloud():
+    created = create("Croquettes", "CRO-1")
+    assert sold_out(said="croquettes").id == created.id
+    assert sold_out(said="cro-1", value=False).is_sold_out is False
+
+
+def test_marking_what_it_already_is_records_nothing():
+    created = create()
+    sold_out(created.id)
+    clear_outbox()
+    assert sold_out(created.id).is_sold_out is True
+    assert outbox() == []
+
+
+def test_an_edit_or_the_switch_keeps_it_sold_out():
+    created = create()
+    sold_out(created.id)
+    update(created.id, name="Espresso", is_active=False)
+    assert update(created.id, is_active=True).is_sold_out is True
+
+
+def test_an_employee_cannot_mark_a_product_sold_out():
+    created = create()
+    refused(PermissionDenied, lambda: sold_out(created.id, role="hub_employee"))
+    assert Product.objects.get().is_sold_out is False
+
+
+@pytest.mark.parametrize("deleted", [True, False])
+def test_marking_a_missing_or_deleted_product_is_not_found(deleted):
+    target = create().id if deleted else uuid.uuid7()
+    if deleted:
+        run("inventory.product.delete", ProductRefIn(id=target))
+    refused(NotFound, lambda: sold_out(target))
 
 
 # inventory.product_category.add and .remove (INVENTORY-F08)
@@ -1755,6 +1832,21 @@ def test_a_write_in_scope_b_notifies_b_only(listen):
     assert received(on_b, stop_after=1) == [
         {"events": [events.PRODUCT_CREATED, events.STOCK_CHANGED]}
     ]
+    assert received(on_a, timeout=0.3) == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_marking_a_product_sold_out_in_scope_b_notifies_b_only(listen):
+    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+    croquettes = get("inventory.product.create")(
+        ctx_for("hub_admin", B), ProductIn(name="Croquettes", sku="CRO", price=1, tax_category_key=TAX)
+    )
+    on_a, on_b = listen(A), listen(B)
+
+    get("inventory.product.set_sold_out")(ctx_for("hub_admin", B), ProductSoldOutIn(id=croquettes.id, sold_out=True))
+
+    # The till's catalog of B re-runs on this event (live.py); the one of A hears nothing.
+    assert received(on_b, stop_after=1) == [{"events": [events.PRODUCT_UPDATED]}]
     assert received(on_a, timeout=0.3) == []
 
 

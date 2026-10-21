@@ -4,7 +4,7 @@
 // product with its supplement and why it is not offered, and per row the handle, up, down, «Sold out» /
 // «Available», edit and remove (after its confirmation); below, the product picker, «Supplement», «Add
 // choice» and «Add several». A refusal is said inside the course.
-import { Combo, ConfirmDialog } from '@erplora/ui/components';
+import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, ionValue, type MountOptions, mountCombo, settle } from '../__tests__/mount-combo';
@@ -85,6 +85,13 @@ describe('CourseCard: its choices', () => {
     expect(s.el('combo-choice-o2-status').textContent?.trim()).toBe('Sold out');
     expect(s.el('combo-choice-o3-status').textContent?.trim()).toBe('Deactivated in Inventory');
     expect(s.inDoc('combo-choice-o1-status')).toBeNull();
+  });
+
+  it('INVENTORY-F29: a product sold out in Inventory says so, a warning like the course\'s own sold out (it comes back)', async () => {
+    const s = await setup({ ...COURSE, options: [option({ id: 'o4', product_id: 'p4', product_name: 'Flan', sku: 'FLA', status: 'product_sold_out' })] });
+    expect(s.el('combo-choice-o4-status').textContent?.trim()).toBe('Sold out in Inventory');
+    const pill = s.wrapper.findAllComponents(StatusPill).find((found) => found.attributes('data-testid') === 'combo-choice-o4-status');
+    expect(pill?.props('tone')).toBe('warning');
   });
 
   it('a course without choices says nobody can resolve it', async () => {
@@ -203,5 +210,7 @@ describe('CourseCard: adding and editing a choice', () => {
     expect(s.el('combo-course-g1-rule').textContent?.trim()).toBe('Obligatorio · elige 1 · hasta 1 · sin repetir');
     expect(s.el('combo-choice-o3-status').textContent?.trim()).toBe('Desactivado en Inventario');
     expect(s.el('combo-course-g1-save').textContent).toContain('Añadir elección');
+    const sold = await setup({ ...COURSE, options: [option({ id: 'o4', product_id: 'p4', product_name: 'Flan', status: 'product_sold_out' })] }, { locale: 'es' });
+    expect(sold.el('combo-choice-o4-status').textContent?.trim()).toBe('Agotado en Inventario');
   });
 });

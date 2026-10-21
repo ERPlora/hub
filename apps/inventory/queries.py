@@ -105,6 +105,8 @@ FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 #: Products that cannot be sold for lack of a live tax category.
 UNTAXED = Q(tax_category__isnull=True) | Q(tax_category__is_active=False)
+#: On sale: what the till offers (INVENTORY-F27). A sold-out article (INVENTORY-F29) stays active, off the till.
+ON_SALE = Q(is_active=True, is_sold_out=False)
 
 
 # Shared by services.py, inside the command's own transaction
@@ -249,7 +251,9 @@ def _first_match(queryset, lookups) -> list:
     expose_api=True,
     ai={
         "description": "List the catalog's products with their current stock; needs_tax_setup marks the ones "
-        "without a tax category, which cannot be sold. Filter by category to get one category's articles."
+        "without a tax category, which cannot be sold, and is_sold_out the ones marked sold out. Filter by "
+        "category to get one category's articles, by is_active=true to get what the till offers (add "
+        "include_sold_out=true for every active product, sold out or not)."
     },
 )
 def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
@@ -282,13 +286,13 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     output=SaleProductPage,
     expose_api=True,
     ai={
-        "description": "Sale catalog: the active products with what prices a sale line (price, cost, tax category, "
-        "units) and whether a sale lowers their stock; never their stock."
+        "description": "Sale catalog: the products on sale (active, not sold out) with what prices a sale line "
+        "(price, cost, tax category, units) and whether a sale lowers their stock; never their stock."
     },
 )
 def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
     products = (
-        Product.objects.filter(is_deleted=False, is_active=True)
+        Product.objects.filter(ON_SALE, is_deleted=False)
         .select_related("tax_category")
         .annotate(tracks=tracks_stock_expression(current_settings()))
     )
@@ -358,15 +362,20 @@ def filter_products(products, params: ProductFiltersIn):
             price__lte=params.price_max,
             stock__gte=params.stock_min,
             stock__lte=params.stock_max,
-            is_active=params.is_active,
             tracks=params.tracks_stock,
             product_type=params.product_type,
         )
     )
+    if params.is_active is not None:
+        # The till asks for what is on sale; a screen that configures, for the switch alone.
+        active = Q(is_active=True) if params.include_sold_out else ON_SALE
+        products = products.filter(active if params.is_active else ~active)
     if params.needs_tax_setup is not None:
         products = products.filter(UNTAXED if params.needs_tax_setup else ~UNTAXED)
     if params.status == "needs_tax_setup":
         products = products.filter(UNTAXED)
+    elif params.status == "sold_out":
+        products = products.filter(is_sold_out=True)
     elif params.status is not None:
         products = products.filter(~UNTAXED, is_active=params.status == "active")
     links = ProductCategory.objects.filter(category__is_deleted=False)
@@ -427,7 +436,7 @@ def list_product_categories(
     output=CategoryPage,
     expose_api=True,
     ai={
-        "description": "List the product categories, with how many active products each one has."
+        "description": "List the product categories, with how many products on sale each one has."
     },
 )
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
@@ -716,6 +725,7 @@ def _product_row(product: Product) -> dict:
         "tax_category_id",
         "track_stock",
         "is_active",
+        "is_sold_out",
         "created_at",
         "updated_at",
     )
@@ -751,7 +761,9 @@ def _sale_row(product: Product) -> dict:
 
 def _categories():
     active = Q(
-        product_links__product__is_active=True, product_links__product__is_deleted=False
+        product_links__product__is_active=True,
+        product_links__product__is_sold_out=False,
+        product_links__product__is_deleted=False,
     )
     return (
         Category.objects.filter(is_deleted=False)

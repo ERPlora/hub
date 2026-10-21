@@ -359,6 +359,7 @@
       "print": "Imprimir",
       "printFailed": "No se pudo imprimir",
       "defaultBusiness": "Mi negocio",
+      "queued": "Enviado a {printer}.",
       "receipt": "Tiquet",
       "invoice": "Factura",
       "number": "Nº",

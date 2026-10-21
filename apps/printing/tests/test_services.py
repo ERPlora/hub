@@ -10,10 +10,12 @@ import datetime as dt
 import pytest
 from django.utils import timezone
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.context import system_context
 from live.models import OutboxEvent
 
 from apps.printing.models import Printer, PrintJob, Settings
-from apps.printing.tests.conftest import RECEIPT, ctx_for, enqueue, printer, run
+from apps.printing import services
+from apps.printing.tests.conftest import A, RECEIPT, ctx_for, enqueue, printer, run
 
 pytestmark = pytest.mark.django_db
 
@@ -326,6 +328,19 @@ def test_with_the_receipt_off_at_checkout_only_the_drawer_opens():
     )
 
 
+def test_a_checkout_without_cash_keeps_the_drawer_shut():
+    """PRINTING-F13: the drawer opens when cash comes in (Square, Toast, Odoo, Shopify, Lightspeed); the till
+    says when it did not, and the settings still decide when it did."""
+    run("printing.settings.update", {"open_drawer_on_sale": True})
+    assert enqueue(automatic=True, open_drawer=False).job.open_drawer is False
+    assert enqueue(automatic=True, open_drawer=True).job.open_drawer is True
+    run("printing.settings.update", {"print_receipt_on_sale": False})
+    out = enqueue(automatic=True, open_drawer=False)
+    assert (out.job, out.skipped) == (None, "print_on_sale_off")
+    run("printing.settings.update", {"open_drawer_on_sale": False})
+    assert enqueue(automatic=True, open_drawer=True).job is None
+
+
 def test_whoever_prints_asks_for_a_print_and_nobody_else():
     assert enqueue().job is not None
     assert run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx_for("hub_employee")).job
@@ -356,6 +371,18 @@ def test_the_system_printer_tests_with_an_a4_page():
     queued = PrintJob.objects.get(pk=out.id)
     assert queued.format == "a4"
     assert "Office" in queued.html and "<script" not in queued.html
+
+
+def test_the_a4_test_page_is_signed_by_the_business_in_the_callers_language():
+    """hub#1735, hub#1803: never «ERPlora Bridge», a product that is gone; the business's name once invoicing
+    knows it (ERPlora until then), in the language of whoever tests."""
+    printer("Office", kind="system", address="")
+    unnamed = PrintJob.objects.get(pk=run("printing.printer.test", {"printer": "Office"}).id).html
+    assert "<h1>ERPlora</h1>" in unnamed and "Bridge" not in unnamed
+    run("invoice.issuer.update", {"legal_name": "Salón Ana SL", "tax_id": "B12345674", "address": "Calle Mayor 1"})
+    out = run("printing.printer.test", {"printer": "Office"}, ctx_for(language="es"))
+    named = PrintJob.objects.get(pk=out.id).html
+    assert "<h1>Salón Ana SL</h1>" in named and '<html lang="es">' in named and "Impresora OK" in named
 
 
 def test_an_inactive_printer_is_not_tested():
@@ -396,6 +423,8 @@ def test_a_device_takes_the_oldest_job_of_its_printers():
     sent = PrintJob.objects.get(pk=first.id)
     assert (sent.status, sent.device, sent.attempts) == ("sent", "Till 1", 1)
     assert sent.leased_until > timezone.now() + dt.timedelta(seconds=80)
+    # The device is told how long it has to answer (WORKBOOK «Contrato con la plataforma», claim).
+    assert taken.leased_until == sent.leased_until
     assert claim(till).id == second.id
     assert claim(till) is None
     assert events("printing.job.claimed")[0] == {"id": str(first.id), "printer_id": str(till.id)}
@@ -755,3 +784,61 @@ def test_a_chosen_printer_that_is_inactive_is_passed_over_for_the_first_active_o
     run("printing.printer.update", {"printer_id": str(till.id), "is_active": False})
     queued = enqueue()
     assert (queued.job.printer_id, queued.job.printer_name) == (spare.id, "Spare")
+
+
+# ── PRINTING-F20 How long the queue keeps a job (HUB-F206) ──────────────────────────────────────────
+
+
+def ended(days: int, status: str, **more) -> PrintJob:
+    """A job of the queue that ended ``days`` ago in ``status`` (or, still waiting, was queued then)."""
+    when = timezone.now() - dt.timedelta(days=days)
+    queued = PrintJob.objects.get(pk=enqueue(source_ref=f"{status}-{days}").job.id)
+    stamp = {"done": "printed_at", "cancelled": "cancelled_at", "failed": "failed_at"}.get(status)
+    PrintJob.objects.filter(pk=queued.pk).update(status=status, created_at=when - dt.timedelta(minutes=5), **({stamp: when} if stamp else {}), **more)
+    return queued
+
+
+def prune(ctx=None):
+    return run("printing.job.prune", {}, ctx or system_context(A))
+
+
+def test_a_finished_job_is_forgotten_30_days_after_it_ended_and_a_waiting_one_never():
+    printer("Till")
+    gone = [ended(31, "done"), ended(31, "cancelled"), ended(31, "failed")]
+    kept = [ended(29, "done"), ended(29, "failed"), ended(60, "pending"), ended(60, "sent")]
+    out = prune()
+    assert out.count == 3
+    assert set(PrintJob.objects.values_list("pk", flat=True)) == {job.pk for job in kept}
+    assert not PrintJob.objects.filter(pk__in=[job.pk for job in gone]).exists()
+    # The screens that show the queue re-run: a deleted failed job no longer counts.
+    assert events("printing.job.pruned") == [{"count": 3}]
+
+
+def test_nothing_to_forget_is_no_event():
+    printer("Till")
+    ended(10, "done")
+    assert prune().count == 0
+    assert events("printing.job.pruned") == []
+
+
+def test_the_queue_is_forgotten_in_batches(monkeypatch):
+    printer("Till")
+    for _ in range(3):
+        ended(40, "done")
+    monkeypatch.setattr(services, "PRUNE_BATCH", 2)
+    assert [prune().count, prune().count, prune().count] == [2, 1, 0]
+
+
+def test_a_forgotten_key_can_print_again():
+    printer("Till")
+    old = ended(40, "done")
+    prune()
+    again = enqueue(job_key=old.job_key)
+    assert (again.duplicate, again.job.status) == (False, "pending")
+
+
+def test_only_the_platform_forgets_the_queue():
+    for role in ("hub_manager", "hub_employee"):
+        with pytest.raises(PermissionDenied):
+            prune(ctx_for(role))
+

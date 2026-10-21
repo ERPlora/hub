@@ -18,6 +18,7 @@ def test_every_event_is_named_by_the_convention():
         "printing.job.failed",
         "printing.job.retried",
         "printing.job.cancelled",
+        "printing.job.pruned",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)
 

@@ -117,7 +117,8 @@ export function cleanDocumentsOf(orders: string): void {
 }
 
 /** Deletes the sales and checks a run made (their lines name an `E2E-` product, an `e2e ` department or
- *  the check's title is `e2e …`), their lines in a cash shift, the fiscal documents Invoicing issued for them in the same charge, void
+ *  the check's title is `e2e …`), their lines in a cash shift, the paper they asked of Printing (and the
+ *  kitchen's sheets of their checks), the fiscal documents Invoicing issued for them in the same charge, void
  *  or refund (with Invoicing's own cleanup, which gives the series' numbers back), and the `e2e `
  *  departments and quick notes. Run it BEFORE the customer and inventory cleanups: a sale keeps its
  *  customer's card. */
@@ -127,6 +128,14 @@ export function cleanSales(): void {
     [
       `create temp table e2e_orders as ${E2E_ORDERS}`,
       'create temp table e2e_sales as select id from sale_sale where order_id in (select id from e2e_orders)',
+      // The paper their charges, reprints and bills asked of Printing, and the kitchen's sheets of their checks
+      // (job keys `sale-<sale>-…`, `sale-order-<check>-…`, `kitchen-<ticket>-…`): a sheet left waiting without
+      // a printer is the next one a device takes in another spec.
+      `delete from printing_printjob where job_key like any (array(
+        select 'sale-' || id || '-%' from e2e_sales
+        union all select 'sale-order-' || id || '-%' from e2e_orders
+        union all select 'kitchen-' || ticket_id || '-%' from kitchen_ticketitem
+          where sale_line_id in (select id from sale_orderline where order_id in (select id from e2e_orders))))`,
       // A sale charged in cash with a drawer open has its line in the shift (a run that stopped before its own
       // cleanup leaves it): it goes first, or it holds its sale, payment and refund.
       `delete from cash_register_movement where sale_id in (select id from e2e_sales)

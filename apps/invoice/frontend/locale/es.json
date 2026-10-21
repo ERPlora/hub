@@ -104,6 +104,7 @@
       "loadError": "No se pudo cargar el detalle",
       "print": "Imprimir / PDF",
       "printFailed": "No se pudo imprimir la factura",
+      "queued": "Enviado a {printer}.",
       "missingTaxId": "Esta factura no tiene el NIF del cliente: la impresora de tiques no puede sacarla como factura completa.",
       "fields": {
         "type": "Tipo",

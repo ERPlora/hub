@@ -17,7 +17,7 @@ import { plain } from '../lib/format';
 import type { InvoiceOut } from '../operations';
 import InvoiceDetailPage from './InvoiceDetailPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn(), sent: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
@@ -26,10 +26,15 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+vi.mock('@erplora/ui/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
+  toastSuccess: mocks.sent,
+}));
 vi.mock('../../../sale/frontend/lib/print', () => ({ printPaper: mocks.print }));
 beforeEach(() => {
   mocks.confirm.mockReset();
   mocks.print.mockReset();
+  mocks.sent.mockReset();
 });
 
 const OP = 'invoice.invoice.get';
@@ -185,8 +190,41 @@ describe('InvoiceDetailPage: its actions', () => {
     await s.show({ ...INVOICE, source_type: 'sale' });
     expect(s.wrapper.findComponent(InvoicePaper).props()).toMatchObject({ duplicate: true });
     await click(s.find('invoice-detail-print').element);
+    await flush();
     expect(mocks.print).toHaveBeenCalledOnce();
     expect((mocks.print.mock.calls[0][0] as HTMLElement).dataset.testid).toBe('invoice-paper');
+  });
+
+  it('«Print / PDF» asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
+    const s = await setup();
+    await s.show({ ...INVOICE, source_type: 'sale' });
+    s.answer(200, { queued: true, job_id: 'j1', printer: 'Office' });
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    expect(s.sent()).toEqual([
+      { method: 'POST', path: '/api/invoice/invoices/print', query: {}, body: { invoice_id: 'i1', duplicate: true } },
+    ]);
+    expect(mocks.sent).toHaveBeenCalledWith('Sent to Office.');
+    expect(mocks.print).not.toHaveBeenCalled();
+  });
+
+  it('not queued, or the queue out of reach, the browser prints the A4 paper', async () => {
+    const answers = [
+      [200, { queued: false, job_id: null, printer: null }],
+      [503, { error: { code: 'unavailable', message: 'down' } }],
+    ] as const;
+    for (const [status, body] of answers) {
+      mocks.print.mockReset();
+      const s = await setup();
+      await s.show(INVOICE);
+      s.answer(status, body);
+      await click(s.find('invoice-detail-print').element);
+      await flush();
+      expect(s.sent().find((call) => call.path === '/api/invoice/invoices/print')?.body).toEqual({ invoice_id: 'i1', duplicate: false });
+      expect(mocks.print).toHaveBeenCalledOnce();
+      expect(mocks.sent).not.toHaveBeenCalled();
+      s.wrapper.unmount();
+    }
   });
 
   it('«Mark as paid» asks and marks it; a refusal is said above the buttons', async () => {
