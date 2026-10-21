@@ -461,17 +461,22 @@ let chargingLines: string[] = [];
 const verifactuOn = computed(
   () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
 );
+/** Kitchen is on in this business. */
+const kitchenActive = computed(() => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on'));
 /** «Current order» and its send: Kitchen on in this business and the right to send to it. */
-const kitchenOn = computed(
-  () => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on') && session.can('kitchen.add_ticket'),
-);
+const kitchenOn = computed(() => kitchenActive.value && session.can('kitchen.add_ticket'));
+/** «Tickets · N» and «Order tickets» (KITCHEN-F19, F20): Kitchen on and the right to see its tickets. */
+const kitchenTickets = computed(() => kitchenActive.value && session.can('kitchen.view_ticket'));
 /** Nothing new to send (another device sent it, or only services wait): not a failure. */
 const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
 
 async function sendRound(rush: boolean): Promise<boolean> {
-  const sent = await till.sendToKitchen(rush);
+  // kitchen#82: the ticket names who attends the check («Atiende»); with «Yo», the kitchen names who sends it.
+  const sent = await till.sendToKitchen(rush, staff.value.id ? staff.value.name : null);
   if (sent.ok) {
-    void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
+    // hub#2257: sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
+    if (sent.printed === false) void toast(t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }), 'warning', 4500);
+    else void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
     return true;
   }
   if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
@@ -636,6 +641,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             :open-checks="openChecks"
             :table-number="seatOfCheck?.table_number ?? null"
             :kitchen="kitchenOn"
+            :kitchen-tickets="kitchenTickets"
             @park="openSheet(() => (parking = true))"
             @close="cartOpen = false"
             @rename="till.rename($event)"

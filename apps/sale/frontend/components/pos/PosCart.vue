@@ -4,7 +4,9 @@
 // the heading (title and chips), the lines (they scroll) and the foot (always in view). It paints what
 // the page knows of the check and asks for everything; the page writes (`useTill`). With Kitchen (SALE-F20,
 // `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending, says how many
-// items wait (also to a screen reader) and carries the send bar; a send goes up (`send`, with its rush).
+// items wait (also to a screen reader) and carries the send bar; a send goes up (`send`, with its rush). With
+// the right to see Kitchen's tickets (`kitchenTickets`), «Tickets · N» rides beside the head of what was sent
+// (KITCHEN-F19, F20).
 import { computed, shallowRef, watch } from 'vue';
 
 import { useT } from '../../composables/useT';
@@ -14,6 +16,7 @@ import CartHeading from './CartHeading.vue';
 import CartLines from './CartLines.vue';
 import CartToolbar from './CartToolbar.vue';
 import KitchenSendBar from './KitchenSendBar.vue';
+import KitchenTickets from './KitchenTickets.vue';
 import OpenChecksPopover from './OpenChecksPopover.vue';
 
 const props = defineProps<{
@@ -39,6 +42,8 @@ const props = defineProps<{
   tableNumber?: string | null;
   /** Kitchen on and the right to send to it (SALE-F20): the tabs «Check» and «Current order». */
   kitchen?: boolean;
+  /** Kitchen on and the right to see its tickets (KITCHEN-F19): «Tickets · N» beside what was sent. */
+  kitchenTickets?: boolean;
 }>();
 const emit = defineEmits<{
   park: [];
@@ -70,10 +75,12 @@ const blockedReason = computed(() => (props.needsCustomer ? t('sale.pos.customer
 
 // ── «Check» and «Current order» (SALE-F20) ──
 const tab = shallowRef<'check' | 'round'>('check');
-/** Another check on screen starts on «Check». */
+/** Another check on screen starts on «Check»; the first line opening this one keeps the tab chosen. */
 watch(
   () => props.order?.id,
-  () => (tab.value = 'check'),
+  (_id, before) => {
+    if (before) tab.value = 'check';
+  },
 );
 /** What the next round sends: the lines not sent yet; a service never goes to the kitchen. */
 const pending = computed(() => lines.value.filter((line) => !line.fired_at && !line.is_service));
@@ -200,7 +207,14 @@ function park(): void {
         @gift="emit('gift', $event)"
         @staff="emit('lineStaff', $event)"
         @void="emit('voidLine', $event)"
-      />
+      >
+        <template
+          v-if="kitchenTickets && order"
+          #sent
+        >
+          <KitchenTickets :order-id="order.id" />
+        </template>
+      </CartLines>
     </div>
     <KitchenSendBar
       v-if="roundMode && pending.length"

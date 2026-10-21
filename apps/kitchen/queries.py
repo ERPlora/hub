@@ -1371,7 +1371,8 @@ def get_settings(ctx: OperationContext, params: NoIn) -> dict:
     return settings_out(current_settings())
 
 
-def log_row(entry: LogEntry) -> dict:
+def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
+    """An entry of the History; ``names`` turns the username it saved into the name a person reads."""
     return {
         "id": entry.id,
         "action": entry.action,
@@ -1379,7 +1380,7 @@ def log_row(entry: LogEntry) -> dict:
         "ticket_number": entry.ticket.number,
         "item_name": entry.item.name if entry.item else "",
         "station_name": entry.station.name if entry.station else "",
-        "actor": entry.actor,
+        "actor": (names or {}).get(entry.actor, entry.actor),
         "notes": entry.notes,
         "created_at": entry.created_at,
     }
@@ -1416,9 +1417,10 @@ def list_log(ctx: OperationContext, params: LogListIn) -> dict:
             created_at__lt=start_of(params.date_to + dt.timedelta(days=1))
         )
     entries = entries.order_by("-created_at", "-id")
-    page = entries[params.offset : params.offset + params.limit]
+    page = list(entries[params.offset : params.offset + params.limit])
+    names = waiter_names(entry.actor for entry in page)
     return {
-        "rows": [log_row(entry) for entry in page],
+        "rows": [log_row(entry, names) for entry in page],
         "total": entries.count(),
         "limit": params.limit,
         "offset": params.offset,

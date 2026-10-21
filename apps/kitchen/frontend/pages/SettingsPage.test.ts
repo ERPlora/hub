@@ -84,6 +84,8 @@ describe('SettingsPage', () => {
     expect(s.field('load-error')?.textContent).toContain('Could not load the settings.');
     expect(s.field('loading')).toBeNull();
     expect(s.field('retry')).not.toBeNull();
+    // kitchen#12: a full-size touch target (44 px), never the small button.
+    expect((s.field('retry') as HTMLElement & { size?: string }).size).toBeUndefined();
   });
 
   it('whoever may not save them is told so', async () => {
@@ -97,5 +99,9 @@ describe('SettingsPage', () => {
     await s.show(SETTINGS);
     expect([s.field('warning_minutes').label, s.field('save').textContent?.trim()]).toEqual(['Aviso ámbar (minutos)', 'Guardar']);
     expect(s.field('works_from_screen').textContent?.trim()).toBe('La cocina trabaja con la pantalla');
+    // hub#1427, kitchen#159: the tone and the type are chosen by their words, never «chime» or «dine_in».
+    const words = (name: string) => [...s.field(name).querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
+    expect(words('sound_tone')).toEqual(['Campanilla', 'Timbre', 'Zumbador']);
+    expect(words('default_order_type')).toEqual(['En sala', 'Para llevar', 'A domicilio']);
   });
 });

@@ -223,7 +223,9 @@
         "chooseToContinue": "Elige una opción para continuar",
         "full": "«{group}» está completo: quita una para elegir otra.",
         "less": "Una menos de {name}",
-        "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo."
+        "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo.",
+        "chooseRange": "Elige de {n} a {max}",
+        "atLeast": "Elige al menos {n}"
       },
       "menu": {
         "badge": "Menú",
@@ -242,7 +244,27 @@
         "sendRush": "Enviar URGENTE ({count})",
         "rush": "Marcar la comanda como urgente",
         "sent": "Comanda {n} enviada a cocina.",
-        "notSent": "No se ha podido enviar la comanda a cocina. Inténtalo de nuevo."
+        "sentNotPrinted": "Comanda {n} enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.",
+        "notSent": "No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.",
+        "tickets": {
+          "open": "Comandas · {count}",
+          "title": "Comandas de la cuenta",
+          "status": {
+            "pending": "Por preparar",
+            "preparing": "En preparación",
+            "ready": "Lista",
+            "served": "Servida",
+            "cancelled": "Cancelada"
+          },
+          "rush": "Urgente",
+          "voided": "Anulado",
+          "markRush": "Marcar urgente",
+          "clearRush": "Quitar urgente",
+          "rushFailed": "No se pudo actualizar la comanda",
+          "rushNoticeFailed": "No se ha podido imprimir el aviso de urgencia. Avisa a cocina de viva voz y revisa su impresora.",
+          "loadError": "No se pudieron cargar las comandas de la cuenta.",
+          "retry": "Reintentar"
+        }
       },
       "fiscal": {
         "title": "Ahora no se pueden cobrar ventas.",

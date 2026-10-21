@@ -166,6 +166,8 @@ export interface TicketSendIn {
   label?: string;
   channel?: OrderType;
   priority?: 'normal' | 'rush';
+  /** Who attends the check as the till names it («Atiende»); empty: who sends it. */
+  waiter?: string;
 }
 
 export interface ManualItemIn {

@@ -9,13 +9,18 @@ export const STATION_KEY = 'kitchen.display.station';
 export interface Arrivals {
   /** Ring now: a ticket appeared, or one turned rush. */
   ring: boolean;
-  /** What the board shows now: id → priority. */
+  /** What the board shows now, cooking or on the pass: id → priority. */
   known: Map<string, Priority>;
 }
 
-/** Compares the tickets being cooked with what the board already knew (`undefined`: the first result). */
-export function arrivals(known: Map<string, Priority> | undefined, cooking: readonly TicketOut[]): Arrivals {
-  const now = new Map(cooking.map((ticket) => [ticket.id, ticket.priority] as const));
+/** Compares the tickets being cooked with what the board already knew (`undefined`: the first result). The
+ *  ones waiting on the pass (`ready`) count as known: one the pass recalls to the line is not a new ticket. */
+export function arrivals(
+  known: Map<string, Priority> | undefined,
+  cooking: readonly TicketOut[],
+  ready: readonly TicketOut[] = [],
+): Arrivals {
+  const now = new Map([...ready, ...cooking].map((ticket) => [ticket.id, ticket.priority] as const));
   if (known === undefined) return { ring: false, known: now };
   const ring = cooking.some((ticket) => {
     const before = known.get(ticket.id);

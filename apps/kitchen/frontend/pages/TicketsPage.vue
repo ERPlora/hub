@@ -69,7 +69,8 @@ const blocked = computed(() => blockingError(error.value));
 const options = (values: readonly string[], prefix: string) => values.map((value) => ({ value, label: t(`${prefix}.${value}`) }));
 
 const columns = computed<DataTableColumn<TicketRowOut>[]>(() => [
-  { key: 'number', label: t('kitchen.tickets.columns.number'), sortable: true, priority: 'high' },
+  // kitchen#134: the whole number (its end tells one ticket from another), never «20261021-00…».
+  { key: 'number', label: t('kitchen.tickets.columns.number'), sortable: true, priority: 'high', width: 'minmax(9.5rem, 1fr)' },
   { key: 'label', label: t('kitchen.tickets.columns.label'), format: (_, r) => r.label || '—' },
   {
     key: 'order_type',
