@@ -6,7 +6,7 @@ import uuid
 import pytest
 from live.errors import Conflict, NotFound
 
-from apps.modifier.models import ModifierGroup
+from apps.modifier.models import ModifierGroup, ModifierOption
 
 from .conftest import FOOD, GENERIC, make_category, make_product, run
 
@@ -108,6 +108,22 @@ def test_a_group_by_its_id_or_its_name():
         run("modifier.group.get", {"id": str(uuid.uuid7())})
 
 
+def test_tied_groups_follow_the_list_s_direction():
+    """hub#2355: groups tied on the sorted column come by name in the list's own direction, never always
+    ascending; a descending list is the ascending one read backwards, ties included."""
+    # Created out of name order, so that the name tie-break is not the id one (names are unique).
+    for name in ("Beta", "Gamma", "Alpha"):
+        group(name)
+    for column in ("name", "sort_order", "min_choices", "max_choices", "option_count", "link_count"):
+        up = names(run("modifier.group.list", {"sort": column}))
+        down = names(run("modifier.group.list", {"sort": f"-{column}"}))
+        assert (column, up, down) == (
+            column,
+            ["Alpha", "Beta", "Gamma"],
+            ["Gamma", "Beta", "Alpha"],
+        )
+
+
 # The options (MODIFIER-F04)
 
 
@@ -134,6 +150,34 @@ def test_the_options_of_a_group_or_all_with_their_tax_category_in_the_readers_la
     )
     assert names(run("modifier.option.list", {"search": "ket"})) == ["Ketchup"]
     assert names(run("modifier.option.list", {"sort": "-price_delta"}))[0] == "Soda"
+
+
+def test_tied_options_follow_the_list_s_direction():
+    """hub#2355: options tied on the sorted column come by name, then by id, in the list's own direction;
+    the whole catalog by its groups too, so «-sort_order» is «sort_order» read backwards."""
+    group("Sauces")
+    group("Extras")
+    # Created out of name order, and two «Bacon» in two groups, so that neither the name nor the id
+    # tie-break is the creation order.
+    bacon = option("Sauces", "Bacon")
+    avocado = option("Sauces", "Avocado")
+    extra_bacon = option("Extras", "Bacon")
+    # Postgres writes a touched row's new version after the others: without the id tie-break, the first
+    # «Bacon» would come after the second.
+    ModifierOption.objects.filter(pk=bacon.id).update(kitchen_name="BACON")
+
+    def listed(**query) -> list:
+        return [row.id for row in run("modifier.option.list", query).rows]
+
+    for sort in ("name", "price_delta"):
+        assert (sort, listed(sort=sort)) == (sort, [avocado.id, bacon.id, extra_bacon.id])
+        assert (sort, listed(sort=f"-{sort}")) == (sort, [extra_bacon.id, bacon.id, avocado.id])
+    for sort in ("sort_order", "price_delta", "name"):
+        assert (sort, listed(group="Sauces", sort=sort)) == (sort, [avocado.id, bacon.id])
+        assert (sort, listed(group="Sauces", sort=f"-{sort}")) == (sort, [bacon.id, avocado.id])
+    # The whole catalog by its groups' order and name (Extras before Sauces), then each group's own.
+    assert listed(sort="sort_order") == [extra_bacon.id, avocado.id, bacon.id]
+    assert listed(sort="-sort_order") == [bacon.id, avocado.id, extra_bacon.id]
 
 
 # The links (MODIFIER-F05)
