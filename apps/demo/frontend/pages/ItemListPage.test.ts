@@ -435,8 +435,8 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
   });
 
   // CLOSE-DEMO: one page of `demo.item.list` holds 100 rows at most (`ItemListIn.limit`, le=100). «Load more» never
-  // asks for more (the third one asked for 150 and the 422 left «The items could not be loaded»), and past 100 rows
-  // a phone pages too (`maxWindow`, ERPlora/ui#12), so every row stays in reach.
+  // asks for more (at 50 per page the second one asked for 150 and the 422 left «The items could not be loaded»),
+  // and past 100 rows a phone pages too (`maxWindow`, ERPlora/ui#12), so every row stays in reach.
   it('«Load more» never asks for more than the server’s 100 rows', async () => {
     viewport(true);
     const s = await setup();
