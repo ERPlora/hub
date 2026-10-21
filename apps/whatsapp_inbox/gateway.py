@@ -1,4 +1,4 @@
-"""The Hub's client of erplora.com's WhatsApp doors (WORKBOOK «Contrato con el SaaS», doors 5 and 6).
+"""The Hub's client of erplora.com's WhatsApp doors (WORKBOOK «Contrato con el SaaS», doors 5, 6, 8 and 9).
 
 The WhatsApp Business account and Meta's token live in the SaaS: the Hub asks it to send and to forget
 a number, and keeps what it answers. JSON, signed like every ``/internal`` call (``X-Erplora-Timestamp``
