@@ -511,12 +511,20 @@ test('TABLE-F15, F16, F17: transfer a check, merge two tables and split a check'
     await expect(sheet(page)).toBeVisible();
     await settled(page);
     await sheet(page).locator('[data-testid=table-sheet-action-split]').click();
-    await sheet(page).locator(`[data-testid=table-sheet-split-line-${firstLine.id}]`).click();
+    const mark = sheet(page).locator(`[data-testid=table-sheet-split-line-${firstLine.id}]`);
+    await mark.click();
+    await expect(mark).toHaveClass(/checkbox-checked/);
     await flowShots(page, ['TABLE-F17'], async () => {
-      await expect(sheet(page).locator('[data-testid=table-sheet-split-confirm]')).toBeEnabled();
+      await expect(mark).toHaveClass(/checkbox-checked/);
     });
     await sheet(page).locator('[data-testid=table-sheet-split-confirm]').click();
     await expect.poll(async () => (await tableNo(context, '2')).checks.length).toBe(2);
+    // The line marked went to the new check; the other stayed.
+    const halves = (await tableNo(context, '2')).checks;
+    const linesOf = async (orderId: string | null) =>
+      (await api<{ lines: { id: string }[] }>(context, A, 'GET', `/sale/orders/detail?order_id=${orderId}`)).data.lines.map((line) => line.id);
+    const split = await Promise.all(halves.map((half) => linesOf(half.order_id)));
+    expect(split.map((lines) => lines.length).sort()).toEqual([1, 1]);
   } finally {
     await context.close();
   }

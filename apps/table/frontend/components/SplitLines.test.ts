@@ -3,7 +3,7 @@
 // check with no lines says so.
 import { describe, expect, it } from 'vitest';
 
-import { click, mountTable, settle } from '../__tests__/mount-table';
+import { click, ionChecked, mountTable, settle } from '../__tests__/mount-table';
 import SplitLines from './SplitLines.vue';
 
 const OP = 'sale.order.get';
@@ -36,12 +36,24 @@ describe('SplitLines', () => {
     const s = await setup(['l2']);
     await s.result(OP, ORDER);
     expect((s.el('split-line-l2').element as HTMLElement & { checked?: boolean }).checked).toBe(true);
-    await click(s.el('split-line-l1').element);
+    await ionChecked(s.el('split-line-l1').element, true);
     await click(s.el('split-confirm').element);
     await click(s.el('split-back').element);
     expect(s.wrapper.emitted('toggle')).toEqual([['l1']]);
     expect(s.wrapper.emitted('confirm')).toHaveLength(1);
     expect(s.wrapper.emitted('back')).toHaveLength(1);
+  });
+
+  it('a tap marks a line once: the checkbox’s change counts, not its clicks', async () => {
+    // In the browser one tap on an ion-checkbox reaches its host as a click from the label and another from the
+    // box; counting clicks marked and unmarked the line at once, and the new check was born empty (e2e F17).
+    const s = await setup();
+    await s.result(OP, ORDER);
+    const box = s.el('split-line-l1').element;
+    await click(box);
+    await click(box);
+    await ionChecked(box, true);
+    expect(s.wrapper.emitted('toggle')).toEqual([['l1']]);
   });
 
   it('a check with no lines yet says so', async () => {

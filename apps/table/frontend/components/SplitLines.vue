@@ -55,7 +55,7 @@ const lines = computed(() => data.value?.lines ?? []);
           :checked="marked.includes(line.id)"
           label-placement="end"
           justify="start"
-          @click="emit('toggle', line.id)"
+          @ion-change="emit('toggle', line.id)"
         >
           {{ line.quantity }} × {{ line.name }} · {{ formatMoney(line.line_total, locale) }}
         </ion-checkbox>

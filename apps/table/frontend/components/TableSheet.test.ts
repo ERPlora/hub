@@ -7,7 +7,7 @@
 //   with two checks, which one first.
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, mountTable, resultFrame, settle } from '../__tests__/mount-table';
+import { click, EMPLOYEE, ionChecked, mountTable, resultFrame, settle } from '../__tests__/mount-table';
 import { NOW, occupied, SETTINGS, tableRow } from '../__tests__/tables';
 import type { TableOut } from '../operations';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -143,7 +143,7 @@ describe('TableSheet · an occupied table', () => {
     const stream = await s.live();
     stream.push(resultFrame(s.subId('sale.order.get', { order_id: 'o1' }), order, 1));
     await settle();
-    await click(s.el('split-line-l2'));
+    await ionChecked(s.el('split-line-l2'), true);
     await click(s.el('split-confirm'));
     expect(s.sent().map((call) => [call.path, call.body])).toEqual([['/api/table/sessions/split', { id: 's1', line_ids: ['l2'] }]]);
     expect(s.closed()).toBe(true);
