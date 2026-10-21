@@ -83,6 +83,25 @@ export interface AppointmentOut extends AppointmentRow {
   charged_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Its day ready to say, in the caller's language («martes, 5 de marzo de 2030»). */
+  start_date_label: string;
+  /** Its hour ready to say, 24-hour on the business's clock («10:30»). */
+  start_time_label: string;
+}
+
+/** What a customer did herself (G01): a booking or a cancellation, as the notice says it. */
+export interface NoticeOut {
+  kind: 'booked' | 'cancelled';
+  at: string;
+  id: string;
+  number: string;
+  /** Empty once the customer's data was erased. */
+  customer_name: string;
+  service_names: string;
+  staff_name: string;
+  start: string;
+  start_date_label: string;
+  start_time_label: string;
 }
 
 export interface AppointmentPage extends Page<AppointmentRow> {
@@ -401,6 +420,7 @@ declare module '@erplora/ui/sdk' {
     'appointment.appointment.list_for_customer': { input: ForCustomerIn; output: Page<VisitOut> };
     'appointment.appointment.count_active_for_service': { input: ServiceRefIn; output: CountOut };
     'appointment.appointment.count_to_confirm': { input: NoInput; output: CountOut };
+    'appointment.appointment.notices': { input: { since?: string | null; limit?: number }; output: { rows: NoticeOut[] } };
     'appointment.appointment.create': { input: AppointmentCreateIn; output: AppointmentOut };
     'appointment.appointment.bulk_create': { input: BulkCreateIn; output: { rows: AppointmentOut[] } };
     'appointment.appointment.reschedule': { input: RescheduleIn; output: AppointmentOut };

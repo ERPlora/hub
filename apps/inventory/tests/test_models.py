@@ -1,10 +1,11 @@
 """Models of the inventory app: UUIDv7 keys, live codes unique, the units register and the ledger's rules."""
 
+import uuid
 from decimal import Decimal
 from fractions import Fraction
 
 import pytest
-from django.db import IntegrityError, models, transaction
+from django.db import IntegrityError, connection, models, transaction
 
 from apps.inventory.models import (
     UNIT_SPECS,
@@ -73,10 +74,26 @@ def test_product_defaults():
     assert (
         product.track_stock,
         product.is_active,
+        product.is_sold_out,
         product.is_deleted,
         product.ean13,
-    ) == (None, True, False, None)
+    ) == (None, True, False, False, None)
     assert product.tax_category_id is None
+
+
+def test_a_product_written_by_code_that_does_not_know_the_sold_out_mark_is_on_sale():
+    """Expand/contract: while a deploy rolls, a process still on the previous code inserts products
+    without the column; the database gives it its default instead of refusing the row."""
+    product_id = uuid.uuid7()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO inventory_product (id, name, sku, description, product_type, price, cost, stock,"
+            " low_stock_threshold, unit, price_quantity, pricing_unit, is_active, is_deleted, created_at,"
+            " updated_at, created_by, updated_by) VALUES (%s, 'Old', 'OLD-1', '', 'physical', 100, 0, 0, 10,"
+            " 'ud', 1, 'ud', true, false, now(), now(), '', '')",
+            [product_id],
+        )
+    assert Product.objects.get(pk=product_id).is_sold_out is False
 
 
 def test_quantities_keep_three_decimals():

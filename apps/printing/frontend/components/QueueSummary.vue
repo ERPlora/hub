@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // «Print queue» (PRINTING-F01; the old screen's queue zone): one card per role that has an active printer
 // or jobs (a new business sees none), with its state — «Ready», «Waiting, no printer», «With errors» —,
-// «Waiting: N · the oldest has waited 3 min» or «Nothing waiting», the failed ones and the printer that
-// prints it. A role with jobs waiting for over a minute and no active printer raises the orange alert
+// «Waiting: N · the oldest has waited 3 min» or «Nothing waiting», the failed ones and the printer it prints
+// on now (the chosen one, else the first active one: named, never counted — hub#1527). A role with jobs waiting for over a minute and no active printer raises the orange alert
 // with its cause. Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs
 // it; the ages and the alert move on by themselves every 30 s (`useNow`). A failed read says so, with «Retry», and never «All clear».
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
@@ -131,10 +131,11 @@ function alertText(u: UsageSummary): string {
           {{ $t('printing.summary.failed', { n: u.failed }) }}
         </p>
         <p
-          v-if="u.default_printer"
+          v-if="u.prints_on"
           class="printing-summary__muted"
+          :data-testid="`printing-summary-prints-on-${u.usage}`"
         >
-          {{ $t('printing.summary.printsOn', { name: u.default_printer }) }}
+          {{ $t('printing.summary.printsOn', { name: u.prints_on }) }}
         </p>
       </article>
     </div>

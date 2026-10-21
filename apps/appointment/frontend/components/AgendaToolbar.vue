@@ -3,7 +3,8 @@
 // in a week, the week), «Filter by status», «N to confirm» when customers' bookings wait (a tap filters the
 // pending ones), the «List · By professional · Repeating» switch (icons only on a phone) and, for the
 // first two, «Day · Week». A device on another zone than the business is told the agenda shows the
-// business's clock.
+// business's clock. One or two rows, as the old agenda (appointments#93, #206, #243): on a phone, ‹ the day's
+// field › and «Today», then the filter and the switches; the long date only where it fits.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
@@ -63,6 +64,7 @@ function jump(value: unknown): void {
     >
       <ion-button
         fill="clear"
+        class="agenda-toolbar__prev"
         data-testid="appointment-toolbar-prev"
         :aria-label="span === 'week' ? $t('appointment.toolbar.prevWeek') : $t('appointment.toolbar.prevDay')"
         @click="day = addDays(day, -step)"
@@ -78,6 +80,7 @@ function jump(value: unknown): void {
       >{{ label }}</strong>
       <ion-button
         fill="clear"
+        class="agenda-toolbar__next"
         data-testid="appointment-toolbar-next"
         :aria-label="span === 'week' ? $t('appointment.toolbar.nextWeek') : $t('appointment.toolbar.nextDay')"
         @click="day = addDays(day, step)"
@@ -90,6 +93,7 @@ function jump(value: unknown): void {
       <ion-button
         fill="outline"
         size="small"
+        class="agenda-toolbar__today"
         data-testid="appointment-toolbar-today"
         @click="day = today"
       >
@@ -210,9 +214,11 @@ function jump(value: unknown): void {
   text-align: center;
 }
 .agenda-toolbar__calendar {
-  max-width: 11rem;
+  flex: 0 0 10.5rem;
+  width: 10.5rem;
 }
 .agenda-toolbar__status {
+  flex: 0 0 13rem;
   width: 13rem;
 }
 .agenda-toolbar ion-segment {
@@ -225,10 +231,32 @@ function jump(value: unknown): void {
   color: var(--ion-color-warning-shade, #8a6d00);
 }
 @media (max-width: 640px) {
+  .agenda-toolbar {
+    gap: 6px;
+  }
   .agenda-toolbar__view-label {
     display: none;
   }
+  /* The day's field says the day: the long date would take a row of its own. */
   .agenda-toolbar__date {
+    display: none;
+  }
+  /* ‹ the day's field ›, then «Today», as the old agenda. */
+  .agenda-toolbar__prev {
+    order: 1;
+  }
+  .agenda-toolbar__calendar {
+    order: 2;
+  }
+  .agenda-toolbar__next {
+    order: 3;
+  }
+  .agenda-toolbar__today {
+    order: 4;
+  }
+  .agenda-toolbar__status {
+    flex: 1 1 9rem;
+    width: auto;
     min-width: 0;
   }
 }

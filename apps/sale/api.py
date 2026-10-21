@@ -46,6 +46,7 @@ from apps.sale.schemas import (
     RefundIn,
     SaleByKeyIn,
     SaleListIn,
+    SalePrintIn,
     SaleRefIn,
     SettingsPatchIn,
     VoidIn,
@@ -110,6 +111,11 @@ async def sale_complete_over_limit(request, data: CompleteIn):
 @bind(router, "sale.sale.void", "/sale/sales/void")
 async def sale_void(request, data: VoidIn):
     return await run_operation(request, services.void_sale, data)
+
+
+@bind(router, "sale.sale.print", "/sale/sales/print")
+async def sale_print(request, data: SalePrintIn):
+    return await run_operation(request, services.print_sale, data)
 
 
 @bind(router, "sale.sale.refund", "/sale/sales/refund")
@@ -203,6 +209,11 @@ async def order_void_line(request, data: OrderVoidLineIn):
 @bind(router, "sale.order.fire", "/sale/orders/fire")
 async def order_fire(request, data: OrderFireIn):
     return await run_operation(request, services.fire, data)
+
+
+@bind(router, "sale.order.print_bill", "/sale/orders/print_bill")
+async def order_print_bill(request, data: OrderRefIn):
+    return await run_operation(request, services.print_bill, data)
 
 
 @bind(router, "sale.order.split", "/sale/orders/split")

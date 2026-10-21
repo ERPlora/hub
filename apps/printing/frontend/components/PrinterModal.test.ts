@@ -5,6 +5,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, ionToggle, ionValue, mountPrinting } from '../__tests__/mount-printing';
+import type { PrinterDraft } from '../lib/discovery';
 import type { PrinterOut } from '../operations';
 import PrinterModal from './PrinterModal.vue';
 
@@ -31,8 +32,8 @@ const TILL = {
   is_active: true,
 } as PrinterOut;
 
-async function setup(printer: PrinterOut | null = null) {
-  const m = await mountPrinting(PrinterModal, { props: { open: true, printer } });
+async function setup(printer: PrinterOut | null = null, draft: PrinterDraft | null = null) {
+  const m = await mountPrinting(PrinterModal, { props: { open: true, printer, draft } });
   const field = (name: string) => m.inDoc(`printing-printer-${name}`);
   const submit = () => click(m.inDoc('printing-printer-submit'));
   return { ...m, field, submit };
@@ -59,6 +60,20 @@ describe('PrinterModal', () => {
     ]);
     expect(toastSuccess).toHaveBeenCalledWith('Printer added');
     expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
+  });
+
+  it('a printer the search found starts filled in, and is added as it came (PRINTING-F02)', async () => {
+    const s = await setup(null, { name: 'MTP-II', kind: 'bluetooth', address: 'AA:BB:CC:DD:EE:FF', port: null, paper_width: 58 });
+    expect(s.inDoc('printing-printer')?.getAttribute('aria-label')).toBe('New printer');
+    expect([prop(s.field('name'), 'value'), prop(s.field('kind'), 'value'), prop(s.field('address'), 'value'), prop(s.field('paper'), 'value')]).toEqual([
+      'MTP-II',
+      'bluetooth',
+      'AA:BB:CC:DD:EE:FF',
+      58,
+    ]);
+    s.answer(201, { ...TILL, name: 'MTP-II' });
+    await s.submit();
+    expect(s.sent()[0].body).toEqual({ name: 'MTP-II', kind: 'bluetooth', address: 'AA:BB:CC:DD:EE:FF', port: null, paper_width: 58, usage: 'receipt', is_active: true });
   });
 
   it('a Bluetooth printer asks for its MAC and has no port', async () => {

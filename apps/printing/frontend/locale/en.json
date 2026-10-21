@@ -58,6 +58,7 @@
       "heading": "Printers",
       "intro": "Add the business's printers, say what each one prints and check that paper comes out.",
       "appNote": "Paper comes out through the ERPlora app on the device next to the printer: a browser cannot reach printers.",
+      "appNoteInApp": "Paper comes out through the ERPlora app on the device next to the printer.",
       "add": "Add printer",
       "empty": "No printers yet. Add the one at your till by its address.",
       "loading": "Loading…",
@@ -115,6 +116,21 @@
       "failed": "Could not save the printer.",
       "paperHint": "Kept with the printer: the ERPlora app prints 32 characters a line for now, whatever the paper."
     },
+    "discover": {
+      "action": "Search printers",
+      "title": "Search printers",
+      "searching": "Searching for printers…",
+      "browser": "A browser cannot search for printers: add it by its address.",
+      "denied": "The app is not allowed to search the local network: allow it in the device’s settings and search again.",
+      "unlinked": "This app is not linked to this business: open the business from the app to search for its printers.",
+      "failed": "Could not search for printers.",
+      "empty": "No printer found. Check that it is on and on the same network, or add it by its address.",
+      "add": "Add",
+      "added": "Already added",
+      "again": "Search again",
+      "manual": "Add by its address",
+      "close": "Close"
+    },
     "summary": {
       "heading": "Print queue",
       "loadError": "Could not read the print queue.",
@@ -127,7 +143,6 @@
       "nothing": "Nothing waiting",
       "failed": "Failed: {n}",
       "printsOn": "Prints on: {name}.",
-      "printers": "{n} active printers.",
       "alert": "{n} print jobs for {usage} have been waiting {age}.",
       "alertOne": "1 print job for {usage} has been waiting {age}.",
       "alertCause": "No active printer has this role: add one below or give this role to one of them."

@@ -177,14 +177,14 @@
         "rescheduled": "Cambio de hora",
         "staff_changed": "Cambio de profesional",
         "service_changed": "Cambio de servicio",
-        "unassigned": "Profesional dado de baja: pendiente de reasignar",
+        "unassigned": "Profesional dado de baja: hay que reasignarla",
         "charged": "Cobrada",
         "uncharged": "Venta anulada",
         "deleted": "Borrada"
       }
     },
     "series": {
-      "search": "Buscar por cliente, servicio o profesional",
+      "search": "Buscar cliente o servicio…",
       "empty": "Todavía no hay citas periódicas.",
       "loadError": "No se han podido cargar las citas periódicas.",
       "add": "Nueva cita periódica",
@@ -228,13 +228,25 @@
         "occurrences": "Número de citas (opcional)",
         "create": "Crear cita periódica",
         "save": "Guardar de esta cita en adelante",
+        "scopeHintNoneCharged": "El cambio se aplica desde el {from}: alcanza {upcoming} citas reservadas. Lo que ya ha pasado se queda como está.",
         "scopeHint": "El cambio se aplica desde el {from}: alcanza {upcoming} citas reservadas; {charged} ya cobradas no se tocarán. Lo que ya ha pasado se queda como está."
       },
       "outcome": {
-        "booked": "{booked} citas reservadas · {skipped} no se han podido reservar",
+        "booked": "{booked} citas reservadas",
+        "notBooked": "{skipped} no se han podido reservar",
+        "alreadyBooked": "Nada nuevo que reservar: sus {already} citas ya estaban reservadas",
+        "none": "No se ha reservado ninguna cita",
         "pendingFrom": "Las fechas desde el {date} aún no están reservadas: pulsa «Reservar citas» en la serie para reservarlas.",
         "upcoming": "Aún no hay nada que reservar: la próxima fecha de esta serie, el {date}, queda más lejos que la antelación máxima. Pulsa «Reservar citas» en la serie cuando se acerque.",
-        "updated": "{moved} citas movidas · {cancelled} canceladas porque ya no caen en la repetición · {locked} sin tocar porque ya están cobradas"
+        "moved": "{moved} citas movidas",
+        "handed": "{moved} citas pasan a {staff}",
+        "servicesChanged": "{moved} citas cambian a {services}",
+        "handedWithServices": "{moved} citas pasan a {staff} con {services}",
+        "newDates": "{booked} fechas nuevas reservadas",
+        "cancelled": "{cancelled} canceladas porque ya no caen en la repetición",
+        "locked": "{locked} sin tocar porque ya están cobradas",
+        "notMoved": "{skipped} no se han podido mover y se quedan a su hora:",
+        "unchanged": "Guardado: no ha hecho falta cambiar ninguna cita."
       },
       "frequency": {
         "daily": "Cada día",

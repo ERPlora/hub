@@ -32,7 +32,10 @@ const props = withDefaults(
   { fromDate: null, ownStaff: null },
 );
 
-const emit = defineEmits<{ outcome: [outcome: MaterializeOut]; updated: [outcome: RecurringUpdatedOut] }>();
+const emit = defineEmits<{
+  outcome: [outcome: MaterializeOut];
+  updated: [outcome: RecurringUpdatedOut, change: RecurringUpdateIn];
+}>();
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
@@ -169,7 +172,10 @@ function changes(series: RecurringOut): RecurringUpdateIn {
 
 async function save(): Promise<void> {
   try {
-    if (props.series) emit('updated', await update.run(changes(props.series)));
+    if (props.series) {
+      const change = changes(props.series);
+      emit('updated', await update.run(change), change);
+    }
     else emit('outcome', await create.run(newSeries()));
   } catch {
     return; // The panel says why; what was typed stays.
@@ -325,6 +331,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
           />
           <ion-input
             data-testid="series-form-max_occurrences"
+            class="series-form__wide"
             type="number"
             inputmode="numeric"
             min="1"
@@ -351,6 +358,10 @@ const text = (value: unknown): string => (value === null || value === undefined 
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+/* Its label is the longest of the form: on a row of its own it is never cut. */
+.series-form__wide {
+  grid-column: 1 / -1;
 }
 .series-form__label {
   display: block;

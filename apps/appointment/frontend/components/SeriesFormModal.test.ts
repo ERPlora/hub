@@ -141,7 +141,23 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
     expect(s.sent().filter((call) => call.method === 'POST')).toEqual([
       { method: 'POST', path: '/api/appointment/recurring/update', query: {}, body: { id: 'r1', from_date: '2026-11-02', time: '12:30' } },
     ]);
-    expect(s.wrapper.emitted('updated')?.[0]?.[0]).toMatchObject({ moved: 4, locked: 1 });
+    expect(s.wrapper.emitted('updated')?.[0]).toEqual([
+      { recurring: SERIES, moved: 4, cancelled: 0, locked: 1, skipped: [], booked: 0 },
+      { id: 'r1', from_date: '2026-11-02', time: '12:30' },
+    ]);
+  });
+
+  // appointments#211: closing the panel while what it reaches is still loading closes it for good; the answer
+  // that arrives afterwards opens nothing.
+  it('closed while it loads, it stays closed when the answer arrives', async () => {
+    const s = await setup({ series: SERIES, fromDate: '2026-11-02' });
+    await s.live();
+    await s.wrapper.setProps({ open: false });
+    await settle();
+    await s.result('appointment.recurring.get', { ...SERIES, next_date: '2026-11-02', upcoming: 5, charged: 0 });
+    await settle();
+    expect(s.wrapper.props('open')).toBe(false);
+    expect((s.wrapper.emitted('update:open') ?? []).filter(([open]) => open === true)).toEqual([]);
   });
 
   it('speaks Spanish', async () => {

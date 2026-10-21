@@ -188,5 +188,65 @@ describe('a line of the history', () => {
     expect(
       describeLog(entry({ operation: 'task.task.create', outcome: 'failed', error: { code: 'invalid_field', message: 'No such project.' } }), steps, CATALOG, p),
     ).toBe('Create a task: No such project.');
+    expect(
+      describeLog(entry({ operation: 'task.task.create', outcome: 'skipped', failed: [{ path: 'input.total', op: 'gte', value: 10000 }] }), steps, CATALOG, p),
+    ).toBe('Skipped: its «Only if…» did not hold (Total greater than or equal to 10000)');
+    expect(
+      describeLog(entry({ operation: 'task.task.create', outcome: 'failed', continued: true, error: { code: 'flow.not_allowed', message: 'Not allowed.' } }), steps, CATALOG, p),
+    ).toBe('Create a task: Not allowed. It carried on with the next steps.');
   });
 });
+
+// FLOW-F27: what a call is called on the screen.
+describe('a call in words', () => {
+  const call: Step = { id: 's1', kind: 'http', method: 'GET', url: 'https://api.example.com/v1/x', headers: {}, body: '', timeout: 10 };
+
+  it('names the call by its host, and its permission too', () => {
+    const p = phrasing();
+    expect(describeStep(call, [call], CATALOG, p)).toBe('Call api.example.com');
+    expect(describeStep({ ...call, url: '' }, [call], CATALOG, p)).toBe('Call another system');
+    expect(actionLabel('http:https://api.example.com', CATALOG, p)).toBe('Call api.example.com');
+    expect(actionLabel('http:https://api.example.com', CATALOG, phrasing('es'))).toBe('Llamar a api.example.com');
+  });
+
+  it('names a secret, the key and what a call leaves', () => {
+    const p = phrasing();
+    expect(pathLabel('secret.STRIPE_KEY', [call], CATALOG, p)).toBe('Secret «STRIPE_KEY»');
+    expect(pathLabel('run.idempotency_key', [call], CATALOG, p)).toBe('No-repeat key');
+    expect(pathLabel('steps.s1.status', [call], CATALOG, p)).toBe('1. Call api.example.com › Status');
+  });
+
+  it('says in the history what the call did', () => {
+    const p = phrasing();
+    const at = '2026-10-15T10:00:00+02:00';
+    expect(describeLog({ step: 's1', kind: 'http', outcome: 'calling', host: 'api.example.com', at }, [call], CATALOG, p)).toBe('Calling api.example.com…');
+    expect(describeLog({ step: 's1', kind: 'http', outcome: 'called', host: 'api.example.com', status: 201, at }, [call], CATALOG, p)).toBe('Called api.example.com: it answered 201');
+  });
+});
+
+// FLOW-F28 to F30: what a question is called, and what its run says.
+describe('a question in words', () => {
+  const question: Step = { id: 's1', kind: 'ask', title: 'Refund {{input.amount}}?', details: '', role: 'manager', hours: 24, on_no: 'stop', on_timeout: 'no' };
+
+  it('names the step by its question', () => {
+    const p = phrasing();
+    // A datum in the question is named by its words, never by its path.
+    expect(describeStep(question, [question], CATALOG, p)).toBe('Ask: Refund «Amount»?');
+    expect(describeStep({ ...question, title: '' }, [question], CATALOG, p)).toBe('Ask someone first');
+    expect(describeStep(question, [question], CATALOG, phrasing('es'))).toBe('Preguntar: Refund «Importe»?');
+    expect(pathLabel('steps.s1.approved', [question], CATALOG, p)).toBe('1. Ask: Refund «Amount»? › Approved');
+  });
+
+  it('says in the history who was asked, who answered and what', () => {
+    const p = phrasing();
+    const at = '2026-10-15T10:00:00+02:00';
+    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'asking', role: 'manager', until: '2026-10-16T10:00:00+02:00', at }, [question], CATALOG, p)).toBe(
+      'Asked the managers; waiting for an answer until Oct 16, 2026, 10:00 AM',
+    );
+    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'asking', role: '', until: at, at }, [question], CATALOG, p)).toContain('Asked whoever runs the business');
+    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'answered', approved: true, by: 'Marta', note: 'ok', at }, [question], CATALOG, p)).toBe('Marta answered yes: «ok»');
+    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'answered', approved: false, by: 'Marta', note: '', at }, [question], CATALOG, p)).toBe('Marta answered no');
+    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'expired', at }, [question], CATALOG, p)).toBe('Nobody answered in time');
+  });
+});
+

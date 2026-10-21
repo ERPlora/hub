@@ -18,6 +18,7 @@ import CustomerSearch, { type CustomerSnapshot } from '../../../customer/fronten
 import { useLocale, useT } from '../composables/useT';
 import { dayOf, timeOf, wallInput } from '../lib/clock';
 import { formatMoney } from '../lib/format';
+import { describeUpdate } from '../lib/outcome';
 import { eligibleStaff, ownTerms, type ServiceFacts, type Terms } from '../lib/pickers';
 import type { AppointmentOut, RecurringUpdateIn, UpdateIn } from '../operations';
 import AppointmentHistory from './AppointmentHistory.vue';
@@ -266,7 +267,8 @@ async function saveFollowing(): Promise<void> {
     const result = await editSeries.run(change);
     const notesOnly = noteChanges(booked);
     if (Object.keys(notesOnly).length) await update.run({ id: booked.id, ...notesOnly });
-    emit('outcome', t('appointment.series.outcome.updated', { moved: result.moved, cancelled: result.cancelled, locked: result.locked }));
+    const said = describeUpdate(result, change, t, locale.value);
+    emit('outcome', [said.summary, said.skipped.join('; ')].filter(Boolean).join(' '));
     open.value = false;
   } catch (error) {
     failure.value = error as ApiError;

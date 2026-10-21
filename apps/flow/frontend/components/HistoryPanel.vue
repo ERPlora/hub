@@ -3,8 +3,11 @@
 // twenty at a time with «See more» (in live windows of at most 100 rows, `useLiveList`). The runs that
 // stopped by an error go on top under «Needs somebody», with how many there are in all. Each run says
 // how it ended and when, opens to its steps in words, says why it failed and what to do (the technical
-// text folded, for support), and copies its reference.
-import { InlineFeedback, StatusPill } from '@erplora/ui/components';
+// text folded, for support), and copies its reference. A run stopped by an error at a step that can
+// still be resumed offers «Resume from the step that failed» (FLOW-F24; `flow.run.retry`), after a
+// confirmation: it does things for real.
+import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
+import { useCommand } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
@@ -17,6 +20,10 @@ import type { CatalogOut, RunOut, RunPageOut, Step } from '../operations';
 
 const props = defineProps<{ flowId: string; steps: readonly Step[]; catalog: CatalogOut | null }>();
 const phrasing = usePhrasing();
+const { confirm } = useConfirm();
+const retrying = useCommand('flow.run.retry');
+/** What went wrong resuming a run, by its id. */
+const retryProblem = ref<Record<string, string>>({});
 
 const PAGE = 20;
 const MAX_WINDOW = 100;
@@ -62,6 +69,26 @@ function advice(code: string): string {
 function technical(run: RunOut): string {
   const last = run.log.at(-1)?.error;
   return [run.error_code, last?.technical, last?.fields ? JSON.stringify(last.fields) : ''].filter(Boolean).join(' · ');
+}
+
+async function retry(run: RunOut): Promise<void> {
+  const t = phrasing.value.t;
+  const yes = await confirm({
+    title: t('flow.history.retryTitle'),
+    message: t('flow.history.retryMessage'),
+    tone: 'warning',
+    confirmLabel: t('flow.history.retryYes'),
+    cancelLabel: t('flow.history.retryNo'),
+  });
+  if (!yes) return;
+  retryProblem.value = { ...retryProblem.value, [run.id]: '' };
+  try {
+    const resumed = await retrying.run({ id: run.id });
+    if (resumed.status === 'failed') retryProblem.value = { ...retryProblem.value, [run.id]: t('flow.history.retriedFailed', { message: resumed.error_message }) };
+    else void toastSuccess(t(resumed.status === 'waiting' ? 'flow.history.retriedWaiting' : 'flow.history.retried'));
+  } catch (failure) {
+    retryProblem.value = { ...retryProblem.value, [run.id]: wording(failure, t('flow.errors.action')) };
+  }
 }
 
 const attentionText = computed(() => {
@@ -151,6 +178,28 @@ const attentionText = computed(() => {
           <summary>{{ $t('flow.history.technical') }}</summary>
           <code>{{ technical(run) }}</code>
         </details>
+        <IonButton
+          v-if="run.resumable"
+          class="flow-history__retry"
+          size="small"
+          fill="outline"
+          mode="md"
+          :disabled="retrying.pending.value"
+          :data-testid="`flow-run-retry-${run.id}`"
+          @click="retry(run)"
+        >
+          <HubIcon
+            slot="start"
+            name="ion:refresh-outline"
+          />
+          {{ $t('flow.history.retry') }}
+        </IonButton>
+        <span
+          v-if="retryProblem[run.id]"
+          class="flow-history__why"
+          role="alert"
+          :data-testid="`flow-run-retry-problem-${run.id}`"
+        >{{ retryProblem[run.id] }}</span>
       </div>
       <ul
         v-if="open.has(run.id)"
@@ -242,6 +291,10 @@ const attentionText = computed(() => {
 }
 .flow-history__why {
   color: var(--ion-color-danger);
+}
+.flow-history__retry {
+  align-self: flex-start;
+  white-space: normal;
 }
 .flow-history__trouble code {
   font-size: 0.78rem;

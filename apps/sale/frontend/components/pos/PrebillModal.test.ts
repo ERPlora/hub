@@ -1,8 +1,10 @@
 // «Bill», the pre-bill (SALE-F21): the check as the paper taken to the table — business, title, date,
 // customer, lines with their notes and comps, the discount, the VAT breakdown and the total the server
 // works out —, «Bill — this is not an invoice…», and the print and close buttons. No number, no QR.
+// «Print» asks the printing queue first (PRINTING-F09): queued, a toast names the printer; else the
+// browser prints the screen's paper.
 import { formatDateTime } from '@erplora/ui/components';
-import { toastError } from '@erplora/ui/shell';
+import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
@@ -20,6 +22,7 @@ vi.mock('../../lib/print', () => ({ printPaper: vi.fn() }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
   toastError: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(() => Promise.resolve()),
 }));
 
 beforeEach(() => {
@@ -30,6 +33,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.mocked(printPaper).mockReset();
   vi.mocked(toastError).mockClear();
+  vi.mocked(toastSuccess).mockClear();
 });
 
 const CHECK = order({
@@ -147,16 +151,31 @@ describe('PrebillModal', () => {
     expect(m.find('pos-prebill-paper').find('.pos-bill__business').text()).toBe('My business');
   });
 
+  it('asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
+    const m = await setup();
+    await m.result('sale.checkout.preview', VALUED);
+    m.answer(200, { queued: true, job_id: 'j1', printer: 'Till' });
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(m.sent().filter((call) => call.path === '/api/sale/orders/print_bill').map((call) => call.body)).toEqual([
+      { order_id: CHECK.id },
+    ]);
+    expect(toastSuccess).toHaveBeenCalledWith('Sent to Till.');
+    expect(printPaper).not.toHaveBeenCalled();
+  });
+
   it('prints the paper; a failure says the bill could not be printed', async () => {
     const m = await setup();
     await m.result('sale.checkout.preview', VALUED);
     expect(m.find('pos-prebill-print').attributes('aria-label')).toBe('Print');
     await click(m.find('pos-prebill-print').element);
+    await settle();
     expect(printPaper).toHaveBeenCalledExactlyOnceWith(m.find('pos-prebill-paper').element);
     vi.mocked(printPaper).mockImplementationOnce(() => {
       throw new Error('blocked');
     });
     await click(m.find('pos-prebill-print').element);
+    await settle();
     expect(toastError).toHaveBeenCalledExactlyOnceWith('Bill could not be printed');
   });
 

@@ -2,8 +2,9 @@
 // test double and the customer search is the Customers app's own business): what is charged is frozen
 // when «Charge» opens the sheet (the marked lines, the version of the total it paints), a check changed
 // meanwhile is refused and said in the sheet, a check closed elsewhere is let go once the sheet closes,
-// and a partial charge keeps the check and opens its sale's document.
-import { toastError } from '@erplora/ui/shell';
+// and a partial charge keeps the check and opens its sale's document. A receipt the charge queued for the
+// printer (PRINTING-F07) is said, and the paper on screen is then a copy.
+import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, flush, mountSale, resultFrame, settle } from '../__tests__/mount-sale';
@@ -12,6 +13,7 @@ import PosCatalog from '../components/pos/PosCatalog.vue';
 import { line, memoryStorage, order, preview, product, settings } from '../components/pos/__tests__/fixtures';
 import { CURRENT_CHECK_KEY } from '../composables/pos/useCurrentCheck';
 import type { CompleteIn, PaymentMethodOut, SaleOut } from '../operations';
+import DocumentModal from '../components/document/DocumentModal.vue';
 import PosPage from './PosPage.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -41,6 +43,7 @@ beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(toastError).mockClear();
+  vi.mocked(toastSuccess).mockClear();
 });
 
 const TWO = order({ id: 'o1', version: 2, lines: [line({ id: 'l1' }), line({ id: 'l2', product_id: 'p2', name: 'Tea' })] });
@@ -125,5 +128,28 @@ describe('PosPage + the real checkout sheet', () => {
     expect(s.find('sale-checkout').exists()).toBe(false);
     expect(s.params('sale.sale.get')).toEqual([{ sale_id: 'sale-9' }]);
     expect(s.find('sale-document-modal').exists()).toBe(true);
+  });
+
+  it('a receipt the charge queued is said, and the paper on screen is then a copy', async () => {
+    const s = await setup();
+    await s.openCheck();
+    await s.chargeMarked('l1');
+    s.answers['/api/sale/sales'] = [Response.json({ ...SALE, printed: { queued: true, job_id: 'j1', printer: 'Till' } })];
+    await click(s.find('sale-checkout-confirm').element);
+    await settle();
+    await s.reopen();
+    expect(toastSuccess).toHaveBeenCalledWith('Sent to Till.');
+    expect(s.wrapper.findComponent(DocumentModal).props('duplicate')).toBe(true);
+  });
+
+  it('a receipt the charge did not queue leaves the original to the paper on screen', async () => {
+    const s = await setup();
+    await s.openCheck();
+    await s.chargeMarked('l1');
+    s.answers['/api/sale/sales'] = [Response.json({ ...SALE, printed: { queued: false, job_id: null, printer: null } })];
+    await click(s.find('sale-checkout-confirm').element);
+    await settle();
+    expect(toastSuccess).not.toHaveBeenCalledWith(expect.stringMatching(/^Sent to/));
+    expect(s.wrapper.findComponent(DocumentModal).props('duplicate')).toBe(false);
   });
 });
