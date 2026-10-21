@@ -117,6 +117,7 @@ PRODUCT_NOT_AVAILABLE = _(
 TAX_CATEGORY_MISSING = _(
     "«%(name)s» cannot be sold: it has no tax category. Its %(tax)s is missing."
 )
+PRODUCT_SOLD_OUT = _("«%(name)s» is sold out.")
 SERVICES_UNAVAILABLE = _(
     "Services is not active in this business: its services cannot be sold nor its vouchers used. Take the "
     "voucher off the line to charge it."
@@ -1047,7 +1048,8 @@ def ratio_of(line: OrderLine | object):
 def freeze_product_line(
     ctx: OperationContext, data: ProductLineIn, units: dict | None = None
 ) -> OrderLine:
-    """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog."""
+    """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
+    new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
     try:
         product = _inventory(
             ctx,
@@ -1060,6 +1062,9 @@ def freeze_product_line(
         ) from None
     if not product.is_active:
         raise Conflict(str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available")
+    # Sold out («86», INVENTORY-F29) stops only a new line: what was ordered before is still charged.
+    if product.is_sold_out:
+        raise Conflict(str(PRODUCT_SOLD_OUT) % {"name": product.name}, code="sale.product_sold_out")
     if product.needs_tax_setup or not product.tax_category_key:
         raise Conflict(
             missing_tax(product.name),

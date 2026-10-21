@@ -491,6 +491,10 @@ msgid "«%(name)s» cannot be sold: it has no tax category. Its %(tax)s is missi
 msgstr "«%(name)s» no se puede vender: no tiene categoría fiscal. Falta configurar su %(tax)s."
 
 #, python-format
+msgid "«%(name)s» is sold out."
+msgstr "«%(name)s» está agotado."
+
+#, python-format
 msgid "The quantity does not fit the step of the product (%(step)s %(unit)s)."
 msgstr "La cantidad no encaja con el escalón del producto (%(step)s %(unit)s)."
 
