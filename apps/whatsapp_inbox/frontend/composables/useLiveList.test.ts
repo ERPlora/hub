@@ -24,6 +24,17 @@ const template = (n: number): TemplateOut => ({
   variables: 1,
   rejected_reason: '',
   synced_at: null,
+  header_format: '',
+  body_examples: [],
+  buttons: [],
+  meta_id: '',
+  draft: null,
+  submit_state: '',
+  submit_error_code: '',
+  submit_error: '',
+  editable: true,
+  sendable: true,
+  deleting: false,
 });
 const rows = (from: number, count: number) => Array.from({ length: count }, (_, i) => template(from + i));
 

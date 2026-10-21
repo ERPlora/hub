@@ -137,14 +137,14 @@
     "templates": {
       "sendTitle": "Send a template",
       "pick": "Template",
-      "none": "There are no approved templates. Templates are created in WhatsApp Manager or in erplora.com.",
+      "none": "There are no approved templates yet. They are made in Settings → Meta templates or in WhatsApp Manager.",
       "variable": "Variable {n}",
       "preview": "Preview",
       "send": "Send",
       "missingVariables": "Fill in every variable of the template.",
       "search": "Search template…",
       "empty": "No templates.",
-      "emptyHint": "Templates are created in WhatsApp Manager or in erplora.com and appear here once Meta reviews them.",
+      "emptyHint": "Create one with «Add template»: Meta reviews it. The ones made in WhatsApp Manager appear here too.",
       "loadError": "Could not load the templates.",
       "rejectedReason": "Meta's reason: {reason}",
       "entity": {
@@ -164,12 +164,62 @@
         "AUTHENTICATION": "Authentication"
       },
       "statuses": {
+        "DRAFT": "Not sent to Meta",
         "APPROVED": "Approved",
         "PENDING": "In review",
         "REJECTED": "Rejected",
         "PAUSED": "Paused by Meta",
         "DISABLED": "Disabled by Meta",
         "DELETED": "Deleted in WhatsApp Manager"
+      },
+      "add": "Add template",
+      "editor": {
+        "titleNew": "New template",
+        "titleEdit": "Edit template — {name}",
+        "name": "Name",
+        "nameHint": "Lowercase letters, numbers and underscores. It cannot be changed later.",
+        "nameRule": "Use lowercase letters, numbers and underscores only.",
+        "language": "Language",
+        "category": "Category",
+        "header": "Header (optional)",
+        "body": "Text",
+        "bodyHint": "Where a variable goes, write its number between double braces, starting with 1.",
+        "example": "Example for variable {n}",
+        "examplesHint": "Meta reviews the template with these examples.",
+        "footer": "Footer (optional)",
+        "buttons": "Buttons",
+        "buttonAdd": "Add button",
+        "buttonType": "Type",
+        "buttonText": "Button text",
+        "buttonUrl": "Address (https://…)",
+        "buttonPhone": "Number (+34…)",
+        "buttonRemove": "Remove button",
+        "buttonTypes": {
+          "QUICK_REPLY": "Quick reply",
+          "URL": "Link",
+          "PHONE_NUMBER": "Call"
+        },
+        "send": "Send to Meta for review",
+        "save": "Save and send to Meta",
+        "approvedKept": "Until Meta approves the changes, the approved one keeps being sent.",
+        "categoryFixed": "Meta only lets you change the category of a template it rejected."
+      },
+      "actions": {
+        "edit": "Edit",
+        "retry": "Send to Meta again",
+        "delete": "Delete"
+      },
+      "delete": {
+        "title": "Delete this template?",
+        "message": "{name} ({language}) is deleted here, and Meta deletes it too.",
+        "impact": "An approved template takes days to be approved again.",
+        "confirm": "Delete template"
+      },
+      "state": {
+        "sending": "Sending to Meta…",
+        "notAccepted": "Not accepted: {reason}",
+        "notSent": "Changes not sent: {reason}",
+        "deleting": "Being deleted at Meta"
       }
     },
     "settings": {

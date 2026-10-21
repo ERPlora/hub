@@ -137,14 +137,14 @@
     "templates": {
       "sendTitle": "Enviar una plantilla",
       "pick": "Plantilla",
-      "none": "No hay plantillas aprobadas. Las plantillas se crean en WhatsApp Manager o en erplora.com.",
+      "none": "No hay plantillas aprobadas todavía. Se hacen en Ajustes → Plantillas de Meta o en WhatsApp Manager.",
       "variable": "Variable {n}",
       "preview": "Vista previa",
       "send": "Enviar",
       "missingVariables": "Rellena todas las variables de la plantilla.",
       "search": "Buscar plantilla…",
       "empty": "Sin plantillas.",
-      "emptyHint": "Las plantillas se crean en WhatsApp Manager o en erplora.com y aparecen aquí cuando Meta las revisa.",
+      "emptyHint": "Crea una con «Añadir plantilla»: Meta la revisa. Las que se hacen en WhatsApp Manager también salen aquí.",
       "loadError": "No se pudieron cargar las plantillas.",
       "rejectedReason": "Motivo de Meta: {reason}",
       "entity": {
@@ -164,12 +164,62 @@
         "AUTHENTICATION": "Autenticación"
       },
       "statuses": {
+        "DRAFT": "Sin enviar a Meta",
         "APPROVED": "Aprobada",
         "PENDING": "En revisión",
         "REJECTED": "Rechazada",
         "PAUSED": "Pausada por Meta",
         "DISABLED": "Desactivada por Meta",
         "DELETED": "Borrada en WhatsApp Manager"
+      },
+      "add": "Añadir plantilla",
+      "editor": {
+        "titleNew": "Nueva plantilla",
+        "titleEdit": "Editar plantilla — {name}",
+        "name": "Nombre",
+        "nameHint": "Minúsculas, números y guiones bajos. No se puede cambiar después.",
+        "nameRule": "Usa solo minúsculas, números y guiones bajos.",
+        "language": "Idioma",
+        "category": "Categoría",
+        "header": "Cabecera (opcional)",
+        "body": "Texto",
+        "bodyHint": "Donde va una variable, escribe su número entre dobles llaves, empezando por el 1.",
+        "example": "Ejemplo de la variable {n}",
+        "examplesHint": "Meta revisa la plantilla con estos ejemplos.",
+        "footer": "Pie (opcional)",
+        "buttons": "Botones",
+        "buttonAdd": "Añadir botón",
+        "buttonType": "Tipo",
+        "buttonText": "Texto del botón",
+        "buttonUrl": "Dirección (https://…)",
+        "buttonPhone": "Número (+34…)",
+        "buttonRemove": "Quitar botón",
+        "buttonTypes": {
+          "QUICK_REPLY": "Respuesta rápida",
+          "URL": "Enlace",
+          "PHONE_NUMBER": "Llamada"
+        },
+        "send": "Enviar a revisión de Meta",
+        "save": "Guardar y enviar a Meta",
+        "approvedKept": "Hasta que Meta apruebe los cambios, se sigue enviando la aprobada.",
+        "categoryFixed": "Meta solo deja cambiar la categoría de una plantilla que ha rechazado."
+      },
+      "actions": {
+        "edit": "Editar",
+        "retry": "Volver a enviar a Meta",
+        "delete": "Borrar"
+      },
+      "delete": {
+        "title": "¿Borrar esta plantilla?",
+        "message": "{name} ({language}) se borra aquí, y Meta también la borra.",
+        "impact": "Una plantilla aprobada tarda días en volver a aprobarse.",
+        "confirm": "Borrar plantilla"
+      },
+      "state": {
+        "sending": "Enviándose a Meta…",
+        "notAccepted": "No aceptada: {reason}",
+        "notSent": "Cambios sin enviar: {reason}",
+        "deleting": "Borrándose en Meta"
       }
     },
     "settings": {
