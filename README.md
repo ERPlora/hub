@@ -102,6 +102,30 @@ más abajo, y pasado el 16 no se entregan. En la fase 1 todas las apps instalada
 enciende después no recibe lo anterior. Lo anotado antes de la migración `base/0006_event_delivery` (el atraso desde
 el primer despliegue) se da por repartido sin aplicarse.
 
+## `/ws/print`: el canal del dispositivo que imprime
+
+El único WebSocket del Hub (PLAN-HUB §5). `config/asgi.py` manda el HTTP a Django, como siempre, y el WebSocket de
+`/ws/print` a `base/ws_print.py`, una aplicación ASGI propia, **sin Channels** (ronda 11: sin capa de canales); otra
+ruta WebSocket se rechaza en el saludo (Daphne contesta 403). Lo sirve el mismo `daphne` del servicio `hub`, y el ALB
+ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su `idle_timeout` de 120 s).
+
+- **Quién entra**: el `Host` pasa por la misma puerta que el HTTP (`base.middleware`: sin hub 4404, terminado 4410,
+  preparándose 4503); el `Origin` tiene que ser el del propio hub; la credencial es la cookie de sesión del Hub del
+  saludo, comprobada en `hello` y en cada mensaje (un cierre de sesión corta el socket en el siguiente latido).
+- **Protocolo**: el del Hub viejo (`print_ws.rs`), mismos mensajes y campos: `hello` (con `deviceId` y las
+  `printers` a las que llega el dispositivo) → `ready`; `claim` → `job` o `idle`; `done`/`failed` → `ack`; `beat`;
+  y del Hub, `wake` y `error` con su código. La tabla de códigos está en el docstring de `base/ws_print.py`.
+- **La cola es de Impresión**: el canal llama por nombre a `printing.printer.get`, `printing.job.claim`,
+  `printing.job.complete`, `printing.job.fail` y `printing.job.list`, con la sesión del dispositivo (mismos permisos,
+  ámbito y comprobación de app que la API HTTP); no toca modelos.
+- **El `wake`** no abre otro `LISTEN`: el socket tiene un stream del broker de `live` (el `LISTEN` único del proceso
+  en la BD de control, el de `/api/live`) suscrito al primer trabajo en cola de cada función del dispositivo; tras el
+  COMMIT de un trabajo nuevo, solo en el canal de su hub, llega el empujón, sin el documento.
+
+Para verlo en local: `curl -i -H 'Host: a.localhost:8000' -H 'Origin: http://a.localhost:8000' -H 'Connection: Upgrade'
+-H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=='
+http://127.0.0.1:8000/ws/print` contesta `101 Switching Protocols`. La e2e es `tests/e2e/ws-print.spec.ts`.
+
 ## Despliegue: `main` → prod, `pre` → pre
 
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
