@@ -17,6 +17,7 @@ import { useCatalog } from '../composables/useCatalog';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import {
+  addMessageStep,
   addStep,
   callChoices,
   type DataChoice,
@@ -26,6 +27,7 @@ import {
   fromFlow,
   missingGrants,
   moveStep,
+  NOTIFY_OPERATION,
   patchStep,
   removeStep,
   requiredGrants,
@@ -70,7 +72,10 @@ const RAN_NOTICE: Partial<Record<string, string>> = {
   calling: 'flow.editor.ranCalling',
   asking: 'flow.editor.ranAsking',
 };
-const ADDERS: readonly StepKind[] = ['command', 'query', 'condition', 'delay', 'http', 'ask'];
+type Adder = StepKind | 'message';
+const ADDERS: readonly Adder[] = ['command', 'query', 'condition', 'delay', 'message', 'http', 'ask'];
+/** «Send a message» only where the WhatsApp inbox is (its narrow send is in the catalog, FLOW-F31). */
+const adders = computed(() => ADDERS.filter((kind) => kind !== 'message' || !!catalog.value?.actions.some((action) => action.name === NOTIFY_OPERATION)));
 
 /** What is compared to know whether something is unsaved: the document and its switch. */
 const snapshot = (value: FlowDocument): string => JSON.stringify({ ...toPayload(value), enabled: value.enabled });
@@ -176,8 +181,8 @@ function setTrigger(trigger: Trigger): void {
   doc.value = { ...doc.value, trigger };
 }
 
-function add(kind: StepKind): void {
-  doc.value = addStep(doc.value, kind);
+function add(kind: Adder): void {
+  doc.value = kind === 'message' ? addMessageStep(doc.value) : addStep(doc.value, kind);
   openStep.value = doc.value.steps.at(-1)?.id ?? null;
 }
 
@@ -462,7 +467,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
         >{{ errors.steps }}</span>
         <div class="flow-editor__adders">
           <button
-            v-for="kind in ADDERS"
+            v-for="kind in adders"
             :key="kind"
             type="button"
             :data-testid="`flow-editor-add-${kind}`"

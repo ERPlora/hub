@@ -130,7 +130,7 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
     from live.operations import registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("whatsapp_inbox.")}
-    assert len(ops) == 41
+    assert len(ops) == 42  # FLOW-F31 added message.notify, the narrow send an automation may be granted
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and len(str(op.ai.get("description", ""))) > 20, name
         if op.kind == "command":

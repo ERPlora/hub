@@ -9,6 +9,7 @@ import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
 import AskStepPanel from './AskStepPanel.vue';
 import HttpStepPanel from './HttpStepPanel.vue';
+import MessageStepPanel from './MessageStepPanel.vue';
 import StepNode from './StepNode.vue';
 import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
@@ -154,5 +155,16 @@ describe('StepNode', () => {
     s.wrapper.findComponent(AskStepPanel).vm.$emit('update:step', { ...question, hours: 5 });
     expect(s.emitted().at(-1)).toMatchObject({ hours: 5 });
     expect(s.find('flow-step-onerror-s1').exists()).toBe(false);
+  });
+
+  it('«Send a message» opens its own form, not the list of actions (FLOW-F31)', async () => {
+    const message: Step = { id: 's1', kind: 'command', operation: 'whatsapp_inbox.message.notify', params: { phone: 'input.phone', text: 'Hi' } };
+    const s = await setup(message);
+    expect(s.find('flow-step-open-s1').text()).toBe('Send a WhatsApp to a customer');
+    expect(s.wrapper.findComponent(Combo).exists()).toBe(false);
+    expect(s.wrapper.findComponent(MessageStepPanel).props('step')).toEqual(message);
+    s.wrapper.findComponent(MessageStepPanel).vm.$emit('update:step', { ...message, params: { phone: 'input.phone', text: 'Hello' } });
+    expect(s.emitted().at(-1)).toMatchObject({ params: { text: 'Hello' } });
+    expect(s.wrapper.findComponent(StepOptions).exists()).toBe(true);
   });
 });
