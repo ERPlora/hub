@@ -724,8 +724,8 @@ Pasos:
    hora real, con su zona).
 2. Cada hora, Mesas las marca como caducadas y les borra el nombre.
 Entra: la hora.
-Sale: las retenciones caducadas, sin nombre (avisa: `table.table.hold_released`, solo si caducó
-alguna).
+Sale: las retenciones caducadas, sin nombre (avisa: `table.table.hold_released` una vez por cada
+retención caducada, con su mesa; nada si no caducó ninguna).
 Si falla: se repite en el siguiente repaso; si el hub estuvo parado, hace uno solo al volver.
 Implicados: TABLE-F09, TABLE-F25
 

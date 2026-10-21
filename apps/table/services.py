@@ -1214,13 +1214,18 @@ def release_hold(ctx: OperationContext, data: HoldReleaseIn) -> dict:
     },
 )
 def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
-    now = timezone.now()
-    expired = Hold.objects.filter(status=Hold.Status.HELD, held_until__lte=now).update(
-        status=Hold.Status.EXPIRED, label="", updated_at=now
+    over = list(
+        Hold.objects.select_for_update()
+        .filter(status=Hold.Status.HELD, held_until__lte=timezone.now())
+        .order_by("pk")
     )
-    if expired:
-        record_event(ctx, events.TABLE_HOLD_RELEASED, {"expired": expired})
-    return {"expired": expired}
+    for hold in over:
+        hold.status = Hold.Status.EXPIRED
+        hold.label = ""
+        hold.save(update_fields=["status", "label", "updated_at"])
+        # One notice per hold, saying its table (hub#2681): never one for the whole sweep.
+        _hold_event(ctx, events.TABLE_HOLD_RELEASED, hold)
+    return {"expired": len(over)}
 
 
 def _window(day: dt.date, at: dt.time, minutes: int) -> tuple[dt.datetime, dt.datetime]:

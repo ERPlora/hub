@@ -412,6 +412,18 @@ def test_the_sweep_expires_the_holds_whose_window_passed_and_says_so_only_then()
     assert names() == ["table.table.hold_released"]
 
 
+def test_the_sweep_says_which_tables_it_freed_one_notice_per_hold():
+    # hub#2681: one notice for the whole sweep, with no table, left an automation not knowing which.
+    six, seven = make_table("6"), make_table("7")
+    make_hold(six, starts_in=-180, lasts=60, ref="r-6", source="reservation")
+    make_hold(seven, starts_in=-240, lasts=60, ref="r-7", source="reservation")
+    assert run("table.hold.expire", {}, ctx_for(permissions={"*"})).expired == 2
+    assert sorted(payloads("table.table.hold_released"), key=lambda p: p["source_ref"]) == [
+        {"table_id": str(six.id), "source": "reservation", "source_ref": "r-6"},
+        {"table_id": str(seven.id), "source": "reservation", "source_ref": "r-7"},
+    ]
+
+
 def test_the_platforms_writes_are_for_the_system_alone():
     for name, data in (
         ("table.hold.expire", {}),
