@@ -1,17 +1,22 @@
-{% load i18n %}<!doctype html>
+{% load i18n static %}<!doctype html>
 {% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 {% comment %}
 402 of a business suspended for an unpaid invoice (base.middleware, the SaaS's photo). Rendered without the request:
-no context processors, no database, no scripts or styles (strict CSP).
+no context processors, no database, no scripts nor inline styles (strict CSP,
+no nonce): its look is base/gate.css, a static file.
 {% endcomment %}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>{% translate "This business is suspended" %}</title>
+  <link rel="stylesheet" href="{% static 'base/gate.css' %}">
 </head>
 <body>
   <main>
+    <div class="ep-gate__brand">
+      <img class="ep-gate__logo" src="{% static 'base/img/logo.png' %}" alt="" width="28" height="28"><span>ERPlora</span>
+    </div>
     <h1>{% translate "This business is suspended" %}</h1>
     <p>{% translate "An invoice of its plan is unpaid. Its data is safe: as soon as whoever pays it settles the invoice in ERPlora, it works again." %}</p>
     <p><a href="{{ back_url }}">{% translate "Go to ERPlora" %}</a></p>

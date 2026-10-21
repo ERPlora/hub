@@ -132,16 +132,22 @@ def test_database_comes_from_the_environment(load_settings):
     assert (db["NAME"], db["HOST"], db["PORT"]) == ("other", "db.internal", 6543)
 
 
-def with_saas_form_action(policy: dict, saas_origin: str) -> dict:
-    """``policy`` with the SaaS's origin in ``form-action``: the logout's redirect leaves for it."""
-    return {**policy, "form-action": [*policy["form-action"], saas_origin]}
+def with_saas_origin(policy: dict, saas_origin: str) -> dict:
+    """``policy`` with the SaaS's origin where the Hub's page reaches it: ``form-action`` (the logout's
+    redirect leaves for it), ``img-src`` and ``media-src`` (the WhatsApp attachments it serves)."""
+    return {
+        **policy,
+        "form-action": [*policy["form-action"], saas_origin],
+        "img-src": [*policy["img-src"], saas_origin],
+        "media-src": ["'self'", saas_origin],
+    }
 
 
 def test_debug_defaults_to_false_so_a_missing_variable_never_turns_it_on(load_settings):
     env = {key: value for key, value in PRODUCTION_ENV.items() if key != "DEBUG"}
     loaded = load_settings(**env)
     assert loaded["DEBUG"] is False
-    assert loaded["SECURE_CSP"] == with_saas_form_action(
+    assert loaded["SECURE_CSP"] == with_saas_origin(
         base_policy(), "https://erplora.com"
     )
     assert loaded["LIVE"]["spa"]["dev_server"] is None
@@ -156,7 +162,7 @@ def test_without_debug_nor_a_secret_key_the_settings_refuse_to_start(load_settin
 def test_development_uses_the_debug_csp_and_vite(load_settings):
     loaded = load_settings(**DEVELOPMENT_ENV)
     assert loaded["DEBUG"] is True
-    assert loaded["SECURE_CSP"] == with_saas_form_action(
+    assert loaded["SECURE_CSP"] == with_saas_origin(
         debug_policy(), "http://localhost:8001"
     )
     assert loaded["LIVE"]["spa"]["dev_server"] == "http://localhost:5173"
@@ -168,7 +174,7 @@ def test_the_vite_port_comes_from_the_environment(load_settings):
     # branch sets VITE_DEV_PORT for Django and for vite.config.ts alike.
     loaded = load_settings(**DEVELOPMENT_ENV, VITE_DEV_PORT="5183")
     assert loaded["LIVE"]["spa"]["dev_server"] == "http://localhost:5183"
-    assert loaded["SECURE_CSP"] == with_saas_form_action(
+    assert loaded["SECURE_CSP"] == with_saas_origin(
         debug_policy("http://localhost:5183"), "http://localhost:8001"
     )
 
@@ -198,7 +204,7 @@ def test_runserver_starts_vite_on_the_port_django_read(load_settings, tmp_path, 
 def test_production_uses_the_base_csp_and_no_dev_server(load_settings):
     loaded = load_settings(**PRODUCTION_ENV)
     assert loaded["DEBUG"] is False
-    assert loaded["SECURE_CSP"] == with_saas_form_action(
+    assert loaded["SECURE_CSP"] == with_saas_origin(
         base_policy(), "https://erplora.com"
     )
     assert loaded["LIVE"]["spa"]["dev_server"] is None
@@ -216,6 +222,40 @@ def test_form_action_lets_the_logout_go_on_to_the_saas_s_origin_only(
     # the whole redirect chain, so 'self' alone left the page where it was (Hub session closed).
     loaded = load_settings(**{**PRODUCTION_ENV, "SAAS_URL": saas_url})
     assert loaded["SECURE_CSP"]["form-action"] == ["'self'", "https://erplora.com"]
+
+
+@pytest.mark.parametrize(
+    ("env", "policy", "saas_origin"),
+    [
+        (
+            {**PRODUCTION_ENV, "SAAS_URL": "https://erplora.com/some/path"},
+            base_policy(),
+            "https://erplora.com",
+        ),
+        (DEVELOPMENT_ENV, debug_policy(), "http://localhost:8001"),
+    ],
+    ids=["production", "development"],
+)
+def test_the_inbox_shows_photos_and_voice_notes_from_the_saas_s_origin_only(
+    load_settings, env, policy, saas_origin
+):
+    # The SaaS serves a WhatsApp conversation's attachments (/whatsapp/media/<id>): the thread shows the photo
+    # and plays the voice note from its origin, and from nowhere else (no `*`, `https:` nor Meta's CDN).
+    # Nothing else widens: connect-src keeps the Tauri bridge (ipc:) as live.csp gives it.
+    csp = load_settings(**env)["SECURE_CSP"]
+    assert csp["img-src"] == [*policy["img-src"], saas_origin]
+    assert csp["media-src"] == ["'self'", saas_origin]
+    for unchanged in ("default-src", "script-src", "connect-src"):
+        assert csp[unchanged] == policy[unchanged]
+
+
+@pytest.mark.parametrize("env", [PRODUCTION_ENV, DEVELOPMENT_ENV], ids=["production", "development"])
+def test_the_gate_pages_take_their_stylesheet_and_logo_from_self(load_settings, env):
+    # A hub being prepared, gone or suspended answers a page rendered without the request (no nonce): it wears
+    # base's static stylesheet and logo (/static/base/), which only 'self' lets in.
+    csp = load_settings(**env)["SECURE_CSP"]
+    assert "'self'" in csp["style-src"]
+    assert "'self'" in csp["img-src"]
 
 
 @pytest.mark.parametrize(

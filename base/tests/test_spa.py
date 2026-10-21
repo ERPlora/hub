@@ -2,8 +2,11 @@
 
 import json
 import re
+from urllib.parse import urlsplit
 
 import pytest
+from django.utils.csp import CSP
+from live.csp import base_policy, debug_policy
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
 
@@ -21,6 +24,12 @@ def json_block(response, block_id: str) -> tuple[str, dict]:
 def csp_nonce(response) -> str:
     [nonce] = re.findall(r"'nonce-([^']+)'", response["Content-Security-Policy"])
     return nonce
+
+
+def csp_directives(response) -> dict[str, str]:
+    return dict(
+        directive.strip().split(" ", 1) for directive in response["Content-Security-Policy"].split(";") if directive.strip()
+    )
 
 
 def test_anonymous_shell_embeds_an_empty_session(client):
@@ -74,10 +83,24 @@ def test_spa_config_points_the_auth_gate_at_the_hub_s_own_jump_to_the_saas_login
 def test_the_csp_header_lets_the_logout_form_go_on_to_the_saas(client, settings):
     # /auth/logout answers 302 to the SaaS's logout; form-action filters that redirect too.
     response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
-    directives = dict(
-        directive.strip().split(" ", 1) for directive in response["Content-Security-Policy"].split(";") if directive.strip()
-    )
-    assert directives["form-action"] == f"'self' {settings.SAAS_URL.rstrip('/')}"
+    assert csp_directives(response)["form-action"] == f"'self' {settings.SAAS_URL.rstrip('/')}"
+
+
+def test_the_csp_header_lets_the_thread_show_the_saas_s_attachments_and_widens_nothing_else(client, settings):
+    # WHATSAPP_INBOX-F06: the SaaS serves a conversation's photos and voice notes (/whatsapp/media/<id>); the
+    # thread shows and plays them from its origin only. default-src, script-src and connect-src (Tauri's ipc:
+    # bridge) stay as live.csp gives them.
+    response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
+    directives = csp_directives(response)
+    saas = "{0.scheme}://{0.netloc}".format(urlsplit(settings.SAAS_URL))
+    # The policy was built at import, with the DEBUG of the checkout (the test run turns DEBUG off later).
+    dev_server = settings.LIVE["spa"]["dev_server"]
+    policy = debug_policy(dev_server) if dev_server else base_policy()
+    nonce = f"'nonce-{csp_nonce(response)}'"
+    assert directives["img-src"] == " ".join([*policy["img-src"], saas])
+    assert directives["media-src"] == f"'self' {saas}"
+    for name in ("default-src", "script-src", "connect-src"):
+        assert directives[name] == " ".join(nonce if value == CSP.NONCE else value for value in policy[name])
 
 
 @pytest.mark.parametrize(

@@ -522,14 +522,16 @@ def project_detail(ctx: OperationContext, data: ProjectRefIn) -> dict:
 
 
 def _sorted(rows: QuerySet[Any], sort: str, columns: dict[str, tuple[str, ...]]) -> QuerySet[Any]:
-    """``rows`` by the columns of ``sort`` («-» first = descending), empty values last, then by id."""
+    """``rows`` by the columns of ``sort`` («-» first = descending), empty values last, then by id in
+    the same direction (the old product's rule, hub#2355): a touched row keeps its place and pages
+    neither repeat nor lose rows."""
     descending = sort.startswith("-")
     key = sort.removeprefix("-")
     order = [
         F(column).desc(nulls_last=True) if descending else F(column).asc(nulls_last=True)
         for column in columns[key]
     ]
-    return rows.order_by(*order, "-id" if descending and key == "id" else "id")
+    return rows.order_by(*order, "-id" if descending else "id")
 
 
 def _page(rows: QuerySet[Any], params: PageIn, row) -> dict:
