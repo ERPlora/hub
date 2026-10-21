@@ -1,5 +1,6 @@
 // A product tile of the till's grid (WORKBOOK «Vender»: articles with their initials, their unit and
-// their price; SALE-F07: one without VAT is marked «Falta el IVA» and still takes the tap, to say why).
+// their price; SALE-F07: one without VAT is marked «Falta el IVA», one sold out «Agotado», and both still
+// take the tap, to say why).
 import { describe, expect, it } from 'vitest';
 
 import { click, mountSale, taxSettings } from '../../__tests__/mount-sale';
@@ -43,6 +44,24 @@ describe('ProductTile', () => {
     const tile = m.find('pos-product-p1');
     expect(tile.find('.pos-tile__badge').text()).toBe('IGIC missing');
     expect(tile.attributes('aria-label')).toBe('Café con leche · Cannot be sold: no tax category. IGIC needs to be set up.');
+  });
+
+  it('a sold-out product («86») is greyed with «Sold out», says so and still takes the tap', async () => {
+    const soldOut = product({ is_sold_out: true });
+    const m = await mountSale(ProductTile, { props: { product: soldOut } });
+    const tile = m.find('pos-product-p1');
+    expect(tile.classes()).toContain('pos-tile--sold-out');
+    expect(tile.attributes('aria-disabled')).toBe('true');
+    expect(tile.find('.pos-tile__badge').text()).toBe('Sold out');
+    expect(tile.attributes('aria-label')).toBe('Café con leche · Sold out');
+    expect(tile.find('.pos-tile__warn').exists()).toBe(false);
+    await click(tile.element);
+    expect(m.wrapper.emitted('pick')).toEqual([[soldOut]]);
+  });
+
+  it('in Spanish a sold-out product reads «Agotado»', async () => {
+    const m = await mountSale(ProductTile, { props: { product: product({ is_sold_out: true }) }, locale: 'es' });
+    expect(m.find('pos-product-p1').find('.pos-tile__badge').text()).toBe('Agotado');
   });
 
   it('a tap hands the product up', async () => {

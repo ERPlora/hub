@@ -13,7 +13,7 @@ from live.context import Scope, system_context
 from live.errors import Conflict
 
 from apps.verifactu import certificates
-from apps.verifactu.models import Config
+from apps.verifactu.models import Config, Record
 from apps.verifactu.queries import production_open
 from apps.verifactu.tests.conftest import A, ctx_for, run
 from base.models import Hub
@@ -63,3 +63,25 @@ def test_a_demo_never_goes_live_even_on_a_server_open_for_it():
 def test_a_business_on_the_same_server_goes_live():
     run("verifactu.config.go_live", ctx=ctx_for(scope=A))
     assert Config.objects.get().environment == "production"
+
+
+@pytest.mark.usefixtures("opened", "ready_route", "demo")
+def test_a_demo_files_in_testing_even_where_the_configuration_says_production():
+    # VERIFACTU-G23 and G25 (SAAS_PUBLIC-F91, HUB-F315): nothing of a demo ever reaches the real AEAT. Phase 1
+    # shares the tables (round 2026-10-17), so the configuration a demo reads may be a business's that went live on
+    # this server: the demo's sale is still sealed in the test environment, never numbered in production.
+    run("verifactu.config.go_live", ctx=ctx_for(scope=A))
+    assert Config.objects.get().environment == "production"
+
+    invoice = run(
+        "invoice.invoice.create",
+        {
+            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+            "series_code": "TICKET",
+        },
+        ctx_for(scope=DEMO),
+    )
+
+    record = Record.objects.get(invoice_id=invoice.id)
+    assert record.environment == "testing"
+    assert "prewww2.aeat.es" in record.qr_url

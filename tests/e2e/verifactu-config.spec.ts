@@ -5,8 +5,13 @@
 //     Spanish text, and takes four minimal PDFs on to ERPlora's account. The local SaaS knows no hub with the id of
 //     `a` (each e2e database gives it its own), so it answers 404 and the Hub says «not linked yet»: the Hub's own
 //     checks passed and the documents reached the SaaS. A 201 needs a hub the SaaS registered;
+//   - VERIFACTU-F06: an authorisation in review offers «Volver a enviar», which opens the form again with what the new
+//     sending does to the one in review;
+//   - VERIFACTU-F04: «Usar mi propio certificado» in Settings chooses who files: the own certificate once it is
+//     loaded, ERPlora's seal again when switched off;
 //   - VERIFACTU-F08: Settings lists what keeps the business from going live, the missing paid option among it, from
 //     the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once paid.
+// Each flow leaves its evidence in the three sizes of the migration (`APP-VERIFACTU-<flow>-390|834|1440`).
 // The photo is the SaaS's, sent here the way the SaaS sends it, to `a`'s row of the registry (`base_hub`). What the
 // run changes in VeriFactu's configuration, the own certificate and that row's photo is put back after it (or
 // removed, if the run made it), and so is the issuer.
@@ -18,8 +23,8 @@ import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, HUB_DIR, login, psql, shown, topbarApps } from './helpers';
-import { cleanInvoices, ensureIssuer, snapshotSeries } from './invoice-helpers';
+import { A, HUB_DIR, login, psql, shot, shown, topbarApps } from './helpers';
+import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
@@ -56,6 +61,17 @@ const CONFIG_COLUMNS = [
 ];
 
 type Representation = 'none' | 'submitted' | 'approved' | 'returned' | 'revoked';
+
+/** The page in the three sizes, as `APP-VERIFACTU-<flow>-<size>`, each once `ready` says it painted. */
+async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void>): Promise<void> {
+  const restore = page.viewportSize() ?? { width: 1280, height: 860 };
+  for (const viewport of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(page);
+    await page.screenshot({ path: shot(`APP-VERIFACTU-${flow}-${viewport.label}`) });
+  }
+  await page.setViewportSize(restore);
+}
 
 /** The SaaS's photo of hub `a`: the representation's state, the live option and the account's status. */
 async function pushPhoto(representation: Representation, livePaid: boolean): Promise<void> {
@@ -226,6 +242,12 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
   await expect(cert.locator('dd').last()).toContainText(String(new Date().getFullYear() + 1));
   await expect(own.locator('[data-testid=verifactu-config-cert-error]')).toHaveCount(0);
   expect(psql('select holder_tax_id from verifactu_owncertificate')).toBe(ISSUER_NIF);
+  for (const flow of ['F02', 'F34']) {
+    // F34: the renewed one is uploaded the same way; what it shows is its holder and «Caduca el».
+    await flowShots(page, flow, async (p) => {
+      await expect(shown(p).locator('[data-testid=verifactu-config-cert]')).toContainText('Cargado');
+    });
+  }
 
   await own.locator('[data-testid=verifactu-config-cert-remove]').click();
   // By its title: the shell keeps other dialogs in the page (the apps launcher is an ion-modal too).
@@ -236,6 +258,9 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
   await expect(cert).toContainText('Sin cargar');
   await expect(cert).not.toContainText(ISSUER_NIF);
   expect(psql('select count(*) from verifactu_owncertificate')).toBe('0');
+  await flowShots(page, 'F03', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-config-cert]')).toContainText('Sin cargar');
+  });
   await context.close();
 });
 
@@ -246,6 +271,9 @@ test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; fo
   await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
   await expect(grant.locator('[data-testid=verifactu-grant-not-linked]')).toHaveCount(0);
   await expect(grant.locator('[data-testid=verifactu-grant-taxpayer]')).toContainText(ISSUER_NIF);
+  await flowShots(page, 'F05', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-grant-form]')).toBeVisible();
+  });
 
   await grant.locator('[data-testid=verifactu-grant-signer-name] input').fill('Ana Pérez');
   await grant.locator('[data-testid=verifactu-grant-signer-nif] input').fill('X1234567L');
@@ -292,6 +320,9 @@ test('Ajustes: the missing paid option keeps the business from going live until 
   await expect(blockers).toContainText('la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora');
   await expect(blockers).not.toContainText('falta que ERPlora apruebe tu autorización firmada');
   await expect(view.locator('[data-testid=verifactu-settings-go-live]')).toHaveAttribute('aria-disabled', 'true');
+  await flowShots(page, 'F08', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-settings-live-blockers]')).toBeVisible();
+  });
 
   // The live result follows the next photo, without reloading: the plan no longer blocks it.
   await pushPhoto('approved', true);
@@ -300,5 +331,50 @@ test('Ajustes: the missing paid option keeps the business from going live until 
   // more of the reasons listed, not a notice of its own.
   await expect(blockers).toContainText('ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor');
   await expect(view.locator('[data-testid=verifactu-settings-go-live]')).toHaveAttribute('aria-disabled', 'true');
+  await context.close();
+});
+
+test('VERIFACTU-F06: an authorisation in review offers «Volver a enviar», which says what the new sending does', async ({ browser }) => {
+  await pushPhoto('submitted', false);
+  const { context, page } = await spanishPage(browser, '/verifactu/config');
+  const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
+  // In review, the form is closed: «Volver a enviar» opens it, with its notice and «Cancelar».
+  await expect(grant.locator('[data-testid=verifactu-grant-form]')).toHaveCount(0);
+  await grant.locator('[data-testid=verifactu-grant-resend]').click();
+  await expect(grant.locator('[data-testid=verifactu-grant-resend-hint]')).toHaveText(
+    'Si algo salió mal, envíalo de nuevo: el envío nuevo sustituye al que está en revisión.',
+  );
+  await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
+  await flowShots(page, 'F06', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-grant-resend-hint]')).toBeVisible();
+  });
+  await grant.locator('[data-testid=verifactu-grant-resend-cancel]').click();
+  await expect(grant.locator('[data-testid=verifactu-grant-form]')).toHaveCount(0);
+  await context.close();
+});
+
+test('VERIFACTU-F04: «Usar mi propio certificado» chooses who files, the own certificate once loaded', async ({ browser }) => {
+  await pushPhoto('none', false);
+  const p12 = join(DIR, 'negocio-f04.p12');
+  makeP12(p12);
+  const { context, page } = await spanishPage(browser, '/verifactu/config');
+  const own = shown(page).locator('[data-testid=verifactu-config-own]');
+  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
+  await own.locator('[data-testid=verifactu-config-cert-file]').setInputFiles(p12);
+  await own.locator('[data-testid=verifactu-config-cert-password] input').fill(PASSWORD);
+  await own.locator('[data-testid=verifactu-config-cert-upload]').click();
+  await expect(own.locator('[data-testid=verifactu-config-cert]')).toContainText('Cargado');
+
+  await page.goto(`${A}/verifactu/settings`);
+  const toggle = shown(page).locator('[data-testid=verifactu-settings-own]');
+  await toggle.click();
+  await expect(page.locator('ion-toast').filter({ hasText: 'Listo: a partir de ahora envías con tu propio certificado.' })).toBeVisible();
+  expect(psql('select route from verifactu_config')).toBe('own');
+  await flowShots(page, 'F04', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-settings-route-hint]')).toBeVisible();
+  });
+  await toggle.click();
+  await expect(page.locator('ion-toast').filter({ hasText: 'Listo: a partir de ahora remite ERPlora en tu nombre.' })).toBeVisible();
+  expect(psql('select route from verifactu_config')).toBe('erplora');
   await context.close();
 });

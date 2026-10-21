@@ -20,6 +20,7 @@ delete a sale, it fixes a sending problem.
 - Own certificate: its holder, kind and expiry only; never its sealed material (the .p12 and its password).
 """
 
+from contextvars import ContextVar
 from decimal import Decimal
 
 from django import forms
@@ -78,6 +79,11 @@ INVOICE_PART = _("Invoice")
 CHAIN_PART = _("Hash chain")
 AEAT_PART = _("AEAT response")
 METADATA_PART = _("Metadata")
+
+
+#: The hub chosen in the admin session while a record's page is drawn: ``why_waiting`` gets no request, and why a
+#: record waits depends on whose hub it is (ERPlora's own files ERPlora's records without an authorisation).
+_drawn_for: ContextVar[Scope | None] = ContextVar("verifactu_admin_drawn_for", default=None)
 
 
 def _staff_context(request) -> OperationContext | None:
@@ -416,6 +422,18 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
     def get_readonly_fields(self, request, obj=None) -> tuple:
         return (*super().get_readonly_fields(request, obj), "why_waiting")
 
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """The page drawn for the hub chosen in the session (``why_waiting``), before the choice is forgotten."""
+        ctx = _staff_context(request)
+        token = _drawn_for.set(ctx.scope if ctx else None)
+        try:
+            response = super().change_view(request, object_id, form_url, extra_context)
+            if hasattr(response, "render"):
+                response.render()
+            return response
+        finally:
+            _drawn_for.reset(token)
+
     @admin.display(
         description=Record._meta.get_field("total_amount").verbose_name,
         ordering="total_amount",
@@ -427,7 +445,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
 
     @admin.display(description=WHY_WAITING)
     def why_waiting(self, record: Record) -> str:
-        reasons = waiting_of(record, config_row())
+        reasons = waiting_of(record, config_row(), _drawn_for.get())
         return "; ".join(reason["message"] for reason in reasons) or "—"
 
     @admin.action(description=RESEND)

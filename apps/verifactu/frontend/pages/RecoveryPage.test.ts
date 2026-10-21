@@ -1,10 +1,15 @@
 // VeriFactu → Recovery (VERIFACTU-F26–F29; the old `erp-verifactu-recovery`): «Chain recovery» with the «Issuer tax
 // ID» (Invoicing's), «Chain integrity» with the last verdict, «Validate chain», «Query AEAT», «Recover chain from
 // AEAT» (asks first), «Latest records at the AEAT» and «Continue chain manually (migration)» (a 64-hex fingerprint,
-// asks first). Without a tax ID the buttons are off; each is shown to whoever may use it.
+// asks first). Without a tax ID the buttons are off; each is shown to whoever may use it. «Latest records at the AEAT»
+// is a server-side DataTable, as the old one: search «Search invoice, fingerprint or CSV…», sort on every column and
+// the funnel's State and Date filters.
+import { DataTable, EmptyState } from '@erplora/ui/components';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Component } from 'vue';
 
-import { click, ionValue, MANAGER, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { click, flush, ionValue, MANAGER, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { plain } from '../lib/format';
 import type { ChainStatusOut, ConfigOut } from '../operations';
 import RecoveryPage from './RecoveryPage.vue';
 
@@ -56,14 +61,21 @@ const AEAT = {
   offset: 0,
 };
 
+const AEAT_OP = 'verifactu.aeat_record.list';
+
 async function setup(chain: ChainStatusOut = CHAIN(null), options: MountOptions = {}) {
   const m = await mountVerifactu(RecoveryPage, { path: '/verifactu/recovery', ...options });
   await m.live();
   await m.result('verifactu.config.get', CONFIG);
   await m.reopen();
   await m.result('verifactu.chain.status', chain);
-  await m.result('verifactu.aeat_record.list', AEAT);
-  return m;
+  await m.result(AEAT_OP, AEAT);
+  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
+  async function emit(name: string, ...args: unknown[]) {
+    table().vm.$emit(name, ...args);
+    await flush();
+  }
+  return { ...m, table, emit };
 }
 
 describe('RecoveryPage', () => {
@@ -87,10 +99,50 @@ describe('RecoveryPage', () => {
     expect(s.find('verifactu-recovery-result').text()).toBe('Operation completed.');
   });
 
-  it('paints the latest records at the AEAT', async () => {
+  it('paints the latest records at the AEAT in a server-side table, the last generated first', async () => {
     const s = await setup();
-    expect(s.find('verifactu-recovery-aeat').text()).toContain('TICKET-2026-000003');
-    expect(s.find('verifactu-recovery-aeat').text()).toContain('Correcto');
+    expect(s.params(AEAT_OP)).toEqual([{ sort: 'generated_on', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, filterable: true, testid: 'verifactu-recovery-aeat', pageSize: 50, total: 1 });
+    expect((s.table().props() as Record<string, unknown>).searchPlaceholder).toBe('Search invoice, fingerprint or CSV…');
+    expect(((s.table().props() as Record<string, unknown>).columns as Array<{ label: string }>).map((c) => c.label)).toEqual([
+      'Invoice',
+      'Date',
+      'Fingerprint',
+      'Status',
+      'CSV',
+      'Queried on',
+    ]);
+    const cells = s.wrapper.findAll('[data-testid="verifactu-recovery-aeat-row"]')[0].findAll('[role="cell"]').map((c) => plain(c.text().trim()));
+    expect(cells.slice(0, 5)).toEqual(['TICKET-2026-000003', '10/14/2026', 'AAAAAAAAAA…AAAAAAAAAA', 'Registered', 'A-1']);
+  });
+
+  it('searches, sorts and filters the AEAT records on the server', async () => {
+    const s = await setup();
+    await s.emit('update:search', 'A-1');
+    await s.emit('sort-change', { sort: 'issue_date', dir: 'asc' });
+    await s.emit('update:filters', { state: 'Anulado', issue_date_from: '2026-10-01' });
+    await s.reopen();
+    expect(s.params(AEAT_OP)).toEqual([
+      { search: 'A-1', state: 'Anulado', issue_date_from: '2026-10-01', sort: 'issue_date', dir: 'asc', limit: 50, offset: 0 },
+    ]);
+    const state = ((s.table().props() as Record<string, unknown>).columns as Array<{ key: string; filter?: { options?: { value: string; label: string }[] } }>).find(
+      (c) => c.key === 'state',
+    );
+    expect(state?.filter?.options).toEqual([
+      { value: 'Correcto', label: 'Registered' },
+      { value: 'AceptadoConErrores', label: 'Accepted with errors' },
+      { value: 'Anulado', label: 'Cancelled' },
+    ]);
+  });
+
+  it('says there is no AEAT data yet, or no results with a search', async () => {
+    const s = await setup();
+    await s.result(AEAT_OP, { rows: [], total: 0, limit: 50, offset: 0 });
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No AEAT data. Press «Query AEAT».');
+    await s.emit('update:search', 'nope');
+    await s.reopen();
+    await s.result(AEAT_OP, { rows: [], total: 0, limit: 50, offset: 0 });
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
   });
 
   it('«Recover chain from AEAT» asks first, and a refusal is said', async () => {

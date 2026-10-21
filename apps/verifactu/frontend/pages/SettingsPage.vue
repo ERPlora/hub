@@ -165,8 +165,14 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
     >
       {{ refused }}
     </InlineFeedback>
-    <template v-if="config">
-      <section class="verifactu-settings__card">
+    <div
+      v-if="config"
+      class="verifactu-settings__grid"
+    >
+      <section
+        class="verifactu-settings__card verifactu-settings__sending"
+        data-testid="verifactu-settings-sending-card"
+      >
         <h3>{{ $t('verifactu.settings.sending') }}</h3>
         <ion-toggle
           v-if="canConfigure"
@@ -276,7 +282,10 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         </template>
       </section>
 
-      <section class="verifactu-settings__card">
+      <section
+        class="verifactu-settings__card verifactu-settings__test"
+        data-testid="verifactu-settings-test-card"
+      >
         <h3>{{ $t('verifactu.settings.test') }}</h3>
         <p class="verifactu-settings__hint">
           {{ $t('verifactu.settings.testHint') }}
@@ -344,7 +353,10 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         </p>
       </section>
 
-      <section class="verifactu-settings__card">
+      <section
+        class="verifactu-settings__card verifactu-settings__declaration"
+        data-testid="verifactu-settings-declaration-card"
+      >
         <h3>{{ $t('verifactu.settings.declaration') }}</h3>
         <p class="verifactu-settings__hint">
           {{ $t('verifactu.settings.declarationDesc') }}
@@ -370,7 +382,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           </template>
         </dl>
       </section>
-    </template>
+    </div>
   </AppPage>
 </template>
 
@@ -418,6 +430,27 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 .verifactu-settings__reasons {
   margin: 0.25rem 0 0;
   padding-inline-start: 1.1rem;
+}
+/* As the old screen on a desk: «Sending» and the declaration on the left, «Live test» on the right. */
+@media (min-width: 992px) {
+  .verifactu-settings__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'sending test'
+      'declaration test';
+    column-gap: 1.25rem;
+    align-items: start;
+  }
+  .verifactu-settings__sending {
+    grid-area: sending;
+  }
+  .verifactu-settings__test {
+    grid-area: test;
+  }
+  .verifactu-settings__declaration {
+    grid-area: declaration;
+  }
 }
 @media (max-width: 575px) {
   .verifactu-settings__fields {
