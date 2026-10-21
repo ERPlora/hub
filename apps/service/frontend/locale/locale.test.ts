@@ -74,6 +74,18 @@ describe('service catalogues (en source + es)', () => {
     }
   });
 
+  it('keep no error message that no page, component or helper paints', () => {
+    // A confirmation or a form shows the server's reason, not a title of its own: an unused «Could not…»
+    // is dead text a WORKBOOK ends up quoting as visible. Only a key a screen should paint and does not
+    // yet stays, listed here while its FIX is queued; once a screen uses it, it leaves this list.
+    const unpainted = new Set(['service.professionals.loadError']);
+    const code = sources(FRONTEND).map((file) => readFileSync(file, 'utf8')).join('\n');
+    const errors = [...EN.keys()].filter((key) => /error$/i.test(key.slice(key.lastIndexOf('.') + 1)));
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.filter((key) => !code.includes(key) && !unpainted.has(key))).toEqual([]);
+    for (const key of unpainted) expect(code.includes(key), `${key} is painted now: drop it from the list`).toBe(false);
+  });
+
   it('name every pricing, status, discount and movement the server knows', () => {
     for (const type of ['fixed', 'hourly', 'from', 'variable', 'free']) expect(EN.has(`service.pricing.${type}`), type).toBe(true);
     for (const status of ['active', 'unconfigured', 'archived']) expect(EN.has(`service.services.status.${status}`), status).toBe(true);
