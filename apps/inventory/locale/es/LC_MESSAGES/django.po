@@ -237,6 +237,16 @@ msgstr "ventas vistas"
 msgid "This product does not exist in this hub."
 msgstr "Este producto no existe en este hub."
 
+msgid "The print queue is not available here: print the label from the browser."
+msgstr "La cola de impresión no está disponible aquí: imprime la etiqueta desde el navegador."
+
+msgid ""
+"This SKU cannot be turned into a barcode: use letters without accents, "
+"digits and signs."
+msgstr ""
+"Este SKU no se puede pasar a código de barras: usa letras sin tilde, números "
+"y signos."
+
 msgid "This category no longer exists."
 msgstr "Esta categoría ya no existe."
 

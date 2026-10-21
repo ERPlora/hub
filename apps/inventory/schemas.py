@@ -862,3 +862,13 @@ class RefundStockOut(Schema):
 
 class DeletedOut(Schema):
     id: UUID = Field(description="What was deleted.")
+
+
+class PrintLabelOut(Schema):
+    """INVENTORY-F25: the label put in Printing's queue."""
+
+    job_id: UUID = Field(description="The print job of the label, in Printing's queue.")
+    printer_name: str | None = Field(
+        description="The printer of the «Label» function that will print it; null: none has that function, so "
+        "the label waits in the queue until one does."
+    )

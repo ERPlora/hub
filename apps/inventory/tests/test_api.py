@@ -9,6 +9,7 @@ import json
 import uuid
 
 import pytest
+from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.inventory.api import router
@@ -26,6 +27,7 @@ ROUTES = {
     ("POST", "/inventory/products/update", "inventory.product.update"),
     ("POST", "/inventory/products/delete", "inventory.product.delete"),
     ("POST", "/inventory/products/sold_out", "inventory.product.set_sold_out"),
+    ("POST", "/inventory/products/print_label", "inventory.product.print_label"),
     ("GET", "/inventory/product_categories", "inventory.product_category.list"),
     ("POST", "/inventory/product_categories/add", "inventory.product_category.add"),
     ("POST", "/inventory/product_categories/remove", "inventory.product_category.remove"),
@@ -92,6 +94,18 @@ def test_the_reactions_to_sales_have_no_route():
 
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
+
+
+def test_the_spas_route_map_names_every_inventory_route():
+    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3);
+    # a route missing there is an operation the screens cannot call.
+    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    mine = {
+        (route["method"].upper(), route["path"].removeprefix("/api"), op)
+        for op, route in spa.items()
+        if op.startswith("inventory.")
+    }
+    assert mine == ROUTES
 
 
 # Authentication and permissions
@@ -183,6 +197,21 @@ def test_a_sold_out_article_leaves_what_the_till_asks_for_until_it_is_back_on_sa
     back = post(admin_client, "/inventory/products/sold_out", {"product": "CRO", "sold_out": False})
     assert (back.status_code, back.json()["is_sold_out"]) == (200, False)
     assert get(admin_client, "/inventory/products", is_active="true").json()["total"] == 1
+
+
+@pytest.mark.django_db
+def test_inventory_f25_the_label_is_asked_for_over_http_and_lands_in_the_print_queue(admin_client):
+    from apps.printing.models import PrintJob
+
+    product = {"name": "Croquettes", "sku": "CRO", "price": 150, "tax_category_key": TAX}
+    assert post(admin_client, "/inventory/products", product).status_code == 201
+
+    printed = post(admin_client, "/inventory/products/print_label", {"product": "CRO"})
+
+    assert (printed.status_code, printed.json()["printer_name"]) == (200, None)
+    job = PrintJob.objects.get(pk=printed.json()["job_id"])
+    assert (job.document_type, job.document["barcode"]) == ("barcode_label", "CRO")
+    assert post(admin_client, "/inventory/products/print_label", {}).status_code == 422
 
 
 @pytest.mark.django_db

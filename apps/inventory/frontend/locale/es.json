@@ -84,12 +84,19 @@
         "edit": "Editar",
         "soldOut": "Marcar agotado",
         "backOnSale": "Volver a poner a la venta",
-        "delete": "Eliminar"
+        "delete": "Eliminar",
+        "printLabel": "Imprimir código de barras"
       },
       "delete": {
         "title": "Eliminar producto",
         "message": "{name} ({sku}) — se eliminará del catálogo (borrado lógico; sus movimientos de stock se conservan)",
         "confirm": "Eliminar"
+      },
+      "label": {
+        "printing": "Imprimiendo…",
+        "sent": "La etiqueta ha ido a la impresora «{printer}».",
+        "queued": "La etiqueta espera en la cola de impresión: ninguna impresora tiene la función «Etiqueta». Asígnasela a una en Impresión.",
+        "error": "No se pudo imprimir la etiqueta del código de barras: {reason}"
       }
     },
     "form": {
@@ -243,6 +250,10 @@
       "loading": "Cargando ajustes…",
       "loadError": "No se pudieron cargar los ajustes.",
       "noPermission": "No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas."
+    },
+    "barcode": {
+      "label": "Código de barras {sku}",
+      "invalid": "Este SKU no se puede pasar a código de barras: usa letras sin tilde, números y signos."
     }
   }
 }

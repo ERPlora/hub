@@ -84,12 +84,19 @@
         "edit": "Edit",
         "soldOut": "Mark sold out",
         "backOnSale": "Put back on sale",
-        "delete": "Delete"
+        "delete": "Delete",
+        "printLabel": "Print barcode"
       },
       "delete": {
         "title": "Delete product",
         "message": "{name} ({sku}) — will be removed from the catalog (soft delete; its stock movements are kept)",
         "confirm": "Delete"
+      },
+      "label": {
+        "printing": "Printing…",
+        "sent": "The label went to the printer «{printer}».",
+        "queued": "The label is waiting in the print queue: no printer has the «Label» function. Give it to one in Printing.",
+        "error": "Could not print the barcode label: {reason}"
       }
     },
     "form": {
@@ -243,6 +250,10 @@
       "loading": "Loading settings…",
       "loadError": "The settings could not be loaded.",
       "noPermission": "You do not have permission to change these settings. Ask an administrator if you need it."
+    },
+    "barcode": {
+      "label": "Barcode {sku}",
+      "invalid": "This SKU cannot be turned into a barcode: use letters without accents, digits and signs."
     }
   }
 }

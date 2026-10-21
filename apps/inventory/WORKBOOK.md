@@ -222,7 +222,7 @@ fueran los del negocio.
 | INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | hecho |
 | INVENTORY-F23 | Reponer el stock al anularse una venta | hecho |
 | INVENTORY-F24 | Reponer el stock de una devolución | hecho |
-| INVENTORY-F25 | Imprimir la etiqueta del código de barras | por construir — necesita la app Impresión (`printing`), que aún no existe |
+| INVENTORY-F25 | Imprimir la etiqueta del código de barras | hecho |
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | servidor hecho |
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API) |
 | INVENTORY-F28 | Completar el primer paso «Tu catálogo» | servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo) |
@@ -758,23 +758,28 @@ aviso de la devolución no los trae; si vuelven a la estantería, se cuentan (IN
 Implicados: SALE-F31
 
 ### INVENTORY-F25 Imprimir la etiqueta del código de barras
-Estado: por construir — necesita la app Impresión (`printing`), que aún no existe
+<!-- origen: old-hub:HUB_PERIPHERALS-F12 old:inventory/workflow/con-otros-modulos.md#inventory-f25 -->
+Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
 Pasos:
-1. Abre la ficha del producto (toca la fila o «Detalles»): se ve el código de barras de su SKU.
+1. Abre la ficha del producto (toca la fila o «Detalles»): se ve el código de barras de su SKU en una
+   placa blanca, con el SKU debajo, que se lee también con el tema oscuro.
 2. Pulsa «Imprimir código de barras».
-3. En la app instalada con una impresora de función «Etiqueta» a su alcance, sale al momento:
-   nombre, código de barras y precio.
-4. Si no, la etiqueta va a la cola de impresión del negocio y la saca el equipo que imprima
-   etiquetas. Cada pulsación saca una etiqueta.
+3. La etiqueta (nombre, código de barras y precio) va a la cola de Impresión, a la impresora con la
+   función «Etiqueta», y la ficha dice «La etiqueta ha ido a la impresora «<nombre>».». La saca el
+   equipo que recoge los trabajos de esa impresora (PRINTING-F12). Cada pulsación saca una etiqueta.
+4. Si ninguna impresora tiene la función «Etiqueta», la etiqueta espera en la cola y la ficha lo
+   dice: «La etiqueta espera en la cola de impresión: ninguna impresora tiene la función «Etiqueta».
+   Asígnasela a una en Impresión.».
 Entra: el SKU, el nombre y el precio del producto; la impresora con la función «Etiqueta», de
-Impresión.
-Sale: la etiqueta en papel, o un trabajo en la cola de impresión.
-Si falla: si ninguna impresora tiene la función «Etiqueta», sale dentro de la ficha «Ninguna
-impresora tiene el rol «Etiqueta»: asígnale una en Impresión». Si no se puede mandar a ningún
-sitio, «No se pudo imprimir la etiqueta del código de barras» con el motivo. En un navegador sin
-cola disponible se abre el diálogo de imprimir del navegador (código, SKU y nombre, sin precio).
+Impresión. También se pide por el asistente («imprime la etiqueta del champú») o por la API.
+Sale: un trabajo de etiqueta en la cola de Impresión, con el precio en la moneda del negocio.
+Si falla: quien no llega a la cola de impresión (Impresión no está activa, o no puede imprimir) ve el
+diálogo de imprimir del navegador con el código, el SKU y el nombre, sin precio. Un SKU con letras que
+un código de barras no lleva (tildes, eñes) no se dibuja ni se imprime: «Este SKU no se puede pasar a
+código de barras: usa letras sin tilde, números y signos.». Cualquier otro rechazo sale dentro de la
+ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
 Implicados: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Vender al peso o por medida: unidades y escalón
@@ -1005,7 +1010,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`) llegan en la fase de frontend, iguales a las del módulo viejo.
-- **30 operaciones** (12 consultas y 18 acciones), todas con `ai` (descripción y, en las acciones,
+- **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada.
 - **Requiere `tax`**: producto y categoría tienen FK a `tax.TaxCategory` (`PROTECT`, sin acceso inverso).
@@ -1050,6 +1055,14 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   (permiso de cambiar productos) reutiliza `inventory.product.updated`, con `is_sold_out` en la carga:
   el TPV, Cocina y Menús re-ejecutan sus consultas sin tocar `live.py`. La ficha (`inventory.product.get`)
   sigue dando el artículo, marcado: es lo que lee Ventas al congelar una línea.
+- **Etiqueta (INVENTORY-F25, 2026-10-21)**: `inventory.product.print_label` (permiso de ver productos) pide
+  a Impresión `printing.job.create` por su nombre (sin `requires`): un `barcode_label` con `product_name`,
+  `barcode` (el SKU) y `price` en unidades de la moneda (euros mientras el Hub no tenga moneda; Impresión
+  le pone los decimales). Sin la cola (Impresión no instalada, apagada o sin `printing.print`) responde 409
+  `inventory.label_queue_unavailable` y la ficha imprime desde el navegador; un SKU fuera del ASCII
+  imprimible, 409 `inventory.sku_not_barcode`. La placa dibuja el Code 128 con JsBarcode (renderizador a
+  objeto: las barras las pinta Vue, sin HTML) y la impresión del navegador es una hoja solo para papel
+  (`@media print`), hecha con el DOM.
 - **Avisos añadidos** a la lista del producto: `inventory.category.*` e `inventory.config.updated`, solo
   para refrescar las consultas vivas.
 - **Administrador de Django**: CRUD completo de todas las tablas para soporte (ronda 12, PLAN §17), el

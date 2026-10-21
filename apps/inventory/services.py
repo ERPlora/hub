@@ -12,13 +12,14 @@ from collections import defaultdict
 from decimal import Decimal
 from uuid import UUID
 
+from babel.numbers import get_currency_precision
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import get, operation
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.operations import UnknownOperation, get, operation
 from live.outbox import record_event
 
 from apps.inventory import events
@@ -68,6 +69,7 @@ from apps.inventory.schemas import (
     ProductOut,
     ProductPatchIn,
     ProductRefIn,
+    PrintLabelOut,
     ProductSoldOutIn,
     ProductsOut,
     ReceiveIn,
@@ -93,6 +95,10 @@ SERVICE_HAS_NO_STOCK = _("A service has no stock.")
 STOCK_NOT_TRACKED = _("This article does not track its stock: there is nothing to write off.")
 INSUFFICIENT_STOCK = _("There is not enough stock to complete the operation.")
 LINE_PRODUCT_UNKNOWN = _("This product does not exist in this hub.")
+LABEL_QUEUE_UNAVAILABLE = _("The print queue is not available here: print the label from the browser.")
+SKU_NOT_BARCODE = _(
+    "This SKU cannot be turned into a barcode: use letters without accents, digits and signs."
+)
 # The reasons of an import report (INVENTORY-F09, F10).
 ROW_NAME_OR_SKU_MISSING = _("Name or SKU missing")
 ROW_TOO_LONG = _("A text is longer than its column allows")
@@ -110,6 +116,8 @@ ROW_NAME_MISSING = _("The name is missing")
 #: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
 SYSTEM = "inventory.system"
 THOUSANDTHS = Decimal("0.001")
+#: The Hub has no currency of its own yet: euros (the export says so too).
+CURRENCY = "EUR"
 #: A quantity holds at most 12 whole digits (DecimalField 15, 3).
 MAX_QUANTITY = Decimal(10) ** (QUANTITY["max_digits"] - QUANTITY["decimal_places"])
 #: What the export put in front of a cell a spreadsheet would run (queries.FORMULA_STARTS).
@@ -357,6 +365,49 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
         product.save(update_fields=["is_sold_out", "updated_by", "updated_at"])
         record_event(ctx, events.PRODUCT_UPDATED, _product_payload(product))
     return load_product(product.id)
+
+
+@operation(
+    "inventory.product.print_label",
+    kind="command",
+    permission="inventory.view_product",
+    input=ProductRefIn,
+    output=PrintLabelOut,
+    expose_api=True,
+    ai={
+        "description": "Print the barcode label of a product (its name, its SKU as the code and its price) on the "
+        "printer of the «Label» function, named by its id, SKU or name; each call prints one label.",
+        "risk": "normal",
+    },
+)
+def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
+    """INVENTORY-F25: Printing's queue takes the label (PRINTING-F12); a person who cannot reach it gets
+    ``inventory.label_queue_unavailable`` and nothing queued, so the screen prints from the browser."""
+    product = find_product(data.id, data.product)
+    # Code 128, the code the label printer draws, carries the printable ASCII only.
+    if not all(" " <= char <= "~" for char in product.sku):
+        raise Conflict(str(SKU_NOT_BARCODE), code="inventory.sku_not_barcode")
+    try:
+        create_job = get("printing.job.create")
+        queued = create_job(
+            ctx,
+            create_job.input.model_validate(
+                {
+                    "document_type": "barcode_label",
+                    "document": {
+                        "product_name": product.name,
+                        "barcode": product.sku,
+                        "price": float(Decimal(product.price).scaleb(-get_currency_precision(CURRENCY))),
+                    },
+                    "currency": CURRENCY,
+                    "source_app": "inventory",
+                    "source_ref": product.sku,
+                }
+            ),
+        )
+    except (UnknownOperation, AppInactive, PermissionDenied):
+        raise Conflict(str(LABEL_QUEUE_UNAVAILABLE), code="inventory.label_queue_unavailable") from None
+    return {"job_id": queued.job.id, "printer_name": queued.job.printer_name}
 
 
 @operation(
