@@ -345,17 +345,18 @@ Pantalla: Reservas (fila → «Sentar»)
 Pasos:
 1. Llega el grupo: «Sentar» en su reserva Pendiente o Confirmada.
 2. Pasa a Sentada. Si tiene mesa, se sienta en Mesas con sus comensales y su cliente: se abre la
-   cuenta de la mesa en Ventas y la retención se gasta (TABLE-F28). Si el grupo ya se sentó en esa mesa
-   desde el plano (gastando la retención de esta reserva), solo se marca la reserva, con la cuenta de la
-   mesa.
+   cuenta de la mesa en Ventas y se gasta la retención de esta reserva, solo la suya (TABLE-F28): con
+   Ana a las 19:00 y Bea a las 21:00 en la mesa 5, sentar a Ana a las 20:10 deja la mesa reservada para
+   Bea, que vuelve a salir Reservada cuando Ana se va. Si el grupo ya se sentó en esa mesa desde el plano
+   (gastando la retención de esta reserva), solo se marca la reserva, con la cuenta de la mesa.
 Entra: la reserva.
 Sale: la reserva sentada y, si se pudo, la cuenta de la mesa (avisa:
 `reservation.reservation.status_changed`; Mesas avisa `table.session.opened`).
 Si falla: desde otro estado: «Esta reserva está completada: su estado ya no puede cambiar.»; la mesa
 fuera de servicio: «La mesa 5 (Terraza) no se puede reservar: está bloqueada o fuera de servicio.»; la
-mesa ocupada por otros (también por el grupo de otra reserva sentado antes, aunque Mesas gastara al
-sentarlo la retención de esta): «La mesa 5 (Terraza) está ocupada ahora mismo: libérala, o pasa la
-reserva a otra mesa antes de sentarla.»; si Mesas o Ventas rechazan sentar, su motivo. En todos, la
+mesa ocupada por otros (también por el grupo de otra reserva sentado antes, aunque al sentarlo desde el
+plano se gastara la retención de esta): «La mesa 5 (Terraza) está ocupada ahora mismo: libérala, o pasa
+la reserva a otra mesa antes de sentarla.»; si Mesas o Ventas rechazan sentar, su motivo. En todos, la
 reserva no cambia.
 
 ### RESERVATION-F12 Completar la reserva
@@ -628,16 +629,17 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
 - **Con Mesas, en la misma transacción** (la única vía): confirmar (o nacer confirmada),
   cancelar, no presentada y borrar llaman por nombre a `table.hold.sync_reservation`; cambiar una
   confirmada la llama con los datos nuevos (mueve la retención) o, si se queda sin mesa, a
-  `table.hold.move_reservation` con `table_id` vacío; sentar llama a `table.session.open` (con la
-  sesión de quien sienta: abre la cuenta en Ventas y gasta la retención de la ventana) y suelta con
-  `table.hold.release` la retención que aún no había entrado en su ventana. Las acciones de plataforma
+  `table.hold.move_reservation` con `table_id` vacío; sentar llama a `table.session.open` con su
+  `reservation_id` (con la sesión de quien sienta: abre la cuenta en Ventas y gasta solo la retención de
+  esta reserva, si ya entró en su ventana) y suelta con `table.hold.release` la que aún no había entrado. Las acciones de plataforma
   de Mesas (`table.system`) se llaman con ese único permiso añadido al contexto de quien actúa. Si Mesas
   rechaza, se deshace todo. Los avisos `status_changed` y `updated` se siguen grabando, pero Mesas ya no
   reacciona a ellos (2026-10-21, APP-TABLE): entregados después por el relay, re-aplicaban la reserva tal
   como era (un «confirmada» viejo volvía a retener la mesa de un grupo ya sentado).
 - **Sentar con la mesa ya ocupada** solo marca la reserva si su retención se gastó y ninguna otra reserva
-  es dueña de la cuenta sentada (`table_session_id`): Mesas gasta todas las retenciones de la mesa dentro
-  de la hora al sentar a cualquiera, así que la retención gastada sola no prueba que sea este grupo.
+  es dueña de la cuenta sentada (`table_session_id`): sentar desde el plano no dice de qué reserva es el
+  grupo y Mesas gasta todas las retenciones de la mesa dentro de la hora, así que la retención gastada
+  sola no prueba que sea este grupo.
 - **RGPD en el registro de avisos**: la reacción a `customer.customer.erased` vacía también `guest_name`
   en los `status_changed` y `updated` de sus reservas (esos avisos llevan el nombre).
 - **Clientes**: sin ficha elegida y con teléfono, se busca la ficha viva con ese número
@@ -708,13 +710,6 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
   (su duda 3).
 - **La entrega de los avisos de Clientes** (relay del outbox, fase 2): las reacciones de F21 y F22
   están declaradas y probadas.
-- **Pide a Mesas: gastar solo la retención del grupo que se sienta** (o guardar en la retención la cuenta
-  que la gastó). Hoy, al sentar a cualquiera, Mesas gasta todas las retenciones de esa mesa dentro de la
-  hora previa: con A a las 19:00 y B a las 21:00 en la mesa 5, sentar a A a las 20:10 gasta la de B.
-  Reservas ya no cuelga a B de la cuenta de A (rechaza «está ocupada»), pero queda el daño colateral: B
-  deja de verse «Reservada» en el plano entre las 20:10 y las 21:00, y mover o reconfirmar B no la vuelve
-  a retener, porque `table.hold.sync_reservation` ignora una retención gastada. Pedido en
-  `UI-REQUESTS.md`.
 - **Que sentar desde el plano marque la reserva** Sentada: Mesas gasta la retención, pero no sabe de la
   reserva; se marca en Reservas con «Sentar» (que entonces no abre otra cuenta).
 - **La cola de la puerta con espera estimada y aviso por SMS** (duda 6): necesita mensajería; la lista de

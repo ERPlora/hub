@@ -650,9 +650,10 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
     Market (duda 3): one gesture seats the reservation and the table; a table out of service is refused,
     and so is one that is taken, to be freed or the reservation moved — unless this very reservation's
     hold was already spent by seating its table from the floor plan (TABLE-F28) and no other reservation
-    owns the check sitting there: then the party is there, and its check is the table's. Tables spends
-    every hold of the table inside the hour when anybody sits, so a spent hold alone proves nothing: the
-    party of another reservation seated there earlier also spends it (WORKBOOK «Lo que queda fuera»).
+    owns the check sitting there: then the party is there, and its check is the table's. Seating from
+    here names the reservation, so Tables spends its hold alone; the floor plan names none and spends
+    every hold of the table inside the hour, so a spent hold alone proves nothing: the party of another
+    reservation seated there from the plan also spends it.
     """
     now = timezone.now()
     table = Table.objects.select_related("zone").get(pk=reservation.table_id)
@@ -671,7 +672,11 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
             return sitting.pk
         text = str(TABLE_NOT_FREE) % {"table": table_label(table)}
         raise Conflict(text, code="reservation.table_not_free")
-    seat = {"table_id": str(table.pk), "guests_count": reservation.party_size}
+    seat = {
+        "table_id": str(table.pk),
+        "guests_count": reservation.party_size,
+        "reservation_id": str(reservation.pk),
+    }
     if reservation.customer_id and Customer.objects.live().filter(pk=reservation.customer_id).exists():
         seat["customer_id"] = str(reservation.customer_id)
     session_id = call_app(ctx, "table.session.open", seat).id

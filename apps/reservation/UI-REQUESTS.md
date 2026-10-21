@@ -21,13 +21,6 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon`), `frontend/tabs.ts`, las ac
 
 ## De Mesas
 
-- **Gastar solo la retención del grupo que se sienta** (o guardar en `Hold` la cuenta que la gastó):
-  `table._consume_holds` gasta todas las retenciones de la mesa dentro de la hora previa al sentar a
-  cualquiera. Con A 19:00 y B 21:00 en la mesa 5, sentar a A a las 20:10 gasta la de B: B deja de verse
-  «Reservada» entre las 20:10 y las 21:00, y mover o reconfirmar B no la vuelve a retener porque
-  `table.hold.sync_reservation` ignora una retención gastada. Reservas ya no cuelga a B de la cuenta de A
-  (comprueba que ninguna otra reserva es dueña de la cuenta sentada), pero el daño en el plano es de
-  Mesas.
 - Que `table.hold.sync_reservation` trate `seated` y `completed` como gastar la retención (hoy no hace
   nada con ellos): Reservas suelta con `table.hold.release` la retención que no entró en su ventana al
   sentar, y la marca queda «soltada» en vez de «gastada».

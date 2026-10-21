@@ -261,12 +261,16 @@ def _seatable_table(
 
 
 def _seat_at(
-    session: TableSession, table: Table, reason: str, now: dt.datetime
+    session: TableSession,
+    table: Table,
+    reason: str,
+    now: dt.datetime,
+    reservation_id: UUID | None = None,
 ) -> None:
     SessionMove.objects.create(
         session=session, table=table, assigned_at=now, assignment_reason=reason
     )
-    _consume_holds(table, now)
+    _consume_holds(table, now, reservation_id)
 
 
 def _release(session: TableSession, reason: str, now: dt.datetime) -> None:
@@ -275,9 +279,21 @@ def _release(session: TableSession, reason: str, now: dt.datetime) -> None:
     )
 
 
-def _consume_holds(table: Table, now: dt.datetime) -> None:
-    """Seating spends the holds already painting the table Reserved (never a later one)."""
-    reserving_holds(now).filter(table=table).update(
+def _seating_holds(table: Table, now: dt.datetime, reservation_id: UUID | None):
+    """The holds a party sitting at ``table`` now spends: the ones already painting it Reserved (never a later
+    one) and, when the party is a reservation's, only that reservation's (a later party's hold stays)."""
+    holds = reserving_holds(now).filter(table=table)
+    if reservation_id is not None:
+        holds = holds.filter(
+            source=Hold.Source.RESERVATION, source_ref=str(reservation_id)
+        )
+    return holds
+
+
+def _consume_holds(
+    table: Table, now: dt.datetime, reservation_id: UUID | None = None
+) -> None:
+    _seating_holds(table, now, reservation_id).update(
         status=Hold.Status.CONSUMED, label="", updated_at=now
     )
 
@@ -684,8 +700,8 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     guests = data.guests_count
     if guests is None:
         hold = (
-            reserving_holds(now)
-            .filter(table=table, party_size__gt=0)
+            _seating_holds(table, now, data.reservation_id)
+            .filter(party_size__gt=0)
             .order_by("held_from", "id")
             .first()
         )
@@ -706,7 +722,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     )
     _stamp(session, ctx, created=True)
     session.save()
-    _seat_at(session, table, SessionMove.Reason.OPENED, now)
+    _seat_at(session, table, SessionMove.Reason.OPENED, now, data.reservation_id)
     if data.customer_id or data.customer:
         _put_customer(ctx, order_id, data.customer_id, data.customer)
     _event(
