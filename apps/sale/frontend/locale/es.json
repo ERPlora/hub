@@ -223,7 +223,9 @@
         "chooseToContinue": "Elige una opción para continuar",
         "full": "«{group}» está completo: quita una para elegir otra.",
         "less": "Una menos de {name}",
-        "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo."
+        "loadFailed": "No se han podido leer los suplementos de este producto. Inténtalo de nuevo.",
+        "chooseRange": "Elige de {n} a {max}",
+        "atLeast": "Elige al menos {n}"
       },
       "menu": {
         "badge": "Menú",

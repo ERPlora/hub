@@ -512,7 +512,8 @@ Pantalla: Vender
 Pasos:
 1. Con Suplementos activa, toca un artículo que tiene grupos de suplementos (suyos o de su categoría): se
    abre una hoja con su nombre. Sin grupos, el artículo entra directo, como siempre.
-2. Cada grupo dice su regla: «Elige N» si es obligatorio, «Hasta N» si tiene techo, «Opcional» si no; cada
+2. Cada grupo dice su regla: «Elige N» si pide justo N, «Elige de N a M» si pide un mínimo y deja llegar a un
+   techo, «Elige al menos N» si pide un mínimo sin techo, «Hasta N» si solo tiene techo, «Opcional» si no; cada
    opción lleva su suplemento con su signo («+1,00 €», «−2,00 €»; nada si es gratis) y las de fábrica ya
    salen marcadas.
 3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en uno con
@@ -545,7 +546,7 @@ Pantalla: Vender
 Pasos:
 1. Con Menús y combos activa, en «Todos» los menús a la venta salen primero, cada uno con la etiqueta «Menú» y
    su precio cerrado. Toca uno: se abre una hoja con su nombre y todos sus platos a la vez.
-2. Cada plato dice su regla («Elige 1», «Hasta 2», «Opcional») y sus elecciones, con el suplemento con su signo
+2. Cada plato dice su regla («Elige 1», «Elige de 1 a 4», «Hasta 2», «Opcional») y sus elecciones, con el suplemento con su signo
    si no es cero («+2,00 €»). Al abrir no hay nada elegido.
 3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
    siguiente toque dice «Café está completo: quita una para elegir otra»; una elección que se puede repetir

@@ -3,6 +3,13 @@
 Lo que las páginas de Servicios necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo
 más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
+**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `f62af6b`: no ha llegado ninguno de los
+cuatro iconos ni el panel lateral. Ninguno rompe un flujo (todos tienen su sustituto, dicho abajo). Los iconos
+ya están en la cola como `FIX-UI-SHELL-ICONS-SERVICE-TASK` (`TODO.md`, junto con los de Tareas); el panel
+lateral pasa a «Fuera por ahora» (`## 6` de `MIGRATION.md`), como lo piden también Inventario, Clientes,
+Tarifas y Tareas. Quien los registre en `ui` los borra de aquí y cambia el sustituto en la misma PR del
+puntero.
+
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
 - `ion:briefcase-outline` — icono del módulo, de la entrada de menú y de la pestaña **Servicios**
@@ -24,3 +31,8 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
 
 - **Qué**: el panel lateral del `ok-data-table` del producto actual, donde se abrían «Nuevo servicio»,
   «Editando servicio — …», la categoría y el bono. **Hoy**: un `FormModal` (como `inventory` y `staff`).
+
+## Hechas
+
+- Los filtros por columna de Servicios y de Bonos y paquetes van tras el botón «Filtros» del `DataTable`
+  (`filterable`), como en el producto actual, y en su panel cada rango dice su columna (hub#107).
