@@ -1,9 +1,9 @@
 # Workbook — Impresión (app)
 Prefijo: PRINTING
 Alcance MVP: núcleo
-Estado de la app: servidor y páginas hechos; Ventas, Facturación, Cocina y Caja ya piden su papel a la
-cola (falta Inventario, PRINTING-F12); solo recoge la cola el dispositivo dado de alta, y el papel sale
-cuando la app del dispositivo la recoja (PRINTING-F18)
+Estado de la app: servidor y páginas hechos; Ventas, Facturación, Cocina, Caja e Inventario ya piden su papel
+a la cola; solo recoge la cola el dispositivo dado de alta, y el papel sale cuando la app del dispositivo la
+recoja (PRINTING-F18)
 
 > Manual de usuario y especificación de la app `printing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -89,7 +89,7 @@ Cuatro pestañas abajo, las mismas que el menú: **Impresoras**, **Dispositivos*
 Menú **Impresión → Impresoras**. Título «Impresión» y la frase «Da de alta las impresoras del negocio,
 di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este orden:
 
-- **Estado de la impresión**: una tarjeta por cada función que tenga alguna impresora o trabajos
+- **Cola de impresión**: una tarjeta por cada función que tenga alguna impresora o trabajos
   esperando (un negocio nuevo no ve ninguna), con su nombre («Recibo», «Cocina», «Barra»,
   «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Con errores»), «En cola: N · el más
   antiguo lleva 3 min» o «Nada en cola», los fallidos («Fallidos: N») y por qué impresora sale ahora:
@@ -190,7 +190,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F09 | Imprimir la cuenta de la mesa | restaurante | hecho |
 | PRINTING-F10 | Imprimir la comanda en cocina y barra | restaurante | hecho |
 | PRINTING-F11 | Reimprimir una comanda | restaurante | hecho |
-| PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | parcial: falta que Inventario lo pida |
+| PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | hecho |
 | PRINTING-F13 | Abrir el cajón al cobrar | común | parcial: el aviso del cajón que no abre es de la app del dispositivo |
 | PRINTING-F14 | Sacar del atasco un trabajo de impresión | común | hecho |
 | PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | hecho |
@@ -426,19 +426,25 @@ Implicados: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Imprimir la etiqueta de un código de barras
 <!-- origen: old-hub:HUB_PERIPHERALS-F12 old:printing/workflow/documentos.md#printing-f12 -->
-Estado: parcial — Impresión acepta la etiqueta (función Etiqueta: nombre, código y precio; el código lo
-dibuja la impresora); falta que Inventario la pida (INVENTORY-F25)
+Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
-Pantalla: Ficha del producto (de Inventario)
+Pantalla: Ficha del producto (de Inventario) e Impresoras
 Pasos:
-1. En la ficha del producto, «Imprimir código de barras».
-2. Inventario pide la etiqueta a Impresión.
-Entra: `product_name`, `barcode` (el SKU) y `price`.
+1. En **Inventario → Productos**, abre la ficha del producto y pulsa «Imprimir código de barras»
+   (INVENTORY-F25).
+2. Inventario pide la etiqueta a Impresión: entra en la cola de la impresora con la función «Etiqueta»,
+   con el nombre del producto, su SKU como código de barras y su precio. El código lo dibuja la impresora
+   y la saca el dispositivo que recoge los trabajos de esa impresora (PRINTING-F18).
+3. En **Impresión → Impresoras**, la tarjeta «Etiqueta» de «Cola de impresión» dice cuántas esperan y por
+   qué impresora salen.
+Entra: el nombre del producto, su SKU (el código de barras) y su precio en la moneda del negocio.
 Sale: un trabajo en la cola de Etiqueta. Cada pulsación saca una etiqueta.
-Si falla: sin impresora con la función Etiqueta, la etiqueta **espera** en la cola y la tarjeta de
-Etiqueta lo dice («En cola, sin impresora»).
-Implicados: INVENTORY-F25, PRINTING-F04
+Si falla: sin impresora con la función «Etiqueta», la etiqueta **espera** en la cola (nunca sale por la
+impresora de tiques) y la tarjeta «Etiqueta» lo dice: «En cola, sin impresora» y «En cola: N». En cuanto
+una impresora tiene esa función, la tarjeta pasa a «Listo», la nombra («Imprime en: …») y su dispositivo
+saca las etiquetas que esperaban, de la más antigua a la más nueva.
+Implicados: INVENTORY-F25, PRINTING-F01, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F13 Abrir el cajón al cobrar
 <!-- origen: old-hub:HUB_APP-F21 old-hub:HUB_SHELL-F71 wf:restaurante-dia#rec_restaurante-f17 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/10-hardware-offline-and-recovery qa:verticals/restaurant/07-payment-and-fiscal old-hub:HUB-F207 old-hub:HUB_PERIPHERALS-F15 old:printing/workflow/documentos.md#printing-f13 qa:modules/printing/open-cash-drawer -->
@@ -682,7 +688,7 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Ventas | Tique al cobrar (con el cajón si entró efectivo), reimpresión y cuenta de la mesa | `printing.job.create` |
 | Facturación | La página A4 de una factura, para la impresora del sistema | `printing.job.create` |
 | Caja | Informe X y Z | `printing.job.create` |
-| Inventario | Etiqueta de código de barras (cuando lo adopte) | `printing.job.create` |
+| Inventario | Etiqueta de código de barras | `printing.job.create` |
 | Cocina | La comanda de cada estación y su reimpresión | `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 
@@ -768,8 +774,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    hub#342): lo da de alta `printing.device.register` desde el propio dispositivo (su `X-Device-Id`), con
    `printing.manage_settings`; el permiso de las tres operaciones sigue siendo `printing.print`, pero solo vale
    desde un dispositivo dado de alta. El dispositivo se guarda por el SHA-256 de su identificador, nunca por el
-   identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` debería leer las
-   impresoras del dispositivo con `printing.device.get` y rechazar el que no tiene alta (pendiente en `base`).
+   identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` lee las
+   impresoras del dispositivo con `printing.device.get` y rechaza el que no tiene alta (`base`, hub#135).
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
@@ -781,8 +787,9 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 - **Facturación** (`invoice`): «Imprimir» → `invoice` (térmica) o su página A4
   (`templates/invoice/invoice.html`) con `format: "a4"`.
 - **Caja** (`cash_register`): «Imprimir» del detalle → `cash_session_report`.
-- **Inventario** (`inventory`, INVENTORY-F25): «Imprimir código de barras» → `barcode_label` con
-  `product_name`, `barcode` = SKU y `price`.
+- **Inventario** (`inventory`, INVENTORY-F25): ya lo hace — «Imprimir código de barras» →
+  `inventory.product.print_label` → `barcode_label` con `product_name`, `barcode` = SKU y `price` en unidades
+  (PRINTING-F12).
 - **Cocina** (`kitchen`): ya lo hace — `kitchen_order` por estación (cada plato con sus suplementos en
   `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
   de su transacción (KITCHEN-F08, F09).
@@ -792,7 +799,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
   `live.py`, `api.py`, `admin.py`, `templates/printing/`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (una venta real de Ventas
   encolada por nombre) y `tests/test_integration_kitchen.py` (la comanda y la reimpresión reales de
-  Cocina, por estación).
+  Cocina, por estación) y `tests/test_integration_inventory.py` (la etiqueta real de Inventario: espera sin
+  impresora de etiquetas, la tarjeta lo cuenta y la recoge la primera que la tenga).
 - **`requires = []`**: Impresión no lee modelos de nadie. Quien imprime compone el documento.
 - **Modelos**: `Settings` (una fila; sin ella valen los de fábrica), `Printer` (nunca se borra: la
   cola la nombra; nombre único sin distinguir mayúsculas), `PrintDevice` (el dispositivo que imprime: nombre,
