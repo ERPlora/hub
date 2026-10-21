@@ -3,6 +3,13 @@
 Lo que las páginas de Reservas online necesitan de `@erplora/ui` (y de la plataforma) y todavía no está.
 Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
+**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `89eaf98` y `ERPlora/hub` `origin/main`
+`cd9f875`: no ha llegado ninguna de las tres. Ninguna rompe un flujo de esta app (todas tienen su sustituto,
+dicho abajo), así que quedan en «Fuera por ahora» (`## 6` de `MIGRATION.md`): la página pública ya está allí
+(`ONLINE_BOOKING-??`, «Puerta pública `/p/<slug>/book`»), y se proponen `online_booking:ui-date-field` y
+`online_booking:ui-icons` (las dos las pide también Citas). Quien entregue una la borra de aquí y cambia su
+sustituto en la misma PR.
+
 ## La página pública de reservas sin sesión (`base`, puerta pública `/p/`)
 
 - **Qué**: la página por la que la clienta reserva sola (`/p/<slug>/book`) y la de su enlace personal

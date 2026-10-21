@@ -7,8 +7,8 @@ live query. They carry ids, the number and the time, never the customer's note. 
 Reaction (WORKBOOK «A qué reacciona»): an erased card revokes the customer's links and forgets the device she
 booked with (``customer.customer.erased``), through this app's own operation run as the system, in its own
 transaction. Merging two cards needs nothing here: Citas moves the appointments and this app keeps no card.
-The outbox relay (phase 2, in the worker) hands each delivered event to ``react``; the reaction is
-idempotent, so a repeated delivery changes nothing.
+The worker's outbox relay (``base/relay.py``, already in phase 1) hands each delivered event to ``react``; the
+reaction is idempotent, so a repeated delivery changes nothing.
 """
 
 from typing import Any
