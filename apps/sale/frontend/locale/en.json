@@ -47,6 +47,8 @@
       "managerOnly": "A manager has to do it",
       "notSellableBadge": "{tax} missing",
       "notSellableNoTaxCategory": "Cannot be sold: no tax category. {tax} needs to be set up.",
+      "soldOutBadge": "Sold out",
+      "soldOut": "«{name}» is sold out.",
       "catalogBlockedOne": "1 item cannot be sold: its {tax} is not set up.",
       "catalogBlocked": "{count} items cannot be sold: their {tax} is not set up.",
       "catalogBlockedFix": "Review the catalogue",

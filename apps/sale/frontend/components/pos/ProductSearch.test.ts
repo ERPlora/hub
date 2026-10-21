@@ -17,13 +17,13 @@ async function setup(locale: 'en' | 'es' = 'en', props: Record<string, unknown> 
 }
 
 describe('ProductSearch', () => {
-  it('asks the server for the active articles by name, 20 at a time, and asks again with what is typed', async () => {
+  it('asks the server for the active articles by name (sold out too), 20 at a time, and asks again with what is typed', async () => {
     const m = await setup();
-    expect(m.params(OP)).toEqual([{ search: '', is_active: true, sort: 'name', limit: 20, offset: 0 }]);
+    expect(m.params(OP)).toEqual([{ search: '', is_active: true, include_sold_out: true, sort: 'name', limit: 20, offset: 0 }]);
     expect((m.wrapper.find('ion-searchbar').element as unknown as { placeholder?: string }).placeholder).toBe('Search product…');
     await ionValue(m.wrapper.find('ion-searchbar').element, ' caf ', 'ionInput');
     await m.reopen();
-    expect(m.params(OP)).toEqual([{ search: 'caf', is_active: true, sort: 'name', limit: 20, offset: 0 }]);
+    expect(m.params(OP)).toEqual([{ search: 'caf', is_active: true, include_sold_out: true, sort: 'name', limit: 20, offset: 0 }]);
   });
 
   it('lists each match with its name, SKU and price; a tap hands it up', async () => {
@@ -47,6 +47,18 @@ describe('ProductSearch', () => {
     expect(row.find('p').text()).toBe('Cannot be sold: no tax category. VAT needs to be set up.');
     await click(row.element);
     expect(m.wrapper.emitted('pick')).toEqual([[blocked]]);
+  });
+
+  it('a sold-out match says «Agotado» instead of its SKU and still takes the tap', async () => {
+    const m = await setup('es');
+    const soldOut = product({ id: 'p3', name: 'Croquetas', is_sold_out: true });
+    await m.result(OP, page([soldOut]));
+    const row = m.find('pos-search-p3');
+    expect(row.attributes('aria-disabled')).toBe('true');
+    expect(row.find('p').text()).toBe('Agotado');
+    expect(row.find('p').classes()).toContain('pos-search__warn');
+    await click(row.element);
+    expect(m.wrapper.emitted('pick')).toEqual([[soldOut]]);
   });
 
   it('in Ceuta or Melilla a match without its tax names the IPSI', async () => {

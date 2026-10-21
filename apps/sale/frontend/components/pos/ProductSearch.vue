@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // The till's product search: a floating, translucent panel over the grid (it does not push it), with
 // «Search product…» and the live answer of Inventory for what is typed — by name or SKU, across the
-// whole catalogue, 20 at a time. A row shows the name, the SKU (or why it cannot be sold) and the
-// price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
+// whole catalogue (sold out too, SALE-F07), 20 at a time. A row shows the name, the SKU (or «Sold out», or
+// why it cannot be sold) and the price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
 // (SALE-F38, `withServices`), the services it finds come after them (`pickService`). Mounted only while
 // open.
 import { useLive } from '@erplora/ui/sdk';
@@ -13,25 +13,33 @@ import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
-import { useLocale } from '../../composables/useT';
+import { useLocale, useT } from '../../composables/useT';
 import { formatMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
 
 withDefaults(defineProps<{ withServices?: boolean }>(), { withServices: false });
 const emit = defineEmits<{ pick: [product: ProductOut]; pickService: [service: ServiceSaleOut]; close: [] }>();
 
+const t = useT();
 const locale = useLocale();
 const taxName = useTaxName();
 const term = shallowRef('');
 const { data, status, error } = useLive('inventory.product.list', () => ({
   search: term.value,
   is_active: true,
+  include_sold_out: true,
   sort: 'name' as const,
   limit: 20,
   offset: 0,
 }));
 
 const rows = computed(() => data.value?.rows ?? []);
+
+/** Under the name: «Sold out», why it cannot be sold, or its SKU. */
+function note(item: ProductOut): string {
+  if (item.is_sold_out) return t('sale.pos.soldOutBadge');
+  return item.needs_tax_setup ? t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value }) : item.sku;
+}
 
 function onInput(event: CustomEvent<{ value?: string | null }>): void {
   term.value = (event.detail.value ?? '').trim();
@@ -100,13 +108,13 @@ onMounted(() => void bar.value?.$el.setFocus?.());
         button
         :detail="false"
         :data-testid="`pos-search-${item.id}`"
-        :aria-disabled="item.needs_tax_setup ? 'true' : undefined"
+        :aria-disabled="item.is_sold_out || item.needs_tax_setup ? 'true' : undefined"
         @click="emit('pick', item)"
       >
         <ion-label>
           <h3>{{ item.name }}</h3>
-          <p :class="{ 'pos-search__warn': item.needs_tax_setup }">
-            {{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory', { tax: taxName }) : item.sku }}
+          <p :class="{ 'pos-search__warn': item.is_sold_out || item.needs_tax_setup }">
+            {{ note(item) }}
           </p>
         </ion-label>
         <ion-note
