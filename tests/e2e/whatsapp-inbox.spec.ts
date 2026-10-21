@@ -311,8 +311,3 @@ test('an employee notes and takes a conversation, but neither erases nor opens t
     await context?.close();
   }
 });
-
-// WHATSAPP_INBOX-F32, F34: a reply that really leaves through erplora.com shows «Sending…», then «Sent»
-// with Meta's id and the statuses Meta reports. The Hub's side is mounted (`/internal/whatsapp/status`
-// since hub#127); erplora.com's door `/internal/whatsapp/send` does not exist yet: marked, never simulated.
-test.fixme('a reply really leaves through erplora.com and Meta’s statuses arrive', async () => {});
