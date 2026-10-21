@@ -689,6 +689,23 @@ def test_the_history_pages_and_finds_a_reason_by_its_words(clock, product):
     assert [(r.action, r.notes) for r in found.rows] == [("cancelled", "Customer left")]
 
 
+def test_the_history_names_who_did_it_by_their_name_never_their_session_id(clock, product, django_user_model):
+    """KITCHEN-F25: «Who» is the person as they read themselves (name, else e-mail), not the username of their
+    session (``saas:<id>``); the system stays empty and a name the Hub does not know stays as it was saved."""
+    marta = django_user_model.objects.create_user(
+        "saas:77", email="marta@example.com", first_name="Marta", last_name="Ruiz"
+    )
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor="luis"))
+    run("kitchen.ticket.cancel", {"ticket_id": str(lines[0].id), "reason": "Left"}, ctx_for(actor=marta))
+    rows = run("kitchen.log.list", {}).rows
+    assert [(r.action, r.actor) for r in rows] == [
+        ("cancelled", "Marta Ruiz"),
+        ("started", "luis"),
+        ("received", ""),
+    ]
+
+
 def test_the_history_needs_its_permission():
     with pytest.raises(PermissionDenied):
         run("kitchen.log.list", {}, ctx_for(permissions={"kitchen.view_ticket"}))
