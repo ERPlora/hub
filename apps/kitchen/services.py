@@ -237,6 +237,8 @@ def save_round(ctx: OperationContext, rnd, route) -> Ticket:
                 id=item.id,
                 ticket=ticket,
                 sale_line_id=item.sale_line_id,
+                menu_dish=item.menu_dish,
+                menu_name=item.menu_name[:200],
                 position=item.position,
                 product_id=item.product_id,
                 category_id=item.category_id,
@@ -244,6 +246,7 @@ def save_round(ctx: OperationContext, rnd, route) -> Ticket:
                 quantity=item.quantity,
                 unit=item.unit,
                 notes=item.notes[:255],
+                modifiers=item.modifiers,
                 station_id=item.station_id,
                 station_name=item.station_name,
                 destination=item.destination,
@@ -477,17 +480,22 @@ def _sheet(
         "waiter": ticket.waiter,
         "priority": str(URGENT) if rush else "",
         "duplicate": duplicate,
-        "items": [
-            {
-                "name": item.name,
-                "quantity": -_quantity(item.quantity)
-                if negative
-                else _quantity(item.quantity),
-                **({"notes": item.notes} if item.notes else {}),
-            }
-            for item in items
-        ],
+        "items": [_paper_dish(item, negative) for item in items],
     }
+
+
+def _paper_dish(item, negative: bool) -> dict:
+    """A dish as the printer paints it (``render_kitchen_order`` of the app): the dishes of a menu in a run
+    under its header (``combo_ref``, ``combo_name``), its options one line each and then its note."""
+    quantity = _quantity(item.quantity)
+    dish = {"name": item.name, "quantity": -quantity if negative else quantity}
+    if item.menu_dish:
+        dish |= {"combo_ref": str(item.sale_line_id), "combo_name": item.menu_name}
+    if item.modifiers:
+        dish["modifiers"] = list(item.modifiers)
+    if item.notes:
+        dish["notes"] = item.notes
+    return dish
 
 
 def print_ticket(

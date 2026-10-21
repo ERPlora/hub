@@ -4,10 +4,10 @@ with their dishes, and the kitchen's history.
 
 A ticket of a round points at its check of Sales by ``order_id`` and each dish at its line by
 ``sale_line_id``: opaque references, no foreign key between apps (like Tables). The id of a round's
-ticket is the id of its first line, and the id of each dish the id of its line (UUIDv7 that Sales made):
-a round the kitchen has not saved yet (no relay in phase 1, queries.py) and the saved one share their
-ids. What was sent stays as it was sent: the station, its destination and its printer are frozen on
-each dish. Stations and tickets are deleted logically. Phase 1 has no tenancy: every scope shares these
+ticket is the id of its first line, and the id of each dish the id of its line (UUIDv7 that Sales made;
+each dish of a menu, one derived from it: ``queries.dish_id``): a round the kitchen has not saved yet and
+the saved one share their ids. What was sent stays as it was sent: the station, its destination and its
+printer, the options chosen and the menu's header are frozen on each dish. Stations and tickets are deleted logically. Phase 1 has no tenancy: every scope shares these
 tables; phase 2 moves them to each hub's database.
 """
 
@@ -393,10 +393,12 @@ class TicketItem(UUIDModel):
     ticket = models.ForeignKey(
         Ticket, on_delete=models.CASCADE, related_name="items", verbose_name=_("ticket")
     )
-    #: The line of Sales (opaque); empty for a dish made by hand.
-    sale_line_id = models.UUIDField(
-        _("line of the check"), null=True, blank=True, unique=True
-    )
+    #: The line of Sales (opaque); empty for a dish made by hand. A menu's line is one dish per dish chosen.
+    sale_line_id = models.UUIDField(_("line of the check"), null=True, blank=True)
+    #: Which dish of its menu's line it is (1, 2…); 0 = a line ordered on its own (KITCHEN-F06).
+    menu_dish = models.PositiveSmallIntegerField(_("dish of the menu"), default=0)
+    #: The header of its menu (its kitchen name, else its name); empty out of a menu (KITCHEN-F06).
+    menu_name = models.CharField(_("menu"), max_length=200, blank=True)
     position = models.PositiveIntegerField(_("position"))
     product_id = models.UUIDField(_("product"), null=True, blank=True)
     category_id = models.UUIDField(_("category"), null=True, blank=True)
@@ -404,6 +406,8 @@ class TicketItem(UUIDModel):
     quantity = models.DecimalField(_("quantity"), **QUANTITY)
     unit = models.CharField(_("unit"), max_length=8, default="ud")
     notes = models.CharField(_("note"), max_length=255, blank=True)
+    #: The options chosen in the till, by their kitchen names, in the order chosen (KITCHEN-F07).
+    modifiers = models.JSONField(_("options"), default=list, blank=True, db_default=[])
     station = models.ForeignKey(
         Station,
         on_delete=models.SET_NULL,
@@ -442,6 +446,10 @@ class TicketItem(UUIDModel):
             models.Index(fields=["station", "status"], name="kitchen_item_station_idx")
         ]
         constraints = [
+            # A round saved twice never doubles a dish: one per line, or one per dish of a menu's line.
+            models.UniqueConstraint(
+                fields=["sale_line_id", "menu_dish"], name="kitchen_item_one_per_line"
+            ),
             models.CheckConstraint(
                 condition=_in("status", ItemStatus), name="kitchen_item_status"
             ),
