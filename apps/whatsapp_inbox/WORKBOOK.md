@@ -323,9 +323,10 @@ Pasos:
 5. Solo se enseñan y se abren adjuntos de erplora.com, por https.
 Entra: el adjunto que guarda erplora.com: su enlace, su tipo, su nombre y su pie.
 Sale: nada cambia en el Hub.
-Si falla: si erplora.com no entrega la foto o la nota de voz, el bocadillo dice «No se ha podido cargar la
-imagen.» o «No se ha podido cargar la nota de voz.» y deja **Abrir el adjunto**; si erplora.com ya no lo
-guarda, la pestaña lo dice.
+Si falla: si erplora.com no entrega la foto o la nota de voz (también cuando el navegador no tiene la
+sesión de erplora.com de quien entró en el dispositivo: erplora.com solo las sirve a quien la tiene), el
+bocadillo dice «No se ha podido cargar la imagen.» o «No se ha podido cargar la nota de voz.» y deja **Abrir
+el adjunto**; si erplora.com ya no lo guarda, la pestaña lo dice.
 Implicados: erplora.com (guarda los adjuntos)
 
 ### WHATSAPP_INBOX-F07 Asignar una conversación a alguien del equipo
