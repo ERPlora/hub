@@ -759,7 +759,7 @@ def booked_price(
 
 
 def own_price(ctx: OperationContext, service_id: UUID, staff_id: UUID | None) -> int | None:
-    """The professional's own price for the service (Services' assignment, SERVICE-F05), as Fresha,
+    """The professional's own price for the service (Services' assignment, SERVICE-F31), as Fresha,
     Phorest and Timely charge it; ``None`` when she has none (or is no professional of Staff)."""
     if staff_id is None:
         return None
