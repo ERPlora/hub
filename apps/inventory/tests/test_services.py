@@ -2086,6 +2086,30 @@ def test_two_sales_of_the_last_unit_at_once_lower_it_once():
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    ("start", "crosses_on"),
+    [
+        ("11", "the first"),  # each alone would cross: said once, not twice
+        ("12", "the second"),  # neither alone would cross from the balance it started with: never lost
+    ],
+)
+def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, crosses_on):
+    article = create("Article", initial_stock=start, low_stock_threshold="10")
+    holder, held, release = _first_holds(lambda: sell(uuid.uuid7(), line(article.id, "1")))
+
+    second, outcome = _in_thread(lambda: sell(uuid.uuid7(), line(article.id, "1")))
+
+    assert _then(holder, release, second)
+    assert (held["result"].movements, outcome["result"].movements) == (1, 1)
+    assert stock_of(article.id) == Decimal(start) - 2
+    said = [
+        (row.payload["crossing"], row.payload["previous_quantity"], row.payload["current_quantity"])
+        for row in OutboxEvent.objects.filter(name=events.STOCK_THRESHOLD_CROSSED)
+    ]
+    assert said == [("below", "11.000", "10.000")], crosses_on
+
+
+@pytest.mark.django_db(transaction=True)
 def test_the_same_sale_delivered_twice_at_once_lowers_once():
     coffee, sale = create("Coffee", initial_stock="10"), uuid.uuid7()
     holder, held, release = _first_holds(lambda: sell(sale, line(coffee.id, "3")))

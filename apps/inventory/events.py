@@ -4,8 +4,8 @@ services.py records them in the outbox, in the command's transaction; live.py na
 re-run each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
 Reactions: a paid sale lowers the stock, a voided one restores it and a refund puts its returned units
-back, each through an operation of this app run as the system, in its own transaction. The outbox relay
-(phase 2, in the worker) hands each delivered event to ``react``; the operations are idempotent per sale
+back, each through an operation of this app run as the system, in its own transaction. The worker's outbox
+relay (``base/relay.py``) hands each delivered event to ``react``; the operations are idempotent per sale
 (per refund for a refund), so a repeated delivery changes nothing. ``sale`` does not require ``inventory`` (PLAN §20.5): this is the only link.
 """
 

@@ -214,14 +214,14 @@ fueran los del negocio.
 | INVENTORY-F15 | Dar de baja stock sin venta (merma, rotura, consumo propio) | servidor hecho |
 | INVENTORY-F16 | Consultar el historial de movimientos | servidor hecho |
 | INVENTORY-F17 | Ver el panel y los productos con stock bajo | servidor hecho |
-| INVENTORY-F18 | Avisar cuando un artículo cruza su mínimo | servidor hecho |
+| INVENTORY-F18 | Avisar cuando un artículo cruza su mínimo | hecho |
 | INVENTORY-F19 | Ajustar el inventario | servidor hecho |
 | INVENTORY-F20 | Decidir qué artículos llevan control de stock | servidor hecho |
 | | **Con otras apps** | |
-| INVENTORY-F21 | Bajar el stock al cobrarse una venta | servidor hecho |
-| INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | servidor hecho |
-| INVENTORY-F23 | Reponer el stock al anularse una venta | servidor hecho |
-| INVENTORY-F24 | Reponer el stock de una devolución | servidor hecho; la entrega entre apps espera al relay del outbox (fase 2) |
+| INVENTORY-F21 | Bajar el stock al cobrarse una venta | hecho |
+| INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | hecho |
+| INVENTORY-F23 | Reponer el stock al anularse una venta | hecho |
+| INVENTORY-F24 | Reponer el stock de una devolución | hecho |
 | INVENTORY-F25 | Imprimir la etiqueta del código de barras | por construir — necesita la app Impresión (`printing`), que aún no existe |
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | servidor hecho |
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API) |
@@ -602,7 +602,8 @@ producto.
 Implicados: ninguno
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
-Estado: servidor hecho
+<!-- origen: old:inventory/workflow/stock.md#inventory-f18 qa:modules/inventory/stock-deduction-on-sale -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -612,15 +613,16 @@ Pasos:
    otra vez por encima, avisa de «recuperado», y eso rearma el siguiente.
 3. Si el mismo artículo va en varias líneas de una venta (suelto y dentro de un menú), se decide
    una vez sobre el total.
-4. Para que alguien se entere, el responsable crea un flujo en **Flujos** que se dispare con este
-   aviso (por ejemplo, avisar para reponer).
+4. Para que alguien se entere, el responsable monta en **Flujos** una automatización que arranque
+   con este aviso (por ejemplo, avisar para reponer), como con cualquier otro aviso del negocio
+   (FLOW-F21).
 Entra: el saldo de antes y el de después del movimiento, y el umbral del producto.
 Sale: el aviso con el producto (SKU y nombre), la cantidad de antes y la de después, el umbral, el
 tipo de movimiento y la venta o el albarán.
 Si falla: solo se avisa de lo que de verdad se movió: una venta que no bajó el stock (INVENTORY-F21)
 no avisa. Dos movimientos a la vez sobre el mismo producto se aplican uno detrás de otro, así que el
-aviso ni se pierde ni sale dos veces.
-Implicados: FLOW-F13
+aviso ni se pierde ni sale dos veces. Si el movimiento no llega a guardarse, tampoco sale el aviso.
+Implicados: FLOW-F21
 
 ### INVENTORY-F19 Ajustar el inventario
 Estado: servidor hecho
@@ -667,7 +669,8 @@ Si falla: los rechazos del formulario (INVENTORY-F01). Una vez decidido, el art�
 Implicados: SALE-F01
 
 ### INVENTORY-F21 Bajar el stock al cobrarse una venta
-Estado: servidor hecho
+<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/08-incidents-voids-and-refunds fi:modules/inventory#command-inventory-stock-decrease qa:modules/inventory/stock-deduction-on-sale fi:modules/inventory#command-inventory-stock-decrease_on_sale-handler-wasm-decrease_on_sale fi:modules/inventory#event-listen-sale-completed-inventory-stock-decrease_on_sale old-hub:HUB-F51 old:inventory/workflow/con-otros-modulos.md#inventory-f21 wf:restaurante-dia#rec_restaurante-f17 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -693,7 +696,8 @@ encendido, queda en negativo.
 Implicados: SALE-F01, SALE-F11, SALE-F15
 
 ### INVENTORY-F22 Bajar el stock de los componentes de un menú o un pack
-Estado: servidor hecho
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old:inventory/workflow/con-otros-modulos.md#inventory-f22 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -710,7 +714,8 @@ Si falla: como INVENTORY-F21.
 Implicados: COMBO-F10, SALE-F12
 
 ### INVENTORY-F23 Reponer el stock al anularse una venta
-Estado: servidor hecho
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void qa:verticals/restaurant/08-incidents-voids-and-refunds qa:modules/inventory/stock-deduction-on-sale fi:modules/inventory#event-listen-sale-voided-inventory-_restock_on_void old:inventory/workflow/con-otros-modulos.md#inventory-f23 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -729,7 +734,8 @@ después ya no baja nada. Un artículo eliminado después de la venta no recuper
 Implicados: SALE-F30
 
 ### INVENTORY-F24 Reponer el stock de una devolución
-Estado: servidor hecho (2026-10-14); la entrega del aviso de Ventas espera al relay del outbox (fase 2)
+<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 qa:verticals/restaurant/08-incidents-voids-and-refunds qa:modules/inventory/stock-deduction-on-sale old:inventory/workflow/con-otros-modulos.md#inventory-f24 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -1023,9 +1029,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   que repone sale del libro (venta menos devoluciones anteriores), y la anulación descuenta lo ya
   devuelto. Los tests usan el evento real de Ventas, importando `apps.sale` solo en los tests. Su permiso, `inventory.system`, no lo tiene ningún rol. La nota por venta
   (`SaleStock`: `moved`, `unmoved`, `voided`) hace que la venta baje una vez, que la anulación reponga
-  una vez lo que dice el libro y que una anulación que llega antes deje la venta sin efecto. El relay
-  del outbox que entrega los eventos llega en la fase 2 (worker); hasta entonces se prueba con eventos
-  sintéticos. La forma del evento de Ventas (`sale_id`, `items[]` con `product_id`, `quantity`,
+  una vez lo que dice el libro y que una anulación que llega antes deje la venta sin efecto. Los entrega
+  el relay del outbox del worker (`base/relay.py`, desde hub#105): `tests/test_relay.py` cobra, anula y
+  devuelve con las operaciones reales de Ventas (y Menús) y pasa un tick real del worker. La forma del evento de Ventas (`sale_id`, `items[]` con `product_id`, `quantity`,
   `is_service` y `components[]`) la fija el WORKBOOK de Ventas.
 - **Importar**: el servidor es la autoridad: recibe las celdas como texto ya mapeadas a nuestros
   campos, lee importes y cantidades en formato español o inglés (con los dos separadores manda el de
