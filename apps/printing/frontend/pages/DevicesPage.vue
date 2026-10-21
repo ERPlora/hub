@@ -179,7 +179,7 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
               class="printing-devices__name"
               :data-testid="`printing-devices-name-${row.id}`"
             >
-              {{ row.name }}
+              <span class="printing-devices__label">{{ row.name }}</span>
               <StatusPill
                 v-if="row.this_device"
                 size="sm"
@@ -227,11 +227,16 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
   margin: 0;
   color: var(--ion-color-medium-shade, var(--ion-color-medium));
 }
+/* The name wraps inside its column (a long one is never cut), the «This device» pill under it. */
 .printing-devices__name {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: inline-grid;
+  justify-items: start;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+.printing-devices__label {
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 </style>
