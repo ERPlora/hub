@@ -1,5 +1,6 @@
 """Writes of base: opening the Hub's session for the person the SaaS vouched for, the clock of the apps' scheduled
-tasks (``base.scheduler``) and the registry of hubs (``base.Hub``, the operations ``base.hub.*``).
+tasks (``base.scheduler``), the outbox relay's deliveries (``base.relay``) and the registry of hubs (``base.Hub``,
+the operations ``base.hub.*``).
 
 The session is not an ``@operation``: it runs before there is an actor, for ``/auth/callback`` only, and needs the
 request to log in. Phase 1 keeps it on ``django.contrib.auth`` + ``Membership``; phase 2 replaces
@@ -30,6 +31,7 @@ import logging
 import secrets
 import time
 from collections.abc import Callable, Iterable
+from contextvars import ContextVar
 from functools import partial
 from uuid import UUID
 
@@ -40,11 +42,14 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, Permission
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
+from live.models import OutboxEvent
 from live.operations import get as get_operation
 from live.operations import operation
 from live.outbox import record_event
@@ -53,7 +58,7 @@ from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from base import auth, events, registry, signing
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
-from base.models import DemoCode, Hub, Membership, TaskSchedule
+from base.models import DemoCode, EventDelivery, Hub, Membership, TaskSchedule
 from base.schemas import (
     DemoCodeIn,
     DemoCodeOut,
@@ -230,6 +235,151 @@ def run_next_due_task(
             row.last_run = now
         row.save(update_fields=["next_run", "last_run"])
     return str(row), ran
+
+
+# ── The outbox relay's deliveries (base.relay) ───────────────────────────────────────────────────────────────────
+
+#: The longest ``last_error`` a delivery keeps (the start of the error is what tells it).
+LAST_ERROR_MAX_LENGTH = 2000
+#: What a delivery past the deepest level says (``base.relay.MAX_EVENT_DEPTH``).
+TOO_DEEP = "Not delivered: its depth, {depth}, is past the deepest level of events ({limit})."
+#: The events the running delivery records, so they are handed over one level deeper, in its transaction.
+_recorded_by_the_delivery: ContextVar[list[OutboxEvent] | None] = ContextVar(
+    "base_recorded_by_the_delivery", default=None
+)
+
+
+@receiver(post_save, sender=OutboxEvent, dispatch_uid="base.services.recorded_by_the_delivery")
+def _note_an_event_recorded_by_the_delivery(sender, instance: OutboxEvent, created: bool, **kwargs) -> None:
+    recorded = _recorded_by_the_delivery.get()
+    if created and recorded is not None:
+        recorded.append(instance)
+
+
+def relay_take_events(
+    now: dt.datetime, *, listeners: Callable[[OutboxEvent], list[str]], limit: int, max_depth: int
+) -> int:
+    """Take up to ``limit`` events nobody took yet, oldest first: one delivery per app of ``listeners(event)``,
+    and the event's ``delivered_at`` (taken) in the same transaction. Returns how many it took.
+
+    ``SELECT … FOR UPDATE SKIP LOCKED``: a second worker (a deploy overlaps the old one and the new one) skips the
+    events this one holds, and once it commits they are taken.
+    """
+    with transaction.atomic():
+        taken = list(
+            OutboxEvent.objects.select_for_update(skip_locked=True)
+            .filter(delivered_at__isnull=True)
+            .order_by("created_at", "id")[:limit]
+        )
+        _hand_over(taken, now=now, depth=0, listeners=listeners, max_depth=max_depth)
+    return len(taken)
+
+
+def relay_deliver_next(
+    now: dt.datetime,
+    *,
+    deliver: Callable[[str, OutboxEvent], object],
+    listeners: Callable[[OutboxEvent], list[str]],
+    max_depth: int,
+    max_attempts: int,
+    backoff: Callable[[int], dt.timedelta],
+) -> tuple[EventDelivery, bool] | None:
+    """Claim one delivery due at ``now`` (the oldest event first), run its app's reaction and mark it, all in
+    one transaction; returns ``(delivery, delivered)``, or ``None`` when nothing is due.
+
+    The claim is ``SKIP LOCKED``, as the scheduler's. ``deliver(app_label, event)`` runs in a savepoint, and the
+    events it records (and keeps) are handed over in it, one level deeper: a reaction that raises has its writes
+    undone and waits ``backoff(attempts)``; after ``max_attempts`` it is given up (``dead``). Either way it is
+    logged with the event, and the other deliveries go on.
+    """
+    with transaction.atomic():
+        delivery = (
+            EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
+            .select_related("event")
+            .filter(status=EventDelivery.Status.PENDING, next_attempt_at__lte=now)
+            .order_by("event__created_at", "event_id", "app_label")
+            .first()
+        )
+        if delivery is None:
+            return None
+        delivery.attempts += 1
+        try:
+            with transaction.atomic():
+                recorded: list[OutboxEvent] = []
+                token = _recorded_by_the_delivery.set(recorded)
+                try:
+                    deliver(delivery.app_label, delivery.event)
+                finally:
+                    _recorded_by_the_delivery.reset(token)
+                # Only what the reaction kept: an event recorded in a savepoint it gave up is gone.
+                kept = list(
+                    OutboxEvent.objects.filter(pk__in=[event.pk for event in recorded]).order_by("created_at", "id")
+                )
+                _hand_over(kept, now=now, depth=delivery.depth + 1, listeners=listeners, max_depth=max_depth)
+        except Exception as error:
+            delivered = False
+            delivery.last_error = f"{type(error).__name__}: {error}"[:LAST_ERROR_MAX_LENGTH]
+            if delivery.attempts >= max_attempts:
+                delivery.status = EventDelivery.Status.DEAD
+                logger.exception(
+                    "relay: %s gave up on %s (%s) after %d attempts; its writes were undone.",
+                    delivery.app_label,
+                    delivery.event.name,
+                    delivery.event_id,
+                    delivery.attempts,
+                )
+            else:
+                delivery.next_attempt_at = now + backoff(delivery.attempts)
+                logger.exception(
+                    "relay: %s failed on %s (%s), attempt %d of %d; its writes were undone and it tries again at %s.",
+                    delivery.app_label,
+                    delivery.event.name,
+                    delivery.event_id,
+                    delivery.attempts,
+                    max_attempts,
+                    delivery.next_attempt_at.isoformat(),
+                )
+        else:
+            delivered = True
+            delivery.status, delivery.delivered_at, delivery.last_error = EventDelivery.Status.DELIVERED, now, ""
+        delivery.save(update_fields=["attempts", "status", "next_attempt_at", "last_error", "delivered_at"])
+    return delivery, delivered
+
+
+def _hand_over(
+    events: list[OutboxEvent],
+    *,
+    now: dt.datetime,
+    depth: int,
+    listeners: Callable[[OutboxEvent], list[str]],
+    max_depth: int,
+) -> None:
+    """One delivery of each event per app that listens to it, at ``depth``; the events are taken (``delivered_at``).
+
+    Past ``max_depth`` the deliveries are written given up, with why: a reaction that records an event another
+    reaction answers with an event… never loops.
+    """
+    if not events:
+        return
+    too_deep = depth > max_depth
+    rows = [
+        EventDelivery(
+            event=event,
+            app_label=app_label,
+            depth=depth,
+            next_attempt_at=now,
+            status=EventDelivery.Status.DEAD if too_deep else EventDelivery.Status.PENDING,
+            last_error=TOO_DEEP.format(depth=depth, limit=max_depth) if too_deep else "",
+        )
+        for event in events
+        for app_label in listeners(event)
+    ]
+    EventDelivery.objects.bulk_create(rows)
+    OutboxEvent.objects.filter(pk__in=[event.pk for event in events]).update(delivered_at=now)
+    for row in rows if too_deep else ():
+        logger.error(
+            "relay: %s (%s) not delivered to %s: %s", row.event.name, row.event_id, row.app_label, row.last_error
+        )
 
 
 # ── The registry of hubs: what the SaaS's /internal/hubs/{id} runs (plan 2026-10-17, §1.5) ──────────────────────
