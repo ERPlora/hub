@@ -2,7 +2,7 @@
 Prefijo: TABLE
 Alcance MVP: restaurante
 Estado de la app: hecha (servidor y páginas; la ventana «Elegir mesa» del TPV la monta Ventas, SALE-F19).
-La entrega de los avisos de otras apps (relay del outbox, fase 2) queda fuera: ver «Lo que queda fuera».
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `table`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -206,16 +206,17 @@ no está activa en este negocio» y «No tienes permiso».
 | TABLE-F22 | Consultar las cuentas de la sala (abiertas y cerradas) | hecho |
 | TABLE-F23 | Borrar una cuenta cerrada del historial | hecho |
 | TABLE-F24 | Volver a sentar una cuenta aparcada | hecho |
-| TABLE-F25 | Retener la mesa de una reserva confirmada | servidor hecho (espera a Reservas) |
-| TABLE-F26 | Mover o soltar la retención cuando cambia la reserva | servidor hecho (espera a Reservas) |
-| TABLE-F27 | Soltar la mesa cuando la reserva se cancela o no se presenta | servidor hecho (espera a Reservas) |
+| TABLE-F25 | Retener la mesa de una reserva confirmada | hecho |
+| TABLE-F26 | Mover o soltar la retención cuando cambia la reserva | hecho |
+| TABLE-F27 | Soltar la mesa cuando la reserva se cancela o no se presenta | hecho |
 | TABLE-F28 | Gastar la retención al sentar a la reserva | hecho |
 | TABLE-F29 | Caducar las retenciones vencidas | hecho |
 | TABLE-F30 | Retener o soltar una mesa a mano | hecho (asistente y API) |
-| TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | servidor hecho (entrega en la fase 2) |
+| TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
+<!-- origen: wf:restaurante-dia#rec_restaurante-f02 fi:modules/tables#command-tables-zones-create fi:modules/tables#query-tables-zones-list old:tables/workflow/plano.md#tables-f01 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Zonas
@@ -230,8 +231,10 @@ Entra: el nombre, la descripción, el color y el orden.
 Sale: la zona (avisa: `table.zone.created`).
 Si falla: sin nombre, el botón no se activa. Un nombre que ya tiene otra zona: «Ya hay una zona con
 ese nombre.». Un empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
+Implicados: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Añadir mesas
+<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-create old:tables/workflow/plano.md#tables-f02 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -249,8 +252,10 @@ en marcha queda hecho (`table.floor.status`).
 Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
 «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
 este negocio.».
+Implicados: TABLE-F03, TABLE-F04, TABLE-F07
 
 ### TABLE-F03 Colocar las mesas en el plano
+<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-move old:tables/workflow/plano.md#tables-f03 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano)
@@ -263,8 +268,10 @@ Pasos:
 Entra: la posición nueva.
 Sale: la posición de la mesa (avisa: `table.table.updated`).
 Si falla: «No se pudo guardar la posición» encima del plano; la mesa vuelve a su sitio guardado.
+Implicados: TABLE-F02, TABLE-F09
 
 ### TABLE-F04 Editar o borrar una mesa
+<!-- origen: fi:modules/tables#command-handler-wasm-tables-tables-delete-delete_table fi:modules/tables#command-tables-tables-update old:tables/workflow/plano.md#tables-f04 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -281,8 +288,10 @@ Sale: la mesa cambiada (avisa: `table.table.updated`) o borrada (avisa: `table.t
 Si falla: dentro de la ventana: «El número de mesa es obligatorio», «Ya hay una mesa con ese número
 en esta zona.», «Esa mesa no existe en este negocio.»; borrar una mesa con cuenta abierta: «Esa mesa
 tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa.».
+Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Sacar una mesa del servicio (bloquearla) y devolverla
+<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan old:tables/workflow/plano.md#tables-f05 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -297,8 +306,10 @@ Entra: la mesa elegida.
 Sale: el estado de la mesa (avisa: `table.table.updated`).
 Si falla: como en TABLE-F04. Sentar en una mesa bloqueada (asistente, API) se rechaza con el mismo
 motivo.
+Implicados: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Renombrar o borrar una zona
+<!-- origen: fi:modules/tables#command-handler-wasm-tables-zones-delete-delete_zone fi:modules/tables#command-tables-zones-update fi:modules/tables#query-tables-zones-get old:tables/workflow/plano.md#tables-f06 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Zonas, Plano de sala (Editar plano)
@@ -313,11 +324,13 @@ Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).
 Si falla: «Esta zona todavía tiene mesas. Muévelas a otra zona o bórralas antes.» o «Esa zona no
 existe en este negocio.».
+Implicados: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Crear muchas mesas de golpe
-Estado: hecho (asistente y API; sin pantalla, como el producto actual)
+<!-- origen: qa:modules/tables/floor-plan-zones-and-tables fi:modules/tables#command-handler-wasm-tables-tables-bulk_create-bulk_create_tables old:tables/workflow/plano.md#tables-f07 -->
+Estado: hecho
 Actor: responsable, asistente
-Pantalla: asistente
+Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
 Pasos:
 1. Pide al asistente «crea 12 mesas en la Terraza, de la T1 a la T12, para 4».
 2. Se crean de una vez (de 1 a 100), numeradas con el prefijo y el número inicial que se digan (1 si
@@ -326,8 +339,10 @@ Entra: zona (por id o por nombre), cuántas, prefijo, número inicial, aforo y f
 Sale: las mesas (avisa: `table.table.created`).
 Si falla: si la zona no existe, no se crea ninguna. Si algún número ya existe en la zona, no se crea
 ninguna y se dice cuáles.
+Implicados: TABLE-F02
 
 ### TABLE-F08 Ajustar la sala: comensales al sentar y avisos de tiempo
+<!-- origen: wf:restaurante-dia#rec_restaurante-f02 old:tables/workflow/plano.md#tables-f08 qa:modules/tables/seat-and-open-table -->
 Estado: hecho
 Actor: administrador
 Pantalla: Ajustes
@@ -342,8 +357,10 @@ Pasos:
 Entra: los tres valores.
 Sale: los ajustes de sala (avisa: `table.settings.updated`).
 Si falla: un valor fuera de rango sale en su campo.
+Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala
+<!-- origen: wf:restaurante-dia#rec_restaurante-f05 qa:verticals/restaurant/04-floor-plan fi:modules/tables#query-tables-tables-list old:tables/workflow/servicio.md#tables-f09 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Plano de sala
@@ -353,13 +370,16 @@ Pasos:
 3. Una mesa ocupada dice los comensales y los minutos que llevan («3 pax · 35 min») y quién la
    atiende; los minutos avanzan solos. Una mesa con reserva hoy dice el nombre y la hora.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que
-   salir y volver. Y con el reloj: una mesa pasa a Reservada una hora antes de su reserva y vuelve a
+   salir y volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en
+   el paso en que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su reserva y vuelve a
    Disponible cuando la reserva acaba, sin que nadie toque nada.
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
+Implicados: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
+<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 qa:modules/reservations/waitlist-and-walk-in qa:modules/tables/seat-and-open-table fi:modules/tables#command-handler-wasm-tables-sessions-open-open_session fi:modules/tables#slot-provides_slots-sales-pos-order_context-erp-tables-pos-zones old:tables/workflow/servicio.md#tables-f10 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -380,8 +400,10 @@ Si falla: si otro dispositivo la acaba de ocupar, «Otro dispositivo acaba de oc
 actualizado el plano.» y la mesa no se sienta. **Dos camareros que sientan la misma mesa a la vez
 dejan una sola cuenta**: el segundo recibe ese mismo aviso. Una mesa bloqueada, desactivada o borrada
 no se sienta.
+Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19
 
 ### TABLE-F11 Volver a una mesa ocupada y cobrarla
+<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f08 qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f11 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -395,8 +417,10 @@ Entra: la mesa tocada y su cuenta abierta.
 Sale: nada en Mesas.
 Si falla: si la cuenta ya se cobró o anuló desde otro sitio, Ventas avisa al llegar «Esa cuenta ya no
 está abierta (se cobró, se anuló o no existe): el TPV sigue como estaba.».
+Implicados: TABLE-F18, SALE-F19
 
 ### TABLE-F12 Llevar a una mesa una cuenta que ya está abierta
+<!-- origen: old:tables/workflow/servicio.md#tables-f12 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Ventas → Vender («Elegir mesa», SALE-F19); asistente
@@ -418,8 +442,10 @@ Sale: la cuenta de mesa abierta y enlazada a esa cuenta (avisa: `table.session.o
 Si falla: los de TABLE-F10, dentro de la ventana y con estas palabras; una cuenta ya cobrada o anulada:
 «Esa cuenta ya no está abierta en Ventas.»; una cuenta que ya está en otra mesa: «Esa cuenta ya está
 en la mesa N.». Las mesas Ocupadas y Bloqueadas no se pueden tocar.
+Implicados: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19
 
 ### TABLE-F13 Quitar la mesa de una cuenta (aparcarla)
+<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f13 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio); también en Ventas → Vender, «Elegir mesa» → «Quitar de la mesa» (SALE-F19)
@@ -433,8 +459,10 @@ Sale: la cuenta aparcada (avisa: `table.session.parked`) y la mesa libre si no l
 luego Ventas la cobra entera o la anula, la cuenta de mesa queda «Cerrada» (sin mesa).
 Si falla: «Esa cuenta no está abierta: no existe en este negocio, o ya se ha cerrado, trasladado,
 fusionado o aparcado.».
+Implicados: TABLE-F24, SALE-F19
 
 ### TABLE-F14 Corregir los comensales de una mesa ocupada
+<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f14 qa:modules/tables/move-and-merge-tables -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -446,8 +474,10 @@ Entra: la cuenta abierta de la mesa.
 Sale: los comensales de la cuenta (avisa: `table.session.updated`).
 Si falla: una cuenta ya cerrada, trasladada, fusionada o aparcada no se corrige (mensaje de
 TABLE-F13). Siempre al menos 1.
+Implicados: TABLE-F10, TABLE-F17
 
 ### TABLE-F15 Pasar la cuenta a otra mesa (transferir)
+<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:restaurante-dia#rec_restaurante-f10 qa:modules/tables/move-and-merge-tables fi:modules/tables#command-handler-wasm-tables-sessions-transfer-transfer_session old:tables/workflow/servicio.md#tables-f15 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -464,8 +494,10 @@ Sale: la cuenta de origen «Trasladada» y una cuenta de mesa nueva en el destin
 de Ventas (avisa: `table.session.transferred`).
 Si falla: «Otro dispositivo acaba de ocupar esa mesa. Se ha actualizado el plano.» si el destino ya no
 está libre; «Esa cuenta no está abierta…» si otro ya la movió.
+Implicados: TABLE-F28, SALE-F25
 
 ### TABLE-F16 Juntar las cuentas de dos mesas ocupadas (fusionar)
+<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:verticals/restaurant/04-floor-plan qa:modules/tables/move-and-merge-tables old:tables/workflow/servicio.md#tables-f16 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -483,8 +515,10 @@ Sale: una sola cuenta abierta en la mesa que se queda (avisa: `table.session.mer
 `sale.order.merged`).
 Si falla: «Esa mesa no tiene ninguna cuenta abierta con la que fusionar.» si el destino está libre o
 es la misma mesa.
+Implicados: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Dividir la cuenta de una mesa
+<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/split-bill old:tables/workflow/servicio.md#tables-f17 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -500,8 +534,10 @@ Sale: dos cuentas de mesa abiertas en la misma mesa, la nueva colgando de la ori
 `table.session.split` y `sale.order.opened`).
 Si falla: si otro dispositivo está cobrando esa cuenta, Ventas lo rechaza («La cuenta ha cambiado…»)
 y no se divide nada.
+Implicados: TABLE-F16, TABLE-F18, SALE-F23
 
 ### TABLE-F18 Liberar la mesa al cobrar la cuenta entera
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/07-payment-and-fiscal wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f18 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ventas: Cobro
@@ -515,8 +551,10 @@ Entra: de Ventas, el estado de la cuenta y sus ventas.
 Sale: la cuenta de mesa «Cerrada» con la hora del cobro; la mesa libre. Una venta sin mesa (barra,
 para llevar) no deja nada.
 Si falla: nada que ver: el plano y Sesiones lo leen de Ventas en cada lectura.
+Implicados: TABLE-F17, TABLE-F22, SALE-F22
 
 ### TABLE-F19 Anular un cobro de una mesa
+<!-- origen: wf:restaurante-dia#rec_restaurante-f15 old:tables/workflow/cierre-e-historial.md#tables-f19 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ventas: Ventas
@@ -527,8 +565,10 @@ Pasos:
 Entra: de Ventas, la venta anulada.
 Sale: nada nuevo; «Cobrado» baja.
 Si falla: como TABLE-F18.
+Implicados: TABLE-F22, SALE-F30
 
 ### TABLE-F20 Eliminar en Ventas la cuenta abierta de una mesa
+<!-- origen: qa:verticals/restaurant/08-incidents-voids-and-refunds wf:restaurante-dia#rec_restaurante-f14 old:tables/workflow/cierre-e-historial.md#tables-f20 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ventas: Cuentas abiertas
@@ -538,8 +578,10 @@ Pasos:
 Entra: de Ventas, la cuenta anulada.
 Sale: la cuenta de mesa cerrada; la mesa libre.
 Si falla: como TABLE-F18.
+Implicados: TABLE-F21, SALE-F18
 
 ### TABLE-F21 Cerrar una mesa a mano
+<!-- origen: wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f21 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Sesiones, Plano de sala (Servicio)
@@ -557,8 +599,10 @@ Sale: la cuenta de mesa «Cerrada» con su hora (avisa: `table.session.closed`).
 Si falla: «La cuenta de esta mesa sigue abierta en Ventas: cóbrala, pásala a otra mesa o elimínala
 desde el TPV.»; «La cuenta de esta mesa ha cambiado. Recarga la lista e inténtalo de nuevo.» (otro
 dispositivo le cambió la cuenta); «Esa cuenta no está abierta…» (ya la cerró otro).
+Implicados: TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Consultar las cuentas de la sala (abiertas y cerradas)
+<!-- origen: wf:restaurante-dia#rec_restaurante-f16 fi:modules/tables#query-tables-sessions-list old:tables/workflow/cierre-e-historial.md#tables-f22 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Sesiones
@@ -571,8 +615,10 @@ Pasos:
 Entra: las cuentas de mesa y lo cobrado en Ventas.
 Sale: nada.
 Si falla: el error de la tabla con reintento. Las devoluciones no restan del «Cobrado».
+Implicados: TABLE-F18, TABLE-F19, TABLE-F23
 
 ### TABLE-F23 Borrar una cuenta cerrada del historial
+<!-- origen: fi:modules/tables#command-handler-wasm-tables-sessions-delete-delete_session old:tables/workflow/cierre-e-historial.md#tables-f23 -->
 Estado: hecho
 Actor: administrador, asistente
 Pantalla: Sesiones
@@ -583,8 +629,10 @@ Entra: la cuenta de mesa.
 Sale: la cuenta borrada (avisa: `table.session.deleted`).
 Si falla: una cuenta abierta o aparcada no se borra: «Esa cuenta sigue abierta: ciérrala antes de
 borrarla.».
+Implicados: TABLE-F22
 
 ### TABLE-F24 Volver a sentar una cuenta aparcada
+<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/cierre-e-historial.md#tables-f24 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Sesiones; también en Ventas → Vender, tocando una mesa en «Elegir mesa» con la cuenta en pantalla (SALE-F19)
@@ -597,50 +645,59 @@ Entra: la cuenta aparcada y la mesa.
 Sale: la cuenta de mesa sentada (avisa: `table.session.restored`).
 Si falla: «Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa.»; la
 mesa tiene que estar libre como al sentar (TABLE-F10).
+Implicados: TABLE-F13, TABLE-F28, SALE-F19
 
 ### TABLE-F25 Retener la mesa de una reserva confirmada
-Estado: servidor hecho — la reacción existe; la dispara Reservas cuando exista (fase 2)
+<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f06 wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f25 -->
+Estado: hecho
 Actor: sistema
-Pantalla: ninguna
+Pantalla: ninguna (se ve en el Plano de sala)
 Pasos:
-1. En Reservas, una reserva con mesa pasa a Confirmada.
-2. Mesas aparta esa mesa para la reserva desde su fecha y hora (del negocio) hasta que acaba su
+1. En Reservas, una reserva con mesa pasa a Confirmada (o nace ya confirmada).
+2. En esa misma operación, Mesas aparta esa mesa para la reserva desde su fecha y hora (del negocio) hasta que acaba su
    duración (120 minutos si no trae), con sus comensales, su nombre y su ficha de cliente.
 3. Desde 60 minutos antes de su hora la mesa sale Reservada; antes, Disponible con «Ana · 21:00».
 4. Una mesa puede tener varias reservas retenidas; el plano enseña la más temprana de hoy.
 Entra: de Reservas, la reserva con su mesa, fecha, hora, duración, comensales, nombre y ficha.
 Sale: la retención (avisa: `table.table.held`). Si la confirmación llega dos veces, sigue habiendo una
 sola retención.
-Si falla: una mesa borrada o desactivada no se retiene.
+Si falla: una mesa borrada, desactivada o fuera de servicio no se retiene, y Reservas no confirma la reserva
+(se deshace todo).
+Implicados: RESERVATION-F07, TABLE-F09, TABLE-F28
 
 ### TABLE-F26 Mover o soltar la retención cuando cambia la reserva
-Estado: servidor hecho — espera a Reservas (fase 2)
+<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f26 -->
+Estado: hecho
 Actor: sistema
-Pantalla: ninguna
+Pantalla: ninguna (se ve en el Plano de sala)
 Pasos:
 1. En Reservas se cambia la mesa, la fecha, la hora, la duración, los comensales o el nombre de una
    reserva retenida.
-2. Mesas mueve la retención a la mesa nueva y a la hora nueva; si a la reserva se le quita la mesa,
+2. En esa misma operación, Mesas mueve la retención a la mesa nueva y a la hora nueva; si a la reserva se le quita la mesa,
    suelta la retención.
 Entra: de Reservas, la reserva cambiada.
 Sale: la retención movida o soltada (avisa: `table.table.held` o `table.table.hold_released`).
-Si falla: una mesa nueva borrada o desactivada no recibe la retención y la reserva sigue retenida en
-la vieja.
+Si falla: una mesa nueva borrada, desactivada o fuera de servicio no recibe la retención: Reservas no
+guarda el cambio y la reserva sigue retenida en la vieja.
+Implicados: RESERVATION-F08, TABLE-F25
 
 ### TABLE-F27 Soltar la mesa cuando la reserva se cancela o no se presenta
-Estado: servidor hecho — espera a Reservas (fase 2)
+<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f27 -->
+Estado: hecho
 Actor: sistema
-Pantalla: ninguna
+Pantalla: ninguna (se ve en el Plano de sala)
 Pasos:
 1. En Reservas, una reserva se cancela, se marca como no presentada o se borra.
-2. Mesas suelta su retención (sin el nombre): la mesa vuelve a Disponible si no tiene otra reserva ni
+2. En esa misma operación, Mesas suelta su retención (sin el nombre): la mesa vuelve a Disponible si no tiene otra reserva ni
    gente sentada.
 3. Una retención que ya se gastó (la gente se sentó) no se toca.
 Entra: de Reservas, la reserva cancelada, no presentada o borrada.
 Sale: la retención soltada (avisa: `table.table.hold_released`).
-Si falla: si el aviso se repite, no cambia nada.
+Si falla: si se pide dos veces, no cambia nada.
+Implicados: RESERVATION-F09, RESERVATION-F10, RESERVATION-F20, TABLE-F25
 
 ### TABLE-F28 Gastar la retención al sentar a la reserva
+<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 old:tables/workflow/reservas.md#tables-f28 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -654,8 +711,10 @@ Pasos:
 Entra: la mesa Reservada.
 Sale: las retenciones que la pintaban Reservada, gastadas y sin nombre.
 Si falla: los de TABLE-F10.
+Implicados: RESERVATION-F11, TABLE-F10, TABLE-F25
 
 ### TABLE-F29 Caducar las retenciones vencidas
+<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f29 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -667,8 +726,10 @@ Entra: la hora.
 Sale: las retenciones caducadas, sin nombre (avisa: `table.table.hold_released`, solo si caducó
 alguna).
 Si falla: se repite en el siguiente repaso; si el hub estuvo parado, hace uno solo al volver.
+Implicados: TABLE-F09, TABLE-F25
 
 ### TABLE-F30 Retener o soltar una mesa a mano
+<!-- origen: old:tables/workflow/reservas.md#tables-f30 -->
 Estado: hecho (asistente y API, como el producto actual)
 Actor: responsable, empleado, asistente
 Pantalla: asistente
@@ -682,20 +743,26 @@ Sale: la retención (avisa: `table.table.held`) o su liberación, que borra el n
 `table.table.hold_released`).
 Si falla: «Esa mesa no existe en este negocio.»; soltar una retención que ya no está: «Esa retención
 ya no está: se soltó, ha vencido, o esa reserva nunca llegó a retener una mesa.».
+Implicados: TABLE-F09, TABLE-F28
 
 ### TABLE-F31 Olvidar el nombre de un cliente cuyos datos se borran (RGPD)
-Estado: servidor hecho — la reacción existe; la entrega el relay del outbox (fase 2)
+<!-- origen: old:tables/workflow/reservas.md#tables-f31 -->
+Estado: hecho
 Actor: sistema
 Pantalla: Plano de sala
 Pasos:
-1. En **Clientes** se borran los datos personales de una ficha.
-2. Todas las retenciones de mesa de esa clienta, vivas o terminadas, se quedan sin su nombre.
+1. En **Clientes** se borran los datos personales de una ficha (también de las que se le unieron).
+2. Al momento, todas las retenciones de mesa de esa clienta, vivas o terminadas, se quedan sin su nombre,
+   y la cuenta de una mesa en la que está sentada deja de enseñarlo.
 3. La mesa sigue apartada a su hora: donde estaba el nombre se lee «Cliente borrado · 21:00».
 Entra: el aviso `customer.customer.erased` con el id de la ficha.
-Sale: retenciones sin el nombre de la clienta. No suelta ninguna mesa.
+Sale: retenciones sin el nombre de la clienta (avisa: `table.table.held`, y el plano se repinta solo). No
+suelta ninguna mesa.
 Si falla: repetirlo no cambia nada; un aviso sin id no toca las retenciones sin ficha.
+Implicados: CUSTOMER-F16, CUSTOMER-F13, RESERVATION-F22
 
 ### TABLE-F32 Poner o quitar el cliente de una mesa
+<!-- origen: gh:sales#569 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -707,6 +774,7 @@ Pasos:
 Entra: la ficha, de Clientes.
 Sale: el enlace cuenta ↔ cliente, que guarda Clientes (avisa: `customer.order.linked`).
 Si falla: el motivo de Clientes; la mesa se sienta igual.
+Implicados: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
 
 ## Mesas: lo que entra y lo que sale
 
@@ -754,8 +822,8 @@ en vivo.
 
 Solo para la plataforma (sin ruta en la API, como sistema): `table.session.close_by_order` (reacción
 a Ventas), `table.hold.expire` (tarea programada), `table.hold.sync_reservation` y
-`table.hold.move_reservation` (reacciones a Reservas) y `table.hold.forget_customer` (reacción a
-Clientes).
+`table.hold.move_reservation` (los llama Reservas dentro de su operación) y `table.hold.forget_customer`
+(reacción a Clientes).
 
 ### Lo que avisa
 
@@ -763,7 +831,7 @@ Clientes).
 |---|---|---|
 | `table.zone.created`, `.updated`, `.deleted` | Crear, cambiar o borrar una zona | `id` |
 | `table.table.created`, `.updated`, `.deleted` | Crear (también de golpe), cambiar, mover o borrar una mesa | `id` (`ids` de golpe) |
-| `table.table.held`, `table.table.hold_released` | Retener o soltar una mesa (también al caducar) | `table_id`, `source`, `source_ref` |
+| `table.table.held`, `table.table.hold_released` | Retener o soltar una mesa (también al caducar) u olvidar el nombre de una clienta borrada | `table_id`, `source`, `source_ref` |
 | `table.session.opened` | Sentar | `id`, `table_id`, `order_id`, `guests_count` |
 | `table.session.closed` | Cerrar a mano o por Ventas | `id`, `table_id`, `order_id` |
 | `table.session.transferred` | Transferir | `id` (la nueva), `from_id`, `from_table_id`, `table_id`, `order_id` |
@@ -783,21 +851,25 @@ Ningún aviso lleva nombres ni notas libres: solo ids y números.
 | `sale.order.completed` | Ventas | Cierra las cuentas de mesa de esa cuenta (F18) | `table.session.close_by_order` |
 | `sale.order.voided` | Ventas | Cierra las cuentas de mesa de esa cuenta (F20) | `table.session.close_by_order` |
 | `customer.customer.erased` | Clientes | Borra el nombre de sus retenciones (F31) | `table.hold.forget_customer` |
-| `reservation.reservation.status_changed` | Reservas (cuando exista) | Retiene, suelta o gasta (F25, F27) | `table.hold.sync_reservation` |
-| `reservation.reservation.updated` | Reservas (cuando exista) | Mueve o suelta la retención (F26) | `table.hold.move_reservation` |
 
-Mientras no hay relay (fase 1), lo que dice Ventas se lee además en cada lectura y en cada escritura:
-una cuenta de mesa cuya cuenta de Ventas está cobrada o anulada se pinta y se trata como cerrada.
+Las reacciones llegan en segundo plano, poco después, y repetirlas no cambia nada. Lo que dice Ventas se lee
+además en cada lectura y en cada escritura: una cuenta de mesa cuya cuenta de Ventas está cobrada o anulada
+se pinta y se trata como cerrada. Reservas no se escucha: llama a Mesas dentro de su propia operación (F25 a
+F28), y sus avisos, recibidos después, repetirían una reserva tal como era (un «confirmada» viejo volvería a
+retener la mesa de un grupo ya sentado).
 
 Carga que esperan las reacciones (de cada aviso se lee solo esto; lo demás se ignora):
 
 - `sale.order.completed`, `sale.order.voided`: `order_id`.
 - `customer.customer.erased`: `id` (la ficha).
-- `reservation.reservation.status_changed`: `id` (la reserva), `status` (`confirmed` retiene;
-  `cancelled`, `no_show` o `deleted` sueltan), `table_id`, `date` y `time` (de pared, del negocio),
-  `duration_minutes` (120 si no viene), `party_size`, `guest_name` y `customer_id`.
-- `reservation.reservation.updated`: `id` y los campos que cambiaron, con los mismos nombres; `table_id`
-  enviado vacío (`null`) = la reserva se quedó sin mesa.
+
+Lo que Reservas manda al llamar (los mismos nombres que sus avisos `status_changed` y `updated`):
+
+- `table.hold.sync_reservation`: `id` (la reserva), `status` (`confirmed` retiene; `cancelled`, `no_show`
+  o `deleted` sueltan), `table_id`, `date` y `time` (de pared, del negocio), `duration_minutes` (120 si no
+  viene), `party_size`, `guest_name` y `customer_id`.
+- `table.hold.move_reservation`: `id` y los campos que cambiaron; `table_id` enviado vacío (`null`) = la
+  reserva se quedó sin mesa.
 
 ### Lo que necesita de otras apps
 
@@ -815,7 +887,7 @@ Carga que esperan las reacciones (de cada aviso se lee solo esto; lo demás se i
 |---|---|---|
 | Ventas | «Elegir mesa» del TPV (SALE-F19): las mesas y su estado, sentar o volver a sentar la cuenta de pantalla, quitarle la mesa y seguir la mesa de una cuenta | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
 | Cocina | La mesa de una comanda | `table.session.by_order` |
-| Reservas | Retener la mesa de una reserva | sus avisos |
+| Reservas | Retener, mover y soltar la mesa de una reserva y sentarla, dentro de su operación | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
 
 ### Quién puede qué
 
@@ -845,8 +917,10 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales)
-  y `tests/test_concurrency.py` (dos camareros a la vez, con hilos).
+  `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales),
+  `tests/test_integration_relay.py` (Reservas, Clientes y Ventas reales, por el bucle del worker con el
+  relay del outbox) y `tests/test_concurrency.py` (dos camareros a la vez, con hilos). Reservas → Mesas, sin
+  mocks, también en `apps/reservation/tests/test_integration_table.py`.
 - **`requires = ["sale", "customer"]`**: la cuenta de cada mesa es una `sale.Order` (guardada como
   `order_id`, UUID sin clave ajena, como Citas), y su estado, sus líneas y sus ventas se leen de los
   modelos de Ventas; el cliente de la cuenta se lee de `customer.OrderLink`. **Ventas no requiere
@@ -864,11 +938,17 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   `held_from`, hasta `held_until`); si no, Disponible. Lo único que se guarda es `blocked`. Así no
   hay «liberar si no le queda otra cuenta» ni repaso que repinte, y una reserva vencida deja de pintar
   en el acto (el defecto de 1–2 horas de TABLES-F29 desaparece).
-- **Sin relay en la fase 1** (como Caja): lo que hace Ventas (cobrar, anular la cuenta) no llega por
-  aviso. Las lecturas tratan como cerrada una cuenta de mesa abierta **o aparcada** cuya `sale.Order`
-  está `completed` o `voided`, con la hora de cierre de la cuenta; las escrituras, antes de nada,
-  cierran esas cuentas (`settle`). `events.REACTIONS` hace lo mismo cuando llegue el relay. Una cuenta
-  que acaba aparcada se cierra sin mesa (restricción `table_session_table_by_status`).
+- **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega a `events.REACTIONS`
+  lo de Ventas (`sale.order.completed`/`voided` → `table.session.close_by_order`) y lo de Clientes
+  (`customer.customer.erased` → `table.hold.forget_customer`, que anota `table.table.held` por retención
+  para repintar el plano). Además, las lecturas tratan como cerrada una cuenta de mesa abierta **o
+  aparcada** cuya `sale.Order` está `completed` o `voided`, con la hora de cierre de la cuenta, y las
+  escrituras, antes de nada, cierran esas cuentas (`settle`): el plano no espera al relay. Una cuenta que
+  acaba aparcada se cierra sin mesa (restricción `table_session_table_by_status`).
+- **Reservas no es una reacción** (ronda propuesta en la PR de APP-TABLE): la llamada dentro de la operación
+  de Reservas es la única vía; sus avisos `reservation.reservation.status_changed` y `updated` no se
+  escuchan, porque entregados después re-aplicarían una reserva vieja
+  (`test_integration_relay.py::test_a_party_seated_long_before_its_time_is_not_held_again_by_a_late_confirmation`).
 - **El paso del tiempo** (una reserva que entra en su ventana o acaba) no tiene aviso: el plano pinta el
   estado por el reloj (cada 30 s) y, cuando lo cambia, vuelve a pedir el plano al servidor.
 - **Concurrencia**: sentar, trasladar, volver a sentar y dividir bloquean la fila de la mesa
@@ -951,10 +1031,10 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- **La entrega de los avisos de otras apps** (relay del outbox, fase 2): las reacciones están
-  declaradas y probadas; mientras, Mesas lee el estado de Ventas en cada lectura y escritura.
-- **Reservas**: la app no existe todavía; las reacciones de TABLE-F25 a F27 esperan sus avisos con
-  la carga documentada arriba.
+- **Gastar solo la retención del grupo que se sienta** (petición de Reservas en su `UI-REQUESTS.md`):
+  sentar gasta todas las retenciones que ya pintan la mesa Reservada; con dos reservas solapadas en la
+  misma mesa, sentar tarde a la primera gasta también la de la segunda. Necesita que Reservas diga qué
+  reserva sienta (un campo nuevo y opcional de `table.session.open`) y que lo mande: va con APP-RESERVATION.
 
 ### Dudas abiertas
 
