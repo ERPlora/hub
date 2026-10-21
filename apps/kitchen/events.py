@@ -10,9 +10,11 @@ Reactions, each through an operation of this app run as the system, in its own t
 - a check charged in full, voided, or one of its lines voided (``sale.order.completed``,
   ``sale.order.voided``, ``sale.order.line_voided``) brings its tickets up to date (KITCHEN-F27 to F29).
 
-The outbox relay (phase 2, in the worker) hands each delivered event to ``react``; every reaction is
-idempotent, so a repeated delivery changes nothing. Until then, what Sales did is read on every read and
-saved on every write (queries.py, services.py).
+The outbox relay (``base/relay.py``, in the worker's loop, running in production since hub#105) hands each
+delivered event to ``react`` a moment after Sales' COMMIT; every reaction is idempotent, so a repeated
+delivery changes nothing. For the moment between that COMMIT and the reaction, what Sales did is also
+read on every read and saved on every write (queries.py, services.py), so the board never waits for the
+worker's tick.
 """
 
 from typing import Any

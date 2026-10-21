@@ -1,7 +1,8 @@
 # Workbook — Cocina (app)
 Prefijo: KITCHEN
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas). Las dos piezas que Cocina pone en el TPV (el botón
+Estado de la app: completa (2026-10-21)
+Lo que no entra todavía: ver «Lo que queda fuera». Las dos piezas que Cocina pone en el TPV (el botón
 «Enviar comanda» con su urgencia y la hoja «Comandas de la cuenta») están en la pantalla «Vender» de
 Ventas, con las operaciones de aquí (KITCHEN-F18–F20).
 
@@ -89,9 +90,9 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en 
 - Configuración inicial, paso a paso:
   1. En **Cocina → Estaciones**, crea las estaciones reales (Plancha, Barra, Postres) con su destino
      (pantalla, papel o ambos) y su impresora (KITCHEN-F01).
-  2. En el panel «Enrutado», manda cada categoría a su estación y los productos sueltos que deban ir a
-     otra (KITCHEN-F04). Lo que no tenga estación sale en la pantalla bajo «Sin estación» y por la
-     impresora de cocina.
+  2. En el panel «Enrutado producto/categoría → estación», manda cada categoría a su estación y los
+     productos sueltos que deban ir a otra (KITCHEN-F04). Lo que no tenga estación sale en la pantalla
+     bajo «Sin estación» y por la impresora de cocina.
   3. En **Cocina → Ajustes**, ajusta los avisos ámbar y rojo, el sonido y, si se quiere, el pase en
      papel. Si en la cocina nadie va a marcar nada en la pantalla, apaga «La cocina trabaja con la
      pantalla» (KITCHEN-F26).
@@ -142,7 +143,7 @@ pantalla», «Solo papel»), Impresora (la función —«Cocina», «Barra»— 
 concreta), En curso (platos por hacer de esa estación) y Activa («Sí»/«No»); buscador «Buscar
 estación…». «Añadir estación» abre el panel con Nombre («p. ej. Plancha»), Color, Destino, Función de
 impresora, Impresora «(opcional)» y Activa. Por fila: «Editar» (también tocando la fila), «Enrutar» (el
-panel del enrutado con esa estación elegida) y «Eliminar», que pregunta «¿Eliminar «<nombre>»?». Debajo, el panel **Enrutado**: la lista de lo que va a cada
+panel del enrutado con esa estación elegida) y «Eliminar», que pregunta «¿Eliminar «<nombre>»?». Debajo, el panel «Enrutado producto/categoría → estación»: la lista de lo que va a cada
 estación (Producto o Categoría, su nombre, la estación) con «Quitar» por fila, y «Enrutar» abre el
 panel para elegir la estación y un producto o una categoría del catálogo («Guardar enrutado»). Vacía:
 «Sin estaciones.» y «Nada enrutado todavía: todo sale en «Sin estación».». Cargando: el esqueleto.
@@ -230,8 +231,8 @@ Pasos:
 Entra: lo que escribe quien la crea.
 Sale: la estación (avisa: estación creada).
 Si falla: el rechazo sale dentro del panel. Un nombre que ya tiene otra estación viva se rechaza
-(«Ya hay una estación con ese nombre.»); el de una eliminada vuelve a estar libre. Quien no puede
-gestionar estaciones no ve el botón.
+(«Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
+Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
 
 ### KITCHEN-F02 Editar, renombrar o desactivar una estación
@@ -240,7 +241,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
 Pasos:
-1. Toca la fila (o «Editar»): se abre «Editar estación».
+1. Toca la fila (o «Editar»): se abre «Editar estación · <nombre>».
 2. Cambia el nombre, el color, el destino, la impresora o «Activa».
 3. Pulsa «Guardar»: la tabla se actualiza.
 Entra: la estación y lo que cambia.
@@ -273,8 +274,8 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
 Pasos:
-1. En el panel «Enrutado», pulsa «Enrutar»: elige la estación y un producto o una categoría (por su
-   nombre, del catálogo de Inventario).
+1. En el panel «Enrutado producto/categoría → estación», pulsa «Enrutar»: elige la estación y un
+   producto o una categoría (por su nombre, del catálogo de Inventario).
 2. Pulsa «Guardar enrutado»: sale en la lista del enrutado, sustituyendo el que tuviera.
 3. «Quitar» en una fila del enrutado lo borra: lo que se envíe después irá por su categoría o «Sin
    estación».
@@ -394,8 +395,8 @@ Pasos:
    papel sale como su primera hoja, sin «copia».
 Entra: la comanda.
 Sale: trabajos nuevos en la cola de Impresión (cada reimpresión es un trabajo distinto).
-Si falla: «No se pudo imprimir la comanda.» con el motivo de Impresión; sin Impresión, «Impresión no
-está activa en este negocio.».
+Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión,
+«Impresión no está activa en este negocio.».
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 Ver el tablero de cocina
@@ -841,7 +842,8 @@ Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 | Comanda recibida | Llega una ronda | La comanda, su número, la cuenta y la ronda | `kitchen.ticket.received` |
 | Comanda creada | Alta a mano | La comanda y su número | `kitchen.ticket.created` |
 | Comanda lanzada, lista, recuperada, servida, cancelada, borrada | Sus acciones y los cierres de F27–F29 | La comanda y su número (la cancelada, su motivo) | `kitchen.ticket.started`, `.ready`, `.recalled`, `.served`, `.cancelled`, `.deleted` |
-| Comanda cambiada | Urgencia | La comanda y su prioridad | `kitchen.ticket.updated` |
+| Comanda cambiada | Urgencia (F14, F20), o el aviso del envío le trae otra etiqueta, tipo, urgencia o camarero (F05, F18) | La comanda y su prioridad | `kitchen.ticket.updated` |
+| Comanda reimpresa | F09 | La comanda y su número | `kitchen.ticket.reprinted` |
 | Plato listo, recuperado, anulado | Sus acciones y F29 | La comanda y los platos (el anulado, su motivo) | `kitchen.item.bumped`, `.recalled`, `.voided` |
 | Estación creada, cambiada, eliminada | F01–F03 | La estación | `kitchen.station.created`, `.updated`, `.deleted` |
 | Enrutado cambiado | F04 | La estación y el producto o la categoría | `kitchen.routing.changed` |
@@ -918,11 +920,13 @@ que no tiene ningún papel: solo el sistema (`*`).
 
 ### Notas técnicas
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0002` crea la fila de ajustes con la
-  hora desde la que Cocina recibe, con reverso), `schemas.py`, `queries.py`, `services.py`,
-  `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
-  por fichero, más `test_integration_sale.py`, `test_integration_inventory.py` y `test_concurrency.py`
-  con las apps reales.
+- Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0001_initial`; `0002_settings_row` crea la
+  fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
+  `0004_item_options_and_menu`, los suplementos y el menú de cada plato), `schemas.py`, `queries.py`,
+  `services.py`, `events.py`, `live.py`, `api.py` (27 rutas: todas las operaciones salvo `receive` y
+  `sync`, que son del sistema), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
+  fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
+  `test_integration_modifier.py` y `test_concurrency.py` con las apps reales.
 - **`requires = ["sale", "inventory"]`**. El enrutado apunta a `inventory.Product` y
   `inventory.Category` con clave ajena. Las cuentas y las líneas de Ventas, por UUID opaco
   (`Ticket.order_id`, `TicketItem.sale_line_id`): sin clave ajena, como Mesas.
@@ -1013,7 +1017,11 @@ que no tiene ningún papel: solo el sistema (`*`).
 
 ### Lo que queda fuera
 
-- Iconos deseados (`UI-REQUESTS.md`).
+- Iconos deseados, las copias de `useServerTable`/`useLiveList`/`useT`/`useNow` y el selector de color
+  (`UI-REQUESTS.md`): no han llegado a `@erplora/ui` y cada uno tiene su sustituto.
+- Lo que sigue pedido a Ventas («Lo que pide a otras apps»): el aviso propio del cambio de título y los
+  índices parciales de las rondas por recibir. Sin ellos no se rompe ningún flujo.
+- Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
 - Alérgenos de punta a punta (pm#115): hoy una alergia es solo texto de la nota (KITCHEN-F07).
