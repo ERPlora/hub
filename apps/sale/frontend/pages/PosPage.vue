@@ -471,7 +471,8 @@ const kitchenTickets = computed(() => kitchenActive.value && session.can('kitche
 const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
 
 async function sendRound(rush: boolean): Promise<boolean> {
-  const sent = await till.sendToKitchen(rush);
+  // kitchen#82: the ticket names who attends the check («Atiende»); with «Yo», the kitchen names who sends it.
+  const sent = await till.sendToKitchen(rush, staff.value.id ? staff.value.name : null);
   if (sent.ok) {
     // hub#2257: sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
     if (sent.printed === false) void toast(t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }), 'warning', 4500);

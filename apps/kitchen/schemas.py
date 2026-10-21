@@ -367,6 +367,10 @@ class TicketSendIn(In):
     priority: Literal["normal", "rush"] = Field(
         "normal", description="rush sends it urgent."
     )
+    waiter: Label = Field(
+        "",
+        description="Who attends the check as the till names it («Atiende»); empty: who sends it.",
+    )
 
 
 _PRIORITIES = {"urgent": "rush", "rush": "rush", "vip": "vip"}

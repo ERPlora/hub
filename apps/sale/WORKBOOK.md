@@ -651,11 +651,12 @@ Pasos:
    «El profesional de la cuenta».
 4. Al cobrar, el chip vuelve a «yo».
 Entra: el equipo de Personal (fichas activas).
-Sale: la venta y cada línea atribuidas a esa persona (para el cierre por profesional).
+Sale: la venta y cada línea atribuidas a esa persona (para el cierre por profesional), y la comanda de
+cocina que se envíe con su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
 cocina no se reasigna.
-Implicados: STAFF-F21
+Implicados: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
 <!-- origen: fi:modules/sales#command-sales-cart-save-sql-transaccional fi:modules/sales#command-sales-park_ticket-sql-transaccional fi:modules/sales#command-sales-retrieve_ticket-sql-transaccional fi:modules/sales#query-sales-cart-get fi:modules/sales#query-sales-parked_tickets old:sales/workflow/la-cuenta.md#sales-f17 -->

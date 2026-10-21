@@ -628,6 +628,7 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
                 "label": data.label,
                 "channel": data.channel,
                 "priority": "urgent" if data.priority == "rush" else "",
+                "waiter": data.waiter,
             }
         ),
     )
@@ -646,7 +647,8 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
         label=data.label or fired.order.label,
         channel=data.channel,
         priority=data.priority,
-        waiter=person_label(ctx.actor),
+        # Who attends the check («Atiende» of the till), else who sends it (kitchen#82).
+        waiter=data.waiter or person_label(ctx.actor),
     )
     return out(ticket, _print_round(ctx, ticket))
 

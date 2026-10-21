@@ -57,6 +57,28 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en 
   y tono de una lista cerrada** (Toast, Fresh KDS, MobiPOS).
 - **Lo que va solo a impresora no espera a que nadie lo marque**, y **cobrar no para la cocina**
   (Toast, Lightspeed K, Odoo, LS Central, Simphony): al cobrar sale lo que nadie va a marcar.
+- **La comanda nombra a quien atiende la cuenta («Atiende» del TPV) y, si es «Yo», a quien la envía**
+  (decisión de mercado del 21/10/2026; kitchen#82, hub#2033, staff#59). Así el pase sabe a quién llamar,
+  aunque esa persona no entre en la app.
+  - Los TPV de sala nombran al camarero dueño de la cuenta o de la mesa:
+    [Toast](https://support.toasttab.com/en/article/Why-Aren-t-Server-Names-Showing-on-Kitchen-Tickets)
+    siempre imprime al camarero, la cuenta es de quien la abre y al traspasarla
+    [reenvía la comanda](https://doc.toasttab.com/doc/platformguide/adminTransferringOrders.html);
+    [TouchBistro](https://cdn.touchbistro.com/help/articles/using-the-kds) pone al camarero de la mesa,
+    que se [traspasa](https://cdn.touchbistro.com/help/articles/table-options);
+    [Loyverse](https://help.loyverse.com/help/kitchen-display-system) pone al camarero del ticket;
+    [Square](https://community.squareup.com/t5/Questions-How-To/Changing-Employee-Name-on-Printed-Tickets/td-p/273546)
+    imprime el nombre del camarero de su ficha del equipo.
+  - Los TPV de mostrador ponen a quien la toma o tiene la sesión, que en sala suele ser la misma persona:
+    [Clover](https://community.clover.com/answers/4424/view.html),
+    [Qamarero](https://qamarero.com/comandero-digital/),
+    [Odoo (módulo de camarero)](https://apps.odoo.com/apps/modules/17.0/pos_waiter_name) y la guía de
+    [Square en español](https://squareup.com/es/es/townsquare/restaurant-order-taking).
+    De ahí sale el respaldo de «Yo».
+  - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) deja elegir los
+    campos del ticket.
+  - Es también lo que hacía el producto actual y lo que promete el propio TPV en «Quién atiende esta
+    cuenta».
 
 ## Antes de empezar
 
@@ -528,9 +550,10 @@ Pasos:
    se desarma.
 4. Ventas marca las líneas pendientes con una ronda nueva (SALE-F20) y Cocina abre la comanda
    (KITCHEN-F05), urgente si se armó la llama, y la imprime en cada estación (KITCHEN-F08).
-Entra: la cuenta abierta con sus líneas sin enviar, su etiqueta, el canal, la prioridad y quién envía.
-Sale: la comanda en la pantalla de cocina y en papel, con el nombre de quien envió la ronda (avisa:
-comanda recibida).
+Entra: la cuenta abierta con sus líneas sin enviar, su etiqueta, el canal, la prioridad y quién atiende
+la cuenta («Atiende», SALE-F16).
+Sale: la comanda en la pantalla de cocina y en papel, con el nombre de quien atiende la cuenta, aunque
+no entre en la app; con «Atiende yo», el de quien envía la ronda (avisa: comanda recibida).
 Si falla: sin nada nuevo, «No hay nada nuevo que enviar a cocina.»: no es un error y no se envía nada.
 Si la ronda se envía pero su hoja no se imprime, el TPV dice «Comanda N enviada a cocina, pero no se
 imprimió. Revisa la impresora de cocina en Impresión.», nunca el motivo técnico; la comanda ya está en
@@ -985,9 +1008,6 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Fase 1 sin tenencia**: todas las cuentas comparten tablas, así que la pantalla de cocina de un hub
   lee también las rondas de otro (`b.localhost` ve las de `a.localhost`). Lo resuelve la BD por hub de la
   fase 2.
-- **Quién sale en la comanda**: la comanda nombra a quien **envía** la ronda (nunca vacío); el producto
-  actual ponía a la persona de «Atiende» del TPV (SALE-F16), y Ventas manda también quién atiende con la
-  ronda (kitchen#82, hub#2033, staff#59). Se señala, no se elige.
 - **Ronda de una cuenta fusionada**: Ventas conserva su `round_no`, así que la cuenta que queda puede
   tener dos «Comanda 1»; el producto actual las renumeraba detrás de las suyas.
 
