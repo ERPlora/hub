@@ -63,7 +63,8 @@ Aquí manda la especificación oficial sobre el mercado:
 - Al activar Facturación se activan con ella **Ventas**, **Impuestos** y **Clientes** (las requiere).
   **VeriFactu** no se activa sola, pero en España hace falta para que cada factura llegue a la AEAT.
 - **El emisor** (razón social, NIF y domicilio del negocio) es obligatorio: **sin él no se emite
-  ningún documento** (Facturación → Emisor, INVOICE-F21). Hoy la identidad fiscal del negocio vive en
+  ningún documento** (Facturación → Emisor, INVOICE-F21); hasta entonces, **Facturas** y **Series** lo
+  avisan arriba («Todavía no puedes facturar», con «Configurar»). Hoy la identidad fiscal del negocio vive en
   la cuenta de ERPlora (el SaaS); cuando el SaaS la mande en la foto del hub, el emisor se rellenará
   solo (INVOICE-F22) y la pantalla dirá que viene de la cuenta.
 - **«Hoy» es la hora de Madrid** en la fase 1 (el Hub todavía no guarda la zona horaria del negocio):
@@ -92,7 +93,9 @@ Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla 
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
 columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes). Sin ordenar, lo
-último emitido sale arriba. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
+último emitido sale arriba. Mientras el emisor no está configurado, arriba sale «Todavía no puedes
+facturar» («No se podrá emitir ningún tique ni factura hasta que configures esto:», «Los datos de tu
+negocio» y «Configurar», que abre **Emisor**). Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
 que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
@@ -150,7 +153,8 @@ el prefijo, el formato y el contador de la numeración por año y tipo de factur
 «Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
 actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por debajo de 1280 px abre en
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
-{código}» (INVOICE-F12, INVOICE-F13).
+{código}» (INVOICE-F12, INVOICE-F13). Sin emisor, el mismo aviso «Todavía no puedes facturar» que en
+**Facturas**.
 Vacía: «Aún no hay series. Crea la primera para numerar tus facturas.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
@@ -636,14 +640,17 @@ Si falla: si la factura aún no existe, contesta que no hay.
 Implicados: SALE-F29
 
 ### INVOICE-F21 Configurar el emisor
+<!-- origen: old-hub:HUB_SHELL-F164 -->
 Estado: hecho
 Actor: propietario, administrador
-Pantalla: Emisor
+Pantalla: Facturas, Series, Emisor
 Pasos:
-1. Abre **Facturación → Emisor**.
+1. Abre **Facturación → Emisor**, o pulsa «Configurar» en el aviso «Todavía no puedes facturar» que sale
+   arriba en **Facturas** y **Series** mientras no hay emisor.
 2. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
    (España de entrada).
-3. Pulsa «Guardar»: sale «Emisor guardado.».
+3. Pulsa «Guardar»: sale «Emisor guardado.» y el aviso de **Facturas** y **Series** desaparece, también en
+   los demás dispositivos.
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`.

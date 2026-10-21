@@ -113,6 +113,14 @@ describe('SeriesPage', () => {
     expect(s.wrapper.findComponent(SeriesFormModal).exists()).toBe(false);
   });
 
+  it('says above the series that nothing can be invoiced while the issuer is not set up (INVOICE-F21)', async () => {
+    const s = await setup();
+    await s.result('invoice.issuer.get', { configured: false });
+    expect(s.find('invoice-issuer-notice').text()).toContain('You cannot invoice yet');
+    await s.result('invoice.issuer.get', { configured: true }, {}, 2);
+    expect(s.find('invoice-issuer-notice').exists()).toBe(false);
+  });
+
   it('empty, it says so; an error says it with Retry', async () => {
     const s = await setup();
     await s.show({ rows: [], total: 0, limit: 50, offset: 0 });

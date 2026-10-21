@@ -290,6 +290,12 @@
       "failed": "No se pudo guardar el emisor",
       "loadError": "No se pudo cargar el emisor"
     },
+    "issuerNotice": {
+      "heading": "Todavía no puedes facturar",
+      "message": "No se podrá emitir ningún tique ni factura hasta que configures esto:",
+      "item": "Los datos de tu negocio",
+      "setUp": "Configurar"
+    },
     "paper": {
       "invoice": "Factura",
       "simplified": "Factura simplificada",
