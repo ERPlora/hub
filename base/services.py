@@ -497,8 +497,11 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     """Keep the SaaS's photo of ``data.id`` if it is newer than the one kept; an equal or older one changes nothing.
 
     Phase 1 applies of it what the apps already use: the VeriFactu block and the business's status, through
-    ``verifactu.config.sync`` on the hub's slug, in this same transaction (a block out of contract keeps
-    nothing). The rights it carries (plan, modules, members) are only kept until phase 2 applies them.
+    ``verifactu.config.sync`` on the hub's slug, and the number's state of WhatsApp (``whatsapp``), through
+    ``whatsapp_inbox.channel.sync`` with the photo's version when the app is on in that business (off, the photo
+    applies and the block waits for the next one); both in this same transaction, so their notices go out after its
+    COMMIT (a block out of contract keeps nothing). The rights it carries (plan, modules, members) are only kept
+    until phase 2 applies them.
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -509,6 +512,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     hub.save(update_fields=["state", "state_version", "updated_at"])
     if data.verifactu is not None or data.status is not None:
         _sync_verifactu(hub, data)
+    if data.whatsapp is not None:
+        _sync_whatsapp(hub, data)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     if was_open and registry.is_suspended(hub):
         transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
@@ -534,6 +539,27 @@ def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
             f"The verifactu block is out of contract: {invalid}", code="internal.payload_invalid"
         ) from None
     sync(system_context(Scope("host", hub.slug)), payload)
+
+
+#: The app whose number's state travels in the photo (``whatsapp``) and whose doors erplora.com calls.
+WHATSAPP_APP = "whatsapp_inbox"
+
+
+def _sync_whatsapp(hub: Hub, data: HubStateIn) -> None:
+    # base.relay imports this module: asked when the photo comes, not when this module loads.
+    from base import relay
+
+    scope = Scope("host", hub.slug)
+    if WHATSAPP_APP not in relay.active_apps(scope):
+        return
+    sync = get_operation("whatsapp_inbox.channel.sync")
+    try:
+        payload = sync.input.model_validate({**data.whatsapp, "version": data.version})
+    except pydantic.ValidationError as invalid:
+        raise InvalidPayload(
+            f"The whatsapp block is out of contract: {invalid}", code="internal.payload_invalid"
+        ) from None
+    sync(system_context(scope), payload)
 
 
 @operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut)

@@ -15,7 +15,16 @@ ITEM_NOT_FOUND = _("This item no longer exists.")
 
 
 @operation(
-    "demo.item.list", kind="query", permission="demo.view", input=ItemListIn, output=ItemPage, expose_api=True
+    "demo.item.list",
+    kind="query",
+    permission="demo.view",
+    input=ItemListIn,
+    output=ItemPage,
+    expose_api=True,
+    ai={
+        "description": "Lists the demo items, most recently changed first, with their status («open» or «done») "
+        "and how many lines each has; searches by a piece of the name and filters by status, a page at a time."
+    },
 )
 def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     """Most recently changed first, ``id`` as the tie-break so that pages never overlap."""
@@ -33,7 +42,17 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     }
 
 
-@operation("demo.item.detail", kind="query", permission="demo.view", input=ByIdIn, output=ItemDetailOut)
+@operation(
+    "demo.item.detail",
+    kind="query",
+    permission="demo.view",
+    input=ByIdIn,
+    output=ItemDetailOut,
+    ai={
+        "description": "Returns one demo item by its id: its name, status and note, and its lines (text and "
+        "quantity) in the order they were added."
+    },
+)
 def item_detail(ctx: OperationContext, data: ByIdIn) -> Item:
     item = load_detail(data.id)
     if item is None:
@@ -41,7 +60,14 @@ def item_detail(ctx: OperationContext, data: ByIdIn) -> Item:
     return item
 
 
-@operation("demo.item.stats", kind="query", permission="demo.manage", input=ItemStatsIn, output=ItemStatsOut)
+@operation(
+    "demo.item.stats",
+    kind="query",
+    permission="demo.manage",
+    input=ItemStatsIn,
+    output=ItemStatsOut,
+    ai={"description": "Counts the demo items: how many there are, how many are open and done, and their lines."},
+)
 def item_stats(ctx: OperationContext, data: ItemStatsIn) -> dict:
     counts = Item.objects.aggregate(
         total=Count("id"),

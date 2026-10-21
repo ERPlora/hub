@@ -1,9 +1,11 @@
-// Shared steps of the WhatsApp inbox e2e (whatsapp-*.spec.ts). erplora.com's doors (`/internal/whatsapp/*`,
-// mounted by `base`) are not here yet, so what erplora.com would push — a customer's message, the channel's
-// state and its templates — is pushed the way those doors will: by running the app's own system operation
-// (`whatsapp_inbox.message.receive`, `whatsapp_inbox.channel.sync`) as the platform, in the hub `a`, through
-// `manage.py shell`. Never Meta, never a row written by hand: the operation commits and notifies, and the
-// open pages update live. What a run creates is named `e2e.…` and deleted in the spec's `afterAll`.
+// Shared steps of the WhatsApp inbox e2e (whatsapp-*.spec.ts). What erplora.com pushes — a customer's message,
+// Meta's statuses, the channel's state and its templates — is pushed here by running the same system operation
+// its doors run (`whatsapp_inbox.message.receive`, `whatsapp_inbox.message.update_status`,
+// `whatsapp_inbox.channel.sync`) as the platform, in the hub `a`, through `manage.py shell`. The doors themselves
+// (`/internal/whatsapp/*`, mounted by `base`) are proven over signed HTTP by whatsapp-internal.spec.ts; these
+// helpers test the inbox, not the doors, and stay synchronous because the inbox specs call them without awaiting.
+// Never Meta, never a row written by hand: the operation commits and notifies, and the open pages update live.
+// What a run creates is named `e2e.…` and deleted in the spec's `afterAll`.
 import { execFileSync } from 'node:child_process';
 
 import type { Page } from '@playwright/test';

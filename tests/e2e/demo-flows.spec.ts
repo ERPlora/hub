@@ -8,7 +8,7 @@
 // flow: DEMO-F01 DEMO-F02 DEMO-F03 DEMO-F04 DEMO-F05 DEMO-F06
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, listReady, rowNames, rowOf, shot, shown, uniqueName } from './helpers';
+import { A, api, createItem, EMPLOYEE, hostPage, listReady, row, rowNames, rowOf, shot, shown, uniqueName } from './helpers';
 
 const FLOW_VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -252,3 +252,84 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
     }
   });
 }
+
+// CLOSE-DEMO: more items than one page of `demo.item.list` holds (100, `ItemListIn.limit`). On a phone «Load more»
+// grows the window only within those 100 (three in a row at 25 per page), and past them the list pages instead, so
+// the oldest row is reached without «The items could not be loaded» (the second «Load more» at 50 per page asked for
+// 150 rows and the server refused it with a 422).
+test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440 wide', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const run = Date.now().toString(36);
+  // 100 «LM<run> a NNN» fill the server's longest page exactly; 30 «LM<run> b NNN» more pass it.
+  const name = (group: 'a' | 'b', n: number) => `LM${run} ${group} ${String(n).padStart(3, '0')}`;
+  // The newest two, outside every search: once they are gone, the (debounced) search has been applied.
+  const outside = [`LO${run} 1`, `LO${run} 2`];
+  const { context, page } = await tablet(browser, FLOW_VIEWPORTS[1440], '/demo/items');
+  const created: string[] = [];
+  const loadError = () => shown(page).locator('[data-role=load-error]');
+  const loadMore = () => shown(page).locator('[data-testid=demo-items-load-more]');
+  /** Searches `text` and waits until the list is that search's: the outside items gone, `first` on top. */
+  async function search(text: string, first: string): Promise<void> {
+    await shown(page).locator('[data-testid=demo-items-search] input').fill(text);
+    for (const other of outside) await expect(row(page, other)).toHaveCount(0);
+    await expect.poll(async () => (await rowNames(page))[0]).toBe(first);
+  }
+  /** Clicks `control` and waits for its answer: the last row shown changes, or the list fails. */
+  async function advance(control: Locator, what: string): Promise<void> {
+    const before = (await rowNames(page)).at(-1);
+    await control.click();
+    await expect
+      .poll(async () => (await loadError().count()) > 0 || (await rowNames(page)).at(-1) !== before, { timeout: 15_000 })
+      .toBe(true);
+    await expect(loadError(), `${what}: no «The items could not be loaded»`).toHaveCount(0);
+  }
+  try {
+    for (const [group, count] of [['a', 100], ['b', 30]] as const) {
+      for (let n = 1; n <= count; n += 1) created.push((await createItem(context, A, name(group, n))).id);
+    }
+    for (const other of outside) created.push((await createItem(context, A, other)).id);
+    await listReady(page);
+
+    await test.step('390: past 100 rows the phone pages to the oldest row', async () => {
+      await page.setViewportSize(FLOW_VIEWPORTS[390]);
+      await search(`LM${run}`, name('b', 30));
+      const oldest = row(page, name('a', 1));
+      for (let step = 1; step <= 6 && !(await oldest.isVisible()); step += 1) {
+        const more = (await loadMore().count()) > 0;
+        await advance(more ? loadMore() : shown(page).locator('[data-testid=demo-items-page-next]'), `step ${step}`);
+      }
+      await expect(oldest).toBeVisible();
+      await expect(loadMore(), 'no «Load more» that would ask past 100 rows').toHaveCount(0);
+      await snap(page, 'CLOSE-DEMO-more-than-100', '390');
+    });
+
+    await test.step('390: three «Load more» in a row at 25 per page, within the 100 rows', async () => {
+      await page.setViewportSize(FLOW_VIEWPORTS[1440]);
+      await search(`LM${run} a`, name('a', 100));
+      await shown(page).locator('ion-select.data-table__page-size-select').click();
+      await page.locator('ion-popover ion-radio').filter({ hasText: /^\s*25\s*$/ }).click();
+      await expect(shown(page).locator('[data-testid=demo-items-row]')).toHaveCount(25);
+      await page.setViewportSize(FLOW_VIEWPORTS[390]);
+      await expect(shown(page).locator('[data-testid=demo-items-row]')).toHaveCount(25);
+      for (const shownRows of [50, 75, 100]) {
+        await advance(loadMore(), `«Load more» to ${shownRows}`);
+        await expect(shown(page).locator('[data-testid=demo-items-row]')).toHaveCount(shownRows);
+      }
+      await expect(row(page, name('a', 1))).toBeVisible();
+      await expect(loadMore(), 'every row is shown').toHaveCount(0);
+      await snap(page, 'CLOSE-DEMO-load-more-100', '390');
+    });
+
+    for (const width of ['834', '1440'] as const) {
+      await test.step(`${width}: the same 130 items page on a desk`, async () => {
+        await page.setViewportSize(FLOW_VIEWPORTS[width]);
+        await search(`LM${run}`, name('b', 30));
+        await expect(loadError()).toHaveCount(0);
+        await snap(page, 'CLOSE-DEMO-more-than-100', width);
+      });
+    }
+  } finally {
+    for (const id of created) await api(context, A, 'POST', '/demo/items/delete', { id });
+    await context.close();
+  }
+});
