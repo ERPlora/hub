@@ -279,15 +279,23 @@ def test_pages():
 
 def test_ties_in_the_sorted_column_come_by_id_so_a_touched_row_keeps_its_place_and_pages_add_up():
     """hub#2352: sorting by a column with repeated values, the row you touched jumped and paging
-    repeated or lost rows. Same priority, status and (empty) due date: the id settles every tie."""
+    repeated or lost rows. Same priority, status and (empty) due date: the id settles every tie. Which
+    way on a descending sort is not pinned: the old product's rule (the list's own direction) and
+    ``_sorted`` (always ascending) differ, flagged in the CLOSE-TASK round of PLAN-HUB."""
     tied = [make_task(f"Tie {n}") for n in range(6)]
     by_id = sorted(task.id for task in tied)
+    sorts = ("priority", "-priority", "status", "due_date", "-due_date")
+
+    def listed(sort, **page):
+        return [row.id for row in run("task.task.list", {"sort": sort, **page}).rows]
+
+    before = {sort: listed(sort) for sort in sorts}
     # Touching a row makes Postgres write its new version after the others.
     Task.objects.filter(pk=by_id[0]).update(description="touched")
-    for sort in ("priority", "-priority", "status", "due_date", "-due_date"):
-        assert [row.id for row in run("task.task.list", {"sort": sort}).rows] == by_id, sort
-    pages = [run("task.task.list", {"sort": "priority", "limit": 2, "offset": n}) for n in (0, 2, 4)]
-    assert [row.id for page in pages for row in page.rows] == by_id
+    for sort in sorts:
+        assert listed(sort) == before[sort] and sorted(before[sort]) == by_id, sort
+    assert before["priority"] == before["status"] == before["due_date"] == by_id
+    assert [row for n in (0, 2, 4) for row in listed("priority", limit=2, offset=n)] == by_id
 
 
 # My tasks
