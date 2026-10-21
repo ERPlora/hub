@@ -11,6 +11,7 @@ import datetime as dt
 import pytest
 from django.utils import timezone, translation
 from live.context import system_context
+from pydantic import ValidationError
 
 from apps.verifactu import certificates, queries
 from apps.verifactu.models import (
@@ -367,6 +368,51 @@ def test_the_aeats_photo(issuer):
     assert [row.invoice_number for row in page.rows] == ["T-1"]
 
 
+@pytest.fixture
+def photo(issuer):
+    """What the AEAT holds after a «Query AEAT»: three records, the last generated first."""
+    now = timezone.now()
+    rows = [
+        ("T-1", dt.date(2026, 1, 10), "a" * 64, "Correcto", "CSV111", now - dt.timedelta(hours=3)),
+        ("T-2", dt.date(2026, 2, 10), "b" * 64, "AceptadoConErrores", "CSV222", now - dt.timedelta(hours=2)),
+        ("R-3", dt.date(2026, 3, 10), "c" * 64, "Anulado", "", now - dt.timedelta(hours=1)),
+    ]
+    for number, day, fingerprint, state, csv, generated in rows:
+        AeatRecord.objects.create(
+            issuer_nif="B12345674",
+            environment="testing",
+            invoice_number=number,
+            issue_date=day,
+            fingerprint=fingerprint.upper(),
+            state=state,
+            csv=csv,
+            generated_on=generated,
+        )
+
+
+def test_the_aeats_photo_searches_its_number_fingerprint_or_csv(photo):
+    assert numbers(run("verifactu.aeat_record.list")) == ["R-3", "T-2", "T-1"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "t-2"})) == ["T-2"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "bbbb"})) == ["T-2"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "csv111"})) == ["T-1"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "nothing"})) == []
+
+
+def test_the_aeats_photo_filters_by_its_state_and_issue_days(photo):
+    assert numbers(run("verifactu.aeat_record.list", {"state": "Anulado"})) == ["R-3"]
+    assert numbers(
+        run("verifactu.aeat_record.list", {"issue_date_from": "2026-02-01", "issue_date_to": "2026-02-28"})
+    ) == ["T-2"]
+    with pytest.raises(ValidationError):
+        run("verifactu.aeat_record.list", {"state": "Rejected"})
+
+
+def test_the_aeats_photo_sorts_by_a_column(photo):
+    assert numbers(run("verifactu.aeat_record.list", {"sort": "issue_date", "dir": "asc"})) == ["T-1", "T-2", "R-3"]
+    assert numbers(run("verifactu.aeat_record.list", {"sort": "invoice_number", "dir": "asc"})) == ["R-3", "T-1", "T-2"]
+    assert numbers(run("verifactu.aeat_record.list", {"sort": "csv", "dir": "desc"}))[0] == "T-2"
+
+
 # The configuration (VERIFACTU-F04, F08, F12, F34)
 
 
@@ -413,12 +459,12 @@ def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_)
 
 def test_erplora_route_in_production_needs_approval_and_the_paid_option(server_ready):
     config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.route_problem(config, "production") == "live_option_unpaid"
+    assert queries.route_problem(config, "production", A) == "live_option_unpaid"
     config.live_paid = True
-    assert queries.route_problem(config, "production") == ""
+    assert queries.route_problem(config, "production", A) == ""
     config.representation_status = "submitted"
-    assert queries.route_problem(config, "production") == "representation_not_approved"
-    assert queries.route_problem(config, "testing") == ""
+    assert queries.route_problem(config, "production", A) == "representation_not_approved"
+    assert queries.route_problem(config, "testing", A) == ""
 
 
 def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
@@ -427,12 +473,12 @@ def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
     # The live option keeps new sales from being sealed (route_problem); what was sealed goes to the AEAT while
     # the route can carry it (every ticket with a QR reaches the AEAT).
     config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.sending_problem(config, "production") == ""
+    assert queries.sending_problem(config, "production", A) == ""
     config.representation_status = "revoked"
-    assert queries.sending_problem(config, "production") == "representation_not_approved"
-    assert queries.sending_problem(config, "testing") == ""
+    assert queries.sending_problem(config, "production", A) == "representation_not_approved"
+    assert queries.sending_problem(config, "testing", A) == ""
     config.route = "own"
-    assert queries.sending_problem(config, "testing") == "own_certificate_missing"
+    assert queries.sending_problem(config, "testing", A) == "own_certificate_missing"
 
 
 def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
@@ -463,13 +509,13 @@ def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
     # certificate, so neither ERPlora's approval nor the live option of the plan applies (Ioan's model,
     # 2026-10-15: «con certificado propio, como en el Hub antiguo»).
     config = Config(route="own", live_paid=False)
-    assert queries.route_problem(config, "production") == "own_certificate_missing"
+    assert queries.route_problem(config, "production", A) == "own_certificate_missing"
     own_certificate(days=-1)
-    assert queries.route_problem(config, "production") == "own_certificate_missing"
+    assert queries.route_problem(config, "production", A) == "own_certificate_missing"
     OwnCertificate.objects.all().delete()
     own_certificate()
-    assert queries.route_problem(config, "production") == ""
-    assert queries.route_problem(config, "testing") == ""
+    assert queries.route_problem(config, "production", A) == ""
+    assert queries.route_problem(config, "testing", A) == ""
 
 
 def test_the_configuration_lists_everything_that_keeps_it_from_going_live(

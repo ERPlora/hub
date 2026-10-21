@@ -5,7 +5,7 @@ live query. A rejection or an acceptance with errors carries no amounts.
 
 Reaction: an issued invoice (``invoice.invoice.issued``, Invoicing's notice of every F1, F2, F3 and R1–R5) is
 sealed as a registration record by ``verifactu.record.create``, run as the system in its own transaction when
-the outbox relay (phase 2, in the worker) delivers it. It is the backup: Invoicing asks by name inside its own
+the worker's outbox relay (``base/relay.py``) delivers it. It is the backup: Invoicing asks by name inside its own
 transaction (WORKBOOK «Contrato con Facturación»), and the operation is idempotent (one registration per invoice
 and environment).
 """

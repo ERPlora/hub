@@ -138,6 +138,9 @@
       "transmit": "Enviar ahora",
       "transmitted": "Enviado: {accepted} aceptados, {rejected} rechazados, {waiting} en espera.",
       "transmitFailed": "No se ha podido enviar",
+      "ask": "Preguntar a la AEAT",
+      "askHeld": "La AEAT ya tiene {number}: sale de la cola.",
+      "askNotHeld": "La AEAT no tiene {number}: sigue en la cola y sale en la siguiente pasada.",
       "correct": "Subsanar",
       "correctTitle": "¿Subsanar el registro de {number}?",
       "correctMessage": "Se sella un registro nuevo de la misma factura, leída otra vez, marcado como subsanación, y sale hacia la AEAT. El rechazado se queda tal cual.",
@@ -214,6 +217,17 @@
       "working": "Trabajando…",
       "aeatTitle": "Últimos registros en la AEAT",
       "aeatEmpty": "Sin datos de la AEAT. Pulsa «Consultar AEAT».",
+      "aeatSearch": "Buscar factura, huella o CSV…",
+      "aeatLoadError": "No se han podido cargar los registros de la AEAT.",
+      "aeatEntity": {
+        "one": "registro en la AEAT",
+        "many": "registros en la AEAT"
+      },
+      "aeatState": {
+        "Correcto": "Correcto",
+        "AceptadoConErrores": "Aceptado con errores",
+        "Anulado": "Anulado"
+      },
       "aeatColumns": {
         "invoice": "Factura",
         "date": "Fecha",

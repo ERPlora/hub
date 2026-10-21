@@ -179,10 +179,10 @@ def test_an_unreadable_own_certificate_is_no_way_to_production(issuer, opened, h
     config = queries.config_row()
 
     assert (
-        queries.route_problem(config, Environment.PRODUCTION)
+        queries.route_problem(config, Environment.PRODUCTION, A)
         == "own_certificate_unreadable"
     )
-    assert queries.route_problem(config, Environment.TESTING) == ""
+    assert queries.route_problem(config, Environment.TESTING, A) == ""
     assert "own_certificate_unreadable" in codes(
         run("verifactu.config.get").live_blockers
     )
@@ -235,9 +235,9 @@ def test_without_the_gateway_production_has_no_way_to_the_aeat(issuer, opened):
     config = queries.config_row()
 
     assert (
-        queries.route_problem(config, Environment.PRODUCTION) == "gateway_unavailable"
+        queries.route_problem(config, Environment.PRODUCTION, A) == "gateway_unavailable"
     )
-    assert queries.route_problem(config, Environment.TESTING) == ""
+    assert queries.route_problem(config, Environment.TESTING, A) == ""
     assert "gateway_unavailable" in codes(run("verifactu.config.get").live_blockers)
     assert (
         code_of(lambda: run("verifactu.config.go_live"))

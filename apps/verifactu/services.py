@@ -24,7 +24,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload
 from live.operations import get as get_operation
 from live.operations import operation
@@ -537,13 +537,13 @@ def _rechazo_previo(corrects: Record) -> str:
     return "S" if corrects.status == Record.Status.REJECTED else "N"
 
 
-def _refuse_without_a_way(config: Config, environment: str) -> None:
+def _refuse_without_a_way(config: Config, environment: str, scope: Scope) -> None:
     """In production nothing is sealed that can never reach the AEAT (working-rules §15; the old Hub's
     ``enforce_fiscal_road``, HUB-1935): 409 with the route's own code, inside the transaction of the sale or
     invoice, so the document is undone and the series gives its number back. Testing never refuses."""
     if environment != Environment.PRODUCTION:
         return
-    problem = route_problem(config, environment)
+    problem = route_problem(config, environment, scope)
     if problem:
         raise Conflict(
             str(NO_WAY_TO_THE_AEAT) % {"why": wait_reason_text(problem)},
@@ -572,7 +572,7 @@ def _seal_alta(
         if existing is not None:
             return existing, True
     if refuse_without_a_way:
-        _refuse_without_a_way(config, environment)
+        _refuse_without_a_way(config, environment, ctx.scope)
     if (
         invoice.invoice_type in ("F1", "F3", "R1", "R2", "R3", "R4")
         and not invoice.customer_tax_id.strip()
@@ -873,7 +873,7 @@ def _send_chain(
     strict: bool,
 ) -> None:
     now = timezone.now()
-    problem = sending_problem(config, environment)
+    problem = sending_problem(config, environment, ctx.scope)
     certificate = None
     if not problem:
         try:
@@ -1084,7 +1084,9 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
     config = _config(lock=False)
     strict = only is not None
     scope = _unsent(only.issuer_nif, only.environment) if strict else _unsent()
-    for code in blockers(config, only.environment if strict else config.environment):
+    for code in blockers(
+        config, only.environment if strict else config.environment, ctx.scope
+    ):
         if code == "gateway_unavailable":
             if strict:
                 raise Conflict(
@@ -1671,7 +1673,7 @@ def recover_from_aeat(ctx: OperationContext, data: RecoverFromAeatIn) -> Recover
 def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     config = config_row()
     nif = issuer_identity()[0]
-    codes = blockers(config, config.environment)
+    codes = blockers(config, config.environment, ctx.scope)
     gateway_ready, gateway_detail, refusal = None, "", ""
     if gateway.configured() and "own_certificate_unreadable" not in codes:
         reply = gateway.probe(
@@ -1697,7 +1699,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
         "environment": config.environment,
         "route": config.route,
         "issuer_ready": issuer_configured(),
-        "route_ready": not route_problem(config, config.environment),
+        "route_ready": not route_problem(config, config.environment, ctx.scope),
         "gateway_configured": gateway.configured(),
         "gateway_ready": gateway_ready,
         "gateway_detail": gateway_detail,
@@ -1794,12 +1796,14 @@ def _changed(
     record_event(ctx, events.CONFIG_CHANGED, {"fields": fields})
 
 
-def _route_refusal(config: Config, route: str, environment: str) -> Conflict | None:
+def _route_refusal(
+    config: Config, route: str, environment: str, scope: Scope
+) -> Conflict | None:
     """Why ``route`` cannot file in ``environment`` (VERIFACTU-F04, F08), as the refusal to raise. A closed server
     is not the route's: ``go_live`` refuses it first, and choosing a route stays possible meanwhile."""
     probe = copy.copy(config)
     probe.route = route
-    problem = route_problem(probe, environment)
+    problem = route_problem(probe, environment, scope)
     if problem == "own_certificate_missing":
         return Conflict(str(NO_OWN_CERTIFICATE), code="verifactu.no_own_certificate")
     if problem == "own_certificate_unreadable":
@@ -1833,7 +1837,7 @@ def _route_refusal(config: Config, route: str, environment: str) -> Conflict | N
 )
 def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     config = _config()
-    refusal = _route_refusal(config, data.route, config.environment)
+    refusal = _route_refusal(config, data.route, config.environment, ctx.scope)
     if refusal is not None:
         raise refusal
     if config.route != data.route:
@@ -1879,7 +1883,7 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
         raise Conflict(str(GO_LIVE_FORBIDDEN), code="verifactu.go_live_forbidden")
     if not issuer_configured():
         raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
-    refusal = _route_refusal(config, config.route, Environment.PRODUCTION)
+    refusal = _route_refusal(config, config.route, Environment.PRODUCTION, ctx.scope)
     if refusal is not None:
         raise refusal
     if config.hub_status != Config.HubStatus.ACTIVE:

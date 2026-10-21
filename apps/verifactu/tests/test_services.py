@@ -1722,7 +1722,7 @@ def test_losing_the_live_option_in_production_refuses_new_sales_and_sends_what_w
     config = run("verifactu.config.get")
     assert (config.environment, config.reasons) == ("production", [])
     assert config.issue_blocker.code == "live_option_unpaid"
-    assert queries.blockers(Config.objects.get(), "production") == []
+    assert queries.blockers(Config.objects.get(), "production", A) == []
 
 
 def test_going_live_needs_the_issuer(settings, db):
@@ -1931,7 +1931,7 @@ def test_remove_leaves_the_own_route_waiting(
     out = run("verifactu.certificate.remove")
     assert out.own_certificate.loaded is False
     assert not OwnCertificate.objects.exists()
-    assert queries.route_problem(queries.config_row(), "testing") == "own_certificate_missing"
+    assert queries.route_problem(queries.config_row(), "testing", A) == "own_certificate_missing"
     assert Event.objects.filter(message_key="certificate_removed").exists()
     create(ticket())
     assert run("verifactu.contingency.process").reason == "own_certificate_missing"
