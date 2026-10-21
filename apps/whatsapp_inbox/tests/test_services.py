@@ -87,7 +87,14 @@ def test_the_first_message_opens_a_conversation_keyed_by_the_international_numbe
     )
     assert (out.id, out.conversation_id, out.created) == (message.id, c.id, True)
     assert events("whatsapp_inbox.message.received") == [
-        {"id": str(message.id), "conversation_id": str(c.id), "direction": "inbound"}
+        {
+            "id": str(message.id),
+            "conversation_id": str(c.id),
+            "direction": "inbound",
+            # It answers nothing the Hub sent (WHATSAPP_INBOX-F38): empty, never absent.
+            "reply_to_message_id": None,
+            "reply_id": "",
+        }
     ]
 
 
@@ -278,6 +285,13 @@ def test_a_number_on_exactly_one_card_joins_the_conversation_to_it():
     assert events("whatsapp_inbox.conversation.customer_linked") == [
         {"id": str(conv().id), "customer_id": str(ana.id)}
     ]
+
+
+def test_a_number_that_keeps_its_leading_zero_abroad_is_recognised():
+    """gh:whatsapp_inbox#201: an Italian landline keeps its 0 after +39, on the card and on WhatsApp."""
+    gianni = card("Gianni Rossi", "+39 06 1234 5678")
+    receive("wamid.1", "390612345678")
+    assert (conv().phone, conv().customer_id) == ("+390612345678", gianni.id)
 
 
 def test_two_cards_with_the_number_join_it_to_nobody():
@@ -561,6 +575,16 @@ def test_with_the_month_s_messages_spent_nothing_is_kept():
     assert route.call_count == 0
 
 
+def test_with_the_month_s_messages_spent_what_customers_write_still_arrives():
+    """gh:whatsapp_inbox#287, gh:hub#2726: the cap only limits what the business sends."""
+    c = ready()
+    connect(version=5, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    out = receive("wamid.AFTER", text="¿Tenéis hora el viernes?")
+    assert out.created is True and out.conversation_id == c.id
+    c.refresh_from_db()
+    assert (c.unread_count, c.last_message_preview) == (2, "¿Tenéis hora el viernes?")
+
+
 @respx.mock
 def test_erplora_s_refusal_leaves_the_message_not_delivered_with_its_reason(delivered):
     c = ready()
@@ -721,6 +745,22 @@ def test_a_template_to_a_number_that_never_wrote_opens_its_conversation():
         send({"to": "600 444 555", "text": "Hola"})
     assert excinfo.value.code == "whatsapp_inbox.window_closed"
     assert not Conversation.objects.filter(phone="+34600444555").exists()
+
+
+@pytest.mark.parametrize("typed", ["600222333", "600 222 333", "+34 600 222 333", "0034600222333"])
+def test_a_number_typed_by_hand_goes_to_that_person_never_to_another_country(typed):
+    """gh:whatsapp_inbox#279: a number written on a card or by voice is national unless it says its country."""
+    connect(templates=[template("recordatorio")])
+    send({"to": typed, "template": {"name": "recordatorio", "variables": ["Ana", "lunes"]}})
+    assert list(Conversation.objects.values_list("phone", flat=True)) == ["+34600222333"]
+
+
+def test_an_incomplete_number_is_refused_and_nothing_is_kept():
+    connect(templates=[template("recordatorio")])
+    with pytest.raises(InvalidPayload) as excinfo:
+        send({"to": "600 22", "template": {"name": "recordatorio", "variables": ["Ana", "lunes"]}})
+    assert "to" in excinfo.value.fields
+    assert not Conversation.objects.exists() and not Message.objects.exists()
 
 
 def test_marketing_to_a_number_without_conversation_reads_the_card_of_that_number():
@@ -988,6 +1028,23 @@ ERASE = f"{SAAS}/internal/whatsapp/erase"
 
 
 @respx.mock
+def test_no_notice_of_the_app_keeps_her_number_her_name_or_what_was_said(delivered):
+    """gh:hub#2474, #2467, #2477: the internal history keeps the notices for days after an erasure; they
+    carry identifiers only, so erasing the conversation leaves nothing of her there."""
+    c = ready(contact_name="Ana Secreta", text="Mi alergia es al tinte")
+    answering()
+    delivered(lambda: send({"id": str(c.id), "text": "Apuntado, Ana"}))
+    run("whatsapp_inbox.note.add", {"id": str(c.id), "text": "Nota sobre Ana"})
+    run("whatsapp_inbox.conversation.set_status", {"id": str(c.id), "status": "pending"})
+    respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
+    delivered(lambda: run("whatsapp_inbox.conversation.erase", {"id": str(c.id)}))
+    notices = [json.dumps(e.payload, ensure_ascii=False) for e in OutboxEvent.objects.filter(name__startswith="whatsapp_inbox.")]
+    assert len(notices) >= 5
+    for said in ("600111222", "Ana Secreta", "alergia", "Apuntado", "Nota sobre"):
+        assert not [notice for notice in notices if said in notice], said
+
+
+@respx.mock
 def test_erasing_asks_erplora_to_forget_the_number_after_the_commit(django_capture_on_commit_callbacks):
     receive("wamid.1")
     receive("wamid.2")
@@ -1032,10 +1089,10 @@ def test_the_worker_resumes_what_was_left_for_erplora(delivered, fixed_clock, mo
     respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
     # Not before 2 minutes: a delivery may still be on its way.
     early = delivered(lambda: system("whatsapp_inbox.delivery.resume"))
-    assert early.model_dump() == {"messages": 0, "erasures": 0}
+    assert early.model_dump() == {"messages": 0, "erasures": 0, "templates": 0, "template_deletions": 0}
     monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
     out = delivered(lambda: system("whatsapp_inbox.delivery.resume"))
-    assert out.model_dump() == {"messages": 1, "erasures": 1}
+    assert out.model_dump() == {"messages": 1, "erasures": 1, "templates": 0, "template_deletions": 0}
     assert stored(stuck).status == "sent"
     other.refresh_from_db()
     assert other.erase_status == "done"

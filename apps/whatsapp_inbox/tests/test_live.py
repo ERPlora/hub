@@ -62,7 +62,7 @@ def test_each_screen_and_its_events():
             E.ERASED,
         ],
         "whatsapp_inbox.note.list": [E.NOTE_ADDED, E.NOTE_DELETED, E.ERASED],
-        "whatsapp_inbox.template.list": [E.CHANNEL_SYNCED],
+        "whatsapp_inbox.template.list": [E.CHANNEL_SYNCED, E.TEMPLATE_CREATED, E.TEMPLATE_UPDATED, E.TEMPLATE_DELETED],
         "whatsapp_inbox.channel.get": [E.CHANNEL_SYNCED],
     }
 

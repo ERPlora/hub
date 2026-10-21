@@ -28,6 +28,17 @@ const template = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   variables: 2,
   rejected_reason: '',
   synced_at: null,
+  header_format: '',
+  body_examples: [],
+  buttons: [],
+  meta_id: 'm1',
+  draft: null,
+  submit_state: '',
+  submit_error_code: '',
+  submit_error: '',
+  editable: true,
+  sendable: true,
+  deleting: false,
   ...over,
 });
 const PAGE = { rows: [template(), template({ id: 't2', name: 'promo', category: 'MARKETING', body: '¡Oferta de otoño!', variables: 0 })], total: 2, limit: 100, offset: 0 };
@@ -50,7 +61,8 @@ async function setup(locale: 'en' | 'es' = 'en') {
 describe('TemplateSendModal (WHATSAPP_INBOX-F33)', () => {
   it('offers the approved templates with their language, category and text', async () => {
     const s = await setup();
-    expect(s.params(OP)).toEqual([{ status: 'APPROVED', limit: 100 }]);
+    // Only what the Hub can send now: approved, not being deleted, no file header (WHATSAPP_INBOX-F33).
+    expect(s.params(OP)).toEqual([{ sendable: true, limit: 100 }]);
     await s.result(OP, PAGE);
     expect(s.inDoc('whatsapp-inbox-template-form')?.getAttribute('aria-label')).toBe('Send a template');
     const first = s.inDoc('whatsapp-inbox-template-option-t1');

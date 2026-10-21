@@ -249,10 +249,10 @@ watch(
 .wa-bubble--inbound {
   align-self: flex-start;
 }
+/* The business's own: a light wash of the primary colour, so its time, status and reason stay legible. */
 .wa-bubble--outbound {
   align-self: flex-end;
-  background: var(--ion-color-primary-tint, #d0ebff);
-  color: var(--ion-color-primary-contrast-rgb, inherit);
+  background: rgba(var(--ion-color-primary-rgb, 0, 84, 233), 0.1);
 }
 .wa-bubble--note {
   align-self: center;
@@ -289,7 +289,7 @@ watch(
 }
 .wa-bubble__status--failed,
 .wa-bubble__error {
-  color: var(--ion-color-danger);
+  color: var(--ep-danger-text, var(--ion-color-danger-shade));
   font-size: 0.75rem;
   font-weight: 600;
 }

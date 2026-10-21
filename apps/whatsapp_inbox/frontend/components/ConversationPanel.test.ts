@@ -69,6 +69,7 @@ const message = (id: string, sent_at: string): MessageOut => ({
   error_message: '',
   wa_message_id: `wamid.${id}`,
   reply_to: '',
+  reply_id: '',
   sent_by_name: '',
   sent_at,
   status_at: null,

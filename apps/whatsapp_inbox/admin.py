@@ -1,8 +1,9 @@
 """Django admin of the WhatsApp inbox: CRUD for the platform's staff (round 12, PLAN §17).
 
 Messages are read only, received and sent alike (WORKBOOK «Modelo»): they are what WhatsApp carried;
-a conversation's data is corrected by erasing it, never by editing a message. Templates and the
-channel are erplora.com's copy: what is changed here is overwritten by its next push.
+a conversation's data is corrected by erasing it, never by editing a message. The channel, and the
+templates Meta holds, are erplora.com's copy: what is changed here is overwritten by its next push; a
+template's hand-over to Meta (its key, state and reason) is shown, never edited.
 """
 
 from django.contrib import admin
@@ -80,9 +81,19 @@ class NoteAdmin(admin.ModelAdmin):
 
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "language", "category", "status", "variables", "synced_at")
-    list_filter = ("status", "category", "language")
+    list_display = ("name", "language", "category", "status", "submit_state", "delete_state", "variables", "synced_at")
+    list_filter = ("status", "category", "language", "submit_state", "delete_state")
     search_fields = ("name", "body")
+    readonly_fields = (
+        "supported",
+        "submit_state",
+        "submit_key",
+        "submit_error_code",
+        "submit_error",
+        "submit_at",
+        "deleted_at",
+        "delete_state",
+    )
 
 
 @admin.register(Channel)

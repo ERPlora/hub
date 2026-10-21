@@ -98,6 +98,9 @@ def visible_texts() -> set[str]:
         Message.Status,
         Template.Category,
         Template.Status,
+        Template.HeaderFormat,
+        Template.SubmitState,
+        Template.DeleteState,
     ):
         lazies += list(choices.labels)
     with override("en"):

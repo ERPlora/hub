@@ -16,7 +16,7 @@ number erplora.com has to forget (``forget``). What a crash leaves half-way, the
 import datetime as dt
 import re
 from functools import partial
-from uuid import UUID
+from uuid import UUID, uuid7
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Value
@@ -46,6 +46,7 @@ from apps.whatsapp_inbox.queries import (
     e164,
     find_conversation,
     live_conversations,
+    live_templates,
     may_delete_note,
     message_out,
     note_out,
@@ -53,6 +54,7 @@ from apps.whatsapp_inbox.queries import (
     preview,
     send_blocked,
     team,
+    template_out,
 )
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
@@ -60,6 +62,8 @@ from apps.whatsapp_inbox.schemas import (
     ChannelSyncOut,
     ClaimDeliveryOut,
     ClaimErasureOut,
+    ClaimTemplateDeletionOut,
+    ClaimTemplateOut,
     ConversationOut,
     ConversationRefIn,
     CustomerEventIn,
@@ -78,12 +82,20 @@ from apps.whatsapp_inbox.schemas import (
     RecordDeliveryIn,
     RecordErasureIn,
     RecordOut,
+    RecordTemplateDeletionIn,
+    RecordTemplateIn,
     ResumeIn,
     ResumeOut,
     SendIn,
     SetStatusIn,
     StatusIn,
     StatusOut,
+    TemplateCreateIn,
+    TemplateOut,
+    TemplateRefIn,
+    TemplateUpdateIn,
+    TemplateWriteIn,
+    template_variables,
 )
 
 #: Only the system context (``*``) holds it: the doors erplora.com calls, the reactions, the deliveries.
@@ -122,7 +134,25 @@ TEMPLATE_NOT_APPROVED = _(
     "Meta has not approved the template “%(name)s”: it cannot be sent."
 )
 TEMPLATE_VARIABLES = _("Fill in every variable of the template (%(count)d).")
+TEMPLATE_NOT_SENDABLE = _(
+    "This template has a photo, video, document or place header, or buttons with something to fill in: send it "
+    "from WhatsApp Manager."
+)
 MARKETING_CONSENT = _("This customer has not agreed to receive marketing by WhatsApp.")
+TEMPLATE_EXISTS = _("There is already a template “%(name)s” in that language.")
+TEMPLATE_GONE = _("That template no longer exists.")
+TEMPLATE_READ_ONLY = _("This template is changed in WhatsApp Manager: the Hub cannot change it.")
+TEMPLATE_IN_REVIEW = _("Meta is reviewing this template: wait for its verdict to change it.")
+TEMPLATE_SUBMITTING = _("This template is on its way to Meta: wait a moment.")
+TEMPLATE_CATEGORY_FIXED = _("Meta only lets you change the category of a template it rejected.")
+TEMPLATE_NOT_RETRYABLE = _("There is nothing of this template to hand to Meta again.")
+TEMPLATE_REFUSED = _("Meta did not accept the template.")
+META_UNREACHABLE = _("Meta did not answer. Try again in a few minutes.")
+META_RATE_LIMITED = _("Meta asks to wait before trying again. Try again in a few minutes.")
+TEMPLATE_SAAS_UNREACHABLE = _("erplora.com did not answer: the template has not left. Try again.")
+TEMPLATE_UNKNOWN = _("erplora.com did not confirm the template. Try again: it is never registered twice.")
+DELETE_SAAS_UNREACHABLE = _("erplora.com did not answer: Meta still has the template. Try again.")
+DELETE_UNKNOWN = _("erplora.com did not confirm that Meta deleted the template. Try again.")
 ALREADY_ASSIGNED = _("This conversation is already with %(name)s.")
 ONLY_YOURSELF = _("You may only assign conversations to yourself.")
 NOBODY_CALLED = _("Nobody in this business is called “%(reference)s”.")
@@ -144,6 +174,14 @@ _ON_ITS_WAY = (Message.Status.QUEUED, Message.Status.SENDING)
 _VARIABLE = re.compile(r"\{\{\s*(\d+)\s*\}\}")
 #: erplora.com's 409 codes the Hub knows by name; any other is «erplora.com did not send it».
 _REFUSALS = {"whatsapp.cap_reached": "whatsapp_inbox.cap_reached"}
+#: erplora.com's 409 codes for a template the Hub says in its own words (never blaming ERPlora for Meta:
+#: gh:hub#2731); any other is Meta's refusal, with Meta's reason.
+_TEMPLATE_REFUSALS = {
+    "whatsapp.meta_unreachable": ("whatsapp_inbox.meta_unreachable", META_UNREACHABLE),
+    "whatsapp.meta_rate_limited": ("whatsapp_inbox.meta_rate_limited", META_RATE_LIMITED),
+    "whatsapp.not_connected": ("whatsapp_inbox.channel_not_connected", NOT_CONNECTED),
+}
+_TEMPLATE_ON_ITS_WAY = (Template.SubmitState.QUEUED, Template.SubmitState.SENDING)
 
 
 def _save(instance, *fields: str) -> None:
@@ -246,6 +284,48 @@ def _media_fields(data: ReceiveIn) -> dict:
     }
 
 
+def _tapped(data: ReceiveIn) -> tuple[str, str, str]:
+    """``(reply_to, reply_id, text)`` of a message: the option she tapped and the message it answers, as
+    erplora.com lifted them or, when it did not, read from Meta's object (WHATSAPP_INBOX-F38)."""
+    payload = data.payload if isinstance(data.payload, dict) else {}
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+    reply_to = data.reply_to or str(context.get("id") or "")
+    option_id, title = (data.reply.id, data.reply.title) if data.reply else ("", "")
+    if data.reply is None and data.type == "button" and isinstance(payload.get("button"), dict):
+        option_id, title = str(payload["button"].get("payload") or ""), str(payload["button"].get("text") or "")
+    elif data.reply is None and data.type == "interactive" and isinstance(payload.get("interactive"), dict):
+        interactive = payload["interactive"]
+        chosen = interactive.get("button_reply") or interactive.get("list_reply")
+        if isinstance(chosen, dict):
+            option_id, title = str(chosen.get("id") or ""), str(chosen.get("title") or "")
+    return reply_to[:255], option_id[:256], data.text or title
+
+
+def _received(ctx: OperationContext, message: Message) -> None:
+    """``whatsapp_inbox.message.received``, saying which message the Hub sent it answers (never absent:
+    empty when it answers nothing this Hub sent) and the option tapped."""
+    asked = (
+        Message.objects.filter(
+            conversation_id=message.conversation_id, wa_message_id=message.reply_to, origin=Message.Origin.HUB
+        )
+        .values_list("id", flat=True)
+        .first()
+        if message.reply_to
+        else None
+    )
+    record_event(
+        ctx,
+        events.MESSAGE_RECEIVED,
+        {
+            "id": str(message.id),
+            "conversation_id": str(message.conversation_id),
+            "direction": message.direction,
+            "reply_to_message_id": str(asked) if asked else None,
+            "reply_id": message.reply_id,
+        },
+    )
+
+
 def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> dict:
     """The same WhatsApp message again: nothing changes, unless it completes a history placeholder."""
     completes = (
@@ -255,21 +335,13 @@ def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> di
         and message.conversation.erased_at is None
     )
     if completes:
+        message.reply_to, message.reply_id, message.body = _tapped(data)
         message.kind = data.type
-        message.body = data.text
         message.payload = data.payload
         for field, value in _media_fields(data).items():
             setattr(message, field, value)
         message.save()
-        record_event(
-            ctx,
-            events.MESSAGE_RECEIVED,
-            {
-                "id": str(message.id),
-                "conversation_id": str(message.conversation_id),
-                "direction": message.direction,
-            },
-        )
+        _received(ctx, message)
     return {
         "id": message.id,
         "conversation_id": message.conversation_id,
@@ -294,7 +366,7 @@ def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> di
 )
 def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
     try:
-        phone = e164(data.from_, ctx)
+        phone = e164(data.from_, ctx, from_whatsapp=True)
     except InvalidPhone:
         raise InvalidPayload(
             str(NOT_A_NUMBER), fields={"from": str(NOT_A_NUMBER)}
@@ -319,6 +391,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
         return _redelivered(ctx, existing, data)
     said = data.sent_at or clock.now()
     kind = data.type or "text"
+    reply_to, reply_id, text = _tapped(data)
     try:
         with transaction.atomic():
             message = Message.objects.create(
@@ -327,10 +400,11 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
                 origin=Message.Origin.CUSTOMER if inbound else Message.Origin.PHONE_APP,
                 source=data.source,
                 kind=kind,
-                body=data.text,
+                body=text,
                 status=Message.Status.RECEIVED if inbound else Message.Status.SENT,
                 wa_message_id=data.wa_message_id,
-                reply_to=data.reply_to,
+                reply_to=reply_to,
+                reply_id=reply_id,
                 payload=data.payload,
                 sent_at=said,
                 **_media_fields(data),
@@ -369,15 +443,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
             conversation.last_message_direction = message.direction
         conversation.save()
     _link_by_phone(ctx, conversation, card_id)
-    record_event(
-        ctx,
-        events.MESSAGE_RECEIVED,
-        {
-            "id": str(message.id),
-            "conversation_id": str(conversation.id),
-            "direction": message.direction,
-        },
-    )
+    _received(ctx, message)
     return {"id": message.id, "conversation_id": conversation.id, "created": True}
 
 
@@ -483,29 +549,46 @@ def sync_channel(ctx: OperationContext, data: ChannelSyncIn) -> dict:
     row.synced_at = now
     row.save()
     if data.templates is not None:
-        kept = []
-        for item in data.templates:
-            template, _created = Template.objects.update_or_create(
-                name=item.name,
-                language=item.language,
-                defaults={
-                    "category": item.category,
-                    "status": item.status,
-                    "header": item.header,
-                    "body": item.body,
-                    "footer": item.footer,
-                    "variables": item.variables,
-                    "rejected_reason": item.rejected_reason,
-                    "meta_id": item.meta_id,
-                    "synced_at": now,
-                },
-            )
-            kept.append(template.pk)
-        Template.objects.exclude(pk__in=kept).exclude(
-            status=Template.Status.DELETED
-        ).update(status=Template.Status.DELETED, synced_at=now)
+        _sync_templates(data.templates, now)
     record_event(ctx, events.CHANNEL_SYNCED, {"version": data.version})
     return {"applied": True, "version": data.version}
+
+
+def _sync_templates(items, now) -> None:
+    """Meta's list replaces the copy (F27, F28): what it no longer lists is «Deleted in WhatsApp Manager».
+
+    Never on what the Hub has not handed over yet (a new template on its way or not accepted keeps what was
+    written; an edit waits in its ``draft``), and never bringing back a template deleted here: Meta still
+    lists it until the deletion reaches it, or by the same id.
+    """
+    kept = []
+    for item in items:
+        row = live_templates().select_for_update().filter(name=item.name, language=item.language).first()
+        if row is None:
+            deleted = Template.objects.filter(name=item.name, language=item.language, deleted_at__isnull=False)
+            if deleted.filter(Q(delete_state=Template.DeleteState.PENDING) | Q(meta_id=item.meta_id)).exists():
+                continue
+            row = Template(name=item.name, language=item.language)
+        elif row.status == Template.Status.DRAFT and row.submit_state:
+            kept.append(row.pk)
+            continue
+        row.category = item.category
+        row.status = item.status
+        row.header_format = item.header_format if item.header_format is not None else ("TEXT" if item.header else "")
+        row.header = item.header
+        row.body = item.body
+        row.body_examples = list(item.body_examples)
+        row.footer = item.footer
+        row.buttons = list(item.buttons)
+        row.variables = item.variables
+        row.rejected_reason = item.rejected_reason
+        row.meta_id = item.meta_id
+        row.synced_at = now
+        row.save()
+        kept.append(row.pk)
+    live_templates().exclude(pk__in=kept).exclude(
+        status__in=[Template.Status.DELETED, Template.Status.DRAFT]
+    ).update(status=Template.Status.DELETED, synced_at=now)
 
 
 # ── Sending (WHATSAPP_INBOX-F32, F33): kept here, handed to erplora.com after the COMMIT ─────────
@@ -521,7 +604,7 @@ def _blocked_error(reason: str) -> OperationError:
 
 def _template_for(data: SendIn) -> Template:
     wanted = data.template
-    rows = Template.objects.filter(name=wanted.name)
+    rows = live_templates().filter(name=wanted.name)
     if wanted.language:
         rows = rows.filter(language=wanted.language)
     found = list(rows[:2])
@@ -540,6 +623,8 @@ def _template_for(data: SendIn) -> Template:
             str(TEMPLATE_NOT_APPROVED % {"name": template.name}),
             code="whatsapp_inbox.template_not_approved",
         )
+    if not template.supported:
+        raise Conflict(str(TEMPLATE_NOT_SENDABLE), code="whatsapp_inbox.template_not_sendable")
     if len(wanted.variables) != template.variables:
         message = str(TEMPLATE_VARIABLES % {"count": template.variables})
         raise InvalidPayload(message, fields={"template": message})
@@ -844,8 +929,8 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     input=ResumeIn,
     output=ResumeOut,
     ai={
-        "description": "System only (the worker's scheduled task, phase 2): hands erplora.com again the messages "
-        "and erasures whose delivery after the COMMIT never ended.",
+        "description": "System only (the worker's scheduled task): hands erplora.com again the messages, erasures, "
+        "templates and template deletions whose delivery after the COMMIT never ended.",
         "risk": "normal",
     },
 )
@@ -863,11 +948,32 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
         .order_by("erased_at", "id")
         .values_list("id", flat=True)[:RESUME_BATCH]
     )
+    templates = list(
+        Template.objects.select_for_update(skip_locked=True)
+        .filter(submit_state__in=_TEMPLATE_ON_ITS_WAY, submit_at__lt=cutoff, deleted_at__isnull=True)
+        .order_by("submit_at", "id")
+        .values_list("id", flat=True)[:RESUME_BATCH]
+    )
+    deletions = list(
+        Template.objects.select_for_update(skip_locked=True)
+        .filter(delete_state=Template.DeleteState.PENDING, deleted_at__lt=cutoff)
+        .order_by("deleted_at", "id")
+        .values_list("id", flat=True)[:RESUME_BATCH]
+    )
     for message_id in messages:
         _after_commit(ctx, deliver, message_id)
     for conversation_id in erasures:
         _after_commit(ctx, forget, conversation_id)
-    return {"messages": len(messages), "erasures": len(erasures)}
+    for template_id in templates:
+        _after_commit(ctx, submit_template, template_id)
+    for template_id in deletions:
+        _after_commit(ctx, remove_template, template_id)
+    return {
+        "messages": len(messages),
+        "erasures": len(erasures),
+        "templates": len(templates),
+        "template_deletions": len(deletions),
+    }
 
 
 # ── The team's work on a conversation ───────────────────────────────────────────────────────────
@@ -1074,6 +1180,7 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
             media_caption="",
             payload={},
             reply_to="",
+            reply_id="",
             error_message="",
             template_variables=[],
         )
@@ -1247,6 +1354,364 @@ def delete_note(ctx: OperationContext, data: NoteRefIn) -> dict:
         {"id": str(data.id), "conversation_id": str(conversation_id)},
     )
     return {"id": data.id}
+
+
+# ── Templates (WHATSAPP_INBOX-F29…F31): kept here, handed to erplora.com after the COMMIT ─────────
+
+
+def _content(data: TemplateWriteIn) -> dict:
+    """What the form wrote, as the template keeps it and door 8 takes it."""
+    return {
+        "category": data.category,
+        "header": data.header,
+        "body": data.body,
+        "body_examples": list(data.body_examples),
+        "footer": data.footer,
+        "buttons": [{field: value for field, value in button.model_dump().items() if value} for button in data.buttons],
+    }
+
+
+def _apply(row: Template, content: dict) -> None:
+    for field, value in content.items():
+        setattr(row, field, value)
+    row.header_format = Template.HeaderFormat.TEXT if row.header else Template.HeaderFormat.NONE
+    row.variables = template_variables(row.body)
+
+
+def _no_template_without_a_number() -> None:
+    blocked = send_blocked(channel())
+    if blocked in ("not_connected", "unconfigured"):
+        raise _blocked_error(blocked)
+
+
+def _queue(ctx: OperationContext, row: Template, key: UUID, event: str) -> None:
+    row.submit_state = Template.SubmitState.QUEUED
+    row.submit_key = key
+    row.submit_error_code = row.submit_error = ""
+    row.submit_at = clock.now()
+    row.save()
+    record_event(ctx, event, {"id": str(row.id)})
+    _after_commit(ctx, submit_template, row.id)
+
+
+@operation(
+    "whatsapp_inbox.template.create",
+    kind="command",
+    permission="whatsapp_inbox.configure",
+    input=TemplateCreateIn,
+    output=TemplateOut,
+    expose_api=True,
+    ai={
+        "description": "Creates a WhatsApp message template (name, language, utility or marketing, header, text with "
+        "{{1}}… and an example of each, footer, buttons) and sends it to Meta for review. Give a new submit_key per "
+        "save (the same one if you retry it): it is registered once.",
+        "risk": "high",
+    },
+)
+def create_template(ctx: OperationContext, data: TemplateCreateIn) -> dict:
+    already = Template.objects.filter(submit_key=data.submit_key).first()
+    if already is not None:
+        return template_out(already)
+    _no_template_without_a_number()
+    exists = Conflict(str(TEMPLATE_EXISTS % {"name": data.name}), code="whatsapp_inbox.template_exists")
+    if live_templates().filter(name=data.name, language=data.language).exists():
+        raise exists
+    row = Template(name=data.name, language=data.language, status=Template.Status.DRAFT)
+    _apply(row, _content(data))
+    try:
+        with transaction.atomic():
+            _queue(ctx, row, data.submit_key, events.TEMPLATE_CREATED)
+    except IntegrityError:
+        # The same save at the same time (its key), or the name just taken by another.
+        twin = Template.objects.filter(submit_key=data.submit_key).first()
+        if twin is None:
+            raise exists from None
+        return template_out(twin)
+    return template_out(row)
+
+
+def _changeable(row: Template, content: dict) -> None:
+    if not row.supported or row.status in (Template.Status.DISABLED, Template.Status.DELETED):
+        raise Conflict(str(TEMPLATE_READ_ONLY), code="whatsapp_inbox.template_read_only")
+    if row.status == Template.Status.PENDING:
+        raise Conflict(str(TEMPLATE_IN_REVIEW), code="whatsapp_inbox.template_in_review")
+    in_flight = row.submit_state == Template.SubmitState.QUEUED or (
+        row.submit_state == Template.SubmitState.SENDING and not row.submit_error_code
+    )
+    if in_flight:
+        raise Conflict(str(TEMPLATE_SUBMITTING), code="whatsapp_inbox.template_submitting")
+    judged = row.status not in (Template.Status.DRAFT, Template.Status.REJECTED)
+    if judged and content["category"] != row.category:
+        raise Conflict(str(TEMPLATE_CATEGORY_FIXED), code="whatsapp_inbox.template_category_fixed")
+
+
+@operation(
+    "whatsapp_inbox.template.update",
+    kind="command",
+    permission="whatsapp_inbox.configure",
+    input=TemplateUpdateIn,
+    output=TemplateOut,
+    expose_api=True,
+    ai={
+        "description": "Changes a WhatsApp template (not its name or language) and sends it to Meta for review "
+        "again; until Meta takes the change, the approved one keeps being the one sent. Not while Meta reviews it.",
+        "risk": "high",
+    },
+)
+def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
+    row = live_templates().select_for_update().filter(pk=data.id).first()
+    if row is None:
+        raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
+    if row.submit_key == data.submit_key:
+        return template_out(row)  # the same save again
+    _no_template_without_a_number()
+    content = _content(data)
+    _changeable(row, content)
+    if row.status == Template.Status.DRAFT:
+        _apply(row, content)  # Meta never had it: what is written is the template
+        row.draft = None
+    else:
+        row.draft = content  # Meta's stays the one sent until it takes the edit
+    try:
+        with transaction.atomic():
+            _queue(ctx, row, data.submit_key, events.TEMPLATE_UPDATED)
+    except IntegrityError:
+        raise Conflict(str(TEMPLATE_SUBMITTING), code="whatsapp_inbox.template_submitting") from None
+    return template_out(row)
+
+
+@operation(
+    "whatsapp_inbox.template.retry",
+    kind="command",
+    permission="whatsapp_inbox.configure",
+    input=TemplateRefIn,
+    output=TemplateOut,
+    expose_api=True,
+    ai={
+        "description": "Hands a template that did not reach Meta (or a deletion Meta has not confirmed) to "
+        "erplora.com again: never registered twice.",
+        "risk": "normal",
+    },
+)
+def retry_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
+    row = Template.objects.select_for_update().filter(pk=data.id).first()
+    if row is None or (row.deleted_at is not None and row.delete_state != Template.DeleteState.PENDING):
+        raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
+    if row.delete_state == Template.DeleteState.PENDING:
+        row.submit_error_code = row.submit_error = ""
+        row.save(update_fields=["submit_error_code", "submit_error"])
+        _after_commit(ctx, remove_template, row.id)
+        return template_out(row)
+    if row.submit_state == Template.SubmitState.FAILED:
+        # Refused: the same key would get the same answer; a transient refusal goes again as a new save.
+        _queue(ctx, row, uuid7(), events.TEMPLATE_UPDATED)
+    elif row.submit_state in _TEMPLATE_ON_ITS_WAY:
+        _queue(ctx, row, row.submit_key, events.TEMPLATE_UPDATED)
+    else:
+        raise Conflict(str(TEMPLATE_NOT_RETRYABLE), code="whatsapp_inbox.not_retryable")
+    return template_out(row)
+
+
+@operation(
+    "whatsapp_inbox.template.delete",
+    kind="command",
+    permission="whatsapp_inbox.configure",
+    input=TemplateRefIn,
+    output=TemplateOut,
+    expose_api=True,
+    ai={
+        "description": "Deletes a WhatsApp template here and at Meta (that language only). Irreversible: an approved "
+        "template takes days to be approved again.",
+        "risk": "high",
+    },
+)
+def delete_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
+    row = live_templates().select_for_update().filter(pk=data.id).first()
+    if row is None:
+        raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
+    # Meta may have it unless it never left the Hub (or it left and Meta refused it).
+    at_meta = bool(row.meta_id) or row.status != Template.Status.DRAFT or row.submit_state == Template.SubmitState.SENDING
+    row.deleted_at = clock.now()
+    row.delete_state = Template.DeleteState.PENDING if at_meta else Template.DeleteState.DONE
+    row.submit_state = Template.SubmitState.NONE
+    row.submit_error_code = row.submit_error = ""
+    row.save()
+    record_event(ctx, events.TEMPLATE_DELETED, {"id": str(row.id)})
+    if at_meta:
+        _after_commit(ctx, remove_template, row.id)
+    return template_out(row)
+
+
+def submit_template(scope: Scope, template_id: UUID) -> None:
+    """Hand a template to erplora.com (door 8) with no transaction and no lock around the HTTP call; its
+    answer is recorded in a transaction of its own."""
+    system = system_context(scope)
+    claimed = get("whatsapp_inbox.template.claim_submit")(system, TemplateRefIn(id=template_id))
+    if not claimed.claimed:
+        return
+    try:
+        reply = gateway.submit_template(
+            hub=scope.key, idempotency_key=str(claimed.submit_key), template=claimed.template
+        )
+    except gateway.NotConfigured:
+        reply = gateway.Reply(kind=gateway.UNREACHABLE, message="SAAS_INTERNAL_URL is not set.")
+    get("whatsapp_inbox.template.record_submit")(
+        system,
+        RecordTemplateIn(
+            id=template_id,
+            submit_key=claimed.submit_key,
+            kind=reply.kind,
+            meta_id=reply.meta_id,
+            status=reply.status,
+            code=reply.code,
+            message=reply.message,
+        ),
+    )
+
+
+def remove_template(scope: Scope, template_id: UUID) -> None:
+    """Ask erplora.com to delete a template deleted here at Meta (door 9), outside any transaction."""
+    system = system_context(scope)
+    claimed = get("whatsapp_inbox.template.claim_delete")(system, TemplateRefIn(id=template_id))
+    if not claimed.claimed:
+        return
+    try:
+        reply = gateway.delete_template(
+            hub=scope.key, name=claimed.name, language=claimed.language, meta_id=claimed.meta_id
+        )
+    except gateway.NotConfigured:
+        reply = gateway.Reply(kind=gateway.UNREACHABLE, message="SAAS_INTERNAL_URL is not set.")
+    get("whatsapp_inbox.template.record_delete")(
+        system, RecordTemplateDeletionIn(id=template_id, kind=reply.kind, code=reply.code, message=reply.message)
+    )
+
+
+@operation(
+    "whatsapp_inbox.template.claim_submit",
+    kind="command",
+    permission=RECEIVE,
+    input=TemplateRefIn,
+    output=ClaimTemplateOut,
+    ai={"description": "System only: takes a template to hand to erplora.com (nobody else is on it).", "risk": "normal"},
+)
+def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
+    row = (
+        Template.objects.select_for_update(skip_locked=True)
+        .filter(pk=data.id, submit_state__in=_TEMPLATE_ON_ITS_WAY, deleted_at__isnull=True)
+        .first()
+    )
+    if row is None:
+        return {"claimed": False}
+    row.submit_state = Template.SubmitState.SENDING
+    row.submit_at = clock.now()
+    row.save(update_fields=["submit_state", "submit_at"])
+    content = row.draft or {
+        "category": row.category,
+        "header": row.header,
+        "body": row.body,
+        "body_examples": row.body_examples,
+        "footer": row.footer,
+        "buttons": row.buttons,
+    }
+    return {
+        "claimed": True,
+        "template": {"name": row.name, "language": row.language, **content, "meta_id": row.meta_id},
+        "submit_key": row.submit_key,
+    }
+
+
+def _template_failure(kind: str, code: str, message: str, *, deleting: bool = False) -> tuple[str, str]:
+    """The Hub's code and reason of a hand-over that did not end well."""
+    if kind == gateway.REFUSED:
+        known = _TEMPLATE_REFUSALS.get(code)
+        if known:
+            return known[0], str(known[1])
+        return "whatsapp_inbox.template_refused", (message or str(TEMPLATE_REFUSED))[:500]
+    if kind == gateway.UNKNOWN:
+        return "whatsapp_inbox.send_unknown", str(DELETE_UNKNOWN if deleting else TEMPLATE_UNKNOWN)
+    return "whatsapp_inbox.saas_unreachable", str(DELETE_SAAS_UNREACHABLE if deleting else TEMPLATE_SAAS_UNREACHABLE)
+
+
+@operation(
+    "whatsapp_inbox.template.record_submit",
+    kind="command",
+    permission=RECEIVE,
+    input=RecordTemplateIn,
+    output=RecordOut,
+    ai={
+        "description": "System only: records erplora.com's answer to a template: Meta took it (its id and verdict), "
+        "refused it with its reason, or no answer (to retry with the same key).",
+        "risk": "normal",
+    },
+)
+def record_submit(ctx: OperationContext, data: RecordTemplateIn) -> dict:
+    row = Template.objects.select_for_update().filter(pk=data.id).first()
+    if row is None:
+        return {"status": None}
+    if row.submit_key != data.submit_key or row.submit_state not in _TEMPLATE_ON_ITS_WAY:
+        return {"status": row.status}  # an answer to an older save, or the template was deleted meanwhile
+    if data.kind == gateway.ACCEPTED:
+        if row.draft:
+            _apply(row, row.draft)
+            row.draft = None
+        row.status = data.status
+        row.meta_id = data.meta_id
+        row.rejected_reason = ""
+        row.submit_state = Template.SubmitState.NONE
+        row.submit_error_code = row.submit_error = ""
+    else:
+        row.submit_error_code, row.submit_error = _template_failure(data.kind, data.code, data.message)
+        row.submit_state = (
+            Template.SubmitState.FAILED if data.kind == gateway.REFUSED else Template.SubmitState.SENDING
+        )
+    row.submit_at = clock.now()
+    row.save()
+    record_event(ctx, events.TEMPLATE_UPDATED, {"id": str(row.id)})
+    return {"status": row.status}
+
+
+@operation(
+    "whatsapp_inbox.template.claim_delete",
+    kind="command",
+    permission=RECEIVE,
+    input=TemplateRefIn,
+    output=ClaimTemplateDeletionOut,
+    ai={"description": "System only: takes a template deleted here that Meta still has to delete.", "risk": "normal"},
+)
+def claim_delete(ctx: OperationContext, data: TemplateRefIn) -> dict:
+    row = (
+        Template.objects.select_for_update(skip_locked=True)
+        .filter(pk=data.id, delete_state=Template.DeleteState.PENDING)
+        .first()
+    )
+    if row is None:
+        return {"claimed": False}
+    return {"claimed": True, "name": row.name, "language": row.language, "meta_id": row.meta_id}
+
+
+@operation(
+    "whatsapp_inbox.template.record_delete",
+    kind="command",
+    permission=RECEIVE,
+    input=RecordTemplateDeletionIn,
+    output=RecordOut,
+    ai={
+        "description": "System only: records that erplora.com deleted a template at Meta; unconfirmed, it is asked again.",
+        "risk": "normal",
+    },
+)
+def record_delete(ctx: OperationContext, data: RecordTemplateDeletionIn) -> dict:
+    row = Template.objects.select_for_update().filter(pk=data.id).first()
+    if row is None or row.delete_state != Template.DeleteState.PENDING:
+        return {"status": row.delete_state if row else None}
+    if data.kind == gateway.ACCEPTED:
+        row.delete_state = Template.DeleteState.DONE
+        row.submit_error_code = row.submit_error = ""
+    else:
+        row.submit_error_code, row.submit_error = _template_failure(data.kind, data.code, data.message, deleting=True)
+    row.save(update_fields=["delete_state", "submit_error_code", "submit_error"])
+    record_event(ctx, events.TEMPLATE_UPDATED, {"id": str(row.id)})
+    return {"status": row.delete_state}
 
 
 # ── Reactions to Customers (events.py) ──────────────────────────────────────────────────────────

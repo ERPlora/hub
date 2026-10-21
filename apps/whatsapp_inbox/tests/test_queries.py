@@ -125,6 +125,14 @@ def test_sorting_by_any_column_keeps_a_stable_order(three):
     assert len(listed({"sort": "assigned_to"})) == 3
 
 
+def test_an_empty_value_goes_last_whichever_way_it_is_sorted(three, make_user):
+    """gh:hub#2099: sorting by a column some rows leave empty never puts the empty ones first."""
+    luis = make_user("luis")
+    run("whatsapp_inbox.conversation.assign", {"id": str(three["Bea"].id), "assignee_id": luis.id})
+    assert listed({"sort": "assigned_to", "dir": "desc"})[0] == "+34600222222"
+    assert listed({"sort": "assigned_to", "dir": "asc"})[0] == "+34600222222"
+
+
 def test_erased_conversations_leave_the_inbox(three):
     run("whatsapp_inbox.conversation.erase", {"id": str(three["Bea"].id)})
     assert listed() == ["+34600111111", "+34600333333"]
