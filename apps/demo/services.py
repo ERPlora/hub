@@ -21,14 +21,36 @@ from apps.demo.schemas import ByIdIn, DeletedOut, ItemDetailOut, ItemIn, ItemPat
 ITEM_DONE = _("This item is closed: open it to add lines.")
 
 
-@operation("demo.item.create", kind="command", permission="demo.manage", input=ItemIn, output=ItemDetailOut)
+@operation(
+    "demo.item.create",
+    kind="command",
+    permission="demo.manage",
+    input=ItemIn,
+    output=ItemDetailOut,
+    ai={
+        "description": "Creates a demo item with its name (up to 120 characters) and, if given, its status («open» "
+        "or «done») and a note.",
+        "risk": "normal",
+    },
+)
 def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
     item = Item.objects.create(**data.model_dump())
     record_event(ctx, events.ITEM_CREATED, {"id": str(item.id)})
     return load_detail(item.id)
 
 
-@operation("demo.item.update", kind="command", permission="demo.manage", input=ItemPatchIn, output=ItemDetailOut)
+@operation(
+    "demo.item.update",
+    kind="command",
+    permission="demo.manage",
+    input=ItemPatchIn,
+    output=ItemDetailOut,
+    ai={
+        "description": "Changes a demo item, by its id, only in what is sent: its name, its status («done» closes it "
+        "to new lines, «open» reopens it) or its note.",
+        "risk": "normal",
+    },
+)
 def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     """Changes only the fields sent (``null`` leaves one as it is); no change, no event."""
     item = _locked(data.id)
@@ -42,14 +64,35 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     return load_detail(item.id)
 
 
-@operation("demo.item.delete", kind="command", permission="demo.manage", input=ByIdIn, output=DeletedOut)
+@operation(
+    "demo.item.delete",
+    kind="command",
+    permission="demo.manage",
+    input=ByIdIn,
+    output=DeletedOut,
+    ai={
+        "description": "Deletes a demo item, by its id, together with all its lines. It cannot be undone.",
+        "risk": "high",
+    },
+)
 def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
     _locked(data.id).delete()
     record_event(ctx, events.ITEM_DELETED, {"id": str(data.id)})
     return {"id": data.id}
 
 
-@operation("demo.item.add_line", kind="command", permission="demo.manage", input=LineIn, output=ItemDetailOut)
+@operation(
+    "demo.item.add_line",
+    kind="command",
+    permission="demo.manage",
+    input=LineIn,
+    output=ItemDetailOut,
+    ai={
+        "description": "Adds a line (a text and a quantity above zero) at the end of an open demo item, by its id; "
+        "the same client_line_id sent again does not add it twice.",
+        "risk": "normal",
+    },
+)
 def add_line(ctx: OperationContext, data: LineIn) -> Item | None:
     """Appends a line; repeating it with the same ``client_line_id`` returns the item as it is.
 

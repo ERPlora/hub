@@ -57,3 +57,44 @@ def test_navigation_points_at_the_item_list_with_an_iconify_icon():
     assert (entry.id, str(entry.label), entry.path) == ("demo", "Demo", "/demo/items")
     # Iconify names carry their set prefix (HubIcon, working-rules §11).
     assert entry.icon == "ion:flask-outline"
+
+
+# The assistant's contract: every operation is one of its tools (CLAUDE.md «Un solo camino hacia el servidor»).
+
+
+def demo_operations():
+    from live.operations import registry
+
+    return {name: op for name, op in registry.items() if name.startswith("demo.")}
+
+
+def test_the_operations_of_the_app():
+    operations = demo_operations()
+    assert {name for name, op in operations.items() if op.kind == "query"} == {
+        "demo.item.list",
+        "demo.item.detail",
+        "demo.item.stats",
+    }
+    assert {name for name, op in operations.items() if op.kind == "command"} == {
+        "demo.item.create",
+        "demo.item.update",
+        "demo.item.delete",
+        "demo.item.add_line",
+    }
+
+
+def test_every_operation_tells_the_assistant_what_it_does():
+    for name, op in demo_operations().items():
+        assert isinstance(op.ai, dict), name
+        assert str(op.ai.get("description", "")).strip(), name
+        expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        assert set(op.ai) == expected, name
+        if op.kind == "command":
+            assert op.ai["risk"] in {"normal", "high"}, name
+
+
+def test_deleting_an_item_is_the_only_high_risk_command():
+    # It takes the item's lines with it and cannot be undone; the rest are undone with another command.
+    assert {name for name, op in demo_operations().items() if op.ai and op.ai.get("risk") == "high"} == {
+        "demo.item.delete"
+    }
