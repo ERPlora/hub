@@ -1,7 +1,7 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: en construcción (servidor hecho; páginas en la fase de frontend)
+Estado de la app: en uso; parciales F12 y F28 (esperan al núcleo) y F27 (espera a Ventas)
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -189,48 +189,60 @@ la pestaña; si escriben su dirección, ven «Esta página no existe». Cargando
 Error: «No se pudieron cargar los ajustes.» con «Reintentar», nunca los valores de fábrica como si
 fueran los del negocio.
 
+## Estados de cada pantalla
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando…» (en Ajustes, «Cargando ajustes…») mientras llega el primer resultado. |
+| Vacío | Productos: «Sin productos»; Movimientos: «Todavía no hay movimientos. Aparecen al usar Recibir stock o Contar stock en un producto de Productos, y con cada venta.»; Categorías: «Sin categorías.»; Panel: «Sin productos en stock bajo.». Con búsqueda o filtros sin resultado, la tabla dice que nada coincide. |
+| Error | Panel: «No se pudieron cargar las métricas del inventario.»; Ajustes: «No se pudieron cargar los ajustes.»; las tablas, su aviso con «Reintentar». Un rechazo de una acción sale en su ventana, junto a su campo, o encima de la tabla. |
+| Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
+| App inactiva | «Esta app no está activa en este negocio» en lugar de las cifras y de la tabla. |
+| Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Esta página no existe»; si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
+
 ## Flujos
 
 | ID | Flujo | Estado |
 |---|---|---|
 | | **Catálogo** | |
-| INVENTORY-F01 | Dar de alta un producto | servidor hecho |
-| INVENTORY-F02 | Editar un producto | servidor hecho |
-| INVENTORY-F03 | Activar y desactivar un producto | servidor hecho |
-| INVENTORY-F04 | Eliminar un producto | servidor hecho |
-| INVENTORY-F05 | Revisar los productos que no se pueden vender por falta de IVA | servidor hecho |
-| INVENTORY-F06 | Crear y editar una categoría | servidor hecho |
-| INVENTORY-F07 | Eliminar una categoría | servidor hecho |
-| INVENTORY-F08 | Agrupar productos en categorías para el TPV | servidor hecho |
+| INVENTORY-F01 | Dar de alta un producto | hecho |
+| INVENTORY-F02 | Editar un producto | hecho |
+| INVENTORY-F03 | Activar y desactivar un producto | hecho |
+| INVENTORY-F04 | Eliminar un producto | hecho |
+| INVENTORY-F05 | Revisar los productos que no se pueden vender por falta de IVA | hecho |
+| INVENTORY-F06 | Crear y editar una categoría | hecho |
+| INVENTORY-F07 | Eliminar una categoría | hecho |
+| INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | | **Importar y exportar** | |
-| INVENTORY-F09 | Importar productos desde un CSV | servidor hecho |
-| INVENTORY-F10 | Importar categorías desde un CSV | servidor hecho |
-| INVENTORY-F11 | Exportar el catálogo a CSV | servidor hecho |
-| INVENTORY-F12 | Cargar la carta de una plantilla del sector | servidor hecho (su parte: alta en lote y enlaces); falta cargar la plantilla (núcleo) |
+| INVENTORY-F09 | Importar productos desde un CSV | hecho |
+| INVENTORY-F10 | Importar categorías desde un CSV | hecho |
+| INVENTORY-F11 | Exportar el catálogo a CSV | hecho |
+| INVENTORY-F12 | Cargar la carta de una plantilla del sector | parcial — la parte de Inventario está (el alta en lote con su stock y sus categorías, que salta los SKU que ya existen); falta cargar la plantilla del sector, que es del núcleo y el Hub todavía no tiene |
 | | **Stock** | |
-| INVENTORY-F13 | Recibir mercancía | servidor hecho |
-| INVENTORY-F14 | Contar el stock de un producto | servidor hecho |
-| INVENTORY-F15 | Dar de baja stock sin venta (merma, rotura, consumo propio) | servidor hecho |
+| INVENTORY-F13 | Recibir mercancía | hecho |
+| INVENTORY-F14 | Contar el stock de un producto | hecho |
+| INVENTORY-F15 | Dar de baja stock sin venta (merma, rotura, consumo propio) | hecho |
 | INVENTORY-F16 | Consultar el historial de movimientos | hecho |
-| INVENTORY-F17 | Ver el panel y los productos con stock bajo | servidor hecho |
+| INVENTORY-F17 | Ver el panel y los productos con stock bajo | hecho |
 | INVENTORY-F18 | Avisar cuando un artículo cruza su mínimo | hecho |
-| INVENTORY-F19 | Ajustar el inventario | servidor hecho |
-| INVENTORY-F20 | Decidir qué artículos llevan control de stock | servidor hecho |
+| INVENTORY-F19 | Ajustar el inventario | hecho |
+| INVENTORY-F20 | Decidir qué artículos llevan control de stock | hecho |
 | | **Con otras apps** | |
 | INVENTORY-F21 | Bajar el stock al cobrarse una venta | hecho |
 | INVENTORY-F22 | Bajar el stock de los componentes de un menú o un pack | hecho |
 | INVENTORY-F23 | Reponer el stock al anularse una venta | hecho |
 | INVENTORY-F24 | Reponer el stock de una devolución | hecho |
 | INVENTORY-F25 | Imprimir la etiqueta del código de barras | hecho |
-| INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | servidor hecho |
+| INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | hecho |
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | parcial — Ventas todavía acepta la línea de un artículo agotado que le llega sin pasar por la rejilla (asistente o API) |
-| INVENTORY-F28 | Completar el primer paso «Tu catálogo» | servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo) |
+| INVENTORY-F28 | Completar el primer paso «Tu catálogo» | parcial — la cifra de productos activos está; falta la lista «Termina de configurar tu negocio», que es del núcleo y el Hub todavía no tiene |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
 ### INVENTORY-F01 Dar de alta un producto
-Estado: servidor hecho
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices fi:modules/inventory#command-inventory-products-create old:inventory/workflow/catalogo.md#inventory-f01 qa:modules/inventory/create-product-with-vat wf:peluqueria-dia#rec_peluqueria-f04 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -264,7 +276,8 @@ llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guar
 Implicados: SALE-F01, TAX-F01, TAX-F19
 
 ### INVENTORY-F02 Editar un producto
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#command-inventory-products-update fi:modules/inventory#query-inventory-products-get old:inventory/workflow/catalogo.md#inventory-f02 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -287,7 +300,8 @@ un producto con stock. Cuenta su stock a cero y cámbiala después.».
 Implicados: SALE-F01, TAX-F01, TAX-F19
 
 ### INVENTORY-F03 Activar y desactivar un producto
-Estado: servidor hecho
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:inventory/workflow/catalogo.md#inventory-f03 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -303,7 +317,8 @@ app). Sin permiso de cambio se ve «Sí»/«No» sin interruptor.
 Implicados: SALE-F01
 
 ### INVENTORY-F04 Eliminar un producto
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#command-inventory-products-delete old:inventory/workflow/catalogo.md#inventory-f04 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -320,7 +335,8 @@ Si falla: «No se pudo eliminar el producto» (o el motivo) encima de la tabla.
 Implicados: SALE-F01
 
 ### INVENTORY-F05 Revisar los productos que no se pueden vender por falta de IVA
-Estado: servidor hecho
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/inventory/create-product-with-vat old:inventory/workflow/catalogo.md#inventory-f05 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -337,7 +353,8 @@ Si falla: los rechazos del formulario (INVENTORY-F02).
 Implicados: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Crear y editar una categoría
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#command-inventory-categories-create-update fi:modules/inventory#query-inventory-categories-list old:inventory/workflow/catalogo.md#inventory-f06 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
@@ -358,7 +375,8 @@ guardar la categoría» o el motivo).
 Implicados: KITCHEN-F04, SALE-F01, TAX-F01
 
 ### INVENTORY-F07 Eliminar una categoría
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#command-inventory-categories-delete old:inventory/workflow/catalogo.md#inventory-f07 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
@@ -373,7 +391,8 @@ Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla
 Implicados: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F08 Agrupar productos en categorías para el TPV
-Estado: servidor hecho
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 fi:modules/inventory#query-inventory-product_categories old:inventory/workflow/catalogo.md#inventory-f08 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -392,7 +411,8 @@ categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Importar productos desde un CSV
-Estado: servidor hecho
+<!-- origen: qa:modules/inventory/create-product-with-vat fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-products-bulk_create-handler-wasm-bulk_create old:inventory/workflow/importar-y-exportar.md#inventory-f09 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Importar productos
 Pasos:
@@ -434,7 +454,8 @@ estaba.».
 Implicados: TAX-F02, TAX-F14, TAX-F15
 
 ### INVENTORY-F10 Importar categorías desde un CSV
-Estado: servidor hecho
+<!-- origen: old:inventory/workflow/importar-y-exportar.md#inventory-f10 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
@@ -453,7 +474,8 @@ fiscal no reconocida: <texto>».
 Implicados: TAX-F15
 
 ### INVENTORY-F11 Exportar el catálogo a CSV
-Estado: servidor hecho
+<!-- origen: old:inventory/workflow/importar-y-exportar.md#inventory-f11 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -474,7 +496,8 @@ fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la impo
 Implicados: ninguno
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
-Estado: servidor hecho (su parte: alta en lote y enlaces); falta cargar la plantilla (núcleo)
+<!-- origen: old-hub:HUB_SHELL-F26 old-hub:HUB-F235 old:inventory/workflow/importar-y-exportar.md#inventory-f12 wf:alta#rec_alta-f08 -->
+Estado: parcial — la parte de Inventario está (el alta en lote con su stock y sus categorías, que salta los SKU que ya existen); falta cargar la plantilla del sector, que es del núcleo y el Hub todavía no tiene
 Actor: administrador
 Pantalla: Ajustes del negocio: plantillas
 Pasos:
@@ -489,10 +512,10 @@ con los mismos SKU, esos productos se saltan: no cambian ni su precio ni su stoc
 Si falla: cada app aplica su parte por separado; si la de Inventario falla, sale en el informe de
 la plantilla y el resto se aplica.
 Implicados: ninguno
-Pendiente de enlazar: core — cargar una plantilla del sector (su WORKBOOK aún no existe)
 
 ### INVENTORY-F13 Recibir mercancía
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-stock-receive-handler-wasm-receive_stock old:inventory/workflow/stock.md#inventory-f13 qa:modules/inventory/waste-and-adjustment -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Recepción
 Pasos:
@@ -516,7 +539,8 @@ falla: no entra ninguna.
 Implicados: ninguno
 
 ### INVENTORY-F14 Contar el stock de un producto
-Estado: servidor hecho
+<!-- origen: qa:modules/inventory/waste-and-adjustment fi:modules/inventory#command-inventory-stock-adjust old:inventory/workflow/stock.md#inventory-f14 qa:verticals/restaurant/08-incidents-voids-and-refunds -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Recuento
 Pasos:
@@ -540,7 +564,8 @@ de la ventana; si no, «No se pudo aplicar el recuento».
 Implicados: ninguno
 
 ### INVENTORY-F15 Dar de baja stock sin venta (merma, rotura, consumo propio)
-Estado: servidor hecho
+<!-- origen: qa:modules/inventory/waste-and-adjustment qa:verticals/restaurant/08-incidents-voids-and-refunds fi:modules/inventory#command-inventory-stock-decrease old:inventory/workflow/stock.md#inventory-f15 -->
+Estado: hecho
 Actor: administrador, responsable (pantalla); asistente
 Pantalla: ficha y tabla de Productos (ventana «Baja»); asistente
 Pasos:
@@ -584,7 +609,8 @@ por el número de la venta. Error de carga: el aviso de la tabla con «Reintenta
 Implicados: INVOICE-F20, SALE-F28
 
 ### INVENTORY-F17 Ver el panel y los productos con stock bajo
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#query-inventory-products-low_stock fi:modules/inventory#query-inventory-products-stats fi:modules/inventory#widget-inventory-low_stock_count-kpi-inventory-value-kpi-inventory-in_stock-stat-inventory-low_stock_products-bar-list old:inventory/workflow/stock.md#inventory-f17 -->
+Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Panel
 Pasos:
@@ -592,15 +618,13 @@ Pasos:
    «Stock bajo» (saldo igual o menor que su umbral) y «Valor de existencias» a coste. Tocar una de
    las cuatro primeras lleva a **Productos**.
 2. Debajo, «Productos con stock bajo», del que menos tiene al que más, con su umbral.
-3. En el **Inicio** del negocio, los paneles «Stock bajo», «Valor de inventario» y «Productos con
-   menos stock» (y «Productos en stock», si se añade) dan las mismas cifras.
 Entra: los productos activos, físicos y con control de stock. El valor es la suma de coste por
 saldo de los que tienen saldo positivo; un saldo negativo no resta.
 Sale: nada.
 Si falla: «No se pudieron cargar las métricas del inventario.» y el aviso de la tabla con
-«Reintentar». El panel y los paneles del Inicio se refrescan solos con cualquier movimiento de
-stock (venta, anulación, recepción, recuento, baja) y con cualquier alta, cambio o eliminación de un
-producto.
+«Reintentar». El panel se refresca solo con cualquier movimiento de stock (venta, anulación,
+recepción, recuento, baja) y con cualquier alta, cambio o eliminación de un producto. Las cifras viven
+aquí: el Inicio del negocio es la rejilla de apps, sin paneles.
 Implicados: ninguno
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
@@ -627,7 +651,8 @@ aviso ni se pierde ni sale dos veces. Si el movimiento no llega a guardarse, tam
 Implicados: FLOW-F21
 
 ### INVENTORY-F19 Ajustar el inventario
-Estado: servidor hecho
+<!-- origen: fi:modules/inventory#command-inventory-settings-update fi:modules/inventory#query-inventory-settings-get old:inventory/workflow/stock.md#inventory-f19 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ajustes
 Pasos:
@@ -652,7 +677,8 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 Implicados: SALE-F01
 
 ### INVENTORY-F20 Decidir qué artículos llevan control de stock
-Estado: servidor hecho
+<!-- origen: old:inventory/workflow/stock.md#inventory-f20 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -785,7 +811,8 @@ ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
 Implicados: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Vender al peso o por medida: unidades y escalón
-Estado: servidor hecho
+<!-- origen: qa:verticals/restaurant/03-menu-and-prices old:inventory/workflow/con-otros-modulos.md#inventory-f26 -->
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -805,7 +832,6 @@ Si falla: «La cantidad no respeta el incremento permitido para esta unidad» en
 cantidad no encaja en la unidad del producto…» por el asistente o la API. La unidad de un producto
 con stock no se cambia (INVENTORY-F02).
 Implicados: SALE-F10
-Pendiente de enlazar: core — leer la báscula y mandar el peso al TPV (no existe)
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
 <!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 fi:modules/inventory#query-inventory-products-list old:inventory/workflow/con-otros-modulos.md#inventory-f27 -->
@@ -835,7 +861,8 @@ reparto.
 Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
-Estado: servidor hecho (la cifra); falta la lista «Termina de configurar tu negocio» (núcleo)
+<!-- origen: old-hub:HUB_SHELL-F27 old-hub:HUB_SHELL-F31 old:inventory/workflow/con-otros-modulos.md#inventory-f28 -->
+Estado: parcial — la cifra de productos activos está; falta la lista «Termina de configurar tu negocio», que es del núcleo y el Hub todavía no tiene
 Actor: administrador, responsable
 Pantalla: Inicio: Termina de configurar tu negocio
 Pasos:
@@ -847,7 +874,6 @@ Entra: el número de productos activos.
 Sale: el paso hecho o pendiente. Lo ve quien puede dar de alta productos.
 Si falla: si se desactivan o eliminan todos los productos, el paso vuelve a pendiente.
 Implicados: ninguno
-Pendiente de enlazar: core — lista «Termina de configurar tu negocio» (su WORKBOOK aún no existe)
 
 ### INVENTORY-F29 Marcar un artículo como agotado
 <!-- origen: qa:modules/sales/sold-out-item-86 -->
@@ -1011,7 +1037,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
-  Las páginas (`frontend/`) llegan en la fase de frontend, iguales a las del módulo viejo.
+  Las páginas (`frontend/`) son las del módulo viejo: Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada.
