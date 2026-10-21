@@ -10,6 +10,7 @@ import DraftTray from '../components/DraftTray.vue';
 import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
+import RecipeRepairs from '../components/RecipeRepairs.vue';
 import AutomationsPage from './AutomationsPage.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -115,5 +116,17 @@ describe('AutomationsPage: review 2026-10-15, item 5', () => {
     expect(answerer.params('flow.flow.list')).toEqual([]);
     expect(answerer.wrapper.findComponent(FlowGallery).exists()).toBe(false);
     expect(answerer.find('flow-new').exists()).toBe(false);
+    expect(answerer.params('flow.recipe.list')).toEqual([]);
+  });
+});
+
+describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 to F36)', () => {
+  it('what needs a repair sits above «Your automations»', async () => {
+    const m = await setup('/flow/automations', [flow('f1')]);
+    const repairs = m.wrapper.findComponent(RecipeRepairs);
+    expect(repairs.exists()).toBe(true);
+    const order = [...m.wrapper.element.querySelectorAll('*')];
+    expect(order.indexOf(repairs.element as Element)).toBeLessThan(order.indexOf(m.wrapper.findComponent(FlowList).element as Element));
+    expect(m.params('flow.recipe.list')).toEqual([{}]);
   });
 });

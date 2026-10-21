@@ -30,6 +30,7 @@ def test_the_lists_and_the_detail_can_be_followed_live():
         "flow.draft.list",
         "flow.secret.list",
         "flow.question.list",
+        "flow.recipe.list",
     }
 
 
@@ -45,6 +46,8 @@ def test_each_query_and_its_events():
     assert queries["flow.secret.list"] == events.SECRET_EVENTS
     # A question comes, is answered or expires; one whose run is cancelled leaves too (FLOW-F29).
     assert queries["flow.question.list"] == [*events.QUESTION_EVENTS, *events.RUN_EVENTS]
+    # A recipe's card says whether it was turned on, how and whether it needs a repair (FLOW-F33 to F36).
+    assert queries["flow.recipe.list"] == events.FLOW_EVENTS
 
 
 # What a run does in a business is heard by that business only (review 2026-10-15, item 7)

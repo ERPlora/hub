@@ -363,3 +363,11 @@ def test_a_draft_reads_only_what_its_earlier_steps_leave():
     later = [COMMAND | {"params": {"title": "steps.s2.id"}}, COMMAND | {"id": "s2"}]
     found = errors(schemas.DraftProposeIn, {"name": "A", "definition": {"steps": later}, "notes": []})
     assert found == {"definition.steps": "Value error, Step 1 reads «steps.s2.id», which no earlier step leaves."}
+
+
+def test_a_step_the_hub_cannot_run_yet_is_refused():
+    # FLOW-F31, F37: with no assistant in the Hub or the SaaS and no message gateway, there is no «Ask the
+    # assistant» nor «Send a message» step: a document that names one is refused, never kept to fail later.
+    for kind in ("agent", "assistant", "message"):
+        with pytest.raises(pydantic.ValidationError):
+            schemas.CreateIn.model_validate({"steps": [{"id": "s1", "kind": kind, "prompt": "Answer the customer"}]})

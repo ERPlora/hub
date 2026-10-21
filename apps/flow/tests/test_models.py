@@ -62,6 +62,23 @@ def test_an_unknown_trigger_kind_is_refused_by_the_database():
         Flow.objects.create(name="Odd", trigger_kind="sometimes")
 
 
+def test_an_automation_of_its_own_comes_from_no_recipe():
+    flow = Flow.objects.create(name="Mine")
+    assert (flow.recipe, flow.recipe_digest) == ("", "")
+
+
+def test_one_automation_per_recipe_while_it_is_not_deleted():
+    # FLOW-F33: turning a recipe on twice is one automation; a deleted one lets it be built again.
+    first = make_flow(recipe="appointment/customer_cancelled", recipe_digest="a" * 64)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_flow("Again", recipe="appointment/customer_cancelled", recipe_digest="a" * 64)
+    make_flow("Another recipe", recipe="online_booking/booked_online")
+    make_flow("Mine"), make_flow("Mine too")  # automations of the owner's own come from no recipe
+    first.deleted_at = first.created_at
+    first.save(update_fields=["deleted_at"])
+    make_flow("Built again", recipe="appointment/customer_cancelled")
+
+
 def test_one_run_per_flow_and_trigger_key():
     flow = make_flow()
     make_run(flow, trigger_key="event-1")

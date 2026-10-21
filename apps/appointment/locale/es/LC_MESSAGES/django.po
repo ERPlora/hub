@@ -547,3 +547,22 @@ msgstr "Esta cita tiene una cuenta abierta en el TPV: cóbrala o anúlala allí 
 
 msgid "open check"
 msgstr "cuenta abierta"
+
+msgid "Fill the gap when a customer cancels"
+msgstr "Cubrir el hueco cuando un cliente cancela"
+
+msgid "When a customer cancels their appointment, leaves you a task to fill the gap."
+msgstr "Cuando un cliente cancela su cita, te deja una tarea para cubrir el hueco."
+
+msgid ""
+"Only the cancellations the customer asks for: the ones your team makes do not "
+"start it. The task is high priority and names the appointment."
+msgstr ""
+"Solo con las cancelaciones que pide el cliente: las que hace tu equipo no la "
+"arrancan. La tarea es de prioridad alta y dice qué cita era."
+
+msgid "Fill the gap of appointment {{input.number}}"
+msgstr "Cubrir el hueco de la cita {{input.number}}"
+
+msgid "Leaves you the task, so you remember to offer the free time."
+msgstr "Te deja la tarea, para que te acuerdes de ofrecer ese hueco."

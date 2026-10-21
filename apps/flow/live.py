@@ -14,3 +14,5 @@ live("flow.draft.list", on=DRAFT_EVENTS)
 live("flow.secret.list", on=SECRET_EVENTS)
 # «Waiting for your answer» (FLOW-F29): a question comes, is answered or expires; one whose run is cancelled leaves.
 live("flow.question.list", on=[*QUESTION_EVENTS, *RUN_EVENTS])
+# A ready-made automation's card says whether it was turned on, how, and whether it needs a repair (FLOW-F33 to F36).
+live("flow.recipe.list", on=FLOW_EVENTS)
