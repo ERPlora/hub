@@ -456,3 +456,161 @@ msgstr "Esa nota ya no existe."
 
 msgid "You may only delete your own notes."
 msgstr "Solo puedes borrar tus propias notas."
+
+# Templates made in the Hub (WHATSAPP_INBOX-F29…F31)
+
+msgid "A call button needs a number with its country code (+34…)."
+msgstr "Un botón de llamada necesita un número con su prefijo de país (+34…)."
+
+msgid "A link button needs an https:// address without variables."
+msgstr "Un botón de enlace necesita una dirección https:// sin variables."
+
+msgid "At most 2 link buttons and 1 call button."
+msgstr "Como mucho 2 botones de enlace y 1 de llamada."
+
+msgid "Being deleted at Meta"
+msgstr "Borrándose en Meta"
+
+msgid "Choose the template's language."
+msgstr "Elige el idioma de la plantilla."
+
+msgid "Deleted"
+msgstr "Borrada"
+
+msgctxt "whatsapp template header"
+msgid "None"
+msgstr "Ninguna"
+
+msgctxt "whatsapp template header"
+msgid "Text"
+msgstr "Texto"
+
+msgctxt "whatsapp template header"
+msgid "Image"
+msgstr "Imagen"
+
+msgctxt "whatsapp template header"
+msgid "Video"
+msgstr "Vídeo"
+
+msgctxt "whatsapp template header"
+msgid "Document"
+msgstr "Documento"
+
+msgctxt "whatsapp template header"
+msgid "Location"
+msgstr "Ubicación"
+
+msgid "Meta asks to wait before trying again. Try again in a few minutes."
+msgstr "Meta pide esperar antes de volver a intentarlo. Inténtalo de nuevo en unos minutos."
+
+msgid "Meta did not accept the template."
+msgstr "Meta no ha aceptado la plantilla."
+
+msgid "Meta did not answer. Try again in a few minutes."
+msgstr "Meta no ha contestado. Inténtalo de nuevo en unos minutos."
+
+msgid "Meta is reviewing this template: wait for its verdict to change it."
+msgstr "Meta está revisando esta plantilla: espera a su veredicto para cambiarla."
+
+msgid "Meta only lets you change the category of a template it rejected."
+msgstr "Meta solo deja cambiar la categoría de una plantilla que ha rechazado."
+
+msgctxt "whatsapp template"
+msgid "Not sent to Meta"
+msgstr "Sin enviar a Meta"
+
+msgctxt "whatsapp template"
+msgid "Queued"
+msgstr "En cola"
+
+msgctxt "whatsapp template"
+msgid "Sending to Meta"
+msgstr "Enviándose a Meta"
+
+msgctxt "whatsapp template"
+msgid "Not accepted"
+msgstr "No aceptada"
+
+msgid "Not deleted"
+msgstr "Sin borrar"
+
+msgid "Nothing to send to Meta"
+msgstr "Nada que enviar a Meta"
+
+msgid "Number the variables 1, 2, 3… in order, without skipping any."
+msgstr "Numera las variables 1, 2, 3… en orden, sin saltarte ninguna."
+
+msgid "Put the quick replies together, before or after the link and call buttons."
+msgstr "Pon juntas las respuestas rápidas, antes o después de los botones de enlace y de llamada."
+
+msgid "That template no longer exists."
+msgstr "Esa plantilla ya no existe."
+
+msgid "The header and the footer cannot have variables."
+msgstr "La cabecera y el pie no pueden llevar variables."
+
+msgid "There is already a template “%(name)s” in that language."
+msgstr "Ya hay una plantilla «%(name)s» en ese idioma."
+
+msgid "There is nothing of this template to hand to Meta again."
+msgstr "No hay nada de esta plantilla que volver a enviar a Meta."
+
+msgid "This template has a photo, video, document or place header, or buttons with something to fill in: send it from WhatsApp Manager."
+msgstr "Esta plantilla lleva una cabecera con foto, vídeo, documento o ubicación, o botones con algo que rellenar: envíala desde WhatsApp Manager."
+
+msgid "This template is changed in WhatsApp Manager: the Hub cannot change it."
+msgstr "Esta plantilla se cambia en WhatsApp Manager: el Hub no puede cambiarla."
+
+msgid "This template is on its way to Meta: wait a moment."
+msgstr "Esta plantilla se está enviando a Meta: espera un momento."
+
+msgid "Use lowercase letters, numbers and underscores only."
+msgstr "Usa solo minúsculas, números y guiones bajos."
+
+msgid "Write an example for each variable."
+msgstr "Escribe un ejemplo para cada variable."
+
+msgid "buttons"
+msgstr "botones"
+
+msgid "changes not yet at Meta"
+msgstr "cambios que aún no han llegado a Meta"
+
+msgid "deleted at"
+msgstr "borrada el"
+
+msgid "deletion at Meta"
+msgstr "borrado en Meta"
+
+msgid "erplora.com did not answer: Meta still has the template. Try again."
+msgstr "erplora.com no ha contestado: Meta aún tiene la plantilla. Inténtalo de nuevo."
+
+msgid "erplora.com did not answer: the template has not left. Try again."
+msgstr "erplora.com no ha contestado: la plantilla no ha salido. Inténtalo de nuevo."
+
+msgid "erplora.com did not confirm that Meta deleted the template. Try again."
+msgstr "erplora.com no ha confirmado que Meta haya borrado la plantilla. Inténtalo de nuevo."
+
+msgid "erplora.com did not confirm the template. Try again: it is never registered twice."
+msgstr "erplora.com no ha confirmado la plantilla. Inténtalo de nuevo: nunca se registra dos veces."
+
+msgid "examples of the variables"
+msgstr "ejemplos de las variables"
+
+msgid "handed over at"
+msgstr "entregada el"
+
+msgid "handled by the Hub"
+msgstr "la gestiona el Hub"
+
+msgid "header type"
+msgstr "tipo de cabecera"
+
+msgid "sending to Meta"
+msgstr "envío a Meta"
+
+# What the customer taps answers a message of the Hub (WHATSAPP_INBOX-F38)
+
+msgid "option tapped"
+msgstr "opción tocada"

@@ -23,7 +23,10 @@ from apps.whatsapp_inbox.schemas import (
     NoteRefIn,
     SendIn,
     SetStatusIn,
+    TemplateCreateIn,
     TemplateListIn,
+    TemplateRefIn,
+    TemplateUpdateIn,
 )
 
 router = Router(tags=["whatsapp_inbox"])
@@ -157,3 +160,23 @@ async def channel_get(request):
 @bind(router, "whatsapp_inbox.agent.list", "/whatsapp_inbox/agents")
 async def agent_list(request, params: Query[AgentListIn]):
     return await run_operation(request, queries.list_agents, params)
+
+
+@bind(router, "whatsapp_inbox.template.create", "/whatsapp_inbox/templates", status=201)
+async def template_create(request, data: TemplateCreateIn):
+    return await run_operation(request, services.create_template, data)
+
+
+@bind(router, "whatsapp_inbox.template.update", "/whatsapp_inbox/templates/update")
+async def template_update(request, data: TemplateUpdateIn):
+    return await run_operation(request, services.update_template, data)
+
+
+@bind(router, "whatsapp_inbox.template.retry", "/whatsapp_inbox/templates/retry")
+async def template_retry(request, data: TemplateRefIn):
+    return await run_operation(request, services.retry_template, data)
+
+
+@bind(router, "whatsapp_inbox.template.delete", "/whatsapp_inbox/templates/delete")
+async def template_delete(request, data: TemplateRefIn):
+    return await run_operation(request, services.delete_template, data)

@@ -7,6 +7,7 @@ is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees i
 """
 
 import datetime as dt
+import re
 
 from django.conf import settings
 from django.db import models
@@ -248,6 +249,8 @@ class Message(UUIDModel):
     # The key the Hub sends with a message (Idempotency-Key): a retry never sends it twice.
     client_message_id = models.UUIDField(_("send key"), null=True, blank=True)
     reply_to = models.CharField(_("answers"), max_length=255, blank=True)
+    # The option the customer tapped (a template's quick reply, an interactive button or list row): its id.
+    reply_id = models.CharField(_("option tapped"), max_length=256, blank=True)
     sent_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -318,8 +321,38 @@ class Note(UUIDModel):
         return self.text[:60]
 
 
+#: The buttons the Hub writes and sends as they are (no value to fill when sending).
+HUB_BUTTONS = frozenset({"QUICK_REPLY", "URL", "PHONE_NUMBER"})
+#: A variable that is not ``{{1}}``, ``{{2}}``…: one Meta names (``{{nombre}}``), which the Hub never fills.
+NAMED_VARIABLE = re.compile(r"\{\{(?!\s*\d+\s*\}\})")
+
+
+def hub_handles(category: str, header_format: str, header: str, body: str, buttons: list) -> bool:
+    """Whether the Hub's form makes this content and its sending fills it: no authentication code, no file or
+    place header, no variable outside the body, only numbered variables in it, and only quick replies, fixed
+    links and calls."""
+    if category == "AUTHENTICATION" or header_format not in ("", "TEXT") or "{{" in (header or ""):
+        return False
+    if NAMED_VARIABLE.search(body or ""):
+        return False
+    return all(
+        isinstance(button, dict)
+        and button.get("type") in HUB_BUTTONS
+        and "{{" not in str(button.get("url", ""))
+        for button in buttons or []
+    )
+
+
 class Template(UUIDModel):
-    """The local copy of a message template of the business's WhatsApp account (synced by the SaaS)."""
+    """A message template of the business's WhatsApp account: made and changed here (WHATSAPP_INBOX-F29…F31)
+    or in WhatsApp Manager, and kept in step with what Meta holds (synced by the SaaS, F27, F28).
+
+    The main fields are what Meta has (or, while Meta never had it, what was written here). An edit of a
+    template Meta has waits in ``draft`` until erplora.com registers it, so the approved one stays usable and
+    Meta's verdict never lands on a text changed afterwards. ``submit_state`` follows the hand-over to
+    erplora.com (door 8) as a message's status does; a template deleted here keeps its row (``deleted_at``) so
+    Meta's next list never brings it back, and ``delete_state`` follows its deletion at Meta (door 9).
+    """
 
     class Category(models.TextChoices):
         UTILITY = "UTILITY", pgettext_lazy("whatsapp template", "Utility")
@@ -327,12 +360,33 @@ class Template(UUIDModel):
         AUTHENTICATION = "AUTHENTICATION", pgettext_lazy("whatsapp template", "Authentication")
 
     class Status(models.TextChoices):
+        DRAFT = "DRAFT", pgettext_lazy("whatsapp template", "Not sent to Meta")
         APPROVED = "APPROVED", pgettext_lazy("whatsapp template", "Approved")
         PENDING = "PENDING", pgettext_lazy("whatsapp template", "In review")
         REJECTED = "REJECTED", pgettext_lazy("whatsapp template", "Rejected")
         PAUSED = "PAUSED", pgettext_lazy("whatsapp template", "Paused by Meta")
         DISABLED = "DISABLED", pgettext_lazy("whatsapp template", "Disabled by Meta")
         DELETED = "DELETED", _("Deleted in WhatsApp Manager")
+
+    class HeaderFormat(models.TextChoices):
+        NONE = "", pgettext_lazy("whatsapp template header", "None")
+        TEXT = "TEXT", pgettext_lazy("whatsapp template header", "Text")
+        IMAGE = "IMAGE", pgettext_lazy("whatsapp template header", "Image")
+        VIDEO = "VIDEO", pgettext_lazy("whatsapp template header", "Video")
+        DOCUMENT = "DOCUMENT", pgettext_lazy("whatsapp template header", "Document")
+        LOCATION = "LOCATION", pgettext_lazy("whatsapp template header", "Location")
+
+    class SubmitState(models.TextChoices):
+        # The hand-over of a new template or an edit to erplora.com (door 8).
+        NONE = "", _("Nothing to send to Meta")
+        QUEUED = "queued", pgettext_lazy("whatsapp template", "Queued")
+        SENDING = "sending", pgettext_lazy("whatsapp template", "Sending to Meta")
+        FAILED = "failed", pgettext_lazy("whatsapp template", "Not accepted")
+
+    class DeleteState(models.TextChoices):
+        NONE = "", _("Not deleted")
+        PENDING = "pending", _("Being deleted at Meta")
+        DONE = "done", _("Deleted")
 
     name = models.CharField(_("name"), max_length=512)
     language = models.CharField(_("language"), max_length=15)
@@ -345,25 +399,64 @@ class Template(UUIDModel):
         choices=Status.choices,
         default=Status.APPROVED,
     )
+    header_format = models.CharField(
+        _("header type"), max_length=10, choices=HeaderFormat.choices, default=HeaderFormat.NONE, blank=True
+    )
     header = models.CharField(_("header"), max_length=200, blank=True)
     body = models.TextField(_("body"), blank=True)
+    # An example of each body variable, in order: Meta reviews the template with them.
+    body_examples = models.JSONField(_("examples of the variables"), default=list, blank=True)
     footer = models.CharField(_("footer"), max_length=200, blank=True)
+    # Meta's buttons as it lists them: ``{"type", "text", "url"?, "phone_number"?}``.
+    buttons = models.JSONField(_("buttons"), default=list, blank=True)
     # How many variables the body takes ({{1}}…{{n}}).
     variables = models.PositiveSmallIntegerField(_("variables"), default=0)
     rejected_reason = models.CharField(_("Meta's reason"), max_length=500, blank=True)
     meta_id = models.CharField(_("Meta id"), max_length=64, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
+    # An edit of a template Meta has, waiting for erplora.com to register it (category, header, body,
+    # body_examples, footer, buttons); empty when there is none.
+    draft = models.JSONField(_("changes not yet at Meta"), null=True, blank=True)
+    submit_state = models.CharField(
+        _("sending to Meta"), max_length=10, choices=SubmitState.choices, default=SubmitState.NONE, blank=True
+    )
+    # The key the Hub sends with this hand-over (Idempotency-Key): a retry never registers it twice.
+    submit_key = models.UUIDField(_("send key"), null=True, blank=True)
+    # The code and reason of the last hand-over or deletion that did not end well.
+    submit_error_code = models.CharField(_("error code"), max_length=64, blank=True)
+    submit_error = models.CharField(_("error"), max_length=500, blank=True)
+    submit_at = models.DateTimeField(_("handed over at"), null=True, blank=True)
+    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    delete_state = models.CharField(
+        _("deletion at Meta"), max_length=10, choices=DeleteState.choices, default=DeleteState.NONE, blank=True
+    )
+    # Whether the Hub makes and sends what Meta holds (``hub_handles``); else only WhatsApp Manager does.
+    supported = models.BooleanField(_("handled by the Hub"), default=True, editable=False)
 
     class Meta:
         verbose_name = _("template")
         verbose_name_plural = _("templates")
         ordering = ["name", "language", "id"]
         constraints = [
+            # One live template per name and language: one deleted here frees them.
             models.UniqueConstraint(
                 fields=["name", "language"],
-                name="whatsapp_inbox_template_name_language_unique",
+                condition=Q(deleted_at__isnull=True),
+                name="whatsapp_inbox_template_live_name_language_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["submit_key"],
+                condition=Q(submit_key__isnull=False),
+                name="whatsapp_inbox_template_submit_key_unique",
             ),
         ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.language})"
+
+    def save(self, *args, **kwargs):
+        self.supported = hub_handles(self.category, self.header_format, self.header, self.body, self.buttons)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = {*update_fields, "supported"}
+        super().save(*args, **kwargs)
