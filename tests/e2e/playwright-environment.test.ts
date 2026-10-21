@@ -145,6 +145,21 @@ describe('the tests that load Playwright', () => {
       const read = vi.mocked(readFileSync).mock.calls.map(([path]) => relative(work, String(path)));
       expect(read.sort()).toEqual(['first.test.ts', 'helper.ts', 'second.test.ts', 'shared.ts']);
     });
+
+    it('sees Playwright through a module that another test file already walked', () => {
+      work = mkdtempSync(join(tmpdir(), 'hub-loads-playwright-'));
+      const modules: Record<string, string> = {
+        'page.ts': "import { test } from '@playwright/test';\nexport const page = test;\n",
+        'helper.ts': "import { page } from './page';\nexport const helper = page;\n",
+        'first.test.ts': "import { helper } from './helper';\n",
+        'second.test.ts': "import { helper } from './helper';\n",
+      };
+      for (const [name, code] of Object.entries(modules)) writeFileSync(join(work, name), code);
+      expect(['first.test.ts', 'second.test.ts'].filter((name) => loadsPlaywright(join(work, name)))).toEqual([
+        'first.test.ts',
+        'second.test.ts',
+      ]);
+    });
   });
 
   it("reads the environment from the file's docblock, else the config's", () => {
