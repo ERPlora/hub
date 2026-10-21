@@ -27,8 +27,8 @@ DISCONNECT = f"{SAAS}/internal/whatsapp/disconnect"
 RETURN_PAGE = "https://erplora.com/whatsapp/return"
 CONFIGURED = {
     "configured": True,
-    "app_id": "1481226093843982",
-    "config_id": "1101452998214123",
+    "app_id": "1234567890",
+    "config_id": "9876543210",
     "graph_version": "v25.0",
     "redirect_uri": RETURN_PAGE,
 }

@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { dialogUrl, newState, readReturn, readSession, type SignupOptions } from './metaSignup';
 
 const OPTIONS: SignupOptions = {
-  app_id: '1481226093843982',
-  config_id: '1101452998214123',
+  app_id: '1234567890',
+  config_id: '9876543210',
   graph_version: 'v25.0',
   redirect_uri: 'https://erplora.com/whatsapp/return',
 };
@@ -22,8 +22,8 @@ describe('dialogUrl', () => {
     const url = new URL(dialogUrl(OPTIONS, STATE));
     expect(`${url.origin}${url.pathname}`).toBe('https://www.facebook.com/v25.0/dialog/oauth');
     expect(Object.fromEntries(url.searchParams)).toEqual({
-      client_id: '1481226093843982',
-      config_id: '1101452998214123',
+      client_id: '1234567890',
+      config_id: '9876543210',
       response_type: 'code',
       override_default_response_type: 'true',
       redirect_uri: 'https://erplora.com/whatsapp/return',

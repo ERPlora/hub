@@ -343,7 +343,7 @@ CONFIG = f"{URL}/internal/whatsapp/config"
 CONNECT = f"{URL}/internal/whatsapp/connect"
 DISCONNECT = f"{URL}/internal/whatsapp/disconnect"
 WINDOW = {"code": "AQD-one-time", "event": "FINISH", "waba_id": "102290129340398", "phone_number_id": "106540352242922", "business_id": "2729063490586005"}
-CONFIGURED = {"configured": True, "app_id": "1481226093843982", "config_id": "1101452998214123", "graph_version": "v25.0"}
+CONFIGURED = {"configured": True, "app_id": "1234567890", "config_id": "9876543210", "graph_version": "v25.0"}
 
 
 def signed_by_the_hub(request) -> bool:

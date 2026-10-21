@@ -8,8 +8,8 @@ import type { SignupOptions } from '../lib/metaSignup';
 import { CLOSE_GRACE_MS, SESSION_WAIT_MS, useMetaSignup } from './useMetaSignup';
 
 const OPTIONS: SignupOptions = {
-  app_id: '1481226093843982',
-  config_id: '1101452998214123',
+  app_id: '1234567890',
+  config_id: '9876543210',
   graph_version: 'v25.0',
   redirect_uri: 'https://erplora.com/whatsapp/return',
 };

@@ -2,11 +2,14 @@
 Prefijo: WHATSAPP_INBOX
 Alcance MVP: transversal
 Estado de la app: hecha en el Hub (servidor y páginas), también las plantillas, que se crean, editan y
-borran desde el Hub. Lo que entra de erplora.com y lo que sale hacia él está declarado y probado en el Hub,
-y el Hub ya tiene montadas las puertas por las que erplora.com le habla; falta la mitad de erplora.com
-(recibir de Meta, enviar, olvidar un número y registrar plantillas), así que los flujos que cruzan con
-erplora.com quedan en parcial. Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26)
-están escritas y esperan al asistente del Hub y a que Automatizaciones pueda mandar un mensaje a un cliente.
+borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se desconecta desde Ajustes. Lo que
+entra de erplora.com y lo que sale hacia él está declarado y probado en el Hub, y el Hub ya tiene montadas
+las puertas por las que erplora.com le habla. erplora.com tiene su mitad desde saas#63 (2026-10-21: recibir
+de Meta, enviar, olvidar un número, registrar plantillas y conectar el número), pero los flujos que cruzan
+con erplora.com siguen en parcial hasta probarlos de punta a punta contra él; conectar espera además la
+página de erplora.com a la que Meta devuelve su código (F01). Las respuestas automáticas que reservan cita
+o mesa por WhatsApp (F14–F26) están escritas y esperan al asistente del Hub y a que Automatizaciones pueda
+mandar un mensaje a un cliente.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -70,9 +73,9 @@ WhatsApp Manager a crear las plantillas saca al dueño de la app para lo que hac
 ## Antes de empezar
 
 1. Activar **Clientes**: la bandeja no se enciende sin ella (une cada conversación a su ficha).
-2. Conectar el número de WhatsApp Business del negocio **en erplora.com** (la cuenta de WhatsApp y el
-   enlace con Meta viven allí). En el Hub, **Bandeja de WhatsApp → Ajustes** dice si el número está
-   conectado y lleva a erplora.com para conectarlo.
+2. Conectar el número de WhatsApp Business del negocio en **Bandeja de WhatsApp → Ajustes → Conectar
+   WhatsApp**: se abre la ventana de Meta, se entra con Facebook y se elige el número (la cuenta de
+   WhatsApp y el enlace con Meta los guarda erplora.com).
 3. Crear las plantillas en **Ajustes → Plantillas de Meta → Añadir plantilla** (o en WhatsApp Manager) y
    esperar a que Meta las apruebe: las de WhatsApp Manager aparecen solas en la misma lista.
 4. Escribir al número desde otro móvil y comprobar que la conversación aparece en la bandeja.
@@ -100,8 +103,9 @@ escribirle con una plantilla aprobada.») y solo queda **Plantilla**. Solo el pr
 administrador ven **Borrar datos de este número**.
 
 Avisos encima de la lista: «Reconectando…» mientras vuelve la conexión en vivo; el número sin
-conectar («WhatsApp no está conectado. Conecta el número del negocio en erplora.com para recibir y
-enviar mensajes.», con **Ir a erplora.com** para quien puede configurar); los mensajes del plan
+conectar («WhatsApp no está conectado. Conecta el número del negocio en Ajustes para recibir y enviar
+mensajes.») o por reconectar («WhatsApp pide volver a conectar el número en Ajustes: hasta entonces no se
+puede enviar nada.»), los dos con **Ir a Ajustes** para quien puede configurar; los mensajes del plan
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
 llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.»).
 Vacía: «Sin conversaciones.»; con búsqueda o filtro: «Sin resultados»; cargando: indicador; error de
@@ -111,7 +115,9 @@ conversación».
 ### Ajustes
 Menú **Bandeja de WhatsApp → Ajustes** (título «Ajustes del canal»), solo propietario y
 administrador. Tres bloques: **Tu número** («Conectado» con el número y el nombre del negocio, «Sin
-conectar» o «Hay que reconectar», y **Gestionar en erplora.com**); **Este mes** (los mensajes
+conectar» o «Hay que reconectar»; sin conectar o por reconectar, «Comprobando con erplora.com…» y luego
+**Conectar WhatsApp** o **Volver a conectar**, o el motivo por el que todavía no se puede; conectado o por
+reconectar, **Desconectar**, que pregunta antes); **Este mes** (los mensajes
 enviados frente a los del plan, o «Sin límite»); y **Plantillas de Meta**: tabla con **Nombre**,
 **Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
 Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
@@ -147,8 +153,8 @@ categoría de una plantilla que ha rechazado.»).
 
 | ID | Flujo | Estado | Vertical |
 |---|---|---|---|
-| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la conexión es de erplora.com, que aún no la tiene | comun |
-| WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | parcial — la reconexión es de erplora.com, que aún no la tiene | comun |
+| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la ventana de Meta aún no puede devolver su código: falta la página de vuelta de erplora.com y que el Hub no corte las ventanas que abre | comun |
+| WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | parcial — desconectar está hecho; volver a conectar abre la ventana de F01, que aún no puede devolver su código | comun |
 | WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | parcial — falta la entrada desde erplora.com | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
 | WHATSAPP_INBOX-F05 | Leer una conversación | hecho | comun |
@@ -188,36 +194,54 @@ categoría de una plantilla que ha rechazado.»).
 
 ### WHATSAPP_INBOX-F01 Conectar el número de WhatsApp del negocio
 <!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
-Estado: parcial — el Hub enseña el estado del número y lleva a erplora.com; conectar el número
-(Facebook, QR de la app WhatsApp Business) y contárselo al Hub es la mitad de erplora.com, que todavía
-no existe
+Estado: parcial — **Tu número** ya pregunta a erplora.com con qué abrir la ventana de Meta, la abre sin
+programas de Facebook y conecta en erplora.com el número que esa ventana elige; falta que la ventana pueda
+devolver su código: erplora.com todavía no tiene la página a la que Meta lo devuelve, y las páginas del Hub
+cortan las ventanas que abren. Mientras, **Tu número** dice «Todavía no se puede conectar el número desde
+aquí.» en vez de ofrecer **Conectar WhatsApp**
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
-1. Abrir **Bandeja de WhatsApp → Ajustes**: **Tu número** dice «Sin conectar».
-2. Pulsar **Gestionar en erplora.com**: en el panel del negocio de erplora.com se conecta el número
-   (Facebook, QR de la app WhatsApp Business).
-3. Al volver, **Tu número** dice «Conectado» con el número, sin recargar.
-Entra: el estado del número que erplora.com manda al Hub.
-Sale: nada en el Hub; el número conectado vive en erplora.com.
-Si falla: lo dice erplora.com; el Hub sigue diciendo «Sin conectar».
-Implicados: erplora.com (la cuenta de WhatsApp Business del negocio)
+1. Abrir **Bandeja de WhatsApp → Ajustes**: **Tu número** dice «Sin conectar» y, tras «Comprobando con
+   erplora.com…», ofrece **Conectar WhatsApp**.
+2. Pulsar **Conectar WhatsApp**: se abre la ventana de Meta («Termina en la ventana de Meta…»); se entra
+   con Facebook y se elige o se añade el número del negocio. Si ya se usa en la app WhatsApp Business del
+   móvil, se escanea el código con ese móvil y se sigue usando WhatsApp en él como siempre.
+3. Al terminar en la ventana, **Tu número** dice «Conectando…» y enseguida «Conectado» con el número y el
+   nombre del negocio, sin recargar. Si el número venía de la app del móvil, avisa de que sus contactos y
+   chats llegan a la bandeja en unos minutos.
+Entra: lo que la ventana de Meta devuelve (un código de un solo uso, la cuenta de WhatsApp Business, el
+número elegido y el portfolio) y la respuesta de erplora.com.
+Sale: el número conectado de este negocio, sin tocar el de ningún otro; aviso
+`whatsapp_inbox.channel.connected`.
+Si falla: si erplora.com no contesta, **Tu número** lo dice con **Reintentar**; si WhatsApp todavía no está
+disponible en ERPlora, lo dice y no ofrece conectar. Si el navegador no deja abrir la ventana, pide permitir
+las ventanas emergentes; si la ventana se cierra antes de terminar o Meta no termina, no se conecta nada y
+se dice por qué. Si Meta rechaza el código (caduca a los 30 segundos), el número elegido no está en la
+cuenta o la cuenta tiene varios y no se eligió ninguno, se dice y no se conecta nada; una demo no puede
+conectar ningún número. Si erplora.com no confirma, en un momento **Tu número** dice si quedó conectado.
+Implicados: erplora.com (la cuenta de WhatsApp Business del negocio), Meta
 
 ### WHATSAPP_INBOX-F02 Desconectar o volver a conectar el número
 <!-- origen: old-hub:HUB_SHELL-F171 old-hub:HUB_SHELL-F172 old-saas:SAAS_WHATSAPP_INBOX-F03 old-saas:SAAS_WHATSAPP_INBOX-F04 old-hub:HUB-F262 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f02 -->
-Estado: parcial — el Hub enseña «Hay que reconectar» y quita el aviso solo cuando el número vuelve;
-desconectar y reconectar se hace en erplora.com, que todavía no tiene esa mitad
+Estado: parcial — **Desconectar** funciona de punta a punta con erplora.com y los avisos se van solos;
+**Volver a conectar** abre la ventana de Meta de F01, que todavía no puede devolver su código
 Actor: propietario, administrador
 Pantalla: Ajustes, Bandeja de entrada
 Pasos:
-1. Si WhatsApp retiró el permiso, **Tu número** dice «Hay que reconectar» y la bandeja avisa de que
-   no se puede enviar.
-2. **Gestionar en erplora.com** lleva a reconectar o desconectar.
-3. Con el número de vuelta, los avisos se van solos, sin recargar.
-Entra: el estado del número que erplora.com manda al Hub.
-Sale: las conversaciones guardadas no se tocan.
-Si falla: mientras siga «Hay que reconectar», **Enviar** dice por qué no sale; lo guardado se sigue
-leyendo.
+1. Si WhatsApp retiró el permiso, **Tu número** dice «Hay que reconectar» y la bandeja avisa de que no se
+   puede enviar, con **Ir a Ajustes** para quien puede configurar.
+2. **Volver a conectar** abre la ventana de Meta, como al conectar (F01).
+3. **Desconectar** pregunta antes («¿Desconectar el número de WhatsApp?»: deja de recibir y enviar hasta que
+   se vuelva a conectar; las conversaciones guardadas no se tocan). Al confirmar, **Tu número** dice «Sin
+   conectar» y «WhatsApp desconectado.».
+4. Con el número de vuelta, los avisos se van solos, sin recargar.
+Entra: el estado del número que erplora.com manda al Hub y su respuesta al desconectar.
+Sale: las conversaciones guardadas no se tocan; aviso `whatsapp_inbox.channel.disconnected`.
+Si falla: si erplora.com no contesta o no confirma, el diálogo lo dice y el número sigue como estaba (en un
+momento **Tu número** dice cómo quedó); si erplora.com no tenía ningún número conectado para este negocio,
+lo dice y **Tu número** queda «Sin conectar». Mientras siga «Hay que reconectar», **Enviar** dice por qué no
+sale; lo guardado se sigue leyendo.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
@@ -969,6 +993,9 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.template.update` | Cambia una plantilla; la aprobada sigue enviándose hasta que Meta recibe el cambio |
 | `whatsapp_inbox.template.retry` | Vuelve a entregar la plantilla (o su borrado) que no llegó a Meta; un rechazo va con clave nueva |
 | `whatsapp_inbox.template.delete` | Borra una plantilla aquí y en Meta (irreversible) |
+| `whatsapp_inbox.channel.prepare` | Pregunta a erplora.com con qué abrir la ventana de Meta y dice si se puede abrir ya (no guarda nada; es acción porque espera a erplora.com fuera de toda transacción) |
+| `whatsapp_inbox.channel.connect` | Conecta el número que eligió la ventana de Meta, con su código de un solo uso tal cual llegó |
+| `whatsapp_inbox.channel.disconnect` | Desconecta el número del negocio; las conversaciones se quedan |
 
 Del sistema (sin ruta pública; solo erplora.com por `/internal`, las entregas, el worker y las
 reacciones): `whatsapp_inbox.message.receive`, `whatsapp_inbox.message.update_status`,
@@ -988,7 +1015,7 @@ las reacciones a Clientes (`whatsapp_inbox.conversation.claim_for_customer`,
 `whatsapp_inbox.conversation.assigned`, `whatsapp_inbox.conversation.status_changed`,
 `whatsapp_inbox.conversation.customer_linked`, `whatsapp_inbox.conversation.erased`,
 `whatsapp_inbox.note.added`, `whatsapp_inbox.note.deleted`, `whatsapp_inbox.channel.synced`,
-`whatsapp_inbox.template.created`, `whatsapp_inbox.template.updated`, `whatsapp_inbox.template.deleted`.
+`whatsapp_inbox.channel.connected`, `whatsapp_inbox.channel.disconnected`, `whatsapp_inbox.template.created`, `whatsapp_inbox.template.updated`, `whatsapp_inbox.template.deleted`.
 Llevan identificadores, nunca un número, un nombre ni un texto de la conversación.
 
 ### A qué reacciona y lo que necesita de otras apps
@@ -1015,7 +1042,7 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 | `whatsapp_inbox.view` (leer, marcar leída) | sí | sí | sí | sí |
 | `whatsapp_inbox.reply` (enviar, reintentar, notas, estado, ficha, asignarse una libre) | sí | sí | sí | sí |
 | `whatsapp_inbox.assign` (asignar a otro, quitársela a otro, borrar notas ajenas) | sí | sí | sí | no |
-| `whatsapp_inbox.configure` (Ajustes; crear, editar, reenviar y borrar plantillas) | sí | sí | no | no |
+| `whatsapp_inbox.configure` (Ajustes; conectar, volver a conectar y desconectar el número; crear, editar, reenviar y borrar plantillas) | sí | sí | no | no |
 | `whatsapp_inbox.erase` (borrar datos de un número) | sí | sí | no | no |
 
 Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tiene.
@@ -1024,11 +1051,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 
 ### Modelo
 
-- `Channel` (una fila): estado del número (`not_connected`, `connected`, `reconnect_needed`), número
-  y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`) y la
-  `version` de la última foto de erplora.com (una igual o más vieja se ignora). **Fase 1 sin tenencia:**
-  es una sola fila compartida por todos los hubs (como todas las tablas de la fase 1); en la fase 2 vive
-  en la BD de cada hub.
+- `Channel` (una fila por negocio): estado del número (`not_connected`, `connected`, `reconnect_needed`),
+  número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`) y la
+  `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). **Fase 1
+  sin tenencia:** las tablas son compartidas, así que la fila lleva el negocio en `host` (la primera etiqueta
+  de su host, como `base.Membership`; única) y cada operación lee y escribe solo la del `Scope` de su
+  contexto: la foto de `b` nunca pisa el número de `a` (desde la migración `0005`, reversible). En la fase
+  2 vive una sola en la BD de cada hub. Solo la escribe lo que dice erplora.com: su foto y su respuesta al
+  conectar o desconectar desde Ajustes.
 - `Conversation`: número E.164 (`phone`, único entre las no borradas), nombre de WhatsApp y su forma
   para buscar (`contact_search`: sin mayúsculas, tildes, emojis ni espacios de más), ficha
   (`customer`, FK a `customer.Customer`; una ficha eliminada cuenta como ninguna), asignada
@@ -1071,7 +1101,12 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   (`conversation.claim_erasure` → HTTP → `conversation.record_erasure`) y con las plantillas
   (`template.claim_submit` → HTTP → `template.record_submit`; `template.claim_delete` → HTTP →
   `template.record_delete`). Un erplora.com lento nunca bloquea la conversación (`receive`, `mark_read`,
-  `assign`) ni, con el plan Gratis, el hub.
+  `assign`) ni, con el plan Gratis, el hub. `channel.prepare`, `channel.connect` y `channel.disconnect`
+  son acciones aunque `prepare` no guarde nada (una consulta abre su transacción `READ ONLY` antes de su
+  primera línea): las tres preguntan a erplora.com **antes** de leer o escribir nada, y solo después
+  `connect` y `disconnect` guardan su respuesta en la fila del negocio, en una transacción corta con su
+  evento. La foto que erplora.com empuja entretanto dice lo mismo con una versión mayor, y la siguiente
+  sigue ganando.
 - **Fase 1** entrega al terminar la petición (el `on_commit` corre en ella); **fase 2**: el trabajo
   diferido entra con `use_hub(hub)` explícito (corre fuera de la petición que eligió el hub) y la tarea
   del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
@@ -1225,8 +1260,9 @@ las llame:
    puerta 3 (sin `hub`), con la `version` de la foto; `base` se la pasa a `whatsapp_inbox.channel.sync`.
 
 **Las puertas que sirve el SaaS** (el Hub → erplora.com; `apps/whatsapp_inbox/gateway.py`, `httpx`, 5 s
-para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción). Ninguna existe
-todavía en erplora.com, ni su webhook de Meta (FIX-SAAS-WHATSAPP-GATEWAY-DOORS):
+para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción). Existen en
+erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/internal.py`; su WORKBOOK,
+«Contrato con el Hub», añade las 10–12):
 
 5. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/send`, con `Idempotency-Key: <client_message_id>`:
 
@@ -1277,6 +1313,60 @@ todavía en erplora.com, ni su webhook de Meta (FIX-SAAS-WHATSAPP-GATEWAY-DOORS)
    otro 404 (una puerta que no existe, una dirección mal puesta: gh:whatsapp_inbox#296), 409 con su
    motivo, otro 4xx, 5xx o sin respuesta = sigue `pending` y el Hub lo vuelve a pedir.
 
+Las tres de **conectar el número desde Ajustes** (F01, F02; `whatsapp_inbox.channel.prepare`, `.connect` y
+`.disconnect`, en la petición de la persona y sin transacción abierta). En las tres, el sobre de errores de
+erplora.com con cualquier estado es un rechazo: no se hizo nada y se dice su motivo (`hub_unknown` → 409
+`whatsapp_inbox.hub_unknown`, «una demo no puede conectar»; `whatsapp.meta_rejected` → 409
+`whatsapp_inbox.meta_rejected` con las palabras de Meta; `whatsapp.number_not_in_account` y
+`whatsapp.number_not_chosen` → 409 con el suyo; `whatsapp.meta_rate_limited` → 409; `whatsapp.meta_unreachable`
+y `whatsapp.meta_no_token` → 503 `whatsapp_inbox.meta_unreachable`; `whatsapp.not_configured` → 409
+`whatsapp_inbox.whatsapp_unavailable`; otro código → 503 `whatsapp_inbox.saas_refused`, con log de error). Un
+4xx sin sobre o sin conexión → 503 `whatsapp_inbox.saas_unreachable` (no salió nada); un 5xx sin sobre, sin
+respuesta o un 200 que no es el de la puerta → 503 `whatsapp_inbox.connect_unknown` /
+`whatsapp_inbox.disconnect_unknown` (no se sabe: la foto lo dirá). Sin `SAAS_INTERNAL_URL`, 409
+`whatsapp_inbox.saas_unconfigured`.
+
+10. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/config` `{"hub": "a"}` → 200 `{"configured": true, "app_id":
+    "1234567890", "config_id": "9876543210", "graph_version": "v25.0", "redirect_uri":
+    "https://erplora.com/whatsapp/return"}` (solo identificadores públicos). `configured: false` → «WhatsApp
+    todavía no está disponible en ERPlora.» y no se ofrece conectar. Ids que no son cifras o una versión que
+    no es `vNN.N` → 503 `whatsapp_inbox.saas_unreachable`. **`redirect_uri` es propuesta del Hub** (la puerta
+    de `main` no lo da todavía): la página de erplora.com a la que Meta devuelve el código; el Hub solo la
+    acepta https y del origen de `SAAS_URL`. Sin ella, o si las páginas del Hub cortan las ventanas que abren
+    (`SECURE_CROSS_ORIGIN_OPENER_POLICY` que no es `same-origin-allow-popups` ni `unsafe-none`; el `same-origin`
+    de Django por defecto las corta), `prepare` dice `available: false` con `window_unavailable` o
+    `popups_blocked` y la pantalla, «Todavía no se puede conectar el número desde aquí.».
+11. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/connect` con lo que dio la ventana, tal cual:
+
+    ```json
+    {"hub": "a", "code": "AQB…", "event": "FINISH", "waba_id": "102290129340398",
+     "phone_number_id": "106540352242922", "business_id": "2729063490586005"}
+    ```
+
+    → 200 `{"connected": true, "phone_number": "+34910000000", "display_name": "Peluquería Ana",
+    "history_requested": false}`: el Hub lo guarda en la fila del negocio al momento (con un número E.164 y un
+    nombre de hasta 200; si no, `connect_unknown`) y avisa `whatsapp_inbox.channel.connected`
+    (`{"history_requested"}`). `event`: `FINISH` o `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` (número de la app
+    del móvil: erplora.com pide su historial); una ventana cancelada no llega a la puerta. El código dura 30 s.
+12. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/disconnect` `{"hub": "a"}` → 200 `{"disconnected": true |
+    false}` (`false`: no había número). En los dos casos la fila del negocio queda `not_connected` sin número
+    (con `whatsapp_inbox.channel.disconnected` si cambió); el consumo del mes y las conversaciones se quedan.
+
+**La ventana de Meta sin el SDK de Facebook** (la CSP del Hub no carga nada de otro origen; decidido con el
+mercado: Meta «manual flow» y Embedded Signup, HubSpot, Chatwoot, respond.io, Chakra, Typewise y Bird). En el
+clic, `window.open` de `https://www.facebook.com/<graph_version>/dialog/oauth?client_id=<app_id>&config_id=<config_id>&response_type=code&override_default_response_type=true&redirect_uri=<redirect_uri>&state=<slug>.<32 hex>&display=popup&extras={"setup":{}}`.
+Mientras corre, Meta manda a esta página por `postMessage`, desde `https://*.facebook.com`, la sesión
+(`WA_EMBEDDED_SIGNUP`: `FINISH*` con `waba_id`, `phone_number_id`, `business_id`; `CANCEL` o `ERROR` con su
+motivo); al terminar lleva el navegador a `redirect_uri` con `?code=…&state=…` (o `error`). **Propuesta a
+erplora.com** (FIX de su carril): `GET /whatsapp/return`, pública, con COOP `unsafe-none`, que hace
+`window.opener.postMessage({"type": "erplora.whatsapp.signup", "state", "code" | "error", "error_description"},
+"https://<slug>.erplora.com")` con el `slug` del `state` y se cierra; y el canje del código en la puerta 11 con
+ese mismo `redirect_uri` (Meta lo exige: error 100/36008). El Hub solo acepta la sesión de facebook.com y la
+vuelta del origen de `redirect_uri` con el `state` de ese intento; sin sesión en 3 s tras el código, «Meta no
+ha dicho qué cuenta de WhatsApp Business se eligió». Riesgo no medido: que Meta mande la sesión a una ventana
+abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta del permiso
+(`debug_token`, `granular_scopes`).
+
 ### Contrato con `base`
 
 - Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB; hecho desde hub#127,
@@ -1293,6 +1383,10 @@ todavía en erplora.com, ni su webhook de Meta (FIX-SAAS-WHATSAPP-GATEWAY-DOORS)
 - La campana de la barra superior puede leer `whatsapp_inbox.conversation.summary` (`awaiting_reply`).
 - Para ver fotos y audio dentro del hilo (F06 completo), la CSP del Hub tiene que permitir el origen de
   erplora.com en `img-src` y `media-src` (`config/settings.py`, como ya hace con `form-action`).
+- Para que la ventana de Meta devuelva su código (F01, F02), las páginas del Hub no pueden cortar las
+  ventanas que abren: `SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"` en `config/settings.py`
+  (hoy, el `same-origin` de Django por defecto). La CSP no cambia: la ventana es otra pestaña, sin
+  `frame-src`, `connect-src` ni `form-action` nuevos, y el `postMessage` no pasa por la CSP.
 
 ### Respuestas automáticas: lo que falta
 
@@ -1339,8 +1433,10 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
   crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
   (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; en las
   citas también se crea (F21, CUSTOMER-F26).
-- Fase 1 sin tenencia: `Channel` es una sola fila compartida por todos los hubs, y las conversaciones de
-  `a` y `b` comparten tablas (solo los avisos vivos van por hub), como en todas las apps de la fase 1.
+- Fase 1 sin tenencia: las conversaciones y las plantillas de `a` y `b` comparten tablas (solo los avisos
+  vivos van por hub), como en todas las apps de la fase 1. El número ya no: `Channel` es una fila por
+  negocio (ver «Modelo»). Las plantillas sí: la lista de Meta que trae la foto de `b` marca «Borrada en
+  WhatsApp Manager» las de `a` que no lista (pendiente de su propia tarea).
 
 ### Cambios frente al producto actual
 

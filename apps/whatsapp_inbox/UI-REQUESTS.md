@@ -33,6 +33,16 @@ icono.
   `media-src 'self' blob:` si se sirven por el Hub.
 - **Hoy**: el adjunto se abre en una pestaña nueva servida por erplora.com («Abrir el adjunto»).
 
+## Ventana de Meta para conectar el número (COOP)
+
+- **Qué**: para que la ventana de Meta que abre **Conectar WhatsApp** (WHATSAPP_INBOX-F01, F02) pueda
+  devolver su resultado a Ajustes, las páginas del Hub no pueden cortar las ventanas que abren:
+  `SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"` en `config/settings.py` (hoy, el
+  `same-origin` de Django por defecto). Y de erplora.com, la página a la que Meta devuelve el código
+  (WORKBOOK, «Contrato con el SaaS», puertas 10 y 11).
+- **Hoy**: **Tu número** dice «Todavía no se puede conectar el número desde aquí.» en vez de ofrecer
+  **Conectar WhatsApp**; **Desconectar** sí funciona.
+
 ## Muestra de la cabecera de una plantilla (archivo)
 
 - **Qué**: para crear desde el Hub plantillas con foto, vídeo o documento en la cabecera
