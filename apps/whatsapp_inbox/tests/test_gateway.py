@@ -303,7 +303,8 @@ def test_a_template_deletion_is_posted_signed_and_200_deleted_confirms_it():
 
 @respx.mock
 def test_a_template_meta_no_longer_has_is_deleted_and_a_refusal_keeps_its_reason():
-    respx.post(TEMPLATES_DELETE).mock(return_value=httpx.Response(404, json={}))
+    gone = {"error": {"code": "whatsapp.template_not_found", "message": "Meta has no such template"}}
+    respx.post(TEMPLATES_DELETE).mock(return_value=httpx.Response(404, json=gone))
     assert gateway.delete_template(hub="a", name="x", language="es", meta_id="").kind == gateway.ACCEPTED
     respx.post(TEMPLATES_DELETE).mock(
         return_value=httpx.Response(409, json={"error": {"code": "whatsapp.meta_unreachable", "message": "Meta"}})
@@ -312,6 +313,20 @@ def test_a_template_meta_no_longer_has_is_deleted_and_a_refusal_keeps_its_reason
     assert (reply.kind, reply.code) == (gateway.REFUSED, "whatsapp.meta_unreachable")
     respx.post(TEMPLATES_DELETE).mock(return_value=httpx.Response(200, json={"deleted": False}))
     assert gateway.delete_template(hub="a", name="x", language="es", meta_id="").kind == gateway.UNKNOWN
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [httpx.Response(404, json={}), httpx.Response(404, text="<h1>Not Found</h1>"),
+     httpx.Response(404, json={"error": {"code": "not_found", "message": "No route"}})],
+)
+@respx.mock
+def test_a_404_that_is_not_erplora_saying_meta_has_no_such_template_deletes_nothing(answer):
+    """gh:whatsapp_inbox#296: a door erplora.com does not serve yet (or a wrong address) also answers 404;
+    reading it as «Meta no longer has it» would drop the template here while Meta keeps it alive."""
+    respx.post(TEMPLATES_DELETE).mock(return_value=answer)
+    reply = gateway.delete_template(hub="a", name="x", language="es", meta_id="1")
+    assert reply.kind == gateway.UNREACHABLE and "404" in reply.message
 
 
 def test_without_the_saas_url_no_template_leaves(settings):

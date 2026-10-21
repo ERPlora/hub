@@ -970,8 +970,9 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
    ```
 
    Borra en Meta esa plantilla en ese idioma (no las demás del mismo nombre). 200 `{"deleted": true}` o
-   404 (Meta ya no la tiene) = borrada; 409 con su motivo, otro 4xx, 5xx o sin respuesta = sigue
-   `pending` y el Hub lo vuelve a pedir.
+   404 `{"error": {"code": "whatsapp.template_not_found", …}}` (Meta ya no la tiene) = borrada; cualquier
+   otro 404 (una puerta que no existe, una dirección mal puesta: gh:whatsapp_inbox#296), 409 con su
+   motivo, otro 4xx, 5xx o sin respuesta = sigue `pending` y el Hub lo vuelve a pedir.
 
 ### Contrato con `base`
 

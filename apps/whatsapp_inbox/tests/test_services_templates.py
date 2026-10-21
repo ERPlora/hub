@@ -451,13 +451,21 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
     assert events("whatsapp_inbox.template.deleted") == [{"id": str(row.id)}]
 
 
+@pytest.mark.parametrize(
+    ("status", "body", "code"),
+    [
+        (409, {"error": {"code": "whatsapp.meta_unreachable", "message": "timeout"}}, "whatsapp_inbox.meta_unreachable"),
+        # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296).
+        (404, {}, "whatsapp_inbox.saas_unreachable"),
+    ],
+)
 @respx.mock
-def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_reason(delivered):
+def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_reason(delivered, status, body, code):
     row = approved()
-    deleting(409, {"error": {"code": "whatsapp.meta_unreachable", "message": "timeout"}})
+    deleting(status, body)
     delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}))
     row.refresh_from_db()
-    assert (row.delete_state, row.submit_error_code) == ("pending", "whatsapp_inbox.meta_unreachable")
+    assert (row.delete_state, row.submit_error_code) == ("pending", code)
     [shown] = listed()
     assert (shown.id, shown.deleting) == (row.id, True)
     # Not sendable while it is being deleted.

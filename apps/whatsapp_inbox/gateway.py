@@ -24,7 +24,8 @@ its messages (WHATSAPP_INBOX-F10, F11); only ``200 {"erased": true}`` confirms i
 F30) with an ``Idempotency-Key``: erplora.com registers (or edits) the template at Meta once per key and
 answers ``200 {"meta_id", "status"}`` (``accepted``: Meta took it for review); a 409 carries its code and
 Meta's reason (``refused``); the rest reads as for ``send``. ``delete_template`` → ``POST …/templates/delete``
-(door 9, F31): ``200 {"deleted": true}`` or a 404 (Meta no longer has it) is ``accepted``.
+(door 9, F31): ``200 {"deleted": true}`` or its 404 ``whatsapp.template_not_found`` (Meta no longer has
+it) is ``accepted``; any other 404 is «nothing left».
 
 No call ever raises past its caller: ``httpx`` also raises errors that are not ``HTTPError`` (an URL it
 cannot parse, a header it cannot encode), and they read as «nothing left» (``unreachable``).
@@ -57,6 +58,8 @@ VERDICTS = frozenset({"APPROVED", "PENDING", "REJECTED", "PAUSED", "DISABLED"})
 
 #: The code of a 409 that did not carry erplora.com's error envelope.
 GENERIC_REFUSAL = "whatsapp.refused"
+#: erplora.com's 404 code at door 9: Meta has no such template (so it is deleted).
+TEMPLATE_NOT_FOUND = "whatsapp.template_not_found"
 
 
 class NotConfigured(Exception):
@@ -166,6 +169,12 @@ def _settled(response: httpx.Response) -> Reply | None:
     return None
 
 
+def _error_code(response: httpx.Response) -> str:
+    """The code of erplora.com's error envelope, or ``""``."""
+    error = _json(response).get("error")
+    return str(error.get("code", "")) if isinstance(error, dict) else ""
+
+
 def _json(response: httpx.Response) -> dict:
     try:
         data = response.json()
@@ -210,13 +219,15 @@ def submit_template(*, hub: str, idempotency_key: str, template: dict) -> Reply:
 
 
 def delete_template(*, hub: str, name: str, language: str, meta_id: str) -> Reply:
-    """Ask erplora.com to delete that one template at Meta; a 404 (Meta no longer has it) is a deletion."""
+    """Ask erplora.com to delete that one template at Meta. Its 404 saying ``whatsapp.template_not_found``
+    (Meta no longer has it) is a deletion; any other 404 (a door it does not serve, a wrong address) is
+    «nothing left», never a deletion (gh:whatsapp_inbox#296)."""
     response = _post(
         TEMPLATES_DELETE_PATH, {"hub": hub, "name": name, "language": language, "meta_id": meta_id}
     )
     if isinstance(response, Reply):
         return response
-    if response.status_code == 404:
+    if response.status_code == 404 and _error_code(response) == TEMPLATE_NOT_FOUND:
         return Reply(kind=ACCEPTED)
     settled = _settled(response)
     if settled is not None:
