@@ -111,7 +111,8 @@ def test_tied_lists_follow_the_list_s_direction_and_empty_values_stay_last():
     sorted column come by code in the list's own direction, never always ascending; empty values go last both ways."""
     from apps.pricing.models import PriceList
 
-    for code in ("A1", "B2", "C3"):
+    # Created out of code order, so that the code tie-break is not the id one.
+    for code in ("C3", "A1", "B2"):
         make_list(code, "Same name")
     make_list("Z9", "Same name", tax_included=True)
     # Postgres writes a touched row's new version after the others: without a tie-break, A1 would come last.
@@ -179,9 +180,10 @@ def test_tied_prices_follow_the_list_s_direction():
 
     price_list = make_list("VIP")
     first, second = make_product("Shampoo", "SH-1"), make_product("Shampoo", "SH-2")
+    # The larger breaks first, so that the from-quantity tie-break is not the id one.
     items = [
         make_item(price_list, product, price=1000, min_quantity=quantity)
-        for quantity in ("1", "5")
+        for quantity in ("5", "1")
         for product in (first, second)
     ]
     # Postgres writes a touched row's new version after the others: without a tie-break, it would come last.
@@ -250,7 +252,8 @@ def test_tied_rules_follow_the_list_s_direction():
     """hub#2355: rules tied on the sorted column come by code in the list's own direction."""
     from apps.pricing.models import DiscountRule
 
-    for code in ("A1", "B2", "C3"):
+    # Created out of code order, so that the code tie-break is not the id one.
+    for code in ("C3", "A1", "B2"):
         make_rule(code, name="Same name")
     # Postgres writes a touched row's new version after the others: without a tie-break, A1 would come last.
     DiscountRule.objects.filter(code="A1").update(name="Same name")
