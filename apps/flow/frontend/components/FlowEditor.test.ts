@@ -304,6 +304,14 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is calling another system: see it in History.');
   });
 
+  // FLOW-F31, F37: without the WhatsApp gateway nor an assistant in the Hub or the SaaS, «Send a message» and
+  // «Ask the assistant» are not offered: these are all the steps there are.
+  it('offers exactly the steps the Hub can run, none it cannot yet', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    const adders = s.wrapper.findAll('[data-testid^="flow-editor-add-"]').map((button) => button.attributes('data-testid'));
+    expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'http', 'ask'].map((kind) => `flow-editor-add-${kind}`));
+  });
+
   it('«Ask someone first» has its own button (FLOW-F28)', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     expect(s.find('flow-editor-add-ask').text()).toBe('Ask someone first');
