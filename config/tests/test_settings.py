@@ -423,6 +423,14 @@ def test_hsts_comes_from_the_environment(load_settings):
     )
 
 
+@pytest.mark.parametrize("env", [PRODUCTION_ENV, DEVELOPMENT_ENV], ids=["production", "development"])
+def test_the_hub_s_pages_keep_the_windows_they_open_so_a_sign_in_window_can_answer(load_settings, env):
+    # Meta's window to connect a WhatsApp number (WHATSAPP_INBOX-F01/F02, Embedded Signup) and the SaaS's return
+    # page post back to the page that opened them: Django's default `same-origin` leaves them no opener. Nothing
+    # looser than allow-popups: `unsafe-none` would also let a page of another origin that opens the Hub keep it.
+    assert load_settings(**env)["SECURE_CROSS_ORIGIN_OPENER_POLICY"] == "same-origin-allow-popups"
+
+
 def test_a_request_the_alb_forwarded_over_https_is_secure():
     # The ALB terminates TLS and sets X-Forwarded-Proto (daphne --proxy-headers reads it too).
     factory = RequestFactory()

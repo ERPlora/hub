@@ -53,6 +53,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = config(
     "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False, cast=bool
 )
 SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=False, cast=bool)
+# The windows a page opens keep it as their opener: Meta's window to connect a WhatsApp number (Embedded Signup)
+# and the SaaS's return page post back to it. Django's default, same-origin, cuts them; a page of another origin
+# that opens the Hub is still cut off. Never unsafe-none.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 # What the platform answers elsewhere: the ALB redirects to HTTPS (W008); HSTS for subdomains and the
 # preload list is the apex's (W005, W021).
 SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W008", "security.W021"]
