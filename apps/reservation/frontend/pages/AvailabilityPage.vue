@@ -339,6 +339,7 @@ const isBlocked = computed(() => blockingError(noticeError.value));
         <DataTable
           testid="reservation-availability-slots"
           server-side
+          filterable
           :filters="slotFilters"
           :rows="slots.data.value?.rows ?? []"
           :total="slots.data.value?.total ?? 0"
@@ -378,6 +379,7 @@ const isBlocked = computed(() => blockingError(noticeError.value));
         <DataTable
           testid="reservation-availability-blocked"
           server-side
+          filterable
           :filters="blockedFilters"
           :rows="blocked.data.value?.rows ?? []"
           :total="blocked.data.value?.total ?? 0"

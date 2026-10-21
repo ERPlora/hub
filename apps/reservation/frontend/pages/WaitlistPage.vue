@@ -233,6 +233,7 @@ async function confirmRemove(): Promise<void> {
       testid="reservation-waitlist"
       server-side
       searchable
+      filterable
       fill
       :filters="filters"
       :rows="result?.rows ?? []"

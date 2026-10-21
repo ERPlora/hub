@@ -182,6 +182,11 @@ describe('ReservationsPage', () => {
 });
 
 describe('ReservationsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+  it('keeps its column filters behind the table’s funnel, as the old table: the list is not pushed down', async () => {
+    const s = await setup();
+    expect(s.prop('filterable')).toBe(true);
+  });
+
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

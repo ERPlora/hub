@@ -79,10 +79,12 @@ export interface ReservationPatchIn extends ReservationRefIn {
   notes?: string;
   internal_notes?: string;
   overbook?: boolean;
+  on_behalf_of?: string | null;
 }
 
 export interface CancelIn extends ReservationRefIn {
   reason?: string;
+  on_behalf_of?: string | null;
 }
 
 export interface ReservationOut {

@@ -386,5 +386,15 @@ msgstr "La mesa %(table)s está ocupada ahora mismo: libérala, o pasa la reserv
 msgid "Tables is not available in this business: the reservation's table cannot be held or seated."
 msgstr "Mesas no está disponible en este negocio: la mesa de la reserva no se puede apartar ni sentar."
 
+msgid "That reservation belongs to a different guest, so it cannot be managed on their behalf."
+msgstr "Esa reserva es de otro comensal, así que no se puede gestionar en su nombre."
+
+msgid ""
+"The table and the restaurant's internal notes are set by the restaurant: they cannot be changed from the "
+"guest's own booking."
+msgstr ""
+"La mesa y las notas internas las pone el restaurante: no se pueden cambiar desde la reserva del propio "
+"cliente."
+
 msgid "Send overbook as true to book this full slot anyway."
 msgstr "Envía overbook como true para reservar igualmente esta franja llena."
