@@ -184,7 +184,8 @@ class BoardIn(In):
 
 class ItemOut(Schema):
     id: UUID = Field(
-        description="The dish's id (the id of its line of Sales, for a round of a check)."
+        description="The dish's id (for a round of a check, the id of its line of Sales; for a dish of a menu, "
+        "one derived from it)."
     )
     position: int = Field(description="Its place in the ticket.")
     product_id: UUID | None = Field(description="Inventory's product, if it is one.")
@@ -192,6 +193,15 @@ class ItemOut(Schema):
     quantity: Decimal = Field(description="How many.")
     unit: str = Field(description="Unit of the quantity.")
     notes: str = Field(description="The waiter's note.")
+    modifiers: list[str] = Field(
+        description="The options chosen in the till, by the names the cook reads, in the order chosen."
+    )
+    menu_name: str = Field(
+        description="The header of the menu it is a dish of (its kitchen name, else its name); empty if none."
+    )
+    menu_line_id: UUID | None = Field(
+        description="The menu's line of the check: the dishes of one menu share it; none out of a menu."
+    )
     station_id: UUID | None = Field(
         description="The station it went to; none = «No station»."
     )
