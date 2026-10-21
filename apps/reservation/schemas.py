@@ -30,6 +30,12 @@ from apps.reservation.models import MAX_GUESTS, MAX_MINUTES
 T = TypeVar("T")
 
 SAY_FOR_WHOM = _("Say who the reservation is for: a customer, or the guest's name.")
+#: The sources where the guest books herself (engine.GUEST_SOURCES): without a name, her phone names her.
+GUEST_BOOKS = frozenset({"online", "whatsapp"})
+D_ON_BEHALF_OF = (
+    "Only for a channel acting for the guest herself (WhatsApp): her customer card. The reservation must be hers; "
+    "the table, the internal notes and booking anyway stay the restaurant's, and her own booking rules apply."
+)
 SAY_WHICH_RESERVATION = _(
     "Say which reservation: its id, or its guest's name or phone."
 )
@@ -270,7 +276,9 @@ class ReservationIn(In):
 
     @model_validator(mode="after")
     def _for_whom(self):
-        if not self.guest_name and self.customer_id is None and not self.customer:
+        named = self.guest_name or self.customer_id is not None or self.customer
+        # A guest who books herself without a name (a WhatsApp message) is booked under her phone.
+        if not named and not (self.source in GUEST_BOOKS and self.guest_phone):
             raise ValueError(str(SAY_FOR_WHOM))
         return self
 
@@ -296,10 +304,12 @@ class ReservationPatchIn(ReservationRefIn):
         None, description="The restaurant's new internal notes."
     )
     overbook: bool = Field(False, description=D_OVERBOOK)
+    on_behalf_of: UUID | None = Field(None, description=D_ON_BEHALF_OF)
 
 
 class CancelIn(ReservationRefIn):
     reason: _text(500) = Field("", description="Why it is cancelled (optional).")
+    on_behalf_of: UUID | None = Field(None, description=D_ON_BEHALF_OF)
 
 
 class ReservationOut(Schema):

@@ -237,6 +237,22 @@ def test_a_full_slot_is_a_409_with_its_code_and_field_in_the_readers_language(
     }
 
 
+@pytest.mark.django_db
+def test_a_change_on_behalf_of_another_guest_is_a_409_that_says_nothing_of_the_booking(admin_client):
+    other = make_reservation()
+    response = post(
+        admin_client,
+        "/reservation/reservations/cancel",
+        {"id": str(other.id), "on_behalf_of": "01a15d83-0000-7000-8000-000000000000"},
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    assert response.status_code == 409
+    assert response.json()["error"] == {
+        "code": "reservation.customer_mismatch",
+        "message": "Esa reserva es de otro comensal, así que no se puede gestionar en su nombre.",
+    }
+
+
 # ── The whole flow over HTTP ─────────────────────────────────────────────────────────────────────
 
 

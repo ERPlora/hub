@@ -819,3 +819,139 @@ def test_the_reactions_are_the_platforms_only():
     with pytest.raises(PermissionDenied):
         run("reservation.customer.erase", {"id": None})
     assert run("reservation.customer.erase", {}, system_context(A)).changed == 0
+
+
+# ── Review of 2026-10-21: who changes a guest's own booking (F08) and the WhatsApp door (F17, F18) ─────────
+
+
+def test_the_staff_change_a_booking_the_guest_made_herself_without_her_rules(week):
+    # Duda 8: the book's rules bind the guest who books herself, not the staff who change her booking later:
+    # 25 guests and tomorrow's dinner full are the staff's call, with «Book anyway?» for the full slot.
+    set_rules(max_party_size=20)
+    out = book(source="whatsapp", date="2026-10-16")
+    changed = run("reservation.reservation.update", {"id": str(out.id), "party_size": 25}, ctx_for(EMPLOYEE))
+    assert changed.party_size == 25
+    book(time="14:00", guest_name="Eva", guest_phone="600444555")
+    for _ in range(9):
+        book(time="14:30", guest_name="Luis", guest_phone="600555666")
+    error = refusal(
+        lambda: run(
+            "reservation.reservation.update",
+            {"id": str(out.id), "date": "2026-10-15", "time": "14:00", "party_size": 2},
+            ctx_for(EMPLOYEE),
+        )
+    )
+    assert (error.code, "overbook" in (error.fields or {})) == ("reservation.no_capacity", True)
+    moved = run(
+        "reservation.reservation.update",
+        {"id": str(out.id), "date": "2026-10-15", "time": "14:00", "party_size": 2, "overbook": True},
+        ctx_for(EMPLOYEE),
+    )
+    assert (moved.date, moved.time) == (TOMORROW, dt.time(14, 0))
+
+
+def test_a_guest_booking_by_whatsapp_without_a_name_is_booked_under_her_phone():
+    # The old module's F17: «si no da ninguno, su teléfono hace de nombre». WhatsApp hands the number in
+    # international form.
+    open_week()
+    out = book(source="whatsapp", guest_name="", guest_phone="+34600999888", date="2026-10-16")
+    assert (out.guest_name, out.guest_phone, out.source) == ("+34600999888", "+34600999888", "whatsapp")
+    assert run("customer.customer.detail", {"id": str(out.customer_id)}).name == "+34600999888"
+
+
+def test_a_guest_with_a_card_books_by_whatsapp_under_the_name_she_writes(week):
+    first = book(guest_name="Ana García", guest_phone="600111222")
+    again = book(source="whatsapp", guest_name="Anita", guest_phone="600111222", date="2026-10-16", time="21:30")
+    assert (again.customer_id, again.guest_name) == (first.customer_id, "Anita")
+
+
+def on_behalf(name: str, data: dict, customer_id):
+    """``name`` as a channel acting for the guest herself (WhatsApp), as the system."""
+    return run(name, {**data, "on_behalf_of": str(customer_id)}, system_context(A))
+
+
+def test_a_guest_changes_her_own_booking_through_the_channel_under_her_rules(week):
+    out = book(source="whatsapp", date="2026-10-16")
+    changed = on_behalf("reservation.reservation.update", {"id": str(out.id), "time": "21:30", "party_size": 3}, out.customer_id)
+    assert (changed.time, changed.party_size) == (dt.time(21, 30), 3)
+    # Her rules, not the staff's: a group past the limits, or a change too close to now, is refused.
+    set_rules(max_party_size=6)
+    error = refusal(lambda: on_behalf("reservation.reservation.update", {"id": str(out.id), "party_size": 7}, out.customer_id))
+    assert error.code == "reservation.party_size_exceeded"
+    phoned = book(guest_name="Ana García", guest_phone="600111222", time="22:00")
+    error = refusal(lambda: on_behalf("reservation.reservation.update", {"id": str(phoned.id), "date": "2026-10-14", "time": "12:30"}, phoned.customer_id))
+    assert error.code == "reservation.too_soon"
+
+
+def test_a_guest_cancels_her_own_booking_through_the_channel(week):
+    table = make_table("5")
+    out = book(source="whatsapp", date="2026-10-16", table_id=str(table.id))
+    run("reservation.reservation.confirm", {"id": str(out.id)})
+    cancelled = on_behalf("reservation.reservation.cancel", {"id": str(out.id), "reason": "Plans changed"}, out.customer_id)
+    assert (cancelled.status, cancelled.cancellation_reason) == ("cancelled", "Plans changed")
+
+
+@pytest.mark.parametrize("action", ["update", "cancel"])
+def test_the_channel_never_touches_a_booking_that_is_not_the_guests(week, action):
+    hers, other = book(guest_name="Ana García", guest_phone="600111222"), book(
+        guest_name="Bea Ruiz", guest_phone="600333444", time="21:30"
+    )
+    walk_in = make_reservation(time="22:00")
+    gone = make_reservation(time="22:30", customer_id=hers.customer_id, is_deleted=True)
+    data = {"party_size": 3} if action == "update" else {}
+    before = events()
+    for target in (other.id, walk_in.id, gone.id, "01a15d83-0000-7000-8000-000000000000"):
+        error = refusal(lambda: on_behalf(f"reservation.reservation.{action}", {"id": str(target), **data}, hers.customer_id))
+        assert (error.code, error.message) == (
+            "reservation.customer_mismatch",
+            "That reservation belongs to a different guest, so it cannot be managed on their behalf.",
+        ), target
+    assert events() == before
+    assert Reservation.objects.get(pk=other.id).party_size == 4
+    assert Reservation.objects.get(pk=other.id).status == "pending"
+
+
+def test_whose_booking_it_is_is_asked_before_its_status(week):
+    out = book(guest_name="Bea Ruiz", guest_phone="600333444")
+    Reservation.objects.filter(pk=out.id).update(status="completed")
+    stranger = book(guest_name="Ana García", guest_phone="600111222", time="21:30")
+    error = refusal(lambda: on_behalf("reservation.reservation.cancel", {"id": str(out.id)}, stranger.customer_id))
+    assert error.code == "reservation.customer_mismatch"
+
+
+@pytest.mark.parametrize(
+    "sent",
+    [{"table": "5"}, {"no_table": True}, {"internal_notes": "VIP"}, {"overbook": True}],
+)
+def test_the_table_and_the_internal_notes_stay_the_restaurants(week, sent):
+    make_table("5")
+    out = book(source="whatsapp", date="2026-10-16", internal_notes="Regular")
+    error = refusal(lambda: on_behalf("reservation.reservation.update", {"id": str(out.id), **sent}, out.customer_id))
+    assert (error.code, error.message) == (
+        "reservation.staff_only_field",
+        "The table and the restaurant's internal notes are set by the restaurant: they cannot be changed from the "
+        "guest's own booking.",
+    )
+    row = Reservation.objects.get(pk=out.id)
+    assert (row.table_id, row.internal_notes) == (None, "Regular")
+
+
+def test_confirming_a_whatsapp_booking_announces_what_the_whatsapp_notice_reads(week):
+    # RESERVATION-F19, Reservations' half: confirming says so in the outbox, and the booking's detail says it came
+    # by WhatsApp and from which number, which is what a notice to the guest needs.
+    out = book(source="whatsapp", guest_phone="+34600999888", date="2026-10-16")
+    run("reservation.reservation.confirm", {"id": str(out.id)}, ctx_for(EMPLOYEE))
+    told = payload("reservation.reservation.status_changed")
+    assert (told["id"], told["status"], told["previous_status"], told["customer_id"]) == (
+        str(out.id),
+        "confirmed",
+        "pending",
+        str(out.customer_id),
+    )
+    detail = run("reservation.reservation.get", {"id": str(out.id)}, ctx_for(EMPLOYEE))
+    assert (detail.source, detail.guest_phone, detail.date, detail.time) == (
+        "whatsapp",
+        "+34600999888",
+        dt.date(2026, 10, 16),
+        dt.time(21, 0),
+    )
