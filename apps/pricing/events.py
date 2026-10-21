@@ -5,8 +5,8 @@ re-run each live query. They carry ids, codes, quantities and prices, never a cu
 
 Reactions: a product or a category Inventory deletes, a customer group Customers deletes, and a service
 Services changes, each through an operation of this app run as the system, in its own transaction
-(WORKBOOK PRICING-F14). The outbox relay (phase 2, in the worker) hands each delivered event to
-``react``; the operations are idempotent, so a repeated delivery changes nothing.
+(WORKBOOK PRICING-F14). The worker's outbox relay (``base/relay.py``) hands each delivered event to
+``react``; the operations are idempotent, so a repeated delivery changes nothing (tests/test_relay.py).
 """
 
 from typing import Any
