@@ -231,8 +231,8 @@ Pasos:
 Entra: lo que escribe quien la crea.
 Sale: la estación (avisa: estación creada).
 Si falla: el rechazo sale dentro del panel. Un nombre que ya tiene otra estación viva se rechaza
-(«Ya hay una estación con ese nombre.»); el de una eliminada vuelve a estar libre. Quien no puede
-gestionar estaciones no ve el botón.
+(«Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
+Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
 
 ### KITCHEN-F02 Editar, renombrar o desactivar una estación
@@ -241,7 +241,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
 Pasos:
-1. Toca la fila (o «Editar»): se abre «Editar estación».
+1. Toca la fila (o «Editar»): se abre «Editar estación · <nombre>».
 2. Cambia el nombre, el color, el destino, la impresora o «Activa».
 3. Pulsa «Guardar»: la tabla se actualiza.
 Entra: la estación y lo que cambia.
@@ -395,8 +395,8 @@ Pasos:
    papel sale como su primera hoja, sin «copia».
 Entra: la comanda.
 Sale: trabajos nuevos en la cola de Impresión (cada reimpresión es un trabajo distinto).
-Si falla: «No se pudo imprimir la comanda.» con el motivo de Impresión; sin Impresión, «Impresión no
-está activa en este negocio.».
+Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión,
+«Impresión no está activa en este negocio.».
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 Ver el tablero de cocina
