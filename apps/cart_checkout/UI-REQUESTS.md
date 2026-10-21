@@ -3,6 +3,13 @@
 Lo que las páginas de Carrito y pago necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan
 lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
+**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `89eaf98`: no ha llegado ninguna de
+las tres (ni los dos iconos en `ION_ICONS`, ni la tabla de servidor viva, ni un lector común de importes).
+Ninguna rompe un flujo (todas tienen su sustituto, dicho abajo), así que pasan a «Fuera por ahora» (`## 6`
+de `MIGRATION.md`) con las claves `cart_checkout:ui-icons`, `cart_checkout:ui-live-server-table` y
+`cart_checkout:ui-money-reader`. Quien entregue una en `ui` la borra de aquí y cambia su sustituto en la
+misma PR del puntero.
+
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
 - `ion:bag-check-outline` — icono del módulo, de la entrada de menú y de la pestaña **Carritos** (el del

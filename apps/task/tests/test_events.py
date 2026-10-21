@@ -1,7 +1,7 @@
 """The task app's events (``task.<entity>.<fact>``) and its reaction to Staff's.
 
-There is no outbox relay yet (phase 2 runs it in the worker); a reaction is tested by handing ``react``
-the event as the relay will: its name, its scope and its payload.
+A reaction is tested here by handing ``react`` the event as the outbox relay does: its name, its scope
+and its payload. Its delivery by the worker's real relay is in ``test_relay.py``.
 """
 
 import re
