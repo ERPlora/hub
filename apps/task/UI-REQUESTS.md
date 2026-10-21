@@ -3,6 +3,12 @@
 Lo que las páginas de Tareas necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
+**Estado al cerrar la app (2026-10-21, CLOSE-TASK)**: no ha llegado nada a `ui` (`origin/main` f62af6b, el
+puntero del Hub): los tres puntos siguen abiertos, todos con sustituto, y propuestos para «Fuera por ahora» del
+registro (`MIGRATION.md` §6) como `task:ui-icons`, `task:ui-datatable-side-panel` y `task:ui-color-picker`.
+Los iconos ya están en la cola como `FIX-UI-SHELL-ICONS-SERVICE-TASK` (`TODO.md`). Ya salió de aquí la carpeta
+de Proyectos (`ion:folder-outline`, registrada, APP-TASK).
+
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
 - `ion:checkbox-outline` — icono del módulo, de la entrada de menú y de la pestaña **Tareas**

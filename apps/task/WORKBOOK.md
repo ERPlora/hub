@@ -1,7 +1,8 @@
 # Workbook — Tareas (app)
 Prefijo: TASK
 Alcance MVP: transversal (peluquería y restaurante: la lista de cosas por hacer del equipo)
-Estado de la app: hecha (servidor y páginas)
+Estado de la app: completa (2026-10-21)
+Lo que no entra todavía: ver «Lo que NO hace, a propósito».
 
 > Manual de usuario y especificación de la app `task`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -25,6 +26,9 @@ Quién la usa:
 - El **empleado** ve y cambia **las suyas**: las que tiene asignadas y las que ha creado él. Puede
   crear tareas (también para un compañero), empezarlas, completarlas, comentarlas y añadirles
   subtareas.
+- **Automatizaciones** crea tareas cuando el negocio se lo permite: por ejemplo, las automatizaciones
+  que traen **Citas** (una clienta cancela y queda una tarea para llenar el hueco) y **Reservas online**
+  (entra una reserva y queda una tarea para revisarla).
 
 El asistente lo usa por voz o por texto con la sesión de quien habla: «crea una tarea limpiar el
 almacén para mañana y asígnala a Ana», «¿qué tareas tengo?», «completa la tarea limpiar almacén»,
@@ -93,7 +97,7 @@ filtros puestos; 50 por página. El empleado solo ve las suyas.
   (solo si sigue abierta). Iniciar y completar confirman con un aviso breve. Pulsar la fila abre la
   tarea.
 - **+** abre **Nueva tarea**: **Título** (obligatorio), **Descripción**, **Prioridad** (Media por
-  defecto), **Vence**, **Responsable**, **Proyecto** y **Etiquetas**.
+  defecto), **Vence**, **Asignada a**, **Proyecto** y **Etiquetas**.
 
 **Mis tareas**: las tareas **abiertas** asignadas a mí, primero las que tienen fecha (la más próxima
 arriba) y después las que no, las más nuevas primero. Iniciar, asignar o comentar no mueve la
@@ -163,15 +167,15 @@ la crea dentro del proyecto.
 ### TASK-F01 Crear una tarea
 <!-- origen: fi:modules/tasks#command-handler-wasm-tasks-tasks-create-create_task old:tasks/WORKFLOW.md#que-hay-hoy -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable, empleado, asistente
+Actor: propietario, administrador, responsable, empleado, asistente, una automatización con permiso
 Pantalla: Tareas
 Pasos:
 1. En **Tareas**, pulsa **+**: se abre **Nueva tarea**.
 2. Escribe el **Título** (obligatorio, hasta 255 caracteres). Si quieres: Descripción (hasta 5000),
-   Prioridad (Baja, Media, Alta, Urgente; Media por defecto), Vence (un día), Responsable (una
+   Prioridad (Baja, Media, Alta, Urgente; Media por defecto), Vence (un día), Asignada a (una
    persona activa del equipo), Proyecto (el selector ofrece los activos) y Etiquetas (hasta 20, de
    hasta 50 caracteres, separadas por comas).
-3. Pulsa **Crear**: la tarea sale en la lista **Por hacer**, sin fecha de completada y con su número
+3. Pulsa **Crear tarea**: la tarea sale en la lista **Por hacer**, sin fecha de completada y con su número
    `TSK-AAAAMMDD-NNNN` (el día del negocio y un contador del día que no deja huecos).
 Entra: el formulario. El asistente nombra el proyecto por su código o su nombre, la tarea madre por su
 número o su título y al responsable por su nombre. Una fecha con hora se toma como su día en la zona
@@ -240,7 +244,8 @@ Pasos:
 Entra: la tarea y el estado nuevo.
 Sale: la tarea (`task.task.status_changed`; al llegar a Hecha, también `task.task.completed`).
 Elegir el estado que ya tiene no cambia nada ni avisa.
-Si falla: «Esa tarea no existe en este negocio.», «No tienes permiso» (la de otro).
+Si falla: «Esa tarea no existe en este negocio.» (también la de otra persona, que el empleado no ve);
+quien ve todas las tareas pero solo puede cambiar las suyas, «Solo puedes cambiar tus propias tareas.».
 Implicados: ninguno
 
 ### TASK-F06 Completar una tarea
@@ -340,7 +345,7 @@ Pasos:
 1. Pulsa **+**, escribe **Código** (hasta 40, único sin distinguir mayúsculas) y **Nombre** (hasta
    200); si quieres, **Color** (#RRGGBB). Por la API o el asistente, también un dueño (una persona
    del equipo).
-2. Pulsa **Crear**: el proyecto sale **Activo**.
+2. Pulsa **Crear proyecto**: el proyecto sale **Activo**.
 Entra: el código, el nombre y, si quieres, el color; por la API o el asistente, también el dueño.
 Sale: el proyecto (`task.project.created`).
 Si falla: «Ya hay un proyecto con ese código.» bajo el campo; un color que no es #RRGGBB.
@@ -453,6 +458,9 @@ cliente o a un compañero).
   «Asignármela» lee la ficha propia con `staff.member.mine`.
 - De la plataforma: la cuenta de quien actúa (creador y autor de los comentarios) y la zona horaria
   del negocio (el «hoy»).
+- Quién más la usa: **Automatizaciones** llama a `task.task.create` por su nombre, con el permiso que el
+  negocio le concede; sus automatizaciones de fábrica de Citas y de Reservas online dejan una tarea
+  (FLOW-F33). Tareas no sabe de ellas.
 
 ### Quién puede qué
 
@@ -490,6 +498,9 @@ cliente o a un compañero).
   Personal (`resolve_member(…, lock=True)`) y después la tarea o el proyecto: es el orden del «Delete»
   del admin del Hub (`lock_members` de Personal y luego lo que la nombra), así que uno espera al otro y
   nunca en círculo. Si la persona ya se borró, la escritura responde «no existe» en su campo, nunca 500.
+- Las listas ordenan por su columna con los vacíos al final y desempatan por `id` en la misma dirección
+  (`_sorted`; regla del producto actual, hub#2355, como Ventas, Caja e Inventario): la fila tocada no salta
+  y las páginas no repiten ni pierden filas (hub#2352).
 - El «hoy» es `timezone.localdate()` (zona del negocio; en la fase 1, `TIME_ZONE` = Europe/Madrid);
   las páginas calculan «vencida» y «vence hoy» en esa misma zona.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
@@ -507,8 +518,12 @@ cliente o a un compañero).
 - La hoja de la tarea y la del proyecto son `ion-modal` con sus consultas en vivo; la ruta de
   subtareas abiertas (**Volver**) vive en la hoja.
 - Los selectores de persona y de proyecto buscan en el servidor (`Combo` de `@erplora/ui`).
-- Los iconos son los registrados en la shell; los del producto actual (`checkbox-outline`,
-  `folder-outline`, `play-circle-outline`, `open-outline`) esperan en `UI-REQUESTS.md`.
+- Los iconos son los registrados en la shell: Proyectos ya lleva la carpeta del producto actual
+  (`ion:folder-outline`); los otros cuatro (`checkbox-outline` del módulo y de la pestaña Tareas,
+  `open-outline`, `play-circle-outline` y `checkmark-done-outline` de las acciones de fila) esperan en
+  `UI-REQUESTS.md` con su sustituto.
+- Las hojas no cambian la URL (como las de Servicios y Personal, y como el panel del producto actual,
+  que tampoco tenía sub-ruta): no hay enlace directo a una tarea ni a un proyecto.
 
 ## Lo que NO hace, a propósito
 
