@@ -1,14 +1,17 @@
 """The cart_checkout app's event vocabulary: ``cart_checkout.<entity>.<fact in the past tense>``.
 
 The old module's twelve events keep their facts; only ``carts.expired`` takes its entity in the singular
-(``cart.expired``). No app of the Hub listens to them, and this app reacts to no event of another one.
+(``cart.expired``). Only the flow app listens to them (it hears every event, FLOW-F21), and this app reacts to
+no event of another one.
 """
 
 import re
 
+from live.models import OutboxEvent
 from live.operations import NAME_RE
 
 from apps.cart_checkout import events
+from base import relay
 
 #: A fact in the past: «-ed», or «paid» (irregular, the old module's own word).
 PAST_FACT = re.compile(r"^cart_checkout\.(cart|item|checkout|order|customer)\.([a-z_]+ed|paid)$")
@@ -68,3 +71,10 @@ def test_the_events_are_grouped_by_what_they_change():
 def test_it_listens_to_nobody():
     # No foreign key to Customers or Inventory (WORKBOOK «Decisión»): no reaction to their events.
     assert not hasattr(events, "react")
+    assert not getattr(events, "REACTIONS", None)
+
+
+def test_only_flow_hears_its_events():
+    # CART_CHECKOUT-F13: the relay hands them to flow («*», FLOW-F21) and to no other app.
+    for name in events.ALL:
+        assert relay.listeners(OutboxEvent(scope_kind="host", scope_key="a", name=name)) == ["flow"], name
