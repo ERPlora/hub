@@ -90,3 +90,29 @@ def db_dsn(django_db_setup):
         host=params["HOST"],
         port=params["PORT"],
     )
+
+
+@pytest.fixture
+def listen(db_dsn):
+    """Opens a session that LISTENs on the channel of a scope: what wakes that hub's screens after the COMMIT."""
+    import psycopg
+    from live.outbox import channel_for
+
+    sessions = []
+
+    def open_session(scope: Scope):
+        session = psycopg.connect(db_dsn, autocommit=True)
+        sessions.append(session)
+        session.execute(f"LISTEN {channel_for(scope)}")
+        return session
+
+    yield open_session
+    for session in sessions:
+        session.close()
+
+
+def received(session, timeout: float = 1.0, stop_after: int | None = None) -> list[tuple[str, dict]]:
+    """The notifications a ``listen`` session got: (channel, payload) pairs."""
+    import json
+
+    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
