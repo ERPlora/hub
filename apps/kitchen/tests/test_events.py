@@ -235,6 +235,31 @@ def test_voiding_a_check_cancels_its_rounds_through_the_relay(relay, clock, prod
     assert LogEntry.objects.filter(ticket_id=lines[0].id, action="cancelled").count() == 1
 
 
+def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_slip_through_the_relay(
+    relay, clock, product
+):
+    """KITCHEN-F22, F28 (kitchen#168): the round went to paper; deleting its check in the till cancels it, and the
+    tick prints the «CANCELLED» slip of what was left, so the kitchen stops cooking it."""
+    from apps.printing.models import PrintJob
+
+    order = open_check("Table 4")
+    add_line(order.id, product("Burger"))
+    ticket = run("kitchen.ticket.send", {"order_id": str(order.id)})
+    relay()
+    run("sale.order.void", {"order_id": str(order.id)})
+
+    relay()
+
+    assert (saved(ticket.id), delivery("sale.order.voided")) == ("cancelled", ("delivered", 1))
+    sheets = list(PrintJob.objects.filter(source_app="kitchen").order_by("created_at", "id"))
+    assert len(sheets) == 2
+    slip = sheets[-1].document
+    assert (slip["label"], [(i["name"], i["quantity"]) for i in slip["items"]]) == (
+        "CANCELLED · Table 4",
+        [("Burger", -1.0)],
+    )
+
+
 def test_a_line_voided_in_the_till_strikes_its_dish_and_prints_its_slip_through_the_relay(relay, clock, product):
     """KITCHEN-F29 (hub#2640): the tick brings the voided line; its dish is struck with the reason, the rest of the
     round cooks on, and the station that had it on paper gets its void slip."""

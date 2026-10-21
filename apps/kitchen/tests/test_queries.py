@@ -673,6 +673,22 @@ def test_the_history_is_newest_first_with_who_and_which_dish(clock, product):
     assert run("kitchen.log.list", {"date_to": "2026-10-14"}).total == 4
 
 
+def test_the_history_pages_and_finds_a_reason_by_its_words(clock, product):
+    """KITCHEN-F25: ``limit`` and ``offset`` page it newest first (kitchen#1); the search finds the words of a
+    reason, in any case (kitchen#113)."""
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    clock.advance(minutes=1)
+    run("kitchen.ticket.cancel", {"ticket_id": str(lines[0].id), "reason": "Customer left"})
+    every = [r.action for r in run("kitchen.log.list", {}).rows]
+    assert every == ["cancelled", "received"]
+    first = run("kitchen.log.list", {"limit": 1})
+    second = run("kitchen.log.list", {"limit": 1, "offset": 1})
+    assert (first.total, [r.action for r in first.rows]) == (2, ["cancelled"])
+    assert (second.total, [r.action for r in second.rows]) == (2, ["received"])
+    found = run("kitchen.log.list", {"search": "customer LEFT"})
+    assert [(r.action, r.notes) for r in found.rows] == [("cancelled", "Customer left")]
+
+
 def test_the_history_needs_its_permission():
     with pytest.raises(PermissionDenied):
         run("kitchen.log.list", {}, ctx_for(permissions={"kitchen.view_ticket"}))

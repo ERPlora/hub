@@ -53,6 +53,8 @@ describe('HistoryPage', () => {
     await flush();
     await s.reopen();
     expect(s.params(OP)).toEqual([{ search: '0012', action: 'cancelled', limit: 50, offset: 0 }]);
+    // kitchen#113: the box promises what the search finds (the ticket or the notes); the action is the filter.
+    expect(prop(s.table(), 'searchPlaceholder')).toBe('Search ticket or notes…');
   });
 
   it('says when there is nothing yet', async () => {
