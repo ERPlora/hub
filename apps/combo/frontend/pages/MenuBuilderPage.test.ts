@@ -157,8 +157,10 @@ describe('MenuBuilderPage', () => {
     expect(s.cards()).toHaveLength(0);
     expect(s.wrapper.findComponent(CourseForm).exists()).toBe(false);
     expect([s.inDoc('combo-builder-name'), s.inDoc('combo-builder-supply'), s.inDoc('combo-builder-error')]).toEqual([null, null, null]);
-    // Nothing left here: the notice itself offers the way back.
-    expect(gone?.find('[data-testid="combo-builder-back"]').text()).toContain('All menus');
+    // Nothing left here: the notice itself offers the way back, to Menus.
+    const back = gone?.find('[data-testid="combo-builder-back"]');
+    expect(back?.text()).toContain('All menus');
+    expect(back?.attributes('routerlink')).toBe('/combo/menus');
   });
 
   it('a menu that no longer exists when opened says so', async () => {
