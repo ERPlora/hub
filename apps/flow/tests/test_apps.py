@@ -37,6 +37,7 @@ COMMANDS = {
     "flow.run.retry",
     "flow.secret.set",
     "flow.secret.delete",
+    "flow.run.call",
     "flow.run.claim_call",
     "flow.run.record_call",
     "flow.question.answer",
@@ -54,9 +55,11 @@ HIGH_RISK = {
     "flow.secret.delete",
     "flow.question.answer",
 }
-# Run only by the platform: the reaction to every event and the three scheduled tasks.
+# Run only by the platform: the reactions (to every event, and to a run parked on a call) and the
+# scheduled tasks.
 SYSTEM = {
     "flow.run.react",
+    "flow.run.call",
     "flow.schedule.fire_due",
     "flow.run.resume_due",
     "flow.run.prune",

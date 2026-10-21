@@ -3,11 +3,13 @@
 services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids (and a run's status), never a name or what an event brought.
 
-Reaction: flow is the one app that listens to EVERY event (FLOW-F21): each one may start the
-automations of the business that wait for it. The outbox relay (phase 2, in the worker) hands each
-delivered event to ``react`` with its id and its actor; ``flow.run.react`` runs as the system, in its
-own transaction, and starts at most one run per automation and event, so a repeated delivery changes
-nothing. Its own events are never handed on: no automation can start on them.
+Reactions: flow is the one app that listens to EVERY event (FLOW-F21): each one may start the
+automations of the business that wait for it. The outbox relay (in the worker) hands each delivered
+event to ``react`` with its id and its actor; ``flow.run.react`` runs as the system, in its own
+transaction, and starts at most one run per automation and event, so a repeated delivery changes
+nothing. Its own events start no automation; the one it hears is ``flow.run.parked``: a run parked on a
+«Call another system» step gets its call made by the worker (``flow.run.call``, FLOW-F27), never inside
+the request that parked it.
 """
 
 from typing import Any
@@ -51,8 +53,8 @@ ALL = [*FLOW_EVENTS, *RUN_EVENTS, *DRAFT_EVENTS, *SECRET_EVENTS, *QUESTION_EVENT
 
 #: Any event, as ``live.live_registry.ALL_EVENTS`` names it.
 ANY_EVENT = "*"
-#: Event of another app → the operation of this app that reacts to it: here, every event.
-REACTIONS = {ANY_EVENT: "flow.run.react"}
+#: Event → the operation of this app that reacts to it: every event of another app, and its own parked runs.
+REACTIONS = {ANY_EVENT: "flow.run.react", RUN_PARKED: "flow.run.call"}
 
 
 def react(
@@ -77,9 +79,14 @@ def react(
 
 
 def deliver(event):
-    """Hands an outbox event (``live.models.OutboxEvent``) to ``react``, as the relay will."""
+    """Hands an outbox event (``live.models.OutboxEvent``) to its reaction, as the relay does: a parked run to
+    ``flow.run.call``, any other app's event to ``react``."""
+    scope = Scope(event.scope_kind, event.scope_key)
+    if event.name == RUN_PARKED:
+        call = get(REACTIONS[RUN_PARKED])
+        return call(system_context(scope), call.input.model_validate({"id": event.payload["id"]}))
     return react(
-        Scope(event.scope_kind, event.scope_key),
+        scope,
         event.name,
         event.payload,
         event_id=event.id,

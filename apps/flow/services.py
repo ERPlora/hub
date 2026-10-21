@@ -909,8 +909,10 @@ def _call_allowed(run: FlowRun, flow: Flow, step: dict) -> StepFailed | None:
 
 
 def _park_call(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> bool:
-    """Parks the run on a call, which goes out after the COMMIT (``dispatch_call``); ``True`` when the run
-    stops here (parked, or failed), ``False`` when it goes on (a refusal with «If it fails, carry on»)."""
+    """Parks the run on a call and answers: the call never goes out from here (a web request would wait for
+    the other system). Its ``flow.run.parked`` reaches the worker through the outbox relay, which makes it
+    (``flow.run.call``); ``True`` when the run stops here (parked, or failed), ``False`` when it goes on (a
+    refusal with «If it fails, carry on»)."""
     refused = _call_allowed(run, flow, step)
     if refused is not None:
         return not _fail(ctx, run, step, refused, now)
@@ -921,7 +923,6 @@ def _park_call(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now:
     record_event(
         ctx, events.RUN_PARKED, {"id": str(run.id), "flow_id": str(flow.id), "resume_at": now.isoformat()}
     )
-    transaction.on_commit(partial(dispatch_call, ctx.scope, run.id), robust=True)
     return True
 
 
@@ -1108,6 +1109,26 @@ def dispatch_call(scope: Scope, run_id: uuid.UUID) -> None:
             detail=vault.mask(reply.detail, claimed.masks)[:2000],
         ),
     )
+
+
+@operation(
+    "flow.run.call",
+    kind="command",
+    permission=SYSTEM,
+    input=RunRefIn,
+    output=DueOut,
+    ai={
+        "description": "Platform only, in the worker: the reaction to `flow.run.parked` — a run that is calling "
+        "makes its call after this COMMIT (`flow.run.claim_call` → the call → `flow.run.record_call`), never "
+        "inside a person's request; a run that waits or asks has nothing to call.",
+        "risk": "normal",
+    },
+)
+def call_parked(ctx: OperationContext, data: RunRefIn) -> dict:
+    if not FlowRun.objects.filter(pk=data.id, status=FlowRun.Status.CALLING).exists():
+        return {"count": 0}
+    transaction.on_commit(partial(dispatch_call, ctx.scope, data.id), robust=True)
+    return {"count": 1}
 
 
 @operation(

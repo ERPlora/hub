@@ -1,9 +1,11 @@
 // What the specs of Automations share (apps/flow): a signed-in context in a size, picking in an `IonSelect`
 // popover, confirming a dialog, the id of the automation the editor shows, and the API setup of an
 // automation (the screens under test build their own steps; the API only sets the stage).
+import { execFileSync } from 'node:child_process';
+
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, type Credentials, login, OWNER, shown } from './helpers';
+import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, shown } from './helpers';
 
 export async function signedIn(
   browser: Browser,
@@ -44,4 +46,29 @@ export async function manualFlow(context: BrowserContext, name: string, steps: u
   if (grants.length) expect((await api(context, A, 'POST', '/flow/flows/grant', { id, operations: grants })).status).toBe(200);
   expect((await api(context, A, 'POST', '/flow/flows/set_enabled', { id, enabled: true })).status).toBe(200);
   return id;
+}
+
+const RELAY = `
+import os
+from django.db import transaction
+from live.models import OutboxEvent
+from base import relay
+event = OutboxEvent.objects.get(pk=os.environ["FLOW_EVENT"])
+with transaction.atomic():
+    relay.deliver("flow", event)
+`;
+
+/** The worker's part of a call (FLOW-F27): the newest `flow.run.parked` of the automation `flowId`, read from
+ *  the outbox, handed to flow's reaction as the outbox relay does on every tick; the call goes out after that
+ *  COMMIT, never from the request that parked it. */
+export function workerCalls(flowId: string): void {
+  const event = psql(
+    `select id from live_outboxevent where name = 'flow.run.parked' and payload->>'flow_id' = '${flowId}' order by created_at desc, id desc limit 1`,
+  );
+  expect(event, `flow.run.parked of ${flowId} in the outbox`).not.toBe('');
+  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+    cwd: HUB_DIR,
+    encoding: 'utf8',
+    env: { ...process.env, FLOW_EVENT: event },
+  });
 }

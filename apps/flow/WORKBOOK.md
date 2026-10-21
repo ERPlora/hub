@@ -747,8 +747,9 @@ Pasos:
 4. Ajusta los **Segundos de espera** (de 1 a 30) y, si quieres, **Más opciones** (FLOW-F25).
 5. **Guardar** y, en **Permisos**, concede «Llamar a» ese servidor.
 Entra: el método, la dirección, las cabeceras, el texto que envía y la espera.
-Sale: al ejecutarse, la llamada sale cuando la ejecución ya está guardada, nunca dentro de ella; el historial
-dice «Llamando a…» con el nombre del servidor y luego «Llamó a…: respondió 201», y los pasos siguientes
+Sale: **Ejecutar ahora** responde al momento, sin esperar al otro sistema: la ejecución queda en «Llamando
+a…» con el nombre del servidor y el Hub hace la llamada por detrás, en unos segundos; luego el historial dice
+«Llamó a…: respondió 201», y los pasos siguientes
 pueden leer su «Estado» y su «Texto» (hasta 1 MiB). Si el proceso se cae a mitad, la llamada se repite a los
 5 minutos con la **misma** «Clave de no repetición», para que el otro sistema no la haga dos veces.
 **Probar** dice «Llamaría a… con esto» con lo que enviaría y los secretos tapados, sin llamar.
@@ -904,6 +905,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
 | Guarda (o cambia) un secreto, sellado | gestionar | F26 | `flow.secret.set` |
 | Borra un secreto | gestionar | F26 | `flow.secret.delete` |
+| Hace, por detrás, la llamada de una ejecución que la espera | solo la plataforma | F27 | `flow.run.call` |
 | Toma la llamada de una ejecución para hacerla | solo la plataforma | F27 | `flow.run.claim_call` |
 | Apunta cómo acabó la llamada y sigue la ejecución | solo la plataforma | F27 | `flow.run.record_call` |
 | Contesta sí o no, con una nota, a una pregunta de una automatización | contestar (su rol) | F29 | `flow.question.answer` |
@@ -920,7 +922,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Permisos cambiados | Conceder o retirar | `id` | `flow.flow.granted` |
 | Borrada | Borrarla | `id` | `flow.flow.deleted` |
 | Ejecución empezada | Arranca una ejecución | `id`, `flow_id` | `flow.run.started` |
-| Ejecución en espera | Llega a un «Esperar» | `id`, `flow_id`, `resume_at` | `flow.run.parked` |
+| Ejecución en espera | Llega a un «Esperar», a «Llamar a otro sistema» o a «Preguntar antes a alguien» | `id`, `flow_id`, `resume_at` | `flow.run.parked` |
 | Ejecución reanudada | Termina la espera o se reanuda desde el paso que falló | `id`, `flow_id` | `flow.run.resumed` |
 | Ejecución terminada | Termina bien, por una condición, por un error o cancelada | `id`, `flow_id`, `status` | `flow.run.finished` |
 | Borrador propuesto | El asistente deja un borrador | `id` | `flow.draft.proposed` |
@@ -939,6 +941,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   cualquier aviso. Hace las acciones y consultas de otras apps **por su nombre** (`task.task.create`),
   con sus reglas y sus mensajes, nunca tocando sus datos; por eso no necesita ninguna app
   (`requires` vacío): una automatización que nombra una app apagada falla con su motivo, visible.
+- **A su propio `flow.run.parked`**: cuando una ejecución espera a «Llamar a otro sistema», el worker hace la
+  llamada (`flow.run.call`, FLOW-F27); nunca la petición que la dejó esperando.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
   tipo, para Probar y los ejemplos).
 
@@ -1035,9 +1039,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `http:https://host`); el nombre se resuelve **una** vez, se rechaza toda dirección que no sea pública
   (privada, del propio equipo, de enlace local —metadatos de la nube—, multicast o reservada) y se conecta
   a esa misma IP con su nombre en TLS (sin cambio de DNS entre medias); sin redirecciones ni proxies del
-  entorno, con tiempo total y como mucho 1 MiB de respuesta. El paso deja la ejecución en `calling`; la
-  llamada sale tras el COMMIT (`dispatch_call`, sin transacción ni bloqueo alrededor):
-  `flow.run.claim_call` la toma con un plazo de `CALL_LEASE_MINUTES` (5) en `resume_at` y
+  entorno, con tiempo total y como mucho 1 MiB de respuesta. El paso deja la ejecución en `calling` y la
+  petición responde: la llamada **nunca** sale de la petición que la aparcó («Ejecutar ahora», reanudar o
+  contestar «Sí» esperarían hasta 30 s ocupando un hilo web). La hace el worker: su relay entrega a `flow` el
+  `flow.run.parked` (`REACTIONS`), `flow.run.call` la programa tras el COMMIT de esa entrega
+  (`dispatch_call`, sin transacción ni bloqueo alrededor), `flow.run.claim_call` la toma con un plazo de `CALL_LEASE_MINUTES` (5) en `resume_at` y
   `flow.run.record_call` apunta cómo acabó y sigue. Si el proceso se cae, `resume_due` la vuelve a lanzar
   al vencer el plazo con la misma `Idempotency-Key` (uuid5 de ejecución y paso). Los tests llaman a un
   servidor HTTPS local de verdad (`tests/local_https.py`), nunca a un `patch` del cliente.
@@ -1066,10 +1072,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Fase 1**: el worker (`run_worker`) corre cada minuto las dos tareas programadas (`fire_due`,
   `resume_due`) como el sistema, en un único ámbito fijo (`WORKER_SCOPE_SLUG`); como en la fase 1 todos
   los hubs comparten tablas, ve todas las automatizaciones (FLOW-F22 y F23, probado pasando por
-  `base.scheduler.run_due`). **No** hay relay del outbox: nada llama a `flow.run.react` fuera de los tests
-  (FLOW-F21 parcial). El motor se prueba entregando a `events.react` (o `events.deliver`) avisos
-  **reales** del outbox, hechos por las operaciones reales de otras apps. El relay debe entregar a
-  `flow` **todos** los avisos (`REACTIONS = {"*": "flow.run.react"}`), con su id y su actor.
+  `base.scheduler.run_due`). Desde la ronda 2026-10-20 de PLAN-HUB el worker reparte además el outbox en
+  cada tick (5 s, `base/relay.py`): entrega a `flow` los avisos de las demás apps y sus propios
+  `flow.run.parked` (`REACTIONS = {"*": "flow.run.react", "flow.run.parked": "flow.run.call"}`), con su id y
+  su actor. El motor se prueba entregando a `events.react` (o `events.deliver`) avisos **reales** del
+  outbox, hechos por las operaciones reales de otras apps, y las llamadas con una pasada real del relay.
 - **Lo que ya no se puede leer** (hub#1766): un «Solo cuando…» o un «Solo sigue si…» guardado con una
   forma que el motor no entiende (escrito en crudo desde el admin o por una versión anterior) nunca se
   evalúa como «no se cumple»: la ejecución se para con `flow.filter_unreadable` o
@@ -1147,7 +1154,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | `POST /api/hub/flows/{id}/run` | `flow.flow.run` | ahora con botón |
 | motor del núcleo (eventos, cron, `at`, esperas) | `flow.run.react`, `flow.schedule.fire_due`, `flow.run.resume_due` | — |
 | `…/flows/secrets` | `flow.secret.list`, `flow.secret.set`, `flow.secret.delete` | solo el nombre: el valor no se vuelve a leer nunca |
-| paso `http` del motor | paso «Llamar a otro sistema» (`flow.run.claim_call`, `flow.run.record_call`) | la llamada sale tras guardar la ejecución, con su clave de no repetición |
+| paso `http` del motor | paso «Llamar a otro sistema» (`flow.run.claim_call`, `flow.run.record_call`) | la llamada la hace el worker tras guardar la ejecución, nunca la petición, con su clave de no repetición |
 | `…/approvals` (preguntas) | `flow.question.list`, `flow.question.answer`, `flow.question.expire_due` | el rol al que se pregunta sí decide quién contesta |
 | `…/approvals` (propuestas del asistente), `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
 

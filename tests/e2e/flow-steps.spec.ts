@@ -3,14 +3,15 @@
 // the real Tasks app, with one screenshot per flow and size (`APP-FLOW-2-<flow>-<width>`). A run stopped by a
 // permission is resumed from the step that failed once allowed (F24); a step that fails carries on and the
 // next one runs only if it failed (F25); a secret is saved in «Call another system» and never comes back
-// (F26); the call is built, tried, allowed and run, and it is not made because its server is inside a
-// private network (F27, the SSRF guard: no call leaves the machine); a question is built (F28) and the
+// (F26); the call is built, tried, allowed and run: «Run now» answers with the run «calling», the worker's
+// pass makes the call, and it is not made because its server is inside a private network (F27, the SSRF
+// guard: no call leaves the machine); a question is built (F28) and the
 // employee answers it in «Waiting for your answer», which is all they see of the app (F29). What a run
 // creates is tagged `E2E FlowG` and goes.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, psql, shot, shown } from './helpers';
-import { choose, confirmDialog, idFromUrl, manualFlow, signedIn } from './flow-helpers';
+import { choose, confirmDialog, idFromUrl, manualFlow, signedIn, workerCalls } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick } from './task-helpers';
 
@@ -150,6 +151,10 @@ for (const viewport of VIEWPORTS) {
       await confirmDialog(page, 'Run it now?');
       await expect(page.locator('ion-toast').filter({ hasText: 'calling another system' }).last()).toBeVisible();
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
+      // «Run now» answered without calling: the run waits for the worker, which makes the call on its next pass.
+      const calling = await openRun(page, 'Calling another system');
+      await expect(calling).toContainText('Calling localhost…');
+      workerCalls(callId);
       const blocked = await openRun(page, 'Stopped by an error');
       await expect(blocked).toContainText('«localhost» is inside a private network, so it was not called.');
       await expect(blocked).toContainText('Use the public address of the other system');
