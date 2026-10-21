@@ -43,7 +43,7 @@ const CATALOG = {
 describe('events and actions in words', () => {
   it('every event and action of the Hub today has its phrase in Spanish, never English words (flows#41)', () => {
     const p = phrasing('es');
-    expect(eventLabel('cart_checkout.cart.abandoned', CATALOG, p)).toBe('se abandona un carrito online');
+    expect(eventLabel('cart_checkout.cart.abandoned', CATALOG, p)).toBe('se abandona un carrito');
     expect(eventLabel('kitchen.ticket.ready', CATALOG, p)).toBe('una comanda está lista');
     expect(actionLabel('table.session.open', CATALOG, p)).toBe('Abrir una mesa');
     expect(actionLabel('reservation.waitlist.convert', CATALOG, phrasing())).toBe('Give a table to somebody on the waiting list');

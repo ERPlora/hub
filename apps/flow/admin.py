@@ -26,7 +26,7 @@ class FlowRunInline(admin.TabularInline):
 class FlowAdmin(admin.ModelAdmin):
     list_display = ("name", "enabled", "trigger_kind", "trigger_event", "version", "next_fire_at", "deleted_at")
     list_filter = ("enabled", "trigger_kind")
-    search_fields = ("name", "trigger_event", "search_text")
+    search_fields = ("name", "trigger_event", "search_text", "recipe")
     readonly_fields = ("id", "created_at", "updated_at")
     inlines = [FlowRunInline]
     fields = (
@@ -39,6 +39,7 @@ class FlowAdmin(admin.ModelAdmin):
         "steps",
         "grants",
         ("version", "language"),
+        ("recipe", "recipe_digest"),
         "search_text",
         ("created_by", "updated_by"),
         ("created_at", "updated_at", "deleted_at"),

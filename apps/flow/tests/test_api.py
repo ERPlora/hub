@@ -43,6 +43,11 @@ ROUTES = {
     ("POST", "/flow/secrets/delete", "flow.secret.delete"),
     ("GET", "/flow/questions", "flow.question.list"),
     ("POST", "/flow/questions/answer", "flow.question.answer"),
+    ("GET", "/flow/recipes", "flow.recipe.list"),
+    ("POST", "/flow/recipes/enable", "flow.recipe.enable"),
+    ("POST", "/flow/recipes/disable", "flow.recipe.disable"),
+    ("POST", "/flow/recipes/restore", "flow.recipe.restore"),
+    ("POST", "/flow/recipes/repair", "flow.recipe.repair"),
 }
 
 
@@ -286,3 +291,40 @@ def test_the_sample_of_this_business_only(owner_client):
         ]
         is False
     )
+
+
+@pytest.mark.django_db
+def test_the_recipes_over_http_list_on_off_restore_and_repair(owner_client):
+    gap = "appointment/customer_cancelled"
+    listed = get(owner_client, "/flow/recipes")
+    assert listed.status_code == 200
+    assert gap in {recipe["ref"] for recipe in listed.json()["recipes"]}
+
+    on = post(owner_client, "/flow/recipes/enable", {"recipe": gap})
+    assert on.status_code == 200, on.json()
+    assert (on.json()["created"], on.json()["flow"]["enabled"], on.json()["flow"]["grants"]) == (
+        True,
+        True,
+        ["task.task.create"],
+    )
+    off = post(owner_client, "/flow/recipes/disable", {"recipe": gap})
+    assert (off.status_code, off.json()["enabled"]) == (200, False)
+    assert post(owner_client, "/flow/recipes/restore", {"recipe": gap}).status_code == 200
+    assert post(owner_client, "/flow/recipes/repair", {"recipe": gap}).status_code == 200
+
+    unknown = post(owner_client, "/flow/recipes/enable", {"recipe": "appointment/nothing"})
+    assert (unknown.status_code, unknown.json()["error"]["code"]) == (404, "flow.recipe_not_found")
+    malformed = post(owner_client, "/flow/recipes/enable", {"recipe": "nothing"})
+    assert malformed.status_code == 422
+    Flow.objects.filter(recipe=gap).update(deleted_at=Flow.objects.get(recipe=gap).created_at)
+    never = post(owner_client, "/flow/recipes/disable", {"recipe": gap})
+    assert (never.status_code, never.json()["error"]["code"]) == (404, "flow.recipe_not_on")
+
+
+@pytest.mark.django_db
+def test_a_manager_neither_reads_nor_turns_on_recipes(manager_client):
+    for response in (
+        get(manager_client, "/flow/recipes"),
+        post(manager_client, "/flow/recipes/enable", {"recipe": "appointment/customer_cancelled"}),
+    ):
+        assert (response.status_code, response.json()["error"]["code"]) == (403, "permission_denied")

@@ -410,6 +410,57 @@ export interface DeletedOut {
   id: string;
 }
 
+/** A ready-made automation an app brings (FLOW-F33 to F36): `<app>/<id>`. */
+export interface RecipeRefIn {
+  recipe: string;
+}
+export interface RecipeGrantOut {
+  operation: string;
+  /** Why it asks for it, in the words of the app that brings it. */
+  reason: string;
+}
+export interface RecipeInstalledOut {
+  flow_id: string;
+  name: string;
+  enabled: boolean;
+  /** Its app brings a newer version than the one it was built or restored from. */
+  outdated: boolean;
+  missing_grants: string[];
+  /** The «Only when…» clauses its app added since; empty: nothing to repair. */
+  repair: Condition;
+}
+export interface RecipeOut {
+  ref: string;
+  app: string;
+  app_name: string;
+  icon: string;
+  id: string;
+  name: string;
+  summary: string;
+  description: string;
+  trigger: Trigger;
+  steps: Step[];
+  grants: RecipeGrantOut[];
+  installed: RecipeInstalledOut | null;
+}
+export interface RecipeSetAsideOut {
+  ref: string;
+  app: string;
+  app_name: string;
+  name: string;
+  code: 'flow.recipe_needs_apps' | 'flow.recipe_invalid';
+  message: string;
+  apps: string[];
+}
+export interface RecipeListOut {
+  recipes: RecipeOut[];
+  set_aside: RecipeSetAsideOut[];
+}
+export interface RecipeEnabledOut {
+  created: boolean;
+  flow: FlowOut;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'flow.flow.list': { input: FlowListIn; output: Page<FlowOut> };
@@ -435,5 +486,10 @@ declare module '@erplora/ui/sdk' {
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };
     'flow.catalog.read': { input: Record<string, never>; output: CatalogOut };
     'flow.event.sample': { input: SampleIn; output: SampleOut };
+    'flow.recipe.list': { input: Record<string, never>; output: RecipeListOut };
+    'flow.recipe.enable': { input: RecipeRefIn; output: RecipeEnabledOut };
+    'flow.recipe.disable': { input: RecipeRefIn; output: FlowOut };
+    'flow.recipe.restore': { input: RecipeRefIn; output: FlowOut };
+    'flow.recipe.repair': { input: RecipeRefIn; output: FlowOut };
   }
 }
