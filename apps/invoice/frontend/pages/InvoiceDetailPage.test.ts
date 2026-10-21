@@ -8,7 +8,7 @@
 import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
+import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice, OWNER } from '../__tests__/mount-invoice';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
 import RectifyModal from '../components/RectifyModal.vue';
@@ -17,7 +17,7 @@ import { plain } from '../lib/format';
 import type { InvoiceOut } from '../operations';
 import InvoiceDetailPage from './InvoiceDetailPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn(), sent: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn(), sent: vi.fn(), failed: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
@@ -29,12 +29,14 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
   toastSuccess: mocks.sent,
+  toastError: mocks.failed,
 }));
 vi.mock('../../../sale/frontend/lib/print', () => ({ printPaper: mocks.print }));
 beforeEach(() => {
   mocks.confirm.mockReset();
   mocks.print.mockReset();
   mocks.sent.mockReset();
+  mocks.failed.mockReset();
 });
 
 const OP = 'invoice.invoice.get';
@@ -283,5 +285,75 @@ describe('InvoiceDetailPage: the states of the screen', () => {
     await s.show(INVOICE);
     expect([s.field('title'), s.field('status'), s.field('print'), s.field('issue-date')]).toEqual(['Factura FACT-2026-000001', 'Emitida', 'Imprimir / PDF', '14/10/2026']);
     expect(s.field('mark-paid')).toBe('Marcar pagada');
+  });
+});
+
+describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F19)', () => {
+  const RECORD_OP = 'verifactu.record.by_invoice';
+  const WITH_VERIFACTU = { ...OWNER, permissions: [...OWNER.permissions, 'verifactu.view_record'], apps: [{ label: 'verifactu', state: 'on' as const }] };
+  const RECORD = {
+    id: 'r1',
+    invoice_id: 'i1',
+    invoice_number: 'FACT-2026-000001',
+    record_type: 'alta',
+    invoice_type: 'F1',
+    sequence: 1,
+    environment: 'production',
+    status: 'accepted',
+    fingerprint: 'ABC',
+    qr_url: 'https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674',
+    qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+',
+    csv: 'A-ZGTHW2SE4KQ8B2',
+  };
+
+  async function withRecord(options: MountOptions = {}) {
+    const s = await setup({ session: WITH_VERIFACTU, ...options });
+    await s.show(INVOICE);
+    await s.reopen();
+    return s;
+  }
+
+  it('follows the record of the invoice and shows its receipt; the paper carries its QR', async () => {
+    const s = await withRecord();
+    expect(s.params(RECORD_OP)).toEqual([{ invoice_id: 'i1' }]);
+    await s.result(RECORD_OP, { record: RECORD });
+    expect(s.find('invoice-verifactu').exists()).toBe(true);
+    expect(s.wrapper.findComponent(InvoicePaper).props('record')).toMatchObject({ qr_svg: RECORD.qr_svg, qr_url: RECORD.qr_url });
+  });
+
+  it('without a record yet there is no receipt and the paper has no QR', async () => {
+    const s = await withRecord();
+    await s.result(RECORD_OP, { record: null });
+    expect(s.find('invoice-verifactu').exists()).toBe(false);
+    expect(s.wrapper.findComponent(InvoicePaper).props('record')).toBeNull();
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    expect(mocks.print).toHaveBeenCalledOnce();
+  });
+
+  it('asks nothing with VeriFactu off or without the right to read its records', async () => {
+    for (const session of [OWNER, { ...WITH_VERIFACTU, permissions: OWNER.permissions }]) {
+      const s = await setup({ session });
+      await s.show(INVOICE);
+      await s.reopen();
+      expect(s.params(RECORD_OP)).toEqual([]);
+      expect(s.find('invoice-verifactu').exists()).toBe(false);
+      s.wrapper.unmount();
+    }
+  });
+
+  it('never prints on screen without the QR: «Print / PDF» waits for the record, and a record it cannot read prints nothing', async () => {
+    const s = await withRecord();
+    const disabled = () => (s.find('invoice-detail-print').element as HTMLElement & { disabled: boolean }).disabled;
+    expect(disabled()).toBe(true);
+    s.net.lastStream().push(errorFrame(s.subId(RECORD_OP), 'verifactu.boom'));
+    await flush();
+    expect(s.find('invoice-verifactu').exists()).toBe(false);
+    expect(disabled()).toBe(false);
+    s.answer(200, { queued: false, job_id: null, printer: null });
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    expect(mocks.print).not.toHaveBeenCalled();
+    expect(mocks.failed).toHaveBeenCalledWith('Could not print the invoice');
   });
 });

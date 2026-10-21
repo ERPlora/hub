@@ -148,6 +148,20 @@
         "substitute": "Factura completa"
       }
     },
+    "verifactu": {
+      "heading": "Justificante VeriFactu",
+      "csv": "CSV: {csv}",
+      "check": "Validar en la Agencia Tributaria ↗",
+      "qrAlt": "QR VeriFactu de la factura",
+      "testing": "Pruebas (AEAT de pruebas)",
+      "status": {
+        "pending": "Pendiente",
+        "sent": "Enviado, sin respuesta",
+        "accepted": "Aceptado",
+        "accepted_with_errors": "Aceptado con errores",
+        "rejected": "Rechazado"
+      }
+    },
     "markPaid": {
       "title": "¿Marcar {number} como pagada?",
       "message": "El cobro se registra con la fecha y la hora de ahora.",

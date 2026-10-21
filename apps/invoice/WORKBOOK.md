@@ -118,7 +118,11 @@ nombre del impuesto que declara la factura («IVA %», «IGIC %» o «IPSI %»; 
 desglose por tipo («IVA 21 %», «Recargo de equivalencia 5,2 %», «Exento (E1)», «No sujeto»,
 «Inversión del sujeto pasivo») con su base y su cuota, y los totales «Base», «Impuestos» y «Total». Los
 botones «Marcar pagada», «Rectificar» y «Factura completa» (solo en un tique que no se ha sustituido)
-con la misma regla que en la fila. Un rechazo sale justo encima de esos botones.
+con la misma regla que en la fila. Un rechazo sale justo encima de esos botones. Con **VeriFactu** activa y
+permiso para ver sus registros, debajo, la tarjeta «Justificante VeriFactu»: el estado del registro en la AEAT
+(«Pendiente», «Enviado, sin respuesta», «Aceptado», «Aceptado con errores» o «Rechazado»; «Pruebas (AEAT de
+pruebas)» si es del entorno de pruebas), el «CSV» cuando la AEAT ya contestó, el QR y «Validar en la Agencia
+Tributaria ↗». Sin VeriFactu, sin registro todavía o sin permiso, no sale la tarjeta.
 Error al abrir: «Factura no encontrada» o el mensaje del fallo, con «← Volver».
 
 ### Rectificar
@@ -195,7 +199,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F14 | Saber si la numeración del año está preparada | servidor hecho; la tarea de Inicio es de la plataforma |
 | INVOICE-F15 | Comprobar que la numeración no tiene huecos | hecho |
 | INVOICE-F16 | Buscar una factura | hecho |
-| INVOICE-F17 | Ver una factura | hecho; el justificante VeriFactu llega con la app de VeriFactu |
+| INVOICE-F17 | Ver una factura | hecho |
 | INVOICE-F18 | Imprimir o guardar en PDF una factura | hecho |
 | INVOICE-F19 | Marcar una factura como pagada | hecho |
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
@@ -573,40 +577,47 @@ inicial, «La fecha final no puede ser anterior a la inicial.»; ninguno de los 
 Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura
-Estado: hecho; el justificante VeriFactu llega con la app de VeriFactu
+<!-- origen: fi:modules/invoice#query-invoice-get fi:modules/invoice#query-invoice-lines old:invoice/workflow/consulta.md#invoice-f17 -->
+Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
 Pasos:
 1. En **Facturas**, abre la factura.
 2. Lee la cabecera, las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
    columna «Dto.» con el descuento sin IVA), el desglose y los totales.
-3. «Rectifica a», «Sustituye a», «Sustituida por» y las rectificativas abren el documento enlazado.
-4. «← Volver» regresa a la lista.
-Entra: la factura y sus líneas.
-Sale: nada; solo se lee. La ficha se pone al día sola si mientras tanto se paga o se rectifica.
-Si falla: «Factura no encontrada» o el motivo del fallo.
-Pendiente: el «Justificante VeriFactu» (estado, CSV, QR «QR tributario:» / «VERI*FACTU») lo pintará
-la ficha cuando exista VeriFactu, con su propia consulta por factura.
-Implicados: ninguno
+3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
+   cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗».
+4. «Rectifica a», «Sustituye a», «Sustituida por» y las rectificativas abren el documento enlazado.
+5. «← Volver» regresa a la lista.
+Entra: la factura y sus líneas y, con VeriFactu, su registro.
+Sale: nada; solo se lee. La ficha se pone al día sola si mientras tanto se paga, se rectifica o la AEAT
+contesta.
+Si falla: «Factura no encontrada» o el motivo del fallo. Sin VeriFactu, sin registro todavía o sin permiso
+para verlo, la ficha sale sin la tarjeta del justificante.
+Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
+<!-- origen: old:invoice/workflow/consulta.md#invoice-f18 qa:verticals/beauty/06-fiscal-and-printing -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
 Pasos:
 1. En la ficha, pulsa «Imprimir / PDF».
-2. Con **Impresión** y una impresora del sistema activa con la función Recibo, Facturación le pide la
-   página A4 (`invoice.invoice.print`, la plantilla `templates/invoice/invoice.html`, con el QR de
-   VeriFactu si la factura tiene su registro) y se lee «Enviado a <impresora>.» (PRINTING-F08).
-3. Si no (sin Impresión encendida, sin impresora del sistema, o sin poder leer su registro de
-   VeriFactu: el papel nunca sale sin su QR), se abre el diálogo de impresión del navegador con la
-   factura en A4 (emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que
-   rectifica), desde donde se puede guardar como PDF.
+2. Con **Impresión** y una impresora del sistema activa con la función Recibo, la factura en A4 va a esa
+   impresora, con el QR de VeriFactu si tiene su registro, y se lee «Enviado a <impresora>.»
+   (PRINTING-F08).
+3. Si no (sin Impresión encendida, sin impresora del sistema, o si no se pudo leer su registro de VeriFactu
+   para esa impresora), se abre el diálogo de impresión del
+   navegador con la factura en A4 (con VeriFactu, arriba el QR del registro con «QR tributario:» y
+   «VERI*FACTU»; emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
+   desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
+   nunca sale sin su QR.
 4. Siempre en el idioma de quien imprime. Un documento de una venta sale como «Copia» (el original fue
    el papel del cobro); uno emitido desde Facturación, como original.
 Entra: la factura y sus líneas.
 Sale: el papel; la factura no cambia. Cada pulsación, un papel.
-Si falla: «No se pudo imprimir la factura».
+Si falla: «No se pudo imprimir la factura», también si no se puede leer el registro de VeriFactu de una
+factura que lo tiene (no se imprime sin su QR).
 Implicados: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Marcar una factura como pagada

@@ -4,8 +4,9 @@
 // and the document block on top (the title by kind — invoice, simplified invoice, rectifying invoice —,
 // «Copy» on a reprint, number, date and, when it differs, the operation date), «Bill to» (a ticket without
 // recipient has none), the lines with their price without VAT, their discount apart and their rate, the breakdown with its bases, the totals and the
-// note of what it rectifies — in the page's language. Every figure is the server's. The VeriFactu QR comes
-// with VeriFactu.
+// note of what it rectifies — in the page's language. Every figure is the server's. With its VeriFactu record
+// (VERIFACTU-F19), the record's QR on top, as on the server's paper, with the AEAT's own Spanish words («QR
+// tributario:», «VERI*FACTU»; Orden HAC/1177/2024, art. 21).
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
@@ -18,8 +19,10 @@ const props = withDefaults(
     invoice: InvoiceOut;
     /** A reprint: «Copy» under the title. */
     duplicate?: boolean;
+    /** VeriFactu's record of the invoice (its QR); none = no QR. */
+    record?: { qr_svg: string; qr_url: string } | null;
   }>(),
-  { duplicate: false },
+  { duplicate: false, record: null },
 );
 
 const t = useT();
@@ -60,6 +63,20 @@ const note = computed(() => documentNote(props.invoice, t));
     class="invoice-paper"
     data-testid="invoice-paper"
   >
+    <div
+      v-if="record"
+      class="invoice-paper__qr"
+      data-testid="invoice-paper-qr"
+    >
+      <div>QR tributario:</div>
+      <img
+        :src="record.qr_svg"
+        :alt="record.qr_url"
+      >
+      <div class="invoice-paper__qr-mode">
+        VERI*FACTU
+      </div>
+    </div>
     <div class="invoice-paper__top">
       <div data-testid="invoice-paper-issuer">
         <div class="invoice-paper__issuer-name">
@@ -240,6 +257,22 @@ const note = computed(() => documentNote(props.invoice, t));
 </template>
 
 <style scoped>
+.invoice-paper__qr {
+  width: 40mm;
+  margin: 0 auto 5mm;
+  text-align: center;
+  font-size: 9px;
+}
+.invoice-paper__qr img {
+  display: block;
+  width: 32mm;
+  height: 32mm;
+  margin: 1mm auto;
+}
+.invoice-paper__qr-mode {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
 .invoice-paper {
   box-sizing: border-box;
   width: 210mm;

@@ -148,6 +148,20 @@
         "substitute": "Full invoice"
       }
     },
+    "verifactu": {
+      "heading": "VeriFactu receipt",
+      "csv": "CSV: {csv}",
+      "check": "Check at the tax agency ↗",
+      "qrAlt": "VeriFactu QR of the invoice",
+      "testing": "Testing (AEAT test)",
+      "status": {
+        "pending": "Pending",
+        "sent": "Sent, no answer",
+        "accepted": "Accepted",
+        "accepted_with_errors": "Accepted with errors",
+        "rejected": "Rejected"
+      }
+    },
     "markPaid": {
       "title": "Mark {number} as paid?",
       "message": "The payment is recorded with the current date and time.",
