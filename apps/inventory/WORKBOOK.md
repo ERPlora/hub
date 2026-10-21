@@ -174,8 +174,9 @@ filtros. Una venta se encuentra por el número de su tique, factura o venta.». 
 tabla con «Reintentar».
 
 ### Categorías
-Tabla con Nombre, Slug y Productos (cuántos activos tiene); buscador «Buscar categoría…»; 25 por
-página; importar y exportar CSV. El **+** y la fila (o «Editar») abren el panel: Nombre, «Slug
+Tabla con Nombre, Slug y Productos (cuántos a la venta tiene: activos y no agotados, la misma cifra
+que la tira de categorías del TPV); buscador «Buscar categoría…»; 25 por página; importar y
+exportar CSV. El **+** y la fila (o «Editar») abren el panel: Nombre, «Slug
 (opcional)», «Tipo de IVA / Impuesto» («— (por defecto)» o una categoría fiscal), «Cancelar
 edición» y «Guardar» / «Guardar cambios». «Eliminar» abre «Eliminar categoría» con lo que va a
 pasar y «Eliminar y desvincular» / «Cancelar». Vacía: «Sin categorías.». Cargando: «Cargando…».
