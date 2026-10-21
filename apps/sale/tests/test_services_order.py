@@ -432,6 +432,20 @@ def test_a_round_says_who_sends_it_by_the_name_a_person_reads(steak, django_user
     assert sent == ["Ana García", "luis@example.com", "saas:44"]
 
 
+def test_a_round_names_who_attends_the_check_else_who_sends_it(steak, django_user_model):
+    """KITCHEN-F18, F08 (kitchen#82, hub#2033): the till names who attends the check («Atiende», a member of the
+    team who may have no login); the kitchen reads that name. Empty or blank: who sends it."""
+    luis = django_user_model.objects.create_user("saas:45", first_name="Luis", last_name="Pérez")
+    named = []
+    for waiter in ("Marta Ruiz", "   ", ""):
+        order = open_order({"product": "STK"})
+        OutboxEvent.objects.all().delete()
+        run("sale.order.fire", {"order_id": str(order.id), "waiter": waiter}, ctx_for(actor=luis))
+        ((_, payload), _changed) = events()
+        named.append(payload["waiter"])
+    assert named == ["Marta Ruiz", "Luis Pérez", "Luis Pérez"]
+
+
 def test_a_line_sent_to_the_kitchen_is_not_changed_nor_removed_but_voided(
     steak, coffee
 ):

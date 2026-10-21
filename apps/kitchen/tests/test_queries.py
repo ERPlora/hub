@@ -447,7 +447,7 @@ def test_all_day_adds_up_what_is_left_most_first_per_station(clock, product):
     order = open_check("Table 1")
     add_line(order.id, burger, "2")
     add_line(order.id, product("Soup"))
-    fire(order.id)
+    first = fire(order.id).order.lines
     other = open_check("Table 2")
     add_line(other.id, burger)
     lines = fire(other.id).order.lines
@@ -461,6 +461,11 @@ def test_all_day_adds_up_what_is_left_most_first_per_station(clock, product):
         (r.name, r.quantity)
         for r in run("kitchen.ticket.all_day", {"station": "grill"}).rows
     ] == [("Burger", Decimal("2.000"))]
+    # A dish marked ready in a round that still cooks (the soup is left) leaves the count too.
+    run("kitchen.item.bump", {"ticket_id": str(first[0].id), "item_ids": [str(first[0].id)]})
+    assert [(r.name, r.quantity) for r in run("kitchen.ticket.all_day", {}).rows] == [
+        ("Soup", Decimal("1.000"))
+    ]
 
 
 def test_all_day_is_empty_when_nothing_is_left():
@@ -671,6 +676,39 @@ def test_the_history_is_newest_first_with_who_and_which_dish(clock, product):
     assert run("kitchen.log.list", {"search": "0001"}).total == 4
     assert run("kitchen.log.list", {"date_from": "2026-10-15"}).rows == []
     assert run("kitchen.log.list", {"date_to": "2026-10-14"}).total == 4
+
+
+def test_the_history_pages_and_finds_a_reason_by_its_words(clock, product):
+    """KITCHEN-F25: ``limit`` and ``offset`` page it newest first (kitchen#1); the search finds the words of a
+    reason, in any case (kitchen#113)."""
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    clock.advance(minutes=1)
+    run("kitchen.ticket.cancel", {"ticket_id": str(lines[0].id), "reason": "Customer left"})
+    every = [r.action for r in run("kitchen.log.list", {}).rows]
+    assert every == ["cancelled", "received"]
+    first = run("kitchen.log.list", {"limit": 1})
+    second = run("kitchen.log.list", {"limit": 1, "offset": 1})
+    assert (first.total, [r.action for r in first.rows]) == (2, ["cancelled"])
+    assert (second.total, [r.action for r in second.rows]) == (2, ["received"])
+    found = run("kitchen.log.list", {"search": "customer LEFT"})
+    assert [(r.action, r.notes) for r in found.rows] == [("cancelled", "Customer left")]
+
+
+def test_the_history_names_who_did_it_by_their_name_never_their_session_id(clock, product, django_user_model):
+    """KITCHEN-F25: «Who» is the person as they read themselves (name, else e-mail), not the username of their
+    session (``saas:<id>``); the system stays empty and a name the Hub does not know stays as it was saved."""
+    marta = django_user_model.objects.create_user(
+        "saas:77", email="marta@example.com", first_name="Marta", last_name="Ruiz"
+    )
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor="luis"))
+    run("kitchen.ticket.cancel", {"ticket_id": str(lines[0].id), "reason": "Left"}, ctx_for(actor=marta))
+    rows = run("kitchen.log.list", {}).rows
+    assert [(r.action, r.actor) for r in rows] == [
+        ("cancelled", "Marta Ruiz"),
+        ("started", "luis"),
+        ("received", ""),
+    ]
 
 
 def test_the_history_needs_its_permission():

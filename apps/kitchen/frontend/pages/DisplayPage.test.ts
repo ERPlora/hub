@@ -193,6 +193,8 @@ describe('DisplayPage', () => {
     await flush();
     expect(s.find('kitchen-display-error').text()).toContain('Could not load the kitchen display');
     expect(s.find('kitchen-display-retry').exists()).toBe(true);
+    // kitchen#12: a full-size touch target (44 px) on the kitchen's screen, never the small button.
+    expect((s.find('kitchen-display-retry').element as HTMLElement & { size?: string }).size).toBeUndefined();
   });
 
   it('is only to look at for whoever may not change tickets', async () => {

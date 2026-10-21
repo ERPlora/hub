@@ -328,6 +328,16 @@ def test_a_ticket_by_hand_takes_the_next_number_and_routes_its_dishes(clock, pro
     assert len(jobs()) == 1
 
 
+def test_a_ticket_by_hand_names_who_made_it_by_their_name(django_user_model):
+    """KITCHEN-F23: the card and the paper read the person (name, else e-mail), never the id of their session,
+    as a round sent from the till does (KITCHEN-F18)."""
+    marta = django_user_model.objects.create_user(
+        "saas:77", email="marta@example.com", first_name="Marta", last_name="Ruiz"
+    )
+    ticket = run("kitchen.ticket.create", {"items": [{"name": "Salad"}]}, ctx_for(actor=marta))
+    assert ticket.waiter == "Marta Ruiz"
+
+
 def test_a_ticket_by_hand_starts_with_the_settings_type():
     KitchenSettings.objects.update(default_order_type="takeaway")
     ticket = run("kitchen.ticket.create", {"items": [{"name": "Salad"}]})

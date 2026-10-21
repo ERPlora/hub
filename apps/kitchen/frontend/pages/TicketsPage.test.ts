@@ -81,6 +81,42 @@ describe('TicketsPage', () => {
     expect(s.params(OP)).toEqual([{ search: 'table', sort: '-received_at', status: 'ready', priority: 'rush', limit: 50, offset: 0 }]);
   });
 
+  it('25 a page asks the server for 25 (kitchen#135)', async () => {
+    const s = await setup();
+    await s.show([PENDING]);
+    s.table().vm.$emit('pageSizeChange', 25);
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ sort: '-received_at', limit: 25, offset: 0 }]);
+  });
+
+  it('type, priority and status filter by a list of their words, never by typing (kitchen#39)', async () => {
+    const s = await setup();
+    await s.show([PENDING]);
+    const filters = s
+      .prop<Array<{ key: string; filter?: { type: string; options?: Array<{ label: string }> } }>>('columns')
+      .filter((c) => c.filter)
+      .map((c) => [c.key, c.filter!.type, c.filter!.options?.map((o) => o.label)]);
+    expect(filters).toEqual([
+      ['order_type', 'select', ['Dine in', 'Takeaway', 'Delivery']],
+      ['priority', 'select', ['Normal', 'Rush', 'VIP']],
+      ['status', 'select', ['To prepare', 'Preparing', 'Ready', 'Served', 'Cancelled']],
+    ]);
+  });
+
+  it('a ticket made on page 2 is seen: the list goes back to the first page (kitchen#133)', async () => {
+    const s = await setup();
+    await s.show([PENDING]);
+    s.table().vm.$emit('pageChange', 1);
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ sort: '-received_at', limit: 50, offset: 50 }]);
+    s.wrapper.findComponent(TicketFormModal).vm.$emit('saved', PENDING);
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ sort: '-received_at', limit: 50, offset: 0 }]);
+  });
+
   it('offers only the steps the status allows', async () => {
     const s = await setup();
     await s.show([PENDING, READY, SERVED]);

@@ -37,6 +37,12 @@ describe('arrivals', () => {
     expect(arrivals(known, [ticket('a')]).ring).toBe(false);
   });
 
+  it('never rings for a ticket the pass recalls: it was on the board, under «Ready» (KITCHEN-F12, F16)', () => {
+    const known = arrivals(undefined, [ticket('a')], [ticket('b', { status: 'ready' })]).known;
+    expect(arrivals(known, [ticket('a'), ticket('b', { status: 'preparing' })], []).ring).toBe(false);
+    expect(arrivals(known, [ticket('a'), ticket('c')], [ticket('b', { status: 'ready' })]).ring).toBe(true);
+  });
+
   it('never rings when the rush is taken away or a ticket leaves', () => {
     const known = arrivals(undefined, [ticket('a', { priority: 'rush' }), ticket('b')]).known;
     expect(arrivals(known, [ticket('a')]).ring).toBe(false);
