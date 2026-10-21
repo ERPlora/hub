@@ -650,7 +650,8 @@ test('TABLE-F21, F22, F23, F13, F24: the checks of the room in Sessions', async 
     await sessions.locator('[data-testid=table-sessions-segment-all]').click();
     await rowAction(page, 'table-sessions', parked.id, 'restore');
     const restore = page.locator('ion-modal[data-testid=table-restore]');
-    await pick(page, restore.locator('[data-testid=table-restore-table]'), new RegExp(`^\\s*1\\b`));
+    // Table 1 of the run's zone: another zone of a shared database may have a table 1 too.
+    await pick(page, restore.locator('[data-testid=table-restore-table]'), new RegExp(`^\\s*1 · ${ZONE}\\s*$`));
     await flowShots(page, ['TABLE-F24'], async () => {
       await expect(restore.locator('[data-testid=table-restore-submit]')).toBeEnabled();
     });
