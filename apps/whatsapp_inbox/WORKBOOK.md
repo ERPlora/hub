@@ -1104,10 +1104,13 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   evento. La foto que erplora.com empuja entretanto dice lo mismo con una versión mayor, y la siguiente
   sigue ganando.
 - **Fase 1** entrega al terminar la petición (el `on_commit` corre en ella); **fase 2**: el trabajo
-  diferido entra con `use_hub(hub)` explícito (corre fuera de la petición que eligió el hub) y la tarea
+  diferido entra con `use_hub(hub)` explícito (corre fuera de la petición que eligió el hub). La tarea
   del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
-  `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos.
+  `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. En la
+  fase 1 el worker la corre con un solo ámbito fijo (`WORKER_SCOPE_SLUG`, `base/scheduler.py`): retoma las
+  plantillas y los borrados de plantillas de todos los negocios, y cada una se entrega a erplora.com como la
+  de su negocio (`host`), con su contenido; en la fase 2 corre en la BD de cada hub.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`, cualquier otro como `whatsapp_inbox.send_refused`); conexión fallida o un

@@ -59,6 +59,7 @@ from apps.whatsapp_inbox.queries import (
     team,
     template_out,
     templates_of,
+    templates_of_every_business,
 )
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
@@ -212,6 +213,11 @@ def _after_commit(ctx: OperationContext, job, *args) -> None:
     the job enters ``use_hub(hub)`` itself, since it runs outside the request that chose the hub.
     """
     transaction.on_commit(partial(job, ctx.scope, *args), robust=True)
+
+
+def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
+    """``_after_commit`` for the business in ``host`` (a template's own), whatever business ``ctx`` runs as."""
+    transaction.on_commit(partial(job, Scope(ctx.scope.kind, host), *args), robust=True)
 
 
 def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
@@ -1158,26 +1164,27 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
         .order_by("erased_at", "id")
         .values_list("id", flat=True)[:RESUME_BATCH]
     )
+    # Every business's, each handed over as its own (phase 1's worker runs on one fixed scope).
     templates = list(
-        templates_of(ctx.scope).select_for_update(skip_locked=True)
+        templates_of_every_business().select_for_update(skip_locked=True)
         .filter(submit_state__in=_TEMPLATE_ON_ITS_WAY, submit_at__lt=cutoff, deleted_at__isnull=True)
         .order_by("submit_at", "id")
-        .values_list("id", flat=True)[:RESUME_BATCH]
+        .values_list("id", "host")[:RESUME_BATCH]
     )
     deletions = list(
-        templates_of(ctx.scope).select_for_update(skip_locked=True)
+        templates_of_every_business().select_for_update(skip_locked=True)
         .filter(delete_state=Template.DeleteState.PENDING, deleted_at__lt=cutoff)
         .order_by("deleted_at", "id")
-        .values_list("id", flat=True)[:RESUME_BATCH]
+        .values_list("id", "host")[:RESUME_BATCH]
     )
     for message_id in messages:
         _after_commit(ctx, deliver, message_id)
     for conversation_id in erasures:
         _after_commit(ctx, forget, conversation_id)
-    for template_id in templates:
-        _after_commit(ctx, submit_template, template_id)
-    for template_id in deletions:
-        _after_commit(ctx, remove_template, template_id)
+    for template_id, host in templates:
+        _after_commit_as(host, ctx, submit_template, template_id)
+    for template_id, host in deletions:
+        _after_commit_as(host, ctx, remove_template, template_id)
     return {
         "messages": len(messages),
         "erasures": len(erasures),

@@ -5,20 +5,24 @@ Phase 1 shares the tables, so a template belongs to the business of the context 
 copy where business b's photo of Meta's list marked business a's templates «Deleted in WhatsApp Manager».
 """
 
+import datetime as dt
+import json
 import uuid
 
 import httpx
 import pytest
 import respx
+from live.context import Scope
 from live.errors import NotFound
 
 from apps.whatsapp_inbox.models import Template
-from apps.whatsapp_inbox.tests.conftest import A, B, ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import NOW, A, B, ctx_for, receive, run, system, template
 
 pytestmark = pytest.mark.django_db
 
 SAAS = "http://saas.test"
 REGISTER = f"{SAAS}/internal/whatsapp/templates"
+DELETE = f"{SAAS}/internal/whatsapp/templates/delete"
 
 
 def photo(scope, version: int, templates: list | None, phone: str = "+34910000000") -> None:
@@ -111,3 +115,49 @@ def test_a_template_made_by_a_business_is_its_own_and_goes_to_meta_for_it(django
     # A's own photo, listing nothing, leaves B's template as it was.
     photo(A, 6, [])
     assert listed(B) == [("aviso", "PENDING", "Hola {{1}}")]
+
+
+@respx.mock
+def test_one_run_of_the_worker_resumes_every_business_s_stuck_templates_each_for_its_own(
+    django_capture_on_commit_callbacks, fixed_clock, monkeypatch, settings
+):
+    """Phase 1's worker runs ``delivery.resume`` on one fixed scope (``WORKER_SCOPE_SLUG``, base/scheduler.py): a
+    creation and a deletion of every business whose after-COMMIT call never ran go to erplora.com again in that one
+    run, each for its own business and with its own content (review of hub#151: they were only the worker's host's)."""
+    photo(A, 5, [template("recordatorio")])
+    photo(B, 7, [template("recordatorio", meta_id="meta-b", body="Hola {{1}}, tu mesa es el {{2}}.")], phone="+34910000001")
+    made = {}
+    for scope, body in ((A, "Hola {{1}}, tu cita en la peluquería"), (B, "Hola {{1}}, tu mesa en el restaurante")):
+        made[scope.key] = run(
+            "whatsapp_inbox.template.create",
+            {"name": f"aviso_{scope.key}", "language": "es", "category": "UTILITY", "body": body,
+             "body_examples": ["Ana"], "submit_key": str(uuid.uuid7())},
+            ctx_for(scope=scope),
+        )
+        theirs = Template.objects.get(host=scope.key, name="recordatorio")
+        run("whatsapp_inbox.template.delete", {"id": str(theirs.id)}, ctx_for(scope=scope))
+    registered = respx.post(REGISTER).mock(
+        side_effect=lambda request: httpx.Response(
+            200, json={"meta_id": f"meta-new-{json.loads(request.content)['hub']}", "status": "PENDING"}
+        )
+    )
+    deleted = respx.post(DELETE).mock(return_value=httpx.Response(200, json={"deleted": True}))
+    monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
+    worker = Scope("host", settings.WORKER_SCOPE_SLUG)
+    assert worker.key not in {"a", "b"}
+
+    with django_capture_on_commit_callbacks(execute=True):
+        resumed = system("whatsapp_inbox.delivery.resume", {}, worker)
+
+    assert (resumed.templates, resumed.template_deletions) == (2, 2)
+    sent = sorted((body["hub"], body["name"], body["body"]) for body in (json.loads(c.request.content) for c in registered.calls))
+    assert sent == [
+        ("a", "aviso_a", "Hola {{1}}, tu cita en la peluquería"),
+        ("b", "aviso_b", "Hola {{1}}, tu mesa en el restaurante"),
+    ]
+    gone = sorted((body["hub"], body["meta_id"]) for body in (json.loads(c.request.content) for c in deleted.calls))
+    assert gone == [("a", "meta-recordatorio"), ("b", "meta-b")]
+    for host in ("a", "b"):
+        row = Template.objects.get(pk=made[host].id)
+        assert (row.host, row.status, row.meta_id) == (host, "PENDING", f"meta-new-{host}")
+        assert Template.objects.get(host=host, name="recordatorio").delete_state == "done"

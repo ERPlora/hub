@@ -482,6 +482,13 @@ def templates_of(scope: Scope) -> QuerySet:
     return Template.objects.filter(host=scope.key)
 
 
+def templates_of_every_business() -> QuerySet:
+    """Every business's templates, only for the worker's ``delivery.resume``: phase 1 runs it on one fixed scope
+    (``WORKER_SCOPE_SLUG``) over the shared table, and it hands each template over as its own business (``host``);
+    phase 2 runs it in each hub's database, which holds that hub's alone."""
+    return Template.objects.all()
+
+
 def live_templates(scope: Scope) -> QuerySet:
     """The business's templates not deleted here."""
     return templates_of(scope).filter(deleted_at__isnull=True)
