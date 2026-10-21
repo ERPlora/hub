@@ -706,12 +706,14 @@ def _not_understood(door: str) -> OperationError:
 
 
 def _return_page(value) -> str:
-    """erplora.com's page Meta brings the code back to: an https address of erplora.com's own origin (the one the
-    Hub knows, ``SAAS_URL``), or ``""``."""
+    """erplora.com's page Meta brings the code back to: an address of erplora.com's own origin (the one the Hub
+    knows, ``SAAS_URL``: same scheme, host and port) without a fragment, or ``""``. Over https; plain http only in
+    development (``DEBUG``) with an http ``SAAS_URL``, as erplora.com's own rule (``whatsapp.meta.redirect_uri``)."""
     if not isinstance(value, str) or not value:
         return ""
     page, known = urlsplit(value), urlsplit(str(getattr(settings, "SAAS_URL", "") or ""))
-    if page.scheme != "https" or not page.netloc or page.fragment or (page.scheme, page.netloc) != (known.scheme, known.netloc):
+    schemes = ("https", "http") if settings.DEBUG else ("https",)
+    if page.scheme not in schemes or not page.netloc or page.fragment or (page.scheme, page.netloc) != (known.scheme, known.netloc):
         return ""
     return value
 
