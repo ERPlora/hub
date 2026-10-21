@@ -211,6 +211,7 @@ async function confirmDelete(): Promise<void> {
       fill
       server-side
       searchable
+      filterable
       row-key="id"
       :filters="filters"
       :rows="result?.rows ?? []"
@@ -240,7 +241,7 @@ async function confirmDelete(): Promise<void> {
     >
       <template #customer="{ row }">
         <span class="ob-customer">
-          <span>{{ customer(row) }}</span>
+          <span data-testid="ob-bookings-customer-name">{{ customer(row) }}</span>
           <small v-if="row.customer_phone">{{ row.customer_phone }}</small>
         </span>
       </template>
@@ -284,6 +285,14 @@ async function confirmDelete(): Promise<void> {
   display: inline-flex;
   flex-direction: column;
   gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+}
+/* A long name ends in «…» inside its column instead of being cut off mid-letter. */
+.ob-customer span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ob-customer small {
   font-size: 0.75rem;
