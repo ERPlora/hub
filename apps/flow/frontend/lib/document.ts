@@ -80,6 +80,9 @@ function blankStep(id: string, kind: StepKind): Step {
   if (kind === 'condition') return { id, kind, when: {} };
   // An hour: long enough to read as «later», short enough that a first try needs no patience.
   if (kind === 'delay') return { id, kind, seconds: 3600 };
+  if (kind === 'http') return { id, kind, method: 'POST', url: '', headers: {}, body: '', timeout: 10 };
+  // Whoever runs the business, three days, and a no stops it: the old module's defaults.
+  if (kind === 'ask') return { id, kind, title: '', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' };
   return { id, kind: 'command', operation: '', params: {} };
 }
 
@@ -144,15 +147,55 @@ export function valueToParts(value: unknown): ValuePart[] {
 
 // ── Permissions ────────────────────────────────────────────────────────────────────────────────
 
-/** The actions and reads the steps run, once each and in order (a half-filled step asks nothing). */
+/** The origin of a call whose host is written by hand (`https://host[:port]`, lower case, no default
+ *  port); `null` otherwise. Mirrors apps/flow/document.py `literal_origin`. */
+export function callOrigin(url: string): string | null {
+  const filled = url.trim().replace(TEMPLATE_RE, 'x');
+  let parsed: URL;
+  try {
+    parsed = new URL(filled);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password || filled.split('/')[2]?.includes('@')) return null;
+  const head = url.trim().split('{{')[0];
+  if (url.includes('{{') && !/^https:\/\/[^/?#{}]+[/?#]/i.test(head)) return null;
+  return `https://${parsed.host}`;
+}
+
+/** The permission a call asks for (`http:https://host`), or `null` for an address not written by hand. */
+export function httpGrant(url: string): string | null {
+  const origin = callOrigin(url);
+  return origin ? `http:${origin}` : null;
+}
+
+/** The actions, reads and calls' origins the steps need, once each and in order (a half-filled step asks
+ *  nothing). */
 export function requiredGrants(steps: readonly Step[]): string[] {
   const names: string[] = [];
   for (const step of steps) {
     if ((step.kind === 'command' || step.kind === 'query') && step.operation.trim() && !names.includes(step.operation)) {
       names.push(step.operation);
+    } else if (step.kind === 'http') {
+      const grant = httpGrant(step.url);
+      if (grant && !names.includes(grant)) names.push(grant);
     }
   }
   return names;
+}
+
+/** What a call can insert besides the automation's data: the secrets (by name) and its own key. */
+export function callChoices(secrets: readonly string[]): DataChoice[] {
+  return [
+    ...secrets.map((name) => ({ path: `secret.${name}`, group: 'secret', example: undefined })),
+    { path: 'run.idempotency_key', group: 'run', example: undefined },
+  ];
+}
+
+/** Every value of a call is text: a datum alone (what `partsToValue` keeps bare) becomes `{{…}}`. */
+export function asCallText(value: unknown): string {
+  if (typeof value !== 'string') return value === undefined || value === null ? '' : String(value);
+  return /^(input|steps|secret|run)(\.[A-Za-z_][A-Za-z0-9_]*)+$/.test(value) ? `{{${value}}}` : value;
 }
 
 export function missingGrants(steps: readonly Step[], grants: readonly string[]): string[] {
@@ -196,7 +239,7 @@ export function rowsToCondition(rows: readonly ConditionRow[]): Condition {
 export function fieldErrors(fields: Readonly<Record<string, string>> | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, message] of Object.entries(fields ?? {})) {
-    let normal = key.replace(/^steps\.(\d+)\.(command|query|condition|delay)\./, 'steps.$1.');
+    let normal = key.replace(/^steps\.(\d+)\.(command|query|condition|delay|http|ask)\./, 'steps.$1.');
     normal = normal === 'trigger.schedule' ? 'trigger' : normal.replace(/^trigger\.(event|schedule|at|manual)\./, 'trigger.');
     out[normal] = message;
   }
@@ -221,9 +264,19 @@ export function dataChoices(steps: readonly Step[], index: number, sample: Recor
   const out: DataChoice[] = [];
   flatten(sample ?? {}, 'input', out);
   for (const step of steps.slice(0, index)) {
-    if (step.kind !== 'command' && step.kind !== 'query') continue;
-    const action = catalog?.actions.find((candidate) => candidate.name === step.operation);
-    for (const field of action?.outputs ?? []) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
+    if (step.kind === 'condition' || step.kind === 'delay') continue;
+    const outputs =
+      step.kind === 'http'
+        ? ['status', 'body']
+        : step.kind === 'ask'
+          ? ['approved', 'expired', 'note', 'answered_by']
+          : (catalog?.actions.find((candidate) => candidate.name === step.operation)?.outputs ?? []);
+    for (const field of outputs) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
+    // FLOW-F25: whether it was skipped, or failed and carried on.
+    if (step.run_if) out.push({ path: `steps.${step.id}.skipped`, group: step.id, example: undefined });
+    if (step.kind !== 'ask' && step.on_error === 'continue') {
+      for (const field of ['failed', 'error_code']) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
+    }
   }
   return out;
 }

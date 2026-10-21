@@ -5,7 +5,7 @@
 // decorative zeros; «Total from 12» means twelve euros (1200 cents) and «Items from 2» two units.
 import { describe, expect, it } from 'vitest';
 
-import { CART_TONE, currencyDecimals, formatMoney, formatQuantity, ORDER_TONE, toMinor, toQuantity } from './format';
+import { CART_TONE, currencyDecimals, formatMoney, formatQuantity, ORDER_TONE, toMinor, toQuantity, unreadableTotals } from './format';
 
 const nbsp = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -19,6 +19,14 @@ describe('formatMoney', () => {
     expect(formatMoney(1999, 'en', 'JPY')).toBe('¥1,999');
     expect(nbsp(formatMoney(1999, 'en', 'KWD'))).toBe('KWD 1.999');
     expect(formatMoney(1999, 'en', 'USD')).toBe('$19.99');
+  });
+
+  it('groups the thousands of a four-digit amount too, so a column of totals lines up (hub#1090)', () => {
+    // Spanish CLDR leaves 1234,56 ungrouped (minimumGroupingDigits = 2); Odoo, Business Central and
+    // the old hub's fix group it, as 12.345,60 is.
+    expect(nbsp(formatMoney(123456, 'es'))).toBe('1.234,56 €');
+    expect(nbsp(formatMoney(1234560, 'es'))).toBe('12.345,60 €');
+    expect(formatMoney(123456, 'en')).toBe('€1,234.56');
   });
 });
 
@@ -55,6 +63,44 @@ describe('toMinor: a money range filter in the unit the column shows', () => {
     expect(toMinor('')).toBeUndefined();
     expect(toMinor(undefined)).toBeUndefined();
     expect(toMinor('-3')).toBeUndefined();
+    expect(toMinor('1,2,3')).toBeUndefined();
+    expect(toMinor('12,345')).toBe(1234500);
+  });
+
+  it('reads what a person pastes, thousands marks and currency sign included (pm#521)', () => {
+    expect(toMinor('1.250,50')).toBe(125050);
+    expect(toMinor('1,250.50')).toBe(125050);
+    expect(toMinor(' 1.234,56 € ')).toBe(123456);
+    expect(toMinor('1.234.567')).toBe(123456700);
+    expect(toMinor('1.255')).toBe(125500);
+    expect(toMinor('1 250,5')).toBe(125050);
+  });
+
+  it('a mark followed by three digits ending in 0 can be thousands or a third decimal: it is not guessed', () => {
+    // «1.250» is 1.250 € or 1,25 €; the filter filters nothing rather than the wrong amount.
+    expect(toMinor('1.250')).toBeUndefined();
+    expect(toMinor('1,250')).toBeUndefined();
+    // A currency with three decimals reads it as its decimals; one without decimals, as thousands.
+    expect(toMinor('1.250', 'KWD')).toBe(1250);
+    expect(toMinor('1.500', 'JPY')).toBe(1500);
+  });
+
+  it('more decimals than the currency has, or groups that are not of three, filter nothing', () => {
+    expect(toMinor('12,3456')).toBeUndefined();
+    expect(toMinor('12.5', 'JPY')).toBeUndefined();
+    expect(toMinor('1.23.456')).toBeUndefined();
+    expect(toMinor('1.234,5.6')).toBeUndefined();
+    // With both marks the thousands still go in groups of three.
+    expect(toMinor('12.34,50')).toBeUndefined();
+    expect(toMinor('1,2.50')).toBeUndefined();
+  });
+});
+
+describe('unreadableTotals: the ends of the Total filter that are not an amount', () => {
+  it('names the typed ends it cannot read, never an empty one or another filter', () => {
+    expect(unreadableTotals({ total_amount_from: '1.250', total_amount_to: '12,5', total_items_from: 'two' })).toEqual(['total_amount_from']);
+    expect(unreadableTotals({ total_amount_from: ' ', total_amount_to: 'abc' })).toEqual(['total_amount_to']);
+    expect(unreadableTotals({})).toEqual([]);
   });
 });
 

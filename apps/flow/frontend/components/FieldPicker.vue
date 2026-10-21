@@ -28,6 +28,8 @@ const groups = computed(() => {
 
 function heading(group: string): string {
   if (group === 'input') return phrasing.value.t('flow.picker.input');
+  if (group === 'secret') return phrasing.value.t('flow.picker.secrets');
+  if (group === 'run') return phrasing.value.t('flow.picker.run');
   return phrasing.value.t('flow.picker.step', { n: props.steps.findIndex((step) => step.id === group) + 1 });
 }
 

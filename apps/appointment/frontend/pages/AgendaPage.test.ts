@@ -17,6 +17,7 @@ import SeriesList from '../components/SeriesList.vue';
 import WeekBoard from '../components/WeekBoard.vue';
 import AgendaPage from './AgendaPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { errorFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -118,6 +119,23 @@ describe('AgendaPage', () => {
     expect(s.params(LIST)[0]).toMatchObject({ date_from: '2026-10-19', date_to: '2026-10-25' });
     await s.result('appointment.agenda.lanes', LANES);
     expect(s.wrapper.findComponent(WeekBoard).props('days')).toHaveLength(7);
+  });
+
+  // appointments#323: when the agenda's rows cannot load, «By professional» says so with «Retry» instead of
+  // hiding the day's appointments without a word.
+  it('«By professional» whose rows cannot load says so and retries', async () => {
+    const s = await setup();
+    s.toolbar().vm.$emit('update:view', 'staff');
+    await settle();
+    s.net.lastStream().push(errorFrame(s.subId('appointment.agenda.lanes'), 'internal_error'));
+    await settle();
+    expect(s.find('appointment-agenda-lanes-error').exists()).toBe(true);
+    expect(s.wrapper.findComponent(DayGrid).exists()).toBe(false);
+    await s.find('appointment-agenda-lanes-error').find('ion-button').trigger('click');
+    await s.reopen();
+    await s.result('appointment.agenda.lanes', LANES);
+    expect(s.find('appointment-agenda-lanes-error').exists()).toBe(false);
+    expect(s.wrapper.findComponent(DayGrid).props('lanes')).toEqual(LANES.rows);
   });
 
   it('the day grid shades the hours the business is closed, read from Schedules for that day', async () => {

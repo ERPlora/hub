@@ -90,6 +90,30 @@ describe('SeriesList', () => {
     expect(s.find('appointment-series-outcome').text()).toContain('Tuesday, December 8, 2026: Closed.');
   });
 
+  // APPOINTMENT-F14 · appointments#256, #293, #220: saving an edit says to whom the appointments go, only what
+  // happened, and each one that kept its time with its date as the reader reads dates.
+  it('after «Edit series» says who the appointments go to and what kept its time', async () => {
+    const s = await setup();
+    await s.result(OP, page([series('r1')], 1, 100));
+    s.wrapper.findComponent(SeriesFormModal).vm.$emit(
+      'updated',
+      {
+        recurring: series('r1', { staff_name: 'Bea Ruiz' }),
+        moved: 3,
+        cancelled: 0,
+        locked: 0,
+        skipped: [{ occurrence_date: '2026-09-26', code: 'blocked', message: 'Blocked.' }],
+        booked: 0,
+      },
+      { id: 'r1', from_date: '2026-09-21', staff_id: 'm2' },
+    );
+    await settle();
+    const said = s.find('appointment-series-outcome').text();
+    expect(said).toContain('3 appointments now with Bea Ruiz · 1 could not be moved and keep their time:');
+    expect(said).toContain('Saturday, September 26, 2026: Blocked.');
+    expect(said).not.toContain('0 cancelled');
+  });
+
   it('«Delete» asks first, «Edit series» and add open the panel', async () => {
     const s = await setup();
     await s.result(OP, page([series('r1')], 1, 100));

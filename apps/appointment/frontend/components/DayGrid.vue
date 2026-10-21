@@ -355,12 +355,13 @@ const label = (row: AppointmentRow): string =>
         <div
           class="day-grid__name"
           role="rowheader"
+          :title="lane.name"
         >
           <span
             class="day-grid__swatch"
             :style="{ background: lane.color || 'var(--ion-color-medium, #9ca3af)' }"
           />
-          {{ lane.name }}
+          <span class="day-grid__name-text">{{ lane.name }}</span>
         </div>
         <div
           class="day-grid__track"
@@ -460,10 +461,19 @@ const label = (row: AppointmentRow): string =>
   gap: 6px;
   padding: 0 10px;
   font-size: 0.88rem;
+  line-height: 1.2;
   border-right: 1px solid var(--ion-border-color, #e7e2d6);
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+}
+/* A long name takes a second line before it ends in «…» (outfitkit#284); the whole one is its title. */
+.day-grid__name-text {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .day-grid__swatch {
   flex: 0 0 10px;

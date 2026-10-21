@@ -298,7 +298,7 @@ msgid "Service changed"
 msgstr "Cambio de servicio"
 
 msgid "Professional left: to be reassigned"
-msgstr "Profesional dado de baja: pendiente de reasignar"
+msgstr "Profesional dado de baja: hay que reasignarla"
 
 msgid "Charged"
 msgstr "Cobrada"

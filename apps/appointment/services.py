@@ -55,6 +55,7 @@ from apps.appointment.queries import (
     MOVABLE,
     SERIES_DEFAULT_WINDOW,
     blocked_out,
+    by_person,
     business_zone,
     check_member,
     conflicts_of,
@@ -316,7 +317,11 @@ def _judge(
     exclude: tuple = (),
     agenda: engine.Agenda | None = None,
 ) -> engine.Agenda:
-    """Refuses ``[start, end)`` with its reason (409), or asks to confirm an overlap; returns the agenda read."""
+    """Refuses ``[start, end)`` with its reason (409), or asks to confirm an overlap; returns the agenda read.
+
+    ``customer``: judged by the customer's rules; a caller who is not a person always is (``by_person``).
+    """
+    customer = customer or not by_person(ctx)
     zone = business_zone()
     if agenda is None:
         agenda = load_agenda(
@@ -477,7 +482,7 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
         internal_notes=data.internal_notes,
         settings=current_settings(),
     )
-    return load_detail(appointment.id)
+    return load_detail(ctx, appointment.id)
 
 
 @operation(
@@ -550,7 +555,7 @@ def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
             ],
         )
         created.append(appointment.id)
-    return {"rows": [load_detail(appointment_id) for appointment_id in created]}
+    return {"rows": [load_detail(ctx, appointment_id) for appointment_id in created]}
 
 
 # ── Moving and editing (F04, F06, F22) ───────────────────────────────────────────────────────
@@ -722,7 +727,7 @@ def reschedule(ctx: OperationContext, data: RescheduleIn) -> dict:
         reason=data.reason,
         confirm_overlap=data.confirm_overlap and not by_customer,
     )
-    return load_detail(appointment.id)
+    return load_detail(ctx, appointment.id)
 
 
 @operation(
@@ -784,7 +789,7 @@ def update_appointment(ctx: OperationContext, data: UpdateIn) -> dict:
         appointment.updated_by = _actor(ctx)
         appointment.save(update_fields=[*changed, "updated_by", "updated_at"])
         _event(ctx, events.APPOINTMENT_UPDATED, appointment)
-    return load_detail(appointment.id)
+    return load_detail(ctx, appointment.id)
 
 
 # ── States (F03, F05, F07, F08, F09) ─────────────────────────────────────────────────────────
@@ -810,7 +815,7 @@ def _transition(
     appointment.save(update_fields=["status", "updated_by", "updated_at"])
     _history(ctx, appointment, action)
     _event(ctx, event, appointment)
-    return load_detail(appointment.id)
+    return load_detail(ctx, appointment.id)
 
 
 @operation(
@@ -942,7 +947,7 @@ def cancel(ctx: OperationContext, data: CancelIn) -> dict:
     ):
         raise Conflict(str(CANNOT["cancel"]), code="appointment.cannot_cancel")
     _refuse_with_open_check(appointment)
-    if by_customer:
+    if by_customer or not by_person(ctx):
         settings = current_settings()
         if not settings.allow_customer_cancellation:
             raise Conflict(
@@ -965,7 +970,7 @@ def cancel(ctx: OperationContext, data: CancelIn) -> dict:
     appointment.save()
     _history(ctx, appointment, A.CANCELLED, by_customer=by_customer, reason=data.reason)
     _event(ctx, events.APPOINTMENT_CANCELLED, appointment, by_customer=by_customer)
-    return load_detail(appointment.id)
+    return load_detail(ctx, appointment.id)
 
 
 # ── Deleting (F11) ───────────────────────────────────────────────────────────────────────────

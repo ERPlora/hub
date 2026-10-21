@@ -11,6 +11,7 @@ from ninja import Query, Router
 
 from apps.flow import queries, services
 from apps.flow.schemas import (
+    AnswerIn,
     CreateIn,
     DraftListIn,
     DraftProposeIn,
@@ -21,7 +22,10 @@ from apps.flow.schemas import (
     GrantIn,
     RunIn,
     RunListIn,
+    RunRefIn,
     SampleIn,
+    SecretRefIn,
+    SecretSetIn,
     StatusIn,
     TestIn,
     UpdateIn,
@@ -96,6 +100,11 @@ async def run_list(request, params: Query[RunListIn]):
     return await run_operation(request, queries.list_runs, params)
 
 
+@bind(router, "flow.run.retry", "/flow/runs/retry")
+async def run_retry(request, data: RunRefIn):
+    return await run_operation(request, services.retry_run, data)
+
+
 @bind(router, "flow.draft.list", "/flow/drafts")
 async def draft_list(request, params: Query[DraftListIn]):
     return await run_operation(request, queries.list_drafts, params)
@@ -122,3 +131,34 @@ async def catalog_read(request):
 @bind(router, "flow.event.sample", "/flow/events/sample")
 async def event_sample(request, params: Query[SampleIn]):
     return await run_operation(request, queries.event_sample, params)
+
+
+# Secrets (FLOW-F26): names only; a value goes in and never comes out.
+
+
+@bind(router, "flow.secret.list", "/flow/secrets")
+async def secret_list(request):
+    return await run_operation(request, queries.list_secrets)
+
+
+@bind(router, "flow.secret.set", "/flow/secrets")
+async def secret_set(request, data: SecretSetIn):
+    return await run_operation(request, services.set_secret, data)
+
+
+@bind(router, "flow.secret.delete", "/flow/secrets/delete")
+async def secret_delete(request, data: SecretRefIn):
+    return await run_operation(request, services.delete_secret, data)
+
+
+# «Waiting for your answer» (FLOW-F29)
+
+
+@bind(router, "flow.question.list", "/flow/questions")
+async def question_list(request):
+    return await run_operation(request, queries.list_questions)
+
+
+@bind(router, "flow.question.answer", "/flow/questions/answer")
+async def question_answer(request, data: AnswerIn):
+    return await run_operation(request, services.answer_question, data)

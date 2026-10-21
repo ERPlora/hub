@@ -40,6 +40,8 @@ def test_the_trigger_and_run_choices():
     assert FlowRun.Status.values == [
         "running",
         "waiting",
+        "calling",
+        "asking",
         "succeeded",
         "stopped",
         "failed",
