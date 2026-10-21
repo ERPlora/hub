@@ -153,6 +153,22 @@ describe('BookingsPage', () => {
     expect(employee.actions()).toEqual([]);
   });
 
+  it('keeps the column filters behind the toolbar funnel, like the old inbox, not in a row above the list', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    expect(s.wrapper.find('[data-testid="ob-bookings-filters-toggle"]').exists()).toBe(true);
+  });
+
+  it('the row opens nothing: the inbox has only its state actions, no second path (pm#155 leaves it out)', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('rowClickable')).toBeFalsy();
+    await s.rows()[0].trigger('click');
+    expect(s.table().emitted('rowClick')).toBeUndefined();
+    expect(s.wrapper.findComponent(CancelDialog).props('open')).toBe(false);
+  });
+
   it('confirms, completes and marks a no-show through the inbox, and says why it could not', async () => {
     const s = await setup();
     await s.show(page(ROWS));

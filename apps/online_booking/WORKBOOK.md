@@ -57,8 +57,9 @@ Reservas online se abre desde el menú **Reservas online** y tiene dos pestañas
 app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Reservas (bandeja)
-Tabla de 50 filas por página con buscador («Buscar nº, cliente, teléfono, servicio…») y filtros por columna:
-Nº, Cliente, Servicio, Profesional, Fecha (un día) y Estado. Columnas: **Nº** (`APT-…`), **Cliente** (con su
+Tabla de 50 filas por página con buscador («Buscar nº, cliente, teléfono, servicio…») y filtros por columna
+detrás del botón de filtros de la barra, como en el producto actual: Nº, Cliente, Servicio, Profesional, Fecha
+(un día) y Estado. Columnas: **Nº** (`APT-…`), **Cliente** (con su
 teléfono), **Servicio**, **Profesional**, **Fecha**, **Hora**, **Estado** y **Reservada** (cuándo la pidió).
 Las más recientes primero; se ordena por columna. Lista o tarjetas.
 
@@ -119,6 +120,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
+<!-- origen: fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f01 -->
 Estado: hecho (operaciones y vista previa; la página pública es de `base`)
 Actor: clienta (sin sesión)
 Pantalla: página pública de reservas (`base`); en desarrollo, la vista previa
@@ -143,8 +145,9 @@ la ficha de la clienta **enlazada por su teléfono** o creada si no existe (`cus
 origen «web»), y el aviso `online_booking.booking.created`. Si la ficha no tiene email, el que escribió
 queda como contacto de la cita (la ficha no se toca). Con «Sin preferencia», la cita es del primer
 profesional (por orden de nombre) que tiene libre esa hora. Nada de lo que responde la página dice el nombre
-de la ficha de ese móvil.
-Si falla (no se escribe nada): la página apagada («Este negocio no acepta reservas online ahora mismo.»); un
+de la ficha de ese móvil. Quien abra la vista previa desde dentro (propietario o administrador) reserva con
+las mismas reglas que la clienta: nunca con las excepciones del mostrador.
+Si falla: no se escribe nada. La página apagada («Este negocio no acepta reservas online ahora mismo.»); un
 servicio que no se reserva online; elegir profesional cuando el negocio no lo permite; la hora ya no está
 libre o no cumple las reglas (el motivo de Citas); el móvil que no es un número válido; falta el email
 obligatorio; una nota cuando el negocio no las admite; **límites anti-abuso**: más de 5 reservas en una hora
@@ -152,40 +155,52 @@ desde el mismo dispositivo o más de 100 en una hora en el negocio («Inténtalo
 reservas online próximas con el mismo móvil de las que permiten los Ajustes (3 de fábrica: «Este móvil ya
 tiene reservas próximas…», sin decir cuántas). Dos clientas que reservan a la vez la misma hora del mismo
 profesional: entra una y la otra recibe «Esa hora ya no está libre».
+Implicados: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirmar una reserva
+<!-- origen: fi:modules/online_booking#command-online_booking-bookings-confirm-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f02 qa:modules/online_booking/online-booking -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
 Pasos:
 1. En una reserva **Pendiente**, pulsa **Confirmar** (o di «confirma la reserva de Ana de mañana»).
 2. La cita pasa a **Confirmada** en la agenda y su historial dice «Confirmada».
+Entra: una reserva online pendiente (la página con la confirmación automática apagada, o un servicio que
+requiere confirmación).
 Sale: `appointment.appointment.confirmed`.
 Si falla: «Esta cita ya no se puede confirmar: ya no está pendiente.»; si el nombre vale para varias
 reservas, se dicen cuáles y se pide el número.
+Implicados: APPOINTMENT-F03
 
 ### ONLINE_BOOKING-F03 Completar una reserva
+<!-- origen: fi:modules/online_booking#command-online_booking-bookings-complete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f03 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
 Pasos:
 1. En una reserva **Confirmada** o **En curso**, pulsa **Completar**.
 2. La cita pasa a **Completada**. No cobra: el cobro es el de la agenda en el TPV.
+Entra: una reserva online confirmada o en curso.
 Sale: `appointment.appointment.completed`.
 Si falla: «Esta cita no se puede completar en su estado actual.»
+Implicados: APPOINTMENT-F08, APPOINTMENT-F17
 
 ### ONLINE_BOOKING-F04 Marcar que no se presentó
+<!-- origen: fi:modules/online_booking#command-online_booking-bookings-no_show-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f04 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
 Pasos:
 1. Pasada la hora de la reserva, en una **Pendiente** o **Confirmada**, pulsa **No-show**.
 2. La cita pasa a **No-show** y el hueco queda libre.
+Entra: una reserva online pendiente o confirmada cuya hora ya pasó.
 Sale: `appointment.appointment.marked_no_show`.
 Si falla: antes de su hora, «Todavía no es la hora de esta cita…»; en otro estado, «Esta cita no se puede
 marcar como no presentada en su estado actual.»
+Implicados: APPOINTMENT-F09
 
 ### ONLINE_BOOKING-F05 Cancelar una reserva
+<!-- origen: qa:modules/online_booking/online-booking fi:modules/online_booking#command-online_booking-bookings-cancel-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f05 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -193,21 +208,27 @@ Pasos:
 1. Pulsa **Cancelar** en una reserva pendiente, confirmada o no presentada.
 2. «¿Cancelar la reserva de Lucía (martes 14, 10:00)?» con el motivo opcional; pulsa **Cancelar la reserva**.
 3. La cita pasa a **Cancelada**, el hueco queda libre y el historial guarda quién y el motivo.
+Entra: una reserva online pendiente, confirmada o no presentada, sin cobrar.
 Sale: `appointment.appointment.cancelled`. Rechazar una reserva pendiente es cancelarla (el mercado: el
 «rechazar» de una solicitud libera el hueco igual).
 Si falla: «Esta cita ya no se puede cancelar en su estado actual.»; dentro del diálogo.
+Implicados: APPOINTMENT-F05
 
 ### ONLINE_BOOKING-F06 Borrar una reserva
+<!-- origen: fi:modules/online_booking#command-online_booking-bookings-delete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f06 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Reservas
 Pasos:
 1. Pulsa **Borrar** y confirma «¿Borrar la reserva APT-…? Es mejor cancelarla, que conserva su historial.».
 2. La reserva desaparece de la bandeja y de la agenda (borrado lógico: el dato no se pierde).
+Entra: una reserva online que no está en curso, completada ni cobrada.
 Sale: `appointment.appointment.deleted`.
 Si falla: una cita en curso, completada o cobrada no se borra («Esta cita no se puede borrar…»).
+Implicados: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Configurar la página de reservas
+<!-- origen: fi:modules/online_booking#command-online_booking-settings-upsert-sql-transaccional fi:modules/online_booking#query-online_booking-settings-get old:online_booking/WORKFLOW.md#online_booking-f07 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -222,55 +243,83 @@ Sale: `online_booking.settings.updated` (si cambia algo de la página) y `appoin
 cambia una regla); el interruptor de un servicio, `service.service.updated`.
 Si falla: un color que no es `#RRGGBB`, una URL que no es `http(s)://…`, un número fuera de rango o un texto
 demasiado largo, debajo de su campo; no se guarda nada.
+Implicados: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 Ver y buscar las reservas
+<!-- origen: qa:modules/online_booking/online-booking fi:modules/online_booking#navigation-ui-bookings fi:modules/online_booking#query-online_booking-bookings-get fi:modules/online_booking#query-online_booking-bookings-list old:online_booking/WORKFLOW.md#online_booking-f08 -->
 Estado: hecho
 Actor: empleado (las de su agenda), responsable, propietario, administrador, asistente
 Pantalla: Reservas
 Pasos:
 1. Abre **Reservas**: las citas con origen «Reserva online», las más recientes primero.
-2. Busca por número, nombre, teléfono, email, servicio o profesional; filtra por columna; ordena.
+2. Busca por número, nombre, teléfono, email, servicio o profesional; filtra por columna desde el botón de
+   filtros de la barra; ordena. Un nombre largo acaba en «…» dentro de su columna.
 3. Una reserva concreta la da el asistente o la API por su número, o por la clienta y el día.
-Sale: nada se escribe.
+Entra: las citas de Citas con origen «Reserva online» que la persona puede ver.
+Sale: nada se escribe. La fila no abre nada por sí sola: lo que se hace con una reserva son sus acciones.
 Si falla: «No se pudieron cargar las reservas» con **Reintentar**.
+Implicados: APPOINTMENT-F27
 
 ### ONLINE_BOOKING-F09 Seguir a la clienta cuando se fusionan dos fichas
+<!-- origen: old:online_booking/WORKFLOW.md#online_booking-f09 -->
 Estado: hecho (lo hace Citas; la bandeja lo refleja)
 Actor: sistema
+Pantalla: ninguna (se ve en Reservas)
 Pasos:
-1. En **Clientes** se fusionan dos fichas (`customer.customer.merged`).
+1. En **Clientes** se fusionan dos fichas.
 2. Citas pasa las citas de la absorbida a la que queda (APPOINTMENT-F23); la bandeja enseña la reserva con
-   la ficha que queda. Esta app no guarda la ficha de la clienta: nada más que hacer.
+   la ficha que queda y el nombre que la clienta escribió al reservar. Esta app no guarda la ficha de la
+   clienta: nada más que hacer, y su enlace sigue funcionando.
+Entra: el aviso de Clientes con la ficha que queda y la absorbida, que entrega el relay del worker.
+Sale: nada propio (el aviso de Citas, `appointment.appointment.reassigned`).
+Si falla: Citas no se queda a medias y el relay lo reintenta solo.
+Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
+<!-- origen: nuevo (el enlace personal de la confirmación, como Square, Treatwell, SimplyBook.me y Acuity) -->
 Estado: hecho (operación; la página es de `base`)
 Actor: clienta (sin sesión)
+Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
 Pasos:
 1. Abre el enlace de su confirmación.
 2. Ve el número, el estado, el día y la hora, los servicios, el profesional, la política de cancelación y si
    todavía puede cancelar y hasta cuándo. Nunca el nombre de la ficha: quien tenga el enlace no averigua
    a quién pertenece un móvil.
+Entra: el enlace que recibió al reservar; las reglas de cancelación de Citas.
+Sale: nada se escribe. El enlace sigue valiendo aunque el negocio apague la página.
 Si falla: un enlace que no existe, revocado o de una reserva borrada: «Esa reserva no existe o su enlace ya
 no es válido.».
+Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
+<!-- origen: nuevo (cancelar desde el enlace de la confirmación dentro de la política del negocio, como Square, Treatwell, SimplyBook.me y Acuity) -->
 Estado: hecho (operación; la página es de `base`)
 Actor: clienta (sin sesión)
+Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
 Pasos:
 1. Desde su enlace pulsa **Cancelar la reserva** (motivo opcional).
 2. Se aplica la política de Citas: «Permitir que la clienta cancele su cita» y «Antelación mínima para
-   cancelar». La cita queda **Cancelada**, con «Lo pidió la clienta» en su historial.
+   cancelar». La cita queda **Cancelada**, con «Lo pidió la clienta» en su historial. La política vale
+   igual cuando el equipo prueba el enlace desde la vista previa.
+Entra: el enlace de una reserva pendiente o confirmada, sin cobrar.
 Sale: `appointment.appointment.cancelled`.
 Si falla: «La cancelación online no está disponible. Contacta con el negocio.»; «Esta cita solo se puede
 cancelar online con N horas de antelación…»; una ya cancelada o completada, el motivo de Citas.
+Implicados: APPOINTMENT-F06, APPOINTMENT-F19
 
 ### ONLINE_BOOKING-F12 Borrar los datos de una clienta (RGPD)
+<!-- origen: old-hub:HUB-F250 -->
 Estado: hecho
 Actor: sistema
+Pantalla: ninguna (se ve en Reservas)
 Pasos:
-1. En **Clientes** se borran los datos personales de una ficha (`customer.customer.erased`).
+1. En **Clientes** se borran los datos personales de una ficha.
 2. Citas vacía sus citas (APPOINTMENT-F24); esta app **revoca sus enlaces** (dejan de funcionar) y olvida el
    rastro del dispositivo con el que reservó. Repetirlo no cambia nada más.
+Entra: el aviso de Clientes con la ficha borrada, que entrega el relay del worker.
+Sale: nada propio: la reserva queda sin nombre en la bandeja y su enlace ya no abre nada.
+Si falla: el relay reintenta la reacción sola; no se queda a medias.
+Implicados: APPOINTMENT-F24, CUSTOMER-F16
 
 ## Servicios: lo que entra y lo que sale
 
@@ -363,8 +412,8 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
 - **Reloj**: el de Citas (`apps.appointment.queries.now`, `business_zone`); los tests lo fijan.
-- Las reacciones (`events.py`) las ejecuta el relay del outbox en la fase 2; aquí se prueban con el aviso
-  real de Clientes.
+- Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`, ya en la fase 1);
+  `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
 
 ### Contrato con la página pública (para `base`)
 

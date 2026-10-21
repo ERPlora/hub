@@ -117,6 +117,7 @@
       "day": "Day",
       "times": "Free times",
       "loadingTimes": "Loading free times…",
+      "noServices": "No service is booked online yet: switch them on in Settings.",
       "noTimes": "No free times that day.",
       "name": "Name",
       "phone": "Mobile",
