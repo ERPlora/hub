@@ -101,10 +101,11 @@ test.afterAll(async ({ browser }) => {
     psql(`delete from printing_printjob where printer_id in (${made})`);
     psql(`delete from printing_printer where id in (${made})`);
   }
+  // Its sales first: they find the kitchen's sheets of its checks through the tickets, which go after.
+  cleanSalesAndProduct();
   psql(`delete from kitchen_logentry where ticket_id in (select id from kitchen_ticket where label like '${LABEL}%')`);
   psql(`delete from kitchen_ticketitem where ticket_id in (select id from kitchen_ticket where label like '${LABEL}%')`);
   psql(`delete from kitchen_ticket where label like '${LABEL}%'`);
-  cleanSalesAndProduct();
 });
 
 /** Deletes this run's sales (they sold its SKU), its checks (by their title) and its product. The fiscal
@@ -117,6 +118,12 @@ function cleanSalesAndProduct(): void {
     [
       `create temp table crf_sales as select distinct sale_id as id from sale_saleline where sku = '${SKU}'`,
       `create temp table crf_orders as ${orders}`,
+      // The kitchen's sheets of its checks (job key `kitchen-<ticket>-…`, the ticket found by its lines or its
+      // title): one left waiting without a printer is the next one a device takes in another spec.
+      `delete from printing_printjob where job_key like any (array(
+        select 'kitchen-' || ticket_id || '-%' from kitchen_ticketitem
+          where sale_line_id in (select id from sale_orderline where order_id in (select id from crf_orders))
+        union all select 'kitchen-' || id || '-%' from kitchen_ticket where label like '${LABEL}%'))`,
       'delete from sale_refundline where refund_id in (select id from sale_refund where sale_id in (select id from crf_sales))',
       'delete from sale_refundpayment where refund_id in (select id from sale_refund where sale_id in (select id from crf_sales))',
       'delete from sale_refund where sale_id in (select id from crf_sales)',
