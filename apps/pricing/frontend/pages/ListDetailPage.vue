@@ -384,14 +384,24 @@ function onAction({ actionId, row }: { actionId: string; row: PriceItemOut }): v
   font-size: 0.78rem;
   color: var(--ion-color-medium, #5c594f);
 }
+.pricing-summary > div {
+  min-width: 0;
+}
 .pricing-summary dd {
   margin: 2px 0 0;
   font-weight: 600;
+  /* A code of up to 50 characters breaks inside its cell instead of running over the next one. */
+  overflow-wrap: anywhere;
 }
 .pricing-summary__code {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+}
+.pricing-summary__code > span:first-child {
+  min-width: 0;
 }
 .pricing-detail__heading {
   margin: 0.5rem 0 0;
