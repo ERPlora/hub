@@ -632,7 +632,9 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   escrituras con `useCommand`; formularios con `FormModal`, confirmaciones con `ConfirmDialog` y
   buscadores con `Combo` (productos y categorías de Inventario, servicios de Servicios, grupos de
   Clientes, por sus consultas).
-- Importes con `MoneyInput` (lo que teclea una persona, en céntimos) y el formato del idioma (`Intl`).
+- Importes con `MoneyInput` (lo que teclea una persona, en céntimos) y el formato del idioma (`Intl`),
+  con los millares agrupados desde cuatro cifras también en español («1.234,56 €»; el CLDR espera a cinco:
+  hub#1090), como Cobro en línea.
 - Icono: `ion:pricetags-outline` (registrado); el `pricetag` del producto actual espera en
   `UI-REQUESTS.md`.
 
