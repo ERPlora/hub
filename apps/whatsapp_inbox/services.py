@@ -58,6 +58,7 @@ from apps.whatsapp_inbox.queries import (
     send_blocked,
     team,
     template_out,
+    templates_of,
 )
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
@@ -553,7 +554,7 @@ def sync_channel(ctx: OperationContext, data: ChannelSyncIn) -> dict:
     row.synced_at = now
     row.save()
     if data.templates is not None:
-        _sync_templates(data.templates, now)
+        _sync_templates(ctx, data.templates, now)
     record_event(ctx, events.CHANNEL_SYNCED, {"version": data.version})
     return {"applied": True, "version": data.version}
 
@@ -572,21 +573,22 @@ def _locked_channel(ctx: OperationContext) -> Channel:
     return row
 
 
-def _sync_templates(items, now) -> None:
+def _sync_templates(ctx: OperationContext, items, now) -> None:
     """Meta's list replaces the copy (F27, F28): what it no longer lists is «Deleted in WhatsApp Manager».
 
     Never on what the Hub has not handed over yet (a new template on its way or not accepted keeps what was
     written; an edit waits in its ``draft``), and never bringing back a template deleted here: Meta still
-    lists it until the deletion reaches it, or by the same id.
+    lists it until the deletion reaches it, or by the same id. Only the business's own templates: another
+    business's list never touches them.
     """
     kept = []
     for item in items:
-        row = live_templates().select_for_update().filter(name=item.name, language=item.language).first()
+        row = live_templates(ctx.scope).select_for_update().filter(name=item.name, language=item.language).first()
         if row is None:
-            deleted = Template.objects.filter(name=item.name, language=item.language, deleted_at__isnull=False)
+            deleted = templates_of(ctx.scope).filter(name=item.name, language=item.language, deleted_at__isnull=False)
             if deleted.filter(Q(delete_state=Template.DeleteState.PENDING) | Q(meta_id=item.meta_id)).exists():
                 continue
-            row = Template(name=item.name, language=item.language)
+            row = Template(host=ctx.scope.key, name=item.name, language=item.language)
         elif row.status == Template.Status.DRAFT and row.submit_state:
             kept.append(row.pk)
             continue
@@ -604,7 +606,7 @@ def _sync_templates(items, now) -> None:
         row.synced_at = now
         row.save()
         kept.append(row.pk)
-    live_templates().exclude(pk__in=kept).exclude(
+    live_templates(ctx.scope).exclude(pk__in=kept).exclude(
         status__in=[Template.Status.DELETED, Template.Status.DRAFT]
     ).update(status=Template.Status.DELETED, synced_at=now)
 
@@ -810,9 +812,9 @@ def _blocked_error(reason: str) -> OperationError:
     return Conflict(str(NOT_CONNECTED), code="whatsapp_inbox.channel_not_connected")
 
 
-def _template_for(data: SendIn) -> Template:
+def _template_for(ctx: OperationContext, data: SendIn) -> Template:
     wanted = data.template
-    rows = live_templates().filter(name=wanted.name)
+    rows = live_templates(ctx.scope).filter(name=wanted.name)
     if wanted.language:
         rows = rows.filter(language=wanted.language)
     found = list(rows[:2])
@@ -910,7 +912,7 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
         if conversation is None or not conversation.window_open(now):
             raise Conflict(str(WINDOW_CLOSED), code="whatsapp_inbox.window_closed")
     else:
-        template = _template_for(data)
+        template = _template_for(ctx, data)
         if template.category == Template.Category.MARKETING:
             card_id = _live_card_id(conversation) if conversation is not None else None
             if not _marketing_allowed(card_id or _only_card_of(phone)):
@@ -1157,13 +1159,13 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
         .values_list("id", flat=True)[:RESUME_BATCH]
     )
     templates = list(
-        Template.objects.select_for_update(skip_locked=True)
+        templates_of(ctx.scope).select_for_update(skip_locked=True)
         .filter(submit_state__in=_TEMPLATE_ON_ITS_WAY, submit_at__lt=cutoff, deleted_at__isnull=True)
         .order_by("submit_at", "id")
         .values_list("id", flat=True)[:RESUME_BATCH]
     )
     deletions = list(
-        Template.objects.select_for_update(skip_locked=True)
+        templates_of(ctx.scope).select_for_update(skip_locked=True)
         .filter(delete_state=Template.DeleteState.PENDING, deleted_at__lt=cutoff)
         .order_by("deleted_at", "id")
         .values_list("id", flat=True)[:RESUME_BATCH]
@@ -1617,21 +1619,21 @@ def _queue(ctx: OperationContext, row: Template, key: UUID, event: str) -> None:
     },
 )
 def create_template(ctx: OperationContext, data: TemplateCreateIn) -> dict:
-    already = Template.objects.filter(submit_key=data.submit_key).first()
+    already = templates_of(ctx.scope).filter(submit_key=data.submit_key).first()
     if already is not None:
         return template_out(already)
     _no_template_without_a_number(ctx)
     exists = Conflict(str(TEMPLATE_EXISTS % {"name": data.name}), code="whatsapp_inbox.template_exists")
-    if live_templates().filter(name=data.name, language=data.language).exists():
+    if live_templates(ctx.scope).filter(name=data.name, language=data.language).exists():
         raise exists
-    row = Template(name=data.name, language=data.language, status=Template.Status.DRAFT)
+    row = Template(host=ctx.scope.key, name=data.name, language=data.language, status=Template.Status.DRAFT)
     _apply(row, _content(data))
     try:
         with transaction.atomic():
             _queue(ctx, row, data.submit_key, events.TEMPLATE_CREATED)
     except IntegrityError:
         # The same save at the same time (its key), or the name just taken by another.
-        twin = Template.objects.filter(submit_key=data.submit_key).first()
+        twin = templates_of(ctx.scope).filter(submit_key=data.submit_key).first()
         if twin is None:
             raise exists from None
         return template_out(twin)
@@ -1667,7 +1669,7 @@ def _changeable(row: Template, content: dict) -> None:
     },
 )
 def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
-    row = live_templates().select_for_update().filter(pk=data.id).first()
+    row = live_templates(ctx.scope).select_for_update().filter(pk=data.id).first()
     if row is None:
         raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
     if row.submit_key == data.submit_key:
@@ -1702,7 +1704,7 @@ def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
     },
 )
 def retry_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
-    row = Template.objects.select_for_update().filter(pk=data.id).first()
+    row = templates_of(ctx.scope).select_for_update().filter(pk=data.id).first()
     if row is None or (row.deleted_at is not None and row.delete_state != Template.DeleteState.PENDING):
         raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
     if row.delete_state == Template.DeleteState.PENDING:
@@ -1734,7 +1736,7 @@ def retry_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
     },
 )
 def delete_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
-    row = live_templates().select_for_update().filter(pk=data.id).first()
+    row = live_templates(ctx.scope).select_for_update().filter(pk=data.id).first()
     if row is None:
         raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
     # Meta may have it unless it never left the Hub (or it left and Meta refused it).
@@ -1804,7 +1806,7 @@ def remove_template(scope: Scope, template_id: UUID) -> None:
 )
 def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
     row = (
-        Template.objects.select_for_update(skip_locked=True)
+        templates_of(ctx.scope).select_for_update(skip_locked=True)
         .filter(pk=data.id, submit_state__in=_TEMPLATE_ON_ITS_WAY, deleted_at__isnull=True)
         .first()
     )
@@ -1853,7 +1855,7 @@ def _template_failure(kind: str, code: str, message: str, *, deleting: bool = Fa
     },
 )
 def record_submit(ctx: OperationContext, data: RecordTemplateIn) -> dict:
-    row = Template.objects.select_for_update().filter(pk=data.id).first()
+    row = templates_of(ctx.scope).select_for_update().filter(pk=data.id).first()
     if row is None:
         return {"status": None}
     if row.submit_key != data.submit_key or row.submit_state not in _TEMPLATE_ON_ITS_WAY:
@@ -1888,7 +1890,7 @@ def record_submit(ctx: OperationContext, data: RecordTemplateIn) -> dict:
 )
 def claim_delete(ctx: OperationContext, data: TemplateRefIn) -> dict:
     row = (
-        Template.objects.select_for_update(skip_locked=True)
+        templates_of(ctx.scope).select_for_update(skip_locked=True)
         .filter(pk=data.id, delete_state=Template.DeleteState.PENDING)
         .first()
     )
@@ -1909,7 +1911,7 @@ def claim_delete(ctx: OperationContext, data: TemplateRefIn) -> dict:
     },
 )
 def record_delete(ctx: OperationContext, data: RecordTemplateDeletionIn) -> dict:
-    row = Template.objects.select_for_update().filter(pk=data.id).first()
+    row = templates_of(ctx.scope).select_for_update().filter(pk=data.id).first()
     if row is None or row.delete_state != Template.DeleteState.PENDING:
         return {"status": row.delete_state if row else None}
     if data.kind == gateway.ACCEPTED:

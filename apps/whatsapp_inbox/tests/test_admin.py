@@ -67,7 +67,7 @@ def test_the_pages_render(client, superuser):
     conversation = Conversation.objects.get()
     message = Message.objects.get()
     note = Note.objects.create(conversation=conversation, text="Llamar", created_at=NOW)
-    template = Template.objects.create(name="recordatorio", language="es")
+    template = Template.objects.create(host="a", name="recordatorio", language="es")
     channel = Channel.objects.create()
     client.force_login(superuser)
     host = {"HTTP_HOST": "hubs.localhost"}
@@ -89,3 +89,12 @@ def test_the_channels_say_whose_business_they_are():
     assert channels.list_display[0] == "host"
     assert "host" in channels.search_fields
     assert "host" in channels.readonly_fields
+
+
+def test_the_templates_say_whose_business_they_are():
+    # Each business's templates are its own (phase 1: its host); the staff tells them apart by it.
+    templates = admin.site._registry[Template]
+    assert templates.list_display[0] == "host"
+    assert "host" in templates.list_filter
+    assert "host" in templates.search_fields
+    assert "host" in templates.readonly_fields

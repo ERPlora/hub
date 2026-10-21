@@ -360,6 +360,9 @@ class Template(UUIDModel):
     Meta's verdict never lands on a text changed afterwards. ``submit_state`` follows the hand-over to
     erplora.com (door 8) as a message's status does; a template deleted here keeps its row (``deleted_at``) so
     Meta's next list never brings it back, and ``delete_state`` follows its deletion at Meta (door 9).
+
+    Phase 1 shares the tables, so a template belongs to the business in ``host`` (as ``Channel``): its photo, its
+    list, its edits and its sends only ever reach its own. Phase 2 keeps them in each hub's database.
     """
 
     class Category(models.TextChoices):
@@ -396,6 +399,12 @@ class Template(UUIDModel):
         PENDING = "pending", _("Being deleted at Meta")
         DONE = "done", _("Deleted")
 
+    host = models.CharField(
+        _("host"),
+        max_length=63,
+        editable=False,
+        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
+    )
     name = models.CharField(_("name"), max_length=512)
     language = models.CharField(_("language"), max_length=15)
     category = models.CharField(
@@ -446,11 +455,11 @@ class Template(UUIDModel):
         verbose_name_plural = _("templates")
         ordering = ["name", "language", "id"]
         constraints = [
-            # One live template per name and language: one deleted here frees them.
+            # One live template per business, name and language: one deleted here frees them.
             models.UniqueConstraint(
-                fields=["name", "language"],
+                fields=["host", "name", "language"],
                 condition=Q(deleted_at__isnull=True),
-                name="whatsapp_inbox_template_live_name_language_unique",
+                name="whatsapp_inbox_template_live_host_name_language_unique",
             ),
             models.UniqueConstraint(
                 fields=["submit_key"],

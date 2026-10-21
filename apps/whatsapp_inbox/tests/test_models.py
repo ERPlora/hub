@@ -121,12 +121,14 @@ def test_one_channel_row_per_business():
     )
 
 
-def test_one_template_per_name_and_language():
-    Template.objects.create(name="recordatorio", language="es")
-    Template.objects.create(name="recordatorio", language="en")
+def test_one_template_per_business_name_and_language():
+    Template.objects.create(host="a", name="recordatorio", language="es")
+    Template.objects.create(host="a", name="recordatorio", language="en")
+    # Another business holds its own of the same name (phase 1 shares the table).
+    Template.objects.create(host="b", name="recordatorio", language="es")
     assert violates(
-        "whatsapp_inbox_template_live_name_language_unique",
-        lambda: Template.objects.create(name="recordatorio", language="es"),
+        "whatsapp_inbox_template_live_host_name_language_unique",
+        lambda: Template.objects.create(host="a", name="recordatorio", language="es"),
     )
 
 

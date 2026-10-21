@@ -1077,7 +1077,9 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
   mensaje.
 - `Note`: texto, autor y hora.
-- `Template`: nombre + idioma (únicos entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
+- `Template` (de cada negocio): el negocio en `host` (fase 1, como `Channel`; desde la migración `0006`,
+  reversible: las copias de antes quedan sin negocio, solo en el admin, y la foto de cada negocio trae de Meta
+  las suyas), nombre + idioma (únicos por negocio entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
   Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
   (`header_format`: vacío, `TEXT` o un archivo o lugar hecho en WhatsApp Manager; `header`), cuerpo,
   ejemplos (`body_examples`), pie, botones, número de variables, motivo de rechazo, `meta_id`,
@@ -1433,10 +1435,10 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
   crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
   (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; en las
   citas también se crea (F21, CUSTOMER-F26).
-- Fase 1 sin tenencia: las conversaciones y las plantillas de `a` y `b` comparten tablas (solo los avisos
-  vivos van por hub), como en todas las apps de la fase 1. El número ya no: `Channel` es una fila por
-  negocio (ver «Modelo»). Las plantillas sí: la lista de Meta que trae la foto de `b` marca «Borrada en
-  WhatsApp Manager» las de `a` que no lista (pendiente de su propia tarea).
+- Fase 1 sin tenencia: las conversaciones de `a` y `b` comparten tablas (solo los avisos vivos van por
+  hub), como en todas las apps de la fase 1. El número y las plantillas ya no: `Channel` y `Template` son
+  de cada negocio (ver «Modelo»), porque la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
+  «Borradas en WhatsApp Manager» las plantillas de `a`.
 
 ### Cambios frente al producto actual
 

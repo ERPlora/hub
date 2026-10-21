@@ -477,14 +477,19 @@ def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────
 
 
-def live_templates() -> QuerySet:
-    """The templates not deleted here."""
-    return Template.objects.filter(deleted_at__isnull=True)
+def templates_of(scope: Scope) -> QuerySet:
+    """The templates of the business of ``scope`` (phase 1: its host), and only those."""
+    return Template.objects.filter(host=scope.key)
 
 
-def listed_templates() -> QuerySet:
-    """What Settings lists: the live templates and the ones deleted here that Meta has not deleted yet."""
-    return Template.objects.filter(
+def live_templates(scope: Scope) -> QuerySet:
+    """The business's templates not deleted here."""
+    return templates_of(scope).filter(deleted_at__isnull=True)
+
+
+def listed_templates(scope: Scope) -> QuerySet:
+    """What Settings lists: the business's live templates and the ones deleted here that Meta has not deleted yet."""
+    return templates_of(scope).filter(
         Q(deleted_at__isnull=True) | Q(delete_state=Template.DeleteState.PENDING)
     )
 
@@ -556,7 +561,7 @@ def template_out(row: Template) -> dict:
     },
 )
 def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
-    rows = listed_templates()
+    rows = listed_templates(ctx.scope)
     if params.search:
         rows = rows.filter(name__icontains=params.search.strip())
     for field in ("status", "category", "language"):

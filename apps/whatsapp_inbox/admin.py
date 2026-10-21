@@ -81,10 +81,21 @@ class NoteAdmin(admin.ModelAdmin):
 
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "language", "category", "status", "submit_state", "delete_state", "variables", "synced_at")
-    list_filter = ("status", "category", "language", "submit_state", "delete_state")
-    search_fields = ("name", "body")
+    list_display = (
+        "host",
+        "name",
+        "language",
+        "category",
+        "status",
+        "submit_state",
+        "delete_state",
+        "variables",
+        "synced_at",
+    )
+    list_filter = ("host", "status", "category", "language", "submit_state", "delete_state")
+    search_fields = ("host", "name", "body")
     readonly_fields = (
+        "host",
         "supported",
         "submit_state",
         "submit_key",
