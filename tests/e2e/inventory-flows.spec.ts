@@ -9,12 +9,13 @@
 //   - INVENTORY-F19: the settings save and say so;
 //   - INVENTORY-F20: an article set to «catalog only» shows «—» as its stock;
 //   - INVENTORY-F25: the sheet shows the SKU's barcode; «Print barcode» queues one label per press and says
-//     where it goes (no «Label» printer yet, then one);
+//     where it goes (no «Label» printer yet, then one; the ones the database already has are switched off
+//     for it, so it never skips);
 //   - INVENTORY-F26: a quantity off the unit's step is refused under its field; by the kilo, grams are fine;
 //   - on a phone (pm#478, inventory#105): a refused save is said where it can be read and «Save» is reachable.
 import { execFileSync } from 'node:child_process';
 
-import { expect, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { A, api, HUB_DIR, login, psql, shown } from './helpers';
 import {
@@ -217,36 +218,69 @@ test('INVENTORY-F19: the settings save and say so', async ({ page, context }) =>
   }
 });
 
+/**
+ * INVENTORY-F25 starts where no printer takes a label, whatever the database already holds (a run cut short
+ * leaves its «Label» printer behind): the active «Label» printers, and the one Printing's settings pick for
+ * labels, are switched off through Printing. The function returned switches them back on straight in the
+ * database, so it still works in a `finally` after the test's time ran out and its browser context closed.
+ */
+async function switchOffLabelPrinters(context: BrowserContext): Promise<() => void> {
+  const active = await api<{ rows: { id: string; usage: string }[]; total: number }>(
+    context,
+    A,
+    'GET',
+    '/printing/printers?is_active=true&limit=100',
+  );
+  expect(active.status).toBe(200);
+  expect(active.data.total, 'every active printer fits in one page').toBe(active.data.rows.length);
+  const settings = await api<{ label_printer_id: string | null }>(context, A, 'GET', '/printing/settings');
+  expect(settings.status).toBe(200);
+  const labels = active.data.rows
+    .filter((printer) => printer.usage === 'label' || printer.id === settings.data.label_printer_id)
+    .map((printer) => printer.id);
+  for (const id of labels) {
+    const res = await api(context, A, 'POST', '/printing/printers/update', { printer_id: id, is_active: false });
+    expect(res.status, `printer ${id} switched off`).toBe(200);
+  }
+  return () => {
+    if (labels.length) psql(`update printing_printer set is_active = true where id in ('${labels.join("','")}')`);
+  };
+}
+
 test('INVENTORY-F25: the sheet shows the barcode and each press queues one label, said where it goes', async ({ page, context }) => {
   // flow: INVENTORY-F25
   const sku = `E2E-LABEL-${stamp()}`;
-  const labelPrinters = psql(`select count(*) from printing_printer where usage = 'label' and is_active`);
-  test.skip(labelPrinters !== '0', 'this database already has a «Label» printer');
   await login(page, A, '/inventory/products');
-  const wax = await createProduct(context, { name: 'E2E Hair wax', sku, price: 1210 });
-  await productsReady(page);
-  await searchProducts(page, sku);
-  await rowAction(page, wax.id, 'detail');
-  const sheet = dialog(page, 'inventory-product-detail');
-  await expect(sheet.locator('[data-testid=inventory-barcode] svg')).toHaveAttribute('aria-label', new RegExp(sku));
-  await expect(sheet.locator('[data-testid=inventory-barcode-text]')).toHaveText(sku);
+  const switchBackOn = await switchOffLabelPrinters(context);
+  try {
+    expect(psql(`select count(*) from printing_printer where usage = 'label' and is_active`)).toBe('0');
+    const wax = await createProduct(context, { name: 'E2E Hair wax', sku, price: 1210 });
+    await productsReady(page);
+    await searchProducts(page, sku);
+    await rowAction(page, wax.id, 'detail');
+    const sheet = dialog(page, 'inventory-product-detail');
+    await expect(sheet.locator('[data-testid=inventory-barcode] svg')).toHaveAttribute('aria-label', new RegExp(sku));
+    await expect(sheet.locator('[data-testid=inventory-barcode-text]')).toHaveText(sku);
 
-  // No printer has the «Label» function yet: the label waits in the queue and the sheet says what to do.
-  await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
-  await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/(waiting in the print queue|espera en la cola)/);
-  const created = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
-    name: `E2E Labels ${stamp()}`,
-    kind: 'network',
-    address: '192.168.1.250',
-    usage: 'label',
-  });
-  expect(created.status).toBe(201);
-  printers.push(created.data.id);
-  await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
-  await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/E2E Labels/);
-  await shootFlow(page, 'INVENTORY-F25');
-  expect(psql(`select count(*) from printing_printjob where document_type = 'barcode_label' and reference = '${sku}'`)).toBe('2');
-  expect(psql(`select document->>'price' from printing_printjob where reference = '${sku}' order by created_at desc limit 1`)).toBe('12.1');
+    // No printer has the «Label» function yet: the label waits in the queue and the sheet says what to do.
+    await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
+    await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/(waiting in the print queue|espera en la cola)/);
+    const created = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
+      name: `E2E Labels ${stamp()}`,
+      kind: 'network',
+      address: '192.168.1.250',
+      usage: 'label',
+    });
+    expect(created.status).toBe(201);
+    printers.push(created.data.id);
+    await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
+    await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/E2E Labels/);
+    await shootFlow(page, 'INVENTORY-F25');
+    expect(psql(`select count(*) from printing_printjob where document_type = 'barcode_label' and reference = '${sku}'`)).toBe('2');
+    expect(psql(`select document->>'price' from printing_printjob where reference = '${sku}' order by created_at desc limit 1`)).toBe('12.1');
+  } finally {
+    switchBackOn();
+  }
 });
 
 test('INVENTORY-F26: a quantity off its unit\'s step is refused under its field; grams fit the kilo', async ({ page }) => {

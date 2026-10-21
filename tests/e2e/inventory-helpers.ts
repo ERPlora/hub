@@ -115,11 +115,15 @@ export async function shootFlow(page: Page, key: string, restore = { width: 1280
 /** Runs a row action of the products list: its inline button, or the row's «⋮» menu when it folded there. */
 export async function rowAction(page: Page, id: string, action: string): Promise<void> {
   const hook = `inventory-products-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
+  const inline = shown(page).locator(`[data-testid=${hook}]`).first();
+  const menu = shown(page).locator(`[data-testid=inventory-products-row-${id}-menu]`).first();
+  // Right after a search the row may not be painted yet: choosing then took the menu and waited there for an
+  // inline action until the test's time ran out. The row's buttons paint together, so wait for either.
+  await expect(inline.or(menu).first()).toBeVisible();
+  if (await inline.isVisible()) {
+    await inline.click();
     return;
   }
-  await shown(page).locator(`[data-testid=inventory-products-row-${id}-menu]`).first().click();
+  await menu.click();
   await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
