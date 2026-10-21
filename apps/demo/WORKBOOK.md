@@ -258,9 +258,11 @@ papel en ningún negocio.
   `add_line` bloquea la fila del elemento, así que dos líneas a la vez no comparten posición.
 - Errores: 422 `invalid_payload` con `fields` por campo (mensaje en el idioma de la petición); 404
   `not_found` («Este elemento ya no existe»); 409 `demo.item_done` (línea en un elemento hecho); 403
-  `permission_denied`; 401 `unauthorized`; 404 `app_inactive`. En la ficha, cualquier error de la
-  consulta viva deja de pintar el elemento y sus acciones (`ItemDetailPage.vue`, `shown`), y
-  `permission_denied` se titula «No tienes permiso».
+  `permission_denied`; 401 `unauthorized`; 404 `app_inactive`. En la ficha, un error de la consulta
+  viva que dice que el elemento ya no es de quien mira (`not_found`, `permission_denied`,
+  `unauthorized`, `app_inactive`, `app_entitlement_blocked`) deja de pintarlo con sus acciones
+  (`ItemDetailPage.vue`, `GONE`); un fallo pasajero (`internal_error`) lo deja a la vista bajo el
+  aviso. `permission_denied` se titula «No tienes permiso».
 - El administrador de Django enseña los elementos con sus líneas **solo para leer**: toda escritura
   pasa por una operación, que es la que deja el aviso. Vive solo en `http://hubs.localhost:8000/admin/`
   (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS
