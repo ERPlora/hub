@@ -288,5 +288,5 @@ test('on a phone a refused save is said where it can be read, and «Save» is ne
   await expect(refusal).toContainText(/(That SKU already exists|Ese SKU ya existe)/);
   await refusal.scrollIntoViewIfNeeded();
   await expect(refusal).toBeInViewport();
-  await shootFlow(page, 'INVENTORY-F01');
+  await shootFlow(page, 'INVENTORY-F01-refused', { width: 390, height: 844 });
 });

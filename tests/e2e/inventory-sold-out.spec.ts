@@ -22,6 +22,7 @@ import {
   productsReady,
   rowAction,
   searchProducts,
+  shootFlow,
   stamp,
 } from './inventory-helpers';
 import { drawerOff, restoreDrawer } from './sale-helpers';
@@ -164,6 +165,7 @@ test('INVENTORY-F29: the product sheet marks it sold out, says so beside its sta
   await expect(sheet.locator('[data-testid=inventory-product-detail-back-on-sale]')).toBeVisible();
   expect((await productBySku(context, bread.sku)).is_sold_out).toBe(true);
   await page.screenshot({ path: shot('inventory-sold-out-sheet-834') });
+  await shootFlow(page, 'INVENTORY-F29', { width: 834, height: 1112 });
 
   await sheet.locator('[data-testid=inventory-product-detail-back-on-sale]').click();
   await expect(status).toHaveText(/^(Yes|Sí)$/);

@@ -108,8 +108,8 @@ export async function shoot(page: Page, name: string, restore = { width: 1280, h
 }
 
 /** The screenshots of a flow of the migration (APP-INVENTORY): `APP-INVENTORY-<key>-<390|834|1440>`. */
-export async function shootFlow(page: Page, key: string): Promise<string[]> {
-  return shoot(page, `APP-INVENTORY-${key}`);
+export async function shootFlow(page: Page, key: string, restore = { width: 1280, height: 860 }): Promise<string[]> {
+  return shoot(page, `APP-INVENTORY-${key}`, restore);
 }
 
 /** Runs a row action of the products list: its inline button, or the row's «⋮» menu when it folded there. */
