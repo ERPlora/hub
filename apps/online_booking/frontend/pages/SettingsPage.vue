@@ -385,9 +385,15 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
 <style scoped>
 .ob-settings {
   display: grid;
+  /* The column never grows past the page: a one-line switch label widened it to 409 px on a 375 px phone. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   max-width: 560px;
   margin-bottom: 24px;
+}
+/* The switch's long label wraps (ion-toggle keeps it on one line): the same defect Attendance had (hub#94). */
+.ob-settings ion-toggle::part(label) {
+  white-space: normal;
 }
 .ob-settings__title {
   font-size: 1.1rem;
