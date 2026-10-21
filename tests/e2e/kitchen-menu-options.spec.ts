@@ -223,6 +223,17 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
       const drawn = await drawnWord(dish, WIDE);
       expect(drawn.lines, `${size.label}: «${WIDE}» of «${name}» is ${drawn.word}px, its name ${drawn.box}px`).toBe(1);
     }
+    // ...and its ✓ is where it always was: at the dish's right edge, level with the first line of the name.
+    for (const dish of [dishOn(page, lentils.name), dishOn(page, hake.name)]) {
+      const off = await dish.evaluate((line) => {
+        const tick = line.querySelector('.kds-line__tick')!.getBoundingClientRect();
+        const name = line.querySelector('.kds-line__name')!.getBoundingClientRect();
+        const edge = line.getBoundingClientRect().right - parseFloat(getComputedStyle(line).paddingRight);
+        return { top: Math.abs(tick.top - name.top), right: Math.abs(tick.right - edge) };
+      });
+      expect(off.top, `${size.label}: the ✓ starts level with the name`).toBeLessThan(8);
+      expect(off.right, `${size.label}: the ✓ ends at the dish's right edge`).toBeLessThanOrEqual(1);
+    }
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 });
