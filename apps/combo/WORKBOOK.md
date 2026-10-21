@@ -1,7 +1,7 @@
 # Workbook — Menús y combos (app)
 Prefijo: COMBO
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas); lo que pinta o manda Ventas lo dice cada flujo
+Estado de la app: hecha (servidor, páginas y sus pasos en Ventas, Inventario y Cocina)
 
 > Manual de usuario y especificación de la app `combo`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -146,6 +146,7 @@ máximas», la casilla «Se puede elegir la misma opción más de una vez» y «
 | COMBO-F13 | Cuando un producto deja el catálogo | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
+<!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Menús
@@ -162,6 +163,7 @@ primero con el botón +.».
 Implicados: ninguno
 
 ### COMBO-F02 Crear un menú a precio cerrado
+<!-- origen: old:combos/WORKFLOW.md#combos-f02 qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -190,6 +192,7 @@ permiso de gestión no hay botón +.
 Implicados: TAX-F01
 
 ### COMBO-F03 Cambiar los datos de un menú, ponerlo o quitarlo de la venta
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -207,6 +210,7 @@ Si falla: los mismos avisos que el alta. Pasar a «en el local» sin tipo de IVA
 Implicados: SALE-F12
 
 ### COMBO-F04 Retirar un menú
+<!-- origen: old:combos/WORKFLOW.md#combos-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -224,6 +228,7 @@ existe en este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se
 Implicados: SALE-F12
 
 ### COMBO-F05 Montar los platos de un menú
+<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -410,6 +415,7 @@ pedirlo), así que nunca llega a cocina a medias. Un plato que es un servicio no
 Implicados: KITCHEN-F06, KITCHEN-F08, SALE-F12, SALE-F20
 
 ### COMBO-F12 Marcar una elección como agotada
+<!-- origen: nuevo (mercado: Square y Lightspeed dejan marcar agotado lo que el menú ofrece, sin quitarlo; INVENTORY-F29) -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -570,7 +576,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
-  `test_integration_tax.py` y `test_concurrency.py`.
+  `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
+  reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y
+  producto eliminado) y `test_concurrency.py`.
 - `requires = ["inventory", "tax"]`: `ChoiceOption.product` es FK a `inventory.Product` (`CASCADE`;
   Inventario borra lógicamente, así que la quita la reacción de F13 cuando el relay del outbox del worker,
   `base/relay.py`, le entrega `inventory.product.deleted`; probado por su tick real en
@@ -610,7 +618,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
   `demo`; lo que sí se separa son los avisos en vivo.
 - En el navegador: `tests/e2e/combo-menus.spec.ts` (oculto, con Inventario e Impuestos de verdad), que
-  borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después.
+  borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después, y `tests/e2e/combo-till.spec.ts` (el TPV de
+  Ventas, Cocina e Inventario de verdad y un paso del relay: COMBO-F07–F11), que borra `e2e Combo …` y
+  `E2E-CMT-…`.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -674,7 +684,12 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `combos.groups.*` y `combos.options.*`; avisos `combo.group.*` y `combo.option.*` en vez de
   `combos.choice_group.*` y `combos.choice_option.*`; permisos `combo.view` y `combo.manage` en vez de
   `combos.view_combo` y `combos.manage_combo`.
-- **Añadir varios** es una sola operación (`bulk_create`, todo o nada); antes, una por elección.
+- **Añadir varios** es una sola operación (`bulk_create`, todo o nada); antes, una por elección. Y admite
+  una **categoría entera** de Inventario («Marcar todos los de «…»»), como Square y WooCommerce Composite
+  (combos#12); antes, casilla a casilla.
+- **Crear un producto desde el menú no se hace** (combos#13): Square, Shopify Bundles, Revel, Lightspeed
+  L-Series, WooCommerce y Odoo PdV mandan crearlo en el catálogo; solo Lightspeed K-Series y Toast lo crean
+  dentro. Se crea en Inventario y el buscador del constructor lo encuentra en cuanto se guarda.
 - Precios en céntimos, como el resto de la plataforma.
 
 ## Contradicciones señaladas

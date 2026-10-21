@@ -50,6 +50,10 @@ describe('combo catalogues (en source + es)', () => {
     expect([...ES.keys()].sort()).toEqual([...EN.keys()].sort());
   });
 
+  it('combos#14: in Spanish a course of a menu is a «plato», never a «curso»', () => {
+    for (const [key, message] of ES) expect(message, key).not.toMatch(/\bcursos?\b/i);
+  });
+
   it('have no empty message', () => {
     for (const [key, message] of [...EN, ...ES]) expect(message.trim(), key).not.toBe('');
   });
