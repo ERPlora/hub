@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type Component, defineComponent } from 'vue';
 
 import type { GroupOut } from '../operations';
-import { EMPLOYEE, flush, type MountOptions, mountModifier, page } from '../__tests__/mount-modifier';
+import { EMPLOYEE, errorFrame, flush, type MountOptions, mountModifier, page } from '../__tests__/mount-modifier';
 import GroupFormModal from '../components/GroupFormModal.vue';
 import GroupSheet from '../components/GroupSheet.vue';
 import GroupsPage from './GroupsPage.vue';
@@ -83,6 +83,38 @@ describe('GroupsPage', () => {
     await s.reopen();
     await s.show(page([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
+  });
+
+  // pm#611: while the first groups are on their way the table says «Loading…», never empty nor «0 groups».
+  it('while the first result is on its way it says «Loading…», not that there are none', async () => {
+    const s = await setup();
+    expect(s.find('modifier-groups-loading').exists()).toBe(true);
+    expect(s.find('modifier-groups-loading').text()).toContain('Loading…');
+    expect(s.find('modifier-groups-empty').exists()).toBe(false);
+    expect(s.wrapper.text()).not.toMatch(/\b0 groups?\b/);
+    await s.show(page(ROWS));
+    expect(s.find('modifier-groups-loading').exists()).toBe(false);
+  });
+
+  // pm#533 and hub#2328: a list that cannot load says so and offers «Retry», never «No … yet» nor «0 groups».
+  it('a list that could not load says so with «Retry», not that there are none; Retry asks again', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
+    await flush();
+    expect(s.wrapper.text()).toContain('The groups could not be loaded.');
+    expect(s.find('modifier-groups-empty').exists()).toBe(false);
+    expect(s.wrapper.text()).not.toMatch(/\b0 groups?\b/);
+    const retry = s.find('modifier-groups-retry');
+    expect(retry.exists()).toBe(true);
+    const streams = s.net.streams.length;
+    await retry.trigger('click');
+    await flush();
+    await s.reopen();
+    // «Retry» asks the server again: the stream opens anew with the groups' subscription.
+    expect(s.net.streams.length).toBe(streams + 1);
+    await s.show(page(ROWS));
+    expect(s.rows()).toHaveLength(2);
+    expect(s.wrapper.text()).not.toContain('The groups could not be loaded.');
   });
 
   it('the Choice filter offers Required and Optional', async () => {
