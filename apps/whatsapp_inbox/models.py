@@ -248,6 +248,8 @@ class Message(UUIDModel):
     # The key the Hub sends with a message (Idempotency-Key): a retry never sends it twice.
     client_message_id = models.UUIDField(_("send key"), null=True, blank=True)
     reply_to = models.CharField(_("answers"), max_length=255, blank=True)
+    # The option the customer tapped (a template's quick reply, an interactive button or list row): its id.
+    reply_id = models.CharField(_("option tapped"), max_length=256, blank=True)
     sent_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

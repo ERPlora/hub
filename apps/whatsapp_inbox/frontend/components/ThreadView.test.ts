@@ -28,6 +28,7 @@ const message = (over: Partial<MessageOut> = {}): MessageOut => ({
   error_message: '',
   wa_message_id: 'wamid.1',
   reply_to: '',
+  reply_id: '',
   sent_by_name: '',
   sent_at: '2026-10-15T09:00:00Z',
   status_at: null,

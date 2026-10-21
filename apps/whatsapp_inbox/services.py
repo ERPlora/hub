@@ -284,6 +284,48 @@ def _media_fields(data: ReceiveIn) -> dict:
     }
 
 
+def _tapped(data: ReceiveIn) -> tuple[str, str, str]:
+    """``(reply_to, reply_id, text)`` of a message: the option she tapped and the message it answers, as
+    erplora.com lifted them or, when it did not, read from Meta's object (WHATSAPP_INBOX-F38)."""
+    payload = data.payload if isinstance(data.payload, dict) else {}
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+    reply_to = data.reply_to or str(context.get("id") or "")
+    option_id, title = (data.reply.id, data.reply.title) if data.reply else ("", "")
+    if data.reply is None and data.type == "button" and isinstance(payload.get("button"), dict):
+        option_id, title = str(payload["button"].get("payload") or ""), str(payload["button"].get("text") or "")
+    elif data.reply is None and data.type == "interactive" and isinstance(payload.get("interactive"), dict):
+        interactive = payload["interactive"]
+        chosen = interactive.get("button_reply") or interactive.get("list_reply")
+        if isinstance(chosen, dict):
+            option_id, title = str(chosen.get("id") or ""), str(chosen.get("title") or "")
+    return reply_to[:255], option_id[:256], data.text or title
+
+
+def _received(ctx: OperationContext, message: Message) -> None:
+    """``whatsapp_inbox.message.received``, saying which message the Hub sent it answers (never absent:
+    empty when it answers nothing this Hub sent) and the option tapped."""
+    asked = (
+        Message.objects.filter(
+            conversation_id=message.conversation_id, wa_message_id=message.reply_to, origin=Message.Origin.HUB
+        )
+        .values_list("id", flat=True)
+        .first()
+        if message.reply_to
+        else None
+    )
+    record_event(
+        ctx,
+        events.MESSAGE_RECEIVED,
+        {
+            "id": str(message.id),
+            "conversation_id": str(message.conversation_id),
+            "direction": message.direction,
+            "reply_to_message_id": str(asked) if asked else None,
+            "reply_id": message.reply_id,
+        },
+    )
+
+
 def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> dict:
     """The same WhatsApp message again: nothing changes, unless it completes a history placeholder."""
     completes = (
@@ -293,21 +335,13 @@ def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> di
         and message.conversation.erased_at is None
     )
     if completes:
+        message.reply_to, message.reply_id, message.body = _tapped(data)
         message.kind = data.type
-        message.body = data.text
         message.payload = data.payload
         for field, value in _media_fields(data).items():
             setattr(message, field, value)
         message.save()
-        record_event(
-            ctx,
-            events.MESSAGE_RECEIVED,
-            {
-                "id": str(message.id),
-                "conversation_id": str(message.conversation_id),
-                "direction": message.direction,
-            },
-        )
+        _received(ctx, message)
     return {
         "id": message.id,
         "conversation_id": message.conversation_id,
@@ -357,6 +391,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
         return _redelivered(ctx, existing, data)
     said = data.sent_at or clock.now()
     kind = data.type or "text"
+    reply_to, reply_id, text = _tapped(data)
     try:
         with transaction.atomic():
             message = Message.objects.create(
@@ -365,10 +400,11 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
                 origin=Message.Origin.CUSTOMER if inbound else Message.Origin.PHONE_APP,
                 source=data.source,
                 kind=kind,
-                body=data.text,
+                body=text,
                 status=Message.Status.RECEIVED if inbound else Message.Status.SENT,
                 wa_message_id=data.wa_message_id,
-                reply_to=data.reply_to,
+                reply_to=reply_to,
+                reply_id=reply_id,
                 payload=data.payload,
                 sent_at=said,
                 **_media_fields(data),
@@ -407,15 +443,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
             conversation.last_message_direction = message.direction
         conversation.save()
     _link_by_phone(ctx, conversation, card_id)
-    record_event(
-        ctx,
-        events.MESSAGE_RECEIVED,
-        {
-            "id": str(message.id),
-            "conversation_id": str(conversation.id),
-            "direction": message.direction,
-        },
-    )
+    _received(ctx, message)
     return {"id": message.id, "conversation_id": conversation.id, "created": True}
 
 
@@ -1152,6 +1180,7 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
             media_caption="",
             payload={},
             reply_to="",
+            reply_id="",
             error_message="",
             template_variables=[],
         )

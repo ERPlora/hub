@@ -609,3 +609,8 @@ msgstr "tipo de cabecera"
 
 msgid "sending to Meta"
 msgstr "envío a Meta"
+
+# What the customer taps answers a message of the Hub (WHATSAPP_INBOX-F38)
+
+msgid "option tapped"
+msgstr "opción tocada"

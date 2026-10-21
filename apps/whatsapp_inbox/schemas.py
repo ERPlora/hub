@@ -345,6 +345,7 @@ class MessageOut(Schema):
     error_message: str = Field(description="Meta's reason when it was not delivered.")
     wa_message_id: str | None = Field(description="WhatsApp's id of the message; none while it has not left.")
     reply_to: str = Field(description="WhatsApp's id of the message it answers.")
+    reply_id: str = Field("", description="The id of the option the customer tapped, for a button or list reply.")
     sent_by_name: str = Field(description="Who sent it from the Hub.")
     sent_at: datetime = Field(description="When it was said.")
     status_at: datetime | None = Field(description="When its status last changed.")
@@ -436,6 +437,11 @@ class ReceiveMediaIn(Schema):
         return _from_erplora(value)
 
 
+class ReceiveReplyIn(Schema):
+    id: _text(256) = Field("", description="The id of the option the customer tapped (a quick reply's payload, a button's or a list row's id).")
+    title: _text(1024) = Field("", description="Its text, as she saw it.")
+
+
 class ReceiveIn(Schema):
     wa_message_id: _text(255, 1) = Field(
         description="WhatsApp's id of the message (wamid…)."
@@ -462,6 +468,9 @@ class ReceiveIn(Schema):
     )
     reply_to: _text(255) = Field(
         "", description="WhatsApp's id of the message this one answers."
+    )
+    reply: ReceiveReplyIn | None = Field(
+        None, description="The option she tapped, for a button or interactive reply; read from Meta's object when missing."
     )
     sent_at: datetime | None = Field(
         None, description="When it was said (Meta's time); now when missing."

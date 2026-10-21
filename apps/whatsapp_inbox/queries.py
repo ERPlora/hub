@@ -241,6 +241,7 @@ def message_out(row: Message) -> dict:
         "error_message": row.error_message,
         "wa_message_id": row.wa_message_id,
         "reply_to": row.reply_to,
+        "reply_id": row.reply_id,
         "sent_by_name": person_name(row.sent_by),
         "sent_at": row.sent_at,
         "status_at": row.status_at,

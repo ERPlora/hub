@@ -87,7 +87,14 @@ def test_the_first_message_opens_a_conversation_keyed_by_the_international_numbe
     )
     assert (out.id, out.conversation_id, out.created) == (message.id, c.id, True)
     assert events("whatsapp_inbox.message.received") == [
-        {"id": str(message.id), "conversation_id": str(c.id), "direction": "inbound"}
+        {
+            "id": str(message.id),
+            "conversation_id": str(c.id),
+            "direction": "inbound",
+            # It answers nothing the Hub sent (WHATSAPP_INBOX-F38): empty, never absent.
+            "reply_to_message_id": None,
+            "reply_id": "",
+        }
     ]
 
 

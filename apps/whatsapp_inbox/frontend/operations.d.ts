@@ -133,6 +133,8 @@ export interface MessageOut {
   /** Meta's id; `null` while the message has not left. */
   wa_message_id: string | null;
   reply_to: string;
+  /** The id of the option the customer tapped (a quick reply, a button or list row). */
+  reply_id: string;
   sent_by_name: string;
   sent_at: string;
   status_at: string | null;
