@@ -24,6 +24,7 @@ import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
+import IssuerMissingNotice from '../components/IssuerMissingNotice.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
@@ -167,6 +168,7 @@ function onAction({ actionId, row }: { actionId: string; row: InvoiceRowOut }): 
       :status="status"
       :error="error"
     />
+    <IssuerMissingNotice />
     <InlineFeedback
       v-if="paid.refused.value"
       class="invoice-list__notice"

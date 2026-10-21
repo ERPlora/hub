@@ -6,9 +6,9 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
-from apps.printing.models import Printer, PrintJob, Settings
+from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 
-MODELS = [Settings, Printer, PrintJob]
+MODELS = [Settings, Printer, PrintJob, PrintDevice]
 DATES = (
     "created_at",
     "updated_at",
@@ -19,6 +19,9 @@ DATES = (
     "failed_at",
     "retried_at",
     "cancelled_at",
+    "registered_at",
+    "last_seen_at",
+    "retired_at",
 )
 
 
@@ -55,6 +58,14 @@ def test_ids_and_dates_are_read_only():
         for field in DATES:
             if any(f.name == field for f in model._meta.get_fields()):
                 assert field in readonly, (model.__name__, field)
+
+
+def test_a_devices_key_is_never_typed_nor_searched():
+    # The key is the digest of the device's own id (its credential): a staff member never writes one by hand
+    # (it would not match any device) and the list shows the device by its name.
+    device_admin = admin.site._registry[PrintDevice]
+    assert "key" in device_admin.readonly_fields
+    assert "key" not in device_admin.list_display and "key" not in device_admin.search_fields
 
 
 def test_the_queue_is_searched_by_document_and_filtered_by_state():

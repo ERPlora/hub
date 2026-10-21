@@ -6,6 +6,7 @@ import type { ShellTab } from '@erplora/ui/shell';
 
 export const PRINTING_TABS: readonly Omit<ShellTab, 'label'>[] = Object.freeze([
   { id: 'printers', icon: 'lucide:receipt', to: '/printing/printers' },
+  { id: 'devices', icon: 'lucide:smartphone', to: '/printing/devices' },
   { id: 'jobs', icon: 'ion:list-outline', to: '/printing/jobs' },
   { id: 'settings', icon: 'ion:settings-outline', to: '/printing/settings' },
 ]);

@@ -316,8 +316,8 @@ def test_without_invoicing_a_sale_is_a_ticket_without_fiscal_document(bar, invoi
 
 def test_a_refusal_of_invoicing_never_stops_the_charge_and_the_document_waits(bar):
     # No issuer yet (INVOICE-F06): the charge goes through, nothing of Invoicing is written and the
-    # document is issued by Invoicing's own reaction once the issuer exists; the sale learns its number
-    # from the document's notice.
+    # document is issued by Invoicing's own reaction once the issuer exists, which gives the sale its
+    # number in that same transaction; the document's notice, handed to Sales afterwards, changes nothing.
     from live.context import system_context
     from live.models import OutboxEvent
 
@@ -331,18 +331,15 @@ def test_a_refusal_of_invoicing_never_stops_the_charge_and_the_document_waits(ba
     run("invoice.issuer.update", ISSUER)
     completed = OutboxEvent.objects.get(name="sale.sale.completed")
     issued = invoice_events.react(A, completed.name, completed.payload)
-    notice = (
-        OutboxEvent.objects.filter(name="invoice.invoice.issued").order_by("-created_at", "-id").first()
-    )
-    recorded = sale_events.react(A, notice.name, notice.payload)
-    assert recorded.recorded is True
     read = run("sale.sale.get", {"sale_id": str(sale.id)})
     assert (read.invoice_status, read.invoice_number, read.invoice_id) == (
         "issued",
         issued.invoice.number,
         issued.invoice.id,
     )
-    # Twice, nothing new.
+    notice = (
+        OutboxEvent.objects.filter(name="invoice.invoice.issued").order_by("-created_at", "-id").first()
+    )
     assert sale_events.react(A, notice.name, notice.payload).recorded is False
     assert system_context(A).actor  # the reaction ran as the platform
 

@@ -89,6 +89,21 @@ describe('InvoicePaper', () => {
     expect(s.text('invoice-paper-note')).toBe('Rectifies invoice FACT-2026-000001. Reason: Wrong price');
   });
 
+  it('with its VeriFactu record carries the AEAT’s QR on top, in the AEAT’s words (Orden HAC/1177/2024, art. 21)', async () => {
+    const s = await setup({ record: { qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+', qr_url: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674' } });
+    const qr = s.find('invoice-paper-qr');
+    expect(qr.text()).toContain('QR tributario:');
+    expect(qr.text()).toContain('VERI*FACTU');
+    expect(qr.find('img').attributes('src')).toBe('data:image/svg+xml;base64,PHN2Zy8+');
+    // The QR is the first thing of the sheet, as on the server's paper.
+    expect(s.wrapper.find('[data-testid="invoice-paper"]').element.firstElementChild?.getAttribute('data-testid')).toBe('invoice-paper-qr');
+  });
+
+  it('without a record carries no QR', async () => {
+    expect((await setup()).find('invoice-paper-qr').exists()).toBe(false);
+    expect((await setup({ record: null })).find('invoice-paper-qr').exists()).toBe(false);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ duplicate: true }, 'es');
     expect([s.text('invoice-paper-title'), s.text('invoice-paper-copy'), s.text('invoice-paper-date')]).toEqual(['Factura', 'Copia', '14/10/2026']);

@@ -4,6 +4,7 @@
     "tabs": {
       "label": "Secciones de Impresión",
       "printers": "Impresoras",
+      "devices": "Dispositivos",
       "jobs": "Cola",
       "settings": "Ajustes"
     },
@@ -93,6 +94,60 @@
       "deactivated": "Impresora desactivada",
       "activated": "Impresora activada",
       "toggleFailed": "No se pudo cambiar la impresora."
+    },
+    "devices": {
+      "heading": "Dispositivos que imprimen",
+      "intro": "Solo los dispositivos dados de alta aquí imprimen la cola, con la sesión de cualquiera: da de alta el que está junto a las impresoras desde ese dispositivo.",
+      "add": "Imprimir desde este dispositivo",
+      "empty": "Todavía no imprime ningún dispositivo. Da de alta el que está junto a las impresoras desde ese dispositivo.",
+      "loading": "Cargando…",
+      "loadError": "No se pudieron cargar los dispositivos.",
+      "entity": {
+        "one": "dispositivo",
+        "many": "dispositivos"
+      },
+      "columns": {
+        "name": "Nombre",
+        "printers": "Impresoras",
+        "lastSeen": "Último trabajo pedido",
+        "registeredBy": "Dado de alta por"
+      },
+      "thisDevice": "Este dispositivo",
+      "inactive": "{name} (inactiva)",
+      "lastSeen": "hace {age}",
+      "never": "Nunca",
+      "thisPrints": "Este dispositivo imprime para: {printers}.",
+      "thisNotSetUp": "Este dispositivo todavía no imprime: «Imprimir desde este dispositivo» lo da de alta con las impresoras a las que llega.",
+      "thisAskSomeone": "Este dispositivo no imprime aquí: quien gestiona las impresoras lo da de alta desde él.",
+      "actions": {
+        "edit": "Editar",
+        "retire": "Retirar"
+      },
+      "retire": {
+        "title": "¿Retirar {name}?",
+        "message": "No imprimirá nada más, y los trabajos que tenga vuelven a la cola. Para imprimir otra vez desde él, dalo de alta de nuevo desde él.",
+        "confirm": "Sí, retirar",
+        "back": "Volver",
+        "done": "Dispositivo retirado: ya no imprime.",
+        "failed": "No se pudo retirar el dispositivo."
+      },
+      "modal": {
+        "create": "Imprimir desde este dispositivo",
+        "edit": "Editar dispositivo",
+        "hint": "Solo imprimen los dispositivos dados de alta aquí, con la sesión de cualquiera. Elige las impresoras a las que llega este dispositivo: en su red, por su cable o emparejadas por Bluetooth.",
+        "name": "Nombre del dispositivo",
+        "namePlaceholder": "Caja del mostrador",
+        "required": "Escribe su nombre.",
+        "printers": "Impresoras a las que llega",
+        "printer": "{name} · {usage}",
+        "choosePrinters": "Elige las impresoras a las que llega este dispositivo.",
+        "noPrinters": "Todavía no hay ninguna impresora activa: añade una antes en Impresoras.",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "created": "Este dispositivo ya imprime.",
+        "saved": "Dispositivo guardado",
+        "failed": "No se pudo guardar el dispositivo."
+      }
     },
     "modal": {
       "create": "Nueva impresora",

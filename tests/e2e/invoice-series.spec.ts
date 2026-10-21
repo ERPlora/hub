@@ -6,8 +6,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, shown } from './helpers';
-import { cleanInvoices, openDialog, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
-import { shots, stamp } from './sale-helpers';
+import { cleanInvoices, openDialog, ensureIssuer, flowShots, issuedIds, snapshotSeries } from './invoice-helpers';
+import { stamp } from './sale-helpers';
 
 const RUN = stamp();
 const CODE = `E2E${RUN}`.slice(0, 20);
@@ -58,9 +58,9 @@ test('INVOICE-F12 and F13: a series that continues at 7, renamed, and locked onc
   await form.locator('[data-testid=invoice-series-name] input').fill(`e2e Online ${RUN}`);
   await form.locator('[data-testid=invoice-series-prefix] input').fill(PREFIX);
   await form.locator('[data-testid=invoice-series-next-number] input').fill('7');
-  await shots(page, 'invoice-series-new', async (p) => {
+  await flowShots(page, 'INVOICE-F12', async (p) => {
     await expect(openDialog(p, 'invoice-series-form')).toBeVisible();
-  }, { width: 1440, height: 900 });
+  });
   await form.locator('[data-testid=invoice-series-form-submit]').click();
   await expect(form).toBeHidden();
 
@@ -68,7 +68,7 @@ test('INVOICE-F12 and F13: a series that continues at 7, renamed, and locked onc
   expect([created.current_number, created.next_number, created.format_locked]).toEqual([6, `${PREFIX}-${year}-000007`, false]);
   await shown(page).locator('[data-testid=invoice-series-search] input').fill(CODE);
   await expect(rowOf(page)).toContainText(`e2e Online ${RUN}`);
-  await shots(page, 'invoice-series', async (p) => {
+  await flowShots(page, 'INVOICE-F12-list', async (p) => {
     await expect(rowOf(p)).toBeVisible();
   });
 
@@ -103,9 +103,9 @@ test('INVOICE-F12 and F13: a series that continues at 7, renamed, and locked onc
     await expect(form.locator(`[data-testid=invoice-series-${field}] input`)).toBeDisabled();
   }
   await expect(form.locator('[data-testid=invoice-series-preview]')).toContainText(`${PREFIX}-${year}-000008`);
-  await shots(page, 'invoice-series-locked', async (p) => {
+  await flowShots(page, 'INVOICE-F13', async (p) => {
     await expect(openDialog(p, 'invoice-series-form').locator('[data-testid=invoice-series-format-locked]')).toBeVisible();
-  }, { width: 1440, height: 900 });
+  });
   await form.locator('[data-testid=invoice-series-form-cancel]').click();
   await expect(form).toBeHidden();
 

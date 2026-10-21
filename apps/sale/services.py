@@ -1697,25 +1697,11 @@ def _recipient_of(sale: Sale) -> dict:
     }
 
 
-def _invoiced(ctx: OperationContext, sale: Sale, document: dict, **more) -> None:
-    """Says a document of ``sale`` was issued after its write (the lists and the paper follow it)."""
-    record_event(
-        ctx,
-        events.SALE_INVOICED,
-        {
-            "sale_id": str(sale.id),
-            "invoice_id": str(document["id"]) if document["id"] else None,
-            "number": document["number"],
-            "refund_id": None,
-            "void": False,
-            **more,
-        },
-    )
-
-
 def _issue_waiting_document(ctx: OperationContext, sale: Sale, *, strict: bool = False) -> bool:
     """The ticket or invoice of ``sale`` while it waits (``pending``), asked again by name with the
-    recipient the sale keeps: idempotent in Invoicing (one per sale). True when it is issued now."""
+    recipient the sale keeps: idempotent in Invoicing (one per sale). True when it is issued now; Invoicing
+    has then given the sale its document by ``sale.sale.record_invoice``, in this same transaction
+    (INVOICE-F06), so the sale is read again, not written twice."""
     if sale.invoice_status != FiscalStatus.PENDING:
         return False
     document = _fiscal_document(
@@ -1726,10 +1712,7 @@ def _issue_waiting_document(ctx: OperationContext, sale: Sale, *, strict: bool =
     )
     if document["status"] != FiscalStatus.ISSUED:
         return False
-    sale.invoice_status, sale.invoice_id = document["status"], document["id"]
-    sale.invoice_number, sale.invoice_type = document["number"], document["type"]
-    sale.save(update_fields=["invoice_status", "invoice_id", "invoice_number", "invoice_type"])
-    _invoiced(ctx, sale, document)
+    sale.refresh_from_db(fields=["invoice_status", "invoice_id", "invoice_number", "invoice_type"])
     return True
 
 
@@ -2307,28 +2290,31 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
     },
 )
 def issue_documents(ctx: OperationContext, data: SaleRefIn) -> dict:
-    """«Issue now» (phase 1 has no relay to issue them on its own): every document of the sale that waits,
-    in order — its own, then its void's or its refunds' rectifying invoices, which need it —, each by its
-    operation of Invoicing with the caller's session. Any refusal reaches the caller and nothing is kept."""
+    """«Issue now» (the relay gives up after its last attempt): every document of the sale that waits, in
+    order — its own, then its void's or its refunds' rectifying invoices, which need it —, each by its
+    operation of Invoicing with the caller's session. Invoicing gives each one it issues to the sale or the
+    refund (``sale.sale.record_invoice``, in this transaction, INVOICE-F06): only an answer with no document
+    (nothing left to declare) is written here. Any refusal reaches the caller and nothing is kept."""
     sale = find_sale(data.sale_id, data.sale, lock=True)
     _issue_waiting_document(ctx, sale, strict=True)
     if sale.void_invoice_status == FiscalStatus.PENDING:
         document = _fiscal_document(
             ctx, "invoice.invoice.rectify_from_void", {"sale_id": str(sale.id)}, strict=True
         )
-        sale.void_invoice_status, sale.void_invoice_number = document["status"], document["number"]
-        sale.save(update_fields=["void_invoice_status", "void_invoice_number"])
-        _invoiced(ctx, sale, document, void=True)
+        if document["status"] != FiscalStatus.ISSUED:
+            sale.void_invoice_status, sale.void_invoice_number = document["status"], document["number"]
+            sale.save(update_fields=["void_invoice_status", "void_invoice_number"])
     for record in sale.refunds.filter(invoice_status=FiscalStatus.PENDING).order_by(
         "created_at", "id"
     ):
         document = _fiscal_document(
             ctx, "invoice.invoice.rectify_from_refund", {"refund_id": str(record.id)}, strict=True
         )
-        record.invoice_status, record.invoice_number = document["status"], document["number"]
-        record.invoice_type = document["type"]
-        record.save(update_fields=["invoice_status", "invoice_number", "invoice_type"])
-        _invoiced(ctx, sale, document, refund_id=str(record.id))
+        if document["status"] != FiscalStatus.ISSUED:
+            record.invoice_status, record.invoice_number = document["status"], document["number"]
+            record.invoice_type = document["type"]
+            record.save(update_fields=["invoice_status", "invoice_number", "invoice_type"])
+    sale.refresh_from_db()
     with translation.override(ctx.language):
         return sale_detail(sale)
 

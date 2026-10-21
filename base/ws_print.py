@@ -46,6 +46,7 @@ code                            close  when
 ``not_found``                   4404   the Host is no hub's (the platform host included)
 ``base.hub_gone``               4410   the hub ended
 ``base.hub_preparing``          4503   the hub is still being prepared
+``base.hub_suspended``          4402   the business is suspended for an unpaid invoice
 ``print.not_ready``             4400   a frame before ``hello``, or no ``hello`` within 15 s
 ``print.frame_too_large``       4413   a frame over 8 KiB (before anything is parsed)
 ``unauthenticated``             4401   no session, one that is not valid here, or one that ended
@@ -64,7 +65,8 @@ reconnect is taken from the device that held the job, whatever hand-out it was.
 
 **Tenancy** (phase 1, PLAN §16): the hub is the Host's first label, checked against the registry by the gate the
 HTTP doors pass (``base.middleware.HubHostRequiredMiddleware``), and every operation runs in its scope with the
-session's user; phase 2 swaps the context builder for ``use_hub`` and this module does not change. The ``Origin``
+session's user. The gate is heard again before every frame and every wake (the context's refresh,
+``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code; phase 2 swaps the context builder for ``use_hub`` and this module does not change. The ``Origin``
 must be the hub's own (cross-site WebSocket hijacking): anything else is refused at the handshake (Daphne answers
 it 403).
 
@@ -104,6 +106,7 @@ from live.executor import BYE_FRAME, Stream, Subscription, executor
 from live.operations import UnknownOperation, get
 
 from base.middleware import HubHostRequiredMiddleware
+from base.operations import HostClosed
 
 logger = logging.getLogger(__name__)
 
@@ -294,12 +297,15 @@ class PrintSocket:
     async def _on_stream(self, item: bytes) -> bool:
         """A frame of the wake stream: a changed result is a ``wake``; ``False`` once the socket is closed."""
         if item == BYE_FRAME:
-            # The broker ended the stream (its queue overflowed, or its user is gone): follow again if the
-            # session still holds, which the next frame checks anyway.
+            # The broker ended the stream (its queue overflowed, its user is gone, or the hub stopped serving): follow
+            # again if the session and the hub still hold, which the next frame checks anyway.
             try:
                 await self._sync(self._authenticate)
+                await self._sync(self._fresh_context)
             except Refusal as refusal:
                 return await self._refuse(refusal)
+            except OperationError as exc:
+                return await self._refuse(_refusal_of(exc))
             self._unfollow()
             await self._follow()
             return True
@@ -598,7 +604,7 @@ def _validated(name: str, data: dict):
 
 def _refusal_of(exc: OperationError) -> Refusal:
     """An operation's refusal as a frame, with the code it carries over HTTP (``unauthenticated`` for 401, the old
-    hub's); a refusal no retry fixes closes the socket."""
+    hub's); a refusal no retry fixes closes the socket, as a hub that stopped serving does (the gate's code)."""
     error = exc.envelope()["error"]
     if exc.status == 401:
         return Refusal("unauthenticated", str(error["message"]), status=401)
@@ -606,7 +612,7 @@ def _refusal_of(exc: OperationError) -> Refusal:
         error["code"],
         str(error["message"]),
         status=exc.status,
-        fatal=error["code"] in FATAL_OPERATION_CODES,
+        fatal=isinstance(exc, HostClosed) or error["code"] in FATAL_OPERATION_CODES,
         fields=error.get("fields"),
     )
 

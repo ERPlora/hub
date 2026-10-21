@@ -1,9 +1,11 @@
 """Models of the printing app: what the database itself refuses, and the helpers the models carry."""
 
+import hashlib
+
 import pytest
 from django.db import IntegrityError, transaction
 
-from apps.printing.models import Printer, PrintJob, Settings
+from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 
 pytestmark = pytest.mark.django_db
 
@@ -127,7 +129,30 @@ def test_a_printer_with_jobs_is_never_deleted():
         till.delete()
 
 
+def a_device(**more) -> PrintDevice:
+    return PrintDevice.objects.create(**({"name": "Till", "key": PrintDevice.key_of("till-1")} | more))
+
+
+def test_a_device_is_known_by_the_digest_of_its_own_id_never_by_the_id():
+    # hub#2551: the id a device sends is its credential; the database keeps its SHA-256, which proves nothing.
+    assert PrintDevice.key_of("till-1") == hashlib.sha256(b"till-1").hexdigest()
+    assert PrintDevice.key_of("  till-1 ") == PrintDevice.key_of("till-1")
+    a_device()
+    refused(lambda: a_device(name="Other"))
+    refused(lambda: a_device(key=PrintDevice.key_of("till-2"), name=""))
+
+
+def test_a_device_reaches_printers_and_one_with_jobs_is_never_deleted():
+    till = a_device()
+    till.printers.add(a_printer())
+    assert [p.name for p in till.printers.all()] == ["Till"]
+    a_job(print_device=till, device="Till")
+    with pytest.raises(Exception), transaction.atomic():
+        till.delete()
+
+
 def test_names():
+    assert str(a_device(name="Counter till")) == "Counter till"
     assert str(a_printer()) == "Till"
     assert str(Settings()) == "printing settings"
     assert str(a_job(reference="T-000123")) == "receipt T-000123"

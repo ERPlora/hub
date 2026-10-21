@@ -13,7 +13,7 @@ describe('SettingsPage', () => {
     const page = m.wrapper.findComponent(AppPage);
     expect(page.props('title')).toBe('Printing');
     expect(page.props('contentLayout')).toBe('detail');
-    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['printers', 'jobs', 'settings']);
+    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['printers', 'devices', 'jobs', 'settings']);
     expect(m.wrapper.findComponent(SettingsCard).props('editable')).toBe(true);
   });
 

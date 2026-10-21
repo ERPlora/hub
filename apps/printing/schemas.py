@@ -25,6 +25,7 @@ MAX_CLAIM_PRINTERS = 20
 SAY_WHICH_PRINTER = _("Say which printer: its id or its name.")
 SAY_WHICH_JOB = _("Say which job: its id or the number of its document.")
 NOTHING_TO_CHANGE = _("Say what changes in the printer.")
+NOTHING_TO_CHANGE_DEVICE = _("Say what changes in the device: its name or its printers.")
 A4_NEEDS_PAGE = _("An A4 job carries its A4 page (html).")
 PAGE_ONLY_A4 = _("Only an A4 job carries a page: a receipt printer prints the structured document.")
 PAGE_TOO_LARGE = _("The A4 page is larger than 2 MB.")
@@ -304,7 +305,7 @@ class JobOut(Schema):
     stale: bool = Field(description="Sent and with no answer past its 90 s.")
     retryable: bool = Field(description="It can be sent back to the queue (queued, failed, or sent with no answer).")
     cancellable: bool = Field(description="It can be cancelled (queued, failed, or sent with no answer).")
-    device: str = Field(description="The device that took it last.")
+    device: str = Field(description="The name of the device that took it last (never its own id).")
     last_error: str = Field(description="Its last error, as the device said it.")
     source_app: str = Field(description="The app that asked for it.")
     created_at: datetime = Field(description="When it was asked for.")
@@ -379,9 +380,13 @@ class JobSummaryOut(Schema):
 
 class JobClaimIn(Closed):
     printers: list[UUID] = Field(
-        min_length=1, max_length=MAX_CLAIM_PRINTERS, description="The printers this device reaches (their ids)."
+        min_length=1,
+        max_length=MAX_CLAIM_PRINTERS,
+        description="The printers this device reaches (their ids): the ones it was set up with.",
     )
-    device: DeviceName = Field(description="The device that asks (its name or id).")
+    device: DeviceName = Field(
+        description="The device's own id (its deviceId): what proves it is the device set up to print here."
+    )
 
 
 class HostJobOut(Schema):
@@ -415,13 +420,13 @@ class JobClaimOut(Schema):
 
 class JobCompleteIn(Closed):
     job_id: UUID = Field(description="The job the device printed.")
-    device: DeviceName = Field(description="The device that printed it: the one that took it.")
+    device: DeviceName = Field(description="The own id of the device that printed it: the one that took it.")
     attempt: int = Field(ge=1, description="The hand-out it printed (the `attempts` it was given).")
 
 
 class JobFailIn(Closed):
     job_id: UUID = Field(description="The job the device could not print.")
-    device: DeviceName = Field(description="The device that could not print it: the one that has it.")
+    device: DeviceName = Field(description="The own id of the device that could not print it: the one that has it.")
     attempt: int = Field(ge=1, description="The hand-out that failed (the `attempts` it was given).")
     error: DeviceError = Field(description="Why, as the device says it (cut at 500 characters).")
 
@@ -432,6 +437,62 @@ class JobAckOut(Schema):
         "was retried or cancelled)."
     )
     job: JobOut = Field(description="The job as it is now.")
+
+
+# ── The devices that print (PRINTING-F18) ────────────────────────────────────────────────────────
+
+
+class DevicePrinterOut(Schema):
+    id: UUID = Field(description="The printer's id.")
+    name: str = Field(description="Its name.")
+    usage: Usage = Field(description="What it prints.")
+    is_active: bool = Field(description="It takes jobs.")
+
+
+class DeviceOut(Schema):
+    id: UUID = Field(description="The device's registration id. The device's own id is never shown: it proves the device.")
+    name: str = Field(description="Its name, as the business calls it (Counter till).")
+    printers: list[DevicePrinterOut] = Field(description="The printers it reaches and prints for, by name.")
+    registered_at: datetime = Field(description="When it was set up to print.")
+    registered_by: str = Field(description="Who set it up.")
+    last_seen_at: datetime | None = Field(description="When it last asked for a job; none = never yet.")
+    this_device: bool = Field(description="It is the device asking.")
+
+
+class DeviceRegisterIn(Closed):
+    name: Name = Field(description="The device's name, as the business calls it: Counter till, Kitchen tablet.")
+    printers: list[UUID] = Field(
+        max_length=MAX_CLAIM_PRINTERS, description="The active printers this device reaches and prints for (their ids)."
+    )
+
+
+class DeviceRefIn(Closed):
+    device_id: UUID = Field(description="The device's registration id (printing.device.list).")
+
+
+class DeviceUpdateIn(DeviceRefIn):
+    name: Name | None = Field(None, description="Its new name.")
+    printers: list[UUID] | None = Field(
+        None, max_length=MAX_CLAIM_PRINTERS, description="The active printers it reaches from now on (their ids)."
+    )
+
+    @model_validator(mode="after")
+    def _changes(self):
+        if self.name is None and self.printers is None:
+            raise ValueError(str(NOTHING_TO_CHANGE_DEVICE))
+        return self
+
+
+class DeviceListIn(PageIn):
+    pass
+
+
+class DeviceGetIn(Closed):
+    device: DeviceName = Field(description="The device's own id, as its hello says it (base's /ws/print).")
+
+
+class DeviceGetOut(Schema):
+    device: DeviceOut | None = Field(description="The device set up with that id; none = not set up here (or retired).")
 
 
 class PruneOut(Schema):

@@ -142,7 +142,8 @@ def _card_charge(key: str, ctx=None):
 @pytest.mark.django_db
 def test_the_rectifying_invoice_of_a_void_issued_later_goes_back_to_its_sale(product):
     # No issuer at the till: the ticket and the void's rectifying invoice both wait (pending). Invoicing
-    # issues them from the outbox once the issuer exists; each notice carries its real ``source``.
+    # issues them from the outbox once the issuer exists and gives each to the sale as it issues it
+    # (INVOICE-F06); each notice carries its real ``source``, and Sales' reaction to it changes nothing.
     product("Coffee", "COF", 150, "restaurant.drink")
     sale = _card_charge("source-void-01")
     voided = run("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong table"})
@@ -152,7 +153,6 @@ def test_the_rectifying_invoice_of_a_void_issued_later_goes_back_to_its_sale(pro
     rectification = _deliver_to_invoicing("sale.sale.voided").invoice
     notices = _issued_notices()
     assert [n.payload["source"]["void"] for n in notices] == [False, True]
-    assert all(events.react(A, n.name, n.payload).recorded for n in notices)
     read = Sale.objects.get(pk=sale.id)
     assert (read.invoice_status, read.invoice_number, read.invoice_id) == (
         "issued",
@@ -160,15 +160,16 @@ def test_the_rectifying_invoice_of_a_void_issued_later_goes_back_to_its_sale(pro
         ticket.id,
     )
     assert (read.void_invoice_status, read.void_invoice_number) == ("issued", rectification.number)
-    # Twice: nothing new.
+    # The relay's notices come afterwards: nothing new.
     assert not any(events.react(A, n.name, n.payload).recorded for n in notices)
 
 
 @pytest.mark.django_db
 def test_the_rectifying_invoice_of_a_refund_issued_later_goes_back_to_its_refund(product):
     # The ticket was issued at the till; the manager who refunded may not rectify invoices, so the
-    # refund's rectifying invoice waits and Invoicing's reaction issues it: the refund learns its number,
-    # the sale's own documents do not change.
+    # refund's rectifying invoice waits and Invoicing's reaction issues it: the refund has its number at
+    # once (INVOICE-F06), the sale's own documents do not change, and Sales' reaction to the notice
+    # changes nothing.
     from apps.sale.models import Refund
     from apps.sale.tests.conftest import ctx_for
 
@@ -203,7 +204,6 @@ def test_the_rectifying_invoice_of_a_refund_issued_later_goes_back_to_its_refund
         "refund_id": str(refund.id),
         "void": False,
     }
-    assert events.react(A, notice.name, notice.payload).recorded is True
     refund.refresh_from_db()
     assert (refund.invoice_status, refund.invoice_number, refund.invoice_type) == (
         "issued",

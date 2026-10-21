@@ -331,6 +331,17 @@ describe('InvoicesPage: who may do what', () => {
 });
 
 describe('InvoicesPage: the states of the screen', () => {
+  it('says above the list that nothing can be invoiced while the issuer is not set up (INVOICE-F21)', async () => {
+    const s = await setup();
+    expect(s.subId('invoice.issuer.get')).toBeTruthy();
+    await s.result('invoice.issuer.get', { configured: false });
+    await s.show(PAGE);
+    expect(s.find('invoice-issuer-notice').text()).toContain('You cannot invoice yet');
+    expect(s.rows()).toHaveLength(3);
+    await s.result('invoice.issuer.get', { configured: true }, {}, 2);
+    expect(s.find('invoice-issuer-notice').exists()).toBe(false);
+  });
+
   it('on an error the table says so with Retry', async () => {
     const s = await setup();
     s.call.push(errorFrame(s.subId(OP), 'invoice.boom'));

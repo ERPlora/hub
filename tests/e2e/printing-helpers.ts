@@ -1,9 +1,10 @@
 // Helpers of the printing specs (apps/printing/WORKBOOK.md): the screenshots of a flow in the three sizes the
-// migration asks for (`APP-PRINTING-<KEY>-390`, `-834`, `-1440` in `.artifacts/`) and the device's side of the
-// queue by the API (claim, then confirm or fail: what `/ws/print` will do for the app of the device).
+// migration asks for (`APP-PRINTING-<KEY>-390`, `-834`, `-1440` in `.artifacts/`), the device's side of the
+// queue by the API (claim, then confirm or fail: what `/ws/print` will do for the app of the device) and letting
+// go of the devices a spec printed from (PRINTING-F18: the owner's claim sets the device up).
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, shot } from './helpers';
+import { A, api, psql, shot } from './helpers';
 
 /** Phone, tablet and desktop: 390×844, 834×1112 and 1440×900. */
 export const FLOW_VIEWPORTS = [
@@ -48,4 +49,20 @@ export async function claim(context: BrowserContext, printerId: string, device =
 export async function fail(context: BrowserContext, job: { id: string; attempts: number }, error: string, device = 'e2e device'): Promise<void> {
   const res = await api(context, A, 'POST', '/printing/jobs/fail', { job_id: job.id, error, device, attempt: job.attempts });
   expect(res.status, JSON.stringify(res.data)).toBe(200);
+}
+
+/**
+ * Lets go of the devices a spec printed from (PRINTING-F18): the printers named `like` leave every device, and
+ * the devices it used — by their own `ids` (the hub keeps their SHA-256, never the id) or by `names` (`like`
+ * patterns) — go, their jobs' mark first. Run after the spec's jobs are deleted and before its printers are: a
+ * device names the printers it reaches.
+ */
+export function forgetDevices(like: string, { ids = [], names = [] }: { ids?: readonly string[]; names?: readonly string[] } = {}): void {
+  psql(`delete from printing_printdevice_printers where printer_id in (select id from printing_printer where name like '${like}')`);
+  const which = [...ids.map((id) => `key = encode(sha256('${id}'::bytea), 'hex')`), ...names.map((name) => `name like '${name}'`)];
+  if (which.length === 0) return;
+  const where = which.join(' or ');
+  psql(`update printing_printjob set print_device_id = null where print_device_id in (select id from printing_printdevice where ${where})`);
+  psql(`delete from printing_printdevice_printers where printdevice_id in (select id from printing_printdevice where ${where})`);
+  psql(`delete from printing_printdevice where ${where}`);
 }

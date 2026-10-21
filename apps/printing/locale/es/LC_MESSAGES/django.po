@@ -349,3 +349,57 @@ msgstr "Un documento solo lleva valores JSON: texto, números, verdadero o falso
 
 msgid "An A4 page prints once: ask for another job for another copy."
 msgstr "Una página A4 se imprime una vez: pide otro trabajo para otra copia."
+
+msgid "Choose active printers of this business."
+msgstr "Elige impresoras activas de este negocio."
+
+msgid "Choose the printers this device reaches."
+msgstr "Elige las impresoras a las que llega este dispositivo."
+
+msgid "Device %(number)s"
+msgstr "Dispositivo %(number)s"
+
+msgid "Say what changes in the device: its name or its printers."
+msgstr "Di qué cambia en el dispositivo: su nombre o sus impresoras."
+
+msgid "Set a device up from the device itself: this request does not say which device it is."
+msgstr "Da de alta un dispositivo desde el propio dispositivo: esta petición no dice qué dispositivo es."
+
+msgid "There is no device set up to print with that id."
+msgstr "No hay ningún dispositivo dado de alta para imprimir con ese id."
+
+msgid "This device does not print for %(printers)s: someone who manages the printers adds it to the device."
+msgstr "Este dispositivo no imprime para %(printers)s: quien gestiona las impresoras la añade al dispositivo."
+
+msgid "This device is not set up to print here: someone who manages the printers sets it up in Printing → Devices."
+msgstr "Este dispositivo no está dado de alta para imprimir aquí: quien gestiona las impresoras lo da de alta en Impresión → Dispositivos."
+
+msgid "device name"
+msgstr "nombre del dispositivo"
+
+msgid "key"
+msgstr "clave"
+
+msgid "last asked for a job at"
+msgstr "último trabajo pedido el"
+
+msgid "printing device"
+msgstr "dispositivo de impresión"
+
+msgid "printing devices"
+msgstr "dispositivos de impresión"
+
+msgid "retired at"
+msgstr "retirado el"
+
+msgid "retired by"
+msgstr "retirado por"
+
+msgid "set up at"
+msgstr "dado de alta el"
+
+msgid "set up by"
+msgstr "dado de alta por"
+
+msgid "Devices"
+msgstr "Dispositivos"

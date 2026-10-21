@@ -14,6 +14,7 @@ The clock is ``_now()``: the business's day is its date in the Hub's time zone (
 import datetime as dt
 import logging
 import uuid
+from dataclasses import replace
 from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
 from uuid import UUID
@@ -184,6 +185,9 @@ GENERAL_REGIME = "01"
 #: Facturación»), called by name inside the issue's own transaction.
 VERIFACTU_RECORD = "verifactu.record.create"
 SEALED, UNAVAILABLE, PENDING = "sealed", "unavailable", "pending"
+#: Sales' operation that gives a sale waiting for its document that document (its WORKBOOK, «A qué reacciona»),
+#: called by name inside the issue's own transaction (INVOICE-F06); its permission is the platform's.
+SALE_RECORD_INVOICE = "sale.sale.record_invoice"
 #: The language a document's own texts are written in for the tax agency (DescripcionOperacion).
 FISCAL_LANGUAGE = "es"
 DESCRIPTION_MAX_LENGTH = 500
@@ -429,34 +433,35 @@ def _issue(
             for position, line in enumerate(lines, start=1)
         ]
     )
-    record_event(
-        ctx,
-        events.INVOICE_ISSUED,
-        {
-            "invoice_id": str(invoice.id),
-            "number": invoice.number,
-            "series": invoice.series_code,
-            "invoice_type": invoice.invoice_type,
-            "total": invoice.total_amount,
-            "source_type": invoice.source_type,
-            "sale_id": str(invoice.source_sale_id) if invoice.source_sale_id else None,
-            # Where it comes from, so Sales links a document issued later (by the outbox) to its write.
-            "source": {
-                "type": invoice.source_type,
-                "sale_id": str(invoice.source_sale_id) if invoice.source_sale_id else None,
-                "refund_id": str(invoice.source_refund_id)
-                if invoice.source_refund_id
-                else None,
-                "void": invoice.source_type == Invoice.Source.VOID,
-            },
-            "rectifies_id": str(invoice.rectifies_id) if invoice.rectifies_id else None,
-            "substitutes_id": str(invoice.substitutes_id)
-            if invoice.substitutes_id
-            else None,
-        },
-    )
+    record_event(ctx, events.INVOICE_ISSUED, _issued_notice(invoice))
     invoice.verifactu_status = _seal_in_verifactu(ctx, invoice)
     return invoice
+
+
+def _issued_notice(invoice: Invoice) -> dict:
+    """The payload of ``invoice.invoice.issued`` (WORKBOOK, «Lo que avisa»)."""
+    return {
+        "invoice_id": str(invoice.id),
+        "number": invoice.number,
+        "series": invoice.series_code,
+        "invoice_type": invoice.invoice_type,
+        "total": invoice.total_amount,
+        "source_type": invoice.source_type,
+        "sale_id": str(invoice.source_sale_id) if invoice.source_sale_id else None,
+        # Where it comes from, so Sales links a document issued later (by the outbox) to its write.
+        "source": {
+            "type": invoice.source_type,
+            "sale_id": str(invoice.source_sale_id) if invoice.source_sale_id else None,
+            "refund_id": str(invoice.source_refund_id)
+            if invoice.source_refund_id
+            else None,
+            "void": invoice.source_type == Invoice.Source.VOID,
+        },
+        "rectifies_id": str(invoice.rectifies_id) if invoice.rectifies_id else None,
+        "substitutes_id": str(invoice.substitutes_id)
+        if invoice.substitutes_id
+        else None,
+    }
 
 
 def _seal_in_verifactu(ctx: OperationContext, invoice: Invoice) -> str:
@@ -865,6 +870,7 @@ def create_from_sale(ctx: OperationContext, data: FromSaleIn) -> dict:
         source_sale=sale, source_type=Invoice.Source.SALE
     ).first()
     if existing is not None:
+        _tell_sales(ctx, existing, sale.invoice_status)
         return _result(ctx, existing, issued=False, already=True)
     issuer = _configured_issuer()
     full = sale.document_type == Settings.DocumentType.INVOICE
@@ -935,7 +941,22 @@ def create_from_sale(ctx: OperationContext, data: FromSaleIn) -> dict:
         currency=sale.currency,
         description=_sale_operation(sale),
     )
+    _tell_sales(ctx, invoice, sale.invoice_status)
     return _result(ctx, invoice, issued=True)
+
+
+def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
+    """Gives Sales, by its operation, the document of a charge, a void or a refund that was written without
+    it and waits (INVOICE-F06) — asked later by the API, the assistant, «Issue now» or the relay —, so the
+    sale and its document agree when the issue commits. ``written`` is the fiscal status Sales keeps for that
+    document: blank while Sales' own write is still running (the charge, the void or the refund writes the
+    answer itself). Sales changes nothing for a document it already has, nor when the relay hands it the
+    notice afterwards."""
+    if not written:
+        return
+    record = get_operation(SALE_RECORD_INVOICE)
+    as_platform = replace(ctx, permissions=ctx.permissions | {record.permission})
+    record(as_platform, record.input.model_validate(_issued_notice(invoice)))
 
 
 # ── A full invoice for a ticket (INVOICE-F04, F05) ──────────────────────────────────────────────
@@ -1249,6 +1270,7 @@ def rectify_from_refund(ctx: OperationContext, data: FromRefundIn) -> dict:
     sale = find_sale(refund.sale_id, None, lock=True)
     existing = Invoice.objects.filter(source_refund=refund).first()
     if existing is not None:
+        _tell_sales(ctx, existing, refund.invoice_status)
         return _result(ctx, existing, issued=False, already=True)
     original = _sale_document(sale)
     left_over = remaining_of(original)
@@ -1273,6 +1295,7 @@ def rectify_from_refund(ctx: OperationContext, data: FromRefundIn) -> dict:
         source_refund=refund,
         returned=None if closes else _returned_by_key(refund),
     )
+    _tell_sales(ctx, rectification, refund.invoice_status)
     return _result(ctx, rectification, issued=True)
 
 
@@ -1300,6 +1323,7 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
         source_sale=sale, source_type=Invoice.Source.VOID
     ).first()
     if existing is not None:
+        _tell_sales(ctx, existing, sale.void_invoice_status)
         return _result(ctx, existing, issued=False, already=True)
     original = _sale_document(sale)
     left_over = remaining_of(original)
@@ -1315,6 +1339,7 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
         operation_date=timezone.localdate(sale.voided_at or _now()),
         line_description=sale.void_reason,
     )
+    _tell_sales(ctx, rectification, sale.void_invoice_status)
     return _result(ctx, rectification, issued=True)
 
 

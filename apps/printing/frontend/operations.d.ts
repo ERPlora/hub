@@ -246,6 +246,43 @@ export interface JobAckOut {
   job: JobOut;
 }
 
+// ── The devices that print (PRINTING-F18) ────────────────────────────────────────────────────
+
+export interface DevicePrinterOut {
+  id: string;
+  name: string;
+  usage: Usage;
+  is_active: boolean;
+}
+
+/** A device set up to print. Its own id (X-Device-Id) is never sent back: it proves the device. */
+export interface DeviceOut {
+  /** The registration's id: what «Edit» and «Retire» name. */
+  id: string;
+  name: string;
+  printers: DevicePrinterOut[];
+  registered_at: string;
+  registered_by: string;
+  /** When it last asked for a job; null = never yet. */
+  last_seen_at: string | null;
+  /** It is the device the page runs on. */
+  this_device: boolean;
+}
+
+export interface DeviceRegisterIn {
+  name: string;
+  printers: string[];
+}
+
+export interface DeviceRefIn {
+  device_id: string;
+}
+
+export interface DeviceUpdateIn extends DeviceRefIn {
+  name?: string;
+  printers?: string[];
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'printing.settings.get': { input: EmptyIn; output: SettingsOut };
@@ -264,5 +301,9 @@ declare module '@erplora/ui/sdk' {
     'printing.job.fail': { input: { job_id: string; device: string; attempt: number; error: string }; output: JobAckOut };
     'printing.job.retry': { input: JobRefIn; output: JobOut };
     'printing.job.cancel': { input: JobCancelIn; output: JobOut };
+    'printing.device.list': { input: PageIn; output: Page<DeviceOut> };
+    'printing.device.register': { input: DeviceRegisterIn; output: DeviceOut };
+    'printing.device.update': { input: DeviceUpdateIn; output: DeviceOut };
+    'printing.device.retire': { input: DeviceRefIn; output: DeviceOut };
   }
 }

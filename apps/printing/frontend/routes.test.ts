@@ -13,6 +13,7 @@ import routes from './routes';
 // second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
 // this file does not stub.
 vi.mock('./pages/PrintersPage.vue', () => ({ default: { name: 'PrintersPage' } }));
+vi.mock('./pages/DevicesPage.vue', () => ({ default: { name: 'DevicesPage' } }));
 vi.mock('./pages/JobsPage.vue', () => ({ default: { name: 'JobsPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 
@@ -24,9 +25,10 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
 }
 
 describe('printing routes.ts', () => {
-  it('maps the printers, the queue and the settings, all behind a session', () => {
+  it('maps the printers, the devices, the queue and the settings, all behind a session', () => {
     expect(routes.map((r) => [r.path, r.meta?.auth])).toEqual([
       ['/printing/printers', true],
+      ['/printing/devices', true],
       ['/printing/jobs', true],
       ['/printing/settings', true],
     ]);
@@ -35,8 +37,9 @@ describe('printing routes.ts', () => {
   it('loads each page on demand (one chunk per page), not at boot', async () => {
     for (const r of routes) expect(typeof r.component).toBe('function');
     expect(await load(routes[0])).toEqual({ name: 'PrintersPage' });
-    expect(await load(routes[1])).toEqual({ name: 'JobsPage' });
-    expect(await load(routes[2])).toEqual({ name: 'SettingsPage' });
+    expect(await load(routes[1])).toEqual({ name: 'DevicesPage' });
+    expect(await load(routes[2])).toEqual({ name: 'JobsPage' });
+    expect(await load(routes[3])).toEqual({ name: 'SettingsPage' });
   });
 
   it('imports types only: Vite hoists the eager glob of main.ts above the shell boot hooks', () => {
@@ -47,7 +50,7 @@ describe('printing routes.ts', () => {
   it('has a page for every menu entry of apps.py', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
     const paths = [...appsPy.matchAll(/"(\/printing\/[a-z_]+)"/g)].map((m) => m[1]);
-    expect(paths).toEqual(['/printing/printers', '/printing/jobs', '/printing/settings']);
+    expect(paths).toEqual(['/printing/printers', '/printing/devices', '/printing/jobs', '/printing/settings']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
 });
