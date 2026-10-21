@@ -66,6 +66,10 @@ ROUTES = {
     ("POST", "/whatsapp_inbox/notes", "whatsapp_inbox.note.add"),
     ("POST", "/whatsapp_inbox/notes/delete", "whatsapp_inbox.note.delete"),
     ("GET", "/whatsapp_inbox/templates", "whatsapp_inbox.template.list"),
+    ("POST", "/whatsapp_inbox/templates", "whatsapp_inbox.template.create"),
+    ("POST", "/whatsapp_inbox/templates/update", "whatsapp_inbox.template.update"),
+    ("POST", "/whatsapp_inbox/templates/retry", "whatsapp_inbox.template.retry"),
+    ("POST", "/whatsapp_inbox/templates/delete", "whatsapp_inbox.template.delete"),
     ("GET", "/whatsapp_inbox/channel", "whatsapp_inbox.channel.get"),
     ("GET", "/whatsapp_inbox/agents", "whatsapp_inbox.agent.list"),
 }
@@ -82,6 +86,10 @@ SYSTEM_ONLY = {
     "whatsapp_inbox.conversation.claim_erasure",
     "whatsapp_inbox.conversation.record_erasure",
     "whatsapp_inbox.delivery.resume",
+    "whatsapp_inbox.template.claim_submit",
+    "whatsapp_inbox.template.record_submit",
+    "whatsapp_inbox.template.claim_delete",
+    "whatsapp_inbox.template.record_delete",
 }
 
 
@@ -211,3 +219,44 @@ def test_an_employee_neither_erases_nor_opens_the_settings_reads_of_others(
 @pytest.mark.django_db
 def test_without_a_session_nothing_is_read(client):
     assert get(client, "/whatsapp_inbox/conversations").status_code in (401, 403)
+
+
+# Templates (WHATSAPP_INBOX-F29…F31)
+
+
+@pytest.mark.django_db
+@respx.mock
+def test_templates_over_http_are_201_registered_after_the_commit_and_422_under_their_field(
+    admin_client, django_capture_on_commit_callbacks
+):
+    connect()
+    respx.post("http://saas.test/internal/whatsapp/templates").mock(
+        return_value=httpx.Response(200, json={"meta_id": "m-1", "status": "PENDING"})
+    )
+    body = {
+        "name": "recordatorio_cita",
+        "language": "es",
+        "category": "UTILITY",
+        "body": "Hola {{1}}, te esperamos.",
+        "body_examples": ["Ana"],
+        "submit_key": "0199e000-0000-7000-8000-0000000000c1",
+    }
+    with django_capture_on_commit_callbacks(execute=True):
+        made = post(admin_client, "/whatsapp_inbox/templates", body)
+    assert (made.status_code, made.json()["status"], made.json()["submit_state"]) == (201, "DRAFT", "queued")
+    listed = get(admin_client, "/whatsapp_inbox/templates").json()["rows"]
+    assert [(row["name"], row["status"], row["meta_id"]) for row in listed] == [("recordatorio_cita", "PENDING", "m-1")]
+    refused = post(admin_client, "/whatsapp_inbox/templates", {**body, "name": "Con Espacios", "submit_key": "0199e000-0000-7000-8000-0000000000c2"})
+    assert refused.status_code == 422
+    assert set(refused.json()["error"]["fields"]) == {"name"}
+    taken = post(admin_client, "/whatsapp_inbox/templates", {**body, "submit_key": "0199e000-0000-7000-8000-0000000000c3"})
+    assert (taken.status_code, taken.json()["error"]["code"]) == (409, "whatsapp_inbox.template_exists")
+
+
+@pytest.mark.django_db
+def test_an_employee_picks_templates_but_neither_makes_nor_deletes_them(employee_client):
+    connect(templates=[{"name": "recordatorio", "language": "es", "body": "Hola", "meta_id": "m"}])
+    [row] = get(employee_client, "/whatsapp_inbox/templates", sendable="true").json()["rows"]
+    body = {"name": "otra", "language": "es", "body": "Hola", "submit_key": "0199e000-0000-7000-8000-0000000000c4"}
+    assert post(employee_client, "/whatsapp_inbox/templates", body).status_code == 403
+    assert post(employee_client, "/whatsapp_inbox/templates/delete", {"id": row["id"]}).status_code == 403

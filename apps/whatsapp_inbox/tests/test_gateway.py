@@ -199,3 +199,114 @@ def test_without_the_saas_url_no_erasure_is_asked(settings):
     settings.SAAS_INTERNAL_URL = ""
     with pytest.raises(gateway.NotConfigured):
         gateway.erase(hub="a", phone="+34600111222", wa_message_ids=[])
+
+
+# ── A client that never crashes (area-hub HALLAZGO rv-102) ──────────────────────────────────────
+
+
+def test_a_saas_url_the_client_cannot_use_is_unreachable_never_a_crash(settings):
+    """httpx raises errors that are not HTTPError (an URL it cannot parse): the caller still gets an answer."""
+    settings.SAAS_INTERNAL_URL = "http://saas:abc"  # httpx.InvalidURL: not an HTTPError
+    assert send_text().kind == gateway.UNREACHABLE
+    assert gateway.erase(hub="a", phone="+34600111222", wa_message_ids=[]) is False
+    assert gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE).kind == gateway.UNREACHABLE
+    assert gateway.delete_template(hub="a", name="recordatorio", language="es", meta_id="1").kind == gateway.UNREACHABLE
+
+
+# ── The templates doors (WORKBOOK «Contrato con el SaaS», doors 8 and 9; WHATSAPP_INBOX-F29…F31) ──
+
+TEMPLATES = f"{URL}/internal/whatsapp/templates"
+TEMPLATES_DELETE = f"{URL}/internal/whatsapp/templates/delete"
+TEMPLATE = {
+    "name": "recordatorio",
+    "language": "es",
+    "category": "UTILITY",
+    "header": "Tu cita",
+    "body": "Hola {{1}}, te esperamos el {{2}}.",
+    "body_examples": ["Ana", "viernes"],
+    "footer": "Peluquería Ana",
+    "buttons": [{"type": "QUICK_REPLY", "text": "Confirmar"}],
+    "meta_id": "",
+}
+
+
+@respx.mock
+def test_a_template_is_posted_signed_with_its_key_and_200_is_meta_s_verdict():
+    route = respx.post(TEMPLATES).mock(
+        return_value=httpx.Response(200, json={"meta_id": "1234", "status": "PENDING"})
+    )
+    reply = gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE)
+    assert reply == gateway.Reply(kind=gateway.ACCEPTED, meta_id="1234", status="PENDING")
+    request = route.calls.last.request
+    assert json.loads(request.content) == {"hub": "a", **TEMPLATE}
+    assert request.headers["Idempotency-Key"] == KEY
+    timestamp = request.headers[TIMESTAMP_HEADER]
+    assert request.headers[SIGNATURE_HEADER] == sign("s3cret", timestamp, request.content)
+
+
+@respx.mock
+def test_a_409_on_a_template_is_a_refusal_with_meta_s_reason():
+    respx.post(TEMPLATES).mock(
+        return_value=httpx.Response(
+            409, json={"error": {"code": "whatsapp.template_invalid", "message": "Template name already exists"}}
+        )
+    )
+    reply = gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE)
+    assert reply == gateway.Reply(
+        kind=gateway.REFUSED, code="whatsapp.template_invalid", message="Template name already exists"
+    )
+
+
+@pytest.mark.parametrize(
+    ("answer", "kind"),
+    [
+        (httpx.Response(200, json={"status": "PENDING"}), gateway.UNKNOWN),
+        (httpx.Response(200, json={"meta_id": "1", "status": "SOMETHING"}), gateway.UNKNOWN),
+        (httpx.Response(500, json={}), gateway.UNKNOWN),
+        (httpx.Response(404, json={}), gateway.UNREACHABLE),
+    ],
+)
+@respx.mock
+def test_a_template_is_registered_only_with_meta_s_id_and_a_known_verdict(answer, kind):
+    respx.post(TEMPLATES).mock(return_value=answer)
+    assert gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE).kind == kind
+
+
+@respx.mock
+def test_a_template_with_no_connection_is_unreachable_and_with_no_answer_unknown():
+    respx.post(TEMPLATES).mock(side_effect=httpx.ConnectError("refused"))
+    assert gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE).kind == gateway.UNREACHABLE
+    respx.post(TEMPLATES).mock(side_effect=httpx.ReadTimeout("slow"))
+    assert gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE).kind == gateway.UNKNOWN
+
+
+@respx.mock
+def test_a_template_deletion_is_posted_signed_and_200_deleted_confirms_it():
+    route = respx.post(TEMPLATES_DELETE).mock(return_value=httpx.Response(200, json={"deleted": True}))
+    reply = gateway.delete_template(hub="a", name="recordatorio", language="es", meta_id="1234")
+    assert reply.kind == gateway.ACCEPTED
+    request = route.calls.last.request
+    assert json.loads(request.content) == {"hub": "a", "name": "recordatorio", "language": "es", "meta_id": "1234"}
+    timestamp = request.headers[TIMESTAMP_HEADER]
+    assert request.headers[SIGNATURE_HEADER] == sign("s3cret", timestamp, request.content)
+
+
+@respx.mock
+def test_a_template_meta_no_longer_has_is_deleted_and_a_refusal_keeps_its_reason():
+    respx.post(TEMPLATES_DELETE).mock(return_value=httpx.Response(404, json={}))
+    assert gateway.delete_template(hub="a", name="x", language="es", meta_id="").kind == gateway.ACCEPTED
+    respx.post(TEMPLATES_DELETE).mock(
+        return_value=httpx.Response(409, json={"error": {"code": "whatsapp.meta_unreachable", "message": "Meta"}})
+    )
+    reply = gateway.delete_template(hub="a", name="x", language="es", meta_id="")
+    assert (reply.kind, reply.code) == (gateway.REFUSED, "whatsapp.meta_unreachable")
+    respx.post(TEMPLATES_DELETE).mock(return_value=httpx.Response(200, json={"deleted": False}))
+    assert gateway.delete_template(hub="a", name="x", language="es", meta_id="").kind == gateway.UNKNOWN
+
+
+def test_without_the_saas_url_no_template_leaves(settings):
+    settings.SAAS_INTERNAL_URL = ""
+    with pytest.raises(gateway.NotConfigured):
+        gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE)
+    with pytest.raises(gateway.NotConfigured):
+        gateway.delete_template(hub="a", name="x", language="es", meta_id="")

@@ -1032,10 +1032,10 @@ def test_the_worker_resumes_what_was_left_for_erplora(delivered, fixed_clock, mo
     respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
     # Not before 2 minutes: a delivery may still be on its way.
     early = delivered(lambda: system("whatsapp_inbox.delivery.resume"))
-    assert early.model_dump() == {"messages": 0, "erasures": 0}
+    assert early.model_dump() == {"messages": 0, "erasures": 0, "templates": 0, "template_deletions": 0}
     monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
     out = delivered(lambda: system("whatsapp_inbox.delivery.resume"))
-    assert out.model_dump() == {"messages": 1, "erasures": 1}
+    assert out.model_dump() == {"messages": 1, "erasures": 1, "templates": 0, "template_deletions": 0}
     assert stored(stuck).status == "sent"
     other.refresh_from_db()
     assert other.erase_status == "done"

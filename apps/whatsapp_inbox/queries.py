@@ -473,6 +473,72 @@ def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────
 
 
+def live_templates() -> QuerySet:
+    """The templates not deleted here."""
+    return Template.objects.filter(deleted_at__isnull=True)
+
+
+def listed_templates() -> QuerySet:
+    """What Settings lists: the live templates and the ones deleted here that Meta has not deleted yet."""
+    return Template.objects.filter(
+        Q(deleted_at__isnull=True) | Q(delete_state=Template.DeleteState.PENDING)
+    )
+
+
+def template_editable(row: Template) -> bool:
+    """Whether the Hub may change it now: content it handles, not under Meta's review, not gone."""
+    return (
+        row.supported
+        and row.deleted_at is None
+        and row.status not in (Template.Status.PENDING, Template.Status.DISABLED, Template.Status.DELETED)
+    )
+
+
+def template_sendable(row: Template) -> bool:
+    return row.supported and row.deleted_at is None and row.status == Template.Status.APPROVED
+
+
+def _buttons_out(buttons) -> list[dict]:
+    return [
+        {
+            "type": str(button.get("type", "")),
+            "text": str(button.get("text", "")),
+            "url": str(button.get("url", "") or ""),
+            "phone_number": str(button.get("phone_number", "") or ""),
+        }
+        for button in buttons or []
+        if isinstance(button, dict)
+    ]
+
+
+def template_out(row: Template) -> dict:
+    draft = row.draft
+    return {
+        "id": row.id,
+        "name": row.name,
+        "language": row.language,
+        "category": row.category,
+        "status": row.status,
+        "header_format": row.header_format,
+        "header": row.header,
+        "body": row.body,
+        "body_examples": list(row.body_examples or []),
+        "footer": row.footer,
+        "buttons": _buttons_out(row.buttons),
+        "variables": row.variables,
+        "rejected_reason": row.rejected_reason,
+        "meta_id": row.meta_id,
+        "synced_at": row.synced_at,
+        "draft": {**draft, "buttons": _buttons_out(draft.get("buttons"))} if draft else None,
+        "submit_state": row.submit_state,
+        "submit_error_code": row.submit_error_code,
+        "submit_error": row.submit_error,
+        "editable": template_editable(row),
+        "sendable": template_sendable(row),
+        "deleting": row.delete_state == Template.DeleteState.PENDING,
+    }
+
+
 @operation(
     "whatsapp_inbox.template.list",
     kind="query",
@@ -486,14 +552,17 @@ def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
     },
 )
 def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
-    rows = Template.objects.all()
+    rows = listed_templates()
     if params.search:
         rows = rows.filter(name__icontains=params.search.strip())
     for field in ("status", "category", "language"):
         value = getattr(params, field)
         if value:
             rows = rows.filter(**{field: value})
-    return page(rows.order_by("name", "language", "id"), params)
+    if params.sendable is not None:
+        sendable = Q(status=Template.Status.APPROVED, supported=True, deleted_at__isnull=True)
+        rows = rows.filter(sendable if params.sendable else ~sendable)
+    return page(rows.order_by("name", "language", "id"), params, template_out)
 
 
 @operation(

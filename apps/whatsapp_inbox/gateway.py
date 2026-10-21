@@ -19,6 +19,15 @@ contributors): 5 s to connect, 15 s to read. How a call ended is the reply's ``k
 
 ``erase`` → ``POST {SAAS_INTERNAL_URL}/internal/whatsapp/erase`` with the number and the WhatsApp ids of
 its messages (WHATSAPP_INBOX-F10, F11); only ``200 {"erased": true}`` confirms it.
+
+``submit_template`` → ``POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates`` (door 8, WHATSAPP_INBOX-F29,
+F30) with an ``Idempotency-Key``: erplora.com registers (or edits) the template at Meta once per key and
+answers ``200 {"meta_id", "status"}`` (``accepted``: Meta took it for review); a 409 carries its code and
+Meta's reason (``refused``); the rest reads as for ``send``. ``delete_template`` → ``POST …/templates/delete``
+(door 9, F31): ``200 {"deleted": true}`` or a 404 (Meta no longer has it) is ``accepted``.
+
+No call ever raises past its caller: ``httpx`` also raises errors that are not ``HTTPError`` (an URL it
+cannot parse, a header it cannot encode), and they read as «nothing left» (``unreachable``).
 """
 
 import json
@@ -32,6 +41,8 @@ from base.auth import SIGNATURE_HEADER, TIMESTAMP_HEADER, sign
 
 SEND_PATH = "/internal/whatsapp/send"
 ERASE_PATH = "/internal/whatsapp/erase"
+TEMPLATES_PATH = "/internal/whatsapp/templates"
+TEMPLATES_DELETE_PATH = "/internal/whatsapp/templates/delete"
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 
@@ -39,6 +50,10 @@ SENT = "sent"
 REFUSED = "refused"
 UNREACHABLE = "unreachable"
 UNKNOWN = "unknown"
+ACCEPTED = "accepted"
+
+#: Meta's verdicts erplora.com may report for a template it registered.
+VERDICTS = frozenset({"APPROVED", "PENDING", "REJECTED", "PAUSED", "DISABLED"})
 
 #: The code of a 409 that did not carry erplora.com's error envelope.
 GENERIC_REFUSAL = "whatsapp.refused"
@@ -54,6 +69,8 @@ class Reply:
     wa_message_id: str = ""
     code: str = ""
     message: str = ""
+    meta_id: str = ""
+    status: str = ""
 
 
 def base_url() -> str:
@@ -84,6 +101,25 @@ def _url(path: str) -> str:
     return f"{url}{path}"
 
 
+def _post(path: str, payload: dict, idempotency_key: str | None = None) -> httpx.Response | Reply:
+    """POST ``payload`` signed to erplora.com's ``path``: its response, or the ``Reply`` of a call that
+    ended without one (never an exception)."""
+    url = _url(path)
+    body, headers = _signed(payload)
+    if idempotency_key is not None:
+        headers[IDEMPOTENCY_HEADER] = str(idempotency_key)
+    try:
+        with httpx.Client(timeout=TIMEOUT) as client:
+            return client.post(url, content=body, headers=headers)
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as error:
+        return Reply(kind=UNREACHABLE, message=f"erplora.com could not be reached: {error}.")
+    except httpx.HTTPError as error:
+        return Reply(kind=UNKNOWN, message=f"The request left and no answer came back: {error}.")
+    except (httpx.InvalidURL, ValueError) as error:
+        # Not an HTTPError (an URL httpx cannot parse, a header it cannot encode): nothing left.
+        return Reply(kind=UNREACHABLE, message=f"The request to erplora.com could not be made: {error}.")
+
+
 def send(
     *,
     hub: str,
@@ -93,29 +129,18 @@ def send(
     template: dict | None = None,
 ) -> Reply:
     """Ask erplora.com to send ``text`` or ``template`` to ``to`` (E.164) for the business ``hub``."""
-    url = _url(SEND_PATH)
     payload: dict = {"hub": hub, "to": to}
     if template is not None:
         payload.update(type="template", template=template)
     else:
         payload.update(type="text", text=text or "")
-    body, headers = _signed(payload)
-    headers[IDEMPOTENCY_HEADER] = str(idempotency_key)
-    try:
-        with httpx.Client(timeout=TIMEOUT) as client:
-            response = client.post(url, content=body, headers=headers)
-    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as error:
-        return Reply(
-            kind=UNREACHABLE, message=f"erplora.com could not be reached: {error}."
-        )
-    except httpx.HTTPError as error:
-        return Reply(
-            kind=UNKNOWN, message=f"The request left and no answer came back: {error}."
-        )
-    return _read(response)
+    response = _post(SEND_PATH, payload, idempotency_key)
+    return response if isinstance(response, Reply) else _read(response)
 
 
-def _read(response: httpx.Response) -> Reply:
+def _settled(response: httpx.Response) -> Reply | None:
+    """How a response that is not a 200 ends: a 409 refusal, «unknown» for a 5xx, «nothing left» for
+    any other 4xx; ``None`` for a 200, which its caller reads."""
     if response.status_code == 409:
         try:
             error = response.json()["error"]
@@ -138,11 +163,22 @@ def _read(response: httpx.Response) -> Reply:
             kind=UNREACHABLE,
             message=f"erplora.com answered HTTP {response.status_code}.",
         )
+    return None
+
+
+def _json(response: httpx.Response) -> dict:
     try:
         data = response.json()
     except ValueError:
-        data = None
-    wa_message_id = data.get("wa_message_id") if isinstance(data, dict) else None
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _read(response: httpx.Response) -> Reply:
+    settled = _settled(response)
+    if settled is not None:
+        return settled
+    wa_message_id = _json(response).get("wa_message_id")
     if not isinstance(wa_message_id, str) or not wa_message_id:
         return Reply(
             kind=UNKNOWN, message="erplora.com's answer has no WhatsApp message id."
@@ -152,19 +188,39 @@ def _read(response: httpx.Response) -> Reply:
 
 def erase(*, hub: str, phone: str, wa_message_ids: list[str]) -> bool:
     """Ask erplora.com to forget ``phone`` and those messages; ``True`` only when it confirms."""
-    url = _url(ERASE_PATH)
-    body, headers = _signed(
-        {"hub": hub, "phone": phone, "wa_message_ids": list(wa_message_ids)}
+    response = _post(ERASE_PATH, {"hub": hub, "phone": phone, "wa_message_ids": list(wa_message_ids)})
+    if isinstance(response, Reply) or response.status_code != 200:
+        return False
+    return _json(response).get("erased") is True
+
+
+def submit_template(*, hub: str, idempotency_key: str, template: dict) -> Reply:
+    """Ask erplora.com to register ``template`` at Meta for ``hub`` (new, or an edit of its ``meta_id``)."""
+    response = _post(TEMPLATES_PATH, {"hub": hub, **template}, idempotency_key)
+    if isinstance(response, Reply):
+        return response
+    settled = _settled(response)
+    if settled is not None:
+        return settled
+    data = _json(response)
+    meta_id, status = data.get("meta_id"), data.get("status")
+    if not isinstance(meta_id, str) or not meta_id or status not in VERDICTS:
+        return Reply(kind=UNKNOWN, message="erplora.com's answer has no Meta id or verdict for the template.")
+    return Reply(kind=ACCEPTED, meta_id=meta_id, status=status)
+
+
+def delete_template(*, hub: str, name: str, language: str, meta_id: str) -> Reply:
+    """Ask erplora.com to delete that one template at Meta; a 404 (Meta no longer has it) is a deletion."""
+    response = _post(
+        TEMPLATES_DELETE_PATH, {"hub": hub, "name": name, "language": language, "meta_id": meta_id}
     )
-    try:
-        with httpx.Client(timeout=TIMEOUT) as client:
-            response = client.post(url, content=body, headers=headers)
-    except httpx.HTTPError:
-        return False
-    if response.status_code != 200:
-        return False
-    try:
-        data = response.json()
-    except ValueError:
-        return False
-    return isinstance(data, dict) and data.get("erased") is True
+    if isinstance(response, Reply):
+        return response
+    if response.status_code == 404:
+        return Reply(kind=ACCEPTED)
+    settled = _settled(response)
+    if settled is not None:
+        return settled
+    if _json(response).get("deleted") is not True:
+        return Reply(kind=UNKNOWN, message="erplora.com did not confirm the deletion.")
+    return Reply(kind=ACCEPTED)
