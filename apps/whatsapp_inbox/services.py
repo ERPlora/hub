@@ -366,7 +366,7 @@ def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> di
 )
 def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
     try:
-        phone = e164(data.from_, ctx)
+        phone = e164(data.from_, ctx, from_whatsapp=True)
     except InvalidPhone:
         raise InvalidPayload(
             str(NOT_A_NUMBER), fields={"from": str(NOT_A_NUMBER)}

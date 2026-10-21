@@ -575,6 +575,16 @@ def test_with_the_month_s_messages_spent_nothing_is_kept():
     assert route.call_count == 0
 
 
+def test_with_the_month_s_messages_spent_what_customers_write_still_arrives():
+    """gh:whatsapp_inbox#287, gh:hub#2726: the cap only limits what the business sends."""
+    c = ready()
+    connect(version=5, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    out = receive("wamid.AFTER", text="¿Tenéis hora el viernes?")
+    assert out.created is True and out.conversation_id == c.id
+    c.refresh_from_db()
+    assert (c.unread_count, c.last_message_preview) == (2, "¿Tenéis hora el viernes?")
+
+
 @respx.mock
 def test_erplora_s_refusal_leaves_the_message_not_delivered_with_its_reason(delivered):
     c = ready()
@@ -735,6 +745,22 @@ def test_a_template_to_a_number_that_never_wrote_opens_its_conversation():
         send({"to": "600 444 555", "text": "Hola"})
     assert excinfo.value.code == "whatsapp_inbox.window_closed"
     assert not Conversation.objects.filter(phone="+34600444555").exists()
+
+
+@pytest.mark.parametrize("typed", ["600222333", "600 222 333", "+34 600 222 333", "0034600222333"])
+def test_a_number_typed_by_hand_goes_to_that_person_never_to_another_country(typed):
+    """gh:whatsapp_inbox#279: a number written on a card or by voice is national unless it says its country."""
+    connect(templates=[template("recordatorio")])
+    send({"to": typed, "template": {"name": "recordatorio", "variables": ["Ana", "lunes"]}})
+    assert list(Conversation.objects.values_list("phone", flat=True)) == ["+34600222333"]
+
+
+def test_an_incomplete_number_is_refused_and_nothing_is_kept():
+    connect(templates=[template("recordatorio")])
+    with pytest.raises(InvalidPayload) as excinfo:
+        send({"to": "600 22", "template": {"name": "recordatorio", "variables": ["Ana", "lunes"]}})
+    assert "to" in excinfo.value.fields
+    assert not Conversation.objects.exists() and not Message.objects.exists()
 
 
 def test_marketing_to_a_number_without_conversation_reads_the_card_of_that_number():

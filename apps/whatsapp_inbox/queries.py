@@ -60,13 +60,15 @@ def business_country(ctx: OperationContext | None = None) -> str:
     return DEFAULT_COUNTRY
 
 
-def e164(raw: str, ctx: OperationContext | None = None) -> str:
-    """``raw`` as the conversation's key (E.164); WhatsApp's bare digits are international.
+def e164(raw: str, ctx: OperationContext | None = None, *, from_whatsapp: bool = False) -> str:
+    """``raw`` as the conversation's key (E.164). WhatsApp's bare digits are international; a number a
+    person typed is national unless it says its country (gh:whatsapp_inbox#279: ``600222333`` is Spain's,
+    never +60's).
 
     Raises ``InvalidPhone`` when it is no number.
     """
     text = (raw or "").strip()
-    if text.isdigit() and not text.startswith("0"):
+    if from_whatsapp and text.isdigit() and not text.startswith("0"):
         text = f"+{text}"
     number = to_e164(text, business_country(ctx))
     if not number:
