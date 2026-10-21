@@ -94,8 +94,8 @@ const note = computed(() => (invoice.value ? documentNote(invoice.value, t) : ''
 const verifactuOn = computed(
   () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
 );
-/** The invoice whose record is followed: the one asked for, once it is here; none without VeriFactu. */
-const recordOf = computed(() => (verifactuOn.value && invoice.value?.id === props.id ? props.id : null));
+/** The invoice whose record is followed, from the start (one stream with the invoice); none without VeriFactu. */
+const recordOf = computed(() => (verifactuOn.value ? props.id : null));
 const fiscal = shallowRef<FiscalRecordState>({ record: undefined, error: null });
 watch(recordOf, () => {
   fiscal.value = { record: undefined, error: null };
@@ -164,6 +164,12 @@ function onSubstituted(full: InvoiceOut): void {
       :status="status"
       :error="error"
     />
+    <FiscalRecordFollower
+      v-if="recordOf"
+      :key="recordOf"
+      :invoice-id="recordOf"
+      @change="fiscal = $event"
+    />
     <InlineFeedback
       v-if="loadError"
       tone="warning"
@@ -180,12 +186,6 @@ function onSubstituted(full: InvoiceOut): void {
     </div>
 
     <template v-if="invoice">
-      <FiscalRecordFollower
-        v-if="recordOf"
-        :key="recordOf"
-        :invoice-id="recordOf"
-        @change="fiscal = $event"
-      />
       <header class="invoice-detail__header">
         <div class="invoice-detail__title">
           <h2 data-testid="invoice-detail-title">

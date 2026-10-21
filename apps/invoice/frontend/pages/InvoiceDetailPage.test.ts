@@ -306,10 +306,13 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     csv: 'A-ZGTHW2SE4KQ8B2',
   };
 
+  /** The invoice and its record on the same stream, from the first one: no reopen (an aborted stream). */
   async function withRecord(options: MountOptions = {}) {
     const s = await setup({ session: WITH_VERIFACTU, ...options });
     await s.show(INVOICE);
+    // Past the SDK's 150 ms debounce: had the record been asked for later, the stream would have reopened.
     await s.reopen();
+    expect(s.net.streams).toHaveLength(1);
     return s;
   }
 
@@ -346,7 +349,7 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     const s = await withRecord();
     const disabled = () => (s.find('invoice-detail-print').element as HTMLElement & { disabled: boolean }).disabled;
     expect(disabled()).toBe(true);
-    s.net.lastStream().push(errorFrame(s.subId(RECORD_OP), 'verifactu.boom'));
+    s.call.push(errorFrame(s.subId(RECORD_OP), 'verifactu.boom'));
     await flush();
     expect(s.find('invoice-verifactu').exists()).toBe(false);
     expect(disabled()).toBe(false);
