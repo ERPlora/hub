@@ -80,6 +80,15 @@ def test_an_automation_is_renamed_from_the_admin(client, superuser):
     assert Flow.objects.get(pk=flow.pk).name == "Hello"
 
 
+@pytest.mark.django_db
+def test_the_recipe_an_automation_comes_from_is_seen_in_the_admin(client, superuser):
+    # FLOW-F33: staff can tell an app's ready-made automation from the owner's own, and from which version.
+    flow = make_flow("Gap", recipe="appointment/customer_cancelled", recipe_digest="a" * 64)
+    client.force_login(superuser)
+    form = client.get(f"/admin/flow/flow/{flow.pk}/change/", HTTP_HOST="hubs.localhost").context["adminform"].form
+    assert (form["recipe"].value(), form["recipe_digest"].value()) == ("appointment/customer_cancelled", "a" * 64)
+
+
 # FLOW-F26: a secret is sealed with the server's key; the admin sees its name and may delete it, never its
 # value, and cannot write one (it would not be sealed).
 @pytest.mark.django_db

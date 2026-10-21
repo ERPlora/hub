@@ -20,6 +20,7 @@ from apps.flow.schemas import (
     FlowListIn,
     FlowRefIn,
     GrantIn,
+    RecipeRefIn,
     RunIn,
     RunListIn,
     RunRefIn,
@@ -162,3 +163,31 @@ async def question_list(request):
 @bind(router, "flow.question.answer", "/flow/questions/answer")
 async def question_answer(request, data: AnswerIn):
     return await run_operation(request, services.answer_question, data)
+
+
+# The ready-made automations the apps bring (FLOW-F33 to F36)
+
+
+@bind(router, "flow.recipe.list", "/flow/recipes")
+async def recipe_list(request):
+    return await run_operation(request, queries.list_recipes)
+
+
+@bind(router, "flow.recipe.enable", "/flow/recipes/enable")
+async def recipe_enable(request, data: RecipeRefIn):
+    return await run_operation(request, services.enable_recipe, data)
+
+
+@bind(router, "flow.recipe.disable", "/flow/recipes/disable")
+async def recipe_disable(request, data: RecipeRefIn):
+    return await run_operation(request, services.disable_recipe, data)
+
+
+@bind(router, "flow.recipe.restore", "/flow/recipes/restore")
+async def recipe_restore(request, data: RecipeRefIn):
+    return await run_operation(request, services.restore_recipe, data)
+
+
+@bind(router, "flow.recipe.repair", "/flow/recipes/repair")
+async def recipe_repair(request, data: RecipeRefIn):
+    return await run_operation(request, services.repair_recipe, data)

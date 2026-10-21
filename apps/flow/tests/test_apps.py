@@ -19,6 +19,7 @@ QUERIES = {
     "flow.event.sample",
     "flow.secret.list",
     "flow.question.list",
+    "flow.recipe.list",
 }
 COMMANDS = {
     "flow.flow.create",
@@ -42,6 +43,10 @@ COMMANDS = {
     "flow.run.record_call",
     "flow.question.answer",
     "flow.question.expire_due",
+    "flow.recipe.enable",
+    "flow.recipe.disable",
+    "flow.recipe.restore",
+    "flow.recipe.repair",
 }
 # What the assistant confirms before running: turning on or off, granting, running by hand or resuming
 # a failed run, deleting, a secret, and answering a question a person was asked (FLOW-F29).
@@ -54,6 +59,9 @@ HIGH_RISK = {
     "flow.secret.set",
     "flow.secret.delete",
     "flow.question.answer",
+    "flow.recipe.enable",
+    "flow.recipe.disable",
+    "flow.recipe.restore",
 }
 # Run only by the platform: the reactions (to every event, and to a run parked on a call) and the
 # scheduled tasks.

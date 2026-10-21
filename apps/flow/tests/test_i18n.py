@@ -8,7 +8,7 @@ from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
 
-from apps.flow import queries, schemas, services
+from apps.flow import queries, recipes, schemas, services
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 
 LOCALE = Path(apps.get_app_config("flow").path) / "locale" / "es" / "LC_MESSAGES"
@@ -75,6 +75,7 @@ def visible_texts() -> set[str]:
         *module_texts(queries),
         *module_texts(services),
         *module_texts(schemas),
+        *module_texts(recipes),
     ]
     for model in MODELS:
         lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]

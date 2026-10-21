@@ -6,7 +6,8 @@
 // new automation on its Permissions (it does nothing without them); a row opens it on its steps. The
 // app turned off, or no permission, replace everything with their notice. «Waiting for your answer» (FLOW-F29) sits
 // on top; a manager or an employee, who may only answer what automations ask, sees only it (and nothing
-// else of the app is asked for them: no list, no catalog).
+// else of the app is asked for them: no list, no catalog). Above the list, the ready-made automations set up
+// with a fault their app already fixed, with «Update it» (FLOW-F36).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
@@ -19,6 +20,7 @@ import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
+import RecipeRepairs from '../components/RecipeRepairs.vue';
 import { useCatalog } from '../composables/useCatalog';
 import { wording } from '../lib/refusal';
 import type { FlowOut } from '../operations';
@@ -84,6 +86,7 @@ function openFlow(flow: FlowOut, tab?: string): void {
     >
       <QuestionInbox :alone="false" />
       <DraftTray @ready="draftsReady = true" />
+      <RecipeRepairs />
       <FlowList
         v-if="total > 0"
         :catalog="catalog"

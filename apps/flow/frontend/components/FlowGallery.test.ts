@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogOut, FlowOut } from '../operations';
 import { click, mountFlow, settle } from '../__tests__/mount-flow';
 import FlowGallery from './FlowGallery.vue';
+import RecipeShelf from './RecipeShelf.vue';
 
 const ALL_EVENTS = [
   'customer.customer.created',
@@ -97,5 +98,14 @@ describe('Gallery', () => {
     await settle();
     expect(m.find('flow-card-error-welcome').text()).toContain('That does not happen in this business.');
     expect(m.wrapper.emitted('created')).toBeUndefined();
+  });
+
+  it('«Comes with …» sits under its own cards, before what is hidden (FLOW-F33)', async () => {
+    const m = await setup({ catalog: catalog(['customer.customer.created']) });
+    const shelf = m.wrapper.findComponent(RecipeShelf);
+    expect(shelf.props('catalog')).toEqual(catalog(['customer.customer.created']));
+    const order = [...m.find('flow-gallery').element.querySelectorAll('*')];
+    expect(order.indexOf(m.find('flow-gallery-sector-any').element)).toBeLessThan(order.indexOf(m.find('flow-gallery-hidden').element));
+    expect(m.params('flow.recipe.list')).toEqual([{}]);
   });
 });

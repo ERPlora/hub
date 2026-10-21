@@ -207,3 +207,22 @@ msgstr "Tu reserva está confirmada. ¡Hasta pronto!"
 
 msgid "We have received your booking. The business will confirm it shortly."
 msgstr "Hemos recibido tu reserva. El negocio la confirmará en breve."
+
+msgid "Check each booking made online"
+msgstr "Revisar cada cita reservada por internet"
+
+msgid "When a customer books online, leaves you a task to check the appointment."
+msgstr "Cuando un cliente reserva por internet, te deja una tarea para revisar la cita."
+
+msgid ""
+"Every booking made on your booking page, whatever its state. The task names "
+"the appointment."
+msgstr ""
+"Cada reserva hecha en tu página de reservas, esté como esté. La tarea dice "
+"qué cita es."
+
+msgid "Check the online booking {{input.number}}"
+msgstr "Revisar la reserva por internet {{input.number}}"
+
+msgid "Leaves you the task, so no online booking goes unseen."
+msgstr "Te deja la tarea, para que ninguna reserva por internet pase sin verse."

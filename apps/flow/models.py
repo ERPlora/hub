@@ -18,6 +18,8 @@ from live.models import UUIDModel
 NAME_MAX_LENGTH = 120
 #: An event name of the outbox (``live.models.OutboxEvent.name``).
 EVENT_MAX_LENGTH = 96
+#: ``<app>/<id>`` of a factory recipe.
+RECIPE_MAX_LENGTH = 96
 
 
 class Flow(UUIDModel):
@@ -62,12 +64,21 @@ class Flow(UUIDModel):
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     # Deleted automations stop at once and keep their history.
     deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    # The factory recipe it was built from (``<app>/<id>``, FLOW-F33); empty for the owner's own.
+    recipe = models.CharField(_("factory recipe"), max_length=RECIPE_MAX_LENGTH, blank=True, default="")
+    # The fingerprint of that recipe when it was built or restored: a newer one is «New version».
+    recipe_digest = models.CharField(_("recipe fingerprint"), max_length=64, blank=True, default="")
 
     class Meta:
         verbose_name = _("automation")
         verbose_name_plural = _("automations")
         ordering = ["-updated_at", "id"]
         constraints = [
+            models.UniqueConstraint(
+                fields=["recipe"],
+                condition=Q(deleted_at__isnull=True) & ~Q(recipe=""),
+                name="flow_flow_one_per_recipe",
+            ),
             models.CheckConstraint(
                 condition=Q(trigger_kind__in=["event", "schedule", "at", "manual"]),
                 name="flow_flow_trigger_kind_valid",
