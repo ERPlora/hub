@@ -1208,7 +1208,7 @@ importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera d
 servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
 que reservó la cita para este servicio: está cancelada, es de otra clienta, no reservó este servicio o
 lo reservó más barato.» (409 en su campo). Sin Servicios activa, «Servicios» no sale en la tira.
-Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F05, APPOINTMENT-F17
+Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ## Qué comparten los verticales
 
