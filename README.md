@@ -39,11 +39,26 @@ Lo escribe el SaaS por `/internal` (`base/internal.py`), firmado con HMAC v1 + v
 | `GET /internal/hubs/{id}` | `base.hub.get` | la fila (`status: "ready"` es lo que espera el SaaS); 404 |
 | `DELETE /internal/hubs/{id}` | `base.hub.cancel` | 202 `cancelled`; 404; 409 `hub_purged` |
 | `POST /internal/hubs/{id}/restore` | `base.hub.restore` | 200 `ready`; 404; 409 `hub_purged` |
-| `PUT /internal/hubs/{id}/state` | `base.hub.state_apply` | 200 `{applied, version}`: guarda la foto si su versión es mayor y aplica el bloque VeriFactu y el estado del negocio; 404 |
+| `PUT /internal/hubs/{id}/state` | `base.hub.state_apply` | 200 `{applied, version}`: guarda la foto si su versión es mayor y aplica el bloque VeriFactu y el estado del negocio y, con la app de WhatsApp activa en ese negocio, su clave `whatsapp` (el estado del número, con la versión de la foto, por `whatsapp_inbox.channel.sync`; apagada, la foto se aplica y la clave espera a la siguiente); 404; 422 si un bloque no cumple el contrato (no se guarda nada) |
 
 Sin firma válida, 401 `internal.unsigned`; un cuerpo que nombra otro hub que el de la ruta, 422
 `internal.hub_mismatch`. `/internal` responde en cualquier host (el SaaS entra por `hub.erplora.internal`; el ALB
 no lo publica).
+
+Las puertas de WhatsApp (contrato en `apps/whatsapp_inbox/WORKBOOK.md`, «Contrato con el SaaS», puertas 1–4) llevan
+en el cuerpo el negocio, `hub` (su slug en la fase 1), y ejecutan la operación de la bandeja como el sistema en ese
+negocio:
+
+| Ruta | Operación | Respuesta |
+|---|---|---|
+| `POST /internal/whatsapp/inbound` | `whatsapp_inbox.message.receive` | 200 `{id, conversation_id, created}`; el mismo `wa_message_id` otra vez, 200 con `created: false` |
+| `POST /internal/whatsapp/status` | `whatsapp_inbox.message.update_status` | 200 `{updated, status}`; un mensaje desconocido, `updated: false` |
+| `PUT /internal/whatsapp/channel` | `whatsapp_inbox.channel.sync` | 200 `{applied, version}`; una versión igual o menor no se aplica |
+
+En las tres, en este orden: sin `hub`, 422 `internal.payload_invalid`; el negocio responde como su host (404
+`not_found` si el registro no lo conoce, 410 `base.hub_gone`, 503 `base.hub_preparing`, 402 `base.hub_suspended`);
+la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reintenta); un cuerpo fuera de contrato, 422
+con `fields`; y el sobre de cualquier otra negativa de la operación, tal cual.
 
 ## Demo
 
