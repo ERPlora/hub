@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// A record (VERIFACTU-F17, F18, F24, F25, F30; the old detail of `erp-verifactu-records`, now its own page with Back
+// A record (VERIFACTU-F17, F18, F24, F25, F30, F35; the old detail of `erp-verifactu-records`, now its own page with Back
 // to the list): «Record <number>» with its status and environment; «Not at the AEAT yet» with why and when, or «The
 // AEAT rejected it» with its code, its message and what to do; the invoice's figures, the fingerprint chain, the QR
 // (and «Verify at the AEAT»), the AEAT's answer with the delivery's fingerprint, the XML and its latest events.
-// «Send now», «Correct» and «Cancel record» where they apply and for whoever may; a refusal is said right above them.
+// «Send now», «Ask the AEAT» (in the queue: it leaves only if the AEAT already has it), «Correct» and «Cancel record»
+// where they apply and for whoever may; a refusal is said right above them.
 // It follows `verifactu.record.get` live: an answer of the AEAT shows by itself.
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
@@ -29,6 +30,7 @@ const { confirm } = useConfirm();
 
 const { data: record, status, error } = useLive('verifactu.record.get', () => ({ record_id: props.id }));
 const transmit = useCommand('verifactu.record.transmit');
+const reconcile = useCommand('verifactu.record.reconcile');
 const correct = useCommand('verifactu.record.correct');
 const cancelling = shallowRef(false);
 const refused = shallowRef<string | null>(null);
@@ -39,7 +41,7 @@ const loadError = computed(() =>
     ? error.value?.message ?? ''
     : null,
 );
-const pending = computed(() => transmit.pending.value || correct.pending.value);
+const pending = computed(() => transmit.pending.value || reconcile.pending.value || correct.pending.value);
 
 const when = (value: string | null | undefined) => (value ? formatDateTime(value, locale.value) : '—');
 
@@ -94,6 +96,25 @@ async function sendNow(): Promise<void> {
   void toastSuccess(
     t('verifactu.detail.transmitted', { accepted: answer.accepted + answer.accepted_with_errors, rejected: answer.rejected, waiting: answer.waiting }),
   );
+}
+
+async function askTheAeat(): Promise<void> {
+  const r = record.value;
+  if (!r || pending.value) return;
+  refused.value = null;
+  let answer;
+  try {
+    answer = await reconcile.run({ record_id: r.id });
+  } catch {
+    refused.value = refusal(reconcile.error.value, t('verifactu.detail.actionFailed'))?.message ?? t('verifactu.detail.actionFailed');
+    return;
+  }
+  // Not held is no failure, but nothing changed: it stays in the queue (a warning, never a success).
+  if (!answer.held) {
+    void toast(t('verifactu.detail.askNotHeld', { number: r.invoice_number }), 'warning', 4500);
+    return;
+  }
+  void toastSuccess(t('verifactu.detail.askHeld', { number: r.invoice_number }));
 }
 
 async function correctIt(): Promise<void> {
@@ -333,6 +354,15 @@ async function correctIt(): Promise<void> {
           @click="sendNow"
         >
           {{ $t('verifactu.detail.transmit') }}
+        </ion-button>
+        <ion-button
+          v-if="canTransmit && record.can_transmit"
+          fill="outline"
+          data-testid="verifactu-record-ask"
+          :disabled="pending"
+          @click="askTheAeat"
+        >
+          {{ $t('verifactu.detail.ask') }}
         </ion-button>
         <ion-button
           v-if="canCorrect && record.can_correct"
