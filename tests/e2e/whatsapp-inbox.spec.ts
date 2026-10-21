@@ -61,12 +61,10 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   const name = `${PREFIX}Ana ${Date.now().toString(36)}`;
   pushChannel({ status: 'not_connected' });
 
-  // F01: the number not connected, and where to connect it.
+  // F01: the number not connected, and where to connect it: the inbox's own Settings (whatsapp-inbox-connect.spec.ts).
   await login(page, A, '/whatsapp_inbox/inbox');
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-not-connected]')).toContainText('WhatsApp is not connected');
-  // The run's SaaS (`SAAS_URL`: :8001 on the shared stack, its own beside it; erplora.com in production).
-  const saas = new RegExp(`^${SAAS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`);
-  await expect(shown(page).locator('[data-testid=whatsapp-inbox-go-to-saas]')).toHaveAttribute('href', saas);
+  await expect(shown(page).locator('[data-testid=whatsapp-inbox-go-to-settings]')).toHaveAttribute('href', '/whatsapp_inbox/settings');
   await searchInbox(page, phone.slice(3));
 
   // F03: the customer writes; her conversation arrives live, unread.
@@ -75,7 +73,7 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   await expect(rowOf(page, phone)).toContainText(name);
   await expect(rowOf(page, phone).locator('[data-testid=whatsapp-inbox-unread]')).toHaveText('1');
   await flowShots(page, 'WHATSAPP_INBOX-F01', async (p) => {
-    await expect(shown(p).locator('[data-testid=whatsapp-inbox-go-to-saas]')).toBeVisible();
+    await expect(shown(p).locator('[data-testid=whatsapp-inbox-go-to-settings]')).toBeVisible();
   });
   await flowShots(page, 'WHATSAPP_INBOX-F03', async (p) => {
     await expect(rowOf(p, phone)).toBeVisible();
