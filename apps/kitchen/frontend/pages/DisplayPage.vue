@@ -289,7 +289,6 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
       >
         {{ error?.message }}
         <ion-button
-          size="small"
           fill="outline"
           data-testid="kitchen-display-retry"
           @click="refresh()"

@@ -131,6 +131,17 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     const view = shown(page);
     await expect(view.locator('[data-testid=kitchen-display-views]')).toBeVisible();
     await expect(view.locator('[data-testid=kitchen-display-loading]')).toHaveCount(0);
+    // kitchen#116: the views are tabs with their names, the one open selected.
+    const views = view.getByRole('tablist', { name: 'Views of the display' });
+    await expect(views.getByRole('tab', { name: 'Tickets' })).toHaveAttribute('aria-selected', 'true');
+    await expect(views.getByRole('tab', { name: 'Ready' })).toHaveAttribute('aria-selected', 'false');
+    await expect(views.getByRole('tab', { name: 'All-Day' })).toBeVisible();
+    // kitchen#60: «Full screen» puts the display alone on the screen and a second tap gives the shell back.
+    await view.locator('[data-testid=kitchen-display-fullscreen]').click();
+    await expect(view.locator('[data-testid=kitchen-display]')).toHaveClass(/kds--fullscreen/);
+    expect(await page.evaluate(() => document.fullscreenElement?.getAttribute('data-testid'))).toBe('kitchen-display');
+    await view.locator('[data-testid=kitchen-display-fullscreen]').click();
+    await expect(view.locator('[data-testid=kitchen-display]')).not.toHaveClass(/kds--fullscreen/);
     // F16: opening the display does not ring for what was already there.
     expect(await rings(page)).toBe(0);
 
@@ -163,6 +174,30 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     // ...and «Recall» on the card brings back the struck ones.
     await dish(page, saladLine).click();
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', 'ready');
+    // kitchen#156, kitchen#12: half done, the card offers «Ready», «Mark rush» and «Recall»; on a tablet upright or
+    // on its side none is cut ("Recal…") or spills out of the card, and each is a 44 px touch target.
+    for (const size of [{ width: 834, height: 1112 }, { width: 1112, height: 834 }, { width: 820, height: 1180 }]) {
+      await page.setViewportSize(size);
+      await card(page, ticketId).scrollIntoViewIfNeeded();
+      const edge = await card(page, ticketId).boundingBox();
+      for (const action of ['bump', 'rush', 'recall']) {
+        const button = view.locator(`[data-testid=kitchen-card-${ticketId}-${action}]`);
+        await expect(button, `${action} at ${size.width}`).toBeVisible();
+        const box = await button.boundingBox();
+        expect(box!.height, `${action} at ${size.width}: 44 px`).toBeGreaterThanOrEqual(44);
+        expect(box!.x + box!.width, `${action} at ${size.width}: inside the card`).toBeLessThanOrEqual(edge!.x + edge!.width + 1);
+        // The laid-out label against the button: an ellipsis or a clip is paint, the text keeps its full width.
+        const cut = await button.evaluate((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const text = range.getBoundingClientRect();
+          const own = el.getBoundingClientRect();
+          return text.width === 0 || text.left < own.left - 1 || text.right > own.right + 1;
+        });
+        expect(cut, `${action} at ${size.width}: its label whole`).toBe(false);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
     await view.locator(`[data-testid=kitchen-card-${ticketId}-recall]`).click();
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', TO_DO);
 

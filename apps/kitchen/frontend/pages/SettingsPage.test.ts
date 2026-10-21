@@ -84,6 +84,8 @@ describe('SettingsPage', () => {
     expect(s.field('load-error')?.textContent).toContain('Could not load the settings.');
     expect(s.field('loading')).toBeNull();
     expect(s.field('retry')).not.toBeNull();
+    // kitchen#12: a full-size touch target (44 px), never the small button.
+    expect((s.field('retry') as HTMLElement & { size?: string }).size).toBeUndefined();
   });
 
   it('whoever may not save them is told so', async () => {

@@ -153,7 +153,6 @@ async function save(): Promise<void> {
       >
         {{ error?.message }}
         <ion-button
-          size="small"
           fill="outline"
           data-testid="kitchen-settings-retry"
           @click="refresh()"

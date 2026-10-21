@@ -119,6 +119,19 @@ test('KITCHEN-F01, F02: «Add station» creates one, a taken name is refused in 
       const dot = await row(page, GRILL).locator('.kitchen-stations__dot').boundingBox();
       expect(dot?.width ?? 0, `${size.label}: the colour dot keeps its size`).toBeGreaterThan(8);
     }
+    // kitchen#131: on a tablet or a phone on its side, editing a station keeps the list with its rows (it shrank
+    // to the toolbar while the edit box was open).
+    for (const size of [{ width: 1024, height: 600 }, { width: 844, height: 390 }, { width: 667, height: 375 }]) {
+      await page.setViewportSize(size);
+      await row(page, GRILL).click();
+      await expect(form.locator('[data-testid=kitchen-station-form-name] input')).toHaveValue(GRILL);
+      await form.locator('[data-testid=kitchen-station-form-cancel]').click();
+      await expect(form).toBeHidden();
+      await row(page, BAR).scrollIntoViewIfNeeded();
+      await expect(row(page, BAR), `${size.width}×${size.height}`).toBeInViewport();
+      const box = await row(page, BAR).boundingBox();
+      expect(box?.height ?? 0, `${size.width}×${size.height}: the row keeps its height`).toBeGreaterThan(20);
+    }
     await page.setViewportSize({ width: 1440, height: 900 });
 
     // KITCHEN-F02: a tap on the row opens «Edit station»; renamed and deactivated.
