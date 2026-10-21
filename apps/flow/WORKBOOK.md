@@ -111,10 +111,15 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
   pausa** (FLOW-F02, FLOW-F03).
+- Encima de **Tus automatizaciones**, un aviso por cada automatización que trae otra app y se montó con un
+  fallo que esa app ya corrigió, con **Actualizarla** (FLOW-F36).
 - **La galería**, siempre debajo: «Elige una y pasa a ser tuya, apagada, para que la mires antes de que
   haga nada.», el botón **¿Cómo funciona esto?** y las tarjetas en «Cualquier negocio», «Peluquería y
-  estética» y «Bares y restaurantes»; al final, la línea de lo que falta («Hay automatizaciones
-  ocultas: necesitan la app …») (FLOW-F04).
+  estética» y «Bares y restaurantes»; debajo, una sección **Viene con …** por cada app que trae
+  automatizaciones hechas (hoy, «Citas» y «Reservas online»), con sus tarjetas, su estado («Activa»,
+  «En pausa», «Versión nueva») y **Encenderla**, **Ponerla en pausa**, **Verla** y **Restaurar la de
+  fábrica** (FLOW-F33 a F35); al final, la línea de lo que falta («Hay automatizaciones ocultas: necesitan
+  la app …») (FLOW-F04).
 
 ### Editor de automatización
 Se abre al tocar una fila, al pulsar **Nueva automatización**, al usar una tarjeta o al revisar un
@@ -189,6 +194,10 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F30 | Cerrar lo que nadie contestó a tiempo | hecho |
 | FLOW-F31 | Mandar un mensaje a un cliente | parcial |
 | FLOW-F32 | Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp | parcial |
+| FLOW-F33 | Encender una automatización que trae otra app | hecho |
+| FLOW-F34 | Poner en pausa una automatización que trae otra app, sin borrarla | hecho |
+| FLOW-F35 | Restaurar la versión de fábrica de una automatización que trae otra app | hecho |
+| FLOW-F36 | Reparar una automatización montada con un fallo que su app ya corrigió | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
@@ -865,6 +874,89 @@ Sale: nada todavía.
 Si falla: no aplica mientras el paso no se ofrezca.
 Implicados: FLOW-F31
 
+### FLOW-F33 Encender una automatización que trae otra app
+<!-- origen: old-hub:HUB-F105 old-hub:HUB-F104 old:flows/workflow/lista-y-galeria.md#flows-f05 -->
+Estado: hecho (servidor y pantalla)
+Actor: propietario, administrador, asistente
+Pantalla: Automatizaciones
+Pasos:
+1. Debajo de la galería, en **Viene con «Citas»** (una sección por cada app que trae automatizaciones hechas),
+   toca una tarjeta: «Esta automatización viene con Citas.», qué hace y «Lo que podrá hacer, y por qué», cada
+   permiso con la frase que escribió esa app.
+2. Pulsa **Encenderla** («Empieza a funcionar ya, solo con estos permisos.»).
+3. Sale ««…» está encendida.» y la tarjeta pasa a «Activa», con **Ponerla en pausa**, **Verla** (abre la
+   automatización en el editor) y **Restaurar la de fábrica**.
+4. Si ya se encendió antes, **Encenderla** solo la vuelve a encender tal como la dejaste: con tu nombre, tus
+   pasos y tus permisos. Solo si se quedó sin ningún permiso vuelve a recibir los de su app.
+Entra: las automatizaciones que traen las apps activas del negocio, en el idioma de quien la enciende. Hoy:
+«Cubrir el hueco cuando un cliente cancela» (Citas: cuando un cliente cancela su cita, una tarea de prioridad
+alta para cubrir el hueco; las cancelaciones que hace el equipo no la arrancan) y «Revisar cada cita reservada
+por internet» (Reservas online: cuando un cliente reserva en la página de reservas, una tarea para
+revisar la cita).
+Sale: la primera vez, una automatización nueva, encendida, con **exactamente** los permisos que pide su app
+(ni uno más, aunque quien la enciende pueda hacer más cosas), en la misma operación (`flow.flow.created`,
+`flow.flow.granted`, `flow.flow.enabled`): nunca queda encendida a medias. Pulsar dos veces, o dos personas a
+la vez, es una sola automatización.
+Si falla: si quien la enciende no puede hacer él mismo algo de lo que pide («No puedes permitir lo que tú no
+puedes hacer: «…».»), no se crea nada; una que pide una app que el negocio no tiene no sale en su sección y la
+línea de abajo dice cuál falta; el mensaje en rojo dentro de la tarjeta.
+Implicados: FLOW-F04, FLOW-F12, FLOW-F21, FLOW-F34, FLOW-F35
+
+### FLOW-F34 Poner en pausa una automatización que trae otra app, sin borrarla
+<!-- origen: old-hub:HUB-F106 -->
+Estado: hecho (servidor y pantalla)
+Actor: propietario, administrador, asistente
+Pantalla: Automatizaciones
+Pasos:
+1. En su tarjeta de **Viene con …**, pulsa **Ponerla en pausa**.
+2. Sale ««…» está en pausa. No se ha borrado nada.» y la tarjeta pasa a «En pausa», con **Encenderla**.
+3. En **Tus automatizaciones** se ve igual, «En pausa»: pausarla desde allí es lo mismo.
+Entra: la automatización que se montó desde esa tarjeta.
+Sale: en pausa (`flow.flow.paused`), con sus permisos y su historial; deja de arrancar como cualquier otra en
+pausa (FLOW-F03).
+Si falla: una que nunca se encendió, o que se borró: «Este negocio no ha encendido esa automatización: no hay
+nada que cambiar.».
+Implicados: FLOW-F03, FLOW-F33
+
+### FLOW-F35 Restaurar la versión de fábrica de una automatización que trae otra app
+<!-- origen: old-hub:HUB-F107 old:flows/workflow/lista-y-galeria.md#flows-f06 -->
+Estado: hecho (servidor y pantalla)
+Actor: propietario, administrador, asistente
+Pantalla: Automatizaciones
+Pasos:
+1. Si su app trae ahora una versión distinta de la que se encendió, la tarjeta lleva «Versión nueva» y, al
+   abrirla, «Hay una versión nueva de esta automatización.».
+2. Pulsa **Restaurar la de fábrica** (sirve también para deshacer tus retoques).
+3. Confirma con **Restaurar** («Se sustituirán tus cambios en esta automatización por la versión que trae hoy
+   su app. Seguirá encendida o en pausa como esté ahora.») o **Dejar la mía**.
+4. Sale «Hecho: esta automatización ya es la versión de fábrica.» y desaparece «Versión nueva».
+Entra: la automatización que se montó desde esa tarjeta y la versión que trae hoy su app.
+Sale: la misma automatización, con su historial, con el nombre, el arranque, los pasos y **exactamente** los
+permisos de hoy (`flow.flow.updated`, `flow.flow.granted`); encendida o en pausa como estaba. Tus retoques no
+la marcan como «Versión nueva»: solo un cambio de su app.
+Si falla: una que nunca se encendió, o que se borró, «Este negocio no ha encendido esa automatización: no hay
+nada que cambiar.»; si quien restaura no puede hacer él mismo algo de lo que pide, no cambia nada.
+Implicados: FLOW-F33, FLOW-F36
+
+### FLOW-F36 Reparar una automatización montada con un fallo que su app ya corrigió
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f11 -->
+Estado: hecho (servidor y pantalla)
+Actor: propietario, administrador, asistente
+Pantalla: Automatizaciones
+Pasos:
+1. Encima de **Tus automatizaciones** sale, por cada una que se montó con una versión anterior que arrancaba
+   en más casos de los debidos: ««…» se montó con una versión anterior de Citas que arranca en más casos de los
+   debidos. Actualizarla solo cambia cuándo arranca: sus pasos, permisos e interruptor se quedan como están.».
+2. Pulsa **Actualizarla**.
+3. Sale ««…» ya solo arranca cuando debe.» y el aviso desaparece.
+Entra: las automatizaciones montadas desde una tarjeta de **Viene con …** con una versión anterior cuyo «Solo
+cuando…» no tiene lo que su app le añadió después, y que siguen arrancando con el mismo aviso.
+Sale: la misma automatización con solo eso añadido a su «Solo cuando…» (`flow.flow.updated`); su nombre, sus
+pasos, sus permisos y su interruptor no cambian, y lo que ya tenía su «Solo cuando…» se respeta. Una que no
+tiene nada que reparar no cambia.
+Si falla: el mensaje en el aviso, que se queda.
+Implicados: FLOW-F33, FLOW-F35
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -885,6 +977,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26 | `flow.secret.list` |
 | Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100 (en vivo) | contestar | F29 | `flow.question.list` |
+| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -910,6 +1003,10 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Apunta cómo acabó la llamada y sigue la ejecución | solo la plataforma | F27 | `flow.run.record_call` |
 | Contesta sí o no, con una nota, a una pregunta de una automatización | contestar (su rol) | F29 | `flow.question.answer` |
 | Cierra las preguntas que nadie contestó a tiempo | solo la plataforma | F30 | `flow.question.expire_due` |
+| Enciende una automatización que trae otra app: la primera vez la crea encendida con exactamente sus permisos; después solo la enciende | gestionar | F33 | `flow.recipe.enable` |
+| La pone en pausa, sin borrarla | gestionar | F34 | `flow.recipe.disable` |
+| Le devuelve la versión que trae hoy su app, con sus permisos, encendida o en pausa como esté | gestionar | F35 | `flow.recipe.restore` |
+| Añade a su «Solo cuando…» solo lo que su app le añadió desde la versión con que se montó | gestionar | F36 | `flow.recipe.repair` |
 
 ### Lo que avisa
 
@@ -968,7 +1065,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `trigger_key` único por automatización, `input`, `status`, `step_index`, `log`, `outputs`, error,
   `resume_at`, `chain`), `Draft`, `Secret` (nombre único y valor sellado, FLOW-F26) y `Question` (FLOW-F28:
   ejecución y paso únicos, texto ya rellenado, `role`, `on_no`, `on_timeout`, `expires_at`, `status`, quién
-  y cuándo contestó y la nota). UUIDv7, sin `hub_id`.
+  y cuándo contestó y la nota). UUIDv7, sin `hub_id`. `Flow.recipe` (`<app>/<id>`, vacío en las del negocio) y
+  `Flow.recipe_digest` dicen de qué receta y de qué versión salió (FLOW-F33); una restricción única parcial
+  (`flow_flow_one_per_recipe`, solo entre las no borradas) deja una por receta.
 - **El documento**: `trigger` = `{kind: event, event, filter}` · `{kind: schedule, every: day|week|month,
   weekday 0–6 (lunes 0), day 1–31, time "HH:MM"}` · `{kind: at, at}` · `{kind: manual}`; `steps` = lista
   de `{id, kind: command|query|condition|delay|http, …}`; `http` = `{method, url, headers, body, timeout}`
@@ -1081,6 +1180,22 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   forma que el motor no entiende (escrito en crudo desde el admin o por una versión anterior) nunca se
   evalúa como «no se cumple»: la ejecución se para con `flow.filter_unreadable` o
   `flow.condition_unreadable` y las demás automatizaciones del aviso siguen (`document.readable`).
+- **Recetas de fábrica** (`recipes.py`, FLOW-F33 a F36; el `flows/templates.rs` del Hub viejo): cada app declara
+  las suyas como datos en **su propio** `recipes.py` (`RECIPES`: `id`, `name`, `summary`, `description`,
+  `trigger`, `steps` y `grants` = `{operación: por qué}`, con textos `gettext_lazy`; no importa nada de esta
+  app). `recipes.shelf()` lee las de las apps activas y aparta, con su motivo y sin romper las demás, la que
+  nombra una app que el negocio no tiene (`flow.recipe_needs_apps`) o la que no se lee como automatización,
+  repite id o pide **otros** permisos que los que usan sus pasos, ni más ni menos, o uno que necesita a una
+  persona (`flow.recipe_invalid`); un test (`test_every_recipe_the_apps_bring_is_offered`) exige que todas las
+  del código se ofrezcan. Su **huella** (`digest`) es un sha256 de su documento en cada idioma y de sus
+  permisos, nunca de sus frases: una huella distinta de la guardada es «Versión nueva». Encender
+  (`flow.recipe.enable`, `risk: high`) crea, concede y enciende en **una** transacción, y quien la enciende
+  debe poder hacer lo que pide (la regla de `grant`); dos a la vez dan una (la restricción única y un
+  *savepoint*: la segunda lee la de la primera). Reencender conserva lo del dueño; sin ningún permiso, recibe
+  los de la receta. Restaurar (`risk: high`) sobrescribe nombre, disparador, pasos, permisos y huella y no toca
+  el interruptor. Reparar (`missing_clauses`): una montada con otra huella que sigue en el aviso de la receta y
+  a cuyo «Solo cuando…» le faltan **claves** del de hoy recibe solo esas (una clave que el dueño cambió se
+  respeta). Las apps de este carril que traen recetas hoy: `appointment` y `online_booking`.
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`.
 - El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun`, `Draft` y `Question`; de `Secret`, solo
@@ -1157,6 +1272,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | paso `http` del motor | paso «Llamar a otro sistema» (`flow.run.claim_call`, `flow.run.record_call`) | la llamada la hace el worker tras guardar la ejecución, nunca la petición, con su clave de no repetición |
 | `…/approvals` (preguntas) | `flow.question.list`, `flow.question.answer`, `flow.question.expire_due` | el rol al que se pregunta sí decide quién contesta |
 | `…/approvals` (propuestas del asistente), `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
+| `POST /api/hub/flows/templates/{module}/{family}/activate` | `flow.recipe.enable` | se enciende desde la galería; crear, conceder y encender son una transacción y dos a la vez dan una |
+| `…/templates/{module}/{family}/deactivate` | `flow.recipe.disable` | — |
+| `…/templates/{module}/{family}/restore` | `flow.recipe.restore` | — |
+| reparación del filtro de WhatsApp en la pantalla | `flow.recipe.repair` | general: vale para la receta de cualquier app, no solo la de WhatsApp |
 
 ### Paridad: consultas
 
@@ -1170,6 +1289,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | `GET /api/hub/events` | `flow.catalog.read` | también las acciones y consultas |
 | `GET /api/hub/events/shape` | `flow.event.sample` | el último aviso real, no muestras por campo |
 | «Probar» calculado en la pantalla | `flow.flow.test` | en el servidor, que valida contra la acción |
+| `GET /api/hub/flows/templates` | `flow.recipe.list` | sin cabecera de módulo: lo pide la galería con `flow.view` |
 
 ### Paridad: páginas
 
@@ -1203,9 +1323,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   asistente en el Hub (parte 3 de la migración de esta app).
 - **«Necesita tu atención»** (eventos que no se entregaron): es la administración del outbox (PLAN-HUB
   bloque 7), de la plataforma, con el relay de la fase 2.
-- **Recetas que traen otras apps** («Viene con …», restaurar la de fábrica) y la reparación de las de
-  WhatsApp: ninguna app del Hub publica recetas todavía; la tarjeta «Contestar los WhatsApp» vuelve
-  cuando la Bandeja de WhatsApp declare su aviso.
+- **Las recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp y el aviso de cita confirmada) y
+  su reparación concreta: las declara esa app en su `recipes.py` sobre este registro (su parte 2 de la
+  migración); la tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
+- **Encender una receta desde la pantalla de su propia app** (el Hub viejo lo hacía desde la de WhatsApp): hoy
+  se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
+  cuando la tenga.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
   (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
