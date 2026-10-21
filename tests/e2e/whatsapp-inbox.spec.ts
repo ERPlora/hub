@@ -17,6 +17,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { cleanUp as cleanUpCards } from './customer-helpers';
 import { A, EMPLOYEE, hostPage, login, SAAS, shot, shown } from './helpers';
+import { filterBy } from './service-helpers';
 import { cleanUp, e2ePhone, flowShots, PREFIX, pushChannel, receive, seedErplora, template, waId } from './whatsapp-helpers';
 
 test.beforeAll(() => {
@@ -56,11 +57,9 @@ async function contrast(bubble: Locator, part: string): Promise<number> {
   }, part);
 }
 
-/** Picks `option` in the inbox's column filter `filter` (beside the search at this width). */
+/** Picks `option` in the inbox's column filter `filter`, through its «Filters» panel (the old hub's funnel). */
 async function filterInbox(page: Page, filter: string, option: string): Promise<void> {
-  await shown(page).locator(`[data-testid=whatsapp-inbox-filter-${filter}]`).click();
-  await page.locator('ion-popover.select-popover ion-radio').filter({ hasText: new RegExp(`^\\s*${option}\\s*$`) }).click();
-  await page.locator('ion-popover.select-popover').waitFor({ state: 'detached' });
+  await filterBy(page, 'whatsapp-inbox', filter, option);
 }
 
 test('the owner reads, answers, organises and erases a WhatsApp conversation; the composer follows the number', async ({ page }) => {

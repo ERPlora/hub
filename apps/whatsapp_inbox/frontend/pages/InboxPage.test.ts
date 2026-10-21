@@ -227,4 +227,13 @@ describe('InboxPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+
+  it('on a phone «No conversations.» stays in sight: the list hangs from AppPage’s stack itself, never from a nested one under the notices, and its filters sit behind «Filters» (the old hub’s funnel)', async () => {
+    const s = await setup({}, { ...CONNECTED, status: 'not_connected', phone_number: '' });
+    expect(s.find('whatsapp-inbox-not-connected').exists()).toBe(true);
+    expect(s.prop('filterable')).toBe(true);
+    const stack = s.table().element.parentElement;
+    expect(stack?.parentElement?.classList.contains('hub-detail-shell--fill')).toBe(true);
+    expect(stack?.contains(s.find('whatsapp-inbox-not-connected').element)).toBe(true);
+  });
 });

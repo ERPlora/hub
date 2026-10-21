@@ -87,7 +87,8 @@ Menú **Bandeja de WhatsApp → Bandeja de entrada** (título «Bandeja de Whats
 roles. Tabla con **Contacto** (el nombre de la ficha, o el de WhatsApp, o el número), **Teléfono**,
 **Estado** (Abierta, Pendiente, Cerrada), **Asignada a**, **Sin leer** y **Último mensaje** (hora si es
 de hoy, «Ayer», o la fecha, en el reloj del negocio); buscador «Filtrar contacto o teléfono…»; filtros
-**Estado**, **Asignada a** (A mí, Sin asignar) y **Sin leer**; 50 por página; primero la actividad
+**Estado**, **Asignada a** (A mí, Sin asignar) y **Sin leer** detrás de **Filtros**, junto al buscador (en
+el móvil se abren en una hoja sobre la lista) y con **Aplicar**; 50 por página; primero la actividad
 más reciente. Acción de fila **Abrir** (o tocar la fila): la conversación se abre en un panel encima
 de la lista, que se queda debajo.
 
@@ -108,9 +109,9 @@ mensajes.») o por reconectar («WhatsApp pide volver a conectar el número en A
 puede enviar nada.»), los dos con **Ir a Ajustes** para quien puede configurar; los mensajes del plan
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
 llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.»).
-Vacía: «Sin conversaciones.»; con búsqueda o filtro: «Sin resultados»; cargando: indicador; error de
-lista: el motivo con **Reintentar**; error del panel: el motivo que da el Hub o «No se pudo cargar la
-conversación».
+Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
+«Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
+motivo que da el Hub o «No se pudo cargar la conversación».
 
 ### Ajustes
 Menú **Bandeja de WhatsApp → Ajustes** (título «Ajustes del canal»), solo propietario y
@@ -158,7 +159,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | hecho | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
 | WHATSAPP_INBOX-F05 | Leer una conversación | hecho | comun |
-| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; el hilo no enseña la foto ni reproduce el audio hasta que la política de seguridad del Hub permita el origen de erplora.com (en curso, aún no publicada) | comun |
+| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; la política de seguridad del Hub ya deja ver fotos y oír audio de erplora.com, pero el hilo todavía no enseña la foto ni reproduce el audio | comun |
 | WHATSAPP_INBOX-F07 | Asignar una conversación a alguien del equipo | hecho | comun |
 | WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | hecho | comun |
 | WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho (filtro y recuento; la campana del Hub llegará con la barra superior) | comun |
@@ -291,8 +292,8 @@ Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
-1. Buscar por contacto o teléfono (el teléfono escrito de cualquier forma, también solo una parte) o
-   filtrar por estado, asignación o sin leer. El asistente la nombra como se dice: «Ana Lopez», «ana
+1. Buscar por contacto o teléfono (el teléfono escrito de cualquier forma, también solo una parte) o,
+   en **Filtros**, filtrar por estado, asignación o sin leer. El asistente la nombra como se dice: «Ana Lopez», «ana
    lópez» o «Zoé 🌸» llevan a la misma conversación si solo una coincide.
 2. Pulsar **Abrir** en la fila (o tocar la fila).
 3. El hilo aparece encima de la lista, del más antiguo al más reciente; un mensaje sin texto ni
@@ -308,9 +309,9 @@ Implicados: Clientes (el nombre de la ficha)
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F15 old-hub:HUB-F267 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f06 -->
-Estado: parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; el hilo no enseña la
-foto ni reproduce el audio hasta que la política de seguridad del Hub permita el origen de erplora.com
-(en curso, aún no publicada)
+Estado: parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; la política de
+seguridad del Hub ya deja ver fotos y oír audio de erplora.com, pero el hilo todavía no enseña la foto ni
+reproduce el audio
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -360,8 +361,8 @@ Estado: hecho (filtro y recuento; la campana del Hub llegará con la barra super
 Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
-1. Filtrar **Estado: Abierta** y **Sin leer**: quedan las conversaciones cuyo último mensaje es del
-   cliente.
+1. En **Filtros**, elegir **Estado: Abierta** y **Sin leer** y pulsar **Aplicar**: quedan las
+   conversaciones cuyo último mensaje es del cliente.
 2. El recuento de conversaciones esperando respuesta está disponible para la campana del Hub.
 3. Al ordenar por cualquier columna, las filas sin ese dato van al final, en los dos sentidos.
 Entra: los filtros y el orden.
