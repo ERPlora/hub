@@ -218,7 +218,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F10 | Probar la conexión con la AEAT | hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Crear una factura de prueba | hecho |
 | VERIFACTU-F12 | Consultar la declaración responsable | hecho |
-| VERIFACTU-F13 | Registrar una factura emitida | hecho — Facturación lo pide por nombre dentro de su emisión; la reacción del outbox (relay de la fase 2) queda de respaldo |
+| VERIFACTU-F13 | Registrar una factura emitida | hecho — Facturación lo pide por nombre dentro de su emisión; el relay del outbox del worker queda de respaldo |
 | VERIFACTU-F14 | Registrar una factura rectificativa | hecho — igual que F13 |
 | VERIFACTU-F15 | Enviar el registro a la AEAT y recoger su respuesta | hecho — lo envía el worker por la pasarela del SaaS; sin `VERIFACTU_GATEWAY_URL` los registros esperan en la cola |
 | VERIFACTU-F16 | Consultar los registros y su estado | hecho |
@@ -498,7 +498,7 @@ Implicados: ninguno
 
 ### VERIFACTU-F13 Registrar una factura emitida
 <!-- origen: wf:restaurante-dia#rec_restaurante-f12 fi:hub/domain#build_record_output-recordinput-nucleo-de-encadenado fi:hub/domain#create_record-command-issue-verifactu-2 fi:hub/domain#derive_tax_rate-tipo-iva-del-registro-a-partir-del-desglose-real fi:hub/domain#ingest_invoice-listener-de-invoice-created-invoice-rectified fi:hub/domain#modulo-chain-formatos-aeat-huella-sha-256-url-qr wf:peluqueria-dia#rec_peluqueria-f11 wf:cadena-fiscal#rec_fiscal-f04 fi:modules/verifactu#command-handler-nativo-verifactu-records-create-create_record fi:modules/verifactu#command-handler-nativo-verifactu-records-ingest_invoice-ingest_invoice fi:modules/verifactu#event-events-listen-invoice-created-invoice-rectified old-hub:HUB-F317 old-hub:HUB_VERIFACTU-F01 old-hub:HUB_VERIFACTU-F04 old:verifactu/workflow/registro-y-envio.md#verifactu-f13 qa:modules/verifactu/record-and-qr-for-each-receipt -->
-Estado: hecho — Facturación lo pide por nombre dentro de su emisión; la reacción del outbox (relay de la fase 2) queda de respaldo
+Estado: hecho — Facturación lo pide por nombre dentro de su emisión; el relay del outbox del worker queda de respaldo
 Actor: quien emite (su propia sesión); en la reacción al aviso, el sistema
 Pantalla: ninguna
 Pasos:
@@ -565,7 +565,8 @@ Sale: el estado y la respuesta en cada registro (avisa `verifactu.record.transmi
 `verifactu.record.rejected` o `verifactu.record.accepted_with_errors`, sin importes).
 Si falla: sin pasarela configurada, sin datos del productor o sin vía lista, no se manda nada y cada registro
 dice por qué espera (VERIFACTU-F17). Nunca se da por aceptado un registro sin la respuesta de la AEAT.
-Implicados: VERIFACTU-F20
+Implicados: VERIFACTU-F20, FLOW-F04 (la tarjeta de la galería de Automatizaciones que crea una tarea urgente cuando
+la AEAT rechaza un registro)
 
 ### VERIFACTU-F16 Consultar los registros y su estado
 <!-- origen: qa:modules/verifactu/responsible-declaration-and-status fi:modules/verifactu#query-verifactu-records-list old:verifactu/workflow/registro-y-envio.md#verifactu-f16 -->
@@ -1111,8 +1112,9 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
    `issuer_tax_id`), `substitutes` (lo mismo), `tax_breakdown`, `base_amount`, `tax_amount`, `total_amount` y
    `description`.
 3. **El respaldo**: `events.react` sella el registro de un documento «pending» o emitido sin VeriFactu cuando
-   el relay del outbox (fase 2) entrega `invoice.invoice.issued` (`{"invoice_id": …}`); los tests entregan el
-   aviso real del outbox.
+   el relay del outbox del worker entrega `invoice.invoice.issued` (`{"invoice_id": …}`; `base/relay.py`, desde
+   hub#105); `tests/test_relay.py` lo prueba con un tick real del worker y `test_services.py` entrega el aviso real
+   del outbox a la reacción.
 4. Facturación **no** pide nada al anular una venta: su R5 se registra como un alta más (VERIFACTU-F14). El
    registro de anulación (VERIFACTU-F30) es solo para una factura emitida por error.
 5. **Los e2e de Facturación**: como un registro guarda su factura con `PROTECT`, su limpieza tiene que borrar
