@@ -63,7 +63,8 @@ solo para quien puede gestionar.
 ### Ficha del elemento
 Nombre, estado, nota y la lista de líneas (texto y cantidad, en el orden en que se añadieron).
 Acciones para quien puede gestionar: «Editar», «Marcar como hecho» (o «Reabrir»), «Eliminar»,
-«Guardar nota» y «Añadir línea». Si otra persona cambia la nota mientras se escribe, la nota escrita
+«Guardar nota» y «Añadir línea»; en el móvil, las tres primeras se abren desde «Más acciones» (⋮),
+arriba a la derecha, para que el nombre se lea entero. Si otra persona cambia la nota mientras se escribe, la nota escrita
 **no se pisa** y sale «Actualizado en otro sitio», con «Recargar» para tomar la de la otra persona. Si
 el elemento se borra en otro sitio, o la persona deja de poder verlo, la ficha deja de enseñarlo y
 dice por qué.

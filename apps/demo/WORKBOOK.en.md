@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df13dfd434f8f81d77f45bc1b2a1dd79931b46291f23b67b5decb5350e9a5107 -->
+<!-- generated from WORKBOOK.md sha256:7600fe2f59a7c95986291a54ea75eed7fa55cdcc4d1fb9244cc8776f265c54be -->
 
 ## What it is for and who it is for
 
@@ -55,7 +55,8 @@ item page. Above it, the figures "Open", "Done" and "Lines", only for those who 
 
 ### Item page
 Name, status, note and the list of lines (text and quantity, in the order they were added). Actions
-for those who can manage: "Edit", "Mark done" (or "Reopen"), "Delete", "Save note" and "Add line". If
+for those who can manage: "Edit", "Mark done" (or "Reopen"), "Delete", "Save note" and "Add line"; on a
+phone, the first three open from "More actions" (⋮), at the top right, so that the name is read whole. If
 someone else changes the note while you are writing it, your note **is not overwritten** and "Updated
 elsewhere" is shown, with "Reload" to take the other person's. If the item is deleted elsewhere, or
 the person can no longer see it, the page stops showing it and says why.
