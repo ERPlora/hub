@@ -26,10 +26,27 @@ TUESDAY = MONDAY + dt.timedelta(days=1)
 PUBLIC = {"online_booking.public"}
 
 
+class Teammate:
+    """A person of the team as the platform passes one (a user account), without a database row. Citas
+    judges any other actor (a plain string: an automation, the platform) by the customer's rules."""
+
+    pk = None
+    email = ""
+
+    def get_username(self) -> str:
+        return "tester"
+
+    def get_full_name(self) -> str:
+        return "tester"
+
+    def __str__(self) -> str:
+        return "tester"
+
+
 def ctx_for(
     role: str = "hub_admin",
     scope: Scope = A,
-    actor: object = "tester",
+    actor: object = Teammate(),
     permissions: set[str] | None = None,
     ip: str | None = None,
 ) -> OperationContext:

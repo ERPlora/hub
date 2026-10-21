@@ -46,6 +46,14 @@ describe('SettingsPage', () => {
     expect(s.field('save').disabled).toBe(true);
   });
 
+  // As the old settings: each switch says what it does first and sits at the end of its row.
+  it('each switch is its label, then the switch at the end of the row', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    const toggle = s.field('allow_overlapping') as Control & { labelPlacement?: string; justify?: string };
+    expect([toggle.labelPlacement, toggle.justify]).toEqual(['start', 'space-between']);
+  });
+
   it('saves only what was touched and changed, and says so', async () => {
     const s = await setup();
     await s.show(SETTINGS);

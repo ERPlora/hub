@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogOut, Step } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
+import AskStepPanel from './AskStepPanel.vue';
+import HttpStepPanel from './HttpStepPanel.vue';
 import StepNode from './StepNode.vue';
+import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
 
 const CATALOG = {
@@ -107,5 +110,49 @@ describe('StepNode', () => {
     expect(s.find('flow-step-panel-s1').exists()).toBe(false);
     await click(s.find('flow-step-open-s1').element);
     expect(s.wrapper.emitted('toggle')).toHaveLength(1);
+  });
+
+  // FLOW-F25: the options of a step, inside it, and what they say when it is closed.
+  it('an action, a read and a wait carry «More options»; a condition does not', async () => {
+    const command = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'x' } });
+    expect(command.wrapper.findComponent(StepOptions).exists()).toBe(true);
+    command.wrapper.findComponent(StepOptions).vm.$emit('update:step', { id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'x' }, on_error: 'continue' });
+    expect(command.emitted().at(-1)).toEqual({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'x' }, on_error: 'continue' });
+    const wait = await setup({ id: 's1', kind: 'delay', seconds: 60 });
+    expect(wait.wrapper.findComponent(StepOptions).exists()).toBe(true);
+    const condition = await setup({ id: 's1', kind: 'condition', when: {} });
+    expect(condition.wrapper.findComponent(StepOptions).exists()).toBe(false);
+  });
+
+  it('a closed step says its «Only if…» and that it carries on if it fails', async () => {
+    const s = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: {}, run_if: { 'input.total': { gt: 10000 } }, on_error: 'continue' }, false);
+    expect(s.find('flow-step-summary-s1').text()).toBe('Only if: Total greater than 10000 · If it fails, it carries on');
+    const plain = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: {} }, false);
+    expect(plain.find('flow-step-summary-s1').exists()).toBe(false);
+  });
+
+  // FLOW-F27: «Call another system» is a card named by its host; open, its form and its options.
+  it('a call is a card named by its host that opens to its form and its options', async () => {
+    const call: Step = { id: 's1', kind: 'http', method: 'POST', url: 'https://api.example.com/v1/x', headers: {}, body: '', timeout: 10, on_error: 'continue' };
+    const closed = await setup(call, false);
+    expect(closed.find('flow-step-open-s1').text()).toContain('Call api.example.com');
+    expect(closed.find('flow-step-summary-s1').text()).toBe('If it fails, it carries on');
+    const s = await setup(call);
+    expect(s.wrapper.findComponent(HttpStepPanel).exists()).toBe(true);
+    expect(s.wrapper.findComponent(StepOptions).exists()).toBe(true);
+    s.wrapper.findComponent(HttpStepPanel).vm.$emit('update:step', { ...call, method: 'PUT' });
+    expect(s.emitted().at(-1)).toMatchObject({ method: 'PUT' });
+  });
+
+  // FLOW-F28: «Ask someone first» is a card named by its question; open, its form and «Only if…» (it never fails).
+  it('a question is a card named by what it asks that opens to its form', async () => {
+    const question: Step = { id: 's1', kind: 'ask', title: 'Refund?', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' };
+    const closed = await setup(question, false);
+    expect(closed.find('flow-step-open-s1').text()).toContain('Ask: Refund?');
+    const s = await setup(question);
+    expect(s.wrapper.findComponent(AskStepPanel).exists()).toBe(true);
+    s.wrapper.findComponent(AskStepPanel).vm.$emit('update:step', { ...question, hours: 5 });
+    expect(s.emitted().at(-1)).toMatchObject({ hours: 5 });
+    expect(s.find('flow-step-onerror-s1').exists()).toBe(false);
   });
 });

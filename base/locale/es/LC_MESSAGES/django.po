@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-20 22:50+0200\n"
+"POT-Creation-Date: 2026-10-21 02:57+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -58,7 +58,7 @@ msgstr "Base"
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
-#: middleware.py:105
+#: middleware.py:105 ws_print.py:218 ws_print.py:220
 msgid "Not found"
 msgstr "No encontrado."
 
@@ -311,11 +311,11 @@ msgstr "código de la demo"
 msgid "demo codes"
 msgstr "códigos de la demo"
 
-#: queries.py:87 services.py:390
+#: queries.py:87 services.py:396
 msgid "No hub has this id."
 msgstr "Ningún hub tiene este id."
 
-#: queries.py:106 services.py:630 services.py:701
+#: queries.py:106 services.py:636 services.py:707
 msgid "No demo has this address."
 msgstr "Ninguna demo tiene esta dirección."
 
@@ -332,41 +332,41 @@ msgstr "Content-Length tiene que ser una longitud."
 msgid "The request may weigh %(mb)s MB at most."
 msgstr "La petición puede pesar %(mb)s MB como máximo."
 
-#: services.py:396
+#: services.py:402
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
 
-#: services.py:400
+#: services.py:406
 msgid "Another hub has this address."
 msgstr "Otro hub ya tiene esta dirección."
 
-#: services.py:417
+#: services.py:423
 #, python-format
 msgid "This address cannot name a business (%(reason)s)."
 msgstr "Esta dirección no puede nombrar un negocio (%(reason)s)."
 
-#: services.py:447
+#: services.py:453
 msgid "This hub was cancelled: restore it first."
 msgstr "Este hub está cancelado: restáuralo primero."
 
-#: services.py:615
+#: services.py:621
 msgid "Every demo is taken right now; try again in a minute."
 msgstr ""
 "Ahora mismo todas las demos están ocupadas; vuelve a intentarlo en un minuto."
 
-#: services.py:682
+#: services.py:688
 msgid "No demo could be made right now; try again."
 msgstr "Ahora mismo no se ha podido crear la demo; vuelve a intentarlo."
 
-#: services.py:703
+#: services.py:709
 msgid "This demo has ended."
 msgstr "Esta demo ha terminado."
 
-#: services.py:705
+#: services.py:711
 msgid "This demo is another browser's."
 msgstr "Esta demo es de otro navegador."
 
-#: services.py:790
+#: services.py:796
 msgid "This demo has not ended yet."
 msgstr "Esta demo aún no ha terminado."
 
@@ -424,3 +424,70 @@ msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
 #: tests/test_queries.py:85 tests/test_queries.py:86
 msgid "January"
 msgstr ""
+
+#: ws_print.py:248
+#, python-format
+msgid "No hello within %(seconds)s seconds."
+msgstr "No ha llegado el hello en %(seconds)s segundos."
+
+#: ws_print.py:274
+msgid "Say hello with a deviceId before draining."
+msgstr "Envía hello con un deviceId antes de recoger trabajos."
+
+#: ws_print.py:325
+msgid ""
+"This channel speaks JSON text frames: hello, claim, done, failed and beat."
+msgstr "Este canal habla con mensajes de texto JSON: hello, claim, done, failed y beat."
+
+#: ws_print.py:330
+#, python-format
+msgid "A frame of %(size)s bytes is over this channel's cap of %(cap)s bytes."
+msgstr "Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
+
+#: ws_print.py:339
+msgid "This channel speaks hello, claim, done, failed and beat."
+msgstr "Este canal habla hello, claim, done, failed y beat."
+
+#: ws_print.py:354
+msgid "This channel drains for one device: send its deviceId."
+msgstr "Este canal recoge trabajos para un dispositivo: envía su deviceId."
+
+#: ws_print.py:358
+msgid "printers is the list of the ids of the printers this device reaches."
+msgstr "printers es la lista de los id de las impresoras a las que llega este dispositivo."
+
+#: ws_print.py:368
+msgid ""
+"This device reaches no active printer of this hub: choose its printers "
+"before printing."
+msgstr "Este dispositivo no llega a ninguna impresora activa de este hub: elige sus impresoras antes de imprimir."
+
+#: ws_print.py:379
+#, python-format
+msgid "This device does not print «%(role)s» for this hub."
+msgstr "Este dispositivo no imprime «%(role)s» para este hub."
+
+#: ws_print.py:445
+msgid "Sign in to this hub to print: this connection has no session."
+msgstr "Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
+
+#: ws_print.py:452
+msgid "This connection's session is not valid on this hub: sign in again."
+msgstr "La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
+
+#: ws_print.py:554
+msgid "jobId is the id of a job this hub handed out."
+msgstr "jobId es el id de un trabajo que entregó este hub."
+
+#: ws_print.py:582
+msgid "Printing is not on in this hub."
+msgstr "Impresión no está activada en este hub."
+
+#: ws_print.py:593
+msgid "Invalid frame."
+msgstr "Mensaje no válido."
+
+#: ws_print.py:619
+#, python-format
+msgid "%(field)s is text."
+msgstr "%(field)s es un texto."

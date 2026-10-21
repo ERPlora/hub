@@ -71,11 +71,22 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('CartsPage', () => {
+  it('while the first page loads, the table paints the loading state and counts nothing (pm#611)', async () => {
+    const s = await setup();
+    expect(s.prop('loading')).toBe(true);
+    expect(s.find('cart-checkout-carts-loading').exists()).toBe(true);
+    expect(s.wrapper.text()).not.toMatch(/\b0 carts?\b/i);
+    await s.show(page(ROWS));
+    expect(s.prop('loading')).toBe(false);
+    expect(s.find('cart-checkout-carts-loading').exists()).toBe(false);
+  });
+
   it('follows the carts newest first, with the old table’s columns', async () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carts');
+    // The topbar names the app, as the old hub's did; the tabbar says which section.
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Cart & Checkout');
     expect(s.prop('searchPlaceholder')).toBe('Search session or email…');
     expect(s.prop<{ add: string }>('labels').add).toBe('New cart');
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
@@ -148,6 +159,21 @@ describe('CartsPage', () => {
         offset: 0,
       },
     ]);
+  });
+
+  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box (pm#521)', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const total = s.prop<Array<{ key: string; filter?: unknown }>>('columns').find((c) => c.key === 'total_amount');
+    expect(total?.filter).toEqual({ type: 'range', amount: true });
+    s.table().vm.$emit('filtersChange', { total_amount_from: '1.250,50', total_amount_to: '1.250' });
+    await flush();
+    // «1.250» is 1.250 € or 1,25 €: it filters nothing and says why, never the wrong amount.
+    expect(s.list()).toEqual([{ total_amount_min: 125050, sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Type an amount, like 12.50' });
+    s.table().vm.$emit('filtersChange', { total_amount_from: '12' });
+    await flush();
+    expect(s.prop('filterErrors')).toEqual({});
   });
 
   it('a bound that is not a number is left out, never «from 0»', async () => {
@@ -266,7 +292,7 @@ describe('CartsPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carritos');
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Carrito y pago');
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Buscar sesión o email…', 'Nuevo carrito']);
     expect(s.cells(0).slice(2, 5).map((cell) => cell.replace(/[  ]/g, ' '))).toEqual(['Activo', '2', '31,50 €']);
     expect(s.offered(ACTIVE)).toEqual(['Abandonar', 'Borrar']);

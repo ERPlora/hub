@@ -2,6 +2,7 @@
 // APPOINTMENT-F10: «History» of a row (or a block that can no longer move) opens «Appointment history»:
 // its number and every change (AppointmentHistory). Read only: its one button closes it.
 import { FormModal } from '@erplora/ui/components';
+import { IonButton } from '@ionic/vue';
 
 import type { AppointmentRow } from '../operations';
 import AppointmentHistory from './AppointmentHistory.vue';
@@ -15,12 +16,18 @@ const open = defineModel<boolean>('open', { default: false });
     v-model:open="open"
     testid="appointment-history-modal"
     :title="$t('appointment.history.title')"
-    :submit-label="$t('appointment.close')"
-    @submit="open = false"
   >
     <template v-if="appointment">
       <p><strong>{{ appointment.number }}</strong></p>
       <AppointmentHistory :appointment-id="appointment.id" />
+    </template>
+    <template #footer="{ cancel }">
+      <ion-button
+        data-testid="appointment-history-close"
+        @click="cancel"
+      >
+        {{ $t('appointment.close') }}
+      </ion-button>
     </template>
   </FormModal>
 </template>

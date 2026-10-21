@@ -9,12 +9,18 @@ permissions its steps ask for (WORKBOOK «Para quien lo mantiene»). Pure: no da
   never matches, except with ``exists: false``.
 - A **schedule** is every day, week (``weekday``, Monday 0) or month (``day``) at ``time``, read in the
   business's time zone (``python-dateutil``'s ``rrule``: a day a month lacks is skipped that month).
+- A **call** (``http``, FLOW-F27) is the one step whose texts may also read ``secret.<NAME>`` (a kept
+  secret) and ``run.idempotency_key``; its address is written by hand up to its host, and its permission
+  is its origin (``http:https://host``).
 """
 
 import datetime as dt
+import json
 import re
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from urllib.parse import quote, urlsplit
 
 from dateutil import rrule
 
@@ -33,7 +39,11 @@ MAX_DELAY_SECONDS = 30 * 24 * 3600
 #: event it delivers (base/ and the apps' `react`), not this app.
 MAX_CHAIN = 8
 #: The kinds of step this engine runs.
-STEP_KINDS = ("command", "query", "condition", "delay")
+STEP_KINDS = ("command", "query", "condition", "delay", "http")
+#: What a call's texts may read besides the automation's data: a kept secret, and the call's own key.
+CALL_ONLY_RE = re.compile(r"^(?:secret\.[A-Z][A-Z0-9_]{0,63}|run\.idempotency_key)$")
+#: The prefix of a call's permission: ``http:https://host[:port]``.
+HTTP_GRANT = "http:"
 
 _SEGMENT = r"[A-Za-z_][A-Za-z0-9_]*"
 PATH_RE = re.compile(rf"^(?:{'|'.join(ROOTS)})(?:\.{_SEGMENT})+$")
@@ -96,6 +106,11 @@ def _text(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def fill(text: str, data: dict) -> str:
+    """``text`` with its ``{{…}}`` data filled in, always text (a path alone is its value as text)."""
+    return _text(resolve(text, data))
 
 
 # --- Conditions -------------------------------------------------------------------------------------
@@ -242,11 +257,96 @@ def next_fire(schedule: dict, after: dt.datetime, tz: dt.tzinfo) -> dt.datetime:
 
 
 def required_grants(steps: list[dict]) -> list[str]:
-    """The actions and reads the steps run, once each and in order (a half-filled step asks nothing)."""
+    """The actions, reads and calls' origins the steps need, once each and in order (a half-filled step
+    asks nothing)."""
     names: list[str] = []
     for step in steps:
         if step.get("kind") in ("command", "query"):
             name = str(step.get("operation") or "").strip()
             if name and name not in names:
                 names.append(name)
+        elif step.get("kind") == "http":
+            grant = http_grant(str(step.get("url") or ""))
+            if grant and grant not in names:
+                names.append(grant)
     return names
+
+
+# --- Calls to another system (FLOW-F27) ------------------------------------------------------------
+
+
+def origin(url: str) -> str | None:
+    """``https://host[:port]`` of a plain https address (lower case, without the default port), or ``None``."""
+    try:
+        parts = urlsplit(url.strip())
+        port = parts.port
+    except ValueError:
+        return None
+    if parts.scheme.lower() != "https" or not parts.hostname or parts.username is not None or "@" in parts.netloc:
+        return None
+    host = parts.hostname.lower()
+    shown = f"[{host}]" if ":" in host else host
+    return f"https://{shown}" if port in (None, 443) else f"https://{shown}:{port}"
+
+
+def literal_origin(url: str) -> str | None:
+    """The origin of ``url`` when its host is written by hand: any ``{{…}}`` goes after it, in the path or
+    the query, and cannot change it. ``None`` otherwise."""
+    filled = TEMPLATE_RE.sub("x", url)
+    found = origin(filled)
+    if found is None:
+        return None
+    if "{{" in url:
+        head = url[: url.index("{{")]
+        if not re.match(r"^https://[^/?#{}]+[/?#]", head, re.IGNORECASE) or origin(head) != found:
+            return None
+    return found
+
+
+def http_grant(url: str) -> str | None:
+    """The permission a call to ``url`` asks for (``http:https://host``), or ``None`` for a bad address."""
+    found = literal_origin(url)
+    return f"{HTTP_GRANT}{found}" if found else None
+
+
+def host_of(url: str) -> str:
+    """The host a call goes to, for the history and the screen."""
+    try:
+        return (urlsplit(TEMPLATE_RE.sub("x", url)).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def secret_names(step: Mapping[str, Any]) -> list[str]:
+    """The kept secrets a call reads, once each and in order."""
+    names: list[str] = []
+    for text in (step.get("url", ""), *(step.get("headers") or {}).values(), step.get("body", "")):
+        for match in TEMPLATE_RE.finditer(str(text)):
+            path = match.group(1)
+            if path.startswith("secret.") and CALL_ONLY_RE.match(path) and path[7:] not in names:
+                names.append(path[7:])
+    return names
+
+
+def _render(text: str, data: dict, encode) -> str:
+    return TEMPLATE_RE.sub(lambda match: encode(_text(lookup(match.group(1), data)[1])), text)
+
+
+def _json_escaped(text: str) -> str:
+    return json.dumps(text, ensure_ascii=False)[1:-1]
+
+
+def render_call(step: Mapping[str, Any], data: dict, secrets: Mapping[str, str], key: str) -> tuple[str, dict[str, str], str]:
+    """``(url, headers, body)`` of a call for what the run knows: a datum inserted in the address is
+    percent-encoded, one in a JSON body JSON-escaped, one in a header as it is. A body without its
+    ``Content-Type`` gets the JSON one when it looks like JSON, plain text otherwise."""
+    full = {**data, "secret": dict(secrets), "run": {"idempotency_key": key}}
+    headers = {name: _render(str(value), full, str) for name, value in (step.get("headers") or {}).items()}
+    url = _render(str(step.get("url", "")), full, lambda value: quote(value, safe=""))
+    body = str(step.get("body") or "")
+    kind = next((value for name, value in headers.items() if name.lower() == "content-type"), "")
+    if body and not kind:
+        kind = "application/json" if body.lstrip().startswith(("{", "[")) else "text/plain; charset=utf-8"
+        headers["Content-Type"] = kind
+    body = _render(body, full, _json_escaped if "json" in kind.lower() else str)
+    return url, headers, body

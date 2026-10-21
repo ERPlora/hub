@@ -312,3 +312,154 @@ msgstr "Cancelada: la automatización se puso en pausa mientras esperaba."
 
 msgid "Cancelled: the automation was deleted."
 msgstr "Cancelada: la automatización se borró."
+
+msgid "Only a run that stopped by an error at one of its steps can be resumed."
+msgstr "Solo se puede reanudar una ejecución que se paró por un error en uno de sus pasos."
+
+msgid "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it again whole."
+msgstr "Esta ejecución no se puede reanudar: se paró antes de hacer ningún paso, o volvería a pararse ahí. Ejecútala de nuevo entera."
+
+msgid "This run can no longer be resumed: it stopped more than %(days)s days ago and no longer keeps what its steps did. Run it again whole."
+msgstr "Esta ejecución ya no se puede reanudar: se paró hace más de %(days)s días y ya no guarda lo que hicieron sus pasos. Ejecútala de nuevo entera."
+
+msgid "That run does not exist in this business."
+msgstr "Esa ejecución no existe en este negocio."
+
+msgid "The «Only if…» of this step can no longer be read, so it stopped. Open the automation, check this step and save it again."
+msgstr "Ya no se puede leer el «Solo si…» de este paso, así que se ha parado. Abre la automatización, revisa este paso y vuelve a guardarla."
+
+msgid "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
+msgstr "Este servidor todavía no puede guardar secretos: le falta su clave de cifrado. No se ha guardado nada."
+
+msgid "There is no secret called «%(name)s»."
+msgstr "No hay ningún secreto llamado «%(name)s»."
+
+msgid "secret"
+msgstr "secreto"
+
+msgid "secrets"
+msgstr "secretos"
+
+msgid "sealed value"
+msgstr "valor cifrado"
+
+msgctxt "run status"
+msgid "Calling another system"
+msgstr "Llamando a otro sistema"
+
+msgctxt "run status"
+msgid "Waiting for an answer"
+msgstr "Esperando una respuesta"
+
+msgid "Step %(n)s reads «%(path)s»: a secret or the call's key only go in «Call another system»."
+msgstr "El paso %(n)s lee «%(path)s»: un secreto o la clave de la llamada solo van en «Llamar a otro sistema»."
+
+msgid "Write the address by hand, starting with https:// and its server's name, without a user or a password; data can only go after the name, in the path or the query."
+msgstr "Escribe la dirección a mano, empezando por https:// y el nombre de su servidor, sin usuario ni contraseña; los datos solo pueden ir después del nombre, en la ruta o en la consulta."
+
+msgid "«%(name)s» is no header this step can send."
+msgstr "«%(name)s» no es una cabecera que este paso pueda enviar."
+
+msgid "«%(name)s» is no address this automation can be allowed to call."
+msgstr "«%(name)s» no es una dirección a la que se pueda permitir llamar a esta automatización."
+
+msgid "«%(host)s» answered %(status)s, so it stopped."
+msgstr "«%(host)s» respondió %(status)s, así que se ha parado."
+
+msgid "«%(host)s» is inside a private network, so it was not called."
+msgstr "«%(host)s» está dentro de una red privada, así que no se ha llamado."
+
+msgid "It could not reach «%(host)s», so it stopped."
+msgstr "No ha podido llegar a «%(host)s», así que se ha parado."
+
+msgid "«%(host)s» did not answer within %(seconds)s seconds, so it stopped."
+msgstr "«%(host)s» no respondió en %(seconds)s segundos, así que se ha parado."
+
+msgid "The address of this step is not a plain https address, so it was not called."
+msgstr "La dirección de este paso no es una dirección https normal, así que no se ha llamado."
+
+msgid "The secret «%(name)s» no longer exists, so it stopped before calling. Save it again in this step."
+msgstr "El secreto «%(name)s» ya no existe, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
+
+msgid "The secret «%(name)s» cannot be opened with this server's key, so it stopped before calling. Save it again in this step."
+msgstr "El secreto «%(name)s» no se puede abrir con la clave de este servidor, así que se ha parado antes de llamar. Vuelve a guardarlo en este paso."
+
+msgid "This server cannot use secrets (its encryption key is missing), so it stopped before calling."
+msgstr "Este servidor no puede usar secretos (le falta su clave de cifrado), así que se ha parado antes de llamar."
+
+msgid "Cancelled: %(who)s answered no to «%(title)s»."
+msgstr "Cancelada: %(who)s contestó que no a «%(title)s»."
+
+msgid "Cancelled: nobody answered «%(title)s» in time."
+msgstr "Cancelada: nadie contestó a tiempo «%(title)s»."
+
+msgctxt "question status"
+msgid "Waiting for an answer"
+msgstr "Esperando una respuesta"
+
+msgctxt "question status"
+msgid "Yes"
+msgstr "Sí"
+
+msgctxt "question status"
+msgid "No"
+msgstr "No"
+
+msgctxt "question status"
+msgid "Nobody answered in time"
+msgstr "Nadie contestó a tiempo"
+
+msgctxt "question status"
+msgid "Cancelled"
+msgstr "Cancelada"
+
+msgid "Someone already answered this one. Nothing was done twice."
+msgstr "Alguien ya contestó a esta. No se ha hecho nada dos veces."
+
+msgid "That question does not exist in this business."
+msgstr "Esa pregunta no existe en este negocio."
+
+msgid "This question is closed: its automation no longer waits for it."
+msgstr "Esta pregunta está cerrada: su automatización ya no la espera."
+
+msgid "This question was asked of someone else: you cannot answer it."
+msgstr "Esta pregunta se le hizo a otra persona: tú no puedes contestarla."
+
+msgid "Too late: nobody answered it in time, so it was closed. Nothing was done."
+msgstr "Demasiado tarde: nadie la contestó a tiempo y se cerró. No se ha hecho nada."
+
+msgid "answer before"
+msgstr "contestar antes de"
+
+msgid "answered at"
+msgstr "contestada el"
+
+msgid "answered by"
+msgstr "contestada por"
+
+msgid "asked at"
+msgstr "preguntada el"
+
+msgid "asked of"
+msgstr "preguntada a"
+
+msgid "details"
+msgstr "detalles"
+
+msgid "if nobody answers"
+msgstr "si nadie contesta"
+
+msgid "if they say no"
+msgstr "si dicen que no"
+
+msgid "note"
+msgstr "nota"
+
+msgid "question"
+msgstr "pregunta"
+
+msgid "questions"
+msgstr "preguntas"
+
+msgid "step"
+msgstr "paso"

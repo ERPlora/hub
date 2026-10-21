@@ -563,13 +563,14 @@ def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, setting
     assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
 
     clock(NOON)
-    assert sorted(scheduler.run_due(NOON)) == ["flow.fire_due", "flow.resume_due"]
+    assert sorted(scheduler.run_due(NOON)) == ["flow.expire_questions", "flow.fire_due", "flow.resume_due"]
     fired = FlowRun.objects.get(flow=daily)
     assert (fired.trigger_kind, fired.status) == ("schedule", FlowRun.Status.SUCCEEDED)
     assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
 
     clock(NOON + dt.timedelta(minutes=1))
     assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1))) == [
+        "flow.expire_questions",
         "flow.fire_due",
         "flow.resume_due",
     ]
