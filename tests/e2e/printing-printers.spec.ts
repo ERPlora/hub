@@ -38,12 +38,17 @@ interface Usage {
 
 test.afterAll(() => {
   psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like 'e2e %')`);
+  // The test page is named after its printer: once «Till» became a kitchen printer (PRINTING-F04), its pending
+  // test page went back to the receipt queue with no printer, out of reach of the line above.
+  psql(`delete from printing_printjob where reference in ('${TILL}', '${FOUND}')`);
   // Only the defaults that point at this spec's printers: the hub's own choices stay as they were.
   for (const column of ['receipt_printer_id', 'kitchen_printer_id', 'bar_printer_id', 'label_printer_id']) {
     psql(`update printing_settings set ${column} = null where ${column} in (select id from printing_printer where name like 'e2e %')`);
   }
   forgetDevices('e2e %', { ids: [DEVICE] });
   psql(`delete from printing_printer where name like 'e2e %'`);
+  // Nothing of this run stays in the queue: the next spec's device would take it as its own.
+  expect(psql(`select count(*) from printing_printjob where reference in ('${TILL}', '${FOUND}')`)).toBe('0');
 });
 
 async function printersReady(page: Page): Promise<void> {

@@ -18,7 +18,7 @@ from live.models import OutboxEvent
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 from apps.printing import services
-from apps.printing.tests.conftest import A, B, RECEIPT, ctx_for, enqueue, printer, run
+from apps.printing.tests.conftest import A, B, RECEIPT, ctx_for, enqueue, printer, received, run
 
 pytestmark = pytest.mark.django_db
 
@@ -964,39 +964,12 @@ def test_the_test_page_carries_the_business_name_when_invoicing_knows_it():
     assert PrintJob.objects.get(pk=out.id).document == {"locale": "en", "business_name": "Salón Ana SL"}
 
 
-# Notifications: after the COMMIT, on the channel of the command's scope only
-
-
-@pytest.fixture
-def listen(db_dsn):
-    import psycopg
-
-    sessions = []
-
-    def open_session(scope):
-        from live.outbox import channel_for
-
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def received(session, timeout=1.0, stop_after=None):
-    import json
-
-    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
+# Notifications: after the COMMIT, on the channel of the command's scope only (`listen`, in conftest.py)
 
 
 @pytest.mark.django_db(transaction=True)
 def test_a_job_queued_in_b_wakes_b_only(listen):
     from live.outbox import channel_for
-
-    from apps.printing.tests.conftest import A, B
 
     on_a, on_b = listen(A), listen(B)
     run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx_for(scope=B))
