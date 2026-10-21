@@ -434,19 +434,43 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.wrapper.text()).toContain('Renamed 11');
   });
 
+  // CLOSE-DEMO: one page of `demo.item.list` holds 100 rows at most (`ItemListIn.limit`, le=100). «Load more» never
+  // asks for more (the third one asked for 150 and the 422 left «The items could not be loaded»), and past 100 rows
+  // a phone pages too (`maxWindow`, ERPlora/ui#12), so every row stays in reach.
+  it('«Load more» never asks for more than the server’s 100 rows', async () => {
+    viewport(true);
+    const s = await setup();
+    await s.show({ rows: many(50), total: 100, limit: 50, offset: 0 });
+    expect(s.prop('maxWindow')).toBe(100);
+    for (let n = 0; n < 3; n += 1) s.table().vm.$emit('loadMore');
+    await flush();
+    expect(s.params()).toEqual([{ limit: 100, offset: 0 }]);
+  });
+
+  it('past 100 rows a phone pages one page at a time instead of «Load more»', async () => {
+    viewport(true);
+    const s = await setup();
+    await s.show({ rows: many(50), total: 250, limit: 50, offset: 0 });
+    expect(s.testid('demo-items-load-more').exists(), 'no «Load more» that would ask past 100 rows').toBe(false);
+    await s.testid('demo-items-page-next').trigger('click');
+    await flush();
+    expect(s.params()).toEqual([{ limit: 50, offset: 50 }]);
+  });
+
+  // 100 rows at most: a longer query pages on a phone (the tests above), so the window here stays within them.
   it('back on a desk, or with a new search, the window starts again at one page', async () => {
     viewport(true);
     const s = await setup();
     expect(s.params()).toEqual([{ limit: 50, offset: 0 }]);
-    await s.show({ rows: many(50), total: 120, limit: 50, offset: 0 });
+    await s.show({ rows: many(50), total: 100, limit: 50, offset: 0 });
     await s.testid('demo-items-load-more').trigger('click');
     await flush();
     expect(s.params()).toEqual([{ limit: 100, offset: 0 }]);
-    await s.showOnNewStream({ rows: many(100), total: 120, limit: 100, offset: 0 });
+    await s.showOnNewStream({ rows: many(100), total: 100, limit: 100, offset: 0 });
 
     await cross(false);
     expect(s.params(), 'a desk pages one page at a time').toEqual([{ limit: 50, offset: 0 }]);
-    await s.showOnNewStream({ rows: many(50), total: 120, limit: 50, offset: 0 });
+    await s.showOnNewStream({ rows: many(50), total: 100, limit: 50, offset: 0 });
 
     await cross(true);
     await s.testid('demo-items-load-more').trigger('click');
@@ -459,7 +483,7 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.params()).toEqual([{ search: 'item', limit: 50, offset: 0 }]);
 
     // A new status filter starts the window again too.
-    await s.showOnNewStream({ rows: many(50), total: 120, limit: 50, offset: 0 });
+    await s.showOnNewStream({ rows: many(50), total: 100, limit: 50, offset: 0 });
     await s.testid('demo-items-load-more').trigger('click');
     await flush();
     expect(s.params()).toEqual([{ search: 'item', limit: 100, offset: 0 }]);
