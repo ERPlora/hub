@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 04:18+0200\n"
+"POT-Creation-Date: 2026-10-21 04:25+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -58,7 +58,7 @@ msgstr "Base"
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
-#: middleware.py:110
+#: middleware.py:110 ws_print.py:218 ws_print.py:220
 msgid "Not found"
 msgstr "No encontrado."
 
@@ -440,3 +440,79 @@ msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
 #: tests/test_queries.py:85 tests/test_queries.py:86
 msgid "January"
 msgstr ""
+
+#: ws_print.py:248
+#, python-format
+msgid "No hello within %(seconds)s seconds."
+msgstr "No ha llegado el hello en %(seconds)s segundos."
+
+#: ws_print.py:274
+msgid "Say hello with a deviceId before draining."
+msgstr "Envía hello con un deviceId antes de recoger trabajos."
+
+#: ws_print.py:328
+msgid ""
+"This channel speaks JSON text frames: hello, claim, done, failed and beat."
+msgstr ""
+"Este canal habla con mensajes de texto JSON: hello, claim, done, failed y "
+"beat."
+
+#: ws_print.py:333
+#, python-format
+msgid "A frame of %(size)s bytes is over this channel's cap of %(cap)s bytes."
+msgstr ""
+"Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
+
+#: ws_print.py:342
+msgid "This channel speaks hello, claim, done, failed and beat."
+msgstr "Este canal habla hello, claim, done, failed y beat."
+
+#: ws_print.py:357
+msgid "This channel drains for one device: send its deviceId."
+msgstr "Este canal recoge trabajos para un dispositivo: envía su deviceId."
+
+#: ws_print.py:361
+msgid "printers is the list of the ids of the printers this device reaches."
+msgstr ""
+"printers es la lista de los id de las impresoras a las que llega este "
+"dispositivo."
+
+#: ws_print.py:371
+msgid ""
+"This device reaches no active printer of this hub: choose its printers "
+"before printing."
+msgstr ""
+"Este dispositivo no llega a ninguna impresora activa de este hub: elige sus "
+"impresoras antes de imprimir."
+
+#: ws_print.py:382
+#, python-format
+msgid "This device does not print «%(role)s» for this hub."
+msgstr "Este dispositivo no imprime «%(role)s» para este hub."
+
+#: ws_print.py:448
+msgid "Sign in to this hub to print: this connection has no session."
+msgstr ""
+"Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
+
+#: ws_print.py:455
+msgid "This connection's session is not valid on this hub: sign in again."
+msgstr ""
+"La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
+
+#: ws_print.py:557
+msgid "jobId is the id of a job this hub handed out."
+msgstr "jobId es el id de un trabajo que entregó este hub."
+
+#: ws_print.py:585
+msgid "Printing is not on in this hub."
+msgstr "Impresión no está activada en este hub."
+
+#: ws_print.py:596
+msgid "Invalid frame."
+msgstr "Mensaje no válido."
+
+#: ws_print.py:622
+#, python-format
+msgid "%(field)s is text."
+msgstr "%(field)s es un texto."
