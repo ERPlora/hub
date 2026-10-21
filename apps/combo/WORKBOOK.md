@@ -688,8 +688,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   una **categoría entera** de Inventario («Marcar todos los de «…»»), como Square y WooCommerce Composite
   (combos#12); antes, casilla a casilla.
 - **Crear un producto desde el menú no se hace** (combos#13): Square, Shopify Bundles, Revel, Lightspeed
-  L-Series, WooCommerce y Odoo PdV mandan crearlo en el catálogo; solo Lightspeed K-Series y Toast lo crean
-  dentro. Se crea en Inventario y el buscador del constructor lo encuentra en cuanto se guarda.
+  L-Series y WooCommerce Composite mandan crearlo en el catálogo; Lightspeed K-Series, Toast y Odoo (su
+  «Crear» en el campo de producto) lo crean dentro. Gana lo más aceptado: se crea en Inventario y el
+  buscador del constructor lo encuentra en cuanto se guarda.
 - Precios en céntimos, como el resto de la plataforma.
 
 ## Contradicciones señaladas
