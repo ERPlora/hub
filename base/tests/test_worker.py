@@ -8,8 +8,10 @@ then 60 s; any other failure stops the worker with 1. Then it schedules the apps
 (``scheduler.run_due``) until asked to stop, waking up at once: ECS gives it 30 s after SIGTERM. A
 tick that fails is logged and the next one tries again. On the first tick and then every
 ``REAPER_INTERVAL_SECONDS`` it purges the demos that ended (``reap_demos``, plan 2026-10-17 §1.7); a reaper that
-fails is logged and never stops the worker. No database here: ``register_apps``, the scheduler and the reaper are
-replaced; their own tests are ``test_register_apps.py``, ``test_scheduler.py`` and ``test_services_demo.py``.
+fails is logged and never stops the worker. Every tick, after the tasks, it relays the outbox (``relay.run``, round
+2026-10-20); a relay pass that fails is logged and the next tick tries again. No database here: ``register_apps``,
+the scheduler, the relay and the reaper are replaced; their own tests are ``test_register_apps.py``,
+``test_scheduler.py``, ``test_relay.py`` and ``test_services_demo.py``.
 """
 
 import datetime as dt
@@ -20,7 +22,7 @@ import time
 import pytest
 from django.db import DatabaseError
 
-from base import catalog, scheduler, worker
+from base import catalog, relay, scheduler, worker
 from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
 
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
@@ -60,6 +62,27 @@ class FakeReaper:
         if self.failures:
             raise self.failures.pop(0)
         return 1
+
+
+class FakeRelay:
+    """Stands in for ``relay.run``: records the clock of each pass, and raises the failures it is given."""
+
+    def __init__(self) -> None:
+        self.passes: list[dt.datetime] = []
+        self.failures: list[Exception] = []
+
+    def __call__(self, now: dt.datetime) -> relay.RelayPass:
+        self.passes.append(now)
+        if self.failures:
+            raise self.failures.pop(0)
+        return relay.RelayPass(taken=1, delivered=2, failed=0)
+
+
+@pytest.fixture(autouse=True)
+def outbox(monkeypatch) -> FakeRelay:
+    fake = FakeRelay()
+    monkeypatch.setattr(relay, "run", fake)
+    return fake
 
 
 @pytest.fixture(autouse=True)
@@ -428,3 +451,56 @@ def test_a_failed_tick_of_the_scheduler_still_reaps(calls, tasks, reaper):
     worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
 
     assert reaper.passes == [ten(0)]
+
+
+# ── The outbox relay (round 2026-10-20) ──────────────────────────────────────────────────────────
+
+
+def test_relays_the_outbox_on_every_tick_after_the_tasks(monkeypatch, calls, tasks, outbox):
+    order: list[str] = []
+    monkeypatch.setattr(scheduler, "run_due", lambda now: order.append("tasks") or [])
+    monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 3)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1, 2))
+
+    assert outbox.passes == [ten(0), ten(1), ten(2)]
+    # What a task records is relayed in the same tick.
+    assert order == ["tasks", "relay"] * 3
+
+
+def test_a_stop_before_the_first_tick_relays_nothing(calls, outbox):
+    worker.run(stopped())
+
+    assert outbox.passes == []
+
+
+def test_a_relay_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, reaper, outbox):
+    failure = DatabaseError("server closed the connection unexpectedly")
+    outbox.failures.append(failure)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 2)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1)) == 0
+
+    assert outbox.passes == [ten(0), ten(1)]
+    # The tasks and the reaper did not wait for it.
+    assert tasks.ticks == [ten(0), ten(1)]
+    assert reaper.passes == [ten(0), ten(1)]
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "outbox relay" in record.getMessage() and record.exc_info[1] is failure
+    # Its broken connection is released before the next tick: after registering, after the failed pass, and after
+    # each of the reaper's two passes.
+    assert calls.count("close_old_connections") == 4
+
+
+def test_a_failed_tick_of_the_scheduler_still_relays(calls, tasks, outbox):
+    tasks.failures.append(DatabaseError("deadlock detected"))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 1)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
+
+    assert outbox.passes == [ten(0)]
