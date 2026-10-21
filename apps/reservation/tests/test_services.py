@@ -622,15 +622,17 @@ def test_the_host_writes_somebody_on_the_waitlist_and_marks_her_contacted():
             "date": "2026-10-15",
             "preferred_time": "21:00",
             "party_size": 3,
+            "notes": "Window, please",
         },
         ctx_for(EMPLOYEE),
     )
     assert (
         entry.guest_name,
         entry.party_size,
+        entry.notes,
         entry.is_contacted,
         entry.is_converted,
-    ) == ("Luis", 3, False, False)
+    ) == ("Luis", 3, "Window, please", False, False)
     contacted = run(
         "reservation.waitlist.update",
         {"id": str(entry.id), "is_contacted": True, "notes": "Called"},
