@@ -761,7 +761,9 @@ Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se arm
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
 línea enviada, avisa de la línea anulada con su motivo.
 Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
-podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Pedir que se quite una línea ya
+podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Si la comanda se envía pero su hoja
+no se imprime, el TPV avisa «Comanda N enviada a cocina, pero no se imprimió. Revisa la impresora de
+cocina en Impresión.». Pedir que se quite una línea ya
 enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
