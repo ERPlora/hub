@@ -301,6 +301,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await rowAction(page, 'appointment-list', online.id, 'charge');
       await page.waitForURL(/\/sale\/pos\?order=/);
       expect(psql(`select label from sale_order where appointment_id = '${online.id}'`)).toBe(`${who.customer.name} · ${online.number}`);
+      await expect(shown(page).locator('[data-testid=pos-total]')).toContainText('20.00');
       await capture(page, 'APPOINTMENT-F17');
 
       // APPOINTMENT-F09: an appointment whose time is gone is marked as a no-show.
