@@ -1,7 +1,8 @@
 // The print host's channel, /ws/print, in Chrome (PLAN-HUB §5; base/ws_print.py). It answered 500: Django
 // serves HTTP only. A page of the hub, signed in, opens the WebSocket the way the device's print host does,
-// says hello with the printer it reaches, is woken when a job is queued (by the API, after its COMMIT), claims
-// it and confirms it printed. No screen changes: there are no screenshots.
+// says hello with the printer it reaches (a device new here: the owner's session sets it up instead of being
+// refused, PRINTING-F18), is woken when a job is queued (by the API, after its COMMIT), claims it and confirms it
+// printed. No screen changes: there are no screenshots.
 // flow: ninguno — FIX base
 // What is made here is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
@@ -11,6 +12,7 @@ import { stamp } from './sale-helpers';
 
 const RUN = stamp();
 const PRINTER = `e2e WS label ${RUN}`;
+const DEVICE = 'e2e-ws-till';
 
 interface Frame {
   type: string;
@@ -19,6 +21,9 @@ interface Frame {
 
 test.afterAll(() => {
   psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like 'e2e WS %')`);
+  // The owner's claim set the device up on the printer (PRINTING-F18): its registration goes before the printer.
+  psql(`delete from printing_printdevice_printers where printer_id in (select id from printing_printer where name like 'e2e WS %')`);
+  psql(`delete from printing_printdevice where key = encode(sha256('${DEVICE}'::bytea), 'hex')`);
   psql(`update printing_settings set label_printer_id = null where label_printer_id in (select id from printing_printer where name like 'e2e WS %')`);
   psql(`delete from printing_printer where name like 'e2e WS %'`);
 });
@@ -44,7 +49,7 @@ test('ninguno — FIX base: the device opens /ws/print, is woken by a new job, t
   expect(printer.status).toBe(201);
 
   await page.evaluate(
-    (printerId) =>
+    ({ printerId, deviceId }) =>
       new Promise<void>((resolve, reject) => {
         const socket = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/print`);
         const page = window as unknown as { printSocket: WebSocket; printFrames: unknown[] };
@@ -52,16 +57,16 @@ test('ninguno — FIX base: the device opens /ws/print, is woken by a new job, t
         page.printFrames = [];
         socket.onmessage = (event) => page.printFrames.push(JSON.parse(String(event.data)));
         socket.onopen = () => {
-          socket.send(JSON.stringify({ type: 'hello', session: '', deviceId: 'e2e-ws-till', printers: [printerId] }));
+          socket.send(JSON.stringify({ type: 'hello', session: '', deviceId, printers: [printerId] }));
           resolve();
         };
         socket.onerror = () => reject(new Error('the print channel did not open'));
       }),
-    printer.data.id,
+    { printerId: printer.data.id, deviceId: DEVICE },
   );
   await expect.poll(() => frames(page)).toContainEqual({
     type: 'ready',
-    deviceId: 'e2e-ws-till',
+    deviceId: DEVICE,
     roles: ['label'],
     heartbeatSeconds: 30,
   });

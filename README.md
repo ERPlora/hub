@@ -130,9 +130,14 @@ ya hace el *upgrade* por HTTP/1.1 (el latido de 30 s del dispositivo cabe en su 
 - **Protocolo**: el del Hub viejo (`print_ws.rs`), mismos mensajes y campos: `hello` (con `deviceId` y las
   `printers` a las que llega el dispositivo) → `ready`; `claim` → `job` o `idle`; `done`/`failed` → `ack`; `beat`;
   y del Hub, `wake` y `error` con su código. La tabla de códigos está en el docstring de `base/ws_print.py`.
-- **La cola es de Impresión**: el canal llama por nombre a `printing.printer.get`, `printing.job.claim`,
-  `printing.job.complete`, `printing.job.fail` y `printing.job.list`, con la sesión del dispositivo (mismos permisos,
-  ámbito y comprobación de app que la API HTTP); no toca modelos.
+- **Quién imprime lo decide Impresión** (PRINTING-F18): en `hello` el canal lee el alta del dispositivo por su
+  `deviceId` (`printing.device.get`) y sus impresoras son las activas de esa alta, como en el Hub viejo. Un
+  dispositivo sin alta (o retirado) se rechaza ya en `hello` con `print.host_not_registered` (4403). Con la sesión de
+  quien gestiona las impresoras, las `printers` que nombra se suman y su primer `claim` lo da de alta (o le añade la
+  impresora); con cualquier otra sesión no cambian nada. Cada `beat` vuelve a leer el alta: retirado, `refreshed: 0`.
+- **La cola es de Impresión**: el canal llama por nombre a `printing.device.get`, `printing.printer.get`,
+  `printing.job.claim`, `printing.job.complete`, `printing.job.fail` y `printing.job.list`, con la sesión del
+  dispositivo (mismos permisos, ámbito y comprobación de app que la API HTTP); no toca modelos.
 - **El `wake`** no abre otro `LISTEN`: el socket tiene un stream del broker de `live` (el `LISTEN` único del proceso
   en la BD de control, el de `/api/live`) suscrito al primer trabajo en cola de cada función del dispositivo; tras el
   COMMIT de un trabajo nuevo, solo en el canal de su hub, llega el empujón, sin el documento.
