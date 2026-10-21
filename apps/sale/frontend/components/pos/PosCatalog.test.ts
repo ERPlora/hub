@@ -23,7 +23,8 @@ afterEach(() => vi.mocked(toast).mockClear());
 
 const PRODUCTS = 'inventory.product.list';
 const CATEGORIES = 'inventory.category.list';
-const GRID = { is_active: true, sort: 'name' };
+// The grid shows what is sold out too, greyed (SALE-F07): the count of «All» is what is on sale.
+const GRID = { is_active: true, include_sold_out: true, sort: 'name' };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountSale(PosCatalog, { props: { showProducts: true, canOpenPrice: true, ...props }, locale });
@@ -99,6 +100,16 @@ describe('PosCatalog: taps', () => {
     await s.result(PRODUCTS, page([product({ id: 'p1', needs_tax_setup: true })]), { sort: 'name' });
     await click(s.find('pos-product-p1').element);
     const reason = 'No se puede vender: sin categoría fiscal. Falta configurar el IGIC.';
+    expect(s.find('pos-tap-notice').text()).toBe(reason);
+    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
+  });
+
+  it('a sold-out article adds nothing: «… is sold out.» goes above the grid and in a warning toast', async () => {
+    const s = await setup({}, 'es');
+    await s.result(PRODUCTS, page([product({ id: 'p1', name: 'Croquetas', is_sold_out: true })]), { sort: 'name' });
+    await click(s.find('pos-product-p1').element);
+    expect(s.wrapper.emitted('add')).toBeUndefined();
+    const reason = '«Croquetas» está agotado.';
     expect(s.find('pos-tap-notice').text()).toBe(reason);
     expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
   });

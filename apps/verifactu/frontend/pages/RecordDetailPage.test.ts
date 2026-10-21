@@ -1,6 +1,6 @@
-// A record (VERIFACTU-F17, F18, F24, F25, F30): «Record <number>» with its status and environment, why it is not in
+// A record (VERIFACTU-F17, F18, F24, F25, F30, F35): «Record <number>» with its status and environment, why it is not in
 // the AEAT yet (or that the AEAT rejected it and what to do), its invoice, its chain, its QR, the AEAT's answer and
-// its XML; «Send now», «Correct» and «Cancel record» where they apply and for whoever may.
+// its XML; «Send now», «Ask the AEAT», «Correct» and «Cancel record» where they apply and for whoever may.
 import { toast, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -182,6 +182,43 @@ describe('RecordDetailPage', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Correction of TICKET-2026-000002 sealed: it goes out with the next pass.');
   });
 
+  it('«Ask the AEAT» takes it out of the queue when the AEAT already has it (VERIFACTU-F35)', async () => {
+    const s = await setup();
+    s.answer(200, { held: true, record: { id: 'r1', invoice_number: 'TICKET-2026-000002' } });
+    await click(s.find('verifactu-record-ask').element);
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/verifactu/records/reconcile', query: {}, body: { record_id: 'r1' } }]);
+    expect(toastSuccess).toHaveBeenCalledWith('The AEAT already has TICKET-2026-000002: it is out of the queue.');
+  });
+
+  it('when the AEAT does not have it, «Ask the AEAT» says it stays in the queue, never a success', async () => {
+    const s = await setup();
+    s.answer(200, { held: false, record: { id: 'r1', invoice_number: 'TICKET-2026-000002' } });
+    await click(s.find('verifactu-record-ask').element);
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(
+      'The AEAT does not have TICKET-2026-000002: it stays in the queue and goes out with the next pass.',
+      'warning',
+      4500,
+    );
+  });
+
+  it('a refusal of «Ask the AEAT» is said above the buttons, in the server’s words', async () => {
+    const s = await setup();
+    s.answer(409, { error: { code: 'verifactu.gateway_unavailable', message: 'The AEAT cannot be asked now.' } });
+    await click(s.find('verifactu-record-ask').element);
+    expect(s.find('verifactu-record-error').text()).toBe('The AEAT cannot be asked now.');
+  });
+
+  it('in Spanish, «Ask the AEAT» is «Preguntar a la AEAT»', async () => {
+    const s = await setup({}, { locale: 'es' });
+    expect(s.find('verifactu-record-ask').text()).toBe('Preguntar a la AEAT');
+  });
+
+  it('a record out of the queue has nothing to ask the AEAT', async () => {
+    const s = await setup({ status: 'accepted', waiting: [], can_transmit: false });
+    expect(s.find('verifactu-record-ask').exists()).toBe(false);
+  });
+
   it('«Cancel record» opens its window', async () => {
     const s = await setup();
     await click(s.find('verifactu-record-cancel').element);
@@ -190,7 +227,7 @@ describe('RecordDetailPage', () => {
 
   it('the employee only looks', async () => {
     const s = await setup({ can_correct: true }, { session: EMPLOYEE });
-    for (const action of ['transmit', 'correct', 'cancel']) expect(s.find(`verifactu-record-${action}`).exists()).toBe(false);
+    for (const action of ['transmit', 'ask', 'correct', 'cancel']) expect(s.find(`verifactu-record-${action}`).exists()).toBe(false);
   });
 
   it('a record that does not exist says so, with Back', async () => {

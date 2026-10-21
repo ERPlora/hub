@@ -113,7 +113,8 @@ zonas:
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos («Todos» primero y,
   con Servicios, «Servicios» detrás), la lupa que abre el buscador («Buscar producto…», por nombre o
   SKU, en el servidor; con Servicios busca también sus servicios) y la rejilla: artículos con sus
-  iniciales, su unidad y su precio, y al final la baldosa «Precio libre». En «Servicios», cada servicio
+  iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al final la baldosa «Precio
+  libre». En «Servicios», cada servicio
   con sus iniciales, su duración y su precio («Desde», «Por hora», «Variable» o «Gratis» si no es de
   precio fijo). La rejilla pide de 100 en 100, por categoría, y «Cargar más» trae los siguientes.
 - **Cuenta** (en el móvil, un cajón que abre el botón flotante con el total): arriba, el botón de
@@ -278,7 +279,8 @@ cobro (INVOICE-F01): o los dos o ninguno. Ventas avisa de la venta cobrada: Inve
 el tipo, el país, la región y la regla de Impuestos con que se cobró.
 Si falla: sin importe entregado el botón no cobra y se lee «Marca en el teclado el importe
 entregado»; corto, «Lo entregado no cubre el total». Un artículo sin IVA sale marcado «Falta el IVA»
-y al tocarlo dice «No se puede vender: sin categoría fiscal. Falta configurar el IVA.». Un rechazo al
+y al tocarlo dice «No se puede vender: sin categoría fiscal. Falta configurar el IVA.»; uno agotado
+sale en gris con «Agotado» y al tocarlo dice «… está agotado.» (SALE-F07). Un rechazo al
 cobrar se pinta en la hoja con su frase (p. ej. «Un producto del tique ya no está en el catálogo.
 Quita la línea y vuelve a añadirla.») y la cuenta sigue intacta. Si mientras se cobra otro
 dispositivo cambia la cuenta (añade, cambia, quita, anula o cobra una línea, pone o quita un
@@ -425,16 +427,22 @@ Pasos:
    no se pueden vender: les falta el IVA.» y, a quien puede arreglarlo, «Revisar el catálogo», que
    lleva a Inventario.
 2. Esos artículos salen en la rejilla marcados «Falta el IVA» y no entran en la cuenta.
-3. Si Inventario no está activo, la rejilla lo explica y se vende a precio libre.
-4. Con VeriFactu activa, si ahora mismo no deja emitir tiques ni facturas (el negocio ya factura en
+3. Lo que Inventario tiene marcado como agotado sale en la rejilla y en el buscador en gris, con
+   «Agotado»: tocarlo no lo añade y dice «… está agotado.» con su nombre. Pedirlo por el asistente
+   tampoco lo añade. Lo que ya estaba en una cuenta antes de agotarse se divide, se junta, se
+   imprime y se cobra igual. En cuanto vuelve a la venta, se puede pedir otra vez.
+4. Si Inventario no está activo, la rejilla lo explica y se vende a precio libre.
+5. Con VeriFactu activa, si ahora mismo no deja emitir tiques ni facturas (el negocio ya factura en
    producción y sus registros no tendrían cómo llegar a Hacienda), sale arriba de la rejilla «Ahora no se
    pueden cobrar ventas.» con el motivo que da VeriFactu y, a quien puede configurarla, «Revisar VeriFactu».
    El aviso se va solo en cuanto se arregla.
-Entra: el catálogo de venta de Inventario y la configuración de VeriFactu.
+Entra: el catálogo de venta de Inventario (con lo agotado) y la configuración de VeriFactu.
 Sale: nada.
 Si falla: si el catálogo no carga, «No se ha podido cargar el catálogo.» con «Reintentar»; el precio
 libre sigue disponible. Si VeriFactu no se puede leer, no hay aviso: el propio cobro dice por qué no sale.
-Implicados: INVENTORY-F04, VERIFACTU-F08
+Si un artículo se agota con **Vender** abierto y se toca antes de que la rejilla lo ponga en gris, no
+entra en la cuenta y sale el mismo «… está agotado.».
+Implicados: INVENTORY-F04, INVENTORY-F29, VERIFACTU-F08
 
 ### SALE-F08 Cobrar sin la caja abierta
 <!-- origen: old:sales/workflow/vender-y-cobrar.md#sales-f08 -->
@@ -1654,8 +1662,9 @@ administrador y responsable, los mismos que anulan y devuelven).
 - No mueve stock ni cuadra la caja: Inventario al oír la venta; Caja lee las ventas de cada turno.
 - No habla con el datáfono ni con la báscula.
 - No tiene propinas, ni comensal por línea, ni cursos con retención.
-- No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV deja de ofrecer lo
-  que el catálogo no tiene a la venta.
+- No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV enseña en gris
+  con «Agotado» lo que Inventario tiene agotado y no deja pedirlo (`sale.product_sold_out`), pero cobra lo
+  que ya estaba pedido (SALE-F07).
 - No reabre una venta cobrada ni cambia su tipo de documento.
 - No reprecia una cuenta abierta: si el catálogo cambia, la cuenta conserva el precio con que se
   pidió.

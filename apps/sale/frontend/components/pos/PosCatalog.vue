@@ -3,8 +3,9 @@
 // magnifier and the ⋮ screen menu, the notices, and the grid. Everything comes from Inventory's own
 // operations: the categories by name, the count of «All», and the articles of the category in use in
 // windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too.
-// A sellable tap goes up (`add`); a blocked one says why, above the grid and in a toast, and adds
-// nothing. Inventory off: the grid explains it and the open price stays. With products hidden by the
+// The grid and the search show what is sold out in Inventory too, greyed (SALE-F07): the counts are what is
+// on sale (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the
+// grid and in a toast, and adds nothing. Inventory off: the grid explains it and the open price stays. With products hidden by the
 // till settings, only the open price is offered. With the services of Services (SALE-F38,
 // `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
 // hidden; «All» keeps the open price); a sellable service goes up (`service`), the search finds them too.
@@ -77,7 +78,12 @@ const categories = useLiveWindows<'inventory.category.list', CategoryOut>('inven
 const allCount = useLive('inventory.product.list', { is_active: true, limit: 1, offset: 0 });
 const products = useLiveWindows<'inventory.product.list', ProductOut>(
   'inventory.product.list',
-  () => ({ is_active: true, sort: 'name', ...(productCategory.value ? { category_id: productCategory.value } : {}) }),
+  () => ({
+    is_active: true,
+    include_sold_out: true,
+    sort: 'name',
+    ...(productCategory.value ? { category_id: productCategory.value } : {}),
+  }),
   100,
 );
 
@@ -94,15 +100,20 @@ const emptyText = computed(() => {
   return failure.value ?? undefined;
 });
 
-/** A tap on something without VAT: the reason above the grid and in a toast; nothing is added. */
-function blocked(): void {
-  const reason = t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value });
+/** A tap on something the till cannot sell now: the reason above the grid and in a toast; nothing is added. */
+function refuse(reason: string): void {
   tapNotice.value = reason;
   void toast(reason, 'warning');
 }
 
+/** A tap on something without VAT. */
+function blocked(): void {
+  refuse(t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value }));
+}
+
 function pick(product: ProductOut): void {
   searching.value = false;
+  if (product.is_sold_out) return refuse(t('sale.pos.soldOut', { name: product.name }));
   if (product.needs_tax_setup) return blocked();
   tapNotice.value = null;
   emit('add', product);

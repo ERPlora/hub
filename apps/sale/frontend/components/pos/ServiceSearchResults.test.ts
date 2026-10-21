@@ -28,7 +28,7 @@ describe('ServiceSearchResults', () => {
     await m.result(OP, page([cut]));
     expect(m.find('pos-search-services-title').text()).toBe('Servicios');
     const row = m.find('pos-search-service-sv1');
-    expect(row.find('p').text()).toBe('30 min');
+    expect(row.find('.pos-search__note').text()).toBe('30 min');
     expect(plain(row.find('.pos-search__price').text())).toBe('18,00 €');
     await click(row.element);
     expect(m.wrapper.emitted('pick')).toEqual([[cut]]);
@@ -39,14 +39,21 @@ describe('ServiceSearchResults', () => {
     await m.result(OP, page([service({ id: 'sv2', needs_tax_setup: true })]));
     const row = m.find('pos-search-service-sv2');
     expect(row.attributes('aria-disabled')).toBe('true');
-    expect(row.find('p').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
+    expect(row.find('.pos-search__note').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
+  });
+
+  it('a row is a native button, so one without VAT keeps its aria-disabled in the browser (an ion-item drops it)', async () => {
+    const m = await setup();
+    await m.result(OP, page([service({ id: 'sv1' }), service({ id: 'sv2', needs_tax_setup: true })]));
+    expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).element.tagName)).toEqual(['BUTTON', 'BUTTON']);
+    expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).attributes('aria-disabled'))).toEqual([undefined, 'true']);
   });
 
   it('in the Canary Islands a service without its tax names the IGIC', async () => {
     const m = await setup();
     await m.result('tax.settings.get', taxSettings('igic'));
     await m.result(OP, page([service({ id: 'sv2', needs_tax_setup: true })]));
-    expect(m.find('pos-search-service-sv2').find('p').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IGIC.');
+    expect(m.find('pos-search-service-sv2').find('.pos-search__note').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IGIC.');
   });
 
   it('nothing found paints nothing', async () => {

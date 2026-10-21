@@ -332,6 +332,18 @@ export interface ContingencyListIn extends PageIn {
   dir?: SortDir;
 }
 
+/** How the AEAT's query names the state of a record it holds (`EstadoRegistro`). */
+export type AeatState = 'Correcto' | 'AceptadoConErrores' | 'Anulado';
+
+export interface AeatRecordListIn extends PageIn {
+  search?: string;
+  state?: AeatState;
+  issue_date_from?: string;
+  issue_date_to?: string;
+  sort?: 'generated_on' | 'invoice_number' | 'issue_date' | 'fingerprint' | 'state' | 'csv' | 'queried_at';
+  dir?: SortDir;
+}
+
 export interface EventListIn extends PageIn {
   search?: string;
   kind?: EventKind;
@@ -375,7 +387,7 @@ declare module '@erplora/ui/sdk' {
     'verifactu.stats.records_by_status': { input: NoInput; output: { rows: { status: RecordStatus; label: string; total: number }[] } };
     'verifactu.stats.contingency_summary': { input: NoInput; output: { queued_count: number; overdue_count: number; severity: 'ok' | 'warning' | 'danger' } };
     'verifactu.stats.events_recent': { input: { limit?: number }; output: { rows: EventOut[] } };
-    'verifactu.aeat_record.list': { input: PageIn; output: Page<AeatRecordOut> };
+    'verifactu.aeat_record.list': { input: AeatRecordListIn; output: Page<AeatRecordOut> };
     'verifactu.aeat.query': { input: IssuerIn & { year?: number; month?: number }; output: { count: number; rows: AeatRecordOut[] } };
     'verifactu.chain.status': { input: IssuerIn; output: ChainStatusOut };
     'verifactu.chain.validate': { input: IssuerIn; output: ChainValidationOut };

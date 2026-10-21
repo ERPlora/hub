@@ -7,11 +7,13 @@ transaction.
 import json
 
 import pytest
+from live.context import system_context
 from live.ninja import ensure_api_parity
 from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
 from apps.sale.api import router
+from apps.sale.tests.conftest import A, run
 from config.api import api
 
 ROUTES = {
@@ -86,9 +88,9 @@ def get(client, path, host="a.localhost", **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data, host="a.localhost"):
+def post(client, path, data, host="a.localhost", **headers):
     return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
+        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host, **headers
     )
 
 
@@ -274,3 +276,29 @@ def test_an_employee_pays_a_line_with_a_voucher_over_http_and_an_exhausted_one_i
         {"order_id": order["id"], "line_id": line},
     )
     assert undone.status_code == 200 and undone.json()["lines"][0]["paid_by_voucher"] is False
+
+
+@pytest.mark.django_db
+def test_a_sold_out_article_is_a_409_over_http_and_the_check_stays_as_it_was(employee_client, product):
+    # INVENTORY-F29 / SALE-F07: a new line of an article marked sold out is refused at every door.
+    product("Croquettes", "CRQ", 650, "restaurant.food")
+    product("Coffee", "COF", 150, "restaurant.drink")
+    run("inventory.product.set_sold_out", {"product": "CRQ", "sold_out": True}, system_context(A))
+    order = post(employee_client, "/sale/orders", {"label": "Bar", "lines": [{"product": "COF"}]}).json()
+    refusals = [
+        post(employee_client, "/sale/orders", {"label": "Bar", "lines": [{"product": "CRQ"}]}),
+        post(employee_client, "/sale/orders/add_line", {"order_id": order["id"], "product": "CRQ"}),
+        post(
+            employee_client,
+            "/sale/sales",
+            {"idempotency_key": "http-sold-0001", "lines": [{"product": "CRQ"}], "payments": [{"method": "card"}]},
+        ),
+    ]
+    assert [(r.status_code, r.json()["error"]["code"]) for r in refusals] == [(409, "sale.product_sold_out")] * 3
+    assert refusals[0].json()["error"]["message"] == "«Croquettes» is sold out."
+    spanish = post(
+        employee_client, "/sale/orders/add_line", {"order_id": order["id"], "product": "CRQ"}, HTTP_ACCEPT_LANGUAGE="es"
+    )
+    assert spanish.json()["error"]["message"] == "«Croquettes» está agotado."
+    check = get(employee_client, "/sale/orders/detail", order_id=order["id"]).json()
+    assert [line["sku"] for line in check["lines"]] == ["COF"]
