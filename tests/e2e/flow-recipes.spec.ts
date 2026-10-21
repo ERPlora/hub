@@ -87,6 +87,8 @@ for (const viewport of VIEWPORTS) {
       const notice = shown(page).locator(`[data-testid="flow-repair-${REF}"]`);
       await expect(notice).toContainText('«My gap» was set up with an older version of Appointments');
       await expect(notice).toContainText('Updating it only changes when it starts');
+      // The list under the notice has loaded before the screenshot: the automation is still there, paused.
+      await expect(shown(page).locator(`[data-testid="flow-list-toggle-${built('id')}"]`)).toBeVisible();
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F36');
       await shown(page).locator(`[data-testid="flow-repair-run-${REF}"]`).click();
