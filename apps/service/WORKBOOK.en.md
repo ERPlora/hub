@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5d6c24e9f8c89ffa925c91e0cabcfc224ab5584a80cc6a6f8beb7a86a70f8293 -->
+<!-- generated from WORKBOOK.md sha256:6756d1f96929c5656f3c0b0edd42851ea6c258afa6a446820eb580c44f7bcb49 -->
 
 ## What it is for and who it is for
 
@@ -732,7 +732,9 @@ the professionals of a service and to take their own duration and price, and Sal
 price (SALE-F38). Assigning the same person again (assistant or API) changes their minutes and their
 price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
-several (the list to choose from) or the amount unreadable or negative.
+several (the list to choose from) or the amount unreadable or negative. While the list arrives it shows
+"Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
+"Retry", never "Nobody assigned yet".
 Involved: STAFF-F01, SALE-F38
 
 ### SERVICE-F32 Change or remove a professional from a service

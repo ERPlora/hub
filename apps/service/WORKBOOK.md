@@ -766,7 +766,9 @@ los profesionales de un servicio y tomar su duración y su precio propios, y Ven
 propio (SALE-F38). Asignar otra vez a la misma persona (asistente o API) cambia sus minutos y su precio;
 su servicio principal solo cambia si se dice.
 Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
-vale para varios (la lista para elegir) o el importe ilegible o negativo.
+vale para varios (la lista para elegir) o el importe ilegible o negativo. Mientras llega la lista sale
+«Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
+«Reintentar», nunca «Nadie asignado todavía».
 Implicados: STAFF-F01, SALE-F38
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
