@@ -14,12 +14,13 @@ import { IonInput, IonReorder, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
-import { type DataChoice, delayParts, type DelayUnit, secondsOf } from '../lib/document';
+import { type DataChoice, delayParts, type DelayUnit, NOTIFY_OPERATION, secondsOf } from '../lib/document';
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
 import AskStepPanel from './AskStepPanel.vue';
 import ConditionRows from './ConditionRows.vue';
 import HttpStepPanel from './HttpStepPanel.vue';
+import MessageStepPanel from './MessageStepPanel.vue';
 import StepOptions from './StepOptions.vue';
 import ValueBox from './ValueBox.vue';
 
@@ -131,6 +132,8 @@ function helper(field: FieldOut): string | undefined {
 }
 
 const title = computed(() => describeStep(props.step, props.steps, props.catalog, phrasing.value));
+/** «Send a message» (FLOW-F31): the narrow send has its own form, not the list of actions. */
+const message = computed(() => props.step.kind === 'command' && props.step.operation === NOTIFY_OPERATION);
 
 /** «Only if: … · If it fails, it carries on», for a closed step that has options. */
 const summary = computed(() => {
@@ -451,7 +454,18 @@ const summary = computed(() => {
         class="flow-card__panel"
         :data-testid="`flow-step-panel-${id}`"
       >
+        <MessageStepPanel
+          v-if="message"
+          :step="step"
+          :index="index"
+          :steps="steps"
+          :catalog="catalog"
+          :errors="errors"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
         <Combo
+          v-else
           :testid="`flow-step-action-${id}`"
           :model-value="chosenAction"
           :options="actions"
@@ -485,7 +499,7 @@ const summary = computed(() => {
           >{{ $t('flow.steps.queryHint') }}</span>
         </template>
         <div
-          v-if="step.operation"
+          v-if="step.operation && !message"
           class="flow-card__field"
         >
           <span class="flow-card__label">{{ $t('flow.steps.info') }}</span>

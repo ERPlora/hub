@@ -241,7 +241,7 @@
         "items": [
           "Branches: an automation is one column; «Only continue if…» ends it when it does not hold. Two outcomes are two automations.",
           "Counting back from a date of the event («the day before the appointment»): a wait counts from the previous step.",
-          "Sending messages or asking the assistant: they come in a later version.",
+          "Asking the assistant: it comes in a later version. Messages to a customer go by WhatsApp only, not by email.",
           "The assistant writes drafts: it never turns an automation on nor allows it anything."
         ]
       }
@@ -331,6 +331,7 @@
         "query": "Look something up",
         "condition": "Only continue if…",
         "delay": "Wait",
+        "message": "Send a message",
         "http": "Call another system",
         "ask": "Ask someone first"
       },
@@ -1290,7 +1291,8 @@
       "whatsapp_inbox__message__list": "Read the messages of a WhatsApp conversation",
       "whatsapp_inbox__note__add": "Write a note on a WhatsApp conversation",
       "whatsapp_inbox__note__list": "Read the notes of a WhatsApp conversation",
-      "whatsapp_inbox__template__list": "Look for WhatsApp templates"
+      "whatsapp_inbox__template__list": "Look for WhatsApp templates",
+      "whatsapp_inbox__message__notify": "Send a WhatsApp to a customer"
     },
     "facts": {
       "created": "created",
@@ -2533,6 +2535,20 @@
       "continue": "Carry on with the next steps",
       "asNo": "Count it as a no",
       "continueHint": "To act on the answer, add «Only continue if…» on «Approved» (or «Expired») after this step."
+    },
+    "message": {
+      "phone": "To (their phone)",
+      "phoneHint": "Insert the customer's phone: only the WhatsApp conversation of exactly that international number gets it. If there is none, nothing is sent.",
+      "text": "Message",
+      "textHint": "Sent as it is if the customer wrote to you in the last 24 hours.",
+      "template": "Template",
+      "noTemplate": "No template",
+      "templateHint": "After 24 hours WhatsApp only lets an approved template through.",
+      "templatesLoading": "Reading your WhatsApp templates…",
+      "templatesError": "Your WhatsApp templates could not be read.",
+      "noTemplates": "You have no approved templates yet: create one in WhatsApp › Settings.",
+      "missing": "«{name}» is not among your approved WhatsApp templates: WhatsApp will not send it.",
+      "variable": "Value {n}"
     },
     "inbox": {
       "heading": "Waiting for your answer",
