@@ -87,8 +87,9 @@ cada estación por su nombre y con su color, y «Sin estación»). La estación 
 dispositivo. Debajo, una rejilla de tarjetas de columnas iguales (una sola en el móvil). Cada tarjeta:
 la etiqueta («Mesa 4»; sin etiqueta, el tipo), «Camarero: <nombre>», las marcas «Urgente», «VIP»,
 «Ronda N» (desde la segunda) y «Lista», el reloj y el número corto «#0012»; los platos con la cantidad
-grande, el nombre, la nota en cursiva y, en «Todas», la estación; un icono de papel si la estación es
-solo de papel. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
+grande, el nombre, sus suplementos en negrita, la nota en cursiva y, en «Todas», la estación; los platos
+de un menú, junto a una raya bajo la cabecera del menú, que dice cuántos platos lleva («2 platos») y al
+tocarla marca listos sus platos; un icono de papel si la estación es solo de papel. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
 responde al toque. Al pie, según el permiso y el estado: «Listo», «Marcar urgente» / «Quitar
 urgente», «Recuperar» y «Servida». El borde superior de la tarjeta va en verde, ámbar o rojo según el
 tiempo desde que se envió. Vacía: «No hay comandas en marcha.» (Comandas), «No hay nada esperando a
@@ -105,7 +106,7 @@ Total; buscador «Buscar comanda o destino…» (por número y etiqueta), filtro
 Estado, y vista tabla o tarjetas. Acciones por fila, solo icono: «Lanzar», «Lista», «Servida»,
 «Recuperar» y «Cancelar» (en el menú «⋮», con confirmación y motivo opcional); solo salen las que el
 perfil puede hacer y se esconden las que el estado no admite. Tocar una fila abre su detalle: los
-platos con su estación y su estado. «Nueva comanda» abre el panel (a pantalla completa en el móvil)
+platos con su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel (a pantalla completa en el móvil)
 con Tipo, Destino, Notas y sus platos (producto del catálogo, cantidad y nota; «Añadir plato»), y
 «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
 tabla con reintento; un rechazo de una acción sale en su diálogo o encima de la tabla, y uno del alta,
@@ -160,8 +161,8 @@ campo marcado.
 | KITCHEN-F03 | Eliminar una estación | hecho |
 | KITCHEN-F04 | Mandar productos y categorías a una estación (y quitarlos) | hecho |
 | KITCHEN-F05 | Recibir la ronda que envía el TPV | hecho |
-| KITCHEN-F06 | Un menú del día en la comanda | no hecho — Ventas todavía no manda menús desglosados |
-| KITCHEN-F07 | Notas de cada plato | hecho (los suplementos, cuando Ventas los mande) |
+| KITCHEN-F06 | Un menú del día en la comanda | hecho |
+| KITCHEN-F07 | Notas de cada plato | hecho |
 | KITCHEN-F08 | La comanda sale en papel en cada estación | hecho |
 | KITCHEN-F09 | Reimprimir una comanda | hecho |
 | KITCHEN-F10 | Ver el tablero de cocina | hecho |
@@ -261,11 +262,12 @@ Pasos:
    Madrid), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
    camarero.
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
-   (KITCHEN-F04). Las líneas de servicio no se cocinan.
+   (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
+   cocinan.
 4. La comanda aparece en la pantalla «Por preparar», suena (KITCHEN-F16) y sale en papel
    (KITCHEN-F08).
 Entra: de Ventas, las líneas enviadas de la cuenta (su ronda, su hora de envío, su producto, su
-cantidad, su nota y su categoría) y, cuando el envío lo hace Cocina, la prioridad, el canal y quién
+cantidad, su nota, sus suplementos, su categoría y, si es un menú, sus platos) y, cuando el envío lo hace Cocina, la prioridad, el canal y quién
 envía.
 Sale: la comanda «Por preparar» con sus platos y «Recibida» en el Historial, a la hora del envío
 (avisa: comanda recibida).
@@ -273,20 +275,51 @@ Si falla: una ronda de solo servicios no abre comanda. Lo que se envió antes de
 el negocio no aparece. Ningún fallo de aquí bloquea al camarero.
 
 ### KITCHEN-F06 Un menú del día en la comanda
-Estado: no hecho — Ventas todavía no tiene menús desglosados (`combo`): cuando los mande, cada plato
-irá a su estación con la cabecera del menú, como en el producto actual (pedido a Ventas).
-
-### KITCHEN-F07 Notas de cada plato
+<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f06 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
 Pasos:
-1. El camarero escribe una nota en la línea antes de enviar (SALE-F13).
-2. En la tarjeta, debajo del nombre del plato sale la nota en cursiva; en el papel, igual.
-Entra: de Ventas, la nota de la línea y, si la línea va invitada, el motivo.
-Sale: la nota congelada en el plato.
-Si falla: una alergia solo existe como texto de la nota. Los suplementos llegarán cuando Ventas los
-mande (pedido a Ventas).
+1. En el TPV, añade un menú eligiendo un plato de cada tanda (SALE-F12) y pulsa «Enviar comanda»
+   (KITCHEN-F18).
+2. En la tarjeta sale la cabecera del menú (su nombre de cocina o, si no tiene, su nombre) con cuántos
+   platos lleva («2 platos»; «1 plato» si es uno) y, debajo, junto a una raya, cada plato elegido con la
+   cantidad multiplicada por los menús pedidos.
+3. Cada plato va a la estación de su propio producto o, si no tiene, a la de su categoría (KITCHEN-F04),
+   nunca a la del menú: cada estación ve solo sus platos, con la misma cabecera encima.
+4. Toca un plato para marcarlo listo, o toca la cabecera del menú para marcar listos de una vez sus
+   platos que quedan en pantalla; el resto de la comanda no cambia.
+5. En el papel de cada estación sale la cabecera del menú y, sangrados debajo, sus platos (KITCHEN-F08).
+Entra: de Ventas, el menú tal como se pidió: sus platos elegidos (cada uno con su producto y su
+categoría), su nombre de cocina, cuántos menús y la nota del menú, que sale en cada uno de sus platos.
+Sale: un plato por cada plato del menú, cada uno en su estación, que se marca listo y se entrega por
+separado; el importe del menú cuenta una sola vez en el total de la comanda (avisa: comanda recibida).
+Si falla: un plato del menú que es un servicio no se cocina ni sale; un menú cuyos platos son todos
+servicios no abre comanda. Un menú sin ningún plato llega como una sola línea con su nombre, en «Sin
+estación». El TPV no deja añadir un menú al que le falta una tanda obligatoria, así que nunca llega a
+medias. Anular el menú en el TPV tacha todos sus platos (KITCHEN-F29). Lo ya enviado no cambia aunque
+el menú cambie después.
+Implicados: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
+
+### KITCHEN-F07 Notas de cada plato
+<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f07 -->
+Estado: hecho
+Actor: empleado
+Pantalla: Pantalla
+Pasos:
+1. En el TPV, elige los suplementos del plato («+QUESO», «sin cebolla», el punto) (SALE-F11) y, si hace
+   falta, escribe una nota en la línea (SALE-F13); después envía la ronda.
+2. En la tarjeta, debajo del nombre del plato salen sus suplementos en negrita, separados por comas y en
+   el orden en que se eligieron, y debajo la nota en cursiva.
+3. En el papel salen igual: cada suplemento en su renglón, sangrado bajo el plato, y después la nota
+   (KITCHEN-F08).
+Entra: de Ventas, los suplementos elegidos con su nombre de cocina (si no tiene, su nombre), la nota de
+la línea y, si la línea va invitada, el motivo.
+Sale: los suplementos y la nota congelados en el plato: cambiar el catálogo después no cambia esta
+comanda.
+Si falla: una alergia solo existe como texto de la nota: no se resalta ni se distingue de otra nota. Un
+suplemento que se cobra en una línea aparte (otro IVA) sale igual bajo su plato.
+Implicados: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 La comanda sale en papel en cada estación
 Estado: hecho
@@ -296,8 +329,9 @@ Pasos:
 1. Al recibir la ronda por el envío de Cocina (KITCHEN-F18), Cocina pide a Impresión una hoja por
    impresora: los platos de cada estación que no es «Solo pantalla», por su función («Cocina»,
    «Barra») o por la impresora concreta de la estación; un plato sin estación, por «Cocina».
-2. La hoja lleva la etiqueta, el número, la ronda, el camarero y cada plato con su cantidad y su nota;
-   si la ronda va urgente, `!! URGENTE !!`.
+2. La hoja lleva la etiqueta, el número, la ronda, el camarero y cada plato con su cantidad, sus
+   suplementos (uno por renglón) y su nota, y los platos de un menú sangrados bajo su cabecera
+   (KITCHEN-F06, F07); si la ronda va urgente, `!! URGENTE !!`.
 Entra: los platos con el destino y la impresora congelados al recibir.
 Sale: un trabajo por impresora en la cola de Impresión, una sola vez aunque se pida dos veces.
 Si falla: nunca bloquea al camarero. Sin Impresión no sale papel y no se avisa (la cocina trabaja con
@@ -659,8 +693,8 @@ Sale: la lista.
 | Comanda enviada (`sale.order.fired`) | Ventas | Abre la comanda de esa ronda con su prioridad, su canal y su camarero, e imprime | `kitchen.ticket.receive` |
 | Cuenta cerrada (`sale.order.completed`), anulada (`sale.order.voided`), línea anulada (`sale.order.line_voided`) | Ventas | Pone al día las comandas de la cuenta (F27–F29) | `kitchen.ticket.sync` |
 
-Las reacciones las entrega el relay del outbox (fase 2, en el worker). Hasta entonces no hay relay:
-**lo que hizo Ventas se lee en cada lectura y se asienta en cada escritura**. Una ronda enviada que
+Las reacciones las entrega el relay del outbox, en el worker (hub#105). Además, **lo que hizo Ventas se
+lee en cada lectura y se asienta en cada escritura**. Una ronda enviada que
 Cocina aún no tiene se pinta igual (comanda «por recibir», con el número que tendrá) y la primera
 escritura de Cocina la guarda; una cuenta cobrada, anulada o una línea anulada cambian el estado que se
 lee, y la primera escritura lo guarda con su Historial. `live.py` re-ejecuta las consultas con los
@@ -670,7 +704,11 @@ avisos de Ventas (`sale.order.*`).
 
 - **Ventas** (requisito): sus cuentas y sus líneas enviadas (`Order`, `OrderLine`: ronda, hora de
   envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado y hora de cierre de
-  la cuenta), leídas con sus modelos; el envío, por su operación `sale.order.fire`.
+  la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
+  y el menú con su `kitchen_name` y sus platos, `combo.components`), leídas con sus modelos; el envío,
+  por su operación `sale.order.fire`. Un plato de un menú guarda la línea del menú y su número dentro de
+  él (`menu_dish`); su id sale del de la línea (`queries.dish_id`), así que la comanda por recibir y la
+  guardada comparten los ids de sus platos.
 - **Inventario** (requisito): los productos y las categorías del enrutado (claves ajenas) y sus
   listas para elegirlos (`inventory.product.list`, `inventory.category.list`).
 - **Impresión** (opcional): `printing.job.create` por nombre, con el documento `kitchen_order`
@@ -685,13 +723,14 @@ avisos de Ventas (`sale.order.*`).
      llama); sin ella, a `sale.order.fire`.
   2. La hoja «Comandas de la cuenta» del TPV (KITCHEN-F19, F20): `useLive('kitchen.ticket.by_order',
      {order_id})` y `kitchen.ticket.set_rush`; textos y estados como los de la pantalla de cocina.
-  3. Los menús desglosados y los suplementos de cada línea en `sale.order.fired` (KITCHEN-F06, F07).
-  4. Un aviso propio del cambio de título de una cuenta (p. ej. `sale.order.relabeled`): la pantalla ya
+  3. Un aviso propio del cambio de título de una cuenta (p. ej. `sale.order.relabeled`): la pantalla ya
      no se relanza con `sale.order.changed` (cada línea añadida en cualquier TPV la relanzaba), así que
      el título nuevo de una ronda por recibir sale en el siguiente aviso de cocina.
-  5. Índices parciales para la lectura de las rondas por recibir: `sale_orderline(fired_at) WHERE
+  4. Índices parciales para la lectura de las rondas por recibir: `sale_orderline(fired_at) WHERE
      fired_at IS NOT NULL` y `sale_order(closed_at)`.
-- **A Impresión**: nada nuevo; usa `kitchen_order` tal como está.
+- **A Impresión**: nada nuevo; usa `kitchen_order` tal como está. Cada plato lleva además sus
+  suplementos (`modifiers`, una lista) y, si es de un menú, `combo_ref` (la línea del menú) y
+  `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07).
 - **A Caja**: avisar al cerrar de las comandas sin servir con `kitchen.ticket.board` (CASH_REGISTER-F08).
 
 ### Quién puede qué
@@ -808,15 +847,10 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Regresión de paridad hasta la ronda de enganches**: Ventas todavía no llama a `kitchen.ticket.send`
   ni monta la hoja «Comandas de la cuenta», y Caja no pregunta por las comandas sin servir: F08 (papel al
   enviar desde el TPV), F18–F20 y F31 no tienen camino desde la UI, solo por el asistente o la API.
-- **Suplementos y menús** (F06, F07) tendrán que viajar en la línea de Ventas: hoy la línea no los lleva.
 - **Ronda de una cuenta fusionada**: Ventas conserva su `round_no`, así que la cuenta que queda puede
   tener dos «Comanda 1»; el producto actual las renumeraba detrás de las suyas.
 
 ### Lo que queda fuera
 
-- Los menús desglosados (F06) y los suplementos (F07) llegan cuando Ventas los mande.
 - El botón «Enviar comanda» y la hoja «Comandas de la cuenta» del TPV los monta Ventas (pedido arriba).
-- El relay del outbox (fase 2) hará que la reacción a `sale.order.fired` imprima la comanda de un envío
-  hecho directamente por Ventas (asistente, API, envío antes de cobrar); hasta entonces solo imprime el
-  envío de Cocina (`kitchen.ticket.send`).
 - Iconos deseados (`UI-REQUESTS.md`).
