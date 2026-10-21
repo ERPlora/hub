@@ -1,7 +1,8 @@
 // The searches behind the combo pickers (`Combo` of @erplora/ui): each asks the server for what the
 // person types, 20 at a time, and turns every row into an option. A choice is an active product of
 // Inventory, sold out today or not (INVENTORY-F29: only the till hides it) (by id, with its SKU and its price); a menu's VAT category, a Taxes key named by its name
-// and its rate in force. The required apps' lists are read through their own operations.
+// and its rate in force; a category of Inventory (by id, with how many products it has) narrows «Add
+// several» to it. The required apps' lists are read through their own operations.
 import type { ComboOption, ComboSearch } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 
@@ -42,5 +43,13 @@ export function searchTaxCategories(client: LiveClient, locale: string): ComboSe
       id: row.key,
       label: row.rate_pct === null || row.operation_class === null ? row.display_name || row.key : `${row.display_name || row.key} · ${formatRate(row.rate_pct, locale)}`,
     }));
+  };
+}
+
+/** Inventory's categories by name, each with how many products it has (`count` words it). */
+export function searchCategories(client: LiveClient, count: (n: number) => string): ComboSearch {
+  return async (query) => {
+    const page = await client.api.call('inventory.category.list', { ...search(query), limit: PAGE, sort: 'name' });
+    return page.rows.map((row): ComboOption => ({ id: row.id, label: row.name, hint: count(row.product_count) }));
   };
 }

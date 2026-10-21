@@ -152,7 +152,12 @@
       "empty": "No products in the catalogue yet.",
       "loadError": "The product catalogue could not be loaded.",
       "loading": "Loading…",
-      "retry": "Retry"
+      "retry": "Retry",
+      "category": "Category",
+      "categoryPlaceholder": "Every category",
+      "categoryCount": "Products: {n}",
+      "tickAll": "Tick all of “{category}” ({n})",
+      "noMatch": "No products match."
     }
   }
 }

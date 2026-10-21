@@ -1,7 +1,7 @@
 # Workbook — Menús y combos (app)
 Prefijo: COMBO
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas); lo que pinta o manda Ventas lo dice cada flujo
+Estado de la app: hecha (servidor, páginas y sus pasos en Ventas, Inventario y Cocina)
 
 > Manual de usuario y especificación de la app `combo`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -93,8 +93,8 @@ siempre a la vista y la elegida resaltada), «Tipo de IVA» (solo si es «en el 
 lista de menús» y la casilla «A la venta» (marcada de partida), con «Guardar» y «Cancelar».
 
 ### Constructor del menú
-Se abre al tocar un menú (`/combo/menus/<id>`). Arriba, la flecha atrás («Todos los menús»), el nombre
-y el precio del menú, y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
+Se abre al tocar un menú (`/combo/menus/<id>`). La flecha atrás de la barra de arriba vuelve a Menús.
+Arriba de la página, el nombre y el precio del menú, y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
 único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.» o «Este menú
 se factura como entrega de bienes: su precio se repartirá entre los componentes que añadas, una línea
 por cada uno.». Debajo, si el menú todavía no sale en el TPV, otro aviso dice por qué («Todavía no
@@ -109,7 +109,8 @@ para todo el negocio y, si el producto ya no se puede vender, «Desactivado en I
 catálogo», «No se vende por unidades en Inventario» o, en un menú «para llevar», «Sin tipo de IVA para
 llevar»; por fila, el asa, subir, bajar, «Agotado / Disponible», editar y quitar. Debajo, el buscador
 «Busca un producto…», «Suplemento», «Añadir elección» y «Añadir varios» (ventana con buscador y
-casillas: «Añadir N seleccionados»; lo que ya está en el plato sale marcado «Ya está en este plato»).
+casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»;
+lo que ya está en el plato sale marcado «Ya está en este plato»).
 Al final, el formulario «Añadir un plato» (Nombre del plato, «Elecciones mínimas», «Elecciones
 máximas», la casilla «Se puede elegir la misma opción más de una vez» y «Guardar»), que pasa a
 «Plato · {nombre}» al editar uno.
@@ -136,15 +137,16 @@ máximas», la casilla «Se puede elegir la misma opción más de una vez» y «
 | COMBO-F04 | Retirar un menú | hecho |
 | COMBO-F05 | Montar los platos de un menú | hecho |
 | COMBO-F06 | Elegir los productos de cada plato y su suplemento | hecho |
-| COMBO-F07 | Elegir un menú al vender | servidor hecho; la hoja del TPV es de Ventas (pedido a Ventas) |
-| COMBO-F08 | Cobrar el menú: precio cerrado y suplementos | servidor hecho; lo llama Ventas al cobrar (pedido a Ventas) |
-| COMBO-F09 | Repartir el IVA de un menú | servidor hecho; lo aplica Ventas en sus líneas (pedido a Ventas) |
-| COMBO-F10 | Bajar el stock de cada plato al cobrar | contrato probado con Inventario real; el aviso lo manda Ventas (pedido a Ventas) |
-| COMBO-F11 | Mandar el menú a cocina | contrato hecho; la comanda la arma Ventas y la pinta Cocina (pedido a Ventas y a Cocina) |
+| COMBO-F07 | Elegir un menú al vender | hecho |
+| COMBO-F08 | Cobrar el menú: precio cerrado y suplementos | hecho |
+| COMBO-F09 | Repartir el IVA de un menú | hecho |
+| COMBO-F10 | Bajar el stock de cada plato al cobrar | hecho |
+| COMBO-F11 | Mandar el menú a cocina | hecho |
 | COMBO-F12 | Marcar una elección como agotada | hecho |
-| COMBO-F13 | Cuando un producto deja el catálogo | parcial — quitar solas de todos los menús las elecciones de un producto eliminado llega con el reparto de avisos entre apps (fase 2); hasta entonces se quedan marcadas, no se ofrecen ni se cobran y se quitan a mano |
+| COMBO-F13 | Cuando un producto deja el catálogo | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
+<!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Menús
@@ -161,6 +163,7 @@ primero con el botón +.».
 Implicados: ninguno
 
 ### COMBO-F02 Crear un menú a precio cerrado
+<!-- origen: old:combos/WORKFLOW.md#combos-f02 qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -189,6 +192,7 @@ permiso de gestión no hay botón +.
 Implicados: TAX-F01
 
 ### COMBO-F03 Cambiar los datos de un menú, ponerlo o quitarlo de la venta
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -200,12 +204,13 @@ Pasos:
 Entra: los mismos campos que el alta; solo cambia lo que se envía (por el asistente o la API, lo que no
 se nombra se queda como estaba).
 Sale: el menú cambiado (avisa: menú cambiado). Lo ya cobrado no cambia: cada línea de venta lleva su
-copia del menú. En una cuenta abierta, Ventas conserva el importe pedido; la forma de venta, el tipo de
-IVA y si el menú sigue a la venta se leen al cobrar (COMBO-F08).
+copia del menú. Una cuenta abierta cobra el importe con que se pidió, aunque el menú suba de precio o
+se quite de la venta; la forma de venta y el tipo de IVA se leen al cobrar (COMBO-F08, F09).
 Si falla: los mismos avisos que el alta. Pasar a «en el local» sin tipo de IVA se rechaza.
 Implicados: SALE-F12
 
 ### COMBO-F04 Retirar un menú
+<!-- origen: old:combos/WORKFLOW.md#combos-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -219,10 +224,11 @@ Entra: el menú elegido (por id o por nombre).
 Sale: el menú, sus platos y sus elecciones borrados en una sola operación (avisa: menú retirado, con
 su nombre). Los tiques emitidos llevan su copia y se siguen leyendo.
 Si falla: «No se ha podido retirar el menú.» en el diálogo; un menú que ya no existe, «Ese menú no
-existe en este negocio.». Una cuenta abierta que lo llevaba se rechaza al cobrar (COMBO-F08).
+existe en este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08).
 Implicados: SALE-F12
 
 ### COMBO-F05 Montar los platos de un menú
+<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -256,7 +262,9 @@ Pasos:
 2. Escribe el «Suplemento» si sustituir cuesta más (o menos, con signo negativo) que el precio
    cerrado; vacío es sin suplemento.
 3. Pulsa «Añadir elección»: entra la última. Para varios de golpe, «Añadir varios»: marca las casillas
-   y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron).
+   y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron). Para
+   una categoría entera, elígela en «Categoría»: la lista enseña sus productos y «Marcar todos los de
+   «{categoría}» (N)» marca los que el plato aún no ofrece.
 4. Para cambiar el producto o el suplemento de una elección, pulsa su lápiz: el formulario dice
    «Editando «{producto}». Conserva su posición en el plato.». Con el asa, subir o bajar se reordena;
    la papelera la quita, tras confirmarlo.
@@ -268,131 +276,146 @@ Si falla: «Elige antes un producto del catálogo.», «Este plato ya ofrece ese
 pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez».», ««{producto}» está
 desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende por
 unidades puede ser una elección de menú.», «Un plato admite como mucho 40 elecciones.» y los avisos de
-importe. «Añadir varios» sin nada marcado: «Marca al menos un producto.». Si el catálogo no carga,
-el buscador lo dice con «Reintentar».
+importe. «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
+sin productos: «Ningún producto coincide.». Si el catálogo no carga, el buscador lo dice con
+«Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
+cuanto se guarda.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
 <!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f07 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 -->
-Estado: servidor hecho; la hoja del TPV es de Ventas (pedido a Ventas, SALE-F12)
+Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
 Pasos:
-1. En el TPV, en «Todos», los menús salen primero con la etiqueta «Menú». Toca uno: se abre una hoja
-   con todos sus platos a la vez.
-2. Cada plato muestra su contador (0/1) y sus elecciones disponibles, con el suplemento con su signo
-   si no es cero. En un plato de una sola elección, tocar otra la cambia; en uno de varias, tocar de
-   más no añade.
-3. Mientras falte algo, el botón dice el motivo («Elige {n} en {plato}»); cuando cada plato
-   obligatorio está completo, el botón suma el total en vivo. Pulsa añadir.
-Entra: los menús a la venta que se pueden completar, con sus platos y sus elecciones disponibles
-(`combo.combo.for_sale`).
-Sale: la línea del menú con lo elegido. El precio que ve el TPV es una vista previa: el que vale lo
-calcula este módulo al cobrar (COMBO-F08).
+1. En el TPV, en «Todos», los menús a la venta salen primero, cada uno con la etiqueta «Menú» y su
+   precio cerrado. Toca uno: se abre una hoja con su nombre y todos sus platos a la vez.
+2. Cada plato dice su regla («Elige 1», «Hasta 2», «Opcional») y sus elecciones disponibles, con el
+   suplemento con su signo si no es cero («+2,00 €»). Al abrir no hay nada elegido.
+3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
+   siguiente toque dice «Café está completo: quita una para elegir otra»; una elección que se puede
+   repetir lleva su contador y su «−».
+4. Mientras falte algo, el botón dice qué («Elige 1 en «Segundos»») y tocarlo señala ese plato; cuando
+   cada plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los
+   suplementos. Púlsalo: el menú entra en la cuenta como una línea, con sus platos debajo del nombre.
+Entra: los menús a la venta que se pueden completar, con sus platos y sus elecciones disponibles.
+Sale: la línea del menú con lo elegido, que Menús comprueba y pone precio al añadirla (COMBO-F08).
 Si falla: un menú no sale en el TPV si no está a la venta, si no tiene ningún plato con elecciones o
 si un plato obligatorio no tiene bastantes elecciones disponibles (agotadas aquí o en Inventario,
-desactivadas o eliminadas en Inventario). Un plato opcional sin elecciones disponibles no sale en la hoja.
+desactivadas o eliminadas en Inventario). Una elección agotada no sale en la hoja, y un plato opcional
+sin elecciones disponibles tampoco. Si Menús rechaza la línea, la hoja dice por qué sin cerrarse
+(COMBO-F08). Si no se pueden leer los menús, encima de la rejilla «No se han podido leer los menús.
+Inténtalo de nuevo.» con «Reintentar», y los productos se venden igual. Con el perfil de empleado
+también se ven y se venden.
 Implicados: SALE-F12, MODIFIER-F06
 
 ### COMBO-F08 Cobrar el menú: precio cerrado y suplementos
 <!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f08 wf:restaurante-dia#rec_restaurante-f11 -->
-Estado: servidor hecho; lo llama Ventas al pedir y al cobrar (pedido a Ventas, SALE-F12)
-Actor: sistema
-Pantalla: ninguna
+Estado: hecho
+Actor: empleado, responsable
+Pantalla: Ventas: Vender
 Pasos:
-1. Ventas manda a Menús el menú, las elecciones de la línea y cómo se vende esa línea (el canal de su
-   pedido: en el local, para llevar o a domicilio; sin canal vale el ajuste del menú)
-   (`combo.combo.resolve`).
-2. Menús comprueba cada plato (mínimo, máximo, repetición), que cada elección siga en el menú y siga
-   siendo una ración (se vende por unidades) y, en un pedido nuevo, que esté disponible (no agotada aquí
-   ni en Inventario), con su producto activo, y que el menú siga a la venta.
-3. El importe es el precio cerrado más un suplemento por cada elección (también la repetida). En una
-   cuenta abierta, Ventas manda el importe que tenía al pedirlo: Menús reparte ese y **no vuelve a
-   pedir disponibilidad** (el último flan servido y marcado «Agotado» no impide cobrar la mesa), solo
-   los platos, las raciones y los datos fiscales.
-4. Devuelve la línea del menú: nombre, nombre de cocina, importe, forma de venta y sus componentes, en
-   el orden de los platos y de la elección.
+1. Añade el menú con sus platos en el TPV (COMBO-F07): la línea entra con el precio cerrado más el
+   suplemento de cada elección, también el de una repetida (dos cafés, dos suplementos); un suplemento
+   negativo lo abarata.
+2. Cobra como siempre: el tique pone el nombre del menú con su importe y, debajo, cada plato elegido.
+3. En una cuenta abierta, el menú cobra el importe que tenía al pedirlo aunque después suba de precio,
+   se agote un plato (el último flan servido), se quite de la venta o se retire: al cobrar, Menús solo
+   vuelve a comprobar los platos, las raciones y cómo se factura (COMBO-F09).
 Entra: el menú (por id o por nombre) y las elecciones (por id, o por el nombre o el SKU del producto,
-con el plato si hace falta), con cuántas de cada una.
-Sale: la línea del menú con sus componentes y su reparto fiscal (COMBO-F09). No guarda nada.
-Si falla: la venta no se guarda y Menús dice por qué: «Ese menú no existe en este negocio.» (`combo.combo_missing`: un
-404 es también «la app no está activa»), «Ese menú ya no está a la venta.», «Elige algo del menú antes de añadirlo.», «Al menú le falta elegir en «{plato}»: elige
-{min}.», «El plato «{plato}» admite como mucho {max}.», «El plato «{plato}» no admite elegir dos veces
-lo mismo.», ««{producto}» no es una elección de este menú.», ««{producto}» está agotado.», ««{producto}»
-ya no se puede vender: está desactivado o eliminado en Inventario.», ««{producto}» ya no se vende por
-unidades en Inventario, así que no se puede cobrar como elección de menú.» y «El importe del menú no puede
-quedar en negativo.».
+con el plato si hace falta), con cuántas de cada una; al cobrar una cuenta abierta, el importe pedido.
+Sale: la línea del menú con su importe, su nombre de cocina y sus platos, en el orden de los platos y
+de la elección, y cómo se factura (COMBO-F09). Menús no guarda nada; la venta es de Ventas.
+Si falla: la línea no entra en la cuenta y la hoja (o el asistente, o la API) dice por qué: «Ese menú
+no existe en este negocio.», «Ese menú ya no está a la venta.», «Elige algo del menú antes de
+añadirlo.», «Al menú le falta elegir en «{plato}»: elige {min}.», «El plato «{plato}» admite como
+mucho {max}.», «El plato «{plato}» no admite elegir dos veces lo mismo.», ««{producto}» no es una
+elección de este menú.», ««{producto}» está agotado.», ««{producto}» ya no se puede vender: está
+desactivado o eliminado en Inventario.», ««{producto}» ya no se vende por unidades en Inventario, así
+que no se puede cobrar como elección de menú.» y «El importe del menú no puede quedar en negativo.».
+Sin Menús activa, el TPV no ofrece menús y uno pedido por la API se rechaza.
 Implicados: SALE-F12
 
 ### COMBO-F09 Repartir el IVA de un menú
-Estado: servidor hecho; lo aplica Ventas en sus líneas (pedido a Ventas, SALE-F12)
-Actor: sistema
-Pantalla: ninguna
+<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F09 old:combos/WORKFLOW.md#combos-f09 wf:restaurante-dia#rec_restaurante-f12 -->
+Estado: hecho
+Actor: empleado, responsable
+Pantalla: Ventas: Vender
 Pasos:
-1. «En el local»: el menú sale en UNA línea, con el importe y el tipo de IVA del menú, aunque una
-   bebida de dentro tenga otro tipo en el catálogo (art. 91.Uno.2.2º LIVA: la bebida, también la
-   alcohólica, es accesoria del servicio de restauración).
-2. «Para llevar» (el ajuste del menú, o un pedido para llevar o a domicilio aunque el menú sea «en el
-   local»): cada plato va a la categoría de su producto, salvo lo que en el local es servicio y para
-   llevar es venta de bienes: `restaurant.alcohol` (la cerveza o el vino del restaurante, 10 % en la
-   mesa) va a `retail.alcohol` (21 %, art. 90 LIVA). Es un mapa explícito con solo ese par de fábrica de
-   Impuestos; una categoría propia del negocio va como está. Si todos van a la misma categoría: UNA línea
-   con el importe y esa categoría.
-3. «Para llevar» con categorías distintas: UNA línea por plato elegido, cada una con su categoría y el
-   importe repartido en proporción al precio de catálogo de cada producto (art. 79.Dos
-   LIVA), con el céntimo sobrante al resto mayor (a igualdad, al plato elegido antes); la suma es
-   exactamente el importe. Ejemplo: 6,00 € sobre un bocadillo de 4,50 € (10 %) y una cerveza de 2,00 €
-   (21 %): 4,15 € + 1,85 €.
-4. No hay línea «padre» con dinero.
-Entra: forma de venta, tipo de IVA del menú y elecciones; precio de catálogo y categoría fiscal de cada
-producto, de Inventario.
+1. Cobra un menú «en el local»: el tique lo pone en UNA línea, con su importe y el tipo de IVA del menú,
+   aunque una bebida de dentro tenga otro tipo en el catálogo (art. 91.Uno.2.2º LIVA: la bebida,
+   también la alcohólica, es accesoria del servicio de restauración).
+2. Cobra un menú «para llevar»: cada plato va a la categoría fiscal de su producto, salvo lo que en el
+   local es servicio y para llevar es venta de bienes: la cerveza o el vino del restaurante (10 % en la
+   mesa) van al 21 % (art. 90 LIVA). Si todos van a la misma categoría, sale en UNA línea con el importe
+   y esa categoría.
+3. Si los platos de un menú «para llevar» van a categorías distintas, el tique pone el nombre del menú
+   como cabecera y UNA línea por plato elegido, cada una con su IVA y el importe repartido en proporción
+   al precio de catálogo de cada producto (art. 79.Dos LIVA), con el céntimo sobrante al resto mayor (a
+   igualdad, al plato que va antes); la suma es exactamente el importe. Ejemplo: 6,00 € sobre un
+   bocadillo de 4,50 € (10 %) y una cerveza de 2,00 € (21 %): 4,15 € + 1,85 €. No hay línea del menú con
+   dinero.
+4. La cuenta que se enseña antes de cobrar reparte igual que el cobro.
+Entra: forma de venta y tipo de IVA del menú y las elecciones; precio de catálogo y categoría fiscal de
+cada producto, de Inventario.
 Sale: el reparto, con la categoría fiscal de cada línea; Ventas calcula base y cuota con Impuestos.
-Un menú «para llevar» sin tipo de IVA propio que se toma en el local va por plato a las categorías de
-sus productos (las del local).
+En el TPV manda el ajuste del menú: una cuenta no se marca «para llevar». Por el asistente o la API se
+puede pedir un menú «en el local» para llevar o a domicilio, y entonces se reparte como uno «para
+llevar»; un menú «para llevar» sin tipo de IVA propio que se toma en el local va por plato a las
+categorías de sus productos (las del local).
 Si falla: «En el local» sin tipo de IVA no se puede guardar (COMBO-F02). Para llevar, un plato cuya
 categoría no tiene equivalente activo en Impuestos: ««{producto}» se factura en {categoría}, que no
-tiene equivalente para llevar en Impuestos, así que este menú no se puede vender para llevar.»
-(`combo.tax_category_takeaway`); en un menú «para llevar» ese plato no se ofrece y el constructor lo
-marca «Sin tipo de IVA para llevar». «Para llevar» con un producto sin categoría fiscal: ««{producto}» no tiene categoría fiscal en Inventario, así que este menú no se
-puede cobrar.» (y no se ofrece). Partido con todos los productos a 0 € en el catálogo: «Los productos de
-este menú no tienen precio de catálogo, así que no se puede repartir su IVA.»; si todas las elecciones
-ofrecidas de un menú «para llevar» valen 0 € y van a categorías distintas, el menú no sale en el TPV.
+tiene equivalente para llevar en Impuestos, así que este menú no se puede vender para llevar.»; en un
+menú «para llevar» ese plato no se ofrece y el constructor lo marca «Sin tipo de IVA para llevar».
+«Para llevar» con un producto sin categoría fiscal: ««{producto}» no tiene categoría fiscal en
+Inventario, así que este menú no se puede cobrar.» (y no se ofrece). Partido con todos los productos a
+0 € en el catálogo: «Los productos de este menú no tienen precio de catálogo, así que no se puede
+repartir su IVA.»; si todas las elecciones ofrecidas de un menú «para llevar» valen 0 € y van a
+categorías distintas, el menú no sale en el TPV.
 Implicados: SALE-F12, TAX-F05
 
 ### COMBO-F10 Bajar el stock de cada plato al cobrar
-Estado: contrato probado con Inventario real; el aviso de venta lo manda Ventas (pedido a Ventas)
+<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f11 old:combos/WORKFLOW.md#combos-f10 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al cobrar, Ventas pone en el aviso de venta cobrada, en la línea del menú, cada producto elegido con
-   su cantidad (la de la línea ya multiplicada: tres menús, tres raciones de cada plato).
-2. Inventario baja el stock de cada producto elegido, nunca el del menú, y solo de los que controlan
-   existencias; un producto de tipo servicio no mueve nada.
-3. Si se anula la venta, Inventario devuelve lo que salió de su libro de movimientos.
-4. Si se devuelve, Inventario repone lo que le lleguen como líneas devueltas (INVENTORY-F24): Ventas
-   manda los componentes del menú × los menús devueltos, una línea por producto.
-Entra: los componentes que da COMBO-F08 (producto, cantidad, si es servicio).
-Sale: movimientos de stock por producto (Inventario); nada de este módulo.
-Si falla: como INVENTORY-F21. Probado con Inventario real (`restore_refund` repone los platos que le
-llegan como líneas).
-Implicados: INVENTORY-F22, INVENTORY-F23, SALE-F12
+1. Cobra en el TPV una cuenta con menús (COMBO-F08). En Menús no se hace nada a mano.
+2. En unos segundos, Inventario baja el stock de cada producto elegido: tantas raciones como menús y
+   como veces se eligió (tres menús con dos cafés cada uno, seis cafés). El menú no tiene stock propio,
+   y un producto de tipo servicio o sin control de stock no mueve nada.
+3. Si se anula la venta, Inventario devuelve todo lo que salió.
+4. Si se devuelve una parte (uno de tres menús), Inventario repone una ración de cada plato de ese menú.
+Entra: los platos de la línea del menú tal como se cobraron: cada producto elegido, cuántas veces y si
+es un servicio (COMBO-F08).
+Sale: un movimiento «Venta» por plato en Inventario (INVENTORY-F22), y su reposición al anular
+(INVENTORY-F23) o al devolver (INVENTORY-F24); nada de este módulo. Si el aviso de la venta llega dos
+veces, el stock baja una sola.
+Si falla: la venta ya está cobrada; si Inventario no puede bajar el stock en ese momento, lo reintenta
+solo (INVENTORY-F21).
+Implicados: INVENTORY-F22, INVENTORY-F23, INVENTORY-F24, SALE-F12
 
 ### COMBO-F11 Mandar el menú a cocina
-Estado: contrato hecho; la comanda la arma Ventas y la pinta Cocina (pedido a Ventas y a Cocina)
-Actor: sistema
-Pantalla: ninguna
+<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F10 old:combos/WORKFLOW.md#combos-f11 wf:restaurante-dia#rec_restaurante-f07 -->
+Estado: hecho
+Actor: empleado, responsable
+Pantalla: ninguna (la comanda la pinta Cocina)
 Pasos:
-1. El camarero añade un menú a la cuenta de la mesa y manda la cuenta a cocina.
-2. Ventas manda la línea del menú con su nombre, su nombre de cocina y los platos elegidos, cada uno
-   con su producto, su categoría y su cantidad (lo que dio COMBO-F08 al pedir).
-3. Cocina pone cada plato en la estación de su producto (o de su categoría), bajo el nombre de cocina
-   del menú (KITCHEN-F06).
-Entra: la línea del menú de la cuenta abierta.
-Sale: nada de este módulo.
-Si falla: lo decide Ventas (pedido: no mandar a cocina un menú con un plato obligatorio sin elegir).
-Implicados: KITCHEN-F06, SALE-F20
+1. En el TPV, añade un menú a la cuenta de la mesa eligiendo sus platos (COMBO-F07) y pulsa «Enviar
+   comanda».
+2. Cocina recibe la comanda: cada plato elegido en la estación de su producto (o de
+   su categoría), bajo la cabecera del menú con su nombre de cocina (o su nombre, si no tiene), con la
+   cantidad por los menús pedidos y la nota del menú en cada plato (KITCHEN-F06).
+3. En el papel de cada estación sale la misma cabecera del menú con sus platos debajo.
+Entra: la línea del menú de la cuenta abierta, con lo que dio Menús al pedirla (COMBO-F08): su nombre
+de cocina y cada plato con su producto, su categoría y cuántas veces se eligió.
+Sale: nada de este módulo; la comanda es de Cocina (avisa: comanda enviada).
+Si falla: un menú al que le falta un plato obligatorio no entra en la cuenta (Menús lo rechaza al
+pedirlo), así que nunca llega a cocina a medias. Un plato que es un servicio no se cocina.
+Implicados: KITCHEN-F06, KITCHEN-F08, SALE-F12, SALE-F20
 
 ### COMBO-F12 Marcar una elección como agotada
+<!-- origen: nuevo (mercado: Square y Lightspeed dejan marcar agotado lo que el menú ofrece, sin quitarlo; INVENTORY-F29) -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -412,20 +435,25 @@ Implicados: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 Cuando un producto deja el catálogo
 <!-- origen: old:combos/WORKFLOW.md#combos-f06 old:combos/WORKFLOW.md#combos-f09 -->
-Estado: parcial — quitar solas de todos los menús las elecciones de un producto eliminado llega con el reparto de avisos entre apps (fase 2); hasta entonces se quedan marcadas, no se ofrecen ni se cobran y se quitan a mano
+Estado: hecho
 Actor: sistema, propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
 Pasos:
 1. Alguien desactiva un producto en Inventario: sus elecciones siguen en los menús, marcadas
    «Desactivado en Inventario», y el TPV no las ofrece hasta que se reactive.
-2. Alguien elimina un producto en Inventario: sus elecciones siguen en los menús, marcadas «Ya no está
-   en el catálogo», y el TPV no las ofrece ni se pueden cobrar (es definitivo: un producto eliminado no
-   vuelve).
-3. En el constructor del menú, quita cada una con su papelera, como cualquier otra elección (COMBO-F06).
+2. Alguien elimina un producto en Inventario: en unos segundos sus elecciones salen solas de todos los
+   menús que lo ofrecían, y el constructor abierto lo enseña al momento. Mientras tanto salen marcadas
+   «Ya no está en el catálogo» y el TPV no las ofrece ni se pueden cobrar (es definitivo: un producto
+   eliminado no vuelve).
+3. Mira el aviso de arriba del constructor: si un plato obligatorio se ha quedado sin bastantes
+   elecciones, dice por qué el menú ya no sale en el TPV; añade otra elección a ese plato (COMBO-F06).
 Entra: el producto desactivado o eliminado en Inventario.
-Sale: las elecciones marcadas y, al quitarlas, fuera del menú (avisa: elección quitada).
+Sale: las elecciones del producto eliminado, fuera de todos los menús (avisa: elección quitada, con el
+motivo «producto eliminado»). Si el aviso de Inventario llega dos veces, la segunda no cambia nada; lo
+que se elimina en un negocio no toca los menús de otro.
 Si falla: si un plato obligatorio se queda sin bastantes elecciones que ofrecer, el menú deja de salir
-en el TPV y el aviso del constructor dice por qué.
+en el TPV y el aviso del constructor dice por qué. Si quitar las elecciones falla, Menús lo reintenta
+solo; mientras, siguen marcadas y nadie las vende.
 Implicados: INVENTORY-F04, COMBO-F06
 
 ## Servicios: lo que entra y lo que sale
@@ -479,7 +507,7 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 
 | Aviso de | Qué hace Menús | Flujos | Servicio que escucha |
 |---|---|---|---|
-| Inventario: producto eliminado | Quita sus elecciones de todos los menús (cuando llegue el reparto de avisos entre apps, fase 2; hasta entonces se quitan a mano) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
+| Inventario: producto eliminado | Quita sus elecciones de todos los menús, en unos segundos (el reparto de avisos del worker; repetirlo no cambia nada) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
 
 Además, los cambios de producto de Inventario (`inventory.product.updated`, `.deleted`) vuelven a
 leer en vivo el constructor y el catálogo del TPV: el nombre, el precio, si está activo y si está
@@ -503,36 +531,38 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `product_name`, `sku`, `price_delta`). Solo menús a la venta que se pueden completar y elecciones
   disponibles.
 - **Al pedir y al cobrar**: `combo.combo.resolve` con `{id | combo, choices: [{option_id |
-  product (+ group), quantity}], amount?, channel?}`; `channel` es el de su pedido (`dine_in`,
-  `takeaway`, `delivery`) y decide «en el local» o «para llevar» (sin él, el ajuste del menú). Devuelve `combo_id`, `name`, `kitchen_name`,
+  product (+ group), quantity}], amount?, channel?}`; `channel` (`dine_in`, `takeaway`, `delivery`)
+  decide «en el local» o «para llevar», y sin él vale el ajuste del menú. Devuelve `combo_id`, `name`, `kitchen_name`,
   `supply_kind`, `price`, `supplements`, `amount`, `split` y `tax_category_key` (la de la línea única,
   o `null` si se parte) y `components[]` en orden: `option_id`, `group_id`, `group_name`,
   `product_id`, `product_name`, `sku`, `category_id`, `is_service`, `quantity` (por menú),
   `price_delta`, `catalog_price`, `tax_category_key` y `amount` (su parte, solo si `split`).
-- **Qué hace Ventas con eso** (pedido a Ventas, SALE-F12): congelar la respuesta en la línea al pedir
-  (en una cuenta abierta, guardar `amount`); al cobrar, volver a llamar con ese `amount` y materializar
-  UNA línea (`split = false`, a `tax_category_key`) o UNA línea por componente (`split = true`, cada una
-  a su `tax_category_key` y por su `amount`), hermanas y sin línea padre con dinero; mandar siempre el
-  `channel` del pedido; multiplicar las cantidades por la de la línea; propagar los 409 de Menús tal
-  cual; no mandar a cocina un menú con un plato obligatorio sin elegir; en una devolución, mandar los
-  componentes × la cantidad devuelta como líneas de `sale.sale.refunded`.
+- **Qué hace Ventas con eso** (SALE-F12, hecho; probado con Ventas real): congela la respuesta en la línea al pedir (y su `amount` como el
+  importe pedido); al cobrar vuelve a llamar con ese `amount` y materializa UNA línea (`split = false`, a
+  `tax_category_key`) o UNA línea por componente (`split = true`, cada una a su `tax_category_key` y por
+  su `amount`), sin línea padre con dinero; su vista previa (`sale.checkout.preview`) reparte igual;
+  multiplica las cantidades por la de la línea; propaga los 409 de Menús tal cual, así que un menú con
+  un plato obligatorio sin elegir nunca entra en la cuenta ni llega a cocina; en una devolución manda
+  los componentes × la cantidad devuelta como líneas de `sale.sale.refunded`. Un menú que Menús ya no
+  conoce al cobrar (retirado, o Menús apagada) se cobra con lo que congeló. El TPV no manda `channel`:
+  la cuenta no tiene canal («Lo que queda fuera» de Ventas), así que manda el ajuste del menú.
 
 ### Contrato con Inventario
 
-- En el aviso `sale.sale.completed`, la línea del menú lleva `components[]` con `product_id`,
-  `quantity` (la de la línea ya multiplicada) e `is_service` de cada componente de COMBO-F08, y no
-  mueve stock por sí misma (INVENTORY-F22; ya implementado en `inventory.stock.apply_sale`). Probado con
-  Inventario real.
-- La devolución: INVENTORY-F24 ya repone las líneas que le llegan en `sale.sale.refunded`
-  (`inventory.stock.restore_refund`, `lines` de producto y cantidad). Ventas manda los componentes del
-  menú × los menús devueltos como esas líneas (pedido a Ventas); probado con Inventario real.
+- En el aviso `sale.sale.completed`, Ventas pone en la línea del menú `components[]` con `product_id`,
+  `quantity` (la de cada plato por la de la línea) e `is_service` de cada componente de COMBO-F08; la
+  línea del menú no mueve stock por sí misma (INVENTORY-F22, `inventory.stock.apply_sale`).
+- La anulación (`sale.sale.voided`) la repone Inventario de su libro de movimientos (INVENTORY-F23), y
+  la devolución (`sale.sale.refunded`) con los componentes × los menús devueltos, una línea por producto
+  (INVENTORY-F24, `inventory.stock.restore_refund`).
+- Probado de punta a punta con el reparto real de avisos del worker.
 
 ### Contrato con Cocina
 
 - Cocina no lee Menús. Recibe de Ventas, en `sale.order.fired`, la línea del menú con `name`,
-  `kitchen_name` y sus componentes (`product_id`, `product_name`, `category_id`, `quantity`), y pone
-  cada plato en su estación bajo el nombre de cocina del menú (KITCHEN-F06, pedido a Ventas por
-  Cocina).
+  `kitchen_name` y sus componentes (`product_id`, `product_name`, `category_id`, `quantity` × menús), y
+  pone cada plato en su estación bajo el nombre de cocina del menú, en la tarjeta y en el papel
+  (KITCHEN-F06, KITCHEN-F08). Probado de punta a punta con el reparto real de avisos del worker.
 
 ### Quién puede qué
 
@@ -546,10 +576,13 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
-  `test_integration_tax.py` y `test_concurrency.py`.
+  `test_integration_tax.py`, `test_integration_sale.py` (Ventas real: precio, rechazos, cuenta abierta y
+  reparto al céntimo), `test_relay.py` (el tick real del worker: stock por plato, comanda por plato y
+  producto eliminado) y `test_concurrency.py`.
 - `requires = ["inventory", "tax"]`: `ChoiceOption.product` es FK a `inventory.Product` (`CASCADE`;
-  Inventario borra lógicamente, así que la quitará la reacción de F13 cuando el relay del outbox la
-  entregue, fase 2; hasta entonces, la papelera del constructor) y
+  Inventario borra lógicamente, así que la quita la reacción de F13 cuando el relay del outbox del worker,
+  `base/relay.py`, le entrega `inventory.product.deleted`; probado por su tick real en
+  `tests/test_relay.py`) y
   `Combo.tax_category` FK a `tax.TaxCategory` (`PROTECT`; Impuestos nunca borra una categoría). La
   migración depende de `inventory 0001` y `tax 0005`.
 - Modelos: `Combo` (precio en céntimos ≥ 0; `supply_kind` `service` | `goods`; restricción: `service`
@@ -585,7 +618,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
   `demo`; lo que sí se separa son los avisos en vivo.
 - En el navegador: `tests/e2e/combo-menus.spec.ts` (oculto, con Inventario e Impuestos de verdad), que
-  borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después.
+  borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después, y `tests/e2e/combo-till.spec.ts` (el TPV de
+  Ventas, Cocina e Inventario de verdad y un paso del relay: COMBO-F07–F11), que borra `e2e Combo …` y
+  `E2E-CMT-…`.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -623,9 +658,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   NO hace»); un producto de tipo servicio de Inventario sí.
 - **Solo productos activos y que se venden por unidades** al añadir (antes, cualquier id).
 - **Agotado** (COMBO-F12) es nuevo: antes había que quitar la elección y volver a ponerla.
-- **Producto eliminado** (COMBO-F13): la elección se marca «Ya no está en el catálogo» y el TPV no la
-  ofrece ni la cobra; antes quedaba colgando. Que se quite sola de todos los menús llega con el relay
-  del outbox (fase 2): la reacción ya está escrita y probada entregando el aviso real.
+- **Producto eliminado** (COMBO-F13): sus elecciones salen solas de todos los menús en unos segundos y,
+  hasta entonces, se marcan «Ya no está en el catálogo» y el TPV no las ofrece ni las cobra; antes
+  quedaban colgando.
 - **Un plato obligatorio sin elecciones bloquea el menú en el TPV**: antes no llegaba a Ventas y el
   menú se vendía sin él. El constructor dice por qué un menú no sale en el TPV.
 - **Cambiar solo lo enviado**: editar un plato ya no lo manda al primer puesto ni pone mínimo y máximo
@@ -649,7 +684,13 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `combos.groups.*` y `combos.options.*`; avisos `combo.group.*` y `combo.option.*` en vez de
   `combos.choice_group.*` y `combos.choice_option.*`; permisos `combo.view` y `combo.manage` en vez de
   `combos.view_combo` y `combos.manage_combo`.
-- **Añadir varios** es una sola operación (`bulk_create`, todo o nada); antes, una por elección.
+- **Añadir varios** es una sola operación (`bulk_create`, todo o nada); antes, una por elección. Y admite
+  una **categoría entera** de Inventario («Marcar todos los de «…»»), como Square y WooCommerce Composite
+  (combos#12); antes, casilla a casilla.
+- **Crear un producto desde el menú no se hace** (combos#13): Square, Shopify Bundles, Revel, Lightspeed
+  L-Series y WooCommerce Composite mandan crearlo en el catálogo; Lightspeed K-Series, Toast y Odoo (su
+  «Crear» en el campo de producto) lo crean dentro. Gana lo más aceptado: se crea en Inventario y el
+  buscador del constructor lo encuentra en cuanto se guarda.
 - Precios en céntimos, como el resto de la plataforma.
 
 ## Contradicciones señaladas
@@ -659,12 +700,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   también va al 10 %: es accesoria del servicio de restauración (art. 91.Uno.2.2º LIVA), como dice la
   categoría `restaurant.alcohol` de Impuestos. Por eso «en el local» es una línea y «para llevar» se
   parte por categoría.
-- SALE-F12 dice «al cobrar el menú se reparte en tantas líneas como tipos de IVA tenga». Solo es así
-  «para llevar»; «en el local» es una línea (COMBO-F09). Pedido a Ventas que lo corrija al portar
-  SALE-F12.
-- «Para llevar» se decidía en dos sitios: por menú en Menús y por `channel` del pedido en Ventas. Queda
-  unificado: manda el `channel` que Ventas pasa a `resolve`; el ajuste del menú es solo el valor por
-  defecto.
+- «Para llevar» se decide en dos sitios: por menú en Menús y por `channel` en `resolve`. En el TPV manda
+  el ajuste del menú, porque una cuenta de Ventas no tiene canal (su «Lo que queda fuera»: marcar una
+  cuenta «para llevar»); el `channel` lo usan el asistente y la API. Cuando Ventas añada el canal a la
+  cuenta, bastará con que lo pase a `resolve`.
 - Una bebida refrescante con azúcar añadido va al 21 % para llevar y al 10 % en el local, pero Impuestos
   no tiene una categoría de fábrica que lo distinga (`restaurant.drink` va igual en los dos): no se mapea.
   Si hace falta, Impuestos tendrá que crear la pareja y añadirse aquí a `TAKEAWAY_CATEGORY`.
