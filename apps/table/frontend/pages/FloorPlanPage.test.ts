@@ -77,6 +77,19 @@ describe('FloorPlanPage · service', () => {
     expect(s.net.streams.length).toBe(1);
   });
 
+  it('the zone strip fades the edge with more zones behind it (tables#97)', async () => {
+    const s = await setup();
+    await s.show();
+    const strip = s.el('zones').element;
+    Object.defineProperty(strip, 'clientWidth', { configurable: true, value: 300 });
+    Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 700 });
+    Object.defineProperty(strip, 'scrollLeft', { configurable: true, writable: true, value: 0 });
+    strip.dispatchEvent(new Event('scroll'));
+    await flush();
+    expect(s.el('zones').classes()).toContain('table-floor__zones--more-right');
+    expect(s.el('zones').classes()).not.toContain('table-floor__zones--more-left');
+  });
+
   it('a tap opens the table’s window, which follows the live table', async () => {
     const s = await setup();
     await s.show();
