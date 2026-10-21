@@ -21,10 +21,11 @@ from django.utils import timezone
 from live.context import system_context
 from live.errors import InvalidPayload
 
-from apps.flow import services, vault
+from apps.flow import events, services, vault
 from apps.flow.models import Flow, FlowRun, Question, Secret
 from apps.task.models import Task
 from base import relay
+from base.models import EventDelivery
 
 from .conftest import A, TASK_STEP, ctx_for, make_flow, run
 from .local_https import Handler
@@ -139,6 +140,38 @@ def test_the_worker_calls_only_for_a_run_parked_on_a_call(trusted, clock, worker
     assert worker.request("flow.run.call", {"id": str(parked.id)}, system).count == 0
     calling = worker.request("flow.flow.run", {"id": str(_manual(trusted, [_call(trusted)]).id), "input": {}})
     assert worker.request("flow.run.call", {"id": str(calling.id)}, system).count == 1
+    assert len(Handler.seen) == 1
+
+
+def test_the_worker_makes_the_call_only_once_its_delivery_is_committed(trusted, clock, worker, monkeypatch):
+    # The reaction schedules the call for after the COMMIT of the delivery that handed it `flow.run.parked`:
+    # made inside it, the worker would hold that delivery (its lock and its connection) for up to 30 s per call.
+    clock(NOON)
+    flow = _manual(trusted, [_call(trusted)])
+    worker.request("flow.flow.run", {"id": str(flow.id), "input": {}})
+    delivery_when_called: list[str] = []
+    real_call = services.http.call
+
+    def observing(*args, **kwargs):
+        delivery_when_called.append(EventDelivery.objects.get(event__name=events.RUN_PARKED, app_label="flow").status)
+        return real_call(*args, **kwargs)
+
+    monkeypatch.setattr(services.http, "call", observing)
+    worker()
+    assert delivery_when_called == [EventDelivery.Status.DELIVERED]
+    assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+
+
+def test_a_call_the_scheduled_task_already_made_is_not_made_again_by_the_reaction(trusted, clock, worker):
+    # `resume_due` (every minute) and the relay (every tick) both reach a parked call: the first makes it and
+    # the second finds nothing to call, so the other system hears it once.
+    clock(NOON)
+    flow = _manual(trusted, [_call(trusted)])
+    ran = worker.request("flow.flow.run", {"id": str(flow.id), "input": {}})
+    assert worker.request("flow.run.resume_due", {}, system_context(A)).count == 1
+    assert len(Handler.seen) == 1
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
+    worker()
     assert len(Handler.seen) == 1
 
 
