@@ -137,7 +137,8 @@ Las ventanas tapan toda la pantalla en el móvil y van centradas en tableta y or
 
 ### Zonas
 Menú **Mesas → Zonas**. Tabla: Nombre (con su color), Mesas, Libres («libres / total»), Orden,
-Estado (Activa, Inactiva); buscador «Buscar zona…», filtros por columna, vista tabla o tarjetas. El «+»
+Estado (Activa, Inactiva); buscador «Buscar zona…», filtros por columna tras el embudo, vista tabla o
+tarjetas. El «+»
 (solo a quien puede crear zonas) abre el panel con Nombre, Descripción, Color (Azul, Cian, Morado,
 Verde, Ámbar, Rojo, Gris), Orden y «Añadir zona»; por fila «Editar» (el mismo panel con el interruptor
 «Activa» y «Guardar cambios») y «Borrar» (solo el administrador), que pide confirmación en «¿Borrar la
@@ -145,7 +146,8 @@ zona?» y deja «Borrar zona» apagado si la zona tiene mesas.
 
 ### Mesas
 Menú **Mesas → Mesas**. Tabla en orden natural (la 2 antes que la 10): Número, Nombre, Zona, Aforo,
-Estado; buscador «Buscar mesa…» (número y nombre), filtros por columna (zona, estado, forma, aforo),
+Estado; buscador «Buscar mesa…» (número y nombre), filtros por columna tras el embudo (zona, estado,
+forma, aforo),
 vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Zona y «Añadir mesa». Por fila,
 «Editar» (Número, Nombre, Aforo, Forma, Zona, Estado y Activa) y «Borrar» (solo el administrador, con
 confirmación).
@@ -154,8 +156,8 @@ confirmación).
 Menú **Mesas → Sesiones**: las cuentas de la sala. Pestañas «Abiertas», «Cerradas» y «Todas». Tabla:
 Mesa («Sin mesa (aparcada)» si no tiene), Cobrado y Cierre (no salen en Abiertas), Zona, Camarero,
 Comensales, Apertura, Tiempo, Estado (Abierta, Cerrada, Trasladada, Fusionada, Aparcada); el tiempo de
-una cuenta abierta se pone ámbar y rojo según los Ajustes. Buscador «Buscar mesa…», filtros por zona,
-camarero y estado. Por fila «Detalle» (ventana con zona, camarero, estado, comensales, apertura,
+una cuenta abierta se pone ámbar y rojo según los Ajustes. Buscador «Buscar mesa…», filtros tras el
+embudo por zona, camarero y estado. Por fila «Detalle» (ventana con zona, camarero, estado, comensales, apertura,
 cierre, tiempo, cobrado y notas), en las abiertas «Cerrar sesión» (con confirmación), en las aparcadas
 «Volver a sentar» (elige la mesa libre) y, en las terminadas, «Borrar» (solo el administrador). Las
 horas van en la hora del negocio.

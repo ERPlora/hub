@@ -86,6 +86,8 @@ describe('SessionsPage', () => {
   it('searches the table and filters by zone, server and status on the server', async () => {
     const s = await setup();
     await s.show([OPEN]);
+    // The filters wait behind the table's funnel, as in the old list: open on a phone they took the screen.
+    expect(s.prop('filterable')).toBe(true);
     s.table().vm.$emit('update:search', '4');
     s.table().vm.$emit('filtersChange', { zone_id: 'z1', waiter_id: '2' });
     await flush();

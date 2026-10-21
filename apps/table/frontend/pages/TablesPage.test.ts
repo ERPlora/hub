@@ -57,6 +57,8 @@ describe('TablesPage', () => {
     const s = await setup();
     await s.show(page([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No tables.');
+    // The filters wait behind the table's funnel, as in the old list: open on a phone they took the screen.
+    expect(s.prop('filterable')).toBe(true);
     const zone = s.prop<Array<{ key: string; filter?: { options?: Array<{ value: string; label: string }> } }>>('columns').find((c) => c.key === 'zone_name');
     expect(zone?.filter?.options).toEqual([
       { value: 'z1', label: 'Dining room' },
