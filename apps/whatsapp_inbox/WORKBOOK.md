@@ -6,9 +6,8 @@ borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se des
 tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están probados de punta a punta contra
 el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
 la opción tocada, contestar, enviar una plantilla, editarla y borrarla, y olvidar un número. Quedan en parcial
-conectar el número (falta la página de erplora.com a la que Meta devuelve su código, F01 y F02), ver fotos y
-audio en el hilo (F06), llegar al tope del mes (F13), la lista de plantillas de Meta (F27, F28) y la cabecera
-con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
+conectar el número (falta la página de erplora.com a la que Meta devuelve su código, F01 y F02), llegar al
+tope del mes (F13), la lista de plantillas de Meta (F27, F28) y la cabecera con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
 esperan al asistente del Hub y a que Automatizaciones pueda mandar un mensaje a un cliente.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
@@ -96,7 +95,8 @@ El panel enseña: el contacto, su número y su estado; la ficha de Clientes unid
 **Unir a una ficha** / **Crear ficha**; **Asignada a** con el selector del equipo y **Asignármela**;
 los botones de estado **Abierta / Pendiente / Cerrada**; el hilo, del mensaje más antiguo al más
 reciente (los del cliente a la izquierda, los del negocio a la derecha con su estado —Enviando…,
-Enviado, Entregado, Leído, No entregado, o No enviado con **Reintentar**—, las notas internas en amarillo con su autor); **Ver anteriores** si
+Enviado, Entregado, Leído, No entregado, o No enviado con **Reintentar**—, las fotos y las notas de voz dentro
+de su bocadillo, los vídeos y documentos con **Abrir el adjunto**, las notas internas en amarillo con su autor); **Ver anteriores** si
 hay más; y debajo el cuadro para escribir con dos pestañas: **Responder** (texto, **Enviar**, y
 **Plantilla**) y **Nota interna** (**Añadir nota**). Con la ventana de 24 horas cerrada, el cuadro de
 texto lo dice («Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja
@@ -111,7 +111,8 @@ gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este me
 llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.»).
 Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
 «Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
-motivo que da el Hub o «No se pudo cargar la conversación».
+motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una nota de voz que no carga: «No se ha
+podido cargar la imagen.» o «No se ha podido cargar la nota de voz.», con **Abrir el adjunto**.
 
 ### Ajustes
 Menú **Bandeja de WhatsApp → Ajustes** (título «Ajustes del canal»), solo propietario y
@@ -159,7 +160,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | hecho | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
 | WHATSAPP_INBOX-F05 | Leer una conversación | hecho | comun |
-| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; la política de seguridad del Hub ya deja ver fotos y oír audio de erplora.com, pero el hilo todavía no enseña la foto ni reproduce el audio | comun |
+| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | hecho | comun |
 | WHATSAPP_INBOX-F07 | Asignar una conversación a alguien del equipo | hecho | comun |
 | WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | hecho | comun |
 | WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho (filtro y recuento; la campana del Hub llegará con la barra superior) | comun |
@@ -309,18 +310,22 @@ Implicados: Clientes (el nombre de la ficha)
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F15 old-hub:HUB-F267 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f06 -->
-Estado: parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; la política de
-seguridad del Hub ya deja ver fotos y oír audio de erplora.com, pero el hilo todavía no enseña la foto ni
-reproduce el audio
+Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
 1. Un mensaje con adjunto enseña su tipo (Foto, Nota de voz, Vídeo, Documento, Sticker), el nombre del
    archivo y su texto.
-2. Pulsar **Abrir el adjunto**: se abre en una pestaña nueva (solo adjuntos de erplora.com por https).
+2. Una foto o un sticker se ven dentro de su bocadillo, sin salirse de él; tocarlos los abre a tamaño
+   completo en una pestaña nueva.
+3. Una nota de voz se escucha con su reproductor, en el mismo bocadillo.
+4. Un vídeo o un documento: pulsar **Abrir el adjunto** lo abre en una pestaña nueva.
+5. Solo se enseñan y se abren adjuntos de erplora.com, por https.
 Entra: el adjunto que guarda erplora.com: su enlace, su tipo, su nombre y su pie.
 Sale: nada cambia en el Hub.
-Si falla: si erplora.com ya no lo guarda, la pestaña lo dice.
+Si falla: si erplora.com no entrega la foto o la nota de voz, el bocadillo dice «No se ha podido cargar la
+imagen.» o «No se ha podido cargar la nota de voz.» y deja **Abrir el adjunto**; si erplora.com ya no lo
+guarda, la pestaña lo dice.
 Implicados: erplora.com (guarda los adjuntos)
 
 ### WHATSAPP_INBOX-F07 Asignar una conversación a alguien del equipo
@@ -1371,8 +1376,9 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   la tarea `resume_deliveries` de `apps.py` en cada hub (`hub_due`), y el trabajo diferido de esta app
   entra con `use_hub(hub)`.
 - La campana de la barra superior puede leer `whatsapp_inbox.conversation.summary` (`awaiting_reply`).
-- Para ver fotos y audio dentro del hilo (F06 completo), la CSP del Hub tiene que permitir el origen de
-  erplora.com en `img-src` y `media-src` (`config/settings.py`, como ya hace con `form-action`).
+- Las fotos y las notas de voz del hilo (F06) se cargan de erplora.com: la CSP del Hub permite su origen en
+  `img-src` y `media-src` (`config/settings.py`, hub#147), y erplora.com las sirve a quien tiene su sesión
+  (`<slug>.erplora.com` y `erplora.com` son un mismo sitio, así que la cookie viaja).
 - Para que la ventana de Meta devuelva su código (F01, F02), las páginas del Hub no pueden cortar las
   ventanas que abren: `SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"` en `config/settings.py`
   (hoy, el `same-origin` de Django por defecto). La CSP no cambia: la ventana es otra pestaña, sin
@@ -1436,7 +1442,7 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 | Asignar tecleando el identificador, solo el administrador | Selector del equipo + «Asignármela»; el responsable asigna | Mercado (Shopify, Chakra); el producto actual lo marcaba «parcial» |
 | Sin notas | Notas internas (F36) | Mercado (Fresha, Intercom, Front) |
 | «Necesita atención» lo ponían las recetas | Filtro **Sin leer** + recuento `awaiting_reply` | Sin recetas no hay quien la ponga |
-| Fotos y audio dentro del hilo, descargados por una puerta del Hub | Enlace al adjunto en erplora.com | La CSP del Hub no deja pintar archivos de otro origen (ver «Contrato con `base`») |
+| Fotos y audio dentro del hilo, descargados por una puerta del Hub | Fotos y notas de voz dentro del hilo, servidas por erplora.com; vídeos y documentos con **Abrir el adjunto** | El Hub no guarda ni pasa archivos: erplora.com los sirve con la sesión de la persona y la CSP del Hub permite su origen (ver «Contrato con `base`») |
 | Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31), con la entrega a Meta por erplora.com; sin cabecera con archivo | El Hub no guarda archivos; la cabecera con foto, vídeo o documento se hace en WhatsApp Manager |
 | Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
 | `templates.list` y ajustes solo para el administrador | Elegir plantilla para enviar: quien contesta; Ajustes: propietario y administrador | Quien contesta necesita las plantillas |

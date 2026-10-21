@@ -1,6 +1,7 @@
 // The thread of a conversation (WHATSAPP_INBOX-F05, F06, F08, F34, F36): oldest first, the customer's
 // messages on the left and the business's on the right with their delivery status, the owner's replies
-// from the phone marked, attachments opened at erplora.com, internal notes in their own colour with
+// from the phone marked, photos and voice notes from erplora.com in their bubble (the rest, and what does not
+// load, opened there), internal notes in their own colour with
 // «Delete note» for whoever may; «View earlier», «No messages yet.», «Loading…» and the error.
 import { describe, expect, it, vi } from 'vitest';
 
@@ -157,6 +158,84 @@ describe('ThreadView', () => {
     });
     expect(s.find('whatsapp-inbox-message-media').text()).toContain('Photo');
     expect(s.find('whatsapp-inbox-message-media').find('a').exists()).toBe(false);
+    expect(s.find('whatsapp-inbox-message-media').find('img').exists()).toBe(false);
+  });
+
+  // WHATSAPP_INBOX-F06: what erplora.com serves is shown in the thread itself (the Hub's CSP allows its origin).
+  const PHOTO = 'https://erplora.com/whatsapp/media/photo-1';
+  const VOICE = 'https://erplora.com/whatsapp/media/voice-1';
+
+  it('paints a photo inside its bubble, described for a screen reader, opening full size in a new tab', async () => {
+    const s = await setup({
+      messages: [
+        message({ id: 'p', kind: 'image', body: '', media_url: PHOTO, media_mime_type: 'image/jpeg', media_caption: 'Así lo quiero' }),
+        message({ id: 'q', kind: 'image', body: '', media_url: `${PHOTO}b`, media_mime_type: 'image/jpeg', sent_at: '2026-10-15T09:01:00Z' }),
+      ],
+    });
+    const [withCaption, bare] = s.wrapper.findAll('[data-testid="whatsapp-inbox-message-image"]');
+    expect(withCaption.element.tagName).toBe('IMG');
+    expect(withCaption.attributes()).toMatchObject({ src: PHOTO, alt: 'Así lo quiero', loading: 'lazy' });
+    expect(bare.attributes('alt')).toBe('Photo');
+    const link = withCaption.element.closest('a');
+    expect(link?.getAttribute('href')).toBe(PHOTO);
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(s.wrapper.find('[data-testid="whatsapp-inbox-message-media-error"]').exists()).toBe(false);
+  });
+
+  it('gives a voice note its player; a video or a document keeps «Open the attachment»', async () => {
+    const s = await setup({
+      messages: [
+        message({ id: 'v', kind: 'audio', body: '', media_url: VOICE, media_mime_type: 'audio/ogg; codecs=opus' }),
+        message({ id: 'd', kind: 'document', body: '', media_url: `${PHOTO}.pdf`, media_mime_type: 'application/pdf', sent_at: '2026-10-15T09:01:00Z' }),
+        message({ id: 'w', kind: 'video', body: '', media_url: `${PHOTO}.mp4`, media_mime_type: 'video/mp4', sent_at: '2026-10-15T09:02:00Z' }),
+      ],
+    });
+    const [voice, document, video] = s.wrapper.findAll('[data-testid="whatsapp-inbox-message-media"]');
+    const player = voice.find('[data-testid="whatsapp-inbox-message-audio"]');
+    expect(player.element.tagName).toBe('AUDIO');
+    expect(player.attributes()).toMatchObject({ src: VOICE, preload: 'metadata', 'aria-label': 'Voice note' });
+    expect(player.attributes()).toHaveProperty('controls');
+    expect(voice.find('a').exists()).toBe(false);
+    for (const other of [document, video]) {
+      expect(other.find('img').exists()).toBe(false);
+      expect(other.find('audio').exists()).toBe(false);
+      expect(other.find('a').text()).toBe('Open the attachment');
+    }
+  });
+
+  it('a photo or a voice note that does not load says so, and still offers to open it at erplora.com', async () => {
+    const s = await setup({
+      messages: [
+        message({ id: 'p', kind: 'image', body: '', media_url: PHOTO, media_mime_type: 'image/jpeg' }),
+        message({ id: 'v', kind: 'audio', body: '', media_url: VOICE, media_mime_type: 'audio/ogg', sent_at: '2026-10-15T09:01:00Z' }),
+      ],
+    });
+    await s.wrapper.find('[data-testid="whatsapp-inbox-message-image"]').trigger('error');
+    await s.wrapper.find('[data-testid="whatsapp-inbox-message-audio"]').trigger('error');
+    const [photo, voice] = s.wrapper.findAll('[data-testid="whatsapp-inbox-message-media"]');
+    expect(photo.find('img').exists()).toBe(false);
+    expect(photo.find('[data-testid="whatsapp-inbox-message-media-error"]').text()).toBe('The image could not be loaded.');
+    expect(photo.find('a').attributes()).toMatchObject({ href: PHOTO, target: '_blank' });
+    expect(photo.find('a').text()).toBe('Open the attachment');
+    expect(voice.find('audio').exists()).toBe(false);
+    expect(voice.find('[data-testid="whatsapp-inbox-message-media-error"]').text()).toBe('The voice note could not be loaded.');
+    expect(voice.find('a').attributes('href')).toBe(VOICE);
+  });
+
+  it('says it in Spanish too', async () => {
+    const s = await setup(
+      { messages: [message({ id: 'p', kind: 'image', body: '', media_url: PHOTO, media_mime_type: 'image/jpeg' }), message({ id: 'v', kind: 'audio', body: '', media_url: VOICE, media_mime_type: 'audio/ogg', sent_at: '2026-10-15T09:01:00Z' })] },
+      'es',
+    );
+    expect(s.wrapper.find('[data-testid="whatsapp-inbox-message-image"]').attributes('alt')).toBe('Foto');
+    expect(s.wrapper.find('[data-testid="whatsapp-inbox-message-audio"]').attributes('aria-label')).toBe('Nota de voz');
+    await s.wrapper.find('[data-testid="whatsapp-inbox-message-image"]').trigger('error');
+    await s.wrapper.find('[data-testid="whatsapp-inbox-message-audio"]').trigger('error');
+    expect(s.wrapper.findAll('[data-testid="whatsapp-inbox-message-media-error"]').map((error) => error.text())).toEqual([
+      'No se ha podido cargar la imagen.',
+      'No se ha podido cargar la nota de voz.',
+    ]);
   });
 
   it('offers «Delete note» only on the notes the reader may delete, and asks the page', async () => {

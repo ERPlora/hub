@@ -5,11 +5,13 @@
 // «Retry» when erplora.com gave no final answer), the owner's replies from the phone marked «From the
 // phone», a message without text nor attachment named by its type in the reader's language, reactions on
 // the message they answer, and the team's internal notes in their own colour. An attachment is kept by
-// erplora.com: it opens there in a new tab, over https only (the Hub's CSP paints no file of another
-// origin; WORKBOOK F06). «View earlier» asks the page for the previous page; the page owns the data.
+// erplora.com, over https only (WORKBOOK F06): a photo or a sticker is painted in its bubble (opening full size
+// in a new tab) and a voice note gets a player — the Hub's CSP lets `img-src` and `media-src` reach erplora.com's
+// origin —; one that does not load says so and, like a video or a document, offers «Open the attachment» there.
+// «View earlier» asks the page for the previous page; the page owns the data.
 import { InlineFeedback } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMessageTime, mediaKind, safeMediaUrl } from '../lib/format';
@@ -44,6 +46,22 @@ function when(value: string): string {
 /** Meta's type when there is nothing else to show (a location, a button reply). */
 function bodiless(message: MessageOut): boolean {
   return !message.body && !mediaKind(message) && message.kind !== 'text' && message.kind !== 'template';
+}
+
+/** The attachments the browser could not load (by message and address): they fall back to the link. */
+const unloaded = reactive(new Set<string>());
+const mediaKey = (message: MessageOut) => `${message.id}|${message.media_url}`;
+
+/** How an attachment is shown in the thread: a picture, a player, or only its link. */
+function inline(message: MessageOut): 'image' | 'audio' | null {
+  if (!safeMediaUrl(message.media_url) || unloaded.has(mediaKey(message))) return null;
+  const kind = mediaKind(message);
+  return kind === 'image' || kind === 'sticker' ? 'image' : kind === 'audio' ? 'audio' : null;
+}
+
+/** Why an attachment that should have been shown is only a link. */
+function unloadedText(message: MessageOut): string {
+  return t(mediaKind(message) === 'audio' ? 'whatsapp_inbox.thread.audioError' : 'whatsapp_inbox.thread.imageError');
 }
 
 /** Handed to erplora.com and no final answer: «Not sent», to retry with the same key. */
@@ -129,11 +147,44 @@ watch(
             {{ $t(`whatsapp_inbox.thread.kinds.${mediaKind(item.message)}`) }}<template v-if="item.message.media_filename"> · {{ item.message.media_filename }}</template>
           </span>
           <a
-            v-if="safeMediaUrl(item.message.media_url)"
+            v-if="inline(item.message) === 'image'"
+            class="wa-bubble__photo"
             :href="safeMediaUrl(item.message.media_url) ?? undefined"
             target="_blank"
             rel="noopener noreferrer"
-          >{{ $t('whatsapp_inbox.thread.openAttachment') }}</a>
+          >
+            <img
+              data-testid="whatsapp-inbox-message-image"
+              :src="safeMediaUrl(item.message.media_url) ?? undefined"
+              :alt="item.message.media_caption || $t(`whatsapp_inbox.thread.kinds.${mediaKind(item.message)}`)"
+              loading="lazy"
+              decoding="async"
+              @error="unloaded.add(mediaKey(item.message))"
+            >
+          </a>
+          <audio
+            v-else-if="inline(item.message) === 'audio'"
+            class="wa-bubble__audio"
+            data-testid="whatsapp-inbox-message-audio"
+            :src="safeMediaUrl(item.message.media_url) ?? undefined"
+            :aria-label="$t('whatsapp_inbox.thread.kinds.audio')"
+            controls
+            preload="metadata"
+            @error="unloaded.add(mediaKey(item.message))"
+          />
+          <template v-else-if="safeMediaUrl(item.message.media_url)">
+            <span
+              v-if="unloaded.has(mediaKey(item.message))"
+              class="wa-bubble__error"
+              role="status"
+              data-testid="whatsapp-inbox-message-media-error"
+            >{{ unloadedText(item.message) }}</span>
+            <a
+              :href="safeMediaUrl(item.message.media_url) ?? undefined"
+              target="_blank"
+              rel="noopener noreferrer"
+            >{{ $t('whatsapp_inbox.thread.openAttachment') }}</a>
+          </template>
           <p
             v-if="item.message.media_caption && item.message.media_caption !== item.message.body"
             class="wa-bubble__body"
@@ -278,6 +329,26 @@ watch(
   color: var(--ion-color-primary);
   font-weight: 600;
   word-break: break-all;
+}
+/* A photo never wider than its bubble nor taller than a few lines of the thread. */
+.wa-bubble__photo {
+  display: block;
+  line-height: 0;
+}
+.wa-bubble__photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 18rem;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.wa-bubble__audio {
+  display: block;
+  width: 16rem;
+  max-width: 100%;
+  height: 2.5rem;
 }
 .wa-bubble__meta {
   display: flex;

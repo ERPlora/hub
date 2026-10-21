@@ -86,6 +86,8 @@
       "deleteNote": "Borrar nota",
       "deleteNoteTitle": "¿Borrar esta nota?",
       "openAttachment": "Abrir el adjunto",
+      "imageError": "No se ha podido cargar la imagen.",
+      "audioError": "No se ha podido cargar la nota de voz.",
       "template": "Plantilla: {name}",
       "failedReason": "Motivo de Meta: {reason}",
       "kinds": {

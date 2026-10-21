@@ -25,14 +25,6 @@ icono.
   el asistente y cualquier canal (correo, SMS).
 - **Hoy**: `components/ThreadView.vue`, propio de esta app.
 
-## Adjuntos dentro del hilo (CSP)
-
-- **Qué**: para enseñar fotos y reproducir notas de voz y vídeos dentro del hilo (WHATSAPP_INBOX-F06,
-  como el producto actual), la CSP del Hub tiene que permitir el origen de erplora.com en `img-src` y
-  `media-src` (en `config/settings.py`, como ya hace con `form-action`), o `packages/live` añadir
-  `media-src 'self' blob:` si se sirven por el Hub.
-- **Hoy**: el adjunto se abre en una pestaña nueva servida por erplora.com («Abrir el adjunto»).
-
 ## Ventana de Meta para conectar el número (COOP)
 
 - **Qué**: para que la ventana de Meta que abre **Conectar WhatsApp** (WHATSAPP_INBOX-F01, F02) pueda

@@ -86,6 +86,8 @@
       "deleteNote": "Delete note",
       "deleteNoteTitle": "Delete this note?",
       "openAttachment": "Open the attachment",
+      "imageError": "The image could not be loaded.",
+      "audioError": "The voice note could not be loaded.",
       "template": "Template: {name}",
       "failedReason": "Meta's reason: {reason}",
       "kinds": {

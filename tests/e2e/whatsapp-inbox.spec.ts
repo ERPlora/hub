@@ -209,7 +209,8 @@ test('an attachment, the echo of the owner’s phone and an option tapped show i
   await rowOf(page, phone).click();
   await expect(bubbles(page, 'inbound')).toHaveCount(1);
 
-  // F06: a photo she sends opens at erplora.com in a new tab, named by its kind, with its caption.
+  // F06: a photo she sends is named by its kind, with its caption; erplora.com has none at this made-up address, so
+  // the bubble says it could not be loaded and opens it at erplora.com in a new tab (painted: whatsapp-inbox-media.spec.ts).
   receive(phone, '', name, {
     type: 'image',
     media: { url: `${SAAS}/whatsapp/media/${PREFIX}foto.jpg`, mime_type: 'image/jpeg', filename: '', caption: 'Así lo quiero' },
@@ -217,6 +218,7 @@ test('an attachment, the echo of the owner’s phone and an option tapped show i
   const media = panel(page).locator('[data-testid=whatsapp-inbox-message-media]');
   await expect(media).toContainText('Photo');
   await expect(media).toContainText('Así lo quiero');
+  await expect(media.locator('[data-testid=whatsapp-inbox-message-media-error]')).toHaveText('The image could not be loaded.');
   await expect(media.locator('a')).toHaveAttribute('href', `${SAAS}/whatsapp/media/${PREFIX}foto.jpg`);
   await expect(media.locator('a')).toHaveAttribute('target', '_blank');
   await flowShots(page, 'WHATSAPP_INBOX-F06', async () => {
