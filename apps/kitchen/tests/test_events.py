@@ -12,7 +12,17 @@ import pytest
 from apps.kitchen import events
 from apps.kitchen.models import LogEntry, Ticket, TicketItem
 
-from .conftest import A, add_line, charge, fire, fired_round, open_check, run
+from .conftest import (
+    A,
+    add_line,
+    charge,
+    fire,
+    fired_round,
+    make_station,
+    open_check,
+    route_product,
+    run,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -150,6 +160,26 @@ def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay,
 
     relay()
     assert (Ticket.objects.count(), len(kitchen_sheets()), LogEntry.objects.count()) == (1, 1, 1)
+
+
+def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takeaway(relay, product):
+    """KITCHEN-F04, F05, F08 (kitchen#148): a drink routed to the bar, fired with no title and no channel, opens
+    a «dine in» ticket whose sheet goes to the bar's printer, never the kitchen's nor as «takeaway»."""
+    from apps.printing.models import PrintJob
+
+    bar = make_station("Bar", destination="printer", printer_usage="bar")
+    beer = product("Beer")
+    route_product(beer.id, bar)
+    order = open_check("")
+    add_line(order.id, beer)
+    fire(order.id)
+
+    relay()
+
+    ticket = Ticket.objects.get()
+    assert (ticket.order_type, ticket.label) == ("dine_in", "")
+    sheets = PrintJob.objects.filter(source_app="kitchen")
+    assert list(sheets.values_list("usage", flat=True)) == ["bar"]
 
 
 def test_a_round_the_kitchen_sends_is_not_printed_twice_when_the_relay_brings_its_fire(relay, product):
