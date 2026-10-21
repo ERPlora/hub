@@ -158,7 +158,7 @@ la crea dentro del proyecto.
 | TASK-F12 | Crear un proyecto | hecho |
 | TASK-F13 | Abrir y cambiar un proyecto | hecho |
 | TASK-F14 | Borrar un proyecto | hecho |
-| TASK-F15 | Cuando alguien deja el equipo | parcial: la baja le llega con el envío de avisos entre apps (fase 2) |
+| TASK-F15 | Cuando alguien deja el equipo | hecho |
 
 ### TASK-F01 Crear una tarea
 <!-- origen: fi:modules/tasks#command-handler-wasm-tasks-tasks-create-create_task old:tasks/WORKFLOW.md#que-hay-hoy -->
@@ -377,15 +377,14 @@ Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
 <!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
-Estado: parcial — la reacción está hecha y probada contra Personal real, pero el aviso de la baja le
-llega con el envío de avisos entre apps, que es de la plataforma (fase 2). Hasta entonces, las tareas
-abiertas de quien se da de baja siguen a su nombre y un responsable las reasigna (TASK-F07).
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Un responsable da de baja en **Personal** a una persona que tiene tareas abiertas (STAFF-F06).
-2. Sus tareas **abiertas** se quedan **sin asignar**, para que el responsable las reparta; las
-   cerradas conservan su nombre.
+2. En unos segundos, sus tareas **abiertas** (por hacer, en curso o bloqueadas) se quedan **sin
+   asignar**; las hechas y las canceladas conservan su nombre.
+3. En **Tareas** salen como «Sin asignar», y el responsable las reparte (TASK-F07).
 Entra: la baja de la persona en Personal.
 Sale: un `task.task.assigned` (responsable vacío) por tarea.
 Si falla: si la persona no tenía tareas abiertas, no se hace nada; una segunda entrega del mismo aviso
@@ -449,8 +448,8 @@ cliente o a un compañero).
 ### A qué reacciona y lo que necesita de otras apps
 - **Personal** (`requires = ["staff"]`): el responsable y el dueño de un proyecto son fichas de
   Personal; Tareas lee sus nombres y, al dar de baja a alguien (`staff.member.terminated`), desasigna
-  sus tareas abiertas (TASK-F15: la reacción está declarada; el aviso se lo entrega el relay del outbox,
-  que llega en la fase 2). Las pantallas buscan a las personas con `staff.member.list` y
+  sus tareas abiertas (TASK-F15: el aviso se lo entrega el relay del outbox del worker, una sola vez por
+  baja). Las pantallas buscan a las personas con `staff.member.list` y
   «Asignármela» lee la ficha propia con `staff.member.mine`.
 - De la plataforma: la cuenta de quien actúa (creador y autor de los comentarios) y la zona horaria
   del negocio (el «hoy»).
@@ -471,7 +470,8 @@ cliente o a un compañero).
 
 - Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
-  por fichero, más `tests/test_integration_staff.py` con Personal de verdad.
+  por fichero, más `tests/test_integration_staff.py` con Personal de verdad y `tests/test_relay.py`, la baja
+  en Personal entregada por el relay real del worker (TASK-F15, con dos negocios).
 - Modelos: `Project`, `Task` (con `parent` a sí misma, `CASCADE`; `project` y `assigned_to`,
   `SET_NULL`), `Comment` (`CASCADE` con su tarea) y `TaskCounter` (un contador por día del negocio).
   UUIDv7, sin `hub_id`. `created_by` y `Comment.author` cuelgan de `settings.AUTH_USER_MODEL`
