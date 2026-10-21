@@ -33,7 +33,7 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
 | `LiveAppConfig` | `kind = "app"`, icono `ion:cash-outline`, categoría `sales`, gratuita (`premium = False`) |
 | Verticales | `hair_salon`, `restaurant` (entra en sus plantillas) |
 | `requires` | `["sale"]`; Ventas no requiere Caja (sería un ciclo): pregunta por nombre a `cash_register.session.current` |
-| Lee de otras apps, sin requisito | Ventas (`Sale`, `SalePayment`, `RefundPayment`, cuentas abiertas), Cocina (`kitchen.ticket.board`), Impresión (`printing.job.summary`, `printing.job.create`) |
+| Usa de otras apps | Ventas, su requisito: lee `Sale`, `SalePayment`, `RefundPayment` y sus cuentas abiertas (`sale.order.list`). Sin requisito, por nombre: Cocina (`kitchen.ticket.board`) e Impresión (`printing.job.summary`; `printing.job.create` encola el informe) |
 | Pantallas | `/cash_register/sessions`, `/cash_register/sessions/:id`, `/cash_register/settings` |
 | Operaciones | 8 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; rutas en `/api/cash_register/…` |
 | Eventos | 7, `cash_register.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
