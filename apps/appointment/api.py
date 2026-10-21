@@ -25,6 +25,7 @@ from apps.appointment.schemas import (
     HistoryIn,
     LanesIn,
     MaterializeIn,
+    NoticesIn,
     RecurringCreateIn,
     RecurringGetIn,
     RecurringListIn,
@@ -82,6 +83,11 @@ async def appointment_count_for_service(request, params: Query[CountForServiceIn
 )
 async def appointment_count_to_confirm(request):
     return await run_operation(request, queries.count_to_confirm)
+
+
+@bind(router, "appointment.appointment.notices", "/appointment/appointments/notices")
+async def appointment_notices(request, params: Query[NoticesIn]):
+    return await run_operation(request, queries.notices, params)
 
 
 # Appointments: writes

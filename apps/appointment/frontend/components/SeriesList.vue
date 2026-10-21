@@ -20,7 +20,7 @@ import { computed, ref } from 'vue';
 import { useLiveWindows } from '../composables/useLiveWindows';
 import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime } from '../lib/clock';
-import { describeOutcome, type OutcomeText } from '../lib/outcome';
+import { describeOutcome, describeUpdate, type OutcomeText, type SeriesChange } from '../lib/outcome';
 import type { MaterializeOut, RecurringOut, RecurringUpdatedOut } from '../operations';
 import SeriesFormModal from './SeriesFormModal.vue';
 
@@ -149,12 +149,8 @@ function onCreated(outcome: MaterializeOut): void {
   said.value = describeOutcome(outcome, t, locale.value);
 }
 
-function onUpdated(outcome: RecurringUpdatedOut): void {
-  said.value = {
-    summary: t('appointment.series.outcome.updated', { moved: outcome.moved, cancelled: outcome.cancelled, locked: outcome.locked }),
-    skipped: outcome.skipped.map((skip) => `${skip.occurrence_date}: ${skip.message}`),
-    more: '',
-  };
+function onUpdated(outcome: RecurringUpdatedOut, change: SeriesChange): void {
+  said.value = describeUpdate(outcome, change, t, locale.value);
 }
 </script>
 

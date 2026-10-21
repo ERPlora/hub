@@ -53,6 +53,8 @@ const BOOKED: AppointmentOut = {
   charged_at: null,
   created_at: '2026-10-14T10:00:00+02:00',
   updated_at: '2026-10-14T10:00:00+02:00',
+  start_date_label: 'Monday, October 19, 2026',
+  start_time_label: '10:00',
 };
 
 const SERVICES = page([
@@ -226,6 +228,39 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.field('time').value).toBe('10:00');
   });
 
+  // appointments#204, #239, #240, #241: the day and the time are the device's own date and time pickers (never a
+  // numeric keypad without «:» or «/»), and a time typed with the keyboard counts at once.
+  it('the day and the time are the device’s pickers, and a typed time counts at once', async () => {
+    const s = await setup();
+    const typeOf = (name: string) => (s.field(name) as Control & { type?: string; inputmode?: string });
+    expect([typeOf('day').type, typeOf('time').type]).toEqual(['date', 'time']);
+    expect([typeOf('day').inputmode, typeOf('time').inputmode]).toEqual([undefined, undefined]);
+    await s.pickCustomer();
+    await s.addService('cut', 'Haircut');
+    await s.pickStaff('s1', 'Ana López');
+    await ionValue(s.field('day'), '2026-10-19', 'ionInput');
+    expect(s.submit().disabled).toBe(true);
+    await ionValue(s.field('time'), '10:00', 'ionInput');
+    expect(s.submit().disabled).toBe(false);
+  });
+
+  // appointments#319, #333: services or professionals that cannot load are never an empty list nor only the
+  // appointment's own: their search fails, and the picker says so with «Retry» (Combo's error state).
+  it('services and professionals that cannot load fail their search, new and edited alike', async () => {
+    const broken: Record<string, [number, unknown]> = {
+      '/api/service/services/for_sale': [500, { error: { code: 'internal_error', message: 'Internal error' } }],
+      '/api/staff/members': [500, { error: { code: 'internal_error', message: 'Internal error' } }],
+      '/api/service/assignments/eligible': [500, { error: { code: 'internal_error', message: 'Internal error' } }],
+    };
+    for (const appointment of [null, BOOKED]) {
+      const s = await setup({ appointment });
+      s.answerBy(broken);
+      const search = (picker: ReturnType<typeof s.staffPicker>) => (picker.props('search') as (q: string) => Promise<unknown>)('');
+      await expect(search(s.servicePicker())).rejects.toBeTruthy();
+      await expect(search(s.staffPicker())).rejects.toBeTruthy();
+    }
+  });
+
   it('warns that the time is in the past', async () => {
     const s = await setup();
     await fillNew(s);
@@ -306,7 +341,8 @@ describe('AppointmentFormModal: Edit appointment', () => {
         body: { id: 'r1', from_date: '2026-10-19', time: '12:00' },
       },
     ]);
-    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 0 cancelled because they no longer fit the pattern · 1 left alone because they are already charged']);
+    // appointments#293: only what happened, never «0 cancelled».
+    expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because they are already charged']);
   });
 });
 

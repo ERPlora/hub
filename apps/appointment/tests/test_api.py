@@ -34,6 +34,7 @@ ROUTES = {
         "/appointment/appointments/count_to_confirm",
         "appointment.appointment.count_to_confirm",
     ),
+    ("GET", "/appointment/appointments/notices", "appointment.appointment.notices"),
     ("POST", "/appointment/appointments", "appointment.appointment.create"),
     (
         "POST",
