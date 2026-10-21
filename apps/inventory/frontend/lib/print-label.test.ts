@@ -42,6 +42,8 @@ describe('printInBrowser', () => {
     expect(rules).toContain('@media print');
     expect(rules).toContain('body > :not([data-testid="inventory-label-print"])');
     expect(rules).toContain('@media screen');
+    // Black on a white sheet whatever the theme, so the scanner reads the printed label (inventory#45).
+    expect(rules).toMatch(/\[data-testid="inventory-label-print"\] \{[^}]*color: #000; background: #fff;/);
     // The original plate stays where it was.
     expect(document.querySelector('main [data-testid=plate]')).toBe(svg);
 

@@ -30,6 +30,15 @@ describe('BarcodePlate', () => {
     expect(wrapper.find('svg rect.bar').attributes('fill')).toBe('#000000');
   });
 
+  it('leaves ten modules of white on each side of the bars, the quiet zone a scanner needs to find the code', async () => {
+    const { wrapper } = await setup('SHA-250');
+    const { modules } = code128('SHA-250')!;
+    expect(wrapper.find('svg').attributes('viewBox')).toBe(`0 0 ${modules + 20} 50`);
+    const bars = wrapper.findAll('svg rect.bar').map((bar) => [Number(bar.attributes('x')), Number(bar.attributes('width'))]);
+    expect(Math.min(...bars.map(([x]) => x))).toBe(10);
+    expect(Math.max(...bars.map(([x, width]) => x + width))).toBe(modules + 10);
+  });
+
   it('says so when the SKU cannot be a barcode, in the page language', async () => {
     const { wrapper } = await setup('Ñandú', 'es');
     expect(wrapper.find('svg').exists()).toBe(false);
