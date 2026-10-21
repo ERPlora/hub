@@ -2,8 +2,8 @@
 // Price Lists → «Discount rules» (WORKBOOK «Pantallas · Tarifas»; PRICING-F09 to F12): the live
 // `pricing.rule.list` in a server-side DataTable — Code, Name, Type, Value (one column with its unit, the
 // old module's pricing#28: neither sorted nor filtered, its units differ), Applies to (with the customer
-// group), Validity, Priority and Status —, «Search code or name…», column filters (Status shows the
-// inactive ones), list or cards, 50 a page by name. Whoever manages gets «+» (New discount rule), Edit,
+// group), Validity, Priority and Status —, «Search code or name…», column filters behind the funnel (Status
+// opens on the active ones), list or cards, 50 a page by name. Whoever manages gets «+» (New discount rule), Edit,
 // Deactivate (asking first) and Activate.
 import {
   ConfirmDialog,
@@ -30,7 +30,10 @@ import RuleFormModal from './RuleFormModal.vue';
 
 const TYPES: readonly RuleType[] = ['percent', 'fixed', 'buy_x_get_y', 'tiered'];
 const SCOPES: readonly RuleScope[] = ['all', 'products', 'services', 'category', 'product', 'service'];
-const STATUSES: readonly Status[] = ['active', 'inactive', 'all'];
+// The active ones until the person picks another status; the table's own blank option («All») asks for
+// every one, so there is no second «All» beside it that meant something else (pm#254).
+const STATUSES: readonly Status[] = ['active', 'inactive'];
+const DEFAULT_STATUS = 'active';
 
 const session = useSession();
 const t = useT();
@@ -38,7 +41,7 @@ const locale = useLocale();
 const canManage = computed(() => session.can('pricing.manage'));
 
 const table = useServerTable({ sort: 'name' });
-const filters = ref<DataTableFilters>({});
+const filters = ref<DataTableFilters>({ status: DEFAULT_STATUS });
 
 const query = computed<Partial<RuleListIn>>(() => {
   const f = filters.value;
@@ -47,13 +50,14 @@ const query = computed<Partial<RuleListIn>>(() => {
     ...(f.name ? { name: f.name } : {}),
     ...(f.rule_type ? { rule_type: f.rule_type as RuleType } : {}),
     ...(f.applies_to ? { applies_to: f.applies_to as RuleScope } : {}),
-    ...(f.status ? { status: f.status as Status } : {}),
+    status: (f.status || 'all') as Status,
   };
 });
 
 function onFilters(now: DataTableFilters): void {
   filters.value = now;
-  table.restart({ narrowed: Object.keys(now).length > 0 });
+  // The default status narrows nothing the person asked for: an empty answer is still «No discount rules.».
+  table.restart({ narrowed: Object.entries(now).some(([key, value]) => value && !(key === 'status' && value === DEFAULT_STATUS)) });
 }
 
 const { data: result, status, error, refresh } = useLiveList(
@@ -185,6 +189,7 @@ async function onAction({ actionId, row }: { actionId: string; row: RuleOut }): 
       testid="pricing-rules"
       server-side
       searchable
+      filterable
       :filters="filters"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
