@@ -90,6 +90,12 @@ async function openTill(page: Page): Promise<void> {
   await shown(page).locator(`[data-testid=pos-product-${burger.id}]`).waitFor({ state: 'visible' });
 }
 
+/** What Sales says it charged: the total and each line with its rate, base and VAT. */
+interface ChargedSale {
+  total: number;
+  lines: { name: string; tax_rate: string; line_total: number; net_amount: number; tax_amount: number }[];
+}
+
 const optionsSheet = (page: Page) => page.locator('ion-modal[data-testid=pos-options]');
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
 
@@ -208,9 +214,9 @@ test('MODIFIER-F07: the supplements are charged at the catalogue price, the soda
 
   // What Sales charged, line by line: the burger with its cheese at 10 %, the soda at 21 %, each squaring.
   const sales = await api<{ rows: { id: string }[] }>(context, A, 'GET', '/sale/sales?limit=50');
-  let charged: { total: number; lines: { name: string; tax_rate: string; line_total: number; net_amount: number; tax_amount: number }[] } | null = null;
+  let charged: ChargedSale | null = null;
   for (const row of sales.data.rows) {
-    const sale = (await api<typeof charged & object>(context, A, 'GET', `/sale/sales/detail?sale_id=${row.id}`)).data;
+    const sale = (await api<ChargedSale>(context, A, 'GET', `/sale/sales/detail?sale_id=${row.id}`)).data;
     if (sale.lines.some((line) => line.name === burger.name)) {
       charged = sale;
       break;
