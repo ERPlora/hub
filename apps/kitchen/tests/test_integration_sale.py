@@ -159,3 +159,62 @@ def test_a_round_fired_by_sales_alone_still_reaches_the_kitchen_and_is_numbered_
         "20261014-0002",
         "20261014-0003",
     ]
+
+
+# ── Who sent it, by the name a person reads (KITCHEN-F05, F08, F10) ──────────────────────────────
+
+
+@pytest.fixture
+def ana(django_user_model):
+    """A waiter of the till as the Hub has her: her session's username is an id; her name is Ana García."""
+    return django_user_model.objects.create_user(
+        "saas:42", email="ana@example.com", first_name="Ana", last_name="García"
+    )
+
+
+def kitchen_sheets():
+    from apps.printing.models import PrintJob
+
+    return list(PrintJob.objects.filter(document_type="kitchen_order").order_by("created_at", "id"))
+
+
+def said_by(ticket_id) -> tuple[str, str, str, list[str]]:
+    """Who the card, the detail, the saved ticket and its paper say sent the round."""
+    (card,) = [t for t in board().cooking if t.id == ticket_id]
+    detail = run("kitchen.ticket.get", {"ticket_id": str(ticket_id)})
+    saved = Ticket.objects.get(pk=ticket_id)
+    return card.waiter, detail.waiter, saved.waiter, [job.document["waiter"] for job in kitchen_sheets()]
+
+
+def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana):
+    order = open_check("Table 4")
+    add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana))
+    ticket = run("kitchen.ticket.send", {"order_id": str(order.id)}, ctx_for(actor=ana))
+    assert ticket.waiter == "Ana García"
+    assert said_by(ticket.id) == ("Ana García", "Ana García", "Ana García", ["Ana García"])
+
+
+def test_a_round_fired_by_sales_says_its_waiter_by_name_once_the_relay_brings_it(relay, product, ana):
+    order = open_check("Table 4")
+    line = add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana)).lines[0]
+    fire(order.id, ctx=ctx_for(actor=ana))
+
+    relay()
+
+    assert said_by(line.id) == ("Ana García", "Ana García", "Ana García", ["Ana García"])
+
+
+def test_a_round_not_saved_yet_already_says_its_waiter_by_name(product, ana, django_user_model):
+    order = open_check("Table 4")
+    add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana))
+    fire(order.id, ctx=ctx_for(actor=ana))
+    # Who has no name is said by their e-mail; the id of the session only as the last resort.
+    for username, email in (("saas:43", "luis@example.com"), ("saas:44", "")):
+        person = django_user_model.objects.create_user(username, email=email)
+        other = open_check(f"Table {username[-1]}")
+        add_line(other.id, product(f"Soup {username[-1]}"), ctx=ctx_for(actor=person))
+        fire(other.id, ctx=ctx_for(actor=person))
+
+    shown = board().cooking
+    assert all(not t.saved for t in shown)
+    assert sorted(t.waiter for t in shown) == ["Ana García", "luis@example.com", "saas:44"]

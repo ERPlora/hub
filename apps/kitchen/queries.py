@@ -24,6 +24,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from uuid import UUID
 
+from django.contrib.auth import get_user_model
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -341,6 +342,8 @@ class Round:
     round_no: int
     fired_at: dt.datetime
     lines: list[OrderLine] = field(default_factory=list)
+    #: Who sent it, by the name a person reads (``waiter_names``).
+    waiter: str = ""
 
     @property
     def anchor(self) -> OrderLine:
@@ -385,7 +388,30 @@ def pending_rounds(
                 order=line.order, round_no=line.round_no, fired_at=line.fired_at
             )
         rounds[key].lines.append(line)
+    names = waiter_names(rnd.anchor.created_by for rnd in rounds.values())
+    for rnd in rounds.values():
+        rnd.waiter = names.get(rnd.anchor.created_by, rnd.anchor.created_by)
     return list(rounds.values())
+
+
+def person_label(who) -> str:
+    """A person as the kitchen names them (the waiter of a ticket, on the card and on paper): their name, else
+    their e-mail; their username (the id of the session) only as the last resort; anything else as it is."""
+    if who is None:
+        return ""
+    if hasattr(who, "get_username"):
+        return who.get_full_name() or getattr(who, "email", "") or who.get_username()
+    return str(who)
+
+
+def waiter_names(usernames: Iterable[str]) -> dict[str, str]:
+    """The people Sales keeps by their username (who added a round's lines), by the name a person reads."""
+    wanted = {name for name in usernames if name}
+    if not wanted:
+        return {}
+    users = get_user_model()
+    found = users.objects.filter(**{f"{users.USERNAME_FIELD}__in": wanted})
+    return {user.get_username(): person_label(user) for user in found}
 
 
 @dataclass
@@ -570,7 +596,7 @@ def round_view(rnd: Round, day: dt.date, sequence: int, route: Routing) -> Ticke
         priority="normal",
         status=TicketStatus.PENDING,
         notes="",
-        waiter=rnd.anchor.created_by,
+        waiter=rnd.waiter or rnd.anchor.created_by,
         received_at=rnd.fired_at,
         started_at=None,
         ready_at=None,

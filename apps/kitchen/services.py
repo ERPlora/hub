@@ -64,6 +64,7 @@ from apps.kitchen.queries import (
     in_progress_by_station,
     in_scope,
     pending_rounds,
+    person_label,
     product_routes,
     round_view,
     routing,
@@ -226,7 +227,7 @@ def save_round(ctx: OperationContext, rnd, route) -> Ticket:
         order_id=view.order_id,
         round_no=view.round_no,
         label=view.label,
-        waiter=view.waiter,
+        waiter=view.waiter[:ACTOR_MAX_LENGTH],
         received_at=view.received_at,
         total=view.total,
         created_by=actor(ctx),
@@ -645,7 +646,7 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
         label=data.label or fired.order.label,
         channel=data.channel,
         priority=data.priority,
-        waiter=actor(ctx),
+        waiter=person_label(ctx.actor),
     )
     return out(ticket, _print_round(ctx, ticket))
 
