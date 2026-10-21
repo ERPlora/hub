@@ -181,10 +181,15 @@ def test_the_rules_are_searched_filtered_and_sorted():
     make_rule("A", name="Alpha", priority=5)
     make_rule("B", "fixed", amount=10, name="Beta", priority=1)
     make_rule("C", "buy_x_get_y", buy_quantity=2, get_quantity=1, name="Gamma", applies_to="services")
+    make_rule("OFF", name="Omega", is_active=False)
 
     def codes(**params):
         return [row.code for row in run("pricing.rule.list", params).rows]
 
+    # The active ones unless asked otherwise (PRICING-F09: «Activas» at opening, «Inactivas», or every one).
+    assert codes() == ["A", "B", "C"]
+    assert codes(status="inactive") == ["OFF"]
+    assert codes(status="all") == ["A", "B", "C", "OFF"]
     assert codes(search="bet") == ["B"]
     assert codes(rule_type="buy_x_get_y") == ["C"]
     assert codes(applies_to="services") == ["C"]
