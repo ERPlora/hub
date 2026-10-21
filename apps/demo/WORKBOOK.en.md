@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7600fe2f59a7c95986291a54ea75eed7fa55cdcc4d1fb9244cc8776f265c54be -->
+<!-- generated from WORKBOOK.md sha256:ad915a833a2438da0a8fe8ce680ae64bb84b68656ea29a8675ee6c41bf89af27 -->
 
 ## What it is for and who it is for
 
@@ -48,7 +48,8 @@ Demo opens from **"My apps"**, at the top right, and has two screens and two for
 A table with Name, Status ("Open" / "Done"), Lines (how many it has) and Updated. A "Search…" box by
 name (not case-sensitive); the funnel opens "Filters", with the status one ("All", "Open", "Done"); 50
 per page (it can be changed), from the most recently changed to the oldest, as a table or as cards; on
-a phone, "Load more". A **"New item"** button only for those who can manage. Tapping a row opens the
+a phone, "Load more" up to 100 items and, with more, page by page ("Previous page", "Next page" and
+"1 / 3"). A **"New item"** button only for those who can manage. Tapping a row opens the
 item page. Above it, the figures "Open", "Done" and "Lines", only for those who can manage.
 
 ![The list of items on a phone, with the figures, the search box, the filters funnel and "New item"](docs/img/items-list.png)
