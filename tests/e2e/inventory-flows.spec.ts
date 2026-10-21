@@ -74,6 +74,9 @@ test('INVENTORY-F02: «Edit» opens the product with its SKU locked and the row 
   await productsReady(page);
   await searchProducts(page, sku);
   await expect(productRow(page, sku)).toBeVisible();
+  // inventory#108: the row's stock actions are buttons with their names, not bare icons.
+  await expect(productRow(page, sku).getByRole('button', { name: /^(Receive stock|Recibir stock)$/ })).toBeVisible();
+  await expect(productRow(page, sku).getByRole('button', { name: /^(Count stock|Contar stock)$/ })).toBeVisible();
 
   await rowAction(page, tea.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
@@ -201,6 +204,9 @@ test('INVENTORY-F19: the settings save and say so', async ({ page, context }) =>
     await expect(threshold).toBeVisible();
     await threshold.fill('7');
     await threshold.blur();
+    // hub#2224: on a phone the threshold keeps a field's width, never one letter per line.
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect((await threshold.boundingBox())!.width).toBeGreaterThan(200);
     await shootFlow(page, 'INVENTORY-F19');
     await shown(page).locator('[data-testid=inventory-settings-save]').click();
     await expect(page.locator('ion-toast')).toContainText(/Settings saved\.|Ajustes guardados\./);
