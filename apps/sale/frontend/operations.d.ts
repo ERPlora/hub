@@ -660,12 +660,26 @@ export interface SaleOut {
   documents_pending: boolean;
   /** True: this attempt had already been charged; nothing new was recorded. */
   already: boolean;
+  /** The charge only: whether its receipt (or the drawer's order) went to the printing queue; null elsewhere. */
+  printed?: PaperOut | null;
 }
 
 /** Which sale: its id or its number. */
 export interface SaleRefIn {
   sale_id?: string;
   sale?: string;
+}
+
+/** Print a sale's paper on the receipt printer; a copy («DUPLICATE») unless told. */
+export interface SalePrintIn extends SaleRefIn {
+  duplicate?: boolean;
+}
+
+/** A paper asked of Printing: queued for its printer, or not (the device prints the screen's paper). */
+export interface PaperOut {
+  queued: boolean;
+  job_id: string | null;
+  printer: string | null;
 }
 
 export interface SaleByKeyIn {
@@ -873,6 +887,7 @@ declare module '@erplora/ui/sdk' {
     'sale.sale.complete': { input: CompleteIn; output: SaleOut };
     'sale.sale.complete_over_limit': { input: CompleteIn; output: SaleOut };
     'sale.sale.void': { input: VoidIn; output: SaleOut };
+    'sale.sale.print': { input: SalePrintIn; output: PaperOut };
     'sale.sale.refund': { input: RefundIn; output: RefundOut };
     'sale.sale.issue_documents': { input: SaleRefIn; output: SaleOut };
     'sale.checkout.preview': { input: PreviewIn; output: PreviewOut };
@@ -891,6 +906,7 @@ declare module '@erplora/ui/sdk' {
     'sale.order.remove_line': { input: OrderLineRefIn; output: OrderOut };
     'sale.order.void_line': { input: OrderVoidLineIn; output: OrderOut };
     'sale.order.fire': { input: OrderFireIn; output: OrderFireOut };
+    'sale.order.print_bill': { input: OrderRefIn; output: PaperOut };
     'sale.order.split': { input: OrderSplitIn; output: OrderSplitOut };
     'sale.order.merge': { input: OrderMergeIn; output: OrderOut };
     'sale.order.void': { input: OrderRefIn; output: OrderOut };

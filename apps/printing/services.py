@@ -4,19 +4,22 @@ The queue's state machine is the old hub's (``print_queue.rs``): a job waits ``p
 it (``claim``: ``sent``, one more hand-out, a 90 s lease) with ``SELECT … FOR UPDATE SKIP LOCKED``, so two
 devices never take the same one; the device confirms it (``done``) or reports its failure (back to
 ``pending``, or ``failed`` after 5 hand-outs); a lease that runs out puts it back in the queue at the next
-claim. A person retries a failed (or unanswered) job or cancels it, stamped. Nothing is ever deleted.
+claim. A person retries a failed (or unanswered) job or cancels it, stamped. A job that ended (printed,
+cancelled or failed) is forgotten 30 days later by the hourly prune, the platform's own (PRINTING-F20).
 
 Every app that prints calls ``printing.job.create`` by name inside its own transaction; the job is the
 structured document the app's renderer paints, never bytes (PLAN-HUB §5; hub#501).
 """
 
+import datetime as dt
 import ipaddress
+import logging
 import re
 import uuid
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.db.models.functions import Lower
+from django.db.models.functions import Coalesce, Lower
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
 from babel.numbers import get_currency_precision
@@ -46,6 +49,7 @@ from apps.printing.queries import (
     settings_row,
 )
 from apps.printing.schemas import (
+    EmptyIn,
     JobAckOut,
     JobCancelIn,
     JobClaimIn,
@@ -60,11 +64,20 @@ from apps.printing.schemas import (
     PrinterOut,
     PrinterRefIn,
     PrinterUpdateIn,
+    PruneOut,
     SettingsOut,
     SettingsPatchIn,
 )
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_PORT = 9100
+#: Run only by the platform (the scheduled prune): no role is given it, and it has no route.
+SYSTEM = "printing.system"
+#: How long the queue keeps a job after it ended — printed, cancelled or failed (PRINTING-F20).
+KEEP_FINISHED = dt.timedelta(days=30)
+#: The most jobs one prune deletes: an hourly run never holds the queue for long.
+PRUNE_BATCH = 500
 
 PRINTER_EXISTS = _("There is already a printer with that name.")
 BAD_HOST = _("Type a valid IP or network name (for example 192.168.1.100).")
@@ -438,9 +451,11 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
         "source_app": data.source_app or "",
     }
     skipped = None
+    # The drawer opens at checkout when the settings say so and the till took cash.
+    drawer = data.automatic and data.open_drawer and settings.open_drawer_on_sale
     if data.automatic and not settings.print_receipt_on_sale:
         skipped = "print_on_sale_off"
-        if not settings.open_drawer_on_sale:
+        if not drawer:
             return {"job": None, "duplicate": False, "skipped": skipped}
         # The receipt stays in the drawer's printer's tray: only the kick travels.
         job = _new_job(ctx, kind=PrintJob.Kind.DRAWER, open_drawer=True, **common)
@@ -458,7 +473,7 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
             html=data.html or "",
             format=data.format,
             copies=copies,
-            open_drawer=data.automatic and settings.open_drawer_on_sale,
+            open_drawer=drawer,
             **common,
         )
     if getattr(job, "duplicate", False):
@@ -601,6 +616,7 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
             "copy_document": _copy_of(job),
             "open_drawer": job.open_drawer,
             "attempts": job.attempts,
+            "leased_until": job.leased_until,
         }
     }
 
@@ -728,3 +744,28 @@ def cancel_job(ctx: OperationContext, data: JobCancelIn) -> dict:
     job.save(update_fields=["status", "leased_until", "cancelled_at", "cancelled_by", "cancel_reason", "document", "html"])
     record_event(ctx, events.JOB_CANCELLED, {"id": str(job.id)})
     return job_row(job)
+
+
+# ── PRINTING-F20 How long the queue keeps a job ───────────────────────────────────────────────────
+
+
+@operation("printing.job.prune", kind="command", permission=SYSTEM, input=EmptyIn, output=PruneOut)
+def prune_jobs(ctx: OperationContext, data: EmptyIn) -> dict:
+    """Deletes the jobs that ended over ``KEEP_FINISHED`` ago (the oldest first, ``PRUNE_BATCH`` at most).
+    A job still waiting or sent is never touched; a deleted job's key can be queued again."""
+    cutoff = timezone.now() - KEEP_FINISHED
+    finished = (PrintJob.Status.DONE, PrintJob.Status.CANCELLED, PrintJob.Status.FAILED)
+    doomed = list(
+        PrintJob.objects.filter(status__in=finished)
+        .annotate(ended=Coalesce("printed_at", "cancelled_at", "failed_at", "created_at"))
+        .filter(ended__lt=cutoff)
+        .order_by("ended", "id")
+        .values_list("pk", flat=True)[:PRUNE_BATCH]
+    )
+    if doomed:
+        PrintJob.objects.filter(pk__in=doomed).delete()
+        # Counted: a silent prune cannot be told from lost data the day somebody looks for an old job.
+        logger.info("printing: deleted %d finished jobs older than %d days", len(doomed), KEEP_FINISHED.days)
+        record_event(ctx, events.JOB_PRUNED, {"count": len(doomed)})
+    return {"count": len(doomed)}
+

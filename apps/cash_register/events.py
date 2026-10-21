@@ -4,8 +4,9 @@ services.py records them in the outbox, in the command's transaction; live.py na
 each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
 No reactions: the sale lines of a shift are read from sale (its requirement) when they are looked at, so
-a charge, a void or a refund is in the open shift at once, without the outbox relay of phase 2, and none
-is lost if an event never arrives. Sale's events only re-run the drawer's live queries (``SALE_EVENTS``).
+a charge, a void or a refund is in the open shift at once without depending on the outbox relay (the
+worker's ``base/relay.py`` skips this app: ``REACTIONS`` is empty), and none is lost if an event never
+arrives. Sale's events only re-run the drawer's live queries (``SALE_EVENTS``).
 """
 
 from typing import Any

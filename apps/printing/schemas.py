@@ -260,6 +260,10 @@ class JobCreateIn(Closed):
         description="The print by itself at checkout: it follows «print the receipt at checkout» and «open the drawer "
         "at checkout» of the settings.",
     )
+    open_drawer: bool = Field(
+        True,
+        description="With automatic: false keeps the drawer shut whatever the settings (a checkout with no cash).",
+    )
     source_app: _text(32) | None = Field(None, description="The app that asks for it (sale).")
     source_ref: _text(64) | None = Field(None, description="The document it is, as a person reads it (T-000123).")
 
@@ -353,6 +357,10 @@ class UsageSummary(Schema):
     usage: Usage = Field(description="The function.")
     printers: int = Field(description="Its active printers.")
     default_printer: str | None = Field(description="The printer chosen for it in the settings, if any.")
+    prints_on: str | None = Field(
+        description="The printer its next job goes to now: the chosen one if active, else its first active roll-paper "
+        "printer by name, else its computer's printer; none when no active printer has the function."
+    )
     pending: int = Field(description="Its jobs waiting.")
     oldest_pending_at: datetime | None = Field(description="When the oldest of them was queued.")
     sent: int = Field(description="Its jobs a device has and has not confirmed.")
@@ -396,6 +404,9 @@ class HostJobOut(Schema):
     copies: int = Field(description="Times to print it.")
     open_drawer: bool = Field(description="Open the drawer after printing.")
     attempts: int = Field(description="Times it has been handed out, this one included.")
+    leased_until: datetime = Field(
+        description="When the device's time to answer runs out: past it, the job goes back to the queue."
+    )
 
 
 class JobClaimOut(Schema):
@@ -421,3 +432,8 @@ class JobAckOut(Schema):
         "was retried or cancelled)."
     )
     job: JobOut = Field(description="The job as it is now.")
+
+
+class PruneOut(Schema):
+    count: int = Field(description="The finished jobs this run deleted (printed, cancelled or failed over 30 days ago).")
+

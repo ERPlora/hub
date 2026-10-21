@@ -72,5 +72,8 @@ def test_the_menu_is_its_three_tabs():
     ]
 
 
-def test_no_scheduled_task():
-    assert getattr(config(), "scheduled_tasks", []) == []
+def test_the_queue_forgets_its_finished_jobs_once_an_hour():
+    # PRINTING-F20: run by the worker as the platform (cron in UTC), never by a person.
+    assert config().scheduled_tasks == [
+        {"name": "prune", "operation": "printing.job.prune", "cron": "23 * * * *", "catch_up": "collapse"}
+    ]

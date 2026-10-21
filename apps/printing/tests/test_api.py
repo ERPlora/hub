@@ -70,6 +70,11 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
     from live.operations import registry
 
     ops = {name for name in registry if name.startswith("printing.")}
+    # The platform's own (the scheduled prune, PRINTING-F20) has no door: no route, no API key, no assistant.
+    platform = {"printing.job.prune"}
+    assert platform <= ops
+    assert all(not registry[name].expose_api and not registry[name].ai for name in platform)
+    ops -= platform
     assert ops == {operation for _m, _p, operation in ROUTES}
     assert all(registry[name].expose_api for name in ops)
     assert all(registry[name].ai and registry[name].ai["description"] for name in ops)

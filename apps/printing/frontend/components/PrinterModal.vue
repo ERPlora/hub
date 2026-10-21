@@ -13,10 +13,13 @@ import { IonInput, IonItem, IonLabel, IonNote, IonSelect, IonSelectOption, IonTo
 import { computed, shallowRef, watch } from 'vue';
 
 import { useT } from '../composables/useT';
+import type { PrinterDraft } from '../lib/discovery';
 import { refusal } from '../lib/refusal';
 import type { PaperWidth, PrinterKind, PrinterOut, Usage } from '../operations';
 
-const props = defineProps<{ printer: PrinterOut | null }>();
+// `draft`: a printer «Search printers» found (PRINTING-F02), for a new one: its name, connection, address
+// and paper come filled in; the person still checks them and gives it a role.
+const props = withDefaults(defineProps<{ printer: PrinterOut | null; draft?: PrinterDraft | null }>(), { draft: null });
 
 const open = defineModel<boolean>('open', { required: true });
 
@@ -47,14 +50,14 @@ watch(
   open,
   (now) => {
     if (!now) return;
-    const p = props.printer;
+    const p = props.printer ?? props.draft;
     name.value = p?.name ?? '';
     kind.value = p?.kind ?? 'network';
     address.value = p?.address ?? '';
     port.value = p?.port != null ? String(p.port) : DEFAULT_PORT;
     paper.value = (p?.paper_width as PaperWidth | undefined) ?? 80;
-    usage.value = p?.usage ?? 'receipt';
-    active.value = p?.is_active ?? true;
+    usage.value = props.printer?.usage ?? 'receipt';
+    active.value = props.printer?.is_active ?? true;
     missing.value = false;
     create.error.value = null;
     update.error.value = null;
