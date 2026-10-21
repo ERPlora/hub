@@ -565,7 +565,9 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_*.py` con Inventario, Clientes y
   Servicios de verdad, `tests/test_concurrency.py` con hilos y `tests/test_relay.py` (PRICING-F14 de punta
   a punta: la operación real de la otra app, un tick real del worker y su relay, la reacción una sola vez y
-  el hub B sin tocar al A).
+  el hub B sin tocar al A). En Chrome, `tests/e2e/pricing-flows.spec.ts` (un test por flujo con pantalla,
+  PRICING-F01 a F12, con sus capturas en tres tamaños) y `tests/e2e/pricing-lists.spec.ts` (de la tarifa al
+  precio de una línea, PRICING-F13).
 - **`requires = ["inventory", "customer"]`**: las claves ajenas a `inventory.Product` e
   `inventory.Category` las justifica leer el nombre, el SKU, la unidad y el precio al día; de Clientes se
   leen sus modelos (la ficha, sus grupos y el nombre de un grupo). **Servicios no es requisito**: un
@@ -629,6 +631,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `RulesTable`) y `/pricing/lists/:id` (el detalle, `ListDetailPage`, con el id como prop).
 - Las confirmaciones de la tarifa (hacer general, desactivar) viven en `ListConfirm`, que comparten la
   tabla y el detalle.
+- Las tres tablas llevan sus filtros detrás del embudo (`filterable`, como la tabla del producto actual), y
+  las de tarifas y reglas abren con «Activas» elegido: su opción vacía («Todos») pide todas.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas, cada una su suscripción) y `useServerTable`;
   escrituras con `useCommand`; formularios con `FormModal`, confirmaciones con `ConfirmDialog` y
   buscadores con `Combo` (productos y categorías de Inventario, servicios de Servicios, grupos de
