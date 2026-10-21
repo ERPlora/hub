@@ -64,6 +64,8 @@ export interface MountOptions {
   locale?: 'en' | 'es';
   session?: SessionMe;
   stubs?: Record<string, Component | boolean>;
+  /** Answers the API calls from before the mount: what a component asks as it mounts gets it. */
+  api?: (call: { url: string; init: RequestInit }) => Response;
 }
 
 type Params = Record<string, unknown>;
@@ -78,6 +80,7 @@ export interface SentCall {
 
 export async function mountInbox(component: Component, options: MountOptions = {}) {
   const harness = createTestClient({ routes: OPERATION_ROUTES });
+  if (options.api) harness.net.onApi(options.api);
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:path(.*)*', component: { template: '<div />' } }],

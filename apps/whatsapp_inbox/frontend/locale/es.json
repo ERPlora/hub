@@ -46,9 +46,9 @@
         "allRead": "Todo leído"
       },
       "open": "Abrir",
-      "notConnected": "WhatsApp no está conectado. Conecta el número del negocio en erplora.com para recibir y enviar mensajes.",
-      "reconnectNeeded": "WhatsApp pide volver a conectar el número en erplora.com: hasta entonces no se puede enviar nada.",
-      "goToSaas": "Ir a erplora.com",
+      "notConnected": "WhatsApp no está conectado. Conecta el número del negocio en Ajustes para recibir y enviar mensajes.",
+      "reconnectNeeded": "WhatsApp pide volver a conectar el número en Ajustes: hasta entonces no se puede enviar nada.",
+      "goToSettings": "Ir a Ajustes",
       "capReached": "Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.",
       "erased": "Se han borrado los datos de este número."
     },
@@ -86,6 +86,8 @@
       "deleteNote": "Borrar nota",
       "deleteNoteTitle": "¿Borrar esta nota?",
       "openAttachment": "Abrir el adjunto",
+      "imageError": "No se ha podido cargar la imagen.",
+      "audioError": "No se ha podido cargar la nota de voz.",
       "template": "Plantilla: {name}",
       "failedReason": "Motivo de Meta: {reason}",
       "kinds": {
@@ -129,7 +131,7 @@
       "sent": "Mensaje enviado",
       "noteAdded": "Nota añadida",
       "blocked": {
-        "not_connected": "WhatsApp no está conectado: conecta el número en erplora.com para enviar.",
+        "not_connected": "WhatsApp no está conectado: conecta el número en Ajustes para enviar.",
         "cap_reached": "Los mensajes de WhatsApp de tu plan de este mes están gastados: no se puede enviar nada hasta el mes que viene.",
         "unconfigured": "Este Hub no llega a erplora.com, así que desde él no se puede enviar nada."
       }
@@ -227,16 +229,38 @@
       "connected": "Conectado",
       "notConnected": "Sin conectar",
       "reconnectNeeded": "Hay que reconectar",
-      "notConnectedHint": "Conecta el número de WhatsApp del negocio en erplora.com: los mensajes llegarán aquí.",
-      "reconnectHint": "WhatsApp retiró el permiso: vuelve a conectar el número en erplora.com.",
-      "manage": "Gestionar en erplora.com",
+      "notConnectedHint": "Conecta el número de WhatsApp del negocio: los mensajes llegarán aquí.",
+      "reconnectHint": "WhatsApp retiró el permiso: vuelve a conectar el número. Hasta entonces no se puede enviar nada.",
       "month": "Este mes",
       "sent": "Mensajes enviados",
       "usage": "{used} de {limit} mensajes enviados",
       "noLimit": "Sin límite: {used} mensajes enviados",
       "capReached": "Has usado todos los mensajes de tu plan este mes.",
       "templatesTitle": "Plantillas de Meta",
-      "loadError": "No se pudo cargar el canal."
+      "loadError": "No se pudo cargar el canal.",
+      "connection": {
+        "checking": "Comprobando con erplora.com…",
+        "connect": "Conectar WhatsApp",
+        "reconnect": "Volver a conectar",
+        "hint": "Se abre la ventana de Meta: entra con Facebook y elige o añade el número del negocio. Si ya lo usas en la app WhatsApp Business, escanea el código con ese móvil: sigues usando WhatsApp en él como siempre.",
+        "notConfigured": "WhatsApp todavía no está disponible en ERPlora.",
+        "notYet": "Todavía no se puede conectar el número desde aquí.",
+        "retry": "Reintentar",
+        "waiting": "Termina en la ventana de Meta…",
+        "connecting": "Conectando…",
+        "connected": "WhatsApp conectado: {number}.",
+        "connectedHistory": "WhatsApp conectado: {number}. Sus contactos y chats llegan a la bandeja en unos minutos.",
+        "blocked": "El navegador no ha dejado abrir la ventana de Meta. Permite las ventanas emergentes de este sitio e inténtalo de nuevo.",
+        "closed": "Se ha cerrado la ventana de Meta antes de terminar: no se ha conectado nada.",
+        "metaFailed": "Meta no ha terminado la conexión: {reason}",
+        "noAccount": "Meta no ha dicho qué cuenta de WhatsApp Business se eligió: no se ha conectado nada. Inténtalo de nuevo.",
+        "disconnect": "Desconectar",
+        "disconnectTitle": "¿Desconectar el número de WhatsApp?",
+        "disconnectMessage": "{number} deja de recibir y enviar mensajes en la bandeja hasta que se vuelva a conectar.",
+        "disconnectStays": "Las conversaciones guardadas no se tocan.",
+        "disconnected": "WhatsApp desconectado.",
+        "noNumber": "erplora.com no tenía ningún número conectado para este negocio."
+      }
     }
   }
 }

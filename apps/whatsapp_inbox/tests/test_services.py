@@ -20,6 +20,7 @@ from apps.customer.models import Customer
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import (
     A,
+    B,
     NOW,
     card,
     connect,
@@ -407,6 +408,59 @@ def test_the_channel_follows_erplora_s_newest_version():
     assert len(events("whatsapp_inbox.channel.synced")) == 2
 
 
+def channel_of(scope):
+    return run("whatsapp_inbox.channel.get", {}, ctx_for(scope=scope))
+
+
+def test_each_business_keeps_its_own_number_and_its_own_version():
+    # The row was one for every business: B's newer photo said «not connected» for A too.
+    assert connect(version=50).applied is True
+    b = {"version": 120, "status": "not_connected", "phone_number": "", "display_name": ""}
+    assert system("whatsapp_inbox.channel.sync", b, B).applied is True
+
+    a_now, b_now = channel_of(A), channel_of(B)
+    assert (a_now.status, a_now.phone_number, a_now.monthly_limit) == ("connected", "+34910000000", 150)
+    assert (b_now.status, b_now.phone_number, b_now.monthly_limit) == ("not_connected", "", 0)
+    # Each version is its own business's: A's 60 is newer than A's 50, whatever B's is.
+    assert connect(version=60, status="reconnect_needed").applied is True
+    assert system("whatsapp_inbox.channel.sync", {**b, "version": 110}, B).applied is False
+    assert (channel_of(A).status, channel_of(B).status) == ("reconnect_needed", "not_connected")
+    assert set(Channel.objects.values_list("host", "version")) == {("a", 60), ("b", 120)}
+
+
+def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own():
+    connect(version=1, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    receive("wamid.1", "34600111222")
+    ref = {"id": str(conv().id)}
+    a = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=A))
+    b = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=B))
+    assert (a.send_blocked, b.send_blocked) == ("cap_reached", "not_connected")
+    a_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=A))
+    b_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=B))
+    assert (a_month.cap_reached, b_month.cap_reached) == (True, False)
+
+
+def test_each_business_s_photo_keeps_its_own_number(client, settings):
+    # Two businesses with the inbox on: A's photo v50 says connected, B's v120 not connected.
+    from base.models import Hub
+    from base.tests.test_internal import SECRET, signed
+
+    settings.INTERNAL_SHARED_SECRET, settings.INTERNAL_SHARED_SECRET_PREVIOUS = SECRET, ""
+    # The registry has the local hubs ``a`` and ``b`` (the root conftest, as ``seed_local_hubs``).
+    a_id, b_id = (str(Hub.objects.get(slug=slug).id) for slug in ("a", "b"))
+    block = {"status": "connected", "phone_number": "+34910000000", "display_name": "Ana", "version": 1}
+
+    def photo(hub_id, slug, version, **whatsapp):
+        body = {"hub_id": hub_id, "slug": slug, "version": version, "status": "active", "whatsapp": {**block, **whatsapp}}
+        return signed(client, "put", f"/internal/hubs/{hub_id}/state", body)
+
+    assert photo(a_id, "a", 50).json() == {"applied": True, "version": 50}
+    assert photo(b_id, "b", 120, status="not_connected", phone_number="", display_name="").json()["applied"] is True
+
+    assert (channel_of(A).status, channel_of(A).phone_number) == ("connected", "+34910000000")
+    assert (channel_of(B).status, channel_of(B).phone_number) == ("not_connected", "")
+
+
 def test_templates_are_replaced_by_the_list_and_the_missing_ones_stay_deleted():
     connect(
         version=1,
@@ -547,6 +601,8 @@ def test_without_a_connected_number_nothing_is_kept():
     with pytest.raises(Conflict) as excinfo:
         send({"id": str(conv().id), "text": "Hola"})
     assert excinfo.value.code == "whatsapp_inbox.channel_not_connected"
+    # The number is connected from the inbox's Settings (WHATSAPP_INBOX-F01), not in erplora.com.
+    assert "in Settings" in excinfo.value.message and "erplora.com" not in excinfo.value.message
     connect(version=1, status="reconnect_needed")
     with pytest.raises(Conflict) as excinfo:
         send({"id": str(conv().id), "text": "Hola"})

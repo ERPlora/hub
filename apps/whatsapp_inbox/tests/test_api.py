@@ -71,6 +71,9 @@ ROUTES = {
     ("POST", "/whatsapp_inbox/templates/retry", "whatsapp_inbox.template.retry"),
     ("POST", "/whatsapp_inbox/templates/delete", "whatsapp_inbox.template.delete"),
     ("GET", "/whatsapp_inbox/channel", "whatsapp_inbox.channel.get"),
+    ("POST", "/whatsapp_inbox/channel/prepare", "whatsapp_inbox.channel.prepare"),
+    ("POST", "/whatsapp_inbox/channel/connect", "whatsapp_inbox.channel.connect"),
+    ("POST", "/whatsapp_inbox/channel/disconnect", "whatsapp_inbox.channel.disconnect"),
     ("GET", "/whatsapp_inbox/agents", "whatsapp_inbox.agent.list"),
 }
 SYSTEM_ONLY = {

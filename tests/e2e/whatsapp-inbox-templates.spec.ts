@@ -4,15 +4,21 @@
 // ones made in WhatsApp Manager that the Hub cannot fill are there but cannot be edited; «Add template»
 // refuses what Meta would refuse under its field and keeps a new one «Not sent to Meta»; «Edit» keeps the
 // approved one in use while the change waits; «Delete» asks first and leaves it «Being deleted at Meta».
-// erplora.com does not serve its template doors yet (WORKBOOK «Contrato con el SaaS», doors 8 and 9): what
-// the Hub hands over stays on its way, with the reason, and is never shown as registered or deleted at
-// Meta. Each flow's screen in three sizes (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440). What it creates is
+// What the Hub hands over goes to the run's real erplora.com (WORKBOOK «Contrato con el SaaS», doors 8 and 9), where
+// erplora.com's own test seed gave `a` a number (whatsapp-helpers.ts, `seedErplora`): erplora.com takes it to Meta,
+// which refuses the seed's made-up permission, so each row says it was not accepted, with the reason, and is never
+// shown as registered or deleted at Meta. Each flow's screen in three sizes (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440). What it creates is
 // deleted after the file.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, psql, shown } from './helpers';
 import { rowAction } from './service-helpers';
-import { cleanUp, flowShots, pushChannel, template } from './whatsapp-helpers';
+import { cleanUp, flowShots, pushChannel, seedErplora, template } from './whatsapp-helpers';
+
+test.beforeAll(() => {
+  // erplora.com takes `a`'s number (its test seed): what the Hub hands it reaches Meta.
+  expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+});
 
 test.afterAll(() => {
   cleanUp();
@@ -63,7 +69,8 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   });
 
   // F29: «Add template». What Meta would refuse is said under its field; a valid one is kept «Not sent to
-  // Meta», and the row says erplora.com did not take it (its door does not exist yet), never «In review».
+  // Meta» and handed to erplora.com, which takes it to Meta: Meta refuses the seed's made-up permission and
+  // erplora.com says the number is not connected, so the row says «Not accepted» with it, never «In review».
   await shown(page).locator(`[data-testid=${TABLE}-add]`).click();
   await expect(editor).toBeVisible();
   await editor.locator('[data-testid=whatsapp-inbox-template-editor-name] input').fill(made);
@@ -82,7 +89,7 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   await editor.locator('[data-testid=whatsapp-inbox-template-editor-submit]').click();
   await expect(editor).toBeHidden();
   await expect(rowOf(page, made)).toContainText('Not sent to Meta');
-  await expect(rowOf(page, made)).toContainText('erplora.com did not answer');
+  await expect(rowOf(page, made)).toContainText('Not accepted: WhatsApp is not connected.', { timeout: 30_000 });
   await expect(rowOf(page, made)).not.toContainText('In review');
 
   // F30: «Edit» an approved one: it stays approved (and sendable) while the change waits for Meta.
@@ -95,8 +102,10 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   });
   await editor.locator('[data-testid=whatsapp-inbox-template-editor-submit]').click();
   await expect(editor).toBeHidden();
+  // erplora.com takes the change to Meta, which refuses the seed's permission: the row says the change was not
+  // accepted, and the approved text is still the one in use.
   await expect(rowOf(page, approved)).toContainText('Approved');
-  await expect(rowOf(page, approved)).toContainText('Changes not sent');
+  await expect(rowOf(page, approved)).toContainText('Not accepted: WhatsApp is not connected.', { timeout: 30_000 });
   await expect(rowOf(page, approved)).toContainText('Hola {{1}}, te esperamos mañana.');
 
   // F31: «Delete» asks first, naming it and what it costs; it then waits for Meta, «Being deleted at Meta».

@@ -2,14 +2,14 @@
 // `whatsapp_inbox.conversation.list` in a server-side DataTable — Contact, Phone, Status, Assigned to,
 // Unread and Last message —, «Filter contact or phone…», filters by status, assignment and unread, 50 a
 // page, latest activity first; «Open» (or the row) opens the conversation in a panel above the list
-// (also from `?conversation=`); the notices: number not connected (with «Go to erplora.com» for whoever
-// configures), reconnect, month spent, number erased; every state of the screen.
+// (also from `?conversation=`); the notices: number not connected or to reconnect (with «Go to Settings», where it
+// is connected, for whoever configures), month spent, number erased; every state of the screen.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountInbox } from '../__tests__/mount-inbox';
+import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInbox } from '../__tests__/mount-inbox';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
 import InboxPage from './InboxPage.vue';
@@ -185,17 +185,21 @@ describe('InboxPage: the conversation above the list', () => {
 });
 
 describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => {
-  it('a number not connected: the notice, and «Go to erplora.com» for whoever configures', async () => {
+  it('a number not connected: the notice, and «Go to Settings» (where it is connected) for whoever configures', async () => {
     const s = await setup({}, { ...CONNECTED, status: 'not_connected', phone_number: '' });
-    expect(s.find('whatsapp-inbox-not-connected').text()).toContain('WhatsApp is not connected.');
-    expect(s.find('whatsapp-inbox-go-to-saas').attributes('href')).toBe('http://localhost:8001');
+    expect(s.find('whatsapp-inbox-not-connected').text()).toContain('Connect the business’s number in Settings');
+    expect(s.find('whatsapp-inbox-go-to-settings').text()).toBe('Go to Settings');
+    await click(s.find('whatsapp-inbox-go-to-settings').element);
+    expect(s.router.currentRoute.value.path).toBe('/whatsapp_inbox/settings');
     const employee = await setup({ session: EMPLOYEE }, { ...CONNECTED, status: 'not_connected' });
     expect(employee.find('whatsapp-inbox-not-connected').exists()).toBe(true);
-    expect(employee.find('whatsapp-inbox-go-to-saas').exists()).toBe(false);
+    expect(employee.find('whatsapp-inbox-go-to-settings').exists()).toBe(false);
   });
 
   it('a number to reconnect, and the month spent', async () => {
-    expect((await setup({}, { ...CONNECTED, status: 'reconnect_needed' })).find('whatsapp-inbox-reconnect').text()).toContain('reconnect');
+    const reconnect = await setup({}, { ...CONNECTED, status: 'reconnect_needed' });
+    expect(reconnect.find('whatsapp-inbox-reconnect').text()).toContain('reconnect the number in Settings');
+    expect(reconnect.find('whatsapp-inbox-go-to-settings').exists()).toBe(true);
     const spent = await setup({}, { ...CONNECTED, cap_reached: true, monthly_usage: 150 });
     expect(spent.find('whatsapp-inbox-cap-reached').text()).toContain('You have used all the WhatsApp messages of your plan this month.');
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
@@ -222,5 +226,14 @@ describe('InboxPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+
+  it('on a phone «No conversations.» stays in sight: the list hangs from AppPage’s stack itself, never from a nested one under the notices, and its filters sit behind «Filters» (the old hub’s funnel)', async () => {
+    const s = await setup({}, { ...CONNECTED, status: 'not_connected', phone_number: '' });
+    expect(s.find('whatsapp-inbox-not-connected').exists()).toBe(true);
+    expect(s.prop('filterable')).toBe(true);
+    const stack = s.table().element.parentElement;
+    expect(stack?.parentElement?.classList.contains('hub-detail-shell--fill')).toBe(true);
+    expect(stack?.contains(s.find('whatsapp-inbox-not-connected').element)).toBe(true);
   });
 });

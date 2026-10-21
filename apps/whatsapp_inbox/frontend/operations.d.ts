@@ -292,6 +292,40 @@ export interface AgentOut {
   role: string;
 }
 
+// ── Connecting the number from Settings (WHATSAPP_INBOX-F01, F02; erplora.com's doors 10–12) ────
+
+export type ChannelPrepareIn = Record<string, never>;
+
+export interface ChannelPrepareOut {
+  available: boolean;
+  reason: 'not_configured' | 'window_unavailable' | 'popups_blocked' | null;
+  app_id: string;
+  config_id: string;
+  graph_version: string;
+  redirect_uri: string;
+}
+
+export interface ChannelConnectIn {
+  code: string;
+  event: string;
+  waba_id: string;
+  phone_number_id: string;
+  business_id: string;
+}
+
+export interface ChannelConnectOut {
+  connected: boolean;
+  phone_number: string;
+  display_name: string;
+  history_requested: boolean;
+}
+
+export type ChannelDisconnectIn = Record<string, never>;
+
+export interface ChannelDisconnectOut {
+  disconnected: boolean;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'whatsapp_inbox.conversation.list': { input: ConversationListIn; output: Page<ConversationOut> };
@@ -315,6 +349,9 @@ declare module '@erplora/ui/sdk' {
     'whatsapp_inbox.template.retry': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.template.delete': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.channel.get': { input: ChannelGetIn; output: ChannelOut };
+    'whatsapp_inbox.channel.prepare': { input: ChannelPrepareIn; output: ChannelPrepareOut };
+    'whatsapp_inbox.channel.connect': { input: ChannelConnectIn; output: ChannelConnectOut };
+    'whatsapp_inbox.channel.disconnect': { input: ChannelDisconnectIn; output: ChannelDisconnectOut };
     'whatsapp_inbox.agent.list': { input: AgentListIn; output: Page<AgentOut> };
   }
 }

@@ -5,7 +5,8 @@
 // «Filter contact or phone…» (a number typed any way), column filters by status, assignment and unread,
 // 50 a page, the latest activity first. «Open» (or the row) opens the conversation in a panel above the
 // list, kept in the address (`?conversation=`). Above it: «Reconnecting…», the number not connected or to
-// reconnect («Go to erplora.com» for whoever configures), the month's messages spent, a number erased.
+// reconnect («Go to Settings», where it is connected, for whoever configures), the month's messages spent, a number
+// erased.
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -33,6 +34,8 @@ const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
 const session = useSession();
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
+/** Where the number is connected, reconnected or disconnected (WHATSAPP_INBOX-F01, F02). */
+const SETTINGS = '/whatsapp_inbox/settings';
 const t = useT();
 const locale = useLocale();
 const route = useRoute();
@@ -157,7 +160,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
     :tabs="inboxTabs($t)"
     :tabs-label="$t('whatsapp_inbox.tabs.label')"
   >
-    <div class="wa-inbox page-fill">
+    <div class="wa-inbox">
       <PageNotices
         testid="whatsapp-inbox"
         :status="status"
@@ -170,16 +173,15 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
       >
         {{ $t('whatsapp_inbox.inbox.notConnected') }}
         <template
-          v-if="canConfigure && channel.manage_url"
+          v-if="canConfigure"
           #actions
         >
           <a
             class="wa-inbox__link"
-            data-testid="whatsapp-inbox-go-to-saas"
-            :href="channel.manage_url"
-            target="_blank"
-            rel="noopener"
-          >{{ $t('whatsapp_inbox.inbox.goToSaas') }}</a>
+            data-testid="whatsapp-inbox-go-to-settings"
+            :href="SETTINGS"
+            @click.prevent="router.push(SETTINGS)"
+          >{{ $t('whatsapp_inbox.inbox.goToSettings') }}</a>
         </template>
       </InlineFeedback>
       <InlineFeedback
@@ -188,6 +190,17 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
         data-testid="whatsapp-inbox-reconnect"
       >
         {{ $t('whatsapp_inbox.inbox.reconnectNeeded') }}
+        <template
+          v-if="canConfigure"
+          #actions
+        >
+          <a
+            class="wa-inbox__link"
+            data-testid="whatsapp-inbox-go-to-settings"
+            :href="SETTINGS"
+            @click.prevent="router.push(SETTINGS)"
+          >{{ $t('whatsapp_inbox.inbox.goToSettings') }}</a>
+        </template>
       </InlineFeedback>
       <InlineFeedback
         v-if="channel?.cap_reached"
@@ -211,77 +224,85 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
         @close="close"
         @erased="onErased"
       />
-      <DataTable
-        v-if="!blocked"
-        v-model:search="table.search.value"
-        testid="whatsapp-inbox"
-        fill
-        server-side
-        searchable
-        row-clickable
-        :filters="filters"
-        :rows="result?.rows ?? []"
-        :total="result?.total ?? 0"
-        :page="table.page.value"
-        :page-size="table.pageSize.value"
-        :sort="table.sort.value"
-        :sort-dir="table.dir.value"
-        :views="['table', 'cards']"
-        :card-title="(row: ConversationOut) => row.display_name"
-        card-title-column="contact"
-        :entity-label="{ one: $t('whatsapp_inbox.inbox.entity.one'), many: $t('whatsapp_inbox.inbox.entity.many') }"
-        :loading="status === 'loading'"
-        :error="status === 'error' ? $t('whatsapp_inbox.inbox.loadError') : undefined"
-        :search-placeholder="$t('whatsapp_inbox.inbox.search')"
-        :labels="{ loadError: $t('whatsapp_inbox.inbox.loadError'), retry: $t('whatsapp_inbox.live.retry') }"
-        :actions="actions"
-        :columns="columns"
-        @filters-change="onFilters"
-        @page-change="table.goToPage"
-        @load-more="table.loadMore"
-        @page-size-change="table.setPageSize"
-        @sort-change="table.setSort"
-        @row-click="open"
-        @action="(event) => event.actionId === 'open' && open(event.row)"
-        @retry="refresh()"
-      >
-        <template #contact="{ row }">
-          <span
-            class="wa-inbox__contact"
-            :class="{ 'wa-inbox__contact--unread': row.unread_count > 0 }"
-          >
-            {{ row.display_name }}
-            <small
-              v-if="previewOf(row)"
-              class="wa-inbox__preview"
-              data-testid="whatsapp-inbox-preview"
-            >{{ previewOf(row) }}</small>
-          </span>
-        </template>
-        <template #unread="{ row }">
-          <span
-            class="wa-inbox__unread"
-            :class="{ 'wa-inbox__unread--on': row.unread_count > 0 }"
-            data-testid="whatsapp-inbox-unread"
-          >{{ row.unread_count > 0 ? row.unread_count : '—' }}</span>
-        </template>
-        <template #empty>
-          <EmptyState
-            data-testid="whatsapp-inbox-empty"
-            icon="chatbubbles-outline"
-            :heading="table.filtered.value ? $t('whatsapp_inbox.noResults') : $t('whatsapp_inbox.inbox.empty')"
-            :message="table.filtered.value ? $t('whatsapp_inbox.noResultsMessage') : undefined"
-          />
-        </template>
-      </DataTable>
     </div>
+    <DataTable
+      v-if="!blocked"
+      v-model:search="table.search.value"
+      testid="whatsapp-inbox"
+      fill
+      server-side
+      searchable
+      filterable
+      row-clickable
+      :filters="filters"
+      :rows="result?.rows ?? []"
+      :total="result?.total ?? 0"
+      :page="table.page.value"
+      :page-size="table.pageSize.value"
+      :sort="table.sort.value"
+      :sort-dir="table.dir.value"
+      :views="['table', 'cards']"
+      :card-title="(row: ConversationOut) => row.display_name"
+      card-title-column="contact"
+      :entity-label="{ one: $t('whatsapp_inbox.inbox.entity.one'), many: $t('whatsapp_inbox.inbox.entity.many') }"
+      :loading="status === 'loading'"
+      :error="status === 'error' ? $t('whatsapp_inbox.inbox.loadError') : undefined"
+      :search-placeholder="$t('whatsapp_inbox.inbox.search')"
+      :labels="{ loadError: $t('whatsapp_inbox.inbox.loadError'), retry: $t('whatsapp_inbox.live.retry') }"
+      :actions="actions"
+      :columns="columns"
+      @filters-change="onFilters"
+      @page-change="table.goToPage"
+      @load-more="table.loadMore"
+      @page-size-change="table.setPageSize"
+      @sort-change="table.setSort"
+      @row-click="open"
+      @action="(event) => event.actionId === 'open' && open(event.row)"
+      @retry="refresh()"
+    >
+      <template #contact="{ row }">
+        <span
+          class="wa-inbox__contact"
+          :class="{ 'wa-inbox__contact--unread': row.unread_count > 0 }"
+        >
+          {{ row.display_name }}
+          <small
+            v-if="previewOf(row)"
+            class="wa-inbox__preview"
+            data-testid="whatsapp-inbox-preview"
+          >{{ previewOf(row) }}</small>
+        </span>
+      </template>
+      <template #unread="{ row }">
+        <span
+          class="wa-inbox__unread"
+          :class="{ 'wa-inbox__unread--on': row.unread_count > 0 }"
+          data-testid="whatsapp-inbox-unread"
+        >{{ row.unread_count > 0 ? row.unread_count : '—' }}</span>
+      </template>
+      <template #empty>
+        <EmptyState
+          data-testid="whatsapp-inbox-empty"
+          icon="chatbubbles-outline"
+          :heading="table.filtered.value ? $t('whatsapp_inbox.noResults') : $t('whatsapp_inbox.inbox.empty')"
+          :message="table.filtered.value ? $t('whatsapp_inbox.noResultsMessage') : undefined"
+        />
+      </template>
+    </DataTable>
   </AppPage>
 </template>
 
 <style scoped>
-/* A `.page-fill` stack (polish.css): the list fills the page between the topbar and the tabbar. */
+/* The notices and the open conversation, above the list. The DataTable is a direct child of AppPage's
+   `.page-fill` stack (polish.css), never inside a nested one: on a phone a nested stack let the list's
+   `min-height: 100%` grow by the notices' height and pushed «No conversations.» under the tab bar. */
 .wa-inbox {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
+}
+.wa-inbox:not(:empty) {
+  margin-bottom: 0.75rem;
 }
 .wa-inbox__link {
   color: var(--ion-color-primary);

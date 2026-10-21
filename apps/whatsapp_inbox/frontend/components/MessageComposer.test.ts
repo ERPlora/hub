@@ -132,6 +132,9 @@ describe('MessageComposer: reply (WHATSAPP_INBOX-F32)', () => {
   it('with the number not connected nothing is offered and the reason is said', async () => {
     const s = await setup({ can_send: false, send_blocked: 'not_connected' });
     expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('WhatsApp is not connected');
+    // It is connected (or reconnected) in the inbox's own Settings (WHATSAPP_INBOX-F01, F02), not in erplora.com.
+    expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('in Settings');
+    expect(s.find('whatsapp-inbox-composer-blocked').text()).not.toContain('erplora.com');
     expect(s.find('whatsapp-inbox-composer-blocked').attributes('data-code')).toBe('not_connected');
     expect(s.send().disabled).toBe(true);
     expect((s.inDoc('whatsapp-inbox-composer-template') as Control).disabled).toBe(true);

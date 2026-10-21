@@ -11,7 +11,7 @@ from django.conf import settings
 from django.db.models import Count, F, Q, QuerySet, Value
 from django.db.models.functions import Coalesce, Lower, NullIf
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
@@ -170,8 +170,9 @@ def find_conversation(
     return found
 
 
-def channel() -> Channel | None:
-    return Channel.objects.first()
+def channel(scope: Scope) -> Channel | None:
+    """The number of the business of ``scope`` (phase 1: its host), or ``None`` before erplora.com spoke of it."""
+    return Channel.objects.filter(host=scope.key).first()
 
 
 def send_blocked(row: Channel | None) -> str | None:
@@ -213,8 +214,8 @@ def conversation_out(row: Conversation) -> dict:
     }
 
 
-def conversation_detail(row: Conversation) -> dict:
-    blocked = send_blocked(channel())
+def conversation_detail(ctx: OperationContext, row: Conversation) -> dict:
+    blocked = send_blocked(channel(ctx.scope))
     return {
         **conversation_out(row),
         "window_open": row.window_open(clock.now()),
@@ -371,7 +372,7 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
     },
 )
 def conversation_get(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    return conversation_detail(find_conversation(data.id, data.conversation))
+    return conversation_detail(ctx, find_conversation(data.id, data.conversation))
 
 
 @operation(
@@ -424,7 +425,7 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
             ),
         ),
     )
-    row = channel()
+    row = channel(ctx.scope)
     return {
         **counts,
         "cap_reached": bool(row and row.cap_reached(clock.business_month())),
@@ -476,14 +477,26 @@ def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────
 
 
-def live_templates() -> QuerySet:
-    """The templates not deleted here."""
-    return Template.objects.filter(deleted_at__isnull=True)
+def templates_of(scope: Scope) -> QuerySet:
+    """The templates of the business of ``scope`` (phase 1: its host), and only those."""
+    return Template.objects.filter(host=scope.key)
 
 
-def listed_templates() -> QuerySet:
-    """What Settings lists: the live templates and the ones deleted here that Meta has not deleted yet."""
-    return Template.objects.filter(
+def templates_of_every_business() -> QuerySet:
+    """Every business's templates, only for the worker's ``delivery.resume``: phase 1 runs it on one fixed scope
+    (``WORKER_SCOPE_SLUG``) over the shared table, and it hands each template over as its own business (``host``);
+    phase 2 runs it in each hub's database, which holds that hub's alone."""
+    return Template.objects.all()
+
+
+def live_templates(scope: Scope) -> QuerySet:
+    """The business's templates not deleted here."""
+    return templates_of(scope).filter(deleted_at__isnull=True)
+
+
+def listed_templates(scope: Scope) -> QuerySet:
+    """What Settings lists: the business's live templates and the ones deleted here that Meta has not deleted yet."""
+    return templates_of(scope).filter(
         Q(deleted_at__isnull=True) | Q(delete_state=Template.DeleteState.PENDING)
     )
 
@@ -555,7 +568,7 @@ def template_out(row: Template) -> dict:
     },
 )
 def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
-    rows = listed_templates()
+    rows = listed_templates(ctx.scope)
     if params.search:
         rows = rows.filter(name__icontains=params.search.strip())
     for field in ("status", "category", "language"):
@@ -581,7 +594,7 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     },
 )
 def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
-    row = channel() or Channel()
+    row = channel(ctx.scope) or Channel(host=ctx.scope.key)
     month = clock.business_month()
     return {
         "status": row.status,

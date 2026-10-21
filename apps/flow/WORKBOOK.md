@@ -849,7 +849,7 @@ Implicados: FLOW-F16, FLOW-F28, FLOW-F29
 
 ### FLOW-F31 Mandar un mensaje a un cliente
 <!-- origen: old-hub:HUB-F93 old:flows/workflow/editor.md#flows-f15 gh:whatsapp_inbox#273 -->
-Estado: parcial — el Hub todavía no puede mandarle un mensaje a un cliente: la Bandeja de WhatsApp declara su envío (WHATSAPP_INBOX-F32, F33) pero espera la puerta del SaaS hacia Meta, y no hay correo saliente para clientes; el paso no se ofrece hasta que exista
+Estado: parcial — una automatización todavía no puede mandarle un mensaje a un cliente: la Bandeja de WhatsApp ya envía (WHATSAPP_INBOX-F32, F33), pero el paso «Enviar un mensaje» de Automatizaciones aún no está hecho (lo hará FIX-FLOW-SEND-MESSAGE-STEP), y el correo saliente para clientes sigue sin existir; el paso no se ofrece hasta que exista
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
@@ -1368,7 +1368,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   una llamada están hechos y probados, pero producción y pre todavía no tienen su clave de cifrado; hasta
   que se active, la caja lo dice al abrirse y las llamadas sin secretos funcionan igual.
 - **Paso «Enviar un mensaje»** y la cabecera multimedia de un WhatsApp (FLOW-F31, FLOW-F32, parciales):
-  dependen del envío de WhatsApp y de correo a clientes, que todavía no existe en el Hub ni en el SaaS.
+  el paso aún no está hecho (lo hará FIX-FLOW-SEND-MESSAGE-STEP; la Bandeja de WhatsApp ya envía) y el correo
+  saliente para clientes sigue sin existir.
 - **Paso «Pedírselo al asistente»** (FLOW-F37 a F39, parciales) y las propuestas del asistente en **Esperan tu
   respuesta**: dependen de la app del asistente del Hub y de la pasarela de IA del SaaS, que todavía no existen
   (PLAN-HUB §8, ronda 2026-10-15b).

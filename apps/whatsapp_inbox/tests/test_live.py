@@ -31,6 +31,10 @@ INBOX = [
 ]
 
 
+#: The number's state: erplora.com's photo, and its answer when the business connects or disconnects it here.
+CHANNEL = [E.CHANNEL_SYNCED, E.CHANNEL_CONNECTED, E.CHANNEL_DISCONNECTED]
+
+
 def inbox_queries():
     return {
         name: on
@@ -46,14 +50,14 @@ def test_the_registry_is_valid():
 def test_each_screen_and_its_events():
     assert inbox_queries() == {
         "whatsapp_inbox.conversation.list": [*INBOX, *CARD],
-        "whatsapp_inbox.conversation.detail": [*INBOX, *CARD, E.CHANNEL_SYNCED],
+        "whatsapp_inbox.conversation.detail": [*INBOX, *CARD, *CHANNEL],
         "whatsapp_inbox.conversation.summary": [
             E.MESSAGE_RECEIVED,
             E.MESSAGE_SENT,
             E.CONVERSATION_READ,
             E.STATUS_CHANGED,
             E.ERASED,
-            E.CHANNEL_SYNCED,
+            *CHANNEL,
         ],
         "whatsapp_inbox.message.list": [
             E.MESSAGE_RECEIVED,
@@ -63,7 +67,7 @@ def test_each_screen_and_its_events():
         ],
         "whatsapp_inbox.note.list": [E.NOTE_ADDED, E.NOTE_DELETED, E.ERASED],
         "whatsapp_inbox.template.list": [E.CHANNEL_SYNCED, E.TEMPLATE_CREATED, E.TEMPLATE_UPDATED, E.TEMPLATE_DELETED],
-        "whatsapp_inbox.channel.get": [E.CHANNEL_SYNCED],
+        "whatsapp_inbox.channel.get": CHANNEL,
     }
 
 

@@ -1,11 +1,13 @@
-// flow: WHATSAPP_INBOX-F01 WHATSAPP_INBOX-F02 WHATSAPP_INBOX-F03 WHATSAPP_INBOX-F05 WHATSAPP_INBOX-F06 WHATSAPP_INBOX-F07 WHATSAPP_INBOX-F08 WHATSAPP_INBOX-F09 WHATSAPP_INBOX-F10 WHATSAPP_INBOX-F13 WHATSAPP_INBOX-F32 WHATSAPP_INBOX-F33 WHATSAPP_INBOX-F34 WHATSAPP_INBOX-F35 WHATSAPP_INBOX-F36 WHATSAPP_INBOX-F37 WHATSAPP_INBOX-F38
+// flow: WHATSAPP_INBOX-F01 WHATSAPP_INBOX-F02 WHATSAPP_INBOX-F03 WHATSAPP_INBOX-F05 WHATSAPP_INBOX-F06 WHATSAPP_INBOX-F07 WHATSAPP_INBOX-F08 WHATSAPP_INBOX-F09 WHATSAPP_INBOX-F10 WHATSAPP_INBOX-F13 WHATSAPP_INBOX-F32 WHATSAPP_INBOX-F33 WHATSAPP_INBOX-F35 WHATSAPP_INBOX-F36 WHATSAPP_INBOX-F37 WHATSAPP_INBOX-F38
 // The WhatsApp inbox in a hidden Chrome (apps/whatsapp_inbox/WORKBOOK.md): the owner of hub `a` opens
 // the inbox with the number not connected and reads why; a customer writes (erplora.com's push, run as
 // the system) and her conversation arrives live with its unread; opening it reads it and shows the thread;
 // the composer says nothing can be sent while the number is not connected, with the reason's code, and
-// opens when erplora.com reports it connected; a reply is kept and, as erplora.com does not serve its
-// sending door yet, shows «Not sent» with «Retry», and Meta's statuses (pushed as erplora.com will) move
-// it to «Delivered» and «Read»; a template with its variable; a note, «Pending», «Assign to me»,
+// opens when erplora.com reports it connected; a reply is kept and handed to the run's real erplora.com, where
+// erplora.com's own test seed gave `a` a number (whatsapp-helpers.ts, `seedErplora`): erplora.com takes it to Meta,
+// which refuses the seed's made-up permission, and the bubble says «Not delivered» with that reason, never «Sent»
+// (Meta's statuses through erplora.com: whatsapp-inbox-erplora.spec.ts); a template with its variable, handed over
+// the same way; a note, «Pending», «Assign to me»,
 // «Create card» joining a Customers card; «Erase this number's data» asked first. An attachment, the
 // echo of the owner's phone and an option tapped show in the thread; the filters keep who waits; the
 // month spent and a number to reconnect are said and go by themselves. An employee notes and takes a
@@ -15,7 +17,13 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { cleanUp as cleanUpCards } from './customer-helpers';
 import { A, EMPLOYEE, hostPage, login, SAAS, shot, shown } from './helpers';
-import { cleanUp, e2ePhone, flowShots, lastSentKey, PREFIX, pushChannel, pushStatus, receive, template, waId } from './whatsapp-helpers';
+import { filterBy } from './service-helpers';
+import { cleanUp, e2ePhone, flowShots, PREFIX, pushChannel, receive, seedErplora, template, waId } from './whatsapp-helpers';
+
+test.beforeAll(() => {
+  // erplora.com takes `a`'s number (its test seed): what the Hub hands it reaches Meta.
+  expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+});
 
 test.afterAll(() => {
   cleanUp();
@@ -49,11 +57,9 @@ async function contrast(bubble: Locator, part: string): Promise<number> {
   }, part);
 }
 
-/** Picks `option` in the inbox's column filter `filter` (beside the search at this width). */
+/** Picks `option` in the inbox's column filter `filter`, through its «Filters» panel (the old hub's funnel). */
 async function filterInbox(page: Page, filter: string, option: string): Promise<void> {
-  await shown(page).locator(`[data-testid=whatsapp-inbox-filter-${filter}]`).click();
-  await page.locator('ion-popover.select-popover ion-radio').filter({ hasText: new RegExp(`^\\s*${option}\\s*$`) }).click();
-  await page.locator('ion-popover.select-popover').waitFor({ state: 'detached' });
+  await filterBy(page, 'whatsapp-inbox', filter, option);
 }
 
 test('the owner reads, answers, organises and erases a WhatsApp conversation; the composer follows the number', async ({ page }) => {
@@ -61,12 +67,10 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   const name = `${PREFIX}Ana ${Date.now().toString(36)}`;
   pushChannel({ status: 'not_connected' });
 
-  // F01: the number not connected, and where to connect it.
+  // F01: the number not connected, and where to connect it: the inbox's own Settings (whatsapp-inbox-connect.spec.ts).
   await login(page, A, '/whatsapp_inbox/inbox');
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-not-connected]')).toContainText('WhatsApp is not connected');
-  // The run's SaaS (`SAAS_URL`: :8001 on the shared stack, its own beside it; erplora.com in production).
-  const saas = new RegExp(`^${SAAS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`);
-  await expect(shown(page).locator('[data-testid=whatsapp-inbox-go-to-saas]')).toHaveAttribute('href', saas);
+  await expect(shown(page).locator('[data-testid=whatsapp-inbox-go-to-settings]')).toHaveAttribute('href', '/whatsapp_inbox/settings');
   await searchInbox(page, phone.slice(3));
 
   // F03: the customer writes; her conversation arrives live, unread.
@@ -75,7 +79,7 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   await expect(rowOf(page, phone)).toContainText(name);
   await expect(rowOf(page, phone).locator('[data-testid=whatsapp-inbox-unread]')).toHaveText('1');
   await flowShots(page, 'WHATSAPP_INBOX-F01', async (p) => {
-    await expect(shown(p).locator('[data-testid=whatsapp-inbox-go-to-saas]')).toBeVisible();
+    await expect(shown(p).locator('[data-testid=whatsapp-inbox-go-to-settings]')).toBeVisible();
   });
   await flowShots(page, 'WHATSAPP_INBOX-F03', async (p) => {
     await expect(rowOf(p, phone)).toBeVisible();
@@ -106,8 +110,9 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-not-connected]')).toBeHidden();
   await expect(blocked).toBeHidden();
 
-  // F32: the reply is kept and handed to erplora.com, which does not serve its sending door yet: «Not
-  // sent», with «Retry» (never «Sent» without Meta's id).
+  // F32: the reply is kept and handed to erplora.com (door 5), which takes it to Meta: Meta refuses the seed's
+  // made-up permission and erplora.com says so (409), so the bubble says «Not delivered» with that reason and offers
+  // no «Retry» (the same key would get the same answer); never «Sent» without Meta's id.
   const text = panel(page).locator('[data-testid=whatsapp-inbox-composer-text] textarea');
   await expect(text).toBeEnabled();
   await text.fill('Sí, a las 17:00 tenemos hueco.');
@@ -115,29 +120,15 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   const reply = bubbles(page, 'outbound').filter({ hasText: 'a las 17:00 tenemos hueco' });
   await expect(reply).toBeVisible();
   await expect(text).toHaveValue('');
-  await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not sent');
-  await expect(reply.locator('[data-testid=whatsapp-inbox-message-retry]')).toBeVisible();
-  // What it says can be read on the business's bubble (WCAG AA, 4.5:1): the text, «Not sent» and why.
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered', { timeout: 30_000 });
+  await expect(reply.locator('.wa-bubble__error')).toContainText("Meta's reason:");
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-retry]')).toHaveCount(0);
+  // What it says can be read on the business's bubble (WCAG AA, 4.5:1): the text, «Not delivered» and why.
   for (const part of ['.wa-bubble__body', '[data-testid=whatsapp-inbox-message-status]', '.wa-bubble__error']) {
     expect(await contrast(reply, part), part).toBeGreaterThanOrEqual(4.5);
   }
   await flowShots(page, 'WHATSAPP_INBOX-F32', async () => {
-    await expect(reply.locator('[data-testid=whatsapp-inbox-message-retry]')).toBeVisible();
-  });
-
-  // F34: Meta's statuses, as erplora.com pushes them with the key the Hub sent it with, move the bubble
-  // forward by themselves; a later «Delivered» never undoes «Read».
-  const key = lastSentKey(phone);
-  expect(key).toMatch(/^[0-9a-f-]{36}$/);
-  const wamid = waId();
-  pushStatus(key, 'delivered', wamid);
-  await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Delivered');
-  await expect(reply.locator('[data-testid=whatsapp-inbox-message-retry]')).toHaveCount(0);
-  pushStatus(key, 'read', wamid);
-  await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Read');
-  pushStatus(key, 'delivered', wamid);
-  await flowShots(page, 'WHATSAPP_INBOX-F34', async () => {
-    await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Read');
+    await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered');
   });
 
   // F33: «Template» offers only the approved ones; its variable fills the preview, and it is sent.
@@ -153,7 +144,11 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   });
   await templates.locator('[data-testid=whatsapp-inbox-template-form-submit]').click();
   await expect(templates).toBeHidden();
-  await expect(bubbles(page, 'outbound').filter({ hasText: 'e2e_recordatorio' })).toBeVisible();
+  // Handed to erplora.com (door 5) like a reply: Meta refuses the seed's permission, «Not delivered» with the reason.
+  const sentTemplate = bubbles(page, 'outbound').filter({ hasText: 'e2e_recordatorio' });
+  await expect(sentTemplate).toBeVisible();
+  await expect(sentTemplate.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered', { timeout: 30_000 });
+  await expect(sentTemplate.locator('.wa-bubble__error')).toContainText("Meta's reason:");
 
   // F36: an internal note, in the thread.
   await panel(page).locator('[data-testid=whatsapp-inbox-composer-mode-note]').click();
@@ -214,7 +209,8 @@ test('an attachment, the echo of the owner’s phone and an option tapped show i
   await rowOf(page, phone).click();
   await expect(bubbles(page, 'inbound')).toHaveCount(1);
 
-  // F06: a photo she sends opens at erplora.com in a new tab, named by its kind, with its caption.
+  // F06: a photo she sends is named by its kind, with its caption; erplora.com has none at this made-up address, so
+  // the bubble says it could not be loaded and opens it at erplora.com in a new tab (painted: whatsapp-inbox-media.spec.ts).
   receive(phone, '', name, {
     type: 'image',
     media: { url: `${SAAS}/whatsapp/media/${PREFIX}foto.jpg`, mime_type: 'image/jpeg', filename: '', caption: 'Así lo quiero' },
@@ -222,6 +218,7 @@ test('an attachment, the echo of the owner’s phone and an option tapped show i
   const media = panel(page).locator('[data-testid=whatsapp-inbox-message-media]');
   await expect(media).toContainText('Photo');
   await expect(media).toContainText('Así lo quiero');
+  await expect(media.locator('[data-testid=whatsapp-inbox-message-media-error]')).toHaveText('The image could not be loaded.');
   await expect(media.locator('a')).toHaveAttribute('href', `${SAAS}/whatsapp/media/${PREFIX}foto.jpg`);
   await expect(media.locator('a')).toHaveAttribute('target', '_blank');
   await flowShots(page, 'WHATSAPP_INBOX-F06', async () => {
@@ -316,8 +313,3 @@ test('an employee notes and takes a conversation, but neither erases nor opens t
     await context?.close();
   }
 });
-
-// WHATSAPP_INBOX-F32, F34: a reply that really leaves through erplora.com shows «Sending…», then «Sent»
-// with Meta's id and the statuses Meta reports. The Hub's side is mounted (`/internal/whatsapp/status`
-// since hub#127); erplora.com's door `/internal/whatsapp/send` does not exist yet: marked, never simulated.
-test.fixme('a reply really leaves through erplora.com and Meta’s statuses arrive', async () => {});

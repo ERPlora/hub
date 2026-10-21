@@ -13,6 +13,7 @@ from apps.whatsapp_inbox.schemas import (
     AgentListIn,
     AssignIn,
     ByPhoneIn,
+    ChannelConnectIn,
     ConversationListIn,
     ConversationRefIn,
     LinkCustomerIn,
@@ -155,6 +156,21 @@ async def template_list(request, params: Query[TemplateListIn]):
 @bind(router, "whatsapp_inbox.channel.get", "/whatsapp_inbox/channel")
 async def channel_get(request):
     return await run_operation(request, queries.channel_get)
+
+
+@bind(router, "whatsapp_inbox.channel.prepare", "/whatsapp_inbox/channel/prepare")
+async def channel_prepare(request):
+    return await run_operation(request, services.prepare_connect)
+
+
+@bind(router, "whatsapp_inbox.channel.connect", "/whatsapp_inbox/channel/connect")
+async def channel_connect(request, data: ChannelConnectIn):
+    return await run_operation(request, services.connect_number, data)
+
+
+@bind(router, "whatsapp_inbox.channel.disconnect", "/whatsapp_inbox/channel/disconnect")
+async def channel_disconnect(request):
+    return await run_operation(request, services.disconnect_number)
 
 
 @bind(router, "whatsapp_inbox.agent.list", "/whatsapp_inbox/agents")

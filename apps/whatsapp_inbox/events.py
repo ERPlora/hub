@@ -26,6 +26,9 @@ ERASED = "whatsapp_inbox.conversation.erased"
 NOTE_ADDED = "whatsapp_inbox.note.added"
 NOTE_DELETED = "whatsapp_inbox.note.deleted"
 CHANNEL_SYNCED = "whatsapp_inbox.channel.synced"
+#: erplora.com's answer when the business connects (door 11) or disconnects (door 12) its number from Settings.
+CHANNEL_CONNECTED = "whatsapp_inbox.channel.connected"
+CHANNEL_DISCONNECTED = "whatsapp_inbox.channel.disconnected"
 TEMPLATE_CREATED = "whatsapp_inbox.template.created"
 TEMPLATE_UPDATED = "whatsapp_inbox.template.updated"
 TEMPLATE_DELETED = "whatsapp_inbox.template.deleted"
@@ -42,6 +45,8 @@ ALL = [
     NOTE_ADDED,
     NOTE_DELETED,
     CHANNEL_SYNCED,
+    CHANNEL_CONNECTED,
+    CHANNEL_DISCONNECTED,
     TEMPLATE_CREATED,
     TEMPLATE_UPDATED,
     TEMPLATE_DELETED,
