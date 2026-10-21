@@ -1,9 +1,11 @@
 // The menu's builder (WORKBOOK «Pantallas · Constructor del menú»; COMBO-F05, F06, F12): opened from
-// a row of Menus, it follows `combo.combo.get` live. On top, «All menus», the name and the price, what
+// a row of Menus, it follows `combo.combo.get` live. The top bar goes back to Menus (one way back, as every
+// detail of the Hub); on top of the page, the name and the price, what
 // the menu does on the receipt and, when the till does not offer it yet, why. Then «Courses», one card
 // each in their order (the handle and the arrows save the whole order at once; «Withdraw» asks first),
 // and «Add a course», which edits the course whose «Edit details» was pressed.
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
+import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCombo } from '../__tests__/mount-combo';
@@ -71,7 +73,9 @@ describe('MenuBuilderPage', () => {
     const blockers = s.wrapper.findAllComponents(InlineFeedback).find((b) => b.attributes('data-testid') === 'combo-builder-blockers');
     expect(blockers?.props('heading')).toBe('Not on the till yet');
     expect(blockers?.text()).toContain('The course “Starters” has fewer choices on offer than it asks for.');
-    expect(s.inDoc('combo-builder-back')?.textContent).toContain('All menus');
+    // The way back is the top bar's arrow, never a second one inside the page.
+    expect(s.wrapper.findComponent(AppPage).props('backHref')).toBe('/combo/menus');
+    expect(s.inDoc('combo-builder-back')).toBeNull();
   });
 
   it('a menu to take away says its price will be split, and one on the till says nothing more', async () => {
@@ -153,7 +157,10 @@ describe('MenuBuilderPage', () => {
     expect(s.cards()).toHaveLength(0);
     expect(s.wrapper.findComponent(CourseForm).exists()).toBe(false);
     expect([s.inDoc('combo-builder-name'), s.inDoc('combo-builder-supply'), s.inDoc('combo-builder-error')]).toEqual([null, null, null]);
-    expect(s.inDoc('combo-builder-back')?.textContent).toContain('All menus');
+    // Nothing left here: the notice itself offers the way back, to Menus.
+    const back = gone?.find('[data-testid="combo-builder-back"]');
+    expect(back?.text()).toContain('All menus');
+    expect(back?.attributes('routerlink')).toBe('/combo/menus');
   });
 
   it('a menu that no longer exists when opened says so', async () => {
@@ -173,10 +180,10 @@ describe('MenuBuilderPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(MENU);
-    expect(s.inDoc('combo-builder-back')?.textContent).toContain('Todos los menús');
     expect(s.inDoc('combo-builder-supply')?.textContent).toContain('Este menú se factura como un único servicio');
     s.net.lastStream().push(errorFrame(s.subId(OP), 'not_found'));
     await flush();
+    expect(s.inDoc('combo-builder-back')?.textContent).toContain('Todos los menús');
     expect(s.inDoc('combo-builder-gone')?.textContent).toContain('Este menú ya no existe');
     expect(s.inDoc('combo-builder-gone')?.textContent).toContain('Se ha retirado, quizá desde otro dispositivo.');
   });
