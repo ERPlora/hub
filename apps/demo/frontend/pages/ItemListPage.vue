@@ -6,7 +6,8 @@
 // Nothing here refetches: a write anywhere in this business re-runs the queries on the server and
 // the new results arrive through the stream. On a phone «Load more» grows ONE live window from the
 // first row (a bigger `limit`, `offset` 0), so every row on screen stays live; a desk pages one
-// page at a time.
+// page at a time. That window never passes the server's longest page (`PAGE_MAX`): past it a phone
+// pages too (`maxWindow`).
 import { DataTable, EmptyState, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -21,6 +22,8 @@ type Row = OutputOf<'demo.item.list'>['rows'][number];
 type StatusFilter = NonNullable<InputOf<'demo.item.list'>['status']> | 'all';
 
 const PAGE_SIZES = [10, 25, 50, 100];
+/** The most rows one page of `demo.item.list` holds (`ItemListIn.limit`, 100): past it a phone pages (`maxWindow`). */
+const PAGE_MAX = 100;
 
 const router = useRouter();
 const session = useSession();
@@ -64,7 +67,7 @@ const {
 } = useLive('demo.item.list', () => ({
   search: search.value.trim() || undefined,
   status: statusFilter.value === 'all' ? undefined : statusFilter.value,
-  limit: pageSize.value * windowPages.value,
+  limit: Math.min(pageSize.value * windowPages.value, PAGE_MAX),
   offset: page.value * pageSize.value,
 }));
 
@@ -122,6 +125,7 @@ const open = (row: Row) => router.push(`/demo/items/${row.id}`);
         :page="page"
         :page-size="pageSize"
         :page-size-options="PAGE_SIZES"
+        :max-window="PAGE_MAX"
         :views="['table', 'cards']"
         :loading="status === 'loading'"
         :error="status === 'error' ? error?.message : undefined"

@@ -99,6 +99,7 @@ class HubStateIn(Schema):
     version: int = Field(ge=0)
     status: Literal["active", "past_due", "suspended"] | None = None
     verifactu: dict[str, Any] | None = None
+    whatsapp: dict[str, Any] | None = None
     photo: dict[str, Any]
 
 
