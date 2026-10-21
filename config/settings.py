@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 
 from decouple import Csv, config
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.csp import CSP
 from live.csp import base_policy, debug_policy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -347,6 +348,10 @@ SECURE_CSP = debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy()
 # which answers 302 to the SaaS's logout (one hop, no page of our own in between).
 saas_origin = "{0.scheme}://{0.netloc}".format(urlsplit(SAAS_URL))
 SECURE_CSP["form-action"] = [*SECURE_CSP["form-action"], saas_origin]
+# The SaaS serves a WhatsApp conversation's photos and voice notes (/whatsapp/media/<id>): the inbox's thread
+# shows and plays them from its origin, and from no other (never Meta's CDN).
+SECURE_CSP["img-src"] = [*SECURE_CSP["img-src"], saas_origin]
+SECURE_CSP["media-src"] = [CSP.SELF, saas_origin]
 
 # Static files: WhiteNoise. Vite already hashes its build, so no Manifest storage; the SPA build
 # is served under /static/spa/ (Vite's `base`) and its hashed assets are immutable.
