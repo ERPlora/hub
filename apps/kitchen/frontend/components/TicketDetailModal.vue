@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A ticket's detail (WORKBOOK «Pantallas · Comandas»): tapping a row opens it, live (`kitchen.ticket.get`):
 // destination, type, status, waiter and when it was sent, its notes, and its dishes with their quantity,
-// station and state (a voided one with its reason). The page mounts it only while it is open.
+// their menu and options (KITCHEN-F06, F07), station and state (a voided one with its reason). The page
+// mounts it only while it is open.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
@@ -74,6 +75,14 @@ const title = computed(() => t('kitchen.detail.title', { number: ticket.value?.n
           :data-status="dish.status"
         >
           <strong>{{ formatQuantity(dish.quantity, locale) }}× {{ dish.name }}</strong>
+          <span
+            v-if="dish.menu_name"
+            :data-testid="`kitchen-ticket-detail-dish-${dish.id}-menu`"
+          >{{ dish.menu_name }}</span>
+          <span
+            v-if="dish.modifiers.length"
+            :data-testid="`kitchen-ticket-detail-dish-${dish.id}-modifiers`"
+          >{{ dish.modifiers.join(', ') }}</span>
           <span>{{ dish.station_name || t('kitchen.display.stationNone') }}</span>
           <span>{{ t(`kitchen.itemStatus.${dish.status}`) }}</span>
           <em v-if="dish.void_reason">{{ dish.void_reason }}</em>

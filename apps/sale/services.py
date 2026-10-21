@@ -1020,6 +1020,19 @@ def void_line(ctx: OperationContext, data: OrderVoidLineIn) -> dict:
     return _out(order)
 
 
+def person_label(ctx: OperationContext) -> str:
+    """Who acts, as a person reads it (the waiter the kitchen prints): their name, else their e-mail; their
+    username (the id of the session) only as the last resort; the system, its own label."""
+    who = ctx.actor
+    if who is None:
+        return ""
+    if hasattr(who, "get_username"):
+        label = who.get_full_name() or getattr(who, "email", "") or who.get_username()
+    else:
+        label = str(who)
+    return label[:128]
+
+
 @operation(
     "sale.order.fire",
     kind="command",
@@ -1057,7 +1070,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "channel": data.channel,
             "priority": data.priority,
             "round_no": round_no,
-            "waiter": actor(ctx),
+            "waiter": person_label(ctx),
             "items": [
                 {
                     "order_item_id": str(line.id),

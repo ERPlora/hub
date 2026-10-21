@@ -24,6 +24,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from uuid import UUID
 
+from django.contrib.auth import get_user_model
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -176,6 +177,14 @@ class ItemView:
     ready_at: dt.datetime | None
     total: int
     facts: LineFacts | None = None
+    modifiers: list[str] = field(default_factory=list)
+    menu_name: str = ""
+    menu_dish: int = 0
+
+    @property
+    def menu_line_id(self) -> UUID | None:
+        """The menu's line of the check this dish is a dish of: the dishes of one menu share it."""
+        return self.sale_line_id if self.menu_dish else None
 
     @property
     def struck(self) -> bool:
@@ -255,6 +264,9 @@ def _item_view(item: TicketItem, facts: LineFacts | None) -> ItemView:
         ready_at=item.ready_at,
         total=item.total,
         facts=facts,
+        modifiers=list(item.modifiers),
+        menu_name=item.menu_name,
+        menu_dish=item.menu_dish,
     )
 
 
@@ -330,6 +342,8 @@ class Round:
     round_no: int
     fired_at: dt.datetime
     lines: list[OrderLine] = field(default_factory=list)
+    #: Who sent it, by the name a person reads (``waiter_names``).
+    waiter: str = ""
 
     @property
     def anchor(self) -> OrderLine:
@@ -357,6 +371,7 @@ def pending_lines(settings: KitchenSettings, order_ids: Iterable[UUID] | None = 
         *lines.filter(order_id__in=open_checks).select_related("order"),
         *lines.filter(order_id__in=closed_lately).select_related("order"),
     ]
+    found = [line for line in found if cooks(line)]
     found.sort(key=lambda line: (line.fired_at, line.order_id, line.round_no, line.position, line.id))
     return found
 
@@ -373,7 +388,30 @@ def pending_rounds(
                 order=line.order, round_no=line.round_no, fired_at=line.fired_at
             )
         rounds[key].lines.append(line)
+    names = waiter_names(rnd.anchor.created_by for rnd in rounds.values())
+    for rnd in rounds.values():
+        rnd.waiter = names.get(rnd.anchor.created_by, rnd.anchor.created_by)
     return list(rounds.values())
+
+
+def person_label(who) -> str:
+    """A person as the kitchen names them (the waiter of a ticket, on the card and on paper): their name, else
+    their e-mail; their username (the id of the session) only as the last resort; anything else as it is."""
+    if who is None:
+        return ""
+    if hasattr(who, "get_username"):
+        return who.get_full_name() or getattr(who, "email", "") or who.get_username()
+    return str(who)
+
+
+def waiter_names(usernames: Iterable[str]) -> dict[str, str]:
+    """The people Sales keeps by their username (who added a round's lines), by the name a person reads."""
+    wanted = {name for name in usernames if name}
+    if not wanted:
+        return {}
+    users = get_user_model()
+    found = users.objects.filter(**{f"{users.USERNAME_FIELD}__in": wanted})
+    return {user.get_username(): person_label(user) for user in found}
 
 
 @dataclass
@@ -415,6 +453,33 @@ def routing() -> Routing:
             for route in category_routes(**live).select_related("station")
         },
     )
+
+
+def menu_dishes(line: OrderLine) -> list[dict]:
+    """The dishes of a menu's line (SALE-F12, as Menus answered when it was ordered) that are cooked: a
+    service never is. None for a line ordered on its own."""
+    if line.combo_id is None:
+        return []
+    return [dish for dish in line.combo.get("components", []) if not dish.get("is_service")]
+
+
+def cooks(line: OrderLine) -> bool:
+    """A menu is cooked when one of its dishes is not a service (Menus never sells one with nothing picked):
+    a menu of services only has nothing to cook, like a service line."""
+    return line.combo_id is None or bool(menu_dishes(line))
+
+
+def line_options(line: OrderLine) -> list[str]:
+    """The options chosen for the line (SALE-F11) by the names the cook reads (Modifiers' kitchen names, else
+    their names), in the order chosen."""
+    return [pick["kitchen_name"] for pick in line.modifiers]
+
+
+def dish_id(line_id: UUID, dish: int) -> UUID:
+    """The id of a dish of a round: the id of its line or, for the dish ``n`` of a menu's line, that id with
+    its lowest bits flipped by ``n``: still a UUIDv7 of the same moment, and the same every time it is worked
+    out, so a round not saved yet and the saved one share the ids of its dishes."""
+    return UUID(int=line_id.int ^ dish) if dish else line_id
 
 
 def line_notes(line: OrderLine) -> str:
@@ -462,26 +527,63 @@ def dish_of(
         ready_at=None,
         total=line.line_total,
         facts=facts,
+        modifiers=line_options(line),
     )
 
 
-def round_view(rnd: Round, day: dt.date, sequence: int, route: Routing) -> TicketView:
-    """A round not saved yet, as the kitchen will save it (normal, dine in: what only the send knows)."""
-    items = [
-        dish_of(
-            line,
-            position,
-            route.station_for(line.product_id, line.category_id),
-            LineFacts(
-                line.removed_at,
-                line.void_reason,
-                line.order_id,
-                rnd.order.status,
-                rnd.order.closed_at,
-            ),
+def dishes_of_menu(
+    line: OrderLine, first_position: int, route: Routing, facts: LineFacts
+) -> list[ItemView]:
+    """The dishes of a menu's line (KITCHEN-F06): each one at the station of its own product (else of its
+    category), the quantity times the menus ordered, under the menu's header (its kitchen name, else its
+    name) and with the menu's note; the menu's amount on its first dish, so the ticket counts it once."""
+    header = line.combo.get("kitchen_name") or line.name
+    items = []
+    for number, dish in enumerate(menu_dishes(line), start=1):
+        product_id = UUID(dish["product_id"]) if dish.get("product_id") else None
+        category_id = UUID(dish["category_id"]) if dish.get("category_id") else None
+        item = dish_of(line, first_position + number - 1, route.station_for(product_id, category_id), facts)
+        items.append(
+            replace(
+                item,
+                id=dish_id(line.id, number),
+                product_id=product_id,
+                category_id=category_id,
+                name=dish["product_name"],
+                quantity=Decimal(dish["quantity"]) * line.quantity,
+                unit="ud",
+                total=line.line_total if number == 1 else 0,
+                modifiers=[],
+                menu_name=header,
+                menu_dish=number,
+            )
         )
-        for position, line in enumerate(rnd.lines, start=1)
-    ]
+    return items
+
+
+def round_view(rnd: Round, day: dt.date, sequence: int, route: Routing) -> TicketView:
+    """A round not saved yet, as the kitchen will save it (normal, dine in: what only the send knows): a
+    dish per line, and a menu's line, one per dish of the menu (KITCHEN-F06)."""
+    items: list[ItemView] = []
+    for line in rnd.lines:
+        facts = LineFacts(
+            line.removed_at,
+            line.void_reason,
+            line.order_id,
+            rnd.order.status,
+            rnd.order.closed_at,
+        )
+        if menu_dishes(line):
+            items.extend(dishes_of_menu(line, len(items) + 1, route, facts))
+        else:
+            items.append(
+                dish_of(
+                    line,
+                    len(items) + 1,
+                    route.station_for(line.product_id, line.category_id),
+                    facts,
+                )
+            )
     return TicketView(
         id=rnd.anchor.id,
         number=number_of(day, sequence),
@@ -494,7 +596,7 @@ def round_view(rnd: Round, day: dt.date, sequence: int, route: Routing) -> Ticke
         priority="normal",
         status=TicketStatus.PENDING,
         notes="",
-        waiter=rnd.anchor.created_by,
+        waiter=rnd.waiter or rnd.anchor.created_by,
         received_at=rnd.fired_at,
         started_at=None,
         ready_at=None,
@@ -715,6 +817,9 @@ def item_out(item: ItemView, stations: dict[UUID, Station]) -> dict:
         "quantity": item.quantity,
         "unit": item.unit,
         "notes": item.notes,
+        "modifiers": item.modifiers,
+        "menu_name": item.menu_name,
+        "menu_line_id": item.menu_line_id,
         "station_id": item.station_id,
         "station_name": station.name if station else item.station_name,
         "station_color": station.color if station else "",

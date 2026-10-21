@@ -3,8 +3,8 @@
 // this device works at.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ticket } from '../__tests__/kitchen';
-import { arrivals, rememberedStation, rememberStation, STATION_KEY } from './board';
+import { item, ticket } from '../__tests__/kitchen';
+import { arrivals, groupMenus, rememberedStation, rememberStation, STATION_KEY } from './board';
 
 /** The browser's localStorage (the test environment has none). */
 function memoryStorage(): Storage {
@@ -51,5 +51,26 @@ describe('the station of this device', () => {
     expect(rememberedStation()).toBe('st-grill');
     rememberStation('');
     expect(rememberedStation()).toBe('');
+  });
+});
+
+// KITCHEN-F06 (kitchen#57): a menu is the run of its dishes under its header; a dish ordered on its own is
+// itself. Two menus of the same name on one ticket are two menus (two lines of the check).
+describe('groupMenus', () => {
+  const dish = (id: string, menu: string | null, name = 'MENU') =>
+    item(id, { menu_line_id: menu, menu_name: menu ? name : '' });
+
+  it('gathers the dishes of each menu under it, and leaves the dishes on their own as they are', () => {
+    const groups = groupMenus([dish('a1', 'm1'), dish('a2', 'm1'), dish('b1', 'm2'), dish('c1', null), dish('c2', null)]);
+    expect(groups.map((g) => [g.menu?.lineId ?? null, g.menu?.name ?? '', g.items.map((i) => i.id)])).toEqual([
+      ['m1', 'MENU', ['a1', 'a2']],
+      ['m2', 'MENU', ['b1']],
+      [null, '', ['c1']],
+      [null, '', ['c2']],
+    ]);
+  });
+
+  it('gives nothing for a ticket with no dishes', () => {
+    expect(groupMenus([])).toEqual([]);
   });
 });
