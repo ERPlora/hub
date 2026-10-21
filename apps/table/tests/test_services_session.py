@@ -151,6 +151,48 @@ def test_seating_a_reserved_table_spends_its_reservation_but_not_a_later_one(roo
     assert (later.status, later.label) == ("held", "Luis")
 
 
+def test_seating_without_saying_the_reservation_spends_every_hold_painting_the_table(room):
+    # TABLE-F28 from the floor plan: nobody says whose party sits, so every hold already painting the table goes.
+    table = make_table("6", zone=room)
+    first = make_hold(table, starts_in=-50, ref="first", source="reservation")
+    second = make_hold(table, starts_in=50, ref="second", source="reservation")
+    seat(table)
+    assert [
+        Hold.objects.get(pk=hold.pk).status for hold in (first, second)
+    ] == ["consumed", "consumed"]
+
+
+def test_seating_a_reservations_party_spends_only_its_own_hold(room):
+    # TABLE-F28 from Reservations: A of 19:00 seated late (20:10) leaves B of 21:00 held, still Reserved later.
+    table = make_table("6", zone=room, capacity=6)
+    ana, bea = str(uuid.uuid7()), str(uuid.uuid7())
+    first = make_hold(table, starts_in=-50, ref=ana, source="reservation", party_size=2, label="Ana")
+    second = make_hold(table, starts_in=50, ref=bea, source="reservation", party_size=4, label="Bea")
+    session = seat(table, reservation_id=ana)
+    assert session.guests_count == 2
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert (first.status, first.label) == ("consumed", "")
+    assert (second.status, second.label) == ("held", "Bea")
+
+
+def test_without_guests_a_reservations_party_seats_its_own_party(room):
+    table = make_table("6", zone=room, capacity=6)
+    make_hold(table, starts_in=-50, ref=str(uuid.uuid7()), source="reservation", party_size=2)
+    bea = str(uuid.uuid7())
+    make_hold(table, starts_in=50, ref=bea, source="reservation", party_size=4)
+    assert seat(table, reservation_id=bea).guests_count == 4
+
+
+def test_seating_a_reservation_that_holds_nothing_there_spends_no_hold(room):
+    table = make_table("6", zone=room)
+    mine = str(uuid.uuid7())
+    hold = make_hold(table, starts_in=20, ref=str(uuid.uuid7()), source="reservation")
+    by_hand = make_hold(table, starts_in=20, ref=mine, source="manual")
+    seat(table, reservation_id=mine)
+    assert [Hold.objects.get(pk=row.pk).status for row in (hold, by_hand)] == ["held", "held"]
+
+
 def test_a_party_seated_hours_before_a_reservation_does_not_spend_it(room):
     table = make_table("6", zone=room)
     hold = make_hold(table, starts_in=300, ref="night")

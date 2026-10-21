@@ -179,6 +179,16 @@ TABLE_NOT_FREE = _(
 TABLES_UNAVAILABLE = _(
     "Tables is not available in this business: the reservation's table cannot be held or seated."
 )
+CUSTOMER_MISMATCH = _(
+    "That reservation belongs to a different guest, so it cannot be managed on their behalf."
+)
+STAFF_ONLY = _(
+    "The table and the restaurant's internal notes are set by the restaurant: they cannot be changed from the "
+    "guest's own booking."
+)
+#: What only the restaurant sets on a booking, never a channel acting for the guest (the old module's
+#: ``STAFF_ONLY_UPDATE_FIELDS``, plus booking a full slot anyway).
+STAFF_ONLY_FIELDS = ("table_id", "table", "zone", "no_table", "internal_notes", "overbook")
 
 
 # ── Who acts ─────────────────────────────────────────────────────────────────────────────────────
@@ -412,8 +422,11 @@ def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
     # The card before the gate: a phone Customers refuses is said first, never after «Book anyway?». A
     # refusal of the gate rolls the new card back with everything else.
     if card is None and phone:
-        card = card_for_phone(ctx, name, phone, email, CARD_SOURCES[data.source])
+        card = card_for_phone(ctx, name or phone, phone, email, CARD_SOURCES[data.source])
         phone = card.phone or phone
+        # A guest who books herself without a name (WhatsApp) is booked under her card's name: her phone, on a
+        # new card.
+        name = name or card.name
     request = engine.Request(
         date=data.date,
         time=data.time,
@@ -489,8 +502,12 @@ CONTACT_FIELDS = ("guest_name", "guest_phone", "guest_email")
 )
 def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
     settings = lock_book()
-    reservation = find_reservation(data.id, data.guest, data.day, lock=True)
-    sent = data.model_fields_set - {"id", "guest", "day", "zone"}
+    reservation = _named(data)
+    if data.on_behalf_of is not None and any(
+        getattr(data, field) not in (None, False) for field in STAFF_ONLY_FIELDS
+    ):
+        raise Conflict(str(STAFF_ONLY), code="reservation.staff_only_field")
+    sent = data.model_fields_set - {"id", "guest", "day", "zone", "on_behalf_of"}
     changes: dict[str, Any] = {
         field: getattr(data, field)
         for field in (*SLOT_FIELDS, *CONTACT_FIELDS, "notes", "internal_notes")
@@ -522,7 +539,7 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
             time=reservation.time,
             party_size=reservation.party_size,
             duration_minutes=reservation.duration_minutes,
-            source=reservation.source,
+            source=judged_as(reservation, data),
             check_when=bool({"date", "time"} & set(changes)),
             overbook=data.overbook,
         )
@@ -593,7 +610,27 @@ def held_table(reservation: Reservation) -> None:
 
 
 def _named(data: ReservationRefIn) -> Reservation:
-    return find_reservation(data.id, data.guest, data.day, lock=True)
+    """The reservation the input names, locked. On the guest's behalf (``on_behalf_of``), only hers: any other —
+    somebody else's, a walk-in without a card, a deleted or a missing one — is the same refusal, asked before its
+    status, so a channel learns nothing about a booking that is not the guest's."""
+    guest = getattr(data, "on_behalf_of", None)
+    if guest is None:
+        return find_reservation(data.id, data.guest, data.day, lock=True)
+    try:
+        reservation = find_reservation(data.id, data.guest, data.day, lock=True)
+    except NotFound:
+        reservation = None
+    if reservation is None or reservation.customer_id != guest:
+        raise Conflict(str(CUSTOMER_MISMATCH), code="reservation.customer_mismatch")
+    return reservation
+
+
+def judged_as(reservation: Reservation, data: ReservationPatchIn) -> str:
+    """Whose rules judge a change (duda 8): the staff's, whatever the booking's origin; on the guest's behalf,
+    those of a guest who books herself."""
+    if data.on_behalf_of is None:
+        return Reservation.Source.PHONE
+    return reservation.source if reservation.source in engine.GUEST_SOURCES else Reservation.Source.WHATSAPP
 
 
 @operation(
@@ -650,9 +687,10 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
     Market (duda 3): one gesture seats the reservation and the table; a table out of service is refused,
     and so is one that is taken, to be freed or the reservation moved — unless this very reservation's
     hold was already spent by seating its table from the floor plan (TABLE-F28) and no other reservation
-    owns the check sitting there: then the party is there, and its check is the table's. Tables spends
-    every hold of the table inside the hour when anybody sits, so a spent hold alone proves nothing: the
-    party of another reservation seated there earlier also spends it (WORKBOOK «Lo que queda fuera»).
+    owns the check sitting there: then the party is there, and its check is the table's. Seating from
+    here names the reservation, so Tables spends its hold alone; the floor plan names none and spends
+    every hold of the table inside the hour, so a spent hold alone proves nothing: the party of another
+    reservation seated there from the plan also spends it.
     """
     now = timezone.now()
     table = Table.objects.select_related("zone").get(pk=reservation.table_id)
@@ -671,7 +709,11 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
             return sitting.pk
         text = str(TABLE_NOT_FREE) % {"table": table_label(table)}
         raise Conflict(text, code="reservation.table_not_free")
-    seat = {"table_id": str(table.pk), "guests_count": reservation.party_size}
+    seat = {
+        "table_id": str(table.pk),
+        "guests_count": reservation.party_size,
+        "reservation_id": str(reservation.pk),
+    }
     if reservation.customer_id and Customer.objects.live().filter(pk=reservation.customer_id).exists():
         seat["customer_id"] = str(reservation.customer_id)
     session_id = call_app(ctx, "table.session.open", seat).id

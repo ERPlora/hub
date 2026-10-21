@@ -398,7 +398,7 @@ Pasos:
 Entra: la mesa y los comensales; en una Reservada, los comensales de la reserva.
 Sale: la cuenta de mesa abierta con sus comensales, la hora y el camarero (avisa:
 `table.session.opened`); su cuenta en Ventas (avisa: `sale.order.opened`); las reservas retenidas en
-esa mesa que ya estaban Reservadas, gastadas (TABLE-F28).
+esa mesa que ya estaban Reservadas, gastadas (TABLE-F28; desde Reservas, solo la de esa reserva).
 Si falla: si otro dispositivo la acaba de ocupar, «Otro dispositivo acaba de ocupar esa mesa. Se ha
 actualizado el plano.» y la mesa no se sienta. **Dos camareros que sientan la misma mesa a la vez
 dejan una sola cuenta**: el segundo recibe ese mismo aviso. Una mesa bloqueada, desactivada o borrada
@@ -711,8 +711,12 @@ Pasos:
    volver a sentar allí una aparcada, también la gasta.
 3. Sentar a otro grupo en esa mesa horas antes de la reserva (la mesa aún Disponible) **no** gasta la
    reserva de la noche.
-Entra: la mesa Reservada.
-Sale: las retenciones que la pintaban Reservada, gastadas y sin nombre.
+4. Al sentar desde Reservas («Sentar» en la reserva, RESERVATION-F11) se gasta solo la retención de esa
+   reserva: con Ana a las 19:00 y Bea a las 21:00 en la mesa 5, sentar a Ana a las 20:10 deja la de Bea
+   viva, y cuando Ana se va la mesa vuelve a salir Reservada para Bea. Desde el plano no se sabe de qué
+   reserva es el grupo, y se gastan todas las que ya la pintaban Reservada.
+Entra: la mesa Reservada (y, desde Reservas, la reserva que se sienta).
+Sale: las retenciones que la pintaban Reservada (desde Reservas, solo la suya), gastadas y sin nombre.
 Si falla: los de TABLE-F10.
 Implicados: RESERVATION-F11, TABLE-F10, TABLE-F25
 
@@ -941,6 +945,11 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   `held_from`, hasta `held_until`); si no, Disponible. Lo único que se guarda es `blocked`. Así no
   hay «liberar si no le queda otra cuenta» ni repaso que repinte, y una reserva vencida deja de pintar
   en el acto (el defecto de 1–2 horas de TABLES-F29 desaparece).
+- **Sentar gasta las retenciones que ya pintan la mesa** (TABLE-F28): `table.session.open` con
+  `reservation_id` (opcional; lo manda Reservas al sentar una reserva) gasta solo la retención de esa
+  reserva (`source = "reservation"`, `source_ref` = su id) y toma de ella los comensales si no vienen;
+  sin él (el plano, el TPV), todas las que ya entraron en su ventana. Trasladar, dividir y volver a
+  sentar no dicen reserva: gastan todas.
 - **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega a `events.REACTIONS`
   lo de Ventas (`sale.order.completed`/`voided` → `table.session.close_by_order`) y lo de Clientes
   (`customer.customer.erased` → `table.hold.forget_customer`, que anota `table.table.held` por retención
@@ -1034,10 +1043,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- **Gastar solo la retención del grupo que se sienta** (petición de Reservas en su `UI-REQUESTS.md`):
-  sentar gasta todas las retenciones que ya pintan la mesa Reservada; con dos reservas solapadas en la
-  misma mesa, sentar tarde a la primera gasta también la de la segunda. Necesita que Reservas diga qué
-  reserva sienta (un campo nuevo y opcional de `table.session.open`) y que lo mande: va con APP-RESERVATION.
+- Nada pendiente de esta versión: lo que no entra a propósito está en «Lo que NO hace, a propósito».
 
 ### Dudas abiertas
 

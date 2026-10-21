@@ -254,6 +254,7 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
       testid="reservation-list"
       server-side
       searchable
+      filterable
       fill
       :filters="filters"
       :rows="result?.rows ?? []"

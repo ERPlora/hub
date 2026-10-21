@@ -246,18 +246,20 @@ def test_a_hold_for_a_reservation_with_a_slot_of_another_day(terrace):
 # ── Review of 2026-10-15 ─────────────────────────────────────────────────────────────────────────
 
 
-def test_a_reservation_whose_hold_another_party_spent_is_refused_not_hung_on_its_check(terrace, monkeypatch):
-    # Tables spends every hold of the table inside the hour before when a party sits (TABLE-F28): seating A
-    # at 20:10 spends B's hold of 21:00 too. B arriving at 21:05 with A still at the table must be told the
-    # table is taken, never hung on A's check.
+def test_a_reservation_whose_hold_the_floor_plan_spent_is_refused_not_hung_on_another_check(terrace, monkeypatch):
+    # Seating from the floor plan says no reservation, so Tables spends every hold of the table inside the hour
+    # (TABLE-F28): A's party sat there at 20:10 spends B's hold of 21:00 too. A is then marked from the book; B
+    # arriving at 21:05 with A still at the table must be told the table is taken, never hung on A's check.
     make_slot(THURSDAY, "17:00", "20:00")
     first = book(table_id=str(terrace.id), time="19:00", guest_name="Ana", guest_phone="600111222")
     second = book(table_id=str(terrace.id), time="21:00", guest_name="Bea", guest_phone="600333444")
     for reservation in (first, second):
         run("reservation.reservation.confirm", {"id": str(reservation.id)})
     pin_clock(monkeypatch, at("2026-10-15", "20:10"))
-    seated = run("reservation.reservation.seat", {"id": str(first.id)})
+    opened = run("table.session.open", {"table_id": str(terrace.id)})
     assert [hold.status for hold in holds(second.id)] == ["consumed"]
+    seated = run("reservation.reservation.seat", {"id": str(first.id)})
+    assert seated.table_session_id == opened.id
     pin_clock(monkeypatch, at("2026-10-15", "21:05"))
     from live.errors import Conflict
 
@@ -266,7 +268,43 @@ def test_a_reservation_whose_hold_another_party_spent_is_refused_not_hung_on_its
     assert caught.value.code == "reservation.table_not_free"
     assert Reservation.objects.get(pk=second.id).status == "confirmed"
     assert Reservation.objects.get(pk=second.id).table_session_id is None
-    assert Reservation.objects.get(pk=first.id).table_session_id == seated.table_session_id
+
+
+def late_party_seated(terrace, monkeypatch):
+    """A of 19:00 and B of 21:00, both confirmed on the terrace's table 5; A arrives late and is seated at 20:10."""
+    make_slot(THURSDAY, "17:00", "20:00")
+    first = book(table_id=str(terrace.id), time="19:00", guest_name="Ana", guest_phone="600111222")
+    second = book(table_id=str(terrace.id), time="21:00", guest_name="Bea", guest_phone="600333444")
+    for reservation in (first, second):
+        run("reservation.reservation.confirm", {"id": str(reservation.id)}, ctx_for(EMPLOYEE))
+    pin_clock(monkeypatch, at("2026-10-15", "20:10"))
+    seated = run("reservation.reservation.seat", {"id": str(first.id)}, ctx_for(EMPLOYEE))
+    return first, second, seated
+
+
+def test_seating_a_late_party_spends_only_its_own_hold_and_the_next_one_stays_reserved(terrace, monkeypatch):
+    # RESERVATION-F11 + TABLE-F28 (hub#121 «Lo que queda fuera»): seating A spends A's hold alone. When A leaves,
+    # the table is Reserved again for B, and B arriving at 21:05 sits on a check of its own.
+    first, second, seated = late_party_seated(terrace, monkeypatch)
+    assert [hold.status for hold in holds(first.id)] == ["consumed"]
+    assert [(hold.status, hold.label) for hold in holds(second.id)] == [("held", "Bea")]
+    pin_clock(monkeypatch, at("2026-10-15", "20:40"))
+    run("table.session.close", {"id": str(seated.table_session_id)}, ctx_for(EMPLOYEE))
+    assert plan_status(terrace) == "reserved"
+    pin_clock(monkeypatch, at("2026-10-15", "21:05"))
+    later = run("reservation.reservation.seat", {"id": str(second.id)}, ctx_for(EMPLOYEE))
+    assert later.table_session_id not in (None, seated.table_session_id)
+    assert [hold.status for hold in holds(second.id)] == ["consumed"]
+    assert TableSession.objects.get(pk=later.table_session_id).guests_count == 4
+
+
+def test_the_next_reservation_still_moves_its_hold_after_a_late_party_sat(terrace, monkeypatch):
+    # B's hold is still B's: moving B to the bar moves it there, held, instead of leaving B without a hold.
+    _, second, _ = late_party_seated(terrace, monkeypatch)
+    bar = make_table("2", zone=make_zone("Bar"))
+    run("reservation.reservation.update", {"id": str(second.id), "table": "2", "zone": "Bar"}, ctx_for(EMPLOYEE))
+    [hold] = holds(second.id)
+    assert (hold.table_id, hold.status, hold.label) == (bar.id, "held", "Bea")
 
 
 def test_seating_at_a_table_out_of_service_says_so(terrace):
