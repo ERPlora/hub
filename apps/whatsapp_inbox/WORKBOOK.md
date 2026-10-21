@@ -222,8 +222,8 @@ Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F07 old-saas:SAAS_WHATSAPP_INBOX-F10 fi:modules/whatsapp_inbox#command-sql-multi-stmt-whatsapp_inbox-messages-ingest old-hub:HUB-F263 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f03 wf:whatsapp-cita#rec_wa_cita-f02 wf:whatsapp-mesa#rec_wa_mesa-f02 -->
-Estado: parcial — el Hub guarda y enseña lo que le entregan; falta la puerta por la que erplora.com lo
-entrega (la monta la plataforma) y el lado de erplora.com que lo recibe de Meta
+Estado: parcial — el Hub ya recibe por su puerta lo que le entrega erplora.com, lo guarda y lo enseña al
+momento; falta el lado de erplora.com que lo recibe de Meta y se lo pasa
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
 Pasos:
@@ -319,8 +319,8 @@ Implicados: el equipo del negocio (las personas con acceso a la bandeja)
 
 ### WHATSAPP_INBOX-F08 Contestar desde la app de WhatsApp Business del móvil
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F08 old-hub:HUB-F264 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f08 -->
-Estado: parcial — el Hub guarda el eco del móvil como mensaje del negocio; falta la puerta por la que
-erplora.com lo entrega y el lado de erplora.com que lo recibe de Meta
+Estado: parcial — el Hub ya recibe por su puerta el eco del móvil y lo guarda como mensaje del negocio;
+falta el lado de erplora.com que lo recibe de Meta y se lo pasa
 Actor: propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -401,7 +401,7 @@ Implicados: Clientes
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
 <!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
 Estado: parcial — el Hub enseña el consumo y frena el envío en el tope, pero las cifras del mes las
-manda erplora.com por una puerta que todavía no existe (y es erplora.com quien cuenta y reserva el cupo)
+cuenta y las manda erplora.com, que todavía no lo hace (la puerta del Hub por la que llegan ya está)
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
 Pasos:
@@ -702,7 +702,7 @@ Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, WHATSAPP_INBOX-F15, WHAT
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
 Estado: parcial — la tabla enseña lo que el Hub sabe y cambia sola; el veredicto de Meta lo trae
-erplora.com por una puerta que todavía no existe
+erplora.com, que todavía no lo manda (la puerta del Hub por la que llega ya está)
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -717,8 +717,8 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
-Estado: parcial — el Hub guarda lo que le llega; la lista la manda erplora.com por una puerta que
-todavía no existe
+Estado: parcial — el Hub guarda lo que le llega; la lista la manda erplora.com, que todavía no lo hace
+(la puerta del Hub por la que llega ya está)
 Actor: sistema
 Pantalla: Ajustes
 Pasos:
@@ -858,8 +858,8 @@ Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F09 -->
-Estado: parcial — el Hub guarda y enseña cada estado; los estados de Meta los trae erplora.com por una
-puerta que todavía no existe
+Estado: parcial — el Hub ya recibe por su puerta cada estado, lo guarda y lo enseña; falta el lado de
+erplora.com que los recibe de Meta y se los pasa
 Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
@@ -919,8 +919,8 @@ Implicados: Clientes
 
 ### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
 <!-- origen: old-hub:HUB-F265 -->
-Estado: parcial — el Hub guarda la opción que toca y dice en el aviso a qué mensaje suyo contesta;
-falta la puerta por la que erplora.com entrega los mensajes
+Estado: parcial — el Hub recibe por su puerta la opción que toca, la guarda y dice en el aviso a qué
+mensaje suyo contesta; falta el lado de erplora.com que la recibe de Meta y se la pasa
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
 Pasos:
@@ -1162,7 +1162,10 @@ X-Erplora-Timestamp: 1760518800
 X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cuerpo))
 ```
 
-**Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema):
+**Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema). Están
+montadas desde hub#127 (`base/internal.py`), probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP
+firmado con la bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; lo que falta es que erplora.com
+las llame:
 
 1. `POST /internal/whatsapp/inbound` → `whatsapp_inbox.message.receive`. Un mensaje del cliente o el eco
    de lo que el dueño escribió en el móvil, en vivo o del historial:
@@ -1221,7 +1224,8 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
    puerta 3 (sin `hub`), con la `version` de la foto; `base` se la pasa a `whatsapp_inbox.channel.sync`.
 
 **Las puertas que sirve el SaaS** (el Hub → erplora.com; `apps/whatsapp_inbox/gateway.py`, `httpx`, 5 s
-para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción):
+para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción). Ninguna existe
+todavía en erplora.com, ni su webhook de Meta (FIX-SAAS-WHATSAPP-GATEWAY-DOORS):
 
 5. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/send`, con `Idempotency-Key: <client_message_id>`:
 
@@ -1274,12 +1278,13 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
 
 ### Contrato con `base`
 
-- Montar las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB), comprobar la firma y la
-  marca de tiempo, resolver el negocio por `hub` (fase 1: `Scope("host", hub)`; fase 2: `use_hub`),
-  comprobar que la app está activa (si no, 404 `app_inactive`) y ejecutar la operación con
-  `system_context(scope)`, devolviendo su salida o el sobre de errores con su estado HTTP (422 para un
-  cuerpo que no vale).
-- Al recibir la foto de estado con la clave `whatsapp` (puerta 4), pasarla a `whatsapp_inbox.channel.sync`.
+- Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB; hecho desde hub#127,
+  `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (fase 1:
+  `Scope("host", hub)`; fase 2: `use_hub`), comprueba que la app está activa (si no, 404 `app_inactive`) y
+  ejecuta la operación con `system_context(scope)`, devolviendo su salida o el sobre de errores con su
+  estado HTTP (422 para un cuerpo que no vale).
+- Al recibir la foto de estado con la clave `whatsapp` (puerta 4), se la pasa a
+  `whatsapp_inbox.channel.sync` con la versión de la foto (hecho desde hub#127).
 - El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
   `apps.whatsapp_inbox.events.react` (ya en la fase 1, `base/relay.py`); en la fase 2, el worker ejecuta
   la tarea `resume_deliveries` de `apps.py` en cada hub (`hub_due`), y el trabajo diferido de esta app
