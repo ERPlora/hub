@@ -6,7 +6,8 @@
 // receipt (F07, F08). A pack to take away is split per dish on the receipt, 6,00 → 4,15 at 10 % and 1,85 at 21 %
 // (F09). The worker's outbox relay — run here as each tick runs it: the e2e stack runs no worker — lowers each
 // dish's stock and never the menu's (F10). A menu sent from «Current order» reaches the kitchen dish by dish,
-// under the menu's kitchen name (F11; the fire through the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-F0n-<w>`).
+// under the menu's kitchen name, and the kitchen display shows them under the menu's header (F11; the fire through
+// the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
 // What a run makes — products `E2E-CMT-<run>-…`, its menus «e2e Combo …», checks, sales and kitchen tickets — goes.
 import { spawnSync } from 'node:child_process';
 
@@ -294,4 +295,20 @@ test('COMBO-F11: a menu sent to the kitchen reaches it dish by dish, under its k
   expect(ticket, 'the kitchen has the menu').toBeTruthy();
   expect(ticket!.saved).toBe(true);
   expect(ticket!.items.filter((item) => item.menu_name === `MENU ${RUN}`).map((item) => item.name)).toEqual([products.SAL.name, products.HAK.name]);
+
+  // The kitchen display, every station: both dishes under the menu's header (KITCHEN-F06).
+  await page.goto('/kitchen/display');
+  await page.evaluate(() => localStorage.removeItem('kitchen.display.station'));
+  await page.reload();
+  const dishOn = (name: string) => shown(page).locator('[data-testid^=kitchen-line-][data-status]').filter({ hasText: name }).first();
+  await expect(dishOn(products.SAL.name)).toBeVisible();
+  const menuLine = await dishOn(products.SAL.name).getAttribute('data-menu');
+  expect(menuLine, 'the salad is a dish of the menu').toBeTruthy();
+  await expect(dishOn(products.HAK.name)).toHaveAttribute('data-menu', menuLine!);
+  const header = shown(page).locator(`[data-testid=kitchen-menu-${menuLine}]`);
+  await shots(page, 'COMBO-F11', async () => {
+    await expect(header).toContainText(`MENU ${RUN}`);
+    await expect(header).toContainText('2 dishes');
+    await header.scrollIntoViewIfNeeded();
+  });
 });
