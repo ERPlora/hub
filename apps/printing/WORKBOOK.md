@@ -402,7 +402,8 @@ Pasos:
 2. Cocina abre la comanda y pide a Impresión una hoja por impresora: los platos de cada estación, por su
    función («Cocina» o «Barra») o por la impresora concreta de la estación (KITCHEN-F08).
 3. Cada hoja entra en la cola de la impresora de su función con la mesa, el número, la ronda, el
-   camarero y sus platos; el dispositivo la saca (PRINTING-F18).
+   camarero y sus platos, cada uno con sus suplementos (un renglón cada uno) y su nota; el dispositivo la
+   saca (PRINTING-F18).
 Entra: la comanda de Cocina (mesa, camarero, ronda y platos).
 Sale: un trabajo por impresora en la cola de Impresión.
 Si falla: la comanda no se desvía a la impresora de tiques: sin impresora con su función, espera en la
@@ -729,7 +730,8 @@ Campos del documento que lee la impresora (los demás se ignoran):
   `receipt_id`, `customer_name`, `customer_tax_id` y `tax_breakdown` no vacío (422 si falta).
 - `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío.
 - `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `items`
-  (`name`, `quantity`, `notes`, `combo_name`, `combo_ref`).
+  (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos,
+  los suplementos en el orden elegido, que la impresora pinta un renglón cada uno, antes de `notes`.
 - `barcode_label`: `product_name`, `barcode`, `price`.
 - `cash_session_report`: `receipt_id` (la sesión), `cashier`, `opening_balance`, `closing_balance`,
   `transactions` (`label`, `amount`).
@@ -781,8 +783,9 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 - **Caja** (`cash_register`): «Imprimir» del detalle → `cash_session_report`.
 - **Inventario** (`inventory`, INVENTORY-F25): «Imprimir código de barras» → `barcode_label` con
   `product_name`, `barcode` = SKU y `price`.
-- **Cocina** (`kitchen`): ya lo hace — `kitchen_order` por estación, `usage` `kitchen` o `bar` o la impresora
-  de la estación, en un savepoint de su transacción (KITCHEN-F08, F09).
+- **Cocina** (`kitchen`): ya lo hace — `kitchen_order` por estación (cada plato con sus suplementos en
+  `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
+  de su transacción (KITCHEN-F08, F09).
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
   vocabulario y las comprobaciones del documento), `queries.py`, `services.py`, `events.py`,
