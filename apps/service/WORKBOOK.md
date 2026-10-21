@@ -2,8 +2,7 @@
 Prefijo: SERVICE
 Alcance MVP: peluquería
 Estado de la app: hecha (servidor y páginas), con el bono en el cobro y en la devolución del TPV
-(SERVICE-F22 a F27, con Ventas); quedan fuera vender un bono en el TPV y la entrega de los avisos de
-otras apps, que espera al relay del outbox (fase 2; ver «Lo que queda fuera»)
+(SERVICE-F22 a F27, con Ventas); queda fuera vender un bono en el TPV (ver «Lo que queda fuera»)
 
 > Manual de usuario y especificación de la app `service`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -186,11 +185,11 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F25 | La sesión retenida que nadie cobra vuelve sola | hecho (al leer y con la tarea de cada hora) |
 | SERVICE-F26 | Devolver la sesión al devolver la venta | hecho (con Ventas, SALE-F32) |
 | SERVICE-F27 | Devolver la sesión al anular la venta | hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera») |
-| SERVICE-F28 | Unir dos fichas: los bonos pasan a la que queda | parcial |
-| SERVICE-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | parcial |
+| SERVICE-F28 | Unir dos fichas: los bonos pasan a la que queda | hecho |
+| SERVICE-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | hecho |
 | SERVICE-F30 | Rescatar los bonos sin cliente | hecho (la lista) |
 | SERVICE-F31 | Asignar un profesional a un servicio | hecho |
-| SERVICE-F32 | Cambiar o quitar un profesional de un servicio | parcial |
+| SERVICE-F32 | Cambiar o quitar un profesional de un servicio | hecho |
 | SERVICE-F33 | Saber quién puede hacer un servicio | hecho |
 
 ### SERVICE-F01 Dar de alta un servicio
@@ -699,16 +698,15 @@ Implicados: SALE-F30
 
 ### SERVICE-F28 Unir dos fichas: los bonos pasan a la que queda
 <!-- origen: old:services/workflow/fichas-de-clienta.md#services-f28 -->
-Estado: parcial — Servicios sabe mover los bonos, pero en esta fase el aviso de Clientes al unir dos
-fichas aún no le llega (fase 2), así que no se mueven. Mientras tanto, los bonos de una clienta
-(SERVICE-F15) incluyen los de la ficha unida a la suya y el cobro los acepta, así que ninguno queda
-invisible ni sin poder gastarse
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. En Clientes alguien une dos fichas de la misma persona.
-2. Servicios pasa a la ficha que queda todos los bonos de la absorbida (vivos y anulados), con sus
-   sesiones y sus ajustes.
+2. Al momento, los bonos de la ficha absorbida ya salen entre los de la que queda (SERVICE-F15) y el
+   cobro los acepta: ninguno queda invisible ni sin poder gastarse, y ninguno sale dos veces.
+3. En unos segundos, Servicios pasa a la ficha que queda todos los bonos de la absorbida (vivos y
+   anulados), con sus sesiones y sus ajustes.
 Entra: la ficha que queda y la absorbida (avisa Clientes: `customer.customer.merged`).
 Sale: los bonos apuntando a la ficha que queda (`service.grant.reassigned`); si dos compras son del
 mismo bono, quedan dos, cada una con su saldo y su caducidad.
@@ -717,8 +715,7 @@ Implicados: CUSTOMER-F13, SERVICE-F15, SERVICE-F22
 
 ### SERVICE-F29 Eliminar o anonimizar una ficha: sus bonos quedan sin cliente
 <!-- origen: old-hub:HUB-F250 old:services/workflow/fichas-de-clienta.md#services-f29 -->
-Estado: parcial — la lista de bonos sin cliente se calcula al leer y está hecha; vaciar los textos
-libres al anonimizar una ficha espera a que le llegue el aviso de Clientes (fase 2)
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -772,9 +769,7 @@ Implicados: STAFF-F01
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
 <!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
-Estado: parcial — cambiar, marcar como principal, apagar y quitar están hechos; quitar de sus servicios
-a quien se da de baja en Personal espera a que le llegue el aviso de Personal (fase 2). Mientras
-tanto, quien está de baja ya no sale en las listas ni en «quién puede hacerlo» (SERVICE-F33)
+Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
 Pasos:
@@ -783,6 +778,9 @@ Pasos:
 2. Pulsa «Hacerlo su servicio principal»: sale «Servicio principal» (uno por persona, el anterior deja
    de serlo).
 3. Apaga «Lo hace» para que deje de hacerlo sin quitarla, o pulsa «Quitar».
+4. Si en Personal se da de baja a una persona, deja de salir al momento en «Profesionales que lo hacen»
+   y en «quién puede hacerlo» (SERVICE-F33), y en unos segundos Servicios la quita sola de todos los
+   servicios que hacía.
 Entra: la asignación.
 Sale: el cambio (`service.assignment.updated`, `service.assignment.removed`). Dar de baja a una
 persona en Personal la quita de todos los servicios que hacía.
@@ -958,7 +956,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - Anatomía completa de una app (copia de `apps/tax`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
   `frontend/` y un `tests/test_<fichero>.py` por fichero, más `tests/test_integration_tax.py`,
-  `test_integration_staff.py`, `test_integration_customer.py` (con las apps reales, sin dobles) y
+  `test_integration_staff.py`, `test_integration_customer.py` (con las apps reales, sin dobles),
+  `test_relay.py` (los avisos de Clientes y Personal por el relay real del worker, con dos hubs) y
   `test_concurrency.py` (hilos).
 - **`requires = ["tax", "staff", "customer"]`**: `Service.tax_category` y
   `ServiceSettings.default_tax_category` son claves ajenas a `tax.TaxCategory`;
@@ -1007,9 +1006,13 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   línea marca antes la vencida.
 - **Bonos sin cliente** se calculan desde la ficha de Clientes (eliminada o anonimizada, y no unida a
   otra): no hace falta sellar nada al eliminarla. Unir dos fichas mueve los bonos con la reacción a
-  `customer.customer.merged`; hasta que llegue, `service.grant.list` de una ficha lee también los de
-  las fichas unidas a ella (Clientes deja la cadena en un nivel). Anonimizar vacía sus textos libres
-  con la reacción a `customer.customer.erased` (manda el WORKBOOK de Clientes).
+  `customer.customer.merged`; hasta que el relay la entrega (el siguiente tick del worker, o el
+  reintento si falla), `service.grant.list`, `service.grant.tender_options` y el cobro leen también
+  los de las fichas unidas a ella (Clientes deja la cadena en un nivel). Un bono tiene un solo dueño,
+  así que antes y después del movimiento sale una sola vez. Anonimizar vacía sus textos libres con la
+  reacción a `customer.customer.erased` (manda el WORKBOOK de Clientes). Igual con las bajas: quien
+  está de baja en Personal ya no sale en las listas desde el momento de la baja, y la reacción a
+  `staff.member.terminated` borra después sus asignaciones.
 - **Árbol de categorías**: mover o eliminar una categoría bloquea antes todas las categorías vivas en
   orden de id (dos movimientos a la vez van en fila y el segundo ve el árbol que dejó el primero); el
   recorrido hacia arriba guarda las visitadas, así que un bucle que dejara una escritura cruda se
@@ -1017,8 +1020,10 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   cerraría un bucle.
 - **Fecha de compra de un bono**: nunca en el futuro (5 minutos de margen de reloj) y con zona horaria;
   alargar un bono es **Ajustar**, con sus límites.
-- **Reacciones**: `events.react(scope, name, payload)` ejecuta la operación de esta app que reacciona
-  a cada aviso, como el sistema y en su propia transacción; las tres son idempotentes. Sus operaciones
+- **Reacciones**: el relay del outbox (`base/relay.py`, en cada tick del worker) entrega cada aviso de
+  `REACTIONS` a `events.react(scope, name, payload)`, que ejecuta la operación de esta app que
+  reacciona, como el sistema, en el hub del aviso y en su propia transacción; las tres son
+  idempotentes (un aviso entregado otra vez no escribe nada ni anota otro evento). Sus operaciones
   piden `service.system`, que no tiene ningún papel.
 - Asistente: toda operación declara `ai` (descripción; en las acciones, `risk`: `high` en archivar,
   eliminar categorías y bonos, anular, ajustar, alta de golpe y ajustes) y todo campo de entrada su
@@ -1046,9 +1051,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
   categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
-- **La entrega de los avisos de otras apps** (F28, F29 al anonimizar, F32 al dar de baja): las
-  reacciones están hechas y probadas con los avisos reales; las ejecuta el relay del outbox, que llega
-  en la fase 2. Mientras tanto se resuelve al leer (fichas unidas, personas dadas de baja).
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
 - **El paso «Tu catálogo de servicios» de «Termina de configurar tu negocio»**: el Hub aún no tiene

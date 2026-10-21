@@ -1,7 +1,7 @@
 """Services with the real Customers app: the owner of a voucher is a customer.Customer card.
 
 Customers' own operations create, merge, delete and erase the cards; the merge event is handed to
-``events.react`` from the outbox, as the relay will.
+``events.react`` from the outbox, as the relay does (``test_relay.py`` runs the relay itself).
 """
 
 import pytest

@@ -1,7 +1,8 @@
 """Services with the real Staff app: the professionals who perform a service are staff.Member records.
 
 Staff's own operations create, deactivate and terminate the records; the event Staff records when
-someone leaves is handed to ``events.react`` as the outbox relay will, from the outbox itself.
+someone leaves is handed to ``events.react`` as the outbox relay does, from the outbox itself
+(``test_relay.py`` runs the relay itself).
 """
 
 import pytest

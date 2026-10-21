@@ -88,7 +88,7 @@ class ServiceConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts).
     # SERVICE-F25: the holds of the till nobody charged in a day are marked expired, every hour, by the
-    # phase-2 worker on every hub as the system (cron in UTC). Reading a balance already skips them.
+    # worker as the system (cron in UTC). Reading a balance already skips them.
     scheduled_tasks = [
         {
             "name": "expire_session_holds",

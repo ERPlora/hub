@@ -1,8 +1,7 @@
 # Workbook — Reservas online (app)
 Prefijo: ONLINE_BOOKING
 Alcance MVP: peluquería
-Estado de la app: hecha (servidor y páginas); la página pública sin sesión la sirve `base` (ver «Contrato
-con la página pública», en «Para quien lo mantiene»); lo que queda fuera está en «Lo que queda fuera»
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `online_booking`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor y
@@ -79,8 +78,9 @@ Título «Configuración de la página de reservas». Tres bloques y un botón *
   (minutos)», «Reservar como máximo con esta antelación (días)» (0 = sin límite), «Intervalo entre huecos
   (minutos)», «Confirmar automáticamente las reservas de la clienta», «Permitir que la clienta cancele su
   cita» y «Antelación mínima para cancelar (horas)».
-- **Servicios reservables online**: los servicios en oferta con un interruptor «Reserva online» cada uno
-  (se guarda al tocarlo, en Servicios); el que no se puede reservar en la agenda lo dice.
+- **Servicios reservables online**: los servicios en oferta, cada uno con un interruptor con su nombre
+  (encendido, se reserva online; se guarda al tocarlo, en Servicios); el que no se puede reservar en la
+  agenda lo dice («No se puede reservar en la agenda»).
 
 Al guardar: «Configuración guardada.»; un rechazo sale debajo de su campo («No se pudo guardar»).
 
@@ -151,7 +151,8 @@ Si falla: no se escribe nada. La página apagada («Este negocio no acepta reser
 servicio que no se reserva online; elegir profesional cuando el negocio no lo permite; la hora ya no está
 libre o no cumple las reglas (el motivo de Citas); el móvil que no es un número válido; falta el email
 obligatorio; una nota cuando el negocio no las admite; **límites anti-abuso**: más de 5 reservas en una hora
-desde el mismo dispositivo o más de 100 en una hora en el negocio («Inténtalo dentro de un rato»), o más
+desde el mismo dispositivo («…Inténtalo más tarde o llama al negocio.») o más de 100 en una hora en el
+negocio («…Inténtalo dentro de unos minutos.»), o más
 reservas online próximas con el mismo móvil de las que permiten los Ajustes (3 de fábrica: «Este móvil ya
 tiene reservas próximas…», sin decir cuántas). Dos clientas que reservan a la vez la misma hora del mismo
 profesional: entra una y la otra recibe «Esa hora ya no está libre».
@@ -303,8 +304,8 @@ Pasos:
    igual cuando el equipo prueba el enlace desde la vista previa.
 Entra: el enlace de una reserva pendiente o confirmada, sin cobrar.
 Sale: `appointment.appointment.cancelled`.
-Si falla: «La cancelación online no está disponible. Contacta con el negocio.»; «Esta cita solo se puede
-cancelar online con N horas de antelación…»; una ya cancelada o completada, el motivo de Citas.
+Si falla: «La cancelación online no está disponible. Ponte en contacto con el negocio.»; «Esta cita solo se
+puede cancelar online con N horas de antelación…»; una ya cancelada o completada, el motivo de Citas.
 Implicados: APPOINTMENT-F06, APPOINTMENT-F19
 
 ### ONLINE_BOOKING-F12 Borrar los datos de una clienta (RGPD)
@@ -388,8 +389,10 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 - **`requires = ["appointment", "customer", "service", "staff"]`**: lee las citas, busca y crea fichas, lee
   el catálogo y los profesionales de un servicio (`appointment.queries.bookable_members`, que devuelve
   fichas de Personal). Escribe en ellas solo por sus operaciones: `appointment.appointment.create`,
-  `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `appointment.settings.update`,
-  `appointment.availability.slots` y `customer.customer.create`.
+  `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (solo el email que tecleó la
+  clienta como contacto de la cita, si su ficha no tiene), `appointment.settings.update`,
+  `appointment.availability.slots` y `customer.customer.create`. El interruptor de un servicio en Ajustes
+  lo guarda la página con `service.service.update`, con el permiso de quien lo toca.
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita
   reservada desde la página: la cita, el hash del enlace y la huella del visitante).
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
@@ -414,6 +417,8 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 - **Reloj**: el de Citas (`apps.appointment.queries.now`, `business_zone`); los tests lo fijan.
 - Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`, ya en la fase 1);
   `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
+  Sus dos avisos no los escucha ninguna app salvo Automatizaciones, que se apunta a todos (`"*"` en
+  `apps/flow/events.py`); lo que hace con ellos es de FLOW-F21, que sigue `parcial`.
 
 ### Contrato con la página pública (para `base`)
 
@@ -490,6 +495,8 @@ Cómo las expone la plataforma (fase 2, bloque 7 «puerta pública `/p/`»):
 - **Tablas compartidas en la fase 1**: sin tenencia todavía, la fila única de `Settings` (y `Booking`) la
   comparten todos los ámbitos de la plataforma; es el estado de la fase 1, no del módulo: en la fase 2 cada
   hub la tiene en su BD.
+
+Las dos siguen escritas, sin elegir, en la ronda 2026-10-21 (CLOSE-ONLINE_BOOKING) de `PLAN-HUB.md`.
 
 ## Lo que NO hace, a propósito
 
