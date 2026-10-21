@@ -6,8 +6,8 @@
 import { formatDateTime } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
-import type { ConversationDetailOut } from '../operations';
+import { click, EMPLOYEE, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
+import type { ChannelOut, ConversationDetailOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
 
@@ -44,9 +44,14 @@ const conversation = (over: Partial<ConversationDetailOut> = {}): ConversationDe
 
 type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string; fill?: string; placeholder?: string };
 
-async function setup(over: Partial<ConversationDetailOut> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(
+  over: Partial<ConversationDetailOut> = {},
+  locale: 'en' | 'es' = 'en',
+  extra: { channel?: ChannelOut | null; session?: typeof EMPLOYEE } = {},
+) {
   // The composer subscribes to nothing until «Template» is pressed: no stream to open here.
-  const m = await mountInbox(MessageComposer, { props: { conversation: conversation(over), now: NOW }, locale });
+  const props = { conversation: conversation(over), now: NOW, ...(extra.channel !== undefined ? { channel: extra.channel } : {}) };
+  const m = await mountInbox(MessageComposer, { props, locale, session: extra.session });
   await settle();
   const text = () => m.inDoc('whatsapp-inbox-composer-text') as Control;
   const send = () => m.inDoc('whatsapp-inbox-composer-send') as Control;
@@ -181,5 +186,53 @@ describe('MessageComposer: internal note (WHATSAPP_INBOX-F36)', () => {
     const until = formatDateTime('2026-10-16T09:50:00Z', 'es', { timeZone: 'Europe/Madrid' });
     expect(s.find('whatsapp-inbox-composer-window').text()).toBe(`Puedes escribir libremente hasta el ${until}.`);
     expect(s.send().textContent?.trim()).toBe('Enviar');
+  });
+});
+
+describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
+  const CHANNEL: ChannelOut = {
+    status: 'connected',
+    phone_number: '+34910000000',
+    display_name: 'Peluquería Ana',
+    monthly_limit: 0,
+    monthly_usage: 0,
+    cap_reached: true,
+    synced_at: '2026-10-15T09:00:00Z',
+    manage_url: 'http://localhost:8001',
+    plans_url: 'http://localhost:8001/store/plans',
+  };
+  const BLOCKED = { can_send: false, send_blocked: 'cap_reached' as const };
+
+  it('a plan without WhatsApp messages: «Send» says so instead of sending, «Upgrade plan» for whoever configures', async () => {
+    const s = await setup(BLOCKED, 'en', { channel: CHANNEL });
+    const blocked = s.find('whatsapp-inbox-composer-blocked');
+    expect(blocked.attributes('data-code')).toBe('cap_reached');
+    expect(blocked.text()).toContain('Your plan does not include WhatsApp messages: nothing can be sent.');
+    expect(blocked.text()).not.toContain('next month');
+    expect(s.send().disabled).toBe(true);
+    expect((s.inDoc('whatsapp-inbox-composer-template') as Control).disabled).toBe(true);
+    expect(s.find('whatsapp-inbox-composer-upgrade').attributes()).toMatchObject({
+      href: 'http://localhost:8001/store/plans',
+      target: '_blank',
+      rel: 'noopener',
+    });
+    const employee = await setup(BLOCKED, 'en', { channel: CHANNEL, session: EMPLOYEE });
+    expect(employee.find('whatsapp-inbox-composer-blocked').text()).toContain('Your plan does not include WhatsApp messages');
+    expect(employee.find('whatsapp-inbox-composer-upgrade').exists()).toBe(false);
+  });
+
+  it('the month spent keeps its own words, with «Upgrade plan»; without the channel, only the words', async () => {
+    const spent = await setup(BLOCKED, 'en', { channel: { ...CHANNEL, monthly_limit: 150, monthly_usage: 150 } });
+    expect(spent.find('whatsapp-inbox-composer-blocked').text()).toContain("This month's WhatsApp messages of your plan are spent");
+    expect(spent.find('whatsapp-inbox-composer-upgrade').text()).toBe('Upgrade plan');
+    const unknown = await setup(BLOCKED);
+    expect(unknown.find('whatsapp-inbox-composer-blocked').text()).toContain("This month's WhatsApp messages of your plan are spent");
+    expect(unknown.find('whatsapp-inbox-composer-upgrade').exists()).toBe(false);
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await setup(BLOCKED, 'es', { channel: CHANNEL });
+    expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada.');
+    expect(s.find('whatsapp-inbox-composer-upgrade').text()).toBe('Mejorar el plan');
   });
 });

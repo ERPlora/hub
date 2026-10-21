@@ -133,6 +133,8 @@ CAP_REACHED = _(
     "You have used every WhatsApp message of your plan this month: nothing can be sent until next month "
     "or until you upgrade the plan."
 )
+#: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
+NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
 SEND_REFUSED = _("erplora.com did not send the message.")
 SAAS_UNREACHABLE = _("erplora.com did not answer: the message has not left. Try again.")
 SEND_UNKNOWN = _(
@@ -812,11 +814,13 @@ def disconnect_number(ctx: OperationContext, data: ChannelDisconnectIn) -> dict:
 # ── Sending (WHATSAPP_INBOX-F32, F33): kept here, handed to erplora.com after the COMMIT ─────────
 
 
-def _blocked_error(reason: str) -> OperationError:
+def _blocked_error(reason: str, row: Channel | None = None) -> OperationError:
     if reason == "unconfigured":
         return Conflict(str(SAAS_UNCONFIGURED), code="whatsapp_inbox.saas_unconfigured")
     if reason == "cap_reached":
-        return Conflict(str(CAP_REACHED), code="whatsapp_inbox.cap_reached")
+        # The same published code either way; only the reason said differs.
+        spent = NO_PLAN_MESSAGES if row is not None and row.monthly_limit == 0 else CAP_REACHED
+        return Conflict(str(spent), code="whatsapp_inbox.cap_reached")
     return Conflict(str(NOT_CONNECTED), code="whatsapp_inbox.channel_not_connected")
 
 
@@ -913,7 +917,7 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
     conversation, phone = _target(ctx, data)
     blocked = send_blocked(channel(ctx.scope))
     if blocked:
-        raise _blocked_error(blocked)
+        raise _blocked_error(blocked, channel(ctx.scope))
     now = clock.now()
     template = None
     if data.template is None:

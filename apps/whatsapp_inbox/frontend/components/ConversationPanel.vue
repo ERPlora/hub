@@ -16,14 +16,21 @@ import { RouterLink } from 'vue-router';
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useT } from '../composables/useT';
-import type { ConversationStatus, NoteOut } from '../operations';
+import type { ChannelOut, ConversationStatus, NoteOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import ThreadView from './ThreadView.vue';
 
 const PAGE = 50;
 const STATUS_TONES = { open: 'success', pending: 'warning', closed: 'neutral' } as const;
 
-const props = defineProps<{ conversationId: string }>();
+const props = withDefaults(
+  defineProps<{
+    conversationId: string;
+    /** The business's number and its month (the inbox's own `channel.get`): the box says why nothing is sent. */
+    channel?: ChannelOut | null;
+  }>(),
+  { channel: null },
+);
 const emit = defineEmits<{ close: []; erased: [] }>();
 
 const t = useT();
@@ -301,7 +308,10 @@ async function removeNote(note: NoteOut): Promise<void> {
         @delete-note="removeNote"
         @retry="(message) => act(() => retry.run({ id: message.id }))"
       />
-      <MessageComposer :conversation="conversation" />
+      <MessageComposer
+        :conversation="conversation"
+        :channel="props.channel"
+      />
 
       <div
         v-if="canErase"

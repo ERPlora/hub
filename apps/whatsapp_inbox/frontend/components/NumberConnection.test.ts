@@ -21,6 +21,7 @@ const CHANNEL: ChannelOut = {
   cap_reached: false,
   synced_at: null,
   manage_url: 'http://localhost:8001',
+  plans_url: 'http://localhost:8001/store/plans',
 };
 const CONNECTED: ChannelOut = { ...CHANNEL, status: 'connected', phone_number: '+34910000000', display_name: 'Peluquería Ana' };
 const READY: ChannelPrepareOut = {
