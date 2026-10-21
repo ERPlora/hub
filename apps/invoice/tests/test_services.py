@@ -105,6 +105,13 @@ def test_the_saas_photo_fills_the_issuer_and_an_older_one_is_ignored(db):
         system_context(A),
     )
     assert (older.applied, older.issuer.legal_name) == (False, "Peluquería Ana SL")
+    # The same version again (the SaaS pushes its photo once more) changes nothing either.
+    same = run(
+        "invoice.issuer.sync",
+        {**ISSUER, "legal_name": "Same SL", "version": 3},
+        system_context(A),
+    )
+    assert (same.applied, same.issuer.legal_name) == (False, "Peluquería Ana SL")
     newer = run(
         "invoice.issuer.sync",
         {**ISSUER, "legal_name": "New SL", "version": 4},
