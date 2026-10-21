@@ -3,25 +3,30 @@
 // put it: «Reply» writes to the customer, «Internal note» writes for the team. A reply is free text only
 // within Meta's 24 hours from the customer's last message (the server is the judge; the box also closes
 // when the window runs out on screen) and «Template» opens the approved ones. With the number not
-// connected, the month spent or no erplora.com, nothing is offered and the reason is said. A refusal
-// keeps the text with its reason, and sending it again carries the same key: never sent twice.
+// connected, the month spent (or a plan that includes none: WHATSAPP_INBOX-F13, with «Upgrade plan» for whoever
+// configures) or no erplora.com, nothing is offered and the reason is said. A refusal keeps the text with its
+// reason, and sending it again carries the same key: never sent twice.
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
+import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { BUSINESS_ZONE } from '../lib/format';
-import type { ConversationDetailOut } from '../operations';
+import { noAllowance } from '../lib/plan';
+import type { ChannelOut, ConversationDetailOut } from '../operations';
 import TemplateSendModal from './TemplateSendModal.vue';
 
 const props = withDefaults(
   defineProps<{
     conversation: ConversationDetailOut;
+    /** The business's number and its month: says which cap stops a send and where the plan is upgraded. */
+    channel?: ChannelOut | null;
     /** «Now» for the 24-hour window; the device's clock unless a test pins it. */
     now?: Date;
   }>(),
-  { now: undefined },
+  { channel: null, now: undefined },
 );
 
 const t = useT();
@@ -60,7 +65,18 @@ watch(
 );
 onBeforeUnmount(() => clearTimeout(timer));
 
+const session = useSession();
 const blocked = computed(() => props.conversation.send_blocked);
+/** Why nothing can be sent, in words: a plan that includes none is not «spent until next month». */
+const blockedText = computed(() =>
+  blocked.value === 'cap_reached' && noAllowance(props.channel)
+    ? t('whatsapp_inbox.composer.notIncluded')
+    : t(`whatsapp_inbox.composer.blocked.${blocked.value}`),
+);
+/** «Upgrade plan» at the cap, for whoever configures, with erplora.com to send them to. */
+const upgradeUrl = computed(() =>
+  blocked.value === 'cap_reached' && session.can('whatsapp_inbox.configure') ? (props.channel?.plans_url ?? '') : '',
+);
 const windowOpen = computed(() => {
   const end = props.conversation.window_expires_at;
   return props.conversation.window_open && !!end && new Date(end).getTime() > clock.value;
@@ -142,7 +158,19 @@ watch(
         data-testid="whatsapp-inbox-composer-blocked"
         :data-code="blocked"
       >
-        {{ t(`whatsapp_inbox.composer.blocked.${blocked}`) }}
+        {{ blockedText }}
+        <template
+          v-if="upgradeUrl"
+          #actions
+        >
+          <a
+            class="wa-composer__link"
+            data-testid="whatsapp-inbox-composer-upgrade"
+            :href="upgradeUrl"
+            target="_blank"
+            rel="noopener"
+          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+        </template>
       </InlineFeedback>
       <InlineFeedback
         v-else-if="!windowOpen"
@@ -248,6 +276,10 @@ watch(
 }
 .wa-composer__hint {
   color: var(--ion-color-medium-shade);
+}
+.wa-composer__link {
+  color: var(--ion-color-primary);
+  font-weight: 600;
 }
 .wa-composer__actions {
   display: flex;

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountInbox, settle } from '../__tests__/mount-inbox';
-import type { ConversationDetailOut, MessageOut, NoteOut } from '../operations';
+import type { ChannelOut, ConversationDetailOut, MessageOut, NoteOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import ConversationPanel from './ConversationPanel.vue';
 import ThreadView from './ThreadView.vue';
@@ -109,6 +109,24 @@ describe('ConversationPanel: what it shows', () => {
     expect(thread.props('messages')).toHaveLength(1);
     expect(thread.props('notes')).toEqual([NOTE]);
     expect(s.wrapper.findComponent(MessageComposer).props('conversation')).toMatchObject({ id: 'c1' });
+    expect(s.wrapper.findComponent(MessageComposer).props('channel')).toBeNull();
+  });
+
+  it('hands the business’s channel to the box, which says why nothing can be sent (WHATSAPP_INBOX-F13)', async () => {
+    const channel: ChannelOut = {
+      status: 'connected',
+      phone_number: '+34910000000',
+      display_name: 'Peluquería Ana',
+      monthly_limit: 0,
+      monthly_usage: 0,
+      cap_reached: true,
+      synced_at: '2026-10-15T09:00:00Z',
+      manage_url: 'http://localhost:8001',
+      plans_url: 'http://localhost:8001/store/plans',
+    };
+    const s = await setup({ can_send: false, send_blocked: 'cap_reached' }, { props: { conversationId: 'c1', channel } });
+    expect(s.wrapper.findComponent(MessageComposer).props('channel')).toEqual(channel);
+    expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('Your plan does not include WhatsApp messages');
   });
 
   it('«View earlier» follows one more page of 50', async () => {
