@@ -18,7 +18,7 @@ from live.models import OutboxEvent
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 from apps.printing import services
-from apps.printing.tests.conftest import A, RECEIPT, ctx_for, enqueue, printer, run
+from apps.printing.tests.conftest import A, B, RECEIPT, ctx_for, enqueue, printer, run
 
 pytestmark = pytest.mark.django_db
 
@@ -765,6 +765,16 @@ def test_a_manager_renames_a_device_and_changes_its_printers_from_any_device():
     with pytest.raises(NotFound) as missing:
         run("printing.device.update", {"device_id": str(PrintJob().id), "name": "Ghost"}, ctx=ctx_for(MANAGER))
     assert missing.value.code == "printing.device_not_found"
+
+
+def test_a_device_set_up_in_a_hub_is_told_on_that_hubs_channel_only():
+    # Writing in hub B never tells hub A: the device's events travel on the scope of whoever set it up.
+    till = printer("Till")
+    ctx = dataclasses.replace(on_device(TILL_ID), scope=B)
+    device = run("printing.device.register", {"name": "Till", "printers": [str(till.id)]}, ctx=ctx)
+    run("printing.device.retire", {"device_id": str(device.id)}, ctx=dataclasses.replace(ctx_for(MANAGER), scope=B))
+    scoped = OutboxEvent.objects.filter(name__startswith="printing.device.").values_list("name", "scope_key")
+    assert sorted(scoped) == [("printing.device.registered", "b"), ("printing.device.retired", "b")]
 
 
 def test_the_channel_reads_the_printers_of_the_device_that_says_hello():
