@@ -346,8 +346,8 @@ Pantalla: Guía
 Pasos:
 1. En la galería, pulsa **¿Cómo funciona esto?**.
 2. Lee los cinco apartados. «Lo que todavía no puede hacer» dice lo que de verdad falta: bifurcaciones,
-   contar hacia atrás desde una fecha del aviso, enviar mensajes o pedírselo al asistente, y que el asistente
-   solo escribe borradores.
+   contar hacia atrás desde una fecha del aviso, pedírselo al asistente, que los mensajes a un cliente salen
+   solo por WhatsApp (no por correo), y que el asistente solo escribe borradores.
 3. **Volver a las automatizaciones** regresa.
 Entra: nada; los textos van dentro de la app.
 Sale: nada guardado.

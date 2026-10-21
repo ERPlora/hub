@@ -241,7 +241,7 @@
         "items": [
           "Bifurcaciones: una automatización es una columna; «Solo sigue si…» la termina cuando no se cumple. Dos desenlaces son dos automatizaciones.",
           "Contar hacia atrás desde una fecha del aviso («el día antes de la cita»): una espera cuenta desde el paso anterior.",
-          "Enviar mensajes o pedírselo al asistente: llegan en una versión posterior.",
+          "Pedírselo al asistente: llega en una versión posterior. Los mensajes a un cliente salen solo por WhatsApp, no por correo.",
           "El asistente escribe borradores: nunca enciende una automatización ni le concede nada."
         ]
       }

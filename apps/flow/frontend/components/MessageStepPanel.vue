@@ -216,8 +216,9 @@ function setVariable(position: number, value: unknown): void {
 .flow-message__preview {
   margin: 0;
   padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ep-border-soft, rgba(0, 0, 0, 0.08));
   border-radius: 0.5rem;
-  background: var(--ep-surface-muted, #f4f3ee);
+  background: var(--ep-surface, var(--ion-card-background, #fff));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

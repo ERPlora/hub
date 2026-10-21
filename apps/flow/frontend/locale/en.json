@@ -241,7 +241,7 @@
         "items": [
           "Branches: an automation is one column; «Only continue if…» ends it when it does not hold. Two outcomes are two automations.",
           "Counting back from a date of the event («the day before the appointment»): a wait counts from the previous step.",
-          "Sending messages or asking the assistant: they come in a later version.",
+          "Asking the assistant: it comes in a later version. Messages to a customer go by WhatsApp only, not by email.",
           "The assistant writes drafts: it never turns an automation on nor allows it anything."
         ]
       }
