@@ -103,7 +103,7 @@ describe('RecoveryPage', () => {
     const s = await setup();
     expect(s.params(AEAT_OP)).toEqual([{ sort: 'generated_on', dir: 'desc', limit: 50, offset: 0 }]);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, filterable: true, testid: 'verifactu-recovery-aeat', pageSize: 50, total: 1 });
-    expect(s.table().props('searchPlaceholder')).toBe('Search invoice, fingerprint or CSV…');
+    expect((s.table().props() as Record<string, unknown>).searchPlaceholder).toBe('Search invoice, fingerprint or CSV…');
     expect(((s.table().props() as Record<string, unknown>).columns as Array<{ label: string }>).map((c) => c.label)).toEqual([
       'Invoice',
       'Date',
