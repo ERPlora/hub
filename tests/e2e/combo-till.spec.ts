@@ -8,6 +8,8 @@
 // dish's stock and never the menu's (F10). A menu sent from «Current order» reaches the kitchen dish by dish,
 // under the menu's kitchen name, and the kitchen display shows them under the menu's header (F11; the fire through
 // the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
+// SALE-F12: in a course whose dishes repeat, two of them taken twice keep each name on its line beside its counter
+// and its minus, in the three sizes (`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-<w>`).
 // What a run makes — products `E2E-CMT-<run>-…`, its menus «e2e Combo …», checks, sales and kitchen tickets — goes.
 import { spawnSync } from 'node:child_process';
 
@@ -311,4 +313,46 @@ test('COMBO-F11: a menu sent to the kitchen reaches it dish by dish, under its k
     await expect(header).toContainText('2 dishes');
     await header.scrollIntoViewIfNeeded();
   });
+});
+
+test('SALE-F12: two repeatable dishes taken twice keep each name on its line beside its counter and its minus', async ({ page, context }) => {
+  // FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS: the counter and the minus shared a tile with the name, which
+  // was left a few pixels wide and broke letter by letter at 390 and 834 px.
+  await till(page);
+  products.DEC = await createProduct(context, { name: `E2E CmbTill Decaf with oat milk ${RUN}`, sku: `${SKU}-DEC`, price: 180, tax_category_key: FOOD, initial_stock: '10' });
+  const coffees = (await post<{ id: string }>(context, '/combo/combos', { name: `e2e Combo Coffees ${RUN}`, price: 300, tax_category_key: FOOD })).id;
+  await post(context, '/combo/groups', { combo: `e2e Combo Coffees ${RUN}`, name: 'Coffees', min_choices: 1, max_choices: 4, allow_repeat: true });
+  for (const [code, delta] of [
+    ['COF', 50],
+    ['DEC', 30],
+  ] as const) {
+    await post(context, '/combo/options', { combo: `e2e Combo Coffees ${RUN}`, group: 'Coffees', product: `${SKU}-${code}`, price_delta: delta });
+  }
+  await page.reload();
+  const picks = await offer(context, coffees);
+  await shown(page).locator(`[data-testid=pos-menu-${coffees}]`).click();
+  const sheet = page.locator('ion-modal[data-testid=pos-menu]');
+  for (const code of ['COF', 'COF', 'DEC', 'DEC']) await sheet.locator(`[data-testid=pos-menu-dish-${picks[code]}]`).click();
+  // 3,00 + 2 × 0,50 + 2 × 0,30.
+  await expect(sheet.locator('[data-testid=pos-menu-add]')).toContainText(/4[.,]60/);
+  /** How many lines the name of the dish `code` takes: a name broken letter by letter takes one per letter. */
+  const lines = (code: string) =>
+    sheet.locator(`[data-testid=pos-menu-dish-name-${picks[code]}]`).evaluate((name) => {
+      const range = document.createRange();
+      range.selectNodeContents(name);
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+    });
+  for (const size of SIZES) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    for (const code of ['COF', 'DEC']) {
+      await expect(sheet.locator(`[data-testid=pos-menu-dish-count-${picks[code]}]`)).toHaveText('× 2');
+      await expect(sheet.locator(`[data-testid=pos-menu-dish-less-${picks[code]}]`)).toBeVisible();
+      await expect.poll(() => lines(code), { message: `the name of ${code} at ${size.label} is one or two lines` }).toBeLessThanOrEqual(2);
+    }
+    await page.screenshot({ path: shot(`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-${size.label}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sheet.locator('[data-testid=pos-menu-close]').click();
+  await expect(sheet).toBeHidden();
 });
