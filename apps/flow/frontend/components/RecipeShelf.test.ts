@@ -57,6 +57,20 @@ describe('Comes with …', () => {
     expect(m.find('flow-recipe-open-appointment/customer_cancelled').text()).toContain('leaves you a task to fill the gap');
   });
 
+  it('says, above its sections, that these come ready and start working at once when turned on (FLOW-F33)', async () => {
+    // The gallery's own line above reads «Pick one and it becomes yours, paused»; these do the opposite.
+    const m = await setup({ recipes: [GAP], set_aside: [] });
+    expect(m.find('flow-recipes-intro').text()).toBe(
+      'Your apps bring these ready-made: turn one on and it starts working at once, only with the permissions it names.',
+    );
+    const es = await mountFlow(RecipeShelf, { locale: 'es' });
+    await es.live();
+    await es.result(OP, { recipes: [GAP], set_aside: [] });
+    expect(es.find('flow-recipes-intro').text()).toBe(
+      'Tus apps traen estas ya hechas: enciende una y empieza a funcionar ya, solo con los permisos que nombra.',
+    );
+  });
+
   it('shows nothing when no app brings one', async () => {
     const m = await setup({ recipes: [], set_aside: [] });
     expect(m.find('flow-recipes').exists()).toBe(false);

@@ -68,6 +68,7 @@
     },
     "recipes": {
       "comesWith": "Viene con {app}",
+      "intro": "Tus apps traen estas ya hechas: enciende una y empieza a funcionar ya, solo con los permisos que nombra.",
       "comesWithLong": "Esta automatización viene con {app}.",
       "asks": "Lo que podrá hacer, y por qué",
       "enable": "Encenderla",

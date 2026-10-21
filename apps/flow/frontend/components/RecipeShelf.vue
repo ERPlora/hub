@@ -111,6 +111,13 @@ async function backToFactory(recipe: RecipeOut): Promise<void> {
     class="flow-recipes"
     data-testid="flow-recipes"
   >
+    <p
+      v-if="groups.length"
+      class="flow-recipes__hint"
+      data-testid="flow-recipes-intro"
+    >
+      {{ $t('flow.recipes.intro') }}
+    </p>
     <section
       v-for="group in groups"
       :key="group.app"

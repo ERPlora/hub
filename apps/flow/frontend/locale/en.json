@@ -68,6 +68,7 @@
     },
     "recipes": {
       "comesWith": "Comes with {app}",
+      "intro": "Your apps bring these ready-made: turn one on and it starts working at once, only with the permissions it names.",
       "comesWithLong": "This automation comes with {app}.",
       "asks": "What it may do, and why",
       "enable": "Turn it on",
