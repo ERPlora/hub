@@ -141,7 +141,7 @@ def test_every_input_field_says_what_it_is():
 
 
 def test_the_holds_nobody_charged_expire_every_hour_as_the_system():
-    # SERVICE-F25: the phase-2 worker runs it on every hub; reading the balance already skips them.
+    # SERVICE-F25: the worker runs it as the system; reading the balance already skips them.
     assert service().scheduled_tasks == [
         {
             "name": "expire_session_holds",

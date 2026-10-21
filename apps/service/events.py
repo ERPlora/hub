@@ -11,8 +11,9 @@ Reactions: a professional who leaves (``staff.member.terminated``) stops perform
 customer cards merged (``customer.customer.merged``) move the absorbed card's vouchers to the one that
 stays, and a card erased (``customer.customer.erased``, GDPR) empties the free texts of its vouchers;
 each through an operation of this app run as the system, in its own transaction. The
-outbox relay (phase 2, in the worker) hands each delivered event to ``react``; the three operations are
-idempotent, so a repeated delivery changes nothing.
+outbox relay (``base.relay``, on every tick of the worker) hands each event named in ``REACTIONS`` to ``react``,
+in the scope of the hub that recorded it; the three operations are idempotent, so a repeated delivery changes
+nothing (``tests/test_relay.py``).
 """
 
 from typing import Any
