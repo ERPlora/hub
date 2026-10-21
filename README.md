@@ -182,13 +182,24 @@ Variables del repo: `AWS_REGION`, `ALB_DNS_NAME`, `AWS_DEPLOY_ROLE_ARN` (prod, c
 ### Migraciones que conviven con el código anterior
 
 `ecs-deploy.sh` corre `hub-migrate` **antes** de cambiar los servicios, y un rollback devuelve el código anterior
-sobre el esquema ya migrado: durante un rato, el código anterior escribe en las tablas del nuevo (expand/contract,
-PLAN-DB §7). Por eso una columna nueva `NOT NULL` lleva su valor por defecto **en la BD** (`db_default=…`, además del
-`default` de Python), o nace `null=True` y pasa a `NOT NULL` en un despliegue posterior. Con solo `default`, Django
-rellena las filas y luego quita el `DEFAULT` de la columna, y los `INSERT` del código anterior, que no la conoce, caen
-con `null value in column … violates not-null constraint` hasta que acaba el despliegue (pasó en `kitchen/0004`,
-hub#115).
+sobre el esquema ya migrado: durante un rato, el código anterior lee y escribe las tablas del nuevo (expand/contract,
+PLAN-DB §7). Por eso, en una migración:
+
+- **Una columna nueva `NOT NULL`** lleva su valor por defecto **en la BD** (`db_default=…`, además del `default` de
+  Python), o nace `null=True` y pasa a `NOT NULL` en un despliegue posterior. Con solo `default`, Django rellena las
+  filas y luego quita el `DEFAULT` de la columna, y los `INSERT` del código anterior, que no la conoce, caen con
+  `null value in column … violates not-null constraint` hasta que acaba el despliegue (pasó en `kitchen/0004`, hub#115).
+- **Quitar o renombrar** una columna o una tabla (`RemoveField`, `DeleteModel`, `RenameField`, `RenameModel`,
+  `AlterModelTable`) va en dos despliegues: primero sale solo del estado (`SeparateDatabaseAndState` con
+  `state_operations`; si es una columna, antes `null=True` o `db_default`) y en uno posterior se borra de la BD con
+  `RunSQL`. Un renombrado puede conservar el nombre en la BD (`db_column=…`, `db_table=…`) y no rompe nada.
+- **Estrechar** una columna con `AlterField` (pasar a `NOT NULL`, acortar `max_length`, cambiar a otro tipo o añadirle
+  un `CHECK`, como el de un entero positivo) va en un despliegue posterior al que deja de escribir esos valores. Un
+  `db_default` no salva el paso a `NOT NULL`: el código anterior conoce la columna y manda el `NULL` en su `INSERT`.
+  Ampliar (más `max_length`, `text`, `smallint` → `integer` → `bigint`, `null=True`) no rompe nada.
 
 Lo comprueba `base/tests/test_migration_safety.py` sobre todas las migraciones que carga el proyecto (`base`, `live`,
-las apps y las de Django: `hub-migrate` las aplica todas). Las que ya estaban en producción antes de la regla van en su
-lista `ACCEPTED`: una entrada nueva se justifica en su PR, y una que ya no incumple la regla hace caer el test.
+las apps y las de Django: `hub-migrate` las aplica todas), cada una contra el estado anterior del `MigrationLoader`.
+El paso del despliegue posterior (el contract), las migraciones ya desplegadas antes de la regla y las de Django van en
+su lista `ACCEPTED`: una entrada nueva se justifica en su PR (la del contract, con la PR de su primer paso), y una que ya
+no rompe nada hace caer el test.
