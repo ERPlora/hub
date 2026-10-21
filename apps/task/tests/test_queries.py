@@ -8,6 +8,8 @@ from django.utils import timezone
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
+from apps.task.models import Task
+
 from .conftest import ctx_for, make_comment, make_member, make_project, make_task
 
 pytestmark = pytest.mark.django_db
@@ -273,6 +275,19 @@ def test_pages():
         make_task(f"T{n}")
     page = run("task.task.list", {"limit": 2, "offset": 2, "sort": "title"})
     assert (titles(page), page.total, page.limit, page.offset) == (["T2", "T3"], 5, 2, 2)
+
+
+def test_ties_in_the_sorted_column_come_by_id_so_a_touched_row_keeps_its_place_and_pages_add_up():
+    """hub#2352: sorting by a column with repeated values, the row you touched jumped and paging
+    repeated or lost rows. Same priority, status and (empty) due date: the id settles every tie."""
+    tied = [make_task(f"Tie {n}") for n in range(6)]
+    by_id = sorted(task.id for task in tied)
+    # Touching a row makes Postgres write its new version after the others.
+    Task.objects.filter(pk=by_id[0]).update(description="touched")
+    for sort in ("priority", "-priority", "status", "due_date", "-due_date"):
+        assert [row.id for row in run("task.task.list", {"sort": sort}).rows] == by_id, sort
+    pages = [run("task.task.list", {"sort": "priority", "limit": 2, "offset": n}) for n in (0, 2, 4)]
+    assert [row.id for page in pages for row in page.rows] == by_id
 
 
 # My tasks
