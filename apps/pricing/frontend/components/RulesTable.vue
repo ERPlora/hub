@@ -2,8 +2,8 @@
 // Price Lists → «Discount rules» (WORKBOOK «Pantallas · Tarifas»; PRICING-F09 to F12): the live
 // `pricing.rule.list` in a server-side DataTable — Code, Name, Type, Value (one column with its unit, the
 // old module's pricing#28: neither sorted nor filtered, its units differ), Applies to (with the customer
-// group), Validity, Priority and Status —, «Search code or name…», column filters (Status shows the
-// inactive ones), list or cards, 50 a page by name. Whoever manages gets «+» (New discount rule), Edit,
+// group), Validity, Priority and Status —, «Search code or name…», column filters behind the funnel (Status
+// opens on the active ones), list or cards, 50 a page by name. Whoever manages gets «+» (New discount rule), Edit,
 // Deactivate (asking first) and Activate.
 import {
   ConfirmDialog,

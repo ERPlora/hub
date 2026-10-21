@@ -2,7 +2,7 @@
 // Price Lists → «Price lists» (WORKBOOK «Pantallas · Tarifas»; PRICING-F01 to F05): the live
 // `pricing.price_list.list` in a server-side DataTable — Code (with «General»), Name, Currency, Customer
 // group («Everybody» for the general one, «Deleted group» when Customers deleted it), Tax, Validity, Prices and Status —, «Search code or name…»,
-// column filters (Status shows the inactive ones), list or cards, 50 a page by name. A row and its «Open»
+// column filters behind the funnel (Status opens on the active ones), list or cards, 50 a page by name. A row and its «Open»
 // open the list's detail; whoever manages gets «+» (New price list), Edit, Make general (an active list
 // in euros without group that is not general), Deactivate (not the general one, asking first) and Activate.
 import {
