@@ -422,6 +422,19 @@ class TestTheRegistryGate:
         assert '<meta http-equiv="refresh" content="10">' in html
         assert "Your business is being prepared" in html
 
+    @pytest.mark.parametrize(
+        ("fields", "status"),
+        [({"status": "cancelled"}, 410), ({"state": {"status": "suspended"}}, 402)],
+        ids=["gone", "suspended"],
+    )
+    def test_only_a_hub_being_prepared_asks_to_come_back(self, client, hub, fields, status):
+        # Retry-After says «try again soon»: true while it is being prepared, never for a hub gone or suspended.
+        hub("acme", **fields)
+        page = browse(client, "/", "acme.localhost:8000")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
+        assert (page.status_code, api.status_code) == (status, status)
+        assert not page.has_header("Retry-After") and not api.has_header("Retry-After")
+
     def test_the_api_of_a_hub_being_prepared_is_the_503_envelope(self, client, hub):
         hub("acme", status="failed")
         response = client.get("/api/me", HTTP_HOST="acme.localhost:8000")

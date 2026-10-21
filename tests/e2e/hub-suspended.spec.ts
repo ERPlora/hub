@@ -4,9 +4,11 @@
 // without: a page that says why and takes the person to ERPlora (where the invoice is paid), the API the envelope
 // `base.hub_suspended`. When the photo says it is paid again, the same session works as before. The photo is set
 // here straight in this run's database (the SaaS's push is covered by its own tests and by `/internal`'s).
-import { expect, test } from '@playwright/test';
+// An app already open when the photo arrives leaves for that page too, once: at its next call (the SDK reloads on
+// the gate's envelope) or at its live stream's next run (the Hub ends the stream, its reconnection hears the gate).
+import { expect, type Page, test } from '@playwright/test';
 
-import { api, B, collectProblems, hostPage, listReady, psql, SAAS, shot } from './helpers';
+import { api, B, collectProblems, fillNewItem, hostPage, listReady, psql, SAAS, shot, uniqueName } from './helpers';
 
 const SIZES = [
   { name: '390', width: 390, height: 844 },
@@ -25,6 +27,20 @@ function setPhotoStatus(status: string): void {
     ? `(state - 'status') || jsonb_build_object('status', '${status}')`
     : `state - 'status'`;
   psql(`UPDATE base_hub SET state = ${next} WHERE slug = '${slug}'`);
+}
+
+/** The documents the page loads from now on (a reload is one more). */
+function documentsLoaded(page: Page): { status: number; url: string }[] {
+  const loaded: { status: number; url: string }[] = [];
+  page.on('response', (response) => {
+    if (response.request().resourceType() === 'document') loaded.push({ status: response.status(), url: response.url() });
+  });
+  return loaded;
+}
+
+async function expectSuspendedPage(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('This business is suspended', { timeout: 15_000 });
+  await expect(page.getByRole('link', { name: 'Go to ERPlora' })).toHaveAttribute('href', `${SAAS}/launch`);
 }
 
 test('BILLING-G54: a business suspended for an unpaid invoice answers 402 until it is paid, page and API', async ({
@@ -70,6 +86,68 @@ test('BILLING-G54: a business suspended for an unpaid invoice answers 402 until 
     expect(found.page).toEqual([]);
     // The one console error allowed is the browser's own line about the 402 asked for on purpose.
     expect(found.console.filter((line) => !/status of 402/.test(line))).toEqual([]);
+  } finally {
+    setPhotoStatus(before);
+    await context.close();
+  }
+});
+
+test('BILLING-G54: an app already open when the business is suspended shows the 402 page at its next click, once', async ({
+  browser,
+}) => {
+  const before = photoStatus();
+  const { context } = await hostPage(browser, B, { next: '/demo/items' });
+  const name = uniqueName('Suspended mid-way');
+  try {
+    for (const size of SIZES) {
+      setPhotoStatus('active');
+      // A tab of its own per size: the SDK reloads a tab once, and not again within a moment (no loop).
+      const page = await context.newPage();
+      await page.setViewportSize({ width: size.width, height: size.height });
+      expect((await page.goto('/demo/items'))?.status()).toBe(200);
+      await listReady(page);
+      const save = await fillNewItem(page, name);
+      const documents = documentsLoaded(page);
+
+      // The SaaS's photo arrives while the form is open; the person saves without reloading.
+      setPhotoStatus('suspended');
+      await save.click();
+
+      await expectSuspendedPage(page);
+      expect(documents).toEqual([{ status: 402, url: `${B}/demo/items/new` }]);
+      await page.screenshot({ path: shot(`APP-BILLING-1-BILLING-G54-hub-open-app-${size.name}`), fullPage: true });
+      // Once: the page the gate answers has no app, so nothing reloads it again.
+      await page.waitForTimeout(1500);
+      expect(documents).toHaveLength(1);
+      await page.close();
+    }
+    expect(psql(`SELECT count(*) FROM demo_item WHERE name = '${name}'`)).toBe('0');
+  } finally {
+    setPhotoStatus(before);
+    await context.close();
+  }
+});
+
+test('BILLING-G54: an app left open when the business is suspended leaves for the 402 page at its live stream\'s next run', async ({
+  browser,
+}) => {
+  const before = photoStatus();
+  const { context, page } = await hostPage(browser, B, { next: '/demo/items', viewport: { width: 1440, height: 900 } });
+  try {
+    setPhotoStatus('active');
+    expect((await page.goto('/demo/items'))?.status()).toBe(200);
+    await listReady(page);
+    const documents = documentsLoaded(page);
+
+    // Nobody clicks: the photo arrives, and then anything that re-runs the hub's live queries (here a bare
+    // notification on its channel, `*` = everything may have changed, as a write of the hub sends after its COMMIT).
+    setPhotoStatus('suspended');
+    const channel = `live_host_${slug}`.replace(/[^a-z0-9_]/g, '_');
+    psql(`SELECT pg_notify('${channel}', '*')`);
+
+    await expectSuspendedPage(page);
+    expect(documents).toEqual([{ status: 402, url: `${B}/demo/items` }]);
+    await page.screenshot({ path: shot('APP-BILLING-1-BILLING-G54-hub-idle-app-1440'), fullPage: true });
   } finally {
     setPhotoStatus(before);
     await context.close();

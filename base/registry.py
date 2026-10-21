@@ -7,6 +7,7 @@ cache would delay the 410 of an expired demo). The writes are the operations of 
 """
 
 import datetime as dt
+from dataclasses import dataclass
 
 from django.utils import timezone
 from django.utils.translation import gettext
@@ -56,6 +57,39 @@ def is_suspended(hub: Hub) -> bool:
 def is_preparing(hub: Hub) -> bool:
     """Whether ``hub`` is not ready yet (requested, or its preparation failed and is retried)."""
     return hub.status in PREPARING_STATUSES
+
+
+#: The codes of a host that does not serve the app (``refusal``).
+HUB_GONE = "base.hub_gone"
+HUB_PREPARING = "base.hub_preparing"
+HUB_SUSPENDED = "base.hub_suspended"
+
+
+@dataclass(frozen=True)
+class Refusal:
+    """What the host of a hub that does not serve the app answers: the status and the envelope's code and message."""
+
+    status: int
+    code: str
+    message: str
+
+
+def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
+    """Why the host of ``hub`` does not serve the app, or ``None`` while it does; in the active language.
+
+    The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503,
+    suspended for an unpaid invoice 402. An open live stream and the print socket hear it again before each run
+    (``base.operations.HubContextBuilder.refresh``). ``ended=False`` leaves out that it ended (a demo's login still
+    answers then)."""
+    if hub is None:
+        return Refusal(404, "not_found", gettext("Not found"))
+    if ended and is_gone(hub):
+        return Refusal(410, HUB_GONE, gettext("This hub is no longer available."))
+    if is_preparing(hub):
+        return Refusal(503, HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds."))
+    if is_suspended(hub):
+        return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))
+    return None
 
 
 def internal_only(ctx: OperationContext) -> None:

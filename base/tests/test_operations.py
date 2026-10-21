@@ -280,3 +280,83 @@ def test_erploras_own_hub_is_the_one_of_its_slug(settings):
 
     assert is_platform_hub(Scope("host", "erplora")) is True
     assert is_platform_hub(Scope("host", "a")) is False
+
+
+@pytest.mark.django_db
+class TestRefreshHearsTheHostGate:
+    """A live stream (and the print socket) holds its context open, so the host gate (``base.middleware``) is not
+    asked again: before every re-run, ``refresh`` reads the registry with the gate's own rule. A hub that stopped
+    serving the app ends the stream (live's ``bye`` for an ``Unauthorized``) with the gate's envelope, and the
+    stream's reconnection hears the gate itself (BILLING-F16 of the SaaS: the business suspended does not open)."""
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            pytest.param({"state": {"status": "suspended"}}, id="suspended"),
+            pytest.param({"status": "cancelled"}, id="cancelled"),
+            pytest.param({"status": "purged"}, id="purged"),
+            pytest.param({"status": "requested"}, id="being-prepared"),
+            pytest.param({"status": "failed"}, id="preparation-failed"),
+        ],
+    )
+    def test_a_hub_that_stopped_serving_ends_the_stream_with_the_gate_s_envelope(self, make_user, client, change):
+        from live.errors import Unauthorized
+
+        from base.models import Hub
+
+        user = make_user(host="a", role="hub_admin")
+        builder = HubContextBuilder()
+        ctx = builder.from_request(request_for("a.localhost", user, language="es"))
+        Hub.objects.filter(slug="a").update(**change)
+        gate = client.get("/api/live", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+
+        with pytest.raises(Unauthorized) as ended:
+            builder.refresh(ctx)
+
+        assert gate.status_code in (402, 410, 503)
+        assert (ended.value.status, ended.value.envelope()) == (gate.status_code, gate.json())
+
+    def test_a_demo_whose_time_is_up_ends_the_stream_as_gone(self, make_user):
+        import datetime as dt
+
+        from django.utils import timezone
+        from live.errors import Unauthorized
+
+        from base.models import Hub
+
+        Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True, expires_at=timezone.now() + dt.timedelta(hours=1))
+        user = make_user(host="demo-0000beef", role="hub_admin")
+        builder = HubContextBuilder()
+        ctx = builder.from_request(request_for("demo-0000beef.localhost", user))
+        Hub.objects.filter(slug="demo-0000beef").update(expires_at=timezone.now() - dt.timedelta(seconds=1))
+
+        with pytest.raises(Unauthorized) as ended:
+            builder.refresh(ctx)
+
+        assert (ended.value.status, ended.value.code) == (410, "base.hub_gone")
+
+    def test_a_hub_whose_row_is_gone_ends_the_stream_as_not_found(self, make_user, client):
+        from live.errors import Unauthorized
+
+        from base.models import Hub
+
+        user = make_user(host="a", role="hub_admin")
+        builder = HubContextBuilder()
+        ctx = builder.from_request(request_for("a.localhost", user))
+        Hub.objects.filter(slug="a").delete()
+        gate = client.get("/api/live", HTTP_HOST="a.localhost")
+
+        with pytest.raises(Unauthorized) as ended:
+            builder.refresh(ctx)
+
+        assert (ended.value.status, ended.value.envelope()) == (404, gate.json())
+
+    def test_a_hub_in_its_grace_days_keeps_serving(self, make_user):
+        from base.models import Hub
+
+        user = make_user(host="a", role="hub_admin")
+        builder = HubContextBuilder()
+        ctx = builder.from_request(request_for("a.localhost", user))
+        Hub.objects.filter(slug="a").update(state={"status": "past_due"})
+
+        assert builder.refresh(ctx).has("demo.manage")

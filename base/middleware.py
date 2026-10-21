@@ -95,12 +95,9 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         hub = registry.hub_by_slug(scope.key)
         if hub is None:
             return self._not_found(request)
-        if registry.is_gone(hub) and not (hub.is_demo and path == DEMO_ENTRY_PATH):
-            return self._gone(request, hub)
-        if registry.is_preparing(hub):
-            return self._preparing(request)
-        if registry.is_suspended(hub):
-            return self._suspended(request)
+        refusal = registry.refusal(hub, ended=not (hub.is_demo and path == DEMO_ENTRY_PATH))
+        if refusal is not None:
+            return self._refuse(request, hub, refusal)
         request.hub = hub
         return None
 
@@ -111,29 +108,21 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
             return JsonResponse(error.envelope(), status=error.status)
         raise Http404("This host is no hub's.")
 
-    def _gone(self, request: HttpRequest, hub: Hub) -> HttpResponse:
+    def _refuse(self, request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
+        """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, suspended)."""
         if _wants_envelope(request):
-            return _envelope(410, "base.hub_gone", gettext("This hub is no longer available."))
-        back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
-        html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
-        return HttpResponse(html, status=410)
-
-    def _suspended(self, request: HttpRequest) -> HttpResponse:
-        if _wants_envelope(request):
-            return _envelope(
-                402, "base.hub_suspended", gettext("This business is suspended until its unpaid invoice is paid.")
-            )
-        html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
-        return HttpResponse(html, status=402)
-
-    def _preparing(self, request: HttpRequest) -> HttpResponse:
-        if _wants_envelope(request):
-            response = _envelope(
-                503, "base.hub_preparing", gettext("This hub is still being prepared; try again in a few seconds.")
-            )
+            response = _envelope(refusal.status, refusal.code, refusal.message)
+        elif refusal.code == registry.HUB_GONE:
+            back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
+            html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
+            response = HttpResponse(html, status=refusal.status)
+        elif refusal.code == registry.HUB_PREPARING:
+            response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=refusal.status)
         else:
-            response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=503)
-        response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
+            html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
+            response = HttpResponse(html, status=refusal.status)
+        if refusal.code == registry.HUB_PREPARING:
+            response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
         return response
 
 
