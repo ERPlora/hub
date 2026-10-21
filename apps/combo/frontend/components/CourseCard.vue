@@ -562,4 +562,13 @@ async function save(): Promise<void> {
   font-size: 0.85rem;
   color: var(--ion-color-danger, #c5000f);
 }
+/* combos#4: on a phone or a tablet each button (not only its icon) reaches 44×44, as the tables' actions. */
+@media (pointer: coarse), (max-width: 834px) {
+  .combo-course__actions ion-button,
+  .combo-course__row-actions ion-button {
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+  }
+}
 </style>

@@ -233,7 +233,16 @@ async function save(): Promise<void> {
 <style scoped>
 .combo-bulk {
   display: grid;
+  /* A long name wraps inside the dialog instead of widening it past a phone's edge. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+}
+.combo-bulk ion-checkbox {
+  min-width: 0;
+}
+.combo-bulk ion-checkbox::part(label) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .combo-bulk__empty {
   margin: 0;

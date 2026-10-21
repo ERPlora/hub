@@ -93,8 +93,8 @@ siempre a la vista y la elegida resaltada), «Tipo de IVA» (solo si es «en el 
 lista de menús» y la casilla «A la venta» (marcada de partida), con «Guardar» y «Cancelar».
 
 ### Constructor del menú
-Se abre al tocar un menú (`/combo/menus/<id>`). Arriba, la flecha atrás («Todos los menús»), el nombre
-y el precio del menú, y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
+Se abre al tocar un menú (`/combo/menus/<id>`). La flecha atrás de la barra de arriba vuelve a Menús.
+Arriba de la página, el nombre y el precio del menú, y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
 único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.» o «Este menú
 se factura como entrega de bienes: su precio se repartirá entre los componentes que añadas, una línea
 por cada uno.». Debajo, si el menú todavía no sale en el TPV, otro aviso dice por qué («Todavía no

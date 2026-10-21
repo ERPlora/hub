@@ -6,7 +6,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, flush, type MountOptions, mountCombo, page } from '../__tests__/mount-combo';
+import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCombo, page } from '../__tests__/mount-combo';
 import MenuFormModal from '../components/MenuFormModal.vue';
 import type { ComboOut } from '../operations';
 import MenusPage from './MenusPage.vue';
@@ -71,6 +71,31 @@ describe('MenusPage', () => {
     s.table().vm.$emit('filtersChange', { name: 'day', supply_kind: 'goods', is_active: 'false' });
     await flush();
     expect(s.list()).toEqual([{ name: 'day', supply_kind: 'goods', is_active: false, sort: 'sort_order', dir: 'asc', limit: 50, offset: 0 }]);
+  });
+
+  it('pm#611: while the menus are on their way the table says it is loading, never «0 records» nor «No menus»', async () => {
+    const s = await setup();
+    expect(s.prop('loading')).toBe(true);
+    expect(s.wrapper.findComponent(EmptyState).exists()).toBe(false);
+    await s.show(page(ROWS));
+    expect(s.prop('loading')).toBe(false);
+  });
+
+  it('pm#533, hub#2328: a list that cannot be read says so with «Retry», never that there are no menus', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
+    await flush();
+    expect(s.prop('error')).toBe('The menus could not be loaded.');
+    expect(s.prop('loading')).toBe(false);
+    expect(s.wrapper.findComponent(EmptyState).exists()).toBe(false);
+    const asked = s.list().length;
+    s.table().vm.$emit('retry');
+    await flush();
+    await s.reopen();
+    expect(s.list().length).toBeGreaterThanOrEqual(asked);
+    await s.show(page(ROWS));
+    expect(s.prop('error')).toBeUndefined();
+    expect(s.rows()).toHaveLength(2);
   });
 
   it('tapping a row opens its builder', async () => {

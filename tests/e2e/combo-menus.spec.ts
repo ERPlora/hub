@@ -22,7 +22,7 @@ const sku = (code: string): string => `E2E-CMB-${STAMP}-${code}`;
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
+  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
 
@@ -42,14 +42,16 @@ function cleanUp(): void {
   const combos = `select id from combo_combo where name like '${TAG}%'`;
   const groups = `select id from combo_choicegroup where combo_id in (${combos})`;
   const products = `select id from inventory_product where sku like 'E2E-CMB-%'`;
+  const categories = `select id from inventory_category where name like '${TAG}%'`;
   psql(
     [
       `delete from combo_choiceoption where group_id in (${groups}) or product_id in (${products})`,
       `delete from combo_choicegroup where combo_id in (${combos})`,
       `delete from combo_combo where name like '${TAG}%'`,
       `delete from inventory_stockmovement where product_id in (${products})`,
-      `delete from inventory_productcategory where product_id in (${products})`,
+      `delete from inventory_productcategory where product_id in (${products}) or category_id in (${categories})`,
       `delete from inventory_product where sku like 'E2E-CMB-%'`,
+      `delete from inventory_category where name like '${TAG}%'`,
     ].join('; '),
   );
 }
@@ -64,12 +66,12 @@ async function call<T>(context: BrowserContext, method: 'GET' | 'POST', path: st
   return res.data;
 }
 
-async function product(context: BrowserContext, code: string, name: string, price: number, tax = 'restaurant.food'): Promise<Product> {
+async function product(context: BrowserContext, code: string, name: string, price: number, tax = 'restaurant.food', categoryIds: string[] = []): Promise<Product> {
   const created = await call<Product>(
     context,
     'POST',
     '/inventory/products',
-    { name: `${TAG} ${name} ${STAMP}`, sku: sku(code), price, tax_category_key: tax },
+    { name: `${TAG} ${name} ${STAMP}`, sku: sku(code), price, tax_category_key: tax, category_ids: categoryIds },
     201,
   );
   made[code] = created.id;
@@ -175,6 +177,47 @@ async function shoot(page: Page, name: string, inside?: string): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 860 });
 }
 
+/** combos#29: whether the dialog's title and its «Cancel» overlap (the title once sat on it on a phone). */
+async function titleOverCancel(page: Page, dialog: string): Promise<boolean> {
+  const title = await page.locator(`ion-modal[data-testid=${dialog}] ion-title`).boundingBox();
+  const cancel = await page.locator(`[data-testid=${dialog}-cancel]`).boundingBox();
+  if (!title || !cancel) return false;
+  const text = await page.locator(`ion-modal[data-testid=${dialog}] ion-title`).evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const box = range.getBoundingClientRect();
+    return { x: box.x, right: box.right, y: box.y, bottom: box.bottom };
+  });
+  return text.x < cancel.x + cancel.width && cancel.x < text.right && text.y < cancel.y + cancel.height && cancel.y < text.bottom;
+}
+
+/** combos#28: the clear buttons a search field paints: Ionic's own, and whether the input is a native search
+ *  field whose own cross the browser paints (unless its appearance is `none`). */
+async function clearCrosses(page: Page, searchbar: string): Promise<{ ionic: number; nativeSearch: boolean; appearance: string }> {
+  return page.locator(`[data-testid=${searchbar}]`).evaluate((bar) => {
+    const ionic = [...bar.querySelectorAll('.searchbar-clear-button')].filter((el) => (el as HTMLElement).offsetWidth > 0).length;
+    const input = bar.querySelector('input');
+    return { ionic, nativeSearch: input?.type === 'search', appearance: input ? getComputedStyle(input).appearance : '' };
+  });
+}
+
+/** combos#4: the buttons of a course's head and of each choice row smaller than 44×44, with their size. */
+async function smallTargets(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const small: string[] = [];
+    const css = ['.combo-course__actions ion-button', '.combo-course__row-actions ion-button']
+      .map((selector) => `.ion-page:not(.ion-page-hidden) ${selector}`)
+      .join(', ');
+    for (const el of document.querySelectorAll(css)) {
+      const box = el.getBoundingClientRect();
+      if (box.width > 0 && (box.width < 44 || box.height < 44)) {
+        small.push(`${el.getAttribute('data-testid')} ${Math.round(box.width)}×${Math.round(box.height)}`);
+      }
+    }
+    return small;
+  });
+}
+
 /** Adds a course with the form at the foot of the builder and waits for its card. */
 async function addCourse(page: Page, name: string): Promise<string> {
   await fill(page, 'combo-course-form-name', name);
@@ -261,6 +304,12 @@ test('COMBO-F02, F05, F06, F12: the owner builds the menu of the day from Invent
   await page.reload();
   await expect.poll(order).toEqual(['Mains', 'Starters', 'Drink']);
   await shoot(page, 'combo-builder', '.ion-page:not(.ion-page-hidden) .combo-builder [data-testid]');
+  // combos#4: on a phone and on a tablet every button of a course and of a choice reaches 44×44.
+  for (const width of [390, 834]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect.poll(() => smallTargets(page), { message: `touch targets at ${width}` }).toEqual([]);
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 });
 
 /** The id of the course called `name` in the builder shown. */
@@ -288,6 +337,17 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   await expect(bulk).toBeVisible();
   await page.locator('[data-testid=combo-bulk-search] input').fill(STAMP);
   await expect(page.locator(`[data-testid=combo-bulk-item-${made.LEN}]`)).toContainText('Already in this course');
+  await shoot(page, 'APP-COMBO-COMBO-F06', 'ion-modal[data-testid=combo-bulk] [data-testid]');
+  // combos#28: never two crosses to clear the search: Ionic's, at most, and the browser's own is not painted.
+  const crosses = await clearCrosses(page, 'combo-bulk-search');
+  expect(crosses.ionic).toBeLessThanOrEqual(1);
+  expect(crosses.nativeSearch && crosses.appearance !== 'none').toBe(false);
+  // combos#29: on a phone the title never sits on «Cancel».
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    expect(await titleOverCancel(page, 'combo-bulk'), `title over «Cancel» at ${viewport.label}`).toBe(false);
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
   await page.locator(`[data-testid=combo-bulk-row-${made.SOU}]`).click();
   await expect(page.locator('[data-testid=combo-bulk-submit]')).toContainText('Add 1 selected');
   await page.locator('[data-testid=combo-bulk-submit]').click();
@@ -324,8 +384,23 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   await shown(page).locator('[data-testid=combo-course-form-save]').click();
   await expect(shown(page).locator(`[data-testid=combo-course-${mains}-rule]`)).toHaveText('Compulsory · pick at least 1 · up to 2 · no repeats');
 
-  // Withdraw a course after its confirmation.
+  // combos#12: a whole category of Inventory at once — Dessert gets every sweet of the category.
+  const sweets = await call<{ id: string }>(context, 'POST', '/inventory/categories', { name: `${TAG} Sweets ${STAMP}` }, 201);
+  await product(context, 'FLA', 'Flan', 400, 'restaurant.food', [sweets.id]);
+  await product(context, 'CAK', 'Cake', 450, 'restaurant.food', [sweets.id]);
   const dessert = await addCourse(page, 'Dessert');
+  await shown(page).locator(`[data-testid=combo-course-${dessert}-bulk]`).click();
+  await expect(bulk).toBeVisible();
+  await pick(page, 'combo-bulk-category', 'Sweets', `${TAG} Sweets ${STAMP}`);
+  await expect(page.locator(`[data-testid=combo-bulk-row-${made.FLA}]`)).toBeVisible();
+  await expect(page.locator(`[data-testid=combo-bulk-row-${made.LEN}]`)).toHaveCount(0);
+  await page.locator('[data-testid=combo-bulk-tick-all]').click();
+  await expect(page.locator('[data-testid=combo-bulk-submit]')).toContainText('Add 2 selected');
+  await page.locator('[data-testid=combo-bulk-submit]').click();
+  await expect(bulk).toBeHidden();
+  await expect.poll(() => choicesOf(page, dessert)).toEqual([dish('Cake'), dish('Flan')]);
+
+  // Withdraw a course after its confirmation.
   await shown(page).locator(`[data-testid=combo-course-${dessert}-delete]`).click();
   await expect(page.locator('ion-modal[data-testid=combo-course-delete]')).toContainText('Remove the course «Dessert» and its choices?');
   // Counted on the page, not in `shown()`: while the dialog is open, `shown()` is the dialog.
