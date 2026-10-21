@@ -163,7 +163,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F10 | Imprimir la comanda en cocina y barra | restaurante | hecho |
 | PRINTING-F11 | Reimprimir una comanda | restaurante | hecho |
 | PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | parcial: falta que Inventario lo pida |
-| PRINTING-F13 | Abrir el cajón al cobrar | común | hecho |
+| PRINTING-F13 | Abrir el cajón al cobrar | común | parcial: el aviso del cajón que no abre es de la app del dispositivo |
 | PRINTING-F14 | Sacar del atasco un trabajo de impresión | común | hecho |
 | PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | hecho |
 | PRINTING-F16 | Mandar imprimir desde el asistente | común | hecho |
@@ -413,7 +413,9 @@ Implicados: INVENTORY-F25, PRINTING-F04
 
 ### PRINTING-F13 Abrir el cajón al cobrar
 <!-- origen: old-hub:HUB_APP-F21 old-hub:HUB_SHELL-F71 wf:restaurante-dia#rec_restaurante-f17 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/10-hardware-offline-and-recovery qa:verticals/restaurant/07-payment-and-fiscal old-hub:HUB-F207 old-hub:HUB_PERIPHERALS-F15 old:printing/workflow/documentos.md#printing-f13 qa:modules/printing/open-cash-drawer -->
-Estado: hecho
+Estado: parcial — la parte del Hub está hecha (el cobro con efectivo pide el cajón en su transacción);
+falta la del dispositivo: que la app avise si el pulso no llega al cajón, como avisa del tique (hub#2724), y
+el canal por el que recoge el trabajo (PRINTING-F18)
 Vertical: común
 Actor: empleado
 Pantalla: Vender (de Ventas)

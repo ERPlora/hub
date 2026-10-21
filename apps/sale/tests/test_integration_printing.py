@@ -172,3 +172,14 @@ def test_the_bill_of_a_check_prints_with_its_lines(bar, till):
     # Each press is a bill of its own; the check stays open and nothing is charged.
     assert run("sale.order.print_bill", {"order_id": str(order.id)}).queued is True
     assert len(jobs()) == 2 and not Sale.objects.exists()
+
+
+def test_the_employee_at_the_till_gets_the_receipt_and_the_drawer(bar, till):
+    """Whoever charges, not only the owner (pm#630): an employee's cash charge queues its receipt, with its QR and the
+    order to open the drawer."""
+    run("printing.settings.update", {"open_drawer_on_sale": True})
+    out = charge("sale-print-employee", payments=CASH, ctx=ctx_for("hub_employee"))
+    (job,) = jobs()
+    assert out.printed.queued is True
+    assert (job.job_key, job.open_drawer) == (f"sale-{out.id}-receipt", True)
+    assert job.document["qr_data"].startswith("https://")
