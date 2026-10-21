@@ -365,7 +365,8 @@ Estado: hecho
 Actor: responsable, empleado
 Pantalla: Plano de sala
 Pasos:
-1. Abre **Mesas → Plano de sala** y elige la zona. Se ven todas sus mesas en uso, a su tamaño real.
+1. Abre **Mesas → Plano de sala** y elige la zona: su plano sale al momento, sin esperar a cargar. Se
+   ven todas sus mesas en uso, a su tamaño real.
 2. Cada mesa dice su estado escrito, con icono y color: Disponible, Ocupada, Reservada o Bloqueada.
 3. Una mesa ocupada dice los comensales y los minutos que llevan («3 pax · 35 min») y quién la
    atiende; los minutos avanzan solos. Una mesa con reserva hoy dice el nombre y la hora.

@@ -1,6 +1,7 @@
 // Tables → Floor plan (WORKBOOK «Pantallas · Plano de sala»; TABLE-F01 to F06, F09 to F17): one row on
 // top — the zone strip and, for whoever draws the room, «Service / Edit plan», the «+» and the pencil —
-// and the live plan of the chosen zone underneath.
+// and the live plan of the chosen zone underneath: every table of the room is read once, on the page's one
+// stream, and the strip only picks which zone the plan paints.
 // - Service: the zones and tables in service; a tap opens the table's window; Transfer and Merge pick
 //   their destination on the plan («Transfer 4 to…», «Pick a free table», «Cancel»).
 // - Edit plan: every zone and table (the inactive ones greyed out); a tap opens «Edit table», a drag saves
@@ -28,18 +29,19 @@ const ZONES = [zoneRow({ id: 'z1', name: 'Dining room' }), zoneRow({ id: 'z2', n
 const FREE = tableRow({ id: 't1', number: '1' });
 const BUSY = occupied({ id: 't4', number: '4', position_x: 104 });
 const IDLE = tableRow({ id: 't9', number: '9', is_active: false, in_service: false, position_x: 192 });
+const TERRACE = tableRow({ id: 't7', number: '7', zone_id: 'z2', zone_name: 'Terrace' });
 
 async function setup(options: MountOptions = {}) {
   const m = await mountTable(FloorPlanPage, { path: '/table/floor-plan', ...options });
   await m.live();
   const el = (name: string) => m.wrapper.find(`[data-testid="table-floor-${name}"]`);
   const tiles = () => m.wrapper.findAll('[data-testid^="table-floor-tile-"]').map((tile) => tile.attributes('data-testid')!.replace('table-floor-tile-', ''));
-  const show = async (zones = ZONES, tables: TableOut[] = [FREE, BUSY, IDLE], zone = 'z1') => {
+  const show = async (zones = ZONES, tables: TableOut[] = [FREE, BUSY, IDLE, TERRACE]) => {
     await m.result('table.settings.get', SETTINGS);
     await m.result('table.zone.list', page(zones));
     await flush();
     await m.reopen();
-    await m.result(TABLES, page(tables, tables.length, 100), zones.length ? { zone_id: zone } : {});
+    await m.result(TABLES, page(tables, tables.length, 100));
   };
   const mode = async (value: 'service' | 'edit') => {
     el('mode').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value }, bubbles: true }));
@@ -52,23 +54,27 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('FloorPlanPage · service', () => {
-  it('follows the zones and the plan of the first zone in service', async () => {
+  it('follows the zones and the whole room on one stream, and paints the first zone in service', async () => {
     const s = await setup();
     await s.show();
     expect(s.params('table.zone.list')).toEqual([{ sort: 'sort_order', limit: 100 }]);
-    expect(s.params(TABLES)).toEqual([{ zone_id: 'z1', sort: 'number', limit: 100, offset: 0 }]);
+    // Asked before the zones arrive: a query that waited for them would change once they came, and the
+    // SDK would throw the page's first stream away (an aborted /api/live on every visit).
+    expect(s.params(TABLES)).toEqual([{ sort: 'number', limit: 100, offset: 0 }]);
+    expect(s.net.streams.map((stream) => stream.aborted())).toEqual([false]);
     expect(s.labels('table-floor-zone-tab-')).toEqual(['Dining room', 'Terrace']);
     expect(s.tiles()).toEqual(['t1', 't4']);
     expect(s.el('hint').exists()).toBe(false);
   });
 
-  it('another zone of the strip shows its plan', async () => {
+  it('another zone of the strip shows its plan at once, without asking the server again', async () => {
     const s = await setup();
     await s.show();
     s.el('zones').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'z2' }, bubbles: true }));
     await flush();
     await s.reopen();
-    expect(s.params(TABLES)).toEqual([{ zone_id: 'z2', sort: 'number', limit: 100, offset: 0 }]);
+    expect(s.tiles()).toEqual(['t7']);
+    expect(s.net.streams.length).toBe(1);
   });
 
   it('a tap opens the table’s window, which follows the live table', async () => {
@@ -78,7 +84,7 @@ describe('FloorPlanPage · service', () => {
     await flush();
     const sheet = s.wrapper.findComponent(TableSheet);
     expect([sheet.props('open'), (sheet.props('table') as TableOut).id]).toEqual([true, 't4']);
-    await s.result(TABLES, page([FREE, { ...BUSY, guests: 5 }, IDLE], 3, 100), { zone_id: 'z1' });
+    await s.result(TABLES, page([FREE, { ...BUSY, guests: 5 }, IDLE, TERRACE], 4, 100));
     expect((s.wrapper.findComponent(TableSheet).props('table') as TableOut).guests).toBe(5);
   });
 
@@ -203,8 +209,7 @@ describe('FloorPlanPage · edit plan', () => {
     expect([add.props('open'), add.props('zoneId')]).toEqual([true, 'z1']);
     add.vm.$emit('zone', 'z2');
     await flush();
-    await s.reopen();
-    expect(s.params(TABLES)).toEqual([{ zone_id: 'z2', sort: 'number', limit: 100, offset: 0 }]);
+    expect(s.tiles()).toEqual(['t7']);
     await click(s.el('zone-edit').element);
     const zone = s.wrapper.findComponent(ZoneFormModal);
     expect([zone.props('open'), (zone.props('zone') as { id: string }).id, zone.props('variant')]).toEqual([true, 'z2', 'plan']);

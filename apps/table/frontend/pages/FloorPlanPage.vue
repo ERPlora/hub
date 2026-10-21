@@ -2,8 +2,10 @@
 // Tables → Floor plan (WORKBOOK «Pantallas · Plano de sala»; TABLE-F01 to F06, F09 to F17, F28, F32).
 // One row on top: the zone strip (it scrolls sideways on a phone), «Service / Edit plan» for whoever
 // draws the room, and — editing — «+» («Add zone or table») and the pencil («Edit zone»). Underneath, the
-// live plan of the chosen zone (`table.table.list`, every table of it, windows of 100): it changes by
-// itself when somebody seats, moves, joins, splits, charges or voids.
+// live plan of the chosen zone: every table of the room (`table.table.list`, windows of 100) is read from
+// the start, on the page's one stream, and the strip only picks the zone it paints (a query that waited for
+// the zones would change when they came and throw the first stream away; a zone tap would reopen it). It
+// changes by itself when somebody seats, moves, joins, splits, charges or voids.
 // - Service: the zones and tables in service; a tap opens the table's window (TableSheet). Transfer and
 //   Merge come back here to pick their destination on the plan: only the tables that may be picked answer,
 //   with «Transfer 4 to…» / «Pick a free table» and «Cancel».
@@ -69,7 +71,7 @@ watch(
   { immediate: true },
 );
 
-const plan = useAllRows('table.table.list', () => (activeZoneId.value ? { zone_id: activeZoneId.value, sort: 'number' } : { sort: 'number' }));
+const plan = useAllRows('table.table.list', () => ({ sort: 'number' }));
 /** The tables as the clock paints them now: a reservation enters its window or ends with no event. */
 const painted = computed<TableOut[]>(() =>
   plan.rows.value.map((table) => {
@@ -77,7 +79,9 @@ const painted = computed<TableOut[]>(() =>
     return status === table.status ? table : { ...table, status };
   }),
 );
-const tables = computed<TableOut[]>(() => painted.value.filter((table) => editing.value || table.in_service));
+const tables = computed<TableOut[]>(() =>
+  painted.value.filter((table) => (!activeZoneId.value || table.zone_id === activeZoneId.value) && (editing.value || table.in_service)),
+);
 // When the clock repaints a table, the server is asked again (it may know more: another reservation).
 const drift = computed(() =>
   painted.value
