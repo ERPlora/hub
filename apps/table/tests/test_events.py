@@ -13,11 +13,12 @@ from pathlib import Path
 
 import pytest
 from django.utils import timezone
+from live.context import system_context
 
 from apps.table import events
 from apps.table.models import Hold, TableSession
 
-from .conftest import A, make_hold, make_session, make_table, make_zone, open_check
+from .conftest import A, make_hold, make_session, make_table, make_zone, open_check, run
 
 pytestmark = pytest.mark.django_db
 
@@ -52,9 +53,18 @@ def test_the_reactions_are_the_workbooks():
         "sale.order.completed": "table.session.close_by_order",
         "sale.order.voided": "table.session.close_by_order",
         "customer.customer.erased": "table.hold.forget_customer",
-        "reservation.reservation.status_changed": "table.hold.sync_reservation",
-        "reservation.reservation.updated": "table.hold.move_reservation",
     }
+
+
+@pytest.mark.parametrize(
+    "fact", ["reservation.reservation.status_changed", "reservation.reservation.updated"]
+)
+def test_a_reservations_event_is_no_reaction_its_call_inside_reservations_is(fact):
+    """Reservations holds, moves and releases its table by calling Tables in its own transaction (TABLE-F25–F27):
+    the same event delivered later by the relay would apply a stale reservation (test_integration_relay.py)."""
+    table = make_table("6", zone=make_zone())
+    assert events.react(A, fact, reservation("confirmed", table)) is None
+    assert Hold.objects.count() == 0
 
 
 def test_an_event_without_a_reaction_does_nothing():
@@ -128,7 +138,7 @@ def test_an_erasure_without_a_card_touches_no_hold():
     assert hold.label == "Pedro"
 
 
-# ── Reservations ─────────────────────────────────────────────────────────────────────────────────
+# ── Reservations: the operations it calls by name inside its transaction ─────────────────────────
 
 
 def reservation(status: str, table, ref: str = "res-1", **more) -> dict:
@@ -147,11 +157,19 @@ def reservation(status: str, table, ref: str = "res-1", **more) -> dict:
     }
 
 
+def sync(payload: dict):
+    return run("table.hold.sync_reservation", payload, system_context(A))
+
+
+def move(payload: dict):
+    return run("table.hold.move_reservation", payload, system_context(A))
+
+
 def test_a_confirmed_reservation_holds_its_table_once_in_the_business_zone():
     table = make_table("6", zone=make_zone())
     payload = reservation("confirmed", table)
-    events.react(A, "reservation.reservation.status_changed", payload)
-    events.react(A, "reservation.reservation.status_changed", payload)
+    sync(payload)
+    sync(payload)
     hold = Hold.objects.get()
     assert (hold.source, hold.source_ref, hold.status, hold.label, hold.party_size) == (
         "reservation",
@@ -167,24 +185,18 @@ def test_a_confirmed_reservation_holds_its_table_once_in_the_business_zone():
 
 def test_a_cancelled_or_no_show_reservation_releases_its_hold_without_its_name():
     table = make_table("6", zone=make_zone())
-    events.react(
-        A, "reservation.reservation.status_changed", reservation("confirmed", table)
+    sync(reservation("confirmed", table)
     )
-    events.react(
-        A, "reservation.reservation.status_changed", reservation("cancelled", table)
+    sync(reservation("cancelled", table)
     )
     hold = Hold.objects.get()
     assert (hold.status, hold.label) == ("released", "")
     # A hold already consumed (the party sat down) is not touched.
-    events.react(
-        A,
-        "reservation.reservation.status_changed",
+    sync(
         reservation("confirmed", table, "res-2"),
     )
     Hold.objects.filter(source_ref="res-2").update(status="consumed")
-    events.react(
-        A,
-        "reservation.reservation.status_changed",
+    sync(
         reservation("no_show", table, "res-2"),
     )
     assert Hold.objects.get(source_ref="res-2").status == "consumed"
@@ -194,9 +206,7 @@ def test_a_reservation_on_a_deleted_or_inactive_table_holds_nothing():
     gone = make_table("1", is_deleted=True, deleted_at=timezone.now())
     idle = make_table("2", is_active=False)
     for table in (gone, idle):
-        events.react(
-            A,
-            "reservation.reservation.status_changed",
+        sync(
             reservation("confirmed", table, f"r-{table.number}"),
         )
     assert Hold.objects.count() == 0
@@ -205,13 +215,10 @@ def test_a_reservation_on_a_deleted_or_inactive_table_holds_nothing():
 def test_an_updated_reservation_moves_its_hold_and_one_without_a_table_releases_it():
     zone = make_zone()
     old, new = make_table("1", zone=zone), make_table("2", zone=zone)
-    events.react(
-        A, "reservation.reservation.status_changed", reservation("confirmed", old)
+    sync(reservation("confirmed", old)
     )
     later = timezone.localtime() + dt.timedelta(hours=2)
-    events.react(
-        A,
-        "reservation.reservation.updated",
+    move(
         {
             "id": "res-1",
             "table_id": str(new.id),
@@ -224,8 +231,7 @@ def test_an_updated_reservation_moves_its_hold_and_one_without_a_table_releases_
         new.id,
         later.strftime("%H:%M"),
     )
-    events.react(
-        A, "reservation.reservation.updated", {"id": "res-1", "table_id": None}
+    move({"id": "res-1", "table_id": None}
     )
     hold.refresh_from_db()
     assert (hold.status, hold.label) == ("released", "")

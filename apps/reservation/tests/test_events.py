@@ -19,18 +19,11 @@ def test_every_event_is_named_app_entity_fact():
     assert len(set(events.ALL)) == len(events.ALL)
 
 
-def test_tables_listens_to_the_names_this_app_records():
-    # TABLE-F25–F27: «Contrato con Reservas».
-    assert table_events.RESERVATION_STATUS_CHANGED == events.RESERVATION_STATUS_CHANGED
-    assert table_events.RESERVATION_UPDATED == events.RESERVATION_UPDATED
-    assert (
-        table_events.REACTIONS[events.RESERVATION_STATUS_CHANGED]
-        == "table.hold.sync_reservation"
-    )
-    assert (
-        table_events.REACTIONS[events.RESERVATION_UPDATED]
-        == "table.hold.move_reservation"
-    )
+def test_tables_is_called_in_the_transaction_and_does_not_listen_to_this_apps_events():
+    # TABLE-F25–F27: «Contrato con Reservas». With the relay running, one of the two ways went: the call inside
+    # this app's transaction stays; the same event delivered later would replay a stale reservation.
+    assert events.RESERVATION_STATUS_CHANGED not in table_events.REACTIONS
+    assert events.RESERVATION_UPDATED not in table_events.REACTIONS
 
 
 def test_the_reactions_are_the_two_of_customers():
