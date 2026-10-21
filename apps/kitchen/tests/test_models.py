@@ -242,3 +242,14 @@ def test_a_log_entry_belongs_to_its_ticket():
     )
     assert entry.created_at is not None and str(entry) == "received 20261014-0001"
     assert refused(lambda: LogEntry.objects.create(ticket=ticket, action="sang"))
+
+
+def test_a_ticket_keeps_no_customer_so_merging_two_customers_has_nothing_to_move():
+    """KITCHEN-F30 (descartado): the till sends a label, never a customer; no ticket nor dish keeps one, and the
+    kitchen hears nothing of Customers (``customer.merged`` has no reaction here)."""
+    from apps.kitchen import events
+    from apps.kitchen.models import Ticket, TicketItem
+
+    for model in (Ticket, TicketItem):
+        assert not [field.name for field in model._meta.get_fields() if "customer" in field.name]
+    assert not [name for name in events.REACTIONS if name.startswith("customer.")]
