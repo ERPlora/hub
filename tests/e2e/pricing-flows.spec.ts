@@ -32,6 +32,7 @@ import {
   row,
   rowAction,
   search,
+  shootConfirm,
   shootFlow,
   stamp,
   TAG,
@@ -166,10 +167,13 @@ test('PRICING-F04: «Make general» asks first and the row says General', async 
     await login(page, A, '/pricing/lists');
     const list = await newList(page, s, 'GENERAL');
     await openLists(page, list.code);
-    await rowAction(page, LISTS, list.id, 'makeDefault');
     const confirm = dialog(page, 'pricing-list-default');
-    await expect(confirm).toContainText(`${list.name} becomes the general price list`);
-    await shootFlow(page, 'PRICING-F04');
+    const ask = async () => {
+      await rowAction(page, LISTS, list.id, 'makeDefault');
+      await expect(confirm).toContainText(`${list.name} becomes the general price list`);
+    };
+    await shootConfirm(page, 'PRICING-F04', 'pricing-list-default', ask);
+    await ask();
     await page.locator('[data-testid=pricing-list-default-submit]').click();
     await expect(confirm).toBeHidden();
     await expect(row(page, LISTS, list.code)).toContainText('General');
@@ -188,10 +192,13 @@ test('PRICING-F05: «Deactivate» asks first; the list waits under Inactive unti
   await login(page, A, '/pricing/lists');
   const list = await newList(page, s, 'OFF');
   await openLists(page, list.code);
-  await rowAction(page, LISTS, list.id, 'deactivate');
   const confirm = dialog(page, 'pricing-list-deactivate');
-  await expect(confirm).toContainText(`${list.name} will stop applying to new sales. Its prices are kept.`);
-  await shootFlow(page, 'PRICING-F05');
+  const ask = async () => {
+    await rowAction(page, LISTS, list.id, 'deactivate');
+    await expect(confirm).toContainText(`${list.name} will stop applying to new sales. Its prices are kept.`);
+  };
+  await shootConfirm(page, 'PRICING-F05', 'pricing-list-deactivate', ask);
+  await ask();
   await page.locator('[data-testid=pricing-list-deactivate-submit]').click();
   await expect(confirm).toBeHidden();
   await expect(row(page, LISTS, list.code)).toHaveCount(0);
@@ -288,11 +295,14 @@ test('PRICING-F08: «Edit» changes a price; «Remove» asks first and the price
   await expect(form).toBeHidden();
   await expect(row(page, ITEMS, name)).toContainText('€7.25');
 
-  await rowAction(page, ITEMS, item.id, 'remove');
   const confirm = dialog(page, 'pricing-items-remove');
-  // The quantity with the product's unit (Inventory's «ud»).
-  await expect(confirm).toContainText(`The price of ${name} from 1 ud will be removed.`);
-  await shootFlow(page, 'PRICING-F08');
+  const ask = async () => {
+    await rowAction(page, ITEMS, item.id, 'remove');
+    // The quantity with the product's unit (Inventory's «ud»).
+    await expect(confirm).toContainText(`The price of ${name} from 1 ud will be removed.`);
+  };
+  await shootConfirm(page, 'PRICING-F08', 'pricing-items-remove', ask);
+  await ask();
   await page.locator('[data-testid=pricing-items-remove-submit]').click();
   await expect(confirm).toBeHidden();
   await expect(row(page, ITEMS, name)).toHaveCount(0);
@@ -383,10 +393,13 @@ test('PRICING-F12: «Deactivate» asks first; the rule waits under Inactive unti
   const rule = await newRule(page, s, 'OFF', { rule_type: 'percent', percent: '20' });
   await ready(page, RULES);
   await search(page, RULES, rule.code);
-  await rowAction(page, RULES, rule.id, 'deactivate');
   const confirm = dialog(page, 'pricing-rules-deactivate');
-  await expect(confirm).toContainText(`${rule.name} will stop applying to new sales.`);
-  await shootFlow(page, 'PRICING-F12');
+  const ask = async () => {
+    await rowAction(page, RULES, rule.id, 'deactivate');
+    await expect(confirm).toContainText(`${rule.name} will stop applying to new sales.`);
+  };
+  await shootConfirm(page, 'PRICING-F12', 'pricing-rules-deactivate', ask);
+  await ask();
   await page.locator('[data-testid=pricing-rules-deactivate-submit]').click();
   await expect(confirm).toBeHidden();
   await expect(row(page, RULES, rule.code)).toHaveCount(0);

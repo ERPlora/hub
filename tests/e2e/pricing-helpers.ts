@@ -62,6 +62,27 @@ export async function shootFlow(page: Page, key: string, restore = DESKTOP): Pro
   return files;
 }
 
+/** Screenshots of a confirmation opened at each of the three viewports (`APP-PRICING-<key>-<390|834|1440>`),
+ *  as a person opens it on that screen (a phone shows it as a card at the bottom): `open` opens it, its
+ *  `-submit` must be in sight, then «Cancel» closes it. */
+export async function shootConfirm(page: Page, key: string, testid: string, open: () => Promise<void>, restore = DESKTOP): Promise<string[]> {
+  const files: string[] = [];
+  const confirm = dialog(page, testid);
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await open();
+    await expect(page.locator(`[data-testid=${testid}-submit]`)).toBeInViewport();
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const file = shot(`APP-PRICING-${key}-${viewport.label}`);
+    await page.screenshot({ path: file });
+    files.push(file);
+    await page.locator(`[data-testid=${testid}-cancel]`).click();
+    await expect(confirm).toBeHidden();
+  }
+  await page.setViewportSize(restore);
+  return files;
+}
+
 /** The dialog of a FormModal or a ConfirmDialog (Ionic moves it to ion-app). */
 export const dialog = (page: Page, testid: string): Locator => page.locator(`ion-modal[data-testid=${testid}]`);
 
