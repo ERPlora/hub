@@ -1,7 +1,8 @@
 """Menus with the real Inventory app: its products are the choices, and its stock moves per dish.
 
 Inventory's own operations create, deactivate and delete the products; the event Inventory records when
-one is deleted is handed to ``events.react`` as the outbox relay will, from the outbox itself. The sale
+one is deleted is handed to ``events.react`` as the outbox relay does, from the outbox itself (test_relay.py
+goes through the worker's real tick). The sale
 notice is built from ``combo.combo.resolve`` exactly as the WORKBOOK's «Contrato con Inventario» asks
 Ventas to (COMBO-F10, INVENTORY-F22): the menu moves nothing, each component moves its product.
 """
@@ -203,9 +204,9 @@ def test_a_sold_out_choice_leaves_the_till_and_the_menu_stays_with_the_others():
     assert [option.product_name for option in starters.options] == ["Salad"]
 
 
-def test_without_the_relay_a_deleted_products_choice_is_never_sold_and_is_removed_by_hand():
-    # Phase 1 has no outbox relay (COMBO-F13): nothing hands Inventory's notice over, so the choice stays
-    # in its menu, marked, and neither the till nor a charge takes it until someone removes it.
+def test_until_the_relay_ticks_a_deleted_products_choice_is_never_sold_and_can_be_removed_by_hand():
+    # Until the worker's relay hands Inventory's notice over (COMBO-F13, a few seconds), the choice stays in
+    # its menu, marked, and neither the till nor a charge takes it; its bin removes it at once.
     lentils, hake, water = menu_of_the_day()
     run("inventory.product.delete", {"product": "HAK"})
     detail = run("combo.combo.get", {"combo": "Menu of the day"})
