@@ -55,7 +55,19 @@ const locale = useLocale();
 const creation = useCommand('whatsapp_inbox.template.create');
 const update = useCommand('whatsapp_inbox.template.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
-const error = computed(() => (props.template ? update.error.value : creation.error.value));
+const refusal = computed(() => (props.template ? update.error.value : creation.error.value));
+/** The server's field names of what was changed since the last refusal: their errors are stale. */
+const edited = ref<ReadonlySet<string>>(new Set());
+watch(refusal, () => {
+  edited.value = new Set();
+});
+/** The refusal as the dialog shows it: a field changed since stops showing its error. */
+const error = computed(() => {
+  const refused = refusal.value;
+  if (!refused?.fields) return refused;
+  const fields = Object.fromEntries(Object.entries(refused.fields).filter(([name]) => !edited.value.has(name)));
+  return { message: refused.message, code: refused.code, status: refused.status, fields };
+});
 const title = computed(() =>
   props.template ? t('whatsapp_inbox.templates.editor.titleEdit', { name: props.template.name }) : t('whatsapp_inbox.templates.editor.titleNew'),
 );
@@ -152,8 +164,20 @@ const state = computed(() => {
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
+/** The server's name of each field of the form. */
+const SERVER_FIELD: Record<keyof Form, string> = {
+  name: 'name',
+  language: 'language',
+  category: 'category',
+  header: 'header',
+  body: 'body',
+  examples: 'body_examples',
+  footer: 'footer',
+  buttons: 'buttons',
+};
 function set<K extends keyof Form>(field: K, value: Form[K]): void {
   form.value = { ...form.value, [field]: value };
+  if (refusal.value?.fields?.[SERVER_FIELD[field]] !== undefined) edited.value = new Set([...edited.value, SERVER_FIELD[field]]);
 }
 function setExample(index: number, value: unknown): void {
   const examples = [...form.value.examples];

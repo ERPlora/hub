@@ -43,7 +43,7 @@ const approved = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   ...over,
 });
 
-type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string; fill?: string };
+type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string; fill?: string; errorText?: string };
 
 async function setup(template: TemplateOut | null = null, locale: 'en' | 'es' = 'en') {
   const m = await mountInbox(TemplateFormModal, { props: { open: true, template }, locale });
@@ -162,6 +162,24 @@ describe('TemplateFormModal: a new template (WHATSAPP_INBOX-F29)', () => {
     expect(s.inDoc(`${ID}-error`)?.textContent).toContain(message);
     expect(s.field('name').value).toBe('recordatorio');
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+});
+
+describe('TemplateFormModal: a refusal under a field (WHATSAPP_INBOX-F29, F30)', () => {
+  it('goes away as soon as that field is changed; the others stay until theirs is', async () => {
+    const s = await setup();
+    await s.type('name', 'recordatorio');
+    await s.type('body', 'Hola {{nombre}}');
+    const fields = { body: 'Number the variables 1, 2, 3… in order, without skipping any.', footer: 'The header and the footer cannot have variables.' };
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+    await click(s.submit());
+    await flush();
+    expect(s.field('body').errorText).toBe(fields.body);
+    expect(s.field('footer').errorText).toBe(fields.footer);
+    await s.type('body', 'Hola {{1}}');
+    await flush();
+    expect(s.field('body').errorText ?? '').toBe('');
+    expect(s.field('footer').errorText).toBe(fields.footer);
   });
 });
 
