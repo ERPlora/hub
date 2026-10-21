@@ -91,6 +91,49 @@ class TaskSchedule(UUIDModel):
         return f"{self.app_label}.{self.name}"
 
 
+class EventDelivery(UUIDModel):
+    """One app's delivery of one outbox event (``base.relay``; the old Hub's ``_event_delivery``).
+
+    The relay writes one row per app that listens to the event, when it takes the event (and marks the event's
+    ``delivered_at``); the reaction's writes and its row's ``delivered`` commit in one transaction, so an app
+    never gets an event twice. A reaction that fails waits a little longer each time (``next_attempt_at``) and,
+    after its last attempt or past the deepest level of events an event can start (``depth``), stays ``dead``
+    with what went wrong. Phase 2 keeps it in each hub's database, beside its outbox.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", pgettext_lazy("event delivery status", "Pending")
+        DELIVERED = "delivered", pgettext_lazy("event delivery status", "Delivered")
+        DEAD = "dead", pgettext_lazy("event delivery status", "Given up")
+
+    event = models.ForeignKey(
+        "live.OutboxEvent", on_delete=models.CASCADE, related_name="+", verbose_name=_("event")
+    )
+    app_label = models.CharField(_("app"), max_length=100)
+    depth = models.PositiveSmallIntegerField(_("depth"), default=0)
+    status = models.CharField(_("status"), max_length=16, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(_("attempts"), default=0)
+    next_attempt_at = models.DateTimeField(_("next attempt"))
+    last_error = models.TextField(_("last error"), blank=True)
+    delivered_at = models.DateTimeField(_("delivered at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("event delivery")
+        verbose_name_plural = _("event deliveries")
+        ordering = ["next_attempt_at", "app_label"]
+        constraints = [
+            models.UniqueConstraint(fields=["event", "app_label"], name="base_eventdelivery_event_app_unique")
+        ]
+        indexes = [
+            models.Index(
+                fields=["next_attempt_at"], condition=Q(status="pending"), name="base_eventdelivery_due"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event_id} → {self.app_label} ({self.status})"
+
+
 def registry_slug_validator(value: str) -> None:
     """A hub's slug as the registry takes it: ``live.slugs``' rule, ``demo-…`` included (the Hub's own demos)."""
     try:

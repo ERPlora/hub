@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-17 16:43+0200\n"
+"POT-Creation-Date: 2026-10-20 22:50+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -54,19 +54,19 @@ msgstr "Hub: %(slug)s"
 msgid "Base"
 msgstr "Base"
 
-#: auth_views.py:140
+#: auth_views.py:142
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
-#: middleware.py:101
+#: middleware.py:105
 msgid "Not found"
 msgstr "No encontrado."
 
-#: middleware.py:107
+#: middleware.py:111
 msgid "This hub is no longer available."
 msgstr "Este hub ya no está disponible."
 
-#: middleware.py:115
+#: middleware.py:119
 msgid "This hub is still being prepared; try again in a few seconds."
 msgstr "Este hub aún se está preparando; vuelve a intentarlo en unos segundos."
 
@@ -114,11 +114,11 @@ msgstr "membresía"
 msgid "memberships"
 msgstr "membresías"
 
-#: models.py:74
+#: models.py:74 models.py:112
 msgid "app"
 msgstr "app"
 
-#: models.py:75 models.py:125
+#: models.py:75 models.py:168
 msgid "name"
 msgstr "nombre"
 
@@ -146,129 +146,176 @@ msgstr "tarea programada"
 msgid "scheduled tasks"
 msgstr "tareas programadas"
 
+#: models.py:105
+msgctxt "event delivery status"
+msgid "Pending"
+msgstr "Pendiente"
+
+#: models.py:106
+msgctxt "event delivery status"
+msgid "Delivered"
+msgstr "Entregado"
+
+#: models.py:107
+msgctxt "event delivery status"
+msgid "Given up"
+msgstr "Abandonado"
+
+#: models.py:110
+msgid "event"
+msgstr "evento"
+
+#: models.py:113
+msgid "depth"
+msgstr "profundidad"
+
+#: models.py:114 models.py:173
+msgid "status"
+msgstr "estado"
+
+#: models.py:115
+msgid "attempts"
+msgstr "intentos"
+
 #: models.py:116
+msgid "next attempt"
+msgstr "próximo intento"
+
+#: models.py:117
+msgid "last error"
+msgstr "último error"
+
+#: models.py:118
+msgid "delivered at"
+msgstr "entregado el"
+
+#: models.py:121
+msgid "event delivery"
+msgstr "entrega de evento"
+
+#: models.py:122
+msgid "event deliveries"
+msgstr "entregas de eventos"
+
+#: models.py:159
 msgctxt "hub status"
 msgid "Requested"
 msgstr "Solicitado"
 
-#: models.py:117
+#: models.py:160
 msgctxt "hub status"
 msgid "Ready"
 msgstr "Listo"
 
-#: models.py:118
+#: models.py:161
 msgctxt "hub status"
 msgid "Failed"
 msgstr "Fallido"
 
-#: models.py:119
+#: models.py:162
 msgctxt "hub status"
 msgid "Cancelled"
 msgstr "Cancelado"
 
-#: models.py:120
+#: models.py:163
 msgctxt "hub status"
 msgid "Expired"
 msgstr "Caducado"
 
-#: models.py:121
+#: models.py:164
 msgctxt "hub status"
 msgid "Purged"
 msgstr "Purgado"
 
-#: models.py:124
+#: models.py:167
 msgid "slug"
 msgstr "dirección"
 
-#: models.py:126
+#: models.py:169
 msgid "country"
 msgstr "país"
 
-#: models.py:127
+#: models.py:170
 msgid "time zone"
 msgstr "zona horaria"
 
-#: models.py:128 models.py:169
+#: models.py:171 models.py:212
 msgid "language"
 msgstr "idioma"
 
-#: models.py:129
+#: models.py:172
 msgid "vertical"
 msgstr "sector"
 
-#: models.py:130
-msgid "status"
-msgstr "estado"
-
-#: models.py:131
+#: models.py:174
 msgid "demo"
 msgstr "demo"
 
-#: models.py:132 models.py:170
+#: models.py:175 models.py:213
 msgid "expires at"
 msgstr "caduca el"
 
-#: models.py:133
+#: models.py:176
 msgid "demo session"
 msgstr "sesión de la demo"
 
-#: models.py:134
+#: models.py:177
 msgid "state"
 msgstr "foto del SaaS"
 
-#: models.py:135
+#: models.py:178
 msgid "state version"
 msgstr "versión del estado"
 
-#: models.py:136
+#: models.py:179
 msgid "created at"
 msgstr "creado el"
 
-#: models.py:137
+#: models.py:180
 msgid "updated at"
 msgstr "actualizado el"
 
-#: models.py:138
+#: models.py:181
 msgid "ready at"
 msgstr "listo el"
 
-#: models.py:139
+#: models.py:182
 msgid "cancelled at"
 msgstr "cancelado el"
 
-#: models.py:140
+#: models.py:183
 msgid "purged at"
 msgstr "purgado el"
 
-#: models.py:143 models.py:167
+#: models.py:186 models.py:210
 msgid "hub"
 msgstr "hub"
 
-#: models.py:144
+#: models.py:187
 msgid "hubs"
 msgstr "hubs"
 
-#: models.py:168
+#: models.py:211
 msgid "code hash"
 msgstr "hash del código"
 
-#: models.py:171
+#: models.py:214
 msgid "used at"
 msgstr "usado el"
 
-#: models.py:174
+#: models.py:217
 msgid "demo code"
 msgstr "código de la demo"
 
-#: models.py:175
+#: models.py:218
 msgid "demo codes"
 msgstr "códigos de la demo"
 
-#: queries.py:87 services.py:246
+#: queries.py:87 services.py:390
 msgid "No hub has this id."
 msgstr "Ningún hub tiene este id."
 
-#: queries.py:106 services.py:481 services.py:548
+#: queries.py:106 services.py:630 services.py:701
 msgid "No demo has this address."
 msgstr "Ninguna demo tiene esta dirección."
 
@@ -285,40 +332,41 @@ msgstr "Content-Length tiene que ser una longitud."
 msgid "The request may weigh %(mb)s MB at most."
 msgstr "La petición puede pesar %(mb)s MB como máximo."
 
-#: services.py:252
+#: services.py:396
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
 
-#: services.py:256
+#: services.py:400
 msgid "Another hub has this address."
 msgstr "Otro hub ya tiene esta dirección."
 
-#: services.py:273
+#: services.py:417
 #, python-format
 msgid "This address cannot name a business (%(reason)s)."
 msgstr "Esta dirección no puede nombrar un negocio (%(reason)s)."
 
-#: services.py:303
+#: services.py:447
 msgid "This hub was cancelled: restore it first."
 msgstr "Este hub está cancelado: restáuralo primero."
 
-#: services.py:466
+#: services.py:615
 msgid "Every demo is taken right now; try again in a minute."
-msgstr "Ahora mismo todas las demos están ocupadas; vuelve a intentarlo en un minuto."
+msgstr ""
+"Ahora mismo todas las demos están ocupadas; vuelve a intentarlo en un minuto."
 
-#: services.py:529
+#: services.py:682
 msgid "No demo could be made right now; try again."
 msgstr "Ahora mismo no se ha podido crear la demo; vuelve a intentarlo."
 
-#: services.py:550
+#: services.py:703
 msgid "This demo has ended."
 msgstr "Esta demo ha terminado."
 
-#: services.py:552
+#: services.py:705
 msgid "This demo is another browser's."
 msgstr "Esta demo es de otro navegador."
 
-#: services.py:639
+#: services.py:790
 msgid "This demo has not ended yet."
 msgstr "Esta demo aún no ha terminado."
 
