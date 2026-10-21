@@ -152,7 +152,12 @@
       "empty": "Aún no hay productos en el catálogo.",
       "loadError": "No se ha podido cargar el catálogo de productos.",
       "loading": "Cargando…",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "category": "Categoría",
+      "categoryPlaceholder": "Todas las categorías",
+      "categoryCount": "Productos: {n}",
+      "tickAll": "Marcar todos los de «{category}» ({n})",
+      "noMatch": "Ningún producto coincide."
     }
   }
 }

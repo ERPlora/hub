@@ -109,7 +109,8 @@ para todo el negocio y, si el producto ya no se puede vender, «Desactivado en I
 catálogo», «No se vende por unidades en Inventario» o, en un menú «para llevar», «Sin tipo de IVA para
 llevar»; por fila, el asa, subir, bajar, «Agotado / Disponible», editar y quitar. Debajo, el buscador
 «Busca un producto…», «Suplemento», «Añadir elección» y «Añadir varios» (ventana con buscador y
-casillas: «Añadir N seleccionados»; lo que ya está en el plato sale marcado «Ya está en este plato»).
+casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»;
+lo que ya está en el plato sale marcado «Ya está en este plato»).
 Al final, el formulario «Añadir un plato» (Nombre del plato, «Elecciones mínimas», «Elecciones
 máximas», la casilla «Se puede elegir la misma opción más de una vez» y «Guardar»), que pasa a
 «Plato · {nombre}» al editar uno.
@@ -256,7 +257,9 @@ Pasos:
 2. Escribe el «Suplemento» si sustituir cuesta más (o menos, con signo negativo) que el precio
    cerrado; vacío es sin suplemento.
 3. Pulsa «Añadir elección»: entra la última. Para varios de golpe, «Añadir varios»: marca las casillas
-   y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron).
+   y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron). Para
+   una categoría entera, elígela en «Categoría»: la lista enseña sus productos y «Marcar todos los de
+   «{categoría}» (N)» marca los que el plato aún no ofrece.
 4. Para cambiar el producto o el suplemento de una elección, pulsa su lápiz: el formulario dice
    «Editando «{producto}». Conserva su posición en el plato.». Con el asa, subir o bajar se reordena;
    la papelera la quita, tras confirmarlo.
@@ -268,8 +271,10 @@ Si falla: «Elige antes un producto del catálogo.», «Este plato ya ofrece ese
 pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez».», ««{producto}» está
 desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende por
 unidades puede ser una elección de menú.», «Un plato admite como mucho 40 elecciones.» y los avisos de
-importe. «Añadir varios» sin nada marcado: «Marca al menos un producto.». Si el catálogo no carga,
-el buscador lo dice con «Reintentar».
+importe. «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
+sin productos: «Ningún producto coincide.». Si el catálogo no carga, el buscador lo dice con
+«Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
+cuanto se guarda.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender

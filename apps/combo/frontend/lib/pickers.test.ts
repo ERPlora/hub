@@ -4,7 +4,7 @@
 import type { LiveClient } from '@erplora/ui/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { searchProducts, searchTaxCategories } from './pickers';
+import { searchCategories, searchProducts, searchTaxCategories } from './pickers';
 
 function client(rows: unknown[]) {
   const call = vi.fn().mockResolvedValue({ rows, total: rows.length, limit: 20, offset: 0 });
@@ -46,6 +46,21 @@ describe('searchTaxCategories', () => {
     expect(options).toEqual([
       { id: 'restaurant.food', label: 'Restaurant — food · 10%' },
       { id: 'own.new', label: 'New' },
+    ]);
+  });
+});
+
+describe('searchCategories', () => {
+  it('asks Inventory for its categories by name and offers each by id, with how many products it has', async () => {
+    const { client: c, call } = client([
+      { id: 'c1', name: 'Desserts', product_count: 12 },
+      { id: 'c2', name: 'Drinks', product_count: 1 },
+    ]);
+    const options = await searchCategories(c, (n) => `${n} products`)(' des ');
+    expect(call).toHaveBeenCalledWith('inventory.category.list', { search: 'des', limit: 20, sort: 'name' });
+    expect(options).toEqual([
+      { id: 'c1', label: 'Desserts', hint: '12 products' },
+      { id: 'c2', label: 'Drinks', hint: '1 products' },
     ]);
   });
 });
