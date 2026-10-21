@@ -6,7 +6,7 @@ import { AppPage, toastError } from '@erplora/ui/shell';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AlertStub, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId } from '../__tests__/mount-demo';
+import { AlertStub, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId } from '../__tests__/mount-demo';
 import ItemLines, { type ShownLine } from '../components/ItemLines.vue';
 import ItemDetailPage from './ItemDetailPage.vue';
 import source from './ItemDetailPage.vue?raw';
@@ -108,6 +108,20 @@ describe('ItemDetailPage: the item, live', () => {
     expect(s.banner('demo-detail-error').props('heading')).toBe('The item could not be loaded');
     expect(s.testid('demo-detail-status').exists()).toBe(true);
     expect(s.note().props('modelValue')).toBe('Being written');
+  });
+
+  it('once the item is gone, a reconnection does not paint it again: the failure outlives the stream (DEMO-F03/F06)', async () => {
+    const s = await setup();
+    await s.show(ITEM);
+    s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'not_found'));
+    await flush();
+    s.call.push(BYE);
+    await flush();
+    expect(s.testid('demo-detail-reconnecting').exists()).toBe(true);
+    for (const id of ['demo-detail-status', 'demo-note', 'demo-line-form', 'demo-detail-edit', 'demo-detail-delete']) {
+      expect(s.testid(id).exists(), id).toBe(false);
+    }
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Item');
   });
 
   it('says «You do not have permission» when the permission was taken away (DEMO-F06)', async () => {

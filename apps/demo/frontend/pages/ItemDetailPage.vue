@@ -24,9 +24,11 @@ const canManage = computed(() => session.can('demo.manage'));
 const { data: item, status, error } = useLive('demo.item.detail', () => ({ id: props.id }));
 // After these failures the painted item is gone for this person (deleted elsewhere, permission or
 // session taken away, app turned off or blocked): it is no longer shown, nor are its actions; only
-// why. A passing failure (the query failed once) keeps it on screen under the warning.
+// why. A passing failure (the query failed once) keeps it on screen under the warning. The failure
+// outlives the stream: while it reconnects (`status` is no longer `error`) the item stays hidden
+// until a new result clears the error.
 const GONE = new Set(['not_found', 'permission_denied', 'unauthorized', 'app_inactive', 'app_entitlement_blocked']);
-const shown = computed(() => (status.value === 'error' && GONE.has(error.value?.code ?? '') ? undefined : item.value));
+const shown = computed(() => (GONE.has(error.value?.code ?? '') ? undefined : item.value));
 const ERROR_HEADINGS: Record<string, string> = {
   app_inactive: 'demo.live.appInactive',
   permission_denied: 'demo.form.noPermission',
