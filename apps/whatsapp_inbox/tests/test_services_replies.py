@@ -93,6 +93,13 @@ def test_a_reply_to_nothing_this_hub_sent_leaves_both_empty_never_absent(chat):
     assert (event["reply_to_message_id"], event["reply_id"]) == (None, "")
 
 
+def test_quoting_her_own_message_answers_nothing_the_hub_asked(chat):
+    """WhatsApp lets her quote her own «wamid.HELLO»: that is not an answer to a question of the Hub."""
+    out = receive("wamid.A1", text="Lo de antes", reply_to="wamid.HELLO")
+    assert Message.objects.get(pk=out.id).reply_to == "wamid.HELLO"
+    assert received_event(out.id)["reply_to_message_id"] is None
+
+
 @respx.mock
 def test_erasing_the_number_forgets_what_she_tapped(chat, django_capture_on_commit_callbacks):
     asked(django_capture_on_commit_callbacks, "wamid.Q1")

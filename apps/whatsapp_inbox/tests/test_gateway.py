@@ -213,6 +213,15 @@ def test_a_saas_url_the_client_cannot_use_is_unreachable_never_a_crash(settings)
     assert gateway.delete_template(hub="a", name="recordatorio", language="es", meta_id="1").kind == gateway.UNREACHABLE
 
 
+@respx.mock
+def test_a_header_the_client_cannot_encode_is_unreachable_never_a_crash():
+    """A ``ValueError`` (a key that is not ASCII) is not an HTTPError either: nothing left, and it says so."""
+    route = respx.post(SEND).mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.1"}))
+    reply = send_text(idempotency_key="clé")
+    assert reply.kind == gateway.UNREACHABLE and "could not be made" in reply.message
+    assert not route.called
+
+
 # ── The templates doors (WORKBOOK «Contrato con el SaaS», doors 8 and 9; WHATSAPP_INBOX-F29…F31) ──
 
 TEMPLATES = f"{URL}/internal/whatsapp/templates"

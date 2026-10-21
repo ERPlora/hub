@@ -307,7 +307,22 @@ def test_a_refused_template_is_fixed_and_saved_again_with_a_new_key(delivered):
     assert len(set(keys)) == 2
 
 
-# ── Editing (F30) ───────────────────────────────────────────────────────────────────────────────
+@respx.mock
+def test_a_retry_of_a_refused_template_goes_as_a_new_save_with_a_new_key(delivered):
+    """Refused (Meta asked to wait): with the same key erplora.com would repeat the same refusal."""
+    connect()
+    route = registering(409, {"error": {"code": "whatsapp.meta_rate_limited", "message": "Too many calls"}})
+    row = Template.objects.get(pk=delivered(create).id)
+    assert row.submit_state == "failed"
+    route.mock(return_value=httpx.Response(200, json={"meta_id": "m3", "status": "PENDING"}))
+    delivered(lambda: run("whatsapp_inbox.template.retry", {"id": str(row.id)}))
+    keys = [call.request.headers["Idempotency-Key"] for call in route.calls]
+    assert len(keys) == 2 and keys[0] != keys[1]
+    row.refresh_from_db()
+    assert (row.status, row.submit_state, row.meta_id) == ("PENDING", "", "m3")
+
+
+# ── Editing (F30)───────────────────────────────────────────────────────────────────────────────
 
 
 def approved(**fields) -> Template:
@@ -348,6 +363,25 @@ def test_meta_s_verdict_never_lands_on_a_text_changed_afterwards(delivered):
     row.refresh_from_db()
     assert row.body == "Hola {{1}}, otro {{2}}."  # what Meta has
     assert row.draft["body"] == "Hola {{1}}, nuevo texto {{2}}."  # what is waiting to go
+
+
+@respx.mock
+def test_meta_s_list_never_overwrites_a_new_template_still_on_its_way(delivered):
+    """Meta lists one of that name before the Hub hears back: what was written stays and goes with its key."""
+    connect()
+    route = respx.post(REGISTER).mock(side_effect=httpx.ConnectError("refused"))
+    row = Template.objects.get(pk=delivered(create).id)
+    connect(version=2, templates=[template("recordatorio_cita", status="REJECTED", body="Otro {{1}} {{2}}.")])
+    row.refresh_from_db()
+    assert (row.status, row.submit_state, row.body) == ("DRAFT", "sending", "Hola {{1}}, te esperamos el {{2}}.")
+    assert Template.objects.filter(name="recordatorio_cita").count() == 1
+    route.side_effect = None
+    route.mock(return_value=httpx.Response(200, json={"meta_id": "m4", "status": "PENDING"}))
+    delivered(lambda: run("whatsapp_inbox.template.retry", {"id": str(row.id)}))
+    keys = [call.request.headers["Idempotency-Key"] for call in route.calls]
+    assert keys[0] == keys[1]
+    row.refresh_from_db()
+    assert (row.status, row.meta_id, row.body) == ("PENDING", "m4", "Hola {{1}}, te esperamos el {{2}}.")
 
 
 @pytest.mark.parametrize(
