@@ -23,7 +23,8 @@ afterEach(() => vi.mocked(toast).mockClear());
 
 const PRODUCTS = 'inventory.product.list';
 const CATEGORIES = 'inventory.category.list';
-// The grid shows what is sold out too, greyed (SALE-F07): the count of «All» is what is on sale.
+// The grid shows what is sold out too, greyed (SALE-F07), and the count of «All» counts what the grid shows
+// (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS): «All · 2» over two tiles, one of them greyed.
 const GRID = { is_active: true, include_sold_out: true, sort: 'name' };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
@@ -40,7 +41,7 @@ describe('PosCatalog: what it asks', () => {
     expect(s.params(CATEGORIES)).toEqual([{ sort: 'name', limit: 100, offset: 0 }]);
     expect(s.params(PRODUCTS)).toEqual(
       expect.arrayContaining([
-        { is_active: true, limit: 1, offset: 0 },
+        { is_active: true, include_sold_out: true, limit: 1, offset: 0 },
         { ...GRID, limit: 100, offset: 0 },
       ]),
     );

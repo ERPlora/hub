@@ -2,13 +2,17 @@
 // Price, Stock («—» for an article without stock control) and Status («Yes», «No» or «Not configured ·
 // Missing tax category»), and, with the permission to move stock and on a physical product, «Receive
 // stock», «Count stock» and «Write off stock». For whoever can change products, «Mark sold out» or «Put
-// back on sale» (INVENTORY-F29), whose refusal is said inside the sheet. (The barcode and its label,
-// INVENTORY-F25, wait for the Printing app.)
+// back on sale» (INVENTORY-F29), whose refusal is said inside the sheet. The SKU's barcode on its white
+// plate and «Print barcode» (INVENTORY-F25): the label goes to Printing's queue; without the queue, the
+// browser's print dialog.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, flush, mountInventory, ok, product, refusal } from '../__tests__/mount-inventory';
 import { formatMoney } from '../lib/format';
 import ProductDetailModal from './ProductDetailModal.vue';
+
+const browser = vi.hoisted(() => ({ printInBrowser: vi.fn() }));
+vi.mock('../lib/print-label', () => browser);
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -17,6 +21,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 afterEach(() => {
   document.body.innerHTML = '';
+  browser.printInBrowser.mockReset();
 });
 
 async function setup(props: Record<string, unknown> = {}, options: Parameters<typeof mountInventory>[1] = {}) {
@@ -103,6 +108,53 @@ describe('ProductDetailModal', () => {
     expect(employee.el('inventory-product-detail-back-on-sale')).toBeNull();
   });
 
+  it('INVENTORY-F25: the SKU\'s barcode is on the sheet, for whoever sees products', async () => {
+    const s = await setup({}, { session: EMPLOYEE });
+    expect(s.el('inventory-barcode')?.querySelector('svg')?.getAttribute('aria-label')).toBe('Barcode CAF-1');
+    expect(s.el('inventory-product-detail-print-label')?.textContent?.trim()).toBe('Print barcode');
+  });
+
+  it('INVENTORY-F25: «Print barcode» sends one label per press and says which printer takes it', async () => {
+    const s = await setup({}, { api: () => ok({ job_id: 'j1', printer_name: 'Labels' }) });
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    expect(s.calls('/api/inventory/products/print_label').map((call) => s.body(call))).toEqual([{ id: 'p1' }, { id: 'p1' }]);
+    expect(s.el('inventory-product-detail-label')?.textContent?.trim()).toBe('The label went to the printer «Labels».');
+    expect(browser.printInBrowser).not.toHaveBeenCalled();
+  });
+
+  it('INVENTORY-F25: with no «Label» printer the label waits in the queue, and the sheet says what to do', async () => {
+    const s = await setup({}, { api: () => ok({ job_id: 'j1', printer_name: null }) });
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    expect(s.el('inventory-product-detail-label')?.textContent?.trim()).toBe(
+      'The label is waiting in the print queue: no printer has the «Label» function. Give it to one in Printing.',
+    );
+  });
+
+  it('INVENTORY-F25: without the print queue it opens the browser\'s print dialog with the code, the SKU and the name', async () => {
+    const s = await setup({}, { api: () => refusal(409, 'inventory.label_queue_unavailable', 'The print queue is not available here.') });
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    expect(browser.printInBrowser).toHaveBeenCalledOnce();
+    const [svg, label] = browser.printInBrowser.mock.calls[0];
+    expect((svg as SVGSVGElement).getAttribute('aria-label')).toBe('Barcode CAF-1');
+    expect(label).toEqual({ sku: 'CAF-1', name: 'Coffee' });
+    expect(s.el('inventory-product-detail-error')).toBeNull();
+  });
+
+  it('INVENTORY-F25: any other refusal is said inside the sheet with its reason', async () => {
+    const s = await setup({}, { api: () => refusal(404, 'not_found', 'This product does not exist in this hub.') });
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    expect(s.el('inventory-product-detail-error')?.textContent?.trim()).toBe(
+      'Could not print the barcode label: This product does not exist in this hub.',
+    );
+    expect(browser.printInBrowser).not.toHaveBeenCalled();
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ product: product({ is_active: false }) }, { locale: 'es' });
     expect(s.value('status')).toBe('No');
@@ -112,5 +164,6 @@ describe('ProductDetailModal', () => {
     const sold = await setup({ product: product({ is_sold_out: true }) }, { locale: 'es' });
     expect(sold.value('status')).toBe('Sí · Agotado');
     expect(sold.el('inventory-product-detail-back-on-sale')?.textContent?.trim()).toBe('Volver a poner a la venta');
+    expect(sold.el('inventory-product-detail-print-label')?.textContent?.trim()).toBe('Imprimir código de barras');
   });
 });

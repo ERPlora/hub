@@ -19,6 +19,9 @@ importers:
       '@ionic/vue':
         specifier: 8.8.9
         version: 8.8.9(patch_hash=6e9049f537c14ebfca5408843adc0f125c2eec908cfd83ec9a9da4aed88a5cd0)(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.44(typescript@5.9.3)))(vue@3.5.44(typescript@5.9.3))
+      jsbarcode:
+        specifier: 3.12.3
+        version: 3.12.3
       vue:
         specifier: ^3.5.0
         version: 3.5.44(typescript@5.9.3)
@@ -1341,6 +1344,9 @@ packages:
   js-yaml@4.3.2:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
+
+  jsbarcode@3.12.3:
+    resolution: {integrity: sha512-CuHU9hC6dPsHF5oVFMo8NW76uQVjH4L22CsP4hW+dNnGywJHC/B0ThA1CTDVLnxKLrrpYdicBLnd2xsgTfRnvg==}
 
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
@@ -3135,6 +3141,8 @@ snapshots:
   js-yaml@4.3.2:
     dependencies:
       argparse: 2.0.1
+
+  jsbarcode@3.12.3: {}
 
   json-buffer@3.0.1: {}
 

@@ -92,6 +92,11 @@ async def product_set_sold_out(request, data: ProductSoldOutIn):
     return await run_operation(request, services.set_sold_out, data)
 
 
+@bind(router, "inventory.product.print_label", "/inventory/products/print_label")
+async def product_print_label(request, data: ProductRefIn):
+    return await run_operation(request, services.print_label, data)
+
+
 # Products in categories
 
 

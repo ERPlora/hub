@@ -331,6 +331,12 @@ class SaleStock(UUIDModel):
 
     sale_id = models.UUIDField(_("sale"))
     state = models.CharField(_("state"), max_length=8, choices=State.choices)
+    # INVENTORY-F16: the numbers a person knows the sale by, kept when its stock moves, so the ledger shows
+    # and finds them. The sale's own number, and the number of its ticket or invoice when it has one.
+    sale_number = models.CharField(_("sale number"), max_length=24, blank=True, default="", db_default="")
+    document_number = models.CharField(
+        _("ticket or invoice number"), max_length=64, blank=True, default="", db_default=""
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 

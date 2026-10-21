@@ -279,10 +279,10 @@ class CategoryFiltersIn(Schema):
         None, max_length=7, description="This exact colour (#rrggbb)."
     )
     product_count_min: int | None = Field(
-        None, ge=0, description="At least this many products on sale (active, not sold out)."
+        None, ge=0, description="At least this many active products, sold out included."
     )
     product_count_max: int | None = Field(
-        None, ge=0, description="At most this many products on sale (active, not sold out)."
+        None, ge=0, description="At most this many active products, sold out included."
     )
     sort: CategorySort = Field("name", description="Order; a leading '-' reverses it.")
 
@@ -613,6 +613,7 @@ class SaleItemIn(Schema):
 
 class SaleCompletedIn(Schema):
     sale_id: UUID = Field(description="The sale that was paid.")
+    sale_number: str = Field("", description="Its number (AAAAMMDD-NNNN), for the ledger's reference.")
     items: list[SaleItemIn] = Field(default_factory=list, description="Its lines.")
 
 
@@ -743,7 +744,7 @@ class CategoryOut(Schema):
     order: int = Field(description="Position.")
     tax_category_id: UUID | None = Field(description="Its tax category, if any.")
     tax_category_key: str | None = Field(description="Key of its tax category, if any.")
-    product_count: int = Field(description="Products on sale in it (active, not sold out).")
+    product_count: int = Field(description="Active products in it, sold out included (what the till shows).")
 
 
 CategoryPage = Page[CategoryOut]
@@ -762,6 +763,10 @@ class MovementOut(Schema):
     reason: str = Field(description="Why (counts and write-offs).")
     reference: str = Field(
         description="The sale (sales and voids) or the delivery note (receptions)."
+    )
+    reference_label: str = Field(
+        description="The reference as a person reads it: for a sale, void or refund, the number of its ticket or "
+        "invoice (or the sale's own number), empty when Inventory never learnt it; else the reference itself."
     )
     unit_cost: int | None = Field(description="Cost per unit in cents (receptions).")
     actor: str = Field(description="Who made it.")
@@ -862,3 +867,13 @@ class RefundStockOut(Schema):
 
 class DeletedOut(Schema):
     id: UUID = Field(description="What was deleted.")
+
+
+class PrintLabelOut(Schema):
+    """INVENTORY-F25: the label put in Printing's queue."""
+
+    job_id: UUID = Field(description="The print job of the label, in Printing's queue.")
+    printer_name: str | None = Field(
+        description="The printer of the «Label» function that will print it; null: none has that function, so "
+        "the label waits in the queue until one does."
+    )

@@ -4,7 +4,7 @@
 // 0,532), a movement's quantity with its sign, and a rate as the language writes a percentage.
 import { describe, expect, it } from 'vitest';
 
-import { formatCount, formatMoney, formatPercent, formatQuantity, formatSignedQuantity } from './format';
+import { formatCount, formatMoney, formatPercent, formatQuantity, formatShortDateTime, formatSignedQuantity } from './format';
 
 describe('formatMoney', () => {
   it('paints whole cents as euros in the page language', () => {
@@ -53,5 +53,19 @@ describe('formatCount', () => {
     expect(formatCount(12345, 'es')).toBe('12.345');
     expect(formatCount(12345, 'en')).toBe('12,345');
     expect(formatCount(3, 'es')).toBe('3');
+  });
+});
+
+describe('formatShortDateTime', () => {
+  // inventory#130, inventory#139: the ledger's date on a tablet keeps its time, also for an older year.
+  it('is the numeric date with the year and the time, in the page language and its time zone', () => {
+    const at = '2025-03-07T08:05:00Z';
+    expect(formatShortDateTime(at, 'es', 'Europe/Madrid')).toBe('7/3/25, 9:05');
+    expect(formatShortDateTime(at, 'en', 'Europe/Madrid')).toMatch(/^3\/7\/25, 9:05\sAM$/);
+  });
+
+  it('paints nothing for what is not a date', () => {
+    expect(formatShortDateTime('', 'es')).toBe('');
+    expect(formatShortDateTime('soon', 'es')).toBe('soon');
   });
 });
