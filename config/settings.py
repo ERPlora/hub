@@ -282,6 +282,10 @@ DEMO_TOMBSTONE_DAYS = config("DEMO_TOMBSTONE_DAYS", default=7, cast=int)
 # certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
 # certificate is refused visibly (verifactu.certificate_storage_unavailable).
 FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
+# The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals the secrets the automations
+# use to call other systems (apps/flow/vault.py, FLOW-F26). Empty: the Hub starts, and saving or using a secret
+# is refused visibly (flow.secrets_key_missing).
+FLOW_SECRETS_KEY = config("FLOW_SECRETS_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
 # supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)

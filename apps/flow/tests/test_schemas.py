@@ -267,7 +267,7 @@ def test_at_most_fifty_steps():
 def test_an_unknown_step_kind_is_refused():
     assert "steps.0" in errors(
         schemas.CreateIn,
-        {"name": "A", "steps": [{"id": "s1", "kind": "http", "url": "x"}]},
+        {"name": "A", "steps": [{"id": "s1", "kind": "ai", "prompt": "x"}]},
     )
 
 

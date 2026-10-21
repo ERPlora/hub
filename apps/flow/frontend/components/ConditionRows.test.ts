@@ -79,4 +79,21 @@ describe('ConditionRows', () => {
     await ionValue(picking.el('cond-op-0'), 'in');
     expect(picking.wrapper.find('[data-testid="cond-insert-0"]').exists()).toBe(false);
   });
+
+  // FLOW-F25, FLOW-F28: what a step leaves as yes or no («Failed», «Approved»…) is compared with Yes / No
+  // chosen, never typed: a «yes» typed would be text and never hold.
+  it('a yes-or-no datum of a step is compared with Yes or No, chosen', async () => {
+    const choices = [...CHOICES, { path: 'steps.s1.approved', group: 's1', example: undefined }, { path: 'steps.s1.note', group: 's1', example: undefined }];
+    const m = await mountFlow(ConditionRows, { props: { modelValue: { 'steps.s1.approved': { eq: true } }, choices, steps: [], catalog: null, testid: 'cond' } });
+    const emitted = () => (m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value);
+    expect(m.find('cond-value-0').element.tagName).toBe('ION-SELECT');
+    expect((m.find('cond-value-0').element as unknown as { value: string }).value).toBe('true');
+    await ionValue(m.find('cond-value-0').element, 'false');
+    expect(emitted().at(-1)).toEqual({ 'steps.s1.approved': { eq: false } });
+    await ionValue(m.find('cond-path-0').element, 'steps.s1.note');
+    expect(m.find('cond-value-0').element.tagName).toBe('ION-INPUT');
+    await ionValue(m.find('cond-path-0').element, 'steps.s1.approved');
+    expect(emitted().at(-1)).toEqual({ 'steps.s1.approved': { eq: true } });
+  });
 });
+

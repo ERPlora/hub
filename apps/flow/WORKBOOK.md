@@ -97,6 +97,10 @@ Configuración inicial, paso a paso:
 Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 
 - El botón **Nueva automatización**, arriba a la derecha.
+- **Esperan tu respuesta** — solo si hay alguna pregunta que puedas contestar: cada tarjeta, de qué
+  automatización viene, la pregunta y sus detalles, a quién se le hizo, qué pasa si nadie contesta y qué
+  hace un no, **Añadir una nota (opcional)**, **Aprobar** y **No** (FLOW-F29). Un responsable o un empleado,
+  que solo contestan, ven solo esto: «No hay nada esperando tu respuesta.» cuando no hay nada.
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
   pediste una automatización. No hace nada hasta que la revises y la actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
@@ -120,14 +124,16 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
 
 - **Pasos**: la tarjeta del disparador («Cuando pase esto…»), los pasos en columna, cada uno con su asa
   para arrastrar y × (las esperas y los «Solo sigue si…» son tiras estrechas; el resto, tarjetas que se
-  despliegan al tocarlas), y los botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
-  si…** y **Esperar**. Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
+  despliegan al tocarlas; dentro, **Más opciones**: «Solo si…» y «Si falla, sigue», FLOW-F25), y los
+  botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
+  si…**, **Esperar**, **Llamar a otro sistema** (FLOW-F27) y **Preguntar antes a alguien** (FLOW-F28). Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
   automatización.»
 - **Probar**: lo que haría con lo último que pasó, sin hacer nada (FLOW-F13).
 - **Permisos**: «Una automatización se ejecuta con sus propios permisos, nunca con los tuyos. Nada de
   lo de abajo ocurre hasta que lo autorices.», las filas «Falta tu permiso» o «Autorizado» y
   **Autorizar todo lo que necesita** (FLOW-F12).
-- **Historial**: las ejecuciones, las más recientes primero y las paradas por error arriba (FLOW-F16).
+- **Historial**: las ejecuciones, las más recientes primero y las paradas por error arriba (FLOW-F16);
+  una parada por un error en un paso lleva **Reanudar desde el paso que falló** (FLOW-F24).
 
 ### Guía
 Botón **¿Cómo funciona esto?** de la galería. «Cómo funcionan las automatizaciones», con cinco
@@ -174,6 +180,15 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F21 | Cuando pasa algo en el negocio, la automatización arranca | parcial |
 | FLOW-F22 | Cuando llega la hora, la automatización arranca | hecho |
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
+| FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
+| FLOW-F25 | «Solo si…» y «Si falla, sigue» en cada paso | hecho |
+| FLOW-F26 | Guardar secretos que no se pueden volver a leer | parcial |
+| FLOW-F27 | Llamar a otro sistema | hecho |
+| FLOW-F28 | Preguntar antes a alguien | hecho |
+| FLOW-F29 | Contestar lo que pregunta una automatización | hecho |
+| FLOW-F30 | Cerrar lo que nadie contestó a tiempo | hecho |
+| FLOW-F31 | Mandar un mensaje a un cliente | parcial |
+| FLOW-F32 | Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp | parcial |
 
 ### FLOW-F01 Entrar en Automatizaciones
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
@@ -505,7 +520,8 @@ Pasos:
 Entra: las ejecuciones de esa automatización de los últimos 90 días, y todas las que siguen esperando.
 Sale: nada. El historial guarda cada ejecución terminada **90 días** y después la olvida; una que
 espera o está en marcha no se borra nunca. Lo que leyeron sus pasos (la ficha de un cliente) no se
-guarda al terminar: solo los ids y los importes del aviso que la arrancó.
+guarda al terminar: solo los ids y los importes del aviso que la arrancó; una parada por un error lo
+guarda 7 días, para poder reanudarla (FLOW-F24).
 Si falla: si no se puede leer el historial, el mensaje en rojo con **Reintentar**; sin ejecuciones,
 «Todavía no se ha ejecutado.».
 Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
@@ -636,6 +652,219 @@ automatización se puso en pausa mientras esperaba.»); si está borrada, tambi�
 automatización se borró.»).
 Implicados: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
 
+### FLOW-F24 Reanudar una ejecución desde el paso que falló
+<!-- origen: old-hub:HUB-F103 gh:hub#952 -->
+Estado: hecho
+Actor: propietario, administrador, asistente
+Pantalla: Editor de automatización
+Pasos:
+1. En **Historial**, una ejecución que se paró por un error en uno de sus pasos lleva **Reanudar desde el
+   paso que falló**. Antes, arregla la causa: concede el permiso que faltaba, vuelve a encender la app o
+   espera a que el otro sistema responda.
+2. Pulsa el botón y confirma: «¿Reanudarla desde el paso que falló?» con **Sí, reanúdala** o **Cancelar**.
+3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
+   pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
+   «Reanudada aquí, desde el paso que había fallado».
+Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»).
+Sale: la misma ejecución sigue en el paso que falló, sin repetir los que ya hicieron efecto y con los
+pasos con los que empezó, aunque la automatización haya cambiado después (`flow.run.resumed`,
+`flow.run.finished`). Una ejecución parada por un error guarda lo que dejaron sus pasos **7 días** para
+poder reanudarse; después lo olvida y ya no se reanuda.
+Si falla: con la automatización en pausa, «Esta automatización está en pausa: enciéndela para
+ejecutarla.»; borrada, «Esa automatización no existe en este negocio.»; una que se paró antes de hacer
+ningún paso (una cadena, un «Solo cuando…» ilegible), en algo que necesita a una persona delante o en una
+llamada a una dirección privada o mal escrita (los mismos pasos volverían a fallar), «Esta ejecución no se
+puede reanudar…: ejecútala de nuevo entera»; pasados 7 días, «…ya no se puede reanudar…»;
+una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un error…»: nunca se reanuda dos
+veces. Ninguna se reanuda sola.
+Implicados: FLOW-F12, FLOW-F15, FLOW-F16
+
+### FLOW-F25 «Solo si…» y «Si falla, sigue» en cada paso
+<!-- origen: old-hub:HUB-F97 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. Abre un paso de **Hacer algo**, **Consultar algo** o **Esperar** y pulsa **Más opciones**.
+2. Marca **Solo si…** y escribe sus condiciones, como en un «Solo sigue si…» («Total mayor que 10000»):
+   «Si no se cumple, este paso se salta y la automatización sigue.».
+3. En **Hacer algo** y **Consultar algo**, marca **Si falla, sigue con los pasos siguientes**: «El fallo queda
+   escrito en este paso y los siguientes pueden mirar si falló.».
+4. Cerrado, el paso lo dice debajo de su título («Solo si: Total mayor que 10000 · Si falla, sigue»). Un paso
+   posterior puede mirar, con **Insertar un dato**, si ese paso «Se saltó» o «Falló» y su «Código del fallo».
+5. Pulsa **Guardar**.
+Entra: las condiciones y la casilla de cada paso.
+Sale: el paso con sus opciones, al **Guardar**. Al ejecutarse, un paso cuyo «Solo si…» no se cumple no se
+hace y el historial dice «Se saltó: no se cumplía su «Solo si…» (…)»; uno que falla con «Si falla, sigue»
+deja «…: el motivo. Siguió con los pasos siguientes.» y la ejecución termina bien si el resto va bien.
+**Probar** dice «Se saltaría: no se cumple su «Solo si…»». Sin opciones, un paso que falla para la
+ejecución, como siempre.
+Si falla: un «Solo si…» que lee un dato que no deja ningún paso anterior, con una comparación que no
+existe, o un «Si falla» en una espera o en un «Solo sigue si…», no se guarda. Un «Solo si…» que ya no se
+puede leer (escrito en crudo en la administración) para la ejecución con «Ya no se puede leer el «Solo
+si…» de este paso…», y esa ejecución no se reanuda: hay que corregir el paso.
+Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
+
+### FLOW-F26 Guardar secretos que no se pueden volver a leer
+<!-- origen: old-hub:HUB-F99 -->
+Estado: parcial — en este servidor todavía no se pueden guardar secretos; llegará cuando se active su clave
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. Abre un paso de **Llamar a otro sistema**. Debajo está **Secretos**: «Claves y contraseñas de otros
+   sistemas. Insértalas por su nombre; una vez guardado, nadie puede volver a leer un valor, ni siquiera tú.».
+2. Escribe un **Nombre** (en mayúsculas, como «STRIPE_KEY») y su **Valor**, que se escribe tapado, y pulsa
+   **Guardar secreto**. Sale «STRIPE_KEY guardado. Su valor ya no se puede mostrar.» y los dos campos se
+   vacían. Guardar otra vez el mismo nombre cambia su valor.
+3. La lista enseña solo los nombres. Para usar uno, en un valor del paso pulsa **Insertar un dato** y elige
+   «Secreto «STRIPE_KEY»» en **Secretos**.
+4. Para borrarlo, pulsa su **×** y confirma «¿Borrar STRIPE_KEY?» con **Sí, borrarlo** o **Conservarlo**.
+Entra: el nombre y el valor de cada secreto (por voz, por su nombre: «guarda la clave de Stripe»).
+Sale: el secreto sellado con la clave del servidor (`flow.secret.saved`, `flow.secret.deleted`). Su valor
+solo se abre en el momento de llamar y nunca sale: ni en la lista, ni en **Probar** (que enseña «••••»), ni
+en el historial, ni en un fallo; lo que el otro sistema responda con el secreto dentro también sale tapado.
+Si falla: un nombre con minúsculas al principio, cifras primero o símbolos: «Usa mayúsculas, cifras y _,
+empezando por una letra (STRIPE_KEY).», y lo escrito se queda; sin la clave de cifrado del servidor, la caja
+dice «Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.» en cuanto se abre, en
+lugar de los campos, y no deja guardar.
+Guardar un paso que nombra un secreto que no existe: «No hay ningún secreto llamado «X».» junto al campo.
+Una ejecución cuyo secreto se borró o ya no se puede abrir se para antes de llamar, con el motivo y qué hacer.
+Un secreto solo se puede insertar en **Llamar a otro sistema**: en cualquier otro paso no se guarda.
+Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F27
+
+### FLOW-F27 Llamar a otro sistema
+<!-- origen: old-hub:HUB-F94 old:flows/workflow/editor.md#flows-f16 gh:hub#2648 gh:hub#2659 gh:hub#2675 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. En **Pasos**, pulsa **Llamar a otro sistema**. Se abre su tarjeta.
+2. Elige el **Método** y escribe la **Dirección** a mano, empezando por «https» y el nombre del servidor:
+   «Este paso te pedirá permiso para llamar a» y ese nombre. Después del nombre se pueden insertar datos.
+3. Añade las **Cabeceras** que pida el otro sistema (**Añadir una cabecera**: **Nombre** y **Valor**) y **Qué
+   envía**. En cualquier valor, **Insertar un dato** ofrece lo que trajo el aviso, lo que dejaron los pasos
+   anteriores, los **Secretos** (FLOW-F26) y la «Clave de no repetición» de esta llamada.
+4. Ajusta los **Segundos de espera** (de 1 a 30) y, si quieres, **Más opciones** (FLOW-F25).
+5. **Guardar** y, en **Permisos**, concede «Llamar a» ese servidor.
+Entra: el método, la dirección, las cabeceras, el texto que envía y la espera.
+Sale: **Ejecutar ahora** responde al momento, sin esperar al otro sistema: la ejecución queda en «Llamando
+a…» con el nombre del servidor y el Hub hace la llamada por detrás, en unos segundos; luego el historial dice
+«Llamó a…: respondió 201», y los pasos siguientes
+pueden leer su «Estado» y su «Texto» (hasta 1 MiB). Si el proceso se cae a mitad, la llamada se repite a los
+5 minutos con la **misma** «Clave de no repetición», para que el otro sistema no la haga dos veces.
+**Probar** dice «Llamaría a… con esto» con lo que enviaría y los secretos tapados, sin llamar.
+Si falla: una dirección que no empieza por «https» y su servidor, con usuario o contraseña, o con datos
+antes del nombre, no se guarda («Escribe la dirección a mano…»); tampoco las cabeceras que pone el sistema
+(Host, Content-Length…). Al llamar: una cabecera con un dato que no se puede enviar (una tilde, una «ñ») para la
+ejecución con el motivo y el nombre de la cabecera, sin llamar; una dirección de una red privada, del propio servidor o de los datos
+internos de la nube no se llama («…está dentro de una red privada, así que no se llamó.»); sin permiso, «…no
+le has dejado hacer…»; si responde un error, no contesta a tiempo o no se puede llegar, la ejecución se para
+con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue»; una dirección
+privada no se reanuda: hay que cambiar el paso y ejecutarla de nuevo. Mientras el servidor no pueda guardar
+secretos (FLOW-F26), una llamada que no usa ninguno se guarda, se prueba y sale igual; la que usa uno se
+para antes de llamar («Este servidor no puede usar secretos…»). No sigue
+redirecciones. Una ejecución cuya automatización se borra mientras llama se cancela.
+Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
+
+### FLOW-F28 Preguntar antes a alguien
+<!-- origen: old-hub:HUB-F96 old:flows/workflow/editor.md#flows-f18 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. En **Pasos**, pulsa **Preguntar antes a alguien**. Se abre su tarjeta.
+2. Escribe **La pregunta** y, si quieres, **Detalles (opcional)**, con datos insertados: se rellenan en el
+   momento de preguntar.
+3. En **Quién tiene que contestar** elige «Quien lleva el negocio» (de fábrica), «Un responsable» o «Un
+   empleado»: «Los responsables la contestan en Automatizaciones, en «Esperan tu respuesta»; quien lleva el
+   negocio también puede.».
+4. Ajusta **Cuánto esperar la respuesta** (de 1 a 720 horas; de fábrica, 72).
+5. En **Si dicen que no**, «Parar la automatización aquí» o «Seguir con los pasos siguientes»; en **Si nadie
+   contesta a tiempo**, «Contarlo como un no», «Parar la automatización aquí» o «Seguir con los pasos
+   siguientes». Con «Seguir», el aviso explica cómo poner después un «Solo sigue si…» sobre «Aprobada».
+6. Pulsa **Guardar**. Este paso no pide permiso.
+Entra: la pregunta, sus detalles, a quién, cuánto esperar y qué hacer con un no y con el silencio.
+Sale: el paso. Al ejecutarse, la pregunta espera en «Esperan tu respuesta» (FLOW-F29) con su texto ya rellenado y
+la ejecución se para ahí (`flow.question.asked`); el historial dice «Preguntó a los responsables; espera una
+respuesta hasta el …». Cambiar después la automatización no cambia una pregunta ya hecha. **Probar** dice
+«Preguntaría a … y esperaría hasta … horas» con la pregunta rellenada, sin preguntar.
+Si falla: una pregunta vacía, o una espera de menos de una hora o de más de 30 días, no se guarda; una
+pregunta que nombra un secreto tampoco.
+Implicados: FLOW-F13, FLOW-F16, FLOW-F25, FLOW-F29, FLOW-F30
+
+### FLOW-F29 Contestar lo que pregunta una automatización
+<!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f24 old-hub:HUB-F100 gh:hub#2502 gh:flows#166 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Automatizaciones
+Pasos:
+1. En **Automatizaciones**, **Esperan tu respuesta** enseña cada pregunta que puedes contestar, la que caduca
+   antes primero: de qué automatización viene, la pregunta y sus detalles, «Preguntado a los responsables.
+   Quien lleva el negocio también puede contestar.», qué pasa si nadie contesta («Si nadie contesta antes
+   del …, cuenta como un no.») y qué hace un no.
+2. Si quieres, escribe en **Añadir una nota (opcional)**.
+3. Pulsa **Aprobar** o **No**. Sale «Aprobada: la automatización sigue.» o «Contestada que no.» y la tarjeta
+   sale de la bandeja.
+Entra: la decisión y la nota (por voz: «aprueba la devolución de Ana»), con quién contesta de su sesión.
+Sale: la respuesta con quién, cuándo y la nota (`flow.question.answered`). Un sí sigue con los pasos
+siguientes, que pueden leer «Aprobada», «Nota» y «Contestada por»; un no hace lo que dice el paso: para la
+ejecución («Cancelada: Marta contestó que no a «…».») o sigue. El historial dice «Marta contestó que sí:
+«…»». Quien lleva el negocio ve todas; un responsable, las de los responsables y los empleados; un
+empleado, las de los empleados.
+Si falla: la tarjeta se queda con el motivo: «Alguien ya contestó a esta. No se ha hecho nada dos veces.»
+(dos personas a la vez: gana una sola), «Demasiado tarde: nadie la contestó a tiempo y se cerró. No se ha
+hecho nada.», «Esta pregunta se le hizo a otra persona: tú no puedes contestarla.»; con la automatización
+en pausa, un sí (o un no que sigue) se niega en tu idioma con «Esta automatización está en pausa:
+enciéndela para ejecutarla.» y la pregunta espera; un no que para la ejecución sí se acepta. Borrar la
+automatización cancela sus preguntas.
+Implicados: FLOW-F16, FLOW-F28, FLOW-F30
+
+### FLOW-F30 Cerrar lo que nadie contestó a tiempo
+<!-- origen: old-hub:HUB-F101 -->
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Cada minuto el Hub repasa las preguntas cuyo plazo ha vencido.
+2. Las cierra como caducadas y hace lo que dice su paso: contarlo como un no (lo que haga un no), parar o
+   seguir con los pasos siguientes.
+Entra: las preguntas que esperan, con su plazo.
+Sale: la pregunta caducada (`flow.question.expired`) y su ejecución cancelada («Cancelada: nadie contestó
+«…» a tiempo.») o seguida, con «Caducado» para un «Solo sigue si…» posterior; el historial dice «Nadie contestó
+a tiempo». Un segundo repaso no vuelve a cerrar nada.
+Si falla: una pregunta vencida que aún no ha cerrado el repaso ya no se puede contestar; si la automatización
+está en pausa y tocaba seguir, la ejecución se cancela («Cancelada: la automatización se puso en pausa
+mientras esperaba.»). Si alguien contesta justo cuando la cierra el repaso, gana uno solo.
+Implicados: FLOW-F16, FLOW-F28, FLOW-F29
+
+### FLOW-F31 Mandar un mensaje a un cliente
+<!-- origen: old-hub:HUB-F93 old:flows/workflow/editor.md#flows-f15 gh:whatsapp_inbox#273 -->
+Estado: parcial — el Hub todavía no puede mandarle un mensaje a un cliente: la Bandeja de WhatsApp declara su envío (WHATSAPP_INBOX-F32, F33) pero espera la puerta del SaaS hacia Meta, y no hay correo saliente para clientes; el paso no se ofrece hasta que exista
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. Abre una automatización y mira los botones para añadir de **Pasos**.
+2. El paso **Enviar un mensaje** todavía no aparece entre ellos: una automatización aún no puede escribir a
+   un cliente.
+Entra: —
+Sale: nada todavía. Cuando el envío exista, el paso mandará un WhatsApp (una plantilla aprobada) o un correo
+a un cliente, respetando lo que el cliente haya aceptado recibir, con su permiso como cualquier acción.
+Si falla: no aplica mientras el paso no se ofrezca.
+Implicados: FLOW-F11, FLOW-F12
+
+### FLOW-F32 Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp
+<!-- origen: old-hub:HUB-F112 -->
+Estado: parcial — depende de FLOW-F31 y además de un sitio donde guardar los archivos y de plantillas de WhatsApp con cabecera, que el Hub todavía no tiene
+Actor: propietario, administrador
+Pantalla: Editor de automatización
+Pasos:
+1. Abre una automatización y mira los botones para añadir de **Pasos**.
+2. Sin el paso **Enviar un mensaje** (FLOW-F31) no hay cabecera que rellenar.
+Entra: —
+Sale: nada todavía.
+Si falla: no aplica mientras el paso no se ofrezca.
+Implicados: FLOW-F31
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -654,6 +883,8 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
+| Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26 | `flow.secret.list` |
+| Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100 (en vivo) | contestar | F29 | `flow.question.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -671,6 +902,14 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Arranca las automatizaciones de un aviso | solo la plataforma | F21 | `flow.run.react` |
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
+| Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
+| Guarda (o cambia) un secreto, sellado | gestionar | F26 | `flow.secret.set` |
+| Borra un secreto | gestionar | F26 | `flow.secret.delete` |
+| Hace, por detrás, la llamada de una ejecución que la espera | solo la plataforma | F27 | `flow.run.call` |
+| Toma la llamada de una ejecución para hacerla | solo la plataforma | F27 | `flow.run.claim_call` |
+| Apunta cómo acabó la llamada y sigue la ejecución | solo la plataforma | F27 | `flow.run.record_call` |
+| Contesta sí o no, con una nota, a una pregunta de una automatización | contestar (su rol) | F29 | `flow.question.answer` |
+| Cierra las preguntas que nadie contestó a tiempo | solo la plataforma | F30 | `flow.question.expire_due` |
 
 ### Lo que avisa
 
@@ -683,12 +922,17 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Permisos cambiados | Conceder o retirar | `id` | `flow.flow.granted` |
 | Borrada | Borrarla | `id` | `flow.flow.deleted` |
 | Ejecución empezada | Arranca una ejecución | `id`, `flow_id` | `flow.run.started` |
-| Ejecución en espera | Llega a un «Esperar» | `id`, `flow_id`, `resume_at` | `flow.run.parked` |
-| Ejecución reanudada | Termina la espera | `id`, `flow_id` | `flow.run.resumed` |
+| Ejecución en espera | Llega a un «Esperar», a «Llamar a otro sistema» o a «Preguntar antes a alguien» | `id`, `flow_id`, `resume_at` | `flow.run.parked` |
+| Ejecución reanudada | Termina la espera o se reanuda desde el paso que falló | `id`, `flow_id` | `flow.run.resumed` |
 | Ejecución terminada | Termina bien, por una condición, por un error o cancelada | `id`, `flow_id`, `status` | `flow.run.finished` |
 | Borrador propuesto | El asistente deja un borrador | `id` | `flow.draft.proposed` |
 | Borrador usado | Se crea la automatización desde él | `id`, `flow_id` | `flow.draft.used` |
 | Borrador descartado | Se descarta | `id` | `flow.draft.dismissed` |
+| Secreto guardado | Guardar o cambiar un secreto | `id` | `flow.secret.saved` |
+| Secreto borrado | Borrarlo | `id` | `flow.secret.deleted` |
+| Pregunta hecha | Una ejecución llega a «Preguntar antes a alguien» | `id`, `run_id`, `flow_id` | `flow.question.asked` |
+| Pregunta contestada | Alguien contesta sí o no | `id`, `run_id` | `flow.question.answered` |
+| Pregunta caducada | Nadie la contestó a tiempo | `id`, `run_id` | `flow.question.expired` |
 
 Los avisos llevan ids, nunca nombres ni contenidos.
 
@@ -697,6 +941,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   cualquier aviso. Hace las acciones y consultas de otras apps **por su nombre** (`task.task.create`),
   con sus reglas y sus mensajes, nunca tocando sus datos; por eso no necesita ninguna app
   (`requires` vacío): una automatización que nombra una app apagada falla con su motivo, visible.
+- **A su propio `flow.run.parked`**: cuando una ejecución espera a «Llamar a otro sistema», el worker hace la
+  llamada (`flow.run.call`, FLOW-F27); nunca la petición que la dejó esperando.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
   tipo, para Probar y los ejemplos).
 
@@ -705,7 +951,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver las automatizaciones, sus ejecuciones y los borradores | sí | sí | no | no | `flow.view` |
-| Crear, cambiar, encender, conceder, ejecutar, borrar; probar; decidir borradores | sí | sí | no | no | `flow.manage` |
+| Crear, cambiar, encender, conceder, ejecutar, borrar; probar; decidir borradores; contestar lo que se pregunta a quien lleva el negocio | sí | sí | no | no | `flow.manage` |
+| Ver «Esperan tu respuesta» y contestar lo que se pregunta a los empleados | sí | sí | sí | sí | `flow.answer` |
+| Contestar lo que se pregunta a los responsables | sí | sí | sí | no | `flow.answer_manager` |
 
 ## Para quien lo mantiene
 
@@ -718,14 +966,22 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `trigger_filter`, `schedule`, `run_at`, `next_fire_at`—, `steps`, `grants`, `version`, `language`,
   `search_text`, borrado lógico `deleted_at`), `FlowRun` (versión y copia de los pasos con que empezó,
   `trigger_key` único por automatización, `input`, `status`, `step_index`, `log`, `outputs`, error,
-  `resume_at`, `chain`) y `Draft`. UUIDv7, sin `hub_id`.
+  `resume_at`, `chain`), `Draft`, `Secret` (nombre único y valor sellado, FLOW-F26) y `Question` (FLOW-F28:
+  ejecución y paso únicos, texto ya rellenado, `role`, `on_no`, `on_timeout`, `expires_at`, `status`, quién
+  y cuándo contestó y la nota). UUIDv7, sin `hub_id`.
 - **El documento**: `trigger` = `{kind: event, event, filter}` · `{kind: schedule, every: day|week|month,
   weekday 0–6 (lunes 0), day 1–31, time "HH:MM"}` · `{kind: at, at}` · `{kind: manual}`; `steps` = lista
-  de `{id, kind: command|query|condition|delay, …}`. Un valor es un literal, una **ruta**
+  de `{id, kind: command|query|condition|delay|http, …}`; `http` = `{method, url, headers, body, timeout}`
+  (FLOW-F27), cuyos textos pueden leer además `secret.<NOMBRE>` y `run.idempotency_key` (ningún otro paso). Un valor es un literal, una **ruta**
   (`input.total`, `steps.s1.id`: conserva el tipo) o un texto con `{{ruta}}` (siempre texto). Raíces:
   `input` (lo que trajo el aviso o la ejecución a mano) y `steps.<id>` de un paso anterior. Sin índices
   de lista. Condición: `{ruta: {eq|neq|in|exists|contains|gt|gte|lt|lte: valor}}`, todas a la vez; un
-  dato que no está nunca cumple salvo `exists: false`.
+  dato que no está nunca cumple salvo `exists: false`. Todo paso salvo `condition` admite `run_if` (una
+  condición: si no se cumple, se salta, queda `skipped` en el log y, en una acción o consulta,
+  `steps.<id>.skipped`), y `command`/`query` admiten `on_error: continue` (el fallo queda en el log con
+  `continued`, deja `steps.<id>.failed` y `error_code`/`error_message`, y la ejecución sigue). Sin ellos el
+  paso se guarda como antes (`exclude_none`); un `run_if` ilegible para con `flow.run_if_unreadable`, que no
+  se reanuda (FLOW-F25).
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
   el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:
@@ -761,8 +1017,46 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   outbox (fase 2, en `base/`) ejecute cada reacción con el actor del aviso que entrega; no se hace desde
   esta app ni tocando `packages/`.
 - **Lo que leyeron los pasos** (`outputs`: la ficha de un cliente…) solo se guarda mientras la ejecución
-  puede seguir (esperando); al terminar se vacía, así que un historial terminado no guarda copias de
-  datos de otras apps. Lo que trajo el aviso (`input`) sí se queda con la ejecución.
+  puede seguir: esperando, o parada por un error durante `RESUME_DAYS` (7) para reanudarla (FLOW-F24);
+  al terminar bien, por una condición o cancelada se vacía, y la poda de cada hora vacía la de un fallo de
+  más de 7 días, así que un historial terminado no guarda copias de datos de otras apps. Lo que trajo el
+  aviso (`input`) sí se queda con la ejecución.
+- **Reanudar** (`flow.run.retry`, FLOW-F24): bloquea la automatización y después la ejecución (el mismo
+  orden que toda escritura) y solo sigue si está `failed` en un paso (su última entrada del log es
+  `failed` en `step_index`), guarda lo que dejó cada paso anterior que deja algo, tiene menos de 7 días y la
+  automatización está encendida; nunca tras `flow.loop_stopped`, `flow.filter_unreadable`,
+  `flow.condition_unreadable` ni `flow.high_risk`. Sigue con su `definition` (la versión con la que
+  empezó) y deja en el log `resumed` con quién. Dos a la vez: la segunda espera el bloqueo y ve que ya no
+  está `failed`.
+- **Secretos** (`vault.py`, FLOW-F26): Fernet de `cryptography` con la clave `FLOW_SECRETS_KEY` del
+  entorno (Secrets Manager en AWS; nunca en el código); sin ella, `flow.secret.list` dice `available: false`
+  y guardar da `flow.secrets_key_missing`. El valor entra como `SecretStr` (un 422 nunca lo repite), solo se
+  abre al hacer la llamada y se tapa (`vault.mask`) en todo lo que se guarda o se enseña de ella: log,
+  errores, lo que respondió y **Probar**. Ni la API, ni `live.py`, ni el admin (solo ver el nombre y borrar)
+  lo devuelven. En la fase 1, como toda tabla de `flow`, los secretos se comparten entre los negocios de
+  la misma base de datos hasta la BD por hub de la fase 2.
+- **Llamadas** (`http.py`, FLOW-F27): solo `https` con el nombre del servidor escrito a mano (es el permiso,
+  `http:https://host`); el nombre se resuelve **una** vez, se rechaza toda dirección que no sea pública
+  (privada, del propio equipo, de enlace local —metadatos de la nube—, multicast o reservada) y se conecta
+  a esa misma IP con su nombre en TLS (sin cambio de DNS entre medias); sin redirecciones ni proxies del
+  entorno, con tiempo total y como mucho 1 MiB de respuesta. El paso deja la ejecución en `calling` y la
+  petición responde: la llamada **nunca** sale de la petición que la aparcó («Ejecutar ahora», reanudar o
+  contestar «Sí» esperarían hasta 30 s ocupando un hilo web). La hace el worker: su relay entrega a `flow` el
+  `flow.run.parked` (`REACTIONS`), `flow.run.call` la programa tras el COMMIT de esa entrega
+  (`dispatch_call`, sin transacción ni bloqueo alrededor), `flow.run.claim_call` la toma con un plazo de `CALL_LEASE_MINUTES` (5) en `resume_at` y
+  `flow.run.record_call` apunta cómo acabó y sigue. Si el proceso se cae, `resume_due` la vuelve a lanzar
+  al vencer el plazo con la misma `Idempotency-Key` (uuid5 de ejecución y paso). Los tests llaman a un
+  servidor HTTPS local de verdad (`tests/local_https.py`), nunca a un `patch` del cliente.
+- **Preguntas** (FLOW-F28 a F30): el paso `ask` deja una `Question` con su texto rellenado con `document.fill`
+  y pone la ejecución en `asking` con `resume_at` = el plazo. Contestar (`flow.question.answer`) bloquea la
+  automatización, después la ejecución y después la pregunta (el mismo orden que toda escritura) y solo
+  decide una `pending` dentro de plazo de una ejecución `asking`; quién contesta lo dice su permiso
+  (`ROLE_PERMISSION`: '' → `flow.manage`, `manager` → `flow.answer_manager`, `employee` → `flow.answer`, y
+  `flow.manage` siempre). El rechazo de una automatización en pausa sale en el idioma de quien contesta
+  (flows#166). `flow.question.expire_due` (cada minuto) toma las ejecuciones `asking` vencidas con `SKIP
+  LOCKED` y luego su pregunta; nunca coge la automatización, así que no se cruza con quien contesta. Un paso
+  posterior lee `steps.<id>.approved`, `.expired`, `.note` y `.answered_by`. Borrar la automatización cancela
+  sus ejecuciones `asking` y sus preguntas. Este paso no pide permiso: no hace nada fuera de la app.
 - **Retención** (hub#699, la del Hub viejo: 90 días fijos, sin ajuste por hub): la tarea programada
   `flow.run.prune` (cada hora, en el minuto 17) borra como mucho `PRUNE_BATCH` (500) ejecuciones
   terminadas (`succeeded`, `stopped`, `failed`, `cancelled`) cuya hora de fin —o de inicio, si no la
@@ -778,18 +1072,20 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Fase 1**: el worker (`run_worker`) corre cada minuto las dos tareas programadas (`fire_due`,
   `resume_due`) como el sistema, en un único ámbito fijo (`WORKER_SCOPE_SLUG`); como en la fase 1 todos
   los hubs comparten tablas, ve todas las automatizaciones (FLOW-F22 y F23, probado pasando por
-  `base.scheduler.run_due`). **No** hay relay del outbox: nada llama a `flow.run.react` fuera de los tests
-  (FLOW-F21 parcial). El motor se prueba entregando a `events.react` (o `events.deliver`) avisos
-  **reales** del outbox, hechos por las operaciones reales de otras apps. El relay debe entregar a
-  `flow` **todos** los avisos (`REACTIONS = {"*": "flow.run.react"}`), con su id y su actor.
+  `base.scheduler.run_due`). Desde la ronda 2026-10-20 de PLAN-HUB el worker reparte además el outbox en
+  cada tick (5 s, `base/relay.py`): entrega a `flow` los avisos de las demás apps y sus propios
+  `flow.run.parked` (`REACTIONS = {"*": "flow.run.react", "flow.run.parked": "flow.run.call"}`), con su id y
+  su actor. El motor se prueba entregando a `events.react` (o `events.deliver`) avisos **reales** del
+  outbox, hechos por las operaciones reales de otras apps, y las llamadas con una pasada real del relay.
 - **Lo que ya no se puede leer** (hub#1766): un «Solo cuando…» o un «Solo sigue si…» guardado con una
   forma que el motor no entiende (escrito en crudo desde el admin o por una versión anterior) nunca se
   evalúa como «no se cumple»: la ejecución se para con `flow.filter_unreadable` o
   `flow.condition_unreadable` y las demás automatizaciones del aviso siguen (`document.readable`).
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`.
-- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos; una escritura cruda del admin
-  no deja aviso.
+- El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun`, `Draft` y `Question`; de `Secret`, solo
+  ver el nombre y borrar (un valor no se escribe ni se lee desde el admin). Una escritura cruda del admin no
+  deja aviso.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -815,7 +1111,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **No automatiza lo que necesita a una persona delante**: anular o devolver una venta, borrar los datos
   de un cliente, enviar o anular registros en Hacienda… no salen en la lista de acciones.
 - **No ejecuta en pausa**: para eso está Probar.
-- **No reintenta sola** una ejecución que falló.
+- **No reintenta sola** una ejecución que falló: se reanuda a mano desde el paso que falló (FLOW-F24).
 
 ## Cambios frente al producto actual
 
@@ -857,7 +1153,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | `PUT /api/hub/flows/{id}/grants` | `flow.flow.grant` | permisos por acción o consulta; sin límites de campo (ver «Qué queda fuera») |
 | `POST /api/hub/flows/{id}/run` | `flow.flow.run` | ahora con botón |
 | motor del núcleo (eventos, cron, `at`, esperas) | `flow.run.react`, `flow.schedule.fire_due`, `flow.run.resume_due` | — |
-| `…/flows/secrets`, `…/approvals`, `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
+| `…/flows/secrets` | `flow.secret.list`, `flow.secret.set`, `flow.secret.delete` | solo el nombre: el valor no se vuelve a leer nunca |
+| paso `http` del motor | paso «Llamar a otro sistema» (`flow.run.claim_call`, `flow.run.record_call`) | la llamada la hace el worker tras guardar la ejecución, nunca la petición, con su clave de no repetición |
+| `…/approvals` (preguntas) | `flow.question.list`, `flow.question.answer`, `flow.question.expire_due` | el rol al que se pregunta sí decide quién contesta |
+| `…/approvals` (propuestas del asistente), `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
 
 ### Paridad: consultas
 
@@ -877,9 +1176,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | Producto actual | Aquí | Motivo si cambia |
 |---|---|---|
 | Automatizaciones (lista, borradores, galería) | `/flow/automations` | la lista es la `DataTable` del Hub (mismos controles: buscador, filtros, orden, casillas, interruptor, copiar, borrar) |
-| Editor (Pasos, Probar, Permisos, Historial) | `/flow/automations/:id` y `/new` | la misma columna; los pasos de mensaje, otro sistema, asistente y pregunta, fuera |
+| Editor (Pasos, Probar, Permisos, Historial) | `/flow/automations/:id` y `/new` | la misma columna; los pasos de mensaje y de asistente, fuera |
 | Guía | `/flow/guide` | — |
-| Bandeja «Pendiente de ti» | — | fuera |
+| Bandeja «Esperan tu respuesta» | «Esperan tu respuesta», arriba de `/flow/automations` | solo preguntas: las propuestas del asistente llegan con él |
 | Bandeja «Necesita tu atención» (eventos caídos) | — | fuera: es la administración del outbox, de la plataforma |
 
 ## Contradicciones señaladas (no resueltas aquí)
@@ -895,17 +1194,19 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Qué queda fuera
 
-- **Pasos «Enviar un mensaje», «Llamar a otro sistema» (con sus secretos), «Pedírselo al asistente» y
-  «Preguntar antes a alguien»**, con la bandeja **Pendiente de ti**: dependen del envío de WhatsApp y
-  correo, de guardar secretos cifrados, del asistente en el Hub y de una bandeja de preguntas por rol,
-  que no existen todavía en el Hub. Volverán como pasos nuevos de esta misma columna.
+- **Guardar secretos en los servidores de ERPlora** (FLOW-F26, parcial): la caja, el sellado y su uso en
+  una llamada están hechos y probados, pero producción y pre todavía no tienen su clave de cifrado; hasta
+  que se active, la caja lo dice al abrirse y las llamadas sin secretos funcionan igual.
+- **Paso «Enviar un mensaje»** y la cabecera multimedia de un WhatsApp (FLOW-F31, FLOW-F32, parciales):
+  dependen del envío de WhatsApp y de correo a clientes, que todavía no existe en el Hub ni en el SaaS.
+- **Paso «Pedírselo al asistente»** y las propuestas del asistente en **Esperan tu respuesta**: dependen del
+  asistente en el Hub (parte 3 de la migración de esta app).
 - **«Necesita tu atención»** (eventos que no se entregaron): es la administración del outbox (PLAN-HUB
   bloque 7), de la plataforma, con el relay de la fase 2.
 - **Recetas que traen otras apps** («Viene con …», restaurar la de fábrica) y la reparación de las de
   WhatsApp: ninguna app del Hub publica recetas todavía; la tarjeta «Contestar los WhatsApp» vuelve
   cuando la Bandeja de WhatsApp declare su aviso.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
-- **Reintentar una ejecución fallida** desde el paso que falló.
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
   (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
   conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide

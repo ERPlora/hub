@@ -47,4 +47,17 @@ describe('FieldPicker', () => {
       'There is no data to insert here yet: choose what happens first, or add an action before.',
     );
   });
+
+  // FLOW-F27: inside a call, the secrets and the call's no-repeat key are offered too, by name.
+  it('offers the secrets and the no-repeat key of a call under their own headings', async () => {
+    const m = await setup([
+      { path: 'secret.STRIPE_KEY', group: 'secret', example: undefined },
+      { path: 'run.idempotency_key', group: 'run', example: undefined },
+    ]);
+    expect(m.find('flow-picker-group-secret').text()).toBe('Secrets');
+    expect(m.find('flow-picker-group-run').text()).toBe('This call');
+    expect(m.find('flow-picker-secret.STRIPE_KEY').text()).toContain('Secret «STRIPE_KEY»');
+    expect(m.find('flow-picker-run.idempotency_key').text()).toContain('No-repeat key');
+  });
 });
+

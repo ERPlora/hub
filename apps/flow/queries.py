@@ -11,6 +11,7 @@
   executes nothing: it validates each action's data against the action's own schema.
 """
 
+import datetime as dt
 import importlib
 from importlib.util import find_spec
 from typing import Any
@@ -18,7 +19,7 @@ from typing import Any
 import pydantic
 from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Lower
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -26,8 +27,8 @@ from live.meta import LiveAppConfig, module_configs
 from live.models import OutboxEvent
 from live.operations import Operation, operation, registry
 
-from apps.flow import document
-from apps.flow.models import Draft, Flow, FlowRun
+from apps.flow import document, vault
+from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.schemas import (
     CatalogIn,
     CatalogOut,
@@ -37,10 +38,14 @@ from apps.flow.schemas import (
     FlowOut,
     FlowRefIn,
     Page,
+    QuestionListIn,
+    QuestionPageOut,
     RunListIn,
     RunPageOut,
     SampleIn,
     SampleOut,
+    SecretListIn,
+    SecretPageOut,
     StatusIn,
     StatusOut,
     TestDocumentIn,
@@ -52,6 +57,11 @@ VIEW = "flow.view"
 MANAGE = "flow.manage"
 #: Run only by the platform (events.py and the scheduled tasks): no role holds it.
 SYSTEM = "flow.system"
+#: FLOW-F29: answering what is asked of employees, and of managers; whoever manages answers everything.
+ANSWER = "flow.answer"
+ANSWER_MANAGER = "flow.answer_manager"
+#: The permission each role of «Ask someone first» asks for ('' = whoever runs the business).
+ROLE_PERMISSION = {"": MANAGE, "manager": ANSWER_MANAGER, "employee": ANSWER}
 
 FLOW_NOT_FOUND = _("That automation does not exist in this business.")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
@@ -62,6 +72,8 @@ NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
 HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
 #: The code of a refusal of an action that needs a person, when it is saved, granted or run.
 HIGH_RISK_CODE = "flow.high_risk"
+NO_SECRET = _("There is no secret called «%(name)s».")
+BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
 
 #: How many names an ambiguous reference lists.
 AMBIGUOUS_SHOWN = 5
@@ -219,7 +231,13 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
 
 def operation_problem(name: str, kind: str | None = None) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
-    ``kind``, when given), or ``None`` when it may."""
+    ``kind``, when given), or ``None`` when it may. A call's origin (``http:https://host``) is checked as
+    an address."""
+    if name.startswith(document.HTTP_GRANT) and kind is None:
+        address = name[len(document.HTTP_GRANT) :]
+        if document.origin(address) != address:
+            return "invalid_payload", str(BAD_HTTP_GRANT) % {"name": name}
+        return None
     op = grantable_operations().get(name)
     if op is None:
         return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
@@ -240,7 +258,20 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
     code = "invalid_payload"
     if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events():
         problems["trigger.event"] = str(UNKNOWN_EVENT) % {"name": trigger.event}
+    kept = None
     for index, step in enumerate(steps):
+        if step.kind == "http":
+            # A call names kept secrets: each must exist (FLOW-F26), named next to the field that reads it.
+            kept = set(Secret.objects.values_list("name", flat=True)) if kept is None else kept
+            for name in document.secret_names(step.model_dump()):
+                if name not in kept:
+                    field = next(
+                        part
+                        for part, text in (("url", step.url), ("headers", " ".join(step.headers.values())), ("body", step.body))
+                        if f"secret.{name}" in text
+                    )
+                    problems.setdefault(f"steps.{index}.{field}", str(NO_SECRET) % {"name": name})
+            continue
         if step.kind not in ("command", "query"):
             continue
         problem = operation_problem(step.operation, step.kind)
@@ -441,8 +472,66 @@ def flow_status(ctx: OperationContext, data: StatusIn) -> dict:
 # --- Runs and drafts --------------------------------------------------------------------------------
 
 
+#: How long a run that stopped by an error keeps what its steps left, to be resumed (FLOW-F24); after
+#: that, the hourly prune forgets it (what a step read is never kept longer than a wait could).
+RESUME_DAYS = 7
+#: Failures that happened before any step ran, or that the same steps would hit again for sure.
+NOT_RESUMABLE = frozenset(
+    {
+        "flow.loop_stopped",
+        "flow.filter_unreadable",
+        "flow.condition_unreadable",
+        "flow.run_if_unreadable",
+        HIGH_RISK_CODE,
+        # A call to an address that is not plain https, or inside a private network: the same steps would
+        # be refused again (FLOW-F27); the step has to change, and a resumed run keeps the steps it started with.
+        "flow.http_url_invalid",
+        "flow.http_blocked",
+    }
+)
+#: The kinds of step whose output later steps read (``steps.<id>``).
+LEAVES = ("command", "query", "http", "ask")
+RUN_NOT_RESUMABLE = _("Only a run that stopped by an error at one of its steps can be resumed.")
+BEFORE_ANY_STEP = _(
+    "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it "
+    "again whole."
+)
+RESUME_EXPIRED = _(
+    "This run can no longer be resumed: it stopped more than %(days)s days ago and no longer keeps what "
+    "its steps did. Run it again whole."
+)
+
+
+def resume_problem(run: FlowRun, now) -> tuple[str, str] | None:
+    """``(code, message)`` of why ``run`` cannot be resumed at the step that failed, or ``None``.
+
+    It must have stopped by an error at a step (its last entry), still keep what every earlier step left
+    and have stopped less than ``RESUME_DAYS`` ago.
+    """
+    steps = run.definition.get("steps", [])
+    if run.status != FlowRun.Status.FAILED:
+        return "flow.run_not_resumable", str(RUN_NOT_RESUMABLE)
+    last = run.log[-1] if run.log else {}
+    at_a_step = (
+        run.step_index < len(steps)
+        and last.get("outcome") == "failed"
+        and last.get("step") == steps[run.step_index].get("id")
+    )
+    if not at_a_step or run.error_code in NOT_RESUMABLE:
+        return "flow.run_not_resumable", str(BEFORE_ANY_STEP)
+    ended = run.finished_at or run.started_at
+    lost = any(
+        step.get("kind") in LEAVES and step.get("id") not in run.outputs
+        for step in steps[: run.step_index]
+    )
+    if lost or ended < now - dt.timedelta(days=RESUME_DAYS):
+        return "flow.resume_expired", str(RESUME_EXPIRED) % {"days": RESUME_DAYS}
+    return None
+
+
 def run_row(run: FlowRun) -> dict[str, Any]:
     return {
+        "resumable": resume_problem(run, timezone.now()) is None,
         "id": run.id,
         "flow_id": run.flow_id,
         "flow_version": run.flow_version,
@@ -629,6 +718,23 @@ def _clauses(failed: list[dict]) -> list[dict]:
     ]
 
 
+def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str]) -> dict:
+    """What «Try it» says of a call: where it would go and with what — every secret as ``vault.MASK`` and
+    the call's key as «…» (it is known when it runs) —, never calling."""
+    reads = [
+        path
+        for path in document.references([step.url, *step.headers.values(), step.body])
+        if path.startswith("steps.") and path.split(".")[1] in unknown_steps
+    ]
+    if reads:
+        return {"outcome": "cannot_tell", "unknown": reads}
+    masked = dict.fromkeys(document.secret_names(step.model_dump()), vault.MASK)
+    url, headers, body = document.render_call(step.model_dump(), values, masked, "…")
+    params = {"method": step.method, "url": url, "headers": headers, "body": body, "host": document.host_of(step.url)}
+    granted = document.http_grant(step.url) in grants
+    return {"outcome": "would_call" if granted else "not_allowed", "params": params}
+
+
 @operation(
     "flow.flow.test",
     kind="query",
@@ -673,8 +779,27 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         if stopped:
             steps.append(out | {"outcome": "not_reached"})
             continue
+        run_if = getattr(step, "run_if", None)
+        if run_if and not any(
+            path.startswith("steps.") and path.split(".")[1] in unknown_steps
+            for path in [*run_if, *document.references(list(run_if.values()))]
+        ):
+            skipped = document.failed_clauses(run_if, values)
+            if skipped:
+                steps.append(out | {"outcome": "skipped", "failed": _clauses(skipped)})
+                continue
         if step.kind == "delay":
             steps.append(out | {"outcome": "waits", "seconds": step.seconds})
+            continue
+        if step.kind == "http":
+            steps.append(out | _try_call(step, values, grants, unknown_steps))
+            unknown_steps.add(step.id)
+            continue
+        if step.kind == "ask":
+            # Nothing is asked; what the person would answer is not known here.
+            texts = {"title": document.fill(step.title, values), "details": document.fill(step.details, values)}
+            steps.append(out | {"outcome": "would_ask", "params": texts | {"role": step.role, "hours": step.hours}})
+            unknown_steps.add(step.id)
             continue
         if step.kind == "condition":
             reads = list(step.when)
@@ -723,4 +848,83 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         "starts": not trigger_failed,
         "trigger_failed": _clauses(trigger_failed),
         "steps": steps,
+    }
+
+
+# --- Questions (FLOW-F29) ----------------------------------------------------------------------------
+
+
+def can_answer(ctx: OperationContext, role: str) -> bool:
+    """Whether ``ctx`` may answer a question asked of ``role``: that role's people, and whoever runs the
+    business, always."""
+    return ctx.has(ROLE_PERMISSION.get(role, MANAGE)) or ctx.has(MANAGE)
+
+
+def question_row(question: Question) -> dict[str, Any]:
+    return {
+        "id": question.id,
+        "flow_id": question.flow_id,
+        "flow_name": question.flow.name,
+        "run_id": question.run_id,
+        "title": question.title,
+        "details": question.details,
+        "role": question.role,
+        "on_no": question.on_no,
+        "on_timeout": question.on_timeout,
+        "expires_at": question.expires_at,
+        "created_at": question.created_at,
+    }
+
+
+@operation(
+    "flow.question.list",
+    kind="query",
+    permission=ANSWER,
+    input=QuestionListIn,
+    output=QuestionPageOut,
+    ai={
+        "description": "«Waiting for your answer»: the questions automations asked and are waiting on that this person may "
+        "answer (their role's, or all of them for whoever runs the business), the soonest to expire first, "
+        "up to 100."
+    },
+)
+def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
+    roles = [role for role in ROLE_PERMISSION if can_answer(ctx, role)]
+    pending = (
+        Question.objects.select_related("flow")
+        .filter(status=Question.Status.PENDING, role__in=roles, run__status=FlowRun.Status.ASKING)
+        .order_by("expires_at", "id")[:100]
+    )
+    return {"rows": [question_row(question) for question in pending]}
+
+
+# --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
+
+
+def secret_row(secret: Secret) -> dict[str, Any]:
+    """What is ever shown of a secret: its name and who changed it when; never its value."""
+    return {
+        "id": secret.id,
+        "name": secret.name,
+        "created_at": secret.created_at,
+        "updated_at": secret.updated_at,
+        "updated_by": secret.updated_by,
+    }
+
+
+@operation(
+    "flow.secret.list",
+    kind="query",
+    permission=MANAGE,
+    input=SecretListIn,
+    output=SecretPageOut,
+    ai={
+        "description": "The NAMES of the secrets the automations' calls to other systems can use (never their "
+        "values, which nothing gives back), and whether this server can keep secrets."
+    },
+)
+def list_secrets(ctx: OperationContext, data: SecretListIn) -> dict:
+    return {
+        "rows": [secret_row(secret) for secret in Secret.objects.order_by("name", "id")[:100]],
+        "available": vault.available(),
     }

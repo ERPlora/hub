@@ -32,11 +32,17 @@ ROUTES = {
     ("POST", "/flow/flows/grant", "flow.flow.grant"),
     ("POST", "/flow/flows/run", "flow.flow.run"),
     ("GET", "/flow/runs", "flow.run.list"),
+    ("POST", "/flow/runs/retry", "flow.run.retry"),
     ("GET", "/flow/drafts", "flow.draft.list"),
     ("POST", "/flow/drafts", "flow.draft.propose"),
     ("POST", "/flow/drafts/dismiss", "flow.draft.dismiss"),
     ("GET", "/flow/catalog", "flow.catalog.read"),
     ("GET", "/flow/events/sample", "flow.event.sample"),
+    ("GET", "/flow/secrets", "flow.secret.list"),
+    ("POST", "/flow/secrets", "flow.secret.set"),
+    ("POST", "/flow/secrets/delete", "flow.secret.delete"),
+    ("GET", "/flow/questions", "flow.question.list"),
+    ("POST", "/flow/questions/answer", "flow.question.answer"),
 }
 
 

@@ -97,6 +97,28 @@ def db_dsn(django_db_setup):
     )
 
 
+# The other system of «Call another system» (FLOW-F27): a real local HTTPS server.
+
+
+@pytest.fixture(scope="module")
+def server(tmp_path_factory):
+    from .local_https import start
+
+    yield from start(tmp_path_factory.mktemp("tls"))
+
+
+@pytest.fixture
+def trusted(settings, server):
+    """The local server is trusted as a test's other system: its addresses and its certificate. Without
+    this, the server is the machine itself, and a call to it is blocked."""
+    from .local_https import Handler
+
+    settings.FLOW_HTTP_TRUSTED_ADDRESSES = ["127.0.0.1", "::1"]
+    settings.FLOW_HTTP_CA_BUNDLE = server["ca"]
+    Handler.seen.clear()
+    return f"https://localhost:{server['port']}"
+
+
 # Builders
 
 TASK_STEP = {

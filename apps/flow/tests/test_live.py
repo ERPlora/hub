@@ -23,7 +23,14 @@ def test_the_registry_is_valid():
 
 
 def test_the_lists_and_the_detail_can_be_followed_live():
-    assert set(flow_queries()) == {"flow.flow.list", "flow.flow.detail", "flow.run.list", "flow.draft.list"}
+    assert set(flow_queries()) == {
+        "flow.flow.list",
+        "flow.flow.detail",
+        "flow.run.list",
+        "flow.draft.list",
+        "flow.secret.list",
+        "flow.question.list",
+    }
 
 
 def test_each_query_and_its_events():
@@ -34,6 +41,10 @@ def test_each_query_and_its_events():
     assert queries["flow.run.list"] == events.RUN_EVENTS
     # A draft leaves the tray when it is used or dismissed.
     assert queries["flow.draft.list"] == events.DRAFT_EVENTS
+    # A secret's name comes and goes; never its value (FLOW-F26).
+    assert queries["flow.secret.list"] == events.SECRET_EVENTS
+    # A question comes, is answered or expires; one whose run is cancelled leaves too (FLOW-F29).
+    assert queries["flow.question.list"] == [*events.QUESTION_EVENTS, *events.RUN_EVENTS]
 
 
 # What a run does in a business is heard by that business only (review 2026-10-15, item 7)
@@ -97,3 +108,21 @@ def test_a_run_by_hand_in_b_is_heard_in_b_only(listen):
     # Positive control: the same listener of A hears a run in A.
     run("flow.flow.run", {"id": str(flow.id)}, system_context(A))
     assert "flow.run.finished" in heard_until(on_a, ["flow.run.finished"])
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_question_asked_and_answered_in_b_is_heard_in_b_only(listen):
+    # FLOW-F28/F29: «Waiting for your answer» of A never hears what an automation asked in B.
+    from apps.flow.models import Question
+
+    on_a, on_b = listen(A), listen(B)
+    flow = make_flow(trigger_kind="manual", steps=[{"id": "s1", "kind": "ask", "title": "Go?"}])
+    ran = run("flow.flow.run", {"id": str(flow.id)}, ctx_for(scope=B))
+    asked = ["flow.question.asked", "flow.run.parked", "flow.run.started"]
+    assert heard_until(on_b, asked) == asked
+    question = Question.objects.get(run_id=ran.id)
+    run("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for(scope=B))
+    answered = ["flow.question.answered", "flow.run.finished", "flow.run.resumed"]
+    assert heard_until(on_b, answered) == answered
+    assert heard(on_a, timeout=0.3) == []
+

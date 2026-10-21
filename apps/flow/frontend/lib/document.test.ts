@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogOut, FlowOut, Step } from '../operations';
 import {
   addStep,
+  asCallText,
+  callChoices,
   conditionRows,
   dataChoices,
   delayParts,
@@ -219,4 +221,69 @@ describe('the data a step can insert', () => {
       { path: 'steps.s3.number', group: 's3', example: undefined },
     ]);
   });
+
+  it('a step that may be skipped or carry on after failing also leaves whether it did (FLOW-F25)', () => {
+    const steps: Step[] = [{ ...CMD, id: 's1', run_if: { 'input.total': { gt: 1 } }, on_error: 'continue' }];
+    expect(dataChoices(steps, 1, {}, catalog).map((choice) => choice.path)).toEqual([
+      'steps.s1.id',
+      'steps.s1.number',
+      'steps.s1.skipped',
+      'steps.s1.failed',
+      'steps.s1.error_code',
+    ]);
+  });
 });
+
+// FLOW-F27: «Call another system».
+describe('a call to another system', () => {
+  it('starts as a POST with nothing filled in', () => {
+    expect(addStep(emptyDocument(), 'http').steps).toEqual([{ id: 's1', kind: 'http', method: 'POST', url: '', headers: {}, body: '', timeout: 10 }]);
+  });
+
+  it('asks for the permission of its origin, written by hand', () => {
+    const call = (url: string): Step => ({ id: 's1', kind: 'http', method: 'GET', url, headers: {}, body: '', timeout: 10 });
+    expect(requiredGrants([call('https://API.example.com/v1/{{input.id}}?q=1')])).toEqual(['http:https://api.example.com']);
+    expect(requiredGrants([call('https://{{input.host}}/x'), call('http://api.example.com'), call('')])).toEqual([]);
+  });
+
+  it('leaves its status and its answer to the steps after it', () => {
+    const steps: Step[] = [{ id: 's1', kind: 'http', method: 'GET', url: 'https://api.example.com', headers: {}, body: '', timeout: 10 }];
+    expect(dataChoices(steps, 1, {}, null).map((choice) => choice.path)).toEqual(['steps.s1.status', 'steps.s1.body']);
+  });
+
+  it('offers the secrets and its own key to insert, never their values', () => {
+    expect(callChoices(['STRIPE_KEY'])).toEqual([
+      { path: 'secret.STRIPE_KEY', group: 'secret', example: undefined },
+      { path: 'run.idempotency_key', group: 'run', example: undefined },
+    ]);
+  });
+
+  it('every value of a call is text: a datum alone becomes {{…}}', () => {
+    expect(asCallText('secret.STRIPE_KEY')).toBe('{{secret.STRIPE_KEY}}');
+    expect(asCallText('input.total')).toBe('{{input.total}}');
+    expect(asCallText('Bearer {{secret.K}}')).toBe('Bearer {{secret.K}}');
+    expect(asCallText(12)).toBe('12');
+    expect(asCallText('')).toBe('');
+  });
+});
+
+// FLOW-F28: «Ask someone first».
+describe('a question before going on', () => {
+  it('starts asking whoever runs the business, waiting three days, stopping on a no', () => {
+    expect(addStep(emptyDocument(), 'ask').steps).toEqual([
+      { id: 's1', kind: 'ask', title: '', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' },
+    ]);
+  });
+
+  it('asks no permission and leaves the answer for the next steps', () => {
+    const steps: Step[] = [{ id: 's1', kind: 'ask', title: 'Go?', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' }];
+    expect(requiredGrants(steps)).toEqual([]);
+    expect(dataChoices(steps, 1, null, null).map((choice) => choice.path)).toEqual([
+      'steps.s1.approved',
+      'steps.s1.expired',
+      'steps.s1.note',
+      'steps.s1.answered_by',
+    ]);
+  });
+});
+

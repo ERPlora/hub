@@ -32,13 +32,18 @@ export interface ManualTrigger {
 }
 export type Trigger = EventTrigger | ScheduleTrigger | AtTrigger | ManualTrigger;
 
-export interface CommandStep {
+/** «Only if…» and «If it fails, carry on» (FLOW-F25): absent, the step always runs and a failure stops the run. */
+export interface StepOptions {
+  run_if?: Condition;
+  on_error?: 'stop' | 'continue';
+}
+export interface CommandStep extends StepOptions {
   id: string;
   kind: 'command';
   operation: string;
   params: Record<string, unknown>;
 }
-export interface QueryStep {
+export interface QueryStep extends StepOptions {
   id: string;
   kind: 'query';
   operation: string;
@@ -54,11 +59,38 @@ export interface DelayStep {
   id: string;
   kind: 'delay';
   seconds: number;
+  run_if?: Condition;
 }
-export type Step = CommandStep | QueryStep | ConditionStep | DelayStep;
+/** «Call another system» (FLOW-F27): its texts may read `{{secret.NAME}}` and `{{run.idempotency_key}}`. */
+export interface HttpStep extends StepOptions {
+  id: string;
+  kind: 'http';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url: string;
+  headers: Record<string, string>;
+  body: string;
+  timeout: number;
+}
+/** «Ask someone first» (FLOW-F28): the run waits for a person's yes or no. */
+export interface AskStep {
+  id: string;
+  kind: 'ask';
+  /** The question; `{{…}}` data are filled in when it is asked. */
+  title: string;
+  details: string;
+  /** Who answers: '' whoever runs the business, `manager` or `employee`. */
+  role: QuestionRole;
+  /** How long to wait: 1 to 720 hours. */
+  hours: number;
+  on_no: 'stop' | 'continue';
+  on_timeout: 'no' | 'stop' | 'continue';
+  run_if?: Condition;
+}
+export type QuestionRole = '' | 'manager' | 'employee';
+export type Step = CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep;
 export type StepKind = Step['kind'];
 
-export type RunStatus = 'running' | 'waiting' | 'succeeded' | 'stopped' | 'failed' | 'cancelled';
+export type RunStatus = 'running' | 'waiting' | 'calling' | 'asking' | 'succeeded' | 'stopped' | 'failed' | 'cancelled';
 
 export interface FlowRefIn {
   id?: string;
@@ -129,8 +161,36 @@ export interface LogEntry {
   step: string;
   kind: StepKind;
   operation?: string;
-  outcome: 'done' | 'found' | 'not_found' | 'passed' | 'stopped' | 'waiting' | 'waited' | 'failed';
+  outcome:
+    | 'done'
+    | 'found'
+    | 'not_found'
+    | 'passed'
+    | 'stopped'
+    | 'waiting'
+    | 'waited'
+    | 'failed'
+    | 'resumed'
+    | 'skipped'
+    | 'calling'
+    | 'called'
+    | 'asking'
+    | 'answered'
+    | 'expired';
+  /** Who a question was asked of (`asking`). */
+  role?: QuestionRole;
+  /** The answer (`answered`) and its note. */
+  approved?: boolean;
+  note?: string;
+  /** The host a call went to (`calling`, `called`). */
+  host?: string;
+  /** What a call answered (`called`). */
+  status?: number;
+  /** A failure of a step with «If it fails, carry on»: the run went on. */
+  continued?: boolean;
   at: string;
+  /** Who resumed it (`resumed`) or answered it (`answered`). */
+  by?: string;
   count?: number;
   seconds?: number;
   until?: string;
@@ -155,6 +215,61 @@ export interface RunOut {
   started_at: string;
   finished_at: string | null;
   started_by: string;
+  /** It stopped by an error at a step and can still be resumed there (`flow.run.retry`). */
+  resumable: boolean;
+}
+
+export interface RunRefIn {
+  id: string;
+}
+
+/** A question an automation asked and waits on (FLOW-F29), as «Waiting for your answer» shows it. */
+export interface QuestionOut {
+  id: string;
+  flow_id: string;
+  flow_name: string;
+  run_id: string;
+  title: string;
+  details: string;
+  role: QuestionRole;
+  on_no: 'stop' | 'continue';
+  on_timeout: 'no' | 'stop' | 'continue';
+  expires_at: string;
+  created_at: string;
+}
+export interface QuestionPageOut {
+  rows: QuestionOut[];
+}
+export interface AnswerIn {
+  id: string;
+  approve: boolean;
+  note?: string;
+}
+export interface AnsweredOut {
+  id: string;
+  run_id: string;
+  status: RunStatus;
+}
+
+/** A secret (FLOW-F26): its name, never its value. */
+export interface SecretOut {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  updated_by: string;
+}
+export interface SecretPageOut {
+  rows: SecretOut[];
+  /** Whether this server can keep secrets (it has its key). */
+  available: boolean;
+}
+export interface SecretSetIn {
+  name: string;
+  value: string;
+}
+export interface SecretRefIn {
+  name: string;
 }
 
 export interface RunListIn {
@@ -258,6 +373,9 @@ export interface ClauseOut {
 }
 
 export type TestOutcome =
+  | 'skipped'
+  | 'would_call'
+  | 'would_ask'
   | 'high_risk'
   | 'would_run'
   | 'stops_here'
@@ -306,6 +424,12 @@ declare module '@erplora/ui/sdk' {
     'flow.flow.grant': { input: GrantIn; output: FlowOut };
     'flow.flow.run': { input: RunIn; output: RunOut };
     'flow.run.list': { input: RunListIn; output: RunPageOut };
+    'flow.run.retry': { input: RunRefIn; output: RunOut };
+    'flow.secret.list': { input: Record<string, never>; output: SecretPageOut };
+    'flow.secret.set': { input: SecretSetIn; output: SecretOut };
+    'flow.secret.delete': { input: SecretRefIn; output: DeletedOut };
+    'flow.question.list': { input: Record<string, never>; output: QuestionPageOut };
+    'flow.question.answer': { input: AnswerIn; output: AnsweredOut };
     'flow.draft.list': { input: DraftListIn; output: Page<DraftOut> };
     'flow.draft.propose': { input: DraftProposeIn; output: DraftOut };
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };
