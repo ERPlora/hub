@@ -139,8 +139,8 @@ máximas», la casilla «Se puede elegir la misma opción más de una vez» y «
 | COMBO-F07 | Elegir un menú al vender | servidor hecho; la hoja del TPV es de Ventas (pedido a Ventas) |
 | COMBO-F08 | Cobrar el menú: precio cerrado y suplementos | servidor hecho; lo llama Ventas al cobrar (pedido a Ventas) |
 | COMBO-F09 | Repartir el IVA de un menú | servidor hecho; lo aplica Ventas en sus líneas (pedido a Ventas) |
-| COMBO-F10 | Bajar el stock de cada plato al cobrar | contrato probado con Inventario real; el aviso lo manda Ventas (pedido a Ventas) |
-| COMBO-F11 | Mandar el menú a cocina | contrato hecho; la comanda la arma Ventas y la pinta Cocina (pedido a Ventas y a Cocina) |
+| COMBO-F10 | Bajar el stock de cada plato al cobrar | hecho |
+| COMBO-F11 | Mandar el menú a cocina | hecho |
 | COMBO-F12 | Marcar una elección como agotada | hecho |
 | COMBO-F13 | Cuando un producto deja el catálogo | hecho |
 
@@ -360,37 +360,44 @@ ofrecidas de un menú «para llevar» valen 0 € y van a categorías distintas,
 Implicados: SALE-F12, TAX-F05
 
 ### COMBO-F10 Bajar el stock de cada plato al cobrar
-Estado: contrato probado con Inventario real; el aviso de venta lo manda Ventas (pedido a Ventas)
+<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f11 old:combos/WORKFLOW.md#combos-f10 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al cobrar, Ventas pone en el aviso de venta cobrada, en la línea del menú, cada producto elegido con
-   su cantidad (la de la línea ya multiplicada: tres menús, tres raciones de cada plato).
-2. Inventario baja el stock de cada producto elegido, nunca el del menú, y solo de los que controlan
-   existencias; un producto de tipo servicio no mueve nada.
-3. Si se anula la venta, Inventario devuelve lo que salió de su libro de movimientos.
-4. Si se devuelve, Inventario repone lo que le lleguen como líneas devueltas (INVENTORY-F24): Ventas
-   manda los componentes del menú × los menús devueltos, una línea por producto.
-Entra: los componentes que da COMBO-F08 (producto, cantidad, si es servicio).
-Sale: movimientos de stock por producto (Inventario); nada de este módulo.
-Si falla: como INVENTORY-F21. Probado con Inventario real (`restore_refund` repone los platos que le
-llegan como líneas).
-Implicados: INVENTORY-F22, INVENTORY-F23, SALE-F12
+1. Cobra en el TPV una cuenta con menús (COMBO-F08). En Menús no se hace nada a mano.
+2. En unos segundos, Inventario baja el stock de cada producto elegido: tantas raciones como menús y
+   como veces se eligió (tres menús con dos cafés cada uno, seis cafés). El menú no tiene stock propio,
+   y un producto de tipo servicio o sin control de stock no mueve nada.
+3. Si se anula la venta, Inventario devuelve todo lo que salió.
+4. Si se devuelve una parte (uno de tres menús), Inventario repone una ración de cada plato de ese menú.
+Entra: los platos de la línea del menú tal como se cobraron: cada producto elegido, cuántas veces y si
+es un servicio (COMBO-F08).
+Sale: un movimiento «Venta» por plato en Inventario (INVENTORY-F22), y su reposición al anular
+(INVENTORY-F23) o al devolver (INVENTORY-F24); nada de este módulo. Si el aviso de la venta llega dos
+veces, el stock baja una sola.
+Si falla: la venta ya está cobrada; si Inventario no puede bajar el stock en ese momento, lo reintenta
+solo (INVENTORY-F21).
+Implicados: INVENTORY-F22, INVENTORY-F23, INVENTORY-F24, SALE-F12
 
 ### COMBO-F11 Mandar el menú a cocina
-Estado: contrato hecho; la comanda la arma Ventas y la pinta Cocina (pedido a Ventas y a Cocina)
-Actor: sistema
-Pantalla: ninguna
+<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F10 old:combos/WORKFLOW.md#combos-f11 wf:restaurante-dia#rec_restaurante-f07 -->
+Estado: hecho
+Actor: empleado, responsable
+Pantalla: ninguna (la comanda la pinta Cocina)
 Pasos:
-1. El camarero añade un menú a la cuenta de la mesa y manda la cuenta a cocina.
-2. Ventas manda la línea del menú con su nombre, su nombre de cocina y los platos elegidos, cada uno
-   con su producto, su categoría y su cantidad (lo que dio COMBO-F08 al pedir).
-3. Cocina pone cada plato en la estación de su producto (o de su categoría), bajo el nombre de cocina
-   del menú (KITCHEN-F06).
-Entra: la línea del menú de la cuenta abierta.
-Sale: nada de este módulo.
-Si falla: lo decide Ventas (pedido: no mandar a cocina un menú con un plato obligatorio sin elegir).
-Implicados: KITCHEN-F06, SALE-F20
+1. En el TPV, añade un menú a la cuenta de la mesa eligiendo sus platos (COMBO-F07) y pulsa «Enviar
+   comanda».
+2. En unos segundos, Cocina recibe la comanda: cada plato elegido en la estación de su producto (o de
+   su categoría), bajo la cabecera del menú con su nombre de cocina (o su nombre, si no tiene), con la
+   cantidad por los menús pedidos y la nota del menú en cada plato (KITCHEN-F06).
+3. En el papel de cada estación sale la misma cabecera del menú con sus platos debajo.
+Entra: la línea del menú de la cuenta abierta, con lo que dio Menús al pedirla (COMBO-F08): su nombre
+de cocina y cada plato con su producto, su categoría y cuántas veces se eligió.
+Sale: nada de este módulo; la comanda es de Cocina (avisa: comanda enviada).
+Si falla: un menú al que le falta un plato obligatorio no entra en la cuenta (Menús lo rechaza al
+pedirlo), así que nunca llega a cocina a medias. Un plato que es un servicio no se cocina.
+Implicados: KITCHEN-F06, KITCHEN-F08, SALE-F12, SALE-F20
 
 ### COMBO-F12 Marcar una elección como agotada
 Estado: hecho
@@ -524,20 +531,20 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 
 ### Contrato con Inventario
 
-- En el aviso `sale.sale.completed`, la línea del menú lleva `components[]` con `product_id`,
-  `quantity` (la de la línea ya multiplicada) e `is_service` de cada componente de COMBO-F08, y no
-  mueve stock por sí misma (INVENTORY-F22; ya implementado en `inventory.stock.apply_sale`). Probado con
-  Inventario real.
-- La devolución: INVENTORY-F24 ya repone las líneas que le llegan en `sale.sale.refunded`
-  (`inventory.stock.restore_refund`, `lines` de producto y cantidad). Ventas manda los componentes del
-  menú × los menús devueltos como esas líneas (pedido a Ventas); probado con Inventario real.
+- En el aviso `sale.sale.completed`, Ventas pone en la línea del menú `components[]` con `product_id`,
+  `quantity` (la de cada plato por la de la línea) e `is_service` de cada componente de COMBO-F08; la
+  línea del menú no mueve stock por sí misma (INVENTORY-F22, `inventory.stock.apply_sale`).
+- La anulación (`sale.sale.voided`) la repone Inventario de su libro de movimientos (INVENTORY-F23), y
+  la devolución (`sale.sale.refunded`) con los componentes × los menús devueltos, una línea por producto
+  (INVENTORY-F24, `inventory.stock.restore_refund`).
+- Probado de punta a punta con el reparto real de avisos del worker.
 
 ### Contrato con Cocina
 
 - Cocina no lee Menús. Recibe de Ventas, en `sale.order.fired`, la línea del menú con `name`,
-  `kitchen_name` y sus componentes (`product_id`, `product_name`, `category_id`, `quantity`), y pone
-  cada plato en su estación bajo el nombre de cocina del menú (KITCHEN-F06, pedido a Ventas por
-  Cocina).
+  `kitchen_name` y sus componentes (`product_id`, `product_name`, `category_id`, `quantity` × menús), y
+  pone cada plato en su estación bajo el nombre de cocina del menú, en la tarjeta y en el papel
+  (KITCHEN-F06, KITCHEN-F08). Probado de punta a punta con el reparto real de avisos del worker.
 
 ### Quién puede qué
 

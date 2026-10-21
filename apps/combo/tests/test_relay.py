@@ -1,25 +1,33 @@
-"""Menus and the other apps through the worker's outbox relay, end to end (COMBO-F13).
+"""Menus and the other apps through the worker's outbox relay, end to end (COMBO-F10, F11, F13).
 
 The other app's real operation records its event in the outbox; one tick of the worker's real loop
 (``base.worker.run`` → ``base.relay``) hands it to the reaction of each app that listens, as production runs it:
 nothing is called by hand. A repeated delivery changes nothing, and what happens in hub B is heard in B only.
 
+- COMBO-F10: Sales charges menus (``sale.sale.complete``) and Inventory lowers each dish picked, times the
+  menus and the times it was picked, never the menu, and nothing for a service; a refund puts each dish back.
+- COMBO-F11: Sales fires a check with a menu (``sale.order.fire``) and the kitchen gets each dish at its
+  station under the menu's kitchen name, on the card and on paper; a menu short of a course never gets there.
 - COMBO-F13: Inventory deletes a product (``inventory.product.delete``) and its choices leave every menu
   (``combo.option.drop_product``); until the tick they are marked «no longer in the catalogue» and never offered.
 """
 
 import json
 import threading
+from decimal import Decimal
 
 import psycopg
 import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
+from live.errors import Conflict
 from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
 from apps.combo.models import ChoiceOption
+from apps.inventory.models import Product, StockMovement
+from apps.kitchen.models import Ticket
 from base import catalog, worker
 from base.catalog import RegisterResult
 from base.models import EventDelivery
@@ -56,16 +64,21 @@ def tick(db, monkeypatch):
     return one_tick
 
 
-def delivery_to_combo(name: str) -> tuple[str, int]:
-    """``(status, attempts)`` of the delivery of the newest ``name`` event to Menus."""
+def delivery_to(app: str, name: str) -> tuple[str, int]:
+    """``(status, attempts)`` of the delivery of the newest ``name`` event to ``app``."""
     event = OutboxEvent.objects.filter(name=name).latest("id")
-    row = EventDelivery.objects.get(event_id=event.id, app_label="combo")
+    row = EventDelivery.objects.get(event_id=event.id, app_label=app)
     return row.status, row.attempts
 
 
-def product(name: str, sku: str, scope=A, **more):
+def delivery_to_combo(name: str) -> tuple[str, int]:
+    """``(status, attempts)`` of the delivery of the newest ``name`` event to Menus."""
+    return delivery_to("combo", name)
+
+
+def product(name: str, sku: str, scope=A, *, price: int = 400, **more):
     """A product of Inventory, made by Inventory."""
-    data = {"name": name, "sku": sku, "price": 400, "tax_category_key": FOOD, **more}
+    data = {"name": name, "sku": sku, "price": price, "tax_category_key": FOOD, **more}
     return run("inventory.product.create", data, scope)
 
 
@@ -156,6 +169,217 @@ def test_combo_f13_a_product_on_no_menu_is_deleted_and_nothing_happens(tick, des
     assert delivery_to_combo("inventory.product.deleted") == ("delivered", 1)
     assert dropped(lonely.id) == []
     assert statuses("Menu of the day") == [("Flan", "offered"), ("Cheesecake", "offered")]
+
+
+# ── COMBO-F10 and F11: a menu sold and fired, through Sales, Inventory and the kitchen ─────────────
+
+
+def stock(sku: str) -> Decimal:
+    return Product.objects.get(sku=sku, is_deleted=False).stock
+
+
+@pytest.fixture
+def till_menu(db):
+    """«Menu of the day» (kitchen name «MENU»), 13,50 € eaten in: «Starters» (lentils or salad), «Mains» (hake,
+    or steak +2,00 €), an optional «Coffee» course that takes the same coffee twice, and an optional «Service»
+    of a service (the table service). Each product starts with 10 in stock. Returns the choices by SKU."""
+    for name, sku, price in (
+        ("Lentils", "LEN", 500),
+        ("Salad", "SAL", 450),
+        ("Hake", "HAK", 1400),
+        ("Steak", "STK", 1800),
+        ("Coffee", "COF", 150),
+    ):
+        product(name, sku, price=price, initial_stock="10")
+    product("Table service", "TIP", price=100, product_type="service")
+    run(
+        "combo.combo.create",
+        {"name": "Menu of the day", "kitchen_name": "MENU", "price": 1350, "tax_category_key": FOOD},
+    )
+    for group, minimum, maximum, repeat in (
+        ("Starters", 1, 1, False),
+        ("Mains", 1, 1, False),
+        ("Coffee", 0, 2, True),
+        ("Service", 0, 1, False),
+    ):
+        run(
+            "combo.group.create",
+            {"combo": "Menu of the day", "name": group, "min_choices": minimum, "max_choices": maximum, "allow_repeat": repeat},
+        )
+    options = {}
+    for group, sku, delta in (
+        ("Starters", "LEN", 0),
+        ("Starters", "SAL", 0),
+        ("Mains", "HAK", 0),
+        ("Mains", "STK", 200),
+        ("Coffee", "COF", 0),
+        ("Service", "TIP", 0),
+    ):
+        created = run(
+            "combo.option.create",
+            {"combo": "Menu of the day", "group": group, "product": sku, "price_delta": delta},
+        )
+        options[sku] = str(created.id)
+    return options
+
+
+def picks(options: dict, *skus: str) -> list[dict]:
+    """The choices of the menu, by SKU, as the till sends them: one entry per pick."""
+    return [{"option_id": options[sku]} for sku in skus]
+
+
+def charge(key: str, options: dict, *skus: str, quantity: str = "1", scope=A):
+    """Sales charges ``quantity`` menus with ``skus`` picked, by card, as the till does."""
+    return run(
+        "sale.sale.complete",
+        {
+            "idempotency_key": f"combo-relay-{key}",
+            "payments": [{"method": "card"}],
+            "combo_lines": [{"combo": "Menu of the day", "choices": picks(options, *skus), "quantity": quantity}],
+        },
+        scope,
+    )
+
+
+def test_combo_f10_three_menus_lower_three_portions_of_each_dish_through_the_relay(tick, till_menu):
+    """inventory#69: the menu has no stock of its own; each dish picked moves, times the menus and the times
+    it was picked (two coffees in each), and the service moves nothing."""
+    sale = charge("f10-three", till_menu, "LEN", "STK", "COF", "COF", "TIP", quantity="3")
+    (line,) = sale.lines
+    # 13,50 + 2,00 of the steak, per menu: what Menus priced.
+    assert line.unit_price == 1550
+    # Sales' command only records its notice: the stock waits for the relay.
+    assert (stock("LEN"), stock("STK"), stock("COF")) == (Decimal("10"), Decimal("10"), Decimal("10"))
+
+    tick()
+
+    assert delivery_to("inventory", "sale.sale.completed") == ("delivered", 1)
+    assert (stock("LEN"), stock("STK"), stock("COF")) == (Decimal("7"), Decimal("7"), Decimal("4"))
+    assert (stock("SAL"), stock("HAK")) == (Decimal("10"), Decimal("10"))
+    assert not Product.objects.filter(name="Menu of the day").exists()
+    assert not StockMovement.objects.filter(product__sku="TIP").exists()
+    assert StockMovement.objects.filter(product__sku="COF", movement_type="sale").get().qty == Decimal("-6")
+
+    tick()
+    assert (stock("LEN"), stock("STK"), stock("COF")) == (Decimal("7"), Decimal("7"), Decimal("4"))
+
+
+def test_combo_f10_refunding_one_of_three_menus_puts_one_portion_of_each_dish_back_through_the_relay(tick, till_menu):
+    sale = charge("f10-refund", till_menu, "SAL", "HAK", "COF", quantity="3")
+    tick()
+    assert (stock("SAL"), stock("HAK"), stock("COF")) == (Decimal("7"), Decimal("7"), Decimal("7"))
+    (line,) = sale.lines
+
+    run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(sale.id),
+            "reason": "Cold",
+            "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 1350}],
+            "lines": [{"line_id": str(line.id), "quantity": "1"}],
+        },
+    )
+    tick()
+
+    assert delivery_to("inventory", "sale.sale.refunded") == ("delivered", 1)
+    assert (stock("SAL"), stock("HAK"), stock("COF")) == (Decimal("8"), Decimal("8"), Decimal("8"))
+    tick()
+    assert (stock("SAL"), stock("HAK"), stock("COF")) == (Decimal("8"), Decimal("8"), Decimal("8"))
+
+
+def test_combo_f10_voiding_the_sale_gives_every_dish_back_through_the_relay(tick, till_menu):
+    sale = charge("f10-void", till_menu, "LEN", "HAK", "COF", "COF", quantity="2")
+    tick()
+    assert (stock("LEN"), stock("HAK"), stock("COF")) == (Decimal("8"), Decimal("8"), Decimal("6"))
+
+    run("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong table"})
+    tick()
+
+    assert delivery_to("inventory", "sale.sale.voided") == ("delivered", 1)
+    assert (stock("LEN"), stock("HAK"), stock("COF")) == (Decimal("10"), Decimal("10"), Decimal("10"))
+
+
+def station(name: str, usage: str = "kitchen"):
+    return run("kitchen.station.create", {"name": name, "printer_usage": usage})
+
+
+def route(sku: str, station_name: str) -> None:
+    run("kitchen.routing.set", {"product": sku, "station": station_name})
+
+
+def kitchen_paper() -> dict[str, list[dict]]:
+    """The items of each kitchen sheet sent to print, by printer function."""
+    from apps.printing.models import PrintJob
+
+    jobs = PrintJob.objects.filter(document_type="kitchen_order").order_by("created_at", "id")
+    return {job.usage: job.document["items"] for job in jobs}
+
+
+def test_combo_f11_a_menu_fired_reaches_each_station_under_its_kitchen_name_through_the_relay(tick, till_menu):
+    """sales#522 and hub#1156: the kitchen gets the dishes the table chose, each at its own station, under the
+    menu's kitchen name, on the card and on paper; the service is never cooked."""
+    station("Cold")
+    station("Grill")
+    station("Bar", usage="bar")
+    route("LEN", "Cold")
+    route("STK", "Grill")
+    route("COF", "Bar")
+    order = run("sale.order.open", {"label": "Table 4"})
+    (line,) = run(
+        "sale.order.add_combo_line",
+        {
+            "order_id": str(order.id),
+            "combo": "Menu of the day",
+            "choices": picks(till_menu, "LEN", "STK", "COF", "COF", "TIP"),
+            "quantity": "2",
+            "notes": "No salt",
+        },
+    ).lines
+    run("sale.order.fire", {"order_id": str(order.id)})
+    # Sales' command only records its notice: the kitchen saves its ticket when the relay hands it over.
+    assert not Ticket.objects.exists()
+
+    tick()
+
+    assert delivery_to("kitchen", "sale.order.fired") == ("delivered", 1)
+    (ticket,) = run("kitchen.ticket.board", {}).cooking
+    assert ticket.saved is True
+    assert [(item.name, item.quantity, item.menu_name, item.station_name) for item in ticket.items] == [
+        ("Lentils", Decimal("2"), "MENU", "Cold"),
+        ("Steak", Decimal("2"), "MENU", "Grill"),
+        ("Coffee", Decimal("4"), "MENU", "Bar"),
+    ]
+    assert {item.notes for item in ticket.items} == {"No salt"}
+    assert {item.menu_line_id for item in ticket.items} == {line.id}
+    ref = str(line.id)
+    dish = {"notes": "No salt", "combo_ref": ref, "combo_name": "MENU"}
+    assert kitchen_paper() == {
+        "kitchen": [{"name": "Lentils", "quantity": 2.0, **dish}, {"name": "Steak", "quantity": 2.0, **dish}],
+        "bar": [{"name": "Coffee", "quantity": 4.0, **dish}],
+    }
+
+    tick()
+    assert Ticket.objects.count() == 1
+
+
+def test_combo_f11_a_menu_short_of_a_required_course_never_reaches_the_kitchen(tick, till_menu):
+    """sales#535: a menu without its main course is refused by Menus when it is ordered, so the check has
+    nothing to fire and the kitchen never gets half a menu."""
+    order = run("sale.order.open", {"label": "Table 4"})
+    with pytest.raises(Conflict) as refused:
+        run(
+            "sale.order.add_combo_line",
+            {"order_id": str(order.id), "combo": "Menu of the day", "choices": picks(till_menu, "LEN")},
+        )
+    assert refused.value.code == "combo.group_incomplete"
+    with pytest.raises(Conflict) as nothing:
+        run("sale.order.fire", {"order_id": str(order.id)})
+    assert nothing.value.code == "sale.nothing_to_fire"
+
+    tick()
+
+    assert not Ticket.objects.exists()
+    assert run("kitchen.ticket.board", {}).cooking == []
 
 
 # ── Two hubs, on committed data ──────────────────────────────────────────────────────────────
