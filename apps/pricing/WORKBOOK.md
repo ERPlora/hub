@@ -1,7 +1,7 @@
 # Workbook — Tarifas (app)
 Prefijo: PRICING
 Alcance MVP: transversal (peluquería y restaurante: precios por grupo de clientes y descuentos automáticos)
-Estado de la app: hecha (servidor y páginas); Ventas aún no la llama (ver «Contrato con Ventas»)
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `pricing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -125,16 +125,17 @@ Dos tablas, una encima de otra, como en el producto actual.
 la general, «—» si no tiene), **Impuesto** («Según el negocio», «Impuesto incluido», «Impuesto no
 incluido»), **Vigencia** («Siempre», «Desde 1 jul 2026», «Hasta…» o las dos fechas), **Precios**
 (cuántos tiene) y **Estado** (Activa o Inactiva). Se ordena por Código, Nombre, Divisa, Grupo e Impuesto
-(por defecto, por nombre) y se filtra, con el embudo de la barra, por Código, Nombre y Divisa
-(«contiene»), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido; **Inactivas**, o
-**Todos** para las dos); 50 por página, en lista o en tarjetas.
+(por defecto, por nombre) y se filtra, con el embudo de la barra, por Código, Nombre y Divisa (por el
+texto que contienen), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido;
+**Inactivas**, o **Todos** para las dos); 50 por página, en lista o en tarjetas.
 
 - **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (EUR), **Impuesto**
   (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
   **Hasta**, y **Tarifa general** (un interruptor; no se puede con grupo).
 - Acciones de fila: **Abrir** (también pulsando la fila), **Editar**, **Hacer general** (en el menú «⋮»;
-  solo en una activa, sin grupo y que no lo sea; pide confirmación), **Desactivar** (en el menú «⋮»; pide
-  confirmación; no en la general) o **Activar** (en las inactivas). El empleado solo ve **Abrir**.
+  solo en una activa, sin grupo, en euros y que no lo sea; pide confirmación), **Desactivar** (en el
+  menú «⋮»; pide confirmación; no en la general) o **Activar** (en las inactivas). El empleado solo ve
+  **Abrir**.
 
 **Reglas de descuento**: buscador «Buscar código o nombre…», columnas **Código**, **Nombre**, **Tipo**
 (Porcentaje, Importe por unidad, Compra X, llévate Y, Por tramos), **Valor** («10 %», «0,50 € por
@@ -159,8 +160,9 @@ Debajo, **Precios**: buscador «Buscar producto o servicio…», columnas **Art�
 **Precio de ficha** (el de Inventario; «—» en un servicio). Los precios, en la divisa de la tarifa. Orden
 por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 
-- **+** abre **Nuevo precio**: **Producto** o **Servicio** (un selector), el buscador del artículo
-  (por nombre o SKU), **Desde** (cantidad mínima, 1 por defecto) y **Precio**.
+- **+** abre **Nuevo precio**: **Tipo** (Producto o Servicio), el buscador del artículo (un producto por
+  nombre o SKU; un servicio por nombre), **Desde la cantidad** (cantidad mínima, 1 por defecto) y
+  **Precio**.
 - Acciones de fila: **Editar** (precio y cantidad mínima; también pulsando la fila) y **Quitar** (pide
   confirmación).
 
@@ -192,7 +194,7 @@ por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 | PRICING-F10 | Crear una regla de descuento | hecho |
 | PRICING-F11 | Editar una regla | hecho |
 | PRICING-F12 | Desactivar o reactivar una regla | hecho |
-| PRICING-F13 | Consultar el precio de una línea | hecho — Ventas aún no lo pide (ver «Contrato con Ventas») |
+| PRICING-F13 | Consultar el precio de una línea | hecho |
 | PRICING-F14 | Cuando se borra un producto, una categoría o un grupo, o cambia un servicio | hecho |
 
 ### PRICING-F01 Ver las tarifas
@@ -301,9 +303,10 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
 Pasos:
 1. **+** en «Precios»: **Nuevo precio**.
-2. Elige **Producto** o **Servicio** y búscalo por nombre o SKU.
-3. **Desde**: la cantidad mínima a partir de la que vale (1 por defecto; en la unidad del producto, «0,5»
-   kg, y en su escalón). Para precios por volumen, repite el producto con otra cantidad mínima.
+2. En **Tipo**, elige **Producto** (búscalo por nombre o SKU) o **Servicio** (búscalo por nombre).
+3. **Desde la cantidad**: la cantidad mínima a partir de la que vale (1 por defecto; en la unidad del
+   producto, «0,5» kg, y en su escalón). Para precios por volumen, repite el producto con otra cantidad
+   mínima.
 4. **Precio**: en euros, como lo escribe una persona («12,50»). Es el precio por la misma cantidad que el
    de la ficha (si la ficha dice «0,37 € por 100 ud», el de la tarifa también es por 100 ud).
 5. Pulsa **Añadir**.
@@ -311,7 +314,7 @@ Entra: la tarifa (activa), el artículo y su precio. El asistente nombra la tari
 nombre y el artículo por su nombre o su SKU.
 Sale: el precio y `pricing.price_item.added`.
 Si falla: debajo de su campo y sin guardar nada: «Esa tarifa no está disponible: no existe en este
-negocio o está desactivada.», «Ese producto ya tiene precio en esta tarifa desde esa cantidad.», un
+negocio o está desactivada.», «Ese artículo ya tiene precio en esta tarifa desde esa cantidad.», un
 producto que no existe o está borrado, una cantidad que no encaja en la unidad del producto o que no es
 mayor que 0, un precio negativo. Sin Servicios en el negocio: «Servicios no está activa en este
 negocio.».
@@ -323,13 +326,13 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
 Pasos:
-1. **Editar** en la fila: cambia **Precio** o **Desde** y **Guardar**.
+1. **Editar** en la fila: cambia **Precio** o **Desde la cantidad** y **Guardar**.
 2. **Quitar** en la fila y confirma «Se quitará el precio de {artículo} desde {cantidad}. Se cobrará el de
    otra tarifa o el de la ficha.».
 Entra: el precio, por su fila; el asistente, por la tarifa, el artículo y la cantidad mínima (1 si no la
 dice).
 Sale: `pricing.price_item.updated` o `pricing.price_item.removed`.
-Si falla: «Ese producto ya tiene precio en esta tarifa desde esa cantidad.», «Ese precio ya no
+Si falla: «Ese artículo ya tiene precio en esta tarifa desde esa cantidad.», «Ese precio ya no
 existe.». Los precios de una tarifa **desactivada** no se cambian (como no se añaden: «Esa tarifa no
 está disponible…»): el detalle no ofrece **+** ni **Editar**, solo **Quitar**.
 Implicados: ninguno
@@ -360,11 +363,13 @@ Pasos:
    - **Porcentaje**: el % que se quita a la línea (hasta 100, dos decimales).
    - **Importe por unidad**: los euros que se quitan por cada unidad del precio vendida.
    - **Compra X, llévate Y**: «Compra» y «Gratis» (2 y 1 = cada 3 unidades, 1 gratis, hacia abajo).
-   - **Por tramos**: hasta 10 tramos «a partir de N unidades, X %».
+   - **Por tramos**: hasta 10 tramos, cada uno con **Desde la cantidad** y **Porcentaje (%)** («Añadir
+     tramo», «Quitar tramo»).
 4. **Se aplica a**: Todo, Todos los productos, Todos los servicios, Una categoría, Un producto o Un
    servicio (con su buscador).
-5. Si quieres: **Grupo de clientes** (solo para ellos), **Cantidad mínima**, **Desde**, **Hasta** y
-   **Prioridad** (100 por defecto; a igual descuento, gana la de número menor).
+5. Si quieres: **Grupo de clientes** (solo para ellos; sin elegir, «Todos los clientes»), **Cantidad
+   mínima**, **Desde**, **Hasta** y **Prioridad** (100 por defecto; a igual descuento, gana la de número
+   menor).
 6. **Crear**.
 Entra: el formulario.
 Sale: la regla activa y `pricing.rule.created`.
@@ -396,14 +401,14 @@ Pasos:
 2. Para volver a usarla, filtra por **Inactivas** y pulsa **Activar**.
 Entra: la regla.
 Sale: `pricing.rule.deactivated` o `pricing.rule.activated`. Las ventas ya hechas no cambian.
-Si falla: «Esa regla ya está desactivada.», «Esa regla ya está activa.» y, si Clientes borró su grupo,
-«El grupo de clientes de esta regla ya no existe: elige otro grupo o quítaselo antes de activarla.» (409
-`pricing.rule_group_deleted`): sin grupo valdría para todos.
+Si falla: «Esa regla de descuento ya está desactivada.», «Esa regla de descuento ya está activa.» y, si
+Clientes borró su grupo, «El grupo de clientes de esta regla ya no existe: elige otro grupo o quítaselo
+antes de activarla.» (409 `pricing.rule_group_deleted`): sin grupo valdría para todos.
 Implicados: Clientes
 
 ### PRICING-F13 Consultar el precio de una línea
 <!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-get_price-get_price old:pricing/WORKFLOW.md#pricing-f07 -->
-Estado: hecho (no tiene pantalla propia: lo pide quien vende o el asistente)
+Estado: hecho (no tiene pantalla propia: lo pide quien vende o el asistente; Ventas aún no lo pide, ver «Contrato con Ventas»)
 Actor: sistema (Ventas), asistente, empleado por la API
 Pantalla: ninguna
 Pasos:
@@ -496,9 +501,9 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Olvida un grupo de clientes borrado | solo la plataforma | F14 | `pricing.catalog.forget_group` |
 | Copia el nombre nuevo de un servicio | solo la plataforma | F14 | `pricing.catalog.refresh_service` |
 
-Las API keys (`erpk_live`) llegan a las consultas, a crear y cambiar tarifas y a poner, cambiar y quitar
-precios (para sincronizar precios desde otro sistema); elegir la general, desactivar y las reglas, solo
-desde el Hub o el asistente.
+Cuando el Hub tenga API keys (`erpk_live`), llegarán a las consultas, a crear y cambiar tarifas y a
+poner, cambiar y quitar precios (para sincronizar precios desde otro sistema); elegir la general,
+desactivar y las reglas, solo desde el Hub o el asistente.
 
 ### Lo que avisa
 
@@ -514,6 +519,11 @@ desde el Hub o el asistente.
 | Regla nueva | Crear | `id`, `code` | `pricing.rule.created` |
 | Regla cambiada | Editar, o el nombre nuevo de un servicio | `id` | `pricing.rule.updated` |
 | Regla desactivada / reactivada | Desactivar / activar, o su producto, categoría o grupo borrados | `id` | `pricing.rule.deactivated`, `…activated` |
+
+Ninguna app los escucha salvo **Automatizaciones**, que puede arrancar una automatización con cualquiera
+de ellos (FLOW-F21). Sus pasos también pueden consultar tarifas, precios, reglas y el precio de una
+línea, y usar las acciones de Tarifas que no piden confirmación (FLOW-F11): crear o cambiar una tarifa,
+poner o cambiar un precio y crear, cambiar o reactivar una regla.
 
 ### A qué reacciona y lo que necesita de otras apps
 - **Inventario** (`requires`): los precios y las reglas apuntan a sus productos y categorías; Tarifas lee
@@ -624,6 +634,25 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   responde igual; `pricing.services_unavailable` solo salta si Servicios no está instalada
   (`UnknownOperation`). El «Servicios no está activa en este negocio» de PRICING-F07 depende de que la
   plataforma compruebe la app activa (fase 2).
+- **Ventas no llama a Tarifas** (pricing#9 sigue abierto): ninguna app llama a `pricing.price.resolve`
+  (`git grep` en `origin/main`); el `pricing` de Ventas es su propia valoración (`apps/sale/pricing.py`). El
+  TPV cobra el precio de la ficha. PRICING-F13 es `hecho` como consulta (su test y `pricing-lists.spec.ts`);
+  engancharla es de Ventas, con «Contrato con Ventas» como encargo.
+- **API keys**: el Hub aún no las tiene (`config/api.py`: «API keys (`erpk_live`) come in phase 2»).
+  `expose_api` marca lo que alcanzarán (`EXPOSED` en `tests/test_apps.py`).
+- **«Asistente» en los flujos** (actor de casi todos y el ejemplo de voz): es la operación con `ai=` y su
+  ruta de la API; el asistente del Hub aún no existe (la misma lectura de los cierres de Demo, Servicios,
+  Menús y Tareas).
+- **Fase 2 y las claves ajenas hacia Inventario** (`PriceItem.product`, `DiscountRule.product` y
+  `DiscountRule.category` en `CASCADE`): con «tablas al activar», el borrado físico de un producto o de una
+  categoría (el admin del Hub) en un hub donde Tarifas nunca se creó consultaría tablas que no existen. El
+  grupo ya es un UUID por eso mismo; lo anotó el «Para PLAN-DB» de
+  `docs/plans/2026-10-14-migracion-modulos.md` (Suplementos, Menús, Cocina y Tarifas) y PLAN-DB aún no lo
+  recoge.
+- **Desempate de las tablas**: las tres ordenan por su columna y desempatan por código (o cantidad mínima)
+  e `id` **siempre ascendentes** (`_ordering`), también en descendente; la nota vigente del producto actual
+  del 2026-09-28 (hub#2355) manda desempatar en la dirección de la lista. Arreglarlo es la `FIX` de la cola
+  que ya lleva Clientes, Asistencia y Ventas (visto al cerrar, CLOSE-PRICING).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
