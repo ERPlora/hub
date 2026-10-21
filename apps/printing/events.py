@@ -24,6 +24,11 @@ JOB_RETRIED = "printing.job.retried"
 JOB_CANCELLED = "printing.job.cancelled"
 #: The hourly prune forgot the jobs that ended over 30 days ago (PRINTING-F20); it carries how many.
 JOB_PRUNED = "printing.job.pruned"
+#: A device was set up to print (or printed for the first time from it, by whoever sets up printers), changed
+#: (its name or its printers) or retired (PRINTING-F18). They carry the registration's id, never the device's own.
+DEVICE_REGISTERED = "printing.device.registered"
+DEVICE_UPDATED = "printing.device.updated"
+DEVICE_RETIRED = "printing.device.retired"
 
 ALL = [
     SETTINGS_UPDATED,
@@ -36,7 +41,12 @@ ALL = [
     JOB_RETRIED,
     JOB_CANCELLED,
     JOB_PRUNED,
+    DEVICE_REGISTERED,
+    DEVICE_UPDATED,
+    DEVICE_RETIRED,
 ]
+#: Every change of the devices that print.
+DEVICE_EVENTS = [DEVICE_REGISTERED, DEVICE_UPDATED, DEVICE_RETIRED]
 #: Every change of the queue: what re-runs the screens that show it.
 JOB_EVENTS = [JOB_QUEUED, JOB_CLAIMED, JOB_PRINTED, JOB_FAILED, JOB_RETRIED, JOB_CANCELLED, JOB_PRUNED]
 

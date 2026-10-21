@@ -9,7 +9,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { dialog, fill, pick } from './inventory-helpers';
-import { claim, fail, flowShots } from './printing-helpers';
+import { claim, fail, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
 
 // One printer goes through every test, in order: a failure stops the rest instead of a new worker's names.
@@ -19,6 +19,8 @@ const RUN = stamp();
 const TILL = `e2e Till ${RUN}`;
 const FOUND = `e2e Found ${RUN}`;
 const FOUND_ADDRESS = '192.168.77.21';
+/** The device the API plays (PRINTING-F18): the owner's first claim from it sets it up. */
+const DEVICE = `e2e printers device ${RUN}`;
 
 interface Printer {
   id: string;
@@ -40,6 +42,7 @@ test.afterAll(() => {
   for (const column of ['receipt_printer_id', 'kitchen_printer_id', 'bar_printer_id', 'label_printer_id']) {
     psql(`update printing_settings set ${column} = null where ${column} in (select id from printing_printer where name like 'e2e %')`);
   }
+  forgetDevices('e2e %', { ids: [DEVICE] });
   psql(`delete from printing_printer where name like 'e2e %'`);
 });
 
@@ -125,9 +128,9 @@ test('PRINTING-F19: a printer whose job did not come out says so, with its last 
   await login(page, A, '/printing/printers');
   const till = await byName(context, TILL);
   // The device's side (base's /ws/print, by the API): it takes the test page and says it did not print.
-  const job = await claim(context, till.id);
+  const job = await claim(context, till.id, DEVICE);
   expect(job).not.toBeNull();
-  await fail(context, job!, 'paper out');
+  await fail(context, job!, 'paper out', DEVICE);
   expect((await byName(context, TILL)).last_error).toBe('paper out');
 
   await printersReady(page);

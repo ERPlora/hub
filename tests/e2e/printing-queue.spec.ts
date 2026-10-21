@@ -8,12 +8,14 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { dialog, fill, pick } from './inventory-helpers';
-import { flowShots } from './printing-helpers';
+import { flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const KITCHEN = `e2e Kitchen ${RUN}`;
 const REF = `e2e-T-${RUN}`;
+/** The device the API plays (PRINTING-F18): the owner's first claim from it sets it up. */
+const DEVICE = `e2e queue device ${RUN}`;
 let before: Record<string, unknown> | undefined;
 
 interface Job {
@@ -36,6 +38,7 @@ test.afterAll(() => {
   for (const column of ['receipt_printer_id', 'kitchen_printer_id', 'bar_printer_id', 'label_printer_id']) {
     psql(`update printing_settings set ${column} = null where ${column} in (select id from printing_printer where name like 'e2e %')`);
   }
+  forgetDevices('e2e %', { ids: [DEVICE] });
   psql(`delete from printing_printer where name like 'e2e %'`);
 });
 
@@ -83,13 +86,13 @@ test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelle
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     const claim = await api<{ job: { id: string } | null }>(context, A, 'POST', '/printing/jobs/claim', {
       printers: [created.data.id],
-      device: 'e2e device',
+      device: DEVICE,
     });
     expect(claim.data.job?.id).toBe(queued.data.job.id);
     await api(context, A, 'POST', '/printing/jobs/fail', {
       job_id: queued.data.job.id,
       error: 'printer unreachable',
-      device: 'e2e device',
+      device: DEVICE,
       attempt,
     });
   }

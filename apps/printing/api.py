@@ -2,7 +2,8 @@
 
 No path parameters (as ``apps.demo``): ids travel in the input, because a route takes one parameter, the
 operation's input. ``jobs/claim``, ``jobs/complete`` and ``jobs/fail`` are the device's (base's
-``/ws/print`` calls the same operations).
+``/ws/print`` calls the same operations). ``POST devices`` sets up the device that calls (its ``X-Device-Id``);
+a device's own id never travels in a URL, which access logs keep (``printing.device.get`` has no route).
 """
 
 from live.ninja import bind, run_operation
@@ -10,6 +11,10 @@ from ninja import Query, Router
 
 from apps.printing import queries, services
 from apps.printing.schemas import (
+    DeviceListIn,
+    DeviceRefIn,
+    DeviceRegisterIn,
+    DeviceUpdateIn,
     JobCancelIn,
     JobClaimIn,
     JobCompleteIn,
@@ -114,3 +119,26 @@ async def job_retry(request, data: JobRefIn):
 @bind(router, "printing.job.cancel", "/printing/jobs/cancel")
 async def job_cancel(request, data: JobCancelIn):
     return await run_operation(request, services.cancel_job, data)
+
+
+# The devices that print
+
+
+@bind(router, "printing.device.list", "/printing/devices")
+async def device_list(request, params: Query[DeviceListIn]):
+    return await run_operation(request, queries.list_devices, params)
+
+
+@bind(router, "printing.device.register", "/printing/devices", status=201)
+async def device_register(request, data: DeviceRegisterIn):
+    return await run_operation(request, services.register_device, data)
+
+
+@bind(router, "printing.device.update", "/printing/devices/update")
+async def device_update(request, data: DeviceUpdateIn):
+    return await run_operation(request, services.update_device, data)
+
+
+@bind(router, "printing.device.retire", "/printing/devices/retire")
+async def device_retire(request, data: DeviceRefIn):
+    return await run_operation(request, services.retire_device, data)

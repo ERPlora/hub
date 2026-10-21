@@ -6,16 +6,18 @@ deletion lands in the middle of answers what it read or 404, never a 500; a writ
 it, so the deletion waits for it, and one deleted before is not found.
 """
 
+import dataclasses
 import threading
 import time
 from contextlib import contextmanager
 
 import pytest
 from django.db import connection, transaction
+from django.test import RequestFactory
 from live.errors import NotFound, OperationError
 
-from apps.printing.models import Printer, PrintJob, Settings
-from apps.printing.tests.conftest import RECEIPT, enqueue, printer, run
+from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
+from apps.printing.tests.conftest import RECEIPT, ctx_for, enqueue, printer, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -44,10 +46,34 @@ def at_once(*calls):
     return results
 
 
+def set_up(device: str, *printers: Printer) -> None:
+    """Registers the device ``device`` under that name for ``printers``, as a manager does from it."""
+    ctx = dataclasses.replace(ctx_for("hub_manager"), request=RequestFactory().post("/", HTTP_X_DEVICE_ID=device))
+    run("printing.device.register", {"name": device, "printers": [str(p.id) for p in printers]}, ctx=ctx)
+
+
+def test_a_device_that_prints_twice_at_once_for_the_first_time_is_paired_once():
+    """Whoever sets up printers pairs the device by printing from it: two of its claims at once (two tabs, a
+    reconnect) make one registration, never a 500 on its unique key."""
+    till = printer("Till")
+    enqueue(source_ref="T-1")
+    enqueue(source_ref="T-2")
+
+    def claim():
+        return run("printing.job.claim", {"printers": [str(till.id)], "device": "till-1"}).job
+
+    first, second = at_once(claim, claim)
+    assert not isinstance(first, Exception) and not isinstance(second, Exception), (first, second)
+    assert {first.id, second.id} == set(PrintJob.objects.values_list("id", flat=True))
+    assert PrintDevice.objects.count() == 1
+
+
 def test_two_devices_at_once_take_two_different_jobs(monkeypatch):
     """hub#2029: two tills that reach the kitchen's printer never print the same order twice. The race is made
     certain, not left to the threads' timing: device A has read its job and holds it when device B asks."""
     till = printer("Till")
+    for device in ("A", "B"):  # set up as «A» and «B»: the job names its device by that name
+        set_up(device, till)
     enqueue(source_ref="T-1")
     enqueue(source_ref="T-2")
     a_read, b_done = threading.Event(), threading.Event()

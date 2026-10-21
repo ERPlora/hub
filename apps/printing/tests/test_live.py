@@ -19,6 +19,7 @@ def test_the_registry_is_valid():
 
 
 def test_every_reading_is_live():
+    # Every reading a screen shows; printing.device.get is base's /ws/print's, at hello, and no screen's.
     assert set(queries()) == {
         "printing.settings.get",
         "printing.printer.list",
@@ -26,7 +27,14 @@ def test_every_reading_is_live():
         "printing.printer.status",
         "printing.job.list",
         "printing.job.summary",
+        "printing.device.list",
     }
+
+
+def test_the_devices_re_run_when_one_is_set_up_changed_retired_or_prints():
+    # A claim stamps the device's last news; a printer that changes (its name, active) shows in each device's row.
+    for event in (*events.DEVICE_EVENTS, events.JOB_CLAIMED, events.PRINTER_UPDATED):
+        assert "printing.device.list" in live_registry.affected([event]), event
 
 
 def test_every_event_is_a_literal_of_the_events_module():

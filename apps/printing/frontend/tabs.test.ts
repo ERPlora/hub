@@ -1,4 +1,4 @@
-// The three sections of Printing (the old single «Printers» screen split as the platform's apps do), as
+// The four sections of Printing (the old single «Printers» screen split as the platform's apps do), as
 // the footer tabbar of every page: each tab follows its route, has a registered icon and its label in the
 // reader's language, and wears the same icon and path as its menu entry in apps.py.
 import { readFileSync } from 'node:fs';
@@ -19,16 +19,17 @@ function tabsIn(locale: 'en' | 'es') {
 }
 
 describe('the printing tabbar', () => {
-  it('is the printers, the queue and the settings, each on its own route', () => {
+  it('is the printers, the devices that print, the queue and the settings, each on its own route', () => {
     expect(tabsIn('en').map((t) => [t.id, t.label, t.to])).toEqual([
       ['printers', 'Printers', '/printing/printers'],
+      ['devices', 'Devices', '/printing/devices'],
       ['jobs', 'Queue', '/printing/jobs'],
       ['settings', 'Settings', '/printing/settings'],
     ]);
   });
 
   it('speaks Spanish', () => {
-    expect(tabsIn('es').map((t) => t.label)).toEqual(['Impresoras', 'Cola', 'Ajustes']);
+    expect(tabsIn('es').map((t) => t.label)).toEqual(['Impresoras', 'Dispositivos', 'Cola', 'Ajustes']);
   });
 
   it('gives every tab a registered icon, the same as its menu entry in apps.py', () => {

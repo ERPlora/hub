@@ -4,6 +4,7 @@
     "tabs": {
       "label": "Printing sections",
       "printers": "Printers",
+      "devices": "Devices",
       "jobs": "Queue",
       "settings": "Settings"
     },
@@ -93,6 +94,60 @@
       "deactivated": "Printer deactivated",
       "activated": "Printer activated",
       "toggleFailed": "Could not change the printer."
+    },
+    "devices": {
+      "heading": "Devices that print",
+      "intro": "Only the devices set up here print the queue, with anybody’s session: set up the one next to the printers from that device.",
+      "add": "Print from this device",
+      "empty": "No device prints yet. Set up the one next to the printers from that device.",
+      "loading": "Loading…",
+      "loadError": "Could not load the devices.",
+      "entity": {
+        "one": "device",
+        "many": "devices"
+      },
+      "columns": {
+        "name": "Name",
+        "printers": "Printers",
+        "lastSeen": "Last job asked",
+        "registeredBy": "Set up by"
+      },
+      "thisDevice": "This device",
+      "inactive": "{name} (inactive)",
+      "lastSeen": "{age} ago",
+      "never": "Never",
+      "thisPrints": "This device prints for: {printers}.",
+      "thisNotSetUp": "This device does not print yet: «Print from this device» sets it up with the printers it reaches.",
+      "thisAskSomeone": "This device does not print here: someone who manages the printers sets it up from it.",
+      "actions": {
+        "edit": "Edit",
+        "retire": "Retire"
+      },
+      "retire": {
+        "title": "Retire {name}?",
+        "message": "It will print nothing more, and the jobs it has go back to the queue. To print from it again, set it up again from it.",
+        "confirm": "Yes, retire",
+        "back": "Back",
+        "done": "Device retired: it prints nothing more.",
+        "failed": "Could not retire the device."
+      },
+      "modal": {
+        "create": "Print from this device",
+        "edit": "Edit device",
+        "hint": "Only the devices set up here print, with anybody’s session. Choose the printers this device reaches: on its network, by its cable or paired by Bluetooth.",
+        "name": "Device name",
+        "namePlaceholder": "Counter till",
+        "required": "Type its name.",
+        "printers": "Printers it reaches",
+        "printer": "{name} · {usage}",
+        "choosePrinters": "Choose the printers this device reaches.",
+        "noPrinters": "There is no active printer yet: add one in Printers first.",
+        "save": "Save",
+        "cancel": "Cancel",
+        "created": "This device prints now.",
+        "saved": "Device saved",
+        "failed": "Could not save the device."
+      }
     },
     "modal": {
       "create": "New printer",

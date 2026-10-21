@@ -52,6 +52,7 @@ class PrintingConfig(LiveAppConfig):
     # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/icons.ts).
     navigation = [
         Nav("printers", _("Printers"), "lucide:receipt", "/printing/printers"),
+        Nav("devices", _("Devices"), "lucide:smartphone", "/printing/devices"),
         Nav("jobs", _("Queue"), "ion:list-outline", "/printing/jobs"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/printing/settings"),
     ]

@@ -21,7 +21,9 @@ de `frontend/pages/PrintersPage.vue`, `frontend/components/SettingsCard.vue`, su
   `discovery.ts` pasa a usarlo sin cambiar lo que ve la persona.
 - **Qué falta**: el cliente de `/ws/print` en `packages/ui` (`device.ts`, `bridge-transport.ts`, `print*.ts`)
   que recoge y confirma los trabajos (`printing.job.claim`, `complete`, `fail`) y se los pasa a
-  `erplora_print`; y la entrada de las apps por erplora.com que vincula la app al negocio (sin ella, la
+  `erplora_print`. Su `deviceId` es el mismo `X-Device-Id` del SDK (`erplora.device_id`): solo recoge un
+  dispositivo dado de alta en **Impresión → Dispositivos** (PRINTING-F18), y sus impresoras son las de su alta
+  (`printing.device.list`, fila `this_device`); y la entrada de las apps por erplora.com que vincula la app al negocio (sin ella, la
   búsqueda contesta `not_the_linked_hub` y la ventana lo dice).
 - **Uso**: PRINTING-F02 y PRINTING-F18 (sacar el papel). El contrato está en `WORKBOOK.md` «Contrato con la
   plataforma».

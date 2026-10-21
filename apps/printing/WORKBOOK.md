@@ -2,7 +2,8 @@
 Prefijo: PRINTING
 Alcance MVP: núcleo
 Estado de la app: servidor y páginas hechos; Ventas, Facturación, Cocina y Caja ya piden su papel a la
-cola (falta Inventario, PRINTING-F12); el papel sale cuando `base` sirva `/ws/print` (PRINTING-F18)
+cola (falta Inventario, PRINTING-F12); solo recoge la cola el dispositivo dado de alta, y el papel sale
+cuando la app del dispositivo la recoja (PRINTING-F18)
 
 > Manual de usuario y especificación de la app `printing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -19,12 +20,14 @@ Bluetooth o la impresora del sistema), su ancho de papel (58 u 80 mm) y su **fun
 cocina, barra o etiquetas. Las demás apps (Ventas al cobrar, Caja al cerrar el turno, Inventario para
 las etiquetas) **piden** sus impresiones a Impresión, que las pone en la **cola de impresión** del
 negocio; el dispositivo con la app de ERPlora instalada junto a la impresora las saca en papel y
-confirma. Si algo no sale, la cola lo dice y deja reintentarlo o cancelarlo.
+confirma. Solo imprimen los **dispositivos dados de alta** con sus impresoras: una sesión de cualquier otro
+dispositivo no se lleva el papel de nadie. Si algo no sale, la cola lo dice y deja reintentarlo o cancelarlo.
 
 Quién la usa:
 
 - El **propietario** y el **administrador**: todo; además reintentan y cancelan trabajos atascados.
-- El **responsable**: da de alta y cambia impresoras y ajustes, y pide impresiones.
+- El **responsable**: da de alta y cambia impresoras, los dispositivos que imprimen y los ajustes, y pide
+  impresiones.
 - El **empleado**: ve impresoras, ajustes y cola, y pide impresiones (una prueba, un tique).
 
 Sirve igual a la peluquería y al restaurante: los dos imprimen el tique y las etiquetas; la comanda de
@@ -68,17 +71,19 @@ Configuración inicial, paso a paso:
 1. Abre **Impresión → Impresoras** y pulsa «Añadir impresora». Escribe su nombre, elige la conexión,
    escribe su dirección (la IP de su hoja de configuración, la MAC de Bluetooth o el nombre de la cola
    USB), el ancho de papel y su función (PRINTING-F03, PRINTING-F04).
-2. Pulsa «Probar» en su fila y comprueba que sale la hoja de prueba (PRINTING-F05).
-3. En **Impresión → Ajustes** decide si el tique sale solo al cobrar, si se abre el cajón con él,
+2. En el dispositivo que está junto a la impresora, abre **Impresión → Dispositivos**, pulsa «Imprimir
+   desde este dispositivo», ponle nombre y marca las impresoras a las que llega (PRINTING-F18).
+3. Pulsa «Probar» en la fila de la impresora y comprueba que sale la hoja de prueba (PRINTING-F05).
+4. En **Impresión → Ajustes** decide si el tique sale solo al cobrar, si se abre el cajón con él,
    cuántas copias y, si tienes varias impresoras con la misma función, cuál es la de cada una
    (PRINTING-F06).
-4. La cabecera y el pie del tique se escriben en los ajustes de Ventas, no aquí.
-5. Cobra una venta de prueba y comprueba en **Impresión → Cola** que el trabajo sale y queda «Impreso»
+5. La cabecera y el pie del tique se escriben en los ajustes de Ventas, no aquí.
+6. Cobra una venta de prueba y comprueba en **Impresión → Cola** que el trabajo sale y queda «Impreso»
    (PRINTING-F07, PRINTING-F01).
 
 ## Pantallas
 
-Tres pestañas abajo, las mismas que el menú: **Impresoras**, **Cola** y **Ajustes**.
+Cuatro pestañas abajo, las mismas que el menú: **Impresoras**, **Dispositivos**, **Cola** y **Ajustes**.
 
 ### Impresoras
 Menú **Impresión → Impresoras**. Título «Impresión» y la frase «Da de alta las impresoras del negocio,
@@ -116,6 +121,29 @@ dirección), cada una con «Añadir» o «Ya añadida», con «Buscar otra vez»
 Quien no puede cambiar impresoras no ve «Buscar impresoras», «Añadir impresora», «Editar» ni
 «Desactivar»; quien no puede imprimir no ve «Probar».
 
+### Dispositivos
+Menú **Impresión → Dispositivos**. Título «Dispositivos que imprimen» y la frase «Solo los dispositivos dados de
+alta aquí imprimen la cola, con la sesión de cualquiera: da de alta el que está junto a las impresoras desde ese
+dispositivo.». Debajo, una nota sobre el dispositivo en el que se mira: «Este dispositivo imprime para: Caja,
+Cocina.» (en verde); si no está dado de alta, a quien gestiona las impresoras «Este dispositivo todavía no imprime:
+«Imprimir desde este dispositivo» lo da de alta con las impresoras a las que llega.» y al resto «Este dispositivo no
+imprime aquí: quien gestiona las impresoras lo da de alta desde él.».
+
+La tabla (o tarjetas en el móvil), por nombre: Nombre (con «Este dispositivo» en el suyo), Impresoras (una
+inactiva, «Cocina (inactiva)»), Último trabajo pedido («hace 3 min» o «Nunca») y Dado de alta por. Quien gestiona
+las impresoras ve arriba «Imprimir desde este dispositivo» (solo si este no está dado de alta) y en cada fila
+«Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las impresoras
+desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
+
+La ventana **Imprimir desde este dispositivo / Editar dispositivo** explica «Solo imprimen los dispositivos dados
+de alta aquí, con la sesión de cualquiera. Elige las impresoras a las que llega este dispositivo: en su red, por
+su cable o emparejadas por Bluetooth.» y tiene «Nombre del dispositivo» y «Impresoras a las que llega» (una
+casilla por impresora activa, «Caja · Recibo»), con «Guardar» y «Cancelar». Sin nombre: «Escribe su nombre.»; sin
+impresoras: «Elige las impresoras a las que llega este dispositivo.»; sin ninguna impresora activa: «Todavía no
+hay ninguna impresora activa: añade una antes en Impresoras.». «Retirar» pregunta «¿Retirar Caja del mostrador?»
+con «No imprimirá nada más, y los trabajos que tenga vuelven a la cola. Para imprimir otra vez desde él, dalo de
+alta de nuevo desde él.», «Sí, retirar» y «Volver».
+
 ### Cola
 Menú **Impresión → Cola**. Título «Cola de impresión». La tabla de trabajos, del más reciente al más
 antiguo, 50 por página: Documento («Tique T-000123», o «Tique · 14/10/26 23:05» si no trae número),
@@ -141,11 +169,11 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | «Cargando…» (en Ajustes, «Cargando ajustes…») mientras llega el primer resultado. |
-| Vacío | Impresoras: «Todavía no hay impresoras. Añade la de tu caja con su dirección.»; Cola: «No hay trabajos de impresión.»; el estado de la impresión, «Todo al día: no hay nada en cola.». |
+| Vacío | Impresoras: «Todavía no hay impresoras. Añade la de tu caja con su dirección.»; Dispositivos: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las impresoras desde ese dispositivo.»; Cola: «No hay trabajos de impresión.»; el estado de la impresión, «Todo al día: no hay nada en cola.». |
 | Error | El aviso de su pantalla con «Reintentar»; un rechazo de una acción sale en su ventana, junto a su campo, o en un aviso. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva | «Impresión no está activa en este negocio.» |
-| Sin permiso | No aparece lo que no puede hacer; los ajustes salen bloqueados con «No tienes permiso para cambiar estos ajustes.». |
+| Sin permiso | No aparece lo que no puede hacer (en Dispositivos, ni «Imprimir desde este dispositivo», ni «Editar», ni «Retirar»); los ajustes salen bloqueados con «No tienes permiso para cambiar estos ajustes.». |
 
 ## Flujos
 
@@ -168,7 +196,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | hecho |
 | PRINTING-F16 | Mandar imprimir desde el asistente | común | hecho |
 | PRINTING-F17 | Imprimir el cierre de caja | común | hecho |
-| PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: falta el canal del dispositivo |
+| PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: falta quien recoge en la app del dispositivo |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
 
@@ -374,7 +402,8 @@ Pasos:
 2. Cocina abre la comanda y pide a Impresión una hoja por impresora: los platos de cada estación, por su
    función («Cocina» o «Barra») o por la impresora concreta de la estación (KITCHEN-F08).
 3. Cada hoja entra en la cola de la impresora de su función con la mesa, el número, la ronda, el
-   camarero y sus platos; el dispositivo la saca (PRINTING-F18).
+   camarero y sus platos, cada uno con sus suplementos (un renglón cada uno) y su nota; el dispositivo la
+   saca (PRINTING-F18).
 Entra: la comanda de Cocina (mesa, camarero, ronda y platos).
 Sale: un trabajo por impresora en la cola de Impresión.
 Si falla: la comanda no se desvía a la impresora de tiques: sin impresora con su función, espera en la
@@ -503,28 +532,47 @@ Implicados: CASH_REGISTER-F16
 
 ### PRINTING-F18 Sacar el papel: el dispositivo recoge y confirma los trabajos
 <!-- origen: fi:hub/tauri-packages#camino-de-hardware-handlers-invoke-de-perifericos-erplora-peripherals old-hub:HUB_APP-F19 old-hub:HUB_APP-F18 old-hub:HUB_SHELL-F73 old-hub:HUB_SHELL-F74 qa:verticals/restaurant/10-hardware-offline-and-recovery fi:modules/printing#integracion-bridge-hardware-client-side-no-es-command-query-del-manifest old-hub:HUB-F196 old-hub:HUB-F197 old-hub:HUB-F198 old-hub:HUB-F199 old-hub:HUB-F200 old-hub:HUB_PERIPHERALS-F06 old-hub:HUB_PERIPHERALS-F07 old-hub:HUB_PERIPHERALS-F08 -->
-Estado: parcial — recoger, confirmar y avisar del fallo están hechos en Impresión; falta el canal por el
-que el dispositivo los pide (de la plataforma: hoy el servidor no lo sirve), quien recoge en la app del
-dispositivo y el vínculo de esa app con el negocio. Contrato en «Contrato con la plataforma».
+Estado: parcial — solo el dispositivo dado de alta recoge, confirma y avisa del fallo de los trabajos de sus
+impresoras, y su pantalla está hecha; falta quien recoge en la app del dispositivo (hasta entonces el papel no
+sale solo) y que el canal del dispositivo pregunte por sus impresoras al conectarse.
 Vertical: común
-Actor: sistema (la app del dispositivo)
-Pantalla: ninguna
+Actor: el propietario, el administrador o el responsable (dan de alta el dispositivo) y la app del dispositivo
+(recoge)
+Pantalla: Impresión → Dispositivos
 Pasos:
-1. El dispositivo junto a la impresora pide el siguiente trabajo de las impresoras a las que llega.
-2. Impresión le da el más antiguo en cola (de esa impresora, o sin impresora y de su función), lo
-   marca «Enviado» con un plazo de 90 s y suma un intento.
+1. En el dispositivo que está junto a las impresoras, quien gestiona las impresoras abre **Impresión →
+   Dispositivos**, pulsa «Imprimir desde este dispositivo», le pone nombre («Caja del mostrador») y marca las
+   impresoras a las que llega. Desde ese momento ese dispositivo imprime con la sesión de cualquiera: la lista lo
+   marca «Este dispositivo» y la nota dice «Este dispositivo imprime para: …». Si quien gestiona las impresoras
+   imprime desde un dispositivo nuevo en alguna impresora activa, también queda dado de alta, como «Dispositivo 1»,
+   con las impresoras activas que usa.
+2. El dispositivo pide el siguiente trabajo de sus impresoras. Impresión le da el más antiguo en cola (de esa
+   impresora, o sin impresora y de su función), lo marca «Enviado» con un plazo de 90 s, suma un intento y apunta
+   qué dispositivo lo tiene, por su nombre.
 3. El dispositivo lo imprime —la primera copia como original y las demás de un tique o una factura
-   como «DUPLICADO»— y confirma diciendo quién es y qué entrega contesta: «Impreso». Si no pudo, avisa
-   con el error: vuelve a la cola hasta 5 intentos y después queda «Fallido».
+   como «DUPLICADO»— y confirma: «Impreso». Si no pudo, avisa con el error: vuelve a la cola hasta 5 intentos y
+   después queda «Fallido».
 4. Si el dispositivo se cae sin contestar, pasado el plazo el trabajo vuelve a la cola y se avisa a los
-   dispositivos (`printing.job.queued`).
-Entra: las impresoras que alcanza el dispositivo y, al confirmar, el resultado.
-Sale: el trabajo con su estado (avisa: `printing.job.claimed`, `printing.job.printed`,
-`printing.job.failed`).
-Si falla: confirmar dos veces es una confirmación. Una confirmación tardía del mismo dispositivo
-(una impresora lenta con copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el
-papel salió y no se imprime otra vez. Una confirmación o un fallo de otro dispositivo, o de una entrega
-que no es la suya, se rechaza (409 `printing.job_not_yours`) y no cambia nada.
+   dispositivos.
+5. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
+   un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): ya no imprime nada, y los trabajos que
+   tenía vuelven a la cola cuando vence su plazo.
+Entra: el nombre del dispositivo y las impresoras a las que llega; al pedir, sus impresoras; al confirmar, el
+resultado.
+Sale: el dispositivo dado de alta, cambiado o retirado (avisa: `printing.device.registered`,
+`printing.device.updated`, `printing.device.retired`) y el trabajo con su estado (avisa: `printing.job.claimed`,
+`printing.job.printed`, `printing.job.failed`).
+Si falla: un dispositivo que nadie dio de alta, o retirado, no recoge nada aunque la sesión pueda imprimir: «Este
+dispositivo no está dado de alta para imprimir aquí: quien gestiona las impresoras lo da de alta en Impresión →
+Dispositivos.», y la cola no cambia; imprimir desde un dispositivo retirado no lo vuelve a dar de alta, ni
+desde uno nuevo solo en impresoras inactivas lo da de alta. Pedir
+trabajos de una impresora que el dispositivo no tiene se rechaza («Este dispositivo no imprime para «Cocina»…»).
+Confirmar dos veces es una confirmación. Una confirmación tardía del mismo dispositivo (una impresora lenta con
+copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el papel salió y no se imprime otra
+vez. Una confirmación o un fallo de otro dispositivo, o de una entrega que no es la suya, se rechaza y no cambia
+nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y solo se da de alta desde el propio
+dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
+cualquiera se haría pasar por la caja.
 Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14
 
 ### PRINTING-F19 Ver el estado de una impresora
@@ -574,6 +622,8 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Los ajustes de impresión (los de fábrica si nunca se guardaron) | ver | F06 | `printing.settings.get` |
 | Las impresoras, con búsqueda por nombre, filtros (función, conexión, activa) y páginas, cada una con su estado | ver | F03, F04, F19 | `printing.printer.list` |
 | Una impresora por id o por nombre | ver | F04 | `printing.printer.get` |
+| Los dispositivos que imprimen, por nombre, con sus impresoras, quién los dio de alta, cuándo pidieron el último trabajo y cuál es el que pregunta | ver | F18 | `printing.device.list` |
+| El dispositivo dado de alta con un identificador, con sus impresoras (para el canal del dispositivo, al conectarse; sin ruta ni asistente) | imprimir | F18 | `printing.device.get` |
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
 | El resumen de la cola por función, con la impresora por la que sale cada una | ver | F01 | `printing.job.summary` |
@@ -587,7 +637,10 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Cambia una impresora, o la desactiva y activa | ajustes | F04 | `printing.printer.update` |
 | Encola la hoja de prueba de una impresora | imprimir | F05 | `printing.printer.test` |
 | Encola un documento (idempotente por su clave) | imprimir | F07–F13, F16, F17 | `printing.job.create` |
-| Da al dispositivo el siguiente trabajo de sus impresoras | imprimir | F18 | `printing.job.claim` |
+| Da de alta el dispositivo desde el que se pide, con su nombre y sus impresoras | ajustes | F18 | `printing.device.register` |
+| Cambia el nombre o las impresoras de un dispositivo | ajustes | F18 | `printing.device.update` |
+| Retira un dispositivo: ya no imprime | ajustes | F18 | `printing.device.retire` |
+| Da al dispositivo dado de alta el siguiente trabajo de sus impresoras | imprimir | F18 | `printing.job.claim` |
 | Confirma un trabajo impreso | imprimir | F18 | `printing.job.complete` |
 | Avisa de que un trabajo no salió | imprimir | F18 | `printing.job.fail` |
 | Devuelve a la cola un trabajo fallido o sin respuesta | cola | F14 | `printing.job.retry` |
@@ -607,6 +660,9 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Trabajo devuelto a la cola | Reintentar | El trabajo | `printing.job.retried` |
 | Trabajo cancelado | Cancelar | El trabajo | `printing.job.cancelled` |
 | Trabajos olvidados | La limpieza de cada hora borra lo terminado hace más de 30 días | Cuántos | `printing.job.pruned` |
+| Dispositivo dado de alta | Darlo de alta (o imprimir por primera vez desde él quien gestiona las impresoras) | Cuál (su registro, nunca su identificador) | `printing.device.registered` |
+| Dispositivo cambiado | Cambiar su nombre o sus impresoras (o imprimir desde él en otra impresora quien gestiona las impresoras) | Cuál | `printing.device.updated` |
+| Dispositivo retirado | Retirarlo | Cuál | `printing.device.retired` |
 
 Los avisos no llevan el documento (puede tener el nombre o el NIF de un cliente): solo ids.
 
@@ -635,8 +691,8 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver impresoras, ajustes y cola | sí | sí | sí | sí | `printing.view_settings` |
-| Impresoras y ajustes | sí | sí | sí | no | `printing.manage_settings` |
-| Imprimir (pedir, probar, recoger y confirmar) | sí | sí | sí | sí | `printing.print` |
+| Impresoras, dispositivos que imprimen y ajustes | sí | sí | sí | no | `printing.manage_settings` |
+| Imprimir (pedir, probar y, desde un dispositivo dado de alta, recoger y confirmar) | sí | sí | sí | sí | `printing.print` |
 | Reintentar y cancelar trabajos | sí | sí | no | no | `printing.manage_jobs` |
 
 ## Para quien lo mantiene
@@ -674,7 +730,8 @@ Campos del documento que lee la impresora (los demás se ignoran):
   `receipt_id`, `customer_name`, `customer_tax_id` y `tax_breakdown` no vacío (422 si falta).
 - `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío.
 - `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `items`
-  (`name`, `quantity`, `notes`, `combo_name`, `combo_ref`).
+  (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos,
+  los suplementos en el orden elegido, que la impresora pinta un renglón cada uno, antes de `notes`.
 - `barcode_label`: `product_name`, `barcode`, `price`.
 - `cash_session_report`: `receipt_id` (la sesión), `cashier`, `opening_balance`, `closing_balance`,
   `transactions` (`label`, `amount`).
@@ -687,8 +744,11 @@ Campos del documento que lee la impresora (los demás se ignoran):
 canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 
 1. `claim` → `printing.job.claim` con `printers` (los ids de las impresoras del negocio que ese
-   dispositivo alcanza; el dispositivo los conoce por `printing.printer.list`) y `device` (su nombre o
-   `deviceId`). Contesta `{"job": null}` (→ `idle`) o el trabajo:
+   dispositivo alcanza: las de su alta, que da `printing.device.get` por su `deviceId`) y `device` (su
+   `deviceId`, el mismo `X-Device-Id` con el que la SPA lo dio de alta). Un `deviceId` sin alta (o retirado) →
+   403 `printing.device_not_registered`; una impresora que no es de su alta → 403
+   `printing.printer_not_on_device`; con la sesión de quien gestiona las impresoras, el dispositivo queda dado de
+   alta (o suma la impresora) en vez de rechazarse. Contesta `{"job": null}` (→ `idle`) o el trabajo:
    `{"id", "kind", "printer_id", "target", "paper_width", "document_type", "document", "copy_document", "format", "html", "copies", "open_drawer", "attempts", "leased_until"}`.
 2. El dispositivo lo imprime con los comandos nativos de la app, **que no cambian**:
    - `kind = "document"` y `format = "receipt"`: `erplora_print(printerId = target, documentType, data = document, jobId = id)` una vez y, si `copies` > 1, `erplora_print(…, data = copy_document, …)` las `copies − 1` restantes. En un `receipt` o una `invoice`, `copy_document` es el documento con `"duplicate": true`: la app imprime «DUPLICADO» (`escpos.rs`) y nunca sale un segundo original (RD 1619/2012, art. 14.4). Una página A4 se imprime una vez;
@@ -698,14 +758,18 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `target` es el `printer_id` que entiende la app: `network:<ip>:<puerto>`, `bluetooth:<MAC>`,
    `usb:<cola>` o `system`.
 3. `done` → `printing.job.complete` con `device` y `attempt` (`{"confirmed": true}` → `ack`); se acepta
-   también si el trabajo ya volvió a la cola, siempre que sea del mismo dispositivo. `failed` →
-   `printing.job.fail` con el error, `device` y `attempt`; solo vale para la entrega en curso. Otro
-   dispositivo u otra entrega → 409 `printing.job_not_yours`.
+   también si el trabajo ya volvió a la cola, siempre que sea del mismo dispositivo (el de su alta, no retirado).
+   `failed` → `printing.job.fail` con el error, `device` y `attempt`; solo vale para la entrega en curso. Otro
+   dispositivo, uno sin alta u otra entrega → 409 `printing.job_not_yours`.
 4. `wake`: tras el COMMIT de un trabajo nuevo llega el aviso `printing.job.queued` por la BD de control
    (el mismo NOTIFY que `/api/live`); el canal despierta a los dispositivos de esa impresora o función.
    Es un empujón: el documento solo viaja en la respuesta a `claim`.
-5. Quién puede ser dispositivo de impresión (el registro de dispositivos y su latido) es de `base`; el
-   permiso de las tres operaciones es `printing.print`.
+5. Quién puede ser dispositivo de impresión es de Impresión (`PrintDevice`, el `_print_host` del Hub viejo,
+   hub#342): lo da de alta `printing.device.register` desde el propio dispositivo (su `X-Device-Id`), con
+   `printing.manage_settings`; el permiso de las tres operaciones sigue siendo `printing.print`, pero solo vale
+   desde un dispositivo dado de alta. El dispositivo se guarda por el SHA-256 de su identificador, nunca por el
+   identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` debería leer las
+   impresoras del dispositivo con `printing.device.get` y rechazar el que no tiene alta (pendiente en `base`).
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
@@ -719,8 +783,9 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 - **Caja** (`cash_register`): «Imprimir» del detalle → `cash_session_report`.
 - **Inventario** (`inventory`, INVENTORY-F25): «Imprimir código de barras» → `barcode_label` con
   `product_name`, `barcode` = SKU y `price`.
-- **Cocina** (`kitchen`): ya lo hace — `kitchen_order` por estación, `usage` `kitchen` o `bar` o la impresora
-  de la estación, en un savepoint de su transacción (KITCHEN-F08, F09).
+- **Cocina** (`kitchen`): ya lo hace — `kitchen_order` por estación (cada plato con sus suplementos en
+  `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
+  de su transacción (KITCHEN-F08, F09).
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
   vocabulario y las comprobaciones del documento), `queries.py`, `services.py`, `events.py`,
@@ -730,9 +795,11 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
   Cocina, por estación).
 - **`requires = []`**: Impresión no lee modelos de nadie. Quien imprime compone el documento.
 - **Modelos**: `Settings` (una fila; sin ella valen los de fábrica), `Printer` (nunca se borra: la
-  cola la nombra; nombre único sin distinguir mayúsculas) y `PrintJob` (la cola: clave única
+  cola la nombra; nombre único sin distinguir mayúsculas), `PrintDevice` (el dispositivo que imprime: nombre,
+  `key` = SHA-256 de su identificador, sus impresoras, quién y cuándo lo dio de alta, su última petición y,
+  retirado, quién y cuándo; nunca se borra) y `PrintJob` (la cola: clave única
   `job_key`, tipo, documento, HTML, formato, función, impresora, copias, cajón, estado, intentos,
-  plazo, dispositivo, último error y los sellos de quién reintentó o canceló). Nadie borra un trabajo a
+  plazo, dispositivo —su alta y su nombre—, último error y los sellos de quién reintentó o canceló). Nadie borra un trabajo a
   mano: la tarea programada `prune` (`printing.job.prune`, cada hora, como sistema y sin ruta) borra los
   terminados (`done`, `cancelled`, `failed`) 30 días después de acabar, 500 como mucho por pasada.
 - **Estados**: `pending` → (`claim`) `sent` → (`complete`) `done`; `sent` → (`fail`) `pending` hasta 5
@@ -781,6 +848,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 | Una pantalla con tres zonas | Tres pestañas: Impresoras (con el estado), Cola y Ajustes | Patrón de la plataforma (Caja, Impuestos) |
 | Ancho de papel global, guardado y sin efecto | Ancho de papel por impresora, que viaja con el trabajo (`paper_width`) | Duda abierta 2 resuelta como Epson/Star/Square. La app de hoy imprime siempre 32 caracteres por línea (`escpos.rs`, `LINE_WIDTH`): el ancho se guarda y viaja, pero no cambia el papel hasta que la app lo use (`UI-REQUESTS.md`, «App nativa») |
 | Función por dispositivo («host» de un rol) | Función por impresora, y la impresora de cada función en ajustes | La impresora es la que imprime; el dispositivo solo la alcanza |
+| Registro de «hosts» de impresión por rol (`/api/print/hosts`): se daba de alta cualquier sesión desde su dispositivo | **Dispositivos**: el dispositivo se da de alta con sus impresoras, solo quien gestiona las impresoras y desde el propio dispositivo; se edita y se retira desde cualquiera | Square, Toast y Lightspeed emparejan el dispositivo con el negocio y sus impresoras quien gestiona el equipo; sin alta, una sesión de empleado se llevaba la cola de cualquier impresora (FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE) |
 | Estados `pending`/`printing`/`done`/`dead`/`discarded` | `pending`/`sent`/`done`/`failed`/`cancelled` | Los del encargo; misma máquina (5 entregas, 90 s) |
 | «Descartar» | «Cancelar», con motivo y sello | Mismo gesto; nombre del mercado |
 | «Reintentar» solo un trabajo muerto | También uno enviado sin respuesta pasado su plazo | Un dispositivo caído dejaba el trabajo «Imprimiendo» hasta el siguiente `claim` |
@@ -801,7 +869,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 | Pantalla actual (`erp-printing-settings`) | Plataforma nueva | Nota |
 |---|---|---|
 | Título «Impresoras» y frase de entrada | **Impresoras**: la frase de entrada, arriba | El título de la página es el de la app, como en el resto |
-| «Cola de impresión»: tarjetas por función, aviso naranja, «Todo al día», error de lectura | **Impresoras**: «Cola de impresión» (`QueueSummary`), en vivo | Sin «Refrescar»: la plataforma refresca sola; sin «Imprime desde N dispositivos» (los dispositivos son de `base`, fase 2) |
+| «Cola de impresión»: tarjetas por función, aviso naranja, «Todo al día», error de lectura | **Impresoras**: «Cola de impresión» (`QueueSummary`), en vivo | Sin «Refrescar»: la plataforma refresca sola; los dispositivos que imprimen, con sus impresoras y su último trabajo pedido, están en **Dispositivos** |
 | Trabajos atascados con «Reintentar» y «Descartar» | **Cola**: tabla completa con filtros, «Reintentar» y «Cancelar» con motivo | Se ven todos los trabajos, no solo los atascados; «Retirados recientemente» = filtro «Cancelado» |
 | «Ajustes del ticket»: nota de Ventas y enlace, ancho de papel, tique y cajón al cobrar, «Guardar ajustes» | **Ajustes**: la misma tarjeta con copias y la impresora de cada función | El ancho de papel pasa a cada impresora; el traslado del texto antiguo se retira (F15) |
 | «Impresoras en la red»: búsqueda, rol y «Probar» | **Impresoras**: tabla con función, conexión, dirección, papel, estado y «Probar»; «Buscar impresoras» en su ventana | La búsqueda llama a `erplora_discover_printers` de la app (F02) |
