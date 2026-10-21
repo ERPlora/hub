@@ -131,6 +131,22 @@ def test_in_development_only_erplora_s_exact_origin_brings_the_code_back(setting
 
 
 @pytest.mark.parametrize(
+    "redirect",
+    [
+        "http://[x/whatsapp/return",  # an unclosed bracket: urlsplit cannot read it
+        "http://[::1/whatsapp/return",
+        "http://localhost:abc/whatsapp/return",  # a port that is not a number
+    ],
+)
+@respx.mock
+def test_a_return_page_that_cannot_be_read_opens_nothing_and_never_fails(settings, redirect):
+    settings.DEBUG, settings.SAAS_URL = True, LOCAL_SAAS
+    respx.post(CONFIG).mock(return_value=httpx.Response(200, json={**CONFIGURED, "redirect_uri": redirect}))
+    out = run("whatsapp_inbox.channel.prepare")
+    assert (out.available, out.reason, out.redirect_uri) == (False, "window_unavailable", "")
+
+
+@pytest.mark.parametrize(
     ("debug", "saas_url", "redirect"),
     [
         (True, "https://erplora.com", "http://erplora.com/whatsapp/return"),  # erplora.com over https: never http

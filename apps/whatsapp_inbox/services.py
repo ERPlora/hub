@@ -711,7 +711,11 @@ def _return_page(value) -> str:
     development (``DEBUG``) with an http ``SAAS_URL``, as erplora.com's own rule (``whatsapp.meta.redirect_uri``)."""
     if not isinstance(value, str) or not value:
         return ""
-    page, known = urlsplit(value), urlsplit(str(getattr(settings, "SAAS_URL", "") or ""))
+    try:
+        page, known = urlsplit(value), urlsplit(str(getattr(settings, "SAAS_URL", "") or ""))
+    except ValueError:
+        # An address that cannot be read (an unclosed IPv6 bracket) is no page to bring the code back to.
+        return ""
     schemes = ("https", "http") if settings.DEBUG else ("https",)
     if page.scheme not in schemes or not page.netloc or page.fragment or (page.scheme, page.netloc) != (known.scheme, known.netloc):
         return ""
