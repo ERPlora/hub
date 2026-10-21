@@ -15,8 +15,9 @@ optimista e idempotente, permisos por papel) y es la que se copia para escribir 
 ## Qué hace hoy
 
 - **Lista** (F01, F05, F06): tabla del servidor con buscador por nombre, filtro de estado tras el
-  embudo, 50 por página (10, 25, 50 o 100), tabla o tarjetas y «Cargar más» en el móvil; encima, las
-  cifras «Abiertos», «Hechos» y «Líneas» para quien gestiona.
+  embudo, 50 por página (10, 25, 50 o 100), tabla o tarjetas y, en el móvil, «Cargar más» hasta 100
+  elementos y páginas a partir de ahí; encima, las cifras «Abiertos», «Hechos» y «Líneas» para quien
+  gestiona.
 - **Crear, editar y borrar** (F01, F02, F03): formularios con el error bajo cada campo; editar solo
   cambia lo enviado y, sin cambios, no avisa; borrar pide confirmación y se lleva las líneas.
 - **Línea al instante** (F04): aparece antes de que conteste el servidor, se deshace si lo rechaza y
@@ -35,15 +36,15 @@ optimista e idempotente, permisos por papel) y es la que se copia para escribir 
 | `requires` | ninguno; no lee ni llama a otras apps |
 | Permisos | `demo.view` (todos los papeles) y `demo.manage` (todos menos el empleado) |
 | Pantallas | `/demo/items`, `/demo/items/new`, `/demo/items/:id`, `/demo/items/:id/edit` |
-| Operaciones | 3 consultas (`queries.py`: `list`, `detail`, `stats`) y 4 acciones (`services.py`: `create`, `update`, `delete`, `add_line`), sin `ai=`; rutas en `/api/demo/items…`, sin parámetros en la ruta |
+| Operaciones | 3 consultas (`queries.py`: `list`, `detail`, `stats`) y 4 acciones (`services.py`: `create`, `update`, `delete`, `add_line`), todas con `ai=` (`risk = "high"` solo en `delete`); rutas en `/api/demo/items…`, sin parámetros en la ruta |
 | Eventos | 4, `demo.item.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` |
-| Admin | Django admin de solo lectura en `hubs.erplora.com` (choca con PLAN §17: señalado en la ronda 2026-10-21 de `PLAN-HUB.md`) |
+| Admin | Django admin con CRUD sobre elementos y líneas en `hubs.erplora.com` (PLAN §17–§18), por el ORM y sin aviso, como el de las demás apps |
 
 Las decisiones de diseño (rutas sin parámetros, línea idempotente por `(elemento, client_line_id)` con
 la fila bloqueada, errores y sus códigos, qué deja de pintar la ficha, papeles con prefijo `hub_`, ámbito
-de la fase 1) están en «Para quien lo mantiene» del WORKBOOK; las de la migración, en la ronda
+de la fase 1, el tope de 100 filas de la lista, `ai=` y el admin) están en «Para quien lo mantiene» del WORKBOOK; las de la migración, en la ronda
 2026-10-21 (CLOSE-DEMO) de `PLAN-HUB.md` (raíz de erplora-next).
 
 ## Tests
@@ -60,12 +61,11 @@ pnpm e2e tests/e2e/demo-flows.spec.ts tests/e2e/two-tabs-live.spec.ts tests/e2e/
 
 - Un `tests/test_<fichero>.py` por fichero de la app; `test_services.py` incluye la concurrencia de
   `add_line` con dos sesiones reales.
-- `demo-flows.spec.ts` recorre los 6 flujos en 390, 834 y 1440, con su captura `APP-DEMO-<flujo>-<ancho>`.
+- `demo-flows.spec.ts` recorre los 6 flujos en 390, 834 y 1440, con su captura `APP-DEMO-<flujo>-<ancho>`, y la
+  lista con más de 100 elementos (el móvil pagina; tres «Cargar más» seguidos dentro de esos 100).
 
 ## Qué queda fuera
 
 - Borrar o reordenar líneas, precios e impuestos, y separar los datos de `a` y `b` (llega con la
   tenencia de la fase 2): «Lo que NO hace, a propósito» del WORKBOOK.
-- Lo que la plantilla todavía no enseña y las demás apps ya hacen (sus operaciones sin `ai=`, el admin
-  sin CRUD) y el «Cargar más» del móvil a partir de 100 filas: propuestos como `FIX` en el cierre
-  (CLOSE-DEMO).
+- El asistente del Hub que llama a las operaciones por su `ai=` (fase 2): Demo ya las declara.
