@@ -125,6 +125,11 @@ describe('AvailabilityPage', () => {
     expect(s.sent().at(-1)).toMatchObject({ path: '/api/reservation/blocked_dates/delete', body: { id: 'b1' } });
   });
 
+  it('keeps the filters of the slots and the blocked dates behind each table’s funnel, as the old table', async () => {
+    const s = await setup();
+    expect([s.tprop('reservation-availability-slots', 'filterable'), s.tprop('reservation-availability-blocked', 'filterable')]).toEqual([true, true]);
+  });
+
   it('the host only looks', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show();
