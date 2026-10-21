@@ -365,6 +365,7 @@
   "appointment.appointment.list_for_customer": { "method": "get", "path": "/api/appointment/appointments/for_customer" },
   "appointment.appointment.count_active_for_service": { "method": "get", "path": "/api/appointment/appointments/count_for_service" },
   "appointment.appointment.count_to_confirm": { "method": "get", "path": "/api/appointment/appointments/count_to_confirm" },
+  "appointment.appointment.notices": { "method": "get", "path": "/api/appointment/appointments/notices" },
   "appointment.appointment.create": { "method": "post", "path": "/api/appointment/appointments" },
   "appointment.appointment.bulk_create": { "method": "post", "path": "/api/appointment/appointments/bulk_create" },
   "appointment.appointment.reschedule": { "method": "post", "path": "/api/appointment/appointments/reschedule" },

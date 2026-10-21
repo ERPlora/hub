@@ -48,6 +48,7 @@ def test_each_live_query_and_its_events():
             "service.service.archived",
         ],
         "appointment.appointment.count_to_confirm": APPOINTMENT,
+        "appointment.appointment.notices": [*APPOINTMENT, *CUSTOMER_GONE],
         "appointment.agenda.lanes": [*APPOINTMENT, *events.STAFF_EVENTS],
         "appointment.availability.slots": availability,
         "appointment.blocked_time.list": [

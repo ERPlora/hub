@@ -19,7 +19,7 @@ from dataclasses import replace
 from uuid import UUID
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet
-from django.utils import timezone
+from django.utils import formats, timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -51,6 +51,8 @@ from apps.appointment.schemas import (
     LanesIn,
     LanesOut,
     NoIn,
+    NoticesIn,
+    NoticesOut,
     RecurringDetailOut,
     RecurringGetIn,
     RecurringListIn,
@@ -307,25 +309,58 @@ def row(appointment: Appointment) -> dict:
     }
 
 
-def detail(appointment: Appointment) -> dict:
-    """An ``AppointmentOut``: everything, contact and notes included."""
-    return {
-        **row(appointment),
-        "customer_phone": appointment.customer_phone,
-        "customer_email": appointment.customer_email,
-        "notes": appointment.notes,
-        "internal_notes": appointment.internal_notes,
-        "cancelled_at": appointment.cancelled_at,
-        "cancellation_reason": appointment.cancellation_reason,
-        "cancelled_by_customer": appointment.cancelled_by_customer,
-        "charged_at": appointment.charged_at,
-        "created_at": appointment.created_at,
-        "updated_at": appointment.updated_at,
-    }
+def by_person(ctx: OperationContext) -> bool:
+    """Whether a person of the team acts (a user account). Only a person gets the front desk's exceptions
+    and reads what is the salon's: an automation — a flow's step, the platform itself, an anonymous caller,
+    any kind still to come — is judged and answered as the customer (appointments#143, #177, #180,
+    hub#1623, hub#1662, hub#2113)."""
+    return hasattr(ctx.actor, "get_username")
 
 
-def load_detail(appointment_id: UUID) -> dict:
-    return detail(Appointment.objects.prefetch_related("lines").get(pk=appointment_id))
+#: What a caller that is not a person never reads: the customer's contact, the salon's notes and a
+#: cancellation's reason (they may hold health data). The market's client-facing surfaces never show them.
+PRIVATE = ("customer_phone", "customer_email", "notes", "internal_notes", "cancellation_reason")
+
+
+def for_caller(ctx: OperationContext, answer: dict) -> dict:
+    """``answer`` as ``ctx`` may read it: whole for a person, without ``PRIVATE`` for anyone else."""
+    if by_person(ctx):
+        return answer
+    return {name: "" if name in PRIVATE else value for name, value in answer.items()}
+
+
+def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
+    """``start``'s day and hour ready to say (a flow's template has no clock nor formatter, appointments#151):
+    the weekday and the date in the caller's language, and the hour in 24 hours (the old product's messages)."""
+    wall = start.astimezone(business_zone())
+    with translation.override(ctx.language):
+        day = f"{formats.date_format(wall, 'l')}, {formats.date_format(wall, 'DATE_FORMAT')}"
+    return {"start_date_label": day, "start_time_label": f"{wall:%H:%M}"}
+
+
+def detail(ctx: OperationContext, appointment: Appointment) -> dict:
+    """An ``AppointmentOut``: everything, contact and notes included (for a person; ``for_caller``)."""
+    return for_caller(
+        ctx,
+        {
+            **row(appointment),
+            "customer_phone": appointment.customer_phone,
+            "customer_email": appointment.customer_email,
+            "notes": appointment.notes,
+            "internal_notes": appointment.internal_notes,
+            "cancelled_at": appointment.cancelled_at,
+            "cancellation_reason": appointment.cancellation_reason,
+            "cancelled_by_customer": appointment.cancelled_by_customer,
+            "charged_at": appointment.charged_at,
+            "created_at": appointment.created_at,
+            "updated_at": appointment.updated_at,
+            **start_labels(ctx, appointment.start),
+        },
+    )
+
+
+def load_detail(ctx: OperationContext, appointment_id: UUID) -> dict:
+    return detail(ctx, Appointment.objects.prefetch_related("lines").get(pk=appointment_id))
 
 
 APPOINTMENT_ORDER = {
@@ -408,7 +443,7 @@ def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
     },
 )
 def get_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
-    return detail(find_appointment(ctx, data.id, data.number))
+    return detail(ctx, find_appointment(ctx, data.id, data.number))
 
 
 @operation(
@@ -465,11 +500,10 @@ def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
         rows,
         params.limit,
         params.offset,
-        lambda item: {
-            **row(item),
-            "notes": item.notes,
-            "internal_notes": item.internal_notes,
-        },
+        lambda item: for_caller(
+            ctx,
+            {**row(item), "notes": item.notes, "internal_notes": item.internal_notes},
+        ),
     )
 
 
@@ -516,6 +550,55 @@ def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
     return {
         "count": rows.count(),
         "earliest": first.start.astimezone(business_zone()) if first else None,
+    }
+
+
+# ── What the team is told as it happens (G01) ────────────────────────────────────────────────
+
+#: How far back the notices go when nobody says (old-hub:HUB_SHELL-F66 told each one as it came).
+NOTICES_WINDOW = dt.timedelta(hours=24)
+
+
+@operation(
+    "appointment.appointment.notices",
+    kind="query",
+    permission=VIEW_OWN,
+    input=NoticesIn,
+    output=NoticesOut,
+    expose_api=True,
+    ai={
+        "description": "What customers did themselves lately (WhatsApp, the online booking): the appointments they "
+        "booked and the ones they cancelled, the newest first, with who, which services, when and with whom."
+    },
+)
+def notices(ctx: OperationContext, data: NoticesIn) -> dict:
+    """The customer's own bookings and cancellations since ``data.since`` (the front desk's are not told: who
+    gave or cancelled it knows), of the agenda the caller sees, the newest first."""
+    since = data.since or timezone.now() - NOTICES_WINDOW
+    rows = visible(ctx, appointments())
+    told = [
+        ("booked", item.created_at, item)
+        for item in rows.filter(source__in=CUSTOMER_SOURCES, created_at__gte=since)
+    ] + [
+        ("cancelled", item.cancelled_at, item)
+        for item in rows.filter(cancelled_by_customer=True, cancelled_at__gte=since)
+    ]
+    told.sort(key=lambda notice: (notice[1], notice[2].id, notice[0] == "cancelled"), reverse=True)
+    return {
+        "rows": [
+            {
+                "kind": kind,
+                "at": at,
+                "id": item.id,
+                "number": item.number,
+                "customer_name": item.customer_name,
+                "service_names": row(item)["service_names"],
+                "staff_name": item.staff_name,
+                "start": item.start.astimezone(business_zone()),
+                **start_labels(ctx, item.start),
+            }
+            for kind, at, item in told[: data.limit]
+        ]
     }
 
 

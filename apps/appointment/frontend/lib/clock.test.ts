@@ -60,6 +60,8 @@ describe('the business clock', () => {
     expect(formatShortDate('2026-10-19', 'en')).toBe('Oct 19, 2026');
     expect(formatShortDate('2026-10-19', 'es')).toBe('19 oct 2026');
     expect(formatTime('09:05', 'es')).toBe('9:05');
+    // appointments#214: a hub in Spanish never paints «p. m.».
+    expect(formatTime('21:05', 'es')).toBe('21:05');
     expect(formatTime('21:05', 'en')).toBe('9:05 PM');
   });
 

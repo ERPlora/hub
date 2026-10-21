@@ -296,6 +296,19 @@ def test_one_line_by_its_id(lines):
     assert caught.value.code == "cart_checkout.item_not_found"
 
 
+def test_the_lines_of_a_deleted_cart_are_gone_with_it(shop):
+    # cart_checkout#8 (CART_CHECKOUT-F06): a deleted cart's lines stay in the database for its orders,
+    # but nobody reads them any more, neither the cart's list nor one line by its id.
+    gone = Cart.objects.get(session_token="sess_gone")
+    line = make_item(gone, product_name="Champú")
+    with pytest.raises(NotFound) as caught:
+        run("cart_checkout.item.get", {"item_id": str(line.id)})
+    assert caught.value.code == "cart_checkout.item_not_found"
+    with pytest.raises(NotFound) as caught:
+        run("cart_checkout.item.list", {"cart_id": str(gone.id)})
+    assert caught.value.code == "cart_checkout.cart_not_found"
+
+
 # ── Orders ────────────────────────────────────────────────────────────────────────────────────
 
 
