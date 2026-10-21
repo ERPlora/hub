@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { priceList } from '../__tests__/fixtures';
-import { EMPLOYEE, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
+import { EMPLOYEE, errorFrame, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 import PriceListsTable from './PriceListsTable.vue';
@@ -111,6 +111,25 @@ describe('PriceListsTable', () => {
     await flush();
     await s.show(page([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No price lists.');
+  });
+
+  it('says it is loading until the first answer, and a load that fails says so with «Retry» (pm#611, pm#533)', async () => {
+    const s = await setup();
+    expect(s.prop('loading')).toBe(true);
+    expect(s.prop('error')).toBeUndefined();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
+    await flush();
+    expect(s.prop('loading')).toBe(false);
+    expect(s.prop('error')).toBe('The price lists could not be loaded.');
+    expect(s.prop<{ retry: string; loadError: string }>('labels')).toMatchObject({ retry: 'Retry', loadError: 'The price lists could not be loaded.' });
+    // «Retry» asks again (the stream reopens and the server runs the query anew); its answer clears the error.
+    const streams = s.net.streams.length;
+    s.table().vm.$emit('retry');
+    await flush();
+    expect(s.net.streams.length).toBe(streams + 1);
+    await s.show(page([VIP]));
+    expect(s.prop('error')).toBeUndefined();
+    expect(s.prop('loading')).toBe(false);
   });
 
   it('no list at all says «No price lists.»', async () => {
