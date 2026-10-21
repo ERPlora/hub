@@ -5,12 +5,15 @@
 // removes choices, edits and withdraws a course, and changes the menu and takes it off sale (F03). The
 // till's catalogue and the line of the menu are read from the API (the TPV sheet is Ventas'), eaten in,
 // ordered to take away (split, the beer at retail.alcohol) and as a pack to take away; a product
-// deactivated in Inventory shows up live as «Deactivated in Inventory»; the menu is withdrawn after its
+// deactivated in Inventory shows up live as «Deactivated in Inventory», and one deleted leaves every menu once
+// the worker's outbox relay hands Inventory's notice over (run here as a tick runs it); the menu is withdrawn after its
 // confirmation; a menu withdrawn from another tab while its builder is open says it no longer exists.
 // Screenshots of the list, the form and the builder at three viewports, with nothing past the right edge. What it creates is named «E2E Combo …» / «E2E-CMB-…» and deleted before and after.
+import { spawnSync } from 'node:child_process';
+
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -91,6 +94,20 @@ interface Line {
 
 async function menuId(context: BrowserContext): Promise<string> {
   return (await call<Detail>(context, 'GET', `/combo/combos/detail?combo=${encodeURIComponent(MENU)}`)).id;
+}
+
+/** The outbox relay as the worker runs it on every tick (the e2e stack runs no worker), pass after pass until one
+ *  finds nothing to do. */
+function relayPass(): void {
+  const code = [
+    'from django.utils import timezone',
+    'from base import relay',
+    'for _ in range(200):',
+    '    done = relay.run(timezone.now())',
+    '    if not (done.taken or done.delivered): break',
+  ].join('\n');
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  expect(out.status, `relay pass: ${out.stderr}`).toBe(0);
 }
 
 /** When the document was loaded: a different value later means the page was reloaded. */
@@ -256,7 +273,7 @@ test('COMBO-F02, F05, F06, F12: the owner builds the menu of the day from Invent
   await fill(page, 'combo-menu-form-price', '13,50');
   await expect(page.locator('[data-testid=combo-menu-form-help-service]')).toHaveAttribute('data-active', 'true');
   await pick(page, 'combo-menu-form-tax_category', 'food', 'Restaurant — food');
-  await shoot(page, 'combo-menu-form', 'ion-modal[data-testid=combo-menu-form] [data-testid]');
+  await shoot(page, 'APP-COMBO-COMBO-F02', 'ion-modal[data-testid=combo-menu-form] [data-testid]');
   await page.locator('[data-testid=combo-menu-form-submit]').click();
   await expect(form).toBeHidden();
   const row = shown(page).locator('[data-testid=combo-menus-row]', { hasText: MENU });
@@ -294,6 +311,7 @@ test('COMBO-F02, F05, F06, F12: the owner builds the menu of the day from Invent
   await shown(page).locator(`[data-testid=combo-choice-${waterId}-availability]`).click();
   await expect(shown(page).locator(`[data-testid=combo-choice-${waterId}-status]`)).toHaveText('Sold out');
   await expect(shown(page).locator('[data-testid=combo-builder-blockers]')).toContainText('The course “Drink” has fewer choices on offer than it asks for.');
+  await shoot(page, 'APP-COMBO-COMBO-F12', '.ion-page:not(.ion-page-hidden) .combo-builder [data-testid]');
   await shown(page).locator(`[data-testid=combo-choice-${waterId}-availability]`).click();
   await expect(shown(page).locator(`[data-testid=combo-choice-${waterId}-status]`)).toHaveCount(0);
 
@@ -303,7 +321,7 @@ test('COMBO-F02, F05, F06, F12: the owner builds the menu of the day from Invent
   await expect.poll(order).toEqual(['Mains', 'Starters', 'Drink']);
   await page.reload();
   await expect.poll(order).toEqual(['Mains', 'Starters', 'Drink']);
-  await shoot(page, 'combo-builder', '.ion-page:not(.ion-page-hidden) .combo-builder [data-testid]');
+  await shoot(page, 'APP-COMBO-COMBO-F05', '.ion-page:not(.ion-page-hidden) .combo-builder [data-testid]');
   // combos#4: on a phone and on a tablet every button of a course and of a choice reaches 44×44.
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -431,6 +449,7 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   await edit();
   // Ionic moves the dialog's name into its shadow root: its title is what the person reads.
   await expect(page.locator('ion-modal[data-testid=combo-menu-form]')).toContainText(`Menu · ${MENU}`);
+  await shoot(page, 'APP-COMBO-COMBO-F03', 'ion-modal[data-testid=combo-menu-form] [data-testid]');
   await fill(page, 'combo-menu-form-price', '14');
   await page.locator('[data-testid=combo-menu-form-is_active]').click();
   await page.locator('[data-testid=combo-menu-form-submit]').click();
@@ -486,7 +505,7 @@ test('COMBO-F07, F08, F09: the till sells it, priced with its supplements, eaten
   ]);
 });
 
-test('COMBO-F13: a product deactivated in Inventory shows up live in the builder', async ({ page, context }) => {
+test('COMBO-F13: a product deactivated in Inventory shows up live in the builder, and one deleted leaves every menu', async ({ page, context }) => {
   await login(page, A, '/combo/menus');
   await page.goto(`${A}/combo/menus/${await menuId(context)}`);
   await expect(shown(page).locator('[data-testid=combo-builder-name]')).toHaveText(MENU);
@@ -496,6 +515,18 @@ test('COMBO-F13: a product deactivated in Inventory shows up live in the builder
   await expect(shown(page).locator('[data-testid=combo-builder-blockers]')).toContainText('The course “Mains” has fewer choices on offer than it asks for.');
   await call(context, 'POST', '/inventory/products/update', { product: sku('HAK'), is_active: true });
   await expect(hake.locator('[data-testid$=-status]')).toHaveCount(0);
+
+  // Deleted in Inventory: marked «No longer in the catalogue» until the worker's relay hands the notice over, then
+  // gone from the menu (and from the pack, which offered it too) without touching the builder.
+  const beer = shown(page).locator('[data-testid^=combo-choice-][data-status]', { hasText: dish('Beer') });
+  await expect(beer).toHaveCount(1);
+  expect(psql(`select count(*) from combo_choiceoption where product_id = '${made.BEE}'`)).toBe('2');
+  await call(context, 'POST', '/inventory/products/delete', { product: sku('BEE') });
+  await expect(beer.first().locator('[data-testid$=-status]')).toHaveText('No longer in the catalogue');
+  relayPass();
+  await expect(beer).toHaveCount(0);
+  await shoot(page, 'APP-COMBO-COMBO-F13', '.ion-page:not(.ion-page-hidden) .combo-builder [data-testid]');
+  expect(psql(`select count(*) from combo_choiceoption where product_id = '${made.BEE}'`)).toBe('0');
 });
 
 // flow: ninguno — FIX de una carrera: el detalle de un menú borrado a la vez da 500 en vez de 404
@@ -521,7 +552,7 @@ test('COMBO-F01, F04: the list finds the menu and withdraws it after its confirm
   await shown(page).locator('[data-testid=combo-menus-search] input').fill(STAMP);
   const row = shown(page).locator(`[data-testid=combo-menus-row][data-id="${id}"]`);
   await expect(row).toBeVisible();
-  await shoot(page, 'combo-menus', '.ion-page:not(.ion-page-hidden) [data-testid^=combo-menus]');
+  await shoot(page, 'APP-COMBO-COMBO-F01', '.ion-page:not(.ion-page-hidden) [data-testid^=combo-menus]');
   const action = shown(page).locator(`[data-testid=combo-menus-row-${id}-delete]`);
   const menu = shown(page).locator(`[data-testid=combo-menus-row-${id}-menu]`);
   await action.or(menu).first().waitFor({ state: 'visible' });
@@ -532,6 +563,7 @@ test('COMBO-F01, F04: the list finds the menu and withdraws it after its confirm
   }
   const dialog = page.locator('ion-modal[data-testid=combo-menus-delete]');
   await expect(dialog).toContainText(`«${MENU}» stops being on sale`);
+  await shoot(page, 'APP-COMBO-COMBO-F04', 'ion-modal[data-testid=combo-menus-delete] [data-testid]');
   // Counted on the page, not in `shown()`: while the dialog is open, `shown()` is the dialog, where the
   // list has no row before anything is withdrawn.
   const listed = page.locator(`[data-testid=combo-menus-row][data-id="${id}"]`);

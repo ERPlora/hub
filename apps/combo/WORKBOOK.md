@@ -398,7 +398,7 @@ Pantalla: ninguna (la comanda la pinta Cocina)
 Pasos:
 1. En el TPV, añade un menú a la cuenta de la mesa eligiendo sus platos (COMBO-F07) y pulsa «Enviar
    comanda».
-2. En unos segundos, Cocina recibe la comanda: cada plato elegido en la estación de su producto (o de
+2. Cocina recibe la comanda: cada plato elegido en la estación de su producto (o de
    su categoría), bajo la cabecera del menú con su nombre de cocina (o su nombre, si no tiene), con la
    cantidad por los menús pedidos y la nota del menú en cada plato (KITCHEN-F06).
 3. En el papel de cada estación sale la misma cabecera del menú con sus platos debajo.
