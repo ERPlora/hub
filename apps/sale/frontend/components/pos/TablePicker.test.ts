@@ -185,6 +185,22 @@ describe('TablePicker: the tables', () => {
     expect(m.find('pos-table-empty').exists()).toBe(false);
   });
 
+  it('zones without a usable table are still a floor not set up: it is the tables that count', async () => {
+    const m = await setup({}, { locale: 'es' });
+    await m.result(FLOOR, { usable_tables: 0, zones: 2 });
+    await m.result(LIST, page([]));
+    expect(m.find('pos-table-unset').text()).toBe('Aún no hay mesas. Créalas en Mesas → Plano de sala.');
+    expect(m.wrapper.find('ion-searchbar').exists()).toBe(false);
+  });
+
+  it('usable tables without any zone are a floor set up: the tables are offered, not the notice', async () => {
+    const m = await setup();
+    await m.result(FLOOR, { usable_tables: 1, zones: 0 });
+    await m.result(LIST, page([table({ zone_id: null, zone_name: null })]));
+    expect(m.find('pos-table-unset').exists()).toBe(false);
+    expect(m.find('pos-table-tile-t1').exists()).toBe(true);
+  });
+
   it('tables that cannot be loaded are said, with «Retry»', async () => {
     const m = await setup();
     m.net.lastStream().push(errorFrame(m.subId(LIST), 'internal_error'));
