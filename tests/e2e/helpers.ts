@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
@@ -80,6 +80,37 @@ export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 
 export const MAIL_DIR = mailDirFrom(process.env, REPO_DIR);
 /** Slack between our clock and the mail file's modification time, in ms. */
 const MAIL_CLOCK_SLACK = 50;
+/** What each step of `login` waits outside a test, or in one with no time limit, in ms. */
+const LOGIN_STEP_DEFAULT = 30_000;
+
+/** The running test's (or hook's) time limit, in ms; 0 outside a test or hook, as with no limit. */
+function runningTimeout(): number {
+  try {
+    return test.info().timeout;
+  } catch {
+    // `test.info()` throws outside a test or a hook: there is no time limit to follow.
+    return 0;
+  }
+}
+
+/**
+ * How long each step of `login` waits, in ms: a sixth of the running test's time, so 30 s under the config's
+ * 180 s and longer for a spec that gives itself more (`test.slow()`, `test.setTimeout`). The login's steps
+ * follow each other, so the test still has time for itself after a slow one.
+ */
+function loginStepTimeout(): number {
+  const timeout = runningTimeout();
+  return timeout > 0 ? Math.round(timeout / 6) : LOGIN_STEP_DEFAULT;
+}
+
+/**
+ * The SaaS's cookies of each account this worker signed in, by address. Every sign-in at the SaaS is one more
+ * open session of the account, and allauth walks them all at the next one (`allauth.usersessions`): with a
+ * session left by every login, the SaaS took 30 and 37 s to answer the code on a loaded machine (hub#107, 1680
+ * sessions of the owner). A later login in a fresh context starts with them, as a person signed in at
+ * erplora.com: the SaaS skips its form and its code.
+ */
+const saasSessions = new Map<string, Cookie[]>();
 
 /**
  * The real login of a hub: `origin + next` → the SPA's gate sends to the SaaS (`/hub-login/?hub=…`)
@@ -89,11 +120,17 @@ const MAIL_CLOCK_SLACK = 50;
  * follows its `next` (`/hub-login/…`), which POSTs a one-time code to `origin/auth/callback` → the Hub
  * opens its session and lands on `next`. The account is `credentials` (the owner unless told otherwise).
  *
- * runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
+ * An account signs in to the SaaS once per worker: a fresh context then starts with that SaaS session
+ * (`saasSessions`) and only the hub's half of the trip runs. A context that has been to the SaaS keeps what
+ * it has there. When that session has ended (a spec signed out at the SaaS), the SaaS asks for the account
+ * again and the new session is the one kept.
+ *
+ * Each step waits `loginStepTimeout()` and a step that does not come fails at once, saying which and how long
+ * it waited. runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
  * `origin + next` again, because a POST that died leaves Chrome's error page, with no form to
  * submit; if the SaaS did sign in, the second trip skips its form, and if it did not, signing in
- * again mails a new code, the one read then. Any other failure fails at once, saying at which step.
+ * again mails a new code, the one read then.
  */
 export async function login(
   page: Page,
@@ -102,25 +139,36 @@ export async function login(
   credentials: Credentials = OWNER,
 ): Promise<void> {
   const target = `${origin}${next}`;
-  const inHub = () => topbarApps(page).waitFor({ state: 'attached', timeout: 30_000 });
+  const wait = loginStepTimeout();
+  const context = page.context();
+  const account = credentials.email.toLowerCase();
+  const kept = saasSessions.get(account);
+  if (kept && (await context.cookies(SAAS)).length === 0) await context.addCookies(kept);
+  let signedIn = false;
+  const inHub = () => topbarApps(page).waitFor({ state: 'attached', timeout: wait });
   await withRetry(
     async () => {
       await page.goto(target);
       const where = await Promise.race([
-        page.waitForURL((url) => url.origin === SAAS, { timeout: 30_000 }).then(() => 'saas' as const, () => null),
+        page.waitForURL((url) => url.origin === SAAS, { timeout: wait }).then(() => 'saas' as const, () => null),
         inHub().then(() => 'hub' as const, () => null),
       ]);
-      if (where === null) throw new Error(`login on ${origin}: neither the SaaS nor the hub's shell showed up`);
+      if (where === null) throw new Error(`login on ${origin}: neither the SaaS nor the hub's shell showed up within ${wait} ms`);
       if (where === 'saas') {
         const form = page.getByTestId('login-form');
         const step = await Promise.race([
-          form.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'form' as const, () => null),
-          page.waitForURL((url) => url.origin === origin, { timeout: 30_000 }).then(() => 'back' as const, () => null),
+          form.waitFor({ state: 'visible', timeout: wait }).then(() => 'form' as const, () => null),
+          page.waitForURL((url) => url.origin === origin, { timeout: wait }).then(() => 'back' as const, () => null),
         ]);
-        if (step === null) throw new Error(`login on ${origin}: the SaaS showed neither its sign-in form nor the hub`);
-        if (step === 'form') await signInWithCode(page, origin, target, credentials);
+        if (step === null) {
+          throw new Error(`login on ${origin}: the SaaS showed neither its sign-in form nor the hub within ${wait} ms`);
+        }
+        if (step === 'form') {
+          await signInWithCode(page, origin, target, credentials, wait);
+          signedIn = true;
+        }
       }
-      await page.waitForURL(target, { timeout: 30_000 });
+      await page.waitForURL(target, { timeout: wait });
     },
     {
       onRetry: (error) =>
@@ -128,15 +176,23 @@ export async function login(
     },
   );
   await inHub();
+  if (signedIn) saasSessions.set(account, await context.cookies(SAAS));
 }
 
 /**
  * The SaaS's sign-in form (`/launch`) and then, when the SaaS asks for it, the code it mailed
- * (`/verify-email`); done once the browser is on its way back to the hub. A step that does not come
- * fails with the step's name and what the page said; a refused connection keeps its own error, so
- * that `login` tries again.
+ * (`/verify-email`); done once the browser is on its way back to the hub. A step that does not come within
+ * `wait` ms fails with the step's name, the wait and what the page said; a refused connection keeps its own
+ * error, so that `login` tries again. Still on `/verify-email` after the code: rejected when the page says so,
+ * else a SaaS that has not answered the code yet.
  */
-async function signInWithCode(page: Page, origin: string, target: string, credentials: Credentials): Promise<void> {
+async function signInWithCode(
+  page: Page,
+  origin: string,
+  target: string,
+  credentials: Credentials,
+  wait: number,
+): Promise<void> {
   const form = page.getByTestId('login-form');
   await form.getByTestId('login-email').locator('input').fill(credentials.email);
   await form.getByTestId('login-password').locator('input').fill(credentials.password);
@@ -147,15 +203,17 @@ async function signInWithCode(page: Page, origin: string, target: string, creden
   const codeForm = page.getByTestId('verify-email-form');
   const backHome = (url: URL) => url.origin === origin || url.pathname.startsWith('/hub-login');
   const step = await Promise.race([
-    codeForm.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'code' as const, () => null),
-    page.waitForURL(backHome, { timeout: 30_000 }).then(() => 'back' as const, () => null),
+    codeForm.waitFor({ state: 'visible', timeout: wait }).then(() => 'code' as const, () => null),
+    page.waitForURL(backHome, { timeout: wait }).then(() => 'back' as const, () => null),
   ]);
   if (step === null) {
-    throw new Error(`login on ${origin}: sign-in form sent, but neither /verify-email nor the hub came${await saidBy(page)}`);
+    throw new Error(
+      `login on ${origin}: sign-in form sent, but neither /verify-email nor the hub came within ${wait} ms${await saidBy(page)}`,
+    );
   }
   if (step === 'back') return;
 
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since }).catch((error: unknown) => {
+  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: wait }).catch((error: unknown) => {
     throw new Error(`login on ${origin}: mail not found: ${error instanceof Error ? error.message : String(error)}`);
   });
   // `CodeField` is one input today; six one-digit inputs would take a digit each.
@@ -168,11 +226,17 @@ async function signInWithCode(page: Page, origin: string, target: string, creden
   }
   await codeForm.getByTestId('verify-email-submit').click();
   try {
-    await page.waitForURL(target, { timeout: 30_000 });
+    await page.waitForURL(target, { timeout: wait });
   } catch (error) {
     if (isConnectionRefused(error)) throw error;
-    const where = new URL(page.url()).pathname === '/verify-email' ? 'code rejected' : 'next not reached';
-    throw new Error(`login on ${origin}: ${where} (code ${code} for ${credentials.email}, at ${page.url()})${await saidBy(page)}`);
+    const said = await saidBy(page);
+    const where =
+      new URL(page.url()).pathname !== '/verify-email'
+        ? `next not reached within ${wait} ms`
+        : said
+          ? 'code rejected'
+          : `the SaaS did not answer the code within ${wait} ms`;
+    throw new Error(`login on ${origin}: ${where} (code ${code} for ${credentials.email}, at ${page.url()})${said}`);
   }
 }
 
