@@ -2,20 +2,33 @@
 // VeriFactu → Recovery (VERIFACTU-F26–F29; the old `erp-verifactu-recovery`): «Chain recovery» with the «Issuer tax
 // ID» (filled with Invoicing's issuer) and the current environment; «Chain integrity» with the last verdict and the
 // note of what it checks; «Validate chain», «Query AEAT» (whoever may send) and «Recover chain from AEAT» (asks
-// first; owner and admin); «Latest records at the AEAT» (the last photo); and «Continue chain manually (migration)»
-// (the last fingerprint, 64 hex, with its invoice number and date; asks first; owner and admin). Without a tax ID the
-// buttons are off. Every action ends in «Operation completed.» or its refusal, in the server's words.
-import { formatDateTime, InlineFeedback, useConfirm } from '@erplora/ui/components';
+// first; owner and admin); «Latest records at the AEAT» (the last photo, in a server-side DataTable as the old one:
+// search «Search invoice, fingerprint or CSV…», every column sorts, State and Date in the table's funnel); and
+// «Continue chain manually (migration)» (the last fingerprint, 64 hex, with its invoice number and date; asks first;
+// owner and admin). Without a tax ID the buttons are off. Every action ends in «Operation completed.» or its
+// refusal, in the server's words.
+import {
+  type DataTableColumn,
+  type DataTableFilters,
+  DataTable,
+  EmptyState,
+  formatDateTime,
+  InlineFeedback,
+  useConfirm,
+} from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput } from '@ionic/vue';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
+import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
+import { backwardsDays, filterParams, filtersInUse } from '../lib/filters';
 import { formatDate } from '../lib/format';
-import { short } from '../lib/record';
+import { AEAT_STATES, short } from '../lib/record';
 import { refusal } from '../lib/refusal';
+import type { AeatRecordListIn, AeatRecordOut } from '../operations';
 import { verifactuTabs } from '../tabs';
 
 const HASH = /^[0-9a-fA-F]{64}$/;
@@ -38,7 +51,46 @@ watch(
 );
 const issuer = computed(() => nif.value.trim());
 const { data: chainStatus } = useLive('verifactu.chain.status', () => (issuer.value ? { issuer_nif: issuer.value } : {}));
-const { data: aeat } = useLive('verifactu.aeat_record.list', () => ({ limit: 50 }));
+
+/** «Latest records at the AEAT»: the funnel's filters, as typed. A filter not in use is absent. */
+const aeatFilters = ref<DataTableFilters>({});
+const aeatTable = useServerTable('verifactu.aeat_record.list', {
+  sort: 'generated_on',
+  dir: 'desc',
+  maxSearch: 120,
+  filters: (): Partial<AeatRecordListIn> => filterParams(aeatFilters.value),
+  narrowed: () => filtersInUse(aeatFilters.value) > 0,
+});
+const { data: aeat, status: aeatStatus, error: aeatError, refresh: aeatRefresh } = aeatTable;
+const aeatTableError = computed(() => (aeatStatus.value === 'error' && !Object.keys(aeatError.value?.fields ?? {}).length ? aeatError.value?.message : undefined));
+const aeatFilterErrors = computed<Record<string, string>>(() => ({
+  ...(aeatError.value?.fields ?? {}),
+  ...Object.fromEntries(backwardsDays(aeatFilters.value).map((name) => [name, t('verifactu.filters.dateOrder')])),
+}));
+/** The AEAT's state in the reader's words; a state it does not know yet, as the AEAT wrote it. */
+const aeatState = (state: string) => ((AEAT_STATES as readonly string[]).includes(state) ? t(`verifactu.recovery.aeatState.${state}`) : state || '—');
+const aeatColumns = computed<DataTableColumn<AeatRecordOut>[]>(() => [
+  { key: 'invoice_number', label: t('verifactu.recovery.aeatColumns.invoice'), sortable: true, priority: 'high', width: 'minmax(9rem, 11rem)' },
+  {
+    key: 'issue_date',
+    label: t('verifactu.recovery.aeatColumns.date'),
+    sortable: true,
+    width: 'minmax(7rem, 8rem)',
+    format: (_, row) => formatDate(row.issue_date, locale.value),
+    filter: { type: 'daterange', keys: ['issue_date_from', 'issue_date_to'] },
+  },
+  { key: 'fingerprint', label: t('verifactu.recovery.aeatColumns.fingerprint'), sortable: true, priority: 'low', width: 'minmax(12rem, 1fr)', format: (_, row) => short(row.fingerprint) },
+  {
+    key: 'state',
+    label: t('verifactu.recovery.aeatColumns.state'),
+    sortable: true,
+    width: 'minmax(7rem, 10rem)',
+    format: (_, row) => aeatState(row.state),
+    filter: { type: 'select', options: AEAT_STATES.map((value) => ({ value, label: aeatState(value) })) },
+  },
+  { key: 'csv', label: t('verifactu.recovery.aeatColumns.csv'), sortable: true, width: 'minmax(6rem, 9rem)', format: (_, row) => row.csv || '—' },
+  { key: 'queried_at', label: t('verifactu.recovery.aeatColumns.queried'), sortable: true, priority: 'low', width: 'minmax(9rem, 11rem)', format: (_, row) => formatDateTime(row.queried_at, locale.value) },
+]);
 
 const head = computed(() => chainStatus.value?.chains.find((chain) => chain.environment === chainStatus.value?.environment) ?? null);
 const integrity = computed(() => {
@@ -184,41 +236,43 @@ async function continueManually(): Promise<void> {
 
     <section class="verifactu-recovery__section">
       <h3>{{ $t('verifactu.recovery.aeatTitle') }}</h3>
-      <div
-        class="verifactu-recovery__table"
-        data-testid="verifactu-recovery-aeat"
+      <DataTable
+        v-model:search="aeatTable.search.value"
+        v-model:filters="aeatFilters"
+        testid="verifactu-recovery-aeat"
+        server-side
+        searchable
+        filterable
+        :filter-errors="aeatFilterErrors"
+        :rows="aeat?.rows ?? []"
+        :total="aeat?.total ?? 0"
+        :page="aeatTable.page.value"
+        :page-size="aeatTable.pageSize.value"
+        :sort="aeatTable.sort.value"
+        :sort-dir="aeatTable.dir.value"
+        :views="['table', 'cards']"
+        :card-title="(row: AeatRecordOut) => row.invoice_number"
+        :card-icon="() => 'lucide:shield-check'"
+        :entity-label="{ one: $t('verifactu.recovery.aeatEntity.one'), many: $t('verifactu.recovery.aeatEntity.many') }"
+        :loading="aeatStatus === 'loading'"
+        :error="aeatTableError"
+        :search-placeholder="$t('verifactu.recovery.aeatSearch')"
+        :labels="{ loading: $t('verifactu.records.loading'), loadError: $t('verifactu.recovery.aeatLoadError'), retry: $t('verifactu.live.retry') }"
+        :columns="aeatColumns"
+        @page-change="aeatTable.goToPage"
+        @load-more="aeatTable.loadMore"
+        @page-size-change="aeatTable.setPageSize"
+        @sort-change="aeatTable.setSort"
+        @retry="aeatRefresh()"
       >
-        <p v-if="!aeat?.rows.length">
-          {{ $t('verifactu.recovery.aeatEmpty') }}
-        </p>
-        <table v-else>
-          <thead>
-            <tr>
-              <th>{{ $t('verifactu.recovery.aeatColumns.invoice') }}</th>
-              <th>{{ $t('verifactu.recovery.aeatColumns.date') }}</th>
-              <th>{{ $t('verifactu.recovery.aeatColumns.fingerprint') }}</th>
-              <th>{{ $t('verifactu.recovery.aeatColumns.state') }}</th>
-              <th>{{ $t('verifactu.recovery.aeatColumns.csv') }}</th>
-              <th>{{ $t('verifactu.recovery.aeatColumns.queried') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in aeat.rows"
-              :key="row.id"
-            >
-              <td>{{ row.invoice_number }}</td>
-              <td>{{ formatDate(row.issue_date, locale) }}</td>
-              <td class="verifactu-recovery__hash">
-                {{ short(row.fingerprint) }}
-              </td>
-              <td>{{ row.state || '—' }}</td>
-              <td>{{ row.csv || '—' }}</td>
-              <td>{{ formatDateTime(row.queried_at, locale) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <template #empty>
+          <EmptyState
+            data-testid="verifactu-recovery-aeat-empty"
+            icon="file-tray-outline"
+            :heading="aeatTable.filtered.value ? $t('verifactu.records.noResults') : $t('verifactu.recovery.aeatEmpty')"
+          />
+        </template>
+      </DataTable>
     </section>
 
     <section
@@ -288,6 +342,7 @@ async function continueManually(): Promise<void> {
   font-size: 0.95rem;
 }
 .verifactu-recovery__note {
+  margin: 0.5rem 0 1rem;
   color: var(--ion-color-medium, #8a8577);
   font-size: 0.85rem;
 }
@@ -296,23 +351,6 @@ async function continueManually(): Promise<void> {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-}
-.verifactu-recovery__table {
-  overflow-x: auto;
-}
-.verifactu-recovery__table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-.verifactu-recovery__table th,
-.verifactu-recovery__table td {
-  padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid var(--ion-color-light-shade, #e4e1d8);
-  text-align: start;
-}
-.verifactu-recovery__hash {
-  font-family: ui-monospace, monospace;
 }
 .verifactu-recovery__manual {
   display: grid;

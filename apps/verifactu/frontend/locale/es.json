@@ -217,6 +217,17 @@
       "working": "Trabajando…",
       "aeatTitle": "Últimos registros en la AEAT",
       "aeatEmpty": "Sin datos de la AEAT. Pulsa «Consultar AEAT».",
+      "aeatSearch": "Buscar factura, huella o CSV…",
+      "aeatLoadError": "No se han podido cargar los registros de la AEAT.",
+      "aeatEntity": {
+        "one": "registro en la AEAT",
+        "many": "registros en la AEAT"
+      },
+      "aeatState": {
+        "Correcto": "Correcto",
+        "AceptadoConErrores": "Aceptado con errores",
+        "Anulado": "Anulado"
+      },
       "aeatColumns": {
         "invoice": "Factura",
         "date": "Fecha",

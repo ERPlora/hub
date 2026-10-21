@@ -759,6 +759,9 @@ Pasos:
 1. En **VeriFactu → Recuperación**, pulsa «Consultar AEAT» («Consultando…»).
 2. El sistema pregunta a la AEAT, por la pasarela, por los registros de ese emisor del mes en curso.
 3. La tabla «Últimos registros en la AEAT» se llena y sale «Operación completada.».
+4. En la tabla, busca por factura, huella o CSV («Buscar factura, huella o CSV…»), ordena por cualquier columna y
+   filtra por «Estado» (Correcto, Aceptado con errores, Anulado) o por «Fecha» desde el embudo; sin coincidencias,
+   «Sin resultados»; sin consulta todavía, «Sin datos de la AEAT. Pulsa «Consultar AEAT».».
 Entra: el NIF del emisor; la respuesta de la AEAT.
 Sale: la foto de lo que tiene la AEAT, que sustituye a la anterior (avisa `verifactu.aeat.queried`). No toca
 la cadena.

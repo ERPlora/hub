@@ -11,6 +11,7 @@ import datetime as dt
 import pytest
 from django.utils import timezone, translation
 from live.context import system_context
+from pydantic import ValidationError
 
 from apps.verifactu import certificates, queries
 from apps.verifactu.models import (
@@ -365,6 +366,51 @@ def test_the_aeats_photo(issuer):
     )
     page = run("verifactu.aeat_record.list")
     assert [row.invoice_number for row in page.rows] == ["T-1"]
+
+
+@pytest.fixture
+def photo(issuer):
+    """What the AEAT holds after a «Query AEAT»: three records, the last generated first."""
+    now = timezone.now()
+    rows = [
+        ("T-1", dt.date(2026, 1, 10), "a" * 64, "Correcto", "CSV111", now - dt.timedelta(hours=3)),
+        ("T-2", dt.date(2026, 2, 10), "b" * 64, "AceptadoConErrores", "CSV222", now - dt.timedelta(hours=2)),
+        ("R-3", dt.date(2026, 3, 10), "c" * 64, "Anulado", "", now - dt.timedelta(hours=1)),
+    ]
+    for number, day, fingerprint, state, csv, generated in rows:
+        AeatRecord.objects.create(
+            issuer_nif="B12345674",
+            environment="testing",
+            invoice_number=number,
+            issue_date=day,
+            fingerprint=fingerprint.upper(),
+            state=state,
+            csv=csv,
+            generated_on=generated,
+        )
+
+
+def test_the_aeats_photo_searches_its_number_fingerprint_or_csv(photo):
+    assert numbers(run("verifactu.aeat_record.list")) == ["R-3", "T-2", "T-1"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "t-2"})) == ["T-2"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "bbbb"})) == ["T-2"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "csv111"})) == ["T-1"]
+    assert numbers(run("verifactu.aeat_record.list", {"search": "nothing"})) == []
+
+
+def test_the_aeats_photo_filters_by_its_state_and_issue_days(photo):
+    assert numbers(run("verifactu.aeat_record.list", {"state": "Anulado"})) == ["R-3"]
+    assert numbers(
+        run("verifactu.aeat_record.list", {"issue_date_from": "2026-02-01", "issue_date_to": "2026-02-28"})
+    ) == ["T-2"]
+    with pytest.raises(ValidationError):
+        run("verifactu.aeat_record.list", {"state": "Rejected"})
+
+
+def test_the_aeats_photo_sorts_by_a_column(photo):
+    assert numbers(run("verifactu.aeat_record.list", {"sort": "issue_date", "dir": "asc"})) == ["T-1", "T-2", "R-3"]
+    assert numbers(run("verifactu.aeat_record.list", {"sort": "invoice_number", "dir": "asc"})) == ["R-3", "T-1", "T-2"]
+    assert numbers(run("verifactu.aeat_record.list", {"sort": "csv", "dir": "desc"}))[0] == "T-2"
 
 
 # The configuration (VERIFACTU-F04, F08, F12, F34)

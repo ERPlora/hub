@@ -10,6 +10,7 @@
 //   - VERIFACTU-F20, F21, F22: the queue lists what is not in the AEAT; «Process queue» and «Retry» answer;
 //   - VERIFACTU-F31: Events tells what happened, the latest first;
 //   - VERIFACTU-F26–F29: Recovery validates the chain, asks the AEAT and offers both recoveries, asking first;
+//   - VERIFACTU-F27: «Latest records at the AEAT» searches the last photo on the server;
 //   - VERIFACTU-F09–F12: Settings, two columns on a desk as the old screen: back to testing, the connection test,
 //     the test invoice and the responsible declaration.
 // The gateway is not configured on this server, as in the other VeriFactu specs: what would go to the AEAT says why
@@ -85,6 +86,7 @@ test.afterAll(() => {
     psql(
       [
         `delete from verifactu_event where created_at >= '${STARTED}'`,
+        `delete from verifactu_aeatrecord where invoice_number = 'E2E-AEAT-${RUN}'`,
         configBefore
           ? `update verifactu_config set environment = '${configBefore.environment}', production_since = ${configBefore.production_since ? `'${configBefore.production_since}'` : 'null'}`
           : 'select 1',
@@ -276,6 +278,27 @@ test('VERIFACTU-F26–F29: Recovery validates the chain, asks the AEAT and asks 
   await flowShots(page, 'F29', async (p) => {
     await seen(shown(p).locator('[data-testid=verifactu-recovery-manual]'));
   });
+});
+
+test('VERIFACTU-F27: «Latest records at the AEAT» searches the last photo on the server and says when nothing matches', async ({ page }) => {
+  // The photo as a «Query AEAT» leaves it (this server has no gateway to ask): one record the AEAT accepted with errors.
+  const number = `E2E-AEAT-${RUN}`;
+  psql(
+    'insert into verifactu_aeatrecord (id, issuer_nif, environment, invoice_number, issue_date, fingerprint, state, csv, generated_on, queried_at) ' +
+      `values (gen_random_uuid(), 'B12345674', 'testing', '${number}', '2026-10-14', '${'B'.repeat(64)}', 'AceptadoConErrores', 'CSV-${RUN}', now(), now())`,
+  );
+  await login(page, A, '/verifactu/recovery');
+  const view = shown(page);
+  await view.locator('[data-testid=verifactu-recovery-aeat-search] input').fill(`CSV-${RUN}`);
+  const row = view.locator('[data-testid=verifactu-recovery-aeat-row]').filter({ hasText: number });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Accepted with errors');
+  await expect(view.locator('[data-testid=verifactu-recovery-aeat-row]')).toHaveCount(1);
+  await flowShots(page, 'F27-photo', async (p) => {
+    await seen(shown(p).locator('[data-testid=verifactu-recovery-aeat-row]').filter({ hasText: number }).first());
+  });
+  await view.locator('[data-testid=verifactu-recovery-aeat-search] input').fill(`nothing-${RUN}`);
+  await expect(view.locator('[data-testid=verifactu-recovery-aeat-empty]')).toContainText('No results');
 });
 
 test('VERIFACTU-F09–F12: Settings in two columns on a desk; back to testing, the connection test, the test invoice and the declaration', async ({ page }) => {

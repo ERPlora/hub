@@ -608,8 +608,27 @@ class EventListIn(PageIn):
     dir: Direction = Field("desc", description="asc or desc.")
 
 
+#: How the AEAT's query names the state of a record it holds (``EstadoRegistro`` of RespuestaConsultaLR.xsd).
+AeatStateCode = Literal["Correcto", "AceptadoConErrores", "Anulado"]
+
+
 class AeatRecordListIn(PageIn):
-    """The last photo of the AEAT."""
+    """The last photo of the AEAT, the last generated first unless sorted otherwise."""
+
+    search: OptionalText(120) = Field(
+        None, description=SEARCH + " Invoice number, fingerprint or CSV."
+    )
+    state: AeatStateCode | None = Field(None, description="Only this state at the AEAT.")
+    issue_date_from: dt.date | None = Field(
+        None, description="Invoices issued on this day or later."
+    )
+    issue_date_to: dt.date | None = Field(
+        None, description="Invoices issued on this day or earlier."
+    )
+    sort: Literal["generated_on", "invoice_number", "issue_date", "fingerprint", "state", "csv", "queried_at"] | None = Field(
+        None, description="Column to sort by (the last generated first by default)."
+    )
+    dir: Direction = Field("desc", description="asc or desc.")
 
 
 class RecordCreateIn(Schema):

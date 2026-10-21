@@ -217,6 +217,17 @@
       "working": "Working…",
       "aeatTitle": "Latest records at the AEAT",
       "aeatEmpty": "No AEAT data. Press «Query AEAT».",
+      "aeatSearch": "Search invoice, fingerprint or CSV…",
+      "aeatLoadError": "The records at the AEAT could not be loaded.",
+      "aeatEntity": {
+        "one": "record at the AEAT",
+        "many": "records at the AEAT"
+      },
+      "aeatState": {
+        "Correcto": "Registered",
+        "AceptadoConErrores": "Accepted with errors",
+        "Anulado": "Cancelled"
+      },
       "aeatColumns": {
         "invoice": "Invoice",
         "date": "Date",
