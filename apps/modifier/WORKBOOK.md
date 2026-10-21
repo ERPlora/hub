@@ -131,7 +131,7 @@ De 20 en 20, con «Cargar más».
 | MODIFIER-F03 | Cambiar o borrar un grupo | hecho |
 | MODIFIER-F04 | Añadir, cambiar o quitar las opciones de un grupo | hecho |
 | MODIFIER-F05 | Enganchar un grupo a productos o categorías, y soltarlo | hecho |
-| MODIFIER-F06 | Elegir las opciones al vender un artículo | parcial |
+| MODIFIER-F06 | Elegir las opciones al vender un artículo | hecho |
 | MODIFIER-F07 | Cobrar el suplemento: precio y IVA | hecho |
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
@@ -238,19 +238,19 @@ Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
 <!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f17 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f06 -->
-Estado: parcial — la hoja de Ventas parte letra a letra el nombre de una opción que se repite cuando lleva
-suplemento y ya está elegida (con su «× 2» y su «−»), en los tres tamaños; lo demás del flujo funciona
+Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
 Pasos:
 1. En el TPV, toca un artículo que tiene grupos (suyos o de cualquiera de sus categorías): se abre una
    hoja con su nombre. Sin grupos, el artículo entra directo.
-2. Cada grupo dice su regla: «Elige N» si es obligatorio, «Hasta N» si es opcional con techo,
-   «Opcional» si no tiene techo; cada opción lleva su suplemento con su signo si no es cero
-   («+1,00 €») y las opciones por defecto ya salen marcadas.
+2. Cada grupo dice su regla: «Elige N» si pide justo N, «Elige de N a M» si pide un mínimo y deja llegar a
+   un techo, «Elige al menos N» si pide un mínimo sin techo, «Hasta N» si solo tiene techo, «Opcional» si
+   no; cada opción lleva su suplemento con su signo si no es cero («+1,00 €») y las opciones por defecto ya
+   salen marcadas.
 3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en un grupo
-   que se repite, cada toque suma uno al contador («× 2») y «−» lo resta; al llegar al techo, el siguiente
-   toque avisa de que el grupo está completo.
+   que se repite, cada opción va en su renglón, con su nombre entero, y cada toque suma uno al contador
+   («× 2») que «−» resta; al llegar al techo, el siguiente toque avisa de que el grupo está completo.
 4. Mientras un grupo obligatorio no esté completo, el botón dice «Elige una opción para continuar» y
    tocarlo señala ese grupo. Con todo elegido, dice «Añadir · <precio>» con los suplementos ya sumados.
 5. Pulsa «Añadir»: la línea entra con las opciones en el orden en que se tocaron y su precio.
@@ -502,10 +502,12 @@ Suplementos encendida y el permiso de verla (hub#1121); el empleado lo tiene, y 
 (hub#1219, `tests/test_integration_sale.py`).
 
 1. **La hoja del TPV** (MODIFIER-F06): al tocar un artículo, `modifier.group.for_target` con
-   `product_id`. Sin grupos, la línea entra directa. Con grupos, la hoja: regla por grupo («Elige N»
-   con mínimo ≥ 1 —N el mínimo—, «Hasta N» opcional con techo, «Opcional»), opciones con su suplemento
-   si no es 0, `is_default` ya marcadas, un contador en los grupos con `allow_repeat`, y «Añadir»
-   desactivado («Elige una opción para continuar») mientras un grupo esté fuera de su mínimo y máximo.
+   `product_id`. Sin grupos, la línea entra directa. Con grupos, la hoja: regla por grupo («Elige N» con
+   mínimo = máximo, «Elige de N a M» con mínimo ≥ 1 y un techo mayor, «Elige al menos N» con mínimo ≥ 1 sin
+   techo, «Hasta N» opcional con techo, «Opcional»; `ruleOf` de `apps/sale/frontend/lib/modifierChoice.ts`,
+   hub#143), opciones con su suplemento si no es 0, `is_default` ya marcadas, en los grupos con
+   `allow_repeat` una opción por renglón con su contador y su «−», y «Añadir» desactivado («Elige una opción
+   para continuar») mientras un grupo esté fuera de su mínimo y máximo.
 2. **Añadir la línea** (`sale.order.add_line` y las líneas de `sale.sale.complete` y `sale.order.open`):
    un campo nuevo `option_ids` (lista de UUID en el orden de elección, hasta 100). En la misma
    transacción, `modifier.selection.resolve` con `product_id` y `option_ids`; sus 409 llegan a quien

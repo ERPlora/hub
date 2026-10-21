@@ -29,6 +29,7 @@ const SIZES = [
 ];
 
 let burger: Product;
+let salad: Product;
 let card: string;
 let categoryId: string;
 const ids: Record<string, string> = {};
@@ -139,6 +140,16 @@ test.beforeAll(async ({ browser }) => {
   }
   await post(context, '/modifier/links/attach', { group_id: groups.doneness, category_id: categoryId });
   for (const group of ['extras', 'drink']) await post(context, '/modifier/links/attach', { group_id: groups[group], product_id: burger.id });
+  // A salad whose groups ask a minimum without a ceiling («Dressing») and a minimum up to a ceiling («Toppings»).
+  salad = await createProduct(context, { name: `E2E Salad ${RUN}`, sku: `${SKU}-SAL`, price: 650, tax_category_key: FOOD });
+  for (const [key, fields, option] of [
+    ['dressing', { name: named('Dressing'), min_choices: 1, max_choices: 0, sort_order: 1 }, 'Vinaigrette'],
+    ['toppings', { name: named('Toppings'), min_choices: 1, max_choices: 3, sort_order: 2 }, 'Croutons'],
+  ] as const) {
+    groups[key] = (await post<{ id: string }>(context, '/modifier/groups', fields)).id;
+    await post(context, '/modifier/options', { group_id: groups[key], name: option });
+    await post(context, '/modifier/links/attach', { group_id: groups[key], product_id: salad.id });
+  }
   const list = await api<{ rows: { id: string; type: string }[] }>(context, A, 'GET', '/sale/payment_methods');
   card = list.data.rows.find((row) => row.type === 'card')?.id ?? '';
   expect(card, 'a card method').not.toBe('');
@@ -183,13 +194,31 @@ test('MODIFIER-F06: the till asks the groups of the burger and of its category, 
   await sheet.locator(`[data-testid=pos-option-${ids.onion}]`).click();
   await expect(sheet.locator(`[data-testid=pos-options-group-${groups.extras}]`)).toContainText(`«${named('Extras')}» is full`);
   await expect(add).toContainText(/10[.,]00/);
-  await shots(page, 'MODIFIER-F06', () => expect(add).toBeVisible());
+  // The chosen cheese, with its «× 2» and its «−», keeps its name on one line in every size (hub#143).
+  const cheeseName = sheet.locator(`[data-testid=pos-option-name-${ids.cheese}]`);
+  await shots(page, 'MODIFIER-F06', async () => {
+    await expect(add).toBeVisible();
+    const lines = await cheeseName.evaluate((name) => {
+      const range = document.createRange();
+      range.selectNodeContents(name);
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+    });
+    expect(lines, `«Cheese» on ${page.viewportSize()?.width}px`).toBe(1);
+  });
 
   await add.click();
   await expect(sheet).toBeHidden();
   const line = lineOf(page, burger.name);
   await expect(line).toContainText('Rare, Cheese, Cheese');
   await expect(line).toContainText(/10[.,]00/);
+
+  // A minimum without a ceiling, and a minimum up to a ceiling, each say so.
+  await shown(page).locator(`[data-testid=pos-product-${salad.id}]`).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator(`[data-testid=pos-options-rule-${groups.dressing}]`)).toHaveText('Choose at least 1');
+  await expect(sheet.locator(`[data-testid=pos-options-rule-${groups.toppings}]`)).toHaveText('Choose 1 to 3');
+  await sheet.locator('[data-testid=pos-options-close]').click();
+  await expect(sheet).toBeHidden();
 });
 
 test('MODIFIER-F07: the supplements are charged at the catalogue price, the soda on a line of its own with its VAT', async ({ page, context }) => {
