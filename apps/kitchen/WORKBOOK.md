@@ -625,8 +625,8 @@ Pasos:
 2. «Crear comanda»: el panel se cierra y la comanda sale arriba de la lista (aunque estuvieras en
    otra página, la lista vuelve a la primera) y en la pantalla.
 Entra: el tipo, el destino, las notas y los platos.
-Sale: una comanda Por preparar, ronda 1, sin cuenta (avisa: comanda creada; Historial «Creada»); sus
-platos van a su estación como los de una ronda.
+Sale: una comanda Por preparar, ronda 1, sin cuenta, con el nombre de quien la crea (avisa: comanda
+creada; Historial «Creada»); sus platos van a su estación como los de una ronda.
 Si falla: dentro del panel. Una comanda sin platos se rechaza («Añade al menos un plato.»). Como no
 cuelga de ninguna cuenta, cobrar no la cierra.
 Implicados: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
