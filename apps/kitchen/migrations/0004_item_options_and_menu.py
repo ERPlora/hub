@@ -13,12 +13,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='ticketitem',
             name='menu_dish',
-            field=models.PositiveSmallIntegerField(default=0, verbose_name='dish of the menu'),
+            field=models.PositiveSmallIntegerField(db_default=0, default=0, verbose_name='dish of the menu'),
         ),
         migrations.AddField(
             model_name='ticketitem',
             name='menu_name',
-            field=models.CharField(blank=True, max_length=200, verbose_name='menu'),
+            field=models.CharField(blank=True, db_default='', max_length=200, verbose_name='menu'),
         ),
         migrations.AddField(
             model_name='ticketitem',

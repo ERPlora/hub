@@ -396,9 +396,9 @@ class TicketItem(UUIDModel):
     #: The line of Sales (opaque); empty for a dish made by hand. A menu's line is one dish per dish chosen.
     sale_line_id = models.UUIDField(_("line of the check"), null=True, blank=True)
     #: Which dish of its menu's line it is (1, 2…); 0 = a line ordered on its own (KITCHEN-F06).
-    menu_dish = models.PositiveSmallIntegerField(_("dish of the menu"), default=0)
+    menu_dish = models.PositiveSmallIntegerField(_("dish of the menu"), default=0, db_default=0)
     #: The header of its menu (its kitchen name, else its name); empty out of a menu (KITCHEN-F06).
-    menu_name = models.CharField(_("menu"), max_length=200, blank=True)
+    menu_name = models.CharField(_("menu"), max_length=200, blank=True, db_default="")
     position = models.PositiveIntegerField(_("position"))
     product_id = models.UUIDField(_("product"), null=True, blank=True)
     category_id = models.UUIDField(_("category"), null=True, blank=True)
