@@ -56,6 +56,22 @@ describe('SplitLines', () => {
     expect(s.wrapper.emitted('toggle')).toEqual([['l1']]);
   });
 
+  it('says each quantity as the till does: no trailing decimals, the reader’s separator, a weight with its unit', async () => {
+    // Sales sends quantities with three decimals («1.000»): raw, a Spanish reader read «1.000 ×» as a thousand.
+    const m = await mountTable(SplitLines, { props: { orderId: 'o1', marked: [] }, locale: 'es' });
+    await m.live();
+    await m.result(OP, {
+      id: 'o1',
+      lines: [
+        { id: 'l1', name: 'Café', quantity: '1.000', unit: 'ud', line_total: 150 },
+        { id: 'l2', name: 'Queso', quantity: '0.532', unit: 'kg', line_total: 1064 },
+      ],
+    });
+    const text = (id: string) => m.wrapper.find(`[data-testid="table-sheet-split-line-${id}"]`).text().replace(/\s+/g, ' ');
+    expect(text('l1')).toBe('1 × Café · 1,50 €');
+    expect(text('l2')).toBe('0,532 kg × Queso · 10,64 €');
+  });
+
   it('a check with no lines yet says so', async () => {
     const s = await setup();
     await s.result(OP, { id: 'o1', lines: [] });
