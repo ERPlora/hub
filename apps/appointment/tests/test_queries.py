@@ -395,7 +395,10 @@ def test_the_customers_own_bookings_waiting_for_confirmation_are_counted(salon):
         status="pending",
         source="online",
     )
-    assert run("appointment.appointment.count_to_confirm").count == 1
+    # Two confirmed bookings ahead: a count of the confirmed ones instead would say 2, never 1.
+    make_appointment(salon.lucia, salon.bea, [salon.colour], at(TUESDAY, "12:00"), status="confirmed", source="online")
+    counted = run("appointment.appointment.count_to_confirm")
+    assert (counted.count, counted.earliest) == (1, at(MONDAY, "10:00"))
 
 
 # The agenda's lanes
