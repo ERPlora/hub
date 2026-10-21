@@ -1056,3 +1056,21 @@ def test_only_the_platform_forgets_the_queue():
         with pytest.raises(PermissionDenied):
             prune(ctx_for(role))
 
+
+
+def test_a_retired_device_confirms_and_fails_nothing_it_still_holds():
+    # Retiring a device is a decision (a till lost or replaced): the job it had in hand is not confirmed nor failed
+    # from it any more, and goes back to the queue when its time to answer runs out.
+    till = printer("Till")
+    device = register(till)
+    queued = enqueue().job
+    take(till)
+    run("printing.device.retire", {"device_id": str(device.id)}, ctx=ctx_for(MANAGER))
+    for operation in ("printing.job.complete", "printing.job.fail"):
+        with pytest.raises(Conflict) as refused:
+            answer(operation, queued.id)
+        assert refused.value.code == "printing.job_not_yours", operation
+    assert PrintJob.objects.get(pk=queued.id).status == "sent"
+    expire(queued.id)
+    register(till, device=SPARE_ID, name="Spare")
+    assert take(till, device=SPARE_ID).id == queued.id, "back in the queue, the spare set up for Till takes it"
