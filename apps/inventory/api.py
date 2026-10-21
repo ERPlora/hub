@@ -30,6 +30,7 @@ from apps.inventory.schemas import (
     ProductListIn,
     ProductPatchIn,
     ProductRefIn,
+    ProductSoldOutIn,
     ReceiveIn,
     UnitListIn,
     WriteOffIn,
@@ -84,6 +85,11 @@ async def product_update(request, data: ProductPatchIn):
 @bind(router, "inventory.product.delete", "/inventory/products/delete")
 async def product_delete(request, data: ProductRefIn):
     return await run_operation(request, services.delete_product, data)
+
+
+@bind(router, "inventory.product.set_sold_out", "/inventory/products/sold_out")
+async def product_set_sold_out(request, data: ProductSoldOutIn):
+    return await run_operation(request, services.set_sold_out, data)
 
 
 # Products in categories

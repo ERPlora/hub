@@ -460,9 +460,11 @@ class OptionOut(Schema):
     price_delta: int
     is_available: bool
     sort_order: int
-    status: Literal["offered", "sold_out", "product_inactive", "product_deleted", "not_by_unit", "untaxed"] = Field(
-        description="offered; sold_out (marked here); product_inactive, product_deleted or not_by_unit (in "
-        "Inventory); untaxed (no rate to bill it at in a menu to take away)."
+    status: Literal[
+        "offered", "sold_out", "product_inactive", "product_sold_out", "product_deleted", "not_by_unit", "untaxed"
+    ] = Field(
+        description="offered; sold_out (marked here); product_inactive, product_sold_out, product_deleted or "
+        "not_by_unit (in Inventory); untaxed (no rate to bill it at in a menu to take away)."
     )
 
 

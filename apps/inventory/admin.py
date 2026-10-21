@@ -21,8 +21,8 @@ class ProductCategoryInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "sku", "price", "stock", "unit", "tax_category", "is_active", "is_deleted")
-    list_filter = ("is_active", "is_deleted", "product_type", "unit")
+    list_display = ("name", "sku", "price", "stock", "unit", "tax_category", "is_active", "is_sold_out", "is_deleted")
+    list_filter = ("is_active", "is_sold_out", "is_deleted", "product_type", "unit")
     search_fields = ("name", "sku", "ean13")
     fields = (
         "id",
@@ -41,6 +41,7 @@ class ProductAdmin(admin.ModelAdmin):
         "tax_category",
         "track_stock",
         "is_active",
+        "is_sold_out",
         "is_deleted",
         "deleted_at",
         "created_at",

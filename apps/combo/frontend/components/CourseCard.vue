@@ -17,9 +17,12 @@ import { formatDelta } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchProducts } from '../lib/pickers';
 import { courseRule } from '../lib/rules';
-import type { GroupOut, OptionOut, OptionPatchIn } from '../operations';
+import type { GroupOut, OptionOut, OptionPatchIn, OptionStatus } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
 import MoneyInput from './MoneyInput.vue';
+
+/** Sold out, here or in Inventory (INVENTORY-F29): it comes back, a warning; the rest needs fixing. */
+const SOLD_OUT: ReadonlySet<OptionStatus> = new Set(['sold_out', 'product_sold_out']);
 
 const props = defineProps<{
   course: GroupOut;
@@ -282,7 +285,7 @@ async function save(): Promise<void> {
             <StatusPill
               v-if="choice.status !== 'offered'"
               size="sm"
-              :tone="choice.status === 'sold_out' ? 'warning' : 'danger'"
+              :tone="SOLD_OUT.has(choice.status) ? 'warning' : 'danger'"
               :label="t(`combo.choices.status.${choice.status}`)"
               :data-testid="`combo-choice-${choice.id}-status`"
             />
