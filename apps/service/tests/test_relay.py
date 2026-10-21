@@ -97,9 +97,10 @@ def bono(cut):
 
 
 def balances(customer) -> dict:
-    """``{voucher: (used, left, status)}`` of the vouchers listed on ``customer``'s card."""
+    """``{voucher: (used, left, status)}`` of the vouchers listed on ``customer``'s card, each listed once."""
     page = run("service.grant.list", {"customer_id": str(customer.id)})
-    assert page.total == len(page.rows)
+    ids = [row.id for row in page.rows]
+    assert page.total == len(ids) == len(set(ids))
     return {row.id: (row.used, row.remaining, row.status) for row in page.rows}
 
 
@@ -198,6 +199,9 @@ def test_a_card_erased_in_customers_loses_every_free_text_of_its_vouchers(bono, 
     tick()
     deliver_again("customer.customer.erased")
     tick()
+    assert delivered("customer.customer.erased") == ("delivered", 2)
+    assert free_texts() == {lucia.id: set(), eva.id: {"Eva, card", "Eva on Monday"}}
+    assert recorded("service.grant.erased") == 1
     # Customers announces the erasure every time it is asked again: Services hears it and writes nothing.
     run("customer.customer.erase", {"id": str(lucia.id), "reason": "GDPR request"})
     tick()
