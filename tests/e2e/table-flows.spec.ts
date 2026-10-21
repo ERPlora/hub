@@ -427,6 +427,20 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     await flowShots(page, ['TABLE-F11'], async () => {
       await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 1');
     });
+    await expect(shown(page).locator('[data-testid=pos-customer-chip]')).toContainText(ana.name);
+
+    // sales#569 (TABLE-F32): back on the plan, the next free table starts its check without her.
+    await page.goBack();
+    await page.waitForURL(/\/table\/floor-plan$/);
+    await floor(page);
+    await seat(page, two.id, 2);
+    await tile(page, two.id).click();
+    await sheet(page).locator('[data-testid=table-sheet-action-charge]').click();
+    await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
+    await expect(shown(page).locator('[data-testid=pos-customer-chip]')).toHaveCount(0);
+    const next = (await tableNo(context, '2')).checks;
+    expect(next.map((row) => row.customer_name)).toEqual([null]);
+    await post(context, '/table/sessions/close', { id: next[0].id, order_id: next[0].order_id }, 200);
   } finally {
     await context.close();
   }
