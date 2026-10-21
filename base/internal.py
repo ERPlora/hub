@@ -24,7 +24,8 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   ``base.hub.restore`` (200; 409 ``hub_purged`` when it can never come back);
 - ``PUT /internal/hubs/{id}/state`` (the photo) → ``base.hub.state_apply``: kept on the row if its ``version`` is
   newer, with its VeriFactu block, the business's status and its id in ERPlora applied through
-  ``verifactu.config.sync`` on the hub's slug.
+  ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
+  contract) through ``whatsapp_inbox.channel.sync`` with the photo's version, when the app is on in that business.
 
 The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
 
@@ -43,6 +44,14 @@ ERPlora's invoices: ``GET …/health`` (200 ``{"status": "ok"}`` or 503 ``{"stat
 ``POST …`` (the body of the SaaS's ``platform_payload()``; 201, or 200 when it was issued before), ``GET …/{id}`` (its
 status) and ``GET …/{id}/pdf`` (its PDF, printed after the read, outside any transaction). Each runs its operation of
 Invoicing as the system on ``PLATFORM_HUB_SLUG`` and answers ``{"status", "qr", "error"}``.
+
+``/internal/whatsapp/*`` are erplora.com's WhatsApp doors (``apps/whatsapp_inbox/WORKBOOK.md``, «Contrato con el
+SaaS», doors 1–3): ``POST …/inbound`` → ``whatsapp_inbox.message.receive`` (200 ``{id, conversation_id, created}``),
+``POST …/status`` → ``whatsapp_inbox.message.update_status`` (200 ``{updated, status}``) and ``PUT …/channel`` →
+``whatsapp_inbox.channel.sync`` (200 ``{applied, version}``). The body names the business (``hub``: its slug in phase
+1), whose host gate answers first (404 ``not_found`` unknown, 410 gone, 503 being prepared, 402 suspended); then the
+app off in it is 404 ``app_inactive`` (erplora.com keeps the message and tries again), and the operation runs as the
+system on that business, whose refusals (422 out of contract…) are answered with their own envelope.
 """
 
 import json
@@ -60,8 +69,9 @@ from live.errors import OperationError
 from live.operations import get as get_operation
 from pydantic import ValidationError
 
+from base import registry, relay
 from base.registry import REGISTRY_SCOPE
-from base.services import DEMO_FULL_RETRY_AFTER_SECONDS
+from base.services import DEMO_FULL_RETRY_AFTER_SECONDS, WHATSAPP_APP
 
 # ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
 # SaaS (``apps/verifactu/representation.py``); they are ``base.signing``'s.
@@ -185,7 +195,15 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
         return _payload_invalid("live_paid is true or false.")
     answer, refused = _operation_call(
         "base.hub.state_apply",
-        {"id": str(hub_id), "version": version, "status": status, "verifactu": block, "photo": body},
+        {
+            "id": str(hub_id),
+            "version": version,
+            "status": status,
+            "verifactu": block,
+            # Not an object: the operation's input refuses it (422).
+            "whatsapp": body.get("whatsapp"),
+            "photo": body,
+        },
         _registry_context(),
     )
     return refused or JsonResponse({"applied": answer.applied, "version": answer.version})
@@ -215,6 +233,57 @@ def demo_codes(request: HttpRequest, slug: str) -> HttpResponse:
         return _payload_invalid("The body is not a JSON object.")
     answer, refused = _operation_call("base.demo.code_create", {**body, "slug": slug}, _registry_context())
     return refused or JsonResponse(answer.model_dump(mode="json"), status=201)
+
+
+# ── erplora.com's WhatsApp doors (doors 1–3 of the inbox's contract) ───────────────────────────────────────────────
+
+
+def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:
+    """Runs ``name`` as the system on the business the body names (``hub``), once its host opens and the app is on."""
+    body = _body_object(request)
+    if body is None:
+        return _payload_invalid("The body is not a JSON object.")
+    slug = body.pop("hub", None)
+    if not isinstance(slug, str) or not slug:
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "internal.payload_invalid",
+                    "message": "The body is out of contract.",
+                    "fields": {"hub": "The business's slug is required."},
+                }
+            },
+            status=422,
+        )
+    closed = registry.refusal(registry.hub_by_slug(slug))
+    if closed is not None:
+        return refuse(closed.status, closed.code, closed.message)
+    scope = Scope("host", slug)
+    if WHATSAPP_APP not in relay.active_apps(scope):
+        return refuse(404, "app_inactive", "WhatsApp is not on in this business.")
+    answer, refused = _operation_call(name, body, system_context(scope))
+    return refused or JsonResponse(answer.model_dump(mode="json"))
+
+
+@internal_view
+@require_http_methods(["POST"])
+def whatsapp_inbound(request: HttpRequest) -> HttpResponse:
+    """``POST /internal/whatsapp/inbound``: a customer's message, or the owner's reply from the phone; once per id."""
+    return _whatsapp_call(request, "whatsapp_inbox.message.receive")
+
+
+@internal_view
+@require_http_methods(["POST"])
+def whatsapp_status(request: HttpRequest) -> HttpResponse:
+    """``POST /internal/whatsapp/status``: Meta's status of a message the business sent."""
+    return _whatsapp_call(request, "whatsapp_inbox.message.update_status")
+
+
+@internal_view
+@require_http_methods(["PUT"])
+def whatsapp_channel(request: HttpRequest) -> HttpResponse:
+    """``PUT /internal/whatsapp/channel``: the number's state, its month and its templates; an older version is ignored."""
+    return _whatsapp_call(request, "whatsapp_inbox.channel.sync")
 
 
 # ── ERPlora's own invoices: the door to its platform hub (contract point 4) ──────────────────────────────────────
