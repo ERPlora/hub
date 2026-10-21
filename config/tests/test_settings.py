@@ -249,6 +249,15 @@ def test_the_inbox_shows_photos_and_voice_notes_from_the_saas_s_origin_only(
         assert csp[unchanged] == policy[unchanged]
 
 
+@pytest.mark.parametrize("env", [PRODUCTION_ENV, DEVELOPMENT_ENV], ids=["production", "development"])
+def test_the_gate_pages_take_their_stylesheet_and_logo_from_self(load_settings, env):
+    # A hub being prepared, gone or suspended answers a page rendered without the request (no nonce): it wears
+    # base's static stylesheet and logo (/static/base/), which only 'self' lets in.
+    csp = load_settings(**env)["SECURE_CSP"]
+    assert "'self'" in csp["style-src"]
+    assert "'self'" in csp["img-src"]
+
+
 @pytest.mark.parametrize(
     "missing", ["SECRET_KEY", "SAAS_URL", "INTERNAL_SHARED_SECRET"]
 )
