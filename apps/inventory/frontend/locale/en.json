@@ -182,7 +182,7 @@
       "chunkFailed": "These rows could not be imported: {reason}"
     },
     "movements": {
-      "search": "Search by product, SKU, reference or ticket number…",
+      "search": "Search product, SKU or ticket…",
       "empty": "No movements yet. They appear when you use Receive stock or Count stock on a product in Products, and with every sale.",
       "noMatches": "No movement matches the search or the filters. A sale is found by the number of its ticket, invoice or sale.",
       "loadError": "The movements could not be loaded",
