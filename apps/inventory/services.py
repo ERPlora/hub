@@ -755,6 +755,9 @@ def apply_sale(ctx: OperationContext, data: SaleCompletedIn) -> dict:
     sale, created = _sale_stock(data.sale_id, SaleStock.State.UNMOVED)
     if not created:
         return _sale_result(sale, applied=False, movements=0)
+    # INVENTORY-F16: the numbers the ledger shows and finds this sale by.
+    sale.sale_number = data.sale_number[: SaleStock._meta.get_field("sale_number").max_length]
+    sale.document_number = _document_number(ctx, data.sale_id)[: SaleStock._meta.get_field("document_number").max_length]
     units = [
         (unit.product_id, unit.quantity)
         for item in data.items
@@ -778,7 +781,7 @@ def apply_sale(ctx: OperationContext, data: SaleCompletedIn) -> dict:
             _crossing(ctx, product, settings, before[product_id], StockMovement.Type.SALE, str(data.sale_id))
     if moved:
         sale.state = SaleStock.State.MOVED
-        sale.save(update_fields=["state", "updated_at"])
+    sale.save(update_fields=["state", "sale_number", "document_number", "updated_at"])
     return _sale_result(sale, applied=True, movements=moved)
 
 
@@ -1041,6 +1044,17 @@ def _sale_stock(sale_id: UUID, state: str) -> tuple[SaleStock, bool]:
             return SaleStock.objects.create(sale_id=sale_id, state=state), True
     except IntegrityError:
         return SaleStock.objects.select_for_update().get(sale_id=sale_id), False
+
+
+def _document_number(ctx: OperationContext, sale_id: UUID) -> str:
+    """The number of the sale's ticket or invoice, read from Sales by its operation; empty when Sales is not
+    reachable, does not know the sale or it has no fiscal document yet."""
+    try:
+        get_sale = get("sale.sale.get")
+        found = get_sale(ctx, get_sale.input.model_validate({"sale_id": str(sale_id)}))
+    except (UnknownOperation, AppInactive, PermissionDenied, NotFound):
+        return ""
+    return found.invoice_number
 
 
 def _sale_result(sale: SaleStock, *, applied: bool, movements: int) -> dict:

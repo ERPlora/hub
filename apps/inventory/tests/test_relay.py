@@ -159,6 +159,47 @@ def test_inventory_f21_without_selling_without_stock_an_article_that_does_not_re
     assert SaleStock.objects.get().state == SaleStock.State.UNMOVED
 
 
+# ── INVENTORY-F16: the ledger reads a sale by the number on its paper ──────────────────────────────
+
+ISSUER = {
+    "legal_name": "Peluquería Ana SL",
+    "tax_id": "B12345674",
+    "address": "Calle Mayor 1",
+    "postal_code": "28001",
+    "city": "Madrid",
+    "province": "Madrid",
+}
+
+
+def ledger_rows(search: str) -> list[tuple[str, str]]:
+    page = run("inventory.movement.list", {"search": search})
+    return [(row.movement_type, row.reference_label) for row in page.rows]
+
+
+@pytest.mark.django_db
+def test_inventory_f16_a_sale_and_its_void_read_and_are_found_by_its_ticket_number(tick):
+    run("invoice.issuer.update", ISSUER)
+    make("Shampoo", "SHA")
+    sale = charge("inv-relay-f16-1", ("SHA", "2"))
+    assert sale.invoice_number  # Invoicing numbered its ticket in the charge
+    tick()
+    run("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong table"})
+    tick()
+
+    assert ledger_rows(sale.invoice_number) == [("void", sale.invoice_number), ("sale", sale.invoice_number)]
+    assert ledger_rows(sale.number) == ledger_rows(sale.invoice_number)
+
+
+@pytest.mark.django_db
+def test_inventory_f16_without_a_fiscal_document_a_sale_reads_as_its_own_number(tick):
+    make("Shampoo", "SHA")
+    sale = charge("inv-relay-f16-2", ("SHA", "1"))
+    assert sale.invoice_number == ""  # no issuer yet: the ticket is pending
+    tick()
+
+    assert ledger_rows(sale.number) == [("sale", sale.number)]
+
+
 # ── INVENTORY-F22: a menu lowers its dishes, never itself ───────────────────────────────────────────
 
 

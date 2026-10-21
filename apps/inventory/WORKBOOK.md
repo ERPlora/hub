@@ -212,7 +212,7 @@ fueran los del negocio.
 | INVENTORY-F13 | Recibir mercancía | servidor hecho |
 | INVENTORY-F14 | Contar el stock de un producto | servidor hecho |
 | INVENTORY-F15 | Dar de baja stock sin venta (merma, rotura, consumo propio) | servidor hecho |
-| INVENTORY-F16 | Consultar el historial de movimientos | servidor hecho |
+| INVENTORY-F16 | Consultar el historial de movimientos | hecho |
 | INVENTORY-F17 | Ver el panel y los productos con stock bajo | servidor hecho |
 | INVENTORY-F18 | Avisar cuando un artículo cruza su mínimo | hecho |
 | INVENTORY-F19 | Ajustar el inventario | servidor hecho |
@@ -563,7 +563,8 @@ stock con «Este artículo no controla su stock: no hay nada que dar de baja.» 
 Implicados: ninguno
 
 ### INVENTORY-F16 Consultar el historial de movimientos
-Estado: servidor hecho
+<!-- origen: old:inventory/workflow/stock.md#inventory-f16 -->
+Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Movimientos
 Pasos:
@@ -573,12 +574,13 @@ Pasos:
 3. Filtra por Tipo o por Referencia; ordena por Fecha, Cantidad o Saldo.
 4. En una venta, la Referencia es el número de su tique o factura (o, sin Facturación, el número de
    la venta). En tableta, tocar una referencia cortada la despliega.
-Entra: el libro de movimientos; el número del tique o la factura de cada venta, de Facturación, o,
-si no hay, el número de la venta, de Ventas, solo para pintarlo.
+Entra: el libro de movimientos; el número de cada venta y el de su tique o factura, que Inventario
+apunta de Ventas cuando la venta baja el stock, solo para pintarlos y buscarlos.
 Sale: nada: es solo lectura y ningún movimiento se edita ni se borra. Cada movimiento guarda
 también quién lo hizo, aunque esta pantalla no lo enseña.
-Si falla: si no se puede leer Facturación ni Ventas (no están activas o no hay permiso), la celda
-Referencia de una venta sale vacía. Error de carga: el aviso de la tabla con «Reintentar».
+Si falla: una venta cuyo número Inventario no llegó a apuntar deja vacía la celda Referencia. Un tique
+que Facturación numera más tarde (por ejemplo, sin los datos del negocio al cobrar) se lee y se busca
+por el número de la venta. Error de carga: el aviso de la tabla con «Reintentar».
 Implicados: INVOICE-F20, SALE-F28
 
 ### INVENTORY-F17 Ver el panel y los productos con stock bajo
@@ -1055,6 +1057,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   (permiso de cambiar productos) reutiliza `inventory.product.updated`, con `is_sold_out` en la carga:
   el TPV, Cocina y Menús re-ejecutan sus consultas sin tocar `live.py`. La ficha (`inventory.product.get`)
   sigue dando el artículo, marcado: es lo que lee Ventas al congelar una línea.
+- **Referencia de una venta (INVENTORY-F16, 2026-10-21)**: la nota por venta (`SaleStock`) guarda
+  `sale_number` (del aviso `sale.sale.completed`) y `document_number` (el `invoice_number` que da
+  `sale.sale.get`, leído como sistema al bajar el stock; vacío si Ventas no lo sabe). `inventory.movement.list`
+  devuelve `reference_label` (tique o factura, si no el número de la venta, para venta, anulación y
+  devolución; la propia referencia para el resto) y su búsqueda y su filtro de Referencia encuentran una
+  venta por cualquiera de los dos números. Migración `0004` solo añade columnas con `db_default` (expand).
 - **Etiqueta (INVENTORY-F25, 2026-10-21)**: `inventory.product.print_label` (permiso de ver productos) pide
   a Impresión `printing.job.create` por su nombre (sin `requires`): un `barcode_label` con `product_name`,
   `barcode` (el SKU) y `price` en unidades de la moneda (euros mientras el Hub no tenga moneda; Impresión

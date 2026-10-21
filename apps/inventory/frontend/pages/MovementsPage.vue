@@ -90,7 +90,8 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
     format: (value) => formatQuantity(String(value), locale.value),
   },
   { key: 'reason', label: t('inventory.movements.columns.reason'), priority: 'low', width: 'minmax(3.25rem,1fr)' },
-  { key: 'reference', label: t('inventory.movements.columns.reference'), priority: 'low', width: 'minmax(4.75rem,1.25fr)' },
+  // INVENTORY-F16: a sale reads as the number on its ticket or invoice (the server's label), never as its id.
+  { key: 'reference_label', label: t('inventory.movements.columns.reference'), priority: 'low', width: 'minmax(4.75rem,1.25fr)' },
 ]);
 </script>
 

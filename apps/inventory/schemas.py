@@ -613,6 +613,7 @@ class SaleItemIn(Schema):
 
 class SaleCompletedIn(Schema):
     sale_id: UUID = Field(description="The sale that was paid.")
+    sale_number: str = Field("", description="Its number (AAAAMMDD-NNNN), for the ledger's reference.")
     items: list[SaleItemIn] = Field(default_factory=list, description="Its lines.")
 
 
@@ -762,6 +763,10 @@ class MovementOut(Schema):
     reason: str = Field(description="Why (counts and write-offs).")
     reference: str = Field(
         description="The sale (sales and voids) or the delivery note (receptions)."
+    )
+    reference_label: str = Field(
+        description="The reference as a person reads it: for a sale, void or refund, the number of its ticket or "
+        "invoice (or the sale's own number), empty when Inventory never learnt it; else the reference itself."
     )
     unit_cost: int | None = Field(description="Cost per unit in cents (receptions).")
     actor: str = Field(description="Who made it.")

@@ -2072,6 +2072,22 @@ def _then(holder, release, second):
     return waited
 
 
+def test_inventory_f16_a_sale_keeps_the_number_it_arrived_with_even_one_too_long_for_the_ledger():
+    coffee = create("Coffee", initial_stock="5")
+    sold, long = uuid.uuid7(), uuid.uuid7()
+
+    system("inventory.stock.apply_sale", SaleCompletedIn(sale_id=sold, sale_number="20261021-0099", items=[line(coffee.id, "1")]))
+    system("inventory.stock.apply_sale", SaleCompletedIn(sale_id=long, sale_number="X" * 40, items=[line(coffee.id, "1")]))
+
+    # Sales does not know these sales (they never went through it): no ticket number, and no failure.
+    assert (SaleStock.objects.get(sale_id=sold).sale_number, SaleStock.objects.get(sale_id=sold).document_number) == (
+        "20261021-0099",
+        "",
+    )
+    assert SaleStock.objects.get(sale_id=long).sale_number == "X" * 24
+    assert stock_of(coffee.id) == Decimal("3")
+
+
 @pytest.mark.django_db(transaction=True)
 def test_two_sales_of_the_last_unit_at_once_lower_it_once():
     last = create("Last", initial_stock="1")

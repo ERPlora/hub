@@ -234,6 +234,12 @@ msgstr "venta vista"
 msgid "sales seen"
 msgstr "ventas vistas"
 
+msgid "sale number"
+msgstr "número de la venta"
+
+msgid "ticket or invoice number"
+msgstr "número del tique o la factura"
+
 msgid "This product does not exist in this hub."
 msgstr "Este producto no existe en este hub."
 

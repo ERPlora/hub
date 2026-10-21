@@ -341,6 +341,8 @@ export interface MovementOut {
   stock_after: string;
   reason: string;
   reference: string;
+  /** INVENTORY-F16: a sale's ticket, invoice or own number; else the reference itself. */
+  reference_label: string;
   unit_cost: number | null;
   actor: string;
   created_at: string;

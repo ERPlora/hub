@@ -17,17 +17,21 @@ from django.core.exceptions import EmptyResultSet
 from django.db.models import (
     BooleanField,
     Case,
+    CharField,
     Count,
     DecimalField,
     ExpressionWrapper,
     F,
     Prefetch,
+    OuterRef,
     Q,
     QuerySet,
+    Subquery,
     Sum,
     Value,
     When,
 )
+from django.db.models.functions import Cast, Coalesce, NullIf
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -39,6 +43,7 @@ from apps.inventory.models import (
     Category,
     Product,
     ProductCategory,
+    SaleStock,
     Settings,
     StockMovement,
     Unit,
@@ -477,17 +482,18 @@ def _filter_categories(categories, params: CategoryFiltersIn):
     },
 )
 def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
-    movements = StockMovement.objects.select_related("product")
+    movements = StockMovement.objects.select_related("product").annotate(reference_label=_REFERENCE_LABEL)
     if params.search:
         movements = movements.filter(
             Q(product__name__icontains=params.search)
             | Q(product__sku__icontains=params.search)
-            | Q(reference__icontains=params.search)
+            | _reference_matches(params.search)
         )
+    if params.reference:
+        movements = movements.filter(_reference_matches(params.reference))
     movements = movements.filter(
         **_bounds(
             movement_type=params.movement_type,
-            reference__icontains=params.reference,
             product_id=params.product_id,
             created_at__gte=params.created_from,
             created_at__lte=params.created_to,
@@ -792,6 +798,44 @@ def _category_row(category: Category) -> dict:
     }
 
 
+#: The movements whose reference is a sale of Sales (its id).
+SALE_MOVEMENTS = (StockMovement.Type.SALE, StockMovement.Type.VOID, StockMovement.Type.REFUND)
+
+
+def _sale_note_of(reference) -> QuerySet:
+    """Inventory's note of the sale whose id is ``reference`` (the id as text: a delivery note is no uuid)."""
+    return SaleStock.objects.annotate(key=Cast("sale_id", CharField())).filter(key=reference)
+
+
+#: INVENTORY-F16: a sale reads as the number on its paper (its ticket or invoice, else the sale's own), noted
+#: when its stock moved; another reference (a delivery note) reads as itself.
+_REFERENCE_LABEL = Case(
+    When(
+        movement_type__in=SALE_MOVEMENTS,
+        then=Coalesce(
+            Subquery(
+                _sale_note_of(OuterRef("reference"))
+                .annotate(label=Coalesce(NullIf("document_number", Value("")), "sale_number"))
+                .values("label")[:1]
+            ),
+            Value(""),
+        ),
+    ),
+    default=F("reference"),
+    output_field=CharField(),
+)
+
+
+def _reference_matches(text: str) -> Q:
+    """The reference holds ``text``, or it is a sale whose ticket, invoice or own number does."""
+    text = text.strip()
+    numbered = SaleStock.objects.filter(Q(sale_number__icontains=text) | Q(document_number__icontains=text))
+    return Q(reference__icontains=text) | Q(
+        movement_type__in=SALE_MOVEMENTS,
+        reference__in=numbered.annotate(key=Cast("sale_id", CharField())).values("key"),
+    )
+
+
 def _movement_row(movement: StockMovement) -> dict:
     fields = (
         "id",
@@ -807,6 +851,7 @@ def _movement_row(movement: StockMovement) -> dict:
     )
     return {
         **{field: getattr(movement, field) for field in fields},
+        "reference_label": movement.reference_label,
         "product_name": movement.product.name,
         "sku": movement.product.sku,
     }
