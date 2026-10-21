@@ -168,10 +168,12 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
       await expect(tile(page, one.id)).toContainText('Occupied');
     });
 
-    // Charge goes to the till with the table's check.
+    // Charge goes to the till with the table's check: waited for by what the till shows, not by its URL (the
+    // till drops `?order=` as soon as it has loaded the check, sometimes before a URL check sees it).
     await tile(page, one.id).click();
     await page.locator('[data-testid=table-sheet-action-charge]').click();
-    await expect(page).toHaveURL(new RegExp(`/sale/pos\\?order=${orderId}`));
+    await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 1');
+    await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
     await page.goto(`${A}/table/floor-plan`);
     await chooseZone(page);
 
