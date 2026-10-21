@@ -774,8 +774,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    hub#342): lo da de alta `printing.device.register` desde el propio dispositivo (su `X-Device-Id`), con
    `printing.manage_settings`; el permiso de las tres operaciones sigue siendo `printing.print`, pero solo vale
    desde un dispositivo dado de alta. El dispositivo se guarda por el SHA-256 de su identificador, nunca por el
-   identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` debería leer las
-   impresoras del dispositivo con `printing.device.get` y rechazar el que no tiene alta (pendiente en `base`).
+   identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` lee las
+   impresoras del dispositivo con `printing.device.get` y rechaza el que no tiene alta (`base`, hub#135).
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
