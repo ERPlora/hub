@@ -368,6 +368,30 @@ def test_meta_s_verdict_never_lands_on_a_text_changed_afterwards(delivered):
 
 
 @respx.mock
+def test_an_answer_to_an_older_save_lands_on_nothing(delivered):
+    """erplora.com answers with the key it was asked with (``record_submit``): one for a key the template no
+    longer has (it was saved again meanwhile, with a new key) changes nothing, or a text Meta never saw
+    would read as registered and the new save would never leave."""
+    connect()
+    respx.post(REGISTER).mock(side_effect=httpx.ConnectError("refused"))
+    out = delivered(create)
+    row = Template.objects.get(pk=out.id)
+    older = row.submit_key
+    delivered(lambda: update(row, body="Hola {{1}}, otro texto {{2}}."))
+    row.refresh_from_db()
+    assert row.submit_key != older
+    late = system(
+        "whatsapp_inbox.template.record_submit",
+        {"id": str(row.id), "submit_key": str(older), "kind": "accepted", "meta_id": "meta-late", "status": "PENDING"},
+    )
+    row.refresh_from_db()
+    assert late.status == "DRAFT"
+    assert (row.status, row.meta_id, row.submit_state, row.submit_error_code) == (
+        "DRAFT", "", "sending", "whatsapp_inbox.saas_unreachable"
+    )
+
+
+@respx.mock
 def test_meta_s_list_never_overwrites_a_new_template_still_on_its_way(delivered):
     """Meta lists one of that name before the Hub hears back: what was written stays and goes with its key."""
     connect()

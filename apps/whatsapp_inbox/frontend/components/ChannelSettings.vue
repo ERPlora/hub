@@ -170,7 +170,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
       <h2>{{ $t('whatsapp_inbox.settings.month') }}</h2>
       <template v-if="channel.monthly_limit > 0">
         <UsageMeter
-          :label="t('whatsapp_inbox.settings.month')"
+          :label="t('whatsapp_inbox.settings.sent')"
           :value="channel.monthly_usage"
           :max="channel.monthly_limit"
           :hint="t('whatsapp_inbox.settings.usage', { used: channel.monthly_usage, limit: channel.monthly_limit })"

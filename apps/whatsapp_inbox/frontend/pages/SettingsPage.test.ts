@@ -90,7 +90,8 @@ describe('SettingsPage: the number and the month', () => {
 
   it('the month: messages sent against the plan’s, the cap said when it is reached, or no limit', async () => {
     const s = await setup();
-    expect(s.wrapper.findComponent(UsageMeter).props()).toMatchObject({ value: 12, max: 150, label: 'This month' });
+    // The block is titled «This month» once: the meter's own label says what it counts (hub#118 review).
+    expect(s.wrapper.findComponent(UsageMeter).props()).toMatchObject({ value: 12, max: 150, label: 'Messages sent' });
     expect(s.find('whatsapp-inbox-settings-month').text()).toContain('12 of 150 messages sent');
     const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
     expect(spent.find('whatsapp-inbox-settings-month').text()).toContain('You have used all the messages of your plan this month.');

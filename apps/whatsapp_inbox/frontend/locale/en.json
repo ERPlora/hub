@@ -231,6 +231,7 @@
       "reconnectHint": "WhatsApp withdrew the permission: reconnect the number in erplora.com.",
       "manage": "Manage in erplora.com",
       "month": "This month",
+      "sent": "Messages sent",
       "usage": "{used} of {limit} messages sent",
       "noLimit": "No limit: {used} messages sent",
       "capReached": "You have used all the messages of your plan this month.",
