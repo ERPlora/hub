@@ -8,6 +8,7 @@ never a 500.
 """
 
 import threading
+import time
 from contextlib import contextmanager
 from types import SimpleNamespace
 
@@ -110,23 +111,84 @@ def test_two_transfers_to_the_same_free_table_leave_one_there():
     assert TableSession.objects.filter(table=free, status="open").count() == 1
 
 
+@contextmanager
+def crossing_after_the_first_lock(other, table: str):
+    """Forces two lock orders to cross instead of hoping two threads interleave (rv-121: released together
+    at a barrier, a merge locking its two checks one by one in the order of the call still passed 5 of 5).
+
+    Right after this session's first ``SELECT … FOR UPDATE`` on ``table`` returns (it holds its first lock),
+    ``other`` starts in its own thread and session, and this one goes on only once ``other`` holds its own
+    first lock or waits for one (``pg_locks``): two orders that cross then deadlock every time. ``other``'s
+    result, or its error, lands in the list."""
+    results: list = []
+    issued, holding = threading.Event(), threading.Event()
+    pids: list[int] = []
+
+    def locking(sql: str) -> bool:
+        return "FOR UPDATE" in sql and f'"{table}"' in sql
+
+    def other_wrapper(execute, sql, params, many, context):
+        first = not issued.is_set() and locking(sql)
+        if first:
+            pids.append(context["connection"].connection.info.backend_pid)
+            issued.set()
+        result = execute(sql, params, many, context)
+        if first:
+            holding.set()
+        return result
+
+    def run_other():
+        try:
+            with connection.execute_wrapper(other_wrapper):
+                results.append(other())
+        except Exception as error:  # a refusal, or a deadlock reported to the test
+            results.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=run_other)
+
+    def other_waits(raw) -> bool:
+        with raw.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM pg_locks WHERE pid = %s AND NOT granted", [pids[0]])
+            return cursor.fetchone() is not None
+
+    def wrapper(execute, sql, params, many, context):
+        first = thread.ident is None and locking(sql)
+        result = execute(sql, params, many, context)
+        if first:
+            thread.start()
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and not holding.is_set():
+                if issued.is_set() and other_waits(context["connection"].connection):
+                    break
+                time.sleep(0.02)
+        return result
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield results
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+    assert thread.ident is not None and issued.is_set(), "the second merge never reached its lock: nothing crossed"
+
+
 def test_two_crossed_merges_never_deadlock_and_the_first_wins():
     zone = make_zone()
     one, two = make_table("1", zone=zone), make_table("2", zone=zone)
     first = run("table.session.open", {"table_id": str(one.id)})
     second = run("table.session.open", {"table_id": str(two.id)})
-    results = at_once(
-        as_waiter(
-            "table.session.merge",
-            {"id": str(first.id), "into_session_id": str(second.id)},
-        ),
-        as_waiter(
-            "table.session.merge",
-            {"id": str(second.id), "into_session_id": str(first.id)},
-        ),
-    )
-    assert codes(results)[0] == "ok"
-    assert codes(results)[1] in {"table.session_not_active", "table.nothing_to_merge"}
+    other = as_waiter("table.session.merge", {"id": str(second.id), "into_session_id": str(first.id)})
+    with crossing_after_the_first_lock(other, TableSession._meta.db_table) as others:
+        try:
+            mine = as_waiter("table.session.merge", {"id": str(first.id), "into_session_id": str(second.id)})()
+        except Exception as error:  # a deadlock, reported below
+            mine = error
+    results = [mine, *others]
+    # The first merge holds both checks before the second one locks anything: no deadlock, the first wins.
+    assert codes([mine]) == ["ok"], results
+    assert len(others) == 1 and codes(others)[0] in {"table.session_not_active", "table.nothing_to_merge"}, results
     assert TableSession.objects.filter(status="open").count() == 1
     assert TableSession.objects.filter(status="merged").count() == 1
 
