@@ -543,8 +543,8 @@ Pasos:
    Dispositivos**, pulsa «Imprimir desde este dispositivo», le pone nombre («Caja del mostrador») y marca las
    impresoras a las que llega. Desde ese momento ese dispositivo imprime con la sesión de cualquiera: la lista lo
    marca «Este dispositivo» y la nota dice «Este dispositivo imprime para: …». Si quien gestiona las impresoras
-   imprime desde un dispositivo nuevo, también queda dado de alta, como «Dispositivo 1», con las impresoras que
-   usa.
+   imprime desde un dispositivo nuevo en alguna impresora activa, también queda dado de alta, como «Dispositivo 1»,
+   con las impresoras activas que usa.
 2. El dispositivo pide el siguiente trabajo de sus impresoras. Impresión le da el más antiguo en cola (de esa
    impresora, o sin impresora y de su función), lo marca «Enviado» con un plazo de 90 s, suma un intento y apunta
    qué dispositivo lo tiene, por su nombre.
@@ -563,7 +563,8 @@ Sale: el dispositivo dado de alta, cambiado o retirado (avisa: `printing.device.
 `printing.job.printed`, `printing.job.failed`).
 Si falla: un dispositivo que nadie dio de alta, o retirado, no recoge nada aunque la sesión pueda imprimir: «Este
 dispositivo no está dado de alta para imprimir aquí: quien gestiona las impresoras lo da de alta en Impresión →
-Dispositivos.», y la cola no cambia; imprimir desde un dispositivo retirado no lo vuelve a dar de alta. Pedir
+Dispositivos.», y la cola no cambia; imprimir desde un dispositivo retirado no lo vuelve a dar de alta, ni
+desde uno nuevo solo en impresoras inactivas lo da de alta. Pedir
 trabajos de una impresora que el dispositivo no tiene se rechaza («Este dispositivo no imprime para «Cocina»…»).
 Confirmar dos veces es una confirmación. Una confirmación tardía del mismo dispositivo (una impresora lenta con
 copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el papel salió y no se imprime otra

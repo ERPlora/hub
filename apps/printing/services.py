@@ -578,12 +578,13 @@ def _reclaim_expired(ctx: OperationContext, now) -> None:
 
 def _claiming_device(ctx: OperationContext, device_id: str, printers: list[Printer], now) -> PrintDevice:
     """The device set up with ``device_id``, which must print for every printer it names. Whoever sets up the
-    printers pairs it by asking: a device new here is set up, a printer it does not reach yet is added. Anybody
-    else is refused (403), and so is a retired device: retiring it was a decision, not something a claim undoes."""
+    printers pairs it by asking: a device new here is set up, a printer it does not reach yet is added; with no
+    active printer named there is nothing to pair it with. Anybody else is refused (403), and so is a retired
+    device: retiring it was a decision, not something a claim undoes."""
     key = PrintDevice.key_of(device_id)
     device = PrintDevice.objects.select_for_update().filter(key=key).first()
     pairs = ctx.has(MANAGE_SETTINGS)
-    if (device is None and not pairs) or (device is not None and device.retired_at is not None):
+    if (device is None and not (pairs and printers)) or (device is not None and device.retired_at is not None):
         raise PermissionDenied(str(DEVICE_NOT_SET_UP), code="printing.device_not_registered")
     new = device is None
     if new:

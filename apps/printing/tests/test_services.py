@@ -694,6 +694,26 @@ def test_whoever_sets_up_printers_pairs_the_device_by_printing_from_it():
     assert sorted(PrintDevice.objects.values_list("name", flat=True)) == ["Device 1", "Device 2"]
 
 
+def test_printing_from_a_new_device_on_no_active_printer_pairs_nothing_and_changes_nothing():
+    # Review of hub#120: a manager on a device nobody set up, naming only inactive printers, paired it as
+    # «Device N» with no printer — a device that prints nothing, listed in Devices.
+    till = printer("Till")
+    off = printer("Off", address="10.0.0.3")
+    run("printing.printer.update", {"printer_id": str(off.id), "is_active": False})
+    held = enqueue(source_ref="T-1").job
+    claim(till, device="A")
+    expire(held.id)
+    waiting = enqueue(source_ref="T-2").job
+    devices, registered = PrintDevice.objects.count(), events("printing.device.registered")
+    with pytest.raises(PermissionDenied) as refused:
+        take(off, device="till-1", role=MANAGER)
+    assert refused.value.code == "printing.device_not_registered"
+    # Nothing moved: no device paired, not the expired lease a claim puts back, not the queued job.
+    assert (PrintDevice.objects.count(), events("printing.device.registered")) == (devices, registered)
+    assert PrintJob.objects.get(pk=held.id).status == "sent"
+    assert PrintJob.objects.get(pk=waiting.id).status == "pending"
+
+
 def test_a_retired_device_takes_nothing_and_printing_from_it_does_not_bring_it_back():
     till = printer("Till")
     device = register(till)
