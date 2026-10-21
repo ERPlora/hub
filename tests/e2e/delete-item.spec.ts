@@ -1,6 +1,6 @@
 // DEMO-F03 (and the «borra» of DEMO-F05): «Delete» on the detail asks first; «Cancel» keeps the
 // item, «Delete» removes it and goes back to the list without its row, and another tab with the
-// same detail open says «This item no longer exists.» by itself.
+// same detail open says «This item no longer exists.» by itself, without the item nor its actions.
 import { expect, test } from '@playwright/test';
 
 import { A, api, createItem, listReady, login, record, rowOf, shot, shown, uniqueName } from './helpers';
@@ -54,6 +54,10 @@ test('delete asks first; cancel keeps it; confirm removes it here and the other 
   await expect(rowOf(tab1, item.id)).toHaveCount(0);
   const gone = shown(tab2).locator('[data-testid=demo-detail-error]');
   await expect(gone).toContainText('This item no longer exists.', { timeout: 5000 });
+  // Nothing of the deleted item is offered any more: neither the item nor what acts on it.
+  for (const hook of ['demo-detail-status', 'demo-detail-edit', 'demo-detail-delete', 'demo-note', 'demo-line-form']) {
+    await expect(shown(tab2).locator(`[data-testid=${hook}]`), hook).toHaveCount(0);
+  }
   const toldAt = await tab2.evaluate(() => (window as unknown as { __toldAt?: number }).__toldAt);
   const clickedAt = await tab1.evaluate(() => (window as unknown as { __clickedAt?: number }).__clickedAt);
   expect(toldAt, 'tab 2 timed «This item no longer exists.»').toBeDefined();
