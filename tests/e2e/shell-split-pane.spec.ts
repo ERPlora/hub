@@ -181,3 +181,94 @@ test('no Back on the screens of a module nor on Home, only on a detail; the ⠿ 
     await expect(sheet).toHaveCount(0);
   }
 });
+
+/** The boxes of the user menu once Ionic finished presenting it (its enter animation fades the sheet in). */
+async function measureUserMenu(page: Page) {
+  return page.evaluate(() => {
+    const box = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+    };
+    const lines = (el: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+    };
+    const popover = document.querySelector('ion-popover.sidebar-user-popover')!;
+    const content = popover.shadowRoot!.querySelector('.popover-content')!;
+    const theme = document.querySelector('[data-testid="user-menu-theme"]')!;
+    const segment = theme.querySelector('ion-segment')!;
+    const trigger = document.querySelector('[data-testid="user-menu-trigger"]')!;
+    const text = (el: Element | null) =>
+      el && { ...box(el), display: getComputedStyle(el).display, ellipsis: getComputedStyle(el).textOverflow };
+    return {
+      themeLabel: { ...box(theme.querySelector('ion-label')!), lines: lines(theme.querySelector('ion-label')!) },
+      segment: box(segment),
+      buttons: [...segment.querySelectorAll('ion-segment-button')].map((button) => box(button)),
+      icons: [...segment.querySelectorAll('ion-segment-button ion-icon')].map((icon) => box(icon)),
+      sheet: { ...box(content), opacity: Number(getComputedStyle(content).opacity), fill: getComputedStyle(content).backgroundColor },
+      viewport: { width: innerWidth, height: innerHeight },
+      card: box(trigger),
+      chevron: box(trigger.querySelector('.sidebar-user-chevron')!),
+      name: text(trigger.querySelector('.sidebar-user-name')),
+      email: text(trigger.querySelector('.sidebar-user-email')),
+    };
+  });
+}
+
+// The user menu is the shared shell's (ERPlora/ui UserMenuPopover + App.vue), the SaaS's too: «Theme» went
+// one letter a line, the card's name and email ran under the chevron without «…», and from the name the
+// menu hung over the email line (ACCOUNTS-G93 in the SaaS, MIGRATION-TASK APP-ACCOUNTS-1).
+// The three sizes of the spec and the two others of the fleet's sweep (a short phone, a portrait tablet).
+const MENU_VIEWPORTS = [
+  VIEWPORTS.phone,
+  VIEWPORTS.tablet,
+  VIEWPORTS.desktop,
+  { label: '375', width: 375, height: 667 },
+  { label: '820', width: 820, height: 1180 },
+];
+for (const vp of MENU_VIEWPORTS) {
+  test(`${vp.label}x${vp.height}: the user menu reads whole — «Theme» on one line, under the card, its name and email ending in «…» before the chevron`, async ({ page }) => {
+    await page.setViewportSize(vp);
+    await login(page, A);
+    await page.goto('/demo/items');
+    await listReady(page);
+    if (!(await menu(page).isVisible())) {
+      const opened = page.evaluate(() => new Promise<void>((resolve) => document.addEventListener('ionDidOpen', () => resolve(), { once: true })));
+      await topbar(page).drawer.click();
+      await opened;
+    }
+    const presented = page.evaluate(
+      () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
+    );
+    // On the name: the click that used to hang the menu from the name, over the email line.
+    await menu(page).locator('[data-testid=user-menu-trigger] .sidebar-user-name').click();
+    await presented;
+    const m = await measureUserMenu(page);
+    const at = `${vp.label}: ${JSON.stringify(m)}`;
+    console.log(`user menu at ${at}`);
+
+    expect.soft(m.themeLabel.lines, `«Theme» on one line at ${at}`).toBe(1);
+    expect.soft(m.themeLabel.right, `«Theme» ends before the theme buttons at ${at}`).toBeLessThanOrEqual(m.segment.left);
+    m.buttons.forEach((button, i) => {
+      const icon = m.icons[i];
+      expect.soft(button.left >= m.segment.left && button.right <= m.segment.right, `a theme button stays in its row at ${at}`).toBe(true);
+      expect.soft(Math.min(button.right - button.left, button.bottom - button.top), `a theme button is ≥ 24px at ${at}`).toBeGreaterThanOrEqual(24);
+      const off = Math.abs(icon.left + icon.right - button.left - button.right) / 2;
+      expect.soft(icon.left >= button.left && icon.right <= button.right && off <= 2, `a theme icon sits in the middle of its button at ${at}`).toBe(true);
+    });
+    expect.soft(m.sheet.opacity, `the menu is not see-through at ${at}`).toBe(1);
+    expect.soft(m.sheet.fill, `the menu has an opaque fill at ${at}`).toMatch(/^rgb\(/);
+    expect.soft(m.sheet.top, `the menu opens under the card, never over its email at ${at}`).toBeGreaterThanOrEqual(m.card.bottom);
+    expect.soft(
+      m.sheet.left >= 0 && m.sheet.right <= m.viewport.width && m.sheet.bottom <= m.viewport.height,
+      `the menu is inside the window at ${at}`,
+    ).toBe(true);
+    for (const line of [m.name, m.email].filter((one) => one !== null)) {
+      expect.soft(line.right, `the card's text stops before the chevron at ${at}`).toBeLessThanOrEqual(m.chevron.left);
+      expect.soft(line.display, `the card's text is a block, so «…» can show, at ${at}`).not.toBe('inline');
+      expect.soft(line.ellipsis, `the card's text ends in «…» at ${at}`).toBe('ellipsis');
+    }
+    await page.screenshot({ path: shot(`APP-ACCOUNTS-1-user-menu-${vp.width}x${vp.height}`), fullPage: true });
+  });
+}
