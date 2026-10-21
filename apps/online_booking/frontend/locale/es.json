@@ -117,6 +117,7 @@
       "day": "Día",
       "times": "Horas libres",
       "loadingTimes": "Cargando horas libres…",
+      "noServices": "Aún no hay servicios que se reserven online: actívalos en Ajustes.",
       "noTimes": "No quedan horas libres ese día.",
       "name": "Nombre",
       "phone": "Móvil",

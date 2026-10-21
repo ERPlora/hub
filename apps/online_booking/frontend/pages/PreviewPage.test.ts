@@ -96,6 +96,14 @@ describe('PreviewPage', () => {
     expect(s.sent().map((call) => call.path)).toEqual(['/api/online_booking/public/page', '/api/online_booking/public/services']);
   });
 
+  it('with no service booked online, says so and where to switch them on, in English and in Spanish', async () => {
+    const empty = { ...ROUTES, '/api/online_booking/public/services': [200, page([], 0, 100)] } as Record<string, [number, unknown]>;
+    const s = await setup({}, empty);
+    expect(s.el('no-services')?.textContent).toContain('No service is booked online yet: switch them on in Settings.');
+    const es = await setup({ locale: 'es' }, empty);
+    expect(es.el('no-services')?.textContent).toContain('Aún no hay servicios que se reserven online: actívalos en Ajustes.');
+  });
+
   it('asks the free times of the services, the day and the professional, and offers who does them all', async () => {
     const s = await setup();
     await ionChecked(s.el('service-v1'), true);
