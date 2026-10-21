@@ -155,7 +155,7 @@ categoría de una plantilla que ha rechazado.»).
 
 | ID | Flujo | Estado | Vertical |
 |---|---|---|---|
-| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la ventana de Meta aún no puede devolver su código: falta la página de vuelta de erplora.com y que el Hub no corte las ventanas que abre | comun |
+| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la ventana de Meta aún no puede devolver su código: falta la página de vuelta de erplora.com | comun |
 | WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | parcial — desconectar está hecho; volver a conectar abre la ventana de F01, que aún no puede devolver su código | comun |
 | WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | hecho | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
@@ -198,8 +198,8 @@ categoría de una plantilla que ha rechazado.»).
 <!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
 Estado: parcial — **Tu número** ya pregunta a erplora.com con qué abrir la ventana de Meta, la abre sin
 programas de Facebook y conecta en erplora.com el número que esa ventana elige; falta que la ventana pueda
-devolver su código: erplora.com todavía no tiene la página a la que Meta lo devuelve, y las páginas del Hub
-cortan las ventanas que abren. Mientras, **Tu número** dice «Todavía no se puede conectar el número desde
+devolver su código: erplora.com todavía no tiene la página a la que Meta lo devuelve (las páginas del Hub
+ya conservan las ventanas que abren). Mientras, **Tu número** dice «Todavía no se puede conectar el número desde
 aquí.» en vez de ofrecer **Conectar WhatsApp**
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -1328,8 +1328,8 @@ respuesta o un 200 que no es el de la puerta → 503 `whatsapp_inbox.connect_unk
     no es `vNN.N` → 503 `whatsapp_inbox.saas_unreachable`. **`redirect_uri` es propuesta del Hub** (la puerta
     de `main` no lo da todavía): la página de erplora.com a la que Meta devuelve el código; el Hub solo la
     acepta https y del origen de `SAAS_URL`. Sin ella, o si las páginas del Hub cortan las ventanas que abren
-    (`SECURE_CROSS_ORIGIN_OPENER_POLICY` que no es `same-origin-allow-popups` ni `unsafe-none`; el `same-origin`
-    de Django por defecto las corta), `prepare` dice `available: false` con `window_unavailable` o
+    (`SECURE_CROSS_ORIGIN_OPENER_POLICY` que no es `same-origin-allow-popups` ni `unsafe-none`; `base` pone
+    `same-origin-allow-popups` desde hub#154), `prepare` dice `available: false` con `window_unavailable` o
     `popups_blocked` y la pantalla, «Todavía no se puede conectar el número desde aquí.».
 11. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/connect` con lo que dio la ventana, tal cual:
 
@@ -1381,7 +1381,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   (`<slug>.erplora.com` y `erplora.com` son un mismo sitio, así que la cookie viaja).
 - Para que la ventana de Meta devuelva su código (F01, F02), las páginas del Hub no pueden cortar las
   ventanas que abren: `SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"` en `config/settings.py`
-  (hoy, el `same-origin` de Django por defecto). La CSP no cambia: la ventana es otra pestaña, sin
+  (hecho en hub#154). La CSP no cambia: la ventana es otra pestaña, sin
   `frame-src`, `connect-src` ni `form-action` nuevos, y el `postMessage` no pasa por la CSP.
 
 ### Respuestas automáticas: lo que falta

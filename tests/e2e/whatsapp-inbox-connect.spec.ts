@@ -8,7 +8,7 @@
 // window (door 10) and, as erplora.com has no page yet to bring Meta's one-time code back (FIX in the SaaS), says it
 // cannot be connected from here yet and offers nothing to press; the inbox's notice leads to Settings. Meta's window
 // itself (lib/metaSignup.ts, composables/useMetaSignup.ts) is proven in Vitest: it cannot open here until erplora.com
-// serves that page and the Hub keeps the windows it opens (COOP, FIX in `base`).
+// serves that page (the Hub keeps the windows it opens since hub#154).
 // F02: erplora.com's own test seed gives `a` its number there (whatsapp-helpers.ts, `seedErplora`); disconnecting it from
 // Settings, asked first, has erplora.com (door 12) disconnect it, and «Your number» says «Not connected» at once,
 // without reloading.
