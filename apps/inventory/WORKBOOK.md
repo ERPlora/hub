@@ -849,9 +849,10 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al abrir el TPV, Ventas pide a Inventario los productos a la venta, las categorías, qué categorías
-   tiene cada producto y las unidades. Al cobrar, pide el catálogo de venta entero: precio, coste,
-   categoría fiscal, unidad y si cada artículo lleva control de stock.
+1. Al abrir el TPV, Ventas pide a Inventario los productos activos (los agotados, para enseñarlos en
+   gris), las categorías, qué categorías tiene cada producto y las unidades. Al cobrar, pide el
+   catálogo de venta entero: precio, coste, categoría fiscal, unidad y si cada artículo lleva control
+   de stock.
 2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
@@ -1087,10 +1088,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   coma es el decimal (Excel en español) y BOM UTF-8. El Hub aún no tiene moneda configurada: euros.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
-  agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (el TPV
-  pide `is_active: true`; `false` da el resto, inactivos o agotados), `list_for_sale` y la cifra de cada
-  categoría; `include_sold_out=true` hace que `is_active` sea solo el interruptor (los selectores de Menús,
-  que configuran y no venden); `status=sold_out` filtra la marca y la fila lleva `is_sold_out`. Menús lee
+  agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
+  el resto, inactivos o agotados) y `list_for_sale`; la cifra de cada categoría cuenta los activos,
+  agotados incluidos (lo que enseña el TPV, FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS); `include_sold_out=true`
+  hace que `is_active` sea solo el interruptor (la rejilla, el buscador y el «Todos» del TPV, que enseñan
+  lo agotado en gris (SALE-F07), y los selectores de Menús, que configuran y no venden); `status=sold_out` filtra la marca y la fila lleva `is_sold_out`. Menús lee
   `Product.is_sold_out` directamente (`requires`): estado `product_sold_out` y 409 `combo.option_sold_out`. `inventory.product.set_sold_out`
   (permiso de cambiar productos) reutiliza `inventory.product.updated`, con `is_sold_out` en la carga:
   el TPV, Cocina y Menús re-ejecutan sus consultas sin tocar `live.py`. La ficha (`inventory.product.get`)

@@ -238,13 +238,21 @@ async function switchOffLabelPrinters(context: BrowserContext): Promise<() => vo
   const labels = active.data.rows
     .filter((printer) => printer.usage === 'label' || printer.id === settings.data.label_printer_id)
     .map((printer) => printer.id);
-  for (const id of labels) {
-    const res = await api(context, A, 'POST', '/printing/printers/update', { printer_id: id, is_active: false });
-    expect(res.status, `printer ${id} switched off`).toBe(200);
-  }
-  return () => {
+  // All of them were on: switching every one back on is right even when only some went off.
+  const switchBackOn = () => {
     if (labels.length) psql(`update printing_printer set is_active = true where id in ('${labels.join("','")}')`);
   };
+  try {
+    for (const id of labels) {
+      const res = await api(context, A, 'POST', '/printing/printers/update', { printer_id: id, is_active: false });
+      expect(res.status, `printer ${id} switched off`).toBe(200);
+    }
+  } catch (error) {
+    // The test's `finally` is not armed yet: the ones already off go back on here.
+    switchBackOn();
+    throw error;
+  }
+  return switchBackOn;
 }
 
 test('INVENTORY-F25: the sheet shows the barcode and each press queues one label, said where it goes', async ({ page, context }) => {

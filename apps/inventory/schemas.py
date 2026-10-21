@@ -279,10 +279,10 @@ class CategoryFiltersIn(Schema):
         None, max_length=7, description="This exact colour (#rrggbb)."
     )
     product_count_min: int | None = Field(
-        None, ge=0, description="At least this many products on sale (active, not sold out)."
+        None, ge=0, description="At least this many active products, sold out included."
     )
     product_count_max: int | None = Field(
-        None, ge=0, description="At most this many products on sale (active, not sold out)."
+        None, ge=0, description="At most this many active products, sold out included."
     )
     sort: CategorySort = Field("name", description="Order; a leading '-' reverses it.")
 
