@@ -41,6 +41,24 @@ describe('TicketDetailModal', () => {
     }
   });
 
+  it('says the menu of a dish and the options chosen for it (KITCHEN-F06, F07)', async () => {
+    const m = await setup();
+    await m.result(
+      'kitchen.ticket.get',
+      ticket('t1', {
+        items: [
+          item('i1', { id: 'i1', name: 'Steak', menu_name: 'MENU', menu_line_id: 'm1', modifiers: ['Rare'] }),
+          item('i2', { name: 'Fries' }),
+        ],
+      }),
+    );
+    await flush();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-menu')?.textContent).toBe('MENU');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-modifiers')?.textContent).toBe('Rare');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i2-menu')).toBeNull();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i2-modifiers')).toBeNull();
+  });
+
   it('says when it could not load', async () => {
     const m = await setup();
     m.net.lastStream().push(errorFrame(m.subId('kitchen.ticket.get'), 'not_found'));

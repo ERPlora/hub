@@ -1,15 +1,18 @@
 <script setup lang="ts">
 // A ticket on the kitchen display (WORKBOOK «Pantallas · Pantalla»; KITCHEN-F10 to F14), as the old card:
 // the label (or the type) and «Waiter: …», the Rush/VIP, «Round N» and «Ready» marks, the clock and
-// «#0012»; each dish with its quantity large, its note in italics and, in «All», its station; a dish voided
-// in the till struck with «Voided» and its reason, which does not answer to a tap. The top border is green,
-// amber or red by the minutes since the round was sent. One tap marks a dish ready; a tap on a struck one
-// recalls it; the header or «Ready» marks every dish on screen. No confirmation anywhere: recall is the undo.
+// «#0012»; each dish with its quantity large, the options chosen under its name (KITCHEN-F07), its note in
+// italics and, in «All», its station; the dishes of a menu indented under the menu's header with how many
+// there are (KITCHEN-F06, kitchen#57); a dish voided in the till struck with «Voided» and its reason, which
+// does not answer to a tap. The top border is green, amber or red by the minutes since the round was sent.
+// One tap marks a dish ready; a tap on a struck one recalls it; a menu's header marks its dishes on screen;
+// the card's header or «Ready» every dish on screen. No confirmation anywhere: recall is the undo.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { type DishGroup, groupMenus } from '../lib/board';
 import { formatElapsed, formatQuantity, semaphore } from '../lib/format';
 import type { ItemOut, SettingsOut, TicketOut } from '../operations';
 
@@ -50,6 +53,9 @@ const anyReady = computed(() => props.ticket.items.some((item) => item.status ==
 const tappable = (item: ItemOut) => props.canChange && active.value && !struck(item) && item.status !== 'served';
 const headerTappable = computed(() => props.canChange && cooking.value && anyToDo.value);
 const showFoot = computed(() => (props.canChange && active.value) || (props.canServe && props.ticket.status === 'ready'));
+const groups = computed(() => groupMenus(props.ticket.items));
+const menuToDo = (group: DishGroup) => group.items.filter(toDo).map((item) => item.id);
+const menuTappable = (group: DishGroup) => props.canChange && cooking.value && menuToDo(group).length > 0;
 
 function tap(item: ItemOut): void {
   if (!tappable(item)) return;
@@ -59,6 +65,10 @@ function tap(item: ItemOut): void {
 
 function bumpAll(): void {
   if (headerTappable.value) emit('bump', []);
+}
+
+function bumpMenu(group: DishGroup): void {
+  if (menuTappable(group)) emit('bump', menuToDo(group));
 }
 </script>
 
@@ -117,60 +127,85 @@ function bumpAll(): void {
       >#{{ ticket.short_number }}</span>
     </header>
     <ul class="kds-card__lines">
-      <li
-        v-for="line in ticket.items"
-        :key="line.id"
-        class="kds-line"
-        :data-testid="`kitchen-line-${line.id}`"
-        :data-status="line.status"
-        role="button"
-        :tabindex="tappable(line) ? 0 : -1"
-        :aria-disabled="tappable(line) ? 'false' : 'true'"
-        :title="tappable(line) ? t(toDo(line) ? 'kitchen.card.tapToBump' : 'kitchen.card.tapToRecall') : undefined"
-        @click="tap(line)"
-        @keydown.enter.prevent="tap(line)"
+      <template
+        v-for="group in groups"
+        :key="group.menu?.lineId ?? group.items[0].id"
       >
-        <span class="kds-line__qty">{{ formatQuantity(line.quantity, locale) }}</span>
-        <span class="kds-line__body">
-          <span class="kds-line__name">{{ line.name }}</span>
-          <span
-            v-if="line.notes"
-            class="kds-line__note"
-          >{{ line.notes }}</span>
-          <span
-            v-if="line.status === 'voided'"
-            class="kds-line__void"
-          >
-            <strong>{{ t('kitchen.card.voided') }}</strong>
-            <em v-if="line.void_reason">{{ line.void_reason }}</em>
-          </span>
-          <span
-            v-if="(showStation) || line.destination === 'printer'"
-            class="kds-line__meta"
-          >
+        <li
+          v-if="group.menu"
+          class="kds-menu"
+          :data-testid="`kitchen-menu-${group.menu.lineId}`"
+          role="button"
+          :tabindex="menuTappable(group) ? 0 : -1"
+          :aria-disabled="menuTappable(group) ? 'false' : 'true'"
+          :title="menuTappable(group) ? t('kitchen.card.bumpMenu') : undefined"
+          @click="bumpMenu(group)"
+          @keydown.enter.prevent="bumpMenu(group)"
+        >
+          <span class="kds-menu__name">{{ group.menu.name }}</span>
+          <span class="kds-menu__count">{{ $t('kitchen.card.menuDishes', group.items.length) }}</span>
+        </li>
+        <li
+          v-for="line in group.items"
+          :key="line.id"
+          :class="['kds-line', { 'kds-line--menu': group.menu }]"
+          :data-testid="`kitchen-line-${line.id}`"
+          :data-status="line.status"
+          :data-menu="line.menu_line_id ?? undefined"
+          role="button"
+          :tabindex="tappable(line) ? 0 : -1"
+          :aria-disabled="tappable(line) ? 'false' : 'true'"
+          :title="tappable(line) ? t(toDo(line) ? 'kitchen.card.tapToBump' : 'kitchen.card.tapToRecall') : undefined"
+          @click="tap(line)"
+          @keydown.enter.prevent="tap(line)"
+        >
+          <span class="kds-line__qty">{{ formatQuantity(line.quantity, locale) }}</span>
+          <span class="kds-line__body">
+            <span class="kds-line__name">{{ line.name }}</span>
             <span
-              v-if="showStation"
-              class="kds-line__station"
-              :data-testid="`kitchen-line-${line.id}-station`"
-            ><i
-              v-if="line.station_color"
-              class="kds-line__dot"
-              :style="{ background: line.station_color }"
-            />{{ line.station_name || t('kitchen.display.stationNone') }}</span>
-            <HubIcon
-              v-if="line.destination === 'printer'"
-              name="ion:receipt-outline"
-              :label="t('kitchen.card.paperOnly')"
-              :data-testid="`kitchen-line-${line.id}-paper`"
-            />
+              v-if="line.modifiers.length"
+              class="kds-line__mods"
+              :data-testid="`kitchen-line-${line.id}-modifiers`"
+            >{{ line.modifiers.join(', ') }}</span>
+            <span
+              v-if="line.notes"
+              class="kds-line__note"
+            >{{ line.notes }}</span>
+            <span
+              v-if="line.status === 'voided'"
+              class="kds-line__void"
+            >
+              <strong>{{ t('kitchen.card.voided') }}</strong>
+              <em v-if="line.void_reason">{{ line.void_reason }}</em>
+            </span>
+            <span
+              v-if="(showStation) || line.destination === 'printer'"
+              class="kds-line__meta"
+            >
+              <span
+                v-if="showStation"
+                class="kds-line__station"
+                :data-testid="`kitchen-line-${line.id}-station`"
+              ><i
+                v-if="line.station_color"
+                class="kds-line__dot"
+                :style="{ background: line.station_color }"
+              />{{ line.station_name || t('kitchen.display.stationNone') }}</span>
+              <HubIcon
+                v-if="line.destination === 'printer'"
+                name="ion:receipt-outline"
+                :label="t('kitchen.card.paperOnly')"
+                :data-testid="`kitchen-line-${line.id}-paper`"
+              />
+            </span>
           </span>
-        </span>
-        <span
-          v-if="line.status === 'ready' || line.status === 'served'"
-          class="kds-line__tick"
-          aria-hidden="true"
-        >✓</span>
-      </li>
+          <span
+            v-if="line.status === 'ready' || line.status === 'served'"
+            class="kds-line__tick"
+            aria-hidden="true"
+          >✓</span>
+        </li>
+      </template>
     </ul>
     <div
       v-if="ticket.notes"
@@ -361,10 +396,48 @@ function bumpAll(): void {
   font-weight: 600;
   font-size: 1.4rem;
 }
+.kds-line__mods {
+  font-size: 1.1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
 .kds-line__note {
   font-size: 1.05rem;
   opacity: 0.85;
   font-style: italic;
+}
+.kds-menu {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  padding: 0.45rem 0.75rem 0.2rem;
+  min-height: 44px;
+  border-top: 1px solid var(--ion-border-color, #e7e2d6);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.kds-menu[aria-disabled='true'] {
+  cursor: default;
+}
+.kds-menu:active {
+  background: rgba(0, 0, 0, 0.05);
+}
+.kds-menu__name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.kds-menu__count {
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+.kds-line--menu {
+  border-top: none;
+  margin-left: 0.75rem;
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--ion-border-color, #e7e2d6);
 }
 .kds-line__meta {
   font-size: 1rem;
