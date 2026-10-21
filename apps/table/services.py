@@ -1344,12 +1344,18 @@ def move_reservation(ctx: OperationContext, data: ReservationUpdatedIn) -> dict:
 def forget_customer(ctx: OperationContext, data: CustomerErasedIn) -> dict:
     if data.id is None:
         return {"changed": 0}
-    changed = (
-        Hold.objects.filter(customer_id=data.id)
+    named = list(
+        Hold.objects.select_for_update()
+        .filter(customer_id=data.id)
         .exclude(label="")
-        .update(label="", updated_at=timezone.now())
+        .order_by("pk")
     )
-    return {"changed": changed}
+    for hold in named:
+        hold.label = ""
+        hold.save(update_fields=["label", "updated_at"])
+        # The live plan paints the hold again, now without her name (TABLE-F09).
+        _hold_event(ctx, events.TABLE_HELD, hold)
+    return {"changed": len(named)}
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────

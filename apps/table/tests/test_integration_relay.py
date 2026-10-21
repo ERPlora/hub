@@ -17,7 +17,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
+from live.models import OutboxEvent
 from apps.reservation.tests.conftest import book, holds, open_week
+from apps.table.live import FLOOR
 from apps.table.models import Hold, TableSession
 from base import catalog, worker
 from base.catalog import RegisterResult
@@ -114,6 +116,28 @@ def test_an_erased_customer_is_forgotten_in_the_rooms_holds_and_checks_by_the_re
     assert (floor.status, floor.hold.label, floor.hold.erased) == ("reserved", "", True)
     [check] = run("table.table.get", {"id": str(bar.id)}).checks
     assert (check.id, check.customer_id, check.customer_name) == (seated.id, None, None)
+
+
+def test_a_hold_that_forgets_a_name_says_so_and_the_live_plan_paints_it_again(terrace, tick):
+    # The plan is live (TABLE-F09): the reaction's change of a hold re-runs it, as any other change of a hold.
+    ana = make_customer("Ana García", phone="600111222")
+    out = book(table_id=str(terrace.id), customer_id=str(ana.id))
+    run("reservation.reservation.confirm", {"id": str(out.id)})
+    tick()
+    run("customer.customer.erase", {"id": str(ana.id), "reason": "She asked for it"})
+    seen = set(OutboxEvent.objects.values_list("id", flat=True))
+    tick()
+    told = [
+        (event.name, event.payload)
+        for event in OutboxEvent.objects.exclude(id__in=seen).filter(name__startswith="table.")
+    ]
+    assert told == [
+        (
+            "table.table.held",
+            {"table_id": str(terrace.id), "source": "reservation", "source_ref": str(out.id)},
+        )
+    ]
+    assert "table.table.held" in FLOOR
 
 
 def test_erasing_the_card_a_duplicate_was_merged_into_forgets_the_duplicates_holds_too(terrace, tick):
