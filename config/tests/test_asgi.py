@@ -117,3 +117,48 @@ def test_a_client_root_path_does_not_reach_the_api_of_a_hub():
     assert status == 302
     assert not headers["content-type"].startswith("application/json")
     assert not urlsplit(headers["location"]).path.startswith("/x/")
+
+
+# WebSockets: /ws/print is the only one (PLAN-HUB §5); it was a 500, Django serves HTTP only.
+
+
+def websocket_scope(path: str, root_path: str = "") -> dict:
+    """The scope Daphne builds for a browser's WebSocket handshake on ``path`` of a hub's host."""
+    return {
+        "type": "websocket",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "scheme": "ws",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": root_path,
+        "headers": [(b"host", HUB_HOST.encode()), (b"origin", f"http://{HUB_HOST}".encode())],
+        "client": ("127.0.0.1", 50000),
+        "server": ("127.0.0.1", 8000),
+        "subprotocols": [],
+    }
+
+
+async def _handshake(scope: dict) -> dict:
+    """The application's answer to a WebSocket handshake (``websocket.accept`` or ``websocket.close``)."""
+    inbox, outbox = asyncio.Queue(), asyncio.Queue()
+    inbox.put_nowait({"type": "websocket.connect"})
+    task = asyncio.ensure_future(application(scope, inbox.get, outbox.put))
+    answer = await asyncio.wait_for(outbox.get(), timeout=10)
+    inbox.put_nowait({"type": "websocket.disconnect", "code": 1000})
+    await asyncio.wait_for(task, timeout=10)
+    return answer
+
+
+@pytest.mark.parametrize("root_path", ["", "/x"])
+def test_the_print_channel_accepts_the_websocket_handshake(root_path):
+    assert async_to_sync(_handshake)(websocket_scope("/ws/print", root_path))["type"] == "websocket.accept"
+
+
+@pytest.mark.parametrize("path", ["/ws", "/ws/print/", "/ws/other", "/api/live", "/"])
+def test_any_other_websocket_is_refused_at_the_handshake(path):
+    # A close before the accept: Daphne answers the handshake 403.
+    answer = async_to_sync(_handshake)(websocket_scope(path))
+
+    assert answer == {"type": "websocket.close", "code": 4404}
