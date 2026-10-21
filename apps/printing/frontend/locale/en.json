@@ -46,9 +46,9 @@
       "drawer": "Open the drawer"
     },
     "units": {
-      "s": "{n} s",
-      "min": "{n} min",
-      "h": "{n} h"
+      "s": "{n}\u00a0s",
+      "min": "{n}\u00a0min",
+      "h": "{n}\u00a0h"
     },
     "live": {
       "retry": "Retry",
