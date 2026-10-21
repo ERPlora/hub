@@ -6,7 +6,7 @@ import { AppPage, toastError } from '@erplora/ui/shell';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AlertStub, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId } from '../__tests__/mount-demo';
+import { AlertStub, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId } from '../__tests__/mount-demo';
 import ItemLines, { type ShownLine } from '../components/ItemLines.vue';
 import ItemDetailPage from './ItemDetailPage.vue';
 import source from './ItemDetailPage.vue?raw';
@@ -81,6 +81,55 @@ describe('ItemDetailPage: the item, live', () => {
     const banner = s.banner('demo-detail-error');
     expect([banner.props('tone'), banner.props('heading')]).toEqual(['warning', 'The item could not be loaded']);
     expect(banner.text()).toContain('msg not_found');
+  });
+
+  it.each(['not_found', 'permission_denied', 'unauthorized', 'app_inactive', 'app_entitlement_blocked'])(
+    'a failure after a result that means the item is gone for this person (%s) drops what was painted: no item, no action (DEMO-F03/F06)',
+    async (code) => {
+      const s = await setup();
+      await s.show(ITEM);
+      s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), code));
+      await flush();
+      expect(s.banner('demo-detail-error').text()).toContain(`msg ${code}`);
+      for (const id of ['demo-detail-status', 'demo-note', 'demo-line-form', 'demo-detail-edit', 'demo-detail-toggle', 'demo-detail-delete']) {
+        expect(s.testid(id).exists(), id).toBe(false);
+      }
+      expect(s.wrapper.findComponent(ItemLines).exists()).toBe(false);
+      expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Item');
+    },
+  );
+
+  it('a passing failure (internal_error) keeps the item on screen under the warning: nothing is gone', async () => {
+    const s = await setup();
+    await s.show(ITEM);
+    await s.note().setValue('Being written');
+    s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'internal_error'));
+    await flush();
+    expect(s.banner('demo-detail-error').props('heading')).toBe('The item could not be loaded');
+    expect(s.testid('demo-detail-status').exists()).toBe(true);
+    expect(s.note().props('modelValue')).toBe('Being written');
+  });
+
+  it('once the item is gone, a reconnection does not paint it again: the failure outlives the stream (DEMO-F03/F06)', async () => {
+    const s = await setup();
+    await s.show(ITEM);
+    s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'not_found'));
+    await flush();
+    s.call.push(BYE);
+    await flush();
+    expect(s.testid('demo-detail-reconnecting').exists()).toBe(true);
+    for (const id of ['demo-detail-status', 'demo-note', 'demo-line-form', 'demo-detail-edit', 'demo-detail-delete']) {
+      expect(s.testid(id).exists(), id).toBe(false);
+    }
+    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Item');
+  });
+
+  it('says «You do not have permission» when the permission was taken away (DEMO-F06)', async () => {
+    const s = await setup();
+    await s.show(ITEM);
+    s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'permission_denied'));
+    await flush();
+    expect(s.banner('demo-detail-error').props('heading')).toBe('You do not have permission');
   });
 
   it('says when the app is not active in this business', async () => {
