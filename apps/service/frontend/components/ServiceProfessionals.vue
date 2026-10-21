@@ -4,7 +4,8 @@
 // with what it lasts and costs with that person and their main service marked. Whoever may edit
 // services assigns someone of Staff (searched on the server) with their own minutes and price, changes
 // those (empty = the service's), marks the main service, switches one off or removes it. Changes come
-// back through the stream; a refusal is said above the list.
+// back through the stream; a refusal is said above the list. Until the list arrives it says it is
+// loading; a list that cannot be read says so, with the reason and «Retry».
 import { Combo, type ComboOption, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonToggle } from '@ionic/vue';
@@ -33,7 +34,7 @@ const locale = useLocale();
 const client = useLiveClient();
 const searchStaff = searchMembers(client);
 
-const { data } = useLive('service.assignment.list', () => ({ service_id: props.serviceId, limit: 100 }));
+const { data, status, error: loadFailure, refresh } = useLive('service.assignment.list', () => ({ service_id: props.serviceId, limit: 100 }));
 const rows = computed<AssignmentOut[]>(() => data.value?.rows ?? []);
 /** The people of Staff who do not perform the service yet (WORKBOOK SERVICE-F31). */
 const searchPeople = async (query: string): Promise<ComboOption[]> => {
@@ -143,6 +144,31 @@ const setDraft = (id: string, part: Partial<Draft>) => {
     >
       {{ failure.message }}
     </InlineFeedback>
+    <InlineFeedback
+      v-if="status === 'error'"
+      tone="danger"
+      data-testid="service-professionals-load-error"
+      :heading="t('service.professionals.loadError')"
+    >
+      {{ loadFailure?.message }}
+      <template #actions>
+        <ion-button
+          size="small"
+          fill="outline"
+          data-testid="service-professionals-retry"
+          @click="refresh()"
+        >
+          {{ $t('service.live.retry') }}
+        </ion-button>
+      </template>
+    </InlineFeedback>
+    <p
+      v-else-if="data === undefined"
+      class="service-professionals__empty"
+      data-testid="service-professionals-loading"
+    >
+      {{ $t('service.loading') }}
+    </p>
     <p
       v-if="data && rows.length === 0"
       class="service-professionals__empty"
