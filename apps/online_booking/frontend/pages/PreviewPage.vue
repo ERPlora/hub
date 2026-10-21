@@ -453,4 +453,8 @@ const text = (value: unknown): string => (value === null || value === undefined 
   font-size: 0.75rem;
   opacity: 0.7;
 }
+/* The personal link is one long word: it breaks anywhere instead of pushing the page off the phone's edge. */
+.ob-preview code {
+  overflow-wrap: anywhere;
+}
 </style>
