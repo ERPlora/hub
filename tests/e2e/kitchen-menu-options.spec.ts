@@ -36,11 +36,12 @@ let comboId: string;
 let cheeseId: string;
 let stationId: string;
 
-/** The kitchen tickets of this run's checks (their dishes name the lines of its products or its menu), then its
- *  station and routing, its menu and its options group. Before the sales: a ticket names the check's lines. */
+/** The kitchen tickets of this run's checks (their dishes name the lines of its products or its menu, or carry the
+ *  name of one of its dishes: another spec's cleanup may have taken the checks first), then its station and
+ *  routing, its menu and its options group. Before the sales: a ticket names the check's lines. */
 function cleanRun(): void {
   const lines = `select id from sale_orderline where sku like 'E2E-KMO-%' or name like 'e2e KMO Menu %'`;
-  const tickets = `select distinct ticket_id from kitchen_ticketitem where sale_line_id in (${lines})`;
+  const tickets = `select distinct ticket_id from kitchen_ticketitem where sale_line_id in (${lines}) or name like 'E2E KMO %'`;
   const stations = "select id from kitchen_station where name like 'E2E KMO %'";
   const combos = "select id from combo_combo where name like 'e2e KMO Menu %'";
   const groups = "select id from modifier_modifiergroup where name like 'E2E KMO %'";
