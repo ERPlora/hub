@@ -83,8 +83,8 @@ describe('ItemDetailPage: the item, live', () => {
     expect(banner.text()).toContain('msg not_found');
   });
 
-  it.each(['not_found', 'permission_denied'])(
-    'a failure after a result (%s: deleted elsewhere, permission taken away) drops what was painted: no item, no action (DEMO-F03/F06)',
+  it.each(['not_found', 'permission_denied', 'unauthorized', 'app_inactive', 'app_entitlement_blocked'])(
+    'a failure after a result that means the item is gone for this person (%s) drops what was painted: no item, no action (DEMO-F03/F06)',
     async (code) => {
       const s = await setup();
       await s.show(ITEM);
@@ -98,6 +98,17 @@ describe('ItemDetailPage: the item, live', () => {
       expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Item');
     },
   );
+
+  it('a passing failure (internal_error) keeps the item on screen under the warning: nothing is gone', async () => {
+    const s = await setup();
+    await s.show(ITEM);
+    await s.note().setValue('Being written');
+    s.call.push(errorFrame(subId(s.client, 'demo.item.detail'), 'internal_error'));
+    await flush();
+    expect(s.banner('demo-detail-error').props('heading')).toBe('The item could not be loaded');
+    expect(s.testid('demo-detail-status').exists()).toBe(true);
+    expect(s.note().props('modelValue')).toBe('Being written');
+  });
 
   it('says «You do not have permission» when the permission was taken away (DEMO-F06)', async () => {
     const s = await setup();
