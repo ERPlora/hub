@@ -389,8 +389,10 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 - **`requires = ["appointment", "customer", "service", "staff"]`**: lee las citas, busca y crea fichas, lee
   el catálogo y los profesionales de un servicio (`appointment.queries.bookable_members`, que devuelve
   fichas de Personal). Escribe en ellas solo por sus operaciones: `appointment.appointment.create`,
-  `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `appointment.settings.update`,
-  `appointment.availability.slots` y `customer.customer.create`.
+  `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (solo el email que tecleó la
+  clienta como contacto de la cita, si su ficha no tiene), `appointment.settings.update`,
+  `appointment.availability.slots` y `customer.customer.create`. El interruptor de un servicio en Ajustes
+  lo guarda la página con `service.service.update`, con el permiso de quien lo toca.
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita
   reservada desde la página: la cita, el hash del enlace y la huella del visitante).
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
