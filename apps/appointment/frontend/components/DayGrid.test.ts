@@ -101,6 +101,15 @@ describe('DayGrid', () => {
     expect(s.wrapper.findAll('[data-testid="appointment-grid-block"]')).toHaveLength(3);
   });
 
+  // outfitkit#284: a row's name never ends cut with no way to read it: it wraps to a second line and says
+  // itself whole on hover or a long press.
+  it('a row says its whole name', async () => {
+    const s = await setup();
+    const name = s.wrapper.find('[data-testid="appointment-grid-lane"][data-lane="s1"] [role="rowheader"]');
+    expect(name.attributes('title')).toBe(name.text());
+    expect(name.text()).not.toBe('');
+  });
+
   // outfitkit#71 · appointments#77: two appointments of the same professional at once share the row side by
   // side (a track each, as Google Calendar), never one on top of the other; one that follows takes the row back.
   it('appointments at the same time share the row, each in its own track', async () => {
