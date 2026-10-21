@@ -10,8 +10,9 @@ from live.models import OutboxEvent
 
 from apps.online_booking import events
 from apps.online_booking.models import Booking
+from base import relay
 
-from .conftest import A, TUESDAY, booking_data, public
+from .conftest import TUESDAY, A, booking_data, public
 
 pytestmark = pytest.mark.django_db
 
@@ -27,6 +28,13 @@ def test_it_reacts_only_to_an_erasure():
     assert events.REACTIONS == {
         "customer.customer.erased": "online_booking.customer.erase"
     }
+
+
+def test_only_flows_hears_what_it_announces():
+    # WORKBOOK «Para quien lo mantiene»: no app reacts to these notices but Flows, which hears them all.
+    for name in events.ALL:
+        event = OutboxEvent(scope_kind="host", scope_key="a", name=name)
+        assert relay.listeners(event) == ["flow"], name
 
 
 def test_an_erased_card_revokes_the_links_as_the_system(salon):
