@@ -19,6 +19,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.services import NO_PLAN_MESSAGES
 from apps.whatsapp_inbox.tests.conftest import B, NOW, A, connect, ctx_for, receive, run, template
 
 pytestmark = pytest.mark.django_db
@@ -144,6 +145,16 @@ def test_the_month_spent_sends_nothing():
     with pytest.raises(Conflict) as refused:
         notify({"phone": ANA, "text": TEXT})
     assert refused.value.code == "whatsapp_inbox.cap_reached"
+    assert not Message.objects.filter(direction="outbound").exists()
+
+
+def test_a_plan_without_messages_says_so_instead_of_until_next_month():
+    """hub#158: with a plan of 0 messages the refusal names the plan, as the inbox's own send does."""
+    ready(monthly_limit=0, monthly_usage=0)
+    with pytest.raises(Conflict) as refused:
+        notify({"phone": ANA, "text": TEXT})
+    assert refused.value.code == "whatsapp_inbox.cap_reached"
+    assert refused.value.message == str(NO_PLAN_MESSAGES)
     assert not Message.objects.filter(direction="outbound").exists()
 
 

@@ -57,6 +57,7 @@ const CONNECTED: ChannelOut = {
   cap_reached: false,
   synced_at: '2026-10-15T09:00:00Z',
   manage_url: 'http://localhost:8001',
+  plans_url: 'http://localhost:8001/store/plans',
 };
 
 async function setup(options: MountOptions = {}, channel: ChannelOut = CONNECTED) {
@@ -202,7 +203,32 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(reconnect.find('whatsapp-inbox-go-to-settings').exists()).toBe(true);
     const spent = await setup({}, { ...CONNECTED, cap_reached: true, monthly_usage: 150 });
     expect(spent.find('whatsapp-inbox-cap-reached').text()).toContain('You have used all the WhatsApp messages of your plan this month.');
+    expect(spent.find('whatsapp-inbox-upgrade').attributes()).toMatchObject({
+      href: 'http://localhost:8001/store/plans',
+      target: '_blank',
+      rel: 'noopener',
+    });
+    expect(spent.find('whatsapp-inbox-upgrade').text()).toBe('Upgrade plan');
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
+  });
+
+  it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (ADR-0474: 0 = none)', async () => {
+    const none = { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true };
+    const s = await setup({}, none);
+    const notice = s.find('whatsapp-inbox-cap-reached');
+    expect(notice.text()).toContain('Your plan does not include WhatsApp messages.');
+    expect(notice.text()).not.toContain('next month');
+    expect(s.find('whatsapp-inbox-upgrade').attributes('href')).toBe('http://localhost:8001/store/plans');
+    // The open conversation knows it too: its «Send» says why instead of sending.
+    await s.result(LIST, PAGE);
+    s.table().vm.$emit('rowClick', PAGE.rows[0]);
+    await flush();
+    expect(s.wrapper.findComponent(ConversationPanel).props('channel')).toEqual(none);
+    const employee = await setup({ session: EMPLOYEE }, none);
+    expect(employee.find('whatsapp-inbox-cap-reached').text()).toContain('Your plan does not include WhatsApp messages.');
+    expect(employee.find('whatsapp-inbox-upgrade').exists()).toBe(false);
+    const unlinked = await setup({}, { ...none, plans_url: '' });
+    expect(unlinked.find('whatsapp-inbox-upgrade').exists()).toBe(false);
   });
 
   it('a number reconnected (or a new month) takes its notice away by itself, without reloading (gh:hub#2064)', async () => {
@@ -217,6 +243,11 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' }, { ...CONNECTED, status: 'not_connected' });
     expect(s.find('whatsapp-inbox-not-connected').text()).toContain('WhatsApp no está conectado.');
+    const none = await setup({ locale: 'es' }, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
+    expect(none.find('whatsapp-inbox-cap-reached').text()).toContain(
+      'Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se puede enviar nada hasta que mejores el plan.',
+    );
+    expect(none.find('whatsapp-inbox-upgrade').text()).toBe('Mejorar el plan');
     await s.result(LIST, PAGE);
     expect(s.prop('searchPlaceholder')).toBe('Filtrar contacto o teléfono…');
   });

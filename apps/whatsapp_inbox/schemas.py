@@ -241,7 +241,7 @@ class SummaryOut(Schema):
         description="Open conversations whose last message is the customer's."
     )
     cap_reached: bool = Field(
-        description="Whether this month's messages of the plan are spent."
+        description="Whether this month's messages of the plan are spent (always when it includes none)."
     )
 
 
@@ -855,7 +855,7 @@ class ChannelSyncIn(Schema):
     )
     display_name: _text(200) = Field("", description="The name WhatsApp shows for it.")
     monthly_limit: int = Field(
-        0, ge=0, description="Messages the plan includes each month; 0 = no cap."
+        0, ge=0, description="Messages the plan includes each month; 0 = none (never «unlimited»)."
     )
     monthly_usage: int = Field(
         0, ge=0, description="Messages sent this month, as erplora.com counts them."
@@ -888,15 +888,22 @@ class ChannelOut(Schema):
     phone_number: str = Field(description="The business's number.")
     display_name: str = Field(description="The name WhatsApp shows for it.")
     monthly_limit: int = Field(
-        description="Messages the plan includes each month; 0 = no cap."
+        description="Messages the plan includes each month; 0 = none (never «unlimited»)."
     )
     monthly_usage: int = Field(
         description="Messages sent this month (0 when erplora.com has not counted this month yet)."
     )
-    cap_reached: bool = Field(description="Whether this month's messages are spent.")
+    cap_reached: bool = Field(
+        description="Whether this month's messages are spent: always when the plan includes none (once "
+        "erplora.com said so)."
+    )
     synced_at: datetime | None = Field(description="When erplora.com last reported.")
     manage_url: str = Field(
         description="Where the number is connected and managed: erplora.com."
+    )
+    plans_url: str = Field(
+        description="Where the plan is upgraded for more WhatsApp messages: erplora.com's plans; empty when "
+        "this server is not linked to erplora.com."
     )
 
 

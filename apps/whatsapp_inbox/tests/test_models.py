@@ -177,18 +177,18 @@ def test_the_window_is_24_hours_from_the_customer_s_last_message():
 
 
 def test_the_cap_is_the_platform_s_figure_of_this_month():
-    channel = Channel(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    channel = Channel(monthly_limit=150, monthly_usage=150, usage_month="2026-10", synced_at=NOW)
     assert channel.cap_reached("2026-10") is True
     # Another month's figure counts as nothing spent: November starts again even before the SaaS speaks.
     assert channel.cap_reached("2026-11") is False
     channel.monthly_usage = 149
     assert channel.cap_reached("2026-10") is False
-    # 0 = no cap.
+    # 0 = the plan includes none (ADR-0474), never «no cap»: tests/test_plan_cap.py.
     assert (
-        Channel(monthly_limit=0, monthly_usage=900, usage_month="2026-10").cap_reached(
+        Channel(monthly_limit=0, monthly_usage=0, usage_month="2026-10", synced_at=NOW).cap_reached(
             "2026-10"
         )
-        is False
+        is True
     )
 
 

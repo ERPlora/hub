@@ -18,6 +18,7 @@
     "noResultsMessage": "Nothing matches your search or filters.",
     "yesterday": "Yesterday",
     "cancel": "Cancel",
+    "upgradePlan": "Upgrade plan",
     "status": {
       "open": "Open",
       "pending": "Pending",
@@ -50,6 +51,7 @@
       "reconnectNeeded": "WhatsApp asks to reconnect the number in Settings: until then nothing can be sent.",
       "goToSettings": "Go to Settings",
       "capReached": "You have used all the WhatsApp messages of your plan this month. Messages keep arriving here, but nothing can be sent until next month or until you upgrade the plan.",
+      "notIncluded": "Your plan does not include WhatsApp messages. Messages keep arriving here, but nothing can be sent until you upgrade the plan.",
       "erased": "The data of this number has been erased."
     },
     "conversation": {
@@ -134,7 +136,8 @@
         "not_connected": "WhatsApp is not connected: connect the number in Settings to send.",
         "cap_reached": "This month's WhatsApp messages of your plan are spent: nothing can be sent until next month.",
         "unconfigured": "This Hub cannot reach erplora.com, so nothing can be sent from it."
-      }
+      },
+      "notIncluded": "Your plan does not include WhatsApp messages: nothing can be sent."
     },
     "templates": {
       "sendTitle": "Send a template",
@@ -234,7 +237,8 @@
       "month": "This month",
       "sent": "Messages sent",
       "usage": "{used} of {limit} messages sent",
-      "noLimit": "No limit: {used} messages sent",
+      "notIncluded": "Your plan does not include WhatsApp messages.",
+      "notReported": "erplora.com has not reported this month’s messages yet.",
       "capReached": "You have used all the messages of your plan this month.",
       "templatesTitle": "Meta templates",
       "loadError": "Could not load the channel.",

@@ -141,7 +141,8 @@ def test_another_business_tells_its_customer_through_its_own_number(tick, door):
     appointment = salon()
     system(
         "whatsapp_inbox.channel.sync",
-        {"version": 1, "status": "connected", "phone_number": "+34910000001", "templates": [CONFIRMED]},
+        # A plan with messages: since hub#158 a limit of 0 means the plan includes none, not «no cap».
+        {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150, "monthly_usage": 0, "templates": [CONFIRMED]},
         B,
     )
     confirm(appointment, scope=B)

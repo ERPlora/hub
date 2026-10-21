@@ -403,6 +403,9 @@ msgstr "Este servidor no llega a erplora.com, así que desde él no se puede env
 msgid "You have used every WhatsApp message of your plan this month: nothing can be sent until next month or until you upgrade the plan."
 msgstr "Has usado todos los mensajes de WhatsApp de tu plan este mes: no se puede enviar nada hasta el mes que viene o hasta que mejores el plan."
 
+msgid "Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan."
+msgstr "Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada hasta que mejores el plan."
+
 msgid "erplora.com did not send the message."
 msgstr "erplora.com no ha enviado el mensaje."
 

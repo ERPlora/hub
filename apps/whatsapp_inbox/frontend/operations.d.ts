@@ -280,6 +280,8 @@ export interface ChannelOut {
   cap_reached: boolean;
   synced_at: string | null;
   manage_url: string;
+  /** erplora.com's plans, where more WhatsApp messages come by upgrading; empty without erplora.com. */
+  plans_url: string;
 }
 
 export interface AgentListIn extends PageIn {

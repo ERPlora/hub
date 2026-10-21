@@ -108,7 +108,9 @@ conectar («WhatsApp no está conectado. Conecta el número del negocio en Ajust
 mensajes.») o por reconectar («WhatsApp pide volver a conectar el número en Ajustes: hasta entonces no se
 puede enviar nada.»), los dos con **Ir a Ajustes** para quien puede configurar; los mensajes del plan
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
-llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.»).
+llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.») o un plan que
+no incluye ninguno («Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se
+puede enviar nada hasta que mejores el plan.»), los dos con **Mejorar el plan** para quien puede configurar.
 Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
 «Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
 motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una nota de voz que no carga: «No se ha
@@ -120,7 +122,10 @@ administrador. Tres bloques: **Tu número** («Conectado» con el número y el n
 conectar» o «Hay que reconectar»; sin conectar o por reconectar, «Comprobando con erplora.com…» y luego
 **Conectar WhatsApp** o **Volver a conectar**, o el motivo por el que todavía no se puede; conectado o por
 reconectar, **Desconectar**, que pregunta antes); **Este mes** (los mensajes
-enviados frente a los del plan, o «Sin límite»); y **Plantillas de Meta**: tabla con **Nombre**,
+enviados frente a los del plan, y en el tope «Has usado todos los mensajes de tu plan este mes.»; si el plan
+no incluye ninguno, «Tu plan no incluye mensajes de WhatsApp.»; antes de que erplora.com hable, «erplora.com
+todavía no ha informado de los mensajes de este mes.»; en el tope, **Mejorar el plan**, que abre los planes
+de erplora.com); y **Plantillas de Meta**: tabla con **Nombre**,
 **Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
 Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
 debajo, cuando toca, «Enviándose a Meta…», «No aceptada: …», «Cambios sin enviar: …» o «Borrándose en
@@ -434,11 +439,17 @@ Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
 Pasos:
 1. **Ajustes → Este mes** enseña los mensajes enviados este mes frente a los del plan; los dos
-   números los pone erplora.com.
-2. En el tope, la bandeja lo avisa encima de la lista y **Enviar** lo explica en vez de enviar.
+   números los pone erplora.com. Si el plan no incluye mensajes de WhatsApp, lo dice («Tu plan no incluye
+   mensajes de WhatsApp.»), nunca que no tiene límite; antes de que erplora.com hable, «erplora.com todavía no ha
+   informado de los mensajes de este mes.».
+2. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
+   la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
+   enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve **Mejorar el plan**, que abre
+   los planes de erplora.com.
 3. Lo que escriben los clientes se sigue guardando.
-4. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado.
-Entra: el consumo y el tope del mes que manda erplora.com.
+4. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado; si el
+   plan no incluye mensajes, sigue.
+Entra: el consumo y el tope del mes que manda erplora.com (0: el plan no incluye ninguno).
 Sale: el aviso en la bandeja; nada se guarda.
 Si falla: si erplora.com rechaza un envío por el tope, el mensaje no sale y se dice por qué; si pide ir
 más despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
@@ -1062,7 +1073,9 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 ### Modelo
 
 - `Channel` (una fila por negocio): estado del número (`not_connected`, `connected`, `reconnect_needed`),
-  número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`) y la
+  número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`; 0 = el
+  plan no incluye ninguno, nunca sin límite, y antes de la primera foto, `synced_at` vacío, no se supone
+  tope: `Channel.cap_reached`) y la
   `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). **Fase 1
   sin tenencia:** las tablas son compartidas, así que la fila lleva el negocio en `host` (la primera etiqueta
   de su host, como `base.Membership`; única) y cada operación lee y escribe solo la del `Scope` de su
