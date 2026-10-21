@@ -17,7 +17,7 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('cart_checkout.carts.title')} · ${t('cart_checkout.orders.failForm.title', { number: 'OS-1' })}`);
+          const text = computed(() => `${t('cart_checkout.tabs.carts')} · ${t('cart_checkout.orders.failForm.title', { number: 'OS-1' })}`);
           return () => h('p', text.value);
         },
       }),

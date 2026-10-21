@@ -44,8 +44,9 @@ class CartCheckoutConfig(LiveAppConfig):
         "hub_manager": ["cart_checkout.*"],
         "hub_employee": ["cart_checkout.view_cart"],
     }
-    # CART_CHECKOUT-F07: the phase-2 worker expires the overdue carts on every hub as the system
-    # (cron in UTC). Reading already shows them as expired.
+    # CART_CHECKOUT-F07: the Hub's worker (`base.scheduler`) expires the overdue carts as the system
+    # every quarter of an hour (cron in UTC; phase 1: on the worker's scope). Reading already shows
+    # them as expired. `tests/test_scheduled_expiry.py` runs it without waiting for the clock.
     scheduled_tasks = [
         {
             "name": "expire_overdue_carts",
