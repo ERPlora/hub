@@ -7,6 +7,7 @@ is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees i
 """
 
 import datetime as dt
+import re
 
 from django.conf import settings
 from django.db import models
@@ -322,12 +323,17 @@ class Note(UUIDModel):
 
 #: The buttons the Hub writes and sends as they are (no value to fill when sending).
 HUB_BUTTONS = frozenset({"QUICK_REPLY", "URL", "PHONE_NUMBER"})
+#: A variable that is not ``{{1}}``, ``{{2}}``…: one Meta names (``{{nombre}}``), which the Hub never fills.
+NAMED_VARIABLE = re.compile(r"\{\{(?!\s*\d+\s*\}\})")
 
 
-def hub_handles(category: str, header_format: str, header: str, buttons: list) -> bool:
+def hub_handles(category: str, header_format: str, header: str, body: str, buttons: list) -> bool:
     """Whether the Hub's form makes this content and its sending fills it: no authentication code, no file or
-    place header, no variable outside the body and only quick replies, fixed links and calls."""
+    place header, no variable outside the body, only numbered variables in it, and only quick replies, fixed
+    links and calls."""
     if category == "AUTHENTICATION" or header_format not in ("", "TEXT") or "{{" in (header or ""):
+        return False
+    if NAMED_VARIABLE.search(body or ""):
         return False
     return all(
         isinstance(button, dict)
@@ -449,7 +455,7 @@ class Template(UUIDModel):
         return f"{self.name} ({self.language})"
 
     def save(self, *args, **kwargs):
-        self.supported = hub_handles(self.category, self.header_format, self.header, self.buttons)
+        self.supported = hub_handles(self.category, self.header_format, self.header, self.body, self.buttons)
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             kwargs["update_fields"] = {*update_fields, "supported"}

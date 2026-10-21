@@ -107,10 +107,11 @@ def test_a_409_without_the_envelope_is_still_a_refusal():
     assert (reply.kind, reply.code) == (gateway.REFUSED, "whatsapp.refused")
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 422, 429])
 @respx.mock
 def test_a_4xx_other_than_409_means_nothing_left(status):
-    # erplora.com read the request and did not take it: nothing reached Meta, a retry is safe.
+    # erplora.com read the request and did not take it: nothing reached Meta, a retry is safe. A 429 (go
+    # slower) is never «the month is spent» (gh:hub#2649).
     respx.post(SEND).mock(return_value=httpx.Response(status, json={}))
     reply = send_text()
     assert reply.kind == gateway.UNREACHABLE

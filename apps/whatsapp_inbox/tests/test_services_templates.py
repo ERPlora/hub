@@ -194,6 +194,8 @@ def test_the_month_spent_does_not_stop_making_templates():
         ({"category": "AUTHENTICATION"}, "category"),
         ({"body": ""}, "body"),
         ({"body": "Hola {{1}} y {{3}}", "body_examples": ["a", "b"]}, "body"),
+        ({"body": "Hola {{nombre}}", "body_examples": []}, "body"),
+        ({"body": "Hola {{1}} y {{dia}}", "body_examples": ["a"]}, "body"),
         ({"body": "Hola {{1}}", "body_examples": []}, "body_examples"),
         ({"body": "Hola {{1}}", "body_examples": ["   "]}, "body_examples"),
         ({"header": "Hola {{1}}"}, "header"),
@@ -493,15 +495,21 @@ def test_a_template_deleted_here_is_never_brought_back_but_a_new_one_of_that_nam
 # ── Sending what Meta approved (F33) ────────────────────────────────────────────────────────────
 
 
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"header_format": "IMAGE", "header": ""},
+        # gh:whatsapp_inbox#226, #230: a variable in the title.
+        {"header": "Tu cita, {{1}}", "body": "Te esperamos el {{2}}."},
+        # gh:whatsapp_inbox#186: named variables; the Hub fills them by number only.
+        {"body": "Hola {{nombre}}, te esperamos el {{dia}}."},
+    ],
+)
 @respx.mock
-def test_a_template_with_a_file_header_cannot_be_sent_from_the_hub_yet():
-    connect(
-        templates=[
-            template("con_foto", header_format="IMAGE", header=""),
-            template("sin_foto"),
-        ]
-    )
-    assert [t.name for t in listed(status="APPROVED", sendable=True)] == ["sin_foto"]
+def test_a_template_made_in_whatsapp_manager_the_hub_cannot_fill_is_brought_but_not_sent(fields):
+    connect(templates=[template("de_manager", **fields), template("sencilla")])
+    assert {t.name for t in listed(status="APPROVED")} == {"de_manager", "sencilla"}
+    assert [t.name for t in listed(status="APPROVED", sendable=True)] == ["sencilla"]
     system("whatsapp_inbox.message.receive", {
         "wa_message_id": "wamid.IN", "from": "34600111222", "contact_name": "Ana", "type": "text",
         "text": "Hola", "sent_at": (NOW - dt.timedelta(minutes=5)).isoformat(),
@@ -509,7 +517,7 @@ def test_a_template_with_a_file_header_cannot_be_sent_from_the_hub_yet():
     with pytest.raises(Conflict) as excinfo:
         run(
             "whatsapp_inbox.message.send",
-            {"conversation": "Ana", "template": {"name": "con_foto", "variables": ["a", "b"]}, "client_message_id": key()},
+            {"conversation": "Ana", "template": {"name": "de_manager", "variables": ["a", "b"]}, "client_message_id": key()},
         )
     assert excinfo.value.code == "whatsapp_inbox.template_not_sendable"
 

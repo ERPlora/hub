@@ -17,6 +17,8 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
+from apps.whatsapp_inbox.models import NAMED_VARIABLE
+
 T = TypeVar("T")
 
 WHICH_CONVERSATION = _(
@@ -696,7 +698,7 @@ class TemplateWriteIn(Schema):
     @classmethod
     def _numbered(cls, value: str) -> str:
         numbers = {int(n) for n in TEMPLATE_VARIABLE.findall(value)}
-        if numbers and numbers != set(range(1, max(numbers) + 1)):
+        if NAMED_VARIABLE.search(value) or (numbers and numbers != set(range(1, max(numbers) + 1))):
             raise ValueError(TEMPLATE_NUMBERING)
         return value
 

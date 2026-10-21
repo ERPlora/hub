@@ -287,6 +287,13 @@ def test_a_number_on_exactly_one_card_joins_the_conversation_to_it():
     ]
 
 
+def test_a_number_that_keeps_its_leading_zero_abroad_is_recognised():
+    """gh:whatsapp_inbox#201: an Italian landline keeps its 0 after +39, on the card and on WhatsApp."""
+    gianni = card("Gianni Rossi", "+39 06 1234 5678")
+    receive("wamid.1", "390612345678")
+    assert (conv().phone, conv().customer_id) == ("+390612345678", gianni.id)
+
+
 def test_two_cards_with_the_number_join_it_to_nobody():
     card("Ana López", "600111222")
     card("Ana L.", "+34 600 111 222")
@@ -992,6 +999,23 @@ def test_erasing_a_number_blanks_every_personal_datum_and_frees_it(make_user):
 
 
 ERASE = f"{SAAS}/internal/whatsapp/erase"
+
+
+@respx.mock
+def test_no_notice_of_the_app_keeps_her_number_her_name_or_what_was_said(delivered):
+    """gh:hub#2474, #2467, #2477: the internal history keeps the notices for days after an erasure; they
+    carry identifiers only, so erasing the conversation leaves nothing of her there."""
+    c = ready(contact_name="Ana Secreta", text="Mi alergia es al tinte")
+    answering()
+    delivered(lambda: send({"id": str(c.id), "text": "Apuntado, Ana"}))
+    run("whatsapp_inbox.note.add", {"id": str(c.id), "text": "Nota sobre Ana"})
+    run("whatsapp_inbox.conversation.set_status", {"id": str(c.id), "status": "pending"})
+    respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
+    delivered(lambda: run("whatsapp_inbox.conversation.erase", {"id": str(c.id)}))
+    notices = [json.dumps(e.payload, ensure_ascii=False) for e in OutboxEvent.objects.filter(name__startswith="whatsapp_inbox.")]
+    assert len(notices) >= 5
+    for said in ("600111222", "Ana Secreta", "alergia", "Apuntado", "Nota sobre"):
+        assert not [notice for notice in notices if said in notice], said
 
 
 @respx.mock
