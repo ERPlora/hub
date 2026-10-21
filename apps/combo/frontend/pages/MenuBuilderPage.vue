@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // The menu's builder (WORKBOOK «Pantallas · Constructor del menú»; COMBO-F05, F06, F12), opened from a
-// row of Menus: `combo.combo.get` live. On top, «All menus», the name and the closed price, what the menu
+// row of Menus: `combo.combo.get` live. The top bar goes back to Menus (the Hub's one way back); on top of
+// the page, the name and the closed price, what the menu
 // does on the receipt (one line eaten in, split to take away) and, when the till does not offer it yet,
 // why. Then «Courses»: a card per course in the order the till asks them (the handle and the arrows save
 // the whole order at once; «Withdraw» asks first), and «Add a course», which edits the course whose
 // «Edit details» was pressed. Every change comes back through the stream; a menu withdrawn meanwhile
-// (here or on another device) leaves only «This menu no longer exists» and the way back.
+// (here or on another device) leaves only «This menu no longer exists» with «All menus» in it.
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
@@ -104,10 +105,33 @@ async function confirmRemove(): Promise<void> {
       v-if="!blocked"
       class="combo-builder"
     >
-      <div class="combo-builder__head">
+      <div
+        v-if="shown"
+        class="combo-builder__head"
+      >
+        <span
+          class="combo-builder__name"
+          data-testid="combo-builder-name"
+        >{{ shown.name }}</span>
+        <span
+          class="combo-builder__price"
+          data-testid="combo-builder-price"
+        >{{ formatMoney(shown.price, locale) }}</span>
+      </div>
+
+      <InlineFeedback
+        v-if="gone"
+        tone="warning"
+        icon="ion:trash-outline"
+        :heading="t('combo.builder.goneTitle')"
+        data-testid="combo-builder-gone"
+      >
+        <p class="combo-builder__gone">
+          {{ $t('combo.builder.goneMessage') }}
+        </p>
         <ion-button
           size="small"
-          fill="clear"
+          fill="outline"
           router-link="/combo/menus"
           router-direction="back"
           data-testid="combo-builder-back"
@@ -118,26 +142,6 @@ async function confirmRemove(): Promise<void> {
           />
           {{ $t('combo.builder.back') }}
         </ion-button>
-        <template v-if="shown">
-          <span
-            class="combo-builder__name"
-            data-testid="combo-builder-name"
-          >{{ shown.name }}</span>
-          <span
-            class="combo-builder__price"
-            data-testid="combo-builder-price"
-          >{{ formatMoney(shown.price, locale) }}</span>
-        </template>
-      </div>
-
-      <InlineFeedback
-        v-if="gone"
-        tone="warning"
-        icon="ion:trash-outline"
-        :heading="t('combo.builder.goneTitle')"
-        data-testid="combo-builder-gone"
-      >
-        {{ $t('combo.builder.goneMessage') }}
       </InlineFeedback>
 
       <template v-if="shown">
@@ -254,6 +258,9 @@ async function confirmRemove(): Promise<void> {
 .combo-builder > *,
 .combo-builder__courses > * {
   min-width: 0;
+}
+.combo-builder__gone {
+  margin: 0 0 0.5rem;
 }
 .combo-builder__head {
   display: flex;

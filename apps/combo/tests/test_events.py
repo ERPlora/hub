@@ -1,7 +1,7 @@
 """The combo app's events (``combo.<entity>.<fact>``) and its reaction to Inventory's.
 
-There is no outbox relay yet (phase 2 runs it in the worker); a reaction is tested by handing ``react``
-the event as the relay will: its name, its scope and its payload.
+A reaction is tested here by handing ``react`` the event as the outbox relay does: its name, its scope and
+its payload; test_relay.py goes through the worker's real tick.
 """
 
 import re
