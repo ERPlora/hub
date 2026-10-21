@@ -160,6 +160,27 @@ describe('TableSheet · an occupied table', () => {
     expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o2');
   });
 
+  it('a live repaint of the same table keeps the step and the choices on screen', async () => {
+    // The plan is live: another device changing the room repaints this table (a new row, same id) while the
+    // waiter is correcting the guests, splitting or closing; the window must not go back to its first step.
+    const s = await sheet(occupied());
+    await click(s.el('action-guests'));
+    await click(s.guest('more'));
+    await s.wrapper.setProps({ table: occupied({ waiter_name: 'Luis' }) });
+    await settle();
+    expect(s.guest('value').textContent?.trim()).toBe('4');
+    await click(s.guest('back'));
+    await click(s.el('action-close'));
+    await s.wrapper.setProps({ table: occupied() });
+    await settle();
+    expect(s.el('close-confirm')).not.toBeNull();
+    // Another table is another window: it starts over.
+    await s.wrapper.setProps({ table: occupied({ id: 't9', number: '9' }) });
+    await settle();
+    expect(s.el('close-confirm')).toBeNull();
+    expect(s.el('action-guests')).not.toBeNull();
+  });
+
   it('a person who may not move checks sees no Transfer nor Merge', async () => {
     const s = await sheet(occupied(), { session: { ...EMPLOYEE, permissions: EMPLOYEE.permissions.filter((p) => p !== 'table.transfer_session') } });
     expect(s.el('action-transfer')).toBeNull();

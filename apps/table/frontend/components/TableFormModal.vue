@@ -66,8 +66,10 @@ function fromTable(table: TableOut | null): Form {
 }
 
 const form = ref<Form>(fromTable(props.table));
+// Two sources, compared one by one: a live repaint of the same table (a new row, same id) keeps what is
+// being typed; opening the dialog or another table starts over.
 watch(
-  () => [open.value, props.table?.id] as const,
+  [open, () => props.table?.id],
   ([isOpen]) => {
     if (!isOpen) return;
     form.value = fromTable(props.table);

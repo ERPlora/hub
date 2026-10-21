@@ -41,6 +41,18 @@ describe('ZoneFormModal', () => {
     expect(f.closed()).toBe(true);
   });
 
+  it('a live repaint of the same zone keeps what is being typed; another zone starts over', async () => {
+    // Zones is live: a table added to this zone by another device sends a new row with the same id.
+    const f = await form(zoneRow({ name: 'Bar' }));
+    await ionValue(f.field('name'), 'Bar and terrace', 'ionInput');
+    await f.wrapper.setProps({ zone: zoneRow({ name: 'Bar', table_count: 1, available_count: 1 }) });
+    await settle();
+    expect(f.field('name').value).toBe('Bar and terrace');
+    await f.wrapper.setProps({ zone: zoneRow({ id: 'z9', name: 'Garden' }) });
+    await settle();
+    expect(f.field('name').value).toBe('Garden');
+  });
+
   it('editing sends only what changed, «Active» included', async () => {
     const f = await form(zoneRow({ name: 'Bar', color: 'warning' }), {}, { '/api/table/zones/update': [200, zoneRow()] });
     expect(f.inDoc('table-zone-form')?.getAttribute('aria-label')).toBe('Edit zone');
