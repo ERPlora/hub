@@ -83,7 +83,7 @@ describe('the tests that load Playwright', () => {
   });
 
   // Reads every module the tests load from the disk, so its time is the machine's: with several test runs on one
-  // machine (load 20–40) and every opened file scanned, it took up to 7.6 s reading each module once (2026-10-21),
+  // machine (load 20–40) and every opened file scanned, it took up to 9.4 s reading each module once (2026-10-21),
   // against Vitest's 5 s. 60 s, as the other guardrails that read the whole tree (tsconfig.test.ts).
   it("give every test file that loads Playwright Node's environment", () => {
     const loading = testFiles().filter((file) => loadsPlaywright(join(HUB_DIR, file)));
