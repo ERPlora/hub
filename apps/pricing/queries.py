@@ -80,10 +80,15 @@ def in_force(on: dt.date) -> Q:
     return (Q(valid_from__isnull=True) | Q(valid_from__lte=on)) & (Q(valid_until__isnull=True) | Q(valid_until__gte=on))
 
 
-def _ordering(column: str, direction: str, *tie_breaks: str) -> list:
-    """``column`` in ``direction`` (empty values last), then the tie-breaks, ascending."""
-    expression = F(column).desc(nulls_last=True) if direction == "desc" else F(column).asc(nulls_last=True)
-    return [expression, *tie_breaks]
+def _ordering(column: str, direction: str, *tie_breaks) -> list:
+    """``column``, then the tie-breaks, all in ``direction`` (empty values last): a descending list is the
+    ascending one read backwards, ties included (hub#2355)."""
+
+    def directed(field):
+        expression = F(field) if isinstance(field, str) else field
+        return expression.desc(nulls_last=True) if direction == "desc" else expression.asc(nulls_last=True)
+
+    return [directed(field) for field in (column, *tie_breaks)]
 
 
 def _page(rows: QuerySet, params, to_row) -> dict:
