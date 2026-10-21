@@ -17,7 +17,9 @@ function moneyFormat(locale: string, currency: string): Intl.NumberFormat {
   const key = `${locale}|${currency}`;
   let found = money.get(key);
   if (!found) {
-    found = new Intl.NumberFormat(locale, { style: 'currency', currency });
+    // `always`: Spanish CLDR leaves a four-digit amount ungrouped («1234,56 €» above «12.345,60 €»);
+    // Odoo and Business Central group it, and so did the old hub (hub#1090).
+    found = new Intl.NumberFormat(locale, { style: 'currency', currency, useGrouping: 'always' });
     money.set(key, found);
   }
   return found;
@@ -45,12 +47,60 @@ export function formatQuantity(value: string | number, locale: string): string {
   return found.format(number);
 }
 
-/** A money bound typed in the major unit («12», «12,5») → minor units of `currency`; nothing when it
- *  is not an amount (never «from 0»). */
+/** Far above any total, still exact in a double. */
+const MAX_DIGITS = 15;
+
+/** Whole units and their decimals (as typed) → minor units with `decimals` places. */
+const minor = (whole: string, fraction: string, decimals: number): number =>
+  Number(whole || '0') * 10 ** decimals + Number(fraction.padEnd(decimals, '0') || '0');
+
+/** «1.234.567» (one mark, repeated): its thousands groups as whole units, or nothing when broken. */
+function grouped(raw: string, mark: string): string | undefined {
+  const [head, ...groups] = raw.split(mark);
+  if (!/^[1-9]\d{0,2}$/.test(head) || groups.some((group) => !/^\d{3}$/.test(group))) return undefined;
+  return head + groups.join('');
+}
+
+/** A money bound typed or pasted in the major unit («12», «12,5», «1.250,50», «1.234,56 €») → minor
+ *  units of `currency`; nothing when it is not an amount (never «from 0»). The same reading as a money
+ *  field (pm#521): with both marks the rightmost is the decimal one; one mark repeated groups
+ *  thousands; one mark and three digits are thousands unless the currency has three decimals, and when
+ *  they end in 0 in a currency with decimals («1.250»: 1.250 € or 1,25 €) the bound is not guessed. */
 export function toMinor(text: string | undefined, currency: string = CURRENCY): number | undefined {
-  const raw = (text ?? '').trim();
-  if (!/^\d+([.,]\d+)?$/.test(raw)) return undefined;
-  return Math.round(Number(raw.replace(',', '.')) * 10 ** currencyDecimals(currency));
+  const raw = (text ?? '').replace(/[\s  €]/g, '').replace(new RegExp(currency, 'gi'), '');
+  if (!/^\d[\d.,]*$/.test(raw) || raw.replace(/\D/g, '').length > MAX_DIGITS) return undefined;
+  const decimals = currencyDecimals(currency);
+  const decimal = (whole: string, fraction: string): number | undefined =>
+    fraction.length >= 1 && fraction.length <= decimals && /^\d+$/.test(fraction) ? minor(whole, fraction, decimals) : undefined;
+  const at = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
+  if (at < 0) return minor(raw, '', decimals);
+  const mark = raw[at];
+  const other = mark === ',' ? '.' : ',';
+  const head = raw.slice(0, at);
+  const fraction = raw.slice(at + 1);
+  if (head.includes(other)) {
+    // Both marks: the rightmost is the decimal one, the other one groups thousands.
+    const whole = head.includes(mark) ? undefined : grouped(head, other);
+    return whole === undefined ? undefined : decimal(whole, fraction);
+  }
+  if (head.includes(mark)) {
+    const whole = grouped(raw, mark);
+    return whole === undefined ? undefined : minor(whole, '', decimals);
+  }
+  if (fraction.length !== 3 || decimals >= 3) return decimal(head, fraction);
+  const whole = grouped(raw, mark);
+  return whole === undefined || (decimals > 0 && fraction.endsWith('0')) ? undefined : minor(whole, '', decimals);
+}
+
+/** The two ends of the Total filter, as the table names them. */
+export const TOTAL_BOUNDS = ['total_amount_from', 'total_amount_to'] as const;
+
+/** The ends of the Total filter typed but not readable as an amount: they filter nothing and say so. */
+export function unreadableTotals(filters: Readonly<Record<string, unknown>>): string[] {
+  return TOTAL_BOUNDS.filter((name) => {
+    const text = filters[name];
+    return typeof text === 'string' && text.trim() !== '' && toMinor(text) === undefined;
+  });
 }
 
 /** A quantity bound typed by a person («2», «0,5») → the decimal the server reads; nothing when it is
