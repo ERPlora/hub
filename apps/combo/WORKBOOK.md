@@ -1,7 +1,7 @@
 # Workbook — Menús y combos (app)
 Prefijo: COMBO
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor, páginas y sus pasos en Ventas, Inventario y Cocina)
+Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `combo`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -97,8 +97,8 @@ Se abre al tocar un menú (`/combo/menus/<id>`). La flecha atrás de la barra de
 Arriba de la página, el nombre y el precio del menú, y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
 único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.» o «Este menú
 se factura como entrega de bienes: su precio se repartirá entre los componentes que añadas, una línea
-por cada uno.». Debajo, si el menú todavía no sale en el TPV, otro aviso dice por qué («Todavía no
-sale en el TPV: …»).
+por cada uno.». Debajo, si el menú todavía no sale en el TPV, otro aviso, «Todavía no sale en el TPV»,
+dice por qué, un motivo por línea.
 
 Después, la sección «Platos» («Un plato es un paso de ESTE menú: Primero, Segundo, Postre, Bebida. Su
 orden es el orden en que se pregunta.») y una tarjeta por plato, en orden: nombre, su regla
@@ -175,7 +175,7 @@ Pasos:
    incluida (el menú del día); «Se vende como producto / para llevar»: si todas las elecciones tributan
    igual, UNA línea a ese tipo; si no, UNA línea por plato, cada una a su tipo, con el precio repartido
    (COMBO-F09).
-5. Si es «en el local», elige el «Tipo de IVA» del menú entero (en un restaurante, «Restaurante —
+5. Si es «en el local», elige el «Tipo de IVA» del menú entero (en un restaurante, «Restauración —
    comida», al 10 %).
 6. Deja marcada «A la venta» si ya se puede vender y pulsa «Guardar».
 7. El formulario se cierra y el menú aparece en la lista. Todavía no sale en el TPV: le faltan los
@@ -223,8 +223,8 @@ Pasos:
 Entra: el menú elegido (por id o por nombre).
 Sale: el menú, sus platos y sus elecciones borrados en una sola operación (avisa: menú retirado, con
 su nombre). Los tiques emitidos llevan su copia y se siguen leyendo.
-Si falla: «No se ha podido retirar el menú.» en el diálogo; un menú que ya no existe, «Ese menú no
-existe en este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08).
+Si falla: el diálogo dice por qué y sigue abierto; un menú que ya no existe, «Ese menú no existe en
+este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08).
 Implicados: SALE-F12
 
 ### COMBO-F05 Montar los platos de un menú
@@ -274,8 +274,9 @@ Sale: la elección (avisa: elección nueva, cambiada, reordenada o quitada). El 
 precio cerrado, nunca al precio del producto.
 Si falla: «Elige antes un producto del catálogo.», «Este plato ya ofrece ese producto. Para que se
 pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez».», ««{producto}» está
-desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende por
-unidades puede ser una elección de menú.», «Un plato admite como mucho 40 elecciones.» y los avisos de
+desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende y se
+cobra por unidades puede ser una elección de menú; «{producto}» se vende por {unidad}.», «Un plato admite
+como mucho 40 elecciones.» y los avisos de
 importe. «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
 sin productos: «Ningún producto coincide.». Si el catálogo no carga, el buscador lo dice con
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
@@ -293,7 +294,7 @@ Pasos:
 2. Cada plato dice su regla («Elige 1», «Hasta 2», «Opcional») y sus elecciones disponibles, con el
    suplemento con su signo si no es cero («+2,00 €»). Al abrir no hay nada elegido.
 3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
-   siguiente toque dice «Café está completo: quita una para elegir otra»; una elección que se puede
+   siguiente toque dice ««Café» está completo: quita una para elegir otra.»; una elección que se puede
    repetir lleva su contador y su «−».
 4. Mientras falte algo, el botón dice qué («Elige 1 en «Segundos»») y tocarlo señala ese plato; cuando
    cada plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los
@@ -372,7 +373,7 @@ Inventario, así que este menú no se puede cobrar.» (y no se ofrece). Partido 
 0 € en el catálogo: «Los productos de este menú no tienen precio de catálogo, así que no se puede
 repartir su IVA.»; si todas las elecciones ofrecidas de un menú «para llevar» valen 0 € y van a
 categorías distintas, el menú no sale en el TPV.
-Implicados: SALE-F12, TAX-F05
+Implicados: SALE-F12, TAX-F19
 
 ### COMBO-F10 Bajar el stock de cada plato al cobrar
 <!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f11 old:combos/WORKFLOW.md#combos-f10 -->
@@ -635,8 +636,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
 - Los importes se leen con `lib/money.ts` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento
   admite signo).
-- Iconos registrados en la shell; los del producto actual (`restaurant-outline`,
-  `reorder-three-outline`, `arrow-up-outline`) esperan en `UI-REQUESTS.md`.
+- Iconos registrados en la shell; los del producto actual (`restaurant-outline`, `arrow-up-outline`)
+  esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
+  `ion-reorder` con su icono propio.
 
 ## Lo que NO hace, a propósito
 
@@ -648,6 +650,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - **No admite servicios de la app Servicios** como elección: los packs de peluquería son los bonos y
   paquetes de Servicios (SERVICE-F12).
 - **No manda nada a cocina** por sí mismo.
+- **No enseña en el constructor el reparto en euros** de un menú «para llevar»: el aviso de arriba dice que
+  el precio se reparte entre los platos, y el reparto se ve en la cuenta antes de cobrar, igual que se
+  cobra (COMBO-F09).
 
 ## Cambios frente al producto actual
 
@@ -709,3 +714,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   Si hace falta, Impuestos tendrá que crear la pareja y añadirse aquí a `TAKEAWAY_CATEGORY`.
 - `useServerTable`, `useLiveList`, `useT` y el lector de importes (`MoneyInput`, con signo) están
   copiados en cada app; ya pedido en `UI-REQUESTS.md` que suban a `@erplora/ui`.
+- **El asistente** sale como actor (F01–F06, F12, F13) y en los ejemplos de voz: es la operación con
+  `ai=` y su ruta de la API, porque el asistente del Hub aún no existe (la misma lectura de las rondas
+  CLOSE-DEMO y CLOSE-SERVICE de `PLAN-HUB.md`). Hasta que llegue, esos pasos se hacen por la API.
+- **combos#11** está anotada `aplica` en el registro (hub#139) por la vista previa de Ventas, que
+  reparte igual que el cobro (COMBO-F09, paso 4). Lo que la issue pedía era pintar ese reparto en el
+  constructor del menú, y eso queda fuera, decidido al cerrar (ver «Lo que NO hace, a propósito»).

@@ -37,8 +37,7 @@
       "free": "Gratis"
     },
     "tax": {
-      "exempt": "exento",
-      "loadError": "No se han podido cargar las categorías fiscales."
+      "exempt": "exento"
     },
     "services": {
       "search": "Buscar servicio…",
@@ -72,8 +71,7 @@
         "title": "Archivar servicio",
         "message": "{name} — dejará de ofrecerse y de poder reservarse. Se conservan su histórico y las citas ya reservadas.",
         "upcoming": "{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.",
-        "confirm": "Archivar",
-        "error": "No se pudo archivar el servicio"
+        "confirm": "Archivar"
       },
       "restoreError": "No se pudo restaurar el servicio",
       "form": {
@@ -140,8 +138,7 @@
         "title": "Eliminar categoría",
         "message": "{name} — la categoría desaparece; los servicios que contiene se conservan, sin categoría.",
         "impact": "{count} servicio(s) se quedarán sin categoría.",
-        "confirm": "Eliminar",
-        "error": "No se pudo eliminar la categoría"
+        "confirm": "Eliminar"
       }
     },
     "packages": {
@@ -201,8 +198,7 @@
       "delete": {
         "title": "Eliminar paquete",
         "message": "{name} — el paquete y sus {count} línea(s) salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado.",
-        "confirm": "Eliminar",
-        "error": "No se pudo eliminar el paquete"
+        "confirm": "Eliminar"
       }
     },
     "grants": {
