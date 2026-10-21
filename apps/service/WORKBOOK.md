@@ -762,11 +762,12 @@ Pasos:
 3. Pulsa **Asignar**.
 Entra: el servicio y la ficha del profesional (Personal).
 Sale: la asignación, activa y no principal (`service.assignment.assigned`). Citas la lee para filtrar
-los profesionales de un servicio y tomar su duración y su precio propios. Asignar otra vez a la misma
-persona (asistente o API) cambia sus minutos y su precio; su servicio principal solo cambia si se dice.
+los profesionales de un servicio y tomar su duración y su precio propios, y Ventas cobra ese precio
+propio (SALE-F38). Asignar otra vez a la misma persona (asistente o API) cambia sus minutos y su precio;
+su servicio principal solo cambia si se dice.
 Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
 vale para varios (la lista para elegir) o el importe ilegible o negativo.
-Implicados: STAFF-F01
+Implicados: STAFF-F01, SALE-F38
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
 <!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
@@ -909,7 +910,9 @@ con la sesión de quien vende, como hace con Inventario.
   hasta 100) da por servicio `id`, `name`, `pricing_type`, `price`, `min_price`, `max_price`,
   `duration_minutes`, `category_id`, `category_name`, `tax_category_id`, `tax_category_key` y
   `needs_tax_setup` (sin categoría fiscal viva: no se vende). `service.service.get` da uno, también
-  archivado. Al cobrar, la categoría fiscal de la línea es la de `tax_category_key`.
+  archivado. Al cobrar, la categoría fiscal de la línea es la de `tax_category_key`. Con la profesional de
+  la línea, un servicio de precio fijo se cobra a su precio propio si su asignación activa lo tiene
+  (`service.assignment.list` con `service_id` y `member_id`).
 - **El bono en el cobro y en la devolución (F22–F27)**: Ventas llama por su nombre, con la sesión de
   quien cobra (su permiso y la app activa los comprueba cada operación), y **en la misma transacción**
   que su propia escritura, sin esperar a ningún aviso:

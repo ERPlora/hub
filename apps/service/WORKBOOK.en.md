@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ffe3e6830a056bc284d65af4dfdeb52074bff400b7f7b9727de73653337078ed -->
+<!-- generated from WORKBOOK.md sha256:5d6c24e9f8c89ffa925c91e0cabcfc224ab5584a80cc6a6f8beb7a86a70f8293 -->
 
 ## What it is for and who it is for
 
@@ -728,11 +728,12 @@ Steps:
 3. Tap **Assign**.
 In: the service and the card of the professional (Staff).
 Out: the assignment, active and not main (`service.assignment.assigned`). Appointments reads it to filter
-the professionals of a service and to take their own duration and price. Assigning the same person again
-(assistant or API) changes their minutes and their price; their main service only changes if it is said.
+the professionals of a service and to take their own duration and price, and Sales charges that own
+price (SALE-F38). Assigning the same person again (assistant or API) changes their minutes and their
+price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
 several (the list to choose from) or the amount unreadable or negative.
-Involved: STAFF-F01
+Involved: STAFF-F01, SALE-F38
 
 ### SERVICE-F32 Change or remove a professional from a service
 Status: done
@@ -872,7 +873,9 @@ with the session of whoever sells, as it does with Inventory.
   100) gives per service `id`, `name`, `pricing_type`, `price`, `min_price`, `max_price`,
   `duration_minutes`, `category_id`, `category_name`, `tax_category_id`, `tax_category_key` and
   `needs_tax_setup` (no live tax category: it is not sold). `service.service.get` gives one, also
-  archived. When charging, the tax category of the line is the one of `tax_category_key`.
+  archived. When charging, the tax category of the line is the one of `tax_category_key`. With the
+  line's professional, a fixed-price service is charged at her own price if her active assignment has
+  one (`service.assignment.list` with `service_id` and `member_id`).
 - **The voucher in the checkout and in the refund (F22–F27)**: Sales calls by name, with the session of
   whoever charges (each operation checks their permission and the active app), and **in the same
   transaction** as its own write, without waiting for any notice:
