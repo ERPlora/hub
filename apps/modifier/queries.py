@@ -234,12 +234,13 @@ def _page(queryset, params, row) -> dict:
     }
 
 
-def _ordered(order: dict, sort: str) -> list:
-    descending = sort.startswith("-")
-    first, *rest = order[sort.lstrip("-")]
-    if descending:
-        first = (F(first) if isinstance(first, str) else first).desc()
-    return [first, *rest]
+def _ordered(order: dict, sort: str, *before) -> list:
+    """The order of ``sort`` (a leading «-» is descending): ``before``, the column and its tie-breaks, all in
+    the list's direction, so a descending list is the ascending one read backwards, ties included (hub#2355)."""
+    keys = [*before, *order[sort.lstrip("-")]]
+    if not sort.startswith("-"):
+        return keys
+    return [(F(key) if isinstance(key, str) else key).desc() for key in keys]
 
 
 # The groups (MODIFIER-F01, F03)
@@ -308,12 +309,13 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
 )
 def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
     options = ModifierOption.objects.select_related("group", "tax_category")
-    order = _ordered(_OPTION_ORDER, params.sort)
+    by_group = ()
     if params.group_id is not None or params.group is not None:
         options = options.filter(group=find_group(params.group_id, params.group))
-    elif params.sort == "sort_order":
+    elif params.sort.lstrip("-") == "sort_order":
         # The whole catalog in the till's order: by its groups' order and name, then each group's own.
-        order = ["group__sort_order", Lower("group__name"), "group_id", *order]
+        by_group = ("group__sort_order", Lower("group__name"), "group_id")
+    order = _ordered(_OPTION_ORDER, params.sort, *by_group)
     if params.search:
         options = options.filter(Q(name__icontains=params.search) | Q(kitchen_name__icontains=params.search))
     return _page(options.order_by(*order), params, option_row)
