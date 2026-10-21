@@ -205,7 +205,12 @@ class ProductFiltersIn(Schema):
     is_active: bool | None = Field(
         None,
         description="Only the products on sale in the till (true: active and not sold out) or the rest "
-        "(false: inactive or sold out).",
+        "(false: inactive or sold out); with include_sold_out, the active switch alone.",
+    )
+    include_sold_out: bool = Field(
+        False,
+        description="With is_active: filter by the active switch alone, sold out or not (screens that "
+        "configure rather than sell, such as a menu's choices).",
     )
     needs_tax_setup: bool | None = Field(
         None, description="Only products without (true) or with (false) a tax category."

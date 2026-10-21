@@ -33,7 +33,9 @@ export interface ProductFiltersIn {
   stock_min?: DecimalIn;
   stock_max?: DecimalIn;
   status?: ProductStatus;
+  /** On sale in the till (active and not sold out); with `include_sold_out`, the active switch alone. */
   is_active?: boolean;
+  include_sold_out?: boolean;
   needs_tax_setup?: boolean;
   tracks_stock?: boolean;
   category_id?: string;

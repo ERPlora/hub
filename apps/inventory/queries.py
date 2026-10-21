@@ -252,7 +252,8 @@ def _first_match(queryset, lookups) -> list:
     ai={
         "description": "List the catalog's products with their current stock; needs_tax_setup marks the ones "
         "without a tax category, which cannot be sold, and is_sold_out the ones marked sold out. Filter by "
-        "category to get one category's articles, by is_active=true to get what the till offers."
+        "category to get one category's articles, by is_active=true to get what the till offers (add "
+        "include_sold_out=true for every active product, sold out or not)."
     },
 )
 def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
@@ -366,7 +367,9 @@ def filter_products(products, params: ProductFiltersIn):
         )
     )
     if params.is_active is not None:
-        products = products.filter(ON_SALE if params.is_active else ~ON_SALE)
+        # The till asks for what is on sale; a screen that configures, for the switch alone.
+        active = Q(is_active=True) if params.include_sold_out else ON_SALE
+        products = products.filter(active if params.is_active else ~active)
     if params.needs_tax_setup is not None:
         products = products.filter(UNTAXED if params.needs_tax_setup else ~UNTAXED)
     if params.status == "needs_tax_setup":

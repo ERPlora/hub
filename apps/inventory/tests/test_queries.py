@@ -466,6 +466,10 @@ def test_a_sold_out_article_stays_in_products_and_leaves_what_the_till_offers(ge
     ]
     assert listed(status="active") == ["Coffee", "Croquettes"]
     assert listed(status="sold_out") == ["Croquettes"]
+    # A screen that configures rather than sells (a menu's choices, COMBO-F06) still picks a sold-out
+    # article: with include_sold_out, is_active is the switch alone.
+    assert listed(is_active=True, include_sold_out=True) == ["Coffee", "Croquettes"]
+    assert listed(is_active=False, include_sold_out=True) == ["Off"]
 
 
 def test_the_detail_of_a_sold_out_article_says_so(general):
