@@ -291,8 +291,10 @@ Pantalla: Ventas: Vender
 Pasos:
 1. En el TPV, en «Todos», los menús a la venta salen primero, cada uno con la etiqueta «Menú» y su
    precio cerrado. Toca uno: se abre una hoja con su nombre y todos sus platos a la vez.
-2. Cada plato dice su regla («Elige 1», «Hasta 2», «Opcional») y sus elecciones disponibles, con el
-   suplemento con su signo si no es cero («+2,00 €»). Al abrir no hay nada elegido.
+2. Cada plato dice su regla: «Elige N» si pide justo N, «Elige de N a M» si pide un mínimo y deja llegar a
+   un techo, «Elige al menos N» si pide un mínimo sin techo, «Hasta N» si solo tiene techo, «Opcional» si
+   no; y sus elecciones disponibles, con el suplemento con su signo si no es cero («+2,00 €»). Al abrir no
+   hay nada elegido.
 3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
    siguiente toque dice ««Café» está completo: quita una para elegir otra.»; una elección que se puede
    repetir lleva su contador y su «−».

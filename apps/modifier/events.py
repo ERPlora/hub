@@ -4,9 +4,9 @@ services.py records them in the outbox, in the command's transaction; live.py na
 each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
 Reactions (MODIFIER-F09): a product or a category deleted in Inventory drops the groups hung from it,
-through an operation of this app run as the system, in its own transaction. The outbox relay (phase 2,
-in the worker) hands each delivered event to ``react``; the operations are idempotent, so a repeated
-delivery changes nothing. Until then the reads leave out the links to what is deleted.
+through an operation of this app run as the system, in its own transaction. The worker's outbox relay
+(``base/relay.py``, every tick) hands each delivered event to ``react``; the operations are idempotent, so
+a repeated delivery changes nothing. Until the tick, the reads leave out the links to what is deleted.
 """
 
 from typing import Any

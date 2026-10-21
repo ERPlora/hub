@@ -1,7 +1,7 @@
 # Workbook — Suplementos (app)
 Prefijo: MODIFIER
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas); la hoja del TPV y la comanda son de Ventas y Cocina (MODIFIER-F06 a F08)
+Estado de la app: hecha (servidor y páginas); la hoja del TPV y la comanda las pintan Ventas y Cocina (MODIFIER-F06 a F08)
 
 > Manual de usuario y especificación de la app `modifier`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -73,7 +73,7 @@ Configuración inicial, paso a paso:
 3. En la misma hoja, en «Se aplica a», engánchalo a los productos o categorías que lo llevan
    (MODIFIER-F05).
 4. En el TPV, toca uno de esos artículos: sale la hoja con el grupo, su regla y el precio de cada opción
-   (MODIFIER-F06, cuando Ventas la tenga).
+   (MODIFIER-F06).
 
 ## Pantallas
 
@@ -131,12 +131,13 @@ De 20 en 20, con «Cargar más».
 | MODIFIER-F03 | Cambiar o borrar un grupo | hecho |
 | MODIFIER-F04 | Añadir, cambiar o quitar las opciones de un grupo | hecho |
 | MODIFIER-F05 | Enganchar un grupo a productos o categorías, y soltarlo | hecho |
-| MODIFIER-F06 | Elegir las opciones al vender un artículo | servidor hecho; la hoja es de Ventas (SALE-F11) |
-| MODIFIER-F07 | Cobrar el suplemento: precio y IVA | servidor hecho; el cobro es de Ventas (SALE-F11) |
-| MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | servidor hecho; la comanda es de Ventas y Cocina (KITCHEN-F07) |
-| MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | servidor hecho; corre cuando el worker reparta los avisos (fase 2) |
+| MODIFIER-F06 | Elegir las opciones al vender un artículo | hecho |
+| MODIFIER-F07 | Cobrar el suplemento: precio y IVA | hecho |
+| MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
+| MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
+<!-- origen: old:modifiers/WORKFLOW.md#modifiers-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Suplementos
@@ -152,6 +153,7 @@ Si falla: el aviso de la tabla con «Reintentar»; sin grupos, «Todavía no hay
 Implicados: ninguno
 
 ### MODIFIER-F02 Crear un grupo
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:modifiers/WORKFLOW.md#modifiers-f02 qa:modules/modifiers/required-modifiers-and-price -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Suplementos
@@ -172,6 +174,7 @@ nombre.» debajo del Nombre. Lo escrito se queda.
 Implicados: ninguno
 
 ### MODIFIER-F03 Cambiar o borrar un grupo
+<!-- origen: old:modifiers/WORKFLOW.md#modifiers-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos
@@ -190,6 +193,7 @@ grupo no existe.».
 Implicados: SALE-F11
 
 ### MODIFIER-F04 Añadir, cambiar o quitar las opciones de un grupo
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
@@ -214,6 +218,7 @@ que cero.». Un grupo admite hasta 100 opciones.
 Implicados: SALE-F11
 
 ### MODIFIER-F05 Enganchar un grupo a productos o categorías, y soltarlo
+<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
@@ -232,31 +237,38 @@ hub.» o «Esta categoría no existe.»; un enganche que ya existe, «Este grupo
 Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
-Estado: servidor hecho; la hoja del TPV es de Ventas (SALE-F11), pedida en «Contrato con Ventas»
+<!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f17 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f06 -->
+Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
 Pasos:
 1. En el TPV, toca un artículo que tiene grupos (suyos o de cualquiera de sus categorías): se abre una
    hoja con su nombre. Sin grupos, el artículo entra directo.
-2. Cada grupo dice su regla: «Elige N» si es obligatorio, «Hasta N» si es opcional con techo,
-   «Opcional» si no tiene techo; cada opción lleva su suplemento si no es cero y las opciones por
-   defecto ya salen marcadas.
-3. Toca las opciones (volver a tocar una la quita; en un grupo que se repite, un contador suma y resta).
-   «Añadir» espera mientras un grupo tenga menos del mínimo o más del máximo.
-4. Pulsa «Añadir»: la línea entra con las opciones en el orden elegido y su precio ya sumado.
+2. Cada grupo dice su regla: «Elige N» si pide justo N, «Elige de N a M» si pide un mínimo y deja llegar a
+   un techo, «Elige al menos N» si pide un mínimo sin techo, «Hasta N» si solo tiene techo, «Opcional» si
+   no; cada opción lleva su suplemento con su signo si no es cero («+1,00 €») y las opciones por defecto ya
+   salen marcadas.
+3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en un grupo
+   que se repite, cada opción va en su renglón, con su nombre entero, y cada toque suma uno al contador
+   («× 2») que «−» resta; al llegar al techo, el siguiente toque avisa de que el grupo está completo.
+4. Mientras un grupo obligatorio no esté completo, el botón dice «Elige una opción para continuar» y
+   tocarlo señala ese grupo. Con todo elegido, dice «Añadir · <precio>» con los suplementos ya sumados.
+5. Pulsa «Añadir»: la línea entra con las opciones en el orden en que se tocaron y su precio.
 Entra: los grupos y opciones de este artículo (servicio «grupos de un producto»).
-Sale: la línea con las opciones elegidas; del TPV solo viajan los ids de las opciones.
+Sale: la línea con las opciones elegidas; del TPV solo viajan las opciones, nunca su precio.
 Si falla: un grupo sin opciones no se pregunta. Un grupo enganchado al producto y a su categoría sale
-una sola vez.
+una sola vez. Si no se pueden leer los grupos, «No se han podido leer los suplementos de este producto.
+Inténtalo de nuevo.» y no entra nada.
 Implicados: SALE-F11
 
 ### MODIFIER-F07 Cobrar el suplemento: precio y IVA
-Estado: servidor hecho; el cobro es de Ventas (SALE-F11), pedido en «Contrato con Ventas»
+<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old-hub:HUB_PERIPHERALS-F09 qa:modules/modifiers/required-modifiers-and-price old-hub:HUB_PERIPHERALS-F11 old:modifiers/WORKFLOW.md#modifiers-f07 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Al añadir la línea (a una cuenta o a una venta directa), Ventas pide a Suplementos que **compruebe y
-   valore** las opciones elegidas para ese artículo.
+   valore** las opciones elegidas para ese artículo, con la sesión de quien vende.
 2. Suplementos comprueba que cada opción es de un grupo de ese artículo, que cada grupo tiene entre su
    mínimo y su máximo y que nada se repite donde no se puede; devuelve cada opción con su precio de
    catálogo, sus nombres y su categoría fiscal.
@@ -264,9 +276,12 @@ Pasos:
    otra categoría se cobra en una línea propia, hija de la del plato, con su tipo.
 4. Ventas congela esa copia en la línea: cambiar o borrar la opción después no cambia lo que paga esa
    mesa.
+5. Al cobrar, el tique nombra las opciones bajo el plato y cada opción con otra categoría fiscal sale como
+   línea propia («+ Refresco»), por cada plato, con su base y su cuota: lo que dice la cuenta es lo que paga
+   la tarjeta.
 Entra: el artículo y las opciones elegidas, en orden.
-Sale: las opciones con su precio, el total que se suma a la línea y cuáles van en línea propia; ninguna
-mueve stock.
+Sale: las opciones con su precio, el total que se suma a la línea y cuáles van en línea propia; una opción
+elegida dos veces cuenta dos; ninguna mueve stock.
 Si falla: una opción que no es de ese artículo, «Esta opción no se ofrece con este producto.»; un grupo
 por debajo de su mínimo, «Elige al menos N en «Grupo».»; por encima de su máximo, «Elige como mucho N en
 «Grupo».»; una opción repetida donde no se puede, ««Opción» no se puede repetir.»; unos descuentos que
@@ -276,29 +291,34 @@ medida: no admite una opción con suplemento.». La línea no entra.
 Implicados: SALE-F11
 
 ### MODIFIER-F08 Que el suplemento salga en la comanda de cocina
-Estado: servidor hecho; la comanda es de Ventas y Cocina (KITCHEN-F07), pedida en «Contrato con Cocina»
+<!-- origen: old-hub:HUB_PERIPHERALS-F10 wf:restaurante-dia#rec_restaurante-f07 old-hub:HUB_SHELL-F78 old-hub:HUB_SHELL-F72 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f08 -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Al valorar las opciones (F07), Suplementos da también el **texto de cocina**: el nombre de comanda
    de cada opción (o el nombre, si no tiene), en el orden elegido, separados por «, ».
-2. Ventas lo congela en la línea y lo manda con la comanda; Cocina lo pinta debajo del plato.
+2. Ventas lo congela en la línea y lo manda con la comanda; Cocina lo pinta debajo del plato, en la
+   pantalla de cocina («+QUESO, -CEBOLLA») y en el papel, una opción por renglón.
+3. Renombrar o borrar la opción, o su grupo, después de pedirla no cambia lo que ya tiene cocina.
 Entra: las opciones elegidas.
 Sale: el texto de cocina («+QUESO, -CEBOLLA»).
 Si falla: nada que no sea F07: si la valoración falla, la línea no entra.
 Implicados: KITCHEN-F07, SALE-F20
 
 ### MODIFIER-F09 Soltar los grupos de un producto o una categoría que se borra
-Estado: servidor hecho; corre cuando el worker reparta los avisos (fase 2)
+<!-- origen: nuevo (lo pide MODIFIER-F05: un enganche apunta a un producto o una categoría de Inventario, y esos se borran) -->
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Alguien borra un producto o una categoría en Inventario.
-2. Suplementos suelta los grupos que colgaban de él (avisa: enganche soltado, uno por grupo).
+2. A los pocos segundos, Suplementos suelta los grupos que colgaban de él (avisa: enganche soltado, uno
+   por grupo); los demás enganches del grupo se quedan.
 Entra: el aviso de Inventario (producto borrado, categoría borrada).
-Sale: los enganches soltados. Mientras tanto (fase 1), un enganche a algo borrado no se ve ni se
-pregunta en el TPV.
-Si falla: repetir el aviso no cambia nada.
+Sale: los enganches soltados. Mientras el aviso llega, un enganche a algo borrado ya no se ve en la hoja del
+grupo ni se pregunta en el TPV.
+Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta los enganches de otro.
 Implicados: INVENTORY-F04, INVENTORY-F07
 
 ## Servicios: lo que entra y lo que sale
@@ -360,8 +380,8 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 
 | App | Para qué | Servicio |
 |---|---|---|
-| Ventas | Pregunta los grupos de un artículo en el TPV y comprueba y valora lo elegido al añadir la línea (pedido en «Contrato con Ventas») | `modifier.group.for_target`, `modifier.selection.resolve` |
-| Cocina | No lee Suplementos: recibe de Ventas el texto de cocina de cada línea (pedido en «Contrato con Cocina») | — |
+| Ventas | Pregunta los grupos de un artículo en el TPV y comprueba y valora lo elegido al añadir la línea (SALE-F11; «Contrato con Ventas») | `modifier.group.for_target`, `modifier.selection.resolve` |
+| Cocina | No lee Suplementos: recibe de Ventas las opciones congeladas de cada línea (KITCHEN-F07; «Contrato con Cocina») | — |
 
 ### Quién puede qué
 
@@ -378,7 +398,10 @@ cajero del producto actual es un empleado.
 - Anatomía completa: `apps.py`, `models.py` (`ModifierGroup`, `ModifierOption`, `ModifierLink`),
   `migrations/`, `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`,
   `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
-  `tests/test_integration_inventory.py` y `tests/test_integration_tax.py` con las apps reales y
+  `tests/test_integration_inventory.py`, `tests/test_integration_tax.py`, `tests/test_integration_sale.py`
+  (F06 y F07 contra Ventas: descuento, repetido, a peso e IVA al céntimo) y
+  `tests/test_integration_kitchen.py` (F08, Ventas → relay → Cocina) con las apps reales,
+  `tests/test_relay.py` (F09 por un tick real del relay del worker, con dos negocios) y
   `tests/test_concurrency.py` con dos sesiones de verdad.
 - **`requires = ["inventory", "tax"]`**. `ModifierLink.product` y `ModifierLink.category` son claves
   ajenas a `inventory.Product` y `inventory.Category` (exactamente una de las dos, `CheckConstraint`);
@@ -420,8 +443,9 @@ cajero del producto actual es un empleado.
   producto o la categoría, 422 en `tax_category_key`), nunca un enganche a algo borrado ni un
   `IntegrityError` en el COMMIT (500).
 - **Borrar es borrar**: un grupo arrastra sus opciones y enganches por `CASCADE`; Ventas guarda su
-  copia congelada. Un producto o categoría de Inventario se borra lógicamente: hasta que el worker
-  reparta sus avisos (F09), los enganches a lo borrado se excluyen de toda lectura.
+  copia congelada. Un producto o categoría de Inventario se borra lógicamente y el relay del outbox del
+  worker (`base/relay.py`, cada tick) entrega su aviso a `events.REACTIONS` (F09); mientras llega, los
+  enganches a lo borrado se excluyen de toda lectura (`LIVE_LINK`).
 - **Reacciones** (`events.REACTIONS`): `inventory.product.deleted` → `modifier.link.drop_product`,
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
   ningún papel tiene), sin ruta, idempotentes.
@@ -449,8 +473,9 @@ cajero del producto actual es un empleado.
   `LinkFormModal` (Producto o Categoría, `Combo` sobre las listas de Inventario), `PageNotices`; las
   búsquedas de los `Combo` llaman a las operaciones de Inventario e Impuestos (`lib/pickers.ts`), nunca
   a sus modelos. Icono: `lucide:sliders-horizontal` (el `options-outline` de antes, pedido en
-  `UI-REQUESTS.md`). Pruebas: Vitest por fichero y `tests/e2e/modifier-groups.spec.ts` contra Inventario
-  e Impuestos reales.
+  `UI-REQUESTS.md`). Pruebas: Vitest por fichero, `tests/e2e/modifier-groups.spec.ts` (F01 a F05) contra
+  Inventario e Impuestos reales y `tests/e2e/modifier-till.spec.ts` (F06 a F09) contra Inventario,
+  Impuestos, Ventas y Cocina reales, con el relay del outbox corrido como lo corre cada tick.
 
 ### Paridad con la pantalla del producto actual
 
@@ -469,16 +494,20 @@ cajero del producto actual es un empleado.
 
 ### Contrato con Ventas
 
-Lo que Ventas tiene que hacer para cerrar SALE-F11 (pedido a Ventas; Suplementos no toca `apps/sale`).
+Lo que Ventas hace con Suplementos (SALE-F11, hecho; Suplementos no toca `apps/sale`).
 Ventas **no requiere** Suplementos: llama a sus servicios por nombre (`call_app`), con la sesión de
 quien vende, y sin Suplementos activo una línea con opciones se rechaza con su propio código
-(`sale.modifier_unavailable`) y una sin opciones entra como hoy.
+(`sale.modifier_unavailable`) y una sin opciones entra como siempre. El TPV solo pregunta los grupos con
+Suplementos encendida y el permiso de verla (hub#1121); el empleado lo tiene, y cobra con su propia sesión
+(hub#1219, `tests/test_integration_sale.py`).
 
 1. **La hoja del TPV** (MODIFIER-F06): al tocar un artículo, `modifier.group.for_target` con
-   `product_id`. Sin grupos, la línea entra directa. Con grupos, la hoja: regla por grupo («Elige N»
-   con mínimo ≥ 1 —N el mínimo—, «Hasta N» opcional con techo, «Opcional»), opciones con su suplemento
-   si no es 0, `is_default` ya marcadas, un contador en los grupos con `allow_repeat`, y «Añadir»
-   desactivado («Elige una opción para continuar») mientras un grupo esté fuera de su mínimo y máximo.
+   `product_id`. Sin grupos, la línea entra directa. Con grupos, la hoja: regla por grupo («Elige N» con
+   mínimo = máximo, «Elige de N a M» con mínimo ≥ 1 y un techo mayor, «Elige al menos N» con mínimo ≥ 1 sin
+   techo, «Hasta N» opcional con techo, «Opcional»; `ruleOf` de `apps/sale/frontend/lib/modifierChoice.ts`,
+   hub#143), opciones con su suplemento si no es 0, `is_default` ya marcadas, en los grupos con
+   `allow_repeat` una opción por renglón con su contador y su «−», y «Añadir» desactivado («Elige una opción
+   para continuar») mientras un grupo esté fuera de su mínimo y máximo.
 2. **Añadir la línea** (`sale.order.add_line` y las líneas de `sale.sale.complete` y `sale.order.open`):
    un campo nuevo `option_ids` (lista de UUID en el orden de elección, hasta 100). En la misma
    transacción, `modifier.selection.resolve` con `product_id` y `option_ids`; sus 409 llegan a quien
@@ -516,20 +545,23 @@ quien vende, y sin Suplementos activo una línea con opciones se rechaza con su 
    `modifiers` (ver «Contrato con Cocina»).
 8. **Dividir y juntar cuentas** mueven la línea con su copia congelada; no se vuelve a valorar.
 
-Casos que los tests de Ventas tienen que cubrir (del TPV viejo: `modifier_chain`,
-`modifier_child_line`): la hamburguesa con queso cobra 8,00 + 1,00 € y no 8,00 € (sales#148); lo que
-vale la cuenta y lo que cobra la caja son el mismo número; la opción con otro IVA sale en línea hija y
-base + cuota cuadran en las dos; una opción sin categoría propia sigue siendo una sola línea; nada cruza
-de un hub a otro.
+Casos cubiertos, del TPV viejo (`modifier_chain`, `modifier_child_line`): la hamburguesa con queso cobra
+8,00 + 1,00 € y no 8,00 € (sales#148); lo que vale la cuenta y lo que cobra la caja son el mismo número; la
+opción con otro IVA sale en línea hija y base + cuota cuadran en las dos; una opción sin categoría propia
+sigue siendo una sola línea (`apps/sale/tests/test_integration_modifier.py`); el descuento, el repetido, el
+plato a peso y el IVA de cada suplemento al céntimo, tres platos con queso y refresco: 27,15 € al 10 %
+(base 24,68 €, cuota 2,47 €) y 6,15 € al 21 % (base 5,08 €, cuota 1,07 €)
+(`apps/modifier/tests/test_integration_sale.py`).
 
 ### Contrato con Cocina
 
-Cocina **no lee** Suplementos. Recibe de Ventas, en cada línea de `sale.order.fired`, el campo
-`modifiers`: el `kitchen_text` que Suplementos dio al valorar y Ventas congeló al pedir («+QUESO,
--CEBOLLA»: los nombres de comanda, o el nombre si no hay, en el orden elegido, separados por «, »).
-Cocina lo guarda en el plato de la comanda y lo pinta debajo del nombre, en la pantalla y en el papel
-(KITCHEN-F07; pedido a Cocina: leer `modifiers` de cada línea y pintarlo). Renombrar o borrar la opción
-después de pedirla no cambia lo que lee cocina.
+Cocina **no lee** Suplementos (KITCHEN-F07, hecho). Ventas congela en cada línea lo que Suplementos dio
+al valorar —cada opción con su `kitchen_name` (el nombre de comanda, o el nombre si no hay), en el orden
+elegido, y el `kitchen_text` («+QUESO, -CEBOLLA»)— y lo manda con la ronda (`sale.order.fired`); el relay
+del worker la entrega a Cocina (`kitchen.ticket.receive`), que guarda en el plato la lista de nombres de
+comanda y la pinta debajo del nombre: en la pantalla separada por «, » y en el papel una por renglón
+(hub#1156, hub#1138). Renombrar o borrar la opción, o su grupo, después de pedirla no cambia lo que lee
+cocina (`tests/test_integration_kitchen.py`).
 
 ### Cambios frente al producto actual
 

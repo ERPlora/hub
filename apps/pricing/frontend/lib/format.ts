@@ -31,9 +31,10 @@ function numberFormat(locale: string, key: string, options: Intl.NumberFormatOpt
   return found;
 }
 
-/** Whole cents in `currency` (euros by default), in `locale` («12,50 €», «€12.50», «$12.50»). */
+/** Whole cents in `currency` (euros by default), in `locale` («12,50 €», «€12.50», «$12.50»), with the
+ *  thousands grouped from four digits on in every language (Spanish CLDR waits for five: hub#1090). */
 export function formatMoney(cents: number, locale: string, currency = 'EUR'): string {
-  return numberFormat(locale, `money:${currency}`, { style: 'currency', currency }).format(cents / 100);
+  return numberFormat(locale, `money:${currency}`, { style: 'currency', currency, useGrouping: 'always' }).format(cents / 100);
 }
 
 /** A quantity as the server sends it («10.000») without its trailing zeros, in `locale`. */

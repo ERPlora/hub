@@ -21,7 +21,7 @@
       "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
     },
     "state": { "active": "Active", "inactive": "Inactive" },
-    "status": { "active": "Active", "inactive": "Inactive", "all": "All" },
+    "status": { "active": "Active", "inactive": "Inactive" },
     "taxBasis": { "business": "Business default", "included": "Tax included", "excluded": "Tax excluded" },
     "validity": { "always": "Always", "from": "From {from}", "until": "Until {until}", "between": "{from} – {until}" },
     "lists": {

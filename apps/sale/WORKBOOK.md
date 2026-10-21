@@ -517,7 +517,7 @@ Pasos:
    opción lleva su suplemento con su signo («+1,00 €», «−2,00 €»; nada si es gratis) y las de fábrica ya
    salen marcadas.
 3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en uno con
-   techo, al llegar a él el siguiente toque dice «Extras está completo: quita una para elegir otra»; una
+   techo, al llegar a él el siguiente toque dice ««Extras» está completo: quita una para elegir otra.»; una
    opción que se puede repetir lleva su contador («× 2») y su «−».
 4. Pulsa «Añadir · <precio>»: la línea entra con sus suplementos debajo del nombre y su precio ya sumado.
    Mientras un grupo obligatorio no esté completo, el botón dice «Elige una opción para continuar» y
@@ -549,7 +549,7 @@ Pasos:
 2. Cada plato dice su regla («Elige 1», «Elige de 1 a 4», «Hasta 2», «Opcional») y sus elecciones, con el suplemento con su signo
    si no es cero («+2,00 €»). Al abrir no hay nada elegido.
 3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
-   siguiente toque dice «Café está completo: quita una para elegir otra»; una elección que se puede repetir
+   siguiente toque dice ««Café» está completo: quita una para elegir otra.»; una elección que se puede repetir
    lleva su contador y su «−».
 4. Mientras falte algo, el botón dice qué («Elige 1 en «Segundos»») y tocarlo señala ese plato; cuando cada
    plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los suplementos.
@@ -557,7 +557,7 @@ Pasos:
    línea propia; su cantidad se cambia por unidades enteras.
 5. Cobra como siempre (SALE-F01): el menú cobra el importe que tenía al pedirlo aunque después suba de precio,
    se agote un plato o el menú se retire (también con Menús y combos apagada: cobra lo que congeló). «En el
-   local» sale en una línea al IVA del menú; «para llevar» con platos de distinto
+   local» sale en una línea al IVA del menú; «Para llevar» con platos de distinto
    IVA sale en una línea por plato, con el importe repartido según el precio de catálogo de cada uno (6,00 €
    de bocadillo y caña: 4,15 € al 10 % y 1,85 € al 21 %), y sin línea del menú con dinero.
 Entra: los menús de Menús y combos; Menús comprueba los platos elegidos y pone el precio al añadir la línea y
