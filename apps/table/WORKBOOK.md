@@ -249,8 +249,8 @@ Pasos:
 5. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
    primer hueco libre de su zona.
 Entra: número (o ninguno), y en la lista también aforo y zona.
-Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, el paso «Tus mesas» de la puesta
-en marcha queda hecho (`table.floor.status`).
+Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa» del TPV deja de decir
+«Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`).
 Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
 «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
 este negocio.».
@@ -516,8 +516,8 @@ Pasos:
 Entra: las dos cuentas.
 Sale: una sola cuenta abierta en la mesa que se queda (avisa: `table.session.merged` y
 `sale.order.merged`).
-Si falla: «Esa mesa no tiene ninguna cuenta abierta con la que fusionar.» si el destino está libre o
-es la misma mesa.
+Si falla: «Esa mesa no tiene ninguna otra cuenta abierta con la que fusionar.» si el destino está libre
+o es la misma mesa sin otra cuenta.
 Implicados: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Dividir la cuenta de una mesa
@@ -805,7 +805,7 @@ nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 | Una cuenta de mesa | ver cuentas | F21, F22 | `table.session.get` |
 | Las cuentas de mesa de una cuenta de Ventas (para el TPV: la mesa de la cuenta en pantalla) | ver cuentas | F12, F13, F24 | `table.session.by_order` |
 | Los camareros que han abierto cuentas (para el filtro) | ver cuentas | F22 | `table.waiter.list` |
-| Si el plano está montado (mesas en uso) | ver mesas | F02 | `table.floor.status` |
+| Si el plano está montado (mesas en uso y zonas), para «Elegir mesa» del TPV | ver mesas | F02 | `table.floor.status` |
 | Los ajustes de sala | ver ajustes | F08 | `table.settings.get` |
 
 Las zonas, las mesas, las cuentas, los camareros, el estado del plano y los ajustes se pueden seguir
