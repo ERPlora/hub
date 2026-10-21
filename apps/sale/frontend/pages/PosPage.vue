@@ -461,10 +461,12 @@ let chargingLines: string[] = [];
 const verifactuOn = computed(
   () => !!session.me.value?.apps.some((app) => app.label === 'verifactu' && app.state === 'on') && session.can('verifactu.view_record'),
 );
+/** Kitchen is on in this business. */
+const kitchenActive = computed(() => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on'));
 /** «Current order» and its send: Kitchen on in this business and the right to send to it. */
-const kitchenOn = computed(
-  () => !!session.me.value?.apps.some((app) => app.label === 'kitchen' && app.state === 'on') && session.can('kitchen.add_ticket'),
-);
+const kitchenOn = computed(() => kitchenActive.value && session.can('kitchen.add_ticket'));
+/** «Tickets · N» and «Order tickets» (KITCHEN-F19, F20): Kitchen on and the right to see its tickets. */
+const kitchenTickets = computed(() => kitchenActive.value && session.can('kitchen.view_ticket'));
 /** Nothing new to send (another device sent it, or only services wait): not a failure. */
 const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
 
@@ -636,6 +638,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
             :open-checks="openChecks"
             :table-number="seatOfCheck?.table_number ?? null"
             :kitchen="kitchenOn"
+            :kitchen-tickets="kitchenTickets"
             @park="openSheet(() => (parking = true))"
             @close="cartOpen = false"
             @rename="till.rename($event)"

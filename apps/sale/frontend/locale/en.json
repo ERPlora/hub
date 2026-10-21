@@ -242,7 +242,26 @@
         "sendRush": "Send RUSH ({count})",
         "rush": "Mark the order as rush",
         "sent": "Order {n} sent to the kitchen.",
-        "notSent": "The order could not be sent to the kitchen. Try again."
+        "notSent": "The order could not be sent to the kitchen. Try again.",
+        "tickets": {
+          "open": "Tickets · {count}",
+          "title": "Order tickets",
+          "status": {
+            "pending": "To prepare",
+            "preparing": "Preparing",
+            "ready": "Ready",
+            "served": "Served",
+            "cancelled": "Cancelled"
+          },
+          "rush": "Rush",
+          "voided": "Voided",
+          "markRush": "Mark rush",
+          "clearRush": "Remove rush",
+          "rushFailed": "Could not update the ticket",
+          "rushNoticeFailed": "The urgent notice could not be printed. Tell the kitchen by voice and check its printer.",
+          "loadError": "The order tickets could not be loaded.",
+          "retry": "Retry"
+        }
       },
       "fiscal": {
         "title": "Sales cannot be charged right now.",

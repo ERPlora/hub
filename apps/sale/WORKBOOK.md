@@ -753,6 +753,9 @@ Pasos:
    «Agotado», «Pedido dos veces») y «O escribe el motivo…». «Anular artículo» no se puede pulsar sin
    motivo.
 6. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
+7. Para seguir lo enviado, en «Cuenta» pulsa «Comandas · N», junto a la cabecera de lo enviado: se abre
+   «Comandas de la cuenta», una tarjeta por ronda (la más reciente arriba) con su estado en cocina, y desde
+   ella se marca urgente una ronda que se cocina (KITCHEN-F19, KITCHEN-F20).
 Entra: las líneas pendientes de la cuenta.
 Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
@@ -763,7 +766,7 @@ enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (a
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F29
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 <!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->

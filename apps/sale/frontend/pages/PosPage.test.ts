@@ -799,6 +799,22 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastError).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.');
   });
 
+  it('the cart follows the check’s kitchen tickets with Kitchen on and the right to see them (KITCHEN-F19)', async () => {
+    const VIEW = { ...MANAGER, permissions: [...MANAGER.permissions, 'kitchen.view_ticket'], apps: [{ label: 'kitchen', state: 'on' as const }] };
+    const cases: [typeof MANAGER, boolean][] = [
+      [MANAGER, false],
+      [{ ...VIEW, apps: [] }, false],
+      [{ ...VIEW, apps: [{ label: 'kitchen', state: 'activating' }] }, false],
+      [{ ...VIEW, permissions: MANAGER.permissions }, false],
+      [VIEW, true],
+    ];
+    for (const [session, on] of cases) {
+      vi.stubGlobal('localStorage', memoryStorage());
+      const s = await setup({ session });
+      expect(s.wrapper.findComponent(PosCart).props('kitchenTickets')).toBe(on);
+    }
+  });
+
   it('a round another device already sent does not stop the charge', async () => {
     const s = await setup({ session: WITH_KITCHEN });
     await s.addProduct();
