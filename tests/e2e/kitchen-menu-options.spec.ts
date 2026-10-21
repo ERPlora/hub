@@ -3,10 +3,11 @@
 // Inventory apps: a burger with its options sheet («+CHEESE» under the dish, before the note) and a menu composed
 // course by course (its header with how many dishes, each dish indented under it, at its own station: the grill
 // sees only the hake, still under «MENU»); the card names its waiter, never the id of the session. A tap on the menu's header marks its dishes ready. The card in
-// 390×844, 834×1112 and 1440×900. What a run creates — products `E2E-KMO-<run>-…`, the options group
-// «E2E KMO <run>», the menu «e2e KMO Menu <run>», the station «E2E KMO <run> Grill», its checks and tickets — is
-// deleted after it.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+// 390×844, 834×1112 and 1440×900. KITCHEN-F11: a dish marked ready keeps the width of its name, so its ✓ never splits
+// a word («HAMBURGUESA» broke in two at 834 once its dish was done). What a run creates — products
+// `E2E-KMO-<run>-…`, the options group «E2E KMO <run>», the menu «e2e KMO Menu <run>», the station
+// «E2E KMO <run> Grill», its checks and tickets — is deleted after it.
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -19,6 +20,9 @@ const MENU = `e2e KMO Menu ${RUN}`;
 const STATION = `E2E KMO ${RUN} Grill`;
 const FOOD = 'restaurant.food';
 const KEY = 'FIX-KITCHEN-TICKET-WITHOUT-MODIFIERS-AND-MENU-DISHES';
+/** A long word in capitals, the way a kitchen writes a dish: it fits a dish's name on a tablet card, but not once
+ *  something else takes room beside the name. Fixed, so the card looks the same on every run. */
+const WIDE = 'HAMBURGUESA';
 const SIZES = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -69,15 +73,38 @@ async function post<T>(context: BrowserContext, path: string, body: unknown, sta
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
 const dishOn = (page: Page, name: string) => shown(page).locator('[data-testid^=kitchen-line-][data-status]').filter({ hasText: name }).first();
 
+/** How `word` of a dish's name is drawn: on how many lines (a name parts between words, never inside one), how wide
+ *  it is and how wide the name's box is — what ui-clip-sweep.sh calls SPLIT-WORD, measured on the card. */
+async function drawnWord(dish: Locator, word: string): Promise<{ lines: number; word: number; box: number }> {
+  return dish.locator('.kds-line__name').evaluate((name, w) => {
+    const box = Math.round(name.getBoundingClientRect().width);
+    const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const at = (node.textContent ?? '').indexOf(w);
+      if (at < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, at);
+      range.setEnd(node, at + w.length);
+      const rects = [...range.getClientRects()].filter((rect) => rect.width > 0);
+      return {
+        lines: new Set(rects.map((rect) => Math.round(rect.top))).size,
+        word: Math.round(rects.reduce((sum, rect) => sum + rect.width, 0)),
+        box,
+      };
+    }
+    return { lines: 0, word: 0, box };
+  }, word);
+}
+
 test.beforeAll(async ({ browser }) => {
   cleanRun();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
   await drawerOff(context);
-  burger = await createProduct(context, { name: `E2E KMO Burger ${RUN}`, sku: `${SKU}-BUR`, price: 800, tax_category_key: FOOD });
-  lentils = await createProduct(context, { name: `E2E KMO Lentils ${RUN}`, sku: `${SKU}-LEN`, price: 500, tax_category_key: FOOD });
-  hake = await createProduct(context, { name: `E2E KMO Hake ${RUN}`, sku: `${SKU}-HAK`, price: 1400, tax_category_key: FOOD });
+  burger = await createProduct(context, { name: `E2E KMO Burger ${WIDE}`, sku: `${SKU}-BUR`, price: 800, tax_category_key: FOOD });
+  lentils = await createProduct(context, { name: `E2E KMO Lentils ${WIDE}`, sku: `${SKU}-LEN`, price: 500, tax_category_key: FOOD });
+  hake = await createProduct(context, { name: `E2E KMO Hake ${WIDE}`, sku: `${SKU}-HAK`, price: 1400, tax_category_key: FOOD });
   await post(context, '/modifier/groups', { name: GROUP, max_choices: 2 });
   cheeseId = (await post<{ id: string }>(context, '/modifier/options', { group: GROUP, name: 'Cheese', kitchen_name: '+CHEESE', price_delta: 100 })).id;
   await post(context, '/modifier/links/attach', { group: GROUP, product_id: burger.id });
@@ -185,4 +212,17 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
   await expect(dishOn(page, lentils.name)).toHaveAttribute('data-status', 'ready');
   await expect(dishOn(page, hake.name)).toHaveAttribute('data-status', 'ready');
   await expect(shown(page).locator(`[data-testid=kitchen-line-${burgerId}]`)).toHaveAttribute('data-status', 'pending');
+
+  // KITCHEN-F11: the dishes done keep the whole width of their name, like the burger still cooking — the ✓ never
+  // breaks «HAMBURGUESA» in two, in any of the three sizes.
+  for (const size of SIZES) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await card.scrollIntoViewIfNeeded();
+    for (const dish of [burgerDish, dishOn(page, lentils.name), dishOn(page, hake.name)]) {
+      const name = (await dish.locator('.kds-line__name').textContent())?.trim();
+      const drawn = await drawnWord(dish, WIDE);
+      expect(drawn.lines, `${size.label}: «${WIDE}» of «${name}» is ${drawn.word}px, its name ${drawn.box}px`).toBe(1);
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
 });

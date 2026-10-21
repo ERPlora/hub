@@ -161,6 +161,11 @@ function bumpMenu(group: DishGroup): void {
         >
           <span class="kds-line__qty">{{ formatQuantity(line.quantity, locale) }}</span>
           <span class="kds-line__body">
+            <span
+              v-if="line.status === 'ready' || line.status === 'served'"
+              class="kds-line__tick"
+              aria-hidden="true"
+            >✓</span>
             <span class="kds-line__name">{{ line.name }}</span>
             <span
               v-if="line.modifiers.length"
@@ -199,11 +204,6 @@ function bumpMenu(group: DishGroup): void {
               />
             </span>
           </span>
-          <span
-            v-if="line.status === 'ready' || line.status === 'served'"
-            class="kds-line__tick"
-            aria-hidden="true"
-          >✓</span>
         </li>
       </template>
     </ul>
@@ -388,19 +388,20 @@ function bumpMenu(group: DishGroup): void {
 .kds-line__body {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
 }
 .kds-line__name {
+  display: block;
   font-weight: 600;
   font-size: 1.4rem;
 }
 .kds-line__mods {
+  display: block;
   font-size: 1.1rem;
   font-weight: 700;
   overflow-wrap: anywhere;
 }
 .kds-line__note {
+  display: block;
   font-size: 1.05rem;
   opacity: 0.85;
   font-style: italic;
@@ -480,7 +481,11 @@ function bumpMenu(group: DishGroup): void {
   font-weight: 400;
   overflow-wrap: anywhere;
 }
+/* The ✓ of a dish done floats beside the first line of its name instead of taking a column of its own: the name
+   keeps the width it had while cooking, so marking a dish never splits a word of it (KITCHEN-F11). */
 .kds-line__tick {
+  float: right;
+  margin-left: 0.6rem;
   font-size: 1.4rem;
   line-height: 1;
   color: var(--ion-color-success, #2dd36f);
