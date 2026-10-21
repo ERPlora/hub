@@ -96,9 +96,9 @@ watch(station, (value) => {
   rememberStation(value);
   known = undefined;
 });
-watch(cooking, (tickets) => {
+watch([cooking, ready], ([tickets, waiting]) => {
   if (!board.value) return;
-  const next = arrivals(known, tickets);
+  const next = arrivals(known, tickets, waiting);
   known = next.known;
   if (next.ring && settings.value.sound_enabled) {
     chime.play({ tone: settings.value.sound_tone, volume: settings.value.sound_volume });
@@ -289,7 +289,6 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
       >
         {{ error?.message }}
         <ion-button
-          size="small"
           fill="outline"
           data-testid="kitchen-display-retry"
           @click="refresh()"

@@ -2,14 +2,15 @@
 // heading (title and chips), the lines and the foot, from what the page knows of the check. It paints and
 // asks; the page writes. «Open checks» opens its dropdown here.
 import { describe, expect, it } from 'vitest';
-import { h } from 'vue';
+import { h, ref } from 'vue';
 
-import { click, mountSale } from '../../__tests__/mount-sale';
+import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { line, order, settings } from './__tests__/fixtures';
 import CartFooter from './CartFooter.vue';
 import CartHeading from './CartHeading.vue';
 import CartLines from './CartLines.vue';
 import CartToolbar from './CartToolbar.vue';
+import KitchenTickets from './KitchenTickets.vue';
 import OpenChecksPopover from './OpenChecksPopover.vue';
 import PosCart from './PosCart.vue';
 
@@ -169,6 +170,33 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     expect(m.find('pos-cart-round-hint').text()).toContain('Revisa cantidades');
     await click(m.find('pos-kitchen-send').element);
     expect(m.cart().emitted('send')).toEqual([[false]]);
+  });
+
+  it('«Tickets · N» follows the check’s kitchen tickets in the head of what it sent, only when they can be seen (KITCHEN-F19)', async () => {
+    const m = await setup({ kitchen: true, kitchenTickets: true, order: WITH_ROUND });
+    const tickets = m.wrapper.findComponent(KitchenTickets);
+    expect(tickets.exists()).toBe(true);
+    expect(tickets.props('orderId')).toBe(WITH_ROUND.id);
+    for (const over of [{ kitchenTickets: false }, { kitchenTickets: true, order: order({ lines: [line({ id: 'l1' })] }) }]) {
+      const without = await setup({ kitchen: true, order: WITH_ROUND, ...over });
+      expect(without.wrapper.findComponent(KitchenTickets).exists()).toBe(false);
+    }
+  });
+
+  it('the first line opening the check keeps «Current order»; another check starts on «Check» (KITCHEN-F18)', async () => {
+    const shown = ref<ReturnType<typeof order> | null>(null);
+    const m = await mountSale(
+      { setup: () => () => h(PosCart, props({ kitchen: true, order: shown.value })) },
+      { locale: 'en' },
+    );
+    await click(m.find('pos-cart-tab-round').element);
+    shown.value = order({ id: 'o9', lines: [line({ id: 'l1' })] });
+    await settle();
+    expect(m.find('pos-cart-tab-round').attributes('aria-selected')).toBe('true');
+    expect(m.find('pos-kitchen-send').exists()).toBe(true);
+    shown.value = order({ id: 'o10', lines: [line({ id: 'l2' })] });
+    await settle();
+    expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
   });
 
   it('with everything sent «Current order» says so and offers no send', async () => {

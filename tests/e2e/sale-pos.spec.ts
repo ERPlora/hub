@@ -24,10 +24,18 @@ let customer: { id: string; name: string };
 let methods: Record<string, string>;
 
 test.afterAll(() => {
+  // The kitchen tickets this file's rounds opened (their dishes name its products): they go with their checks, or
+  // the next spec's kitchen display and cash close show them as their own.
+  const tickets = psql(`select coalesce(string_agg(distinct quote_literal(ticket_id::text), ','), 'null') from kitchen_ticketitem where name like '% ${RUN}'`);
   cleanSales();
   cleanCustomers();
   cleanInventory();
   restoreDrawer();
+  expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
+  expect(
+    psql(`select (select count(*) from kitchen_ticket where id::text in (${tickets})) + (select count(*) from kitchen_ticketitem where ticket_id::text in (${tickets})) + (select count(*) from kitchen_logentry where ticket_id::text in (${tickets}))`),
+    `kitchen rows of ${RUN} left behind`,
+  ).toBe('0');
 });
 
 test.beforeAll(async ({ browser }) => {

@@ -656,6 +656,10 @@ class OrderFireIn(Closed):
     priority: _text(20) = Field(
         "", description="Priority the kitchen shows, e.g. urgent."
     )
+    waiter: _text(128) = Field(
+        "",
+        description="Who attends the check as the till names it («Atiende»); empty: who sends it.",
+    )
 
 
 class OrderListIn(PageIn):

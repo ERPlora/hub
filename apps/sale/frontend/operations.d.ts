@@ -286,6 +286,8 @@ export interface OrderFireIn {
   label?: string;
   channel?: 'dine_in' | 'takeaway' | 'delivery';
   priority?: string;
+  /** Who attends the check as the till names it («Atiende»); empty: who sends it. */
+  waiter?: string;
 }
 
 export interface OrderListIn extends PageIn {
