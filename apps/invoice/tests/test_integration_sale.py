@@ -12,9 +12,11 @@ from decimal import Decimal
 import pytest
 from django.utils import timezone
 from live.errors import Conflict
+from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import ISSUER, ctx_for, deliver, run
+from apps.invoice.tests.conftest import A, ISSUER, ctx_for, deliver, run
+from apps.sale import events as sale_events
 from apps.sale.models import Sale, SaleLine
 from apps.tax.models import TaxRule
 from apps.verifactu.models import Record
@@ -56,6 +58,10 @@ def keys(invoice):
         (e.qualification, e.rate): (e.base, e.quota, e.surcharge_quota)
         for e in invoice.tax_breakdown
     }
+
+
+def newest(name):
+    return OutboxEvent.objects.filter(name=name).order_by("-created_at", "-id").first()
 
 
 # The document of a charge (INVOICE-F01, F02)
@@ -428,15 +434,18 @@ def test_a_sale_that_is_not_voided_has_no_void_to_rectify(issuer, shelf, charge)
     assert refused.value.code == "invoice.sale_not_voided"
 
 
-# Phase 1, without the outbox relay (INVOICE-F06, F07, F09): nothing hands the till's notices to Invoicing
-# yet, so a document that waits is issued by Sales' «Issue now», or first thing by its sale's next void
-# or refund, never on its own.
+# A document that waits (INVOICE-F06, F07, F09): the relay retries it on its own (test_relay.py); Sales'
+# «Issue now», or first thing its sale's next void or refund, issues it at once.
 
 
-def test_an_invoice_asked_of_invoicing_by_number_waits_in_sales_until_issue_now_which_issues_no_other(
+def test_an_invoice_asked_of_invoicing_by_number_is_the_sales_document_at_once_and_issue_now_issues_no_other(
     shelf, charge
 ):
+    # INVOICE-F06: asked of Invoicing (the API, the assistant) by the sale's number, the document and the
+    # sale agree when the operation ends — Invoicing tells Sales in the same transaction, never «in a few
+    # seconds» through the relay.
     sale = charge("inv-0023")
+    assert Sale.objects.get(pk=sale.id).invoice_status == "pending"
     run("invoice.issuer.update", ISSUER)
     asked = run(
         "invoice.invoice.create_from_sale",
@@ -444,15 +453,110 @@ def test_an_invoice_asked_of_invoicing_by_number_waits_in_sales_until_issue_now_
         ctx_for("hub_employee"),
     )
     assert asked.issued is True
-    # Sales hears of it only from the relay (its reaction to the issued notice): the sale still waits.
-    assert Sale.objects.get(pk=sale.id).invoice_status == "pending"
-    linked = run("sale.sale.issue_documents", {"sale": sale.number})
-    assert (linked.invoice_status, linked.invoice_number, linked.documents_pending) == (
+    linked = Sale.objects.get(pk=sale.id)
+    assert (
+        linked.invoice_status,
+        linked.invoice_number,
+        linked.invoice_id,
+        linked.invoice_type,
+    ) == ("issued", asked.invoice.number, asked.invoice.id, "F2")
+    said = OutboxEvent.objects.filter(name="sale.sale.invoiced")
+    assert [event.payload["number"] for event in said] == [asked.invoice.number]
+    # The relay's notice comes later and changes nothing: no second write, no second «invoiced».
+    again = sale_events.react(A, "invoice.invoice.issued", newest("invoice.invoice.issued").payload)
+    assert (again.sale_id, again.recorded) == (sale.id, False)
+    assert said.count() == 1
+    # Nothing waits any more: «Issue now» issues no other document.
+    issued = run("sale.sale.issue_documents", {"sale": sale.number})
+    assert (issued.invoice_status, issued.invoice_number, issued.documents_pending) == (
         "issued",
         asked.invoice.number,
         False,
     )
     assert Invoice.objects.filter(source_sale_id=sale.id).count() == 1
+    assert said.count() == 1
+
+
+def test_issue_now_says_once_that_the_sale_has_its_document(shelf, charge):
+    # «Issue now» of Sales asks Invoicing, which links the waiting sale: the sale is told once, not twice.
+    sale = charge("inv-0025")
+    run("invoice.issuer.update", ISSUER)
+    issued = run("sale.sale.issue_documents", {"sale": sale.number})
+    ticket = Invoice.objects.get(source_sale_id=sale.id)
+    assert (issued.invoice_status, issued.invoice_number) == ("issued", ticket.number)
+    said = OutboxEvent.objects.filter(name="sale.sale.invoiced")
+    assert [event.payload["invoice_id"] for event in said] == [str(ticket.id)]
+
+
+def test_a_charge_with_its_document_issued_in_it_is_not_told_later_it_has_one(issuer, shelf, charge):
+    # The charge writes its own document's number (INVOICE-F01): Invoicing tells Sales only of a sale that
+    # waits, so a charge records no «invoiced».
+    sale = charge("inv-0026")
+    assert Sale.objects.get(pk=sale.id).invoice_status == "issued"
+    assert not OutboxEvent.objects.filter(name="sale.sale.invoiced").exists()
+
+
+def test_the_rectifications_asked_of_invoicing_are_the_void_and_the_refund_documents_at_once(
+    shelf, charge
+):
+    # INVOICE-F06 with F07 and F09: without an issuer, a void and a refund leave their rectifications
+    # waiting; asked of Invoicing directly, each is the document of its void or its refund at once.
+    voided = charge("inv-0027")
+    run("sale.sale.void", {"sale_id": str(voided.id), "reason": "Wrong table"})
+    refunded = charge("inv-0028")
+    payment = Sale.objects.get(pk=refunded.id).payments.get()
+    run(
+        "sale.sale.refund",
+        {
+            "sale_id": str(refunded.id),
+            "reason": "Broken",
+            "allocations": [{"payment_id": str(payment.id), "amount": 500}],
+        },
+    )
+    (record,) = Sale.objects.get(pk=refunded.id).refunds.all()
+    assert (Sale.objects.get(pk=voided.id).void_invoice_status, record.invoice_status) == (
+        "pending",
+        "pending",
+    )
+    run("invoice.issuer.update", ISSUER)
+    for sale in (voided, refunded):
+        run("invoice.invoice.create_from_sale", {"sale": sale.number})
+
+    by_void = run("invoice.invoice.rectify_from_void", {"sale_id": str(voided.id)})
+    by_refund = run("invoice.invoice.rectify_from_refund", {"refund_id": str(record.id)})
+
+    read = Sale.objects.get(pk=voided.id)
+    assert (read.void_invoice_status, read.void_invoice_number) == ("issued", by_void.invoice.number)
+    record.refresh_from_db()
+    assert (record.invoice_status, record.invoice_number, record.invoice_type) == (
+        "issued",
+        by_refund.invoice.number,
+        "R5",
+    )
+    # One «invoiced» per document; «Issue now» finds nothing left and says nothing more.
+    said = OutboxEvent.objects.filter(name="sale.sale.invoiced")
+    assert said.count() == 4
+    for sale in (voided, refunded):
+        assert run("sale.sale.issue_documents", {"sale": sale.number}).documents_pending is False
+    assert said.count() == 4
+    assert Invoice.objects.count() == 4
+
+
+def test_issue_now_links_a_sale_whose_invoice_was_issued_before_it_was_told(shelf, charge):
+    # A sale left waiting by the previous release although Invoicing had issued its ticket (asked by its
+    # number, before Invoicing told Sales itself): «Issue now» gives it that ticket, issuing no other.
+    sale = charge("inv-0029")
+    run("invoice.issuer.update", ISSUER)
+    ticket = run("invoice.invoice.create_from_sale", {"sale": sale.number}).invoice
+    # The data that release left behind: the ticket exists, the sale still waits for it.
+    Sale.objects.filter(pk=sale.id).update(invoice_status="pending", invoice_number="", invoice_id=None, invoice_type="")
+    OutboxEvent.objects.filter(name="sale.sale.invoiced").delete()
+
+    issued = run("sale.sale.issue_documents", {"sale": sale.number})
+
+    assert (issued.invoice_status, issued.invoice_number, issued.invoice_id) == ("issued", ticket.number, ticket.id)
+    assert Invoice.objects.filter(source_sale_id=sale.id).count() == 1
+    assert OutboxEvent.objects.filter(name="sale.sale.invoiced").count() == 1
 
 
 def test_a_refund_of_a_sale_whose_ticket_waits_issues_the_ticket_first_then_its_rectification(

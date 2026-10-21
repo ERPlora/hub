@@ -970,7 +970,8 @@ Pasos:
    rectificativa de su anulación o la de una devolución) lleva la pastilla «Documento pendiente» bajo
    su estado y la acción «Emitir ahora» (quien cobra). «Emitir ahora» pide a Facturación, por nombre y
    con la sesión de quien lo pulsa, todo lo que espera, en orden (su tique o factura y luego las
-   rectificativas) y sale «Documentos fiscales emitidos.». La fase 1 no tiene relay que lo emita solo.
+   rectificativas) y sale «Documentos fiscales emitidos.». Antes, el hub lo reintenta solo unos minutos
+   (INVOICE-F06): si la causa se arregla a tiempo, la pastilla se va sola.
 Entra: la venta, con el número de su documento fiscal (que Facturación le dio en el mismo cobro).
 Sale: el papel; reimprimir no crea venta ni documento fiscal. «Emitir ahora» emite los documentos que
 esperaban (avisa: venta con su documento, uno por documento).
@@ -1478,15 +1479,19 @@ administrador y responsable, los mismos que anulan y devuelven).
   devolución, el de la suya; y una venta cobrada como factura, la **copia del destinatario** comprobada
   (`customer_tax_id`, `customer_address`, `customer_country`, `customer_id_type`, migración `0008`, con
   `db_default` por expand/contract), lo que declara un documento emitido después.
-- **Salida de `pending` en la fase 1** (sin relay): (a) repetir el cobro con la misma clave vuelve a pedir
+- **Salida de `pending`**: (a) repetir el cobro con la misma clave vuelve a pedir
   el documento que espera (`_replay`, idempotente: Facturación emite uno por venta); (b) «Emitir ahora»
   (`sale.sale.issue_documents`, permiso de cobrar y, de cada documento, el de Facturación de quien lo
   pulsa) emite en orden todo lo que espera —el tique o factura, la R de la anulación, las R de las
   devoluciones— y un rechazo llega tal cual (nada se guarda); (c) anular o devolver una venta cuyo tique
   espera lo pide primero (la rectificativa lo necesita) y, si sigue sin poder, siguen las dos pendientes.
-  La lista y la venta dicen `documents_pending`; cada devolución, su `invoice_status`. Cuando exista el
-  relay, la reacción de Facturación (INVOICE-F06) los emite sola y `sale.sale.record_invoice` los
-  enlaza por su `source` (`refund_id` → la devolución, `void` → la anulación, `type = sale` → el cobro).
+  La lista y la venta dicen `documents_pending`; cada devolución, su `invoice_status`. (d) La reacción de
+  Facturación a cada aviso (el relay del worker, con sus reintentos; INVOICE-F06) los emite sola. Sea cual
+  sea la puerta (también la API o el asistente de Facturación), Facturación llama en esa misma transacción
+  a `sale.sale.record_invoice`, que los enlaza por su `source` (`refund_id` → la devolución, `void` → la
+  anulación, `type = sale` → el cobro) y avisa `sale.sale.invoiced` una vez por documento: «Emitir ahora»
+  relee la venta en vez de escribirla, y la reacción de Ventas al aviso `invoice.invoice.issued` ya no
+  cambia nada (respaldo idempotente).
 - **El nombre del destinatario** es el fiscal: el que se escribe en la hoja o, de la ficha, su empresa
   si la tiene (`company_name`), si no la persona, como lo lee Facturación. El país, ISO 3166-1 alpha-2
   con `apps.customer.tax_ids.normalize_country` (la lista de Facturación; sin alias «UK»/«EL»), en la

@@ -180,7 +180,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F03 | Emitir una factura a mano | hecho |
 | INVOICE-F04 | El cliente pide la factura completa de su tique | servidor hecho; falta la página pública de la plataforma (`/p`) |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
-| INVOICE-F06 | Una venta cobrada que no se ha podido facturar | parcial — hoy el documento queda «pendiente», a la vista en Ventas, hasta «Emitir ahora»; que el hub lo reintente solo llega con el reparto de avisos entre apps (fase 2) |
+| INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
 | INVOICE-F08 | Rectificar una factura a mano | hecho |
 | INVOICE-F09 | La rectificativa al devolver una venta entera | hecho — Ventas la pide dentro de la misma devolución |
@@ -334,7 +334,7 @@ Implicados: INVOICE-F04
 
 ### INVOICE-F06 Una venta cobrada que no se ha podido facturar
 <!-- origen: old:invoice/workflow/emision.md#invoice-f06 wf:cadena-fiscal#rec_fiscal-f09 old-hub:HUB-F52 old-hub:HUB-F55 -->
-Estado: parcial — hoy el documento queda «pendiente», a la vista en Ventas, hasta «Emitir ahora»; que el hub lo reintente solo llega con el reparto de avisos entre apps (fase 2)
+Estado: hecho
 Actor: sistema, empleado, responsable, administrador, asistente
 Pantalla: ninguna
 Pasos:
@@ -342,18 +342,24 @@ Pasos:
    cobra no puede emitir facturas o los importes no cuadran. Ventas cobra igualmente y deja su
    documento «pendiente»: en **Ventas** la venta lleva «Documento pendiente» y su documento avisa
    «Documento fiscal pendiente» encima del papel.
-2. Quien arregla la causa (por ejemplo, configura el emisor, INVOICE-F21) pulsa «Emitir ahora» en esa
-   venta: sale su documento y la venta deja de estar pendiente. Por la API o el asistente se pide igual,
-   por el número de la venta.
-3. Si todavía no se puede, «Emitir ahora» dice por qué y no cambia nada.
+2. El hub lo vuelve a intentar solo, cada vez más espaciado (unos minutos en total, hasta 8 veces); un
+   intento que falla no escribe nada ni gasta número. Si mientras tanto se arregla la causa (por ejemplo,
+   se configura el emisor, INVOICE-F21), el siguiente intento emite el documento y la venta deja de estar
+   pendiente.
+3. Pasados los intentos, o sin esperar a ellos, quien arregla la causa pulsa «Emitir ahora» en esa venta:
+   sale su documento y la venta deja de estar pendiente. Por la API o el asistente se pide igual, por el
+   número de la venta, a Ventas o a Facturación: en los dos casos la venta lleva su documento en cuanto se
+   emite.
+4. Si todavía no se puede, «Emitir ahora» dice por qué y no cambia nada.
 Entra: la venta que espera su documento.
 Sale: lo de INVOICE-F01 o INVOICE-F02, fechado el día en que por fin se emite (la fecha de operación
-sigue siendo la del cobro).
+sigue siendo la del cobro); la venta lleva su número desde ese mismo momento (avisa
+`invoice.invoice.issued`).
 Si falla: anular o devolver una venta cuyo documento espera lo pide antes, en la misma operación; si
-sigue sin poder, la anulación o la devolución sigue adelante y los dos documentos quedan «pendientes»
-hasta «Emitir ahora», que los emite en orden (INVOICE-F07, INVOICE-F09). Pedir la factura de una venta
-directamente a Facturación, por la API o el asistente, la emite, pero Ventas la sigue viendo
-«pendiente» hasta «Emitir ahora», que la enlaza sin emitir otra.
+sigue sin poder, la anulación o la devolución sigue adelante y los dos documentos quedan «pendientes»: el
+hub los reintenta y «Emitir ahora» los emite en orden (INVOICE-F07, INVOICE-F09). Pedir a Facturación la
+rectificativa de esa anulación o de esa devolución la deja también en Ventas al momento. Pedir otra vez un
+documento que ya salió no emite otro ni gasta número.
 Implicados: SALE-F01, SALE-F29
 
 ### INVOICE-F07 Anular una venta cobrada que ya tiene su tique
@@ -746,10 +752,11 @@ Todas se pueden seguir en vivo.
 Contrato del origen con Ventas: `source.type` es el `source_type` del documento (`sale`, `manual`,
 `substitution`, `rectification`, `refund`, `void`); `source.sale_id` la venta de la que sale (también en
 su F3 y en sus rectificativas), `source.refund_id` la devolución de una rectificativa por devolución y
-`source.void` es `true` en la de una anulación. Así `sale.sale.record_invoice` enlaza con su cobro, su
-devolución o su anulación un documento que quedó «pendiente» y se emitió después (con «Emitir ahora»
-lo enlaza Ventas misma; el aviso de un documento pedido aquí le llega con el reparto de avisos entre apps,
-en la fase 2).
+`source.void` es `true` en la de una anulación. Con él `sale.sale.record_invoice` enlaza con su cobro, su
+devolución o su anulación un documento que quedó «pendiente» y se emitió después: Facturación se lo pide
+por nombre en la misma operación que lo emite (también con «Emitir ahora», la API, el asistente o un
+reintento del hub), así que la venta y su documento cuadran al terminar; la reacción de Ventas a este aviso,
+cuando le llega después, ya no cambia nada.
 
 Qué refresca cada aviso: la lista, la ficha, la factura de una venta y el documento, con «emitido»,
 «rectificada» y «pagada»; las series, el siguiente número, el estado de la numeración, los huecos y el
@@ -764,13 +771,15 @@ libro, con «emitido» y los de series; el emisor, con «emisor cambiado».
 | Venta anulada (`sale.sale.voided`) | Ventas | Emite la rectificativa del tique entero (F07) | `invoice.invoice.rectify_from_void` |
 
 Cada reacción corre como el sistema, en su propia transacción, y es idempotente: una por venta, una
-por devolución y una por anulación. Hoy nadie le entrega estos avisos: el documento lo pide Ventas
-dentro de su cobro, su anulación o su devolución, y el que quedó «pendiente» sale con «Emitir ahora»
-(INVOICE-F06); el reparto de avisos entre apps, con sus reintentos, llega en la fase 2.
+por devolución y una por anulación. El documento lo pide antes Ventas dentro de su cobro, su anulación o
+su devolución; el reparto de avisos del hub le entrega después estos avisos y, si aquel quedó «pendiente»,
+lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emitir ahora» (INVOICE-F06).
 
 ### Lo que necesita de otras apps
 
-- **Ventas** (requisito): la venta, sus líneas, sus devoluciones y su anulación, leídas de sus filas.
+- **Ventas** (requisito): la venta, sus líneas, sus devoluciones y su anulación, leídas de sus filas; y
+  `sale.sale.record_invoice`, por nombre y con el permiso de la plataforma, para dar a la venta, a su
+  anulación o a su devolución el documento que esperaba (INVOICE-F06).
 - **Impuestos** (requisito): la regla congelada en cada línea de la venta (impuesto, régimen,
   calificación, tipo y recargo) y, en el alta manual por categoría, la regla vigente hoy
   (`resolve_tax`, en el territorio fiscal del negocio); el impuesto de un territorio (`tax_kind_of`,
@@ -794,7 +803,9 @@ dentro de su cobro, su anulación o su devolución, y el que quedó «pendiente�
 | App | Para qué | Servicio |
 |---|---|---|
 | VeriFactu | Registrar cada documento emitido y encadenar su huella | `invoice.invoice.issued` + la factura (requiere `invoice`) |
-| Ventas | Poner el número de la factura en el tique | `invoice.invoice.by_source` |
+| VeriFactu | Su «Crear factura de prueba» | `invoice.invoice.create` |
+| Ventas | Emitir el documento de su cobro, su anulación y su devolución, dentro de ellos | `invoice.invoice.create_from_sale`, `invoice.invoice.rectify_from_void`, `invoice.invoice.rectify_from_refund` |
+| Ventas e Impresión | El emisor de sus papeles | `invoice.issuer.get` |
 
 ### Quién puede qué
 
@@ -945,11 +956,19 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   manda solo lectura en lo emitido (decisión mantenida tras la revisión fiscal del 2026-10-14).
 - **Reacciones**: Ventas llama a las mismas operaciones dentro de su cobro, devolución o anulación (un
   rechazo deshace solo su parte y la venta queda «pendiente»); `events.react(scope, name, payload)` las
-  ejecuta como sistema cuando el relay del outbox (fase 2) entrega el aviso, de respaldo: si el documento
-  ya existe, responde el mismo sin gastar número. Los tests entregan el aviso real del outbox. **En la
-  fase 1 no hay relay** (`base/worker.py` no entrega el outbox): lo «pendiente» lo emite
-  `sale.sale.issue_documents` («Emitir ahora»), o Ventas al anular o devolver esa venta; por eso
-  INVOICE-F06 es `parcial` (tests en `test_integration_sale.py`, «Phase 1, without the outbox relay»).
+  ejecuta como sistema cuando el relay del outbox (`base/relay.py`, en el worker desde hub#105) entrega el
+  aviso: si el documento ya existe, responde el mismo sin gastar número; si se rechaza (sin emisor), el
+  relay reintenta a 2, 4, 8… s y al octavo intento lo deja (`dead`), y queda «Emitir ahora»
+  (`sale.sale.issue_documents`). Los tests entregan el aviso real del outbox (`deliver`) y
+  `tests/test_relay.py` lo hace por el tick real del worker.
+- **La venta sabe su documento en la misma transacción** (INVOICE-F06): `create_from_sale`,
+  `rectify_from_void` y `rectify_from_refund` llaman a `sale.sale.record_invoice` (`_tell_sales`, contexto
+  de quien pide más el permiso `sale.record_invoice` de la plataforma, como `apps/reservation`) cuando la
+  fila de Ventas ya está escrita sin él: su estado fiscal (`invoice_status`, `void_invoice_status` o el de
+  la devolución) no está vacío. Dentro del propio cobro, anulación o devolución ese estado aún está vacío y
+  lo escribe Ventas con la respuesta. También en la rama «ya estaba» (repara una venta que una versión
+  anterior dejó «pendiente» con su factura emitida). `record_invoice` solo escribe lo que no está
+  «emitido» y avisa `sale.sale.invoiced` una vez por documento; «Emitir ahora» ya no lo escribe dos veces.
 - **Validación del NIF**: `python-stdnum` (NIF, NIE y CIF de España; NIF-IVA de la UE con el tipo 02).
 - **Asistente**: cada operación declara `ai` (en las escrituras, `risk`: `high` al emitir, sustituir,
   rectificar y en el emisor) y cada campo su `description`.
@@ -978,13 +997,17 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 12. **Dos rectificaciones a la vez** de la misma factura: la segunda espera al bloqueo de la original y
     se rechaza sin gastar número (test con dos sesiones reales).
 13. **Una devolución o anulación que llega antes que la factura** se rechaza para que se reintente (antes
-    se perdía); en la fase 1, sin relay, Ventas pide antes el documento que espera, en la misma operación.
+    se perdía); Ventas pide antes el documento que espera, en la misma operación.
 14. **La factura completa (F1 y F3) exige nombre, NIF y domicilio** del cliente (art. 6 RD 1619/2012);
     el producto actual solo pedía el NIF.
 15. **El documento de una venta se emite al cobrar**, dentro de la transacción del cobro (Ventas llama a
     `invoice.invoice.create_from_sale`; igual la devolución y la anulación), y cuando no se pudo (sin
-    emisor, importes que no cuadran) la venta queda «pendiente» hasta «Emitir ahora»; la reacción del
-    outbox será el respaldo automático cuando llegue el relay (fase 2).
+    emisor, importes que no cuadran) la venta queda «pendiente»: la reacción del outbox la reintenta sola
+    unos minutos y después queda «Emitir ahora».
+21. **La venta y su documento cuadran al terminar la operación que lo emite** (Odoo, Square, Shopify: el
+    estado de facturación de un pedido cambia con la factura, no después): pedido a Facturación por la API
+    o el asistente, el documento ya está en la venta al contestar; el aviso que llega después no cambia
+    nada.
 16. **Precio unitario sin IVA y descuento aparte** en cada línea (art. 6.1.f RD 1619/2012); antes la
     factura de una venta imprimía el precio con IVA y antes del descuento.
 17. **Una rectificativa por diferencias no inventa un «tipo efectivo»**: una línea por clave fiscal, a su
