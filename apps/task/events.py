@@ -6,8 +6,8 @@ description or a comment: free text that may name a customer or a colleague.
 
 Reaction: a person who leaves the team (``staff.member.terminated``) leaves their open tasks without
 an assignee, through an operation of this app run as the system, in its own transaction. The outbox
-relay (phase 2, in the worker) hands each delivered event to ``react``; the operation is idempotent,
-so a repeated delivery changes nothing.
+relay of the worker (``base.relay``) hands each event to ``react``; the operation is idempotent, so a
+repeated delivery changes nothing.
 """
 
 from typing import Any

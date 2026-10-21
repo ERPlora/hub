@@ -1,8 +1,8 @@
 """Tasks with the real Staff app: the assignee and a project's owner are staff.Member records.
 
 Staff's own operations create, rename, deactivate, link and terminate the records; the event Staff
-records when someone leaves is handed to ``events.react`` as the outbox relay will, from the outbox
-itself.
+records when someone leaves is handed to ``events.react`` as the outbox relay does, from the outbox
+itself (the relay's own delivery: ``test_relay.py``).
 """
 
 import pytest
