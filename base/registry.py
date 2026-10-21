@@ -43,6 +43,16 @@ def is_gone(hub: Hub, now: dt.datetime | None = None) -> bool:
     return hub.is_demo and hub.expires_at is not None and hub.expires_at <= now
 
 
+#: The SaaS's photo of a business suspended for an unpaid invoice (``PUT /internal/hubs/{id}/state``, ``status``).
+SUSPENDED = "suspended"
+
+
+def is_suspended(hub: Hub) -> bool:
+    """Whether the SaaS's last photo of ``hub`` says it is suspended for an unpaid invoice: it does not open until
+    it is paid (the SaaS's BILLING-F16). In its 7 days of grace (``past_due``) it still works."""
+    return isinstance(hub.state, dict) and hub.state.get("status") == SUSPENDED
+
+
 def is_preparing(hub: Hub) -> bool:
     """Whether ``hub`` is not ready yet (requested, or its preparation failed and is retried)."""
     return hub.status in PREPARING_STATUSES

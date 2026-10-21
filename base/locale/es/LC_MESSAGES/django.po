@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-20 22:50+0200\n"
+"POT-Creation-Date: 2026-10-21 04:18+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -58,15 +58,19 @@ msgstr "Base"
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
-#: middleware.py:105
+#: middleware.py:110
 msgid "Not found"
 msgstr "No encontrado."
 
-#: middleware.py:111
+#: middleware.py:116
 msgid "This hub is no longer available."
 msgstr "Este hub ya no está disponible."
 
-#: middleware.py:119
+#: middleware.py:124
+msgid "This business is suspended until its unpaid invoice is paid."
+msgstr "Este negocio está suspendido hasta que se pague su factura pendiente."
+
+#: middleware.py:132
 msgid "This hub is still being prepared; try again in a few seconds."
 msgstr "Este hub aún se está preparando; vuelve a intentarlo en unos segundos."
 
@@ -311,15 +315,15 @@ msgstr "código de la demo"
 msgid "demo codes"
 msgstr "códigos de la demo"
 
-#: queries.py:87 services.py:390
+#: queries.py:87 services.py:396
 msgid "No hub has this id."
 msgstr "Ningún hub tiene este id."
 
-#: queries.py:106 services.py:630 services.py:701
+#: queries.py:106 services.py:636 services.py:707
 msgid "No demo has this address."
 msgstr "Ninguna demo tiene esta dirección."
 
-#: registry.py:54
+#: registry.py:64
 msgid "Only the platform may do this."
 msgstr "Solo la plataforma puede hacer esto."
 
@@ -332,41 +336,41 @@ msgstr "Content-Length tiene que ser una longitud."
 msgid "The request may weigh %(mb)s MB at most."
 msgstr "La petición puede pesar %(mb)s MB como máximo."
 
-#: services.py:396
+#: services.py:402
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
 
-#: services.py:400
+#: services.py:406
 msgid "Another hub has this address."
 msgstr "Otro hub ya tiene esta dirección."
 
-#: services.py:417
+#: services.py:423
 #, python-format
 msgid "This address cannot name a business (%(reason)s)."
 msgstr "Esta dirección no puede nombrar un negocio (%(reason)s)."
 
-#: services.py:447
+#: services.py:453
 msgid "This hub was cancelled: restore it first."
 msgstr "Este hub está cancelado: restáuralo primero."
 
-#: services.py:615
+#: services.py:621
 msgid "Every demo is taken right now; try again in a minute."
 msgstr ""
 "Ahora mismo todas las demos están ocupadas; vuelve a intentarlo en un minuto."
 
-#: services.py:682
+#: services.py:688
 msgid "No demo could be made right now; try again."
 msgstr "Ahora mismo no se ha podido crear la demo; vuelve a intentarlo."
 
-#: services.py:703
+#: services.py:709
 msgid "This demo has ended."
 msgstr "Esta demo ha terminado."
 
-#: services.py:705
+#: services.py:711
 msgid "This demo is another browser's."
 msgstr "Esta demo es de otro navegador."
 
-#: services.py:790
+#: services.py:796
 msgid "This demo has not ended yet."
 msgstr "Esta demo aún no ha terminado."
 
@@ -397,7 +401,7 @@ msgstr ""
 "Su propietario lo cerró en ERPlora. Si es tuyo, puedes recuperarlo desde tu "
 "cuenta."
 
-#: templates/base/hub_gone.html:22
+#: templates/base/hub_gone.html:22 templates/base/hub_suspended.html:17
 msgid "Go to ERPlora"
 msgstr "Ir a ERPlora"
 
@@ -408,6 +412,18 @@ msgstr "Estamos preparando tu negocio"
 #: templates/base/hub_preparing.html:17
 msgid "It takes a few seconds. This page refreshes by itself."
 msgstr "Tarda unos segundos. Esta página se actualiza sola."
+
+#: templates/base/hub_suspended.html:11 templates/base/hub_suspended.html:15
+msgid "This business is suspended"
+msgstr "Este negocio está suspendido"
+
+#: templates/base/hub_suspended.html:16
+msgid ""
+"An invoice of its plan is unpaid. Its data is safe: as soon as whoever pays "
+"it settles the invoice in ERPlora, it works again."
+msgstr ""
+"Hay una factura de su plan sin pagar. Sus datos están a salvo: en cuanto "
+"quien lo paga abone la factura en ERPlora, vuelve a funcionar."
 
 #: templates/base/login_retry.html:10 templates/base/login_retry.html:16
 msgid "Sign in again"

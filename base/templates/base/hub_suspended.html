@@ -1,0 +1,20 @@
+{% load i18n %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+402 of a business suspended for an unpaid invoice (base.middleware, the SaaS's photo). Rendered without the request:
+no context processors, no database, no scripts or styles (strict CSP).
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% translate "This business is suspended" %}</title>
+</head>
+<body>
+  <main>
+    <h1>{% translate "This business is suspended" %}</h1>
+    <p>{% translate "An invoice of its plan is unpaid. Its data is safe: as soon as whoever pays it settles the invoice in ERPlora, it works again." %}</p>
+    <p><a href="{{ back_url }}">{% translate "Go to ERPlora" %}</a></p>
+  </main>
+</body>
+</html>

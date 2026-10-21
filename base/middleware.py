@@ -9,7 +9,8 @@ gone (cancelled, purged, or a demo past its ``expires_at``) is 410, a page with 
 ``/demo/`` learns that it ended (plan 2026-10-17, §1.7); one still being prepared is 503 with ``Retry-After``, a
 page that refreshes itself. The API, and any call that does not ask for a page (``Accept`` without ``text/html``),
 gets the envelope instead (``base.hub_gone``, ``base.hub_preparing``). A hub that answers is left on
-``request.hub``. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``) is no hub either: it is
+``request.hub``; one the SaaS's photo says is suspended for an unpaid invoice is 402 (``base.hub_suspended``), with
+a session or without and its login included, until the photo says it is paid. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``) is no hub either: it is
 marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The Hub admin lives only there (PLAN
 §18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404, never the admin's own login. Static files, CSP
 reports and ``/readyz`` (Route 53 and the deploy probe it on the platform host and on the private name) and
@@ -57,6 +58,8 @@ from base.spa import spa
 #: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
 HUB_GONE_TEMPLATE = "base/hub_gone.html"
 HUB_PREPARING_TEMPLATE = "base/hub_preparing.html"
+#: The page of a business suspended for an unpaid invoice (402): the way back is ERPlora, where it is paid.
+HUB_SUSPENDED_TEMPLATE = "base/hub_suspended.html"
 #: How long a client waits before asking a hub being prepared again (``Retry-After``).
 PREPARING_RETRY_AFTER_SECONDS = 30
 #: Where a demo that ended sends the visitor (the SaaS's /demo/, told it ended so it forgets the demo its session still
@@ -96,6 +99,8 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
             return self._gone(request, hub)
         if registry.is_preparing(hub):
             return self._preparing(request)
+        if registry.is_suspended(hub):
+            return self._suspended(request)
         request.hub = hub
         return None
 
@@ -112,6 +117,14 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
         html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
         return HttpResponse(html, status=410)
+
+    def _suspended(self, request: HttpRequest) -> HttpResponse:
+        if _wants_envelope(request):
+            return _envelope(
+                402, "base.hub_suspended", gettext("This business is suspended until its unpaid invoice is paid.")
+            )
+        html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
+        return HttpResponse(html, status=402)
 
     def _preparing(self, request: HttpRequest) -> HttpResponse:
         if _wants_envelope(request):
