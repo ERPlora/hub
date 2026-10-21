@@ -128,6 +128,7 @@ function onAction({ actionId, row }: { actionId: string; row: ZoneOut }): void {
       fill
       server-side
       searchable
+      filterable
       :filters="filters"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"

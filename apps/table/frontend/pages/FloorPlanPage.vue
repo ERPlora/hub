@@ -2,8 +2,10 @@
 // Tables → Floor plan (WORKBOOK «Pantallas · Plano de sala»; TABLE-F01 to F06, F09 to F17, F28, F32).
 // One row on top: the zone strip (it scrolls sideways on a phone), «Service / Edit plan» for whoever
 // draws the room, and — editing — «+» («Add zone or table») and the pencil («Edit zone»). Underneath, the
-// live plan of the chosen zone (`table.table.list`, every table of it, windows of 100): it changes by
-// itself when somebody seats, moves, joins, splits, charges or voids.
+// live plan of the chosen zone: every table of the room (`table.table.list`, windows of 100) is read from
+// the start, on the page's one stream, and the strip only picks the zone it paints (a query that waited for
+// the zones would change when they came and throw the first stream away; a zone tap would reopen it). It
+// changes by itself when somebody seats, moves, joins, splits, charges or voids.
 // - Service: the zones and tables in service; a tap opens the table's window (TableSheet). Transfer and
 //   Merge come back here to pick their destination on the plan: only the tables that may be picked answer,
 //   with «Transfer 4 to…» / «Pick a free table» and «Cancel».
@@ -13,7 +15,7 @@ import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonLabel, IonSegment, IonSegmentButton, IonSpinner } from '@ionic/vue';
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
@@ -23,6 +25,7 @@ import TableSheet from '../components/TableSheet.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
 import { useAllRows } from '../composables/useAllRows';
 import { useNow } from '../composables/useNow';
+import { useScrollEdges } from '../composables/useScrollEdges';
 import { useT } from '../composables/useT';
 import { paintedStatus, type PickMode, targetable } from '../lib/floor';
 import type { SettingsOut, TableCheckOut, TableOut, ZoneOut } from '../operations';
@@ -68,8 +71,13 @@ watch(
   },
   { immediate: true },
 );
+// The strip fades the edge with more zones behind it (tables#97): a hard cut reads «no more zones».
+const zoneStrip = useTemplateRef<InstanceType<typeof IonSegment>>('zoneStrip');
+const zoneEdges = useScrollEdges(computed(() => (zoneStrip.value?.$el as HTMLElement | undefined) ?? null));
+// Zones added or renamed widen the strip without resizing it.
+watch(zones, () => void nextTick(zoneEdges.mark));
 
-const plan = useAllRows('table.table.list', () => (activeZoneId.value ? { zone_id: activeZoneId.value, sort: 'number' } : { sort: 'number' }));
+const plan = useAllRows('table.table.list', () => ({ sort: 'number' }));
 /** The tables as the clock paints them now: a reservation enters its window or ends with no event. */
 const painted = computed<TableOut[]>(() =>
   plan.rows.value.map((table) => {
@@ -77,7 +85,9 @@ const painted = computed<TableOut[]>(() =>
     return status === table.status ? table : { ...table, status };
   }),
 );
-const tables = computed<TableOut[]>(() => painted.value.filter((table) => editing.value || table.in_service));
+const tables = computed<TableOut[]>(() =>
+  painted.value.filter((table) => (!activeZoneId.value || table.zone_id === activeZoneId.value) && (editing.value || table.in_service)),
+);
 // When the clock repaints a table, the server is asked again (it may know more: another reservation).
 const drift = computed(() =>
   painted.value
@@ -207,7 +217,9 @@ function onZoneSaved(zone: ZoneOut): void {
       <div class="table-floor__bar">
         <ion-segment
           v-if="zones.length"
+          ref="zoneStrip"
           class="table-floor__zones"
+          :class="{ 'table-floor__zones--more-left': zoneEdges.edges.value.left, 'table-floor__zones--more-right': zoneEdges.edges.value.right }"
           data-testid="table-floor-zones"
           scrollable
           :value="activeZoneId ?? undefined"
@@ -401,6 +413,18 @@ function onZoneSaved(zone: ZoneOut): void {
 .table-floor__zones {
   flex: 1;
   min-width: 0;
+}
+.table-floor__zones--more-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+}
+.table-floor__zones--more-left {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 1.5rem), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 1.5rem), transparent);
+}
+.table-floor__zones--more-left.table-floor__zones--more-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
 }
 .table-floor__spacer {
   flex: 1;

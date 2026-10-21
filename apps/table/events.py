@@ -1,5 +1,4 @@
-"""Events of the table app (``table.<entity>.<fact>``) and its reactions to Sales', Customers' and
-Reservations' events.
+"""Events of the table app (``table.<entity>.<fact>``) and its reactions to Sales' and Customers' events.
 
 services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids and numbers, never a name or a free note (WORKBOOK «Lo que avisa»).
@@ -8,12 +7,15 @@ Reactions, each through an operation of this app run as the system, in its own t
 
 - a check of Sales charged in full (``sale.order.completed``) or voided (``sale.order.voided``) closes the
   table checks that hold it (TABLE-F18, F20);
-- a customer's card erased (``customer.customer.erased``) leaves her holds without her name (F31);
-- a reservation confirmed, cancelled or not shown (``reservation.reservation.status_changed``) holds or
-  releases its table, and one updated (``reservation.reservation.updated``) moves its hold (F25–F27).
+- a customer's card erased (``customer.customer.erased``) leaves her holds without her name (F31).
 
-The outbox relay (phase 2, in the worker) hands each delivered event to ``react``; every reaction is
-idempotent, so a repeated delivery changes nothing. Until then, what Sales did is read on every read and
+Reservations is no reaction: it holds, moves and releases its table by calling ``table.hold.sync_reservation``,
+``table.hold.move_reservation`` and ``table.hold.release`` inside its own transaction (F25–F28). Its events,
+delivered afterwards, would replay the reservation as it was (an old «confirmed» would hold again the table of
+a party already seated), so they are not listened to.
+
+The outbox relay (``base.relay``, run by the worker on every tick) hands each event to ``react``; every
+reaction is idempotent, so a repeated delivery changes nothing. What Sales did is also read on every read and
 settled on every write (queries.py, services.py).
 """
 
@@ -99,16 +101,12 @@ CUSTOMER_EVENTS = [
     "customer.customer.deleted",
     "customer.customer.merged",
 ]
-RESERVATION_STATUS_CHANGED = "reservation.reservation.status_changed"
-RESERVATION_UPDATED = "reservation.reservation.updated"
 
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {
     SALE_ORDER_COMPLETED: "table.session.close_by_order",
     SALE_ORDER_VOIDED: "table.session.close_by_order",
     CUSTOMER_ERASED: "table.hold.forget_customer",
-    RESERVATION_STATUS_CHANGED: "table.hold.sync_reservation",
-    RESERVATION_UPDATED: "table.hold.move_reservation",
 }
 
 

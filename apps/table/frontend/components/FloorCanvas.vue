@@ -9,8 +9,9 @@
 //   shows at once (`move` tells the page) and stays until the server's row has it; `revert(id)` puts a
 //   refused one back.
 // - Picking the destination of a transfer or a merge (`pick`): only the tables it accepts answer.
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
+import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
+import { useScrollEdges } from '../composables/useScrollEdges';
 import { clampPosition, DRAG_THRESHOLD, keyDelta, planeSize, type Size } from '../lib/floor';
 import type { TableOut } from '../operations';
 import FloorTile from './FloorTile.vue';
@@ -149,23 +150,7 @@ function onKeydown(table: TableOut, event: KeyboardEvent): void {
 }
 
 // Each edge of the window with tables behind it fades out (a hard cut reads «no more tables»).
-const edges = ref({ left: false, right: false });
-function markEdges(): void {
-  const el = win.value;
-  if (!el) return;
-  const hidden = el.scrollWidth - el.clientWidth;
-  edges.value = { left: el.scrollLeft > 1, right: el.scrollLeft < hidden - 1 };
-}
-let observer: ResizeObserver | null = null;
-onMounted(() => {
-  markEdges();
-  if (typeof ResizeObserver !== 'undefined' && win.value) {
-    observer = new ResizeObserver(markEdges);
-    observer.observe(win.value);
-    if (plane.value) observer.observe(plane.value);
-  }
-});
-onBeforeUnmount(() => observer?.disconnect());
+const { edges, mark: markEdges } = useScrollEdges(win, () => [plane.value]);
 watch(size, () => queueMicrotask(markEdges));
 </script>
 
@@ -175,7 +160,6 @@ watch(size, () => queueMicrotask(markEdges));
     class="table-canvas"
     :class="{ 'table-canvas--more-left': edges.left, 'table-canvas--more-right': edges.right }"
     data-testid="table-floor-canvas"
-    @scroll="markEdges"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerUp"

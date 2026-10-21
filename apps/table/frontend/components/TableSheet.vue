@@ -60,8 +60,10 @@ const pending = computed(() =>
   [seat, setGuests, park, close, split, link].some((command) => command.pending.value),
 );
 
+// Two sources, compared one by one: a live repaint of the same table (a new row, same id) keeps the step the
+// person is on; opening the window or another table starts over.
 watch(
-  () => [open.value, props.table?.id] as const,
+  [open, () => props.table?.id],
   ([isOpen]) => {
     if (!isOpen) return;
     step.value = 'main';

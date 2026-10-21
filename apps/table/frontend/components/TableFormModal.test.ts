@@ -28,6 +28,18 @@ async function form(table: TableOut | null, more: Record<string, unknown> = {}, 
 }
 
 describe('TableFormModal · edit', () => {
+  it('a live repaint of the same table keeps what is being typed; another table starts over', async () => {
+    // Edit plan is live: another device moving or seating this table sends a new row with the same id.
+    const f = await form(tableRow({ name: 'Window' }));
+    await ionValue(f.field('capacity'), '6', 'ionInput');
+    await f.wrapper.setProps({ table: tableRow({ name: 'Window', position_x: 300 }) });
+    await settle();
+    expect(f.field('capacity').value).toBe('6');
+    await f.wrapper.setProps({ table: tableRow({ id: 't9', number: '9', name: '' }) });
+    await settle();
+    expect([f.field('number').value, f.field('capacity').value]).toEqual(['9', '4']);
+  });
+
   it('shows the table with the old labels and sends only what changed', async () => {
     const f = await form(tableRow({ name: 'Window' }), {}, { '/api/table/tables/update': [200, tableRow()] });
     expect(f.inDoc('table-form')?.getAttribute('aria-label')).toBe('Edit table');

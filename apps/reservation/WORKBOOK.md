@@ -464,7 +464,7 @@ Pasos:
    La pantalla dice «Cliente borrado».
 3. Se conservan el día, la hora, los comensales, la mesa, el estado y el enlace a la ficha. El nombre
    también se borra de los avisos que sus reservas dejaron en el registro de avisos (`status_changed` y
-   `updated` lo llevan para Mesas). Mesas olvida el nombre de sus retenciones por su cuenta (TABLE-F31).
+   `updated` lo llevan). Mesas olvida el nombre de sus retenciones por su cuenta (TABLE-F31).
 Entra: el aviso `customer.customer.erased` (`id` de la ficha).
 Sale: reservas y entradas sin datos personales (avisa: `reservation.customer.erased`, solo si cambió
 alguna). Repetirlo no cambia nada.
@@ -537,8 +537,9 @@ Solo para la plataforma (sin ruta en la API, como sistema): `reservation.custome
 | `reservation.settings.updated` | Guardar las reglas | los campos cambiados |
 | `reservation.customer.reassigned`, `reservation.customer.erased` | Reacciones a Clientes | `id` (y `absorbed_id`) |
 
-`status_changed` y `updated` llevan el nombre del cliente y su ficha porque es la carga que Mesas
-necesita para pintar la retención (su contrato, TABLE-F25–F27); los demás, solo ids y números.
+`status_changed` y `updated` llevan además el nombre del cliente y su ficha (era la carga con la que
+Mesas iba a pintar la retención); los demás, solo ids y números. Mesas ya no escucha estos avisos: la
+retención la recibe por la llamada de Reservas en la misma transacción (TABLE-F25–F28).
 
 ### A qué reacciona
 
@@ -563,7 +564,7 @@ necesita para pintar la retención (su contrato, TABLE-F25–F27); los demás, s
 
 | App | Para qué | Servicio |
 |---|---|---|
-| Mesas | Retener, mover y soltar la mesa de cada reserva | sus avisos y sus acciones de plataforma |
+| Mesas | Retener, mover y soltar la mesa de cada reserva | ninguno de Reservas: es Reservas quien llama a sus acciones de plataforma, en la misma transacción |
 
 ### Quién puede qué
 
@@ -624,21 +625,21 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
   una (`tests/test_concurrency.py`, con la fila ya creada: crearla también pone en fila por su índice
   único y escondería si el bloqueo funciona; probado quitando el bloqueo, los tres casos fallan). Los
   cambios de estado bloquean su reserva.
-- **Con Mesas, en la misma transacción** (sin relay en la fase 1): confirmar (o nacer confirmada),
+- **Con Mesas, en la misma transacción** (la única vía): confirmar (o nacer confirmada),
   cancelar, no presentada y borrar llaman por nombre a `table.hold.sync_reservation`; cambiar una
   confirmada la llama con los datos nuevos (mueve la retención) o, si se queda sin mesa, a
   `table.hold.move_reservation` con `table_id` vacío; sentar llama a `table.session.open` (con la
   sesión de quien sienta: abre la cuenta en Ventas y gasta la retención de la ventana) y suelta con
   `table.hold.release` la retención que aún no había entrado en su ventana. Las acciones de plataforma
   de Mesas (`table.system`) se llaman con ese único permiso añadido al contexto de quien actúa. Si Mesas
-  rechaza, se deshace todo. Además se graban los avisos de su contrato (`status_changed`, `updated`):
-  cuando llegue el relay (fase 2), Mesas reaccionará a ellos y las dos vías dejan lo mismo (sus
-  reacciones son idempotentes); entonces se quitará una de las dos.
+  rechaza, se deshace todo. Los avisos `status_changed` y `updated` se siguen grabando, pero Mesas ya no
+  reacciona a ellos (2026-10-21, APP-TABLE): entregados después por el relay, re-aplicaban la reserva tal
+  como era (un «confirmada» viejo volvía a retener la mesa de un grupo ya sentado).
 - **Sentar con la mesa ya ocupada** solo marca la reserva si su retención se gastó y ninguna otra reserva
   es dueña de la cuenta sentada (`table_session_id`): Mesas gasta todas las retenciones de la mesa dentro
   de la hora al sentar a cualquiera, así que la retención gastada sola no prueba que sea este grupo.
 - **RGPD en el registro de avisos**: la reacción a `customer.customer.erased` vacía también `guest_name`
-  en los `status_changed` y `updated` de sus reservas (el contrato con Mesas lleva el nombre).
+  en los `status_changed` y `updated` de sus reservas (esos avisos llevan el nombre).
 - **Clientes**: sin ficha elegida y con teléfono, se busca la ficha viva con ese número
   (`customer.customer.by_phone`; entre varias, la del mismo nombre sin mayúsculas ni acentos, si no la
   primera) y, si no hay, se crea (`customer.customer.create`, origen Teléfono, En el local, WhatsApp o

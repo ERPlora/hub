@@ -7,7 +7,7 @@
 //   with two checks, which one first.
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, mountTable, resultFrame, settle } from '../__tests__/mount-table';
+import { click, EMPLOYEE, ionChecked, mountTable, resultFrame, settle } from '../__tests__/mount-table';
 import { NOW, occupied, SETTINGS, tableRow } from '../__tests__/tables';
 import type { TableOut } from '../operations';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -143,7 +143,7 @@ describe('TableSheet · an occupied table', () => {
     const stream = await s.live();
     stream.push(resultFrame(s.subId('sale.order.get', { order_id: 'o1' }), order, 1));
     await settle();
-    await click(s.el('split-line-l2'));
+    await ionChecked(s.el('split-line-l2'), true);
     await click(s.el('split-confirm'));
     expect(s.sent().map((call) => [call.path, call.body])).toEqual([['/api/table/sessions/split', { id: 's1', line_ids: ['l2'] }]]);
     expect(s.closed()).toBe(true);
@@ -158,6 +158,27 @@ describe('TableSheet · an occupied table', () => {
     await click(s.el('check-s2'));
     await click(s.el('action-charge'));
     expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o2');
+  });
+
+  it('a live repaint of the same table keeps the step and the choices on screen', async () => {
+    // The plan is live: another device changing the room repaints this table (a new row, same id) while the
+    // waiter is correcting the guests, splitting or closing; the window must not go back to its first step.
+    const s = await sheet(occupied());
+    await click(s.el('action-guests'));
+    await click(s.guest('more'));
+    await s.wrapper.setProps({ table: occupied({ waiter_name: 'Luis' }) });
+    await settle();
+    expect(s.guest('value').textContent?.trim()).toBe('4');
+    await click(s.guest('back'));
+    await click(s.el('action-close'));
+    await s.wrapper.setProps({ table: occupied() });
+    await settle();
+    expect(s.el('close-confirm')).not.toBeNull();
+    // Another table is another window: it starts over.
+    await s.wrapper.setProps({ table: occupied({ id: 't9', number: '9' }) });
+    await settle();
+    expect(s.el('close-confirm')).toBeNull();
+    expect(s.el('action-guests')).not.toBeNull();
   });
 
   it('a person who may not move checks sees no Transfer nor Merge', async () => {

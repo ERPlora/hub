@@ -52,8 +52,10 @@ function fromZone(zone: ZoneOut | null): Form {
 }
 
 const form = ref<Form>(fromZone(props.zone));
+// Two sources, compared one by one: a live repaint of the same zone (a new row, same id) keeps what is
+// being typed; opening the dialog or another zone starts over.
 watch(
-  () => [open.value, props.zone?.id] as const,
+  [open, () => props.zone?.id],
   ([isOpen]) => {
     if (!isOpen) return;
     form.value = fromZone(props.zone);
