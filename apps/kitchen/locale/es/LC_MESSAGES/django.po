@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-15 10:50+0200\n"
+"POT-Creation-Date: 2026-10-21 03:19+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -197,7 +197,7 @@ msgstr "creado por"
 msgid "updated by"
 msgstr "cambiado por"
 
-#: models.py:118 models.py:403
+#: models.py:118 models.py:405
 msgid "name"
 msgstr "nombre"
 
@@ -205,19 +205,19 @@ msgstr "nombre"
 msgid "colour"
 msgstr "color"
 
-#: models.py:121 models.py:417
+#: models.py:121 models.py:421
 msgid "destination"
 msgstr "destino"
 
-#: models.py:127 models.py:423
+#: models.py:127 models.py:427
 msgid "printer function"
 msgstr "función de impresora"
 
-#: models.py:133 models.py:428
+#: models.py:133 models.py:432
 msgid "printer"
 msgstr "impresora"
 
-#: models.py:134 models.py:400
+#: models.py:134 models.py:402
 msgid "position"
 msgstr "posición"
 
@@ -233,7 +233,7 @@ msgstr "borrado"
 msgid "deleted at"
 msgstr "borrado el"
 
-#: models.py:140 models.py:179 models.py:203 models.py:413 models.py:486
+#: models.py:140 models.py:179 models.py:203 models.py:417 models.py:494
 msgid "station"
 msgstr "estación"
 
@@ -241,7 +241,7 @@ msgstr "estación"
 msgid "stations"
 msgstr "estaciones"
 
-#: models.py:173 models.py:401
+#: models.py:173 models.py:403
 msgid "product"
 msgstr "producto"
 
@@ -253,7 +253,7 @@ msgstr "enrutado de producto"
 msgid "product routes"
 msgstr "enrutados de producto"
 
-#: models.py:197 models.py:402
+#: models.py:197 models.py:404
 msgid "category"
 msgstr "categoría"
 
@@ -365,11 +365,11 @@ msgstr "tipo"
 msgid "priority"
 msgstr "prioridad"
 
-#: models.py:333 models.py:430
+#: models.py:333 models.py:434
 msgid "status"
 msgstr "estado"
 
-#: models.py:335 models.py:490
+#: models.py:335 models.py:498
 msgid "notes"
 msgstr "notas"
 
@@ -385,7 +385,7 @@ msgstr "recibida el"
 msgid "started at"
 msgstr "empezada el"
 
-#: models.py:340 models.py:433
+#: models.py:340 models.py:437
 msgid "ready at"
 msgstr "lista el"
 
@@ -409,11 +409,11 @@ msgstr "veces urgente"
 msgid "times reprinted"
 msgstr "veces reimpresa"
 
-#: models.py:348 models.py:435
+#: models.py:348 models.py:439
 msgid "total"
 msgstr "total"
 
-#: models.py:353 models.py:394 models.py:470
+#: models.py:353 models.py:394 models.py:478
 msgid "ticket"
 msgstr "comanda"
 
@@ -421,55 +421,67 @@ msgstr "comanda"
 msgid "tickets"
 msgstr "comandas"
 
-#: models.py:398
+#: models.py:397
 msgid "line of the check"
 msgstr "línea de la cuenta"
 
-#: models.py:404
+#: models.py:399
+msgid "dish of the menu"
+msgstr "plato del menú"
+
+#: models.py:401
+msgid "menu"
+msgstr "menú"
+
+#: models.py:406
 msgid "quantity"
 msgstr "cantidad"
 
-#: models.py:405
+#: models.py:407
 msgid "unit"
 msgstr "unidad"
 
-#: models.py:406
+#: models.py:408
 msgid "note"
 msgstr "nota"
 
-#: models.py:415
+#: models.py:410
+msgid "options"
+msgstr "opciones"
+
+#: models.py:419
 msgid "station name"
 msgstr "nombre de la estación"
 
-#: models.py:432
+#: models.py:436
 msgid "void reason"
 msgstr "motivo de la anulación"
 
-#: models.py:438 models.py:478
+#: models.py:442 models.py:486
 msgid "dish"
 msgstr "plato"
 
-#: models.py:439
+#: models.py:443
 msgid "dishes"
 msgstr "platos"
 
-#: models.py:488
+#: models.py:496
 msgid "action"
 msgstr "acción"
 
-#: models.py:489
+#: models.py:497
 msgid "who"
 msgstr "quién"
 
-#: models.py:491
+#: models.py:499
 msgid "when"
 msgstr "cuándo"
 
-#: models.py:494
+#: models.py:502
 msgid "history entry"
 msgstr "entrada del historial"
 
-#: models.py:495
+#: models.py:503
 msgid "history"
 msgstr "historial"
 
@@ -513,7 +525,7 @@ msgstr "Di qué plato: un producto del catálogo o su nombre."
 msgid "Add at least one dish."
 msgstr "Añade al menos un plato."
 
-#: services.py:102
+#: services.py:105
 msgid ""
 "That kitchen ticket is no longer in the state this action requires. Refresh "
 "and try again."
@@ -521,15 +533,15 @@ msgstr ""
 "Esa comanda ya no está en el estado que requiere esta acción. Actualiza e "
 "inténtalo de nuevo."
 
-#: services.py:104
+#: services.py:107
 msgid "That ticket is no longer being cooked."
 msgstr "Esa comanda ya no se cocina."
 
-#: services.py:105
+#: services.py:108
 msgid "That ticket is VIP: a rush does not change its priority."
 msgstr "Esa comanda es VIP: marcarla urgente no cambia su prioridad."
 
-#: services.py:107
+#: services.py:110
 msgid ""
 "That ticket cannot be deleted: it comes from a check or it is already being "
 "cooked. Cancel it instead."
@@ -537,33 +549,33 @@ msgstr ""
 "Esa comanda no se puede borrar: viene de una cuenta o ya se está cocinando. "
 "Cancélala."
 
-#: services.py:109
+#: services.py:112
 msgid "That dish is not on this ticket."
 msgstr "Ese plato no está en esta comanda."
 
-#: services.py:111
+#: services.py:114
 msgid "Nothing of this ticket goes to paper: its stations are screen only."
 msgstr ""
 "Nada de esta comanda sale en papel: sus estaciones son solo de pantalla."
 
-#: services.py:113
+#: services.py:116
 msgid "Nothing on this check is cooked: services do not go to the kitchen."
 msgstr "Nada de esta cuenta se cocina: los servicios no van a cocina."
 
-#: services.py:114
+#: services.py:117
 msgid "Printing is not active in this business."
 msgstr "Impresión no está activa en este negocio."
 
-#: services.py:115
+#: services.py:118
 #, python-format
 msgid "The ticket could not be printed: %(reason)s"
 msgstr "No se pudo imprimir la comanda: %(reason)s"
 
-#: services.py:117
+#: services.py:120
 msgid "There is already a station with that name. Choose a different name."
 msgstr "Ya hay una estación con ese nombre. Elige otro nombre."
 
-#: services.py:120
+#: services.py:123
 msgid ""
 "This station cannot be deleted: products or categories are routed to it, or "
 "it has dishes to cook. Move them to another station first."
@@ -571,46 +583,46 @@ msgstr ""
 "Esta estación no se puede eliminar: tiene productos o categorías enrutados, "
 "o platos por hacer. Pásalos antes a otra estación."
 
-#: services.py:124
+#: services.py:127
 msgid "That station is switched off: switch it on or choose another one."
 msgstr "Esa estación está desactivada: actívala o elige otra."
 
-#: services.py:126
+#: services.py:129
 msgid "That product does not exist in the catalogue."
 msgstr "Ese producto no existe en el catálogo."
 
-#: services.py:127
+#: services.py:130
 #, python-format
 msgid "“%(said)s” matches several products: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varios productos: %(names)s. Di cuál."
 
-#: services.py:128
+#: services.py:131
 msgid "That category does not exist in the catalogue."
 msgstr "Esa categoría no existe en el catálogo."
 
-#: services.py:130
+#: services.py:133
 #, python-format
 msgid "“%(said)s” matches several categories: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias categorías: %(names)s. Di cuál."
 
-#: services.py:132
+#: services.py:135
 msgid "Nothing is routed from that product or category."
 msgstr "Ese producto o esa categoría no van a ninguna estación."
 
-#: services.py:133
+#: services.py:136
 msgid "The amber warning has to come before the red one."
 msgstr "El aviso ámbar tiene que llegar antes que el rojo."
 
-#: services.py:134
+#: services.py:137
 msgid "!! URGENT !!"
 msgstr "!! URGENTE !!"
 
-#: services.py:135
+#: services.py:138
 #, python-format
 msgid "VOIDED DISH · %(label)s"
 msgstr "PLATO ANULADO · %(label)s"
 
-#: services.py:136
+#: services.py:139
 #, python-format
 msgid "CANCELLED · %(label)s"
 msgstr "ANULADA · %(label)s"

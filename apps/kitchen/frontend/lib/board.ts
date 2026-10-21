@@ -1,7 +1,7 @@
 // What the display remembers between updates (KITCHEN-F10, F16): the tickets it already showed — so it
 // rings for a new one or one just rushed, never for what was on the board when it opened — and the
 // station this device works at (Toast, Square and Fresh pin a screen to its station).
-import type { Priority, TicketOut } from '../operations';
+import type { ItemOut, Priority, TicketOut } from '../operations';
 
 /** Where the station of this device is kept (`''`: every station; `none`; or a station's id). */
 export const STATION_KEY = 'kitchen.display.station';
@@ -39,4 +39,29 @@ export function rememberStation(station: string): void {
   } catch {
     // A browser that keeps nothing (private mode): the station is chosen every time, as before.
   }
+}
+
+/** A menu of a ticket (KITCHEN-F06): its line of the check and its header. */
+export interface MenuHead {
+  lineId: string;
+  name: string;
+}
+
+/** A run of dishes on a card: the dishes of one menu under its header, or one dish ordered on its own. */
+export interface DishGroup {
+  menu: MenuHead | null;
+  items: ItemOut[];
+}
+
+/** The dishes of a ticket as the card paints them (kitchen#57): the consecutive dishes of a menu's line
+ * under that menu, each other dish on its own. */
+export function groupMenus(items: readonly ItemOut[]): DishGroup[] {
+  const groups: DishGroup[] = [];
+  for (const item of items) {
+    const last = groups.at(-1);
+    if (item.menu_line_id && last?.menu?.lineId === item.menu_line_id) last.items.push(item);
+    else if (item.menu_line_id) groups.push({ menu: { lineId: item.menu_line_id, name: item.menu_name }, items: [item] });
+    else groups.push({ menu: null, items: [item] });
+  }
+  return groups;
 }

@@ -122,10 +122,94 @@ describe('KdsTicket', () => {
     expect(s.find('kitchen-card-t1-foot').exists()).toBe(false);
   });
 
+  it('shows the options chosen under the dish, before its note (KITCHEN-F07)', async () => {
+    const t = ticket('t1', {
+      items: [
+        item('i1', { name: 'Burger', modifiers: ['+CHEESE', '-ONION', 'Rare'], notes: 'Allergic to nuts' }),
+        item('i2', { name: 'Fries' }),
+      ],
+    });
+    const s = await setup(t);
+    expect(s.find('kitchen-line-i1-modifiers').text()).toBe('+CHEESE, -ONION, Rare');
+    const text = s.find('kitchen-line-i1').text();
+    expect(text.indexOf('+CHEESE')).toBeLessThan(text.indexOf('Allergic to nuts'));
+    expect(s.find('kitchen-line-i2-modifiers').exists()).toBe(false);
+  });
+
+  it('puts the dishes of a menu under its header, with how many there are (KITCHEN-F06)', async () => {
+    const t = ticket('t1', {
+      items: [
+        item('i1', { name: 'Lentils', menu_name: 'MENU', menu_line_id: 'm1' }),
+        item('i2', { name: 'Steak', menu_name: 'MENU', menu_line_id: 'm1', modifiers: ['Rare'] }),
+        item('i3', { name: 'Salad', menu_name: 'MENU', menu_line_id: 'm2' }),
+        item('i4', { name: 'Burger' }),
+      ],
+    });
+    const s = await setup(t);
+    const head = s.find('kitchen-menu-m1');
+    expect(head.text()).toContain('MENU');
+    expect(head.text()).toContain('2 dishes');
+    // kitchen#157: one dish is «1 dish», never «1 dishes».
+    expect(s.find('kitchen-menu-m2').text()).toContain('1 dish');
+    expect(s.find('kitchen-menu-m2').text()).not.toContain('1 dishes');
+    // The header carries the menu, never a dish's options; the dishes follow it in order, inside the menu.
+    expect(head.text()).not.toContain('Rare');
+    const order = s.wrapper.findAll('[data-testid^="kitchen-menu-"], [data-testid^="kitchen-line-"]')
+      .map((node) => node.attributes('data-testid'))
+      .filter((id) => !id?.endsWith('-modifiers'));
+    expect(order).toEqual(['kitchen-menu-m1', 'kitchen-line-i1', 'kitchen-line-i2', 'kitchen-menu-m2', 'kitchen-line-i3', 'kitchen-line-i4']);
+    expect(s.find('kitchen-line-i2').attributes('data-menu')).toBe('m1');
+    expect(s.find('kitchen-line-i4').attributes('data-menu')).toBeUndefined();
+  });
+
+  it('a tap on the menu header marks ready the dishes of that menu still to do, and nothing else', async () => {
+    const t = ticket('t1', {
+      status: 'preparing',
+      items: [
+        item('i1', { menu_name: 'MENU', menu_line_id: 'm1' }),
+        item('i2', { menu_name: 'MENU', menu_line_id: 'm1', status: 'ready' }),
+        item('i3', { menu_name: 'MENU', menu_line_id: 'm1' }),
+        item('i4'),
+      ],
+    });
+    const s = await setup(t);
+    await click(s.find('kitchen-menu-m1').element);
+    expect(s.emitted().bump).toEqual([[['i1', 'i3']]]);
+  });
+
+  it('the menu header does nothing once its dishes are done, or for who may not change tickets', async () => {
+    const done = ticket('t1', {
+      status: 'preparing',
+      items: [item('i1', { menu_name: 'MENU', menu_line_id: 'm1', status: 'ready' }), item('i2')],
+    });
+    const s = await setup(done);
+    await click(s.find('kitchen-menu-m1').element);
+    expect(s.emitted().bump).toBeUndefined();
+    expect(s.find('kitchen-menu-m1').attributes('aria-disabled')).toBe('true');
+
+    const viewer = await setup(ticket('t2', { items: [item('j1', { menu_name: 'MENU', menu_line_id: 'm9' })] }), { canChange: false });
+    await click(viewer.find('kitchen-menu-m9').element);
+    expect(viewer.emitted().bump).toBeUndefined();
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup(ticket('t1', { priority: 'rush', round_no: 3 }), {}, 'es');
     expect(s.find('kitchen-card-t1-waiter').text()).toBe('Camarero: luis');
     expect([s.find('kitchen-card-t1-priority').text(), s.find('kitchen-card-t1-round').text()]).toEqual(['Urgente', 'Ronda 3']);
     expect(s.find('kitchen-card-t1-bump').text()).toBe('Listo');
+  });
+
+  it('counts the dishes of a menu in Spanish', async () => {
+    const t = ticket('t1', {
+      items: [
+        item('i1', { menu_name: 'MENÚ', menu_line_id: 'm1' }),
+        item('i2', { menu_name: 'MENÚ', menu_line_id: 'm2' }),
+        item('i3', { menu_name: 'MENÚ', menu_line_id: 'm2' }),
+      ],
+    });
+    const s = await setup(t, {}, 'es');
+    expect(s.find('kitchen-menu-m1').text()).toContain('1 plato');
+    expect(s.find('kitchen-menu-m1').text()).not.toContain('1 platos');
+    expect(s.find('kitchen-menu-m2').text()).toContain('2 platos');
   });
 });
