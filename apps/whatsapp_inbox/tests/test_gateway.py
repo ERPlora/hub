@@ -1,4 +1,4 @@
-"""The Hub's client of erplora.com's sending door (WORKBOOK «Contrato con el SaaS», door 4).
+"""The Hub's client of erplora.com's WhatsApp doors (WORKBOOK «Contrato con el SaaS», doors 5, 6, 8, 9 and 10–12).
 
 ``respx`` stands in for the transport only: what is checked is the request the Hub writes (path,
 signature, idempotency key, body) and how each answer is read. Nothing here is ever «sent» unless
@@ -335,3 +335,97 @@ def test_without_the_saas_url_no_template_leaves(settings):
         gateway.submit_template(hub="a", idempotency_key=KEY, template=TEMPLATE)
     with pytest.raises(gateway.NotConfigured):
         gateway.delete_template(hub="a", name="x", language="es", meta_id="")
+
+
+# ── Connecting the number (WORKBOOK «Contrato con el SaaS», doors 10–12; WHATSAPP_INBOX-F01, F02) ──
+
+CONFIG = f"{URL}/internal/whatsapp/config"
+CONNECT = f"{URL}/internal/whatsapp/connect"
+DISCONNECT = f"{URL}/internal/whatsapp/disconnect"
+WINDOW = {"code": "AQD-one-time", "event": "FINISH", "waba_id": "102290129340398", "phone_number_id": "106540352242922", "business_id": "2729063490586005"}
+CONFIGURED = {"configured": True, "app_id": "1481226093843982", "config_id": "1101452998214123", "graph_version": "v25.0"}
+
+
+def signed_by_the_hub(request) -> bool:
+    return request.headers[SIGNATURE_HEADER] == sign("s3cret", request.headers[TIMESTAMP_HEADER], request.content)
+
+
+@respx.mock
+def test_door_10_is_asked_signed_for_the_business_and_its_200_is_its_body():
+    route = respx.post(CONFIG).mock(return_value=httpx.Response(200, json=CONFIGURED))
+    reply = gateway.config(hub="a")
+    assert (reply.kind, reply.data) == (gateway.ACCEPTED, CONFIGURED)
+    request = route.calls.last.request
+    assert json.loads(request.content) == {"hub": "a"} and signed_by_the_hub(request)
+    assert "Idempotency-Key" not in request.headers
+
+
+@respx.mock
+def test_door_11_gets_what_meta_s_window_gave_as_it_came_and_its_200_is_the_number():
+    connected = {"connected": True, "phone_number": "+34910000000", "display_name": "Peluquería Ana", "history_requested": False}
+    route = respx.post(CONNECT).mock(return_value=httpx.Response(200, json=connected))
+    reply = gateway.connect(hub="a", **WINDOW)
+    assert (reply.kind, reply.data) == (gateway.ACCEPTED, connected)
+    request = route.calls.last.request
+    assert json.loads(request.content) == {"hub": "a", **WINDOW} and signed_by_the_hub(request)
+
+
+@respx.mock
+def test_door_12_disconnects_the_business_and_its_200_says_whether_there_was_a_number():
+    route = respx.post(DISCONNECT).mock(return_value=httpx.Response(200, json={"disconnected": False}))
+    reply = gateway.disconnect(hub="a")
+    assert (reply.kind, reply.data) == (gateway.ACCEPTED, {"disconnected": False})
+    assert json.loads(route.calls.last.request.content) == {"hub": "a"}
+
+
+@pytest.mark.parametrize(
+    ("answer", "status", "code"),
+    [
+        (httpx.Response(409, json={"error": {"code": "whatsapp.meta_rejected", "message": "The code has expired."}}), 409, "whatsapp.meta_rejected"),
+        (httpx.Response(429, json={"error": {"code": "whatsapp.meta_rate_limited", "message": "Slow down."}}), 429, "whatsapp.meta_rate_limited"),
+        (httpx.Response(502, json={"error": {"code": "whatsapp.meta_no_token", "message": "No token."}}), 502, "whatsapp.meta_no_token"),
+        (httpx.Response(503, json={"error": {"code": "whatsapp.not_configured", "message": "Not configured."}}), 503, "whatsapp.not_configured"),
+        (httpx.Response(404, json={"error": {"code": "hub_unknown", "message": "Unknown business."}}), 404, "hub_unknown"),
+    ],
+)
+@respx.mock
+def test_erplora_s_refusal_keeps_its_status_code_and_reason(answer, status, code):
+    respx.post(CONNECT).mock(return_value=answer)
+    reply = gateway.connect(hub="a", **WINDOW)
+    assert (reply.kind, reply.http_status, reply.code) == (gateway.REFUSED, status, code)
+    assert reply.message == answer.json()["error"]["message"]
+
+
+@pytest.mark.parametrize(
+    ("answer", "kind"),
+    [
+        # No envelope: not erplora.com's door speaking (a 404 page, a proxy).
+        (httpx.Response(404, text="<h1>Not Found</h1>"), gateway.UNREACHABLE),
+        (httpx.Response(405, text=""), gateway.UNREACHABLE),
+        # A 5xx without its envelope, or a 200 that is not a JSON object: erplora.com may have done it.
+        (httpx.Response(500, text="Server Error"), gateway.UNKNOWN),
+        (httpx.Response(200, text="not json"), gateway.UNKNOWN),
+        (httpx.Response(200, json=["connected"]), gateway.UNKNOWN),
+    ],
+)
+@respx.mock
+def test_an_answer_without_erplora_s_envelope_is_never_a_refusal(answer, kind):
+    respx.post(CONNECT).mock(return_value=answer)
+    assert gateway.connect(hub="a", **WINDOW).kind == kind
+
+
+@respx.mock
+def test_no_connection_is_unreachable_and_a_lost_answer_unknown_at_doors_10_to_12():
+    respx.post(CONFIG).mock(side_effect=httpx.ConnectError("refused"))
+    respx.post(CONNECT).mock(side_effect=httpx.ReadTimeout("slow"))
+    respx.post(DISCONNECT).mock(side_effect=httpx.ConnectTimeout("slow"))
+    assert gateway.config(hub="a").kind == gateway.UNREACHABLE
+    assert gateway.connect(hub="a", **WINDOW).kind == gateway.UNKNOWN
+    assert gateway.disconnect(hub="a").kind == gateway.UNREACHABLE
+
+
+def test_without_the_saas_url_doors_10_to_12_are_not_asked(settings):
+    settings.SAAS_INTERNAL_URL = ""
+    for call in (lambda: gateway.config(hub="a"), lambda: gateway.connect(hub="a", **WINDOW), lambda: gateway.disconnect(hub="a")):
+        with pytest.raises(gateway.NotConfigured):
+            call()

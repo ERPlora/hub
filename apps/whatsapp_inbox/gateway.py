@@ -1,4 +1,4 @@
-"""The Hub's client of erplora.com's WhatsApp doors (WORKBOOK «Contrato con el SaaS», doors 5, 6, 8 and 9).
+"""The Hub's client of erplora.com's WhatsApp doors (WORKBOOK «Contrato con el SaaS», doors 5, 6, 8, 9 and 10–12).
 
 The WhatsApp Business account and Meta's token live in the SaaS: the Hub asks it to send and to forget
 a number, and keeps what it answers. JSON, signed like every ``/internal`` call (``X-Erplora-Timestamp``
@@ -27,13 +27,19 @@ Meta's reason (``refused``); the rest reads as for ``send``. ``delete_template``
 (door 9, F31): ``200 {"deleted": true}`` or its 404 ``whatsapp.template_not_found`` (Meta no longer has
 it) is ``accepted``; any other 404 is «nothing left».
 
+``config`` / ``connect`` / ``disconnect`` → ``POST …/internal/whatsapp/{config,connect,disconnect}`` (doors 10–12,
+WHATSAPP_INBOX-F01, F02): what opens Meta's window (Embedded Signup), the number that window chose with its one-time
+code, and disconnecting it. A 200 is ``accepted`` with erplora.com's body (``data``); erplora.com's error envelope at
+any status is ``refused`` with that status, its code and its reason (nothing was done); a 4xx without the envelope
+(a door not served, a proxy) is «nothing left» and a 5xx without it, or a 200 that is no JSON object, ``unknown``.
+
 No call ever raises past its caller: ``httpx`` also raises errors that are not ``HTTPError`` (an URL it
 cannot parse, a header it cannot encode), and they read as «nothing left» (``unreachable``).
 """
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from django.conf import settings
@@ -44,6 +50,9 @@ SEND_PATH = "/internal/whatsapp/send"
 ERASE_PATH = "/internal/whatsapp/erase"
 TEMPLATES_PATH = "/internal/whatsapp/templates"
 TEMPLATES_DELETE_PATH = "/internal/whatsapp/templates/delete"
+CONFIG_PATH = "/internal/whatsapp/config"
+CONNECT_PATH = "/internal/whatsapp/connect"
+DISCONNECT_PATH = "/internal/whatsapp/disconnect"
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 
@@ -74,6 +83,9 @@ class Reply:
     message: str = ""
     meta_id: str = ""
     status: str = ""
+    #: Doors 10–12: erplora.com's body of a 200; the HTTP status of a refusal.
+    data: dict = field(default_factory=dict)
+    http_status: int = 0
 
 
 def base_url() -> str:
@@ -235,3 +247,44 @@ def delete_template(*, hub: str, name: str, language: str, meta_id: str) -> Repl
     if _json(response).get("deleted") is not True:
         return Reply(kind=UNKNOWN, message="erplora.com did not confirm the deletion.")
     return Reply(kind=ACCEPTED)
+
+
+def config(*, hub: str) -> Reply:
+    """Door 10: what the business's screen opens Meta's window with (public ids only)."""
+    return _door(CONFIG_PATH, {"hub": hub})
+
+
+def connect(*, hub: str, code: str, event: str, waba_id: str, phone_number_id: str, business_id: str) -> Reply:
+    """Door 11: connect the number Meta's window chose, with what the window gave, as it came."""
+    window = {"code": code, "event": event, "waba_id": waba_id, "phone_number_id": phone_number_id, "business_id": business_id}
+    return _door(CONNECT_PATH, {"hub": hub, **window})
+
+
+def disconnect(*, hub: str) -> Reply:
+    """Door 12: disconnect the business's number."""
+    return _door(DISCONNECT_PATH, {"hub": hub})
+
+
+def _door(path: str, payload: dict) -> Reply:
+    response = _post(path, payload)
+    if isinstance(response, Reply):
+        return response
+    error = _json(response).get("error")
+    if response.status_code != 200 and isinstance(error, dict) and error.get("code"):
+        return Reply(
+            kind=REFUSED,
+            http_status=response.status_code,
+            code=str(error["code"]),
+            message=str(error.get("message", "")),
+        )
+    if response.status_code >= 500:
+        return Reply(kind=UNKNOWN, message=f"erplora.com answered HTTP {response.status_code}.")
+    if response.status_code != 200:
+        return Reply(kind=UNREACHABLE, message=f"erplora.com answered HTTP {response.status_code}.")
+    try:
+        data = response.json()
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        return Reply(kind=UNKNOWN, message="erplora.com's answer is not the door's.")
+    return Reply(kind=ACCEPTED, data=data)
