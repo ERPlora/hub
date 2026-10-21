@@ -9,7 +9,11 @@ export type SortDir = 'asc' | 'desc';
 export type ConversationStatus = 'open' | 'pending' | 'closed';
 export type MessageStatus = 'received' | 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 export type TemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
-export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'DELETED';
+export type TemplateStatus = 'DRAFT' | 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'DELETED';
+export type WritableCategory = 'UTILITY' | 'MARKETING';
+export type HeaderFormat = '' | 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'LOCATION';
+export type SubmitState = '' | 'queued' | 'sending' | 'failed';
+export type TemplateButtonType = 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
 export type ChannelStatus = 'not_connected' | 'connected' | 'reconnect_needed';
 export type SendBlocked = 'not_connected' | 'cap_reached' | 'unconfigured';
 
@@ -129,6 +133,8 @@ export interface MessageOut {
   /** Meta's id; `null` while the message has not left. */
   wa_message_id: string | null;
   reply_to: string;
+  /** The id of the option the customer tapped (a quick reply, a button or list row). */
+  reply_id: string;
   sent_by_name: string;
   sent_at: string;
   status_at: string | null;
@@ -183,6 +189,33 @@ export interface TemplateListIn extends PageIn {
   status?: TemplateStatus;
   category?: TemplateCategory;
   language?: string;
+  /** true: only what the Hub can send now (approved, not being deleted, no file header). */
+  sendable?: boolean;
+}
+
+/** A button as Meta lists it (made here: QUICK_REPLY, URL, PHONE_NUMBER; others only in WhatsApp Manager). */
+export interface TemplateButtonOut {
+  type: string;
+  text: string;
+  url: string;
+  phone_number: string;
+}
+
+/** A button the form writes: `url` only for URL, `phone_number` only for PHONE_NUMBER. */
+export interface TemplateButtonIn {
+  type: TemplateButtonType;
+  text: string;
+  url?: string;
+  phone_number?: string;
+}
+
+export interface TemplateDraftOut {
+  category: TemplateCategory;
+  header: string;
+  body: string;
+  body_examples: string[];
+  footer: string;
+  buttons: TemplateButtonOut[];
 }
 
 export interface TemplateOut {
@@ -190,13 +223,50 @@ export interface TemplateOut {
   name: string;
   language: string;
   category: TemplateCategory;
+  /** DRAFT: Meta never had it. */
   status: TemplateStatus;
+  header_format: HeaderFormat;
   header: string;
   body: string;
+  body_examples: string[];
   footer: string;
+  buttons: TemplateButtonOut[];
   variables: number;
   rejected_reason: string;
+  meta_id: string;
   synced_at: string | null;
+  /** An edit on its way to Meta; the fields above are what Meta has. */
+  draft: TemplateDraftOut | null;
+  submit_state: SubmitState;
+  submit_error_code: string;
+  submit_error: string;
+  editable: boolean;
+  sendable: boolean;
+  deleting: boolean;
+}
+
+/** What the form writes (WHATSAPP_INBOX-F29, F30); `submit_key`: one per save, the same on a retry. */
+export interface TemplateWriteIn {
+  category: WritableCategory;
+  header: string;
+  body: string;
+  body_examples: string[];
+  footer: string;
+  buttons: TemplateButtonIn[];
+  submit_key: string;
+}
+
+export interface TemplateCreateIn extends TemplateWriteIn {
+  name: string;
+  language: string;
+}
+
+export interface TemplateUpdateIn extends TemplateWriteIn {
+  id: string;
+}
+
+export interface TemplateRefIn {
+  id: string;
 }
 
 export type ChannelGetIn = Record<string, never>;
@@ -240,6 +310,10 @@ declare module '@erplora/ui/sdk' {
     'whatsapp_inbox.note.add': { input: NoteAddIn; output: NoteOut };
     'whatsapp_inbox.note.delete': { input: NoteRefIn; output: ErasedOut };
     'whatsapp_inbox.template.list': { input: TemplateListIn; output: Page<TemplateOut> };
+    'whatsapp_inbox.template.create': { input: TemplateCreateIn; output: TemplateOut };
+    'whatsapp_inbox.template.update': { input: TemplateUpdateIn; output: TemplateOut };
+    'whatsapp_inbox.template.retry': { input: TemplateRefIn; output: TemplateOut };
+    'whatsapp_inbox.template.delete': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.channel.get': { input: ChannelGetIn; output: ChannelOut };
     'whatsapp_inbox.agent.list': { input: AgentListIn; output: Page<AgentOut> };
   }

@@ -26,6 +26,9 @@ ERASED = "whatsapp_inbox.conversation.erased"
 NOTE_ADDED = "whatsapp_inbox.note.added"
 NOTE_DELETED = "whatsapp_inbox.note.deleted"
 CHANNEL_SYNCED = "whatsapp_inbox.channel.synced"
+TEMPLATE_CREATED = "whatsapp_inbox.template.created"
+TEMPLATE_UPDATED = "whatsapp_inbox.template.updated"
+TEMPLATE_DELETED = "whatsapp_inbox.template.deleted"
 
 ALL = [
     MESSAGE_RECEIVED,
@@ -39,6 +42,9 @@ ALL = [
     NOTE_ADDED,
     NOTE_DELETED,
     CHANNEL_SYNCED,
+    TEMPLATE_CREATED,
+    TEMPLATE_UPDATED,
+    TEMPLATE_DELETED,
 ]
 
 # The Customers app's events (its WORKBOOK fixes their payload: ``{"id"}``, merged adds ``absorbed_id``).

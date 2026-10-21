@@ -6,7 +6,10 @@
 // open pages update live. What a run creates is named `e2e.…` and deleted in the spec's `afterAll`.
 import { execFileSync } from 'node:child_process';
 
-import { HUB_DIR, psql } from './helpers';
+import type { Page } from '@playwright/test';
+
+import { HUB_DIR, psql, shot } from './helpers';
+import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 
 /** Every WhatsApp id, template and card name of a run starts like this. */
 export const PREFIX = 'e2e.';
@@ -37,10 +40,19 @@ export function system<T = unknown>(op: string, payload: unknown): T {
   return JSON.parse(line) as T;
 }
 
-/** A customer's text arriving now from `phone` (E.164), as erplora.com pushes it. */
-export function receive(phone: string, text: string, contactName: string): { id: string; conversation_id: string } {
+/** A WhatsApp id of this run. */
+export const waId = (): string => `${PREFIX}wamid.${Date.now()}.${Math.floor(Math.random() * 1e6)}`;
+
+/** A customer's text arriving now from `phone` (E.164), as erplora.com pushes it; `over` changes the
+ *  message (an attachment, the echo of the owner's phone, an option tapped…). */
+export function receive(
+  phone: string,
+  text: string,
+  contactName: string,
+  over: Record<string, unknown> = {},
+): { id: string; conversation_id: string } {
   return system('whatsapp_inbox.message.receive', {
-    wa_message_id: `${PREFIX}wamid.${Date.now()}.${Math.floor(Math.random() * 1e6)}`,
+    wa_message_id: waId(),
     from: phone.replace('+', ''),
     contact_name: contactName,
     direction: 'inbound',
@@ -48,7 +60,38 @@ export function receive(phone: string, text: string, contactName: string): { id:
     type: 'text',
     text,
     sent_at: new Date().toISOString(),
+    ...over,
   });
+}
+
+/** The key the Hub sent its last message to `phone` with (what erplora.com's statuses carry). */
+export function lastSentKey(phone: string): string {
+  return psql(
+    `select m.client_message_id from whatsapp_inbox_message m join whatsapp_inbox_conversation c on c.id = m.conversation_id where c.phone = '${phone.replace(/'/g, '')}' and m.origin = 'hub' order by m.created_at desc limit 1`,
+  );
+}
+
+/** A delivery status of Meta for the Hub's message sent with `key`, as erplora.com pushes it. */
+export function pushStatus(key: string, status: 'sent' | 'delivered' | 'read', wamid: string): void {
+  system('whatsapp_inbox.message.update_status', {
+    wa_message_id: wamid,
+    client_message_id: key,
+    status,
+    status_at: new Date().toISOString(),
+  });
+}
+
+/** The screen of `flow` in the three sizes (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440), once it settles and
+ *  nothing scrolls sideways; `ready` waits for what the capture must show. Back to 1280×860 after. */
+export async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void> = async () => {}): Promise<void> {
+  for (const viewport of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(page);
+    await settled(page);
+    await noHorizontalScroll(page, `${flow} ${viewport.label}`);
+    await page.screenshot({ path: shot(`APP-WHATSAPP_INBOX-1-${flow}-${viewport.label}`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 }
 
 export interface ChannelPush {

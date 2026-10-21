@@ -42,6 +42,17 @@ const template = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   variables: 2,
   rejected_reason: '',
   synced_at: null,
+  header_format: '',
+  body_examples: [],
+  buttons: [],
+  meta_id: 'm1',
+  draft: null,
+  submit_state: '',
+  submit_error_code: '',
+  submit_error: '',
+  editable: true,
+  sendable: true,
+  deleting: false,
   ...over,
 });
 const PAGE = { rows: [template(), template({ id: 't2', name: 'promo', category: 'MARKETING', status: 'REJECTED', rejected_reason: 'INVALID_FORMAT' })], total: 2, limit: 50, offset: 0 };
@@ -79,7 +90,8 @@ describe('SettingsPage: the number and the month', () => {
 
   it('the month: messages sent against the plan’s, the cap said when it is reached, or no limit', async () => {
     const s = await setup();
-    expect(s.wrapper.findComponent(UsageMeter).props()).toMatchObject({ value: 12, max: 150, label: 'This month' });
+    // The block is titled «This month» once: the meter's own label says what it counts (hub#118 review).
+    expect(s.wrapper.findComponent(UsageMeter).props()).toMatchObject({ value: 12, max: 150, label: 'Messages sent' });
     expect(s.find('whatsapp-inbox-settings-month').text()).toContain('12 of 150 messages sent');
     const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
     expect(spent.find('whatsapp-inbox-settings-month').text()).toContain('You have used all the messages of your plan this month.');
@@ -115,7 +127,7 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
     await empty.result(TEMPLATES, { rows: [], total: 0, limit: 50, offset: 0 });
     expect(empty.wrapper.findComponent(EmptyState).props()).toMatchObject({
       heading: 'No templates.',
-      message: 'Templates are created in WhatsApp Manager or in erplora.com and appear here once Meta reviews them.',
+      message: 'Create one with «Add template»: Meta reviews it. The ones made in WhatsApp Manager appear here too.',
     });
   });
 
@@ -124,6 +136,79 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
     s.net.lastStream().push(errorFrame(s.subId(TEMPLATES), 'boom'));
     await flush();
     expect(s.prop('error')).toBe('Could not load the templates.');
+  });
+});
+
+describe('SettingsPage: making, changing and deleting templates (WHATSAPP_INBOX-F29…F31)', () => {
+  it('«Add template» opens the empty form; a row it can change opens it filled', async () => {
+    const s = await setup();
+    await s.result(TEMPLATES, PAGE);
+    expect(s.table().props()).toMatchObject({ addable: true, rowClickable: true });
+    expect(s.prop<{ add: string }>('labels').add).toBe('Add template');
+    s.table().vm.$emit('add');
+    await flush();
+    expect(s.inDoc('whatsapp-inbox-template-editor')?.getAttribute('aria-label')).toBe('New template');
+  });
+
+  it('Edit only on what the Hub can change; Delete on every template; Retry on what did not reach Meta', async () => {
+    const s = await setup();
+    await s.result(TEMPLATES, PAGE);
+    type Action = { id: string; label: string; hidden?: (row: TemplateOut) => boolean };
+    const actions = s.prop<Action[]>('actions');
+    const shown = (row: TemplateOut) => actions.filter((a) => !a.hidden?.(row)).map((a) => a.label);
+    expect(shown(template())).toEqual(['Edit', 'Delete']);
+    expect(shown(template({ editable: false }))).toEqual(['Delete']);
+    expect(shown(template({ submit_state: 'failed', submit_error: 'Bad body' }))).toEqual(['Edit', 'Send to Meta again', 'Delete']);
+    expect(shown(template({ submit_state: 'sending', submit_error_code: 'whatsapp_inbox.saas_unreachable' }))).toEqual([
+      'Edit',
+      'Send to Meta again',
+      'Delete',
+    ]);
+    expect(shown(template({ deleting: true, submit_error: 'Meta did not answer.' }))).toEqual(['Send to Meta again']);
+    expect(shown(template({ deleting: true }))).toEqual([]);
+  });
+
+  it('says where each one is on its way to Meta, and why it did not get there', async () => {
+    const s = await setup();
+    await s.result(TEMPLATES, PAGE);
+    const columns = s.prop<{ key: string; format?: (v: unknown, r: TemplateOut) => string }[]>('columns');
+    const status = columns.find((c) => c.key === 'status')!;
+    expect(status.format!('DRAFT', template({ status: 'DRAFT', submit_state: 'queued' }))).toBe('Not sent to Meta · Sending to Meta…');
+    expect(status.format!('DRAFT', template({ status: 'DRAFT', submit_state: 'failed', submit_error: 'Bad body' }))).toBe(
+      'Not sent to Meta · Not accepted: Bad body',
+    );
+    expect(
+      status.format!('APPROVED', template({ submit_state: 'sending', submit_error_code: 'x', submit_error: 'erplora.com did not answer.' })),
+    ).toBe('Approved · Changes not sent: erplora.com did not answer.');
+    expect(status.format!('APPROVED', template({ deleting: true }))).toBe('Being deleted at Meta');
+    expect(status.format!('APPROVED', template({ deleting: true, submit_error: 'Meta did not answer.' }))).toBe(
+      'Being deleted at Meta · Meta did not answer.',
+    );
+  });
+
+  it('Delete asks first, naming the template and that Meta deletes it too, then deletes it', async () => {
+    const s = await setup();
+    await s.result(TEMPLATES, PAGE);
+    s.answer(200, template({ deleting: true }));
+    s.table().vm.$emit('action', { actionId: 'delete', row: PAGE.rows[0] });
+    await flush();
+    const dialog = s.inDoc('whatsapp-inbox-template-delete');
+    expect(dialog?.getAttribute('aria-label')).toBe('Delete this template?');
+    expect(dialog?.textContent).toContain('recordatorio (es)');
+    expect(dialog?.textContent).toContain('Meta deletes it too');
+    expect(s.sent()).toEqual([]);
+    (s.inDoc('whatsapp-inbox-template-delete-submit') as HTMLElement).click();
+    await flush();
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/whatsapp_inbox/templates/delete', query: {}, body: { id: 't1' } }]);
+  });
+
+  it('«Send to Meta again» hands it over again', async () => {
+    const s = await setup();
+    await s.result(TEMPLATES, PAGE);
+    s.answer(200, template({ submit_state: 'queued' }));
+    s.table().vm.$emit('action', { actionId: 'retry', row: template({ submit_state: 'failed' }) });
+    await flush();
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/whatsapp_inbox/templates/retry', query: {}, body: { id: 't1' } }]);
   });
 });
 

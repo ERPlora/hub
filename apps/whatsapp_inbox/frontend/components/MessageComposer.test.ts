@@ -45,8 +45,8 @@ const conversation = (over: Partial<ConversationDetailOut> = {}): ConversationDe
 type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string; fill?: string; placeholder?: string };
 
 async function setup(over: Partial<ConversationDetailOut> = {}, locale: 'en' | 'es' = 'en') {
+  // The composer subscribes to nothing until «Template» is pressed: no stream to open here.
   const m = await mountInbox(MessageComposer, { props: { conversation: conversation(over), now: NOW }, locale });
-  await m.live();
   await settle();
   const text = () => m.inDoc('whatsapp-inbox-composer-text') as Control;
   const send = () => m.inDoc('whatsapp-inbox-composer-send') as Control;
@@ -137,13 +137,16 @@ describe('MessageComposer: reply (WHATSAPP_INBOX-F32)', () => {
     expect((s.inDoc('whatsapp-inbox-composer-template') as Control).disabled).toBe(true);
   });
 
-  it('«Template» opens «Send a template» for this conversation', async () => {
+  it('«Template» opens «Send a template» for this conversation; the templates are read only from then on', async () => {
     const s = await setup();
+    // Opening a conversation never reopens the tab's stream a second time just for the templates.
+    expect(s.wrapper.findComponent(TemplateSendModal).exists()).toBe(false);
+    expect(s.params('whatsapp_inbox.template.list')).toEqual([]);
+    await click(s.inDoc('whatsapp-inbox-composer-template'));
     const modal = s.wrapper.findComponent(TemplateSendModal);
     expect(modal.props('conversationId')).toBe('c1');
-    expect(modal.props('open')).toBe(false);
-    await click(s.inDoc('whatsapp-inbox-composer-template'));
-    expect(s.wrapper.findComponent(TemplateSendModal).props('open')).toBe(true);
+    expect(modal.props('open')).toBe(true);
+    expect(s.params('whatsapp_inbox.template.list')).toEqual([{ sendable: true, limit: 100 }]);
   });
 });
 

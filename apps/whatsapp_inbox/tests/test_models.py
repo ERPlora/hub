@@ -2,6 +2,7 @@
 conversation per number, one channel row, one template per name and language)."""
 
 import datetime as dt
+import uuid
 
 import pytest
 from django.db import IntegrityError, transaction
@@ -120,9 +121,43 @@ def test_one_template_per_name_and_language():
     Template.objects.create(name="recordatorio", language="es")
     Template.objects.create(name="recordatorio", language="en")
     assert violates(
-        "whatsapp_inbox_template_name_language_unique",
+        "whatsapp_inbox_template_live_name_language_unique",
         lambda: Template.objects.create(name="recordatorio", language="es"),
     )
+
+
+def test_a_template_deleted_here_frees_its_name_and_language():
+    Template.objects.create(name="recordatorio", language="es", deleted_at=NOW, delete_state="done")
+    Template.objects.create(name="recordatorio", language="es")
+    assert Template.objects.filter(name="recordatorio", language="es").count() == 2
+
+
+def test_one_save_of_a_template_per_key():
+    key = uuid.uuid7()
+    Template.objects.create(name="uno", language="es", submit_key=key)
+    assert violates(
+        "whatsapp_inbox_template_submit_key_unique",
+        lambda: Template.objects.create(name="dos", language="es", submit_key=key),
+    )
+
+
+@pytest.mark.parametrize(
+    ("fields", "handled"),
+    [
+        ({}, True),
+        ({"header_format": "TEXT", "header": "Tu cita"}, True),
+        ({"header_format": "TEXT", "header": "Hola {{1}}"}, False),
+        ({"header_format": "IMAGE"}, False),
+        ({"category": "AUTHENTICATION"}, False),
+        ({"buttons": [{"type": "QUICK_REPLY", "text": "Sí"}, {"type": "URL", "text": "Web", "url": "https://p.test"}]}, True),
+        ({"buttons": [{"type": "URL", "text": "Web", "url": "https://p.test/{{1}}"}]}, False),
+        ({"buttons": [{"type": "COPY_CODE", "text": "Copiar"}]}, False),
+    ],
+)
+def test_the_hub_handles_templates_it_can_write_and_fill(fields, handled):
+    row = Template.objects.create(name="t", language="es", **fields)
+    assert row.supported is handled
+    assert Template.objects.get(pk=row.pk).supported is handled
 
 
 def test_the_window_is_24_hours_from_the_customer_s_last_message():

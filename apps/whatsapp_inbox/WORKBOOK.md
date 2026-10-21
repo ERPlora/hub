@@ -1,17 +1,18 @@
 # Workbook — Bandeja de WhatsApp (app)
 Prefijo: WHATSAPP_INBOX
 Alcance MVP: transversal
-Estado de la app: hecha en el Hub (servidor y páginas). Lo que entra de erplora.com y lo que sale hacia
-él está declarado y probado en el Hub, pero espera la otra mitad del contrato: las puertas
-`/internal/whatsapp/*` que monta `base` y las que sirve el SaaS («Contrato con el SaaS»); hasta
-entonces F03, F08, F27, F28 y F32–F34 no funcionan de punta a punta.
+Estado de la app: hecha en el Hub (servidor y páginas), también las plantillas, que se crean, editan y
+borran desde el Hub. Lo que entra de erplora.com y lo que sale hacia él está declarado y probado en el Hub,
+pero espera la otra mitad del contrato: las puertas `/internal/whatsapp/*` que monta `base` y las que sirve
+el SaaS («Contrato con el SaaS»); hasta entonces los flujos que cruzan con erplora.com quedan en parcial.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
 > verde (servidor y páginas). Parte del `WORKFLOW.md` del módulo Bandeja de WhatsApp del producto
 > actual (`modules-workspace/modules/whatsapp_inbox`, `origin/main` `5ea1588`, v2.1.113) y de la app
 > `whatsapp_inbox` del SaaS actual (`saas`, `origin/develop`). Los números de flujo se conservan
-> (otras apps los citan); los nuevos empiezan en F32.
+> (otras apps los citan); los nuevos empiezan en F32. F14–F26 (respuestas automáticas y reservas por
+> WhatsApp) se escriben en la segunda parte de la migración de esta app.
 
 ## Para qué sirve y para quién
 
@@ -21,15 +22,15 @@ desde el Hub**, sin coger el móvil. Reconoce a la persona por su número y une 
 ficha de Clientes; deja **asignar** cada conversación a alguien del equipo, marcarla **abierta,
 pendiente o cerrada** y dejar **notas internas** que el cliente nunca ve. Pasadas 24 horas desde el
 último mensaje del cliente, WhatsApp solo deja escribir con una **plantilla aprobada por Meta**: la
-bandeja lo sabe y ofrece las plantillas del negocio.
+bandeja lo sabe y ofrece las plantillas del negocio, que se crean, editan y borran en sus Ajustes.
 
 Sirve igual a la peluquería (la clienta que pide hora) y al restaurante (el comensal que pregunta por
 una mesa): lo que cambia es lo que se contesta, no cómo.
 
 Quién la usa:
 
-- El **propietario** y el **administrador**: todo, también ver el estado del número y las plantillas
-  (Ajustes) y borrar los datos de un número.
+- El **propietario** y el **administrador**: todo, también ver el estado del número, gestionar las
+  plantillas (Ajustes) y borrar los datos de un número.
 - El **responsable**: lee, contesta, asigna a cualquiera, cambia el estado y deja notas.
 - El **empleado**: lee, contesta, se asigna a sí mismo, cambia el estado y deja notas.
 - Del otro lado, el **cliente** solo usa su WhatsApp.
@@ -45,30 +46,33 @@ aparece en la conversación como mensaje del negocio (coexistencia de Meta).
 | Shopify Inbox | Conversaciones abiertas/cerradas, se cierran y reabren a mano; se asignan solo a quien tiene permiso de chat | https://help.shopify.com/en/manual/inbox/conversations |
 | Fresha (Client Connect) | Bandeja de clientes: contestar, abierta/cerrada, sin leer y notas internas para el equipo | https://www.fresha.com/help-center/knowledge-base/messaging/102320-manage-client-messages-in-client-connect |
 | Vagaro Connect | Mensajes de ida y vuelta con clientes desde el panel | https://www.vagaro.com/en-au/pro/updates/vagaro-connect |
-| Odoo (WhatsApp) | Contesta libre dentro de 24 h del último mensaje del cliente; después, solo plantilla aprobada | https://odoo.com/pt_BR/forum/ajuda-1/v183-how-can-i-send-a-whatsapp-message-to-my-customer-after-24-hours-285255 |
+| Odoo (WhatsApp) | Contesta libre dentro de 24 h del último mensaje del cliente; después, solo plantilla aprobada. Las plantillas se escriben en Odoo y se mandan a Meta con «Submit for Approval» | https://odoo.com/pt_BR/forum/ajuda-1/v183-how-can-i-send-a-whatsapp-message-to-my-customer-after-24-hours-285255 |
 | Zendesk | Abierta / pendiente (esperando al cliente) / resuelta; cuando el cliente contesta, vuelve a abierta | https://www.eesel.ai/blog/zendesk-ticket-status-lifecycle |
 | Intercom | Notas internas en la conversación que no cambian su estado; abrir, posponer, cerrar | https://community.intercom.com/inbox-9/snoozed-conversations-reopen-when-adding-a-note-8095 |
 | Front | Comentarios internos en línea con la conversación, solo para el equipo | https://www.getmacha.com/blog/front-comments-and-mentions-explained |
 | Meta (WhatsApp Business Platform) | Ventana de 24 h desde el último mensaje del cliente; fuera, solo plantillas | https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages |
 | SleekFlow / Chakra (bandejas de WhatsApp) | Opt-in obligatorio antes de escribir; «me la quedo» con aviso de choque entre agentes | https://help.sleekflow.io/whatsapp/whatsapp-message-opt-in · https://chakrahq.com/article/whatsapp-shared-inbox-for-customer-support-teams/ |
+| WATI, Respond.io, Twilio, Gupshup, AiSensy, Interakt, Zoko (plantillas) | Crear, editar y borrar la plantilla en su propio panel, con ejemplos de las variables, y ver el veredicto de Meta en la lista | https://support.wati.io/en/articles/11463217-how-to-create-a-whatsapp-template-message |
 
 **Gana:** una bandeja desde la que se contesta (Square, Shopify, Fresha, Vagaro, Odoo), con tres
 estados (abierta, pendiente, cerrada) donde un mensaje nuevo del cliente reabre la conversación
 (Zendesk), asignación a quien puede leer la bandeja con «Asignármela» que no pisa a otro (Shopify,
-Chakra), notas internas en el hilo (Fresha, Intercom, Front) y la regla de Meta de las 24 horas
-hecha cumplir en el servidor.
+Chakra), notas internas en el hilo (Fresha, Intercom, Front), la regla de Meta de las 24 horas
+hecha cumplir en el servidor y las plantillas gestionadas en la propia app (Odoo, WATI, Respond.io y el
+producto actual).
 **Por qué las demás no:** contestar solo desde el móvil (el producto actual) obliga a coger el
 teléfono y deja la bandeja en solo lectura; dos estados (Shopify) no distinguen «espero al cliente»
-de «está hecho»; asignar tecleando un identificador (el producto actual) no lo usa nadie.
+de «está hecho»; asignar tecleando un identificador (el producto actual) no lo usa nadie; mandar a
+WhatsApp Manager a crear las plantillas saca al dueño de la app para lo que hace a diario.
 
 ## Antes de empezar
 
 1. Activar **Clientes**: la bandeja no se enciende sin ella (une cada conversación a su ficha).
-2. Conectar el número de WhatsApp Business del negocio **en erplora.com** (la cuenta de WhatsApp,
-   el webhook de Meta y las plantillas viven allí). En el Hub, **Bandeja de WhatsApp → Ajustes** dice
-   si el número está conectado y lleva a erplora.com para conectarlo.
-3. Crear las plantillas en WhatsApp Manager o en erplora.com y esperar a que Meta las apruebe:
-   aparecen solas en **Ajustes → Plantillas de Meta**.
+2. Conectar el número de WhatsApp Business del negocio **en erplora.com** (la cuenta de WhatsApp y el
+   enlace con Meta viven allí). En el Hub, **Bandeja de WhatsApp → Ajustes** dice si el número está
+   conectado y lleva a erplora.com para conectarlo.
+3. Crear las plantillas en **Ajustes → Plantillas de Meta → Añadir plantilla** (o en WhatsApp Manager) y
+   esperar a que Meta las apruebe: las de WhatsApp Manager aparecen solas en la misma lista.
 4. Escribir al número desde otro móvil y comprobar que la conversación aparece en la bandeja.
 
 ## Pantallas
@@ -107,10 +111,26 @@ Menú **Bandeja de WhatsApp → Ajustes** (título «Ajustes del canal»), solo 
 administrador. Tres bloques: **Tu número** («Conectado» con el número y el nombre del negocio, «Sin
 conectar» o «Hay que reconectar», y **Gestionar en erplora.com**); **Este mes** (los mensajes
 enviados frente a los del plan, o «Sin límite»); y **Plantillas de Meta**: tabla con **Nombre**,
-**Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Aprobada, En
-revisión, Rechazada, Pausada, Desactivada, Borrada en WhatsApp Manager) y **Texto**, con buscador
-«Buscar plantilla…» y el motivo de Meta en las rechazadas. Vacía: «Sin plantillas.» con «Las
-plantillas se crean en WhatsApp Manager o en erplora.com y aparecen aquí cuando Meta las revisa.».
+**Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
+Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
+debajo, cuando toca, «Enviándose a Meta…», «No aceptada: …», «Cambios sin enviar: …» o «Borrándose en
+Meta») y **Texto**, con buscador «Buscar plantilla…», el motivo de Meta en las rechazadas y el botón
+**Añadir plantilla**. Acciones de fila: **Editar** (o tocar la fila; solo las que el Hub sabe escribir),
+**Volver a enviar a Meta** (la que no llegó o no se aceptó) y **Borrar**. Vacía: «Sin plantillas.» con
+«Crea una con «Añadir plantilla»: Meta la revisa. Las que se hacen en WhatsApp Manager también salen
+aquí.».
+
+### Plantilla (hoja)
+Se abre con **Añadir plantilla** («Nueva plantilla») o **Editar** («Editar plantilla — nombre»), encima
+de Ajustes. Campos: **Nombre** («Minúsculas, números y guiones bajos. No se puede cambiar después.»),
+**Idioma** y **Categoría** (Utilidad o Marketing), **Cabecera (opcional)**, **Texto** («Donde va una
+variable, escribe su número entre dobles llaves, empezando por el 1.»), un **Ejemplo de la variable n**
+por cada variable («Meta revisa la plantilla con estos ejemplos.»), **Pie (opcional)** y **Botones**
+(**Añadir botón**: Respuesta rápida, Enlace o Llamada, con su texto y su dirección o su número;
+**Quitar botón**). Botón final **Enviar a revisión de Meta** (nueva) o **Guardar y enviar a Meta**
+(editar). Al editar una aprobada avisa: «Hasta que Meta apruebe los cambios, se sigue enviando la
+aprobada.»; la categoría de una que Meta no ha rechazado no se puede tocar («Meta solo deja cambiar la
+categoría de una plantilla que ha rechazado.»).
 
 ## Estados de cada pantalla
 
@@ -119,37 +139,43 @@ plantillas se crean en WhatsApp Manager o en erplora.com y aparecen aquí cuando
 | Bandeja | indicador en la tabla; el panel, «Cargando…» | «Sin conversaciones.» / «Sin resultados» | el motivo + **Reintentar**; el panel, su motivo | «No tienes permiso» / «Esta app no está activa en este negocio» en lugar de la lista |
 | Panel de la conversación | «Cargando…» | «Todavía no hay mensajes.» | «No se pudo cargar la conversación» | — |
 | Ajustes | indicador | «Sin plantillas.» | el motivo + **Reintentar** | igual que la bandeja |
+| Plantilla (hoja) | el botón final ocupado mientras guarda | — | el motivo debajo de su campo, o arriba el que da el Hub | solo propietario y administrador la abren |
 
 ## Flujos
 
 | ID | Flujo | Estado | Vertical |
 |---|---|---|---|
-| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | movido a erplora.com (el Hub enseña el estado) | comun |
-| WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | movido a erplora.com (el Hub enseña «Hay que reconectar») | comun |
-| WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | declarado; esperan las puertas de base/SaaS | comun |
+| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la conexión es de erplora.com, que aún no la tiene | comun |
+| WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | parcial — la reconexión es de erplora.com, que aún no la tiene | comun |
+| WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | parcial — falta la entrada desde erplora.com | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
 | WHATSAPP_INBOX-F05 | Leer una conversación | hecho | comun |
-| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial (se abre en una pestaña; sin vista previa en el hilo) | comun |
+| WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | parcial — se abre en una pestaña; sin vista previa en el hilo | comun |
 | WHATSAPP_INBOX-F07 | Asignar una conversación a alguien del equipo | hecho | comun |
-| WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | declarado; esperan las puertas de base/SaaS | comun |
-| WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho (filtro y recuento; la campana del Hub no existe aún) | comun |
-| WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | hecho | comun |
-| WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | hecho | comun |
+| WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | parcial — falta la entrada desde erplora.com | comun |
+| WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho (filtro y recuento; la campana del Hub llegará con la barra superior) | comun |
+| WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | parcial — erplora.com aún no olvida el número | comun |
+| WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | parcial — erplora.com aún no olvida el número | comun |
 | WHATSAPP_INBOX-F12 | Unir dos fichas de la misma clienta | hecho | comun |
-| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | hecho | comun |
-| WHATSAPP_INBOX-F14–F26 | Respuestas automáticas que reservan cita o mesa | fuera de esta app (ver «Lo que NO hace») | — |
-| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | declarado; esperan las puertas de base/SaaS | comun |
-| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | declarado; esperan las puertas de base/SaaS | comun |
-| WHATSAPP_INBOX-F29–F31 | Crear, editar y borrar una plantilla | movido a erplora.com | comun |
-| WHATSAPP_INBOX-F32 | Contestar desde la bandeja | declarado; esperan las puertas de base/SaaS | comun |
-| WHATSAPP_INBOX-F33 | Enviar una plantilla | declarado; esperan las puertas de base/SaaS | comun |
-| WHATSAPP_INBOX-F34 | Saber si un mensaje llegó y se leyó | declarado; esperan las puertas de base/SaaS | comun |
+| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | parcial — las cifras del mes aún no llegan de erplora.com | comun |
+| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | parcial — la lista de Meta aún no llega de erplora.com | comun |
+| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | parcial — la lista de Meta aún no llega de erplora.com | comun |
+| WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — erplora.com aún no la registra en Meta; sin cabecera con archivo | comun |
+| WHATSAPP_INBOX-F30 | Editar una plantilla | parcial — erplora.com aún no registra el cambio en Meta | comun |
+| WHATSAPP_INBOX-F31 | Borrar una plantilla | parcial — erplora.com aún no la borra en Meta | comun |
+| WHATSAPP_INBOX-F32 | Contestar desde la bandeja | parcial — erplora.com aún no envía a Meta | comun |
+| WHATSAPP_INBOX-F33 | Enviar una plantilla | parcial — erplora.com aún no envía a Meta | comun |
+| WHATSAPP_INBOX-F34 | Saber si un mensaje llegó y se leyó | parcial — los estados de Meta aún no llegan de erplora.com | comun |
 | WHATSAPP_INBOX-F35 | Cambiar el estado de una conversación | hecho | comun |
 | WHATSAPP_INBOX-F36 | Dejar una nota interna | hecho | comun |
 | WHATSAPP_INBOX-F37 | Unir la conversación a una ficha o crear la ficha | hecho | comun |
+| WHATSAPP_INBOX-F38 | Saber a qué pregunta contesta lo que toca la clienta | parcial — falta la entrada desde erplora.com | comun |
 
 ### WHATSAPP_INBOX-F01 Conectar el número de WhatsApp del negocio
-Estado: movido a erplora.com
+<!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
+Estado: parcial — el Hub enseña el estado del número y lleva a erplora.com; conectar el número
+(Facebook, QR de la app WhatsApp Business) y contárselo al Hub es la mitad de erplora.com, que todavía
+no existe
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -160,19 +186,29 @@ Pasos:
 Entra: el estado del número que erplora.com manda al Hub.
 Sale: nada en el Hub; el número conectado vive en erplora.com.
 Si falla: lo dice erplora.com; el Hub sigue diciendo «Sin conectar».
+Implicados: erplora.com (la cuenta de WhatsApp Business del negocio)
 
 ### WHATSAPP_INBOX-F02 Desconectar o volver a conectar el número
-Estado: movido a erplora.com
+<!-- origen: old-hub:HUB_SHELL-F171 old-hub:HUB_SHELL-F172 old-saas:SAAS_WHATSAPP_INBOX-F03 old-saas:SAAS_WHATSAPP_INBOX-F04 old-hub:HUB-F262 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f02 -->
+Estado: parcial — el Hub enseña «Hay que reconectar» y quita el aviso solo cuando el número vuelve;
+desconectar y reconectar se hace en erplora.com, que todavía no tiene esa mitad
 Actor: propietario, administrador
-Pantalla: Ajustes
+Pantalla: Ajustes, Bandeja de entrada
 Pasos:
 1. Si WhatsApp retiró el permiso, **Tu número** dice «Hay que reconectar» y la bandeja avisa de que
    no se puede enviar.
 2. **Gestionar en erplora.com** lleva a reconectar o desconectar.
+3. Con el número de vuelta, los avisos se van solos, sin recargar.
+Entra: el estado del número que erplora.com manda al Hub.
 Sale: las conversaciones guardadas no se tocan.
+Si falla: mientras siga «Hay que reconectar», **Enviar** dice por qué no sale; lo guardado se sigue
+leyendo.
+Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F07 old-saas:SAAS_WHATSAPP_INBOX-F10 fi:modules/whatsapp_inbox#command-sql-multi-stmt-whatsapp_inbox-messages-ingest old-hub:HUB-F263 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f03 wf:whatsapp-cita#rec_wa_cita-f02 wf:whatsapp-mesa#rec_wa_mesa-f02 -->
+Estado: parcial — el Hub guarda y enseña lo que le entregan; falta la puerta por la que erplora.com lo
+entrega (la monta la plataforma) y el lado de erplora.com que lo recibe de Meta
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
 Pasos:
@@ -187,9 +223,12 @@ Pasos:
 6. Con los mensajes del plan gastados, el mensaje llega igual: el tope solo limita lo que se envía.
 Entra: cada mensaje que erplora.com recibe de Meta para este negocio.
 Sale: una conversación por número y el mensaje guardado; aviso `whatsapp_inbox.message.received`.
-Si falla: si el Hub no contesta, erplora.com guarda el mensaje y lo vuelve a entregar.
+Si falla: si el Hub no contesta, erplora.com guarda el mensaje y lo vuelve a entregar; un número que no
+es un número no se guarda.
+Implicados: erplora.com, Clientes (reconoce a la clienta, F04)
 
 ### WHATSAPP_INBOX-F04 Reconocer a la clienta por su número
+<!-- origen: wf:whatsapp-cita#rec_wa_cita-f03 wf:whatsapp-mesa#rec_wa_mesa-f03 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f04 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -198,46 +237,55 @@ Pasos:
    esa ficha.
 2. Cuando se crea o se corrige una ficha con el número de alguien que ya había escrito, su
    conversación se une a ella.
-3. El número se compara como número (formato internacional): `600 111 222`, `+34 600 111 222` y
-   `0034600111222` son la misma persona en un negocio de España; los mismos dígitos con el prefijo de
-   otro país son otra persona.
+3. El número se compara como número: escrito con espacios, con el prefijo del país o con «00» delante
+   es la misma persona en un negocio de España, y un número extranjero que conserva su cero (un fijo de
+   Italia) también; los mismos dígitos con el prefijo de otro país son otra persona.
 Entra: el número de la conversación y las fichas con ese número.
 Sale: la conversación sabe de qué ficha es. Solo rellena un vínculo vacío: el que puso una persona se
 respeta. Una ficha eliminada cuenta como vacío: su conversación queda sin ficha y otra ficha viva del
 mismo número la reclama.
 Si falla: si dos fichas tienen el mismo número, no se une a ninguna y el mensaje sigue guardado.
+Implicados: Clientes
 
 ### WHATSAPP_INBOX-F05 Leer una conversación
+<!-- origen: fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-get fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-list fi:modules/whatsapp_inbox#query-whatsapp_inbox-messages-list old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f05 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
-1. Buscar por contacto o teléfono (el teléfono escrito de cualquier forma, también una parte:
-   `600 111` encuentra `+34600111222`) o filtrar por estado, asignación o sin leer. El asistente la
-   nombra como se dice: «Ana Lopez», «ana lópez» o «Zoé 🌸» llevan a la misma conversación si solo una
-   coincide.
+1. Buscar por contacto o teléfono (el teléfono escrito de cualquier forma, también solo una parte) o
+   filtrar por estado, asignación o sin leer. El asistente la nombra como se dice: «Ana Lopez», «ana
+   lópez» o «Zoé 🌸» llevan a la misma conversación si solo una coincide.
 2. Pulsar **Abrir** en la fila (o tocar la fila).
 3. El hilo aparece encima de la lista, del más antiguo al más reciente; un mensaje sin texto ni
    adjunto enseña su tipo en el idioma de quien lo lee («Ubicación», «Respuesta de botón»…), y una
    reacción (👍) aparece sobre el mensaje al que responde, sin sumar en **Sin leer**.
 4. Al abrirla, **Sin leer** vuelve a «—»; un mensaje que llega con el hilo abierto también queda leído.
 5. **Cerrar** vuelve a la lista.
+Entra: la búsqueda, los filtros y la conversación elegida.
 Sale: **Sin leer** a cero en esa conversación; nada más cambia.
-Si falla: el motivo dentro del panel; la lista sigue disponible.
+Si falla: el motivo dentro del panel; la lista sigue disponible. Mientras la lista carga, la tabla lo
+dice (nunca «0 conversaciones»).
+Implicados: Clientes (el nombre de la ficha)
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F15 old-hub:HUB-F267 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f06 -->
 Estado: parcial — el adjunto se abre en una pestaña nueva servida por erplora.com; el hilo no enseña
 la foto ni reproduce el audio (falta permitir el origen de erplora.com en la política de seguridad del
-Hub)
+Hub), y nadie ha visto todavía una nota de voz o un documento reales de punta a punta
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
 1. Un mensaje con adjunto enseña su tipo (Foto, Nota de voz, Vídeo, Documento, Sticker), el nombre del
    archivo y su texto.
 2. Pulsar **Abrir el adjunto**: se abre en una pestaña nueva (solo adjuntos de erplora.com por https).
+Entra: el adjunto que guarda erplora.com: su enlace, su tipo, su nombre y su pie.
+Sale: nada cambia en el Hub.
 Si falla: si erplora.com ya no lo guarda, la pestaña lo dice.
+Implicados: erplora.com (guarda los adjuntos)
 
 ### WHATSAPP_INBOX-F07 Asignar una conversación a alguien del equipo
+<!-- origen: fi:modules/whatsapp_inbox#command-sql-declarativo-whatsapp_inbox-conversations-assign old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f07 -->
 Estado: hecho
 Actor: empleado (a sí mismo), responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -246,33 +294,49 @@ Pasos:
 2. Pulsar **Asignármela**, o elegir a alguien del equipo en **Asignada a** (solo responsable,
    administrador y propietario), o **Quitar asignación**.
 3. La lista y el panel enseñan la asignación, en todas las pantallas abiertas.
+Entra: a quién: a mí, a una persona del equipo o a nadie.
 Sale: la conversación queda asignada; aviso `whatsapp_inbox.conversation.assigned`.
 Si falla: quien no puede asignar a otros (el empleado) nunca quita una conversación a otra persona:
 «Esta conversación ya la lleva {nombre}.», también si se la asignaron un instante antes; tampoco puede
 asignarla a otro («Solo puedes asignarte conversaciones a ti»). El responsable sí reasigna, y su
 **Asignármela** tampoco pisa a nadie.
+Implicados: el equipo del negocio (las personas con acceso a la bandeja)
 
 ### WHATSAPP_INBOX-F08 Contestar desde la app de WhatsApp Business del móvil
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F08 old-hub:HUB-F264 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f08 -->
+Estado: parcial — el Hub guarda el eco del móvil como mensaje del negocio; falta la puerta por la que
+erplora.com lo entrega y el lado de erplora.com que lo recibe de Meta
 Actor: propietario
 Pantalla: Bandeja de entrada
 Pasos:
 1. Contestar como siempre desde la app WhatsApp Business del móvil.
 2. La respuesta aparece en el hilo como mensaje del negocio, marcada «Desde el móvil».
 3. No suma en **Sin leer**.
+Entra: el eco de lo que el dueño escribe en el móvil, que manda erplora.com.
+Sale: el mensaje guardado en su conversación; aviso `whatsapp_inbox.message.received`.
+Si falla: si no llega, el hilo no lo enseña; el móvil lo sigue teniendo.
+Implicados: erplora.com, la app WhatsApp Business del móvil
 
 ### WHATSAPP_INBOX-F09 Ver quién espera respuesta
+<!-- origen: old-hub:HUB_SHELL-F61 old-hub:HUB_SHELL-F64 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f09 wf:whatsapp-cita#rec_wa_cita-f09 wf:whatsapp-mesa#rec_wa_mesa-f09 -->
 Estado: hecho (filtro y recuento; la campana del Hub llegará con la barra superior)
 Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
 1. Filtrar **Estado: Abierta** y **Sin leer**: quedan las conversaciones cuyo último mensaje es del
    cliente.
-2. El recuento de conversaciones esperando respuesta está disponible para la campana del Hub
-   (`whatsapp_inbox.conversation.summary`).
+2. El recuento de conversaciones esperando respuesta está disponible para la campana del Hub.
+3. Al ordenar por cualquier columna, las filas sin ese dato van al final, en los dos sentidos.
+Entra: los filtros y el orden.
+Sale: la lista filtrada y el recuento (`whatsapp_inbox.conversation.summary`); nada cambia.
+Si falla: el motivo con **Reintentar**.
+Implicados: la campana de la barra superior (cuando exista)
 
 ### WHATSAPP_INBOX-F10 Borrar los datos de un número sin ficha
-Estado: hecho
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F21 old-hub:HUB-F251 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f10 -->
+Estado: parcial — el Hub lo borra todo al momento y pide a erplora.com que olvide el número; la mitad
+de erplora.com que lo olvida todavía no existe, así que el Hub guarda el número aparte solo para
+volver a pedírselo
 Actor: propietario, administrador
 Pantalla: Bandeja de entrada
 Pasos:
@@ -281,34 +345,48 @@ Pasos:
    aviso de que no se puede deshacer; pulsar **Borrar datos** (o **Cancelar**).
 3. El panel se cierra, la conversación sale de la lista y aparece «Se han borrado los datos de este
    número.».
+Entra: la conversación y la confirmación.
 Sale: número, nombre, textos, adjuntos y notas vaciados en el Hub al momento; conversación cerrada y
 borrada. Si vuelve a escribir, empieza una conversación nueva. Aviso
-`whatsapp_inbox.conversation.erased` con el identificador (nunca el número). Después del guardado, el Hub
-pide a erplora.com que olvide ese número y sus mensajes (adjuntos incluidos, que viven allí); hasta que
-lo confirma, el número se guarda aparte solo para pedírselo (`erase_status = pending`).
+`whatsapp_inbox.conversation.erased` con el identificador (ningún aviso de la app lleva el número, el
+nombre ni lo que se dijo, así que el historial interno no guarda nada suyo). Después del guardado, el
+Hub pide a erplora.com que olvide ese número y sus mensajes (adjuntos incluidos, que viven allí); hasta
+que lo confirma, el número se guarda aparte solo para pedírselo.
 Si falla: «No se pudieron borrar los datos de este número» (o el motivo). Si erplora.com no confirma,
-se le vuelve a pedir: al pulsarlo otra vez y cada 5 minutos desde el worker (fase 2); pulsarlo dos veces
-no borra nada más.
+se le vuelve a pedir: al pulsarlo otra vez y cada 5 minutos; pulsarlo dos veces no borra nada más.
+Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F11 Borrar los datos de una clienta desde su ficha
-Estado: hecho
+<!-- origen: old-hub:HUB-F250 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f11 -->
+Estado: parcial — el borrado llega desde Clientes y vacía sus conversaciones como en F10; la mitad de
+erplora.com que olvida el número todavía no existe
 Actor: sistema
+Pantalla: ninguna (se borra desde la ficha, en Clientes)
 Pasos:
 1. En Clientes se borran los datos de una ficha.
 2. Todas las conversaciones unidas a esa ficha quedan vaciadas y cerradas como en F10.
 Entra: el aviso `customer.customer.erased`.
+Sale: las conversaciones vaciadas y cerradas; aviso `whatsapp_inbox.conversation.erased` por cada una.
 Si falla: el aviso se reintenta; repetirlo no cambia nada.
+Implicados: Clientes, erplora.com
 
 ### WHATSAPP_INBOX-F12 Unir dos fichas de la misma clienta
+<!-- origen: old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f12 -->
 Estado: hecho
 Actor: sistema
+Pantalla: ninguna (se une desde Clientes)
 Pasos:
 1. En Clientes se une una ficha duplicada a otra.
 2. Las conversaciones de la ficha absorbida pasan a la que queda, sin tocar nada más.
-Entra: el aviso `customer.customer.merged`. Repetirlo no cambia nada.
+Entra: el aviso `customer.customer.merged`.
+Sale: las conversaciones, en la ficha que queda.
+Si falla: el aviso se reintenta; repetirlo no cambia nada.
+Implicados: Clientes
 
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
-Estado: hecho
+<!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
+Estado: parcial — el Hub enseña el consumo y frena el envío en el tope, pero las cifras del mes las
+manda erplora.com por una puerta que todavía no existe (y es erplora.com quien cuenta y reserva el cupo)
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
 Pasos:
@@ -317,10 +395,16 @@ Pasos:
 2. En el tope, la bandeja lo avisa encima de la lista y **Enviar** lo explica en vez de enviar.
 3. Lo que escriben los clientes se sigue guardando.
 4. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado.
-Si falla: si erplora.com rechaza un envío por el tope, el mensaje no sale y se dice por qué.
+Entra: el consumo y el tope del mes que manda erplora.com.
+Sale: el aviso en la bandeja; nada se guarda.
+Si falla: si erplora.com rechaza un envío por el tope, el mensaje no sale y se dice por qué; si pide ir
+más despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
+Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
+Estado: parcial — la tabla enseña lo que el Hub sabe y cambia sola; el veredicto de Meta lo trae
+erplora.com por una puerta que todavía no existe
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -329,15 +413,108 @@ Pasos:
 2. Cuando Meta cambia el veredicto, la tabla cambia sola.
 Entra: la lista que erplora.com manda al Hub cada vez que cambia.
 Sale: nada; una plantilla que Meta ya no lista queda «Borrada en WhatsApp Manager» y no se puede enviar.
+Si falla: si la tabla no carga, el motivo con **Reintentar**; si erplora.com no manda la lista, se queda
+la última que mandó.
+Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
+Estado: parcial — el Hub guarda lo que le llega; la lista la manda erplora.com por una puerta que
+todavía no existe
 Actor: sistema
-Pasos: las que el negocio crea en WhatsApp Manager aparecen en la lista en cuanto erplora.com las
-manda, con su texto, sus variables y su estado.
+Pantalla: Ajustes
+Pasos:
+1. El negocio crea una plantilla en WhatsApp Manager.
+2. Aparece en **Ajustes → Plantillas de Meta** en cuanto erplora.com la manda, con su texto, sus
+   variables, sus botones y su estado.
+3. Las que el Hub no sabe rellenar al enviar (cabecera con foto, vídeo, documento o una variable;
+   variables con nombre en vez de número; códigos de verificación) se ven, pero no se ofrecen para
+   enviar ni se editan aquí.
+Entra: la lista de plantillas que erplora.com trae de Meta.
+Sale: cada plantilla guardada como la tiene Meta.
+Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de vuelta una borrada aquí.
+Implicados: erplora.com, WhatsApp Manager
+
+### WHATSAPP_INBOX-F29 Crear una plantilla y mandarla a revisión
+<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f29 -->
+Estado: parcial — el Hub la guarda, la valida con las reglas de Meta y la entrega a erplora.com; falta
+la mitad de erplora.com que la registra en Meta, y la cabecera con foto, vídeo o documento no se ofrece
+(el Hub no guarda archivos: se hace en WhatsApp Manager)
+Actor: propietario, administrador
+Pantalla: Ajustes, Plantilla (hoja)
+Pasos:
+1. En **Ajustes → Plantillas de Meta**, pulsar **Añadir plantilla**.
+2. Escribir el nombre, elegir idioma y categoría (Utilidad o Marketing) y escribir el texto con `{{1}}`,
+   `{{2}}`… donde van las variables, con un ejemplo de cada una; si se quiere, cabecera, pie y botones
+   (respuestas rápidas juntas, hasta dos enlaces y una llamada; diez como mucho).
+3. Pulsar **Enviar a revisión de Meta**: la plantilla sale en la lista «Sin enviar a Meta» con
+   «Enviándose a Meta…» y pasa a «En revisión» en cuanto Meta la recibe.
+4. Cuando Meta decide, pasa sola a «Aprobada» (ya se puede enviar, F33) o a «Rechazada» con su motivo.
+Entra: nombre, idioma, categoría, cabecera, texto, ejemplos, pie, botones y una clave del guardado (la
+misma al reintentar).
+Sale: la plantilla guardada y, tras el guardado, entregada a erplora.com para que la registre en Meta;
+aviso `whatsapp_inbox.template.created`.
+Si falla: lo que Meta no aceptaría se dice debajo de su campo (un nombre con mayúsculas o espacios,
+variables sin numerar en orden o con nombre, una variable sin ejemplo, una variable en la cabecera o
+el pie, más de 60 caracteres en la cabecera o el pie, botones mezclados o de más); el mismo nombre en el
+mismo idioma: «Ya hay una plantilla «…» en ese idioma.». Si Meta no la acepta o pide esperar, la lista
+dice «No aceptada: …» con el motivo de Meta («Meta no ha contestado. Inténtalo de nuevo en unos
+minutos.» cuando Meta no contesta: nunca culpa a ERPlora) y se corrige con **Editar** o se repite con
+**Volver a enviar a Meta**. Si erplora.com no contesta, la lista lo dice y **Volver a enviar a Meta** la
+entrega otra vez con la misma clave (también sola, cada 5 minutos): nunca se registra dos veces. Con
+el mes gastado se puede crear igual.
+Implicados: erplora.com, Meta
+
+### WHATSAPP_INBOX-F30 Editar una plantilla
+<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f30 -->
+Estado: parcial — el Hub guarda el cambio y lo entrega a erplora.com; falta la mitad de erplora.com que
+lo registra en Meta
+Actor: propietario, administrador
+Pantalla: Ajustes, Plantilla (hoja)
+Pasos:
+1. En **Ajustes → Plantillas de Meta**, pulsar **Editar** en la fila (o tocarla).
+2. Cambiar el texto, los ejemplos, la cabecera, el pie o los botones (la categoría, solo si Meta la
+   rechazó; el nombre y el idioma no cambian) y pulsar **Guardar y enviar a Meta**.
+3. Una plantilla aprobada se sigue enviando tal como Meta la aprobó mientras el cambio va de camino
+   («Hasta que Meta apruebe los cambios, se sigue enviando la aprobada.»); en cuanto Meta lo recibe, pasa
+   a «En revisión» con el texto nuevo.
+Entra: el cambio y una clave del guardado (la misma al reintentar).
+Sale: el cambio guardado aparte hasta que Meta lo recibe, para que su veredicto nunca caiga sobre un
+texto cambiado después; aviso `whatsapp_inbox.template.updated`.
+Si falla: una plantilla en revisión no se cambia («Meta está revisando esta plantilla: espera a su
+veredicto para cambiarla.»), ni una que va de camino («Esta plantilla se está enviando a Meta: espera
+un momento.»); la que tiene algo que el Hub no sabe escribir, o está desactivada o borrada en WhatsApp
+Manager, se cambia allí («Esta plantilla se cambia en WhatsApp Manager: el Hub no puede cambiarla.»);
+la categoría de una aprobada: «Meta solo deja cambiar la categoría de una plantilla que ha rechazado.».
+Si el cambio no llega a Meta, la fila dice «Cambios sin enviar: …» con **Volver a enviar a Meta**; lo
+demás, como en F29.
+Implicados: erplora.com, Meta
+
+### WHATSAPP_INBOX-F31 Borrar una plantilla
+<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f31 -->
+Estado: parcial — el Hub la retira al momento y pide a erplora.com que la borre en Meta; falta la mitad
+de erplora.com que la borra
+Actor: propietario, administrador
+Pantalla: Ajustes
+Pasos:
+1. En **Ajustes → Plantillas de Meta**, pulsar **Borrar** en la fila.
+2. Leer «¿Borrar esta plantilla?» con su nombre y su idioma y el aviso «Una plantilla aprobada tarda
+   días en volver a aprobarse.»; pulsar **Borrar plantilla** (o **Cancelar**).
+3. Ya no se puede enviar. Sale de la lista en cuanto Meta confirma; mientras tanto la fila dice
+   «Borrándose en Meta».
+Entra: la plantilla.
+Sale: la plantilla borrada aquí y, tras el guardado, el borrado de esa plantilla en ese idioma pedido a
+erplora.com (una que Meta nunca tuvo se borra sin preguntar); aviso `whatsapp_inbox.template.deleted`.
+Si falla: si Meta ya no la tenía, cuenta como borrada; si erplora.com o Meta no contestan, la fila dice
+«Borrándose en Meta» con el motivo y **Volver a enviar a Meta** lo pide otra vez. La lista que manda
+Meta nunca la trae de vuelta, aunque la siga listando hasta borrarla; una nueva con el mismo nombre sí
+se puede crear.
+Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F32 Contestar desde la bandeja
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F12 old-hub:HUB-F266 -->
+Estado: parcial — el Hub guarda, entrega y reintenta con la misma clave (probado contra el contrato);
+falta la puerta de erplora.com que lo envía a Meta
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
@@ -349,42 +526,57 @@ Entra: el texto (hasta 4096 caracteres) y una clave del mensaje (la pantalla y e
 la misma al reintentar).
 Sale: el mensaje guardado en cola y, tras el guardado, entregado a erplora.com; avisos
 `whatsapp_inbox.message.sent` y, al contestar erplora.com, `whatsapp_inbox.message.status_changed`.
-Si no se puede ni guardar, el cuadro conserva el texto con el motivo:
-- han pasado más de 24 horas desde el último mensaje del cliente: «Han pasado más de 24 horas…»;
-- el número no está conectado («WhatsApp no está conectado…»), el mes está gastado o el Hub no llega a
-  erplora.com: el cuadro lo dice antes de escribir.
-Si erplora.com lo rechaza (número bloqueado, tope del mes…): la burbuja dice «No entregado» y su motivo.
-Si erplora.com no contesta o no confirma: la burbuja dice «No enviado» con **Reintentar**, que lo entrega
-otra vez con la misma clave: nunca sale dos veces.
+Si falla: si no se puede ni guardar, el cuadro conserva el texto con el motivo: han pasado más de 24
+horas desde el último mensaje del cliente («Han pasado más de 24 horas…»), o el número no está
+conectado, el mes está gastado o el Hub no llega a erplora.com (el cuadro lo dice antes de escribir).
+Si erplora.com lo rechaza (número bloqueado, tope del mes…), la burbuja dice «No entregado» y su motivo.
+Si erplora.com no contesta, no confirma o pide ir más despacio, la burbuja dice «No enviado» con
+**Reintentar**, que lo entrega otra vez con la misma clave: nunca sale dos veces.
+Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Enviar una plantilla
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old-hub:HUB-F266 -->
+Estado: parcial — el Hub guarda, entrega y reintenta como en F32; falta la puerta de erplora.com que lo
+envía a Meta
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
 1. En **Responder**, pulsar **Plantilla**: se abre «Enviar una plantilla» con las plantillas
-   **aprobadas** (nombre, idioma, categoría y texto).
+   **aprobadas** que el Hub sabe rellenar (nombre, idioma, categoría y texto).
 2. Elegir una y rellenar sus variables (`{{1}}`, `{{2}}`…); la vista previa enseña el texto final.
 3. Pulsar **Enviar**: el mensaje aparece en el hilo como en F32.
 También por el asistente o la API a un número que aún no ha escrito («envía la plantilla de
-recordatorio a +34 600 111 222»): se crea su conversación.
+recordatorio a este número»): se crea su conversación. Un número escrito a mano es del país del negocio
+salvo que lleve su prefijo.
+Entra: la plantilla (nombre e idioma), sus variables, una clave del mensaje y la conversación o el
+número.
+Sale: el mensaje guardado y entregado como en F32; aviso `whatsapp_inbox.message.sent`.
 Si falla: una plantilla de **Marketing** solo se envía a una clienta con ficha y con el consentimiento
 de marketing por WhatsApp dado en Clientes («Esta clienta no ha dado su consentimiento para recibir
-publicidad por WhatsApp.»); una plantilla no aprobada o borrada no se puede elegir; faltan variables:
-«Rellena todas las variables de la plantilla.»; el resto, como en F32.
+publicidad por WhatsApp.»); una plantilla no aprobada, borrada o que el Hub no sabe rellenar no se
+puede elegir; faltan variables: «Rellena todas las variables de la plantilla.»; un número incompleto:
+«Esto no es un número de teléfono.» y no se guarda nada; el resto, como en F32.
+Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
-Estado: declarado; esperan las puertas de base/SaaS
+<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F09 -->
+Estado: parcial — el Hub guarda y enseña cada estado; los estados de Meta los trae erplora.com por una
+puerta que todavía no existe
 Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
 1. Cada mensaje enviado lleva su estado: **Enviando…**, **Enviado**, **Entregado**, **Leído**, **No
    entregado** (con el motivo de Meta o de erplora.com) o **No enviado** (con **Reintentar**).
 2. Cambia solo, sin recargar, cuando erplora.com lo cuenta.
+Entra: cada estado que erplora.com recibe de Meta para un mensaje del Hub.
 Sale: el estado solo avanza (un «Entregado» que llega tarde no deshace un «Leído»); un estado que llega
-antes que la respuesta de erplora.com se casa con el mensaje por su clave y no se pierde.
+antes que la respuesta de erplora.com se casa con el mensaje por su clave y no se pierde; aviso
+`whatsapp_inbox.message.status_changed`.
+Si falla: un estado de un mensaje que el Hub no conoce se ignora sin error.
+Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F35 Cambiar el estado de una conversación
+<!-- origen: nuevo (Zendesk, Fresha y Shopify Inbox: abierta, pendiente y cerrada; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -392,9 +584,13 @@ Pasos:
 1. En el panel, pulsar **Abierta**, **Pendiente** (esperando al cliente) o **Cerrada** (resuelta).
 2. La lista lo enseña al momento en todas las pantallas.
 3. Si el cliente vuelve a escribir, la conversación vuelve a **Abierta** sola.
+Entra: el estado elegido.
 Sale: aviso `whatsapp_inbox.conversation.status_changed`.
+Si falla: el motivo dentro del panel; el estado no cambia.
+Implicados: ninguna otra app
 
 ### WHATSAPP_INBOX-F36 Dejar una nota interna
+<!-- origen: nuevo (Fresha, Intercom y Front: notas internas en el hilo; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -402,9 +598,13 @@ Pasos:
 1. En el panel, pestaña **Nota interna**: escribir y pulsar **Añadir nota**.
 2. La nota sale en el hilo, en amarillo, con su autor y su hora; el cliente nunca la ve.
 3. Quien la escribió, el responsable, el administrador y el propietario pueden **Borrarla**.
+Entra: el texto de la nota.
 Sale: aviso `whatsapp_inbox.note.added` / `whatsapp_inbox.note.deleted`.
+Si falla: el motivo en el panel; el empleado no borra la nota de otra persona.
+Implicados: ninguna otra app
 
 ### WHATSAPP_INBOX-F37 Unir la conversación a una ficha o crear la ficha
+<!-- origen: nuevo (Square, Fresha y Shopify Inbox: la conversación lleva a la ficha del cliente; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -414,8 +614,29 @@ Pasos:
 2. O **Crear ficha**: crea en Clientes una ficha con el nombre de WhatsApp (o el número) y el número,
    con origen «WhatsApp», y la une.
 3. Con ficha, **Ver ficha** lleva a ella y **Desunir** la quita.
+Entra: la ficha elegida, o nada para crearla.
 Sale: aviso `whatsapp_inbox.conversation.customer_linked`.
 Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
+Implicados: Clientes
+
+### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
+<!-- origen: old-hub:HUB-F265 -->
+Estado: parcial — el Hub guarda la opción que toca y dice en el aviso a qué mensaje suyo contesta;
+falta la puerta por la que erplora.com entrega los mensajes
+Actor: cliente, sistema
+Pantalla: Bandeja de entrada
+Pasos:
+1. El negocio envía una plantilla con respuestas rápidas («Sí», «No») o un mensaje con botones.
+2. La clienta toca una opción: en el hilo sale con el texto de la opción, como respuesta de botón.
+3. La app que espera esa respuesta (un recordatorio de cita) sabe a cuál de sus mensajes contesta,
+   aunque haya dos preguntas abiertas.
+Entra: la opción tocada (su identificador y su texto) y el mensaje al que contesta, que manda
+erplora.com o que el Hub lee de lo que mandó Meta.
+Sale: la opción guardada con el mensaje; aviso `whatsapp_inbox.message.received` con el mensaje del Hub
+al que contesta y la opción, vacíos (nunca ausentes) cuando no contesta a nada que enviara este Hub.
+Si falla: si contesta a un mensaje que no envió este Hub (o cita uno suyo propio), el aviso no apunta a
+ninguno.
+Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 
 ## Servicios: lo que entra y lo que sale
 
@@ -429,7 +650,7 @@ Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
 | `whatsapp_inbox.conversation.summary` | Abiertas, sin leer y esperando respuesta, y si el tope del mes está gastado |
 | `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo |
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación |
-| `whatsapp_inbox.template.list` | Las plantillas (por defecto, solo las aprobadas) |
+| `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta |
 | `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes |
 | `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación |
 
@@ -445,39 +666,48 @@ Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
 | `whatsapp_inbox.conversation.link_customer` | Une a una ficha, crea la ficha o desune |
 | `whatsapp_inbox.conversation.erase` | Borra los datos de un número (irreversible) |
 | `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Notas internas |
+| `whatsapp_inbox.template.create` | Crea una plantilla y la entrega a erplora.com para Meta; pide una clave por guardado |
+| `whatsapp_inbox.template.update` | Cambia una plantilla; la aprobada sigue enviándose hasta que Meta recibe el cambio |
+| `whatsapp_inbox.template.retry` | Vuelve a entregar la plantilla (o su borrado) que no llegó a Meta; un rechazo va con clave nueva |
+| `whatsapp_inbox.template.delete` | Borra una plantilla aquí y en Meta (irreversible) |
 
 Del sistema (sin ruta pública; solo erplora.com por `/internal`, las entregas, el worker y las
 reacciones): `whatsapp_inbox.message.receive`, `whatsapp_inbox.message.update_status`,
 `whatsapp_inbox.channel.sync`; las entregas (`whatsapp_inbox.message.claim_delivery`,
 `whatsapp_inbox.message.record_delivery`, `whatsapp_inbox.conversation.claim_erasure`,
-`whatsapp_inbox.conversation.record_erasure`); la tarea del worker `whatsapp_inbox.delivery.resume`; y
+`whatsapp_inbox.conversation.record_erasure`, `whatsapp_inbox.template.claim_submit`,
+`whatsapp_inbox.template.record_submit`, `whatsapp_inbox.template.claim_delete`,
+`whatsapp_inbox.template.record_delete`); la tarea del worker `whatsapp_inbox.delivery.resume`; y
 las reacciones a Clientes (`whatsapp_inbox.conversation.claim_for_customer`,
 `whatsapp_inbox.conversation.move_customer`, `whatsapp_inbox.conversation.release_customer`,
 `whatsapp_inbox.conversation.erase_for_customer`).
 
 ### Lo que avisa
 
-`whatsapp_inbox.message.received`, `whatsapp_inbox.message.sent`,
-`whatsapp_inbox.message.status_changed`, `whatsapp_inbox.conversation.read`,
+`whatsapp_inbox.message.received` (con el mensaje del Hub al que contesta y la opción tocada, F38),
+`whatsapp_inbox.message.sent`, `whatsapp_inbox.message.status_changed`, `whatsapp_inbox.conversation.read`,
 `whatsapp_inbox.conversation.assigned`, `whatsapp_inbox.conversation.status_changed`,
 `whatsapp_inbox.conversation.customer_linked`, `whatsapp_inbox.conversation.erased`,
-`whatsapp_inbox.note.added`, `whatsapp_inbox.note.deleted`, `whatsapp_inbox.channel.synced`. Llevan
-identificadores, nunca un número ni un texto.
+`whatsapp_inbox.note.added`, `whatsapp_inbox.note.deleted`, `whatsapp_inbox.channel.synced`,
+`whatsapp_inbox.template.created`, `whatsapp_inbox.template.updated`, `whatsapp_inbox.template.deleted`.
+Llevan identificadores, nunca un número, un nombre ni un texto de la conversación.
 
 ### A qué reacciona y lo que necesita de otras apps
 
 - **Clientes** (obligatoria): `customer.customer.created` y `customer.customer.updated` unen las
   conversaciones sin ficha de ese número (F04); `customer.customer.merged` las pasa a la ficha que
   queda (F12); `customer.customer.deleted` las deja sin ficha y otra ficha viva del número las reclama;
-`customer.customer.erased` las borra (F11). Lee las fichas por número y el
-  consentimiento de marketing por WhatsApp; crea fichas solo con `customer.customer.create`.
+  `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
+  marketing por WhatsApp; crea fichas solo con `customer.customer.create`.
 
 ### Quién la usa
 
 - **Citas** y **Reservas** (cuando avisen por WhatsApp): `conversation.by_phone` para encontrar la
-  conversación y `message.send` con una plantilla de Utilidad para el aviso o el recordatorio.
+  conversación, `message.send` con una plantilla de Utilidad para el aviso o el recordatorio, y el aviso
+  `message.received` para saber qué contestó la clienta (F38).
 - El **asistente**: todas las operaciones, con referencias humanas («responde a Ana», «asigna la
-  conversación de +34 600 111 222 a Luis», «envía la plantilla recordatorio a +34…»).
+  conversación de Ana a Luis», «envía la plantilla recordatorio al número que te dicto», «crea una
+  plantilla de recordatorio»).
 
 ### Quién puede qué
 
@@ -486,21 +716,10 @@ identificadores, nunca un número ni un texto.
 | `whatsapp_inbox.view` (leer, marcar leída) | sí | sí | sí | sí |
 | `whatsapp_inbox.reply` (enviar, reintentar, notas, estado, ficha, asignarse una libre) | sí | sí | sí | sí |
 | `whatsapp_inbox.assign` (asignar a otro, quitársela a otro, borrar notas ajenas) | sí | sí | sí | no |
-| `whatsapp_inbox.configure` (Ajustes) | sí | sí | no | no |
+| `whatsapp_inbox.configure` (Ajustes; crear, editar, reenviar y borrar plantillas) | sí | sí | no | no |
 | `whatsapp_inbox.erase` (borrar datos de un número) | sí | sí | no | no |
 
 Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tiene.
-
-## Lo que NO hace, a propósito
-
-- **No guarda credenciales de Meta**: la cuenta de WhatsApp Business, el webhook y el token viven en
-  erplora.com.
-- **No crea, edita ni borra plantillas** (F29–F31): se hacen en WhatsApp Manager o en erplora.com,
-  que es quien habla con Meta; el Hub guarda una copia para elegirlas y enviarlas.
-- **No contesta sola ni reserva** (F14–F26): las respuestas automáticas eran recetas del módulo de
-  Automatizaciones y del asistente, que no se portan con esta app; vuelven con ellos.
-- **No hace campañas** ni envíos masivos.
-- No sincroniza grupos ni listas de difusión (límite de la coexistencia de Meta).
 
 ## Para quien lo mantiene
 
@@ -523,12 +742,22 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   su origen; tipo MIME, nombre, pie), estado (`received`; los del Hub: `queued` → `sending` → `sent` →
   `delivered` → `read`, o `failed`) con el código y el motivo del último intento o de Meta,
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
-  obligatoria), plantilla usada y sus variables, quién lo envió, hora en que se dijo y objeto de Meta
-  (`payload`). Una reacción es un mensaje de tipo `reaction` cuyo `reply_to` es el mensaje al que
-  responde: no suma en «Sin leer» ni pasa a último mensaje.
+  obligatoria), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
+  (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id` (la opción
+  tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
+  `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
+  mensaje.
 - `Note`: texto, autor y hora.
-- `Template`: nombre + idioma (únicos), categoría, estado en Meta, cabecera, cuerpo, pie, número de
-  variables, motivo de rechazo.
+- `Template`: nombre + idioma (únicos entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
+  Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
+  (`header_format`: vacío, `TEXT` o un archivo o lugar hecho en WhatsApp Manager; `header`), cuerpo,
+  ejemplos (`body_examples`), pie, botones, número de variables, motivo de rechazo, `meta_id`,
+  `synced_at`; el cambio que espera llegar a Meta (`draft`); la entrega a erplora.com (`submit_state`:
+  vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y
+  `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
+  `pending` hasta que Meta lo confirma, `done`); y `supported` (si el Hub la escribe y la sabe rellenar:
+  ni código de verificación, ni cabecera con archivo o con variable, ni variables con nombre, solo
+  respuestas rápidas, enlaces fijos y llamadas).
 
 Mensajes recibidos y enviados: el admin los enseña en **solo lectura** (son lo que llevó WhatsApp; se
 corrigen borrando los datos de la conversación, nunca editando), con borrado para el staff.
@@ -540,20 +769,42 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   (`transaction.on_commit`): `message.claim_delivery` lo toma con `SKIP LOCKED` y lo pone `sending`
   (transacción corta), la llamada HTTP a erplora.com va sin transacción ni bloqueo, y
   `message.record_delivery` guarda la respuesta en otra transacción corta. Lo mismo al borrar
-  (`conversation.claim_erasure` → HTTP → `conversation.record_erasure`). Un erplora.com lento nunca
-  bloquea la conversación (`receive`, `mark_read`, `assign`) ni, con el plan Gratis, el hub.
+  (`conversation.claim_erasure` → HTTP → `conversation.record_erasure`) y con las plantillas
+  (`template.claim_submit` → HTTP → `template.record_submit`; `template.claim_delete` → HTTP →
+  `template.record_delete`). Un erplora.com lento nunca bloquea la conversación (`receive`, `mark_read`,
+  `assign`) ni, con el plan Gratis, el hub.
 - **Fase 1** entrega al terminar la petición (el `on_commit` corre en ella); **fase 2**: el trabajo
   diferido entra con `use_hub(hub)` explícito (corre fuera de la petición que eligió el hub) y la tarea
   del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
-  `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending` y los borrados
-  `pending` con más de 2 minutos.
+  `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
+  `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`, cualquier otro como `whatsapp_inbox.send_refused`); conexión fallida o un
-  4xx que no es 409 → no ha salido (`sending`, `whatsapp_inbox.saas_unreachable`); 5xx, tiempo de lectura
-  agotado o 200 sin id → no se sabe (`sending`, `whatsapp_inbox.send_unknown`). Los dos últimos se
-  reintentan **con la misma clave** («No enviado · Reintentar», `message.retry`): erplora.com nunca envía
-  dos veces la misma clave.
+  4xx que no es 409 (también un 429: ir más despacio no es el tope) → no ha salido (`sending`,
+  `whatsapp_inbox.saas_unreachable`); 5xx, tiempo de lectura agotado o 200 sin id → no se sabe
+  (`sending`, `whatsapp_inbox.send_unknown`). Los dos últimos se reintentan **con la misma clave** («No
+  enviado · Reintentar», `message.retry`): erplora.com nunca envía dos veces la misma clave. Un error de
+  `httpx` que no es `HTTPError` (una URL que no entiende, una cabecera que no puede codificar) cuenta como
+  «no ha salido», nunca como excepción.
+- **Una plantilla nunca se registra dos veces.** Cada guardado lleva su `submit_key` (la pantalla genera
+  una por guardado; el asistente, una por intención); el mismo guardado repetido es la misma fila y la
+  misma entrega. 200 `{meta_id, status}` → la plantilla (o su `draft`) pasa a lo que Meta dice; 409 →
+  `failed` con el motivo de Meta (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited` y
+  `whatsapp.not_connected` se dicen con palabras del Hub, sin culpar a ERPlora); sin respuesta →
+  `sending`, y `template.retry` la entrega con la misma clave; un `failed` reintentado va con clave nueva
+  (la misma daría el mismo rechazo).
+- **La lista de Meta nunca pisa al Hub**: una plantilla `DRAFT` que va de camino conserva lo escrito, un
+  cambio pendiente espera en `draft` (el veredicto de Meta nunca cae sobre un texto cambiado después) y
+  una borrada aquí no vuelve (ni por nombre mientras su borrado está `pending`, ni por su `meta_id`).
+- Solo se envían plantillas `supported` y `APPROVED` (409 `whatsapp_inbox.template_not_sendable` /
+  `whatsapp_inbox.template_not_approved`); solo se editan las `supported` no desactivadas ni borradas en
+  Meta (409 `whatsapp_inbox.template_read_only`), ni en revisión (`whatsapp_inbox.template_in_review`)
+  ni de camino (`whatsapp_inbox.template_submitting`); la categoría, solo de una `DRAFT` o `REJECTED`
+  (`whatsapp_inbox.template_category_fixed`). El formulario aplica las reglas de Meta en el servidor
+  (422 bajo su campo): nombre `[a-z0-9_]`, variables `{{1}}…{{n}}` sin huecos ni con nombre, un ejemplo
+  por variable, sin variables en cabecera ni pie, 60 caracteres en cabecera y pie, 1024 en el cuerpo,
+  hasta 10 botones con las respuestas rápidas juntas, 2 enlaces https sin variables y 1 llamada E.164.
 - **La clave es obligatoria y una por mensaje** (`client_message_id`): la pantalla la guarda hasta que el
   Hub acepta el mensaje (aunque se retoque el texto) y el asistente genera una por intención. La misma
   clave dos veces, también a la vez, es un solo mensaje y una sola entrega (restricción única; el
@@ -562,7 +813,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   servidor; fuera de ella, `message.send` con texto da 409 `whatsapp_inbox.window_closed`. Sin
   `SAAS_INTERNAL_URL`, sin número conectado o con el mes gastado no se guarda nada (409
   `whatsapp_inbox.saas_unconfigured`, `whatsapp_inbox.channel_not_connected`,
-  `whatsapp_inbox.cap_reached`).
+  `whatsapp_inbox.cap_reached`). Recibir no mira el tope.
 - Una plantilla `MARKETING` exige la ficha viva de la conversación o, si no hay conversación, la única
   ficha viva de ese número, con el consentimiento `marketing` por `whatsapp` en vigor (el último hecho
   de Clientes); 409 `whatsapp_inbox.marketing_consent_missing`.
@@ -578,19 +829,25 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - Las referencias por voz o texto («Ana Lopez», «zoe») se comparan sin mayúsculas, tildes, emojis ni
   espacios de más, contra el nombre de WhatsApp y el de la ficha viva; solo valen si señalan
   exactamente una conversación (si no, 409 `whatsapp_inbox.conversation_ambiguous`).
-- Un número que llega de erplora.com tiene que ser internacional (`+?[1-9]` y 7–15 cifras) o es un 422;
-  el número del negocio, E.164 o vacío.
+- Números: el que llega de erplora.com tiene que ser internacional (`+?[1-9]` y 7–15 cifras) o es un
+  422, y sus cifras sueltas son internacionales; el que escribe una persona (`to` de `message.send`) es
+  del país del negocio salvo que lleve su prefijo (`600222333` es de España, nunca +60; gh:whatsapp_inbox#279).
+  El número del negocio, E.164 o vacío.
+- `message.received` dice a qué mensaje **del Hub** contesta (`reply_to_message_id`: solo uno con
+  `origin=hub` de esa conversación) y la opción (`reply_id`), los dos siempre presentes. Ningún evento
+  lleva el número, el nombre ni el texto: el outbox se guarda días después de un borrado.
 - Zona horaria de la fase 1: `Europe/Madrid` (el mes del tope y las horas de la bandeja).
 
 ### Retención (RGPD)
 
 Las conversaciones se guardan mientras el negocio usa la app. Se borran: a mano (F10), al borrar la
 ficha en Clientes (F11) y con la base de datos del negocio cuando se da de baja. Borrar vacía en el Hub,
-al momento, el número, el nombre, los textos, los adjuntos, las variables de plantilla, el objeto de Meta
-y las notas; y pide a erplora.com que olvide el número y los mensajes (los adjuntos viven allí). Quedan
-el identificador de cada mensaje (para no volver a crearlo si erplora.com lo entregara otra vez), las
-fechas y, solo hasta que erplora.com confirma, el número a olvidar (`erase_phone`). No hay purga
-automática por antigüedad en la fase 1: si se decide un plazo, será un ajuste con su tarea.
+al momento, el número, el nombre, los textos, los adjuntos, las variables de plantilla, la opción tocada,
+el objeto de Meta y las notas; y pide a erplora.com que olvide el número y los mensajes (los adjuntos
+viven allí). Quedan el identificador de cada mensaje (para no volver a crearlo si erplora.com lo
+entregara otra vez), las fechas y, solo hasta que erplora.com confirma, el número a olvidar
+(`erase_phone`). Los avisos del outbox solo llevan identificadores. No hay purga automática por
+antigüedad en la fase 1: si se decide un plazo, será un ajuste con su tarea.
 
 ### Contrato con el SaaS
 
@@ -617,17 +874,21 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
     "direction": "inbound", "source": "live", "type": "image", "text": "",
     "media": {"url": "https://erplora.com/whatsapp/media/7f3c…", "mime_type": "image/jpeg",
               "filename": "", "caption": "Mi pelo"},
-    "reply_to": "", "sent_at": "2026-10-15T10:00:00Z", "payload": {"…": "objeto de Meta"}}
+    "reply_to": "", "reply": null, "sent_at": "2026-10-15T10:00:00Z", "payload": {"…": "objeto de Meta"}}
    ```
 
    `from`: el número internacional del cliente, con o sin `+`. `direction`: `inbound` (cliente) u
    `outbound` (eco del móvil; `from` sigue siendo el cliente). `source`: `live` o `history`.
    `media.url`: del origen de erplora.com y por https; el navegador la abre con la sesión del negocio.
    Una reacción llega con `type: "reaction"`, el emoji en `text` y el mensaje que responde en
-   `reply_to`. Respuesta 200 `{"id", "conversation_id", "created"}`; repetir el mismo `wa_message_id`
-   es 200 con `created: false` (o completa un `media_placeholder` del historial). 422 con el sobre de
-   errores si el cuerpo no vale (no reintentar); 404 `app_inactive` si la app no está activa en ese
-   negocio, 5xx o sin respuesta: erplora.com guarda el mensaje y reintenta con espera creciente.
+   `reply_to`. Una opción tocada (F38) llega con `type: "button"` o `"interactive"`, `reply_to` = el
+   `wa_message_id` del mensaje que la ofrecía y `reply: {"id": "<payload o id de la opción>", "title":
+   "<su texto>"}`; sin `reply`, el Hub la lee de `payload` (`button.payload`/`button.text`,
+   `interactive.button_reply` o `interactive.list_reply`, y `context.id`). Respuesta 200
+   `{"id", "conversation_id", "created"}`; repetir el mismo `wa_message_id` es 200 con `created: false`
+   (o completa un `media_placeholder` del historial). 422 con el sobre de errores si el cuerpo no vale
+   (no reintentar); 404 `app_inactive` si la app no está activa en ese negocio, 5xx o sin respuesta:
+   erplora.com guarda el mensaje y reintenta con espera creciente.
 2. `POST /internal/whatsapp/status` → `whatsapp_inbox.message.update_status`:
 
    ```json
@@ -641,23 +902,27 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
    antes que su respuesta al envío y solo la clave lo casa. Respuesta 200
    `{"updated": true|false, "status": "…"}`; un mensaje desconocido es 200 con `updated: false`.
 3. `PUT /internal/whatsapp/channel` → `whatsapp_inbox.channel.sync`, cada vez que cambia el número, el
-   consumo o una plantilla:
+   consumo o una plantilla (también cuando Meta cambia un veredicto: erplora.com escucha su aviso):
 
    ```json
    {"hub": "a", "version": 42, "status": "connected", "phone_number": "+34910000000",
     "display_name": "Peluquería Ana", "monthly_limit": 150, "monthly_usage": 12, "usage_month": "2026-10",
     "templates": [{"name": "recordatorio", "language": "es", "category": "UTILITY", "status": "APPROVED",
-                   "header": "", "body": "Hola {{1}}, te esperamos el {{2}}.", "footer": "",
+                   "header_format": "TEXT", "header": "Tu cita", "body": "Hola {{1}}, te esperamos el {{2}}.",
+                   "body_examples": ["Ana", "viernes"], "footer": "",
+                   "buttons": [{"type": "QUICK_REPLY", "text": "Sí"}],
                    "variables": 2, "rejected_reason": "", "meta_id": "1234567890"}]}
    ```
 
    → 200 `{"applied": true|false, "version": 42}`. `templates: null` deja las plantillas como están;
-   una lista las sustituye (las que faltan quedan `DELETED`). Una `version` igual o menor que la
-   guardada no se aplica.
+   una lista las sustituye (las que faltan quedan `DELETED`), sin pisar lo que el Hub tiene de camino ni
+   traer de vuelta lo borrado aquí. `header_format`: vacío, `TEXT`, `IMAGE`, `VIDEO`, `DOCUMENT` o
+   `LOCATION`. Una `version` igual o menor que la guardada no se aplica. El historial que trae la
+   conexión no gasta cupo: `monthly_usage` cuenta solo lo que envía el negocio.
 4. La clave `whatsapp` de la **foto de estado** (`PUT /internal/hubs/{id}/state`): el mismo cuerpo que la
    puerta 3 (sin `hub`), con la `version` de la foto; `base` se la pasa a `whatsapp_inbox.channel.sync`.
 
-**Tres puertas que sirve el SaaS** (el Hub → erplora.com; `apps/whatsapp_inbox/gateway.py`, `httpx`, 5 s
+**Las puertas que sirve el SaaS** (el Hub → erplora.com; `apps/whatsapp_inbox/gateway.py`, `httpx`, 5 s
 para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción):
 
 5. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/send`, con `Idempotency-Key: <client_message_id>`:
@@ -671,9 +936,9 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
    Respuestas: 200 `{"wa_message_id": "wamid…"}` (aceptado por Meta); 409
    `{"error": {"code": "whatsapp.cap_reached" | "whatsapp.not_connected" | "whatsapp.window_closed" |
    "whatsapp.template_not_approved" | "whatsapp.recipient_blocked", "message": "…"}}` = no ha salido;
-   un 4xx que no es 409 = no ha salido; 5xx o sin respuesta = no se sabe. erplora.com **nunca envía dos
-   veces la misma clave** (devuelve el `wa_message_id` que ya tenía) y **reserva el cupo del mes de forma
-   atómica al aceptar**: dos envíos simultáneos no pueden pasar ambos el tope.
+   un 4xx que no es 409 (también 429) = no ha salido; 5xx o sin respuesta = no se sabe. erplora.com
+   **nunca envía dos veces la misma clave** (devuelve el `wa_message_id` que ya tenía) y **reserva el
+   cupo del mes de forma atómica al aceptar**: dos envíos simultáneos no pueden pasar ambos el tope.
 6. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/erase`:
 
    ```json
@@ -685,6 +950,29 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
    `pending` y el Hub lo vuelve a pedir.
 7. El **envío de estados** de la puerta 2 es obligación del SaaS: cada estado de Meta de un mensaje del
    Hub, con su `wa_message_id` y su `client_message_id`, hasta 200.
+8. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates`, con `Idempotency-Key: <submit_key>` (F29,
+   F30): registra en Meta una plantilla nueva o, con `meta_id`, el cambio de una que Meta ya tiene:
+
+   ```json
+   {"hub": "a", "name": "recordatorio", "language": "es", "category": "UTILITY", "header": "Tu cita",
+    "body": "Hola {{1}}, te esperamos el {{2}}.", "body_examples": ["Ana", "viernes"],
+    "footer": "Peluquería Ana", "buttons": [{"type": "QUICK_REPLY", "text": "Confirmar"}], "meta_id": ""}
+   ```
+
+   Respuestas: 200 `{"meta_id": "…", "status": "PENDING" | "APPROVED" | "REJECTED" | …}` (Meta la
+   recibió); 409 `{"error": {"code": "whatsapp.template_invalid" | "whatsapp.meta_unreachable" |
+   "whatsapp.meta_rate_limited" | "whatsapp.not_connected", "message": "<motivo de Meta>"}}` = no
+   aceptada; el resto como en la puerta 5. erplora.com **nunca registra dos veces la misma clave**.
+9. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates/delete` (F31):
+
+   ```json
+   {"hub": "a", "name": "recordatorio", "language": "es", "meta_id": "1234567890"}
+   ```
+
+   Borra en Meta esa plantilla en ese idioma (no las demás del mismo nombre). 200 `{"deleted": true}` o
+   404 `{"error": {"code": "whatsapp.template_not_found", …}}` (Meta ya no la tiene) = borrada; cualquier
+   otro 404 (una puerta que no existe, una dirección mal puesta: gh:whatsapp_inbox#296), 409 con su
+   motivo, otro 4xx, 5xx o sin respuesta = sigue `pending` y el Hub lo vuelve a pedir.
 
 ### Contrato con `base`
 
@@ -694,9 +982,10 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
   `system_context(scope)`, devolviendo su salida o el sobre de errores con su estado HTTP (422 para un
   cuerpo que no vale).
 - Al recibir la foto de estado con la clave `whatsapp` (puerta 4), pasarla a `whatsapp_inbox.channel.sync`.
-- En la fase 2: el relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
-  `apps.whatsapp_inbox.events.react`; el worker ejecuta la tarea `resume_deliveries` de `apps.py` en
-  cada hub (`hub_due`), y el trabajo diferido de esta app entra con `use_hub(hub)`.
+- El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
+  `apps.whatsapp_inbox.events.react` (ya en la fase 1, `base/relay.py`); en la fase 2, el worker ejecuta
+  la tarea `resume_deliveries` de `apps.py` en cada hub (`hub_due`), y el trabajo diferido de esta app
+  entra con `use_hub(hub)`.
 - La campana de la barra superior puede leer `whatsapp_inbox.conversation.summary` (`awaiting_reply`).
 - Para ver fotos y audio dentro del hilo (F06 completo), la CSP del Hub tiene que permitir el origen de
   erplora.com en `img-src` y `media-src` (`config/settings.py`, como ya hace con `form-action`).
@@ -706,8 +995,13 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
 - `PLAN-SAAS.md` (fila de `assistant`, `speech`, `whatsapp_inbox`, `notify` ≈l.45; ≈l.758; ≈l.875) y
   `PLAN-HUB.md` (≈l.71 y ≈l.461) dicen que WhatsApp **sale del SaaS** y que el Hub llama a Meta
   directamente. Esta app sigue el encargo del 2026-10-15: la cuenta de WhatsApp Business, el webhook de
-  Meta y las plantillas siguen en el SaaS, y el Hub habla con él por `/internal`. Falta la ronda nueva que
-  lo decida en los planes.
+  Meta y el registro de plantillas siguen en el SaaS, y el Hub habla con él por `/internal`. Falta la
+  ronda nueva que lo decida en los planes.
+- `PLAN-SAAS.md` (bloque 12: «Ninguna [pantalla] en el panel: la bandeja y sus ajustes son del Hub») no
+  dice dónde se crean las plantillas, y el WORKBOOK anterior las mandaba a erplora.com. Decidido en la
+  migración (mercado: Odoo, WATI, Respond.io, Twilio, Gupshup, AiSensy, Interakt y Zoko las crean en su
+  propio panel; el producto actual las creaba en el Hub): **se crean, editan y borran en el Hub**
+  (Ajustes) y erplora.com solo las registra en Meta (puertas 8 y 9). Falta escribirlo como ronda.
 - Fase 1 sin tenencia: `Channel` es una sola fila compartida por todos los hubs, y las conversaciones de
   `a` y `b` comparten tablas (solo los avisos vivos van por hub), como en todas las apps de la fase 1.
 
@@ -722,7 +1016,17 @@ para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una
 | Sin notas | Notas internas (F36) | Mercado (Fresha, Intercom, Front) |
 | «Necesita atención» lo ponían las recetas | Filtro **Sin leer** + recuento `awaiting_reply` | Sin recetas no hay quien la ponga |
 | Fotos y audio dentro del hilo, descargados por una puerta del Hub | Enlace al adjunto en erplora.com | La CSP del Hub no deja pintar archivos de otro origen (ver «Contrato con `base`») |
-| Plantillas: crear, editar, borrar desde el Hub | Solo lectura de la copia; se gestionan en erplora.com | Las plantillas son de la cuenta de WhatsApp Business, que vive en erplora.com |
+| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31), con la entrega a Meta por erplora.com; sin cabecera con archivo | El Hub no guarda archivos; la cabecera con foto, vídeo o documento se hace en WhatsApp Manager |
 | Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
-| Recetas de cita y mesa (F14–F26) | Fuera | Dependen de Automatizaciones y del asistente, no portados |
 | `templates.list` y ajustes solo para el administrador | Elegir plantilla para enviar: quien contesta; Ajustes: propietario y administrador | Quien contesta necesita las plantillas |
+
+## Lo que NO hace, a propósito
+
+- **No guarda credenciales de Meta**: la cuenta de WhatsApp Business, el webhook y el token viven en
+  erplora.com, que es quien habla con Meta.
+- **No sube la muestra de una cabecera con foto, vídeo o documento**: esas plantillas se hacen en
+  WhatsApp Manager y aquí se ven, pero no se envían.
+- **No contesta sola ni reserva** (F14–F26): las respuestas automáticas que reservan cita o mesa son la
+  segunda parte de la migración de esta app.
+- **No hace campañas** ni envíos masivos.
+- No sincroniza grupos ni listas de difusión (límite de la coexistencia de Meta).

@@ -40,5 +40,8 @@ live(
     on=[E.MESSAGE_RECEIVED, E.MESSAGE_SENT, E.MESSAGE_STATUS_CHANGED, E.ERASED],
 )
 live("whatsapp_inbox.note.list", on=[E.NOTE_ADDED, E.NOTE_DELETED, E.ERASED])
-live("whatsapp_inbox.template.list", on=[E.CHANNEL_SYNCED])
+live(
+    "whatsapp_inbox.template.list",
+    on=[E.CHANNEL_SYNCED, E.TEMPLATE_CREATED, E.TEMPLATE_UPDATED, E.TEMPLATE_DELETED],
+)
 live("whatsapp_inbox.channel.get", on=[E.CHANNEL_SYNCED])
