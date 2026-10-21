@@ -80,8 +80,9 @@ describe('toMinor: a money range filter in the unit the column shows', () => {
     // «1.250» is 1.250 € or 1,25 €; the filter filters nothing rather than the wrong amount.
     expect(toMinor('1.250')).toBeUndefined();
     expect(toMinor('1,250')).toBeUndefined();
-    // A currency with three decimals reads it as its decimals.
+    // A currency with three decimals reads it as its decimals; one without decimals, as thousands.
     expect(toMinor('1.250', 'KWD')).toBe(1250);
+    expect(toMinor('1.500', 'JPY')).toBe(1500);
   });
 
   it('more decimals than the currency has, or groups that are not of three, filter nothing', () => {
@@ -89,6 +90,9 @@ describe('toMinor: a money range filter in the unit the column shows', () => {
     expect(toMinor('12.5', 'JPY')).toBeUndefined();
     expect(toMinor('1.23.456')).toBeUndefined();
     expect(toMinor('1.234,5.6')).toBeUndefined();
+    // With both marks the thousands still go in groups of three.
+    expect(toMinor('12.34,50')).toBeUndefined();
+    expect(toMinor('1,2.50')).toBeUndefined();
   });
 });
 

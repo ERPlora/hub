@@ -65,7 +65,7 @@ function grouped(raw: string, mark: string): string | undefined {
  *  units of `currency`; nothing when it is not an amount (never «from 0»). The same reading as a money
  *  field (pm#521): with both marks the rightmost is the decimal one; one mark repeated groups
  *  thousands; one mark and three digits are thousands unless the currency has three decimals, and when
- *  they end in 0 («1.250»: 1.250 € or 1,25 €) the bound is not guessed. */
+ *  they end in 0 in a currency with decimals («1.250»: 1.250 € or 1,25 €) the bound is not guessed. */
 export function toMinor(text: string | undefined, currency: string = CURRENCY): number | undefined {
   const raw = (text ?? '').replace(/[\s  €]/g, '').replace(new RegExp(currency, 'gi'), '');
   if (!/^\d[\d.,]*$/.test(raw) || raw.replace(/\D/g, '').length > MAX_DIGITS) return undefined;
@@ -89,9 +89,8 @@ export function toMinor(text: string | undefined, currency: string = CURRENCY): 
   }
   if (fraction.length !== 3 || decimals >= 3) return decimal(head, fraction);
   const whole = grouped(raw, mark);
-  return whole === undefined || fraction.endsWith('0') ? undefined : minor(whole, '', decimals);
+  return whole === undefined || (decimals > 0 && fraction.endsWith('0')) ? undefined : minor(whole, '', decimals);
 }
-
 
 /** The two ends of the Total filter, as the table names them. */
 export const TOTAL_BOUNDS = ['total_amount_from', 'total_amount_to'] as const;
