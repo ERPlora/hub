@@ -553,6 +553,11 @@ class SessionOpenIn(In):
     customer: Said | None = Field(
         None, description="The customer's name or phone, when the id is not known."
     )
+    reservation_id: UUID | None = Field(
+        None,
+        description="The reservation whose party sits: only its hold of the table is spent; empty = every hold "
+        "already showing the table Reserved.",
+    )
 
     @model_validator(mode="after")
     def _said(self):

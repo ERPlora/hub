@@ -8,7 +8,7 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const FIRST_STEPS = 5;
-const LIMITS = 5;
+const LIMITS = 4;
 </script>
 
 <template>

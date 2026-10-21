@@ -6,6 +6,7 @@ its id or as a person says it.
 """
 
 import json
+import uuid
 
 import pytest
 from django.test import Client
@@ -14,7 +15,7 @@ from live.ninja import ensure_api_parity
 from apps.table.api import router
 from config.api import api
 
-from .conftest import make_session, make_table, make_zone
+from .conftest import make_hold, make_session, make_table, make_zone
 
 ROUTES = {
     ("GET", "/table/zones", "table.zone.list"),
@@ -194,6 +195,18 @@ def test_a_taken_table_is_a_409_with_its_own_code_in_the_readers_language(admin_
     error = response.json()["error"]
     assert error["code"] == "table.table_not_available"
     assert error["message"].startswith("Esa mesa no se puede sentar")
+
+
+@pytest.mark.django_db
+def test_seating_a_reservations_party_over_http_spends_only_its_hold(admin_client):
+    table = make_table("4", zone=make_zone())
+    ana, bea = str(uuid.uuid7()), str(uuid.uuid7())
+    make_hold(table, starts_in=-50, ref=ana, source="reservation", party_size=2)
+    later = make_hold(table, starts_in=50, ref=bea, source="reservation", party_size=4)
+    response = post(admin_client, "/table/sessions/open", {"table_id": str(table.id), "reservation_id": ana})
+    assert (response.status_code, response.json()["guests_count"]) == (201, 2)
+    later.refresh_from_db()
+    assert later.status == "held"
 
 
 # ── The whole flow over HTTP ─────────────────────────────────────────────────────────────────────

@@ -315,3 +315,15 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
     assert FlowRun.objects.get(pk=question.run_id).status == FlowRun.Status.SUCCEEDED
     assert Question.objects.get(pk=question.id).status == Question.Status.APPROVED
     assert events.QUESTION_EXPIRED not in events_since(before)
+
+
+def test_two_people_turning_the_same_recipe_on_at_once_build_one_automation():
+    # FLOW-F33: the old Hub could build two (HUB-F105 «parcial»); here one wins and the other finds it.
+    turn_on = lambda: run("flow.recipe.enable", {"recipe": "appointment/customer_cancelled"})  # noqa: E731
+    results = at_once(turn_on, turn_on, turn_on)
+    assert not [result for result in results if isinstance(result, Exception)], results
+    assert sorted(result.created for result in results) == [False, False, True]
+    assert len({result.flow.id for result in results}) == 1
+    flow = Flow.objects.get(recipe="appointment/customer_cancelled")
+    assert (flow.enabled, flow.grants) == (True, ["task.task.create"])
+    assert OutboxEvent.objects.filter(name="flow.flow.created").count() == 1

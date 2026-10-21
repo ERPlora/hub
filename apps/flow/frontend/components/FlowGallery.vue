@@ -6,6 +6,7 @@
 // business already has says how it is («Active», «Paused», «Unfinished») and offers «See it»; one whose
 // event another automation already starts on warns. A card whose apps are not in this business is
 // hidden and the apps are named below. A link (`?template=<id>`) opens a card and brings it into view.
+// Under its own cards, «Comes with …»: the ready-made automations the apps bring (FLOW-F33 to F35).
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -16,6 +17,7 @@ import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { toPayload } from '../lib/document';
 import { actionLabel, statePill } from '../lib/phrasing';
+import RecipeShelf from './RecipeShelf.vue';
 import {
   alreadyFires,
   buildDocument,
@@ -204,6 +206,7 @@ const T = (card: FlowTemplate, key: string): string => phrasing.value.t(`flow.ga
         </article>
       </div>
     </div>
+    <RecipeShelf :catalog="catalog" />
     <p
       v-if="hidden"
       class="flow-gallery__hint"

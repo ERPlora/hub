@@ -14,7 +14,10 @@ async function restricted(code: string, filePath: string): Promise<string[]> {
   return result.messages.filter((m) => m.ruleId === 'no-restricted-globals').map((m) => m.message);
 }
 
-describe('eslint config', () => {
+// The first lint loads ESLint's parsers and plugins from the disk, so its time is the machine's: with several test
+// runs on one machine (load 20–40) and every opened file scanned, it took up to 7.9 s (2026-10-21), against
+// Vitest's 5 s. 60 s for whichever test lints first, as the guardrails that read the whole tree (tsconfig.test.ts).
+describe('eslint config', { timeout: 60_000 }, () => {
   it.each(['fetch', 'EventSource', 'WebSocket', 'XMLHttpRequest'])('forbids %s in an app page and in the entry', async (name) => {
     const code = `export const x = ${name};\n`;
     expect(await restricted(code, 'apps/demo/frontend/pages/ItemListPage.ts')).toHaveLength(1);

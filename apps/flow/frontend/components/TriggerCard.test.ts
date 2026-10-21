@@ -47,13 +47,32 @@ describe('TriggerCard', () => {
     expect(s.emitted().at(-1)).toEqual({ kind: 'event', event: '', filter: { 'input.total': { gt: 10000 } } });
   });
 
-  it('«Something happens» says it does not start on its own yet (FLOW-F21, phase 2); a schedule does not', async () => {
+  it('looking for «carrito» finds Cart & Checkout’s events in its own words, with no online shop it does not have', async () => {
+    const carts = {
+      events: [
+        { name: 'cart_checkout.cart.abandoned', app: 'cart_checkout', app_name: 'Carrito y pago' },
+        { name: 'cart_checkout.checkout.initiated', app: 'cart_checkout', app_name: 'Carrito y pago' },
+        { name: 'cart_checkout.customer.erased', app: 'cart_checkout', app_name: 'Carrito y pago' },
+      ],
+      actions: [],
+    } as CatalogOut;
+    const m = await mountFlow(TriggerCard, {
+      locale: 'es',
+      props: { modelValue: { kind: 'event', event: '' }, open: true, catalog: carts, choices: [], steps: [], errors: {} },
+    });
+    const options = m.wrapper.findComponent(Combo).props('options') as Array<{ label: string }>;
+    expect(options.filter((option) => option.label.includes('carrito')).map((option) => option.label)).toEqual([
+      'se abandona un carrito',
+      'se borran los carritos de un cliente',
+      'se inicia un pedido desde un carrito',
+    ]);
+  });
+
+  it('«Something happens» no longer says it does not start on its own: the worker hands it every event (FLOW-F21)', async () => {
     const s = await setup({ kind: 'event', event: 'sale.sale.completed' });
-    expect(s.find('flow-trigger-event-notice').text()).toBe(
-      'For now it does not start on its own when this happens: run it with «Run now». A schedule or a date does start on its own.',
-    );
-    const clock = await setup({ kind: 'schedule', every: 'day', time: '09:00' });
-    expect(clock.find('flow-trigger-event-notice').exists()).toBe(false);
+    expect(s.find('flow-trigger-event').exists()).toBe(true);
+    expect(s.find('flow-trigger-event-notice').exists()).toBe(false);
+    expect(s.wrapper.text()).not.toContain('does not start on its own');
   });
 
   it('a schedule: how often, which day and what time', async () => {

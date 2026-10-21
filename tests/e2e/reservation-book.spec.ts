@@ -3,9 +3,11 @@
 // (its card is made in Customers), confirms it — the floor plan shows the table Reserved, an hour before
 // —, seats it from the book — the table is Occupied with its check open in Sales — and completes it; keeps
 // the waitlist (add, contacted, convert); and reads the day's occupancy, adds a slot and blocks a date in
-// Availability. Every screen in three viewports. What a run creates is named «E2E Rsv <stamp>…» (a zone,
-// its table, guests, slots, a blocked date and a temporary change of Schedules open all day); `afterAll`
-// removes all of it, with the holds, the table's checks and their orders.
+// Availability. It also edits, cancels with a reason, marks a no-show and deletes (F08–F10, F20), confirms by
+// itself (F04), and seats a late party leaving the next reservation of its table Reserved (F11). Every screen in
+// three viewports, one capture per flow (`APP-RESERVATION-<flow>-<width>`). What a run creates is named «E2E Rsv
+// <stamp>…» (a zone, its table, guests, slots, a blocked date and a temporary change of Schedules open all day);
+// `afterAll` removes all of it, with the holds, the table's checks and their orders.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
@@ -18,7 +20,7 @@ const GUEST = `${TAG} Ana`;
 const WAITING = `${TAG} Luis`;
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
+  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
 
@@ -91,14 +93,26 @@ function cleanUp(): void {
   );
 }
 
-/** Screenshots of the page in the three viewports, each once `ready` says it painted. */
-async function shots(page: Page, name: string, ready: () => Promise<void>): Promise<void> {
+/** Screenshots of the page in the three viewports, each once `ready` says it painted: `APP-RESERVATION-<flow>-<width>`. */
+async function shots(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await ready();
-    await page.screenshot({ path: shot(`${name}-${viewport.label}`), fullPage: true });
+    await page.screenshot({ path: shot(`APP-RESERVATION-${flow}-${viewport.label}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1280, height: 860 });
+}
+
+/** A reservation taken through the API (the form is the first test's), on the run's day and with its tag. */
+async function bookByApi(context: BrowserContext, guest: string, time: string, more: Record<string, unknown> = {}) {
+  return post<{ id: string; status: string }>(context, '/reservation/reservations', {
+    guest_name: guest,
+    guest_phone: `6${String(Date.now()).slice(-8)}`,
+    date: SOON.date,
+    time,
+    party_size: 2,
+    ...more,
+  });
 }
 
 /** The book open all day on the run's days — a slot each (the dev database has no other: only these runs
@@ -136,6 +150,7 @@ test.beforeAll(async ({ browser }) => {
 });
 test.afterAll(cleanUp);
 
+// flow: RESERVATION-F06, RESERVATION-F23, RESERVATION-F07, RESERVATION-F11, RESERVATION-F12
 test('Take a reservation at a table, confirm it, see it Reserved on the plan, seat it and complete it', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/reservation/reservations');
   try {
@@ -151,6 +166,12 @@ test('Take a reservation at a table, confirm it, see it Reserved on the plan, se
     await form.locator('[data-testid=reservation-form-time] input').fill(SOON_TIME);
     await form.locator('[data-testid=reservation-form-party_size] input').fill('3');
     await pick(page, 'reservation-form-table', '51', `51 (${ZONE})`);
+    await shots(page, 'RESERVATION-F23', async () => {
+      await expect(form.locator('[data-testid=reservation-form-table]')).toBeVisible();
+    });
+    await shots(page, 'RESERVATION-F06', async () => {
+      await expect(form.locator('[data-testid=reservation-form-guest_name]')).toBeVisible();
+    });
     await form.locator('[data-testid=reservation-form-submit]').click();
     await expect(form).toBeHidden();
 
@@ -163,7 +184,7 @@ test('Take a reservation at a table, confirm it, see it Reserved on the plan, se
 
     await rowAction(page, 'reservation-list', id, 'confirm');
     await expect(book(page)).toContainText('Confirmed');
-    await shots(page, 'reservation-book', async () => {
+    await shots(page, 'RESERVATION-F07', async () => {
       await expect(book(page)).toBeVisible();
     });
 
@@ -188,11 +209,15 @@ test('Take a reservation at a table, confirm it, see it Reserved on the plan, se
     if (SOON.date !== TODAY.date) await shown(page).locator('[data-testid=reservation-day-next]').click();
     await rowAction(page, 'reservation-list', id, 'complete');
     await expect(book(page)).toContainText('Completed');
+    await shots(page, 'RESERVATION-F12', async () => {
+      await expect(book(page)).toBeVisible();
+    });
   } finally {
     await context.close();
   }
 });
 
+// flow: RESERVATION-F14, RESERVATION-F15, RESERVATION-F16
 test('Keep the waitlist: add a guest, mark her contacted and convert her into a reservation', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/reservation/waitlist');
   try {
@@ -206,9 +231,29 @@ test('Keep the waitlist: add a guest, mark her contacted and convert her into a 
     await expect(form).toBeHidden();
     const row = view.locator('[data-testid=reservation-waitlist-row]', { hasText: WAITING });
     await expect(row).toContainText('Waiting');
+    await shots(page, 'RESERVATION-F14', async () => {
+      await expect(row).toBeVisible();
+    });
     const id = (await row.getAttribute('data-id'))!;
     await rowAction(page, 'reservation-waitlist', id, 'contact');
     await expect(row).toContainText('Yes');
+
+    // Somebody who no longer waits is removed, after confirming.
+    const gone = await post<{ id: string }>(context, '/reservation/waitlist', {
+      guest_name: `${TAG} Mar`,
+      date: SOON.date,
+      preferred_time: SOON_TIME,
+      party_size: 2,
+    });
+    const goneRow = view.locator(`[data-testid=reservation-waitlist-row][data-id="${gone.id}"]`);
+    await expect(goneRow).toBeVisible();
+    await shots(page, 'RESERVATION-F15', async () => {
+      await expect(row).toContainText('Yes');
+    });
+    await rowAction(page, 'reservation-waitlist', gone.id, 'remove');
+    await page.locator('[data-testid=reservation-waitlist-remove-submit]').click();
+    await expect(goneRow).toBeHidden();
+
     await rowAction(page, 'reservation-waitlist', id, 'convert');
     await expect(row).toContainText('Converted');
     await expect(view.locator('[data-testid=reservation-waitlist-outcome]')).toContainText(`${WAITING} now has a reservation`);
@@ -219,7 +264,7 @@ test('Keep the waitlist: add a guest, mark her contacted and convert her into a 
       `/reservation/reservations?search=${encodeURIComponent(WAITING)}`,
     );
     expect(booked.data.rows.map((r) => [r.guest_name, r.source])).toEqual([[WAITING, 'waitlist']]);
-    await shots(page, 'reservation-waitlist', async () => {
+    await shots(page, 'RESERVATION-F16', async () => {
       await expect(row).toBeVisible();
     });
   } finally {
@@ -227,6 +272,7 @@ test('Keep the waitlist: add a guest, mark her contacted and convert her into a 
   }
 });
 
+// flow: RESERVATION-F05, RESERVATION-F02, RESERVATION-F01
 test('Availability: the day’s occupancy, a blocked date and a slot added and removed', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/reservation/availability');
   try {
@@ -245,6 +291,9 @@ test('Availability: the day’s occupancy, a blocked date and a slot added and r
     await expect(blockForm).toBeHidden();
     const blocked = view.locator('[data-testid=reservation-availability-blocked-row]', { hasText: `${TAG} event` });
     await expect(blocked).toContainText('Whole day');
+    await shots(page, 'RESERVATION-F02', async () => {
+      await expect(blocked).toBeVisible();
+    });
 
     // A slot on a weekday the run left free, then removed.
     const free = [0, 1, 2, 3, 4, 5, 6].find((day) => day !== TODAY.weekday && day !== SOON.weekday)!;
@@ -261,7 +310,10 @@ test('Availability: the day’s occupancy, a blocked date and a slot added and r
     const slot = view.locator('[data-testid=reservation-availability-slots-row]', { hasText: '3:00 AM' });
     await expect(slot).toContainText('4:00 AM');
 
-    await shots(page, 'reservation-availability', async () => {
+    await shots(page, 'RESERVATION-F01', async () => {
+      await expect(slot).toBeVisible();
+    });
+    await shots(page, 'RESERVATION-F05', async () => {
       await expect(view.locator('[data-testid=reservation-availability-occupancy-row]').first()).toBeVisible();
     });
 
@@ -278,6 +330,7 @@ test('Availability: the day’s occupancy, a blocked date and a slot added and r
   }
 });
 
+// flow: RESERVATION-F03
 test('Settings: the owner changes the default duration and it is kept', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/reservation/settings');
   const before = await api<{ default_duration_minutes: number }>(context, A, 'GET', '/reservation/settings');
@@ -289,11 +342,121 @@ test('Settings: the owner changes the default duration and it is kept', async ({
     await expect(view.locator('[data-testid=reservation-settings-saved]')).toContainText('Settings saved.');
     const after = await api<{ default_duration_minutes: number }>(context, A, 'GET', '/reservation/settings');
     expect(after.data.default_duration_minutes).toBe(105);
-    await shots(page, 'reservation-settings', async () => {
+    await shots(page, 'RESERVATION-F03', async () => {
       await expect(duration).toBeVisible();
     });
   } finally {
     await api(context, A, 'POST', '/reservation/settings', { default_duration_minutes: before.data.default_duration_minutes });
+    await context.close();
+  }
+});
+
+// flow: RESERVATION-F04
+test('Settings: with «Confirm new reservations automatically» a new reservation is born Confirmed', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/reservation/settings');
+  try {
+    const view = shown(page);
+    const toggle = view.locator('[data-testid=reservation-settings-auto_confirm]');
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await toggle.click();
+    await view.locator('[data-testid=reservation-settings-save]').click();
+    await expect(view.locator('[data-testid=reservation-settings-saved]')).toContainText('Settings saved.');
+    await shots(page, 'RESERVATION-F04', async () => {
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    });
+    const born = await bookByApi(context, `${TAG} Auto`, SOON_TIME);
+    expect(born.status).toBe('confirmed');
+  } finally {
+    await api(context, A, 'POST', '/reservation/settings', { auto_confirm: false });
+    await context.close();
+  }
+});
+
+// flow: RESERVATION-F08, RESERVATION-F09, RESERVATION-F10, RESERVATION-F20
+test('Edit a reservation, cancel one with a reason, mark a no-show and delete one', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/reservation/reservations');
+  try {
+    const edited = await bookByApi(context, `${TAG} Eva`, SOON_TIME);
+    const cancelled = await bookByApi(context, `${TAG} Pau`, SOON_TIME);
+    const absent = await bookByApi(context, `${TAG} Rui`, SOON_TIME);
+    const view = shown(page);
+    if (SOON.date !== TODAY.date) await view.locator('[data-testid=reservation-day-next]').click();
+    const rowOf = (id: string) => view.locator(`[data-testid=reservation-list-row][data-id="${id}"]`);
+    await expect(rowOf(edited.id)).toBeVisible();
+
+    // Edit: the party grows from 2 to 5 (F08).
+    await rowAction(page, 'reservation-list', edited.id, 'edit');
+    const form = page.locator('[data-testid=reservation-form]');
+    await form.locator('[data-testid=reservation-form-party_size] input').fill('5');
+    await shots(page, 'RESERVATION-F08', async () => {
+      await expect(form.locator('[data-testid=reservation-form-party_size] input')).toHaveValue('5');
+    });
+    await form.locator('[data-testid=reservation-form-submit]').click();
+    await expect(form).toBeHidden();
+    await expect(rowOf(edited.id)).toContainText('5');
+
+    // Cancel with a reason (F09).
+    await rowAction(page, 'reservation-list', cancelled.id, 'cancel');
+    const reason = page.locator('[data-testid=reservation-step-cancel-reason] textarea');
+    await reason.fill('Plans changed');
+    await page.locator('[data-testid=reservation-step-cancel-submit]').click();
+    await expect(rowOf(cancelled.id)).toContainText('Cancelled');
+    const detail = await api<{ cancellation_reason: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${cancelled.id}`);
+    expect(detail.data.cancellation_reason).toBe('Plans changed');
+    await shots(page, 'RESERVATION-F09', async () => {
+      await expect(rowOf(cancelled.id)).toBeVisible();
+    });
+
+    // No-show (F10).
+    await rowAction(page, 'reservation-list', absent.id, 'no_show');
+    await page.locator('[data-testid=reservation-step-no_show-submit]').click();
+    await expect(rowOf(absent.id)).toContainText('No-show');
+    await shots(page, 'RESERVATION-F10', async () => {
+      await expect(rowOf(absent.id)).toBeVisible();
+    });
+
+    // Delete for good, after confirming (F20).
+    await rowAction(page, 'reservation-list', edited.id, 'delete');
+    await page.locator('[data-testid=reservation-step-delete-submit]').click();
+    await expect(rowOf(edited.id)).toBeHidden();
+    await shots(page, 'RESERVATION-F20', async () => {
+      await expect(rowOf(absent.id)).toBeVisible();
+    });
+    const deleted = await api(context, A, 'GET', `/reservation/reservations/detail?id=${edited.id}`);
+    expect(deleted.status).toBe(404);
+  } finally {
+    await context.close();
+  }
+});
+
+// flow: RESERVATION-F11
+test('Seating a party leaves the next reservation of its table held: Reserved again when the party leaves', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/reservation/reservations');
+  try {
+    // A soon, for 40 minutes, and B right after it, both at a table of their own (52) and confirmed: both already
+    // paint it.
+    const own = await post<{ id: string }>(context, '/table/tables', { zone_id: zoneId, number: '52', capacity: 4 });
+    const first = await bookByApi(context, `${TAG} Ada`, roundedUp(madrid(5).time), { table_id: own.id, duration_minutes: 40 });
+    const next = await bookByApi(context, `${TAG} Bea`, roundedUp(madrid(50).time), { table_id: own.id });
+    for (const reservation of [first, next]) {
+      await post(context, '/reservation/reservations/confirm', { id: reservation.id }, 200);
+    }
+    const view = shown(page);
+    if (madrid(5).date !== TODAY.date) await view.locator('[data-testid=reservation-day-next]').click();
+    await rowAction(page, 'reservation-list', first.id, 'seat');
+    await expect(view.locator('[data-testid=reservation-list-outcome]')).toContainText(`is seated at table 52 (${ZONE})`);
+    expect(psql(`select status from table_hold where source_ref = '${next.id}'`)).toBe('held');
+
+    // A leaves: her empty check is closed and the table is Reserved again, for B.
+    const seated = await api<{ table_session_id: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${first.id}`);
+    await post(context, '/table/sessions/close', { id: seated.data.table_session_id }, 200);
+    await page.goto(`${A}/table/floor-plan`);
+    await shown(page).locator(`[data-testid=table-floor-zone-tab-${zoneId}]`).click();
+    await expect(tile(page, own.id)).toContainText('Reserved');
+    await shots(page, 'RESERVATION-F11', async () => {
+      await expect(tile(page, own.id)).toContainText('Reserved');
+    });
+  } finally {
     await context.close();
   }
 });

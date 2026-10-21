@@ -232,6 +232,7 @@ export interface SessionOpenIn {
   order_id?: string | null;
   customer_id?: string | null;
   customer?: string | null;
+  reservation_id?: string | null;
 }
 
 export interface SessionCloseIn extends SessionRefIn {

@@ -72,6 +72,15 @@ describe('ReservationFormModal: New reservation', () => {
     expect(s.submit().disabled).toBe(true);
   });
 
+  it('draws every field with its box: outlined in md mode, never a bare line (reservations#71, pm#479)', async () => {
+    const s = await setup();
+    const controls = ['guest_name', 'guest_phone', 'guest_email', 'date', 'time', 'party_size', 'duration_minutes', 'notes', 'internal_notes'];
+    const drawn = (name: string) => s.field(name) as Control & { fill?: string; mode?: string };
+    expect(controls.map((name) => [name, drawn(name).fill, drawn(name).mode ?? drawn(name).getAttribute('mode')])).toEqual(
+      controls.map((name) => [name, 'outline', 'md']),
+    );
+  });
+
   it('offers the free tables at that time, the ones that fit first, saying their seats and zone', async () => {
     const s = await setup();
     await fillNew(s);
