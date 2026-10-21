@@ -1,8 +1,8 @@
 # Workbook — Servicios (app)
 Prefijo: SERVICE
 Alcance MVP: peluquería
-Estado de la app: hecha (servidor y páginas), con el bono en el cobro y en la devolución del TPV
-(SERVICE-F22 a F27, con Ventas); queda fuera vender un bono en el TPV (ver «Lo que queda fuera»)
+Estado de la app: completa (2026-10-21)
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `service`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -19,8 +19,9 @@ Servicios es el **catálogo de lo que vende una peluquería o un centro de esté
 vende no es un artículo**: cada servicio con su nombre, su tarifa, su precio, su duración, su
 categoría y su categoría fiscal (el IVA con el que se cobra), y **qué profesionales lo hacen**, con su
 duración y su precio propios si los tienen. De este catálogo leen la agenda de Citas (qué se reserva,
-cuánto dura y con quién), el TPV de Ventas (qué se cobra), la respuesta automática de WhatsApp y los
-menús.
+cuánto dura y con quién), el TPV de Ventas (qué se cobra), la página de Reservas online (qué se puede
+reservar desde fuera y si se enseñan su precio y su duración) y Tarifas (los precios especiales de un
+servicio).
 
 También guarda los **bonos**: un bono es un paquete de sesiones de servicios concretos que una
 clienta compra una vez y gasta en varias visitas. Un bono paga una línea de servicio entera, no un
@@ -110,7 +111,7 @@ Archivado o Eliminado). En **Filtros**, el filtro de Estado en **Eliminado** cam
 eliminados del catálogo que alguien compró: por fila solo **Movimientos** y **Bonos vendidos**.
 **Nuevo paquete** abre el formulario: **Nombre, Tipo de descuento** (Porcentaje o Importe fijo),
 **Descuento (%)** o **Descuento (importe)**, **Precio cerrado** («Déjalo vacío para que valga la suma
-de sus líneas menos el descuento.»), **Vigencia (días)** («Días canjeable desde la compra; vacío = no
+de sus líneas menos el descuento.»), **Vigencia (días)** («Días canjeables desde la compra; vacío = no
 caduca.»), **Usos** («Usos que concede el bono; vacío = ilimitados.») y **Servicios incluidos**: una
 fila por servicio con **Servicio** y, debajo, **Sesiones** y «Quitar línea»; **Añadir servicio**; botón **Crear
 paquete**. Al editar, en lugar de las líneas sale «Los servicios incluidos no se cambian una vez
@@ -163,11 +164,11 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F03 | Poner un servicio a precio abierto | hecho |
 | SERVICE-F04 | Archivar un servicio | hecho |
 | SERVICE-F05 | Ver y restaurar los servicios archivados | hecho |
-| SERVICE-F06 | Dar de alta muchos servicios de golpe | hecho (asistente y API) |
+| SERVICE-F06 | Dar de alta muchos servicios de golpe | hecho (asistente y API; no hay importador en pantalla) |
 | SERVICE-F07 | Crear y editar categorías | hecho |
 | SERVICE-F08 | Eliminar una categoría | hecho |
-| SERVICE-F09 | Vender un servicio en el TPV | hecho (en Ventas, que lee `service.service.list_for_sale` y `service.service.get`) |
-| SERVICE-F10 | Dar el catálogo a Citas, Ventas, WhatsApp y Menús | hecho |
+| SERVICE-F09 | Vender un servicio en el TPV | hecho (lo hace Ventas, SALE-F38) |
+| SERVICE-F10 | Dar el catálogo a Citas, Ventas, Reservas online y Tarifas | hecho |
 | SERVICE-F11 | Cambiar los ajustes de Servicios | hecho |
 | SERVICE-F12 | Crear un bono | hecho |
 | SERVICE-F13 | Editar o eliminar un bono | hecho |
@@ -187,7 +188,7 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F27 | Devolver la sesión al anular la venta | hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera») |
 | SERVICE-F28 | Unir dos fichas: los bonos pasan a la que queda | hecho |
 | SERVICE-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | hecho |
-| SERVICE-F30 | Rescatar los bonos sin cliente | hecho (la lista) |
+| SERVICE-F30 | Rescatar los bonos sin cliente | hecho (la lista; un bono no se pasa a otra ficha) |
 | SERVICE-F31 | Asignar un profesional a un servicio | hecho |
 | SERVICE-F32 | Cambiar o quitar un profesional de un servicio | hecho |
 | SERVICE-F33 | Saber quién puede hacer un servicio | hecho |
@@ -206,7 +207,7 @@ Pasos:
 4. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
 Entra: las categorías de Servicios y las categorías fiscales activas de Impuestos.
 Sale: el servicio en oferta y reservable (`service.service.created`); desde ese momento lo ven la
-agenda, el TPV y WhatsApp. Lo que no se dice toma los Ajustes: duración, margen antes y después,
+agenda y el TPV y, si se reserva online, la página de Reservas online. Lo que no se dice toma los Ajustes: duración, margen antes y después,
 reserva online y categoría fiscal; sin Ajustes, 60 min, sin margen y con reserva online.
 Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que no se entiende
 («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»), uno que se lee de dos maneras o uno
@@ -263,10 +264,10 @@ Pasos:
 Entra: el servicio y, si Citas está activa y quien archiva ve citas, cuántas citas pendientes o
 confirmadas lo usan desde ahora.
 Sale: el servicio fuera de oferta, no borrado (`service.service.archived`): deja de salir en la
-agenda, en el TPV, en WhatsApp y en el selector de líneas de un bono. Las citas ya reservadas, los
+agenda, en el TPV, en la página de Reservas online y en el selector de líneas de un bono. Las citas ya reservadas, los
 bonos que lo incluyen y los profesionales asignados no cambian.
-Si falla: en la confirmación, «No se pudo archivar el servicio» o «Ese servicio no existe en este
-negocio.». Archivar uno ya archivado no cambia nada. El aviso de citas es un consejo: nunca impide
+Si falla: en la confirmación, el motivo (por ejemplo, «Ese servicio no existe en este negocio.»).
+Archivar uno ya archivado no cambia nada. El aviso de citas es un consejo: nunca impide
 archivar, y si Citas no contesta la confirmación sale sin esa línea.
 Implicados: APPOINTMENT-F01, APPOINTMENT-F26
 
@@ -336,14 +337,12 @@ Pasos:
 Entra: la categoría y cuántos servicios en oferta tiene.
 Sale: la categoría eliminada, no borrada (`service.category.deleted`); su nombre queda libre. Sus
 servicios se quedan **sin categoría** y sus subcategorías pasan a colgar de su padre (o a ser raíz).
-Si falla: en la confirmación, «No se pudo eliminar la categoría» o «Esa categoría no existe en este
-negocio.».
+Si falla: en la confirmación, el motivo (por ejemplo, «Esa categoría no existe en este negocio.»).
 Implicados: SERVICE-F07, SERVICE-F02
 
 ### SERVICE-F09 Vender un servicio en el TPV
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
-Estado: hecho — lo hace Ventas: Servicios le da `service.service.list_for_sale` y `service.service.get`
-(ver «Contrato con Ventas» y SALE-F38)
+Estado: hecho (lo hace Ventas, SALE-F38)
 Actor: empleado
 Pantalla: Ventas: Vender
 Pasos:
@@ -356,21 +355,22 @@ Sale: la línea de venta con el servicio; Servicios no anota nada por vender un 
 Si falla: lo dice Ventas (SALE-F38).
 Implicados: SALE-F01, SALE-F38
 
-### SERVICE-F10 Dar el catálogo a Citas, Ventas, WhatsApp y Menús
+### SERVICE-F10 Dar el catálogo a Citas, Ventas, Reservas online y Tarifas
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 fi:modules/services#event-emitidos old:services/workflow/catalogo.md#services-f10 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
 Pasos:
-1. Quien reserva, cobra, contesta un WhatsApp o compone un menú no abre Servicios: lee su lista de
-   servicios en oferta (`service.service.list_for_sale`) o un servicio concreto (`service.service.get`).
+1. Quien reserva (la agenda de Citas y la página de Reservas online), cobra (el TPV de Ventas) o pone
+   precios (Tarifas) no abre Servicios: lee su lista de servicios en oferta o un servicio concreto.
 2. La lista trae solo los servicios en oferta, con nombre, tarifa, precio, mínimo y máximo, duración,
    margen, si es reservable, su categoría y su categoría fiscal (y si le falta); también los que aún
    no tienen categoría fiscal, marcados.
 Entra: el catálogo.
 Sale: nada; Servicios no guarda quién lo lee.
 Si falla: cada lector decide.
-Implicados: APPOINTMENT-F01, SALE-F01, WHATSAPP_INBOX-F21, COMBO-F06
+Implicados: APPOINTMENT-F01, SALE-F01, ONLINE_BOOKING-F01, ONLINE_BOOKING-F07, PRICING-F07,
+WHATSAPP_INBOX-F21
 
 ### SERVICE-F11 Cambiar los ajustes de Servicios
 <!-- origen: fi:modules/services#command-services-settings-update-sql-transaccional fi:modules/services#query-services-settings-get old:services/workflow/catalogo.md#services-f11 -->
@@ -385,10 +385,11 @@ Entra: los ajustes guardados (o los de fábrica).
 Sale: los ajustes (`service.settings.updated`). La duración, el margen (antes y después), la reserva
 online y la categoría fiscal por defecto los toma todo servicio nuevo que no los diga (formulario,
 asistente, API y alta de golpe); el formulario trae elegida la categoría fiscal por defecto.
-«Mostrar precios» y «Mostrar duración» los leerá la reserva online cuando exista.
+«Mostrar precios» y «Mostrar duración» los usa la página de Reservas online: sin ellos no enseña el
+precio o la duración de cada servicio.
 Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (una duración de 0, una
 categoría fiscal que no existe).
-Implicados: SERVICE-F01, SERVICE-F06
+Implicados: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Crear un bono
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 wf:peluqueria-dia#rec_peluqueria-f13 fi:modules/services#command-services-packages-create-handler-wasm-create_package fi:modules/services#query-services-package_items-list fi:modules/services#query-services-packages-list old:services/workflow/bonos.md#services-f12 -->
@@ -429,7 +430,8 @@ ventas futuras, los bonos vendidos conservan lo que se vendió; el nombre nuevo 
 Al eliminar (`service.package.deleted`), el bono sale del catálogo y ya no se puede conceder; los ya
 vendidos se siguen gastando, ajustando y anulando igual. Un bono eliminado que nadie compró no sale
 en ninguna vista.
-Si falla: «No se pudo guardar el paquete» o «Ese paquete no existe en este negocio.».
+Si falla: al guardar, dentro del formulario, el motivo («Ese paquete no existe en este negocio.» si se
+eliminó entretanto) o los de SERVICE-F12 debajo de su campo; al eliminar, el motivo en la confirmación.
 Implicados: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Vender un bono a una clienta
@@ -448,8 +450,7 @@ fiscal: lo emite la venta del bono.
 Si falla: «Elige el cliente al que pertenece el bono…» si no se dice; «Ese paquete no existe en este
 negocio.» si el bono se eliminó o está desactivado; una fecha de compra futura, «Un bono no se puede
 comprar en el futuro.» (alargar un bono es **Ajustar**, SERVICE-F18), y una sin zona horaria, que la
-diga; un nombre de clienta que vale para varias, la lista
-para elegir (`customer.customer_ambiguous`).
+diga; un nombre de clienta que vale para varias, la lista para elegir.
 Implicados: CUSTOMER-F01
 
 ### SERVICE-F15 Consultar los bonos de una clienta
@@ -580,12 +581,12 @@ Pasos:
 1. Con la clienta asignada a la cuenta, abre el cobro. En «Líneas pagadas de otra forma», cada línea
    de un servicio enseña «Pagar esta línea con un bono» con los bonos de esa clienta que cubren ese
    servicio, tienen sesiones y no han caducado (también los de un bono eliminado del catálogo y los de
-   una ficha unida a la suya). Una línea de varias unidades se separa antes («Separar en N líneas»).
+   una ficha unida a la suya). Una línea de varias unidades se separa antes («Separar en {n} líneas»).
 2. Viene elegido el bono que se gasta primero, con el porqué: primero uno con sesiones contadas antes
    que uno ilimitado, después el que antes caduca, el ya empezado, al que le quedan menos sesiones y
    el comprado antes. Con dos o más dice «{count} bonos válidos». Toca otra tarjeta para gastar otro.
 3. Revisa «Quedan {before} sesiones · {after} después de esta» y pulsa **Gastar una sesión**.
-4. Sale «{name}: sesión gastada. Quedan {after}.» y la línea pasa a 0,00 € con «Ya pagado»; el
+4. Sale «{name}: sesión gastada. Quedan {after}.» y la línea pasa a 0,00 € con «Ya pagado · {name}»; el
    importe del cobro baja. **Deshacer** la devuelve mientras la venta no esté cobrada.
 5. Cobra lo demás con su medio (SERVICE-F24). Cerrar el cobro, aparcar la cuenta o recargar la
    pantalla no cambia nada: la marca vive en la línea de la cuenta, así que al volver la línea sigue
@@ -640,7 +641,7 @@ Si falla: nada se cobra y la cuenta sigue igual si una sesión ya no está reser
 reservada de «{name}» ya no está reservada (pasó su día o se soltó). Quita el bono de la línea y vuelve
 a aplicarlo.»), si la venta no es de la titular del bono («El bono «{name}» es de otro cliente: cobra la
 venta a nombre de su titular o quita el bono de la línea.»). Si Servicios no está activa en el
-negocio, tampoco se cobra (hoy Servicios no se apaga por negocio: llega en la fase 2).
+negocio, tampoco se cobra.
 Implicados: SALE-F01, SALE-F22, SALE-F27
 
 ### SERVICE-F25 La sesión retenida que nadie cobra vuelve sola
@@ -677,7 +678,7 @@ Sale: la sesión de vuelta en el bono, con quién, cuándo y el documento de dev
 si el bono ya caducó, la sesión consta pero no se puede gastar hasta alargarlo (SERVICE-F18). La
 misma devolución repetida devuelve una sola sesión.
 Si falla: «Esa sesión ya se devolvió en otra devolución.». Si Servicios no está activa en el negocio,
-la devolución se rechaza entera (hoy Servicios no se apaga por negocio: llega en la fase 2).
+la devolución se rechaza entera.
 Implicados: SALE-F31, SALE-F32
 
 ### SERVICE-F27 Devolver la sesión al anular la venta
@@ -693,7 +694,7 @@ Entra: la venta anulada, quién y el motivo; las sesiones gastadas en esa venta.
 Sale: las sesiones de vuelta en su bono (`service.session.returned`). No mueve dinero ni emite
 documento fiscal.
 Si falla: repetir la anulación no devuelve dos veces. Si Servicios no está activa en el negocio, la
-venta no se anula y se avisa en la ventana (hoy Servicios no se apaga por negocio: llega en la fase 2).
+venta no se anula y se avisa en la ventana.
 Implicados: SALE-F30
 
 ### SERVICE-F28 Unir dos fichas: los bonos pasan a la que queda
@@ -733,7 +734,7 @@ Implicados: CUSTOMER-F07, CUSTOMER-F16
 
 ### SERVICE-F30 Rescatar los bonos sin cliente
 <!-- origen: old:services/workflow/fichas-de-clienta.md#services-f30 -->
-Estado: hecho (la lista; pasar un bono a otra ficha no existe, ADR-0390)
+Estado: hecho (la lista; un bono no se pasa a otra ficha)
 Actor: responsable
 Pantalla: Bonos y paquetes
 Pasos:
@@ -763,8 +764,8 @@ Entra: el servicio y la ficha del profesional (Personal).
 Sale: la asignación, activa y no principal (`service.assignment.assigned`). Citas la lee para filtrar
 los profesionales de un servicio y tomar su duración y su precio propios. Asignar otra vez a la misma
 persona (asistente o API) cambia sus minutos y su precio; su servicio principal solo cambia si se dice.
-Si falla: dentro de la sección, «Ese profesional no existe en este negocio.», un nombre que vale para
-varios (`staff.ambiguous_member`) o el importe ilegible o negativo.
+Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
+vale para varios (la lista para elegir) o el importe ilegible o negativo.
 Implicados: STAFF-F01
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
@@ -779,7 +780,7 @@ Pasos:
    de serlo).
 3. Apaga «Lo hace» para que deje de hacerlo sin quitarla, o pulsa «Quitar».
 4. Si en Personal se da de baja a una persona, deja de salir al momento en «Profesionales que lo hacen»
-   y en «quién puede hacerlo» (SERVICE-F33), y en unos segundos Servicios la quita sola de todos los
+   y en quién puede hacerlo (SERVICE-F33), y en unos segundos Servicios la quita sola de todos los
    servicios que hacía.
 Entra: la asignación.
 Sale: el cambio (`service.assignment.updated`, `service.assignment.removed`). Dar de baja a una
@@ -793,7 +794,7 @@ Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
 Pasos:
-1. Quien reserva pregunta qué profesionales pueden hacer un servicio (`service.assignment.eligible`).
+1. Quien reserva pregunta qué profesionales pueden hacer un servicio.
 2. Servicios contesta con las personas **Activas** y **Reservables** con una asignación activa para
    ese servicio, con su duración y su precio propios, las de servicio principal primero y luego por
    nombre.
@@ -1031,7 +1032,15 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+  `demo`; lo que sí se separa son los avisos en vivo. Todas las apps están encendidas en todos los
+  negocios (`base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27 solo los
+  ven los tests hasta que un negocio pueda apagarla (fase 2).
+- Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas
+  (`service.service.list_for_sale`, `service.assignment.eligible` y los modelos, que requiere), Ventas
+  (las de «Contrato con Ventas», sin requerirla), Reservas online (`service.service.list` y `.update` en sus
+  Ajustes, y los modelos con «Mostrar precios» y «Mostrar duración», que requiere) y Tarifas
+  (`service.service.list` y `.get`, sin requerirla). Menús no admite servicios (solo artículos de
+  Inventario) y la respuesta automática de WhatsApp lo leerá por el asistente (WHATSAPP_INBOX-F21).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
