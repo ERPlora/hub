@@ -105,6 +105,48 @@ def test_the_customer_never_overlaps_even_when_the_front_desk_may(salon):
     assert error.value.code == "appointment.slot_taken"
 
 
+def test_the_owners_preview_is_judged_as_the_customer_never_as_the_front_desk(salon):
+    """The public operations are the customer's door whoever opens it: a person of the team previewing the
+    page (Citas' ``by_person``) gets none of the front desk's exceptions — an overlap, a time inside the
+    notice or in the past, a cancellation outside the policy (ONLINE_BOOKING-F01, F11)."""
+
+    def preview(name: str, data: dict):
+        return run(f"online_booking.public.{name}", data, role="hub_admin")
+
+    make_rules(allow_overlapping=True, min_booking_notice=24 * 60)
+    run(
+        "appointment.appointment.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "start": f"{(TUESDAY + dt.timedelta(days=1)).isoformat()}T10:00",
+        },
+    )
+    refused = {}
+    for label, data in {
+        "overlap": booking_data(salon, "10:00", day=TUESDAY + dt.timedelta(days=1), staff_id=str(salon.ana.id)),
+        "notice": booking_data(salon, "07:00"),
+        "past": booking_data(salon, "07:00", day=TUESDAY - dt.timedelta(days=2)),
+    }.items():
+        with pytest.raises(Conflict) as error:
+            preview("book", data)
+        refused[label] = error.value.code
+    assert refused == {
+        "overlap": "appointment.slot_taken",
+        "notice": "appointment.too_soon",
+        "past": "appointment.in_past",
+    }
+    make_rules(min_booking_notice=0)
+    booked = preview("book", booking_data(salon, "10:00"))
+    make_rules(cancellation_notice_hours=48)
+    with pytest.raises(Conflict) as error:
+        preview("cancel", {"token": booked.token})
+    assert error.value.code == "appointment.cancellation_notice_required"
+    appointment = Appointment.objects.get(number=booked.number)
+    assert (appointment.source, appointment.status) == ("online", "confirmed")
+
+
 def test_the_maximum_advance_is_the_diarys(salon):
     make_rules(max_advance_booking=7)
     with pytest.raises(Conflict) as error:
