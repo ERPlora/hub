@@ -15,9 +15,12 @@ nothing is called by hand. A repeated delivery changes nothing, and what happens
 import json
 import threading
 from decimal import Decimal
+from importlib import import_module
 
 import psycopg
 import pytest
+from django.apps import apps as global_apps
+from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.errors import Conflict
@@ -386,7 +389,16 @@ def test_combo_f11_a_menu_short_of_a_required_course_never_reaches_the_kitchen(t
 
 
 @pytest.fixture
-def listen(transactional_db, db_dsn):
+def committed(transactional_db):
+    """A flushed database with Taxes' factory catalogue planted again, as its migrations do (a transactional
+    test that ran before flushed it)."""
+    with connections["default"].schema_editor() as editor:
+        for module in ("apps.tax.migrations.0002_factory_catalogue", "apps.tax.migrations.0005_retail_alcohol"):
+            import_module(module).plant(global_apps, editor)
+
+
+@pytest.fixture
+def listen(committed, db_dsn):
     sessions = []
 
     def open_session(scope):
