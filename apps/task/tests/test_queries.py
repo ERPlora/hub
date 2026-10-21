@@ -279,9 +279,8 @@ def test_pages():
 
 def test_ties_in_the_sorted_column_come_by_id_so_a_touched_row_keeps_its_place_and_pages_add_up():
     """hub#2352: sorting by a column with repeated values, the row you touched jumped and paging
-    repeated or lost rows. Same priority, status and (empty) due date: the id settles every tie. Which
-    way on a descending sort is not pinned: the old product's rule (the list's own direction) and
-    ``_sorted`` (always ascending) differ, flagged in the CLOSE-TASK round of PLAN-HUB."""
+    repeated or lost rows. Same priority, status and (empty) due date: the id settles every tie, in
+    the list's own direction (the next test)."""
     tied = [make_task(f"Tie {n}") for n in range(6)]
     by_id = sorted(task.id for task in tied)
     sorts = ("priority", "-priority", "status", "due_date", "-due_date")
@@ -296,6 +295,20 @@ def test_ties_in_the_sorted_column_come_by_id_so_a_touched_row_keeps_its_place_a
         assert listed(sort) == before[sort] and sorted(before[sort]) == by_id, sort
     assert before["priority"] == before["status"] == before["due_date"] == by_id
     assert [row for n in (0, 2, 4) for row in listed("priority", limit=2, offset=n)] == by_id
+
+
+def test_ties_go_by_id_in_the_lists_own_direction():
+    """hub#2355 (the old product's rule, 2026-09-28; Sales, Cash register and Inventory follow it): a
+    descending list settles its ties by id descending, an ascending one ascending — never always ascending."""
+    by_id = sorted(make_task(f"Tie {n}").id for n in range(4))
+
+    def listed(sort, **page):
+        return [row.id for row in run("task.task.list", {"sort": sort, **page}).rows]
+
+    for column in ("priority", "status", "due_date"):
+        assert listed(column) == by_id, column
+        assert listed(f"-{column}") == by_id[::-1], f"-{column}"
+    assert [row for n in (0, 2) for row in listed("-priority", limit=2, offset=n)] == by_id[::-1]
 
 
 # My tasks
