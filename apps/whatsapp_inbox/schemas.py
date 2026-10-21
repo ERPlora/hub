@@ -900,6 +900,74 @@ class ChannelOut(Schema):
     )
 
 
+# ── Connecting the number from Settings (WHATSAPP_INBOX-F01, F02; erplora.com's doors 10–12) ────
+
+#: An id of Meta (an account, a number, a portfolio): digits only.
+META_ID = r"^\d{1,50}$"
+META_ID_OR_EMPTY = r"^\d{0,50}$"
+
+
+class ChannelPrepareIn(Schema):
+    pass
+
+
+class ChannelPrepareOut(Schema):
+    available: bool = Field(
+        description="Whether Meta's window (WhatsApp Embedded Signup) can be opened from Settings now."
+    )
+    reason: Literal["not_configured", "window_unavailable", "popups_blocked"] | None = Field(
+        None,
+        description="Why not: WhatsApp is not set up on erplora.com (not_configured), erplora.com has no page "
+        "to bring Meta's answer back (window_unavailable), or this Hub's pages cut the windows they open "
+        "(popups_blocked).",
+    )
+    app_id: str = Field("", description="The id of ERPlora's app at Meta (public).")
+    config_id: str = Field("", description="The id of the Embedded Signup configuration (public).")
+    graph_version: str = Field("", description="The version of Meta's Graph API, e.g. v25.0.")
+    redirect_uri: str = Field(
+        "", description="erplora.com's page Meta's window returns the one-time code to (https)."
+    )
+
+
+class ChannelConnectIn(Schema):
+    code: _text(2048, 1) = Field(
+        description="The one-time code Meta's window returned (it lasts 30 seconds)."
+    )
+    event: Annotated[str, StringConstraints(pattern=r"^FINISH[A-Z_]{0,58}$")] = Field(
+        "FINISH",
+        description="How Meta's window finished (FINISH, or FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING for a "
+        "number of the WhatsApp Business app); a window cancelled or failed connects nothing.",
+    )
+    waba_id: Annotated[str, StringConstraints(strip_whitespace=True, pattern=META_ID)] = Field(
+        description="The WhatsApp Business account chosen in Meta's window."
+    )
+    phone_number_id: Annotated[str, StringConstraints(strip_whitespace=True, pattern=META_ID_OR_EMPTY)] = Field(
+        "", description="The number chosen in Meta's window (empty: the account's only number)."
+    )
+    business_id: Annotated[str, StringConstraints(strip_whitespace=True, pattern=META_ID_OR_EMPTY)] = Field(
+        "", description="The business portfolio at Meta."
+    )
+
+
+class ChannelConnectOut(Schema):
+    connected: bool = Field(description="Whether erplora.com connected the number.")
+    phone_number: str = Field(description="The connected number, E.164.")
+    display_name: str = Field(description="The name WhatsApp shows for it.")
+    history_requested: bool = Field(
+        description="For a number of the WhatsApp Business app: whether its contacts and chats were asked of Meta."
+    )
+
+
+class ChannelDisconnectIn(Schema):
+    pass
+
+
+class ChannelDisconnectOut(Schema):
+    disconnected: bool = Field(
+        description="False when erplora.com had no number connected for this business."
+    )
+
+
 # ── People of the team ──────────────────────────────────────────────────────────────────────────
 
 

@@ -40,7 +40,11 @@ def test_the_reactions_are_declared_by_name():
 
 
 def test_every_event_of_the_app_is_named_once():
-    assert len(events.ALL) == len(set(events.ALL)) == 14
+    assert len(events.ALL) == len(set(events.ALL)) == 16
+    assert {events.CHANNEL_CONNECTED, events.CHANNEL_DISCONNECTED} == {
+        "whatsapp_inbox.channel.connected",
+        "whatsapp_inbox.channel.disconnected",
+    }
     assert all(name.startswith("whatsapp_inbox.") for name in events.ALL)
 
 

@@ -14,10 +14,13 @@ number erplora.com has to forget (``forget``). What a crash leaves half-way, the
 """
 
 import datetime as dt
+import logging
 import re
 from functools import partial
+from urllib.parse import urlsplit
 from uuid import UUID, uuid7
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Value
 from django.db.models.functions import Concat, Lower
@@ -58,6 +61,12 @@ from apps.whatsapp_inbox.queries import (
 )
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
+    ChannelConnectIn,
+    ChannelConnectOut,
+    ChannelDisconnectIn,
+    ChannelDisconnectOut,
+    ChannelPrepareIn,
+    ChannelPrepareOut,
     ChannelSyncIn,
     ChannelSyncOut,
     ClaimDeliveryOut,
@@ -97,6 +106,8 @@ from apps.whatsapp_inbox.schemas import (
     TemplateWriteIn,
     template_variables,
 )
+
+logger = logging.getLogger(__name__)
 
 #: Only the system context (``*``) holds it: the doors erplora.com calls, the reactions, the deliveries.
 RECEIVE = "whatsapp_inbox.receive"
@@ -596,6 +607,196 @@ def _sync_templates(items, now) -> None:
     live_templates().exclude(pk__in=kept).exclude(
         status__in=[Template.Status.DELETED, Template.Status.DRAFT]
     ).update(status=Template.Status.DELETED, synced_at=now)
+
+
+# ── Connecting the number from Settings (WHATSAPP_INBOX-F01, F02): erplora.com's doors 10–12 ──────
+#
+# Commands, the three of them, although ``prepare`` writes nothing: a query opens its READ ONLY transaction before
+# its first line, and nothing waits for erplora.com inside a transaction. Each asks erplora.com first, before any
+# read or write of its own, so no transaction is open while it answers; then ``connect`` and ``disconnect`` keep
+# erplora.com's answer in the business's row at once (its photo, pushed meanwhile, says the same with a newer version,
+# and the next one still wins).
+
+CONFIGURE = "whatsapp_inbox.configure"
+#: The COOP values that keep the window a page opens (Django's default, ``same-origin``, cuts it: Meta's window
+#: could never tell this page how it ended).
+KEEPS_POPUPS = frozenset({"same-origin-allow-popups", "unsafe-none"})
+GRAPH_VERSION = re.compile(r"^v\d{1,3}\.\d{1,3}$")
+META_ID = re.compile(r"^\d{1,50}$")
+E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+
+CONNECT_UNCONFIGURED = _("This server is not linked to erplora.com: the number cannot be connected from it.")
+CONNECT_SAAS_UNREACHABLE = _("Your hub could not reach erplora.com. Check the connection and try again.")
+CONNECT_UNKNOWN = _(
+    "erplora.com did not confirm the connection. In a moment «Your number» will say whether it is connected; "
+    "if it is not, connect it again."
+)
+DISCONNECT_UNKNOWN = _(
+    "erplora.com did not confirm the disconnection. In a moment «Your number» will say it; if it is still "
+    "connected, try again."
+)
+HUB_UNKNOWN = _("erplora.com does not know this business: a demo cannot connect a WhatsApp number.")
+CONNECT_REJECTED = _("Meta did not accept the connection: %(reason)s")
+NUMBER_NOT_IN_ACCOUNT = _(
+    "The number chosen in Meta's window is not in that WhatsApp Business account: nothing was connected."
+)
+NUMBER_NOT_CHOSEN = _("That WhatsApp Business account has several numbers: choose one in Meta's window.")
+CONNECT_META_UNREACHABLE = _("Meta did not answer: nothing was connected. Try again.")
+WHATSAPP_UNAVAILABLE = _("WhatsApp is not available in ERPlora yet.")
+SAAS_REFUSED = _("erplora.com did not take the request (%(code)s). Try again later.")
+
+#: erplora.com's refusal at doors 10–12 → (status, the Hub's code, its message). A message with ``%(reason)s``
+#: carries erplora.com's (Meta's) own words.
+DOOR_REFUSALS = {
+    "hub_unknown": (409, "whatsapp_inbox.hub_unknown", HUB_UNKNOWN),
+    "whatsapp.meta_rejected": (409, "whatsapp_inbox.meta_rejected", CONNECT_REJECTED),
+    "whatsapp.number_not_in_account": (409, "whatsapp_inbox.number_not_in_account", NUMBER_NOT_IN_ACCOUNT),
+    "whatsapp.number_not_chosen": (409, "whatsapp_inbox.number_not_chosen", NUMBER_NOT_CHOSEN),
+    "whatsapp.meta_rate_limited": (409, "whatsapp_inbox.meta_rate_limited", META_RATE_LIMITED),
+    "whatsapp.meta_unreachable": (503, "whatsapp_inbox.meta_unreachable", CONNECT_META_UNREACHABLE),
+    "whatsapp.meta_no_token": (503, "whatsapp_inbox.meta_unreachable", CONNECT_META_UNREACHABLE),
+    "whatsapp.not_configured": (409, "whatsapp_inbox.whatsapp_unavailable", WHATSAPP_UNAVAILABLE),
+}
+
+
+def _ask_saas(door, unknown=None, **args) -> dict:
+    """erplora.com's 200 body at ``door``, or the refusal the screen shows. ``unknown``: the message when the request
+    left and no answer came back (by default, as nothing left)."""
+    try:
+        reply = door(**args)
+    except gateway.NotConfigured:
+        raise Conflict(str(CONNECT_UNCONFIGURED), code="whatsapp_inbox.saas_unconfigured") from None
+    if reply.kind == gateway.ACCEPTED:
+        return reply.data
+    if reply.kind == gateway.REFUSED:
+        status, code, message = DOOR_REFUSALS.get(reply.code, (503, "whatsapp_inbox.saas_refused", SAAS_REFUSED))
+        if code == "whatsapp_inbox.saas_refused":
+            logger.error("whatsapp_inbox.door.refused status=%s code=%s", reply.http_status, reply.code)
+        text = str(message) % {"reason": reply.message or "—", "code": reply.code}
+        raise OperationError(text, code=code, status=status)
+    logger.warning("whatsapp_inbox.door.%s %s", reply.kind, reply.message)
+    if reply.kind == gateway.UNKNOWN and unknown is not None:
+        raise OperationError(str(unknown[1]), code=unknown[0], status=503)
+    raise OperationError(str(CONNECT_SAAS_UNREACHABLE), code="whatsapp_inbox.saas_unreachable", status=503)
+
+
+def _not_understood(door: str) -> OperationError:
+    logger.error("whatsapp_inbox.door.not_understood door=%s", door)
+    return OperationError(str(CONNECT_SAAS_UNREACHABLE), code="whatsapp_inbox.saas_unreachable", status=503)
+
+
+def _return_page(value) -> str:
+    """erplora.com's page Meta brings the code back to: an https address of erplora.com's own origin (the one the
+    Hub knows, ``SAAS_URL``), or ``""``."""
+    if not isinstance(value, str) or not value:
+        return ""
+    page, known = urlsplit(value), urlsplit(str(getattr(settings, "SAAS_URL", "") or ""))
+    if page.scheme != "https" or not page.netloc or page.fragment or (page.scheme, page.netloc) != (known.scheme, known.netloc):
+        return ""
+    return value
+
+
+@operation(
+    "whatsapp_inbox.channel.prepare",
+    kind="command",
+    permission=CONFIGURE,
+    input=ChannelPrepareIn,
+    output=ChannelPrepareOut,
+    ai={
+        "description": "Whether the business's WhatsApp number can be connected from Settings now (Meta's window "
+        "opens there, and only a person in it connects a number), and why not: WhatsApp not set up on erplora.com "
+        "yet, or the window not available yet.",
+        "risk": "normal",
+    },
+)
+def prepare_connect(ctx: OperationContext, data: ChannelPrepareIn) -> dict:
+    """What Settings opens Meta's window with (erplora.com's door 10), and why it cannot be opened yet."""
+    answer = _ask_saas(gateway.config, hub=ctx.scope.key)
+    if not isinstance(answer.get("configured"), bool):
+        raise _not_understood("config")
+    if not answer["configured"]:
+        return {"available": False, "reason": "not_configured"}
+    ids = {key: answer.get(key) for key in ("app_id", "config_id", "graph_version")}
+    if not all(isinstance(value, str) for value in ids.values()) or not (
+        META_ID.match(ids["app_id"]) and META_ID.match(ids["config_id"]) and GRAPH_VERSION.match(ids["graph_version"])
+    ):
+        raise _not_understood("config")
+    redirect_uri = _return_page(answer.get("redirect_uri"))
+    if not redirect_uri:
+        return {"available": False, "reason": "window_unavailable", **ids}
+    if getattr(settings, "SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin") not in KEEPS_POPUPS | {None}:
+        return {"available": False, "reason": "popups_blocked", **ids}
+    return {"available": True, "reason": None, **ids, "redirect_uri": redirect_uri}
+
+
+@operation(
+    "whatsapp_inbox.channel.connect",
+    kind="command",
+    permission=CONFIGURE,
+    input=ChannelConnectIn,
+    output=ChannelConnectOut,
+    ai={
+        "description": "Connect the business's WhatsApp number chosen in Meta's window, with the one-time code that "
+        "window returned (it lasts 30 seconds). Only Meta's window in Settings gives that code: to connect a "
+        "number, ask the person to press «Connect WhatsApp» in Settings.",
+        "risk": "high",
+    },
+)
+def connect_number(ctx: OperationContext, data: ChannelConnectIn) -> dict:
+    """Connect the number Meta's window chose (erplora.com's door 11), with what the window gave, as it came; the
+    business's row says it at once."""
+    answer = _ask_saas(
+        gateway.connect, unknown=("whatsapp_inbox.connect_unknown", CONNECT_UNKNOWN), hub=ctx.scope.key, **data.model_dump()
+    )
+    out = _connected(answer)
+    if out is None:
+        logger.error("whatsapp_inbox.door.not_understood door=connect")
+        raise OperationError(str(CONNECT_UNKNOWN), code="whatsapp_inbox.connect_unknown", status=503)
+    row = _locked_channel(ctx)
+    row.status = Channel.Status.CONNECTED
+    row.phone_number, row.display_name = out.phone_number, out.display_name
+    row.save(update_fields=["status", "phone_number", "display_name", "updated_at"])
+    record_event(ctx, events.CHANNEL_CONNECTED, {"history_requested": out.history_requested})
+    return out
+
+
+def _connected(answer: dict) -> ChannelConnectOut | None:
+    """Door 11's 200 as the Hub keeps it: connected, an E.164 number and WhatsApp's name; anything else, ``None``."""
+    try:
+        out = ChannelConnectOut.model_validate(answer)
+    except ValueError:
+        return None
+    if answer.get("connected") is not True or not E164.match(out.phone_number) or len(out.display_name) > 200:
+        return None
+    return out
+
+
+@operation(
+    "whatsapp_inbox.channel.disconnect",
+    kind="command",
+    permission=CONFIGURE,
+    input=ChannelDisconnectIn,
+    output=ChannelDisconnectOut,
+    ai={
+        "description": "Disconnect the business's WhatsApp number (erplora.com stops using it): the inbox no longer "
+        "receives nor sends until it is connected again from Settings; the conversations kept stay.",
+        "risk": "high",
+    },
+)
+def disconnect_number(ctx: OperationContext, data: ChannelDisconnectIn) -> dict:
+    """Disconnect the business's number (erplora.com's door 12). Its answer, whether there was a number or not,
+    leaves the business without one at once; the month's figures and the conversations stay."""
+    answer = _ask_saas(gateway.disconnect, unknown=("whatsapp_inbox.disconnect_unknown", DISCONNECT_UNKNOWN), hub=ctx.scope.key)
+    if not isinstance(answer.get("disconnected"), bool):
+        logger.error("whatsapp_inbox.door.not_understood door=disconnect")
+        raise OperationError(str(DISCONNECT_UNKNOWN), code="whatsapp_inbox.disconnect_unknown", status=503)
+    row = _locked_channel(ctx)
+    if row.status != Channel.Status.NOT_CONNECTED or row.phone_number or row.display_name:
+        row.status = Channel.Status.NOT_CONNECTED
+        row.phone_number = row.display_name = ""
+        row.save(update_fields=["status", "phone_number", "display_name", "updated_at"])
+        record_event(ctx, events.CHANNEL_DISCONNECTED, {})
+    return {"disconnected": answer["disconnected"]}
 
 
 # ── Sending (WHATSAPP_INBOX-F32, F33): kept here, handed to erplora.com after the COMMIT ─────────

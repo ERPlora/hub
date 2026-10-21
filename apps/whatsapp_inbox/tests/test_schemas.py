@@ -212,3 +212,39 @@ def test_local_development_takes_the_local_saas_s_own_origin(settings):
     settings.DEBUG = True
     local = {"wa_message_id": "w", "from": "34600111222", "media": {"url": "http://localhost:8001/whatsapp/media/1"}}
     assert S.ReceiveIn.model_validate(local).media.url.startswith("http://localhost:8001/")
+
+
+# ── WHATSAPP_INBOX-F01 What Meta's window gave (door 11, as erplora.com reads it) ───────────────
+
+WINDOW = {"code": " AQD-one-time ", "waba_id": "102290129340398"}
+
+
+def test_meta_s_window_gives_a_code_and_its_account_and_the_rest_may_be_missing():
+    data = S.ChannelConnectIn.model_validate(WINDOW)
+    assert (data.code, data.event, data.waba_id, data.phone_number_id, data.business_id) == (
+        "AQD-one-time",
+        "FINISH",
+        "102290129340398",
+        "",
+        "",
+    )
+    coexistence = {**WINDOW, "event": "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"}
+    assert S.ChannelConnectIn.model_validate(coexistence).event == "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("code", ""),
+        ("code", "x" * 2049),
+        ("waba_id", "abc"),
+        ("waba_id", ""),
+        ("phone_number_id", "10654-0352"),
+        ("business_id", "1" * 51),
+        # A window that did not finish never connects anything.
+        ("event", "CANCEL"),
+        ("event", "ERROR"),
+    ],
+)
+def test_what_the_window_did_not_give_is_never_sent_to_erplora(field, value):
+    assert field in errors(S.ChannelConnectIn, {**WINDOW, field: value})

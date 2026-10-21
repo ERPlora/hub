@@ -620,3 +620,39 @@ msgstr "envío a Meta"
 
 msgid "option tapped"
 msgstr "opción tocada"
+
+# Connecting the number from Settings (WHATSAPP_INBOX-F01, F02)
+msgid "This server is not linked to erplora.com: the number cannot be connected from it."
+msgstr "Este servidor no está enlazado con erplora.com: desde él no se puede conectar el número."
+
+msgid "Your hub could not reach erplora.com. Check the connection and try again."
+msgstr "Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo."
+
+msgid "erplora.com did not confirm the connection. In a moment «Your number» will say whether it is connected; if it is not, connect it again."
+msgstr "erplora.com no ha confirmado la conexión. En un momento «Tu número» dirá si está conectado; si no lo está, vuelve a conectarlo."
+
+msgid "erplora.com did not confirm the disconnection. In a moment «Your number» will say it; if it is still connected, try again."
+msgstr "erplora.com no ha confirmado la desconexión. En un momento «Tu número» lo dirá; si sigue conectado, inténtalo de nuevo."
+
+msgid "erplora.com does not know this business: a demo cannot connect a WhatsApp number."
+msgstr "erplora.com no conoce este negocio: una demo no puede conectar un número de WhatsApp."
+
+#, python-format
+msgid "Meta did not accept the connection: %(reason)s"
+msgstr "Meta no ha aceptado la conexión: %(reason)s"
+
+msgid "The number chosen in Meta's window is not in that WhatsApp Business account: nothing was connected."
+msgstr "El número elegido en la ventana de Meta no está en esa cuenta de WhatsApp Business: no se ha conectado nada."
+
+msgid "That WhatsApp Business account has several numbers: choose one in Meta's window."
+msgstr "Esa cuenta de WhatsApp Business tiene varios números: elige uno en la ventana de Meta."
+
+msgid "Meta did not answer: nothing was connected. Try again."
+msgstr "Meta no ha contestado: no se ha conectado nada. Inténtalo de nuevo."
+
+msgid "WhatsApp is not available in ERPlora yet."
+msgstr "WhatsApp todavía no está disponible en ERPlora."
+
+#, python-format
+msgid "erplora.com did not take the request (%(code)s). Try again later."
+msgstr "erplora.com no ha aceptado la petición (%(code)s). Inténtalo más tarde."
