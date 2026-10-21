@@ -996,7 +996,7 @@ def retry_message(ctx: OperationContext, data: MessageRefIn) -> dict:
         raise Conflict(str(NOT_RETRYABLE), code="whatsapp_inbox.not_retryable")
     message.error_code = message.error_message = ""
     message.save(update_fields=["error_code", "error_message"])
-    _after_commit(ctx, deliver, message.id)
+    _after_commit_as(message.host, ctx, deliver, message.id)
     return message_out(message)
 
 
@@ -1392,7 +1392,8 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
 
 def _erase(ctx: OperationContext, conversation: Conversation) -> None:
     """Empty every personal datum of ``conversation`` once, and ask erplora.com to forget its number
-    after the COMMIT until it confirms; again changes nothing here and asks erplora.com again."""
+    after the COMMIT until it confirms; again changes nothing here and asks erplora.com again, for the business
+    that erased it (``erase_host``), whoever asks from the shared inbox."""
     if conversation.erased_at is None:
         conversation.messages.update(
             body="",
@@ -1421,7 +1422,7 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
         conversation.save()
         record_event(ctx, events.ERASED, {"id": str(conversation.id)})
     if conversation.erase_status == Conversation.EraseStatus.PENDING:
-        _after_commit(ctx, forget, conversation.id)
+        _after_commit_as(conversation.erase_host, ctx, forget, conversation.id)
 
 
 def forget(scope: Scope, conversation_id: UUID) -> None:

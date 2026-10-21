@@ -395,7 +395,8 @@ nombre ni lo que se dijo, así que el historial interno no guarda nada suyo). De
 Hub pide a erplora.com que olvide ese número y sus mensajes (adjuntos incluidos, que viven allí); hasta
 que lo confirma, el número se guarda aparte solo para pedírselo.
 Si falla: «No se pudieron borrar los datos de este número» (o el motivo). Si erplora.com no confirma,
-se le vuelve a pedir: al pulsarlo otra vez y cada 5 minutos; pulsarlo dos veces no borra nada más.
+se le vuelve a pedir, siempre para el negocio que lo borró: al pulsarlo otra vez (desde el negocio que sea) y
+cada 5 minutos; pulsarlo dos veces no borra nada más.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F11 Borrar los datos de una clienta desde su ficha
@@ -851,7 +852,8 @@ horas desde el último mensaje del cliente («Han pasado más de 24 horas…»),
 conectado, el mes está gastado o el Hub no llega a erplora.com (el cuadro lo dice antes de escribir).
 Si erplora.com lo rechaza (número bloqueado, tope del mes…), la burbuja dice «No entregado» y su motivo.
 Si erplora.com no contesta, no confirma o pide ir más despacio, la burbuja dice «No enviado» con
-**Reintentar**, que lo entrega otra vez con la misma clave: nunca sale dos veces.
+**Reintentar**, que lo entrega otra vez con la misma clave: nunca sale dos veces. Sale siempre por el número
+del negocio que lo envió, aunque lo reintente otro desde la bandeja compartida de la fase 1.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Enviar una plantilla
@@ -1113,7 +1115,9 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   todos los negocios, y cada mensaje, plantilla o borrado se entrega a erplora.com como el de su negocio
   (`Message.host`, `Template.host`, `Conversation.erase_host`), con su contenido; un mensaje o un borrado de
   número anterior a la migración `0007`, sin negocio guardado, sale con el ámbito del worker, como hasta
-  entonces. En la fase 2 corre en la BD de cada hub.
+  entonces. En la fase 2 corre en la BD de cada hub. «Reintentar» (`message.retry`) y volver a borrar un
+  número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila y no con el de
+  quien lo pide desde la bandeja compartida; sin negocio guardado (anterior a `0007`), con el de quien lo pide.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`, cualquier otro como `whatsapp_inbox.send_refused`); conexión fallida o un
@@ -1438,7 +1442,8 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
   hub), como en todas las apps de la fase 1. El número y las plantillas ya no: `Channel` y `Template` son
   de cada negocio (ver «Modelo»), porque la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
   «Borradas en WhatsApp Manager» las plantillas de `a`; y el mensaje que sale del Hub y el número que se
-  pide olvidar guardan su negocio, porque el worker los retomaba con el suyo.
+  pide olvidar guardan su negocio, porque el worker los retomaba con el suyo y «Reintentar» o volver a
+  borrar desde otro negocio los entregaban con el de quien lo pedía.
 
 ### Cambios frente al producto actual
 
