@@ -477,6 +477,14 @@ msgstr ""
 "printers es la lista de los id de las impresoras a las que llega este "
 "dispositivo."
 
+#: ws_print.py:389
+msgid ""
+"This device is not set up to print in this hub: someone who manages the "
+"printers sets it up in Printing → Devices."
+msgstr ""
+"Este dispositivo no está dado de alta para imprimir en este hub: quien "
+"gestiona las impresoras lo da de alta en Impresión → Dispositivos."
+
 #: ws_print.py:371
 msgid ""
 "This device reaches no active printer of this hub: choose its printers "
