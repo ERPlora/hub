@@ -1,9 +1,9 @@
 """Events of the cart_checkout app (``<app>.<entity>.<fact>``): recorded by services.py, cited by live.py.
 
 Each one is written in the transaction of its change, and only when the change happened: a refused
-action leaves no event (the old module emitted them anyway). No app of the Hub listens to them, and the
-app reacts to no event of another one (no link to Customers or Inventory), so this module only names
-its own.
+action leaves no event (the old module emitted them anyway). Only the flow app listens to them (it hears
+every event, FLOW-F21), and this app reacts to no event of another one (no link to Customers or
+Inventory), so this module declares no ``REACTIONS`` and only names its own.
 """
 
 CART_CREATED = "cart_checkout.cart.created"
