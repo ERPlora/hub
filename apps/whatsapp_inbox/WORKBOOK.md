@@ -165,8 +165,8 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F16 | Decidir si las reservas por WhatsApp se confirman solas | parcial — el interruptor va en la tarjeta de F14 o F15, que todavía no aparece; mientras, la misma decisión se toma en Citas («Ajustar las reglas de reserva») y en Reservas («Elegir si las reservas se confirman solas») | comun |
 | WHATSAPP_INBOX-F17 | Desactivar una respuesta automática | parcial — sin las tarjetas de F14 y F15, que todavía no aparecen, no hay respuesta automática que desactivar | comun |
 | WHATSAPP_INBOX-F18 | Actualizar una respuesta automática a su versión mejorada | parcial — sin las tarjetas de F14 y F15, que todavía no aparecen, no hay respuesta automática que actualizar | comun |
-| WHATSAPP_INBOX-F19 | Elegir el hueco escribiendo en vez de tocando | parcial — los huecos los ofrece la respuesta automática de F21 o F24, que necesita el asistente, aún no está en el Hub | comun |
-| WHATSAPP_INBOX-F20 | Cuando el asistente no puede contestar | parcial — la disculpa y la marca las pone la respuesta automática de F21 o F24, que necesita el asistente, aún no está en el Hub; hoy el mensaje espera en la bandeja como sin leer (F09) | comun |
+| WHATSAPP_INBOX-F19 | Elegir el hueco escribiendo en vez de tocando | parcial — los huecos los ofrece la respuesta automática de F21 o F24, que necesita el asistente, que aún no está en el Hub | comun |
+| WHATSAPP_INBOX-F20 | Cuando el asistente no puede contestar | parcial — la disculpa y la marca las pone la respuesta automática de F21 o F24, que necesita el asistente, que aún no está en el Hub; hoy el mensaje espera en la bandeja como sin leer (F09) | comun |
 | WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | parcial — el asistente, que lee el mensaje, busca el hueco y redacta la respuesta, todavía no está en el Hub, y erplora.com aún no envía a Meta; hoy el mensaje se contesta a mano desde la bandeja | peluqueria |
 | WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | parcial — el asistente, que entiende qué pide y busca su cita, todavía no está en el Hub, y erplora.com aún no envía a Meta; hoy se anula o se mueve a mano desde la Agenda | peluqueria |
 | WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31) y erplora.com aún no envía a Meta: la clienta no recibe el aviso | peluqueria |
@@ -534,7 +534,7 @@ Implicados: FLOW-F35, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F19 Elegir el hueco escribiendo en vez de tocando
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f19 -->
-Estado: parcial — los huecos los ofrece la respuesta automática de F21 o F24, que necesita el asistente, aún
+Estado: parcial — los huecos los ofrece la respuesta automática de F21 o F24, que necesita el asistente, que aún
 no está en el Hub
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
@@ -552,7 +552,7 @@ Implicados: APPOINTMENT-F02, RESERVATION-F05, WHATSAPP_INBOX-F21, WHATSAPP_INBOX
 ### WHATSAPP_INBOX-F20 Cuando el asistente no puede contestar
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f20 -->
 Estado: parcial — la disculpa y la marca las pone la respuesta automática de F21 o F24, que necesita el
-asistente, aún no está en el Hub; hoy el mensaje espera en la bandeja como sin leer (F09)
+asistente, que aún no está en el Hub; hoy el mensaje espera en la bandeja como sin leer (F09)
 Actor: sistema
 Pantalla: WhatsApp: chat del cliente
 Pasos:
