@@ -74,10 +74,10 @@ lo hace el asistente o la API.
 
 ### Pedidos
 
-Una tabla con **Pedido** (su número, siempre entero), **Email**, **Estado** (Iniciado, Pagado, Fallido, Completado),
-**Pago** (el método de pago, texto) y **Total**, en la moneda del pedido. Buscador «Buscar pedido o
-email…», filtros por columna, orden por columna, vista de lista o de tarjetas y 50 filas por página, el
-más reciente arriba. Un pedido fallido enseña su motivo entero debajo del estado.
+Una tabla con **Pedido** (su número, siempre entero), **Email**, **Estado** (Iniciado, Pagado, Fallido,
+Completado), **Pago** (el método de pago, texto) y **Total**, en la moneda del pedido. Buscador «Buscar
+pedido o email…», filtros por columna, orden por columna, vista de lista o de tarjetas y 50 filas por
+página, el más reciente arriba. Un pedido fallido enseña su motivo entero debajo del estado.
 
 Cada fila ofrece la acción que le toca: **Marcar pagado** (Iniciado), **Completar** (Pagado) y
 **Fallar** (Iniciado o Pagado), que abre un formulario que pide el **motivo**. Mientras una acción de
