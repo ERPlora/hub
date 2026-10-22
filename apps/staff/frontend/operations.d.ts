@@ -9,6 +9,9 @@ import type { Page } from '../../../frontend/sdk-types';
 export type MemberStatus = 'active' | 'inactive' | 'on_leave';
 export type LeaveType = 'vacation' | 'sick' | 'personal' | 'training' | 'other';
 export type TimeOffStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+/** A record's status as the commission report shows it: someone who left still earned what they sold. */
+export type RecordStatus = MemberStatus | 'terminated';
+export type CommissionPeriod = 'today' | 'yesterday' | 'this_week' | 'this_month';
 
 interface PageIn {
   limit?: number;
@@ -192,6 +195,35 @@ export interface CommissionOut {
   role_id: string | null;
   role_name: string | null;
   commission_rate: string;
+}
+
+/** A period: one of the server's (today by default), or two days of one's own (both, in order). */
+export interface CommissionReportIn {
+  period?: CommissionPeriod;
+  date_from?: string | null;
+  date_to?: string | null;
+}
+
+export interface CommissionReportRow {
+  member_id: string;
+  full_name: string;
+  role_name: string | null;
+  status: RecordStatus;
+  commission_rate: string;
+  /** What they sold in the period, refunds taken off, in cents. */
+  sold: number;
+  /** sold × rate ÷ 100 in cents, rounded half up once. */
+  commission: number;
+}
+
+export interface CommissionReportOut {
+  date_from: string;
+  date_to: string;
+  /** False when the business has no Sales: nobody is listed. */
+  sales_available: boolean;
+  rows: CommissionReportRow[];
+  total_sold: number;
+  total_commission: number;
 }
 
 export interface MemberStatsOut {
@@ -455,6 +487,7 @@ declare module '@erplora/ui/sdk' {
     'staff.member.deactivate': { input: MemberRefIn; output: MemberDetailOut };
     'staff.member.terminate': { input: TerminateIn; output: TerminatedOut };
     'staff.commission.summary': { input: CommissionSummaryIn; output: Page<CommissionOut> };
+    'staff.commission.report': { input: CommissionReportIn; output: CommissionReportOut };
     'staff.account.list': { input: AccountListIn; output: Page<AccountOut> };
     'staff.role.list': { input: RoleListIn; output: Page<RoleOut> };
     'staff.role.create': { input: RoleIn; output: RoleOut };

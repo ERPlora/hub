@@ -2,10 +2,11 @@
 // app with four or five tabs shows EVERY tab whole, as a bottom navigation bar does (iOS tab bar,
 // Material's navigation bar: three to five destinations, all on screen, labels never cut): no tab past
 // the edge of the screen, no strip hiding tabs behind a sideways scroll, no tab spilling into the next,
-// and no label cut, neither by its own box nor by its tab. Customers has four tabs, Staff (the owner)
-// five; both in Spanish, as Ioan sees them, and in English, the source. The screenshots of Customers at
-// 375, 390, 834 and 1440 are the evidence for the comparison with the old hub. More tabs than fit (six,
-// or a word wider than a fifth of the strip) keep scrolling with the next tab peeking (`tabbar-peek.ts`).
+// and no label cut, neither by its own box nor by its tab. Customers has four tabs, Sales five; both in
+// Spanish, as Ioan sees them, and in English, the source. The screenshots of Customers at 375, 390, 834
+// and 1440 are the evidence for the comparison with the old hub. More tabs than fit (six, or a word wider
+// than a fifth of the strip) keep scrolling with the next tab peeking (`tabbar-peek.ts`): Staff left this
+// file when the owner's tabbar grew to six (STAFF-F21's «Commissions», FIX-STAFF-COMMISSION-SCREEN).
 // flow: ninguno — FIX de la barra de pestañas de Ventas a 375 px (sigue a FIX-UI-TABBAR-375):
 // FIX-SALE-TABBAR-LABEL adds Sales & POS, five tabs whose fourth label was one word wider than a fifth
 // of a phone's strip, with its screenshots at 375, 390, 834 and 1440.
@@ -22,7 +23,6 @@ const PHONES = [
 
 const PAGES = [
   { app: 'customer', path: '/customer/customers', tabs: 4 },
-  { app: 'staff', path: '/staff/members', tabs: 5 },
   { app: 'sale', path: '/sale/sales', tabs: 5 },
 ];
 

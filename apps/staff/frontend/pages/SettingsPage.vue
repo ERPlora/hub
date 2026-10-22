@@ -31,6 +31,7 @@ type Form = Record<Field, string> & Record<(typeof SWITCHES)[number], boolean>;
 
 const session = useSession();
 const canManage = computed(() => session.can('staff.manage_settings'));
+const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 const { data, status, error, refresh } = useLive('staff.settings.get', {});
 const { run, pending, error: saveError } = useCommand('staff.settings.update');
@@ -119,7 +120,7 @@ async function save(): Promise<void> {
 <template>
   <AppPage
     :title="$t('staff.title')"
-    :tabs="staffTabs($t, { settings: canManage })"
+    :tabs="staffTabs($t, { settings: canManage, commissions: canSeePay })"
     :tabs-label="$t('staff.tabs.label')"
     content-layout="detail"
   >

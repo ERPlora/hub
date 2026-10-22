@@ -19,6 +19,7 @@ const session = useSession();
 const router = useRouter();
 const client = useLiveClient();
 const canSettings = computed(() => session.can('staff.manage_settings'));
+const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 /** The first member by name: whether there is anyone, and whom to show to begin with. */
 const { data: first, status } = useLive('staff.member.list', { sort: 'name', limit: 1 });
@@ -45,7 +46,7 @@ function addMember(): void {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings })"
+    :tabs="staffTabs($t, { settings: canSettings, commissions: canSeePay })"
     :tabs-label="$t('staff.tabs.label')"
   >
     <p

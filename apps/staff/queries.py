@@ -6,6 +6,7 @@ be named by id or by name (the assistant speaks names): ``resolve_member``.
 """
 
 import datetime as dt
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
 
@@ -15,8 +16,8 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound, PermissionDenied
-from live.operations import operation
+from live.errors import AppInactive, Conflict, NotFound, PermissionDenied
+from live.operations import UnknownOperation, get, operation
 
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
 from base.models import Membership
@@ -27,6 +28,8 @@ from apps.staff.schemas import (
     AvailabilityOut,
     ByIdIn,
     CommissionPage,
+    CommissionReportIn,
+    CommissionReportOut,
     CommissionSummaryIn,
     CompensationListIn,
     CompensationPage,
@@ -240,8 +243,8 @@ def member_stats(ctx: OperationContext, data: MemberStatsIn) -> dict:
     expose_api=True,
     ai={
         "description": "Returns each staff member who can earn a commission (active or on leave) with "
-        "their record id, the user id their record hangs from and their commission rate. To close a "
-        "day, add up the sales under both ids of a person and apply commission = gross x rate / 100."
+        "their record id, the user id their record hangs from and their commission rate. What each one "
+        "earned in a period is staff.commission.report."
     },
 )
 def commission_summary(ctx: OperationContext, params: CommissionSummaryIn) -> dict:
@@ -251,6 +254,100 @@ def commission_summary(ctx: OperationContext, params: CommissionSummaryIn) -> di
             search_name=Concat("first_name", Value(" "), "last_name")
         ).filter(search_name__icontains=params.search)
     return _page(members.order_by("first_name", "last_name", "id"), params)
+
+
+#: Sales' figure per professional (SALE-F28), asked by name: Sales is no requirement of Staff.
+SALES_BY_STAFF = "sale.sale.by_staff"
+#: Who can earn a commission: listed in the report even without sales (STAFF-F21).
+EARNING = (Member.Status.ACTIVE, Member.Status.ON_LEAVE)
+
+
+@operation(
+    "staff.commission.report",
+    kind="query",
+    permission="staff.view_compensation",
+    input=CommissionReportIn,
+    output=CommissionReportOut,
+    expose_api=True,
+    ai={
+        "description": "The commission each professional earned in a period of business days: today by "
+        "default, yesterday, this week, this month or two days of your own. Per person: what they sold "
+        "(refunds taken off), their rate and their commission, in cents, and the totals. Lists everyone "
+        "who can earn a commission, also without sales, and whoever sold in the period though no longer "
+        "active. Without Sales in the business, sales_available is false and nobody is listed."
+    },
+)
+def commission_report(ctx: OperationContext, params: CommissionReportIn) -> dict:
+    """STAFF-F21 step 3: what each professional sold in the period (``sale.sale.by_staff``, refunds
+    taken off) times their rate, rounded half up once per person. A sale names its professional by the
+    record's id; one with nobody, or with an id of no record, counts for nobody."""
+    first, last = report_period(params, business_today())
+    sold = _sold_by_staff(ctx, first, last)
+    if sold is None:
+        return {
+            "date_from": first,
+            "date_to": last,
+            "sales_available": False,
+            "rows": [],
+            "total_sold": 0,
+            "total_commission": 0,
+        }
+    members = (
+        Member.objects.filter(Q(status__in=EARNING) | Q(pk__in=list(sold)))
+        .annotate(role_name=F("role__name"))
+        .order_by("first_name", "last_name", "id")
+    )
+    rows = [
+        {
+            "member_id": member.id,
+            "full_name": member.full_name,
+            "role_name": member.role_name,
+            "status": member.status,
+            "commission_rate": member.commission_rate,
+            "sold": sold.get(member.id, 0),
+            "commission": commission_cents(sold.get(member.id, 0), member.commission_rate),
+        }
+        for member in members
+    ]
+    return {
+        "date_from": first,
+        "date_to": last,
+        "sales_available": True,
+        "rows": rows,
+        "total_sold": sum(row["sold"] for row in rows),
+        "total_commission": sum(row["commission"] for row in rows),
+    }
+
+
+def report_period(params: CommissionReportIn, today: dt.date) -> tuple[dt.date, dt.date]:
+    """The report's first and last business day: the days given, or the period counted up to ``today``
+    (a week starts on Monday)."""
+    if params.date_from is not None and params.date_to is not None:
+        return params.date_from, params.date_to
+    if params.period == "yesterday":
+        yesterday = today - dt.timedelta(days=1)
+        return yesterday, yesterday
+    if params.period == "this_week":
+        return today - dt.timedelta(days=today.weekday()), today
+    if params.period == "this_month":
+        return today.replace(day=1), today
+    return today, today
+
+
+def commission_cents(sold: int, rate: Decimal) -> int:
+    """``sold`` x ``rate`` / 100 in whole cents, half up (126.5 → 127)."""
+    return int((Decimal(sold) * rate / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def _sold_by_staff(ctx: OperationContext, first: dt.date, last: dt.date) -> dict[UUID, int] | None:
+    """What each record sold from ``first`` to ``last``, refunds taken off, asked to Sales for the caller
+    (its permission applies); ``None`` when the business has no Sales (absent or off)."""
+    try:
+        op = get(SALES_BY_STAFF)
+        page = op(ctx, op.input.model_validate({"date_from": first, "date_to": last}))
+    except (UnknownOperation, AppInactive):
+        return None
+    return {row.staff_id: row.total_revenue for row in page.rows}
 
 
 def live_members() -> QuerySet[Member]:
