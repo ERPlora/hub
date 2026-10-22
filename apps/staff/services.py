@@ -820,13 +820,15 @@ def _finish_move(
     input=SettingsIn,
     output=SettingsOut,
     ai={
-        "description": "Changes the settings of the staff app (working day, booking notice, limits and "
-        "notices); only what is sent.",
+        "description": "Changes the default working day that a new schedule proposes (start, end and "
+        "break); only what is sent.",
         "risk": "normal",
     },
 )
 def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
-    """STAFF-F22: the first save creates the row; hours are stored without seconds."""
+    """STAFF-F22: the first save creates the row; hours are stored without seconds. The resulting day
+    must be a schedule's day: a problem goes under the field that caused it (a start sent alone that
+    falls after the saved end, under the start)."""
     row = StaffSettings.objects.select_for_update().first()
     created = False
     if row is None:
@@ -839,6 +841,11 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
     if changes:
         for field, value in changes.items():
             setattr(row, field, value)
+        problems = row.workday_errors()
+        if "default_work_end" in problems and "default_work_end" not in sent:
+            problems = {"default_work_start": problems["default_work_end"]}
+        if problems:
+            raise InvalidPayload(next(iter(problems.values())), fields=problems)
         row.save()
     if changes or created:
         record_event(ctx, events.SETTINGS_UPDATED, {})

@@ -2,16 +2,26 @@
 // STAFF-F13 «Crear el horario semanal» and STAFF-F14 «Editar un horario»: the old panel as a dialog —
 // Schedule (name; empty, the server's «Regular schedule»), Effective from, Effective until, Default and
 // the week, one row per weekday: «works» and Start «to» End «break» Start «to» End, or «Off». New
-// proposes Monday to Friday 09:00–18:00 and sends `staff.schedule.create` for the member; editing sends
+// proposes Monday to Friday with the business's default working day (`staff.settings.get`, followed
+// live; until it arrives, its own defaults) and sends `staff.schedule.create` for the member; editing sends
 // `staff.schedule.update`, which replaces the whole week. The server judges: a day's problem goes under
 // that day's row (its `days.<i>` named back to the weekday), a week without working days on the week.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
-import { useCommand } from '@erplora/ui/sdk';
+import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useT } from '../composables/useT';
-import { blankScheduleForm, dayErrors, daysPayload, type ScheduleForm, scheduleFormFromRecord, type WeekRow } from '../lib/scheduleForm';
+import {
+  blankScheduleForm,
+  dayErrors,
+  daysPayload,
+  DEFAULT_WORKDAY,
+  type ScheduleForm,
+  scheduleFormFromRecord,
+  type WeekRow,
+  workdayFromSettings,
+} from '../lib/scheduleForm';
 import type { DayIn, ScheduleOut } from '../operations';
 
 const props = withDefaults(
@@ -29,6 +39,9 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
+/** The business's default working day (Staff › Settings, STAFF-F22): what a new week proposes. */
+const { data: settings } = useLive('staff.settings.get', {});
+const workday = computed(() => (settings.value ? workdayFromSettings(settings.value) : DEFAULT_WORKDAY));
 const form = ref<ScheduleForm>(blankScheduleForm({ isDefault: true }));
 /** The days of the last save: the server names a day by its position among them. */
 const sentDays = shallowRef<DayIn[]>([]);
@@ -43,7 +56,9 @@ watch(
   () => [open.value, props.schedule?.id] as const,
   ([isOpen]) => {
     if (!isOpen) return;
-    form.value = props.schedule ? scheduleFormFromRecord(props.schedule) : blankScheduleForm({ isDefault: props.proposeDefault });
+    form.value = props.schedule
+      ? scheduleFormFromRecord(props.schedule, workday.value)
+      : blankScheduleForm({ isDefault: props.proposeDefault, workday: workday.value });
     sentDays.value = [];
     creation.error.value = null;
     update.error.value = null;

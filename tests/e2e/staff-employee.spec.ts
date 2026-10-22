@@ -78,7 +78,7 @@ test('an employee reads Staff, Roles and Schedules without a single write button
       ['/staff/members/update', { id: member.data.id, phone: '1' }],
       ['/staff/members/terminate', { id: member.data.id }],
       ['/staff/roles', { name: `${TAG} By employee` }],
-      ['/staff/settings', { max_daily_hours: 10 }],
+      ['/staff/settings', { default_break_duration: 30 }],
     ];
     for (const [path, body] of writes) {
       const res = await api<Envelope>(employee.context, A, 'POST', path, body);

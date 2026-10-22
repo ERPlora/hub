@@ -1,7 +1,8 @@
 // Staff → Roles and Schedules in Chrome (WORKBOOK STAFF-F04, F13–F15). Roles: the owner creates a
 // role (0 members), sees a duplicate name refused in the form (409), and retires it from «Edit»: it
 // stays listed, marked «Retired». Schedules: for a member picked by searching the server, «+» proposes
-// Monday to Friday 09:00–18:00 by default and «Create schedule» lists it as the default one with its
+// Monday to Friday with the default working day of Settings (as proposed: 09:00–18:00, break 13:00–14:00;
+// STAFF-F22) and «Create schedule» lists it as the default one with its
 // hours; a day ending before it starts is refused under that day (422); editing drops Friday; «Delete»
 // asks first and empties the list. Everything this spec creates is named «E2E …» and removed after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
@@ -94,7 +95,8 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     await expect(view.locator('[data-testid=staff-schedules-member] input')).toHaveValue(name);
     await expect(view.locator('[data-testid=staff-schedules-empty]')).toContainText('This member has no schedules yet.');
 
-    // «+»: Monday to Friday 09:00–18:00 by default; a Monday ending before it starts is refused under Monday.
+    // «+»: Monday to Friday 09:00–18:00 with a break 13:00–14:00 (the working day of Settings as proposed);
+    // a Monday ending before it starts is refused under Monday.
     await view.locator('[data-testid=staff-schedules-add]').click();
     await expect(page.locator('[data-testid=staff-schedule-form-day-5-off]')).toHaveText('Off');
     await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('08:00');
@@ -105,7 +107,9 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     const row = view.locator('[data-testid=staff-schedules-row]').first();
     await expect(row).toContainText('Yes');
-    await expect(row).toContainText('Mon 09:00–18:00 · Tue 09:00–18:00 · Wed 09:00–18:00 · Thu 09:00–18:00 · Fri 09:00–18:00');
+    await expect(row).toContainText(
+      'Mon 09:00–18:00 (13:00–14:00) · Tue 09:00–18:00 (13:00–14:00) · Wed 09:00–18:00 (13:00–14:00) · Thu 09:00–18:00 (13:00–14:00) · Fri 09:00–18:00 (13:00–14:00)',
+    );
 
     // Edit: Friday off; the week is replaced.
     await row.getByText('Regular schedule').click();
