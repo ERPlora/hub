@@ -1,7 +1,7 @@
 // The website module end to end (apps/website, rounds 2026-10-21 and 2026-10-22, PLAN §29): the owner fills the
 // editor at /website (hero with a cover photo, contact, «About us» typed key by key and then hidden, the footer's
 // line, the «Forest» palette, «Auto» and the «Modern» design) and publishes; a visitor without a session opens `/`
-// and gets the public page with the cover, «Log in», the footer's line and without the hidden section, laid out for a
+// and gets the public page with the cover, «Log in», the footer's line, ERPlora's credit and without the hidden section, laid out for a
 // phone, a tablet and a computer with nothing scrolling sideways and the top bar's menu folding on the phone; «Log in» takes her to the SaaS's sign-in; «Auto» follows the device's light or
 // dark. Then each of the four designs is published in turn and captured at 390, 820 and 1440 px, light and dark
 // (`.artifacts/WEBSITE-<design>-<width>-<mode>.png`), with the editor's own captures. At the end the site is taken
@@ -195,6 +195,10 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   await expect(page.locator('header a[href="/auth/login"]')).toHaveText('Log in');
   await expect(page.locator('footer a[href="/auth/login"]')).toHaveText('Log in');
   await expect(page.locator('footer [data-ep-footer-text]')).toHaveText(FOOTER);
+  // The copyright line is ERPlora's credit, the same on every hub's site and linked to erplora.com, never the business.
+  const credit = page.locator('footer [data-ep-credit]');
+  await expect(credit).toHaveText(/^© \d{4} ERPlora$/);
+  await expect(credit.getByRole('link', { name: 'ERPlora' })).toHaveAttribute('href', 'https://erplora.com');
   // The catalog: Services' offer as cards, priced, with a pill per category, refreshed live by the public bundle.
   const catalog = page.locator('[data-ep-block="catalog"]');
   for (const name of ['Lunch menu', 'Tasting menu', 'Private dining room', 'Cooking class']) {

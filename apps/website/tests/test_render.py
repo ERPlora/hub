@@ -9,6 +9,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
+from django.utils import timezone
 
 from apps.website.palettes import PALETTES, resolve, rgb
 from apps.website.render import local_day, render_site
@@ -472,6 +473,26 @@ def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
     assert not re.search(r"<(p|span|small|div)\b[^>]*>\s*</\1>", empty), empty
     # The name and «Log in» stay.
     assert "Pepe&#x27;s Bistro" in empty and LOGIN.findall(empty) == ["Log in"]
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+@pytest.mark.parametrize("name", ["Pepe's Bistro", ""])
+def test_the_footer_signs_with_erploras_credit_and_link_never_the_business_name(template, name):
+    # Ioan (2026-10-22): the copyright line is the platform's credit, the same on every hub's site, linked to
+    # erplora.com and not editable by the owner; the business's name and legal line stay in their own place.
+    footer = footer_of(render(template, content=full_content(topbar={"name": name})))
+    lines = re.findall(r"<(p|div|small|span)\b[^>]*>((?:(?!</\1>).)*©(?:(?!</\1>).)*)</\1>", footer, re.S)
+    assert len(lines) == 1, lines
+    line = lines[0][1]
+    year = timezone.localtime().year
+    assert re.fullmatch(rf"\s*© {year} <a\b[^>]*>ERPlora</a>\s*", line), line
+    link = re.search(r"<a\b([^>]*)>", line).group(1)
+    assert re.search(r'\bhref="https://erplora\.com"', link), link
+    assert re.search(r'\btarget="_blank"', link), link
+    assert "noopener" in re.search(r'\brel="([^"]*)"', link).group(1).split(), link
+    assert "Pepe" not in line
+    # The only link to erplora.com on the page is the credit.
+    assert render(template, content=full_content(topbar={"name": name})).count('href="https://erplora.com"') == 1
 
 
 def test_today_is_the_hubs_own_day_in_its_time_zone_or_madrids():

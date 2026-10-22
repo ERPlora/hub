@@ -69,7 +69,8 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
     y hasta tres franjas (una hora de cierre anterior a la de apertura pasa de medianoche).
   - **Ubicación**: **Mostrar**, encabezado, hasta cuatro líneas de dirección y un enlace al mapa (`https://`, se abre
     aparte).
-  - **Pie de página** (siempre): una línea de texto (por ejemplo, la razón social) y **Entrar**.
+  - **Pie de página** (siempre): una línea de texto (por ejemplo, la razón social) y **Entrar**. Debajo va la firma
+    «© <año> ERPlora», enlazada a `https://erplora.com`: es la misma en todas las webs y no se edita.
 - Las imágenes (jpeg, png o webp, hasta 5 MB y 8000 px por lado) se suben desde cada campo de imagen: **Elegir
   imagen**, y después su miniatura, **Cambiar imagen** y **Quitar**.
 - **Vista previa**: la página tal y como la verán los clientes con el diseño y el borrador de ahora, a ancho de
@@ -93,7 +94,8 @@ de tarjetas (un degradado con la inicial, porque los productos no traen foto; el
 saltar de categoría si hay dos o más); el contacto en fichas con icono (teléfono, correo), WhatsApp como botón y las
 redes como píldoras; el horario en una lista con **hoy** resaltado (el día del negocio, en la zona horaria del hub;
 sin zona, la de Madrid); la dirección en una tarjeta con **Abrir el mapa**. Pie en columnas: nombre y la línea del
-pie, enlaces a las secciones y **Entrar**. Solo hay transiciones al pasar el ratón (y ninguna si el sistema pide menos
+pie, enlaces a las secciones y **Entrar**, y al final la firma «© <año> ERPlora» (se abre aparte). Solo hay
+transiciones al pasar el ratón (y ninguna si el sistema pide menos
 movimiento). Se adapta a móvil, tableta y ordenador (Bootstrap 5.3) sin desplazamiento
 lateral, con la paleta elegida en claro o en oscuro; en automático, sigue el dispositivo del visitante y cambia si
 este cambia con la página abierta (sin JavaScript, se ve en claro). El catálogo se pinta con lo publicado y, al abrir la
@@ -290,6 +292,8 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
 - Las imágenes se guardan tal cual (sin variantes de tamaño ni recorte, y sin quitarles los metadatos EXIF); no se
   borran las que dejan de usarse ni las versiones antiguas.
 - Sin sitemap ni robots más allá de la etiqueta `noindex` de la vista previa.
+- La firma «© <año> ERPlora» del pie no se quita ni se cambia: el nombre y los datos legales del negocio van en la
+  línea del pie.
 - La activación real del módulo por negocio (`AppActivation`) llega en la fase 2.
 
 ## Para quien lo mantiene

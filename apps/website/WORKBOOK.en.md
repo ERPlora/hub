@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dffe7329946bc8c41774772c6f5efb9f493f76c5cf19d1542e434a6ecdd2ec5d -->
+<!-- generated from WORKBOOK.md sha256:2d4cfbfaed44daf765e29288229fa50d343de6d616212fae715f85035f82357e -->
 
 ## What it is for and who it is for
 
@@ -58,7 +58,8 @@ switches between the two.
     (`https://` links) and, if **Show opening hours** is on, the week's opening hours: each day open or closed and up
     to three time slots (a closing time earlier than the opening one runs past midnight).
   - **Location**: **Show**, heading, up to four address lines and a map link (`https://`, opened apart).
-  - **Footer** (always): one line of text (for example, the company's legal name) and **Log in**.
+  - **Footer** (always): one line of text (for example, the company's legal name) and **Log in**. Below it goes the
+    credit «© <year> ERPlora», linked to `https://erplora.com`: it is the same on every site and is not edited.
 - The images (jpeg, png or webp, up to 5 MB and 8000 px a side) are uploaded from each image field: **Choose image**,
   and then its thumbnail, **Replace image** and **Remove**.
 - **Preview**: the page as customers will see it with the current design and draft, at a computer's or a phone's
@@ -81,7 +82,8 @@ the text; the catalog as a grid of cards (a gradient with the initial, since ite
 pills to jump between categories when there are two or more); the contact as chips with an icon (phone, email),
 WhatsApp as a button and the socials as pills; the opening hours as a list with **today** highlighted (the business's
 day, in the hub's time zone; Madrid's without one); the address in a card with **Open the map**. A footer in columns:
-the name and the footer's line, links to the sections and **Log in**. Motion is only a hover's transition (and none
+the name and the footer's line, links to the sections and **Log in**, and last the credit «© <year> ERPlora» (opened
+apart). Motion is only a hover's transition (and none
 when the system asks for less). It adapts to phone, tablet and computer (Bootstrap 5.3) with no sideways scrolling, in the
 chosen palette, light or dark; in auto it follows the visitor's device, also when it changes with the page open
 (without JavaScript it shows light). The catalog is painted with what was published and, when the page
@@ -277,4 +279,6 @@ visitors' two public reads (`website.public.*`).
 - Images are kept as they are (no size variants nor cropping, and their EXIF metadata is not removed); the ones that
   are no longer used and the old versions are not deleted.
 - No sitemap nor robots beyond the preview's `noindex` tag.
+- The footer's credit «© <year> ERPlora» cannot be removed or changed: the business's name and legal details go in
+  the footer's line.
 - The real activation of the module per business (`AppActivation`) comes in phase 2.
