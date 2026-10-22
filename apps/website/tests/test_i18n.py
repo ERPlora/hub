@@ -19,9 +19,10 @@ TEMPLATES = APP / "templates" / "website"
 _TRANSLATE = re.compile(r'{%\s*translate\s+"([^"]+)"(?:\s+context\s+"([^"]+)")?\s*%}')
 
 
-def po_entries() -> dict[str, str]:
-    """``"<context>\\x04<msgid>"`` (or ``"<msgid>"``) → msgstr; a fuzzy entry maps to ``""``."""
-    entries: dict[str, str] = {}
+def po_entries() -> dict[str | tuple[str, int], str]:
+    """``"<context>\\x04<msgid>"`` (or ``"<msgid>"``) → msgstr; a plural entry gives one ``(key, n)`` → ``msgstr[n]``
+    per form, as ``gettext`` keeps them; a fuzzy entry maps to ``""``."""
+    entries: dict[str | tuple[str, int], str] = {}
     parts: dict[str, list[str]] = {}
     fuzzy, current = False, None
 
@@ -29,22 +30,28 @@ def po_entries() -> dict[str, str]:
         msgid = "".join(parts.get("msgid", []))
         if msgid:
             context = "".join(parts.get("msgctxt", []))
-            entries[f"{context}\x04{msgid}" if context else msgid] = "" if fuzzy else "".join(parts.get("msgstr", []))
+            key = f"{context}\x04{msgid}" if context else msgid
+            forms = sorted(name for name in parts if name.startswith("msgstr["))
+            if forms:
+                for name in forms:
+                    entries[(key, int(name[7:-1]))] = "" if fuzzy else "".join(parts[name])
+            else:
+                entries[key] = "" if fuzzy else "".join(parts.get("msgstr", []))
 
     for line in (LOCALE / "django.po").read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line.startswith(("msgctxt ", "#")) or (line.startswith("msgid ") and current != "msgctxt"):
-            if current == "msgstr":
+            if current and current.startswith("msgstr"):
                 flush()
                 parts, fuzzy = {}, False
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
-        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
+        elif line.startswith(("msgctxt ", "msgid ", "msgid_plural ", "msgstr ", "msgstr[")):
             current, _, rest = line.partition(" ")
             parts[current] = [json.loads(rest)]
         elif line.startswith('"') and current:
             parts[current].append(json.loads(line))
-    if current == "msgstr":
+    if current and current.startswith("msgstr"):
         flush()
     return entries
 
@@ -74,6 +81,7 @@ def visible_texts() -> set[str]:
         schemas.NOT_AN_EMAIL,
         schemas.SAME_TIMES,
         schemas.DAY_TWICE,
+        schemas.NOT_A_PLACE,
     ]
     with translation.override("en"):
         return {str(text) for text in lazies}

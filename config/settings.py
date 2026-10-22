@@ -300,6 +300,10 @@ FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
 # use to call other systems (apps/flow/vault.py, FLOW-F26). Empty: the Hub starts, and saving or using a secret
 # is refused visibly (flow.secrets_key_missing).
 FLOW_SECRETS_KEY = config("FLOW_SECRETS_KEY", default="")
+# The platform's key of Google's Places API (New), with which the Hub reads the rating and reviews of a business's
+# place for its website (apps/website/reviews.py; Place Details and Text Search, from the server only). Secrets Manager
+# and the task definition in AWS. Empty: the reviews section asks nothing and shows only what was read before.
+GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
 # supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)

@@ -17,7 +17,8 @@ from PIL import Image as PILImage
 
 from apps.website.models import Image, Site
 from apps.website.queries import page_cache_key
-from apps.website.tests.conftest import A, B, ctx_for, full_content
+from apps.website import reviews
+from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -415,3 +416,84 @@ def test_two_first_saves_at_once_leave_one_site_and_neither_fails(transactional_
     assert waited, "the second save did not wait for the first one's row"
     assert Site.objects.count() == 1
     assert hub_site("a").template == "bold"
+
+
+# Google's reviews
+
+
+@pytest.fixture
+def google(monkeypatch, settings):
+    """``reviews.load`` as Google answers it (no network): the payload for the place, counting the calls."""
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    calls = []
+
+    def load(slug, ref, address):
+        calls.append((slug, ref, list(address)))
+        payload = google_reviews(place_ref=ref)
+        cache.set(reviews.reviews_key(slug, PLACE_ID), payload, reviews.TTL)
+        return payload
+
+    monkeypatch.setattr(reviews, "load", load)
+    return calls
+
+
+def test_saving_a_new_place_asks_google_after_the_commit_and_keeps_the_answer_in_the_site(
+    google, django_capture_on_commit_callbacks
+):
+    with django_capture_on_commit_callbacks(execute=True):
+        out = save(full_content(reviews={"place_ref": PLACE_ID}))
+    # The save answers before Google is asked (after its COMMIT); the next read of the site has the reviews.
+    assert out.reviews.state == "waiting"
+    assert google == [("a", PLACE_ID, ["Gran Vía 1", "28013 Madrid"])]
+    assert Site.objects.get().reviews_snapshot["place_id"] == PLACE_ID
+    status = run("website.site.get").reviews
+    assert (status.state, status.rating, status.count) == ("ready", 4.7, 128)
+    # Saving again with the same place does not ask again; another place does.
+    with django_capture_on_commit_callbacks(execute=True):
+        save(full_content(reviews={"place_ref": PLACE_ID}, hero={"title": "Other"}))
+    assert len(google) == 1
+    link = f"https://www.google.com/maps/place/?q=place_id:{PLACE_ID}"
+    with django_capture_on_commit_callbacks(execute=True):
+        save(full_content(reviews={"place_ref": link}))
+    assert [ref for _slug, ref, _address in google] == [PLACE_ID, link]
+
+
+def test_a_hidden_section_or_no_place_asks_google_nothing(google, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        save(full_content(reviews={"place_ref": PLACE_ID, "hidden": True}))
+        save(full_content(reviews={"place_ref": ""}))
+    assert google == []
+    assert Site.objects.get().reviews_snapshot == {}
+
+
+def test_publishing_drops_what_is_kept_and_asks_google_again(google, monkeypatch, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        save(full_content(reviews={"place_ref": PLACE_ID}))
+    cache.set(reviews.reviews_key("a", PLACE_ID), {**google_reviews(), "count": 1}, reviews.TTL)
+    forgotten = []
+    real_forget = reviews.forget
+    monkeypatch.setattr(reviews, "forget", lambda *args: (forgotten.append(args), real_forget(*args)))
+    with django_capture_on_commit_callbacks(execute=True):
+        run("website.site.publish")
+    assert forgotten == [("a", PLACE_ID, ["Gran Vía 1", "28013 Madrid"])]
+    assert len(google) == 2
+    assert reviews.cached("a", PLACE_ID, [])["count"] == 128
+
+
+def test_an_answer_already_kept_is_not_written_to_the_site_again(google, monkeypatch):
+    from apps.website.services import refresh_reviews
+
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    kept = google_reviews(count=7)
+    cache.set(reviews.reviews_key("a", PLACE_ID), kept, reviews.TTL)
+    monkeypatch.setattr(reviews, "load", lambda slug, ref, address: reviews.cached(slug, ref, address))
+    assert refresh_reviews(A, Site.objects.get().content) == kept
+    assert Site.objects.get().reviews_snapshot == {}
+
+
+def test_each_hub_keeps_its_own_reviews(google, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        save(full_content(reviews={"place_ref": PLACE_ID}), ctx=ctx_for(scope=B))
+    assert google[0][0] == "b"
+    assert Site.objects.get(hub_id=Hub.objects.get(slug="b").id).reviews_snapshot["place_id"] == PLACE_ID
+

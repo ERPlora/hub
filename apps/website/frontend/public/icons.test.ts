@@ -1,4 +1,5 @@
-// The public page's icons (the contact's chips, WhatsApp, the social profiles, the opening hours, the map): Ionicons
+// The public page's icons (the contact's chips, WhatsApp, the social profiles, the opening hours, the map, the stars of
+// the Google reviews): Ionicons
 // (`ion:`, the default set, MIT) exactly as @erplora/ui ships them (`ionicons/icons`), baked into site.css as CSS
 // masks: the page has no script to paint them and no network for them (CSP `img-src 'self' data:`). Each
 // `.ws-icon-<name>` sets `--ws-icon` to that icon's own data URL, and only filled shapes qualify: an outline icon draws
@@ -27,6 +28,7 @@ const ICONS: Record<string, string> = {
   facebook: 'logoFacebook',
   tiktok: 'logoTiktok',
   x: 'logoX',
+  star: 'star',
 };
 
 async function ionicons(): Promise<Record<string, string>> {

@@ -27,6 +27,7 @@ ROUTES = {
     ("GET", "/website/catalog/categories", "website.catalog.categories"),
     ("GET", "/website/public/site", "website.public.site"),
     ("GET", "/website/public/catalog", "website.public.catalog"),
+    ("GET", "/website/public/reviews", "website.public.reviews"),
 }
 HOST = "a.localhost"
 
@@ -184,7 +185,7 @@ def test_public_catalog_answers_without_a_session_only_when_published_and_is_rat
 def test_one_hubs_publication_is_not_another_hubs_public_site(admin_client, client):
     save_and_publish(admin_client)
     admin_client.logout()
-    for path in ("/api/website/public/site", "/api/website/public/catalog"):
+    for path in ("/api/website/public/site", "/api/website/public/catalog", "/api/website/public/reviews"):
         response = client.get(path, HTTP_HOST="b.localhost")
         assert (response.status_code, response.json()["error"]["code"]) == (404, "website.not_published"), path
         assert client.get(path, HTTP_HOST=HOST).status_code == 200, path
@@ -196,3 +197,32 @@ def test_the_public_site_is_json_for_anyone_once_published(admin_client, client)
     admin_client.logout()
     body = get(client, "/website/public/site").json()
     assert (body["version"], body["template"], body["content"]["hero"]["title"]) == (1, "modern", "Fresh food every day")
+
+
+@pytest.mark.django_db
+def test_the_public_reviews_answer_without_a_session_once_published_in_the_visitors_language(admin_client, client):
+    from django.core.cache import cache
+
+    from apps.website import reviews
+    from apps.website.tests.conftest import PLACE_ID, google_reviews
+
+    assert post(admin_client, "/website/site", {"template": "modern", "theme": {}, "content": full_content(reviews={"place_ref": PLACE_ID})}).status_code == 200
+    assert post(admin_client, "/website/site/publish").status_code == 200
+    admin_client.logout()
+    assert get(client, "/website/public/reviews").json() == {
+        "available": False,
+        "rating_label": "",
+        "stars": [],
+        "stars_label": "",
+        "count_label": "",
+        "maps_uri": "",
+        "write_uri": "",
+        "reviews": [],
+    }
+    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    response = client.get("/api/website/public/reviews", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
+    body = response.json()
+    assert response.status_code == 200 and "Set-Cookie" not in response.headers
+    assert (body["available"], body["rating_label"], body["count_label"]) == (True, "4,7", "128 reseñas en Google")
+    assert len(body["reviews"]) == 5 and body["reviews"][0]["author"] == "Cliente 0"
+

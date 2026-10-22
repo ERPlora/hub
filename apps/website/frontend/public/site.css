@@ -8,7 +8,8 @@
  *   2. draws what Bootstrap has no utility for, through `ws-*` hooks: the see-through top bar, the header's cover veil
  *      and its palette gradient, the eyebrows, the contact's chips and their icons, the catalog's placeholders, the
  *      map panel, the photo frame, the gallery's zoom, and each template's type and spacing;
- *   3. the icons: Ionicons (`ion:`, MIT) as @erplora/ui ships them, as CSS masks (icons.test.ts checks each one).
+ *   3. the icons: Ionicons (`ion:`, MIT) as @erplora/ui ships them, as CSS masks (icons.test.ts checks each one), and
+ *      the half star of the Google reviews.
  * Fonts are system stacks (CSP: nothing from a CDN), chosen to look right on macOS, iOS, Windows and Android. Motion is
  * only a hover's transition, and none for who asks the system for less. */
 
@@ -453,3 +454,13 @@ a:focus-visible > .ws-zoom img {
 .ws-icon-x {
   --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' class='ionicon ionicon-fill-none'><path d='M9.333 6.929 14.546 1H13.31L8.783 6.147 5.169 1H1l5.466 7.783L1 15h1.235l4.779-5.436L10.83 15H15zM7.641 8.852l-.554-.776L2.68 1.911h1.898l3.557 4.977.552.776 4.623 6.47h-1.897z'/></svg>");
 }
+
+.ws-icon-star {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M394 480a16 16 0 0 1-9.39-3L256 383.76 127.39 477a16 16 0 0 1-24.55-18.08L153 310.35 23 221.2a16 16 0 0 1 9-29.2h160.38l48.4-148.95a16 16 0 0 1 30.44 0l48.4 149H480a16 16 0 0 1 9.05 29.2L359 310.35l50.13 148.53A16 16 0 0 1 394 480'/></svg>");
+}
+
+/* Half a star (a rating such as 4.5): the left half in the warning colour of the full stars, the right half muted. */
+.ws-icon.ws-star-half {
+  background: linear-gradient(90deg, var(--bs-warning) 50%, var(--bs-tertiary-color) 50%);
+}
+

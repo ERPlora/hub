@@ -12,9 +12,17 @@ import pytest
 from django.utils import timezone
 
 from apps.website.palettes import PALETTES, resolve, rgb
-from apps.website.render import local_day, render_site
+from apps.website.render import local_day, render_site, stars
 from apps.website.schemas import SECTIONS, TEMPLATES
-from apps.website.tests.conftest import WEBSITE_CSS, WEBSITE_JS, catalog_snapshot, full_content
+from apps.website.tests.conftest import (
+    LONG_REVIEW,
+    PLACE_ID,
+    WEBSITE_CSS,
+    WEBSITE_JS,
+    catalog_snapshot,
+    full_content,
+    google_reviews,
+)
 
 pytestmark = pytest.mark.usefixtures("website_manifest")
 
@@ -29,16 +37,23 @@ def gallery(urls=GALLERY_URLS, **fields) -> dict:
     return {"images": [{"id": str(uuid.uuid4()), "url": url} for url in urls], **fields}
 
 
-def render(template="classic", content=None, lang="en", catalog=None, preview=False, theme=None, today=None) -> str:
+#: The page's Google reviews when a test does not say otherwise.
+DEFAULT = object()
+
+
+def render(
+    template="classic", content=None, lang="en", catalog=None, preview=False, theme=None, today=None, reviews=DEFAULT
+) -> str:
     return render_site(
         template,
         theme or THEME,
-        full_content(gallery=gallery()) if content is None else content,
+        full_content(gallery=gallery(), reviews={"place_ref": PLACE_ID}) if content is None else content,
         lang,
         hub="a",
         catalog=catalog_snapshot() if catalog is None else catalog,
         preview=preview,
         today=today,
+        reviews=google_reviews() if reviews is DEFAULT else reviews,
     )
 
 
@@ -95,12 +110,13 @@ def test_a_hidden_section_is_not_painted(template):
         about={"hidden": True},
         catalog={"hidden": True},
         gallery=gallery(hidden=True),
+        reviews={"hidden": True, "place_ref": PLACE_ID},
         contact={"hidden": True},
         location={"hidden": True},
     )
     html = render(template, content)
     assert sections(html) == ["topbar", "hero", "footer"]
-    for gone in ("We cook", "data-ep-block", GALLERY_URLS[0], "Gran Vía 1", "hola@pepe.es", "Monday"):
+    for gone in ("We cook", "data-ep-block", GALLERY_URLS[0], "Cliente 0", "Gran Vía 1", "hola@pepe.es", "Monday"):
         assert gone not in html, gone
     assert LOGIN.findall(html) == ["Log in", "Log in"]
 
@@ -360,6 +376,7 @@ EYEBROWS = {
     "about": "Who we are",
     "catalog": "What we offer",
     "gallery": "Take a look",
+    "reviews": "Google reviews",
     "contact": "Get in touch",
     "location": "Visit us",
 }
@@ -368,7 +385,12 @@ EYEBROWS = {
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_each_section_has_an_eyebrow_over_its_heading_and_its_content_in_rounded_cards(template):
     html = render(
-        template, content=full_content(about={"image": {"id": str(uuid.uuid4()), "url": IMAGE_URL}}, gallery=gallery())
+        template,
+        content=full_content(
+            about={"image": {"id": str(uuid.uuid4()), "url": IMAGE_URL}},
+            gallery=gallery(),
+            reviews={"place_ref": PLACE_ID},
+        ),
     )
     for name, eyebrow in EYEBROWS.items():
         section = section_of(html, name)
@@ -415,6 +437,114 @@ def test_an_empty_or_hidden_gallery_is_not_painted(template):
     hidden = render(template, content=full_content(gallery=gallery(hidden=True)))
     assert "gallery" not in sections(hidden)
     assert GALLERY_URLS[0] not in hidden and 'href="#gallery"' not in hidden
+
+
+WRITE_URL = f"https://search.google.com/local/writereview?placeid={PLACE_ID}"
+
+
+def links(section: str) -> list[tuple[str, str, str]]:
+    """Each link of ``section``: (href, target, text without tags)."""
+    return [
+        (href, target, re.sub(r"<[^>]+>", "", text).strip())
+        for href, target, text in re.findall(r'<a [^>]*href="([^"]+)"(?: target="([^"]*)")?[^>]*>(.*?)</a>', section, re.S)
+    ]
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_reviews_show_googles_rating_count_five_cards_and_its_two_buttons(template):
+    section = section_of(render(template), "reviews")
+    assert re.search(r'<p class="ws-eyebrow[^"]*">Google reviews</p>', section)
+    assert re.search(r">\s*What our customers say\s*</h2>", section)
+    summary = re.search(r"data-ep-reviews-summary>(.*?)</div>\s*</div>", section, re.S).group(1)
+    assert ">4.7</span>" in summary and "128 reviews on Google" in summary
+    assert 'aria-label="4.7 out of 5 stars"' in summary
+    # 4.7 reads as four and a half stars: four on, one half.
+    assert summary.count("ws-icon ws-icon-star text-warning") == 4 and summary.count("ws-star-half") == 1
+    cards = re.findall(r'<figure class="card[^"]*">(.*?)</figure>', section, re.S)
+    assert len(cards) == 5
+    for index, card in enumerate(cards):
+        on = 5 - index % 2
+        assert card.count("ws-icon ws-icon-star text-warning") == on and card.count("ws-icon ws-icon-star") == 5, index
+        assert f'aria-label="{on} out of 5 stars"' in card
+    assert (f"https://www.google.com/maps/contrib/0", "_blank", "Cliente 0") in links(cards[0])
+    # Django's «2 months» keeps its number and its unit together (a no-break space).
+    assert ("https://www.google.com/maps/reviews/r0", "_blank", "2\u00a0months ago") in links(cards[0])
+    assert "Muy bien, número 0" in cards[0]
+    found = links(section)
+    assert ("https://maps.google.com/?cid=7660264463346408491", "_blank", "See on Google") in found
+    assert (WRITE_URL, "_blank", "Write a review") in found
+    # Google's attribution, never translated, and how the reviews are ordered.
+    assert '<span translate="no">Google Maps</span>' in section
+    assert "The most relevant first, as Google orders them." in section
+    # No picture of Google's: the public CSP allows images from the Hub only.
+    assert "googleusercontent" not in section and "<img" not in section
+    assert 'href="#reviews"' in render(template)
+
+
+def test_the_stars_round_the_rating_to_the_nearest_half():
+    assert stars(4.7) == ["on", "on", "on", "on", "half"]
+    assert stars(4.8) == ["on"] * 5
+    assert stars(4.2) == ["on", "on", "on", "on", "off"]
+    assert stars(4.3) == ["on", "on", "on", "on", "half"]
+    assert stars(1) == ["on", "off", "off", "off", "off"]
+    assert stars(None) == []
+
+
+def test_a_long_review_is_cut_at_280_characters_with_the_whole_text_in_its_title():
+    cards = re.findall(r'<figure class="card[^"]*">(.*?)</figure>', section_of(render(), "reviews"), re.S)
+    paragraph = re.search(r'<p class="mb-0"( title="([^"]*)")?>(.*?)</p>', cards[4], re.S)
+    whole = LONG_REVIEW.strip()
+    assert paragraph.group(2) == whole
+    shown = paragraph.group(3)
+    assert shown.endswith("…") and len(shown) <= 281 and whole.startswith(shown[:-1].rstrip())
+    # A short one has no title: it is whole.
+    assert ' title="' not in re.search(r'<p class="mb-0"[^>]*>', cards[0]).group(0)
+
+
+def test_the_reviews_speak_the_visitors_language():
+    section = section_of(render(lang="es"), "reviews")
+    for text in (
+        "Reseñas de Google",
+        "Lo que dicen nuestros clientes",
+        ">4,7</span>",
+        "128 reseñas en Google",
+        'aria-label="4,7 de 5 estrellas"',
+        "hace 2\u00a0meses",
+        "Ver en Google",
+        "Escribir una reseña",
+        "Las más relevantes primero, como las ordena Google.",
+        '<span translate="no">Google Maps</span>',
+    ):
+        assert text in section, text
+    one = section_of(render(lang="es", reviews=google_reviews(count=1)), "reviews")
+    assert "1 reseña en Google" in one
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_reviews_are_not_painted_when_hidden_without_a_place_or_without_anything_from_google(template):
+    place = {"place_ref": PLACE_ID}
+    assert "reviews" not in sections(render(template, content=full_content(reviews={**place, "hidden": True})))
+    assert "reviews" not in sections(render(template, content=full_content(reviews={"place_ref": ""})))
+    assert "reviews" not in sections(render(template, content=full_content(reviews=place), reviews=None))
+    empty = google_reviews(rating=None, count=0, reviews=[])
+    assert "reviews" not in sections(render(template, content=full_content(reviews=place), reviews=empty))
+    hidden = render(template, content=full_content(reviews={**place, "hidden": True}))
+    assert "Cliente 0" not in hidden and 'href="#reviews"' not in hidden
+
+
+def test_the_preview_says_where_the_reviews_will_be_until_google_answers():
+    preview = render(content=full_content(reviews={"place_ref": PLACE_ID}), reviews=None, preview=True)
+    section = section_of(preview, "reviews")
+    assert "data-ep-reviews-hint" in section
+    assert "Your Google rating and reviews will show here once Google answers for this place." in section
+    # Nothing to say without a place, or with the section hidden.
+    for reviews in ({"place_ref": ""}, {"place_ref": PLACE_ID, "hidden": True}):
+        assert "reviews" not in sections(render(content=full_content(reviews=reviews), reviews=None, preview=True))
+
+
+def test_a_rating_without_written_reviews_shows_the_summary_only():
+    section = section_of(render(reviews=google_reviews(reviews=[])), "reviews")
+    assert "128 reviews on Google" in section and "<figure" not in section
 
 
 def test_the_catalog_is_a_grid_of_cards_with_a_placeholder_a_price_pill_and_category_pills():
@@ -482,7 +612,7 @@ def test_the_location_is_a_card_with_an_open_the_map_pill(template):
 def test_the_footer_has_columns_the_sections_and_log_in(template):
     footer = footer_of(render(template))
     assert 'class="row' in footer and len(re.findall(r'class="col-', footer)) >= 2
-    assert re.findall(r'href="#([a-z]+)"', footer) == ["about", "catalog", "gallery", "contact", "location"]
+    assert re.findall(r'href="#([a-z]+)"', footer) == ["about", "catalog", "gallery", "reviews", "contact", "location"]
     assert "small" in footer and "text-body-secondary" in footer
     login = re.search(r'<a class="([^"]*)" href="/auth/login"', footer).group(1).split()
     assert {"btn", "rounded-pill"} <= set(login)
@@ -606,3 +736,43 @@ def test_the_catalog_block_is_the_markup_the_public_bundle_rebuilds():
     assert {case["name"] for case in fixture["cases"]} == {"two categories", "one category", "empty"}
     for case in fixture["cases"]:
         assert catalog_block_tokens(render(catalog=case["catalog"])) == tokens(case["html"]), case["name"]
+
+
+REVIEWS_FIXTURE = Path(__file__).resolve().parent.parent / "frontend" / "public" / "reviews.fixture.json"
+
+
+def block_tokens(html: str, marker: str) -> list[str]:
+    """The tokens of what is inside the first ``<div …marker…>``."""
+    found, depth, inside = [], 0, False
+    for token in tokens(html):
+        if not inside:
+            inside = token.startswith("<div ") and marker in token
+            continue
+        if token.startswith("</"):
+            depth -= 1
+            if depth < 0:
+                return found
+        elif token.startswith("<") and token[1:].split(" ")[0].rstrip(">") not in VOID:
+            depth += 1
+        found.append(token)
+    raise AssertionError(f"no {marker}")
+
+
+def test_the_reviews_summary_and_cards_are_the_markup_the_public_bundle_rebuilds():
+    from django.template.loader import render_to_string
+
+    fixture = json.loads(REVIEWS_FIXTURE.read_text(encoding="utf-8"))
+    assert {case["name"] for case in fixture["cases"]} == {"rating and reviews", "rating only", "reviews without a rating"}
+    for case in fixture["cases"]:
+        html = render_to_string("website/sections/reviews.html", {"data": {"title": "", "hint": False, **case["view"]}})
+        assert block_tokens(html, "data-ep-reviews-summary") == tokens(case["summary"]), case["name"]
+        assert block_tokens(html, "data-ep-reviews-list") == tokens(case["list"]), case["name"]
+
+
+def test_the_view_the_page_paints_is_the_one_the_public_api_answers():
+    from apps.website.render import reviews_view
+    from apps.website.schemas import ReviewsOut
+
+    view = reviews_view(google_reviews())
+    assert ReviewsOut.model_validate({"available": True, **view}).model_dump(exclude={"available"}) == view
+

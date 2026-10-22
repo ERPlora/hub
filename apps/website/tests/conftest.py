@@ -115,6 +115,7 @@ def full_content(**overrides) -> dict:
         "about": {"hidden": False, "title": "", "text": "We cook **everything** at home.", "image": None},
         "catalog": {"hidden": False, "title": "", "source": "service", "category_ids": [], "show_prices": True},
         "gallery": {"hidden": False, "title": "", "images": []},
+        "reviews": {"hidden": False, "title": "", "place_ref": ""},
         "contact": {
             "hidden": False,
             "title": "",
@@ -156,3 +157,41 @@ def catalog_snapshot() -> dict:
             {"name": "", "items": [{"name": "Consultation", "price": 0, "price_kind": "free", "minutes": 15}]},
         ],
     }
+
+
+#: A business's place on Google Maps (Google's own example Place ID).
+PLACE_ID = "ChIJN1t_tDeuEmsRUsoyG83frY4"
+#: What the page's long review says (over the 280 characters a card shows).
+LONG_REVIEW = "Me encanta este sitio. " * 20
+
+
+def google_reviews(place_ref: str = PLACE_ID, **overrides) -> dict:
+    """Google's rating and reviews of the place as ``apps.website.reviews`` keeps them: five reviews written 75 days
+    ago, the last one long."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    written = (timezone.now() - timedelta(days=75)).isoformat()
+    payload = {
+        "place_id": PLACE_ID,
+        "place_ref": place_ref,
+        "name": "Pepe's Bistro",
+        "rating": 4.7,
+        "count": 128,
+        "maps_uri": "https://maps.google.com/?cid=7660264463346408491",
+        "reviews": [
+            {
+                "author": f"Cliente {index}",
+                "author_uri": f"https://www.google.com/maps/contrib/{index}",
+                "rating": 5 - index % 2,
+                "text": LONG_REVIEW.strip() if index == 4 else f"Muy bien, número {index}",
+                "time": written,
+                "uri": f"https://www.google.com/maps/reviews/r{index}",
+            }
+            for index in range(5)
+        ],
+        "fetched_at": timezone.now().isoformat(),
+    }
+    payload.update(overrides)
+    return payload

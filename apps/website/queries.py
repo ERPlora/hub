@@ -2,11 +2,12 @@
 
 - **The editor**: ``website.site.get`` (the draft and what is published), ``website.site.preview`` (the draft
   rendered as visitors would see it, with a fresh catalog) and ``website.qr.get`` (the QR of the hub's address).
-- **The public reads** (no session, ``permission=None``): ``website.public.site`` and ``website.public.catalog``
-  answer only while the module is on in the hub (404 ``app_inactive`` otherwise) and the hub's own site is published
+- **The public reads** (no session, ``permission=None``): ``website.public.site``, ``website.public.catalog`` and
+  ``website.public.reviews`` answer only while the module is on in the hub (404 ``app_inactive`` otherwise) and the hub's own site is published
   and live (404 ``website.not_published`` otherwise), the same guard ``/`` applies (``public_home.is_published``,
   through :func:`live_version`), and count each visitor (``base.throttle``: 60 a minute per hub and address, then
-  429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version and language.
+  429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version and language; the reviews
+  are those kept (``apps.website.reviews``: a read never asks Google).
 - **The catalog** (``read_catalog``): Inventory's products on sale or Services' offered services, read by their
   operations' names with a context that may read them (as ``apps.flow`` does), only when that app is installed; an
   app that is not there leaves the catalog empty, never an error.
@@ -32,9 +33,10 @@ from live.context import OperationContext, Scope
 from live.errors import AppInactive, NotFound
 from live.operations import get, operation, registry
 
+from apps.website import reviews
 from apps.website.models import Site
 from apps.website.qr import CONTENT_TYPES, public_url, qr_image
-from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site
+from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site, reviews_view
 from apps.website.schemas import (
     DAYS,
     CatalogOut,
@@ -46,6 +48,7 @@ from apps.website.schemas import (
     PreviewOut,
     PublicSiteOut,
     QrIn,
+    ReviewsOut,
     QrOut,
     SiteOut,
     Theme,
@@ -117,7 +120,29 @@ def site_out(ctx: OperationContext, site: Site) -> dict[str, Any]:
         "has_changes": _has_changes(site, now),
         "updated_at": site.updated_at,
         "public_url": public_url(ctx.scope.key, ctx.request),
+        "reviews": _reviews_status(ctx.scope.key, now["content"], site.reviews_snapshot),
     }
+
+
+def _reviews_status(slug: str, content: dict, snapshot: dict | None) -> dict[str, Any]:
+    """Whether Google's reviews of the draft's place are there (the editor's note), hidden or not."""
+    valid = Content.model_validate(content)
+    state, payload = reviews.state(slug, valid.reviews.place_ref, list(valid.location.address_lines), snapshot)
+    return {
+        "state": state,
+        "rating": payload.get("rating") if payload else None,
+        "count": payload.get("count", 0) if payload else 0,
+        "fetched_at": payload.get("fetched_at") if payload else None,
+    }
+
+
+def shown_reviews(slug: str, content: dict, snapshot: dict | None) -> dict | None:
+    """Google's reviews ``content``'s page shows, as kept (never asking Google): ``None`` when its section is hidden,
+    names no place, or nothing was read for it."""
+    valid = Content.model_validate(content)
+    if valid.reviews.hidden:
+        return None
+    return reviews.read(slug, valid.reviews.place_ref, list(valid.location.address_lines), snapshot)
 
 
 @operation(
@@ -146,7 +171,8 @@ def get_site(ctx: OperationContext, data: NoIn) -> dict:
     expose_api=True,
 )
 def preview_site(ctx: OperationContext, data: NoIn) -> dict:
-    now = draft(current_site(hub_id(ctx.scope)))
+    site = current_site(hub_id(ctx.scope))
+    now = draft(site)
     catalog = read_catalog(ctx, Content.model_validate(now["content"]).catalog)
     html = render_site(
         now["template"],
@@ -157,6 +183,7 @@ def preview_site(ctx: OperationContext, data: NoIn) -> dict:
         catalog=catalog,
         preview=True,
         today=business_day(ctx.scope),
+        reviews=shown_reviews(ctx.scope.key, now["content"], site.reviews_snapshot),
     )
     return {"html": html}
 
@@ -244,7 +271,12 @@ def published_page(scope: Scope) -> dict[str, Any] | None:
         return None
     if site is None:
         return None
-    return {**site.published_content, "version": site.published_version, "published_at": site.published_at}
+    return {
+        **site.published_content,
+        "version": site.published_version,
+        "published_at": site.published_at,
+        "reviews_snapshot": site.reviews_snapshot,
+    }
 
 
 def live_version(scope: Scope) -> int:
@@ -308,6 +340,23 @@ def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
         view = catalog_view(read_catalog(ctx, section)) or {"source": None, "show_prices": True, "groups": []}
     cache.set(key, view, CATALOG_TTL)
     return view
+
+
+@operation(
+    "website.public.reviews",
+    kind="query",
+    permission=None,
+    input=NoIn,
+    output=ReviewsOut,
+    expose_api=True,
+)
+def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
+    _count_visitor(ctx)
+    site = _live_site(ctx.scope)
+    payload = shown_reviews(ctx.scope.key, site.published_content["content"], site.reviews_snapshot)
+    with translation.override(ctx.language):
+        view = reviews_view(payload)
+    return {"available": True, **view} if view else {"available": False}
 
 
 # The cache

@@ -8,6 +8,9 @@
   next version.
 - ``website.image.upload`` keeps an image (jpeg, png or webp, 5 MB and 8000 px a side at most, checked with Pillow)
   in the hub file store under its content hash.
+- Google's reviews of the reviews section's place (``apps.website.reviews``) are asked after the COMMIT that names a
+  new place (a save) or that publishes (what was kept is dropped first), never inside a transaction; the public home
+  asks too when nothing is kept (:func:`refresh_reviews`). A fresh answer is kept in the site's row.
 
 Every write acts on the site of the request's hub only (``hub_id``, phase 1: the tables are shared, models.py) and
 locks its row first, so two editors never interleave a save and a publication; the first save or publication of a hub
@@ -28,14 +31,14 @@ from django.core.files.storage import storages
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
 from live.operations import operation
 from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from apps.website import events
+from apps.website import events, reviews
 from apps.website.models import ACTOR_MAX_LENGTH, Image, Site
 from apps.website.queries import draft, forget_cached, read_catalog, site_out
 from apps.website.schemas import (
@@ -118,10 +121,11 @@ def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
         "with the owner's own primary and accent colours over it in custom, null for the palette's own, and the "
         "page's mode: light, dark or auto) and the content of each section: the top bar's name, the hero's title "
         "and tagline, about us (Markdown text), the catalog's source, the gallery (up to 12 photos already uploaded, "
-        "by id, in their order), contact (phone, WhatsApp, email, social links and the opening hours, one row per "
-        "day with up to three intervals HH:MM-HH:MM), location (address lines and an https:// map link) and the "
-        "footer's line; about, catalog, gallery, contact and location can be hidden. Visitors see it only once it "
-        "is published.",
+        "by id, in their order), the Google reviews (the business's Google Maps link or Place ID in place_ref; the "
+        "Hub reads the rating and reviews from Google itself), contact (phone, WhatsApp, email, social links and the "
+        "opening hours, one row per day with up to three intervals HH:MM-HH:MM), location (address lines and an "
+        "https:// map link) and the footer's line; about, catalog, gallery, reviews, contact and location can be "
+        "hidden. Visitors see it only once it is published.",
         "risk": "normal",
     },
 )
@@ -130,6 +134,9 @@ def save_site(ctx: OperationContext, data: SaveIn) -> dict:
     site, created = _locked_site(hub)
     content = _with_image_urls(hub, data.content)
     new = {"template": data.template, "theme": data.theme.model_dump(), "content": content.model_dump(mode="json")}
+    place = reviews_place(new["content"])
+    if place is not None and place != reviews_place(site.content or {}):
+        transaction.on_commit(partial(refresh_reviews, ctx.scope, new["content"]), robust=True)
     if created or draft(site) != new:
         site.template, site.theme, site.content = new["template"], new["theme"], new["content"]
         site.updated_by = _actor(ctx)
@@ -169,6 +176,7 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
     site.save()
     record_event(ctx, events.SITE_PUBLISHED, {"id": str(site.id), "version": site.published_version})
     transaction.on_commit(partial(forget_cached, ctx.scope.key, previous), robust=True)
+    transaction.on_commit(partial(refresh_reviews, ctx.scope, site.published_content["content"], again=True), robust=True)
     return _publication(site)
 
 
@@ -196,6 +204,35 @@ def unpublish_site(ctx: OperationContext, data: NoIn) -> dict:
         record_event(ctx, events.SITE_UNPUBLISHED, {"id": str(site.id), "version": site.published_version})
         transaction.on_commit(partial(forget_cached, ctx.scope.key, site.published_version), robust=True)
     return _publication(site)
+
+
+# Google's reviews
+
+
+def reviews_place(content: dict) -> tuple[str, list[str]] | None:
+    """The reviews section's place in ``content`` (the owner's input and the address it is searched with), or
+    ``None`` when the section is hidden or names none."""
+    valid = Content.model_validate(content)
+    if valid.reviews.hidden or not valid.reviews.place_ref:
+        return None
+    return valid.reviews.place_ref, list(valid.location.address_lines)
+
+
+def refresh_reviews(scope: Scope, content: dict, *, again: bool = False) -> dict | None:
+    """Google's reviews of ``content``'s place on ``scope``'s hub: those kept, or asked now when nothing is (``again``:
+    what is kept is dropped first). Never inside a transaction: after a COMMIT, or from the public home. A fresh
+    answer is kept in the site's row too, so a flushed cache or a later failure still shows it."""
+    place = reviews_place(content)
+    if place is None:
+        return None
+    ref, address = place
+    if again:
+        reviews.forget(scope.key, ref, address)
+    asked = reviews.cached(scope.key, ref, address) is None
+    payload = reviews.load(scope.key, ref, address)
+    if asked and payload is not None:
+        Site.objects.filter(hub_id=hub_id(scope)).update(reviews_snapshot=payload)
+    return payload
 
 
 def _publication(site: Site) -> dict[str, Any]:

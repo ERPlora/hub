@@ -26,6 +26,8 @@ const PHONE = '+34 600 123 456';
 const EMAIL = 'hola@pepe.es';
 /** The footer's line, as an owner writes it (the demo once showed a lone «h»: it was the text typed there). */
 const FOOTER = "Pepe's Bistro S.L. · Gran Vía 1, Madrid";
+/** A business's page on Google Maps, as the address bar shows it. */
+const PLACE_LINK = 'https://www.google.com/maps/place/Puerta+del+Sol/@40.4169473,-3.7035285,17z/';
 /** The gallery's photos, each drawn with its own mark (two different files). */
 const GALLERY = ['Lunch', 'Dinner'] as const;
 /** Their addresses on the Hub, in the order the editor kept them (filled once they are uploaded). */
@@ -79,15 +81,20 @@ async function seedServices(context: BrowserContext): Promise<void> {
   }
 }
 
-/** The catalog section on, from Services, with its own heading and every category, and an empty gallery (whatever a
- * run before left). */
+/** The catalog section on, from Services, with its own heading and every category, an empty gallery and no place on
+ * Google Maps (whatever a run before left). */
 async function showServices(context: BrowserContext): Promise<void> {
   const site = await api<{ template: string; theme: unknown; content: Record<string, unknown> }>(context, A, 'GET', '/website/site');
   expect(site.status).toBe(200);
   const { template, theme, content } = site.data;
   const catalog = { hidden: false, title: '', source: 'service', category_ids: [], show_prices: true };
   const gallery = { hidden: false, title: '', images: [] };
-  const saved = await api(context, A, 'POST', '/website/site', { template, theme, content: { ...content, catalog, gallery } });
+  const reviews = { hidden: false, title: '', place_ref: '' };
+  const saved = await api(context, A, 'POST', '/website/site', {
+    template,
+    theme,
+    content: { ...content, catalog, gallery, reviews },
+  });
   expect(saved.status, JSON.stringify(saved.data)).toBe(200);
 }
 
@@ -220,6 +227,9 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   await expect(cover).toBeVisible();
   await expect(cover).toHaveCSS('object-fit', 'cover');
   await expect.poll(() => cover.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // No place on Google Maps: no reviews section, nor its link in the menu.
+  await expect(page.locator('[data-ep-section="reviews"]')).toHaveCount(0);
+  await expect(page.locator('a[href="#reviews"]')).toHaveCount(0);
   // The gallery: the two photos in a grid of squares, in the owner's order, served by the Hub, and they load.
   const grid = page.locator('[data-ep-section="gallery"] .row-cols-2');
   await expect(grid).toHaveCount(1);
@@ -318,6 +328,26 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
     await expect(page.getByTestId('website-section-about')).toHaveClass(/accordion-expanded/);
     expect(Math.abs((await scrolled(page)) - before), 'the editor did not jump').toBeLessThanOrEqual(2);
     await setToggle(page, 'website-show-about', false);
+
+    // Google reviews (2026-10-22): the business's link on Google Maps, checked by the server; this stack has no key of
+    // Google's, so it says the reviews are not available yet and the page shows no section (asserted in `visit`).
+    await openSection(page, 'reviews');
+    const status = page.getByTestId('website-reviews-status');
+    await expect(status).toHaveAttribute('data-state', 'empty');
+    await field(page, 'website-field-reviews-place_ref').fill('Peluquería Manoli');
+    await expect(status).toHaveAttribute('data-state', 'changed');
+    await page.getByTestId('website-save').click();
+    await expect(page.getByTestId('website-field-reviews-place_ref')).toHaveClass(/ion-invalid/);
+    await expect(page.getByTestId('website-field-reviews-place_ref')).toContainText(
+      'Paste the link of your business on Google Maps, or its Place ID.',
+    );
+    await field(page, 'website-field-reviews-place_ref').fill(PLACE_LINK);
+    await save(page);
+    await expect(status).toHaveAttribute('data-state', 'unavailable');
+    await expect(status).toContainText('Google reviews are not available yet');
+    await field(page, 'website-field-reviews-place_ref').fill('');
+    await save(page);
+    await expect(status).toHaveAttribute('data-state', 'empty');
 
     await openSection(page, 'contact');
     await setToggle(page, 'website-show-contact', true);

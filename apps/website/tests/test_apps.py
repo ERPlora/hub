@@ -61,6 +61,7 @@ def test_the_operations_of_the_app():
         "website.catalog.categories",
         "website.public.site",
         "website.public.catalog",
+        "website.public.reviews",
     }
     assert {name for name, op in operations.items() if op.kind == "command"} == {
         "website.site.save",
@@ -73,7 +74,7 @@ def test_the_operations_of_the_app():
 def test_the_public_operations_need_no_permission_and_the_rest_do():
     operations = website_operations()
     public = {name for name, op in operations.items() if op.permission is None}
-    assert public == {"website.public.site", "website.public.catalog"}
+    assert public == {"website.public.site", "website.public.catalog", "website.public.reviews"}
     assert {op.permission for name, op in operations.items() if name not in public} == {
         "website.view",
         "website.manage",
@@ -93,6 +94,7 @@ SCREEN_ONLY = {
     "website.qr.get",
     "website.public.site",
     "website.public.catalog",
+    "website.public.reviews",
 }
 
 

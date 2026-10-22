@@ -20,14 +20,17 @@ passes it, and the public home keeps one page per day.
 """
 
 import datetime as dt
+import math
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
-from babel.numbers import format_currency
+from babel.numbers import format_currency, format_decimal
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
-from django.utils.translation import gettext, pgettext
+from django.utils.timesince import timesince
+from django.utils.translation import gettext, ngettext, pgettext
 from live.markdown import render_markdown
 
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
@@ -36,9 +39,13 @@ from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
 #: The currency of the prices (ERPlora sells in Spain; the sale's own default).
 CURRENCY = "EUR"
 #: The sections between the hero and the footer, in their order.
-BODY_SECTIONS = ("about", "catalog", "gallery", "contact", "location")
+BODY_SECTIONS = ("about", "catalog", "gallery", "reviews", "contact", "location")
 #: The business's time zone when its hub has none: ERPlora sells in Spain.
 DEFAULT_TIME_ZONE = "Europe/Madrid"
+#: Google's page to write a review of a place (its Place ID after it).
+WRITE_REVIEW_URL = "https://search.google.com/local/writereview?placeid="
+#: The longest review text a card shows; the whole text goes in its title.
+REVIEW_CHARS = 280
 
 
 def local_day(time_zone: str = "", now: dt.datetime | None = None) -> str:
@@ -58,6 +65,7 @@ def _eyebrows() -> dict[str, str]:
         "about": pgettext("website", "Who we are"),
         "catalog": pgettext("website", "What we offer"),
         "gallery": pgettext("website", "Take a look"),
+        "reviews": pgettext("website", "Google reviews"),
         "contact": pgettext("website", "Get in touch"),
         "location": pgettext("website", "Visit us"),
     }
@@ -86,11 +94,13 @@ def render_site(
     request: Any = None,
     preview: bool = False,
     today: str | None = None,
+    reviews: dict | None = None,
 ) -> str:
     """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
 
     ``catalog`` is the snapshot the catalog section paints; ``preview`` marks the editor's preview (not indexed,
-    links inert, no refresh); ``today`` (``mon`` … ``sun``, :func:`local_day`) is marked in the opening hours.
+    links inert, no refresh); ``today`` (``mon`` … ``sun``, :func:`local_day`) is marked in the opening hours;
+    ``reviews`` is Google's answer for the reviews section's place (``apps.website.reviews``), or ``None``.
     ``request`` is accepted for symmetry with Django's renderers and never used: the HTML must not depend on who
     asked. Raises ``ValueError`` for an unknown template or an invalid theme or content.
     """
@@ -100,7 +110,7 @@ def render_site(
     valid_theme = Theme.model_validate(theme or {})
     valid_content = Content.model_validate(content or {})
     with translation.override(lang):
-        body = _body(valid_content, catalog, today)
+        body = _body(valid_content, catalog, today, reviews, preview)
         site_name = valid_content.topbar.name or hub
         context = {
             "lang": lang,
@@ -231,7 +241,9 @@ def _variables(colours: dict[str, str]) -> dict[str, str]:
     return variables
 
 
-def _body(content: Content, catalog: dict | None, today: str | None) -> list[dict]:
+def _body(
+    content: Content, catalog: dict | None, today: str | None, reviews: dict | None = None, preview: bool = False
+) -> list[dict]:
     """The sections between the hero and the footer that are shown and have something to show."""
     eyebrows = _eyebrows()
     body = []
@@ -243,6 +255,8 @@ def _body(content: Content, catalog: dict | None, today: str | None) -> list[dic
             data = _catalog(section, catalog)
         elif name == "contact":
             data = _contact(section, today)
+        elif name == "reviews":
+            data = _reviews(section, reviews, preview)
         else:
             data = {"about": _about, "gallery": _gallery, "location": _location}[name](section)
         if data is not None:
@@ -265,6 +279,85 @@ def _gallery(section) -> dict | None:
     if not section.images:
         return None
     return {"title": section.title or pgettext("website", "Gallery"), "images": section.images}
+
+
+def _reviews(section, payload: dict | None, preview: bool) -> dict | None:
+    """The reviews section: Google's rating and reviews of the owner's place; without them, nothing on the page and a
+    hint in the preview."""
+    if not section.place_ref:
+        return None
+    title = section.title or pgettext("website", "What our customers say")
+    view = reviews_view(payload)
+    if view is None:
+        return {"title": title, "hint": True} if preview else None
+    return {"title": title, "hint": False, **view}
+
+
+def stars(rating: float | None) -> list[str]:
+    """Five stars for ``rating``, rounded to the nearest half: ``on``, ``half`` or ``off`` each; none without one."""
+    if rating is None:
+        return []
+    halves = min(10, max(0, math.floor(rating * 2 + 0.5)))
+    return ["on" if halves >= 2 * star else "half" if halves == 2 * star - 1 else "off" for star in range(1, 6)]
+
+
+def reviews_view(payload: dict | None) -> dict | None:
+    """Google's answer as the page shows it, in the active language: the rating, its stars and the count, the links to
+    the place and to write a review, and each review's card; ``None`` when Google gave neither a rating nor a review."""
+    if not payload or (payload.get("rating") is None and not payload.get("reviews")):
+        return None
+    locale = translation.to_locale(translation.get_language() or "en")
+    rating = payload.get("rating")
+    rating_label = format_decimal(rating, format="0.0", locale=locale) if rating is not None else ""
+    count = int(payload.get("count") or 0)
+    return {
+        "rating_label": rating_label,
+        "stars": stars(rating),
+        "stars_label": _stars_label(rating_label) if rating_label else "",
+        "count_label": ngettext("%(count)s review on Google", "%(count)s reviews on Google", count)
+        % {"count": format_decimal(count, locale=locale)},
+        "maps_uri": payload.get("maps_uri", ""),
+        "write_uri": WRITE_REVIEW_URL + quote(payload.get("place_id", ""), safe=""),
+        "reviews": [_review(review) for review in payload.get("reviews", [])[:5]],
+    }
+
+
+def _stars_label(rating: str) -> str:
+    return gettext("%(rating)s out of 5 stars") % {"rating": rating}
+
+
+def _review(review: dict) -> dict:
+    """One review's card: its author (and initial), its stars, its text cut to :data:`REVIEW_CHARS` (the whole of it
+    in ``full_text`` when cut), when it was written and the link to it on Google Maps."""
+    author = review.get("author") or pgettext("website", "A Google user")
+    text = review.get("text", "")
+    shown = text
+    if len(text) > REVIEW_CHARS:
+        cut = text[:REVIEW_CHARS]
+        shown = (cut.rsplit(" ", 1)[0] if " " in cut else cut).rstrip(" ,.;:") + "…"
+    rating = int(review.get("rating") or 0)
+    return {
+        "author": author,
+        "author_uri": review.get("author_uri", ""),
+        "initial": author[:1].upper(),
+        "stars": stars(rating),
+        "stars_label": _stars_label(str(rating)),
+        "text": shown,
+        "full_text": text if shown != text else "",
+        "when": _ago(review.get("time", "")),
+        "uri": review.get("uri", ""),
+    }
+
+
+def _ago(moment: str) -> str:
+    """How long ago ``moment`` (ISO 8601) was, in the active language («2 months ago»); ``""`` without one."""
+    try:
+        when = dt.datetime.fromisoformat(moment)
+    except TypeError, ValueError:
+        return ""
+    if when.tzinfo is None:
+        return ""
+    return gettext("%(time)s ago") % {"time": timesince(when, depth=1)}
 
 
 def _catalog(section, catalog: dict | None) -> dict | None:

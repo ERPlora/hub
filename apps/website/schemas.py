@@ -2,7 +2,7 @@
 
 The content of a site is a closed set of fixed sections (``SECTIONS``), the same for the four templates: changing
 the template changes one field and never the content. ``topbar`` (with its «Log in»), ``hero`` and ``footer`` are
-always on the page and cannot hide; the other five carry ``hidden``. Every text is bounded, every link is ``https://``
+always on the page and cannot hide; the other six carry ``hidden``. Every text is bounded, every link is ``https://``
 and an image is the id of an upload, whose URL the server writes (``services.save_site``): nothing the owner types
 becomes HTML, a script or a link of another scheme.
 """
@@ -18,11 +18,12 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import AfterValidator, ConfigDict, StringConstraints, field_validator, model_validator
 
+from apps.website import reviews
 from apps.website.palettes import own_colours
 
 
 #: The fixed sections, in the order every template paints them.
-SECTIONS = ("topbar", "hero", "about", "catalog", "gallery", "contact", "location", "footer")
+SECTIONS = ("topbar", "hero", "about", "catalog", "gallery", "reviews", "contact", "location", "footer")
 #: The templates, the id the owner picks (``templates/website/templates/<id>.html``).
 TEMPLATES = ("classic", "modern", "minimal", "bold")
 #: The palettes (``palettes.json``) in the editor's order; the owner may change any one's two colours.
@@ -48,12 +49,15 @@ CatalogSource = Literal["inventory", "service"]
 Day = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 ImageType = Literal["image/jpeg", "image/png", "image/webp"]
 PriceKind = Literal["fixed", "from", "hourly", "free", "none"]
+StarKind = Literal["on", "half", "off"]
+ReviewsState = Literal["empty", "unavailable", "waiting", "failed", "ready"]
 
 NOT_HTTPS = _("Enter a link that starts with https://.")
 NOT_A_PHONE = _("Enter a phone number: digits, spaces and an optional + in front.")
 NOT_AN_EMAIL = _("Enter a valid email address.")
 SAME_TIMES = _("The opening and the closing time cannot be the same.")
 DAY_TWICE = _("Each day can only appear once.")
+NOT_A_PLACE = _("Paste the link of your business on Google Maps, or its Place ID.")
 
 
 def _text(max_length: int):
@@ -94,6 +98,16 @@ def _email(value: str) -> str:
     return value
 
 
+def _place_ref(value: str) -> str:
+    """``value`` when it names a place on Google Maps (``reviews.parse``): a Place ID, a Maps link or a share link."""
+    if value:
+        try:
+            reviews.parse(value)
+        except ValueError:
+            raise ValueError(str(NOT_A_PLACE)) from None
+    return value
+
+
 Text80 = _text(80)
 Text120 = _text(120)
 Text160 = _text(160)
@@ -103,6 +117,7 @@ Phone = Annotated[str, StringConstraints(strip_whitespace=True, max_length=24), 
 Email = Annotated[str, StringConstraints(strip_whitespace=True, max_length=254), AfterValidator(_email)]
 HexColor = Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, pattern=r"^#[0-9a-fA-F]{6}$")]
 Clock = Annotated[str, StringConstraints(pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")]
+PlaceRef = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500), AfterValidator(_place_ref)]
 
 
 class Strict(Schema):
@@ -198,6 +213,16 @@ class GallerySection(Strict):
     )
 
 
+class ReviewsSection(Strict):
+    hidden: bool = Field(False, description="True: not on the page.")
+    title: Text80 = Field("", description="The section's heading; empty = «What our customers say».")
+    place_ref: PlaceRef = Field(
+        "",
+        description="The business on Google Maps: the link of its page there (the address bar's or the Share button's) "
+        "or its Place ID; the page shows its Google rating and reviews. Empty = no reviews.",
+    )
+
+
 class Socials(Strict):
     instagram: HttpsUrl = Field("", description="The Instagram profile (https://…).")
     facebook: HttpsUrl = Field("", description="The Facebook page (https://…).")
@@ -268,6 +293,9 @@ class Content(Strict):
     gallery: GallerySection = Field(
         default_factory=GallerySection, description="A grid of up to 12 photos (the work, the place, the team)."
     )
+    reviews: ReviewsSection = Field(
+        default_factory=ReviewsSection, description="The business's rating and reviews on Google, read by the Hub."
+    )
     contact: ContactSection = Field(
         default_factory=ContactSection, description="Phone, WhatsApp, email, social profiles and opening hours."
     )
@@ -295,6 +323,42 @@ class CatalogOut(Schema):
     source: CatalogSource | None
     show_prices: bool
     groups: list[CatalogGroupOut]
+
+
+# Google's reviews, as the page and the editor show them
+
+
+class ReviewOut(Schema):
+    author: str
+    author_uri: str = Field(description="The author's profile on Google Maps; empty = none.")
+    initial: str
+    stars: list[StarKind]
+    stars_label: str = Field(description="«5 out of 5 stars», in the visitor's language.")
+    text: str = Field(description="The review as written, cut to 280 characters.")
+    full_text: str = Field(description="The whole review when text was cut; empty otherwise.")
+    when: str = Field(description="How long ago it was written, in the visitor's language.")
+    uri: str = Field(description="The review on Google Maps.")
+
+
+class ReviewsOut(Schema):
+    available: bool = Field(description="False: nothing to show (no place, hidden, or nothing from Google yet).")
+    rating_label: str = Field("", description="The rating as the page prints it («4,7»).")
+    stars: list[StarKind] = Field(default_factory=list, description="Five stars, rounded to the nearest half.")
+    stars_label: str = ""
+    count_label: str = Field("", description="«128 reviews on Google», in the visitor's language.")
+    maps_uri: str = Field("", description="The place on Google Maps.")
+    write_uri: str = Field("", description="Google's page to write a review of the place.")
+    reviews: list[ReviewOut] = Field(default_factory=list, description="Up to five, most relevant first.")
+
+
+class ReviewsStatusOut(Schema):
+    state: ReviewsState = Field(
+        description="empty (no place), waiting (Google not asked yet), failed (Google's last answer was a failure), "
+        "unavailable (this server cannot ask Google) or ready."
+    )
+    rating: float | None = None
+    count: int = 0
+    fetched_at: datetime | None = Field(None, description="When Google answered what is shown.")
 
 
 # Inputs
@@ -338,6 +402,7 @@ class SiteOut(Schema):
     has_changes: bool = Field(description="True: the draft differs from what is published.")
     updated_at: datetime | None
     public_url: str = Field(description="The hub's public address, where the site is.")
+    reviews: ReviewsStatusOut = Field(description="Whether Google's rating and reviews of the draft's place are there.")
 
 
 class CategoryOut(Schema):

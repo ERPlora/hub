@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import type { ReviewsOut } from '../operations';
 import { catalogNodes } from './catalog';
+import { listNodes, summaryNodes } from './reviews';
+import REVIEWS from './reviews.fixture.json';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HUB = join(HERE, '..', '..', '..', '..');
@@ -54,6 +57,14 @@ function catalogClasses(): string[] {
   return nodes.flatMap((node) => [node, ...node.querySelectorAll('*')].flatMap((el) => [...el.classList]));
 }
 
+function reviewsClasses(): string[] {
+  const nodes = REVIEWS.cases.flatMap((example) => [
+    ...summaryNodes(example.view as ReviewsOut),
+    ...listNodes(example.view as ReviewsOut),
+  ]);
+  return nodes.flatMap((node) => [node, ...node.querySelectorAll('*')].flatMap((el) => [...el.classList]));
+}
+
 const BOOTSTRAP = bootstrapClasses();
 const TEMPLATE_FILES = files(TEMPLATES);
 const isHook = (name: string) => /^ws-[a-z0-9-]+$/.test(name);
@@ -79,6 +90,7 @@ describe('the public website’s classes', () => {
         'sections/about.html',
         'sections/catalog.html',
         'sections/gallery.html',
+        'sections/reviews.html',
         'sections/contact.html',
         'sections/location.html',
       ]),
@@ -95,14 +107,15 @@ describe('the public website’s classes', () => {
     },
   );
 
-  it('the catalog the bundle rebuilds uses only Bootstrap’s classes and ws-* hooks', () => {
-    for (const token of catalogClasses()) expect(BOOTSTRAP.has(token) || isHook(token), token).toBe(true);
+  it('the catalog and the reviews the bundle rebuilds use only Bootstrap’s classes and ws-* hooks', () => {
+    for (const token of [...catalogClasses(), ...reviewsClasses()]) expect(BOOTSTRAP.has(token) || isHook(token), token).toBe(true);
   });
 
   it('every ws-* hook is defined in site.css, and site.css defines none that is not used', () => {
     const used = new Set([
       ...TEMPLATE_FILES.flatMap((path) => templateClasses(path).flatMap(({ tokens }) => tokens)),
       ...catalogClasses(),
+      ...reviewsClasses(),
     ].filter(isHook));
     expect(used.size).toBeGreaterThan(0);
     for (const hook of used) expect(hooksDefined.has(hook), `.${hook} is not in site.css`).toBe(true);

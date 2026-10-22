@@ -89,6 +89,7 @@
       "about": "Sobre nosotros",
       "catalog": "Catálogo",
       "gallery": "Galería",
+      "reviews": "Reseñas de Google",
       "contact": "Contacto",
       "location": "Ubicación",
       "footer": "Pie de página"
@@ -156,6 +157,18 @@
       "full": "La galería está completa ({max} fotos): quita una para añadir otra.",
       "up": "Subir",
       "down": "Bajar"
+    },
+    "reviews": {
+      "label": "Enlace de Google Maps o Place ID",
+      "help": "En Google Maps, abre tu negocio, pulsa Compartir y pega aquí su enlace.",
+      "status": {
+        "empty": "Pega el enlace para mostrar tu valoración y tus reseñas de Google.",
+        "waiting": "Tus reseñas aparecerán aquí y en tu página en cuanto Google responda por este sitio.",
+        "failed": "Google no respondió por este sitio. Revisa el enlace: se volverá a intentar en unos minutos.",
+        "unavailable": "Las reseñas de Google aún no están disponibles: tu enlace se guarda y aparecerán en cuanto lo estén.",
+        "ready": "Valoración {rating} de 5 · reseñas en Google: {count}",
+        "changed": "Se preguntará a Google por este sitio en cuanto se guarde."
+      }
     },
     "share": {
       "title": "Comparte tu página web",

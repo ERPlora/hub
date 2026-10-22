@@ -34,6 +34,7 @@ import GalleryEditor from '../components/GalleryEditor.vue';
 import HoursEditor from '../components/HoursEditor.vue';
 import PalettePicker from '../components/PalettePicker.vue';
 import PreviewFrame from '../components/PreviewFrame.vue';
+import ReviewsEditor from '../components/ReviewsEditor.vue';
 import ShareDialog from '../components/ShareDialog.vue';
 import TemplatePicker from '../components/TemplatePicker.vue';
 import { useT } from '../composables/useT';
@@ -46,7 +47,7 @@ import type { CatalogSource, Content, SaveIn, ThemeMode } from '../operations';
 /** Saved this long after the last change. */
 const AUTOSAVE_MS = 2000;
 /** The sections a visitor may not see, each with its «Show». */
-const OPTIONAL = ['about', 'catalog', 'gallery', 'contact', 'location'] as const;
+const OPTIONAL = ['about', 'catalog', 'gallery', 'reviews', 'contact', 'location'] as const;
 type Optional = (typeof OPTIONAL)[number];
 const SOCIALS = ['instagram', 'facebook', 'tiktok', 'x'] as const;
 const CONTACT_FIELDS = ['phone', 'whatsapp', 'email'] as const;
@@ -88,6 +89,10 @@ const state = computed(() => {
   return site.value.is_live ? 'live' : 'offline';
 });
 /** The chosen palette's colours, to draw the designs with. */
+/** The reviews' link differs from the saved one: Google is asked about it once it is saved. */
+const reviewsChanged = computed(
+  () => !!draft.value && !!saved.value && draft.value.content.reviews.place_ref.trim() !== saved.value.content.reviews.place_ref.trim(),
+);
 const colours = computed(() => themeColours((draft.value as SaveIn).theme));
 /** The catalog's sources this business has on (Inventory, Services). */
 const sources = computed(() => {
@@ -629,6 +634,14 @@ function setHoursShown(shown: boolean): void {
                     v-model="draft.content.gallery.images"
                     :upload="upload"
                     :error="err('content.gallery.images')"
+                  />
+
+                  <ReviewsEditor
+                    v-else-if="name === 'reviews' && site"
+                    v-model="draft.content.reviews.place_ref"
+                    :status="site.reviews"
+                    :changed="reviewsChanged"
+                    :error="err('content.reviews.place_ref')"
                   />
 
                   <template v-else-if="name === 'contact'">

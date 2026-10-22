@@ -13,7 +13,8 @@ from live.operations import get
 
 from apps.website.queries import catalog_cache_key, live_version, published_page, read_catalog
 from apps.website.schemas import CatalogSection
-from apps.website.tests.conftest import A, B, ctx_for, full_content, with_language
+from apps.website import reviews
+from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
 
 pytestmark = pytest.mark.django_db
 
@@ -260,3 +261,78 @@ def test_the_page_public_home_paints_is_the_live_publication_of_its_hub():
     assert (published_page(Scope("host", "nohub")), live_version(Scope("host", "nohub"))) == (None, 0)
     run("website.site.unpublish")
     assert (published_page(A), live_version(A)) == (None, 0)
+
+
+# Google's reviews (read here, never asked: services and the public home ask Google)
+
+
+@pytest.fixture
+def no_google(monkeypatch):
+    """Any attempt to ask Google fails the test."""
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("a read must never ask Google")
+
+    monkeypatch.setattr(reviews, "load", refuse)
+
+
+def test_the_editor_sees_whether_googles_reviews_are_there(settings, no_google):
+    settings.GOOGLE_PLACES_API_KEY = ""
+    assert run("website.site.get").reviews.state == "empty"
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    assert run("website.site.get").reviews.state == "unavailable"
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    assert run("website.site.get").reviews.state == "waiting"
+    cache.set(reviews.reviews_key("a", PLACE_ID), reviews.FAILED, reviews.FAILURE_TTL)
+    assert run("website.site.get").reviews.state == "failed"
+    payload = google_reviews()
+    cache.set(reviews.reviews_key("a", PLACE_ID), payload, reviews.TTL)
+    status = run("website.site.get").reviews
+    assert (status.state, status.rating, status.count) == ("ready", 4.7, 128)
+    assert status.fetched_at.isoformat() == payload["fetched_at"]
+
+
+def test_the_preview_paints_the_reviews_kept_or_says_where_they_will_be(settings, no_google):
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    assert "data-ep-reviews-hint" in run("website.site.preview").html
+    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    html = run("website.site.preview").html
+    assert "128 reviews on Google" in html and "data-ep-reviews-hint" not in html
+
+
+def test_the_sites_last_good_reviews_stand_in_when_nothing_is_kept(settings, no_google):
+    from apps.website.models import Site
+
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    Site.objects.update(reviews_snapshot=google_reviews(count=9))
+    assert run("website.site.get").reviews.count == 9
+    assert "9 reviews on Google" in run("website.site.preview").html
+
+
+def test_the_public_reviews_are_the_kept_ones_in_the_visitors_language(settings, no_google):
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    with pytest.raises(NotFound):
+        run("website.public.reviews", ctx=visitor())
+    run("website.site.publish")
+    assert run("website.public.reviews", ctx=visitor()).available is False
+    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    out = run("website.public.reviews", ctx=with_language(visitor(), "es"))
+    assert (out.available, out.rating_label, out.count_label) == (True, "4,7", "128 reseñas en Google")
+    assert out.stars == ["on", "on", "on", "on", "half"]
+    assert [review.author for review in out.reviews] == [f"Cliente {index}" for index in range(5)]
+    assert out.reviews[4].full_text and out.reviews[4].text.endswith("…")
+    assert out.write_uri == f"https://search.google.com/local/writereview?placeid={PLACE_ID}"
+
+
+def test_hidden_reviews_are_not_given_to_visitors(settings, no_google):
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    save(full_content(reviews={"place_ref": PLACE_ID, "hidden": True}))
+    run("website.site.publish")
+    assert run("website.public.reviews", ctx=visitor()).available is False
+    # Nor the place behind them: the public site leaves a hidden section empty.
+    assert run("website.public.site", ctx=visitor()).content.reviews.place_ref == ""
+

@@ -25,6 +25,7 @@ class SiteAdmin(admin.ModelAdmin):
         "published_version",
         "published_at",
         "published_content",
+        "reviews_snapshot",
         "updated_by",
         "updated_at",
     )
@@ -37,6 +38,7 @@ class SiteAdmin(admin.ModelAdmin):
         "published_version",
         "published_at",
         "published_content",
+        "reviews_snapshot",
         "updated_by",
         "updated_at",
     )

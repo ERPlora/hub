@@ -634,5 +634,6 @@
   "website.qr.get": { "method": "get", "path": "/api/website/qr" },
   "website.catalog.categories": { "method": "get", "path": "/api/website/catalog/categories" },
   "website.public.site": { "method": "get", "path": "/api/website/public/site" },
-  "website.public.catalog": { "method": "get", "path": "/api/website/public/catalog" }
+  "website.public.catalog": { "method": "get", "path": "/api/website/public/catalog" },
+  "website.public.reviews": { "method": "get", "path": "/api/website/public/reviews" }
 }

@@ -1,10 +1,10 @@
-<!-- generated from WORKBOOK.md sha256:9cdb509573ee305528b3c253db4bb747bf872b9644f72c8ee407ca1cc8470601 -->
+<!-- generated from WORKBOOK.md sha256:73fd96be21047340a94b1d20212c746bce07e8070d76ceff6a8cd7dcb0caeb35 -->
 
 ## What it is for and who it is for
 
 Website gives each business a simple page of its own at its ERPlora address (`https://<your-business>.erplora.com/`).
 The owner picks one of four designs, fills in its sections (name and logo, title and cover photo, a few words about
-the business, its catalog, a photo gallery, how to get in touch, where it is) and its colours, hides what she does not use and
+the business, its catalog, a photo gallery, its Google reviews, how to get in touch, where it is) and its colours, hides what she does not use and
 publishes. Whoever opens that address without having signed in sees the page; the team signs in from its **Log in**
 button, which every template has and cannot be removed. While the page is not published (or has been taken offline),
 the address still leads to the team's sign-in, as always.
@@ -19,6 +19,8 @@ content and the design are kept apart.
   **Services**, the Catalog section can show its products on sale or its offered services.
 - Only the **owner** and the **admin** change, publish or take the page offline; the **manager** sees it and shares
   its address and its QR; the **employee** does not see it.
+- For the **Google reviews**, the business needs its listing on Google Maps (its Google Business Profile): the link of
+  that listing is pasted and ERPlora reads its rating and reviews from Google.
 
 ## Screens
 
@@ -57,6 +59,13 @@ switches between the two.
   - **Gallery**: **Show**, heading (empty = «Gallery») and up to 12 photos, in the order they will be seen: each with
     **Replace image** and **Remove** and the **Move up** and **Move down** arrows; **Add a photo** puts another one at
     the end while there is room, and a counter says how many there are («3 of 12 photos»).
+  - **Google reviews**: **Show**, heading (empty = «What our customers say») and **Google Maps link or Place ID**: the
+    link of the business's listing on Google Maps (the address bar's or its **Share** button's,
+    `https://maps.app.goo.gl/…`) or its Place ID (`ChIJ…`). Below, a note says how they stand: «Paste the link…»
+    (empty), «Google will be asked for this place once it is saved» (changed and not saved), «Your reviews will
+    show… once Google answers» (no answer yet), «Google did not answer for this place…» (a failure; tried again after
+    10 minutes), «Google reviews are not available yet…» (the server has no Google key) or «Rating 4.7 out of 5 ·
+    reviews on Google: 128» (ready).
   - **Contact**: **Show**, heading, phone, WhatsApp (with the country code), email, Instagram, Facebook, TikTok and X
     (`https://` links) and, if **Show opening hours** is on, the week's opening hours: each day open or closed and up
     to three time slots (a closing time earlier than the opening one runs past midnight).
@@ -80,10 +89,15 @@ logo, the name, the sections' menu (folded on a phone) and **Log in** (an outlin
 (or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
 **Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
 without contact or address, one to the first section. Each section has a small line over its heading («Who we are»,
-«What we offer», «Take a look», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
+«What we offer», «Take a look», «Google reviews», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
 the text; the catalog as a grid of cards (a gradient with the initial, since items have no photo; the price in a pill;
 pills to jump between categories when there are two or more); the gallery as a grid of square, rounded photos (two
 a row on a phone, three on a tablet, four on a computer) that grow a little under the pointer and open whole apart;
+the Google reviews with the rating in large type, its stars (rounded to the half star) and «128 reviews on Google»,
+the **See on Google** and **Write a review** buttons (they open on Google) and up to five cards with the author's
+initial and name (linked to their profile), when they wrote it (linked to the review), its stars and its text as
+written (cut at 280 characters, whole under the pointer), and below «Rating and reviews from Google Maps. The most
+relevant first, as Google orders them.»;
 the contact as chips with an icon (phone, email),
 WhatsApp as a button and the socials as pills; the opening hours as a list with **today** highlighted (the business's
 day, in the hub's time zone; Madrid's without one); the address in a card with **Open the map**. A footer in columns:
@@ -124,6 +138,7 @@ what the owner writes, as written.
 | WEBSITE-F09 | Share the address and the QR | done |
 | WEBSITE-F10 | Visit the public page | done |
 | WEBSITE-F11 | Show a photo gallery | done |
+| WEBSITE-F12 | Show the Google reviews | done |
 
 ### WEBSITE-F01 Fill in and save the draft
 Status: done (server and screen)
@@ -133,12 +148,12 @@ Steps:
 1. Open **Website** and unfold a section.
 2. Type: the draft saves itself two seconds after the last change, or when you press **Save**; also when you leave
    the screen if something was left.
-In: the template, the colours and the full content of the eight sections. Images are named by their id; the address
+In: the template, the colours and the full content of the nine sections. Images are named by their id; the address
 they are served at is written by the server.
 Out: the saved draft; customers see nothing until it is published. Notice `website.site.updated` (only if something
 changed).
 If it fails: under each field, without losing what was typed: texts that are too long, a link that does not start
-with `https://`, a phone or an email that is not one, two equal times or a repeated day in the opening hours, «This
+with `https://`, a phone or an email that is not one, a reviews link that is not Google Maps, two equal times or a repeated day in the opening hours, «This
 image was not uploaded to this business's website: upload it again.»
 
 ### WEBSITE-F02 Choose the design, the palette and the background
@@ -151,11 +166,11 @@ If it fails: a mistyped colour is not saved and the field says so: «Write the c
 
 ### WEBSITE-F03 Show or hide a section
 Status: done (server and screen)
-Steps: in About us, Catalog, Gallery, Contact or Location, the **Show** switch. The top bar, the header and the footer cannot
-be hidden.
+Steps: in About us, Catalog, Gallery, Google reviews, Contact or Location, the **Show** switch. The top bar, the
+header and the footer cannot be hidden.
 Out: what is hidden is not painted on the page nor given by the public API; it is kept to show it again. A section
-that is shown but has nothing (no text nor photo, no catalog, no photos in the gallery, no contact details, no
-address nor map) is not painted either.
+that is shown but has nothing (no text nor photo, no catalog, no photos in the gallery, no Google reviews, no
+contact details, no address nor map) is not painted either.
 
 ### WEBSITE-F04 Upload an image
 Status: done (server and screen)
@@ -223,6 +238,24 @@ there is no section (nor a link in the menu).
 If it fails: more than 12 photos are not saved; a photo that is not an upload of this business: «This image was not
 uploaded to this business's website: upload it again.» under the gallery.
 
+### WEBSITE-F12 Show the Google reviews
+Status: done (server, screen and e2e)
+Actor: owner, administrator, assistant (the link), API
+Steps: in **Google reviews**, paste the link of the business's listing on Google Maps (or its Place ID). It saves as in
+F01; the note below says whether the reviews are there yet.
+In: the link or the Place ID. The address bar's (`https://www.google.com/maps/place/<name>/@…`), the **Share** one
+(`https://maps.app.goo.gl/…`), one with `place_id=` or `q=place_id:` and a Place ID (`ChIJ…`) all work.
+Out: ERPlora asks Google from its server, never the visitor's browser: when a new link is saved, when publishing (what
+was kept is dropped and Google is asked again) and when painting the page if nothing is kept. A link by name is
+searched with that name and the address of the Location section, near the link's point. The answer is kept a day per
+business and place, and the last good one in the website too (valid for 30 days): if Google fails or the cache is
+emptied, it still shows. On the page, the rating, the number of reviews, up to five reviews (the most relevant, as
+Google gives them) and the **See on Google** and **Write a review** buttons. The published page refreshes them when it
+opens. Without a link, hidden or with nothing from Google, there is no section; the preview says where they will be.
+If it fails: a link that is neither Google Maps nor a Place ID is not saved: «Paste the link of your business on Google
+Maps, or its Place ID.». If Google does not answer (5 seconds at most), refuses the key or does not find the place, it
+is logged and not asked again until 10 minutes later; meanwhile, the last good answer shows, or nothing.
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of whoever
@@ -238,8 +271,9 @@ speaks) and the API, with the same rules and the same permissions.
 | The QR of the public address, in PNG or SVG | view | F09 | `website.qr.get` |
 | What is published, without the hidden sections (no session) | anyone | F10 | `website.public.site` |
 | The published catalog, read at that moment and with the prices in the asker's language (no session) | anyone | F05, F10 | `website.public.catalog` |
+| The Google reviews kept for the published site, with their texts in the asker's language (no session; never asks Google) | anyone | F10, F12 | `website.public.reviews` |
 
-The two public ones answer only with the page online (otherwise, 404 `website.not_published`) and count each visitor:
+The three public ones answer only with the page online (otherwise, 404 `website.not_published`) and count each visitor:
 60 reads a minute per address, then 429 `base.rate_limited`. The public catalog is kept for a minute.
 
 ### What it offers: actions (they change data)
@@ -254,14 +288,14 @@ The two public ones answer only with the page online (otherwise, 404 `website.no
 ### Assistant
 The assistant (by voice or by text) uses, with the session and permissions of whoever speaks, `website.site.get`,
 `website.site.save`, `website.site.publish`, `website.site.unpublish` and `website.catalog.categories`. Every field of
-the draft carries its description (name, tagline, about text, gallery, contact, opening hours, location, template,
-palette and background), and the save's description tells it the draft is sent whole: it reads it first with `website.site.get`,
-changes only what was asked and sends it back. Example: «Put on the website the opening hours Monday to Friday from 9
+the draft carries its description (name, tagline, about text, gallery, Google reviews link, contact, opening hours,
+location, template, palette and background), and the save's description tells it the draft is sent whole: it reads it
+first with `website.site.get`, changes only what was asked and sends it back. Example: «Put on the website the opening hours Monday to Friday from 9
 to 8 pm» → it reads the draft, puts the five days with the interval `09:00`–`20:00` in `contact.hours` (leaving the
 rest as it was) and calls `website.site.save`; if she adds «and publish it», `website.site.publish`. Not assistant
 tools, on purpose: the preview (`website.site.preview`, an HTML page), the image upload (`website.image.upload`, a
 file in base64 up to 5 MB) and the QR (`website.qr.get`, an image in base64), which are used from the screen, nor the
-visitors' two public reads (`website.public.*`).
+visitors' three public reads (`website.public.*`).
 
 ### What it announces
 
@@ -281,6 +315,10 @@ visitors' two public reads (`website.public.*`).
 - From the platform: the hub's registry (its id, for the file store; `base.operations.hub_id`), the store
   `storages["hub_files"]` and the `/p/media/…` view (`base.storage`, `base.media`), the per-visitor limit
   (`base.throttle`) and the `/` entry (`base.public_home`, which calls `apps/website/public_home.py`).
+- From outside: **Google's Places API (New)**, with the platform's key (`GOOGLE_PLACES_API_KEY`), from the server only:
+  Text Search (the id only: Google does not bill it) and Place Details with reviews (billed by Google as «Place
+  Details Enterprise + Atmosphere»: 1000 a month free and then about $25 per 1000; with the one-day cache, about 30 a
+  month per business with reviews).
 
 ### Who can do what
 
@@ -299,6 +337,9 @@ visitors' two public reads (`website.public.*`).
   are no longer used and the old versions are not deleted.
 - No sitemap nor robots beyond the preview's `noindex` tag.
 - The gallery has no caption per photo nor a full-screen viewer: each photo opens whole in another tab.
+- The Google reviews are the ones Google gives (five at most, the most relevant): not all the reviews, no replying to
+  them from ERPlora, no reviews of its own and no author's photo (the page loads no outside images: their initial
+  goes instead). Without Google's key on the server nothing is asked.
 - The footer's credit «© <year> ERPlora» cannot be removed or changed: the business's name and legal details go in
   the footer's line.
 - The real activation of the module per business (`AppActivation`) comes in phase 2.

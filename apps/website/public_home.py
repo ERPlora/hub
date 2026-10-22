@@ -8,7 +8,9 @@ zone) and the deploy (``queries.page_cache_key``, an hour): a publication change
 served. The response sets no cookie, carries the public CSP
 (``csp.public_policy``: no nonce) and may be kept a minute by the browser, varying on ``Accept-Language`` and on
 ``Cookie``: «Sign in» comes back to ``/`` with a session, which must get the shell, never the page kept for the
-visitor. Only the hub's own site is shown, under the same guard as the public API (``queries.live_version``).
+visitor. Only the hub's own site is shown, under the same guard as the public API (``queries.live_version``). Google's
+reviews are asked when the page is rendered and nothing is kept for its place (``services.refresh_reviews``; a failure
+is kept 10 minutes and the site's last good answer shows meanwhile).
 """
 
 from django.core.cache import cache
@@ -18,7 +20,7 @@ from django.utils.translation import get_supported_language_variant
 from django.utils.translation.trans_real import parse_accept_lang_header
 from live.context import Scope
 
-from apps.website import queries
+from apps.website import queries, services
 from apps.website.csp import public_policy
 from apps.website.render import local_day, render_site
 
@@ -47,6 +49,8 @@ def respond(request: HttpRequest) -> HttpResponse:
         page = queries.published_page(scope)
         if page is None:
             return HttpResponseRedirect(OFFLINE_FALLBACK)
+        # Google is asked here only when nothing is kept for the place (at most 5 s a call); then what is kept.
+        services.refresh_reviews(scope, page["content"])
         html = render_site(
             page["template"],
             page["theme"],
@@ -55,6 +59,7 @@ def respond(request: HttpRequest) -> HttpResponse:
             hub=slug,
             catalog=page.get("catalog"),
             today=today,
+            reviews=queries.shown_reviews(slug, page["content"], page.get("reviews_snapshot")),
         )
         cache.set(queries.page_cache_key(slug, page["version"], language, today), html, queries.PAGE_TTL)
     response = HttpResponse(html, content_type="text/html; charset=utf-8")

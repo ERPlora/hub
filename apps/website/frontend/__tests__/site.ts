@@ -11,6 +11,7 @@ export const SITE: SiteOut = {
     about: { hidden: false, title: '', text: '', image: null },
     catalog: { hidden: false, title: '', source: null, category_ids: [], show_prices: true },
     gallery: { hidden: false, title: '', images: [] },
+    reviews: { hidden: false, title: '', place_ref: '' },
     contact: {
       hidden: false,
       title: '',
@@ -29,4 +30,5 @@ export const SITE: SiteOut = {
   has_changes: false,
   updated_at: null,
   public_url: 'https://a.erplora.com/',
+  reviews: { state: 'empty', rating: null, count: 0, fetched_at: null },
 };

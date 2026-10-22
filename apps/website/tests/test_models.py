@@ -16,6 +16,8 @@ def test_a_new_site_starts_classic_never_published_and_offline():
     assert (site.template, site.theme, site.content, site.published_content) == ("classic", {}, {}, {})
     assert (site.published_version, site.published_at, site.is_live) == (0, None, False)
     assert site.updated_by == ""
+    # Google's reviews of its place: none read yet.
+    assert site.reviews_snapshot == {}
 
 
 def test_each_hub_has_one_site_at_most():

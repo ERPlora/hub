@@ -21,6 +21,7 @@ import PALETTES from '../../palettes.json';
 import { SITE } from '../__tests__/site';
 import type { SiteOut } from '../operations';
 import GalleryEditor from '../components/GalleryEditor.vue';
+import ReviewsEditor from '../components/ReviewsEditor.vue';
 import WebsitePage from './WebsitePage.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn() }));
@@ -350,6 +351,40 @@ describe('WebsitePage', () => {
     await settle();
     expect(s.wrapper.findComponent(GalleryEditor).props('error')).toBe(message);
     expect(s.wrapper.findComponent(GalleryEditor).props('modelValue')).toEqual(photos);
+  });
+
+  it('the Google reviews take the business’s link on Google Maps and say whether its reviews are there', async () => {
+    const s = await setup();
+    const ready = { state: 'ready' as const, rating: 4.7, count: 128, fetched_at: '2026-10-22T09:00:00Z' };
+    await s.show({ ...SITE, reviews: ready });
+    expect(s.testid('website-section-reviews').exists()).toBe(true);
+    const reviews = s.wrapper.findComponent(ReviewsEditor);
+    expect(reviews.props('status')).toEqual(ready);
+    expect(reviews.props('changed')).toBe(false);
+    const link = 'https://maps.app.goo.gl/AbCdEf123';
+    await ionValue(s.wrapper.get('[data-testid="website-field-reviews-place_ref"]').element, link, 'ionInput');
+    // Not saved yet: Google is asked once it is.
+    expect(s.wrapper.findComponent(ReviewsEditor).props('changed')).toBe(true);
+    await s.wrapper.get('[data-testid="website-save"]').trigger('click');
+    await settle();
+    expect(s.body().content.reviews).toEqual({ hidden: false, title: '', place_ref: link });
+    expect(s.wrapper.findComponent(ReviewsEditor).props('changed')).toBe(false);
+  });
+
+  it('a link the server refuses says why on the field', async () => {
+    const message = 'Paste the link of your business on Google Maps, or its Place ID.';
+    const s = await setup({
+      api: () =>
+        Response.json(
+          { error: { code: 'invalid_payload', message, fields: { 'content.reviews.place_ref': message } } },
+          { status: 422 },
+        ),
+    });
+    await s.show();
+    await ionValue(s.wrapper.get('[data-testid="website-field-reviews-place_ref"]').element, 'Peluquería Manoli', 'ionInput');
+    await s.wrapper.get('[data-testid="website-save"]').trigger('click');
+    await settle();
+    expect(s.wrapper.findComponent(ReviewsEditor).props('error')).toBe(message);
   });
 
   it('publishes after a confirmation, saving first what is unsaved', async () => {

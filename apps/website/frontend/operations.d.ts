@@ -7,6 +7,8 @@ export type WebsiteTemplate = 'classic' | 'modern' | 'minimal' | 'bold';
 export type CatalogSource = 'inventory' | 'service';
 export type Day = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 export type PriceKind = 'fixed' | 'from' | 'hourly' | 'free' | 'none';
+export type StarKind = 'on' | 'half' | 'off';
+export type ReviewsState = 'empty' | 'unavailable' | 'waiting' | 'failed' | 'ready';
 
 export interface NoIn {
   [key: string]: never;
@@ -67,6 +69,13 @@ export interface GallerySection {
   images: ImageRef[];
 }
 
+/** The business on Google Maps: the link of its page there, a share link or its Place ID; empty = no reviews. */
+export interface ReviewsSection {
+  hidden: boolean;
+  title: string;
+  place_ref: string;
+}
+
 export interface Socials {
   instagram: string;
   facebook: string;
@@ -111,6 +120,7 @@ export interface Content {
   about: AboutSection;
   catalog: CatalogSection;
   gallery: GallerySection;
+  reviews: ReviewsSection;
   contact: ContactSection;
   location: LocationSection;
   footer: FooterSection;
@@ -122,6 +132,14 @@ export interface SaveIn {
   content: Content;
 }
 
+/** Whether Google's rating and reviews of the draft's place are there (the editor's note). */
+export interface ReviewsStatusOut {
+  state: ReviewsState;
+  rating: number | null;
+  count: number;
+  fetched_at: string | null;
+}
+
 export interface SiteOut extends SaveIn {
   published_version: number;
   published_at: string | null;
@@ -129,6 +147,7 @@ export interface SiteOut extends SaveIn {
   has_changes: boolean;
   updated_at: string | null;
   public_url: string;
+  reviews: ReviewsStatusOut;
 }
 
 export interface PreviewOut {
@@ -190,6 +209,32 @@ export interface CatalogOut {
   groups: { name: string; items: CatalogItemOut[] }[];
 }
 
+/** One review's card, its labels in the visitor's language. */
+export interface ReviewOut {
+  author: string;
+  author_uri: string;
+  initial: string;
+  stars: StarKind[];
+  stars_label: string;
+  text: string;
+  /** The whole review when `text` was cut; empty otherwise. */
+  full_text: string;
+  when: string;
+  uri: string;
+}
+
+/** Google's rating and reviews of the business as the public page shows them; `available: false` = nothing to show. */
+export interface ReviewsOut {
+  available: boolean;
+  rating_label: string;
+  stars: StarKind[];
+  stars_label: string;
+  count_label: string;
+  maps_uri: string;
+  write_uri: string;
+  reviews: ReviewOut[];
+}
+
 export interface PublicSiteOut {
   version: number;
   published_at: string | null;
@@ -210,5 +255,6 @@ declare module '@erplora/ui/sdk' {
     'website.catalog.categories': { input: CategoriesIn; output: CategoriesOut };
     'website.public.site': { input: NoIn; output: PublicSiteOut };
     'website.public.catalog': { input: NoIn; output: CatalogOut };
+    'website.public.reviews': { input: NoIn; output: ReviewsOut };
   }
 }

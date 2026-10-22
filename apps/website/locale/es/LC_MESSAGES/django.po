@@ -294,3 +294,53 @@ msgstr "Galería"
 msgctxt "website"
 msgid "Take a look"
 msgstr "Echa un vistazo"
+
+msgctxt "website"
+msgid "Google reviews"
+msgstr "Reseñas de Google"
+
+msgctxt "website"
+msgid "What our customers say"
+msgstr "Lo que dicen nuestros clientes"
+
+msgctxt "website"
+msgid "A Google user"
+msgstr "Un usuario de Google"
+
+msgid "%(rating)s out of 5 stars"
+msgstr "%(rating)s de 5 estrellas"
+
+msgid "%(count)s review on Google"
+msgid_plural "%(count)s reviews on Google"
+msgstr[0] "%(count)s reseña en Google"
+msgstr[1] "%(count)s reseñas en Google"
+msgstr[2] "%(count)s reseñas en Google"
+
+msgid "%(time)s ago"
+msgstr "hace %(time)s"
+
+msgctxt "website"
+msgid "Your Google rating and reviews will show here once Google answers for this place."
+msgstr "Tu valoración y tus reseñas de Google aparecerán aquí en cuanto Google responda por este sitio."
+
+msgctxt "website"
+msgid "See on Google"
+msgstr "Ver en Google"
+
+msgctxt "website"
+msgid "Write a review"
+msgstr "Escribir una reseña"
+
+msgctxt "website"
+msgid "Rating and reviews from"
+msgstr "Valoración y reseñas de"
+
+msgctxt "website"
+msgid "The most relevant first, as Google orders them."
+msgstr "Las más relevantes primero, como las ordena Google."
+
+msgid "Paste the link of your business on Google Maps, or its Place ID."
+msgstr "Pega el enlace de tu negocio en Google Maps, o su Place ID."
+
+msgid "Google reviews"
+msgstr "Reseñas de Google"

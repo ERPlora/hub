@@ -120,3 +120,8 @@ async def public_site(request):
 @bind(router, "website.public.catalog", "/website/public/catalog", auth=None)
 async def public_catalog(request):
     return await run_operation(request, queries.public_catalog)
+
+
+@bind(router, "website.public.reviews", "/website/public/reviews", auth=None)
+async def public_reviews(request):
+    return await run_operation(request, queries.public_reviews)

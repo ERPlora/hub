@@ -89,6 +89,7 @@
       "about": "About us",
       "catalog": "Catalog",
       "gallery": "Gallery",
+      "reviews": "Google reviews",
       "contact": "Contact",
       "location": "Location",
       "footer": "Footer"
@@ -156,6 +157,18 @@
       "full": "The gallery is full ({max} photos): remove one to add another.",
       "up": "Move up",
       "down": "Move down"
+    },
+    "reviews": {
+      "label": "Google Maps link or Place ID",
+      "help": "On Google Maps, open your business, press Share and paste its link here.",
+      "status": {
+        "empty": "Paste the link to show your rating and reviews from Google.",
+        "waiting": "Your reviews will show here and on your page once Google answers for this place.",
+        "failed": "Google did not answer for this place. Check the link: it will be tried again in a few minutes.",
+        "unavailable": "Google reviews are not available yet: your link is kept and they will show as soon as they are.",
+        "ready": "Rating {rating} out of 5 · reviews on Google: {count}",
+        "changed": "Google will be asked for this place once it is saved."
+      }
     },
     "share": {
       "title": "Share your website",

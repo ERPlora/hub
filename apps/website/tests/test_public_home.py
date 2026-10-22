@@ -19,7 +19,8 @@ from apps.website import public_home
 from apps.website.models import Site
 from apps.website.queries import page_cache_key
 from apps.website.render import local_day
-from apps.website.tests.conftest import B, WEBSITE_JS, ctx_for, full_content
+from apps.website import reviews
+from apps.website.tests.conftest import PLACE_ID, B, WEBSITE_JS, ctx_for, full_content, google_reviews
 from base.models import Hub
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("website_manifest")]
@@ -208,4 +209,59 @@ def test_is_published_says_whether_a_publication_is_live():
     assert public_home.is_published(hub) is True
     run("website.site.unpublish")
     assert public_home.is_published(hub) is False
+
+
+# Google's reviews
+
+
+@pytest.fixture
+def google(monkeypatch, settings):
+    """Google as ``reviews.load`` would ask it: ``answers`` is what each call gets (a payload kept, or ``None``)."""
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    state = {"calls": [], "answer": google_reviews()}
+
+    def load(slug, ref, address):
+        state["calls"].append(ref)
+        found = reviews.cached(slug, ref, address)
+        if found is not None:
+            return found if isinstance(found, dict) else None
+        answer = state["answer"]
+        cache.set(reviews.reviews_key(slug, PLACE_ID), answer or reviews.FAILED, reviews.TTL)
+        return answer
+
+    monkeypatch.setattr(reviews, "load", load)
+    return state
+
+
+def test_the_page_shows_googles_reviews_asked_once_and_kept_in_the_site(client, google):
+    publish(reviews={"place_ref": PLACE_ID})
+    page = visit(client).content.decode()
+    assert 'data-ep-section="reviews"' in page and "128 reviews on Google" in page and "Cliente 0" in page
+    assert google["calls"] == [PLACE_ID]
+    assert Site.objects.get().reviews_snapshot["place_id"] == PLACE_ID
+    # The page is kept: the next visitor costs Google nothing.
+    visit(client)
+    assert google["calls"] == [PLACE_ID]
+
+
+def test_when_google_fails_the_page_shows_the_sites_last_good_reviews(client, google):
+    publish(reviews={"place_ref": PLACE_ID})
+    Site.objects.update(reviews_snapshot=google_reviews(count=9))
+    google["answer"] = None
+    page = visit(client).content.decode()
+    assert "9 reviews on Google" in page
+    assert Site.objects.get().reviews_snapshot["count"] == 9
+
+
+def test_without_anything_from_google_the_page_has_no_reviews(client, google):
+    publish(reviews={"place_ref": PLACE_ID})
+    google["answer"] = None
+    page = visit(client).content.decode()
+    assert 'data-ep-section="reviews"' not in page and 'href="#reviews"' not in page
+
+
+def test_hidden_reviews_never_ask_google(client, google):
+    publish(reviews={"place_ref": PLACE_ID, "hidden": True})
+    assert 'data-ep-section="reviews"' not in visit(client).content.decode()
+    assert google["calls"] == []
 

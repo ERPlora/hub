@@ -20,7 +20,7 @@ from apps.website.schemas import (
 
 
 def test_content_is_a_closed_set_of_sections_and_topbar_and_hero_cannot_hide():
-    assert SECTIONS == ("topbar", "hero", "about", "catalog", "gallery", "contact", "location", "footer")
+    assert SECTIONS == ("topbar", "hero", "about", "catalog", "gallery", "reviews", "contact", "location", "footer")
     assert set(Content.model_fields) == set(SECTIONS)
     # An empty draft is a valid one: every section with its defaults, the optional ones shown.
     empty = Content()
@@ -32,7 +32,7 @@ def test_content_is_a_closed_set_of_sections_and_topbar_and_hero_cannot_hide():
     for fixed in ("topbar", "hero", "footer"):
         with pytest.raises(pydantic.ValidationError):
             Content.model_validate({fixed: {"hidden": True}})
-    for optional in ("about", "catalog", "gallery", "contact", "location"):
+    for optional in ("about", "catalog", "gallery", "reviews", "contact", "location"):
         assert getattr(Content.model_validate({optional: {"hidden": True}}), optional).hidden is True
 
 
@@ -137,6 +137,19 @@ def test_the_gallery_holds_up_to_twelve_uploaded_images_in_their_order():
         Content.model_validate({"gallery": {"images": [{"url": "https://evil.example/x.png"}]}})
     with pytest.raises(pydantic.ValidationError):
         Content.model_validate({"gallery": {"title": "x" * 81}})
+
+
+def test_the_reviews_name_a_place_on_google_maps_by_its_link_or_its_place_id():
+    assert Content().reviews.model_dump() == {"hidden": False, "title": "", "place_ref": ""}
+    place = "ChIJN1t_tDeuEmsRUsoyG83frY4"
+    for ref in (place, f"https://www.google.com/maps/place/Manoli/@40.41,-3.70,17z", "https://maps.app.goo.gl/AbC1"):
+        assert Content.model_validate({"reviews": {"place_ref": f" {ref} "}}).reviews.place_ref == ref
+    for ref in ("Peluquería Manoli", "https://evil.example/maps/place/x/", "https://www.google.com/maps/@40.4,-3.7,15z"):
+        with pytest.raises(pydantic.ValidationError) as refused:
+            Content.model_validate({"reviews": {"place_ref": ref}})
+        assert "Paste the link of your business on Google Maps, or its Place ID." in str(refused.value)
+    with pytest.raises(pydantic.ValidationError):
+        Content.model_validate({"reviews": {"place_ref": "https://maps.app.goo.gl/" + "a" * 500}})
 
 
 def test_the_theme_is_a_palette_and_a_mode_auto_by_default():

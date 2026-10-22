@@ -13,8 +13,8 @@ Lo que no entra todavía: ver «Lo que NO hace, a propósito».
 
 Página web le da a cada negocio una página sencilla en su propia dirección de ERPlora
 (`https://<tu-negocio>.erplora.com/`). El propietario elige uno de cuatro diseños, rellena sus secciones (nombre y
-logotipo, título y foto de portada, unas palabras sobre el negocio, su catálogo, una galería de fotos, cómo
-contactar, dónde está) y sus
+logotipo, título y foto de portada, unas palabras sobre el negocio, su catálogo, una galería de fotos, sus reseñas de
+Google, cómo contactar, dónde está) y sus
 colores, esconde lo que no usa y publica. Quien abre esa dirección sin haber entrado ve la página; el equipo entra
 desde su botón **Entrar**, que todas las plantillas llevan y no se puede quitar. Mientras la página no está publicada
 (o se ha desconectado), la dirección sigue llevando al acceso del equipo, como siempre.
@@ -29,6 +29,8 @@ el contenido y el diseño se guardan por separado.
   **Servicios**, la sección Catálogo puede mostrar sus productos a la venta o sus servicios ofrecidos.
 - Solo el **propietario** y el **administrador** cambian, publican o desconectan la página; el **responsable** la ve
   y comparte su dirección y su QR; el **empleado** no la ve.
+- Para las **reseñas de Google**, el negocio necesita su ficha en Google Maps (su Perfil de Empresa de Google): se
+  pega el enlace de esa ficha y ERPlora lee de Google su valoración y sus reseñas.
 
 ## Pantallas
 
@@ -68,6 +70,13 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
   - **Galería**: **Mostrar**, encabezado (vacío = «Galería») y hasta 12 fotos, en el orden en que se verán: cada una
     con **Cambiar imagen** y **Quitar** y las flechas **Subir** y **Bajar**; **Añadir una foto** pone otra al final
     mientras haya sitio, y un contador dice cuántas lleva («3 de 12 fotos»).
+  - **Reseñas de Google**: **Mostrar**, encabezado (vacío = «Lo que dicen nuestros clientes») y **Enlace de Google
+    Maps o Place ID**: el enlace de la ficha del negocio en Google Maps (el de la barra de direcciones o el de su botón
+    **Compartir**, `https://maps.app.goo.gl/…`) o su Place ID (`ChIJ…`). Debajo, una nota dice cómo están: «Pega el
+    enlace…» (vacío), «Se preguntará a Google por este sitio en cuanto se guarde» (cambiado y sin guardar), «Tus
+    reseñas aparecerán aquí… en cuanto Google responda» (aún sin respuesta), «Google no respondió por este sitio…»
+    (fallo; se reintenta a los 10 minutos), «Las reseñas de Google aún no están disponibles…» (el servidor no tiene la
+    clave de Google) o «Valoración 4,7 de 5 · reseñas en Google: 128» (listas).
   - **Contacto**: **Mostrar**, encabezado, teléfono, WhatsApp (con prefijo), correo, Instagram, Facebook, TikTok y X
     (enlaces `https://`) y, si se activa **Mostrar el horario**, el horario de la semana: cada día abierto o cerrado
     y hasta tres franjas (una hora de cierre anterior a la de apertura pasa de medianoche).
@@ -92,13 +101,17 @@ logotipo, el nombre, el menú de secciones (plegado en un móvil) y **Entrar** (
 cabecera con la foto de portada (o, sin foto, un degradado suave de la paleta, nunca vacía), el título en letra
 grande, el lema y dos botones redondeados: **Escríbenos por WhatsApp** (o **Contáctanos**, a la sección de contacto,
 si no hay WhatsApp) y **Cómo llegar** (a la dirección); sin contacto ni dirección, uno a la primera sección. Cada
-sección lleva una línea pequeña encima del título («Quiénes somos», «Lo que ofrecemos», «Echa un vistazo», «Hablemos»,
-«Visítanos») y su
+sección lleva una línea pequeña encima del título («Quiénes somos», «Lo que ofrecemos», «Echa un vistazo», «Reseñas de
+Google», «Hablemos», «Visítanos») y su
 contenido en tarjetas redondeadas: Sobre nosotros con su foto enmarcada al lado del texto; el catálogo en una rejilla
 de tarjetas (un degradado con la inicial, porque los productos no traen foto; el precio en una píldora; píldoras para
 saltar de categoría si hay dos o más); la galería en una rejilla de fotos cuadradas y redondeadas (dos por fila en
 el móvil, tres en una tableta, cuatro en un ordenador) que crecen un poco al pasar el ratón y se abren enteras
-aparte; el contacto en fichas con icono (teléfono, correo), WhatsApp como botón y las
+aparte; las reseñas de Google con la valoración en grande, sus estrellas (redondeadas a la media estrella) y «128
+reseñas en Google», los botones **Ver en Google** y **Escribir una reseña** (se abren en Google) y hasta cinco
+tarjetas con la inicial y el nombre del autor (enlazado a su perfil), cuándo la escribió (enlazado a la reseña), sus
+estrellas y su texto tal cual lo escribió (cortado a 280 caracteres, entero al pasar el ratón), y debajo «Valoración y
+reseñas de Google Maps. Las más relevantes primero, como las ordena Google.»; el contacto en fichas con icono (teléfono, correo), WhatsApp como botón y las
 redes como píldoras; el horario en una lista con **hoy** resaltado (el día del negocio, en la zona horaria del hub;
 sin zona, la de Madrid); la dirección en una tarjeta con **Abrir el mapa**. Pie en columnas: nombre y la línea del
 pie, enlaces a las secciones y **Entrar**, y al final la firma «© <año> ERPlora» (se abre aparte). Solo hay
@@ -138,6 +151,7 @@ español); lo que escribe el propietario, tal cual.
 | WEBSITE-F09 | Compartir la dirección y el QR | hecho |
 | WEBSITE-F10 | Visitar la página pública | hecho |
 | WEBSITE-F11 | Mostrar una galería de fotos | hecho |
+| WEBSITE-F12 | Mostrar las reseñas de Google | hecho |
 
 ### WEBSITE-F01 Rellenar y guardar el borrador
 Estado: hecho (servidor y pantalla)
@@ -147,12 +161,12 @@ Pasos:
 1. Abre **Página web** y despliega una sección.
 2. Escribe: el borrador se guarda solo dos segundos después del último cambio, o al pulsar **Guardar**; también al
    salir de la pantalla si quedaba algo.
-Entra: la plantilla, los colores y el contenido completo de las ocho secciones. Las imágenes se nombran por su id;
+Entra: la plantilla, los colores y el contenido completo de las nueve secciones. Las imágenes se nombran por su id;
 la dirección donde se sirven la escribe el servidor.
 Sale: el borrador guardado; los clientes no ven nada hasta publicar. Aviso `website.site.updated` (solo si algo
 cambió).
 Si falla: bajo cada campo, sin perder lo escrito: textos demasiado largos, un enlace que no empieza por `https://`,
-un teléfono o un correo que no lo son, dos franjas iguales o un día repetido en el horario, «Esta imagen no se subió
+un teléfono o un correo que no lo son, un enlace de reseñas que no es de Google Maps, dos franjas iguales o un día repetido en el horario, «Esta imagen no se subió
 a la página web de este negocio: vuelve a subirla.»
 
 ### WEBSITE-F02 Elegir el diseño, la paleta y el fondo
@@ -165,11 +179,11 @@ Si falla: un color mal escrito no se guarda y el campo lo dice: «Escribe el col
 
 ### WEBSITE-F03 Mostrar u ocultar una sección
 Estado: hecho (servidor y pantalla)
-Pasos: en Sobre nosotros, Catálogo, Galería, Contacto o Ubicación, el interruptor **Mostrar**. La barra superior, la
+Pasos: en Sobre nosotros, Catálogo, Galería, Reseñas de Google, Contacto o Ubicación, el interruptor **Mostrar**. La barra superior, la
 cabecera y el pie no se pueden ocultar.
 Sale: lo oculto no se pinta en la página ni sale por la API pública; se conserva para volver a mostrarlo. Una sección
-que se muestra pero no tiene nada (sin texto ni foto, sin catálogo, sin fotos en la galería, sin datos de
-contacto, sin dirección ni mapa)
+que se muestra pero no tiene nada (sin texto ni foto, sin catálogo, sin fotos en la galería, sin reseñas de Google,
+sin datos de contacto, sin dirección ni mapa)
 tampoco se pinta.
 
 ### WEBSITE-F04 Subir una imagen
@@ -238,6 +252,24 @@ hay sección (ni enlace en el menú).
 Si falla: más de 12 fotos no se guardan; una foto que no es una subida de este negocio: «Esta imagen no se subió a la
 página web de este negocio: vuelve a subirla.» bajo la galería.
 
+### WEBSITE-F12 Mostrar las reseñas de Google
+Estado: hecho (servidor, pantalla y e2e)
+Actor: propietario, administrador, asistente (el enlace), API
+Pasos: en **Reseñas de Google**, pega el enlace de la ficha del negocio en Google Maps (o su Place ID). Se guarda como
+en F01; la nota de debajo dice si las reseñas ya están.
+Entra: el enlace o el Place ID. Vale el de la barra de direcciones (`https://www.google.com/maps/place/<nombre>/@…`),
+el de **Compartir** (`https://maps.app.goo.gl/…`), uno con `place_id=` o `q=place_id:` y un Place ID (`ChIJ…`).
+Sale: ERPlora pregunta a Google desde su servidor, nunca el navegador del visitante: al guardar un enlace nuevo, al
+publicar (lo que tenía guardado se descarta y se vuelve a preguntar) y al pintar la página si no tiene nada guardado. Un
+enlace por nombre se busca con ese nombre y la dirección de la sección Ubicación, cerca del punto del enlace. La
+respuesta se guarda un día por negocio y sitio, y la última buena también en la página web (vale 30 días): si Google
+falla o se vacía la caché, se sigue viendo. En la página, la valoración, el número de reseñas, hasta cinco reseñas (las
+más relevantes, como las da Google) y los botones **Ver en Google** y **Escribir una reseña**. La página publicada las
+refresca al abrirse. Sin enlace, oculta o sin nada de Google, no hay sección; la vista previa dice dónde saldrán.
+Si falla: un enlace que no es de Google Maps ni un Place ID no se guarda: «Pega el enlace de tu negocio en Google Maps, o
+su Place ID.». Si Google no responde (5 segundos como mucho), rechaza la clave o no encuentra el sitio, se anota y no se
+le vuelve a preguntar hasta 10 minutos después; mientras, se ve lo último bueno o nada.
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien habla) y la API, con
@@ -253,8 +285,9 @@ las mismas reglas y los mismos permisos.
 | El QR de la dirección pública, en PNG o SVG | ver | F09 | `website.qr.get` |
 | Lo publicado, sin las secciones ocultas (sin sesión) | cualquiera | F10 | `website.public.site` |
 | El catálogo publicado, leído en ese momento y con los precios en el idioma de quien pregunta (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
+| Las reseñas de Google guardadas del sitio publicado, con sus textos en el idioma de quien pregunta (sin sesión; nunca pregunta a Google) | cualquiera | F10, F12 | `website.public.reviews` |
 
-Las dos públicas responden solo con la página en línea (si no, 404 `website.not_published`) y cuentan a cada
+Las tres públicas responden solo con la página en línea (si no, 404 `website.not_published`) y cuentan a cada
 visitante: 60 lecturas por minuto y dirección, después 429 `base.rate_limited`. El catálogo público se guarda un
 minuto.
 
@@ -270,14 +303,14 @@ minuto.
 ### Asistente
 El asistente (por voz o por texto) usa, con la sesión y los permisos de quien habla, `website.site.get`,
 `website.site.save`, `website.site.publish`, `website.site.unpublish` y `website.catalog.categories`. Cada campo del
-borrador lleva su descripción (nombre, lema, texto de Sobre nosotros, galería, contacto, horario, ubicación, plantilla,
-paleta y fondo), y la descripción de guardar le dice que el borrador se manda entero: lo lee primero con `website.site.get`,
+borrador lleva su descripción (nombre, lema, texto de Sobre nosotros, galería, enlace de las reseñas de Google,
+contacto, horario, ubicación, plantilla, paleta y fondo), y la descripción de guardar le dice que el borrador se manda entero: lo lee primero con `website.site.get`,
 cambia solo lo pedido y lo devuelve. Ejemplo: «Ponme en la web el horario de lunes a viernes de 9 a 20» → lee el
 borrador, pone en `contact.hours` los cinco días con la franja `09:00`–`20:00` (deja el resto como estaba) y llama a
 `website.site.save`; si además dice «y publícala», `website.site.publish`. No son herramientas del asistente, a
 propósito: la vista previa (`website.site.preview`, una página HTML), la subida de imágenes (`website.image.upload`,
 un fichero en base64 de hasta 5 MB) y el QR (`website.qr.get`, una imagen en base64), que se usan desde la pantalla, ni
-las dos lecturas públicas de los visitantes (`website.public.*`).
+las tres lecturas públicas de los visitantes (`website.public.*`).
 
 ### Lo que avisa
 
@@ -297,6 +330,10 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
 - De la plataforma: el registro del hub (su id, para el almacén de ficheros; `base.operations.hub_id`), el almacén
   `storages["hub_files"]` y la vista `/p/media/…` (`base.storage`, `base.media`), el límite por visitante
   (`base.throttle`) y la entrada `/` (`base.public_home`, que llama a `apps/website/public_home.py`).
+- De fuera: la **Places API (New) de Google**, con la clave de la plataforma (`GOOGLE_PLACES_API_KEY`), solo desde el
+  servidor: Text Search (solo el id: Google no lo cobra) y Place Details con reseñas (Google lo cobra como «Place
+  Details Enterprise + Atmosphere»: 1000 al mes gratis y después unos 25 $ cada 1000; con la caché de un día, unas 30
+  al mes por negocio con reseñas).
 
 ### Quién puede qué
 
@@ -315,6 +352,9 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
   borran las que dejan de usarse ni las versiones antiguas.
 - Sin sitemap ni robots más allá de la etiqueta `noindex` de la vista previa.
 - La galería no lleva textos por foto ni un visor a pantalla completa: cada foto se abre entera en otra pestaña.
+- Las reseñas de Google son las que da Google (cinco como mucho, las más relevantes): sin todas las reseñas, sin
+  responderlas desde ERPlora, sin reseñas propias y sin la foto del autor (la página no carga imágenes de fuera: va su
+  inicial). Sin la clave de Google en el servidor no se pregunta nada.
 - La firma «© <año> ERPlora» del pie no se quita ni se cambia: el nombre y los datos legales del negocio van en la
   línea del pie.
 - La activación real del módulo por negocio (`AppActivation`) llega en la fase 2.
@@ -336,13 +376,13 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
   apagado la API responde 404 `app_inactive` y `/` salta al login) y una publicación en línea de ese hub (si no,
   404 `website.not_published`).
 - Anatomía completa: `apps.py`, `models.py`, `schemas.py`, `render.py`, `csp.py`, `public_home.py`, `storage.py`,
-  `qr.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `templates/website/`
+  `qr.py`, `reviews.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `templates/website/`
   y `frontend/`, con un `tests/test_<fichero>.py` por fichero. **Sin `views.py` ni `urls.py`** (PLAN §29): `/` es de
   `base` y `/p/media/…` también.
 - Modelos: `Site` (una por hub, `hub_id` único: `template`, `theme`, `content` = borrador; `published_content` =
   plantilla, tema, contenido y la copia del catálogo de la última publicación; `published_version`, `published_at`,
-  `is_live`) e `Image` (`hub_id` con índice, `key` única, `sha256`, tipo, ancho, alto y tamaño). UUIDv7.
-- **Contenido = JSON validado** por `schemas.Content` (ocho secciones cerradas; topbar, hero y footer sin
+  `is_live`; `reviews_snapshot` = la última respuesta buena de Google para la sección de reseñas) e `Image` (`hub_id` con índice, `key` única, `sha256`, tipo, ancho, alto y tamaño). UUIDv7.
+- **Contenido = JSON validado** por `schemas.Content` (nueve secciones cerradas; topbar, hero y footer sin
   `hidden`); `render_site` lo valida otra vez antes de pintar: una fila escrita a mano no cuela marcado. Lo que
   escribe el propietario pasa por el escape de Django, y el texto de Sobre nosotros por `live.markdown` (nh3, sin
   imágenes). Los enlaces solo `https://`.
@@ -365,14 +405,39 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
   vista previa (que además lleva `X-Frame-Options: SAMEORIGIN` y `Cache-Control: no-store`). Con DEBUG, el servidor
   de Vite.
 - **Paquete público**: `frontend/website.ts` (entrada `website` de Vite): Bootstrap 5.3, su `collapse` (el menú de la
-  barra, por atributos `data-bs-*`) y `apps/website/frontend/public/{site.css,mode.ts,catalog.ts}`. El refresco del catálogo
-  reconstruye el bloque con `createElement`/`textContent`, nunca `innerHTML`; si falla, se queda la copia publicada.
+  barra, por atributos `data-bs-*`) y `apps/website/frontend/public/{site.css,mode.ts,catalog.ts,reviews.ts}`. El
+  refresco del catálogo y el de las reseñas reconstruyen su bloque con `createElement`/`textContent`, nunca
+  `innerHTML`; si fallan, se queda lo que pintó el servidor.
 - **Imágenes**: `services.upload_image` valida con Pillow (tipo real, tamaño, píxeles), guarda en
   `storages["hub_files"]` con clave por contenido y responde la URL de `base.media` (`/p/media/<hex>/website/img/…`,
   caché de un año). `base.media` solo sirve las carpetas públicas (`PUBLIC_FOLDERS`, hoy `website/img/`): el almacén
   guarda también documentos privados de otros módulos, que nunca salen por ahí; un nombre que es una carpeta en disco
   responde 404. Al guardar, cada imagen del contenido tiene que ser una subida de este hub y su URL la escribe el
   servidor.
+- **Reseñas de Google** (`reviews.py`, ronda 2026-10-22, decisión de Ioan: del servidor, sin JS de terceros, que la
+  CSP prohíbe): `reviews.parse` lee la entrada (Place ID `ChIJ…`; enlace de Google Maps con `place_id=`,
+  `query_place_id=`, `q=place_id:` o `!19sChIJ…`; `/maps/place/<nombre>/@lat,lng`, `/maps/search/<texto>/`, `q=<texto>`
+  o `query=<texto>`, que se buscan por nombre; enlace corto `maps.app.goo.gl` o `goo.gl/maps`) y `schemas` rechaza lo
+  demás. `reviews.load` pregunta con `httpx` (5 s por llamada): el enlace corto se
+  sigue una vez (su redirección), el nombre se busca con Text Search (`POST
+  https://places.googleapis.com/v1/places:searchText`, `X-Goog-FieldMask: places.id`, `pageSize` 1, `locationBias` de
+  1 km alrededor del punto del enlace, `textQuery` = nombre + líneas de la Ubicación) y después Place Details (`GET
+  https://places.googleapis.com/v1/places/{id}`, `X-Goog-Api-Key` y `X-Goog-FieldMask:
+  id,displayName,rating,userRatingCount,reviews,googleMapsUri`). Se guarda el texto original de cada reseña
+  (`originalText`, si no `text`), sin tocarlo; la fecha relativa la escribe el Hub en el idioma del visitante (desde
+  `publishTime`), así una sola respuesta sirve para todos los idiomas. Solo se guardan enlaces `https://`.
+  Caché: `website:reviews:<slug>:<place id>` un día (o `failed` 10 minutos), `website:place:<slug>:<hash>` el sitio
+  encontrado por nombre o enlace corto, y `website:reviews-lock:…` (30 s) para que pregunte un solo proceso. Nunca dentro
+  de una transacción: `services.refresh_reviews` corre tras el COMMIT de guardar un sitio nuevo y de publicar (este
+  borra antes lo guardado) y en `public_home.respond` cuando la página no está en caché y no hay nada guardado; una
+  respuesta nueva se guarda también en `Site.reviews_snapshot`, que vale 30 días y solo para su sitio. La vista previa,
+  `website.site.get` (la nota del editor) y `website.public.reviews` solo leen. El bloque se pinta igual en el servidor
+  (`sections/reviews.html`) y en el paquete (`frontend/public/reviews.ts`, que rehace el resumen y las tarjetas):
+  `frontend/public/reviews.fixture.json` guarda ese marcado y lo comprueban los dos lados. Sin foto del autor (la CSP
+  solo deja imágenes del Hub) ni logotipo: «Google Maps» va en texto, con `translate="no"`, como piden las normas de
+  Google. **Clave**: `GOOGLE_PLACES_API_KEY` (`config/settings.py`, `.env.example`); en AWS va en Secrets Manager y en la
+  definición de tarea del Hub (Terraform, pendiente en `aws/`). Restringirla a la Places API (New).
+- **Migración 0004** (`0004_site_reviews_snapshot`, reversible): añade `Site.reviews_snapshot` (JSON, `{}` por defecto).
 - La subida va en base64 dentro del JSON de la operación (como el certificado de VeriFactu), con
   `accept_body_up_to(7 100 000)` en su ruta: una sola puerta para la SPA, las API keys y el asistente.
 - El QR es `qrcode` (la misma librería del QR de VeriFactu), corrección media y zona tranquila de cuatro módulos.
@@ -403,7 +468,8 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
   fantasma (`ws-btn-ghost`), la línea sobre los títulos (`ws-eyebrow`), las secciones (`ws-section`, `ws-rule`), las
   fichas y sus iconos (`ws-chip`, `ws-glyph`, `ws-icon` y `ws-icon-<nombre>`), las tarjetas que suben al pasar el ratón
   (`ws-lift`), el degradado del catálogo (`ws-thumb`), el panel del mapa (`ws-map`), el marco de la foto
-  (`ws-frame`) y el zum de las fotos de la galería (`ws-zoom`), además de la letra de cada plantilla. Los iconos son
+  (`ws-frame`), el zum de las fotos de la galería (`ws-zoom`) y la media estrella de las reseñas (`ws-star-half`; la
+  estrella es `ws-icon-star`), además de la letra de cada plantilla. Los iconos son
   de Ionicons (MIT, el juego `ion:`) tal como los
   trae `@erplora/ui`, escritos en `site.css` como máscaras CSS (la página no tiene script para pintarlos ni red para
   pedirlos): `frontend/public/icons.test.ts` comprueba que cada uno es exactamente el de `ionicons/icons` y que es
@@ -440,7 +506,8 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
 - Componentes: `TemplatePicker` (las cuatro tarjetas, dibujos en CSS con los colores de la paleta), `PalettePicker`
   (las paletas en tarjetas, de `palettes.json`, con los dos `ColorInput` de los colores a la vista y «Restablecer
   colores»), `HoursEditor`, `GalleryEditor` (las fotos de la galería: una `ImageUpload` por foto, flechas para
-  ordenarlas y otra `ImageUpload` para añadir al final, hasta 12), `CategoryPicker` (lee
+  ordenarlas y otra `ImageUpload` para añadir al final, hasta 12), `ReviewsEditor` (el enlace de Google Maps y la nota
+  de cómo están las reseñas, de `website.site.get` → `reviews`), `CategoryPicker` (lee
   `website.catalog.categories` al cambiar la fuente), `PreviewFrame` (el iframe de `/api/website/site/preview`),
   `ShareDialog`; de `@erplora/ui/components`, `ColorInput` (en `PalettePicker`), `ImageUpload`, `InlineFeedback` y
   `useConfirm`.
