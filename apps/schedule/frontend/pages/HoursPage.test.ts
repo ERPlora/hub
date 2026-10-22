@@ -119,8 +119,10 @@ describe('HoursPage', () => {
   it('the default week says so, and «Yes, these are my hours» confirms it', async () => {
     const s = await setup();
     await s.show(WEEK);
+    // Only what holds while the week is unconfirmed: Appointments (and Online booking through it) refuse outside
+    // it, Reservations does not apply it until it is saved or confirmed (CLOSE-SCHEDULE, hub#172).
     expect(s.find('schedule-hours-default-week').text()).toContain(
-      'These are default opening hours we set up for you. Check they match your business — bookings outside them are refused.',
+      'These are default opening hours we set up for you. Check they match your business — appointments outside them are refused.',
     );
     s.answer(200, { ...WEEK, confirmed: true });
     await s.find('schedule-hours-confirm-week').trigger('click');

@@ -112,7 +112,7 @@ de fila **Editar** (o tocar la fila) abre «Editar horario — {día}» con: **D
 «Jornada partida: una línea por tramo (10:00–14:00 y 17:00–20:00). Un cierre anterior a la apertura pasa
 de medianoche (22:00–02:00).» y **Guardar día**. Mientras nadie haya guardado ni confirmado la semana,
 encima de la tabla sale el aviso amarillo «Este es un horario por defecto que hemos puesto por ti.
-Comprueba que coincide con el de tu negocio: las reservas fuera de él se rechazan.» con el botón **Sí,
+Comprueba que coincide con el de tu negocio: las citas fuera de él se rechazan.» con el botón **Sí,
 este es mi horario** (el botón, solo para quien puede cambiar el horario; el empleado ve el aviso). En
 móvil la tabla se pinta como tarjetas.
 
@@ -122,7 +122,7 @@ Dos tablas, una debajo de otra, cada una con su título.
 - **Días especiales**: columnas **Fecha**, **Nombre**, **Estado** («Cerrado» o sus horas, tramo a tramo)
   y **Anual** («Sí»/«No»); buscador «Buscar día especial…», el embudo «Filtros de días especiales» con
   fecha (desde–hasta), nombre, estado y anual, orden por columna y 50 por página. **+** abre **Nuevo día
-  especial**: **Fecha**, **Nombre** («Nombre (p.ej. Navidad)»), **Estado** («Cerrado» o «Abierto (con
+  especial**: **Fecha**, **Nombre** («Nombre (p. ej. Navidad)»), **Estado** («Cerrado» o «Abierto (con
   horario)»; empieza en Cerrado), el mismo editor de tramos, **Se repite cada año**, **Notas** y **Añadir
   día**. Acciones de fila: **Editar** (o tocar la fila; el mismo formulario, «Editar · {nombre}», con
   **Guardar**) y **Eliminar**.
@@ -220,8 +220,9 @@ Pasos:
 3. El aviso desaparece.
 Entra: la semana que ya está guardada; no se manda ninguna hora, así que nadie confirma un horario que no
 se le ha enseñado.
-Sale: la semana marcada como confirmada, sin cambiar ni una hora, y un aviso `schedule.week.updated`.
-Confirmar dos veces no cambia nada ni avisa.
+Sale: la semana marcada como confirmada, sin cambiar ni una hora, y un aviso `schedule.week.updated`. Desde
+entonces la semana rige también las reservas de mesa (SCHEDULE-F12). Confirmar dos veces no cambia nada ni
+avisa.
 Si falla: arriba de la tabla: «No hay horario semanal que confirmar.» (409 `schedule.no_week`) si no hay
 ningún día guardado (no se llega desde la pantalla: el aviso solo sale cuando hay semana).
 Implicados: ninguno
@@ -391,7 +392,10 @@ Pasos:
    y domingo cerrados.
 2. La semana sale como **sin confirmar**: el aviso amarillo de Horario (SCHEDULE-F03).
 Entra: nada de la persona; la semana es la del mercado, no la del negocio.
-Sale: siete días. Solo una vez: una actualización nunca devuelve días que el negocio cambió.
+Sale: siete días. Solo una vez: una actualización nunca devuelve días que el negocio cambió. Mientras siga
+sin confirmar, la semana rige las citas (también las de Reservas online), pero no las reservas de mesa, que
+solo la aplican cuando el negocio la guarda o la confirma; los días especiales y los cambios temporales rigen
+siempre.
 Si falla: no hay pantalla; si no hubiera semana, Citas vería `no_hours`.
 Implicados: ninguno
 
@@ -627,7 +631,9 @@ no sabe de ellas.
   fila de antes de los tramos, que aquí no existe; tampoco el par apertura–cierre de reserva de las
   excepciones sin tramos.
 - **«Semana confirmada»** es una marca de los ajustes, que pone quien guarda un día o confirma, en vez de
-  mirar quién firmó cada fila; confirmar no reescribe la semana.
+  mirar quién firmó cada fila; confirmar no reescribe la semana. Su aviso amarillo dice «las citas fuera de
+  él se rechazan» (antes «las reservas…»): con la semana sin confirmar, Reservas no la aplica (CLOSE-SCHEDULE,
+  hub#172).
 - **Ajustes**: el aviso solo sale si algo cambia (antes siempre); la tabla gira con cualquier día de
   inicio, no solo lunes o domingo; la zona horaria se enseña sin el botón «Abrir ajustes del hub»;
   **Guardar** dice «Guardado» (antes no decía nada), y el empleado ve los ajustes sin poder guardarlos

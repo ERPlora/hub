@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d537321a281134e5f3862d219cf15e1246115bd492fcdea651a94cda745ff1ff -->
+<!-- generated from WORKBOOK.md sha256:6dfcc26c1d674d0fad24643ea692fd2cff7b09c08723b39f20fcd3db00649cd7 -->
 
 ## What it is for and who it is for
 
@@ -101,7 +101,7 @@ English). The row action **Edit** (or tapping the row) opens "Edit hours — {da
 **+ Add interval**, the hint "Split shifts: one line per interval (10:00–14:00 and 17:00–20:00). A closing
 time earlier than the opening one runs past midnight (22:00–02:00)." and **Save day**. While nobody has
 saved or confirmed the week, the yellow notice "These are default opening hours we set up for you. Check
-they match your business — bookings outside them are refused." shows above the table with the button
+they match your business — appointments outside them are refused." shows above the table with the button
 **Yes, these are my hours** (the button, only for whoever can change the hours; the employee sees the
 notice). On a phone the table is painted as cards.
 
@@ -204,8 +204,9 @@ Steps:
 2. Tap **Yes, these are my hours**; the button is disabled while it works.
 3. The notice disappears.
 In: the week that is already saved; no hour is sent, so nobody confirms hours they have not been shown.
-Out: the week marked as confirmed, without changing a single hour, and a notice `schedule.week.updated`.
-Confirming twice changes nothing and announces nothing.
+Out: the week marked as confirmed, without changing a single hour, and a notice `schedule.week.updated`. From
+then on the week also governs table reservations (SCHEDULE-F12). Confirming twice changes nothing and
+announces nothing.
 If it fails: above the table: "There are no weekly opening hours to confirm." (409 `schedule.no_week`) if
 no day is saved (it cannot be reached from the screen: the notice only shows when there is a week).
 Involved: none
@@ -369,7 +370,10 @@ Steps:
    and Sunday closed are planted.
 2. The week comes out as **not confirmed**: the yellow notice of Hours (SCHEDULE-F03).
 In: nothing from the person; the week is the market's, not the business's.
-Out: seven days. Only once: an update never brings back days the business changed.
+Out: seven days. Only once: an update never brings back days the business changed. While it stays
+unconfirmed, the week governs appointments (also the ones from Online booking), but not table
+reservations, which only apply it once the business saves or confirms it; special days and temporary
+changes always govern.
 If it fails: there is no screen; if there were no week, Appointments would see `no_hours`.
 Involved: none
 
