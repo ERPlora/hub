@@ -1,0 +1,86 @@
+{% extends "website/base.html" %}{% load i18n %}
+{% comment %}Minimal: quiet and literary, after Start Bootstrap's «Clean Blog» (MIT). One narrow column with a lot of
+air, a reading serif, a light sans display, small spaced capitals and thin rules between the sections; the header is
+text on the faintest light of the palette (the cover, if any, goes below it, wide and rounded), and its two calls to
+action are an outline pill and a link. Bootstrap's own classes only; the ws-* hooks are in
+apps/website/frontend/public/site.css.{% endcomment %}
+{% block body %}
+<body class="ws-minimal text-break" data-ep-template="minimal"{% if preview %} data-ep-preview{% endif %}>
+<header data-ep-section="topbar" class="sticky-top ws-glass">
+  <nav class="navbar navbar-expand-md py-3">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 small fw-semibold text-uppercase text-wrap ws-tracking" href="/">
+        {% if content.topbar.logo %}<img class="ws-logo rounded-circle" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
+        <span>{{ site_name }}</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-md-last">
+        <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+        {% if body %}<button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
+      </div>
+      {% if body %}<div class="collapse navbar-collapse justify-content-md-end" id="ws-nav">
+        <ul class="navbar-nav small me-md-3">
+          {% for section in body %}<li class="nav-item"><a class="nav-link" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+    </div>
+  </nav>
+</header>
+<main>
+  <section data-ep-section="hero" data-ep-hero="plain" class="ws-hero{% if not content.hero.cover %} ws-hero-glow{% endif %}">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-8">
+          <h1 class="display-4 fw-light mb-4 ws-display">{{ content.hero.title|default:site_name }}</h1>
+          {% if content.hero.tagline %}<p class="lead text-body-secondary mb-0">{{ content.hero.tagline }}</p>{% endif %}
+          {% if ctas %}<div class="d-flex flex-wrap align-items-center gap-2 mt-4">
+            {% for cta in ctas %}<a class="btn rounded-pill d-inline-flex align-items-center gap-2 {% if forloop.first %}btn-outline-primary px-4{% else %}btn-link{% endif %}" href="{{ cta.href }}"{% if cta.whatsapp %} target="_blank" rel="noopener noreferrer"{% endif %}>{% if cta.whatsapp %}<span class="ws-icon ws-icon-whatsapp" aria-hidden="true"></span>{% endif %}{{ cta.label }}</a>
+            {% endfor %}
+          </div>{% endif %}
+        </div>
+      </div>
+      {% if content.hero.cover %}<div class="row justify-content-center mt-5">
+        <div class="col-xl-10"><div class="ratio ratio-21x9 rounded-4 overflow-hidden"><img class="object-fit-cover" src="{{ content.hero.cover.url }}" alt="" fetchpriority="high"><div class="ws-hero-overlay" aria-hidden="true"></div></div></div>
+      </div>{% endif %}
+    </div>
+  </section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-9 col-xl-8">
+        {% for section in body %}
+        <section id="{{ section.name }}" data-ep-section="{{ section.name }}" class="ws-section border-top">
+          <p class="ws-eyebrow mb-2">{{ section.data.eyebrow }}</p>
+          <h2 class="fw-light mb-4 ws-display">{{ section.data.title }}</h2>
+          {% include section.partial with data=section.data %}
+        </section>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</main>
+<footer data-ep-section="footer" class="pt-5 pb-4">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-9 col-xl-8 border-top pt-4">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <a class="small fw-semibold text-uppercase text-reset text-decoration-none ws-tracking" href="/">{{ site_name }}</a>
+            {% if content.footer.text %}<p class="small text-body-secondary mt-2 mb-0" data-ep-footer-text>{{ content.footer.text }}</p>{% endif %}
+          </div>
+          {% if body %}<div class="col-6 col-md-3">
+            <ul class="list-unstyled small d-grid gap-2 mb-0">
+              {% for section in body %}<li><a class="text-body-secondary text-decoration-none" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+              {% endfor %}
+            </ul>
+          </div>{% endif %}
+          <div class="col-6 col-md-3 text-md-end">
+            <a class="btn btn-sm btn-link rounded-pill" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+          </div>
+        </div>
+        <p class="small text-body-secondary mt-4 mb-0" data-ep-credit>© {% now "Y" %} <a class="text-reset" href="https://erplora.com" target="_blank" rel="noopener">ERPlora</a></p>
+      </div>
+    </div>
+  </div>
+</footer>
+</body>
+{% endblock %}

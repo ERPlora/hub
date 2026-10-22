@@ -23,6 +23,8 @@ dependencies = [
     "croniter>=6",
     "weasyprint>=66",
     "geopy>=2.5",
+    "django-storages[s3]>=1.14.6",
+    "pillow>=12.3.0",
 ]
 
 [dependency-groups]

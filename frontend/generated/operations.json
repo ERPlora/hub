@@ -628,5 +628,16 @@
   "verifactu.chain.recover_manual": { "method": "post", "path": "/api/verifactu/chain/recover_manual" },
   "verifactu.diagnostic.last": { "method": "get", "path": "/api/verifactu/diagnostics/last" },
   "verifactu.diagnostic.run": { "method": "post", "path": "/api/verifactu/diagnostics/run" },
-  "verifactu.test_invoice.create": { "method": "post", "path": "/api/verifactu/test_invoice" }
+  "verifactu.test_invoice.create": { "method": "post", "path": "/api/verifactu/test_invoice" },
+  "website.site.get": { "method": "get", "path": "/api/website/site" },
+  "website.site.save": { "method": "post", "path": "/api/website/site" },
+  "website.site.publish": { "method": "post", "path": "/api/website/site/publish" },
+  "website.site.unpublish": { "method": "post", "path": "/api/website/site/unpublish" },
+  "website.site.preview": { "method": "get", "path": "/api/website/site/preview" },
+  "website.image.upload": { "method": "post", "path": "/api/website/images" },
+  "website.qr.get": { "method": "get", "path": "/api/website/qr" },
+  "website.catalog.categories": { "method": "get", "path": "/api/website/catalog/categories" },
+  "website.public.site": { "method": "get", "path": "/api/website/public/site" },
+  "website.public.catalog": { "method": "get", "path": "/api/website/public/catalog" },
+  "website.public.reviews": { "method": "get", "path": "/api/website/public/reviews" }
 }

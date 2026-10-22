@@ -798,5 +798,5 @@ class RepresentationModelOut(Schema):
     filename: str = Field(description="The file's name.")
     content_type: str = Field(description="The file's type: application/pdf.")
     content_base64: str = Field(
-        description="The blank official model (Anexo I of Convenio 17), a PDF in base64."
+        description="The official model (Anexo I of Convenio 17) with Invoicing's issuer written in, a PDF in base64."
     )

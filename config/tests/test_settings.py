@@ -61,6 +61,9 @@ ENV_KEYS = (
     "FISCAL_CERTIFICATE_KEY",
     "FLOW_SECRETS_KEY",
     "VITE_DEV_PORT",
+    "AWS_STORAGE_BUCKET_NAME",
+    "AWS_REGION",
+    "MEDIA_ROOT",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -431,6 +434,19 @@ def test_the_hub_s_pages_keep_the_windows_they_open_so_a_sign_in_window_can_answ
     assert load_settings(**env)["SECURE_CROSS_ORIGIN_OPENER_POLICY"] == "same-origin-allow-popups"
 
 
+def test_production_trusts_the_alb_as_one_proxy_and_development_none(load_settings):
+    # The ALB appends the caller's address to X-Forwarded-For (base.throttle.client_address); runserver has nothing
+    # in front of it.
+    assert load_settings(**PRODUCTION_ENV)["TRUSTED_PROXY_HOPS"] == 1
+    assert load_settings(**DEVELOPMENT_ENV)["TRUSTED_PROXY_HOPS"] == 0
+    assert load_settings(**PRODUCTION_ENV, TRUSTED_PROXY_HOPS="2")["TRUSTED_PROXY_HOPS"] == 2
+
+
+def test_a_negative_number_of_proxies_refuses_to_start(load_settings):
+    with pytest.raises(ImproperlyConfigured, match="TRUSTED_PROXY_HOPS"):
+        load_settings(**PRODUCTION_ENV, TRUSTED_PROXY_HOPS="-1")
+
+
 def test_a_request_the_alb_forwarded_over_https_is_secure():
     # The ALB terminates TLS and sets X-Forwarded-Proto (daphne --proxy-headers reads it too).
     factory = RequestFactory()
@@ -753,6 +769,32 @@ def test_whitenoise_storage_without_manifest_because_vite_already_hashes():
     assert "Manifest" not in backend
     assert settings.STATIC_URL == "/static/"
     assert settings.STATIC_ROOT == BASE_DIR / "staticfiles"
+
+
+def test_the_hub_files_go_to_the_bucket_terraform_names(load_settings):
+    # aws/stacks/prod/apps.tf hands the Hub's task AWS_STORAGE_BUCKET_NAME and AWS_REGION (base.storage).
+    loaded = load_settings(**PRODUCTION_ENV, AWS_STORAGE_BUCKET_NAME="erplora-prod-hubs", AWS_REGION="eu-west-1")
+    hub_files = loaded["STORAGES"]["hub_files"]
+    assert hub_files["BACKEND"] == "storages.backends.s3.S3Storage"
+    options = hub_files["OPTIONS"]
+    assert (options["bucket_name"], options["region_name"]) == ("erplora-prod-hubs", "eu-west-1")
+    # The rest of STORAGES is untouched.
+    assert loaded["STORAGES"]["staticfiles"]["BACKEND"] == "whitenoise.storage.CompressedStaticFilesStorage"
+
+
+def test_without_a_bucket_the_hub_files_go_under_media_root(load_settings, tmp_path):
+    loaded = load_settings(**DEVELOPMENT_ENV)
+    assert loaded["MEDIA_ROOT"] == BASE_DIR / "media"
+    assert loaded["STORAGES"]["hub_files"] == {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": BASE_DIR / "media"},
+    }
+    moved = load_settings(**DEVELOPMENT_ENV, MEDIA_ROOT=str(tmp_path))
+    assert moved["STORAGES"]["hub_files"]["OPTIONS"]["location"] == tmp_path
+
+
+def test_the_media_directory_is_never_committed():
+    assert "media/" in (BASE_DIR / ".gitignore").read_text().splitlines()
 
 
 def test_only_vite_assets_are_immutable():

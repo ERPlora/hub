@@ -363,7 +363,7 @@
       "issuerMissing": "Configura primero el emisor en Facturación → Emisor: es quien declara el impuesto.",
       "notLinked": "ERPlora todavía no ha vinculado este negocio: podrás enviarlo cuando tu cuenta de ERPlora haya enviado sus datos.",
       "step1Title": "1 · Consigue el modelo oficial",
-      "step1Hint": "Su texto lo fija la Agencia Tributaria y no se puede modificar: rellena los datos de tu negocio y de quien firma.",
+      "step1Hint": "Su texto lo fija la Agencia Tributaria y no se puede modificar. Lleva ya los datos de tu negocio de Facturación: completa lo que falte y los de quien firma.",
       "downloadModel": "Descargar el modelo",
       "downloading": "Descargando…",
       "downloaded": "Modelo descargado. Fírmalo y súbelo aquí abajo.",

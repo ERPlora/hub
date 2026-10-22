@@ -36,6 +36,7 @@ SPA are redirected: anything with a URL of its own in Django (``/api`` answers 4
 ``/healthz``, static files…) never reaches the SPA view. A request that does not ask for HTML gets
 the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
 SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
+``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21).
 """
 
 from django.conf import settings
@@ -53,6 +54,7 @@ from base.auth import admin_hubs_url, demo_login_redirect, login_redirect, saas_
 from base.health import READYZ_PATH
 from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
+from base.public_home import website_enabled
 from base.spa import spa
 
 #: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
@@ -174,6 +176,9 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         if view_func is not spa or request.user.is_authenticated:
             return None
         if request.method not in ("GET", "HEAD") or "text/html" not in request.headers.get("Accept", ""):
+            return None
+        if request.path_info == "/" and website_enabled(request):
+            # The hub's published website is its home page for a visitor (base.public_home); staff sign in from it.
             return None
         slug = HostScopeResolver().resolve(request).key
         hub = getattr(request, "hub", None)

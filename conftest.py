@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from django.utils import translation
 
 from config import testing
 
@@ -11,6 +12,22 @@ ENTRY = "frontend/main.ts"
 
 # Fails the test that leaves a database connection with a session setting changed (config/testing.py).
 session_settings_left_as_found = pytest.fixture(autouse=True)(testing.session_settings_left_as_found)
+
+
+@pytest.fixture(autouse=True)
+def default_language():
+    """Every test starts and ends in the default language (``settings.LANGUAGE_CODE``).
+
+    A request of the test client goes through ``LocaleMiddleware``, which activates the browser's language in the
+    thread and never deactivates it, so a request in Spanish would leave Spanish to the next tests of the same
+    worker (base/tests/test_language_isolation.py). Resetting before covers what a fixture wider than the test
+    left; resetting after, the module and session fixtures set up before the next test's own. A test that wants
+    another language says so in its body or a function fixture (``translation.override("es")``).
+    """
+    translation.deactivate()
+    yield
+    translation.deactivate()
+
 
 #: The hubs every test that uses the database finds in the registry, as ``manage.py seed_local_hubs`` leaves them.
 LOCAL_HUBS = ("a", "b")

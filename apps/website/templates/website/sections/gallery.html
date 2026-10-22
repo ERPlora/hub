@@ -1,0 +1,5 @@
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+  {% for image in data.images %}<div class="col">
+    <a class="d-block rounded-4" href="{{ image.url }}" target="_blank" rel="noopener"><div class="ratio ratio-1x1 rounded-4 overflow-hidden shadow-sm ws-zoom"><img class="img-fluid object-fit-cover" src="{{ image.url }}" alt="" loading="lazy"></div></a>
+  </div>{% endfor %}
+</div>

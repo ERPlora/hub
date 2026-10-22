@@ -1,0 +1,132 @@
+{
+  "_comment": "The reviews block's summary and cards (apps/website/templates/website/sections/reviews.html), which the public bundle rebuilds (reviews.ts) from /api/website/public/reviews: tests/test_render.py renders each view with the server's partial and reviews.test.ts builds it with summaryNodes and listNodes, and both must give this HTML (attributes in any order, spaces between tags ignored).",
+  "cases": [
+    {
+      "name": "rating and reviews",
+      "view": {
+        "available": true,
+        "rating_label": "4.7",
+        "stars": [
+          "on",
+          "on",
+          "on",
+          "on",
+          "half"
+        ],
+        "stars_label": "4.7 out of 5 stars",
+        "count_label": "128 reviews on Google",
+        "maps_uri": "https://maps.google.com/?cid=1",
+        "write_uri": "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "reviews": [
+          {
+            "author": "Lucía <b>M.</b>",
+            "author_uri": "https://www.google.com/maps/contrib/1",
+            "initial": "L",
+            "stars": [
+              "on",
+              "on",
+              "on",
+              "on",
+              "on"
+            ],
+            "stars_label": "5 out of 5 stars",
+            "text": "Me encanta…",
+            "full_text": "Me encanta, de verdad, volveré siempre.",
+            "when": "2 months ago",
+            "uri": "https://www.google.com/maps/reviews/1"
+          },
+          {
+            "author": "A Google user",
+            "author_uri": "",
+            "initial": "A",
+            "stars": [
+              "on",
+              "on",
+              "on",
+              "off",
+              "off"
+            ],
+            "stars_label": "3 out of 5 stars",
+            "text": "Bien.",
+            "full_text": "",
+            "when": "1 week ago",
+            "uri": ""
+          },
+          {
+            "author": "Pepe",
+            "author_uri": "",
+            "initial": "P",
+            "stars": [
+              "on",
+              "on",
+              "on",
+              "on",
+              "on"
+            ],
+            "stars_label": "5 out of 5 stars",
+            "text": "",
+            "full_text": "",
+            "when": "",
+            "uri": ""
+          }
+        ]
+      },
+      "summary": "<span class=\"display-5 fw-bold lh-1\">4.7</span><div class=\"d-flex flex-column gap-1\"><div class=\"d-flex gap-1 fs-5\" role=\"img\" aria-label=\"4.7 out of 5 stars\"><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star ws-star-half\" aria-hidden=\"true\"></span></div><span class=\"small text-body-secondary\">128 reviews on Google</span></div>",
+      "list": "<div class=\"row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4\"><div class=\"col\"><figure class=\"card h-100 border-0 rounded-4 shadow-sm mb-0\"><div class=\"card-body p-4 d-flex flex-column gap-3\"><figcaption class=\"d-flex align-items-center gap-3\"><span class=\"ws-glyph rounded-circle fw-semibold\" aria-hidden=\"true\">L</span><span class=\"d-flex flex-column\"><a class=\"fw-semibold text-reset text-decoration-none\" href=\"https://www.google.com/maps/contrib/1\" target=\"_blank\" rel=\"noopener noreferrer\">Lucía &lt;b&gt;M.&lt;/b&gt;</a><a class=\"small text-body-secondary\" href=\"https://www.google.com/maps/reviews/1\" target=\"_blank\" rel=\"noopener noreferrer\">2 months ago</a></span></figcaption><div class=\"d-flex gap-1\" role=\"img\" aria-label=\"5 out of 5 stars\"><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span></div><blockquote class=\"mb-0\"><p class=\"mb-0\" title=\"Me encanta, de verdad, volveré siempre.\">Me encanta…</p></blockquote></div></figure></div><div class=\"col\"><figure class=\"card h-100 border-0 rounded-4 shadow-sm mb-0\"><div class=\"card-body p-4 d-flex flex-column gap-3\"><figcaption class=\"d-flex align-items-center gap-3\"><span class=\"ws-glyph rounded-circle fw-semibold\" aria-hidden=\"true\">A</span><span class=\"d-flex flex-column\"><span class=\"fw-semibold\">A Google user</span><span class=\"small text-body-secondary\">1 week ago</span></span></figcaption><div class=\"d-flex gap-1\" role=\"img\" aria-label=\"3 out of 5 stars\"><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-body-tertiary\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-body-tertiary\" aria-hidden=\"true\"></span></div><blockquote class=\"mb-0\"><p class=\"mb-0\">Bien.</p></blockquote></div></figure></div><div class=\"col\"><figure class=\"card h-100 border-0 rounded-4 shadow-sm mb-0\"><div class=\"card-body p-4 d-flex flex-column gap-3\"><figcaption class=\"d-flex align-items-center gap-3\"><span class=\"ws-glyph rounded-circle fw-semibold\" aria-hidden=\"true\">P</span><span class=\"d-flex flex-column\"><span class=\"fw-semibold\">Pepe</span></span></figcaption><div class=\"d-flex gap-1\" role=\"img\" aria-label=\"5 out of 5 stars\"><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span></div></div></figure></div></div>"
+    },
+    {
+      "name": "rating only",
+      "view": {
+        "available": true,
+        "rating_label": "4.7",
+        "stars": [
+          "on",
+          "on",
+          "on",
+          "on",
+          "half"
+        ],
+        "stars_label": "4.7 out of 5 stars",
+        "count_label": "128 reviews on Google",
+        "maps_uri": "https://maps.google.com/?cid=1",
+        "write_uri": "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "reviews": []
+      },
+      "summary": "<span class=\"display-5 fw-bold lh-1\">4.7</span><div class=\"d-flex flex-column gap-1\"><div class=\"d-flex gap-1 fs-5\" role=\"img\" aria-label=\"4.7 out of 5 stars\"><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star ws-star-half\" aria-hidden=\"true\"></span></div><span class=\"small text-body-secondary\">128 reviews on Google</span></div>",
+      "list": ""
+    },
+    {
+      "name": "reviews without a rating",
+      "view": {
+        "available": true,
+        "rating_label": "",
+        "stars": [],
+        "stars_label": "",
+        "count_label": "3 reviews on Google",
+        "maps_uri": "https://maps.google.com/?cid=1",
+        "write_uri": "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "reviews": [
+          {
+            "author": "A Google user",
+            "author_uri": "",
+            "initial": "A",
+            "stars": [
+              "on",
+              "on",
+              "on",
+              "off",
+              "off"
+            ],
+            "stars_label": "3 out of 5 stars",
+            "text": "Bien.",
+            "full_text": "",
+            "when": "1 week ago",
+            "uri": ""
+          }
+        ]
+      },
+      "summary": "<div class=\"d-flex flex-column gap-1\"><span class=\"small text-body-secondary\">3 reviews on Google</span></div>",
+      "list": "<div class=\"row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4\"><div class=\"col\"><figure class=\"card h-100 border-0 rounded-4 shadow-sm mb-0\"><div class=\"card-body p-4 d-flex flex-column gap-3\"><figcaption class=\"d-flex align-items-center gap-3\"><span class=\"ws-glyph rounded-circle fw-semibold\" aria-hidden=\"true\">A</span><span class=\"d-flex flex-column\"><span class=\"fw-semibold\">A Google user</span><span class=\"small text-body-secondary\">1 week ago</span></span></figcaption><div class=\"d-flex gap-1\" role=\"img\" aria-label=\"3 out of 5 stars\"><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-warning\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-body-tertiary\" aria-hidden=\"true\"></span><span class=\"ws-icon ws-icon-star text-body-tertiary\" aria-hidden=\"true\"></span></div><blockquote class=\"mb-0\"><p class=\"mb-0\">Bien.</p></blockquote></div></figure></div></div>"
+    }
+  ]
+}

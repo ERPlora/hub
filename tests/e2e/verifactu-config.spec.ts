@@ -5,6 +5,8 @@
 //     Spanish text, and takes four minimal PDFs on to ERPlora's account. The local SaaS knows no hub with the id of
 //     `a` (each e2e database gives it its own), so it answers 404 and the Hub says «not linked yet»: the Hub's own
 //     checks passed and the documents reached the SaaS. A 201 needs a hub the SaaS registered;
+//   - VERIFACTU-F05: «Descargar el modelo» downloads the SaaS's model with the issuer of Invoicing (legal name, NIF and
+//     address) already written in its blanks: the query signed by v2, as the SaaS verifies it, or a 401 and no PDF;
 //   - VERIFACTU-F06: an authorisation in review offers «Volver a enviar», which opens the form again with what the new
 //     sending does to the one in review;
 //   - VERIFACTU-F04: «Usar mi propio certificado» in Settings chooses who files: the own certificate once it is
@@ -17,14 +19,15 @@
 // removed, if the run made it), and so is the issuer.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, HUB_DIR, login, psql, shot, shown, topbarApps } from './helpers';
-import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, snapshotSeries } from './invoice-helpers';
+import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
@@ -35,6 +38,8 @@ const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secr
 let hubId = '';
 /** The issuer `ensureIssuer` sets: a company, so it names its legal representative and proves it. */
 const ISSUER_NIF = 'B12345674';
+/** The issuer the run works with (the hub's own when it already had one), read before the first test. */
+let issuer: IssuerOut;
 const PASSWORD = 'e2e-secret';
 const DIR = mkdtempSync(join(tmpdir(), 'e2e-verifactu-'));
 /** Monotonic photo versions: an older one changes nothing. */
@@ -143,6 +148,30 @@ function pdf(name: string): string {
   return path;
 }
 
+/** The texts a PDF writes with `(…) Tj`, its literal strings decoded (escapes and octal codes, Windows-1252 read as
+ *  Latin-1: every Spanish letter is the same byte), from every stream, raw or deflated. */
+function pdfTexts(file: Buffer): string[] {
+  const raw = file.toString('latin1');
+  const contents: string[] = [];
+  for (const stream of raw.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    const bytes = Buffer.from(stream[1], 'latin1');
+    contents.push(stream[1]);
+    try {
+      contents.push(inflateSync(bytes).toString('latin1'));
+    } catch {
+      // Not deflated (the merged page's content is written raw): read as it is above.
+    }
+  }
+  const escapes: Record<string, string> = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f' };
+  return contents.flatMap((content) =>
+    [...content.matchAll(/\(((?:\\[\s\S]|[^\\)])*)\)\s*Tj/g)].map((literal) =>
+      literal[1].replace(/\\([0-7]{1,3}|[\s\S])/g, (_, code: string) =>
+        /^[0-7]+$/.test(code) ? String.fromCharCode(parseInt(code, 8)) : (escapes[code] ?? code),
+      ),
+    ),
+  );
+}
+
 /** The owner on `a`, in Spanish. */
 async function spanishPage(browser: import('@playwright/test').Browser, next: string): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: A, locale: 'es-ES' });
@@ -210,7 +239,7 @@ test.beforeAll(async ({ browser }) => {
   snapshotSeries();
   backUpConfig();
   const { context } = await spanishPage(browser, '/verifactu/config');
-  await ensureIssuer(context);
+  issuer = await ensureIssuer(context);
   await context.close();
 });
 
@@ -308,6 +337,29 @@ test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; fo
   expect(answer.status()).toBe(409);
   expect(((await answer.json()) as { error: { code: string } }).error.code).toBe('verifactu.hub_unregistered');
   await expect(error).toHaveText('ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos.');
+  await context.close();
+});
+
+test('VERIFACTU-F05: «Descargar el modelo» downloads the model with the business of Invoicing already written in', async ({ browser }) => {
+  await pushPhoto('none', false);
+  const { context, page } = await spanishPage(browser, '/verifactu/config');
+  const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
+  await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
+
+  const downloaded = page.waitForEvent('download');
+  await grant.locator('[data-testid=verifactu-grant-download]').click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe('anexo-i-otorgamiento-representacion-erplora.pdf');
+  await expect(grant.locator('[data-testid=verifactu-grant-downloaded]')).toBeVisible();
+  await expect(grant.locator('[data-testid=verifactu-grant-error]')).toHaveCount(0);
+
+  // The real SaaS wrote them: it reads the query only when the v2 signature covers it (401 and no PDF otherwise).
+  const model = readFileSync(await download.path());
+  expect(model.subarray(0, 4).toString('latin1')).toBe('%PDF');
+  const written = pdfTexts(model);
+  for (const value of [issuer.legal_name, issuer.tax_id, issuer.city, issuer.address]) {
+    expect(written, `the model carries «${value}»`).toContain(value);
+  }
   await context.close();
 });
 

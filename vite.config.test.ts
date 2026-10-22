@@ -28,15 +28,16 @@ describe('vite.config', () => {
     expect(pluginNames(config.plugins)).toEqual(expect.arrayContaining(['vite:vue', 'unplugin-icons', 'erplora:defines']));
   });
 
-  it('builds frontend/main.ts into frontend/dist with the manifest Django reads', () => {
+  it('builds frontend/main.ts and frontend/website.ts into frontend/dist with the manifest Django reads', () => {
     const build = config.build ?? {};
     expect(build.outDir).toBe('frontend/dist');
     expect(build.emptyOutDir).toBe(true);
     // settings.LIVE["spa"]["manifest"] = SPA_DIST / ".vite" / "manifest.json"
     expect(build.manifest).toBe('.vite/manifest.json');
     expect(build.target).toBe('es2022');
-    // settings.LIVE["spa"]["entry"] = "frontend/main.ts" is the manifest key of this input.
-    expect(build.rollupOptions?.input).toBe('frontend/main.ts');
+    // The manifest keys are these paths: settings.LIVE["spa"]["entry"] = "frontend/main.ts" (the SPA), and
+    // {% hub_assets "frontend/website.ts" %} (base/templatetags/hub_assets.py) for a hub's public website.
+    expect(build.rollupOptions?.input).toEqual({ main: 'frontend/main.ts', website: 'frontend/website.ts' });
   });
 
   it('runs the dev server on localhost:5173 only, with absolute asset URLs and HMR there', async () => {

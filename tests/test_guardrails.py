@@ -74,6 +74,10 @@ ORM_EXCEPTIONS: dict[str, str] = {
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
+    "apps/website/qr.py": (
+        "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
+        "(round 2026-10-21)."
+    ),
 }
 
 #: Attributes that are a model's manager: ``Model.objects…`` is always the ORM.

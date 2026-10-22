@@ -6,12 +6,15 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
 from django.test import RequestFactory
+from django.utils import translation
 from live.context import OperationContext, Scope, get_builder
+from live.errors import NotFound
 
 from base.models import Membership
 from base.operations import (
     HostScopeResolver,
     HubContextBuilder,
+    hub_id,
     is_demo_hub,
     is_platform_host,
     is_platform_hub,
@@ -271,6 +274,31 @@ def test_a_demo_hub_is_the_registry_s_word():
     assert is_demo_hub(Scope("host", "a")) is False
     assert is_demo_hub(Scope("host", "demo-00000000")) is False  # no row
     assert is_demo_hub(Scope("host", "demo")) is False
+
+
+@pytest.mark.django_db
+def test_a_hub_s_id_is_the_registry_s_word():
+    # The id names what a module keeps for its hub outside the database (``hub-<id>/`` in the hub file store): the
+    # registry's ``Hub.id`` (``base.Hub`` in phase 1, ``control.Hub`` in phase 2). Apps ask here, never there.
+    from base.models import Hub
+
+    acme = Hub.objects.create(slug="acme", status="ready")
+    demo = Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True)
+    assert hub_id(Scope("host", "acme")) == acme.id
+    assert hub_id(Scope("host", "demo-0000beef")) == demo.id
+    assert hub_id(Scope("host", "a")) == Hub.objects.get(slug="a").id
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("scope", [Scope("host", "zzz"), Scope("platform", "acme")], ids=["no row", "no host"])
+def test_a_scope_without_a_hub_has_no_id(scope):
+    # A slug without a row, or a scope that is no hub's host even when its key is some hub's slug.
+    from base.models import Hub
+
+    Hub.objects.create(slug="acme", status="ready")
+    with translation.override("es"), pytest.raises(NotFound) as caught:
+        hub_id(scope)
+    assert (caught.value.status, caught.value.message) == (404, "Ningún hub responde en este host.")
 
 
 def test_erploras_own_hub_is_the_one_of_its_slug(settings):

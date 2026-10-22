@@ -7,6 +7,7 @@ cache would delay the 410 of an expired demo). The writes are the operations of 
 """
 
 import datetime as dt
+import uuid
 from dataclasses import dataclass
 
 from django.utils import timezone
@@ -29,6 +30,11 @@ PREPARING_STATUSES = frozenset({Hub.Status.REQUESTED, Hub.Status.FAILED})
 def hub_by_slug(slug: str) -> Hub | None:
     """The registry's row of ``slug``, or ``None``."""
     return Hub.objects.filter(slug=slug).first()
+
+
+def hub_id(slug: str) -> uuid.UUID | None:
+    """The id of ``slug``'s row, or ``None``."""
+    return Hub.objects.filter(slug=slug).values_list("id", flat=True).first()
 
 
 def is_demo(slug: str) -> bool:

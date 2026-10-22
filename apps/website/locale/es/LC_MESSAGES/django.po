@@ -1,0 +1,346 @@
+# Spanish translation of the website app of hub-next (English is the source).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next website\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-21 23:00+0200\n"
+"PO-Revision-Date: 2026-10-21 23:00+0200\n"
+"Last-Translator: ERPlora\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+msgctxt "app name"
+msgid "Website"
+msgstr "Página web"
+
+msgid ""
+"Your business's own web page, with your catalog, contact details and a QR "
+"code to print."
+msgstr ""
+"La página web de tu negocio, con tu catálogo, tus datos de contacto y un "
+"código QR para imprimir."
+
+msgid ""
+"Website gives your business a simple page of its own at your ERPlora "
+"address. Choose one of four designs, fill in your name, photos, a few "
+"words about you, your products or services, how to reach you and where you "
+"are, pick your colours and publish. You can change the design at any time "
+"without losing anything, hide what you do not need, and print a QR code "
+"that takes your customers there. Your team signs in from the page's «Log "
+"in» button."
+msgstr ""
+"Página web le da a tu negocio una página sencilla en tu dirección de "
+"ERPlora. Elige uno de los cuatro diseños, rellena tu nombre, tus fotos, "
+"unas palabras sobre ti, tus productos o servicios, cómo contactarte y "
+"dónde estás, elige tus colores y publica. Puedes cambiar de diseño cuando "
+"quieras sin perder nada, ocultar lo que no necesites e imprimir un código "
+"QR que lleva a tus clientes hasta ella. Tu equipo entra desde el botón "
+"«Entrar» de la página."
+
+msgid "Classic"
+msgstr "Clásica"
+
+msgid "Modern"
+msgstr "Moderna"
+
+msgid "Minimal"
+msgstr "Minimalista"
+
+msgid "Bold"
+msgstr "Llamativa"
+
+msgid "hub"
+msgstr "hub"
+
+msgid "template"
+msgstr "plantilla"
+
+msgid "theme"
+msgstr "tema"
+
+msgid "content"
+msgstr "contenido"
+
+msgid "published content"
+msgstr "contenido publicado"
+
+msgid "published version"
+msgstr "versión publicada"
+
+msgid "published at"
+msgstr "publicada el"
+
+msgid "live"
+msgstr "en línea"
+
+msgid "updated at"
+msgstr "actualizada el"
+
+msgid "updated by"
+msgstr "actualizada por"
+
+msgid "website"
+msgstr "página web"
+
+msgid "websites"
+msgstr "páginas web"
+
+msgid "Website"
+msgstr "Página web"
+
+msgid "key"
+msgstr "clave"
+
+msgid "SHA-256"
+msgstr "SHA-256"
+
+msgid "content type"
+msgstr "tipo de contenido"
+
+msgid "width"
+msgstr "ancho"
+
+msgid "height"
+msgstr "alto"
+
+msgid "size"
+msgstr "tamaño"
+
+msgid "created at"
+msgstr "creada el"
+
+msgid "image"
+msgstr "imagen"
+
+msgid "images"
+msgstr "imágenes"
+
+msgid "This website is not published."
+msgstr "Esta página web no está publicada."
+
+msgid "The website is not on in this business."
+msgstr "La página web no está activada en este negocio."
+
+msgctxt "website"
+msgid "Monday"
+msgstr "Lunes"
+
+msgctxt "website"
+msgid "Tuesday"
+msgstr "Martes"
+
+msgctxt "website"
+msgid "Wednesday"
+msgstr "Miércoles"
+
+msgctxt "website"
+msgid "Thursday"
+msgstr "Jueves"
+
+msgctxt "website"
+msgid "Friday"
+msgstr "Viernes"
+
+msgctxt "website"
+msgid "Saturday"
+msgstr "Sábado"
+
+msgctxt "website"
+msgid "Sunday"
+msgstr "Domingo"
+
+msgctxt "website price"
+msgid "Free"
+msgstr "Gratis"
+
+msgid "From %(price)s"
+msgstr "Desde %(price)s"
+
+msgid "%(price)s / hour"
+msgstr "%(price)s / hora"
+
+msgctxt "website"
+msgid "About us"
+msgstr "Sobre nosotros"
+
+msgctxt "website"
+msgid "Our services"
+msgstr "Nuestros servicios"
+
+msgctxt "website"
+msgid "Our products"
+msgstr "Nuestros productos"
+
+msgctxt "website"
+msgid "Contact"
+msgstr "Contacto"
+
+msgctxt "opening hours"
+msgid "Closed"
+msgstr "Cerrado"
+
+msgctxt "website"
+msgid "Find us"
+msgstr "Dónde estamos"
+
+msgid "Enter a link that starts with https://."
+msgstr "Escribe un enlace que empiece por https://."
+
+msgid "Enter a phone number: digits, spaces and an optional + in front."
+msgstr "Escribe un teléfono: números, espacios y, si quieres, un + delante."
+
+msgid "Enter a valid email address."
+msgstr "Escribe un correo electrónico válido."
+
+msgid "The opening and the closing time cannot be the same."
+msgstr "La hora de apertura y la de cierre no pueden ser la misma."
+
+msgid "Each day can only appear once."
+msgstr "Cada día solo puede aparecer una vez."
+
+msgid "Choose the two colours of your own palette."
+msgstr "Elige los dos colores de tu propia paleta."
+
+msgid ""
+"This image was not uploaded to this business's website: upload it again."
+msgstr ""
+"Esta imagen no se subió a la página web de este negocio: vuelve a subirla."
+
+msgid "The file did not arrive whole: choose it again."
+msgstr "El archivo no llegó entero: vuelve a elegirlo."
+
+msgid "The file is empty."
+msgstr "El archivo está vacío."
+
+msgid "The image may weigh 5 MB at most."
+msgstr "La imagen puede pesar 5 MB como mucho."
+
+msgid "This file is not a %(type)s image."
+msgstr "Este archivo no es una imagen %(type)s."
+
+msgid "The image may be %(side)s pixels a side at most."
+msgstr "La imagen puede medir %(side)s píxeles por lado como mucho."
+
+msgctxt "website"
+msgid "Nothing to show here yet."
+msgstr "Todavía no hay nada que mostrar aquí."
+
+msgctxt "website"
+msgid "Phone"
+msgstr "Teléfono"
+
+msgctxt "website"
+msgid "Email"
+msgstr "Correo"
+
+msgctxt "website"
+msgid "Opening hours"
+msgstr "Horario"
+
+msgctxt "website"
+msgid "Log in"
+msgstr "Entrar"
+
+msgctxt "website"
+msgid "Open the map"
+msgstr "Abrir el mapa"
+
+msgctxt "website"
+msgid "Menu"
+msgstr "Menú"
+
+msgctxt "website"
+msgid "Who we are"
+msgstr "Quiénes somos"
+
+msgctxt "website"
+msgid "What we offer"
+msgstr "Lo que ofrecemos"
+
+msgctxt "website"
+msgid "Get in touch"
+msgstr "Hablemos"
+
+msgctxt "website"
+msgid "Visit us"
+msgstr "Visítanos"
+
+msgctxt "website"
+msgid "Chat on WhatsApp"
+msgstr "Escríbenos por WhatsApp"
+
+msgctxt "website"
+msgid "Contact us"
+msgstr "Contáctanos"
+
+msgctxt "website cta"
+msgid "Find us"
+msgstr "Cómo llegar"
+
+msgctxt "website"
+msgid "Today"
+msgstr "Hoy"
+
+msgctxt "website"
+msgid "Gallery"
+msgstr "Galería"
+
+msgctxt "website"
+msgid "Take a look"
+msgstr "Echa un vistazo"
+
+msgctxt "website"
+msgid "Google reviews"
+msgstr "Reseñas de Google"
+
+msgctxt "website"
+msgid "What our customers say"
+msgstr "Lo que dicen nuestros clientes"
+
+msgctxt "website"
+msgid "A Google user"
+msgstr "Un usuario de Google"
+
+msgid "%(rating)s out of 5 stars"
+msgstr "%(rating)s de 5 estrellas"
+
+msgid "%(count)s review on Google"
+msgid_plural "%(count)s reviews on Google"
+msgstr[0] "%(count)s reseña en Google"
+msgstr[1] "%(count)s reseñas en Google"
+msgstr[2] "%(count)s reseñas en Google"
+
+msgid "%(time)s ago"
+msgstr "hace %(time)s"
+
+msgctxt "website"
+msgid "Your Google rating and reviews will show here once Google answers for this place."
+msgstr "Tu valoración y tus reseñas de Google aparecerán aquí en cuanto Google responda por este sitio."
+
+msgctxt "website"
+msgid "See on Google"
+msgstr "Ver en Google"
+
+msgctxt "website"
+msgid "Write a review"
+msgstr "Escribir una reseña"
+
+msgctxt "website"
+msgid "Rating and reviews from"
+msgstr "Valoración y reseñas de"
+
+msgctxt "website"
+msgid "The most relevant first, as Google orders them."
+msgstr "Las más relevantes primero, como las ordena Google."
+
+msgid "Paste the link of your business on Google Maps, or its Place ID."
+msgstr "Pega el enlace de tu negocio en Google Maps, o su Place ID."
+
+msgid "Google reviews"
+msgstr "Reseñas de Google"
