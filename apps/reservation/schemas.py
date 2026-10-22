@@ -325,6 +325,12 @@ class ReservationOut(Schema):
     end_time: dt.time = Field(
         description="When the table is free again, on the business's clock."
     )
+    date_label: str = Field(
+        description="Its day ready to say, in the caller's language (e.g. martes, 5 de marzo de 2030)."
+    )
+    time_label: str = Field(
+        description="Its hour ready to say, 24-hour on the business's clock (e.g. 21:30)."
+    )
     duration_minutes: int = Field(description="How long the table is kept, in minutes.")
     party_size: int = Field(description="How many guests come.")
     table_id: UUID | None = Field(description="The table, if it has one.")
