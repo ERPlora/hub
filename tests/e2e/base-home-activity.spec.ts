@@ -57,6 +57,17 @@ async function rowOf(page: Page, id: string): Promise<Locator> {
   return row;
 }
 
+test('BASE-F09 — the address `/#actividad` opens «Activity» on a full load too (a link, a bookmark, a reload)', async ({ page }) => {
+  await login(page, A, '/');
+  await page.goto('about:blank');
+  await page.goto(`${A}/#actividad`);
+  await expect(shown(page).locator('[data-testid="tab-activity"]')).toHaveClass(/segment-button-checked/);
+  await expect(shown(page).locator('[data-testid=home-activity-search]')).toBeVisible();
+  await page.reload();
+  await expect(shown(page).locator('[data-testid="tab-activity"]')).toHaveClass(/segment-button-checked/);
+  await expect(page).toHaveURL(`${A}/#actividad`);
+});
+
 test('BASE-F09 — a sale shows up live in «Activity», its date and time whole at 390, 834 and 1440', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/');
