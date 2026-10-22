@@ -10,31 +10,53 @@
 // The run's real erplora.com (`SAAS_URL`) also takes part: `seedErplora` gives the hub `a` its WhatsApp number there
 // with erplora.com's own test seed (`tests/e2e/panel/whatsapp_hub_seed.py` of its checkout: `a` and `b` with this
 // Hub's ids, a number with a made-up Meta permission, the photo pushed to this Hub), so the Hub's doors to it (5, 6,
-// 8, 9) reach Meta, which refuses that permission; and `meta` posts to erplora.com's webhook what Meta would, signed
-// with the run's Meta app secret, so that erplora.com hands it to this Hub through its doors 1 and 2. Only Meta is
-// played. It needs, beside this stack, erplora.com run from its checkout on `SAAS_URL` with
-// `HUB_INTERNAL_URL=http://127.0.0.1:<hub port>`, `WHATSAPP_MEDIA_BASE_URL=<SAAS_URL>` (where it links a customer's
-// attachments, and its return page `WHATSAPP_REDIRECT_URI` with them: this Hub takes only its SAAS_URL's origin, and
-// unset it is `http://localhost:8001`; `metaHandsOver` says so when this Hub refuses an attachment) and the e2e Meta
-// app (`WHATSAPP_APP_ID=1234567890`, `WHATSAPP_APP_SECRET=e2e-meta-app-secret`,
-// `WHATSAPP_VERIFY_TOKEN=e2e-meta-verify-token`, `WHATSAPP_CONFIG_ID=987654321`: `WHATSAPP_E2E` of its
-// tests/e2e/panel/project.ts), on its own database created fresh by its tests/e2e/database.ts (the seed refuses one
-// whose `a` has another id). `E2E_SAAS_DIR` (that checkout; by default `../saas` beside this one), `E2E_SAAS_DB` (by
-// default `saas_e2e_<SAAS_URL's port>`) and `E2E_WHATSAPP_APP_SECRET` say where it is.
-// whatsapp-inbox-connect-return.spec.ts also needs erplora.com started with `HTTPS_PROXY` and `SSL_CERT_FILE` (its
-// header) toward a Graph that lives only while that spec runs: the specs whose doors reach Meta itself (a reply, a
-// template) get «Meta did not answer» from such an erplora.com, so they run against one started without them.
+// 8, 9, 12) reach Meta, which refuses that permission; and `meta` posts to erplora.com's webhook what Meta would,
+// signed with the e2e Meta app's secret, so that erplora.com hands it to this Hub through its doors 1 and 2. Only Meta
+// is played, and never the real one: erplora.com reaches Meta only through the run's Graph (whatsapp-graph.ts), which
+// the first spec awaiting `metaGraph()` starts and which lives until the run ends. Every spec that seeds erplora.com
+// awaits it right after the seed: it stops the run in seconds, naming what is missing, unless erplora.com goes through
+// it. erplora.com runs from its checkout on SAAS_URL, started once for the whole run, on its own database created
+// fresh by its tests/e2e/database.ts (the seed refuses one whose `a` has another id), with (`erploraEnv`):
+//   HUB_INTERNAL_URL=http://127.0.0.1:<hub port>      this Hub's doors (<hub port>: E2E_HUB_PORT);
+//   WHATSAPP_MEDIA_BASE_URL=<SAAS_URL's origin>       where it links a customer's attachments: this Hub takes only that
+//                                                     origin (unset: http://localhost:8001; `metaHandsOver` says so
+//                                                     when this Hub refuses one);
+//   WHATSAPP_REDIRECT_URI=<SAAS_URL's origin>/whatsapp/return   its page Meta's window brings the code back to;
+//   WHATSAPP_APP_ID=1234567890 WHATSAPP_APP_SECRET=e2e-meta-app-secret WHATSAPP_VERIFY_TOKEN=e2e-meta-verify-token
+//   WHATSAPP_CONFIG_ID=987654321                      the e2e Meta app (`WHATSAPP_E2E` of its panel/project.ts);
+//   HTTPS_PROXY=http://127.0.0.1:<hub port + 9>       the run's Graph: the only Meta it reaches;
+//   SSL_CERT_FILE=<this checkout>/tests/e2e/.artifacts/meta-graph-<hub port>/ca.pem   the authority it trusts the
+//                                                     Graph with (made again whenever the Graph starts; read per call);
+// besides its own DB_NAME, VITE_DEV_PORT, HUB_CALLBACK_TEMPLATE, HUB_ADMIN_CALLBACK_URL and EMAIL_FILE_PATH
+// (tests/e2e/README.md, «Varias ejecuciones a la vez»). `E2E_SAAS_DIR` (that checkout; by default `../saas` beside
+// this one) and `E2E_SAAS_DB` (by default `saas_e2e_<SAAS_URL's port>`) say where it is.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import type { APIRequestContext, Page } from '@playwright/test';
 
-import { HUB_DIR, psql, REPO_DIR, SAAS, shot } from './helpers';
+import { ARTIFACTS, HUB_DIR, psql, REPO_DIR, SAAS, shot } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
+import {
+  BUSINESS_ID,
+  configProblem,
+  type DoorAnswer,
+  type ErploraRun,
+  GRAPH_PORT_OFFSET,
+  graphProblem,
+  type GraphThread,
+  META_APP,
+  NUMBER_ID,
+  PROBE_CODE,
+  startGraphThread,
+  WABA_ID,
+} from './whatsapp-graph';
 import { messageIds, type Push, pushProblem } from './whatsapp-pushes';
+
+export { NUMBER_ID, WABA_ID };
 
 /** Every WhatsApp id, template and card name of a run starts like this. */
 export const PREFIX = 'e2e.';
@@ -106,15 +128,12 @@ export function pushStatus(key: string, status: 'sent' | 'delivered' | 'read', w
   });
 }
 
-/** erplora.com's seed of the number of `a` (whatsapp_hub_seed.py): Meta's id of the number and of its account, and
- *  the business's number as Meta writes it. */
-export const NUMBER_ID = '880000000000101';
-export const WABA_ID = '880000000000100';
+/** The business's number of `a` as Meta writes it (erplora.com's seed, whatsapp_hub_seed.py; its Meta ids: NUMBER_ID
+ *  and WABA_ID of whatsapp-graph.ts). */
 export const BUSINESS_PHONE = '34910000101';
 
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
 const SAAS_DB = process.env.E2E_SAAS_DB || `saas_e2e_${new URL(SAAS).port || '80'}`;
-const META_SECRET = process.env.E2E_WHATSAPP_APP_SECRET || 'e2e-meta-app-secret';
 
 /** Gives `a` its WhatsApp number in the run's erplora.com, with erplora.com's own test seed, and has it push the
  *  photo to this Hub: what the seed printed (`delivered` true when this Hub took it). Running it again keeps what
@@ -137,6 +156,78 @@ export function seedErplora(): { delivered: boolean; hub_error: string } {
   return JSON.parse(out.trim().split('\n').at(-1) ?? '{}');
 }
 
+const GRAPH_RUN: ErploraRun = {
+  saas: SAAS,
+  hubPort: STACK.hubPort,
+  graphPort: STACK.hubPort + GRAPH_PORT_OFFSET,
+  ca: join(ARTIFACTS, `meta-graph-${STACK.hubPort}`, 'ca.pem'),
+};
+let graph: Promise<GraphThread> | undefined;
+let proven: Promise<void> | undefined;
+
+/** The run's Meta Graph (whatsapp-graph.ts, in its own thread), once erplora.com is proven to reach Meta only through
+ *  it. The first spec of this worker that awaits it starts it, and it stays until the worker ends; the proof runs once
+ *  per worker. It asks erplora.com about the hub `a`, so it goes right after `seedErplora()`, and it throws naming the
+ *  variable erplora.com was started without (whatsapp-helpers.ts's header) before any spec reaches Meta. */
+export async function metaGraph(): Promise<GraphThread> {
+  graph ??= startGraphThread({ port: GRAPH_RUN.graphPort, certs: dirname(GRAPH_RUN.ca), hubDir: HUB_DIR }).catch((error: unknown) => {
+    graph = undefined;
+    throw error;
+  });
+  const started = await graph;
+  proven ??= proveErplora(started).catch((error: unknown) => {
+    proven = undefined;
+    throw error;
+  });
+  await proven;
+  return started;
+}
+
+/** Door 10 opens Meta's window with the e2e Meta app and erplora.com's page on SAAS_URL, and door 11 exchanges the
+ *  probe's code — which only the run's Graph receives, and refuses — through that Graph: nothing is connected. */
+async function proveErplora(started: GraphThread): Promise<void> {
+  const config = configProblem(await door('config', { hub: 'a' }), GRAPH_RUN);
+  if (config) throw new Error(config);
+  const before = await started.seen();
+  const window = { code: PROBE_CODE, event: 'FINISH', waba_id: WABA_ID, phone_number_id: NUMBER_ID, business_id: BUSINESS_ID };
+  const answer = await door('connect', { hub: 'a', ...window });
+  const after = await started.seen();
+  const seen = { calls: after.calls.slice(before.calls.length), tunnels: after.tunnels.slice(before.tunnels.length) };
+  const problem = graphProblem(answer, seen, GRAPH_RUN);
+  if (problem) throw new Error(problem);
+}
+
+/** The secret this stack signs `/internal` with (the local default unless the run exports another). */
+const INTERNAL_SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
+
+const parsed = (text: string): unknown => {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+};
+
+/** Calls erplora.com's WhatsApp door `name` as this Hub does (apps/whatsapp_inbox/gateway.py: JSON signed with
+ *  HMAC-SHA256 of `<timestamp>.<body>`): its status and body, or status 0 and why nothing answered. */
+async function door(name: 'config' | 'connect', payload: Record<string, string>): Promise<DoorAnswer> {
+  const body = JSON.stringify(payload);
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
+  try {
+    const response = await fetch(`${SAAS}/internal/whatsapp/${name}`, {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
+      signal: AbortSignal.timeout(30_000),
+    });
+    return { status: response.status, body: parsed(await response.text()) };
+  } catch (error) {
+    const cause = (error as { cause?: { message?: string } }).cause?.message;
+    return { status: 0, body: cause ? `${(error as Error).message}: ${cause}` : (error as Error).message };
+  }
+}
+
 /** One change of Meta's webhook for `a`'s number (`messages` or `smb_message_echoes`), as Meta posts it. */
 export function notice(field: 'messages' | 'smb_message_echoes', value: Record<string, unknown>): string {
   return JSON.stringify({
@@ -157,7 +248,7 @@ export function notice(field: 'messages' | 'smb_message_echoes', value: Record<s
 
 /** Posts `body` to erplora.com's webhook signed as Meta signs it (`X-Hub-Signature-256`): its HTTP status. */
 export async function meta(request: APIRequestContext, body: string): Promise<number> {
-  const signature = `sha256=${createHmac('sha256', META_SECRET).update(body).digest('hex')}`;
+  const signature = `sha256=${createHmac('sha256', META_APP.secret).update(body).digest('hex')}`;
   const answer = await request.post(`${SAAS}/webhooks/whatsapp/`, {
     data: body,
     headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },

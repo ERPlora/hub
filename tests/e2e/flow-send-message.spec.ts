@@ -19,7 +19,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { choose, confirmDialog, signedIn } from './flow-helpers';
 import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, post, settled } from './service-helpers';
-import { cleanUp as cleanUpInbox, e2ePhone, pushChannel, receive, seedErplora, template } from './whatsapp-helpers';
+import { cleanUp as cleanUpInbox, e2ePhone, metaGraph, pushChannel, receive, seedErplora, template } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -60,10 +60,12 @@ function cleanUp(): void {
   );
 }
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   cleanUp();
   // erplora.com takes `a`'s number (connected); this Hub knows it, with this run's approved template.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
   pushChannel({ status: 'connected', templates: [CONFIRMED] });
 });
 test.afterAll(cleanUp);

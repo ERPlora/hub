@@ -17,13 +17,15 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, e2ePhone, metaHandsOver, metaNow, notice, PREFIX, receive, seedErplora } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, receive, seedErplora } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   // erplora.com's accounts and `a`'s number (a made-up Meta permission), and this Hub takes its photo.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
   cleanUp();
 });
 

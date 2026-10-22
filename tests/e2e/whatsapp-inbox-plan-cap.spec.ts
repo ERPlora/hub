@@ -15,7 +15,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, login, REPO_DIR, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
-import { cleanUp, e2ePhone, meta, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, meta, metaGraph, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -58,8 +58,10 @@ function setPlan(limit: number): { before: number; delivered: boolean } {
 
 let before: number | undefined;
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
   cleanUp();
   const set = setPlan(0);
   expect(set.delivered).toBe(true);

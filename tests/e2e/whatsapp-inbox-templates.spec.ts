@@ -13,11 +13,13 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, psql, shown } from './helpers';
 import { rowAction } from './service-helpers';
-import { cleanUp, flowShots, pushChannel, seedErplora, template } from './whatsapp-helpers';
+import { cleanUp, flowShots, metaGraph, pushChannel, seedErplora, template } from './whatsapp-helpers';
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   // erplora.com takes `a`'s number (its test seed): what the Hub hands it reaches Meta.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
 });
 
 test.afterAll(() => {
