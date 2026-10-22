@@ -76,7 +76,14 @@ const days = computed(() => {
 const money = (cents: number): string => formatMoney(cents, locale.value);
 
 const columns = computed<DataTableColumn<CommissionReportRow>[]>(() => [
-  { key: 'full_name', label: t('staff.commissions.columns.name'), sortable: true, priority: 'high', cell: 'name' },
+  {
+    key: 'full_name',
+    label: t('staff.commissions.columns.name'),
+    sortable: true,
+    priority: 'high',
+    width: 'minmax(10rem, 2fr)',
+    cell: 'name',
+  },
   { key: 'role_name', label: t('staff.commissions.columns.role'), sortable: true, format: (_, row) => row.role_name || '—' },
   { key: 'sold', label: t('staff.commissions.columns.sold'), sortable: true, align: 'right', format: (_, row) => money(row.sold) },
   {
@@ -94,6 +101,16 @@ const columns = computed<DataTableColumn<CommissionReportRow>[]>(() => [
     format: (_, row) => money(row.commission),
   },
 ]);
+
+/** The mark of someone no longer earning a commission who sold in the period; none for the rest. */
+function mark(row: CommissionReportRow): string {
+  if (row.status === 'terminated') return t('staff.commissions.left');
+  if (row.status === 'inactive') return t('staff.commissions.inactive');
+  return '';
+}
+
+/** A card's title (on a phone): the name, with the mark the table paints as a pill beside it. */
+const cardTitle = (row: CommissionReportRow): string => (mark(row) ? `${row.full_name} · ${mark(row)}` : row.full_name);
 
 const totals = computed(() => {
   const shown = data.value;
@@ -223,7 +240,7 @@ const blocked = computed(() => blockingError(error.value));
           :page-size="100"
           :page-size-chooser="false"
           :views="['table', 'cards']"
-          :card-title="(row: CommissionReportRow) => row.full_name"
+          :card-title="cardTitle"
           card-title-column="full_name"
           :card-icon="() => 'wallet-outline'"
           :entity-label="{ one: $t('staff.commissions.entity.one'), many: $t('staff.commissions.entity.many') }"
@@ -234,21 +251,17 @@ const blocked = computed(() => blockingError(error.value));
           @retry="refresh()"
         >
           <template #name="{ row }">
-            <span class="staff-commissions__name">
-              <span>{{ row.full_name }}</span>
+            <span
+              class="staff-commissions__name"
+              :title="row.full_name"
+            >
+              <span class="staff-commissions__full-name">{{ row.full_name }}</span>
               <StatusPill
-                v-if="row.status === 'terminated'"
+                v-if="mark(row)"
                 size="sm"
                 tone="neutral"
-                data-testid="staff-commissions-left"
-                :label="$t('staff.commissions.left')"
-              />
-              <StatusPill
-                v-else-if="row.status === 'inactive'"
-                size="sm"
-                tone="neutral"
-                data-testid="staff-commissions-inactive"
-                :label="$t('staff.commissions.inactive')"
+                :data-testid="row.status === 'terminated' ? 'staff-commissions-left' : 'staff-commissions-inactive'"
+                :label="mark(row)"
               />
             </span>
           </template>
@@ -332,9 +345,21 @@ const blocked = computed(() => blockingError(error.value));
 .staff-commissions__name {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 0.45rem;
   min-width: 0;
+  max-width: 100%;
+}
+
+/* A name too long for its column ends in «…» (the whole of it in the title); the pill keeps its size. */
+.staff-commissions__full-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-commissions__name > :not(.staff-commissions__full-name) {
+  flex: none;
 }
 
 @media (max-width: 575px) {

@@ -1,5 +1,5 @@
 // Staff's navigation in Chrome, as Ioan sees it (Spanish): the «Personal» tile of the «My apps» sheet, the footer tabbar with its four
-// sections (Personal, Roles, Ausencias, Horarios) plus «Ajustes» for
+// sections (Personal, Roles, Ausencias, Horarios) plus «Comisiones» and «Ajustes» for
 // the owner, each tab replacing the address; Ajustes saves only what changed. Every page is captured in
 // the three viewports (desktop 1280×860, tablet 834×1112, phone 390×844) for the comparison with the
 // old module's screens; the page never scrolls sideways.
@@ -18,6 +18,7 @@ const PAGES = [
   ['roles', '/staff/roles', 'Roles'],
   ['time-off', '/staff/time-off', 'Ausencias'],
   ['schedules', '/staff/schedules', 'Horarios'],
+  ['commissions', '/staff/commissions', 'Comisiones'],
   ['settings', '/staff/settings', 'Ajustes'],
 ] as const;
 

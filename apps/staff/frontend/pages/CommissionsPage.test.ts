@@ -90,6 +90,14 @@ describe('CommissionsPage', () => {
     expect(s.find('staff-commissions-left').exists()).toBe(false);
   });
 
+  it('on a phone, where each one is a card, the card title carries the mark too', async () => {
+    const s = await setup();
+    await s.show(REPORT);
+    const title = s.prop<(row: unknown) => string>('cardTitle');
+    expect(REPORT.rows.map((row) => title(row))).toEqual(['Ana López', 'Bea Ruiz', 'Dora Gil · No longer works here']);
+    expect(title({ ...REPORT.rows[0], status: 'inactive' })).toBe('Ana López · Inactive');
+  });
+
   it('above the list, what the period sold and its commissions, and the days it counts', async () => {
     const s = await setup();
     expect(s.find('staff-commissions-total-sold').text()).toContain('…');

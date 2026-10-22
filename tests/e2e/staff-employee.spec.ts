@@ -45,7 +45,8 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await ownerView.locator('[data-testid=staff-members-row]').first().waitFor({ state: 'visible' });
     await expect(ownerView.locator('[data-testid=staff-members-add]')).toBeVisible();
     await expect(ownerView.locator(`[data-testid^=staff-members-row-${member.data.id}-]`).first()).toBeAttached();
-    await expect(ownerView.locator('ion-footer ion-segment-button')).toHaveCount(5);
+    // Staff, Roles, Time Off, Schedules, Commissions and Settings (STAFF-F21: Commissions only with the pay).
+    await expect(ownerView.locator('ion-footer ion-segment-button')).toHaveCount(6);
 
     // The employee: the list, nothing to write.
     const view = shown(employee.page);
