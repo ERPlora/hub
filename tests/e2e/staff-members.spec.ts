@@ -110,10 +110,11 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
 
     // STAFF-F03: linked to the employee's account, picked by searching the server.
     await fillNew(page, linked.first, linked.last);
-    await page.locator('[data-testid=staff-member-form-user_id]').click();
-    await page.locator('[data-testid=staff-member-form-user_id-search] input').fill('employee');
-    await page.locator('[data-testid=staff-member-form-user_id-option]', { hasText: 'employee@example.com' }).click();
-    await expect(page.locator('[data-testid=staff-member-form-user_id] input')).toHaveValue('employee@example.com');
+    const user = page.locator('[data-testid=staff-member-form-user_id] input');
+    await user.click();
+    await user.fill('employee');
+    await page.locator('[data-testid^=staff-member-form-user_id-option-]', { hasText: 'employee@example.com' }).first().click();
+    await expect(user).toHaveValue('employee@example.com');
     await expect(page.locator('[data-testid=staff-member-form-hub-user-hint]')).toHaveCount(0);
     await page.locator('[data-testid=staff-member-form-hourly_rate] input').fill('12,50');
     await page.screenshot({ path: shot('staff-members-new-linked') });

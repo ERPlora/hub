@@ -1,5 +1,14 @@
 # Peticiones de `apps/staff` a `@erplora/ui`
 
+**Estado al cerrar la app (CLOSE-STAFF, 2026-10-22):** contra `ERPlora/ui` `origin/main` de635ff (el puntero
+del Hub está en 07b4392):
+
+- **`SearchSelect`** ha llegado como `Combo` (ya está en 07b4392, el puntero del Hub) y Personal lo usa en sus
+  cuatro selectores; su copia propia se ha borrado (CLOSE-STAFF, segunda vuelta).
+- **Fecha y hora** y la **tarjeta de cifra** siguen abiertas: ninguna ha llegado a `ui`. Sus sustitutos
+  funcionan y ningún flujo está roto; van propuestas para `## 6` de `MIGRATION.md` como
+  `staff:ui-time-date-fields` (la misma petición que `schedule:ui-time-date-fields`) y `staff:ui-kpi-card`.
+
 ## Iconos
 
 Ninguna pendiente: `ion:shield-outline` (pestaña «Roles», el icono del módulo viejo) ya está registrado
@@ -8,20 +17,15 @@ en `packages/ui` (8c30c2a) y lo usan el menú (`apps/staff/apps.py`) y la barra 
 
 ## Componentes
 
-### `SearchSelect` — selector con búsqueda en el servidor
+### `SearchSelect` — selector con búsqueda en el servidor (cerrada: llegó como `Combo`)
 
 - **Para qué:** elegir en una lista que puede pasar de las 100 filas que da el servidor de una vez
   (miembros del equipo, roles, cuentas del negocio). Un `ion-select` con `limit: 100` se queda corto.
-- **API propuesta** (la de `apps/staff/frontend/components/SearchSelect.vue`, que hace de puente):
-  props `label`, `value` (`''` = ninguno), `display` (la etiqueta del valor elegido), `noneLabel?`
-  (opción vacía primera: «Sin rol», «Sin acceso al Hub», «Cualquiera»), `load(search) =>
-  Promise<{ value, label }[]>`, `errorText?`, `disabled?`, `testid`; emite `update:value(value,
-  label)`. Campo con caja como el `ion-select` (`fill="outline"`, `mode="md"`) que abre un
-  `FormModal` con `ion-searchbar` (debounce 300 ms), la lista, «Cargando…», «Sin resultados» y el
-  error; una respuesta tardía de una búsqueda vieja no pisa la nueva.
-- **Uso en staff:** «Rol» y «Usuario del Hub» de la ficha; «Miembro» de la ausencia y de Horarios.
-  Los filtros «Rol», «Usuario del Hub» y «Miembro» ya son el `lookup` del embudo de `DataTable`. Tax
-  tiene otro igual: con el compartido se borran los dos.
+- **Uso en staff:** «Rol» y «Usuario del Hub» de la ficha y «Miembro» de la ausencia y de Horarios son
+  `Combo` con `search` (`frontend/lib/pickers.ts`). «Sin rol» y «Sin acceso al Hub» siguen siendo la
+  primera opción mientras no se teclea (`asCombo`), como en el `ion-select` viejo, y sin botón de vaciar;
+  «Miembro» es obligatorio y tampoco lo lleva. Los filtros «Rol», «Usuario del Hub» y «Miembro» son el
+  `lookup` del embudo de `DataTable`, con las mismas búsquedas.
 
 ### Fecha y hora en el orden del idioma del negocio
 

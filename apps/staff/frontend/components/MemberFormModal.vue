@@ -1,23 +1,22 @@
 <script setup lang="ts">
 // STAFF-F01, F02, F03, F21 — the record of a staff member, the old side panel as a dialog: «New» (no
 // `member`) or «Edit · {name}». Fields in the old order; Status only when editing; the pay (Hourly
-// rate, Commission, HR notes) only for whoever may see it. Role and Hub user are pickers that search
+// rate, Commission, HR notes) only for whoever may see it. Role and Hub user are Combo fields that search
 // the server (a business may have more than the 100 rows it gives at once): the active roles and the
-// accounts with access to this business (`staff.account.list`, not a live query). Editing reads the
+// accounts with access to this business (`staff.account.list`, not a live query), with «No role» and
+// «No Hub access» first, as in the old select: the way to empty them. Editing reads the
 // whole record and its pay when it opens (the row has not everything) and sends only what changed.
 // The server judges: its 422 goes under each field, a 409 on top; the dialog keeps what was typed.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import SearchSelect from './SearchSelect.vue';
-
 import { useLocale, useT } from '../composables/useT';
 import { MEMBER_STATUSES } from '../lib/enums';
 import { blankMemberForm, createPayload, formFromRecord, type MemberForm, patchPayload } from '../lib/memberForm';
-import { accountSearch, roleSearch } from '../lib/pickers';
+import { accountSearch, asCombo, roleSearch } from '../lib/pickers';
 import type { MemberOut } from '../operations';
 
 const props = defineProps<{
@@ -38,7 +37,7 @@ const editing = computed(() => props.member !== null);
 const form = ref<MemberForm>(blankMemberForm());
 /** The form as it was loaded: «Edit» sends only what differs from it. */
 const original = shallowRef<MemberForm>(blankMemberForm());
-/** What the pickers show for the chosen role and Hub user. */
+/** The names of the chosen role and Hub user (the record gives ids). */
 const roleLabel = ref('');
 const userLabel = ref('');
 const loading = ref(false);
@@ -57,8 +56,15 @@ const complete = computed(() => form.value.first_name.trim() !== '' && form.valu
 /** Each opening retires the reads of the previous one: a late answer never lands on another record. */
 let opening = 0;
 
-const findRoles = roleSearch(client, { activeOnly: true, by: 'id' });
-const findAccounts = accountSearch(client);
+const findRoles = asCombo(roleSearch(client, { activeOnly: true, by: 'id' }), () => t('staff.members.form.roleNone'));
+const findAccounts = asCombo(accountSearch(client), () => t('staff.members.form.hubUserNone'));
+/** What the Role and Hub user fields show: the choice, or its «none». */
+const roleChoice = computed<ComboOption>(() =>
+  form.value.role_id ? { id: form.value.role_id, label: roleLabel.value } : { id: '', label: t('staff.members.form.roleNone') },
+);
+const userChoice = computed<ComboOption>(() =>
+  form.value.user_id ? { id: form.value.user_id, label: userLabel.value } : { id: '', label: t('staff.members.form.hubUserNone') },
+);
 
 /** The name of the account the record hangs from; «No access to this business» when it is not among
  *  the active accounts of this business any more (deactivated, or its access withdrawn). */
@@ -138,14 +144,14 @@ function set<K extends keyof MemberForm>(field: K, value: MemberForm[K]): void {
   form.value = { ...form.value, [field]: value };
 }
 
-function pickRole(value: string, label: string): void {
-  set('role_id', value);
-  roleLabel.value = value ? label : '';
+function pickRole(option: ComboOption | null): void {
+  set('role_id', option?.id ?? '');
+  roleLabel.value = option?.id ? option.label : '';
 }
 
-function pickUser(value: string, label: string): void {
-  set('user_id', value);
-  userLabel.value = value ? label : '';
+function pickUser(option: ComboOption | null): void {
+  set('user_id', option?.id ?? '');
+  userLabel.value = option?.id ? option.label : '';
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
@@ -261,27 +267,27 @@ async function save(): Promise<void> {
           :class="invalid(fieldErrors.employee_number)"
           @ion-input="set('employee_number', text($event.detail.value))"
         />
-        <SearchSelect
+        <Combo
           testid="staff-member-form-role_id"
           data-field
-          :value="form.role_id"
-          :display="roleLabel"
+          :model-value="roleChoice"
           :label="$t('staff.members.form.role')"
-          :none-label="$t('staff.members.form.roleNone')"
-          :load="findRoles"
+          :search="findRoles"
+          :empty-label="$t('staff.noResults')"
+          :clearable="false"
           :error-text="fieldErrors.role_id ?? fieldErrors.role"
-          @update:value="pickRole"
+          @update:model-value="pickRole"
         />
-        <SearchSelect
+        <Combo
           testid="staff-member-form-user_id"
           data-field
-          :value="form.user_id"
-          :display="userLabel"
+          :model-value="userChoice"
           :label="$t('staff.members.form.hubUser')"
-          :none-label="$t('staff.members.form.hubUserNone')"
-          :load="findAccounts"
+          :search="findAccounts"
+          :empty-label="$t('staff.noResults')"
+          :clearable="false"
           :error-text="fieldErrors.user_id"
-          @update:value="pickUser"
+          @update:model-value="pickUser"
         />
         <p
           v-if="!form.user_id"

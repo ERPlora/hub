@@ -1,9 +1,10 @@
 // STAFF-F17 «Registrar una ausencia» and STAFF-F24 «Pedir mi propia ausencia»: «+» in Time Off opens the
-// old form — Member (only for whoever manages time off: they register anyone's; an employee asks for
-// their own and is not asked who), Type (Vacation to begin with), From, To, Full day (on) and, when it
+// old form — Member (only for whoever manages time off: they register anyone's, searched on the server
+// in a Combo; an employee asks for their own and is not asked who), Type (Vacation to begin with), From, To, Full day (on) and, when it
 // is off, From (time) and To (time), and Reason. Registering sends `staff.time_off.create`; asking,
 // `staff.time_off.request`. The server judges: an overlap (409) is said on top, a 422 under its field,
 // and the dialog keeps what was typed.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, ionChecked, ionValue, mountStaff, type MountOptions, page, settle } from '../__tests__/mount-staff';
@@ -33,18 +34,27 @@ async function setup(mode: 'create' | 'request', options: MountOptions = {}) {
   await settle();
   const field = (name: string) => m.inDoc(`staff-time-off-form-${name}`) as Control;
   const save = () => m.inDoc('staff-time-off-form-submit') as Control;
-  const root = () => (m.wrapper.element.parentElement ?? m.wrapper.element) as Element;
+  const member = () => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === 'staff-time-off-form-member_id');
+  /** What the Member Combo offers for `query`, as [id, label]. */
+  async function members(query = '') {
+    const search = member()?.props('search') as ((q: string) => Promise<ComboOption[]>) | undefined;
+    if (!search) throw new Error('Member is not a Combo with a server search');
+    return (await search(query)).map((o) => [o.id, o.label]);
+  }
   async function chooseMember(id: string) {
-    await click(field('member_id'));
+    const search = member()?.props('search') as ((q: string) => Promise<ComboOption[]>) | undefined;
+    if (!search) throw new Error('Member is not a Combo with a server search');
+    const option = (await search('')).find((o) => o.id === id);
+    if (!option) throw new Error(`Member offers no ${id}`);
+    member()!.vm.$emit('update:modelValue', option);
     await settle();
-    await click(root().querySelector(`[data-testid="staff-time-off-form-member_id-option"][data-value="${id}"]`));
   }
   async function dates(from: string, to: string) {
     await ionValue(field('start_date'), from, 'ionInput');
     await ionValue(field('end_date'), to, 'ionInput');
   }
   const posts = () => m.sent().filter((c) => c.method === 'POST');
-  return { ...m, field, save, chooseMember, dates, posts };
+  return { ...m, field, save, member, members, chooseMember, dates, posts };
 }
 
 describe('TimeOffFormModal: register anyone’s (STAFF-F17)', () => {
@@ -68,6 +78,19 @@ describe('TimeOffFormModal: register anyone’s (STAFF-F17)', () => {
     expect(s.field('is_full_day').checked).toBe(true);
     expect(s.field('start_time')).toBeNull();
     expect(s.save().disabled).toBe(true);
+  });
+
+  it('Member searches the members by name on the server, with no «none» choice and no Clear button', async () => {
+    const s = await setup('create');
+    expect(s.field('member_id').value).toBe('');
+    expect(await s.members()).toEqual([
+      ['m1', 'Ana López'],
+      ['m2', 'Bea Ruiz'],
+    ]);
+    expect(s.sent()).toContainEqual({ method: 'GET', path: '/api/staff/members', query: { sort: 'name', limit: '100' }, body: undefined });
+    await s.members('bea');
+    expect(s.sent()).toContainEqual({ method: 'GET', path: '/api/staff/members', query: { sort: 'name', limit: '100', search: 'bea' }, body: undefined });
+    expect([s.member()?.props('clearable'), s.member()?.props('emptyLabel')]).toEqual([false, 'No results']);
   });
 
   it('sends staff.time_off.create for the member chosen, then closes', async () => {
@@ -121,6 +144,10 @@ describe('TimeOffFormModal: register anyone’s (STAFF-F17)', () => {
     s.answerBy({ '/api/staff/time_off': [422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { end_date: 'The end date cannot be before the start date.' } } }] });
     await click(s.save());
     expect(s.field('end_date').errorText).toBe('The end date cannot be before the start date.');
+    s.answerBy({ '/api/staff/time_off': [422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { member_id: 'That member is not active.' } } }] });
+    await click(s.save());
+    expect(s.member()?.props('errorText')).toBe('That member is not active.');
+    expect(s.field('member_id').value).toBe('Ana López');
   });
 });
 
