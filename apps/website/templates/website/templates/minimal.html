@@ -1,0 +1,56 @@
+{% extends "website/base.html" %}{% load i18n %}
+{% comment %}Minimal: quiet and literary, after Start Bootstrap's «Clean Blog» (MIT). One narrow column with generous
+white space, a serif text face, light headings, small spaced capitals and thin rules between the sections; no
+button in the header. Bootstrap's own classes only; the ws-* hooks are in
+apps/website/frontend/public/site.css.{% endcomment %}
+{% block body %}
+<body class="ws-minimal text-break" data-ep-template="minimal"{% if preview %} data-ep-preview{% endif %}>
+<header data-ep-section="topbar">
+  <nav class="navbar navbar-expand-md bg-body py-4">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 small fw-semibold text-uppercase text-wrap ws-tracking" href="/">
+        {% if content.topbar.logo %}<img class="ws-logo rounded-circle" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
+        <span>{{ site_name }}</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-md-last">
+        <a class="btn btn-sm btn-outline-primary" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+        {% if body %}<button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
+      </div>
+      {% if body %}<div class="collapse navbar-collapse justify-content-md-end" id="ws-nav">
+        <ul class="navbar-nav small me-md-3">
+          {% for section in body %}<li class="nav-item"><a class="nav-link" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+    </div>
+  </nav>
+</header>
+<main class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+      <section data-ep-section="hero" data-ep-hero="plain" class="ws-hero">
+        <h1 class="display-5 fw-light mb-3 ws-display">{{ content.hero.title|default:site_name }}</h1>
+        {% if content.hero.tagline %}<p class="fs-5 text-body-secondary mb-0">{{ content.hero.tagline }}</p>{% endif %}
+        {% if content.hero.cover %}<div class="ratio ratio-16x9 mt-5"><img class="object-fit-cover rounded-1" src="{{ content.hero.cover.url }}" alt=""></div>{% endif %}
+      </section>
+      {% for section in body %}
+      <hr class="my-5">
+      <section id="{{ section.name }}" data-ep-section="{{ section.name }}">
+        <h2 class="small fw-semibold text-uppercase text-body-secondary mb-4 ws-tracking">{{ section.data.title }}</h2>
+        {% include section.partial with data=section.data %}
+      </section>
+      {% endfor %}
+    </div>
+  </div>
+</main>
+<footer data-ep-section="footer" class="container pt-5 pb-4">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 border-top pt-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <span class="small fw-semibold text-uppercase ws-tracking">{{ site_name }}</span>
+      {% if content.footer.text %}<span class="small text-body-secondary">{{ content.footer.text }}</span>{% endif %}
+      <a class="small" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+    </div>
+  </div>
+</footer>
+</body>
+{% endblock %}

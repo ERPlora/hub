@@ -1,0 +1,65 @@
+{% extends "website/base.html" %}{% load i18n %}
+{% comment %}Classic: timeless and centred, after Start Bootstrap's «Business Casual» (MIT). A serif name and headings,
+a centred header on a soft band with a rule in the second colour and the cover below, and each section as a card on
+bands that alternate. Bootstrap's own classes only; the ws-* hooks are in apps/website/frontend/public/site.css.{% endcomment %}
+{% block body %}
+<body class="ws-classic text-break" data-ep-template="classic"{% if preview %} data-ep-preview{% endif %}>
+<header data-ep-section="topbar" class="border-bottom">
+  <nav class="navbar navbar-expand-md bg-body py-3">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 fs-3 text-wrap ws-display" href="/">
+        {% if content.topbar.logo %}<img class="ws-logo rounded" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
+        <span>{{ site_name }}</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-md-last">
+        <a class="btn btn-outline-primary" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+        {% if body %}<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
+      </div>
+      {% if body %}<div class="collapse navbar-collapse justify-content-md-center" id="ws-nav">
+        <ul class="navbar-nav gap-md-2">
+          {% for section in body %}<li class="nav-item"><a class="nav-link" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+    </div>
+  </nav>
+</header>
+<main>
+  <section data-ep-section="hero" data-ep-hero="center" class="ws-hero bg-body-tertiary text-center">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-8">
+          <h1 class="display-4 mb-0 ws-display">{{ content.hero.title|default:site_name }}</h1>
+          <hr class="border-secondary border-2 opacity-100 w-25 mx-auto my-4">
+          {% if content.hero.tagline %}<p class="lead text-body-secondary mb-4">{{ content.hero.tagline }}</p>{% endif %}
+          {% if cta %}<a class="btn btn-primary btn-lg px-4" href="#{{ cta.name }}">{{ cta.title }}</a>{% endif %}
+        </div>
+      </div>
+      {% if content.hero.cover %}<div class="row justify-content-center mt-5">
+        <div class="col-lg-10"><div class="ratio ratio-16x9"><img class="object-fit-cover rounded-4 shadow" src="{{ content.hero.cover.url }}" alt=""></div></div>
+      </div>{% endif %}
+    </div>
+  </section>
+  {% for section in body %}
+  <section id="{{ section.name }}" data-ep-section="{{ section.name }}" class="py-5{% if forloop.counter|divisibleby:2 %} bg-body-tertiary{% endif %}">
+    <div class="container">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-lg-5">
+          <h2 class="text-center mb-0 ws-display">{{ section.data.title }}</h2>
+          <hr class="border-secondary border-2 opacity-100 w-25 mx-auto mt-3 mb-4">
+          {% include section.partial with data=section.data %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+</main>
+<footer data-ep-section="footer" class="border-top py-4">
+  <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <span class="fs-5 ws-display">{{ site_name }}</span>
+    {% if content.footer.text %}<span class="small text-body-secondary">{{ content.footer.text }}</span>{% endif %}
+    <a class="btn btn-sm btn-outline-primary" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+  </div>
+</footer>
+</body>
+{% endblock %}

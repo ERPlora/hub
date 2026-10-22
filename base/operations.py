@@ -9,19 +9,21 @@ as pre's ``acme.pre.erplora.com`` on prod's Hub) is no hub and raises ``Http404`
 An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The platform host
 (``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin, PLAN §18.1)
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
-Actor = the session's user; permissions from ``base.permissions``. :func:`is_demo_hub` and :func:`is_platform_hub` are what the apps
-ask about a hub's registry (``base.registry``; a module never reads it). This is the only piece phase 2 replaces (scope =
-``use_hub``).
+Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
+:func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it).
+This is the only piece phase 2 replaces (scope = ``use_hub``).
 """
 
 import dataclasses
 import ipaddress
+import uuid
 from typing import Any
 
 from django.conf import settings
 from django.http import Http404, HttpRequest
+from django.utils.translation import gettext
 from live.context import OperationContext, Scope
-from live.errors import Unauthorized
+from live.errors import NotFound, Unauthorized
 from live.slugs import validate_hub_slug
 
 from base import registry
@@ -49,6 +51,16 @@ def is_platform_host(request: HttpRequest) -> bool:
     """Whether the Host is the platform's (``hubs.erplora.com``, locally ``hubs.localhost:8000``)."""
     host = _host_name(request)
     return not _is_ip_address(host) and _hub_label(host) == settings.PLATFORM_HOST_LABEL
+
+
+def hub_id(scope: Scope) -> uuid.UUID:
+    """The id of ``scope``'s hub: the registry's ``Hub.id`` (the SaaS's UUIDv7; ``control.Hub.id`` in phase 2), the
+    one that names what a module keeps for its hub outside the database (``hub-<id>/`` in ``storages["hub_files"]``).
+    A scope that is no hub's host, or a slug without a row, has none: ``NotFound``."""
+    found = registry.hub_id(scope.key) if scope.kind == "host" else None
+    if found is None:
+        raise NotFound(gettext("No hub answers on this host."))
+    return found
 
 
 def is_demo_hub(scope: Scope) -> bool:

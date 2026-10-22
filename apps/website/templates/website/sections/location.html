@@ -1,0 +1,2 @@
+{% load i18n %}{% if data.address_lines %}<address class="fs-5 mb-4">{% for line in data.address_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}
+{% if data.map_url %}<a class="btn btn-primary" href="{{ data.map_url }}" target="_blank" rel="noopener noreferrer">{% translate "Open the map" context "website" %}</a>{% endif %}

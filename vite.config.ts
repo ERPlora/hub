@@ -2,7 +2,8 @@
 // `config/settings.py`): with DEBUG the shell loads `http://localhost:5173/static/spa/@vite/client`
 // (`VITE_DEV_PORT` moves it)
 // and `…/static/spa/frontend/main.ts` (Vite applies `base` in dev too); in production Django reads
-// `frontend/dist/.vite/manifest.json` and links `/static/spa/assets/…` (WhiteNoise).
+// `frontend/dist/.vite/manifest.json` and links `/static/spa/assets/…` (WhiteNoise). A second entry,
+// `frontend/website.ts`, is the public website of a hub (`base/templatetags/hub_assets.py`).
 // `manage.py runserver` starts this dev server (`LIVE["vite"]`); `--novite` skips it.
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +29,8 @@ export default defineConfig({
     emptyOutDir: true,
     manifest: '.vite/manifest.json',
     target: 'es2022',
-    rollupOptions: { input: 'frontend/main.ts' },
+    // `main` = the SPA (`LIVE["spa"]["entry"]`); `website` = a hub's public website (`{% hub_assets %}`, apps/website).
+    rollupOptions: { input: { main: 'frontend/main.ts', website: 'frontend/website.ts' } },
   },
   server: {
     host: DEV_HOST,

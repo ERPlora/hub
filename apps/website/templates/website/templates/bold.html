@@ -1,0 +1,59 @@
+{% extends "website/base.html" %}{% load i18n %}
+{% comment %}Bold: loud and graphic, after Start Bootstrap's «Grayscale» and «One Page Wonder» (MIT). A dark bar, a
+full-width header in the main colour with big condensed capitals and a strong button, the cover across the whole
+width, and big headings over a bar in the second colour. Bootstrap's own classes only; the ws-* hooks are in
+apps/website/frontend/public/site.css.{% endcomment %}
+{% block body %}
+<body class="ws-bold text-break" data-ep-template="bold"{% if preview %} data-ep-preview{% endif %}>
+<header data-ep-section="topbar">
+  <nav class="navbar navbar-expand-md bg-body-tertiary py-3" data-bs-theme="dark">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 fs-4 fw-bold text-uppercase text-wrap ws-display" href="/">
+        {% if content.topbar.logo %}<img class="ws-logo rounded" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
+        <span>{{ site_name }}</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-md-last">
+        <a class="btn btn-primary fw-semibold" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+        {% if body %}<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
+      </div>
+      {% if body %}<div class="collapse navbar-collapse justify-content-md-end" id="ws-nav">
+        <ul class="navbar-nav text-uppercase fw-semibold me-md-3">
+          {% for section in body %}<li class="nav-item"><a class="nav-link" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+    </div>
+  </nav>
+</header>
+<main>
+  <section data-ep-section="hero" data-ep-hero="banner" class="ws-hero text-bg-primary text-center">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-xl-10">
+          <h1 class="display-2 fw-bold text-uppercase mb-3 ws-display">{{ content.hero.title|default:site_name }}</h1>
+          {% if content.hero.tagline %}<p class="fs-4 mb-4">{{ content.hero.tagline }}</p>{% endif %}
+          {% if cta %}<a class="btn btn-lg px-5 fw-bold text-uppercase ws-btn-contrast" href="#{{ cta.name }}">{{ cta.title }}</a>{% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% if content.hero.cover %}<div class="ratio ratio-21x9"><img class="object-fit-cover" src="{{ content.hero.cover.url }}" alt=""></div>{% endif %}
+  {% for section in body %}
+  <section id="{{ section.name }}" data-ep-section="{{ section.name }}" class="py-5{% if forloop.counter|divisibleby:2 %} bg-body-tertiary{% endif %}">
+    <div class="container py-lg-4">
+      <h2 class="display-6 fw-bold text-uppercase mb-0 ws-display">{{ section.data.title }}</h2>
+      <hr class="border-secondary border-4 opacity-100 w-25 mt-3 mb-4">
+      {% include section.partial with data=section.data %}
+    </div>
+  </section>
+  {% endfor %}
+</main>
+<footer data-ep-section="footer" class="bg-body-tertiary text-body py-4" data-bs-theme="dark">
+  <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <span class="fw-bold text-uppercase ws-display">{{ site_name }}</span>
+    {% if content.footer.text %}<span class="small text-body-secondary">{{ content.footer.text }}</span>{% endif %}
+    <a class="btn btn-sm btn-primary" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+  </div>
+</footer>
+</body>
+{% endblock %}

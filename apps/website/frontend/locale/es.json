@@ -1,0 +1,163 @@
+{
+  "website": {
+    "title": "Página web",
+    "noPermission": "Solo el propietario o un administrador pueden cambiar la página web.",
+    "loading": "Cargando tu página web…",
+    "loadError": "No se pudo cargar la página web",
+    "appInactive": "Esta app no está activa en este negocio",
+    "status": {
+      "never": "Tu página web aún no está en línea. Publícala para que tus clientes puedan verla.",
+      "offline": "Tu página web está fuera de línea. Publícala para volver a ponerla en línea.",
+      "live": "Tu página web está en línea en {url}",
+      "changes": "Tienes cambios que aún no están publicados."
+    },
+    "actions": {
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Todos los cambios guardados",
+      "unsaved": "Cambios sin guardar",
+      "publish": "Publicar",
+      "unpublish": "Desconectar",
+      "share": "Compartir y QR"
+    },
+    "publish": {
+      "title": "¿Publicar tu página web?",
+      "message": "Quien abra {url} verá esta versión, con tu catálogo tal y como está ahora.",
+      "done": "Tu página web está en línea",
+      "error": "No se pudo publicar la página web"
+    },
+    "unpublish": {
+      "title": "¿Desconectar tu página web?",
+      "message": "{url} volverá a mostrar la página de acceso de tu equipo. No se pierde nada: vuelve a publicarla cuando quieras.",
+      "done": "Tu página web está fuera de línea",
+      "error": "No se pudo desconectar la página web"
+    },
+    "saveError": "No se pudo guardar la página web",
+    "view": {
+      "label": "Editor o vista previa",
+      "edit": "Editar",
+      "preview": "Vista previa"
+    },
+    "preview": {
+      "frame": "Vista previa de tu página web",
+      "width": "Ancho de la vista previa",
+      "desktop": "Ordenador",
+      "mobile": "Móvil",
+      "reload": "Recargar la vista previa"
+    },
+    "template": {
+      "heading": "Diseño",
+      "classic": "Clásica",
+      "classicHint": "Centrada y atemporal",
+      "modern": "Moderna",
+      "modernHint": "Texto y foto lado a lado",
+      "minimal": "Minimalista",
+      "minimalHint": "Una sola columna limpia",
+      "bold": "Llamativa",
+      "boldHint": "Colores y letras grandes"
+    },
+    "colours": {
+      "heading": "Colores",
+      "primary": "Color principal",
+      "accent": "Color secundario",
+      "mode": "Fondo de la página",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "auto": "Automático",
+      "autoHint": "Automático sigue el dispositivo de cada visitante: oscuro si está en modo oscuro, claro si no."
+    },
+    "palette": {
+      "label": "Paleta",
+      "ocean": "Océano",
+      "forest": "Bosque",
+      "terracotta": "Terracota",
+      "slate": "Pizarra",
+      "rose": "Rosa",
+      "sand": "Arena",
+      "midnight": "Medianoche",
+      "olive": "Oliva",
+      "custom": "Tus colores",
+      "customHint": "Elige dos colores: la página, las franjas y el texto se adaptan a ellos, siempre legibles."
+    },
+    "sections": {
+      "heading": "Secciones",
+      "show": "Mostrar",
+      "always": "Siempre en la página",
+      "hidden": "Oculta",
+      "topbar": "Barra superior",
+      "hero": "Cabecera",
+      "about": "Sobre nosotros",
+      "catalog": "Catálogo",
+      "contact": "Contacto",
+      "location": "Ubicación",
+      "footer": "Pie de página"
+    },
+    "fields": {
+      "name": "Nombre del negocio",
+      "logo": "Logotipo",
+      "title": "Título",
+      "tagline": "Lema",
+      "cover": "Foto de portada",
+      "heading": "Encabezado",
+      "headingHelp": "Déjalo vacío para usar el de siempre.",
+      "text": "Texto",
+      "textHelp": "Puedes usar **negrita**, listas y enlaces.",
+      "image": "Foto",
+      "source": "Qué mostrar",
+      "sourceNone": "Nada",
+      "sourceInventory": "Productos",
+      "sourceService": "Servicios",
+      "noSource": "Activa Inventario o Servicios para mostrar aquí tus productos o servicios.",
+      "categories": "Categorías",
+      "allCategories": "Todas las categorías",
+      "categoriesError": "No se pudieron cargar las categorías",
+      "showPrices": "Mostrar precios",
+      "phone": "Teléfono",
+      "whatsapp": "WhatsApp",
+      "whatsappHelp": "Con el prefijo del país, por ejemplo +34 600 123 456",
+      "email": "Correo",
+      "instagram": "Instagram",
+      "facebook": "Facebook",
+      "tiktok": "TikTok",
+      "x": "X",
+      "socialsHelp": "El enlace completo, empezando por https://",
+      "showHours": "Mostrar el horario",
+      "addressLine": "Línea {n} de la dirección",
+      "mapUrl": "Enlace al mapa",
+      "mapUrlHelp": "Un enlace https:// a tu local en un mapa",
+      "footerText": "Texto del pie",
+      "footerTextHelp": "Por ejemplo, la razón social de tu empresa"
+    },
+    "hours": {
+      "label": "Horario",
+      "open": "Abierto",
+      "closed": "Cerrado",
+      "opens": "Abre",
+      "closes": "Cierra",
+      "add": "Añadir horario",
+      "remove": "Quitar este horario",
+      "days": {
+        "mon": "Lunes",
+        "tue": "Martes",
+        "wed": "Miércoles",
+        "thu": "Jueves",
+        "fri": "Viernes",
+        "sat": "Sábado",
+        "sun": "Domingo"
+      }
+    },
+    "share": {
+      "title": "Comparte tu página web",
+      "url": "La dirección de tu página web",
+      "copy": "Copiar enlace",
+      "copied": "Enlace copiado",
+      "copyError": "No se pudo copiar el enlace: selecciónalo y cópialo a mano.",
+      "qr": "Código QR de tu página web",
+      "downloadPng": "Descargar PNG",
+      "downloadSvg": "Descargar SVG",
+      "signedIn": "En este dispositivo tienes la sesión abierta, así que esta dirección abre la app. Ábrela en tu móvil o en una ventana privada para ver tu página web.",
+      "notLive": "Tu página web no está en línea: hasta que la publiques, esta dirección abre la página de acceso de tu equipo.",
+      "close": "Cerrar"
+    }
+  }
+}

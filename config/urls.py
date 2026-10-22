@@ -27,6 +27,7 @@ from base.internal import (
     whatsapp_inbound,
     whatsapp_status,
 )
+from base.media import media
 from base.spa import spa
 from config.api import api
 
@@ -71,5 +72,7 @@ urlpatterns = [
     path("internal/whatsapp/inbound", whatsapp_inbound, name="internal-whatsapp-inbound"),
     path("internal/whatsapp/status", whatsapp_status, name="internal-whatsapp-status"),
     path("internal/whatsapp/channel", whatsapp_channel, name="internal-whatsapp-channel"),
+    # The hub file store's files (base.media), on the hub's own host; /p is the public pages' prefix.
+    path("p/media/<str:hub>/<path:name>", media, name="media"),
     re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),
 ]

@@ -15,6 +15,7 @@
   "dependencies": {
     "@erplora/ui": "workspace:*",
     "@ionic/vue": "8.8.9",
+    "bootstrap": "~5.3.8",
     "jsbarcode": "3.12.3",
     "vue": "^3.5.0",
     "vue-router": "^4.0.0"

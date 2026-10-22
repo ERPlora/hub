@@ -1,0 +1,167 @@
+/* The public website's one stylesheet of our own (apps/website, round 2026-10-22). The pages are Bootstrap 5.3: its
+ * grid, navbar, cards, list groups, buttons and utilities do the layout (frontend/public/classes.test.ts checks every
+ * class). This file only
+ *   1. maps the palette onto Bootstrap's variables where Bootstrap writes a fixed colour instead of a variable (the
+ *      primary buttons, the text on `text-bg-*`, the navbar's links): the colours themselves are the `--bs-*` and
+ *      `--ws-*` variables of the page's one <style> (templates/website/base.html, from apps/website/palettes.py),
+ *      one set for `data-bs-theme="light"` and one for "dark";
+ *   2. gives each template its type and its spacing through `ws-*` hooks, for what Bootstrap has no utility of
+ *      (a font family, letter spacing, a fluid hero padding, a logo's height).
+ * Fonts are system stacks (CSP: nothing from a CDN), chosen to look right on macOS, iOS, Windows and Android. */
+
+/* 1. The palette on Bootstrap's components */
+
+.btn-primary {
+  --bs-btn-color: var(--ws-on-primary);
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-color: var(--ws-on-primary);
+  --bs-btn-hover-bg: var(--ws-primary-hover);
+  --bs-btn-hover-border-color: var(--ws-primary-hover);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+  --bs-btn-active-color: var(--ws-on-primary);
+  --bs-btn-active-bg: var(--ws-primary-active);
+  --bs-btn-active-border-color: var(--ws-primary-active);
+  --bs-btn-disabled-color: var(--ws-on-primary);
+  --bs-btn-disabled-bg: var(--bs-primary);
+  --bs-btn-disabled-border-color: var(--bs-primary);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--bs-link-color);
+  --bs-btn-border-color: var(--bs-link-color);
+  --bs-btn-hover-color: var(--ws-on-primary);
+  --bs-btn-hover-bg: var(--bs-primary);
+  --bs-btn-hover-border-color: var(--bs-primary);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+  --bs-btn-active-color: var(--ws-on-primary);
+  --bs-btn-active-bg: var(--ws-primary-active);
+  --bs-btn-active-border-color: var(--ws-primary-active);
+  --bs-btn-disabled-color: var(--bs-link-color);
+  --bs-btn-disabled-border-color: var(--bs-link-color);
+}
+
+/* A button on a band of the main colour (bold's header): the main colour's text colour as the fill. */
+.ws-btn-contrast {
+  --bs-btn-color: var(--bs-primary);
+  --bs-btn-bg: var(--ws-on-primary);
+  --bs-btn-border-color: var(--ws-on-primary);
+  --bs-btn-hover-color: var(--bs-primary);
+  --bs-btn-hover-bg: var(--ws-on-primary);
+  --bs-btn-hover-border-color: var(--ws-on-primary);
+  --bs-btn-active-color: var(--bs-primary);
+  --bs-btn-active-bg: var(--ws-on-primary);
+  --bs-btn-active-border-color: var(--ws-on-primary);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+
+/* Bootstrap writes white on `text-bg-*`: the palette says black or white, whichever reads (AA). */
+.text-bg-primary {
+  color: var(--ws-on-primary) !important;
+}
+
+.text-bg-secondary {
+  color: var(--ws-on-accent) !important;
+}
+
+/* The navbar's links at the palette's muted text (AA on the page and on the bands), in either mode. */
+.navbar,
+.navbar[data-bs-theme] {
+  --bs-navbar-color: var(--bs-secondary-color);
+  --bs-navbar-hover-color: var(--bs-emphasis-color);
+  --bs-navbar-active-color: var(--bs-emphasis-color);
+  --bs-navbar-brand-color: var(--bs-emphasis-color);
+  --bs-navbar-brand-hover-color: var(--bs-emphasis-color);
+}
+
+/* The editor's preview: what a link does is shown, not followed. */
+body[data-ep-preview] a {
+  pointer-events: none;
+}
+
+/* 2. The templates' type and spacing */
+
+.ws-classic,
+.ws-modern,
+.ws-minimal,
+.ws-bold {
+  --ws-serif-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', 'URW Palladio L', 'Noto Serif',
+    Georgia, serif;
+  --ws-serif-text: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, 'Noto Serif', Georgia, serif;
+  --ws-sans: 'Avenir Next', Avenir, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui,
+    sans-serif;
+  --ws-condensed: 'Avenir Next Condensed', 'Bahnschrift SemiCondensed', 'Roboto Condensed', sans-serif-condensed,
+    'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --bs-body-line-height: 1.65;
+}
+
+.ws-logo {
+  width: auto;
+  max-height: 2.5rem;
+}
+
+.ws-tracking {
+  letter-spacing: 0.14em;
+}
+
+/* The owner's Markdown: no gap under its last paragraph or list. */
+.ws-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.ws-hero {
+  padding-block: clamp(3rem, 8vw, 6rem);
+}
+
+/* Classic: serif headings over a sans text, centred and calm. */
+.ws-classic {
+  --bs-body-font-family: var(--ws-sans);
+}
+
+.ws-classic .ws-display {
+  font-family: var(--ws-serif-display);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Modern: one geometric sans, heavy and tight headings. */
+.ws-modern {
+  --bs-body-font-family: var(--ws-sans);
+}
+
+.ws-modern .ws-display {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Minimal: a reading serif, light headings and more air between everything. */
+.ws-minimal {
+  --bs-body-font-family: var(--ws-serif-text);
+  --bs-body-font-size: 1.0625rem;
+  --bs-body-line-height: 1.75;
+}
+
+.ws-minimal .ws-display {
+  font-family: var(--ws-sans);
+  letter-spacing: -0.01em;
+}
+
+.ws-minimal .ws-hero {
+  padding-block: clamp(2.5rem, 7vw, 5rem) 0;
+}
+
+/* Bold: condensed capitals, big and tight; a taller header. */
+.ws-bold {
+  --bs-body-font-family: var(--ws-sans);
+}
+
+.ws-bold .ws-display {
+  font-family: var(--ws-condensed);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.ws-bold .ws-hero {
+  padding-block: clamp(4rem, 12vw, 8rem);
+}

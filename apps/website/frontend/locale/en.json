@@ -1,0 +1,163 @@
+{
+  "website": {
+    "title": "Website",
+    "noPermission": "Only the owner or an admin can change the website.",
+    "loading": "Loading your website…",
+    "loadError": "The website could not be loaded",
+    "appInactive": "This app is not active in this business",
+    "status": {
+      "never": "Your website is not online yet. Publish it so your customers can see it.",
+      "offline": "Your website is offline. Publish it to put it back online.",
+      "live": "Your website is online at {url}",
+      "changes": "You have changes that are not published yet."
+    },
+    "actions": {
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "All changes saved",
+      "unsaved": "Unsaved changes",
+      "publish": "Publish",
+      "unpublish": "Take offline",
+      "share": "Share and QR"
+    },
+    "publish": {
+      "title": "Publish your website?",
+      "message": "Whoever opens {url} will see this version, with your catalog as it is now.",
+      "done": "Your website is online",
+      "error": "The website could not be published"
+    },
+    "unpublish": {
+      "title": "Take your website offline?",
+      "message": "{url} will go back to your team's sign-in page. Nothing is lost: publish it again whenever you want.",
+      "done": "Your website is offline",
+      "error": "The website could not be taken offline"
+    },
+    "saveError": "The website could not be saved",
+    "view": {
+      "label": "Editor or preview",
+      "edit": "Edit",
+      "preview": "Preview"
+    },
+    "preview": {
+      "frame": "Preview of your website",
+      "width": "Preview width",
+      "desktop": "Computer",
+      "mobile": "Phone",
+      "reload": "Reload the preview"
+    },
+    "template": {
+      "heading": "Design",
+      "classic": "Classic",
+      "classicHint": "Centred and timeless",
+      "modern": "Modern",
+      "modernHint": "Text and photo side by side",
+      "minimal": "Minimal",
+      "minimalHint": "One clean column",
+      "bold": "Bold",
+      "boldHint": "Big colours and big type"
+    },
+    "colours": {
+      "heading": "Colours",
+      "primary": "Main colour",
+      "accent": "Second colour",
+      "mode": "Page background",
+      "light": "Light",
+      "dark": "Dark",
+      "auto": "Auto",
+      "autoHint": "Auto follows each visitor’s device: dark when it is in dark mode, light otherwise."
+    },
+    "palette": {
+      "label": "Palette",
+      "ocean": "Ocean",
+      "forest": "Forest",
+      "terracotta": "Terracotta",
+      "slate": "Slate",
+      "rose": "Rose",
+      "sand": "Sand",
+      "midnight": "Midnight",
+      "olive": "Olive",
+      "custom": "Your colours",
+      "customHint": "Choose two colours: the page, the bands and the text follow them, always readable."
+    },
+    "sections": {
+      "heading": "Sections",
+      "show": "Show",
+      "always": "Always on the page",
+      "hidden": "Hidden",
+      "topbar": "Top bar",
+      "hero": "Header",
+      "about": "About us",
+      "catalog": "Catalog",
+      "contact": "Contact",
+      "location": "Location",
+      "footer": "Footer"
+    },
+    "fields": {
+      "name": "Business name",
+      "logo": "Logo",
+      "title": "Title",
+      "tagline": "Tagline",
+      "cover": "Cover photo",
+      "heading": "Heading",
+      "headingHelp": "Leave it empty to use the usual one.",
+      "text": "Text",
+      "textHelp": "You can use **bold**, lists and links.",
+      "image": "Photo",
+      "source": "What to show",
+      "sourceNone": "Nothing",
+      "sourceInventory": "Products",
+      "sourceService": "Services",
+      "noSource": "Turn on Inventory or Services to show your products or services here.",
+      "categories": "Categories",
+      "allCategories": "All categories",
+      "categoriesError": "The categories could not be loaded",
+      "showPrices": "Show prices",
+      "phone": "Phone",
+      "whatsapp": "WhatsApp",
+      "whatsappHelp": "With the country code, for example +34 600 123 456",
+      "email": "Email",
+      "instagram": "Instagram",
+      "facebook": "Facebook",
+      "tiktok": "TikTok",
+      "x": "X",
+      "socialsHelp": "The full link, starting with https://",
+      "showHours": "Show opening hours",
+      "addressLine": "Address line {n}",
+      "mapUrl": "Map link",
+      "mapUrlHelp": "A https:// link to your place on a map",
+      "footerText": "Footer text",
+      "footerTextHelp": "For example, your company's legal name"
+    },
+    "hours": {
+      "label": "Opening hours",
+      "open": "Open",
+      "closed": "Closed",
+      "opens": "Opens",
+      "closes": "Closes",
+      "add": "Add hours",
+      "remove": "Remove these hours",
+      "days": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    },
+    "share": {
+      "title": "Share your website",
+      "url": "Your website's address",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "copyError": "The link could not be copied: select it and copy it by hand.",
+      "qr": "QR code of your website",
+      "downloadPng": "Download PNG",
+      "downloadSvg": "Download SVG",
+      "signedIn": "On this device you are signed in, so this address opens the app. Open it on your phone or in a private window to see your website.",
+      "notLive": "Your website is not online: until you publish it, this address opens your team's sign-in page.",
+      "close": "Close"
+    }
+  }
+}

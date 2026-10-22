@@ -1,0 +1,17 @@
+{% load i18n %}<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-ep-block="catalog" data-ep-source="{{ data.source }}" data-ep-empty="{% translate "Nothing to show here yet." context "website" %}">
+  {% for group in data.groups %}
+  <div class="col">
+    {% if group.name %}<h3 class="h5 mb-2 ws-display">{{ group.name }}</h3>{% endif %}
+    <ul class="list-group list-group-flush">
+      {% for item in group.items %}
+      <li class="list-group-item bg-transparent px-0 d-flex align-items-baseline gap-3">
+        <span class="flex-grow-1">{{ item.name }}{% if item.minutes %} <small class="text-body-secondary text-nowrap">{{ item.minutes }} min</small>{% endif %}</span>
+        {% if item.price_label %}<span class="fw-semibold text-nowrap">{{ item.price_label }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% empty %}
+  <div class="col-12"><p class="text-body-secondary mb-0">{% translate "Nothing to show here yet." context "website" %}</p></div>
+  {% endfor %}
+</div>
