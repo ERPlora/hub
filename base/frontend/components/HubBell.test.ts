@@ -98,3 +98,26 @@ describe('HubBell', () => {
     );
   });
 });
+
+describe('HubBell does not poll', () => {
+  // The old hub's bell asked the server every 30 s; this one is told by the live query. Fake timers run the
+  // page's clock five minutes ahead: nothing else must have asked the server, nor reopened the stream.
+  it('asks nothing more once subscribed, however long the page stays open', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'] });
+    try {
+      const s = await setup();
+      await s.show([counter('demo.open_items', 1, '/demo/items')]);
+      const streams = s.net.streams.length;
+      vi.advanceTimersByTime(5 * 60_000);
+      await flush();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(s.net.api).toEqual([]);
+      expect(s.net.streams.length).toBe(streams);
+      expect(s.client.stream.subscriptions('base.bell.counters')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+});
