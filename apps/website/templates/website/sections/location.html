@@ -1,2 +1,11 @@
-{% load i18n %}{% if data.address_lines %}<address class="fs-5 mb-4">{% for line in data.address_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}
-{% if data.map_url %}<a class="btn btn-primary" href="{{ data.map_url }}" target="_blank" rel="noopener noreferrer">{% translate "Open the map" context "website" %}</a>{% endif %}
+{% load i18n %}<div class="card border-0 rounded-4 shadow-sm overflow-hidden">
+  <div class="row g-0">
+    <div class="col-md-5 ws-map d-flex align-items-center justify-content-center p-5" aria-hidden="true"><span class="ws-glyph rounded-circle fs-2 shadow"><span class="ws-icon ws-icon-location"></span></span></div>
+    <div class="col-md-7">
+      <div class="card-body p-4 p-lg-5">
+        {% if data.address_lines %}<address class="fs-5 mb-4">{% for line in data.address_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}
+        {% if data.map_url %}<a class="btn btn-primary rounded-pill px-4 d-inline-flex align-items-center gap-2" href="{{ data.map_url }}" target="_blank" rel="noopener noreferrer"><span class="ws-icon ws-icon-navigate" aria-hidden="true"></span>{% translate "Open the map" context "website" %}</a>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>

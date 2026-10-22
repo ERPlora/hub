@@ -34,8 +34,9 @@ from live.operations import get, operation, registry
 
 from apps.website.models import Site
 from apps.website.qr import CONTENT_TYPES, public_url, qr_image
-from apps.website.render import catalog_view, render_site
+from apps.website.render import catalog_view, local_day, render_site
 from apps.website.schemas import (
+    DAYS,
     CatalogOut,
     CatalogSection,
     CategoriesIn,
@@ -51,6 +52,7 @@ from apps.website.schemas import (
 )
 from base import relay
 from base.operations import hub_id
+from base.registry import hub_by_slug
 from base.throttle import RateLimited, allow, client_address
 
 #: The app's label: what ``base.relay.active_apps`` names when the module is on in a hub.
@@ -147,9 +149,22 @@ def preview_site(ctx: OperationContext, data: NoIn) -> dict:
     now = draft(current_site(hub_id(ctx.scope)))
     catalog = read_catalog(ctx, Content.model_validate(now["content"]).catalog)
     html = render_site(
-        now["template"], now["theme"], now["content"], ctx.language, hub=ctx.scope.key, catalog=catalog, preview=True
+        now["template"],
+        now["theme"],
+        now["content"],
+        ctx.language,
+        hub=ctx.scope.key,
+        catalog=catalog,
+        preview=True,
+        today=business_day(ctx.scope),
     )
     return {"html": html}
+
+
+def business_day(scope: Scope) -> str:
+    """Today (``mon`` … ``sun``) where ``scope``'s business is: in its hub's time zone, Spain's without one."""
+    hub = hub_by_slug(scope.key) if scope.kind == "host" else None
+    return local_day(hub.timezone if hub else "")
 
 
 # Not an assistant tool (no ``ai=``): its answer is an image in base64; the editor downloads it.
@@ -298,9 +313,10 @@ def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
 # The cache
 
 
-def page_cache_key(slug: str, version: int, lang: str) -> str:
-    """The rendered page of ``slug``'s publication ``version`` in ``lang``, for this deploy's bundle."""
-    return f"website:home:{slug}:{version}:{lang}:{settings.APP_VERSION}"
+def page_cache_key(slug: str, version: int, lang: str, day: str) -> str:
+    """The rendered page of ``slug``'s publication ``version`` in ``lang`` on ``day`` (the opening hours mark today),
+    for this deploy's bundle."""
+    return f"website:home:{slug}:{version}:{lang}:{day}:{settings.APP_VERSION}"
 
 
 def catalog_cache_key(slug: str, version: int, lang: str) -> str:
@@ -308,10 +324,11 @@ def catalog_cache_key(slug: str, version: int, lang: str) -> str:
 
 
 def forget_cached(slug: str, version: int) -> None:
-    """Drop the page and the catalog of ``slug``'s publication ``version`` in every language (after a COMMIT)."""
+    """Drop the page and the catalog of ``slug``'s publication ``version`` in every language and on every day (after a
+    COMMIT)."""
     languages = [code for code, _name in settings.LANGUAGES]
     cache.delete_many(
-        [page_cache_key(slug, version, lang) for lang in languages]
+        [page_cache_key(slug, version, lang, day) for lang in languages for day in DAYS]
         + [catalog_cache_key(slug, version, lang) for lang in languages]
     )
 

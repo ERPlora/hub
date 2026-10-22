@@ -125,7 +125,7 @@ def test_publish_copies_the_draft_with_a_catalog_snapshot_bumps_the_version_and_
     services_catalog, django_capture_on_commit_callbacks
 ):
     save(template="modern", theme={"palette": "forest", "mode": "dark"})
-    cache.set(page_cache_key("a", 0, "en"), b"stale")
+    cache.set(page_cache_key("a", 0, "en", "sun"), b"stale")
     with django_capture_on_commit_callbacks(execute=True):
         out = run("website.site.publish")
     site = Site.objects.get()
@@ -149,15 +149,15 @@ def test_publish_copies_the_draft_with_a_catalog_snapshot_bumps_the_version_and_
         ],
     }
     assert [event.payload for event in events("website.site.published")] == [{"id": str(site.id), "version": 1}]
-    assert cache.get(page_cache_key("a", 0, "en")) is None
+    assert cache.get(page_cache_key("a", 0, "en", "sun")) is None
     # A change of the draft stays out of the page until it is published again.
     save(template="bold")
     assert Site.objects.get().published_content["template"] == "modern"
-    cache.set(page_cache_key("a", 1, "es"), b"old")
+    cache.set(page_cache_key("a", 1, "es", "wed"), b"old")
     with django_capture_on_commit_callbacks(execute=True):
         assert run("website.site.publish").published_version == 2
     assert Site.objects.get().published_content["template"] == "bold"
-    assert cache.get(page_cache_key("a", 1, "es")) is None
+    assert cache.get(page_cache_key("a", 1, "es", "wed")) is None
 
 
 def test_publish_snapshots_only_the_chosen_categories(services_catalog):
@@ -243,11 +243,11 @@ def test_taking_offline_a_site_never_saved_keeps_it_unsaved():
 def test_taking_the_site_offline_keeps_its_version_and_publishing_again_goes_on(django_capture_on_commit_callbacks):
     save()
     run("website.site.publish")
-    cache.set(page_cache_key("a", 1, "en"), b"page")
+    cache.set(page_cache_key("a", 1, "en", "mon"), b"page")
     with django_capture_on_commit_callbacks(execute=True):
         out = run("website.site.unpublish")
     assert (out.published_version, out.is_live) == (1, False)
-    assert cache.get(page_cache_key("a", 1, "en")) is None
+    assert cache.get(page_cache_key("a", 1, "en", "mon")) is None
     assert len(events("website.site.unpublished")) == 1
     # Already offline: nothing to do, nothing recorded.
     run("website.site.unpublish")

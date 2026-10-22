@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e1ea6d0b2404f0f616b356b51d9352666db03c55776a5b65b90d44c25b8d172c -->
+<!-- generated from WORKBOOK.md sha256:dffe7329946bc8c41774772c6f5efb9f493f76c5cf19d1542e434a6ecdd2ec5d -->
 
 ## What it is for and who it is for
 
@@ -31,11 +31,13 @@ online) and **Share and QR**, and whether everything is saved or not.
 Below, the editor and the preview. On a computer, side by side; on a tablet or a phone, an **Edit / Preview** tab
 switches between the two.
 
-- **Design**: four cards with a drawing of each template in the palette's colours: **Classic** (centred and timeless:
-  serif name and headings, a centred header on a soft band and each section in a card), **Modern** (a sticky bar,
-  title and photo side by side and each section in two columns), **Minimal** (one narrow column with plenty of air, a
-  serif reading face and thin rules between sections) and **Bold** (a dark bar, a full-width header in the main
-  colour with big capitals and a strong button). All four suit a restaurant, a salon, a shop or a service.
+- **Design**: four cards with a drawing of each template in the palette's colours: **Classic** (centred and warm: the
+  cover across the whole header under a veil, a serif title over a rule in the second colour and each section
+  centred), **Modern** (a split header: title, tagline and buttons beside the framed photo, a heavy tight sans, a
+  strong grid), **Minimal** (one narrow column with plenty of air, a serif reading face, light headings, thin rules
+  between sections and the photo wide under the title) and **Bold** (a dark bar, a full-width header in the main
+  colour with the photo tinted in it, huge capitals and strong buttons). All four suit a restaurant, a salon, a shop
+  or a service.
 - **Colours**: eight palettes as cards showing their colours on the light and the dark page, the chosen one
   highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**. Under
   them, two colour fields (**Main colour** and **Second colour**) with the chosen palette's: changing them makes the
@@ -69,9 +71,18 @@ page: your phone or a private window) and, if the page is not online, that the a
 sign-in.
 
 ### The public page (the business's `/`)
-The chosen template with what is published: top bar with the name, the sections' menu (folded on a phone) and **Log
-in**; header (with a button to the first section, except in Minimal); the sections that are shown and have content;
-footer with **Log in**. It adapts to phone, tablet and computer (Bootstrap 5.3) with no sideways scrolling, in the
+The chosen template with what is published (modern redesign of 2026-10-22): a sticky see-through top bar with the
+logo, the name, the sections' menu (folded on a phone) and **Log in** (an outline pill); a header with the cover photo
+(or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
+**Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
+without contact or address, one to the first section. Each section has a small line over its heading («Who we are»,
+«What we offer», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
+the text; the catalog as a grid of cards (a gradient with the initial, since items have no photo; the price in a pill;
+pills to jump between categories when there are two or more); the contact as chips with an icon (phone, email),
+WhatsApp as a button and the socials as pills; the opening hours as a list with **today** highlighted (the business's
+day, in the hub's time zone; Madrid's without one); the address in a card with **Open the map**. A footer in columns:
+the name and the footer's line, links to the sections and **Log in**. Motion is only a hover's transition (and none
+when the system asks for less). It adapts to phone, tablet and computer (Bootstrap 5.3) with no sideways scrolling, in the
 chosen palette, light or dark; in auto it follows the visitor's device, also when it changes with the page open
 (without JavaScript it shows light). The catalog is painted with what was published and, when the page
 opens, refreshed with the products or services of that moment and their prices in the visitor's language. The rest of

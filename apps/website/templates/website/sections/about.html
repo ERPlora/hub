@@ -1,4 +1,10 @@
-<div class="row g-4 g-lg-5 align-items-center">
-  <div class="{% if data.image %}col-md-7{% else %}col-12{% endif %} ws-prose">{{ data.html|safe }}</div>
-  {% if data.image %}<div class="col-md-5"><img class="img-fluid rounded-4 shadow-sm" src="{{ data.image.url }}" alt="" loading="lazy"></div>{% endif %}
+<div class="card border-0 rounded-4 shadow-sm">
+  <div class="card-body p-4 p-lg-5">
+    <div class="row g-4 g-lg-5 align-items-center">
+      <div class="{% if data.image %}col-lg-6{% else %}col-12{% endif %}"><div class="ws-prose fs-5">{{ data.html|safe }}</div></div>
+      {% if data.image %}<div class="col-lg-6">
+        <div class="ws-frame"><div class="ratio ratio-4x3 rounded-4 overflow-hidden shadow-sm"><img class="object-fit-cover" src="{{ data.image.url }}" alt="" loading="lazy"></div></div>
+      </div>{% endif %}
+    </div>
+  </div>
 </div>

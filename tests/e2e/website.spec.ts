@@ -1,8 +1,8 @@
 // The website module end to end (apps/website, rounds 2026-10-21 and 2026-10-22, PLAN §29): the owner fills the
-// editor at /website (hero, contact, «About us» typed key by key and then hidden, the footer's line, the «Forest»
-// palette, «Auto» and the «Modern» design) and publishes; a visitor without a session opens `/` and gets the public
-// page with «Log in», the footer's line and without the hidden section, laid out for a phone, a tablet and a computer
-// with nothing scrolling sideways and the top bar's menu folding on the phone; «Log in» takes her to the SaaS's sign-in; «Auto» follows the device's light or
+// editor at /website (hero with a cover photo, contact, «About us» typed key by key and then hidden, the footer's
+// line, the «Forest» palette, «Auto» and the «Modern» design) and publishes; a visitor without a session opens `/`
+// and gets the public page with the cover, «Log in», the footer's line and without the hidden section, laid out for a
+// phone, a tablet and a computer with nothing scrolling sideways and the top bar's menu folding on the phone; «Log in» takes her to the SaaS's sign-in; «Auto» follows the device's light or
 // dark. Then each of the four designs is published in turn and captured at 390, 820 and 1440 px, light and dark
 // (`.artifacts/WEBSITE-<design>-<width>-<mode>.png`), with the editor's own captures. At the end the site is taken
 // offline again (`website.site.unpublish`): the other specs on hub `a` expect its `/` to jump to the login.
@@ -30,6 +30,7 @@ const FOOTER = "Pepe's Bistro S.L. · Gran Vía 1, Madrid";
 interface ModeColours {
   primary: string;
   bg: string;
+  link: string;
 }
 const PALETTES = JSON.parse(readFileSync(join(HUB_DIR, 'apps', 'website', 'palettes.json'), 'utf8')) as Record<
   string,
@@ -44,6 +45,82 @@ function rgb(hex: string): string {
 }
 
 test.describe.configure({ mode: 'serial' });
+
+interface Rows<T> {
+  rows: T[];
+}
+
+/** The catalog the page lists: a few services of Services in two categories, through its API, created once (the
+ * stack keeps its rows between runs). */
+async function seedServices(context: BrowserContext): Promise<void> {
+  const MENU = [
+    { category: 'Menus', name: 'Lunch menu', price: 1650, duration_minutes: 60 },
+    { category: 'Menus', name: 'Tasting menu', price: 4800, duration_minutes: 120 },
+    { category: 'Events', name: 'Private dining room', price: 35000, duration_minutes: 180 },
+    { category: 'Events', name: 'Cooking class', price: 6500, duration_minutes: 90 },
+  ];
+  const categories = await api<Rows<{ name: string }>>(context, A, 'GET', '/service/categories?limit=100');
+  expect(categories.status).toBe(200);
+  for (const name of new Set(MENU.map((service) => service.category))) {
+    if (categories.data.rows.some((category) => category.name === name)) continue;
+    const created = await api(context, A, 'POST', '/service/categories', { name });
+    expect(created.status, `category ${name}: ${JSON.stringify(created.data)}`).toBe(201);
+  }
+  const services = await api<Rows<{ name: string }>>(context, A, 'GET', '/service/services?limit=100');
+  expect(services.status).toBe(200);
+  for (const service of MENU) {
+    if (services.data.rows.some((row) => row.name === service.name)) continue;
+    const created = await api(context, A, 'POST', '/service/services', { ...service, tax_category_key: 'service.generic' });
+    expect(created.status, `service ${service.name}: ${JSON.stringify(created.data)}`).toBe(201);
+  }
+}
+
+/** The catalog section on, from Services, with its own heading and every category (whatever a run before left). */
+async function showServices(context: BrowserContext): Promise<void> {
+  const site = await api<{ template: string; theme: unknown; content: Record<string, unknown> }>(context, A, 'GET', '/website/site');
+  expect(site.status).toBe(200);
+  const { template, theme, content } = site.data;
+  const catalog = { hidden: false, title: '', source: 'service', category_ids: [], show_prices: true };
+  const saved = await api(context, A, 'POST', '/website/site', { template, theme, content: { ...content, catalog } });
+  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
+}
+
+/** A photo for the header, drawn in the page (no binary in the repository): a warm gradient with soft lights and the
+ * business's name as a small mark in a corner (never under the page's own title), as a JPEG. */
+async function samplePhoto(page: Page, width: number, height: number, label: string): Promise<Buffer> {
+  const url = await page.evaluate(
+    ({ width, height, label }) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const draw = canvas.getContext('2d') as CanvasRenderingContext2D;
+      const gradient = draw.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#f2c38b');
+      gradient.addColorStop(0.55, '#b5532f');
+      gradient.addColorStop(1, '#2f5f63');
+      draw.fillStyle = gradient;
+      draw.fillRect(0, 0, width, height);
+      for (const [x, y, r, alpha] of [
+        [0.2, 0.3, 0.35, 0.18],
+        [0.8, 0.7, 0.45, 0.14],
+        [0.6, 0.2, 0.2, 0.12],
+      ]) {
+        draw.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        draw.beginPath();
+        draw.arc(x * width, y * height, r * height, 0, Math.PI * 2);
+        draw.fill();
+      }
+      draw.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      draw.font = `600 ${Math.round(height / 26)}px Georgia, serif`;
+      draw.textAlign = 'right';
+      draw.textBaseline = 'bottom';
+      draw.fillText(label, width - height / 20, height - height / 20);
+      return canvas.toDataURL('image/jpeg', 0.86);
+    },
+    { width, height, label },
+  );
+  return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+}
 
 const field = (page: Page, testid: string) => page.getByTestId(testid).locator('input, textarea').first();
 
@@ -118,6 +195,21 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   await expect(page.locator('header a[href="/auth/login"]')).toHaveText('Log in');
   await expect(page.locator('footer a[href="/auth/login"]')).toHaveText('Log in');
   await expect(page.locator('footer [data-ep-footer-text]')).toHaveText(FOOTER);
+  // The catalog: Services' offer as cards, priced, with a pill per category, refreshed live by the public bundle.
+  const catalog = page.locator('[data-ep-block="catalog"]');
+  for (const name of ['Lunch menu', 'Tasting menu', 'Private dining room', 'Cooking class']) {
+    await expect(catalog.locator('.card-title').filter({ hasText: name })).toHaveCount(1);
+  }
+  await expect(catalog.locator('.nav-pills .nav-link')).toHaveCount(2);
+  await expect(catalog.locator('.nav-pills')).toContainText('Menus');
+  await expect(catalog.locator('.nav-pills')).toContainText('Events');
+  await expect(catalog.locator('.badge').first()).toHaveText(/€/);
+  // The cover fills the header (under its veil in classic and bold, framed beside the title in modern, wide under it
+  // in minimal), and it loads.
+  const cover = page.locator('[data-ep-section="hero"] img');
+  await expect(cover).toBeVisible();
+  await expect(cover).toHaveCSS('object-fit', 'cover');
+  await expect.poll(() => cover.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   // Bootstrap's own stylesheet reached the page (the bundle, under the public CSP).
   await expect(page.locator('header .navbar')).toHaveCSS('display', 'flex');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -141,13 +233,11 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
     await expect(page.locator('.navbar-toggler')).toBeHidden();
     await expect(page.locator('#ws-nav a[href="#contact"]')).toBeVisible();
   }
-  // The buttons take the palette: on bold's dark bar the dark set, elsewhere the page's own.
+  // «Log in» is an outline pill in the palette's link colour: on bold's dark bar the dark set, elsewhere the page's.
   const bar = template === 'bold' ? FOREST.dark : FOREST[mode];
   const login = page.locator('header a[href="/auth/login"]');
-  if (template !== 'minimal' && template !== 'classic') {
-    await expect(login).toHaveCSS('background-color', rgb(bar.primary));
-    await expect(login).toHaveCSS('color', bar === FOREST.light ? 'rgb(255, 255, 255)' : 'rgb(0, 0, 0)');
-  }
+  await expect(login).toHaveCSS('color', rgb(bar.link));
+  await expect(login).toHaveCSS('border-top-color', rgb(bar.link));
   await settled(page);
   await page.screenshot({ path: shot(`WEBSITE-${template}-${width}-${mode}`), fullPage: true });
   await context.close();
@@ -157,12 +247,22 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
   test.setTimeout(480_000);
   const { context, page } = await hostPage(browser, A, { next: '/website', viewport: WIDTHS[1440] });
   try {
+    await seedServices(context);
+    await showServices(context);
+    await page.reload();
     await expect(page.getByTestId('website-editor')).toBeVisible();
 
     // The editor: hero, contact, the «Forest» palette, «Auto» and the «Modern» design.
     await field(page, 'website-field-topbar-name').fill("Pepe's Bistro");
     await field(page, 'website-field-hero-title').fill(HERO);
     await field(page, 'website-field-hero-tagline').fill(TAGLINE);
+    // The cover, through the editor's own upload.
+    await page.getByTestId('website-image-cover-file').setInputFiles({
+      name: 'cover.jpg',
+      mimeType: 'image/jpeg',
+      buffer: await samplePhoto(page, 1600, 900, "Pepe's Bistro"),
+    });
+    await expect(page.getByTestId('website-image-cover-image')).toBeVisible({ timeout: 15_000 });
 
     // Regression (Ioan, 2026-10-22): typing key by key in a section opened by hand keeps the section open, the
     // cursor in the field and every letter, also across the autosave and its result coming back live.
@@ -189,6 +289,9 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
     await field(page, 'website-field-footer-text').fill(FOOTER);
     await page.getByTestId('website-palette-forest').click();
     await expect(page.getByTestId('website-palette-forest')).toHaveAttribute('aria-checked', 'true');
+    // The palette's own two colours are on show, ready to change; nothing to reset.
+    await expect(field(page, 'website-colour-primary')).toHaveValue(FOREST.light.primary);
+    await expect(page.getByTestId('website-colours-reset')).toHaveCount(0);
     // (Vue sets an ion-segment-button's `value` as a property: no `[value=…]` selector matches it.)
     await page.getByTestId('website-mode').locator('ion-segment-button').filter({ hasText: 'Auto' }).click();
     await expect(page.getByTestId('website-mode-auto-hint')).toBeVisible();

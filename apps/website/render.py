@@ -13,14 +13,20 @@ visitor's language; what the owner wrote is shown as written.
 The catalog is painted from a snapshot (``published_content["catalog"]``, or the preview's fresh read) in a block the
 bundle refreshes (``data-ep-block="catalog"``); :func:`catalog_view` prices it for the language, and the public
 catalog API answers the same shape.
+
+The header invites to write (WhatsApp, else the contact section) and to come (the address), and the opening hours
+mark today, the business's own day (:func:`local_day`, in the hub's time zone; Spain's when it has none): the caller
+passes it, and the public home keeps one page per day.
 """
 
+import datetime as dt
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from babel.numbers import format_currency
 from django.template.loader import render_to_string
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext, pgettext
 from live.markdown import render_markdown
 
@@ -31,6 +37,29 @@ from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
 CURRENCY = "EUR"
 #: The sections between the hero and the footer, in their order.
 BODY_SECTIONS = ("about", "catalog", "contact", "location")
+#: The business's time zone when its hub has none: ERPlora sells in Spain.
+DEFAULT_TIME_ZONE = "Europe/Madrid"
+
+
+def local_day(time_zone: str = "", now: dt.datetime | None = None) -> str:
+    """Today (``mon`` … ``sun``) where the business is: in ``time_zone`` (the hub's), or in Spain's when it has none or
+    names none that exists."""
+    try:
+        zone = ZoneInfo(time_zone or DEFAULT_TIME_ZONE)
+    # Unknown («Mars/Olympus», a folder like «America»): ZoneInfoNotFoundError, a KeyError; malformed: ValueError.
+    except KeyError, ValueError:
+        zone = ZoneInfo(DEFAULT_TIME_ZONE)
+    return DAYS[(now or timezone.now()).astimezone(zone).weekday()]
+
+
+def _eyebrows() -> dict[str, str]:
+    """The small line over each section's heading."""
+    return {
+        "about": pgettext("website", "Who we are"),
+        "catalog": pgettext("website", "What we offer"),
+        "contact": pgettext("website", "Get in touch"),
+        "location": pgettext("website", "Visit us"),
+    }
 
 
 def _day_names() -> dict[str, str]:
@@ -55,12 +84,14 @@ def render_site(
     catalog: dict | None = None,
     request: Any = None,
     preview: bool = False,
+    today: str | None = None,
 ) -> str:
     """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
 
     ``catalog`` is the snapshot the catalog section paints; ``preview`` marks the editor's preview (not indexed,
-    links inert, no refresh). ``request`` is accepted for symmetry with Django's renderers and never used: the HTML
-    must not depend on who asked. Raises ``ValueError`` for an unknown template or an invalid theme or content.
+    links inert, no refresh); ``today`` (``mon`` … ``sun``, :func:`local_day`) is marked in the opening hours.
+    ``request`` is accepted for symmetry with Django's renderers and never used: the HTML must not depend on who
+    asked. Raises ``ValueError`` for an unknown template or an invalid theme or content.
     """
     del request  # The cached HTML is the same for every visitor.
     if template not in TEMPLATES:
@@ -68,19 +99,40 @@ def render_site(
     valid_theme = Theme.model_validate(theme or {})
     valid_content = Content.model_validate(content or {})
     with translation.override(lang):
-        body = _body(valid_content, catalog)
+        body = _body(valid_content, catalog, today)
+        site_name = valid_content.topbar.name or hub
         context = {
             "lang": lang,
             "template": template,
             "preview": preview,
             "theme": _theme(valid_theme),
-            "site_name": valid_content.topbar.name or hub,
+            "site_name": site_name,
+            # The letter on the header's gradient when there is no cover.
+            "initial": site_name[:1].upper(),
             "content": valid_content,
             "body": body,
-            # The hero's button: to the first section shown, by its heading.
-            "cta": {"name": body[0]["name"], "title": body[0]["data"]["title"]} if body else None,
+            "ctas": _calls_to_action(body),
         }
         return render_to_string(f"website/templates/{template}.html", context)
+
+
+def _calls_to_action(body: list[dict]) -> list[dict]:
+    """The header's buttons, two at most: write (WhatsApp, else the contact section) and come (the address); without
+    either on the page, the first section shown; with nothing shown, none."""
+    shown = {section["name"]: section["data"] for section in body}
+    ctas = []
+    if "contact" in shown:
+        whatsapp = shown["contact"]["whatsapp_href"]
+        ctas.append(
+            {"href": whatsapp, "label": pgettext("website", "Chat on WhatsApp"), "whatsapp": True}
+            if whatsapp
+            else {"href": "#contact", "label": pgettext("website", "Contact us"), "whatsapp": False}
+        )
+    if "location" in shown:
+        ctas.append({"href": "#location", "label": pgettext("website cta", "Find us"), "whatsapp": False})
+    if not ctas and body:
+        ctas.append({"href": f"#{body[0]['name']}", "label": body[0]["data"]["title"], "whatsapp": False})
+    return ctas
 
 
 def catalog_view(catalog: dict | None) -> dict:
@@ -178,16 +230,22 @@ def _variables(colours: dict[str, str]) -> dict[str, str]:
     return variables
 
 
-def _body(content: Content, catalog: dict | None) -> list[dict]:
+def _body(content: Content, catalog: dict | None, today: str | None) -> list[dict]:
     """The sections between the hero and the footer that are shown and have something to show."""
-    builders = {"about": _about, "catalog": _catalog, "contact": _contact, "location": _location}
+    eyebrows = _eyebrows()
     body = []
     for name in BODY_SECTIONS:
         section = getattr(content, name)
         if section.hidden:
             continue
-        data = builders[name](section, catalog) if name == "catalog" else builders[name](section)
+        if name == "catalog":
+            data = _catalog(section, catalog)
+        elif name == "contact":
+            data = _contact(section, today)
+        else:
+            data = {"about": _about, "location": _location}[name](section)
         if data is not None:
+            data["eyebrow"] = eyebrows[name]
             body.append({"name": name, "partial": f"website/sections/{name}.html", "data": data})
     return body
 
@@ -209,15 +267,19 @@ def _catalog(section, catalog: dict | None) -> dict | None:
     default_title = (
         pgettext("website", "Our services") if section.source == "service" else pgettext("website", "Our products")
     )
-    return {"title": section.title or default_title, **view}
+    groups = [{**group, "anchor": f"ws-cat-{index}"} for index, group in enumerate(view["groups"], start=1)]
+    named = [group for group in groups if group["name"]]
+    # Pills to jump between the categories, when there are two or more with a name.
+    return {"title": section.title or default_title, **view, "groups": groups, "pills": named if len(named) > 1 else []}
 
 
-def _contact(section) -> dict | None:
-    socials = [
-        (label, getattr(section.socials, key))
-        for key, label in (("instagram", "Instagram"), ("facebook", "Facebook"), ("tiktok", "TikTok"), ("x", "X"))
+def _contact(section, today: str | None = None) -> dict | None:
+    # Each profile by name (the template writes each one's own icon).
+    socials = {
+        key: getattr(section.socials, key)
+        for key in ("instagram", "facebook", "tiktok", "x")
         if getattr(section.socials, key)
-    ]
+    }
     if not (section.phone or section.whatsapp or section.email or socials or section.hours):
         return None
     days = _day_names()
@@ -234,6 +296,7 @@ def _contact(section) -> dict | None:
                 "day": days[row.day],
                 "times": ", ".join(f"{interval.opens}–{interval.closes}" for interval in row.intervals)
                 or pgettext("opening hours", "Closed"),
+                "today": row.day == today,
             }
             for row in sorted(section.hours, key=lambda row: DAYS.index(row.day))
         ],

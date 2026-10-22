@@ -254,3 +254,35 @@ msgstr "Abrir el mapa"
 msgctxt "website"
 msgid "Menu"
 msgstr "Menú"
+
+msgctxt "website"
+msgid "Who we are"
+msgstr "Quiénes somos"
+
+msgctxt "website"
+msgid "What we offer"
+msgstr "Lo que ofrecemos"
+
+msgctxt "website"
+msgid "Get in touch"
+msgstr "Hablemos"
+
+msgctxt "website"
+msgid "Visit us"
+msgstr "Visítanos"
+
+msgctxt "website"
+msgid "Chat on WhatsApp"
+msgstr "Escríbenos por WhatsApp"
+
+msgctxt "website"
+msgid "Contact us"
+msgstr "Contáctanos"
+
+msgctxt "website cta"
+msgid "Find us"
+msgstr "Cómo llegar"
+
+msgctxt "website"
+msgid "Today"
+msgstr "Hoy"

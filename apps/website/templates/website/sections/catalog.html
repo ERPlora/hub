@@ -1,17 +1,26 @@
-{% load i18n %}<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-ep-block="catalog" data-ep-source="{{ data.source }}" data-ep-empty="{% translate "Nothing to show here yet." context "website" %}">
-  {% for group in data.groups %}
-  <div class="col">
-    {% if group.name %}<h3 class="h5 mb-2 ws-display">{{ group.name }}</h3>{% endif %}
-    <ul class="list-group list-group-flush">
-      {% for item in group.items %}
-      <li class="list-group-item bg-transparent px-0 d-flex align-items-baseline gap-3">
-        <span class="flex-grow-1">{{ item.name }}{% if item.minutes %} <small class="text-body-secondary text-nowrap">{{ item.minutes }} min</small>{% endif %}</span>
-        {% if item.price_label %}<span class="fw-semibold text-nowrap">{{ item.price_label }}</span>{% endif %}
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% empty %}
-  <div class="col-12"><p class="text-body-secondary mb-0">{% translate "Nothing to show here yet." context "website" %}</p></div>
-  {% endfor %}
+{% load i18n %}{% comment %}The catalog's block: frontend/public/catalog.ts rebuilds exactly this markup from the public API, and
+frontend/public/catalog.fixture.json holds it for both sides' tests. Change the three together.{% endcomment %}<div data-ep-block="catalog" data-ep-source="{{ data.source }}" data-ep-empty="{% translate "Nothing to show here yet." context "website" %}">
+  {% if data.pills %}<ul class="nav nav-pills flex-wrap gap-2 mb-4">
+    {% for group in data.pills %}<li class="nav-item"><a class="nav-link rounded-pill border" href="#{{ group.anchor }}">{{ group.name }}</a></li>
+    {% endfor %}
+  </ul>{% endif %}
+  {% if data.groups %}<div class="d-grid gap-5">
+    {% for group in data.groups %}<div id="{{ group.anchor }}">
+      {% if group.name %}<h3 class="h5 fw-semibold mb-3 ws-display">{{ group.name }}</h3>{% endif %}
+      <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for item in group.items %}<div class="col">
+          <div class="card h-100 border-0 rounded-4 shadow-sm overflow-hidden ws-lift">
+            <div class="ratio ratio-21x9 ws-thumb" aria-hidden="true"><span class="d-flex align-items-center justify-content-center fs-1 fw-bold ws-display">{{ item.name|first|upper }}</span></div>
+            <div class="card-body d-flex align-items-start justify-content-between gap-3">
+              <div>
+                <h4 class="h6 card-title mb-1">{{ item.name }}</h4>
+                {% if item.minutes %}<p class="small text-body-secondary mb-0">{{ item.minutes }} min</p>{% endif %}
+              </div>
+              {% if item.price_label %}<span class="badge rounded-pill text-bg-secondary fs-6 text-nowrap">{{ item.price_label }}</span>{% endif %}
+            </div>
+          </div>
+        </div>{% endfor %}
+      </div>
+    </div>{% endfor %}
+  </div>{% else %}<p class="text-body-secondary mb-0">{% translate "Nothing to show here yet." context "website" %}</p>{% endif %}
 </div>

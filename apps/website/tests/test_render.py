@@ -1,13 +1,17 @@
 """``render_site``: the same content painted by any of the four templates, always with «Log in»; what is hidden is not
 painted, nothing the owner typed becomes HTML or a script, and the page carries no nonce and no inline script."""
 
+import json
 import re
 import uuid
+from datetime import UTC, datetime
+from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 
 from apps.website.palettes import PALETTES, resolve, rgb
-from apps.website.render import render_site
+from apps.website.render import local_day, render_site
 from apps.website.schemas import SECTIONS, TEMPLATES
 from apps.website.tests.conftest import WEBSITE_CSS, WEBSITE_JS, catalog_snapshot, full_content
 
@@ -18,7 +22,7 @@ LOGIN = re.compile(r'<a\b[^>]*href="/auth/login"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+?)
 IMAGE_URL = f"/p/media/{uuid.uuid4().hex}/website/img/0123456789abcdef.png"
 
 
-def render(template="classic", content=None, lang="en", catalog=None, preview=False, theme=None) -> str:
+def render(template="classic", content=None, lang="en", catalog=None, preview=False, theme=None, today=None) -> str:
     return render_site(
         template,
         theme or THEME,
@@ -27,6 +31,7 @@ def render(template="classic", content=None, lang="en", catalog=None, preview=Fa
         hub="a",
         catalog=catalog_snapshot() if catalog is None else catalog,
         preview=preview,
+        today=today,
     )
 
 
@@ -108,6 +113,11 @@ def test_the_page_speaks_the_visitors_language():
     assert LOGIN.findall(html) == ["Entrar", "Entrar"]
     for text in ("Lunes", "Domingo", "Cerrado", "15,00\xa0€", "Desde 40,00\xa0€", "Gratis", "Sobre nosotros"):
         assert text in html, text
+    chrome = ("Quiénes somos", "Lo que ofrecemos", "Hablemos", "Visítanos", "Escríbenos por WhatsApp", "Cómo llegar")
+    for text in chrome:
+        assert text in html, text
+    assert ">Hoy</span>" in render(lang="es", today="mon")
+    assert "Contáctanos" in render(lang="es", content=full_content(contact={"whatsapp": ""}))
 
 
 @pytest.mark.parametrize("template", TEMPLATES)
@@ -259,20 +269,176 @@ def test_only_bolds_bar_and_footer_stay_dark_the_rest_follow_the_page(template):
         assert "data-bs-theme" not in nav and "data-bs-theme" not in footer
 
 
-@pytest.mark.parametrize("template", ["classic", "modern", "bold"])
-def test_the_hero_invites_to_the_first_section_shown(template):
-    hero = re.search(r'<section[^>]*data-ep-section="hero".*?</section>', render(template), re.S).group(0)
-    assert re.search(r'<a class="btn[^"]*" href="#about">About us</a>', hero)
-    hidden = render(template, content=full_content(about={"hidden": True}))
-    hero = re.search(r'<section[^>]*data-ep-section="hero".*?</section>', hidden, re.S).group(0)
-    assert re.search(r'<a class="btn[^"]*" href="#catalog">Our services</a>', hero)
-    alone = render(template, content={})
-    assert 'href="#' not in re.search(r'<section[^>]*data-ep-section="hero".*?</section>', alone, re.S).group(0)
+def hero_of(html: str) -> str:
+    return re.search(r'<section[^>]*data-ep-section="hero".*?</section>', html, re.S).group(0)
+
+
+def section_of(html: str, name: str) -> str:
+    return re.search(rf'<section id="{name}"[^>]*data-ep-section="{name}".*?</section>', html, re.S).group(0)
+
+
+def calls_to_action(html: str) -> list[tuple[str, str, str]]:
+    """The hero's buttons: (classes, link, label)."""
+    return re.findall(
+        r'<a class="(btn\b[^"]*)" href="([^"]+)"[^>]*>\s*(?:<span[^>]*></span>\s*)?([^<]+?)\s*</a>', hero_of(html)
+    )
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_hero_offers_two_pills_whatsapp_or_contact_and_find_us(template):
+    # Ioan's redesign (2026-10-22): the header invites to write (WhatsApp, else the contact section) and to come.
+    ctas = calls_to_action(render(template))
+    assert [(href, label) for _classes, href, label in ctas] == [
+        ("https://wa.me/34600123456", "Chat on WhatsApp"),
+        ("#location", "Find us"),
+    ]
+    assert all("rounded-pill" in classes.split() for classes, _href, _label in ctas)
+    whatsapp = re.search(r'<a [^>]*href="https://wa.me/34600123456"[^>]*>', hero_of(render(template))).group(0)
+    assert 'target="_blank"' in whatsapp and 'rel="noopener noreferrer"' in whatsapp
+    no_whatsapp = calls_to_action(render(template, content=full_content(contact={"whatsapp": ""})))
+    assert [(href, label) for _c, href, label in no_whatsapp] == [("#contact", "Contact us"), ("#location", "Find us")]
+    # Without the contact and the address on the page, the first section shown; with nothing, no button.
+    elsewhere = render(template, content=full_content(contact={"hidden": True}, location={"hidden": True}))
+    assert [(href, label) for _c, href, label in calls_to_action(elsewhere)] == [("#about", "About us")]
+    assert calls_to_action(render(template, content={})) == []
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_hero_paints_the_cover_under_an_overlay_and_a_palette_gradient_without_one(template):
+    cover = {"id": str(uuid.uuid4()), "url": IMAGE_URL}
+    hero = hero_of(render(template, content=full_content(hero={"cover": cover})))
+    images = re.findall(r"<img\b[^>]*>", hero)
+    assert len(images) == 1 and f'src="{IMAGE_URL}"' in images[0]
+    assert "object-fit-cover" in images[0] and 'alt=""' in images[0]
+    assert "ws-hero-overlay" in hero and "ws-hero-glow" not in hero
+    plain = hero_of(render(template))
+    assert "<img" not in plain and "ws-hero-overlay" not in plain and "ws-hero-glow" in plain
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_hero_title_is_display_type_and_the_tagline_a_lead(template):
+    hero = hero_of(render(template))
+    title = re.search(r'<h1 class="([^"]*)">([^<]*)</h1>', hero)
+    assert re.search(r"\bdisplay-[1-6]\b", title.group(1)) and "ws-display" in title.group(1)
+    assert title.group(2) == "Fresh food every day"
+    assert re.search(r'<p class="[^"]*\blead\b[^"]*">Since 1998 in Gran Vía</p>', hero)
 
 
 def test_the_minimal_hero_stays_quiet():
-    hero = re.search(r'<section[^>]*data-ep-section="hero".*?</section>', render("minimal"), re.S).group(0)
-    assert "btn" not in hero
+    # Minimal's two calls to action are an outline pill and a link, never a filled button.
+    ctas = calls_to_action(render("minimal"))
+    assert len(ctas) == 2
+    assert all(" btn-primary" not in f" {classes} " for classes, _href, _label in ctas)
+    assert "btn-outline-primary" in ctas[0][0].split() and "btn-link" in ctas[1][0].split()
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_top_bar_is_a_sticky_glass_bar_with_the_logo_and_an_outline_pill_to_log_in(template):
+    logo = {"id": str(uuid.uuid4()), "url": IMAGE_URL}
+    html = render(template, content=full_content(topbar={"logo": logo}))
+    header = re.search(r'<header[^>]*data-ep-section="topbar"[^>]*>.*?</header>', html, re.S).group(0)
+    assert re.search(r'<header\b[^>]*\bclass="[^"]*\bsticky-top\b', header)
+    assert "ws-glass" in header
+    assert re.search(rf'<img class="[^"]*ws-logo[^"]*" src="{IMAGE_URL}" alt="Pepe&#x27;s Bistro">', header)
+    login = re.search(r'<a class="([^"]*)" href="/auth/login"', header).group(1).split()
+    assert {"btn", "btn-outline-primary", "rounded-pill"} <= set(login)
+    assert "<img" not in re.search(r"<header.*?</header>", render(template), re.S).group(0)
+
+
+EYEBROWS = {"about": "Who we are", "catalog": "What we offer", "contact": "Get in touch", "location": "Visit us"}
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_each_section_has_an_eyebrow_over_its_heading_and_its_content_in_rounded_cards(template):
+    html = render(template, content=full_content(about={"image": {"id": str(uuid.uuid4()), "url": IMAGE_URL}}))
+    for name, eyebrow in EYEBROWS.items():
+        section = section_of(html, name)
+        assert re.search(rf'<p class="[^"]*\bws-eyebrow\b[^"]*">{eyebrow}</p>\s*<h2\b', section), (name, section)
+        assert "rounded-4" in section and "shadow-sm" in section, name
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_about_puts_its_photo_in_a_rounded_frame_beside_the_text(template):
+    html = render(template, content=full_content(about={"image": {"id": str(uuid.uuid4()), "url": IMAGE_URL}}))
+    about = section_of(html, "about")
+    photo = re.search(rf'<img class="([^"]*)" src="{IMAGE_URL}"', about)
+    assert "object-fit-cover" in photo.group(1) or "img-fluid" in photo.group(1)
+    # The photo's nearest frame is rounded.
+    before = about[: photo.start()]
+    assert "rounded-4" in before[before.rfind("<div") :]
+    assert about.count("col-lg-6") == 2
+    assert "col-lg-6" not in section_of(render(template), "about")
+
+
+def test_the_catalog_is_a_grid_of_cards_with_a_placeholder_a_price_pill_and_category_pills():
+    html = render()
+    block = re.search(r'<div data-ep-block="catalog".*?</section>', html, re.S).group(0)
+    assert 'class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"' in block
+    assert block.count('class="card ') == 3
+    assert re.search(r'<span class="badge rounded-pill[^"]*">€15.00</span>', block)
+    # No photo in the catalog: a gradient with the item's initial.
+    assert re.search(r'<div class="ratio ratio-21x9 ws-thumb" aria-hidden="true"><span class="[^"]*">C</span>', block)
+    # One named category: no pills to jump between categories; two or more: one pill each.
+    assert "nav-pills" not in block
+    named = [{**group, "name": group["name"] or "Other"} for group in catalog_snapshot()["groups"]]
+    two = {**catalog_snapshot(), "groups": named}
+    pills = re.search(r'<ul class="nav nav-pills[^"]*">.*?</ul>', render(catalog=two), re.S).group(0)
+    assert re.findall(r'<a class="nav-link[^"]*" href="(#ws-cat-\d)">([^<]+)</a>', pills) == [
+        ("#ws-cat-1", "Hair"),
+        ("#ws-cat-2", "Other"),
+    ]
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_contact_is_chips_with_icons_whatsapp_a_pill_and_the_socials_pills(template):
+    contact = section_of(render(template), "contact")
+    phone = re.search(r'<a class="([^"]*)" href="tel:\+34600123456">(.*?)</a>', contact, re.S)
+    assert "ws-chip" in phone.group(1) and "rounded-4" in phone.group(1)
+    glyph = r'<span class="[^"]*\bws-glyph\b[^"]*rounded-circle[^"]*" aria-hidden="true">'
+    assert re.search(glyph + r'<span class="ws-icon ws-icon-call">', phone.group(2))
+    assert "+34 600 123 456" in phone.group(2)
+    email = re.search(r'<a class="[^"]*ws-chip[^"]*" href="mailto:hola@pepe.es">(.*?)</a>', contact, re.S).group(1)
+    assert "ws-icon-mail" in email
+    whatsapp = re.search(r'<a class="([^"]*)" href="https://wa.me/34600123456"[^>]*>(.*?)</a>', contact, re.S)
+    assert {"btn", "rounded-pill"} <= set(whatsapp.group(1).split()) and "ws-icon-whatsapp" in whatsapp.group(2)
+    assert "Chat on WhatsApp" in whatsapp.group(2)
+    instagram = re.search(r'<a class="([^"]*)" href="https://instagram.com/pepe"[^>]*>(.*?)</a>', contact, re.S)
+    assert {"btn", "rounded-pill"} <= set(instagram.group(1).split()) and "ws-icon-instagram" in instagram.group(2)
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_opening_hours_are_a_flush_list_with_today_marked(template):
+    contact = section_of(render(template, today="mon"), "contact")
+    hours = re.search(r'<ul class="list-group list-group-flush[^"]*">(.*?)</ul>', contact, re.S).group(1)
+    rows = re.findall(r"<li\b([^>]*)>(.*?)</li>", hours, re.S)
+    assert [("Monday" in body, "aria-current" in attrs) for attrs, body in rows] == [(True, True), (False, False)]
+    assert 'aria-current="date"' in rows[0][0] and "bg-primary-subtle" in rows[0][0]
+    assert re.search(r'<span class="badge rounded-pill[^"]*">Today</span>', rows[0][1])
+    assert "Today" not in rows[1][1]
+    # On a phone the times wrap under the day; a day's name never breaks («Wednesda y», 2026-10-22).
+    assert all("flex-wrap" in attrs for attrs, _body in rows)
+    assert re.search(r'<span class="text-nowrap">Monday ', rows[0][1]) and '<span class="text-nowrap">Sunday</span>' in rows[1][1]
+    assert "aria-current" not in section_of(render(template, today="tue"), "contact")
+    assert "aria-current" not in section_of(render(template), "contact")
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_location_is_a_card_with_an_open_the_map_pill(template):
+    location = section_of(render(template), "location")
+    assert re.search(r'class="card[^"]*rounded-4[^"]*"', location)
+    map_url = re.escape("https://maps.google.com/?q=Gran+Via+1")
+    link = re.search(rf'<a class="([^"]*)" href="{map_url}"[^>]*>(.*?)</a>', location, re.S)
+    assert {"btn", "rounded-pill"} <= set(link.group(1).split()) and "Open the map" in link.group(2)
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_footer_has_columns_the_sections_and_log_in(template):
+    footer = footer_of(render(template))
+    assert 'class="row' in footer and len(re.findall(r'class="col-', footer)) >= 2
+    assert re.findall(r'href="#([a-z]+)"', footer) == ["about", "catalog", "contact", "location"]
+    assert "small" in footer and "text-body-secondary" in footer
+    login = re.search(r'<a class="([^"]*)" href="/auth/login"', footer).group(1).split()
+    assert {"btn", "rounded-pill"} <= set(login)
 
 
 @pytest.mark.parametrize("template", TEMPLATES)
@@ -306,3 +472,70 @@ def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
     assert not re.search(r"<(p|span|small|div)\b[^>]*>\s*</\1>", empty), empty
     # The name and «Log in» stay.
     assert "Pepe&#x27;s Bistro" in empty and LOGIN.findall(empty) == ["Log in"]
+
+
+def test_today_is_the_hubs_own_day_in_its_time_zone_or_madrids():
+    # 2026-10-19 02:30 UTC: Monday in Madrid (04:30), still Sunday in New York (22:30).
+    moment = datetime(2026, 10, 19, 2, 30, tzinfo=UTC)
+    assert local_day("America/New_York", moment) == "sun"
+    assert local_day("Europe/Madrid", moment) == "mon"
+    # Without a time zone, or with one that does not exist: Spain's (ERPlora sells in Spain).
+    assert local_day("", moment) == "mon"
+    assert local_day("Mars/Olympus", moment) == "mon"
+    assert local_day("../etc", moment) == "mon"
+
+
+# The catalog's block, as the server paints it and as the public bundle rebuilds it (frontend/public/catalog.ts):
+# both are checked against one fixture (frontend/public/catalog.fixture.json; catalog.test.ts reads it too).
+CATALOG_FIXTURE = Path(__file__).resolve().parents[1] / "frontend" / "public" / "catalog.fixture.json"
+VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+
+
+class _Tokens(HTMLParser):
+    """HTML as a list: ``<tag a="…">`` (attributes sorted), ``</tag>`` and each text with its spaces collapsed."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tokens: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        self.tokens.append("<" + " ".join([tag, *(f'{name}="{value or ""}"' for name, value in sorted(attrs))]) + ">")
+
+    def handle_endtag(self, tag):
+        self.tokens.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        text = " ".join(data.split())
+        if text:
+            self.tokens.append(text)
+
+
+def tokens(html: str) -> list[str]:
+    parser = _Tokens()
+    parser.feed(html)
+    parser.close()
+    return parser.tokens
+
+
+def catalog_block_tokens(html: str) -> list[str]:
+    """The tokens of what is inside ``[data-ep-block="catalog"]``."""
+    found, depth, inside = [], 0, False
+    for token in tokens(html):
+        if not inside:
+            inside = token.startswith("<div ") and 'data-ep-block="catalog"' in token
+            continue
+        if token.startswith("</"):
+            depth -= 1
+            if depth < 0:
+                return found
+        elif token.startswith("<") and token[1:].split(" ")[0].rstrip(">") not in VOID:
+            depth += 1
+        found.append(token)
+    raise AssertionError("no catalog block")
+
+
+def test_the_catalog_block_is_the_markup_the_public_bundle_rebuilds():
+    fixture = json.loads(CATALOG_FIXTURE.read_text(encoding="utf-8"))
+    assert {case["name"] for case in fixture["cases"]} == {"two categories", "one category", "empty"}
+    for case in fixture["cases"]:
+        assert catalog_block_tokens(render(catalog=case["catalog"])) == tokens(case["html"]), case["name"]

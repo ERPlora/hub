@@ -41,11 +41,12 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
 **Editar / Vista previa** cambia entre los dos.
 
 - **Diseño**: cuatro tarjetas con un dibujo de cada plantilla en los colores de la paleta: **Clásica** (centrada y
-  atemporal: nombre y títulos con serifa, cabecera centrada sobre una franja suave y cada sección en una tarjeta),
-  **Moderna** (barra fija, título y foto lado a lado y cada sección en dos columnas), **Minimalista** (una sola
-  columna estrecha con mucho aire, letra de lectura con serifa y líneas finas entre secciones) y **Llamativa** (barra
-  oscura, cabecera a todo el ancho en el color principal con mayúsculas grandes y un botón fuerte). Las cuatro sirven
-  para un restaurante, una peluquería, una tienda o un servicio.
+  cálida: la foto de portada a todo el ancho bajo un velo, título con serifa sobre una raya del color secundario y
+  cada sección centrada), **Moderna** (cabecera partida: título, lema y botones al lado de la foto enmarcada, letra sin
+  serifa gruesa y apretada, rejilla marcada), **Minimalista** (una sola columna estrecha con mucho aire, letra de
+  lectura con serifa, títulos ligeros, líneas finas entre secciones y la foto ancha debajo del título) y **Llamativa**
+  (barra oscura, cabecera a todo el ancho en el color principal, con la foto teñida de ese color, mayúsculas enormes y
+  botones fuertes). Las cuatro sirven para un restaurante, una peluquería, una tienda o un servicio.
 - **Colores**: ocho paletas en tarjetas con sus colores sobre el fondo claro y el oscuro, la elegida resaltada:
   **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**. Debajo, dos
   campos de color (**Color principal** y **Color secundario**) con los de la paleta elegida: cambiarlos hace tuya la
@@ -81,9 +82,19 @@ dirección abre la app (para ver la página: el móvil o una ventana privada) y,
 la dirección aún lleva al acceso del equipo.
 
 ### La página pública (`/` del negocio)
-La plantilla elegida con lo publicado: barra superior con el nombre, el menú de secciones (plegado en un móvil) y
-**Entrar**; cabecera (con un botón a la primera sección, salvo en la minimalista); las secciones que se muestran y
-tienen contenido; pie con **Entrar**. Se adapta a móvil, tableta y ordenador (Bootstrap 5.3) sin desplazamiento
+La plantilla elegida con lo publicado (rediseño moderno del 2026-10-22): barra superior fija y translúcida con el
+logotipo, el nombre, el menú de secciones (plegado en un móvil) y **Entrar** (botón de contorno redondeado);
+cabecera con la foto de portada (o, sin foto, un degradado suave de la paleta, nunca vacía), el título en letra
+grande, el lema y dos botones redondeados: **Escríbenos por WhatsApp** (o **Contáctanos**, a la sección de contacto,
+si no hay WhatsApp) y **Cómo llegar** (a la dirección); sin contacto ni dirección, uno a la primera sección. Cada
+sección lleva una línea pequeña encima del título («Quiénes somos», «Lo que ofrecemos», «Hablemos», «Visítanos») y su
+contenido en tarjetas redondeadas: Sobre nosotros con su foto enmarcada al lado del texto; el catálogo en una rejilla
+de tarjetas (un degradado con la inicial, porque los productos no traen foto; el precio en una píldora; píldoras para
+saltar de categoría si hay dos o más); el contacto en fichas con icono (teléfono, correo), WhatsApp como botón y las
+redes como píldoras; el horario en una lista con **hoy** resaltado (el día del negocio, en la zona horaria del hub;
+sin zona, la de Madrid); la dirección en una tarjeta con **Abrir el mapa**. Pie en columnas: nombre y la línea del
+pie, enlaces a las secciones y **Entrar**. Solo hay transiciones al pasar el ratón (y ninguna si el sistema pide menos
+movimiento). Se adapta a móvil, tableta y ordenador (Bootstrap 5.3) sin desplazamiento
 lateral, con la paleta elegida en claro o en oscuro; en automático, sigue el dispositivo del visitante y cambia si
 este cambia con la página abierta (sin JavaScript, se ve en claro). El catálogo se pinta con lo publicado y, al abrir la
 página, se refresca con los productos o servicios de ese momento y sus precios en el idioma del visitante. El resto
@@ -310,7 +321,9 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
   imágenes). Los enlaces solo `https://`.
 - **Render y caché**: `public_home.respond` pinta la plantilla con lo publicado, en el idioma de `Accept-Language`
   (nunca una cookie), y guarda el HTML una hora en
-  `website:home:<slug>:<versión>:<idioma>:<APP_VERSION>`: publicar cambia la versión y un despliegue cambia los
+  `website:home:<slug>:<versión>:<idioma>:<día>:<APP_VERSION>` (el día es el del negocio, `render.local_day` con la
+  zona horaria del hub o `Europe/Madrid` si no tiene: el horario resalta hoy, así que cada día tiene su página; la
+  vista previa usa el mismo día, `queries.business_day`): publicar cambia la versión y un despliegue cambia los
   ficheros del paquete, así que nunca se sirve una página rancia; tras el COMMIT de publicar o desconectar se borran
   las entradas de la versión anterior. `Cache-Control: public, max-age=60`, sin cookies, y `Vary: Accept-Language,
   Cookie`: «Entrar» vuelve a `/` con sesión, y el navegador no puede servirle la página que guardó para el visitante
@@ -357,8 +370,19 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
 - **Solo Bootstrap en las plantillas**: el marcado usa los componentes y utilidades de Bootstrap 5.3 (rejilla, navbar
   con collapse, card, list-group, `ratio`, `object-fit-cover`…). `frontend/public/site.css` es la única hoja propia:
   pasa la paleta a las variables de los botones primarios, de `text-bg-*` y de la navbar (donde Bootstrap escribe un
-  color fijo) y da a cada plantilla su letra y su espaciado con ganchos `ws-*` (`ws-display`, `ws-tracking`,
-  `ws-hero`, `ws-logo`, `ws-prose`, `ws-btn-contrast` y uno por plantilla). `frontend/public/classes.test.ts` recorre
+  color fijo) y dibuja con ganchos `ws-*` lo que Bootstrap no tiene: la barra translúcida (`ws-glass`; no se llama
+  `ws-nav` porque `nav` ya es una clase de Bootstrap y el test lo prohíbe), el velo de la portada (`ws-hero-overlay`),
+  el degradado sin portada (`ws-hero-glow`), la inicial (`ws-monogram`), los títulos enormes (`ws-mega`), el botón
+  fantasma (`ws-btn-ghost`), la línea sobre los títulos (`ws-eyebrow`), las secciones (`ws-section`, `ws-rule`), las
+  fichas y sus iconos (`ws-chip`, `ws-glyph`, `ws-icon` y `ws-icon-<nombre>`), las tarjetas que suben al pasar el ratón
+  (`ws-lift`), el degradado del catálogo (`ws-thumb`), el panel del mapa (`ws-map`) y el marco de la foto
+  (`ws-frame`), además de la letra de cada plantilla. Los iconos son de Ionicons (MIT, el juego `ion:`) tal como los
+  trae `@erplora/ui`, escritos en `site.css` como máscaras CSS (la página no tiene script para pintarlos ni red para
+  pedirlos): `frontend/public/icons.test.ts` comprueba que cada uno es exactamente el de `ionicons/icons` y que es
+  relleno (los de contorno dibujan su trazo con clases de `ion-icon` que una máscara no ve). El catálogo se pinta igual
+  en el servidor (`sections/catalog.html`) y en el paquete (`catalog.ts`): `frontend/public/catalog.fixture.json`
+  guarda ese marcado y lo comprueban los dos lados (`tests/test_render.py` y `catalog.test.ts`).
+  `frontend/public/classes.test.ts` recorre
   todas las plantillas y el catálogo que reconstruye el paquete: cada clase es de Bootstrap (leída del `bootstrap.css`
   instalado) o un gancho `ws-*` definido en `site.css`, ningún gancho sobra ni sustituye a una utilidad que exista, y
   ninguna clase se calcula con `{{ … }}`. Letras: solo pilas del sistema (CSP, nada por CDN), elegidas para macOS,

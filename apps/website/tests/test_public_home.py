@@ -6,6 +6,8 @@ no nonce and a CSP of its own; the browser may keep it a minute. Without a live 
 login as before, and a session always gets the shell.
 """
 
+import re
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 import pytest
@@ -16,6 +18,7 @@ from live.operations import get
 from apps.website import public_home
 from apps.website.models import Site
 from apps.website.queries import page_cache_key
+from apps.website.render import local_day
 from apps.website.tests.conftest import B, WEBSITE_JS, ctx_for, full_content
 from base.models import Hub
 
@@ -93,8 +96,8 @@ def test_the_page_speaks_the_visitors_language_and_each_language_is_kept_apart(c
     assert "Log in" in visit(client, language="en-GB").content.decode()
     # A language the Hub does not speak gets the source.
     assert "Log in" in visit(client, language="de").content.decode()
-    assert cache.get(page_cache_key("a", 1, "es")) is not None
-    assert cache.get(page_cache_key("a", 1, "en")) is not None
+    assert cache.get(page_cache_key("a", 1, "es", local_day(""))) is not None
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""))) is not None
 
 
 def test_the_page_is_rendered_once_per_publication_and_a_new_one_shows_at_once(client, django_capture_on_commit_callbacks):
@@ -123,9 +126,25 @@ def test_a_new_deploy_renders_the_page_again_for_its_bundle(client, settings):
     publish()
     settings.APP_VERSION = "abc"
     visit(client)
-    assert cache.get(page_cache_key("a", 1, "en")) is not None
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""))) is not None
     settings.APP_VERSION = "def"
-    assert cache.get(page_cache_key("a", 1, "en")) is None
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""))) is None
+
+
+def today_row(page: str) -> str:
+    return re.search(r'<li\b[^>]*aria-current="date"[^>]*>(.*?)</li>', page, re.S).group(1)
+
+
+def test_the_page_marks_today_in_the_hubs_time_zone_and_keeps_each_day_apart(client, monkeypatch):
+    Hub.objects.filter(slug="a").update(timezone="America/New_York")
+    publish()
+    # 2026-10-19 02:30 UTC is still Sunday in New York: the kept page is Sunday's; at 14:00 UTC it is Monday's.
+    monkeypatch.setattr("django.utils.timezone.now", lambda: datetime(2026, 10, 19, 2, 30, tzinfo=UTC))
+    assert "Sunday" in today_row(visit(client).content.decode())
+    monkeypatch.setattr("django.utils.timezone.now", lambda: datetime(2026, 10, 19, 14, 0, tzinfo=UTC))
+    assert "Monday" in today_row(visit(client).content.decode())
+    assert cache.get(page_cache_key("a", 1, "en", "sun")) is not None
+    assert cache.get(page_cache_key("a", 1, "en", "mon")) is not None
 
 
 def test_without_a_publication_the_root_jumps_to_the_login(client):
