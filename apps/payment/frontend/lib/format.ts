@@ -17,7 +17,9 @@ function moneyFormat(locale: string, currency: string): Intl.NumberFormat {
   const key = `${locale}|${currency}`;
   let found = money.get(key);
   if (!found) {
-    found = new Intl.NumberFormat(locale, { style: 'currency', currency });
+    // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint
+    // «1234,56 €» here beside «1.234,56 €» in the other screens (hub#1090).
+    found = new Intl.NumberFormat(locale, { style: 'currency', currency, useGrouping: 'always' });
     money.set(key, found);
   }
   return found;
