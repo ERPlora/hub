@@ -424,6 +424,9 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
   con `MoneyInput` y `lib/money.ts`.
+- Los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `useGrouping: 'always'` en
+  `lib/format.ts`, porque el CLDR del español espera a cinco: hub#1090, que salió de payments#20), como
+  Carrito y Tarifas.
 - Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md`: los iconos y las piezas que viven copiadas en
   la app (tabla de servidor viva, `useT`, dinero y avisos de página).
 
