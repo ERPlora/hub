@@ -1104,26 +1104,19 @@ def test_my_time_off_is_empty_without_a_record(make_user):
 
 
 def test_settings_are_the_defaults_until_the_first_save():
+    # Only the default working day: the other eight old settings changed nothing and are retired.
     assert run("staff.settings.get", SettingsGetIn(), "hub_employee").model_dump() == {
         "default_work_start": "09:00",
         "default_work_end": "18:00",
         "default_break_duration": 60,
-        "min_advance_booking": 1,
-        "max_daily_hours": 12,
-        "overtime_threshold": 40,
-        "show_staff_photos": True,
-        "show_staff_bio": True,
-        "allow_staff_selection": True,
-        "notify_new_appointment": True,
-        "notify_cancellation": True,
     }
     assert not StaffSettings.objects.exists()  # a read never creates the row
 
 
 def test_saved_settings_show_their_hours_as_hh_mm():
-    StaffSettings.objects.create(default_work_start=dt.time(9, 30, 15), max_daily_hours=8, show_staff_bio=False)
+    StaffSettings.objects.create(default_work_start=dt.time(9, 30, 15), default_break_duration=30, max_daily_hours=8)
     settings = run("staff.settings.get", SettingsGetIn())
-    assert (settings.default_work_start, settings.max_daily_hours, settings.show_staff_bio) == ("09:30", 8, False)
+    assert settings.model_dump() == {"default_work_start": "09:30", "default_work_end": "18:00", "default_break_duration": 30}
 
 
 # staff.account.list (STAFF-F03): the «Hub user» selector

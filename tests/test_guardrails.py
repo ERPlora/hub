@@ -14,9 +14,15 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     ``@operation``'s). Single exceptions: ``.using(<schema_editor>.connection.alias)`` in a migration
     (``RunPython``), ``base/tenancy/migrator.py`` and ``base/catalog.py`` (the ``shared`` alias).
 (c) No ``GenericForeignKey``: a hub's models only reference what lives in the same hub database.
-(d) Hub aliases (``hub_<hex>``, ``hub_<hex>__ddl``, ``hub_template…``) go through PgBouncer in
-    transaction mode: no ``pool``, ``CONN_MAX_AGE`` 0 and no server-side cursors; no alias has
-    ``ATOMIC_REQUESTS``.
+(d) Hub aliases (``hub_<hex>``, ``hub_<hex>__ddl``, ``demo_…``, ``hub_template…``) go through PgBouncer in
+    transaction mode: no ``pool``, ``CONN_MAX_AGE`` 0, no server-side cursors and no prepared statements; no alias
+    has ``ATOMIC_REQUESTS``.
+(e) Phase 2's tenancy (plan 2026-10-22, S1; PLAN-DB §14.5, §14.9): no ``CREATE``/``DROP DATABASE`` built by string
+    formatting (``base.tenancy.names``: ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is
+    swapped in); ``apps/`` never imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside
+    ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
+    tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
+    ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``) but the 8 S2 moves first.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -29,7 +35,7 @@ from pathlib import Path, PurePosixPath
 from django.conf import settings
 
 HUB_DIR = Path(__file__).resolve().parent.parent
-SOURCE_ROOTS = ("base", "apps")
+SOURCE_ROOTS = ("base", "control", "apps")
 
 # ── (a) Who may touch the ORM ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +63,15 @@ SHARED_CATALOG_REASON = (
     "(base/tests/test_shared_lint.py), and the hub_shared role (SELECT, INSERT, UPDATE on those two "
     "tables) is the boundary."
 )
+#: Phase 2 (plan 2026-10-22, S1): the tenancy itself chooses and checks the hubs' aliases.
+TENANCY_ALIASES_REASON = (
+    "use_hub registers a hub's alias the first time a process uses it, swapping in a copy of "
+    "connections.settings under a lock, never changing it in place (PLAN-DB §4)."
+)
+TENANCY_IDENTITY_REASON = (
+    "use_hub reads base_hub_identity on the hub's own alias once per process before serving anything from it: "
+    "a database that says it is another hub is refused (PLAN-DB §3, §14.4); outside any operation by design."
+)
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
         "The context builder reads Membership and a fresh copy of the user before any operation "
@@ -74,6 +89,12 @@ ORM_EXCEPTIONS: dict[str, str] = {
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
+    "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
+    "base/tenancy/router.py": (
+        "The TenantRouter compares the databases behind two aliases (connections.settings) to allow a relation: it "
+        "routes, it never queries (PLAN-DB §4)."
+    ),
+    "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
     "apps/website/qr.py": (
         "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
         "(round 2026-10-21)."
@@ -124,15 +145,21 @@ ALIAS_EXCEPTIONS: dict[str, str] = {
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
+    "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
 }
 #: Session-level advisory locks (not the ``_xact_`` ones): PgBouncer in transaction mode loses them.
 SESSION_LOCK_RE = re.compile(r"\bpg_(?:try_)?advisory_lock(?:_shared)?\s*\(")
 
 # ── (d) Hub aliases ────────────────────────────────────────────────────────────────────────────
 
-#: ``hub_<hex>`` (a hub), ``hub_<hex>__ddl`` (its migrator) and ``hub_template…`` (the templates);
-#: the control database is ``default``.
-HUB_ALIAS_PREFIX = "hub_"
+#: ``hub_<hex>`` (a hub), ``hub_<hex>__ddl`` and ``<db_name>__ddl`` (its migrator), ``demo_…`` and ``hub_template…``
+#: (the templates); the control database is ``default``.
+HUB_ALIAS_PREFIXES = ("hub_", "demo_")
+DDL_ALIAS_SUFFIX = "__ddl"
+
+
+def is_hub_alias(alias: str) -> bool:
+    return alias.startswith(HUB_ALIAS_PREFIXES) or alias.endswith(DDL_ALIAS_SUFFIX)
 
 
 def source_files(root: Path) -> list[PurePosixPath]:
@@ -293,17 +320,185 @@ def database_problems(databases: dict) -> list[str]:
     """What breaks PgBouncer or ``@operation``'s transaction in ``DATABASES``; empty when nothing does."""
     problems = []
     for alias, db in databases.items():
-        if alias.startswith(HUB_ALIAS_PREFIX):
-            if (db.get("OPTIONS") or {}).get("pool"):
+        if is_hub_alias(alias):
+            options = db.get("OPTIONS") or {}
+            if options.get("pool"):
                 problems.append(f"{alias}: OPTIONS['pool']")
             max_age = db.get("CONN_MAX_AGE", 0)
             if max_age is None or max_age > 0:
                 problems.append(f"{alias}: CONN_MAX_AGE={max_age}")
             if not db.get("DISABLE_SERVER_SIDE_CURSORS"):
                 problems.append(f"{alias}: server-side cursors on")
+            # Django leaves it unset and psycopg 3 then prepares on the fifth run, which PgBouncer in transaction mode
+            # (max_prepared_statements=0) loses: it must be there, None. A __ddl alias is direct, to the writer.
+            if not alias.endswith(DDL_ALIAS_SUFFIX) and (
+                "prepare_threshold" not in options or options["prepare_threshold"] is not None
+            ):
+                problems.append(f"{alias}: prepare_threshold={options.get('prepare_threshold', 'unset (psycopg: 5)')}")
         if db.get("ATOMIC_REQUESTS"):
             problems.append(f"{alias}: ATOMIC_REQUESTS")
     return problems
+
+
+# ── (e) Phase 2's tenancy ──────────────────────────────────────────────────────────────────────
+
+#: ``CREATE DATABASE``/``DROP DATABASE`` in a string: its name may only come through ``sql.Identifier``.
+DATABASE_DDL_RE = re.compile(r"\b(?:CREATE|DROP|ALTER)\s+DATABASE\b", re.IGNORECASE)
+#: Methods that change a dict in place.
+DICT_MUTATORS = frozenset({"update", "pop", "popitem", "setdefault", "clear", "__setitem__", "__delitem__"})
+#: A ``LISTEN``/``UNLISTEN`` statement, alone in its string (a docstring that mentions it is no statement).
+LISTEN_RE = re.compile(r"(?:UN)?LISTEN(?:\s+\S+)?\s*;?")
+#: Who may still run on phase 1's shared database (``base.tenancy.context.use_shared_database``), each with its
+#: reason; S5 removes it with ``db_name=""``.
+SHARED_DATABASE_USERS: dict[str, str] = {
+    "base/tenancy/context.py": "where it is defined.",
+    "base/worker.py": "the scheduled tasks and the outbox relay of every hub of phase 1 at once; S2's hub_due per hub.",
+    "base/middleware.py": "the Hub admin with no hub chosen shows phase 1's one database, as before.",
+    "base/internal.py": "ERPlora's invoices: the platform hub has no registry row before S2.",
+    "base/management/commands/create_platform_hub.py": "the platform hub has no registry row before S2.",
+    "base/management/commands/shell.py": "manage.py shell (the e2e's relay helpers) on phase 1's database.",
+}
+#: ``transaction.on_commit`` in the modules, pending S2, by file and count: with the hub's own database the operation's
+#: transaction is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a
+#: rollback). The first step of S2 moves them to ``live.operations.on_commit`` and empties this list.
+PENDING_S2_ON_COMMIT: dict[str, int] = {
+    "apps/flow/services.py": 2,
+    "apps/website/services.py": 4,
+    "apps/whatsapp_inbox/services.py": 2,
+}
+#: Hub models that still have a ``hub_id`` column, each with its reason (PLAN-DB §11: the border is the database).
+HUB_ID_COLUMNS: dict[str, str] = {
+    "base.hubidentity": "the identity of the hub's database itself (PLAN-DB §3).",
+    "website.site": "phase 1's scaffold so that a hub's website is not another's /: it goes in S5 (plan, decision 2).",
+    "website.image": "phase 1's scaffold, with the site's: it goes in S5 (plan, decision 2).",
+    "verifactu.config": "not tenancy: the business's id in the SaaS; it becomes business_id (plan, decision 2).",
+}
+
+
+def bare_on_commit_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every ``transaction.on_commit(`` and every import of Django's ``on_commit``."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "on_commit"
+            and _receiver_name(node.func.value) == "transaction"
+        ):
+            found.add((node.lineno, "transaction.on_commit("))
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "django.db.transaction"
+            and any(alias.name == "on_commit" for alias in node.names)
+        ):
+            found.add((node.lineno, "from django.db.transaction import on_commit"))
+    return sorted(found)
+
+
+def database_ddl_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every ``CREATE``/``DROP``/``ALTER DATABASE`` built by formatting a string."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        texts: list[str] = []
+        if isinstance(node, ast.JoinedStr):
+            texts = [part.value for part in node.values if isinstance(part, ast.Constant) and isinstance(part.value, str)]
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
+            texts = [side.value for side in (node.left, node.right) if isinstance(side, ast.Constant) and isinstance(side.value, str)]
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "format"
+            and isinstance(node.func.value, ast.Constant)
+            and isinstance(node.func.value.value, str)
+        ):
+            texts = [node.func.value.value]
+        if any(DATABASE_DDL_RE.search(text) for text in texts):
+            found.add((node.lineno, "database DDL by string formatting"))
+    return sorted(found)
+
+
+def _is_connections_settings(node: ast.AST) -> bool:
+    return isinstance(node, ast.Attribute) and node.attr == "settings" and _receiver_name(node.value) == "connections"
+
+
+def settings_mutation_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every change in place of ``connections.settings`` (an item set or deleted, a mutator)."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        targets = []
+        if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        elif isinstance(node, ast.Delete):
+            targets = node.targets
+        for target in targets:
+            if isinstance(target, ast.Subscript) and _is_connections_settings(target.value):
+                found.add((node.lineno, "connections.settings[...] changed in place"))
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in DICT_MUTATORS
+            and _is_connections_settings(node.func.value)
+        ):
+            found.add((node.lineno, f"connections.settings.{node.func.attr}("))
+    return sorted(found)
+
+
+def tenancy_import_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every import of ``base.tenancy``."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            found |= {(node.lineno, a.name) for a in node.names if a.name.startswith("base.tenancy")}
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.startswith("base.tenancy") or (
+                node.module == "base" and any(a.name == "tenancy" for a in node.names)
+            ):
+                found.add((node.lineno, node.module))
+    return sorted(found)
+
+
+def listen_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, "LISTEN")`` for every SQL string that starts with ``LISTEN``/``UNLISTEN``."""
+    return sorted(
+        {
+            (node.lineno, "LISTEN")
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and LISTEN_RE.fullmatch(node.value.strip())
+        }
+    )
+
+
+def shared_database_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, "use_shared_database")`` for every use of phase 1's shared database (a call or an import)."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if (isinstance(node, ast.Name) and node.id == "use_shared_database") or (
+            isinstance(node, ast.Attribute) and node.attr == "use_shared_database"
+        ):
+            found.add((node.lineno, "use_shared_database"))
+        elif isinstance(node, ast.alias) and node.name == "use_shared_database":
+            found.add((getattr(node, "lineno", 0), "use_shared_database"))
+    return sorted(found)
+
+
+def fallback_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, "_test_fallback")`` for every assignment of the tests' fallback (an attribute or ``setattr``)."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, (ast.Assign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(target, ast.Attribute) and target.attr == "_test_fallback" for target in targets):
+                found.add((node.lineno, "_test_fallback"))
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "setattr"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "_test_fallback"
+        ):
+            found.add((node.lineno, "_test_fallback"))
+    return sorted(found)
 
 
 # ── Positive controls: each check sees what it must, and nothing else ──────────────────────────
@@ -475,7 +670,20 @@ def test_database_check_sees_pools_persistent_connections_and_server_cursors_on_
             "NAME": "hub_template",
             "CONN_MAX_AGE": 0,
             "DISABLE_SERVER_SIDE_CURSORS": True,
+            "OPTIONS": {"prepare_threshold": None},
         },
+        "hub_template_restaurant": {
+            "NAME": "hub_template_restaurant",
+            "CONN_MAX_AGE": 0,
+            "DISABLE_SERVER_SIDE_CURSORS": True,
+        },
+        "demo_0190a1b2c3d4": {
+            "NAME": "demo_0190a1b2c3d4",
+            "CONN_MAX_AGE": 0,
+            "DISABLE_SERVER_SIDE_CURSORS": True,
+            "OPTIONS": {"prepare_threshold": 5},
+        },
+        "pre_hub_0190a1b2c3d4__ddl": {"NAME": "pre_hub_0190a1b2c3d4", "CONN_MAX_AGE": 0},
         "other": {"NAME": "other", "ATOMIC_REQUESTS": True},
     }
 
@@ -483,7 +691,11 @@ def test_database_check_sees_pools_persistent_connections_and_server_cursors_on_
         "hub_0190a1b2c3d4: OPTIONS['pool']",
         "hub_0190a1b2c3d4: CONN_MAX_AGE=60",
         "hub_0190a1b2c3d4: server-side cursors on",
+        "hub_0190a1b2c3d4: prepare_threshold=unset (psycopg: 5)",
         "hub_0190a1b2c3d4__ddl: CONN_MAX_AGE=None",
+        "hub_template_restaurant: prepare_threshold=unset (psycopg: 5)",
+        "demo_0190a1b2c3d4: prepare_threshold=5",
+        "pre_hub_0190a1b2c3d4__ddl: server-side cursors on",
         "other: ATOMIC_REQUESTS",
     ]
 
@@ -549,3 +761,179 @@ def test_no_generic_foreign_key():
 
 def test_hub_aliases_go_through_pgbouncer_safely():
     assert database_problems(settings.DATABASES) == []
+
+
+
+# ── (e) Phase 2's tenancy: positive controls ───────────────────────────────────────────────────
+
+TENANCY_OFFENDER = """\
+from base.tenancy.context import use_hub
+from base import tenancy
+import base.tenancy.router
+from base.tenancy.context import use_shared_database
+cursor.execute(f"CREATE DATABASE {name} TEMPLATE {template}")
+cursor.execute("DROP DATABASE %s" % name)
+cursor.execute("ALTER DATABASE {} RENAME".format(name))
+connections.settings[alias] = cfg
+connections.settings.update({alias: cfg})
+del connections.settings[alias]
+cursor.execute("LISTEN hub_x")
+context._test_fallback = SHARED
+setattr(context, "_test_fallback", SHARED)
+transaction.on_commit(partial(notify, scope), robust=True)
+from django.db.transaction import on_commit
+"""
+TENANCY_LOOKALIKES = """\
+\"\"\"LISTEN on control, never CREATE DATABASE by hand.\"\"\"
+query = sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name))
+connections.settings = {**connections.settings, alias: cfg}
+settings = dict(connections.settings)
+fallback = context._test_fallback
+operations.on_commit(partial(notify, scope))
+transaction.atomic(using=alias)
+"""
+
+
+def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
+    assert database_ddl_touches(TENANCY_OFFENDER) == [(5, "database DDL by string formatting")] * 1 + [
+        (6, "database DDL by string formatting"),
+        (7, "database DDL by string formatting"),
+    ]
+    assert settings_mutation_touches(TENANCY_OFFENDER) == [
+        (8, "connections.settings[...] changed in place"),
+        (9, "connections.settings.update("),
+        (10, "connections.settings[...] changed in place"),
+    ]
+    assert tenancy_import_touches(TENANCY_OFFENDER) == [
+        (1, "base.tenancy.context"),
+        (2, "base"),
+        (3, "base.tenancy.router"),
+        (4, "base.tenancy.context"),
+    ]
+    assert listen_touches(TENANCY_OFFENDER) == [(11, "LISTEN")]
+    assert shared_database_touches(TENANCY_OFFENDER) == [(4, "use_shared_database")]
+    assert fallback_touches(TENANCY_OFFENDER) == [(12, "_test_fallback"), (13, "_test_fallback")]
+    assert bare_on_commit_touches(TENANCY_OFFENDER) == [
+        (14, "transaction.on_commit("),
+        (15, "from django.db.transaction import on_commit"),
+    ]
+    for check in (
+        database_ddl_touches,
+        settings_mutation_touches,
+        tenancy_import_touches,
+        listen_touches,
+        shared_database_touches,
+        fallback_touches,
+        bare_on_commit_touches,
+    ):
+        assert check(TENANCY_LOOKALIKES) == [], check.__name__
+
+
+# ── (e) Phase 2's tenancy: the real tree ───────────────────────────────────────────────────────
+
+
+def _everywhere(check) -> list[str]:
+    return _offenders(lambda path: check((HUB_DIR / path).read_text()), source_files(HUB_DIR))
+
+
+def test_no_database_ddl_is_built_by_string_formatting():
+    offenders = _everywhere(database_ddl_touches)
+
+    assert offenders == [], (
+        "A database's name reaches SQL only as sql.Identifier, validated by base.tenancy.names (PLAN-DB §3): "
+        f"{offenders}"
+    )
+
+
+def test_connections_settings_is_never_changed_in_place():
+    offenders = _everywhere(settings_mutation_touches)
+
+    assert offenders == [], (
+        "Other threads read connections.settings: swap in a copy under the lock (base.tenancy.connections): "
+        f"{offenders}"
+    )
+
+
+def test_the_modules_never_import_the_tenancy():
+    files = [path for path in source_files(HUB_DIR) if path.parts[0] == "apps"]
+
+    offenders = _offenders(lambda path: tenancy_import_touches((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], f"A module never chooses its database: @operation and use_hub do (CLAUDE.md): {offenders}"
+
+
+def test_nothing_but_live_listens():
+    offenders = _everywhere(listen_touches)
+
+    assert offenders == [], f"One LISTEN per process, on control, in live.broker (PLAN-DB §9): {offenders}"
+
+
+def test_only_the_listed_code_runs_on_the_shared_database():
+    files = [path for path in source_files(HUB_DIR) if str(path) not in SHARED_DATABASE_USERS]
+
+    offenders = _offenders(lambda path: shared_database_touches((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], (
+        "Phase 1's shared database is transitional (S1–S4): run in use_hub(hub), or add a reasoned entry to "
+        f"SHARED_DATABASE_USERS: {offenders}"
+    )
+
+
+def test_the_tests_fallback_is_never_set_outside_the_tests():
+    offenders = _everywhere(fallback_touches)
+
+    assert offenders == [], f"Only the suite's conftest.py sets base.tenancy.context._test_fallback: {offenders}"
+
+
+def test_no_hub_model_carries_its_hub_but_the_listed_ones():
+    from django.apps import apps
+
+    from base.tenancy import inventory
+
+    found = sorted(
+        model._meta.label_lower
+        for model in apps.get_models()
+        if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
+        and any(getattr(field, "column", None) == "hub_id" for field in model._meta.concrete_fields)
+    )
+
+    assert found == sorted(HUB_ID_COLUMNS), (
+        "The border between hubs is the database, not a column (PLAN-DB §11): drop hub_id, or add a reasoned entry "
+        f"to HUB_ID_COLUMNS (and remove those that no longer have one): {found}"
+    )
+
+
+def _on_commit_counts(files) -> dict[str, int]:
+    counts = {str(path): len(bare_on_commit_touches((HUB_DIR / path).read_text())) for path in files}
+    return {path: count for path, count in counts.items() if count}
+
+
+def on_commit_problems(counts: dict[str, int]) -> dict[str, tuple[int, int]]:
+    """``{file: (found, listed)}`` wherever the bare calls differ from ``PENDING_S2_ON_COMMIT``."""
+    return {
+        path: (counts.get(path, 0), PENDING_S2_ON_COMMIT.get(path, 0))
+        for path in set(counts) | set(PENDING_S2_ON_COMMIT)
+        if counts.get(path, 0) != PENDING_S2_ON_COMMIT.get(path, 0)
+    }
+
+
+def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
+    listed = dict(PENDING_S2_ON_COMMIT)
+
+    assert on_commit_problems(listed) == {}
+    assert on_commit_problems({**listed, "apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
+    assert on_commit_problems({**listed, "apps/flow/services.py": 3}) == {"apps/flow/services.py": (3, 2)}
+    # One moved to live.operations.on_commit: its entry shrinks, so the list never hides a new one.
+    assert on_commit_problems({**listed, "apps/website/services.py": 3}) == {"apps/website/services.py": (3, 4)}
+
+
+def test_the_modules_run_after_the_commit_only_through_live():
+    files = [path for path in source_files(HUB_DIR) if path.parts[0] == "apps"]
+
+    problems = on_commit_problems(_on_commit_counts(files))
+
+    assert problems == {}, (
+        "A module runs after the COMMIT with live.operations.on_commit, on its operation's alias; a bare "
+        "transaction.on_commit registers on default, outside the hub's transaction. PENDING_S2_ON_COMMIT lists the "
+        f"8 calls S2 moves first (shrink an entry once moved, never add one): {{file: (found, listed)}} {problems}"
+    )

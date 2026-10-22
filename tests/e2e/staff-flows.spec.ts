@@ -62,8 +62,9 @@ async function horizontalOverflow(page: Page): Promise<number> {
   });
 }
 
-/** At each of the three sizes: `target` in sight, no sideways scroll, and the screenshot. */
-async function threeShots(page: Page, key: string, target: () => Locator): Promise<void> {
+/** At each of the three sizes: `target` in sight, no sideways scroll, and the screenshot (also saved as
+ *  `<alsoAs>-<width>.png` for a task that asks for its own). */
+async function threeShots(page: Page, key: string, target: () => Locator, alsoAs?: string): Promise<void> {
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     const seen = target();
@@ -74,6 +75,7 @@ async function threeShots(page: Page, key: string, target: () => Locator): Promi
     }, `${key} at ${vp.label}`).toPass();
     await expect.poll(() => horizontalOverflow(page), `${key} at ${vp.label}: sideways scroll`).toBeLessThanOrEqual(1);
     await page.screenshot({ path: shot(`APP-STAFF-${key}-${vp.label}`) });
+    if (alsoAs) await page.screenshot({ path: shot(`${alsoAs}-${vp.label}`) });
   }
 }
 
@@ -273,8 +275,9 @@ async function openSchedules(page: Page, who: Member): Promise<void> {
   await expect(shown(page).locator('[data-testid=staff-schedules-member] input')).toHaveValue(who.full_name);
 }
 
-// flow: STAFF-F13 · gh:staff#86 — the week reads in 24 h
-test('STAFF-F13: «+» in Schedules creates the proposed week, Monday to Friday 09:00–18:00', async ({ browser }) => {
+// flow: STAFF-F13 · gh:staff#86 — the week reads in 24 h. With the working day of Settings as proposed
+// (STAFF-F22 puts it back as it was): 09:00–18:00 with its hour of break in the middle.
+test('STAFF-F13: «+» in Schedules creates the proposed week, Monday to Friday 09:00–18:00 with a break 13:00–14:00', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/schedules');
   try {
     const sara = await member(context, { first_name: `${TAG} Sara` });
@@ -283,7 +286,9 @@ test('STAFF-F13: «+» in Schedules creates the proposed week, Monday to Friday 
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-schedule-form]')).toBeHidden();
     const row = shown(page).locator('[data-testid=staff-schedules-row]').first();
-    await expect(row).toContainText('Mon 09:00–18:00 · Tue 09:00–18:00 · Wed 09:00–18:00 · Thu 09:00–18:00 · Fri 09:00–18:00');
+    await expect(row).toContainText(
+      'Mon 09:00–18:00 (13:00–14:00) · Tue 09:00–18:00 (13:00–14:00) · Wed 09:00–18:00 (13:00–14:00) · Thu 09:00–18:00 (13:00–14:00) · Fri 09:00–18:00 (13:00–14:00)',
+    );
     await threeShots(page, 'STAFF-F13', () => row);
   } finally {
     await context.close();
@@ -425,20 +430,56 @@ test('STAFF-F21: the owner sees each professional’s rate in «Rate/h»', async
   }
 });
 
-// flow: STAFF-F22 · gh:hub#2541 — a read that fails offers «Retry», never values to save (Vitest)
-test('STAFF-F22: Settings saves only what changed and says it is saved', async ({ browser }) => {
+interface WorkingDay {
+  default_work_start: string;
+  default_work_end: string;
+  default_break_duration: number;
+}
+
+// flow: STAFF-F22 · gh:hub#2541 — a read that fails offers «Retry», never values to save (Vitest).
+// FIX-STAFF-SETTINGS-ORPHANS: Settings is the default working day, and a new schedule proposes it.
+test('STAFF-F22: Settings saves the default working day, and a new schedule proposes it', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/settings');
-  const before = await api<{ max_daily_hours: number }>(context, A, 'GET', '/staff/settings');
+  const before = await api<WorkingDay>(context, A, 'GET', '/staff/settings');
   try {
-    const next = String(before.data.max_daily_hours === 11 ? 10 : 11);
-    await shown(page).locator('[data-testid=staff-settings-max_daily_hours] input').fill(next);
+    // The eight old settings that changed nothing are gone from the screen.
+    for (const retired of ['max_daily_hours', 'allow_staff_selection', 'notify_cancellation']) {
+      await expect(shown(page).locator(`[data-testid=staff-settings-${retired}]`)).toHaveCount(0);
+    }
+    await shown(page).locator('[data-testid=staff-settings-default_work_start] input').fill('08:00');
+    await shown(page).locator('[data-testid=staff-settings-default_work_end] input').fill('16:00');
+    await shown(page).locator('[data-testid=staff-settings-default_break_duration] input').fill('30');
     await shown(page).locator('[data-testid=staff-settings-save]').click();
     const saved = shown(page).locator('[data-testid=staff-settings-saved]');
     await expect(saved).toBeVisible();
-    expect((await api<{ max_daily_hours: number }>(context, A, 'GET', '/staff/settings')).data.max_daily_hours).toBe(Number(next));
-    await threeShots(page, 'STAFF-F22', () => saved);
+    expect((await api<WorkingDay>(context, A, 'GET', '/staff/settings')).data).toEqual({
+      default_work_start: '08:00',
+      default_work_end: '16:00',
+      default_break_duration: 30,
+    });
+    await threeShots(page, 'STAFF-F22', () => saved, 'FIX-STAFF-SETTINGS-ORPHANS');
+
+    // A day that crosses midnight cannot be a schedule's day: refused under its end, nothing saved.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await shown(page).locator('[data-testid=staff-settings-default_work_end] input').fill('06:00');
+    await shown(page).locator('[data-testid=staff-settings-save]').click();
+    await expect(shown(page).locator('[data-testid=staff-settings-default_work_end]')).toContainText('The start time must be before the end time.');
+    expect((await api<WorkingDay>(context, A, 'GET', '/staff/settings')).data.default_work_end).toBe('16:00');
+
+    // A new schedule proposes the saved working day, its break in the middle of the day.
+    const sara = await member(context, { first_name: `${TAG} Sara` });
+    await page.goto(`${A}/staff/schedules`);
+    await openSchedules(page, sara);
+    await shown(page).locator('[data-testid=staff-schedules-add]').click();
+    const monday = { start: '08:00', end: '16:00', break_start: '11:45', break_end: '12:15' };
+    for (const [part, value] of Object.entries(monday)) {
+      await expect(page.locator(`[data-testid=staff-schedule-form-day-0-${part}] input`)).toHaveValue(value);
+    }
+    await page.locator('[data-testid=staff-schedule-form-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-schedule-form]')).toBeHidden();
+    await expect(shown(page).locator('[data-testid=staff-schedules-row]').first()).toContainText('Mon 08:00–16:00 (11:45–12:15)');
   } finally {
-    expect((await api(context, A, 'POST', '/staff/settings', { max_daily_hours: before.data.max_daily_hours })).status).toBe(200);
+    expect((await api(context, A, 'POST', '/staff/settings', before.data)).status).toBe(200);
     await context.close();
   }
 });

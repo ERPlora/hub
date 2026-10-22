@@ -312,28 +312,17 @@
       "title": "Ajustes",
       "loadError": "No se pudieron cargar los ajustes",
       "saved": "Ajustes guardados",
-      "workday": "Jornada",
-      "visibility": "Visibilidad y avisos",
+      "workday": "Jornada por defecto",
+      "workdayIntro": "Un horario nuevo propone esta jornada de lunes a viernes, con el descanso en mitad del día.",
       "fields": {
         "default_work_start": "Inicio de jornada (HH:MM)",
         "default_work_end": "Fin de jornada (HH:MM)",
-        "default_break_duration": "Duración del descanso (minutos)",
-        "min_advance_booking": "Antelación mínima de reserva (horas)",
-        "max_daily_hours": "Horas máximas por día",
-        "overtime_threshold": "Umbral de horas extra (horas/semana)",
-        "show_staff_photos": "Mostrar fotos del personal",
-        "show_staff_bio": "Mostrar biografía del personal",
-        "allow_staff_selection": "Permitir elegir profesional",
-        "notify_new_appointment": "Avisar de nueva cita",
-        "notify_cancellation": "Avisar de cancelación"
+        "default_break_duration": "Duración del descanso (minutos)"
       },
       "hints": {
-        "default_work_start": "Hora de inicio de la jornada por defecto. La jornada nocturna (fin antes del inicio) es válida.",
-        "default_work_end": "Hora de fin de la jornada por defecto. Si es anterior al inicio, se entiende que el turno cruza la medianoche.",
-        "default_break_duration": "Entre 0 y 480 minutos.",
-        "min_advance_booking": "Entre 0 y 168 horas (una semana).",
-        "max_daily_hours": "Entre 1 y 24 horas.",
-        "overtime_threshold": "Entre 1 y 168 horas semanales."
+        "default_work_start": "A qué hora empieza cada día de trabajo de un horario nuevo.",
+        "default_work_end": "Después del inicio: un día de horario no cruza la medianoche.",
+        "default_break_duration": "De 0 (sin descanso) a 480 minutos, más corto que la jornada."
       }
     },
     "picker": {

@@ -22,6 +22,8 @@ from live.context import Scope, system_context
 from live.errors import OperationError
 from live.operations import get as get_operation
 
+from base.tenancy.context import use_shared_database
+
 ISSUER_SETTINGS = {
     "legal_name": "PLATFORM_ISSUER_LEGAL_NAME",
     "tax_id": "PLATFORM_ISSUER_TAX_ID",
@@ -47,7 +49,12 @@ class Command(BaseCommand):
             help="Write. Without it the command only says what it would do.",
         )
 
-    def handle(self, *args, execute: bool = False, **options):
+    def handle(self, *args, **options):
+        # Phase 1's platform hub has no registry row: its data lives in the database every hub shares (S1–S4).
+        with use_shared_database():
+            return self._handle(*args, **options)
+
+    def _handle(self, *args, execute: bool = False, **options):
         ctx = system_context(Scope("host", settings.PLATFORM_HUB_SLUG))
         wanted = {
             field: str(getattr(settings, name, "")).strip()

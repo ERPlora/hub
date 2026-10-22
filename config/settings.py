@@ -84,6 +84,8 @@ INSTALLED_APPS = [
     # Before daphne: its runserver (daphne + Vite) must win.
     "live",
     "daphne",
+    # The control database's registry of hubs (phase 2, S1): never inside a hub's database.
+    "control",
     # Before the admin: base/templates/admin/ overrides its templates (the chosen hub's banner).
     "base",
     # The mirror of the SaaS's `shared` schema (round 16): only base/catalog.py writes it.
@@ -135,8 +137,12 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     # A host that is no hub (reserved or invalid first label, live.slugs) answers 404 on hub paths.
     "base.middleware.HubHostRequiredMiddleware",
+    # The rest runs in the request's database: use_hub(request.hub), the admin's chosen hub (phase 2, S1).
+    "base.middleware.HubDatabaseMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # A session opened on another host (another hub's, the platform's) is no session here (phase 2, S1).
+    "base.middleware.SessionHostMiddleware",
     # The platform host (hubs.localhost) is only the Hub admin for the staff (PLAN §18.1).
     "base.middleware.PlatformHostMiddleware",
     # No login of its own: a browser without a session on a SPA route goes to the SaaS's login.
@@ -239,8 +245,37 @@ if SHARED_DB_USER:
         },
         "TEST": {"NAME": f"{TEST_DB_NAME}_shared"},
     }
-# First: the models of `shared` go to that alias only (phase 2's TenantRouter goes after it).
-DATABASE_ROUTERS = ["base.routers.SharedRouter"]
+# The template of every hub's alias (PLAN-DB §4 and §5; phase 2, plan 2026-10-22, S1): base.tenancy.connections copies
+# it, NAME aside, for each hub with a database of its own, and nobody ever connects to the template itself (its clone
+# would fail). The hubs' databases go through the PgBouncer sidecar of the task in transaction mode
+# (PGBOUNCER_HOST/PORT, aws stacks/prod/apps.tf; locally the Postgres of compose.yaml, directly): no pool,
+# CONN_MAX_AGE 0, no server-side cursors and no prepared statements: prepare_threshold=None explicitly (Django leaves
+# it unset and psycopg 3 prepares on a statement's fifth run, which PgBouncer with max_prepared_statements=0 loses:
+# «prepared statement _pg3_N does not exist»). The sidecar listens on the task's own loopback, so TLS goes from
+# PgBouncer to Aurora, not to it.
+PGBOUNCER_HOST = config("PGBOUNCER_HOST", default="")
+DATABASES["hub_template"] = {
+    "ENGINE": "django.db.backends.postgresql",
+    "NAME": f"{DATABASES['default']['NAME']}_template",
+    "USER": DATABASES["default"]["USER"],
+    "PASSWORD": DATABASES["default"]["PASSWORD"],
+    "HOST": PGBOUNCER_HOST or DATABASES["default"]["HOST"],
+    "PORT": config("PGBOUNCER_PORT", default=6432, cast=int) if PGBOUNCER_HOST else DATABASES["default"]["PORT"],
+    "CONN_MAX_AGE": 0,
+    "DISABLE_SERVER_SIDE_CURSORS": True,
+    "OPTIONS": {
+        **{
+            option: value
+            for option, value in DATABASES["default"]["OPTIONS"].items()
+            if option != "pool" and not (PGBOUNCER_HOST and option in ("sslmode", "sslrootcert"))
+        },
+        "prepare_threshold": None,
+    },
+    "TEST": {"NAME": f"{TEST_DB_NAME}_template"},
+}
+# First: the models of `shared` go to that alias only. Then the TenantRouter: control's models to `default`, a hub's
+# to the alias of the active use_hub (base.tenancy.router).
+DATABASE_ROUTERS = ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -423,6 +458,8 @@ WORKBOOK_TRANSLATION_MODEL = config(
 LIVE = {
     "context_builder": "base.operations.HubContextBuilder",
     "control_alias": "default",
+    # Every operation's transaction opens on the alias of its use_hub; the registry's, on control (phase 2, S1).
+    "operation_database": "base.tenancy.context.operation_database",
     # Hub slugs (live.slugs): 3–63 characters in production; local development also opens the
     # one-letter demo hubs a and b (a.localhost:8000, b.localhost:8000).
     "hub_slug_min_length": 1 if DEBUG else 3,
