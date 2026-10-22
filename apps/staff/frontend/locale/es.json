@@ -325,10 +325,6 @@
         "default_break_duration": "De 0 (sin descanso) a 480 minutos, más corto que la jornada."
       }
     },
-    "picker": {
-      "search": "Buscar…",
-      "cancel": "Cancelar"
-    },
     "figures": {
       "label": "Cifras",
       "active": "Plantilla activa",

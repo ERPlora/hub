@@ -1,19 +1,18 @@
 <script setup lang="ts">
 // STAFF-F17 «Registrar una ausencia» (`mode="create"`: whoever manages time off registers anyone's,
-// picking the Member) and STAFF-F24 «Pedir mi propia ausencia» (`mode="request"`: one's own, no Member).
+// picking the Member in a Combo that searches the server) and STAFF-F24 «Pedir mi propia ausencia» (`mode="request"`: one's own, no Member).
 // The old form: Type (Vacation to begin with), From, To, Full day and, when off, the hours, and
 // Reason. The server judges (an overlap is its 409; a bad range, its 422 under the field); the dialog
 // keeps what was typed. The new request comes back through the stream, Pending.
-import { FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
 import { LEAVE_TYPES } from '../lib/enums';
-import { memberSearch } from '../lib/pickers';
+import { asCombo, memberSearch } from '../lib/pickers';
 import type { LeaveType, TimeOffFieldsIn } from '../operations';
-import SearchSelect from './SearchSelect.vue';
 
 const props = defineProps<{
   /** `create`: anyone's, with Member; `request`: one's own. */
@@ -48,8 +47,9 @@ const blank = (): TimeOffForm => ({
 
 const t = useT();
 const client = useLiveClient();
-const findMembers = memberSearch(client);
+const findMembers = asCombo(memberSearch(client));
 const form = ref<TimeOffForm>(blank());
+const memberChoice = computed<ComboOption | null>(() => (form.value.member_id ? { id: form.value.member_id, label: form.value.member_name } : null));
 const creation = useCommand('staff.time_off.create');
 const request = useCommand('staff.time_off.request');
 const forAnyone = computed(() => props.mode === 'create');
@@ -108,15 +108,16 @@ async function save(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="staff-time-off-form">
-        <SearchSelect
+        <Combo
           v-if="forAnyone"
           testid="staff-time-off-form-member_id"
-          :value="form.member_id"
-          :display="form.member_name"
+          :model-value="memberChoice"
           :label="$t('staff.timeOff.form.member')"
-          :load="findMembers"
+          :search="findMembers"
+          :empty-label="$t('staff.noResults')"
+          :clearable="false"
           :error-text="fieldErrors.member_id ?? fieldErrors.member"
-          @update:value="(value: string, label: string) => (form = { ...form, member_id: value, member_name: label })"
+          @update:model-value="(option: ComboOption | null) => (form = { ...form, member_id: option?.id ?? '', member_name: option?.label ?? '' })"
         />
         <ion-select
           data-testid="staff-time-off-form-leave_type"

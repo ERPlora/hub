@@ -89,9 +89,10 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     const view = shown(page);
 
     // Pick the member by searching the server.
-    await view.locator('[data-testid=staff-schedules-member]').click();
-    await page.locator('[data-testid=staff-schedules-member-search] input').fill(`Shifts${stamp}`);
-    await page.locator('[data-testid=staff-schedules-member-option]', { hasText: name }).click();
+    const member = view.locator('[data-testid=staff-schedules-member] input');
+    await member.click();
+    await member.fill(`Shifts${stamp}`);
+    await page.locator('[data-testid^=staff-schedules-member-option-]', { hasText: name }).first().click();
     await expect(view.locator('[data-testid=staff-schedules-member] input')).toHaveValue(name);
     await expect(view.locator('[data-testid=staff-schedules-empty]')).toContainText('This member has no schedules yet.');
 

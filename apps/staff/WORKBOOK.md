@@ -1,7 +1,9 @@
 # Workbook — Personal (app)
 Prefijo: STAFF
 Alcance MVP: transversal (lo usa sobre todo la peluquería; el restaurante lee su directorio)
-Estado de la app: hecha (servidor y páginas)
+Estado de la app: completa (2026-10-22)
+Lo que no entra todavía: ver «Lo que queda fuera». Los paneles de Personal en el Inicio esperan a que el Inicio
+enseñe los paneles de las apps; mientras tanto salen dentro de Personal.
 
 > Manual de usuario y especificación de la app `staff`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -33,9 +35,10 @@ Quién la usa:
   ausencia ajena), ve su propia ficha y sus ausencias, **pide sus ausencias** y retira las que aún
   están pendientes.
 
-Citas (cuando llegue) lee de aquí quién es reservable, su horario y sus ausencias aprobadas; el TPV
-y la cocina leen el directorio para nombrar a quien atiende. Al cerrar el día, **Comisiones** da lo que
-ha vendido y ganado cada profesional.
+Citas (y con ella Reservas online) lee de aquí quién es reservable, su horario y sus ausencias
+aprobadas; Servicios, quién puede hacer cada servicio; Control horario, de quién es cada fichaje; Tareas, a
+quién se asigna cada tarea; y el TPV lee el directorio para nombrar a quien atiende (y con él, la comanda
+de cocina). Al cerrar el día, **Comisiones** da lo que ha vendido y ganado cada profesional.
 
 ## Referencia adoptada
 
@@ -130,10 +133,10 @@ en mitad del día.»: «Inicio de jornada (HH:MM)», «Fin de jornada (HH:MM)»,
 valores propuestos.
 
 ### Paneles del inicio
-El Hub todavía no tiene un Inicio con paneles. Mientras tanto, los cinco paneles del producto actual
-salen dentro de Personal: **Plantilla activa**, **Ausentes hoy** y **Ausencias pendientes** encima de
-la tabla de Personal, **Ausencias de hoy** encima de la de Ausencias y **Empleados por rol** en la
-columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
+El Inicio del Hub todavía no enseña los paneles de las apps. Mientras tanto, los cinco paneles del
+producto actual salen dentro de Personal: **Plantilla activa**, **Ausentes hoy** y **Ausencias
+pendientes** encima de la tabla de Personal, **Ausencias de hoy** encima de la de Ausencias y
+**Empleados por rol** en la columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
 
 ## Estados de cada pantalla
 
@@ -150,30 +153,30 @@ columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
 
 | ID | Flujo | Estado |
 |---|---|---|
-| STAFF-F01 | Dar de alta a un profesional | hecho |
-| STAFF-F02 | Editar la ficha de un profesional | hecho |
-| STAFF-F03 | Vincular la ficha con una cuenta del negocio | hecho |
-| STAFF-F04 | Crear, editar y retirar un rol | hecho |
-| STAFF-F05 | Desactivar a un profesional | hecho |
-| STAFF-F06 | Dar de baja a un profesional | hecho |
-| STAFF-F07 | Dar de alta a varios profesionales de golpe | hecho (asistente y API) |
-| STAFF-F08 | Ver mi propia ficha y mis ausencias | hecho |
-| STAFF-F09 | Dar el equipo a otras apps | hecho (sin pantalla) |
-| STAFF-F13 | Crear el horario semanal de un profesional | hecho |
-| STAFF-F14 | Editar un horario | hecho |
-| STAFF-F15 | Activar, desactivar o eliminar un horario | hecho |
-| STAFF-F16 | Saber cuándo puede trabajar un profesional | hecho (sin pantalla) |
-| STAFF-F17 | Registrar una ausencia | hecho |
-| STAFF-F18 | Aprobar o rechazar una ausencia | hecho |
-| STAFF-F19 | Cancelar una ausencia | hecho |
-| STAFF-F20 | Ver quién falta hoy | hecho |
-| STAFF-F21 | Dar la tarifa y la comisión de cada profesional | hecho |
-| STAFF-F22 | Cambiar los ajustes de Personal | hecho |
-| STAFF-F23 | Ver las cifras de la plantilla y por rol | hecho |
-| STAFF-F24 | Pedir mi propia ausencia | hecho |
+| STAFF-F01 | Dar de alta a un profesional | hecho (servidor y pantalla) |
+| STAFF-F02 | Editar la ficha de un profesional | hecho (servidor y pantalla) |
+| STAFF-F03 | Vincular la ficha con una cuenta del negocio | hecho (servidor y pantalla) |
+| STAFF-F04 | Crear, editar y retirar un rol | hecho (servidor y pantalla) |
+| STAFF-F05 | Desactivar a un profesional | hecho (servidor y pantalla) |
+| STAFF-F06 | Dar de baja a un profesional | hecho (servidor y pantalla) |
+| STAFF-F07 | Dar de alta a varios profesionales de golpe | hecho (asistente y API, como el producto actual) |
+| STAFF-F08 | Ver mi propia ficha y mis ausencias | hecho (servidor y pantalla) |
+| STAFF-F09 | Dar el equipo a otras apps | hecho (lo leen las otras apps) |
+| STAFF-F13 | Crear el horario semanal de un profesional | hecho (servidor y pantalla) |
+| STAFF-F14 | Editar un horario | hecho (servidor y pantalla) |
+| STAFF-F15 | Activar, desactivar o eliminar un horario | hecho (servidor y pantalla) |
+| STAFF-F16 | Saber cuándo puede trabajar un profesional | hecho (lo lee Citas) |
+| STAFF-F17 | Registrar una ausencia | hecho (servidor y pantalla) |
+| STAFF-F18 | Aprobar o rechazar una ausencia | hecho (servidor y pantalla) |
+| STAFF-F19 | Cancelar una ausencia | hecho (servidor y pantalla) |
+| STAFF-F20 | Ver quién falta hoy | hecho (servidor y pantalla) |
+| STAFF-F21 | Dar la tarifa y la comisión de cada profesional | hecho (servidor y pantalla) |
+| STAFF-F22 | Cambiar los ajustes de Personal | hecho (servidor y pantalla) |
+| STAFF-F23 | Ver las cifras de la plantilla y por rol | hecho (servidor y pantalla) |
+| STAFF-F24 | Pedir mi propia ausencia | hecho (servidor y pantalla) |
 
-Los servicios que hace cada profesional (STAFF-F10, F11 y F12 del producto actual) no están en esta
-app: ver «Cambios frente al producto actual».
+Los servicios que hace cada profesional (STAFF-F10, F11 y F12 del producto actual) están en la app
+Servicios: ver «Cambios frente al producto actual».
 
 ### STAFF-F01 Dar de alta a un profesional
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 old-hub:HUB_SHELL-F81 old-hub:HUB_SHELL-F82 fi:modules/staff#command-staff-members-create fi:modules/staff#permission-role_permissions fi:modules/staff#query-staff-members-list old-hub:HUB-F145 old:staff/workflow/ficha.md#staff-f01 qa:modules/staff/create-employee -->
@@ -195,8 +198,8 @@ Si falla: debajo de cada campo y sin guardar nada: nombre o apellidos vacíos, u
 un color que no es #RRGGBB, una tarifa negativa, una comisión fuera de 0–100, «Ese rol no está
 disponible: no existe en este negocio, o se ha eliminado o retirado.», «Ese usuario del Hub no tiene
 acceso a este negocio.» o la cuenta ya vinculada a otra ficha (STAFF-F03). Quien no puede ver la
-compensación no puede enviarla: «Se necesita el permiso…». Dos fichas con el mismo nombre, email o nº
-de empleado se aceptan.
+compensación no puede enviarla: «Se necesita el permiso «{permiso}».». Dos fichas con el mismo
+nombre, email o nº de empleado se aceptan.
 Implicados: ninguno
 
 ### STAFF-F02 Editar la ficha de un profesional
@@ -237,7 +240,7 @@ Si falla: «Ese usuario del Hub ya está vinculado a {nombre}. Un usuario del Hu
 pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario.»
 (`staff.user_already_linked`), también si dos personas lo vinculan a la vez; «Ese usuario del Hub no
 tiene acceso a este negocio.».
-Implicados: ninguno
+Implicados: ATTENDANCE-F01, TASK-F03
 
 ### STAFF-F04 Crear, editar y retirar un rol
 <!-- origen: fi:modules/staff#command-staff-roles-create fi:modules/staff#query-staff-roles-list old:staff/workflow/ficha.md#staff-f04 -->
@@ -288,13 +291,16 @@ Entra: la fecha (vacía, hoy en el día del negocio) y el motivo.
 Sale: la ficha **Dada de baja**, sin Reservable, con su fecha y su motivo, y su cuenta liberada
 (`staff.member.terminated`; el aviso no lleva el motivo). Es definitiva: no se edita ni se reabre.
 Sus horarios dejan de contar y sus ausencias dejan de salir en las listas y en las cifras. Se puede
-dar de baja a quien está Inactivo o tiene ausencias.
+dar de baja a quien está Inactivo o tiene ausencias. En unos segundos, las apps que dependen de
+Personal hacen su parte con ese aviso: Citas pasa sus citas futuras a «Sin asignar», Servicios la quita
+de los servicios que hacía, Control horario cierra su jornada abierta y Tareas deja sin asignar sus
+tareas abiertas (sus flujos, en «Implicados»).
 Si falla: «Ese miembro del personal no existe en este negocio.» si ya estaba dado de baja.
-Implicados: ninguno
+Implicados: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Dar de alta a varios profesionales de golpe
 <!-- origen: fi:modules/staff#command-handler-wasm-staff-members-bulk_create-bulk_create_staff_members old:staff/workflow/ficha.md#staff-f07 -->
-Estado: hecho (asistente y API)
+Estado: hecho (asistente y API, como el producto actual)
 Actor: asistente, API
 Pantalla: asistente
 Pasos:
@@ -328,19 +334,19 @@ Implicados: ninguno
 
 ### STAFF-F09 Dar el equipo a otras apps
 <!-- origen: wf:whatsapp-cita#rec_wa_cita-f04 old-hub:HUB_SHELL-F72 fi:modules/staff#event-emit-staff-member-created-updated-deactivated-terminated-staff-role-created-staff-time_off-created-status_changed-staff-schedule-created-staff-settings-updated old:staff/workflow/ficha.md#staff-f09 -->
-Estado: hecho (sin pantalla)
+Estado: hecho (lo leen las otras apps)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Una app que necesita nombrar al equipo (el TPV en «Atiende», la cocina, Citas) pide el
-   directorio, con su permiso de ver el equipo.
+1. Una app que necesita nombrar al equipo (el TPV en «Quién atiende esta cuenta», y con él la comanda
+   de cocina; Citas, Servicios, Tareas) pide el directorio, con su permiso de ver el equipo.
 2. Recibe, por persona: nombre, email, teléfono, nº de empleado, rol, cuenta, estado, reservable,
    fecha de alta y color; **nunca** la tarifa ni la comisión. Hasta 100 por página; se filtra, entre
    otros, por usuario (para pasar de una cuenta a su ficha).
 Entra: nada; es una lectura.
 Sale: el directorio de fichas que no están dadas de baja (también las Inactivas y De baja).
 Si falla: cada app lo trata a su manera.
-Implicados: ninguno
+Implicados: SALE-F16, APPOINTMENT-F01, SERVICE-F33, TASK-F07
 
 ### STAFF-F13 Crear el horario semanal de un profesional
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 qa:verticals/beauty/01-services-professionals-and-schedules fi:modules/staff#command-handler-wasm-staff-schedules-create-create_schedule fi:modules/staff#query-staff-schedules-list_for_member old:staff/workflow/disponibilidad.md#staff-f13 -->
@@ -400,7 +406,7 @@ Implicados: ninguno
 
 ### STAFF-F16 Saber cuándo puede trabajar un profesional
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 old:staff/workflow/disponibilidad.md#staff-f16 -->
-Estado: hecho (sin pantalla)
+Estado: hecho (lo lee Citas)
 Actor: sistema (Citas), asistente
 Pantalla: ninguna
 Pasos:
@@ -414,7 +420,7 @@ Entra: la persona y las fechas, en días del negocio.
 Sale: solo lectura. Una ausencia pendiente, rechazada o cancelada no cuenta.
 Si falla: «Ese miembro del personal no existe en este negocio.» (también si se dio de baja); un rango
 al revés o de más de 731 días se rechaza en el campo.
-Implicados: ninguno
+Implicados: APPOINTMENT-F01, APPOINTMENT-F02, APPOINTMENT-F04, APPOINTMENT-F13
 
 ### STAFF-F17 Registrar una ausencia
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 fi:modules/staff#command-handler-wasm-staff-time_off-create-create_time_off fi:modules/staff#query-staff-time_off-list old:staff/workflow/ausencias.md#staff-f17 -->
@@ -448,7 +454,8 @@ Pasos:
 Entra: la ausencia y las otras aprobadas de la misma persona.
 Sale: el estado nuevo y, al aprobar, quién aprobó y cuándo (`staff.time_off.approved` o
 `staff.time_off.rejected`). **Aprobada** resta esas horas de la disponibilidad (STAFF-F16) y cuenta
-en «Ausentes hoy»; Rechazada no cambia nada. No avisa a la persona ni mira sus citas.
+en «Ausentes hoy»; Rechazada no cambia nada. No avisa a la persona ni mira sus citas. Quien gestiona
+ausencias puede aprobar también una suya.
 Si falla: «Ese miembro ya tiene una ausencia aprobada en esas fechas.» (al aprobar); «Esa solicitud
 de ausencia no puede pasar a ese estado desde el actual.» (`staff.invalid_transition`); «Esa
 solicitud de ausencia no existe en este negocio.».
@@ -471,7 +478,7 @@ Implicados: ninguno
 
 ### STAFF-F20 Ver quién falta hoy
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 qa:verticals/beauty/02-opening-and-daily-agenda fi:modules/staff#query-staff-time_off-today old:staff/workflow/ausencias.md#staff-f20 fi:modules/staff#widget-staff-time_off_today-timeline -->
-Estado: hecho
+Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Ausencias y Personal
 Pasos:
@@ -539,7 +546,7 @@ Implicados: ninguno
 
 ### STAFF-F23 Ver las cifras de la plantilla y por rol
 <!-- origen: fi:modules/staff#query-staff-members-stats old:staff/workflow/pago-y-ajustes.md#staff-f23 fi:modules/staff#widget-staff-headcount-kpi fi:modules/staff#widget-staff-on_leave_today-stat fi:modules/staff#widget-staff-pending_time_off-kpi fi:modules/staff#widget-staff-by_role-bar-list -->
-Estado: hecho
+Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Personal y Roles
 Pasos:
@@ -652,6 +659,14 @@ de venta cobrada, anulada o devuelta (`sale.sale.completed`, `sale.sale.voided`,
 Sin Ventas, Comisiones lo dice y no lista a nadie. De la plataforma usa las cuentas del negocio (para
 vincular una ficha) y la zona horaria del negocio (para el «hoy»).
 
+Quién la usa: Citas, Servicios, Control horario, Tareas y Reservas online la necesitan (encender una
+enciende Personal, y Personal no se apaga mientras una de ellas siga encendida). Citas, Servicios, Control
+horario y Tareas reaccionan a la baja de una persona (`staff.member.terminated`, STAFF-F06); las cuatro
+se ponen al día con los cambios de las fichas, y Citas también con los de horarios y ausencias. El TPV
+de Ventas lee el directorio para «Quién atiende esta cuenta» sin necesitar Personal, y Automatizaciones
+ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sobre el alta de una ficha
+(`staff.member.created`).
+
 ### Quién puede qué
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
@@ -673,8 +688,8 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
-  `tests/test_<fichero>.py` por fichero. Las páginas (`frontend/`) llegan en la fase siguiente;
-  `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui`.
+  `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
+  abajo), `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui` y `README.md` es la ficha de la app.
 - Modelos: `Role` (el rol de catálogo), `Member` (la ficha), `Schedule` y `ScheduleDay` (el horario y
   sus días, lunes = 0; un día que no está es libre), `TimeOff` (la ausencia) y `StaffSettings` (una
   sola fila, restricción `staff_settings_singleton`). UUIDv7, sin `hub_id`.
@@ -700,7 +715,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   primera y deciden sobre lo que dejó. Aprobar, rechazar, cancelar y tocar un horario bloquean la ficha
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
-- El «hoy» es `timezone.localdate()` (zona del negocio; en la fase 1, `TIME_ZONE`).
+- El «hoy» es `timezone.localdate()` (`business_today()` de `queries.py`; en la fase 1, `TIME_ZONE`),
+  aunque `control.Hub.timezone` ya guarda la zona de cada hub (hub#63): la contradicción está señalada
+  en las rondas CLOSE-SCHEDULE y CLOSE-STAFF de `PLAN-HUB.md`.
 - Dinero en céntimos enteros (`hourly_rate`); la comisión es `Decimal(5, 2)` de 0 a 100. El importe
   de la comisión (`staff.commission.report`) es `vendido × comisión ÷ 100` en `Decimal`, redondeado a
   céntimos enteros con `ROUND_HALF_UP` una sola vez por persona, sobre lo que Ventas le atribuye
@@ -714,19 +731,48 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   horario) y todo campo de entrada lleva `description`; las mismas descripciones salen en el OpenAPI.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+- Borrar una ficha en el admin (`MemberAdmin.delete_model`, `delete_queryset` y, en POST,
+  `get_deleted_objects`) bloquea antes las fichas en orden de id con `lock_members` de `services.py` y
+  después deja correr la cascada, y las acciones del listado van en una transacción (`response_action`):
+  el mismo orden que las escrituras (la ficha primero, luego la fila hija), así que no se interbloquea
+  con una escritura en curso, y lo protegido (fichajes y citas, `PROTECT`) responde como Django, «No se
+  puede eliminar {nombre}» con la lista de lo protegido, en vez de un 500 (hub#66;
+  `tests/test_concurrency.py` y `tests/test_admin.py`).
+- Quién importa qué: Citas, Servicios, Tareas y Reservas online importan `Member` y `resolve_member` (Citas,
+  además, `member_availability` y `own_member`; Tareas, `own_member` y `actor_user_id`), Control horario
+  importa `Member` y los nombres de `events.py`. Lo permiten sus `requires`; ninguna escribe en Personal si
+  no es por sus operaciones.
+- Los avisos llegan a las apps que reaccionan por el relay del outbox del worker (`base.relay`): lo
+  prueban de punta a punta `apps/task/tests/test_relay.py` (TASK-F15, hub#124), `apps/service/tests/test_relay.py`
+  y `apps/appointment/tests/test_relay.py`.
+- Tenencia: en la fase 1, y en el modo compartido de la tenencia S1 (hub#175), un hub sin BD propia —hoy
+  todos— guarda sus datos en la BD compartida, así que `a` y `b` comparten fichas, horarios y ausencias;
+  lo que sí se separa son los avisos en vivo. Con una BD por hub cada uno tendrá su equipo.
 - La resta de intervalos de la disponibilidad está hecha a mano: la única librería de intervalos de
   tamaño razonable (`portion`) es un proyecto de una sola persona, y las que cumplen los criterios
   (`sympy`, `pandas`) son desproporcionadas para eso.
 
-## Lo que queda fuera (páginas)
+## Lo que queda fuera
 
 - **Alta en lote (STAFF-F07)**: es del asistente y de la API, como en el producto actual; no tiene
   pantalla. Importar el equipo desde un fichero CSV (staff de services#152 del producto actual) no
   existía y no se porta: el alta a mano o por el asistente cubre a un equipo de peluquería o de sala.
-- **Los paneles en el Inicio**: cuando el Hub tenga un Inicio con paneles, las cifras y «Ausencias de
-  hoy» podrán salir también allí; hoy salen dentro de Personal.
+- **Los paneles de Personal en el Inicio**: `FIX-STAFF-SETUP-HOOKS` de la cola, BLOQUEADA hasta que se
+  mergee APP-BASE-1 (hub#168: `base.widget.list`). Son los `LiveAppConfig.widgets` del módulo viejo sobre
+  las cifras de STAFF-F23 y «Ausencias de hoy» (STAFF-F20) de hub#91; ni hechos ni simulados en el
+  Inicio. STAFF-G01…G05 siguen `hecho` como cifras de la propia Personal, que es donde salen hoy.
+- **Borrar los ocho ajustes retirados** (STAFF-F22, hub#177): sus columnas (`min_advance_booking`,
+  `max_daily_hours`, `overtime_threshold`, `show_staff_photos`, `show_staff_bio`, `allow_staff_selection`,
+  `notify_new_appointment`, `notify_cancellation`) y el CHECK `staff_settings_ranges` siguen en
+  `staff_staffsettings` hasta el paso contract (expand/contract, PLAN-DB), con su migración reversible,
+  una vez desplegado hub#177; va a `## 6` de `MIGRATION.md`. Al borrarlas, `apps/flow/tests/test_i18n.py`
+  (recorre las columnas de cada modelo) dirá qué entradas del catálogo de Automatizaciones sobran.
+- **Lo que Comisiones aún no cuenta** (STAFF-F21), las dos de otras apps y en la cola: una venta cobrada
+  con «Atiende yo» no se atribuye a nadie (`FIX-SALE-SERVED-BY-ME-NOT-ATTRIBUTED`) y la sesión de un
+  bono vale 0 € para quien la hace (`FIX-SERVICE-VOUCHER-SESSION-STAFF-VALUE`).
+- **Comisiones en el menú**: es una pestaña de Personal para quien ve la compensación, no una entrada de
+  menú, porque una entrada no puede depender de un permiso (`live.meta.Nav`, «Cómo son las páginas»).
+  El producto actual no tenía la pantalla.
 - **Fechas y horas en el orden del idioma del negocio** (staff#86, staff#87 del producto actual): los
   campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga el suyo (`UI-REQUESTS.md`).
 
@@ -754,9 +800,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `proposedBreak`); hasta que llega la primera lectura, los valores propuestos de Ajustes
   (`DEFAULT_WORKDAY`). Un día libre de un horario que se edita propone esa misma jornada al marcarlo.
 - «Mi ficha» (STAFF-F08) es un botón de la barra de Personal para quien tiene ficha vinculada; «Mis
-  ausencias» es el selector «Todas / Mis ausencias» de Ausencias (con el motivo).
-- Los selectores de listas largas (miembro, rol, usuario del Hub) buscan en el servidor
-  (`frontend/components/SearchSelect.vue`).
+  ausencias» es el selector «Todas» / «Mis ausencias» de Ausencias (con el motivo).
+- Los selectores de listas largas (miembro, rol, usuario del Hub) son el `Combo` de
+  `@erplora/ui/components` y buscan en el servidor (`frontend/lib/pickers.ts`; «Sin rol» y «Sin acceso
+  al Hub» van primero mientras no se teclea, con `asCombo`).
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
   hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) son los paneles del Inicio viejo
   (STAFF-G01…G05) dentro de la app, como las cifras de Clientes y «Fichados ahora» de Control horario;
@@ -769,8 +816,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **No es el acceso**: no crea cuentas, no da permisos, no guarda PIN.
 - **No ficha** (entradas, salidas, horas trabajadas, horas extra) ni calcula nóminas: Comisiones da lo
   ganado en un periodo, pero ni lo paga ni lo guarda.
-- **No reserva** ni mira las citas: al desactivar, dar de baja o aprobar una ausencia, las citas ya
-  reservadas siguen en la agenda (la agenda es de Citas).
+- **No reserva** ni mira las citas (la agenda es de Citas): al desactivar o aprobar una ausencia, las
+  citas ya reservadas siguen en su fila; al dar de baja, Citas las pasa a «Sin asignar» con el aviso de
+  la baja (APPOINTMENT-F25).
 - **No guarda el horario del negocio** (abrir, cerrar, festivos: es de Horarios).
 - **No guarda saldos** de vacaciones ni días acumulados.
 - **No avisa de duplicados** de nombre, email o nº de empleado.
@@ -779,12 +827,12 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 ## Cambios frente al producto actual
 
 - **Servicios que hace cada profesional** (STAFF-F10, F11 y F12: asignar, cambiar, quitar, servicio
-  principal, duración y precio propios, y «quién puede hacer un servicio»): **no están en esta app**.
-  Guardan el id de un servicio, y una app solo referencia las de su `requires`; `service` no existe
-  todavía. En el mercado (Fresha, Square Appointments, Vagaro, Mangomint, Odoo Appointments) se
-  asignan en el servicio: irán a la app Servicios (con `requires = ["staff"]`) o a Citas cuando se
-  porten, con sus mismas reglas. Contradice «conservar toda la funcionalidad» mientras tanto; está
-  señalado para decidirlo.
+  principal, duración y precio propios, y «quién puede hacer un servicio»): **están en la app
+  Servicios**, con sus mismas reglas: SERVICE-F31, F32 y F33 (hub#107; `requires = ["tax", "staff",
+  "customer"]`). Guardan el id de un servicio, y una app solo referencia las de su `requires`; en el
+  mercado (Fresha, Square Appointments, Vagaro, Mangomint, Odoo Appointments) se asignan en el
+  servicio. Ninguna funcionalidad se pierde: cambia de app (`scripts/migration/renames.tsv`,
+  2026-10-20).
 - **Las tres lecturas de disponibilidad por instante** (`day_at`, `days_ahead`, `team_day_at`)
   existían porque un comando viejo solo podía leer con parámetros literales; ahora Citas llama a
   `staff.availability.for_member` con el día que calcula ella, y la respuesta es la misma.
@@ -813,7 +861,8 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **Foto** de la ficha y **orden** de la ficha: no se portan; ninguna pantalla ni comando los escribía.
 - Las cifras ya no cuentan las ausencias pendientes de una ficha dada de baja.
 - **Los paneles del Inicio** (Plantilla activa, Ausentes hoy, Ausencias pendientes, Ausencias de hoy y
-  Empleados por rol) salen dentro de Personal mientras el Hub no tenga un Inicio con paneles.
+  Empleados por rol) salen dentro de Personal mientras el Inicio no enseñe los paneles de las apps
+  (`FIX-STAFF-SETUP-HOOKS`, en «Lo que queda fuera»).
 - **Comisiones** (nuevo): el producto actual no tenía pantalla que cruzara lo vendido con la comisión
   (STAFF-F21 «parcial»); el cierre por profesional lo componía cada uno. Ahora Personal da lo ganado por
   cada profesional en un periodo, con lo devuelto restado a quien lo vendió, como el informe de comisiones
