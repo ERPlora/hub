@@ -12,7 +12,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from django.db.models import F, Prefetch, Q, QuerySet
-from django.utils import timezone
+from django.utils import formats, timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -76,6 +76,14 @@ def business_zone() -> ZoneInfo:
 def zone_name() -> str:
     zone = business_zone()
     return getattr(zone, "key", str(zone))
+
+
+def day_label(day: dt.date, language: str) -> str:
+    """``day`` ready to say in ``language``, its weekday first («martes, 5 de marzo de 2030»): what a flow's
+    template prints as it comes, with no formatter (appointments#151). Appointments and Reservations, which
+    both require this app, say their days with it."""
+    with translation.override(language):
+        return f"{formats.date_format(day, 'l')}, {formats.date_format(day, 'DATE_FORMAT')}"
 
 
 def settings_row() -> ScheduleSettings:
