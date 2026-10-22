@@ -45,7 +45,7 @@
       },
       "loadError": "No se ha podido cargar el horario.",
       "defaultWeek": {
-        "message": "Este es un horario por defecto que hemos puesto por ti. Comprueba que coincide con el de tu negocio: las reservas fuera de él se rechazan.",
+        "message": "Este es un horario por defecto que hemos puesto por ti. Comprueba que coincide con el de tu negocio: las citas fuera de él se rechazan.",
         "confirm": "Sí, este es mi horario"
       },
       "form": {
@@ -86,7 +86,7 @@
         "titleEdit": "Editar · {name}",
         "date": "Fecha",
         "name": "Nombre",
-        "namePlaceholder": "Nombre (p.ej. Navidad)",
+        "namePlaceholder": "Nombre (p. ej. Navidad)",
         "status": "Estado",
         "openWithHours": "Abierto (con horario)",
         "recurring": "Se repite cada año",

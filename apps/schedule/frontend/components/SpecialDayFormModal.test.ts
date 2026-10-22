@@ -156,6 +156,6 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
   it('speaks Spanish with the old words', async () => {
     const s = await setup(null, 'es');
     expect(s.inDoc('schedule-special-day-form')?.getAttribute('aria-label')).toBe('Nuevo día especial');
-    expect([s.field('date').label, s.field('name').placeholder, s.submit().textContent?.trim()]).toEqual(['Fecha', 'Nombre (p.ej. Navidad)', 'Añadir día']);
+    expect([s.field('date').label, s.field('name').placeholder, s.submit().textContent?.trim()]).toEqual(['Fecha', 'Nombre (p. ej. Navidad)', 'Añadir día']);
   });
 });

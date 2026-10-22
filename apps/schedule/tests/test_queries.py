@@ -477,3 +477,25 @@ def test_the_ends_of_the_allowed_calendar_answer(empty_week):
     assert [(s.start, s.end) for s in last.days[0].spans] == [(dt.datetime(2200, 12, 31, 22), dt.datetime(2201, 1, 1, 2))]
     assert is_open("1900-01-01T23:00").is_open
     assert is_open("2200-12-31T23:30+00:00").code == "overnight_open"
+
+
+def test_a_descending_sort_breaks_its_ties_by_id_descending_too():
+    # The tie-break follows the direction (rule hub#2355 of the current product), so a touched row does not
+    # jump and the pages neither repeat nor lose rows (WORKBOOK «Para quien lo mantiene», «Listas»).
+    holidays = sorted(
+        [make_special_day("2026-01-06", "Holiday").id, make_special_day("2026-05-01", "Holiday").id]
+    )
+    works = sorted(
+        [
+            make_override("2026-02-01", "2026-02-02", "Works").id,
+            make_override("2026-03-01", "2026-03-02", "Works").id,
+        ]
+    )
+
+    def ids(name, params):
+        return [row.id for row in run(name, params).rows]
+
+    assert ids("schedule.special_day.list", SpecialDayListIn(sort="name")) == holidays
+    assert ids("schedule.special_day.list", SpecialDayListIn(sort="name", dir="desc")) == holidays[::-1]
+    assert ids("schedule.override.list", OverrideListIn(sort="reason")) == works
+    assert ids("schedule.override.list", OverrideListIn(sort="reason", dir="desc")) == works[::-1]
