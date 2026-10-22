@@ -23,6 +23,7 @@ import time
 
 import pytest
 
+from django.test import Client
 from django.utils.dateparse import parse_datetime
 
 from apps.verifactu.models import Config
@@ -58,11 +59,12 @@ def signed(
     with_v1=True,
     with_v2=False,
     v2_secret=None,
+    **meta,
 ):
-    """``method`` on ``path`` with ``body`` (a dict, or raw bytes), signed as the SaaS signs it."""
+    """``method`` on ``path`` with ``body`` (a dict, or raw bytes), signed as the SaaS signs it (more ``meta``)."""
     raw = body if isinstance(body, bytes) else json.dumps(body).encode()
     ts = str(ts or int(time.time()))
-    headers = {"HTTP_X_ERPLORA_TIMESTAMP": ts, "HTTP_HOST": host}
+    headers = {"HTTP_X_ERPLORA_TIMESTAMP": ts, "HTTP_HOST": host, **meta}
     if with_v1:
         headers["HTTP_X_ERPLORA_SIGNATURE"] = v1(raw, ts, secret)
     if with_v2:
@@ -163,6 +165,48 @@ def test_the_signature_opens_the_door_on_any_host(client, db, host):
     # The platform host (no session: it would go to the SaaS admin), the private name (`hub`, reserved) and a hub's.
     answer = signed(client, "put", PATH, {"slug": "a", "version": 1}, host=host)
     assert answer.status_code == 200
+
+
+# Attempts: 30 calls with a bad signature per address in 5 minutes, then 429 until the window of the first one ends.
+# The SaaS never signs wrong: this is for whatever else reaches the door (a scanner inside the network).
+
+BAD_SIGNATURES = 30
+
+
+def test_past_thirty_bad_signatures_the_address_waits_even_with_a_good_one(client, db):
+    for _ in range(BAD_SIGNATURES):
+        assert signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
+    answer = signed(client, "put", PATH, {"slug": "a", "version": 1})
+    assert (answer.status_code, code(answer)) == (429, "base.rate_limited")
+    assert 290 <= int(answer["Retry-After"]) <= 300
+    assert answer["Cache-Control"].startswith("max-age=0")
+    assert Hub.objects.get(id=HUB_ID).state_version == 0, "nothing is applied while the address waits"
+
+
+def test_a_good_signature_is_not_counted(client, db):
+    for _ in range(BAD_SIGNATURES - 1):
+        signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    for version in range(1, 6):
+        assert signed(client, "put", PATH, {"slug": "a", "version": version}).status_code == 200
+    assert signed(client, "put", PATH, {"slug": "a", "version": 9}, secret="other").status_code == 401
+    assert signed(client, "put", PATH, {"slug": "a", "version": 9}).status_code == 429
+
+
+def test_the_bad_signatures_count_per_address(db):
+    scanner, saas = Client(REMOTE_ADDR="10.0.9.9"), Client(REMOTE_ADDR="10.0.1.20")
+    for _ in range(BAD_SIGNATURES):
+        signed(scanner, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    assert signed(scanner, "put", PATH, {"slug": "a", "version": 1}).status_code == 429
+    assert signed(saas, "put", PATH, {"slug": "a", "version": 1}).status_code == 200
+
+
+def test_the_bad_signatures_count_per_address_as_the_proxies_saw_it(db, settings):
+    settings.TRUSTED_PROXY_HOPS = 1
+    behind = Client(REMOTE_ADDR="10.0.0.5")
+    for _ in range(BAD_SIGNATURES):
+        signed(behind, "put", PATH, {"slug": "a", "version": 1}, secret="other", HTTP_X_FORWARDED_FOR="203.0.113.7")
+    assert signed(behind, "put", PATH, {"slug": "a", "version": 1}, HTTP_X_FORWARDED_FOR="203.0.113.7").status_code == 429
+    assert signed(behind, "put", PATH, {"slug": "a", "version": 1}, HTTP_X_FORWARDED_FOR="203.0.113.8").status_code == 200
 
 
 def test_the_state_is_only_put(client, db):
