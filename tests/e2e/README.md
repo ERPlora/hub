@@ -32,6 +32,15 @@ abierta de la cuenta, y el SaaS las recorre todas en cada inicio de sesión (`al
 cargada (hub#107). Si una spec cierra la sesión del SaaS, el siguiente login vuelve a pedir la cuenta y guarda la
 sesión nueva (`helpers-login.spec.ts`).
 
+Lo mismo con el hub: la sesión que abre un salto se guarda **por cuenta y por hub**, y un contexto nuevo empieza con
+ella y aterriza en `next` sin pasar por el SaaS, como quien vuelve a su negocio. Así una spec salta **una vez por
+cuenta y hub** mientras esa sesión viva. Cada salto cuenta para el freno del SaaS (`HUB_LOGIN_RATELIMIT`, 20 por
+cuenta cada 5 minutos, ACCOUNTS-F28): antes cada login saltaba, y una spec de más de 20 tests caía en el 21.º con
+«429 · Too many attempts» (`staff-flows.spec.ts`, de 23 saltos a 2). Si la sesión del hub ya no vale (una spec salió
+del hub), el hub manda al SaaS como siempre y se guarda la nueva; solo se guarda la que el SaaS abrió para esa cuenta.
+La spec que prueba el salto mismo lo pide: `login(page, origin, next, cuenta, { fresh: true })` (o `hostPage(…, {
+fresh: true })`). Lo cubre `helpers-login-hub-session.spec.ts`.
+
 Cada paso espera una sexta parte del tiempo del test (30 s con los 180 s de `playwright.config.ts`; más con
 `test.slow()` o `test.setTimeout`) y, si no llega, falla diciendo cuál y cuánto esperó. «code rejected» solo
 sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
