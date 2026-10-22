@@ -29,7 +29,7 @@ from pathlib import Path, PurePosixPath
 from django.conf import settings
 
 HUB_DIR = Path(__file__).resolve().parent.parent
-SOURCE_ROOTS = ("base", "apps")
+SOURCE_ROOTS = ("base", "control", "apps")
 
 # ── (a) Who may touch the ORM ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +57,15 @@ SHARED_CATALOG_REASON = (
     "(base/tests/test_shared_lint.py), and the hub_shared role (SELECT, INSERT, UPDATE on those two "
     "tables) is the boundary."
 )
+#: Phase 2 (plan 2026-10-22, S1): the tenancy itself chooses and checks the hubs' aliases.
+TENANCY_ALIASES_REASON = (
+    "use_hub registers a hub's alias the first time a process uses it, swapping in a copy of "
+    "connections.settings under a lock, never changing it in place (PLAN-DB §4)."
+)
+TENANCY_IDENTITY_REASON = (
+    "use_hub reads base_hub_identity on the hub's own alias once per process before serving anything from it: "
+    "a database that says it is another hub is refused (PLAN-DB §3, §14.4); outside any operation by design."
+)
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
         "The context builder reads Membership and a fresh copy of the user before any operation "
@@ -74,6 +83,12 @@ ORM_EXCEPTIONS: dict[str, str] = {
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
+    "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
+    "base/tenancy/router.py": (
+        "The TenantRouter compares the databases behind two aliases (connections.settings) to allow a relation: it "
+        "routes, it never queries (PLAN-DB §4)."
+    ),
+    "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
     "apps/website/qr.py": (
         "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
         "(round 2026-10-21)."
@@ -124,6 +139,7 @@ ALIAS_EXCEPTIONS: dict[str, str] = {
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
+    "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
 }
 #: Session-level advisory locks (not the ``_xact_`` ones): PgBouncer in transaction mode loses them.
 SESSION_LOCK_RE = re.compile(r"\bpg_(?:try_)?advisory_lock(?:_shared)?\s*\(")

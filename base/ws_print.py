@@ -74,7 +74,9 @@ reconnect is taken from the device that held the job, whatever hand-out it was.
 **Tenancy** (phase 1, PLAN §16): the hub is the Host's first label, checked against the registry by the gate the
 HTTP doors pass (``base.middleware.HubHostRequiredMiddleware``), and every operation runs in its scope with the
 session's user. The gate is heard again before every frame and every wake (the context's refresh,
-``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code; phase 2 swaps the context builder for ``use_hub`` and this module does not change. The ``Origin``
+``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code. From
+phase 2's S1 every synchronous step after the handshake runs in the hub's database (``use_hub``, ``_sync``) and its
+wake in the live executor, which enters the hub itself (``base.operations.HubContextBuilder.enter``). The ``Origin``
 must be the hub's own (cross-site WebSocket hijacking): anything else is refused at the handshake (Daphne answers
 it 403).
 
@@ -96,6 +98,7 @@ import logging
 import re
 import uuid
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
@@ -119,6 +122,7 @@ from live.operations import UnknownOperation, get
 
 from base.middleware import HubHostRequiredMiddleware
 from base.operations import HostClosed
+from base.tenancy.context import use_hub
 
 logger = logging.getLogger(__name__)
 
@@ -586,11 +590,13 @@ class PrintSocket:
 
     async def _sync(self, fn: Callable, *args: Any) -> Any:
         """Run the synchronous ``fn`` in a thread of its own, as Django runs a request's sync code, in the
-        socket's language; the database connection it used is released after it (there is no request_finished)."""
+        socket's language and, once admitted, in its hub's database (``use_hub``; phase 2, S1); the database
+        connection it used is released after it (there is no request_finished)."""
+        hub = getattr(self.request, "hub", None)
 
         def call():
             try:
-                with translation.override(self.language):
+                with translation.override(self.language), (use_hub(hub) if hub is not None else nullcontext()):
                     return fn(*args)
             finally:
                 close_old_connections()

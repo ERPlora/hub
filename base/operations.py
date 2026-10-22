@@ -11,12 +11,14 @@ An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The pl
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it).
-This is the only piece phase 2 replaces (scope = ``use_hub``).
+This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
+re-run its hub's database (the request's own is ``base.middleware.HubDatabaseMiddleware``'s).
 """
 
 import dataclasses
 import ipaddress
 import uuid
+from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
 from django.conf import settings
@@ -28,6 +30,9 @@ from live.slugs import validate_hub_slug
 
 from base import registry
 from base.permissions import permissions_for, reload_user
+from base.tenancy import connections as tenancy_connections
+from base.tenancy.context import HUB_SCOPE_KIND, use_hub
+from base.tenancy.identity import HubIdentityMismatch
 
 
 class HostScopeResolver:
@@ -120,6 +125,24 @@ class HubContextBuilder:
             language=getattr(request, "LANGUAGE_CODE", None) or settings.LANGUAGE_CODE,
             request=request,
         )
+
+    def enter(self, ctx: OperationContext) -> AbstractContextManager:
+        """The database a live re-run of ``ctx`` works on, in the executor's thread (live's ``ContextBuilder.enter``;
+        phase 2, S1): ``use_hub`` of its hub, read again from the registry. A hub that stopped serving the app, or
+        whose database is not its own, ends the stream (``HostClosed``); a scope that is no hub's enters nothing."""
+        if ctx.scope.kind != HUB_SCOPE_KIND:
+            return nullcontext()
+        hub = registry.hub_by_slug(ctx.scope.key)
+        refusal = registry.refusal(hub)
+        if refusal is not None:
+            raise HostClosed(refusal.message, code=refusal.code, status=refusal.status)
+        if hub.db_name:
+            try:
+                tenancy_connections.open_hub_alias(hub)
+            except HubIdentityMismatch:
+                refusal = registry.unavailable()
+                raise HostClosed(refusal.message, code=refusal.code, status=refusal.status) from None
+        return use_hub(hub)
 
     def refresh(self, ctx: OperationContext) -> OperationContext:
         """Re-read the registry, the user and its Membership, so a revocation, or a hub that stopped serving the app

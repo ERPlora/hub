@@ -37,8 +37,18 @@ SPA are redirected: anything with a URL of its own in Django (``/api`` answers 4
 the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
 SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
 ``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21).
+
+``HubDatabaseMiddleware`` (phase 2, S1; plan 2026-10-22): right after the host gate, the rest of the request runs in
+its database context: ``use_hub(request.hub)`` on a hub's host; on the platform host, the hub the admin chose
+(``/admin/hub/<slug>/``) or, with none, phase 1's shared database; nothing for ``/internal`` and the open paths,
+whose code opens its own. A hub's database that says it is another hub (``base.tenancy.identity``) answers 503
+(``base.hub_unavailable``) and serves nothing.
 """
 
+import logging
+from contextlib import nullcontext
+
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
@@ -56,6 +66,11 @@ from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
 from base.public_home import website_enabled
 from base.spa import spa
+from base.tenancy import connections as tenancy_connections
+from base.tenancy import context as tenancy_context
+from base.tenancy.identity import HubIdentityMismatch
+
+logger = logging.getLogger(__name__)
 
 #: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
 HUB_GONE_TEMPLATE = "base/hub_gone.html"
@@ -185,3 +200,73 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         if hub is not None and hub.is_demo:
             return demo_login_redirect(slug, request.get_full_path())
         return login_redirect(slug, request.get_full_path())
+
+
+#: What the platform host runs in without a hub chosen for the admin (phase 1's one database, S1–S4).
+_SHARED = object()
+
+
+class HubDatabaseMiddleware:
+    """Placed right after ``HubHostRequiredMiddleware``: everything after it runs in the request's database context."""
+
+    sync_capable = True
+    async_capable = True
+
+    def __init__(self, get_response) -> None:
+        self.get_response = get_response
+        if iscoroutinefunction(get_response):
+            markcoroutinefunction(self)
+
+    def __call__(self, request: HttpRequest):
+        if iscoroutinefunction(self):
+            return self.__acall__(request)
+        try:
+            resolved = self._resolve(request)
+        except HubIdentityMismatch:
+            return self._unavailable(request)
+        with self._entered(resolved):
+            return self.get_response(request)
+
+    async def __acall__(self, request: HttpRequest):
+        try:
+            # Reading the session and checking a database's identity reach the database: not in the event loop.
+            resolved = await sync_to_async(self._resolve)(request)
+        except HubIdentityMismatch:
+            return self._unavailable(request)
+        with self._entered(resolved):
+            return await self.get_response(request)
+
+    def _resolve(self, request: HttpRequest):
+        """The hub the request works on, ``_SHARED`` or ``None``; a hub's own database is registered and checked."""
+        hub = getattr(request, "hub", None)
+        if hub is None and getattr(request, "platform_host", False):
+            hub = _admin_hub(request)
+            if hub is None:
+                return _SHARED
+        if hub is not None and hub.db_name:
+            tenancy_connections.open_hub_alias(hub)
+        return hub
+
+    @staticmethod
+    def _entered(resolved):
+        if resolved is _SHARED:
+            return tenancy_context.use_shared_database()
+        if resolved is None:
+            return nullcontext()
+        return tenancy_context.use_hub(resolved)
+
+    @staticmethod
+    def _unavailable(request: HttpRequest) -> HttpResponse:
+        hub = getattr(request, "hub", None)
+        logger.critical("base.hub_unavailable hub=%s: its database is not its own; nothing is served.", hub)
+        refusal = registry.unavailable()
+        return _envelope(refusal.status, refusal.code, refusal.message)
+
+
+def _admin_hub(request: HttpRequest):
+    """The hub the admin chose for this session (``base.admin.open_hub``), or ``None``."""
+    from base.admin import ADMIN_HUB_SESSION_KEY
+
+    session = getattr(request, "session", None)
+    slug = session.get(ADMIN_HUB_SESSION_KEY) if session is not None else None
+    return registry.hub_by_slug(slug) if slug else None

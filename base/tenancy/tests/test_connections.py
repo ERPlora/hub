@@ -1,0 +1,173 @@
+"""Hot registration of a hub's alias (PLAN-DB §4 and §5; plan 2026-10-22-fase-2-tenencia §4, step 4).
+
+A hub's alias is copied from the static ``hub_template`` alias (PgBouncer in transaction mode: no pool,
+``CONN_MAX_AGE`` 0, no server-side cursors, no prepared statements) with the hub's database as ``NAME``, and swapped
+in as a new ``connections.settings`` dict under a lock: the dict other threads are reading is never changed in place.
+A hub without a database of its own (``db_name=""``) stays on ``default``.
+"""
+
+import threading
+import time
+import uuid
+from types import SimpleNamespace
+
+import pytest
+from django.db import connections as django_connections
+
+from base.tenancy import connections, names
+
+
+def pgbouncer_safe(settings: dict) -> bool:
+    """What PgBouncer in transaction mode needs of an alias (``tests/test_guardrails.py``, ``database_problems``)."""
+    return (
+        settings["CONN_MAX_AGE"] == 0
+        and "pool" not in settings["OPTIONS"]
+        and settings["DISABLE_SERVER_SIDE_CURSORS"] is True
+        and settings["OPTIONS"].get("prepare_threshold") is None
+        and not settings.get("ATOMIC_REQUESTS")
+    )
+
+
+@pytest.fixture(autouse=True)
+def restored_settings(monkeypatch):
+    """Whatever a test registers is gone after it (the same swap the module does)."""
+    monkeypatch.setattr(django_connections, "settings", django_connections.settings)
+
+
+def hub_with_database(**fields):
+    hub_id = uuid.uuid7()
+    return SimpleNamespace(
+        id=hub_id, slug="acme", db_name=names.hub_db_name(connections.control_name(), hub_id), cluster=None, **fields
+    )
+
+
+def test_the_template_alias_goes_through_pgbouncer_safely():
+    template = django_connections.settings[connections.TEMPLATE_ALIAS]
+
+    assert template["CONN_MAX_AGE"] == 0
+    assert "pool" not in template["OPTIONS"]
+    assert template["DISABLE_SERVER_SIDE_CURSORS"] is True
+    assert template["OPTIONS"].get("prepare_threshold") is None
+    # Named after the control database of the settings (hub_template, pre_hub_template); config/tests checks it.
+    assert template["NAME"].endswith("_template")
+
+
+def test_a_hub_with_its_database_gets_an_alias_copied_from_the_template():
+    hub = hub_with_database()
+    before = django_connections.settings
+    frozen = dict(before)
+
+    alias = connections.register_hub_alias(hub)
+
+    assert alias == f"hub_{hub.id.hex}"
+    registered = django_connections.settings[alias]
+    template = django_connections.settings[connections.TEMPLATE_ALIAS]
+    assert registered["NAME"] == hub.db_name
+    assert {key: value for key, value in registered.items() if key != "NAME"} == {
+        key: value for key, value in template.items() if key != "NAME"
+    }
+    assert registered["OPTIONS"] is not template["OPTIONS"]
+    # A new dict was swapped in; the one other threads may be reading is as it was.
+    assert django_connections.settings is not before
+    assert before == frozen
+    assert pgbouncer_safe(registered)
+
+
+def test_registering_again_changes_nothing():
+    hub = hub_with_database()
+    connections.register_hub_alias(hub)
+    after_first = django_connections.settings
+
+    assert connections.register_hub_alias(hub) == f"hub_{hub.id.hex}"
+    assert django_connections.settings is after_first
+
+
+def test_an_alias_never_moves_to_another_database_while_the_process_runs():
+    hub = hub_with_database()
+    connections.register_hub_alias(hub)
+    hub.db_name = names.demo_db_name(hub.id)
+
+    with pytest.raises(connections.HubAliasConflict):
+        connections.register_hub_alias(hub)
+
+
+def test_two_threads_registering_the_same_hub_register_it_once():
+    hub = hub_with_database()
+    swaps = []
+    barrier = threading.Barrier(2)
+    seen = []
+
+    original_copy = connections._copied
+
+    def slow_copy(*args, **kwargs):
+        # Wide enough for the other thread to look for the alias meanwhile.
+        time.sleep(0.05)
+        swaps.append(1)
+        return original_copy(*args, **kwargs)
+
+    connections._copied = slow_copy
+    try:
+
+        def register():
+            barrier.wait()
+            seen.append(connections.register_hub_alias(hub))
+
+        threads = [threading.Thread(target=register) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    finally:
+        connections._copied = original_copy
+
+    assert seen == [f"hub_{hub.id.hex}"] * 2
+    assert len(swaps) == 1
+
+
+def test_a_hub_of_the_shared_database_stays_on_default():
+    hub = SimpleNamespace(id=uuid.uuid7(), slug="a", db_name="", cluster=None)
+    before = django_connections.settings
+
+    assert connections.alias_for(hub) == "default"
+    assert django_connections.settings is before
+
+
+def test_a_name_that_is_no_hubs_database_registers_nothing():
+    hub = SimpleNamespace(id=uuid.uuid7(), slug="acme", db_name="postgres", cluster=None)
+    before = django_connections.settings
+
+    with pytest.raises(names.InvalidDatabaseName):
+        connections.register_hub_alias(hub)
+    assert django_connections.settings is before
+
+
+def test_a_hub_on_a_cluster_reaches_its_clusters_pgbouncer():
+    cluster = SimpleNamespace(pooler_host="10.0.0.7", pooler_port=6440)
+    hub = hub_with_database()
+    hub.cluster = cluster
+
+    alias = connections.register_hub_alias(hub)
+
+    assert django_connections.settings[alias]["HOST"] == "10.0.0.7"
+    assert django_connections.settings[alias]["PORT"] == 6440
+
+
+def test_the_migrators_alias_is_the_same_database_reached_directly_without_a_pool():
+    hub = hub_with_database()
+
+    alias = connections.register_ddl_alias(hub.db_name)
+
+    assert alias == f"{hub.db_name}__ddl"
+    registered = django_connections.settings[alias]
+    control = django_connections.settings["default"]
+    assert registered["NAME"] == hub.db_name
+    assert (registered["HOST"], registered["PORT"]) == (control["HOST"], control["PORT"])
+    assert registered["CONN_MAX_AGE"] == 0
+    assert "pool" not in registered["OPTIONS"]
+    assert pgbouncer_safe(registered)
+
+
+def test_the_template_is_never_connected_to_by_registering():
+    connections.register_hub_alias(hub_with_database())
+
+    assert django_connections[connections.TEMPLATE_ALIAS].connection is None

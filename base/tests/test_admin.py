@@ -33,29 +33,29 @@ class TestHubRegistry:
     def test_lists_the_hubs_with_their_status(self, client, superuser):
         Hub.objects.create(slug="acme", name="Acme Bar", status="cancelled", vertical="restaurant")
         client.force_login(superuser)
-        html = client.get("/admin/base/hub/", HTTP_HOST=PLATFORM).content.decode()
+        html = client.get("/admin/control/hub/", HTTP_HOST=PLATFORM).content.decode()
         assert "acme" in html and "restaurant" in html and "Cancelled" in html
 
     def test_filters_by_status_and_demo_and_searches_by_slug_name_or_id(self, client, superuser):
         acme = Hub.objects.create(slug="acme", name="Acme Bar", status="cancelled")
         Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True)
         client.force_login(superuser)
-        cancelled = client.get("/admin/base/hub/?status__exact=cancelled", HTTP_HOST=PLATFORM).content.decode()
+        cancelled = client.get("/admin/control/hub/?status__exact=cancelled", HTTP_HOST=PLATFORM).content.decode()
         assert "acme" in cancelled and "demo-0000beef" not in cancelled
-        demos = client.get("/admin/base/hub/?is_demo__exact=1", HTTP_HOST=PLATFORM).content.decode()
-        assert "demo-0000beef" in demos and "/admin/base/hub/{}/".format(acme.pk) not in demos
+        demos = client.get("/admin/control/hub/?is_demo__exact=1", HTTP_HOST=PLATFORM).content.decode()
+        assert "demo-0000beef" in demos and "/admin/control/hub/{}/".format(acme.pk) not in demos
         for query in ("Acme", str(acme.pk)):
-            found = client.get("/admin/base/hub/", {"q": query}, HTTP_HOST=PLATFORM).content.decode()
-            assert f"/admin/base/hub/{acme.pk}/" in found
+            found = client.get("/admin/control/hub/", {"q": query}, HTTP_HOST=PLATFORM).content.decode()
+            assert f"/admin/control/hub/{acme.pk}/" in found
 
     def test_nothing_is_added_changed_or_deleted_by_hand(self, client, superuser):
         hub = Hub.objects.create(slug="acme", status="ready")
         client.force_login(superuser)
-        assert client.get("/admin/base/hub/add/", HTTP_HOST=PLATFORM).status_code == 403
-        assert client.get(f"/admin/base/hub/{hub.pk}/delete/", HTTP_HOST=PLATFORM).status_code == 403
-        page = client.get(f"/admin/base/hub/{hub.pk}/change/", HTTP_HOST=PLATFORM)
+        assert client.get("/admin/control/hub/add/", HTTP_HOST=PLATFORM).status_code == 403
+        assert client.get(f"/admin/control/hub/{hub.pk}/delete/", HTTP_HOST=PLATFORM).status_code == 403
+        page = client.get(f"/admin/control/hub/{hub.pk}/change/", HTTP_HOST=PLATFORM)
         assert page.status_code == 200 and 'name="slug"' not in page.content.decode()
-        client.post(f"/admin/base/hub/{hub.pk}/change/", {"slug": "other", "status": "purged"}, HTTP_HOST=PLATFORM)
+        client.post(f"/admin/control/hub/{hub.pk}/change/", {"slug": "other", "status": "purged"}, HTTP_HOST=PLATFORM)
         hub.refresh_from_db()
         assert (hub.slug, hub.status) == ("acme", "ready")
 
@@ -88,7 +88,7 @@ class TestExpireNow:
     def expire_now(self, client, *hubs):
         selected = [str(hub.pk) for hub in hubs]
         data = {"action": "expire_now", "_selected_action": selected}
-        return client.post("/admin/base/hub/", data, HTTP_HOST=PLATFORM, follow=True)
+        return client.post("/admin/control/hub/", data, HTTP_HOST=PLATFORM, follow=True)
 
     def test_ends_the_chosen_demos_and_says_so(self, client, superuser, demo):
         from django.utils import timezone
@@ -117,7 +117,7 @@ class TestExpireNow:
         support = make_user("support", is_staff=True)
         support.groups.add(services._support_group())
         client.force_login(support)
-        assert "expire_now" not in client.get("/admin/base/hub/", HTTP_HOST=PLATFORM).content.decode()
+        assert "expire_now" not in client.get("/admin/control/hub/", HTTP_HOST=PLATFORM).content.decode()
         self.expire_now(client, demo)
         demo.refresh_from_db()
         assert demo.status == "ready"

@@ -23,6 +23,10 @@ pass that fails is logged and the next one tries again, and the worker never sto
 releases its connection. Phase 1 runs the tasks on one fixed scope (``WORKER_SCOPE_SLUG``) and relays the
 one database every hub shares; phase 2 adds, in this loop, the hubs whose ``hub_due`` has come (each under
 ``use_hub``, for its tasks and its outbox) and the hubs' provisioning and purge.
+
+Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks and the relay run on phase 1's shared
+database (``use_shared_database``: every hub with ``db_name=""``; a hub with its own database waits for S2's
+``hub_due`` loop), and the reaper on control (``use_control``), where the registry and the demos live.
 """
 
 import datetime as dt
@@ -35,6 +39,7 @@ from django.utils import timezone
 
 from base import catalog, relay, scheduler
 from base.services import reap_demos
+from base.tenancy.context import use_control, use_shared_database
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +90,8 @@ def run(
             return 0
         delay = min(delay * 2, RETRY_MAX_SECONDS)
     try:
-        scheduler.sync(clock())
+        with use_shared_database():
+            scheduler.sync(clock())
     except Exception:
         logger.exception("worker: the apps' scheduled tasks could not be scheduled; the worker stops.")
         return 1
@@ -112,7 +118,8 @@ def run(
 def _reap(now: dt.datetime) -> None:
     """Purge the demos that ended by ``now``; a failure is logged and the next pass tries again."""
     try:
-        purged = reap_demos(now)
+        with use_control():
+            purged = reap_demos(now)
     except Exception:
         logger.exception("worker: the demo reaper failed; its next pass tries again.")
     else:
@@ -126,7 +133,8 @@ def _reap(now: dt.datetime) -> None:
 def _relay(now: dt.datetime) -> None:
     """Relay the outbox at ``now``; a failure is logged and the next tick tries again."""
     try:
-        done = relay.run(now)
+        with use_shared_database():
+            done = relay.run(now)
     except Exception:
         logger.exception("worker: the outbox relay failed; the next tick tries again.")
         # A broken connection is not taken into the next tick.
@@ -141,7 +149,8 @@ def _relay(now: dt.datetime) -> None:
 def _tick(now: dt.datetime) -> None:
     """Run the scheduled tasks due at ``now``; a failure is logged and the next tick tries again."""
     try:
-        ran = scheduler.run_due(now)
+        with use_shared_database():
+            ran = scheduler.run_due(now)
     except Exception:
         logger.exception("worker: the scheduled tasks could not run; the next tick tries again.")
         # A broken connection is not taken into the next tick.
