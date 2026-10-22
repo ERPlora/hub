@@ -11,7 +11,7 @@ describe('draft', () => {
     const draft = toDraft(SITE);
     expect(Object.keys(draft)).toEqual(['template', 'theme', 'content']);
     draft.content.hero.title = 'Changed';
-    draft.theme.palette = 'custom';
+    draft.theme.palette = 'forest';
     expect(SITE.content.hero.title).toBe('Fresh food');
     expect(SITE.theme.palette).toBe('ocean');
   });

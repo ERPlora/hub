@@ -76,8 +76,8 @@
       "sand": "Sand",
       "midnight": "Midnight",
       "olive": "Olive",
-      "custom": "Your colours",
-      "customHint": "Choose two colours: the page, the bands and the text follow them, always readable."
+      "hint": "Change the two colours to make the palette yours: the page, the bands and the text follow them, always readable.",
+      "reset": "Reset colours"
     },
     "sections": {
       "heading": "Sections",

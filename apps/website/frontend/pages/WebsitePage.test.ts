@@ -225,8 +225,8 @@ describe('WebsitePage', () => {
     expect(s.control('website-mode').value).toBe('auto');
     expect(s.testid('website-mode-auto-hint').text()).toContain('device');
     expect(s.wrapper.get('[data-testid="website-palette-ocean"]').attributes('aria-checked')).toBe('true');
-    // The free colours are only for «Your colours».
-    expect(s.testid('website-colour-primary').exists()).toBe(false);
+    // The palette's own two colours are on show, ready to change.
+    expect(s.control('website-colour-primary').value).toBe(PALETTES.ocean.light.primary);
     await s.wrapper.get('[data-testid="website-palette-forest"]').trigger('click');
     await ionValue(s.wrapper.get('[data-testid="website-mode"]').element, 'dark', 'ionChange');
     expect(s.testid('website-mode-auto-hint').exists()).toBe(false);
@@ -243,24 +243,41 @@ describe('WebsitePage', () => {
     expect(s.body().theme.mode).toBe('auto');
   });
 
-  it('«Your colours» shows two colour fields, starting from the palette on show, and keeps them for later', async () => {
+  it('any palette’s two colours can be changed over it, and «Reset colours» gives its own back', async () => {
     const s = await setup();
     await s.show();
-    await s.wrapper.get('[data-testid="website-palette-custom"]').trigger('click');
-    expect(s.control('website-colour-primary').value).toBe(PALETTES.ocean.light.primary);
     expect(s.control('website-colour-accent').value).toBe(PALETTES.ocean.accent);
+    expect(s.testid('website-colours-reset').exists()).toBe(false);
     await ionValue(s.wrapper.get('[data-testid="website-colour-primary"]').element, '#112233', 'ionInput');
+    // The designs are drawn in the owner's colours.
+    expect(s.wrapper.get('[data-testid="website-template-bold"] .wt-thumb').attributes('style')).toContain('--wt-primary: #112233');
     await s.wrapper.get('[data-testid="website-save"]').trigger('click');
     await settle();
-    expect(s.body().theme).toEqual({ palette: 'custom', custom: { primary: '#112233', accent: PALETTES.ocean.accent }, mode: 'auto' });
-    // Back on a curated palette the fields go, and the colours wait for «Your colours» again.
+    expect(s.body().theme).toEqual({ palette: 'ocean', custom: { primary: '#112233', accent: PALETTES.ocean.accent }, mode: 'auto' });
+    // «Reset colours»: the palette's own pair again, stored as none.
+    await s.wrapper.get('[data-testid="website-colours-reset"]').trigger('click');
+    expect(s.control('website-colour-primary').value).toBe(PALETTES.ocean.light.primary);
+    expect(s.testid('website-colours-reset').exists()).toBe(false);
+    await s.wrapper.get('[data-testid="website-save"]').trigger('click');
+    await settle();
+    expect(s.body().theme).toEqual({ palette: 'ocean', custom: null, mode: 'auto' });
+    // Another palette after a change: its own colours, not the owner's of the one before.
+    await ionValue(s.wrapper.get('[data-testid="website-colour-accent"]').element, '#445566', 'ionInput');
     await s.wrapper.get('[data-testid="website-palette-sand"]').trigger('click');
-    expect(s.testid('website-colour-primary').exists()).toBe(false);
+    expect(s.control('website-colour-primary').value).toBe(PALETTES.sand.light.primary);
+    expect(s.control('website-colour-accent').value).toBe(PALETTES.sand.accent);
     await s.wrapper.get('[data-testid="website-save"]').trigger('click');
     await settle();
-    expect(s.body().theme).toEqual({ palette: 'sand', custom: { primary: '#112233', accent: PALETTES.ocean.accent }, mode: 'auto' });
-    await s.wrapper.get('[data-testid="website-palette-custom"]').trigger('click');
+    expect(s.body().theme).toEqual({ palette: 'sand', custom: null, mode: 'auto' });
+  });
+
+  it('a site with the owner’s colours opens with them on show and «Reset colours»', async () => {
+    const s = await setup();
+    await s.show({ ...SITE, theme: { palette: 'rose', custom: { primary: '#112233', accent: '#445566' }, mode: 'light' } });
+    expect(s.wrapper.get('[data-testid="website-palette-rose"]').attributes('aria-checked')).toBe('true');
     expect(s.control('website-colour-primary').value).toBe('#112233');
+    expect(s.control('website-colour-accent').value).toBe('#445566');
+    expect(s.testid('website-colours-reset').exists()).toBe(true);
   });
 
   it('offers as the catalog only the sources this business has on', async () => {

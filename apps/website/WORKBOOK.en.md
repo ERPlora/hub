@@ -37,11 +37,12 @@ switches between the two.
   serif reading face and thin rules between sections) and **Bold** (a dark bar, a full-width header in the main
   colour with big capitals and a strong button). All four suit a restaurant, a salon, a shop or a service.
 - **Colours**: eight palettes as cards showing their colours on the light and the dark page, the chosen one
-  highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**, and
-  **Your colours**, which shows two colour fields (main and second) that start from the palette on show and are kept
-  if another one is chosen later. Each palette has a light and a dark version and reads well in both (WCAG AA: text,
-  links and buttons); with **Your colours**, the page, the bands and the text come from the two colours, and a colour
-  that would not read is adjusted just enough.
+  highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**. Under
+  them, two colour fields (**Main colour** and **Second colour**) with the chosen palette's: changing them makes the
+  palette yours, and **Reset colours** then appears and gives the palette's own back. Choosing another palette shows
+  its own (the changes to the previous one are dropped). Each palette has a light and a dark version and reads well in
+  both (WCAG AA: text, links and buttons); with changed colours, the page, the bands and the text come from the two
+  colours, and a colour that would not read is adjusted just enough.
 - **Page background**: **Light**, **Dark** or **Auto** (the default): auto follows each visitor's device, dark when it
   is in dark mode and light otherwise; a note under it says so.
 - **Sections**, in this order, each one folding:
@@ -124,10 +125,10 @@ image was not uploaded to this business's website: upload it again.»
 ### WEBSITE-F02 Choose the design, the palette and the background
 Status: done (server and screen)
 Actor: owner, admin, assistant, API
-Steps: press one of the four **Design** cards; one of the palettes (or **Your colours** and its two colours); the
-background, **Light**, **Dark** or **Auto**. It is saved as in F01.
+Steps: press one of the four **Design** cards; one of the palettes and, if wished, change its two colours (**Reset
+colours** gives its own back); the background, **Light**, **Dark** or **Auto**. It is saved as in F01.
 Out: the same content in another design or other colours; nothing is lost when changing.
-If it fails: **Your colours** without its two colours: «Choose the two colours of your own palette.»
+If it fails: a mistyped colour is not saved and the field says so: «Write the colour as #RRGGBB, for example #1A73E8.»
 
 ### WEBSITE-F03 Show or hide a section
 Status: done (server and screen)

@@ -1,34 +1,40 @@
 <script setup lang="ts">
 // PalettePicker — the website's palettes as swatch cards (Squarespace's colour palettes, Wix's site themes and
-// Shopify's colour schemes, reduced to a short curated list): the eight of apps/website/palettes.json and «Your
-// colours». Each card shows its main and second colour on the light page and on the dark one, and its name. A radio
-// group: one is chosen, highlighted; picking another emits it. The page shows the two colour fields of «Your colours».
+// Shopify's colour schemes, reduced to a short curated list): the eight of apps/website/palettes.json. Each card shows
+// its main and second colour on the light page and on the dark one, and its name. A radio group: one is chosen,
+// highlighted; picking another emits it and drops the owner's colours (`custom` → null), so the new palette shows as
+// it is. Under the cards, the two colours on show (the owner's, or the chosen palette's own) as colour fields:
+// changing one emits the owner's pair over the palette (`update:custom`), and «Reset colours», shown only then,
+// gives the palette's own back.
+import { ColorInput } from '@erplora/ui/components';
+import { IonButton, IonItem, IonList, IonNote } from '@ionic/vue';
+import { computed } from 'vue';
+
 import { useT } from '../composables/useT';
-import { CURATED, PALETTE_IDS } from '../lib/palettes';
+import { CURATED, currentColours, PALETTE_IDS, withColour } from '../lib/palettes';
 import type { CustomColours, PaletteId } from '../operations';
 
 const props = withDefaults(
   defineProps<{
     modelValue: PaletteId;
-    /** The owner's colours, drawn on «Your colours» once chosen. */
-    custom: CustomColours | null;
+    /** The owner's two colours over the palette's (`v-model:custom`); null = the palette's own. */
+    custom?: CustomColours | null;
     disabled?: boolean;
   }>(),
-  { disabled: false },
+  { custom: null, disabled: false },
 );
 
-const emit = defineEmits<{ 'update:modelValue': [value: PaletteId] }>();
+const emit = defineEmits<{
+  'update:modelValue': [value: PaletteId];
+  'update:custom': [value: CustomColours | null];
+}>();
 
 const t = useT();
 
-/** «Your colours» before any is chosen: a neutral pair. */
-const UNSET = { primary: '#6b7280', accent: '#d1d5db' };
+/** The two colours in the fields. */
+const shown = computed(() => currentColours({ palette: props.modelValue, custom: props.custom }));
 
 function swatch(id: PaletteId): Record<string, string> {
-  if (id === 'custom') {
-    const { primary, accent } = props.custom ?? UNSET;
-    return { '--wp-primary': primary, '--wp-accent': accent, '--wp-bg': '#ffffff', '--wp-dark-bg': '#121417', '--wp-dark-primary': primary };
-  }
   const palette = CURATED[id];
   return {
     '--wp-primary': palette.light.primary,
@@ -42,6 +48,16 @@ function swatch(id: PaletteId): Record<string, string> {
 function pick(id: PaletteId): void {
   if (props.disabled || id === props.modelValue) return;
   emit('update:modelValue', id);
+  if (props.custom) emit('update:custom', null);
+}
+
+function change(key: keyof CustomColours, value: string): void {
+  if (props.disabled) return;
+  emit('update:custom', withColour({ palette: props.modelValue, custom: props.custom }, key, value));
+}
+
+function reset(): void {
+  if (!props.disabled) emit('update:custom', null);
 }
 </script>
 
@@ -65,7 +81,6 @@ function pick(id: PaletteId): void {
     >
       <span
         class="wp-swatch"
-        :class="{ 'wp-swatch--custom': id === 'custom' && !custom }"
         :style="swatch(id)"
         aria-hidden="true"
       >
@@ -75,6 +90,43 @@ function pick(id: PaletteId): void {
       <span class="wp-name">{{ t(`website.palette.${id}`) }}</span>
     </button>
   </div>
+  <ion-list
+    inset
+    class="wp-colours"
+  >
+    <ColorInput
+      :model-value="shown.primary"
+      :label="t('website.colours.primary')"
+      :disabled="disabled"
+      testid="website-colour-primary"
+      @update:model-value="change('primary', $event)"
+    />
+    <ColorInput
+      :model-value="shown.accent"
+      :label="t('website.colours.accent')"
+      :disabled="disabled"
+      testid="website-colour-accent"
+      @update:model-value="change('accent', $event)"
+    />
+    <ion-item lines="none">
+      <ion-note class="wp-note">
+        {{ t('website.palette.hint') }}
+      </ion-note>
+    </ion-item>
+    <ion-item
+      v-if="custom && !disabled"
+      lines="none"
+    >
+      <ion-button
+        fill="clear"
+        size="small"
+        data-testid="website-colours-reset"
+        @click="reset"
+      >
+        {{ t('website.palette.reset') }}
+      </ion-button>
+    </ion-item>
+  </ion-list>
 </template>
 
 <style scoped>
@@ -143,8 +195,8 @@ function pick(id: PaletteId): void {
 .wp-dot--accent {
   background: var(--wp-accent);
 }
-.wp-swatch--custom .wp-dot {
-  background: conic-gradient(#ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444);
+.wp-note {
+  font-size: 0.8125rem;
 }
 .wp-name {
   font-size: 0.875rem;

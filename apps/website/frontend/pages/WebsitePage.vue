@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // Website → the editor (WORKBOOK «El editor»): the site live (`website.site.get`), its status (never published,
 // offline, online and whether the draft has unpublished changes), and, for whoever manages it, the form: the four
-// designs, the palette (or the owner's two colours) and the page mode, and one block per fixed section (the optional ones with «Show»). The draft
+// designs, the palette (with the owner's two colours over it, if changed) and the page mode, and one block per fixed section (the optional ones with «Show»). The draft
 // is saved by hand or two seconds after the last change (`website.site.save`), and the real preview beside it
 // reloads after each save (`website.site.preview`, in a frame). «Publish» and «Take offline» ask first; «Share and
 // QR» gives the address and its QR. On a computer the form and the preview stand side by side; on a tablet or a
 // phone a segment switches between them. Squarespace's, Wix's and Shopify's editors, reduced to fixed sections.
-import { ColorInput, ImageUpload, InlineFeedback, useConfirm } from '@erplora/ui/components';
+import { ImageUpload, InlineFeedback, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import {
@@ -38,9 +38,9 @@ import TemplatePicker from '../components/TemplatePicker.vue';
 import { useT } from '../composables/useT';
 import { copyOf, errorUnder, sameDraft, toDraft, toSaveIn } from '../lib/draft';
 import { defaultHours } from '../lib/hours';
-import { startingCustom, themeColours } from '../lib/palettes';
+import { themeColours } from '../lib/palettes';
 import { makeUploader } from '../lib/upload';
-import type { CatalogSource, Content, PaletteId, SaveIn, ThemeMode } from '../operations';
+import type { CatalogSource, Content, SaveIn, ThemeMode } from '../operations';
 
 /** Saved this long after the last change. */
 const AUTOSAVE_MS = 2000;
@@ -205,13 +205,6 @@ function setSource(value: unknown): void {
   const source = SOURCES.find((known) => known === value) ?? null;
   if (catalog.source !== source) catalog.category_ids = [];
   catalog.source = source;
-}
-
-/** Another palette; «Your colours» opens on the colours chosen before, or on those of the palette on show. */
-function choosePalette(palette: PaletteId): void {
-  const theme = (draft.value as SaveIn).theme;
-  if (palette === 'custom') theme.custom = startingCustom(theme);
-  theme.palette = palette;
 }
 
 function setMode(value: unknown): void {
@@ -379,28 +372,10 @@ function setHoursShown(shown: boolean): void {
               {{ t('website.colours.heading') }}
             </h2>
             <PalettePicker
-              :model-value="draft.theme.palette"
-              :custom="draft.theme.custom"
-              @update:model-value="choosePalette"
+              v-model="draft.theme.palette"
+              v-model:custom="draft.theme.custom"
             />
             <ion-list inset>
-              <template v-if="draft.theme.palette === 'custom' && draft.theme.custom">
-                <ColorInput
-                  v-model="draft.theme.custom.primary"
-                  :label="t('website.colours.primary')"
-                  testid="website-colour-primary"
-                />
-                <ColorInput
-                  v-model="draft.theme.custom.accent"
-                  :label="t('website.colours.accent')"
-                  testid="website-colour-accent"
-                />
-                <ion-item lines="none">
-                  <ion-note class="we-note">
-                    {{ t('website.palette.customHint') }}
-                  </ion-note>
-                </ion-item>
-              </template>
               <ion-item lines="none">
                 <ion-label>{{ t('website.colours.mode') }}</ion-label>
               </ion-item>

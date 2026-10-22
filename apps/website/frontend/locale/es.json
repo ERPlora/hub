@@ -76,8 +76,8 @@
       "sand": "Arena",
       "midnight": "Medianoche",
       "olive": "Oliva",
-      "custom": "Tus colores",
-      "customHint": "Elige dos colores: la página, las franjas y el texto se adaptan a ellos, siempre legibles."
+      "hint": "Cambia los dos colores para hacer tuya la paleta: la página, las franjas y el texto se adaptan a ellos, siempre legibles.",
+      "reset": "Restablecer colores"
     },
     "sections": {
       "heading": "Secciones",

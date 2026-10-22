@@ -18,16 +18,16 @@ export interface ImageRef {
   url: string;
 }
 
-export type PaletteId = 'ocean' | 'forest' | 'terracotta' | 'slate' | 'rose' | 'sand' | 'midnight' | 'olive' | 'custom';
+export type PaletteId = 'ocean' | 'forest' | 'terracotta' | 'slate' | 'rose' | 'sand' | 'midnight' | 'olive';
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
-/** The custom palette's two colours (#rrggbb); the page, the bands and the text are derived from them. */
+/** The owner's two colours (#rrggbb) over the chosen palette's; the page, the bands and the text are derived from them. */
 export interface CustomColours {
   primary: string;
   accent: string;
 }
 
-/** A curated palette or `custom` (with its colours, kept while another is chosen), and light, dark or auto. */
+/** A curated palette, the owner's two colours over it (null = the palette's own), and light, dark or auto. */
 export interface Theme {
   palette: PaletteId;
   custom: CustomColours | null;

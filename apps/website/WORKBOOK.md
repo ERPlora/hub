@@ -47,11 +47,12 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
   oscura, cabecera a todo el ancho en el color principal con mayúsculas grandes y un botón fuerte). Las cuatro sirven
   para un restaurante, una peluquería, una tienda o un servicio.
 - **Colores**: ocho paletas en tarjetas con sus colores sobre el fondo claro y el oscuro, la elegida resaltada:
-  **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**, y **Tus
-  colores**, que muestra dos campos de color (principal y secundario) que empiezan con los de la paleta que se veía y
-  se conservan si luego se elige otra. Cada paleta trae su versión clara y oscura y se lee bien en las dos (WCAG AA:
-  textos, enlaces y botones); con **Tus colores**, el fondo, las franjas y el texto salen de los dos colores y un
-  color que no se leería se ajusta lo justo.
+  **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**. Debajo, dos
+  campos de color (**Color principal** y **Color secundario**) con los de la paleta elegida: cambiarlos hace tuya la
+  paleta, y entonces aparece **Restablecer colores**, que vuelve a los de la paleta. Elegir otra paleta muestra los
+  suyos (los cambios de la anterior se descartan). Cada paleta trae su versión clara y oscura y se lee bien en las dos
+  (WCAG AA: textos, enlaces y botones); con colores cambiados, el fondo, las franjas y el texto salen de los dos
+  colores y un color que no se leería se ajusta lo justo.
 - **Fondo de la página**: **Claro**, **Oscuro** o **Automático** (por defecto): automático sigue el dispositivo de
   cada visitante, oscuro si está en modo oscuro y claro si no; lo dice una nota debajo.
 - **Secciones**, en este orden, cada una plegable:
@@ -136,10 +137,10 @@ a la página web de este negocio: vuelve a subirla.»
 ### WEBSITE-F02 Elegir el diseño, la paleta y el fondo
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente, API
-Pasos: pulsa una de las cuatro tarjetas de **Diseño**; una de las paletas (o **Tus colores** y sus dos colores); el
-fondo, **Claro**, **Oscuro** o **Automático**. Se guarda como en F01.
+Pasos: pulsa una de las cuatro tarjetas de **Diseño**; una de las paletas y, si quieres, cambia sus dos colores
+(**Restablecer colores** vuelve a los suyos); el fondo, **Claro**, **Oscuro** o **Automático**. Se guarda como en F01.
 Sale: el mismo contenido con otro diseño o con otros colores; nada se pierde al cambiar.
-Si falla: **Tus colores** sin sus dos colores: «Elige los dos colores de tu propia paleta.»
+Si falla: un color mal escrito no se guarda y el campo lo dice: «Escribe el color como #RRGGBB, por ejemplo #1A73E8.»
 
 ### WEBSITE-F03 Mostrar u ocultar una sección
 Estado: hecho (servidor y pantalla)
@@ -342,10 +343,11 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
 - **Paletas** (`palettes.json` + `palettes.py`, ronda 2026-10-22): las ocho paletas, cada una con su juego claro y
   oscuro (principal, página, franjas, texto, enlaces y bordes) y el color secundario; el editor lee el mismo fichero.
   `tests/test_palettes.py` comprueba WCAG AA (4,5:1) en los dos modos para texto, texto atenuado, enlaces, botones y
-  el color secundario; **Tus colores** (`custom`) se deriva en `palettes._derived` (fondo blanco y uno oscuro teñido
+  el color secundario; los dos colores del propietario sobre cualquier paleta (`custom`) se derivan en `palettes._derived` (fondo blanco y uno oscuro teñido
   del color, texto AAA, enlaces y botones movidos hacia negro o blanco solo lo que haga falta) y pasa la misma prueba
-  con colores difíciles (amarillo, gris medio, blanco, negro, neón). El tema es `{palette, custom, mode}`; `custom` se
-  guarda aunque se elija otra paleta.
+  con colores difíciles (amarillo, gris medio, blanco, negro, neón). El tema es `{palette, custom, mode}`: `custom` son
+  los dos colores cambiados sobre la paleta, `null` = los de la paleta (el servidor guarda como `null` el par propio
+  de la paleta, y el editor lo pone a `null` al elegir otra paleta o con «Restablecer colores»).
 - **Pintar la paleta**: `render._theme` escribe un solo `<style>` con las variables de Bootstrap 5.3 (`--bs-primary`,
   `--bs-body-bg`, `--bs-body-color`, `--bs-link-color`, `--bs-tertiary-bg`, `--bs-border-color`… y sus `-rgb`) para
   `data-bs-theme="light"` y para `"dark"`, más tres `--ws-*` que Bootstrap no tiene (el texto sobre el color principal
@@ -370,6 +372,10 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
   borrador y de lo publicado pasa a `{palette: "custom", custom: {primary, accent}, mode}`, así que ninguna página
   cambia de colores; a la inversa, una paleta vuelve a sus dos colores (congelados en la migración) y automático a
   claro.
+- **Migración 0003** (`0003_theme_overrides`, reversible, solo JSON): «Tus colores» deja de ser una paleta; un tema
+  `{palette: "custom", custom}` pasa a `ocean` con los mismos dos colores (se pinta igual: la página sale de ellos sea
+  cual sea la paleta) y los colores que una paleta guardaba para un «Tus colores» posterior se descartan (nunca se
+  pintaron y ahora se pintarían). Borrador y publicado por igual.
 - **Escribir en el editor** (regresión de 2026-10-22): el grupo de secciones (`ion-accordion-group`) guarda las
   abiertas en el estado de la página (`openSections`) y solo atiende a su propio `ionChange`. Antes llevaba un valor
   fijo y Vue lo volvía a poner en cada pulsación: la sección abierta se plegaba, el campo perdía el foco y la página
@@ -380,10 +386,12 @@ las dos lecturas públicas de los visitantes (`website.public.*`).
 
 - `frontend/routes.ts`: `/website` → `pages/WebsitePage.vue`.
 - Componentes: `TemplatePicker` (las cuatro tarjetas, dibujos en CSS con los colores de la paleta), `PalettePicker`
-  (las paletas y «Tus colores» en tarjetas, de `palettes.json`), `HoursEditor`, `CategoryPicker` (lee
+  (las paletas en tarjetas, de `palettes.json`, con los dos `ColorInput` de los colores a la vista y «Restablecer
+  colores»), `HoursEditor`, `CategoryPicker` (lee
   `website.catalog.categories` al cambiar la fuente), `PreviewFrame` (el iframe de `/api/website/site/preview`),
-  `ShareDialog`; de `@erplora/ui/components`, `ColorInput`, `ImageUpload`, `InlineFeedback` y `useConfirm`.
+  `ShareDialog`; de `@erplora/ui/components`, `ColorInput` (en `PalettePicker`), `ImageUpload`, `InlineFeedback` y
+  `useConfirm`.
 - `lib/draft.ts` (copia del borrador, comparación, errores por campo), `lib/hours.ts`, `lib/upload.ts` (fichero →
-  base64 → `website.image.upload`), `lib/palettes.ts` (las paletas del fichero compartido, los colores de un tema y
-  con qué colores empieza «Tus colores»).
+  base64 → `website.image.upload`), `lib/palettes.ts` (las paletas del fichero compartido, los colores de un tema:
+  `ownColours`, `currentColours`, `withColour` y `themeColours`).
 - Textos en `frontend/locale/{en,es}.json`; los de la página pública, en el catálogo de Django de la app.
