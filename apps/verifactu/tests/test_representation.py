@@ -12,6 +12,7 @@ import datetime as dt
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 
 import httpx
@@ -384,6 +385,27 @@ def test_a_refusal_that_names_nothing_sent_downloads_the_blank_model():
     )
     assert representation.model_pdf(BUSINESS) == b"%PDF-1.4 Anexo I"
     assert route.calls.last.request.url.raw_path == b"/internal/representation/model"
+
+
+@respx.mock
+def test_the_refusal_is_logged_by_the_fields_names_and_never_their_values(caplog):
+    """The business's details are personal data: the warning names the fields the model could not write, not what
+    they held."""
+    route = respx.get(MODEL_URL).mock(
+        side_effect=[
+            refusal(422, "invalid_payload", "Invalid payload", {"taxpayer_name": "No.", "street": "No."}),
+            a_pdf(),
+        ]
+    )
+    with caplog.at_level(logging.WARNING, logger="apps.verifactu.representation"):
+        representation.model_pdf(BUSINESS)
+    assert route.call_count == 2
+    [message] = [
+        record.getMessage() for record in caplog.records if "model_field_unwritable" in record.getMessage()
+    ]
+    assert "fields=street,taxpayer_name" in message
+    for value in BUSINESS.values():
+        assert value not in message
 
 
 @pytest.mark.parametrize(
