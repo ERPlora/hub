@@ -801,8 +801,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   (`DEFAULT_WORKDAY`). Un día libre de un horario que se edita propone esa misma jornada al marcarlo.
 - «Mi ficha» (STAFF-F08) es un botón de la barra de Personal para quien tiene ficha vinculada; «Mis
   ausencias» es el selector «Todas» / «Mis ausencias» de Ausencias (con el motivo).
-- Los selectores de listas largas (miembro, rol, usuario del Hub) buscan en el servidor
-  (`frontend/components/SearchSelect.vue`).
+- Los selectores de listas largas (miembro, rol, usuario del Hub) son el `Combo` de
+  `@erplora/ui/components` y buscan en el servidor (`frontend/lib/pickers.ts`; «Sin rol» y «Sin acceso
+  al Hub» van primero mientras no se teclea, con `asCombo`).
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
   hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) son los paneles del Inicio viejo
   (STAFF-G01…G05) dentro de la app, como las cifras de Clientes y «Fichados ahora» de Control horario;

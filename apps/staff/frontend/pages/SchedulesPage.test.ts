@@ -2,6 +2,7 @@
 // business may have more than 100) above the schedules of the chosen member — the first one by name to
 // begin with. With no member at all there is nobody to schedule: only «No staff members yet» and «Add
 // staff member», which opens Staff (the old staff#98).
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -35,17 +36,22 @@ describe('SchedulesPage', () => {
     await s.result('staff.member.list', FIRST);
     const picker = s.find('staff-schedules-member').element as HTMLElement & { value?: unknown; label?: string };
     expect([picker.label, picker.value]).toEqual(['Member', 'Ana López']);
+    expect(s.wrapper.findComponent(Combo).props('clearable')).toBe(false);
     expect(s.wrapper.findComponent(MemberSchedules).props('memberId')).toBe('m1');
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Staff');
   });
 
-  it('picking another member shows theirs', async () => {
+  it('picking another member, searched on the server, shows theirs', async () => {
     const s = await setup();
     await s.result('staff.member.list', FIRST);
-    await click(s.find('staff-schedules-member').element);
+    const picker = s.wrapper.findComponent(Combo);
+    const options = await (picker.props('search') as (q: string) => Promise<ComboOption[]>)('');
+    expect(options).toEqual([
+      { id: 'm1', label: 'Ana López' },
+      { id: 'm2', label: 'Bea Ruiz' },
+    ]);
+    picker.vm.$emit('update:modelValue', options[1]);
     await settle();
-    const root = (s.wrapper.element.parentElement ?? s.wrapper.element) as Element;
-    await click(root.querySelector('[data-testid="staff-schedules-member-option"][data-value="m2"]'));
     expect(s.wrapper.findComponent(MemberSchedules).props('memberId')).toBe('m2');
     expect((s.find('staff-schedules-member').element as HTMLElement & { value?: unknown }).value).toBe('Bea Ruiz');
   });

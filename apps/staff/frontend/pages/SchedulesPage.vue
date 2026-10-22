@@ -3,7 +3,7 @@
 // the schedules of the chosen member (MemberSchedules) — the first one by name to begin with. The
 // picker is the scope of the list, not a field of the form. With no member at all there is nobody to
 // schedule: «No staff members yet» and «Add staff member», which opens Staff (the old staff#98).
-import { EmptyState } from '@erplora/ui/components';
+import { Combo, type ComboOption, EmptyState } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -11,8 +11,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import MemberSchedules from '../components/MemberSchedules.vue';
-import SearchSelect from '../components/SearchSelect.vue';
-import { memberSearch } from '../lib/pickers';
+import { asCombo, memberSearch } from '../lib/pickers';
 import { staffTabs } from '../tabs';
 
 const session = useSession();
@@ -23,7 +22,7 @@ const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 /** The first member by name: whether there is anyone, and whom to show to begin with. */
 const { data: first, status } = useLive('staff.member.list', { sort: 'name', limit: 1 });
-const findMembers = memberSearch(client);
+const findMembers = asCombo(memberSearch(client));
 
 const chosen = ref<{ id: string; name: string } | null>(null);
 const member = computed(() => {
@@ -31,10 +30,12 @@ const member = computed(() => {
   const row = first.value?.rows[0];
   return row ? { id: row.id, name: row.full_name } : null;
 });
+/** The Member field's choice. */
+const choice = computed<ComboOption | null>(() => (member.value ? { id: member.value.id, label: member.value.name } : null));
 const nobody = computed(() => first.value !== undefined && first.value.total === 0);
 
-function pick(id: string, name: string): void {
-  chosen.value = id ? { id, name } : null;
+function pick(option: ComboOption | null): void {
+  chosen.value = option?.id ? { id: option.id, name: option.label } : null;
 }
 
 function addMember(): void {
@@ -74,13 +75,14 @@ function addMember(): void {
     </EmptyState>
     <template v-else-if="member">
       <header class="staff-schedules__scope">
-        <SearchSelect
+        <Combo
           testid="staff-schedules-member"
           :label="$t('staff.schedules.member')"
-          :value="member.id"
-          :display="member.name"
-          :load="findMembers"
-          @update:value="pick"
+          :model-value="choice"
+          :search="findMembers"
+          :empty-label="$t('staff.noResults')"
+          :clearable="false"
+          @update:model-value="pick"
         />
       </header>
       <MemberSchedules

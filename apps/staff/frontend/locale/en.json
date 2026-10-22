@@ -325,10 +325,6 @@
         "default_break_duration": "From 0 (no break) to 480 minutes, shorter than the working day."
       }
     },
-    "picker": {
-      "search": "Search…",
-      "cancel": "Cancel"
-    },
     "figures": {
       "label": "Figures",
       "active": "Active staff",
