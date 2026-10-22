@@ -6,7 +6,7 @@
 // worker and later logins reuse that SaaS session, as a person signed in at erplora.com: the SaaS skips its
 // form and its code and only hands the hub its one-time code. A SaaS session that ended (a spec signed out
 // there) falls back to the real sign-in, whose session is reused next. And a SaaS slow to answer the code is
-// said as such, with the time waited: «code rejected» is only what the SaaS itself says.
+// said as such, with the time waited: «code rejected» is only what the SaaS itself says, and then it does say it.
 import { type BrowserContext, expect, type Route, test } from '@playwright/test';
 
 import { A, hostPage, listReady, login, SAAS, shot, topbarApps } from './helpers';
@@ -112,6 +112,34 @@ test('a SaaS slow to answer the code: the login says it waited for the answer an
     expect(failure).not.toContain('code rejected');
   } finally {
     await codes.release();
+    await context.close();
+  }
+});
+
+test('a code the SaaS turns down: the login says «code rejected» and what the SaaS said', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const first = await hostPage(browser, A);
+  await signOutOfSaas(first.context);
+  await first.context.close();
+
+  const context = await browser.newContext({ baseURL: A });
+  // The mailed code goes out as another one: the SaaS itself refuses it (400) and says why under the field.
+  const answers: number[] = [];
+  await context.route(CODE, async (route) => {
+    const sent = JSON.parse(route.request().postData() ?? '{}') as { code?: string };
+    const response = await route.fetch({ postData: JSON.stringify({ ...sent, code: sent.code === '000000' ? '111111' : '000000' }) });
+    answers.push(response.status());
+    await route.fulfill({ response });
+  });
+  try {
+    const failure = await login(await context.newPage(), A).then(
+      () => 'signed in',
+      (error: unknown) => String(error),
+    );
+    expect(answers, 'the SaaS answered the code').toEqual([400]);
+    expect(failure).toMatch(/: code rejected \(code \d{6} for owner@example\.com, at .+\): «.+»$/);
+    expect(failure).not.toContain('did not answer');
+  } finally {
     await context.close();
   }
 });
