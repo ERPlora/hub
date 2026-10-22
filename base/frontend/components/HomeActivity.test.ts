@@ -77,10 +77,11 @@ describe('HomeActivity', () => {
       limit: 100,
       offset: 0,
     });
-    const table = m.wrapper.getComponent(DataTable);
-    expect(table.props('filterable')).toBe(true);
+    // DataTable is generic: its props are read as a plain record.
+    const props = m.wrapper.getComponent(DataTable).props() as Record<string, unknown>;
+    expect(props.filterable).toBe(true);
     type Filter = { type: string; options?: { value: string; label: string }[] };
-    const columns = table.props('columns') as { key: string; filter?: Filter }[];
+    const columns = props.columns as { key: string; filter?: Filter }[];
     expect(columns.filter((c) => c.filter).map((c) => [c.key, c.filter?.type, c.filter?.options])).toEqual([
       ['payment_method_name', 'select', [{ value: 'Efectivo', label: 'Efectivo' }, { value: 'Tarjeta', label: 'Tarjeta' }]],
       [
