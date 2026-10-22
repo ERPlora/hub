@@ -73,6 +73,25 @@ describe('main.ts', () => {
     expect(routes.map((r) => r.path)).toEqual(expect.arrayContaining(['/demo/items', '/demo/items/:id']));
   });
 
+  it("boots with base's Home at `/`: its route goes before the shell's grid, under a name of its own (APP-BASE-1)", () => {
+    const routes = importBoot.routes as RouteRecordRaw[];
+    const home = routes.filter((r) => r.path === '/');
+    expect(home.map((r) => [r.name, r.meta?.auth])).toEqual([['base-home', true]]);
+    // The shell's grid (`home: true`) stays registered after it, as the fallback of `/` and «Home» first in the menu.
+    expect(importBoot.home).toBe(true);
+  });
+
+  it("plugs base's pieces into the chrome: the bell in the topbar, «Upgrade plan» in the menu, the blocking strip", () => {
+    const chrome = importBoot.chrome as Record<string, unknown>;
+    expect(Object.keys(chrome).sort()).toEqual(['notice', 'sidebarFooter', 'topbar']);
+    for (const piece of Object.values(chrome)) expect(piece).toBeTruthy();
+  });
+
+  it("on import, globs base's catalogue next to the apps' (the Home would show raw keys otherwise)", () => {
+    const messages = importBoot.messages as Record<string, { base: { home: { title: string } } }>;
+    expect([messages.en.base.home.title, messages.es.base.home.title]).toEqual(['Home', 'Inicio']);
+  });
+
   it('collects the routes of every app, in path order, behind a session by default', async () => {
     fakeShell();
     await main.boot({
@@ -235,12 +254,14 @@ describe('import order guards (hub#1060)', () => {
     expect(runtimeImports[0]).toBe('@erplora/ui/shell');
   });
 
-  it('keeps every apps/*/frontend/routes.ts free of runtime imports: Vite hoists eager globs above the shell', () => {
+  it('keeps base/frontend/routes.ts and every apps/*/frontend/routes.ts free of runtime imports: Vite hoists eager globs above the shell', () => {
     const appsDir = join(HERE, '..', 'apps');
     const files = readdirSync(appsDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(appsDir, entry.name, 'frontend', 'routes.ts'))
+      .concat(join(HERE, '..', 'base', 'frontend', 'routes.ts'))
       .filter((file) => existsSync(file));
+    expect(files).toContain(join(HERE, '..', 'base', 'frontend', 'routes.ts'));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
       const source = readFileSync(file, 'utf8');
@@ -251,8 +272,9 @@ describe('import order guards (hub#1060)', () => {
 });
 
 describe('app catalogue guards', () => {
-  it('keeps every apps/<id>/frontend/locale/<lang>.json under its own <id>, so merging apps never collides', () => {
+  it('keeps base/frontend/locale/<lang>.json under base and every apps/<id>/frontend/locale/<lang>.json under its own <id>, so merging apps never collides', () => {
     const appsDir = join(HERE, '..', 'apps');
+    const baseLocale = join(HERE, '..', 'base', 'frontend', 'locale');
     const catalogues = readdirSync(appsDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && existsSync(join(appsDir, entry.name, 'frontend', 'locale')))
       .flatMap((entry) => {
@@ -260,8 +282,13 @@ describe('app catalogue guards', () => {
         return readdirSync(dir)
           .filter((name) => name.endsWith('.json'))
           .map((name) => ({ app: entry.name, file: join(dir, name) }));
-      });
-    expect(catalogues.length).toBeGreaterThan(0);
+      })
+      .concat(
+        (existsSync(baseLocale) ? readdirSync(baseLocale) : [])
+          .filter((name) => name.endsWith('.json'))
+          .map((name) => ({ app: 'base', file: join(baseLocale, name) })),
+      );
+    expect(catalogues.map(({ app }) => app)).toContain('base');
     for (const { app, file } of catalogues) {
       expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')) as object), file).toEqual([app]);
     }

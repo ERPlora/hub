@@ -12,7 +12,7 @@ import {
   type ShellSidebar,
 } from '@erplora/ui/shell';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
-import { ref } from 'vue';
+import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { OPERATION_ROUTES } from './generated/operation-routes';
@@ -36,6 +36,16 @@ export const SIDEBAR: ShellSidebar = {
       { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings' },
     ],
   ],
+};
+
+/**
+ * base's pieces of the chrome (APP-BASE-1, the old hub's): the bell at the end of the topbar, «Upgrade plan»
+ * in the menu's footer and the blocking strip over every screen. Loaded on demand: none is needed to paint.
+ */
+export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
+  topbar: defineAsyncComponent(() => import('../base/frontend/components/HubBell.vue')),
+  sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/UpgradePlanLink.vue')),
+  notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
 };
 
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
@@ -97,13 +107,15 @@ export async function boot(
     messages: appMessages(catalogues),
     // The hub has no login of its own: the SaaS's, for this hub (Django fills it in spa-config).
     loginPath: config.loginUrl,
-    // The apps of the hub as a grid at `/` (where the login lands without `next`).
+    // «Home» first in the menu, and the shell's grid of apps as the fallback of `/` (where the login lands
+    // without `next`): base's Home (base/frontend/routes.ts) is registered before it and wins `/`.
     home: true,
     // The old hub's shell (PLAN-MIGRATIONS §16): its side menu, pinned from 992 px and a drawer below,
     // with the QR in its footer and the rail toggle and «My apps» in the topbar.
     sidebar: SIDEBAR,
     // Sign out is the Hub's: a form POST to `/auth/logout`, then the SaaS's logout page.
     userMenu: { logout },
+    chrome: CHROME,
   });
   provideLiveClient(client, app);
   try {
@@ -116,6 +128,9 @@ export async function boot(
 }
 
 void boot(
-  import.meta.glob<AppRoutes>('../apps/*/frontend/routes.ts', { eager: true }),
-  import.meta.glob<AppCatalogue>('../apps/*/frontend/locale/*.json', { eager: true, import: 'default' }),
+  import.meta.glob<AppRoutes>(['../base/frontend/routes.ts', '../apps/*/frontend/routes.ts'], { eager: true }),
+  import.meta.glob<AppCatalogue>(['../base/frontend/locale/*.json', '../apps/*/frontend/locale/*.json'], {
+    eager: true,
+    import: 'default',
+  }),
 );

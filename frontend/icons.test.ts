@@ -11,8 +11,15 @@ import { describe, expect, it } from 'vitest';
 
 /** The root of hub-next: the globs below are relative to it. */
 const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
-/** Where the hub names icons: the apps' pages and components, the shell entry and each app's menu. */
-const SOURCES = ['apps/*/frontend/**/*.vue', 'apps/*/frontend/**/*.ts', 'frontend/**/*.ts', 'apps/*/apps.py'];
+/** Where the hub names icons: base's Home, the apps' pages and components, the shell entry and each app's menu. */
+const SOURCES = [
+  'base/frontend/**/*.vue',
+  'base/frontend/**/*.ts',
+  'apps/*/frontend/**/*.vue',
+  'apps/*/frontend/**/*.ts',
+  'frontend/**/*.ts',
+  'apps/*/apps.py',
+];
 
 describe('guardrail: every icon the hub names is registered', () => {
   // `scanIcons` reads each of the ~700 sources once, from the disk, so its time is the machine's: with several
