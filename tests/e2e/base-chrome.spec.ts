@@ -90,7 +90,10 @@ test('BASE-F11 — «Upgrade plan» lines up with the QR at the foot of the menu
   await expect(page.locator('ion-split-pane.rail')).toHaveCount(0);
 });
 
-/** A ⛔ step pending: what `base.setup.status` says until Invoicing has the business's tax details. */
+/**
+ * A ⛔ step pending: what `base.setup.status` says until Invoicing has the business's tax details. Its route is
+ * Invoicing's real issuer screen, so the strip shows its «Set up» as the old hub did (an unknown route hides it).
+ */
 const IDENTITY_PENDING = {
   total: 1,
   pending: 1,
@@ -107,7 +110,7 @@ const IDENTITY_PENDING = {
       title: "Your business's tax details",
       description: 'The name, tax ID and address every invoice carries.',
       icon: 'ion:receipt-outline',
-      route: '/invoice/settings',
+      route: '/invoice/issuer',
       order: 10,
     },
   ],
@@ -139,6 +142,7 @@ test('BASE-F01 — the blocking strip sits between the bar and the content, at i
     const strip = screen.locator('[data-testid="blocking-strip"]');
     await expect(strip).toBeVisible();
     await expect(strip).toContainText("Your business's tax details");
+    await expect(strip.locator('[data-testid="blocking-configure-invoice.business_identity"]')).toBeVisible();
     const [bar, notice, body, content] = await Promise.all([
       boxOf(screen.locator(':scope > ion-header')),
       boxOf(screen.locator(':scope > .page-notice')),
