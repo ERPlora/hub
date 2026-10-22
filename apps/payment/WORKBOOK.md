@@ -1,7 +1,7 @@
 # Workbook — Pagos (app)
 Prefijo: PAYMENT
 Alcance MVP: fuera del MVP (en la tienda; no viene en ninguna plantilla)
-Estado de la app: completa (2026-10-22); sus avisos arrancan las automatizaciones (PAYMENT-F07)
+Estado de la app: completa (2026-10-23); sus avisos arrancan las automatizaciones (PAYMENT-F07)
 
 > Manual de usuario y especificación de la app `payment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -139,7 +139,7 @@ Si falla: dentro del formulario, debajo de su campo: un nombre vacío; un nombre
 método, sin distinguir mayúsculas («Ya hay un método de pago con ese nombre. Elige otro nombre.»); un
 tipo fuera de la lista. Lo tecleado se conserva. Sin ningún método activo, «Nuevo pago» avisa
 «Todavía no hay métodos de pago activos. Crea uno en Métodos antes de registrar un pago.».
-Implicados: ninguno
+Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F02 Registrar un pago
 <!-- origen: fi:modules/payments#command-wasm-payments-payments-create-create_payment old:payments/WORKFLOW.md#payments-f02 -->
@@ -172,7 +172,7 @@ está desactivado: elige uno activo.»). Por el asistente, un nombre de método 
 dice cuáles («“Caja” encaja con varios métodos de pago: …»). Una clave de intento que ya registró
 otro pago se rechaza («Esa clave de intento ya registró otro pago. Crea una clave nueva para cada
 pago.») y no se guarda nada.
-Implicados: FLOW-F21
+Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
 <!-- origen: fi:modules/payments#command-payments-payments-approve old:payments/WORKFLOW.md#payments-f03 -->
@@ -241,7 +241,7 @@ Sale: nada; solo lectura. La lista se pone al día sola cuando otra persona regi
 Por el asistente, «el pago PAY-20261014-0003» se lee entero, con su método, concepto, IBAN y factura.
 Si falla: si la lista no carga, la tabla lo dice («No se han podido cargar los pagos.») con
 «Reintentar», nunca «Sin pagos.». Un importe del filtro que no es una cifra no filtra (nunca «desde 0»).
-Implicados: ninguno
+Implicados: FLOW-F11
 
 ### PAYMENT-F07 Avisar de un pago completado
 <!-- origen: fi:modules/payments#event-emitidos-payment-created-approved-sent-completed-cancelled old:payments/WORKFLOW.md#payments-f07 -->
@@ -278,7 +278,7 @@ Sale: el método cambiado (`payment.method.updated`, `.deactivated`, `.activated
 lo usaron lo conservan y enseñan su nombre nuevo.
 Si falla: un nombre que ya tiene otro método se rechaza debajo de Nombre. Desactivar uno desactivado
 o activar uno activo no cambia nada y dice por qué. Un método no se borra nunca.
-Implicados: ninguno
+Implicados: FLOW-F11, FLOW-F21
 
 ## Pagos: lo que entra y lo que sale
 
@@ -312,8 +312,11 @@ que su cambio y solo si el cambio ocurrió.
 
 ### A qué reacciona y lo que necesita de otras apps
 
-A nada y de nadie: `requires = []`. Ninguna otra app lee Pagos; **Automatizaciones** escucha todos
-sus avisos y los ofrece como disparadores (PAYMENT-F07).
+A nada y de nadie: `requires = []`. Ninguna otra app lee Pagos salvo **Automatizaciones**, que
+escucha todos sus avisos y los ofrece como disparadores (PAYMENT-F07, FLOW-F21). Sus pasos también
+pueden consultar pagos y métodos y usar las acciones de Pagos que no piden confirmación (FLOW-F11):
+registrar un pago y crear, cambiar, desactivar o activar un método. Aprobar, marcar como enviado o
+completado y cancelar piden una persona: una automatización no los hace.
 
 ### Quién puede qué
 
@@ -421,7 +424,8 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
   con `MoneyInput` y `lib/money.ts`.
-- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos).
+- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md`: los iconos y las piezas que viven copiadas en
+  la app (tabla de servidor viva, `useT`, dinero y avisos de página).
 
 ### Tablas de paridad con el producto actual
 
@@ -456,7 +460,9 @@ Tests:
 
 ## Lo que queda fuera
 
-Nada de sus flujos: los ocho están hechos (2026-10-22). Lo que no hace a propósito, abajo.
+Nada de sus flujos: los ocho están hechos (hub#182; app completa el 2026-10-23). Lo que no hace a
+propósito, abajo. Lo que aún espera de `@erplora/ui` (iconos y piezas compartidas) está en
+`UI-REQUESTS.md`, con sustituto en uso y ningún flujo roto.
 
 ## Lo que NO hace, a propósito
 
