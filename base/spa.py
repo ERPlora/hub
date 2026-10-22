@@ -5,7 +5,9 @@ paints the menu and decides on the login without a first round trip. ``spa-confi
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
 Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
-plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1).
+plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1). It goes only
+to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the business
+nor the hub's id.
 
 ``spa`` is the view ``base.middleware`` knows by identity; it dispatches. A visitor without a session who loads
 ``/`` of a hub with a published website gets that website (``base.public_home``), which never passes through
@@ -37,7 +39,7 @@ def _shell(request: HttpRequest) -> HttpResponse:
     me = run_operation_sync(request, queries.session_me)
     extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
     hub = getattr(request, "hub", None)
-    if hub is not None:
+    if hub is not None and request.user.is_authenticated:
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,
             "plan_url": saas_url(f"/store/plans?business={hub.id}"),

@@ -45,6 +45,14 @@ describe('HomePage', () => {
     expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Today, Thursday, October 22');
   });
 
+  // base/spa.py embeds `hub-home` only for a person with a session: without the block at all, the Home still paints.
+  it('greets by the hour without the hub-home block at all', async () => {
+    vi.setSystemTime(new Date(2026, 9, 22, 21, 0));
+    const m = await home();
+    expect(m.wrapper.get('h1').text()).toBe('Good evening');
+    expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Today, Thursday, October 22');
+  });
+
   it('«Summary»: «My apps», then the checklist, then the board', async () => {
     embed('Bar');
     const m = await home();
