@@ -45,7 +45,7 @@ from apps.reservation.schemas import (
     WaitlistListIn,
     WaitlistPage,
 )
-from apps.schedule.queries import get_week, hours_for_range
+from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table
 from apps.table.queries import natural_key, table_label
@@ -136,7 +136,9 @@ def _end(reservation: Reservation) -> dt.time:
     return (start + dt.timedelta(minutes=reservation.duration_minutes)).time()
 
 
-def reservation_out(reservation: Reservation) -> dict:
+def reservation_out(ctx: OperationContext, reservation: Reservation) -> dict:
+    """A ``ReservationOut``, its day and hour also ready to say in ``ctx``'s language (a reservation keeps the
+    business's wall clock: no zone moves them)."""
     table = reservation.table
     try:
         entry_id = reservation.waitlist_entry.pk
@@ -151,6 +153,8 @@ def reservation_out(reservation: Reservation) -> dict:
         "date": reservation.date,
         "time": reservation.time,
         "end_time": _end(reservation),
+        "date_label": day_label(reservation.date, ctx.language),
+        "time_label": f"{reservation.time:%H:%M}",
         "duration_minutes": reservation.duration_minutes,
         "party_size": reservation.party_size,
         "table_id": reservation.table_id,
@@ -513,7 +517,9 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     if params.party_size_to:
         rows = rows.filter(party_size__lte=params.party_size_to)
     return _page(
-        _ordered(rows, params.sort, RESERVATION_SORTS, ("id",)), params, reservation_out
+        _ordered(rows, params.sort, RESERVATION_SORTS, ("id",)),
+        params,
+        lambda reservation: reservation_out(ctx, reservation),
     )
 
 
@@ -530,7 +536,7 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     },
 )
 def get_reservation(ctx: OperationContext, params: ReservationRefIn) -> dict:
-    return reservation_out(find_reservation(params.id, params.guest, params.day))
+    return reservation_out(ctx, find_reservation(params.id, params.guest, params.day))
 
 
 @operation(

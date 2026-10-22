@@ -507,14 +507,16 @@ Implicados: RESERVATION-F08, RESERVATION-F09, WHATSAPP_INBOX-F25
 
 ### RESERVATION-F19 Avisar por WhatsApp cuando el restaurante confirma
 <!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f19 wf:whatsapp-mesa#rec_wa_mesa-f07 -->
-Estado: parcial — Reservas ya avisa al confirmar y su reserva dice que llegó por WhatsApp y desde qué
-número; falta que WhatsApp escuche ese aviso y mande el mensaje (segunda parte de la Bandeja de
-WhatsApp; en el producto actual tampoco estaba)
+Estado: parcial — Reservas ya avisa al confirmar, su reserva dice que llegó por WhatsApp y desde qué
+número, y da su día y su hora listos para el mensaje; solo falta la parte de WhatsApp: que escuche ese
+aviso y mande el mensaje (segunda parte de la Bandeja de WhatsApp; en el producto actual tampoco estaba)
 Actor: responsable, cliente
 Pantalla: Reservas
 Pasos:
 1. El personal confirma una reserva que nació por WhatsApp (RESERVATION-F07).
-2. El cliente recibe por el mismo WhatsApp que su mesa está confirmada.
+2. La reserva da su día y su hora listos para decírselos al cliente («martes, 5 de marzo de 2030»,
+   «21:30»), en su idioma y en el reloj del negocio.
+3. El cliente recibe por el mismo WhatsApp que su mesa está confirmada.
 Entra: la confirmación de la reserva y el teléfono del cliente.
 Sale: el aviso de la confirmación (`reservation.reservation.status_changed`) y el mensaje al cliente.
 Si falla: sin conversación de WhatsApp con ese número, no se manda nada y la reserva sigue confirmada.
@@ -601,7 +603,7 @@ mesa, las notas internas ni reservar igualmente (F18).
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las reservas de unos días (o de todo el libro buscando), con filtros, orden y páginas (hasta 100) | ver reservas | F05–F12 | `reservation.reservation.list` |
-| Una reserva | ver reservas | F08 | `reservation.reservation.get` |
+| Una reserva | ver reservas | F08, F19 | `reservation.reservation.get` |
 | Un día: cubiertos, reservas, bloqueos, horario del negocio y ocupación de cada franja | ver reservas | F05 | `reservation.availability.day` |
 | Las mesas libres para una fecha, hora, duración y grupo | ver reservas | F23 | `reservation.availability.tables` |
 | Las franjas horarias, con filtros y páginas | ver franjas | F01 | `reservation.time_slot.list` |
@@ -610,6 +612,11 @@ mesa, las notas internas ni reservar igualmente (F18).
 | Las reglas (con la zona horaria del negocio) | ver ajustes | F03, F04 | `reservation.settings.get` |
 
 Todas se pueden seguir en vivo.
+
+Cada reserva que dan (la lista, una reserva y la que devuelve cada acción) trae, además de su fecha y su
+hora, el día y la hora listos para decir en el idioma de quien la pide («martes, 5 de marzo de 2030» o
+«Tuesday, March 5, 2030», y «21:30»): es lo que usa un mensaje que no sabe dar formato a una fecha. Son
+los de la reserva tal como se apuntó, en el reloj del negocio, sin correrse por la zona horaria.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -664,7 +671,8 @@ retención la recibe por la llamada de Reservas en la misma transacción (TABLE-
 - **Clientes** (requisito): la ficha del cliente (`find_customer`), buscarla por teléfono
   (`customer.customer.by_phone`) y crearla (`customer.customer.create`), con la sesión de quien reserva.
 - **Horarios** (requisito): el horario del negocio de cada día (`schedule.hours.for_range`), leído en
-  nombre de quien reserva aunque no tenga permiso en Horarios.
+  nombre de quien reserva aunque no tenga permiso en Horarios, y la forma de decir un día
+  (`day_label`), la misma que usa Citas.
 
 ### Quién la usa
 
@@ -831,7 +839,8 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
 - **La conversación de WhatsApp** (F17–F19): pedir los comensales y ofrecer horas libres, cambiar o
   anular desde el mensaje y avisar al confirmar son de la segunda parte de la Bandeja de WhatsApp
   (`whatsapp_inbox` F14–F26). Reservas ya tiene su parte: la reserva del cliente con sus reglas, la puerta
-  «en nombre del cliente» y el aviso al confirmar.
+  «en nombre del cliente», el aviso al confirmar y el día y la hora listos para el mensaje
+  (`date_label`, `time_label`; `tests/test_queries.py`, `tests/test_services.py`).
 - **Asignación automática de mesa y juntar mesas para un grupo grande**: una reserva tiene una mesa
   (la retención de Mesas es una por reserva); juntar mesas espera a que Mesas tenga mesas unidas
   (su duda 3).
