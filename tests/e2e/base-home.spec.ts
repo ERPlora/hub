@@ -7,7 +7,7 @@
 // flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, clearItems, hostPage, shot, shown, uniqueName } from './helpers';
+import { A, api, clearItems, hostPage, shot, shown, uniqueName, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -42,20 +42,8 @@ function countMovingOverlays(): void {
  */
 async function snap(page: Page, flow: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
-  await page.waitForFunction(() => {
-    if (((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) !== 0) return false;
-    const animations = [...document.getAnimations()];
-    const walk = (root: Document | ShadowRoot) => {
-      for (const el of root.querySelectorAll('*')) {
-        if (el.shadowRoot) {
-          animations.push(...el.shadowRoot.getAnimations());
-          walk(el.shadowRoot);
-        }
-      }
-    };
-    walk(document);
-    return animations.every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity);
-  });
+  await page.waitForFunction(() => ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0);
+  await untilStill(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-1-${flow}-${width}`) });

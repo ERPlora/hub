@@ -116,12 +116,16 @@ const IDENTITY_PENDING = {
   ],
 };
 
-/** Answers the page's live stream: `base.setup.status` with the ⛔ step pending, nothing for the other queries. */
+/** No sale yet: what `sale.sale.list` gives «Activity», so the table shows its empty state, not «Loading…». */
+const NO_SALES = { rows: [], total: 0, limit: 100, offset: 0 };
+
+/** Answers the page's live stream: `base.setup.status` with the ⛔ step pending and «Activity» empty; nothing else. */
 async function oneBlockingStep(route: Route): Promise<void> {
+  const answers: Record<string, unknown> = { 'base.setup.status': IDENTITY_PENDING, 'sale.sale.list': NO_SALES };
   const frames = ['event: hello\ndata: {}\n\n'];
   for (const sub of decodeSubs(route.request().url()) as { id: string; op: string }[]) {
-    if (sub.op === 'base.setup.status') {
-      frames.push(`event: result\ndata: ${JSON.stringify({ id: sub.id, data: IDENTITY_PENDING, rev: 1 })}\n\n`);
+    if (sub.op in answers) {
+      frames.push(`event: result\ndata: ${JSON.stringify({ id: sub.id, data: answers[sub.op], rev: 1 })}\n\n`);
     }
   }
   await route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: frames.join('') });
@@ -153,6 +157,9 @@ test('BASE-F01 — the blocking strip sits between the bar and the content, at i
     expect(content.top, `the content under the strip at ${vp.label}`).toBeGreaterThanOrEqual(notice.bottom - 0.5);
     expect(body.height, `the strip has a height at ${vp.label}`).toBeGreaterThan(0);
     expect(notice.height, `the strip whole, never squeezed, at ${vp.label}`).toBeGreaterThanOrEqual(body.height - 0.5);
+    // The capture shows «Activity» loaded (empty here), never its «Loading…».
+    await expect(screen.locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
+    await expect(screen.locator('.data-table__empty')).toBeVisible();
     await page.screenshot({ path: shot(`APP-BASE-1-BASE-F01-strip-${vp.label}`) });
     await page.unroute(/\/api\/live\?/);
   }
