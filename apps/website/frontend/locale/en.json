@@ -110,6 +110,8 @@
       "sourceInventory": "Products",
       "sourceService": "Services",
       "noSource": "Turn on Inventory or Services to show your products or services here.",
+      "sourceOffInventory": "Inventory is not on in this business: your page shows no catalog until you turn it on or choose another source.",
+      "sourceOffService": "Services is not on in this business: your page shows no catalog until you turn it on or choose another source.",
       "categories": "Categories",
       "allCategories": "All categories",
       "categoriesError": "The categories could not be loaded",

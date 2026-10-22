@@ -22,6 +22,7 @@ passes it, and the public home keeps one page per day.
 import datetime as dt
 import math
 from decimal import Decimal
+from html import escape
 from typing import Any
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -120,11 +121,28 @@ def render_site(
             "site_name": site_name,
             # The letter on the header's gradient when there is no cover.
             "initial": site_name[:1].upper(),
+            "icon": _icon(valid_content, site_name, valid_theme),
             "content": valid_content,
             "body": body,
             "ctas": _calls_to_action(body),
         }
         return render_to_string(f"website/templates/{template}.html", context)
+
+
+def _icon(content: Content, site_name: str, theme: Theme) -> str:
+    """The page's own icon: the logo, or the name's initial on the palette's main colour (an SVG in a ``data:`` URL).
+
+    Named so the browser never asks the hub for ``/favicon.ico``, which is no page of the website."""
+    if content.topbar.logo is not None and content.topbar.logo.url:
+        return content.topbar.logo.url
+    colours = resolve(theme.palette, theme.custom.model_dump() if theme.custom else None)["light"]
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
+        f"<rect width='64' height='64' rx='14' fill='{colours['primary']}'/>"
+        "<text x='32' y='44' font-family='system-ui,sans-serif' font-size='36' font-weight='700' "
+        f"text-anchor='middle' fill='{colours['on_primary']}'>{escape(site_name[:1].upper())}</text></svg>"
+    )
+    return "data:image/svg+xml," + quote(svg, safe="")
 
 
 def _calls_to_action(body: list[dict]) -> list[dict]:

@@ -202,6 +202,17 @@ def test_with_the_module_off_in_the_hub_neither_the_root_nor_the_public_api_show
         assert (response.status_code, response.json()["error"]["code"]) == (404, "app_inactive"), path
 
 
+def test_a_site_switched_live_by_hand_without_a_publication_is_not_shown(client):
+    # flow: WEBSITE-F10 — the Hub's admin may tick «live» on a site never published: nothing is published to show,
+    # so `/` still jumps to the login and the public reads are not found (never a page of an empty publication).
+    run("website.site.save", {"template": "classic", "theme": {}, "content": full_content()})
+    Site.objects.filter().update(is_live=True)
+    assert public_home.is_published(Hub.objects.get(slug="a")) is False
+    assert jumps_to_the_login(visit(client))
+    public = client.get("/api/website/public/site", HTTP_HOST="a.localhost:8000")
+    assert (public.status_code, public.json()["error"]["code"]) == (404, "website.not_published")
+
+
 def test_is_published_says_whether_a_publication_is_live():
     hub = Hub.objects.get(slug="a")
     assert public_home.is_published(hub) is False
