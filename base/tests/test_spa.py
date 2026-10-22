@@ -114,10 +114,14 @@ def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(
 
 
 @pytest.mark.parametrize("slug", ["a", "b"])
-def test_the_shell_embeds_where_this_hub_s_plan_is_changed_on_the_saas(client, settings, slug):
-    # BASE-G169: «Upgrade plan» at the foot of the menu opens this hub's plan page on erplora.com.
+def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_saas(client, settings, slug):
+    # BASE-G127: the Home is headed by the business's name; BASE-G169: «Upgrade plan» opens its plan on erplora.com.
     from base.models import Hub
 
+    Hub.objects.filter(slug=slug).update(name=f"Bar {slug.upper()}")
     hub = Hub.objects.get(slug=slug)
-    _, plan = json_block(client.get("/demo/items", HTTP_HOST=f"{slug}.localhost:8000"), "hub-plan")
-    assert plan == {"url": f"{settings.SAAS_URL.rstrip('/')}/store/plans?business={hub.id}"}
+    _, home = json_block(client.get("/demo/items", HTTP_HOST=f"{slug}.localhost:8000"), "hub-home")
+    assert home == {
+        "name": f"Bar {slug.upper()}",
+        "plan_url": f"{settings.SAAS_URL.rstrip('/')}/store/plans?business={hub.id}",
+    }

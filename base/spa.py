@@ -3,8 +3,9 @@
 Next to ``spa-config`` it embeds the result of ``base.session.me`` (``session-me``), so the shell
 paints the menu and decides on the login without a first round trip. ``spa-config`` carries
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
-jump to the SaaS's login, which gives it its ``state``. ``hub-plan`` carries where this hub's plan is changed on the
-SaaS (``/store/plans?business=<hub id>``): the menu's «Upgrade plan» (BASE-G169).
+jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
+Home, BASE-G127) and where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
+plan», BASE-G169).
 """
 
 from django.http import HttpRequest, HttpResponse
@@ -17,7 +18,7 @@ from base import queries
 from base.auth import saas_url
 
 SESSION_ME_ID = "session-me"
-HUB_PLAN_ID = "hub-plan"
+HUB_HOME_ID = "hub-home"
 
 
 @require_safe
@@ -26,7 +27,7 @@ def spa(request: HttpRequest) -> HttpResponse:
     extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
     hub = getattr(request, "hub", None)
     if hub is not None:
-        extra_json[HUB_PLAN_ID] = {"url": saas_url(f"/store/plans?business={hub.id}")}
+        extra_json[HUB_HOME_ID] = {"name": hub.name, "plan_url": saas_url(f"/store/plans?business={hub.id}")}
     return render_spa(
         request,
         extra_json=extra_json,
