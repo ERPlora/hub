@@ -9,9 +9,21 @@ import { useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
-import type { SaleRow } from '../../../apps/sale/frontend/operations';
 import { formatValue, saleStatus } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
+
+/**
+ * The fields «Activity» reads of a row of `sale.sale.list`. base is the platform and requires no module, so it keeps
+ * its own type of the row instead of importing Sales' (`platform-boundary.test.ts`).
+ */
+interface ActivitySale {
+  created_at: string;
+  number: string;
+  customer_name: string;
+  payment_method_name: string;
+  total: number;
+  status: string;
+}
 
 const LIMIT = 100;
 /** Rows per page: 15 first (the old hub's), and the chooser offers it, so it never shows blank. */
@@ -26,7 +38,7 @@ const sales = salesOn
   ? useLive('sale.sale.list', { limit: LIMIT, offset: 0, sort: 'created_at', dir: 'desc' })
   : undefined;
 
-const rows = computed<SaleRow[]>(() => sales?.data.value?.rows ?? []);
+const rows = computed<ActivitySale[]>(() => sales?.data.value?.rows ?? []);
 /** The methods of the sales on screen, once each and sorted: what the method filter offers. */
 const methods = computed(() => [...new Set(rows.value.map((row) => row.payment_method_name).filter(Boolean))].sort());
 const loading = computed(() => !!sales && sales.data.value === undefined && sales.status.value !== 'error');
@@ -104,8 +116,8 @@ const columns = computed(() => [
       <template #status="{ row }">
         <StatusPill
           data-testid="home-activity-status"
-          :tone="saleStatus((row as SaleRow).status).tone"
-          :label="$t(`base.activity.status.${saleStatus((row as SaleRow).status).key}`)"
+          :tone="saleStatus((row as ActivitySale).status).tone"
+          :label="$t(`base.activity.status.${saleStatus((row as ActivitySale).status).key}`)"
         />
       </template>
     </DataTable>
