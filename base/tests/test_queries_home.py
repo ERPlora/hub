@@ -277,11 +277,15 @@ def test_a_step_whose_query_the_person_may_not_run_is_left_out(modules, declare)
 
 
 def test_a_step_needing_a_permission_the_person_lacks_is_not_on_their_list(modules, declare):
-    declare("stock.catalog.status", {"n": 0})
-    modules(module("stock", setup=[step(permission="stock.manage")], permissions=["stock.manage"]))
+    declare("stock.catalog.status", {"n": 0}, permission="stock.view")
+    pending = [SetupCheck(field="n", truthy=True)]
+    modules(module("stock", setup=[step(permission="stock.manage", configured_when=pending)],
+                   permissions=["stock.view", "stock.manage"]))
 
     assert keys(setup_status(ctx())) == []
-    assert by_key(setup_status(ctx("stock.manage")))["stock.catalog"]["actionable"] is True
+    # Reading its query is not enough: the step is the work of whoever has its own permission.
+    assert keys(setup_status(ctx("stock.view"))) == []
+    assert by_key(setup_status(ctx("stock.view", "stock.manage")))["stock.catalog"]["actionable"] is True
 
 
 def test_a_pending_wall_stays_for_who_cannot_clear_it_but_not_actionable(modules, declare):
