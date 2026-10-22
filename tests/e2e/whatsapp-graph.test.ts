@@ -4,6 +4,7 @@
 // before, an erplora.com started without HTTPS_PROXY called the real graph.facebook.com with the e2e's made-up
 // credentials (8 calls in one pass of the inbox), and one started with it failed the specs whose Graph had gone.
 // flow: WHATSAPP_INBOX-F01
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { createServer, type Server } from 'node:net';
@@ -28,6 +29,7 @@ import {
   NUMBER_ID,
   PROBE_CODE,
   startGraph,
+  startGraphThread,
   TOKEN,
   WABA_ID,
 } from './whatsapp-graph';
@@ -261,4 +263,45 @@ describe('startGraph', () => {
       await new Promise((resolve) => holder.close(resolve));
     }
   });
+});
+
+describe('startGraphThread', () => {
+  const certs = mkdtempSync(join(tmpdir(), 'meta-graph-thread-'));
+
+  afterAll(() => {
+    rmSync(certs, { recursive: true, force: true });
+  });
+
+  it('answers erplora.com while the spec that started it waits on a synchronous child process', async () => {
+    // A spec's relay pass (spawnSync of the Hub's shell) hands a message to erplora.com, which asks Meta and waits:
+    // a Graph living in the spec's own event loop could not answer until the child ended (flow-send-message.spec.ts).
+    const graph = await startGraphThread({ port: 0, certs, hubDir: HUB_DIR });
+    try {
+      const out = execFileSync(
+        'curl',
+        ['-sS', '--max-time', '5', '--proxy', `http://127.0.0.1:${graph.port}`, '--cacert', graph.ca, '-X', 'POST', '-H',
+          `Authorization: Bearer ${SEED_TOKEN}`, `https://graph.facebook.com/v25.0/${NUMBER_ID}/messages`],
+        { encoding: 'utf8' },
+      );
+      expect(JSON.parse(out)).toMatchObject({ error: { code: 190 } });
+      const seen = await graph.seen();
+      expect(seen.calls.at(-1)).toEqual({ method: 'POST', path: `/${NUMBER_ID}/messages`, query: {}, token: SEED_TOKEN });
+      expect(seen.tunnels).toEqual(['graph.facebook.com:443']);
+      await graph.forget();
+      expect(await graph.seen()).toEqual({ calls: [], tunnels: [] });
+    } finally {
+      await graph.close();
+    }
+  }, 60_000);
+
+  it('says why it could not start', async () => {
+    const holder: Server = createServer();
+    await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
+    const port = (holder.address() as { port: number }).port;
+    try {
+      await expect(startGraphThread({ port, certs, hubDir: HUB_DIR, busyFor: 300 })).rejects.toThrow(`127.0.0.1:${port}`);
+    } finally {
+      await new Promise((resolve) => holder.close(resolve));
+    }
+  }, 60_000);
 });

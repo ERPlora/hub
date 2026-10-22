@@ -45,13 +45,13 @@ import {
   configProblem,
   type DoorAnswer,
   type ErploraRun,
-  type Graph,
   GRAPH_PORT_OFFSET,
   graphProblem,
+  type GraphThread,
   META_APP,
   NUMBER_ID,
   PROBE_CODE,
-  startGraph,
+  startGraphThread,
   WABA_ID,
 } from './whatsapp-graph';
 import { messageIds, type Push, pushProblem } from './whatsapp-pushes';
@@ -162,15 +162,15 @@ const GRAPH_RUN: ErploraRun = {
   graphPort: STACK.hubPort + GRAPH_PORT_OFFSET,
   ca: join(ARTIFACTS, `meta-graph-${STACK.hubPort}`, 'ca.pem'),
 };
-let graph: Promise<Graph> | undefined;
+let graph: Promise<GraphThread> | undefined;
 let proven: Promise<void> | undefined;
 
-/** The run's Meta Graph (whatsapp-graph.ts), once erplora.com is proven to reach Meta only through it. The first spec
- *  of this worker that awaits it starts it, and it stays until the worker ends; the proof runs once per worker. It
- *  asks erplora.com about the hub `a`, so it goes right after `seedErplora()`, and it throws naming the variable
- *  erplora.com was started without (whatsapp-helpers.ts's header) before any spec reaches Meta. */
-export async function metaGraph(): Promise<Graph> {
-  graph ??= startGraph({ port: GRAPH_RUN.graphPort, certs: dirname(GRAPH_RUN.ca), hubDir: HUB_DIR }).catch((error: unknown) => {
+/** The run's Meta Graph (whatsapp-graph.ts, in its own thread), once erplora.com is proven to reach Meta only through
+ *  it. The first spec of this worker that awaits it starts it, and it stays until the worker ends; the proof runs once
+ *  per worker. It asks erplora.com about the hub `a`, so it goes right after `seedErplora()`, and it throws naming the
+ *  variable erplora.com was started without (whatsapp-helpers.ts's header) before any spec reaches Meta. */
+export async function metaGraph(): Promise<GraphThread> {
+  graph ??= startGraphThread({ port: GRAPH_RUN.graphPort, certs: dirname(GRAPH_RUN.ca), hubDir: HUB_DIR }).catch((error: unknown) => {
     graph = undefined;
     throw error;
   });
@@ -185,13 +185,15 @@ export async function metaGraph(): Promise<Graph> {
 
 /** Door 10 opens Meta's window with the e2e Meta app and erplora.com's page on SAAS_URL, and door 11 exchanges the
  *  probe's code — which only the run's Graph receives, and refuses — through that Graph: nothing is connected. */
-async function proveErplora(started: Graph): Promise<void> {
+async function proveErplora(started: GraphThread): Promise<void> {
   const config = configProblem(await door('config', { hub: 'a' }), GRAPH_RUN);
   if (config) throw new Error(config);
-  const [calls, tunnels] = [started.calls.length, started.tunnels.length];
+  const before = await started.seen();
   const window = { code: PROBE_CODE, event: 'FINISH', waba_id: WABA_ID, phone_number_id: NUMBER_ID, business_id: BUSINESS_ID };
   const answer = await door('connect', { hub: 'a', ...window });
-  const problem = graphProblem(answer, { calls: started.calls.slice(calls), tunnels: started.tunnels.slice(tunnels) }, GRAPH_RUN);
+  const after = await started.seen();
+  const seen = { calls: after.calls.slice(before.calls.length), tunnels: after.tunnels.slice(before.tunnels.length) };
+  const problem = graphProblem(answer, seen, GRAPH_RUN);
   if (problem) throw new Error(problem);
 }
 

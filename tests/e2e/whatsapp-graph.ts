@@ -6,7 +6,9 @@
 // Meta does (`graphAnswer`) with a certificate of the run's own authority. Its code is not touched: environment only.
 //
 // One Graph per run: the first WhatsApp spec of a Playwright worker starts it (`metaGraph` of whatsapp-helpers.ts) and
-// it lives until the worker ends, so every door that reaches Meta finds it, whichever spec runs. Before a spec uses
+// it lives until the worker ends, so every door that reaches Meta finds it, whichever spec runs. It runs in its own
+// thread (`startGraphThread`): a spec waiting on a synchronous child process (a relay pass of the Hub that hands a
+// message to erplora.com, which asks Meta) would otherwise hold the very Graph that child waits on. Before a spec uses
 // erplora.com, `configProblem` and `graphProblem` read what erplora.com answered to the Hub's doors 10 and 11 (the
 // latter with `PROBE_CODE`, which only this Graph receives) and name the variable it was started without: a run whose
 // erplora.com would call the real Meta stops there, in seconds (FIX-HUB-WHATSAPP-E2E-STACK-RECIPE-MISSING-META-ENV).
@@ -17,6 +19,7 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo, Socket } from 'node:net';
 import { join } from 'node:path';
+import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 
 export const GRAPH_HOST = 'graph.facebook.com';
 /** The Graph listens on the Hub's port + 9 (`HTTPS_PROXY` of the run's erplora.com). */
@@ -234,9 +237,17 @@ const listen = (server: Server, port: number): Promise<void> =>
     });
   });
 
-/** Starts the run's Graph on `port` (0: any), with a new authority in `certs` made from `hubDir`'s environment. A port
- *  still held after `busyFor` ms (a worker that has not ended yet) is an error naming it. */
-export async function startGraph(options: { port: number; certs: string; hubDir: string; busyFor?: number }): Promise<Graph> {
+/** Where the Graph listens (0: any port), the folder of its authority and calls, and the Hub checkout whose
+ *  environment makes the certificates; a port still held after `busyFor` ms is an error naming it. */
+export interface GraphOptions {
+  port: number;
+  certs: string;
+  hubDir: string;
+  busyFor?: number;
+}
+
+/** Starts the run's Graph in this thread, with a new authority (the specs use `startGraphThread`). */
+export async function startGraph(options: GraphOptions): Promise<Graph> {
   execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, options.certs], { cwd: options.hubDir, encoding: 'utf8' });
   const ca = join(options.certs, 'ca.pem');
   const log = join(options.certs, 'calls.jsonl');
@@ -303,4 +314,97 @@ export async function startGraph(options: { port: number; certs: string; hubDir:
         proxy.close(() => resolve());
       }),
   };
+}
+
+/** The run's Graph in its own thread, seen from the specs: what erplora.com asked it (`seen`), forgetting that
+ *  (`forget`) and stopping it. The thread never keeps the worker alive and ends with it. */
+export interface GraphThread {
+  port: number;
+  ca: string;
+  seen(): Promise<Seen>;
+  forget(): Promise<void>;
+  close(): Promise<void>;
+}
+
+type Ask = 'seen' | 'forget' | 'close';
+interface Seen {
+  calls: GraphCall[];
+  tunnels: string[];
+}
+type Told = { ready: { port: number; ca: string } } | { failed: string } | { id: number; seen?: Seen };
+
+/** Starts the run's Graph (`startGraph`) in a thread of its own; it rejects with the thread's reason when it cannot,
+ *  and once the thread is gone every question to it fails saying so. */
+export function startGraphThread(options: GraphOptions): Promise<GraphThread> {
+  const thread = new Worker(new URL(import.meta.url), { workerData: { metaGraph: options } });
+  thread.unref();
+  const waiting = new Map<number, { resolve: (told: Told) => void; reject: (error: Error) => void }>();
+  let gone: Error | undefined;
+  let next = 0;
+  const ask = (what: Ask): Promise<Told> =>
+    gone
+      ? Promise.reject(gone)
+      : new Promise((resolve, reject) => {
+          next += 1;
+          waiting.set(next, { resolve, reject });
+          thread.postMessage({ id: next, ask: what });
+        });
+  const stop = (error: Error) => {
+    gone ??= error;
+    for (const { reject } of waiting.values()) reject(gone);
+    waiting.clear();
+  };
+  return new Promise((resolve, reject) => {
+    thread.on('error', (thrown: unknown) => {
+      const error = thrown instanceof Error ? thrown : new Error(String(thrown));
+      reject(error);
+      stop(error);
+    });
+    thread.on('exit', (code) => {
+      const error = new Error(`The run's Meta Graph stopped (its thread exited with ${code}).`);
+      reject(error);
+      stop(error);
+    });
+    thread.on('message', (told: Told) => {
+      if ('failed' in told) {
+        reject(new Error(told.failed));
+        void thread.terminate();
+      } else if ('ready' in told) {
+        resolve({
+          ...told.ready,
+          seen: async () => ((await ask('seen')) as { seen: Seen }).seen,
+          forget: async () => {
+            await ask('forget');
+          },
+          close: async () => {
+            await ask('close');
+            await thread.terminate();
+          },
+        });
+      } else {
+        waiting.get(told.id)?.resolve(told);
+        waiting.delete(told.id);
+      }
+    });
+  });
+}
+
+// The thread's side: this same module, started by startGraphThread.
+const threadOptions = isMainThread ? undefined : (workerData as { metaGraph?: GraphOptions } | null)?.metaGraph;
+if (threadOptions && parentPort) {
+  const port = parentPort;
+  startGraph(threadOptions).then(
+    (graph) => {
+      port.on('message', ({ id, ask }: { id: number; ask: Ask }) => {
+        if (ask === 'seen') port.postMessage({ id, seen: { calls: graph.calls, tunnels: graph.tunnels } });
+        else if (ask === 'forget') {
+          graph.calls.length = 0;
+          graph.tunnels.length = 0;
+          port.postMessage({ id });
+        } else void graph.close().then(() => port.postMessage({ id }));
+      });
+      port.postMessage({ ready: { port: graph.port, ca: graph.ca } });
+    },
+    (error: unknown) => port.postMessage({ failed: error instanceof Error ? error.message : String(error) }),
+  );
 }

@@ -25,7 +25,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
+import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, type GraphThread, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
 import { cleanUp, metaGraph, pushChannel, seedErplora } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED';
@@ -142,21 +142,23 @@ async function shots(page: Page, name: string, ready: (page: Page) => Promise<vo
 
 test.describe.configure({ mode: 'serial' });
 
+let graph: GraphThread;
+
 /** What erplora.com asked the run's Graph during the test running. */
-let graphCalls: GraphCall[] = [];
+const graphCalls = async (): Promise<GraphCall[]> => (await graph.seen()).calls;
 
 test.beforeAll(async () => {
   // erplora.com knows `a` (its test seed, with `a`'s number) and this Hub takes its photo; it reaches only the run's Graph.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
-  graphCalls = (await metaGraph()).calls;
+  graph = await metaGraph();
 });
 
 test.afterAll(() => {
   cleanUp();
 });
 
-test.beforeEach(() => {
-  graphCalls.length = 0;
+test.beforeEach(async () => {
+  await graph.forget();
 });
 
 test('WHATSAPP_INBOX-F01: «Connect WhatsApp» opens Meta’s window, erplora.com’s page brings the code back and the number is connected', async ({
@@ -193,9 +195,9 @@ test('WHATSAPP_INBOX-F01: «Connect WhatsApp» opens Meta’s window, erplora.co
     display_name: SHOWN_NAME,
     history_requested: false,
   });
-  const exchange = graphCalls.find((call) => call.path === '/oauth/access_token');
+  const exchange = (await graphCalls()).find((call) => call.path === '/oauth/access_token');
   expect(exchange?.query).toMatchObject({ code: CODE, redirect_uri: RETURN_PAGE });
-  expect(graphCalls.map((call) => `${call.method} ${call.path}`)).toContain(`POST /${NUMBER_ID}/register`);
+  expect((await graphCalls()).map((call) => `${call.method} ${call.path}`)).toContain(`POST /${NUMBER_ID}/register`);
 
   // «Your number» says it at once, without reloading.
   await expect(number(page).locator('[data-testid=whatsapp-inbox-number-done]')).toHaveText(
@@ -225,7 +227,7 @@ test('WHATSAPP_INBOX-F01: Meta’s window cancelled connects nothing and says Me
   await expect(number(page)).toContainText('Not connected');
   await expect(connectButton(page)).toBeVisible();
   expect(connectAsked).toBe(false);
-  expect(graphCalls).toEqual([]);
+  expect(await graphCalls()).toEqual([]);
 });
 
 test('WHATSAPP_INBOX-F01: an expired code is Meta’s refusal, said through erplora.com, and nothing is connected', async ({
@@ -242,7 +244,7 @@ test('WHATSAPP_INBOX-F01: an expired code is Meta’s refusal, said through erpl
   const answer = await refused;
   expect(answer.status()).toBe(409);
   expect(((await answer.json()) as { error: { code: string } }).error.code).toBe('whatsapp_inbox.meta_rejected');
-  expect(graphCalls.map((call) => `${call.method} ${call.path}`)).toEqual(['GET /oauth/access_token']);
+  expect((await graphCalls()).map((call) => `${call.method} ${call.path}`)).toEqual(['GET /oauth/access_token']);
   await expect(number(page).locator('[data-testid=whatsapp-inbox-number-failed]')).toHaveText(
     'Meta did not accept the connection: This authorization code has expired.',
   );
@@ -274,7 +276,7 @@ test('WHATSAPP_INBOX-F02: the inbox’s notice leads to «Reconnect», which ope
   await pressAndFinish(page, 'Reconnect');
 
   expect((await connected).status()).toBe(200);
-  expect(graphCalls.find((call) => call.path === '/oauth/access_token')?.query).toMatchObject({ code: CODE });
+  expect((await graphCalls()).find((call) => call.path === '/oauth/access_token')?.query).toMatchObject({ code: CODE });
   await expect(number(page).locator('[data-testid=whatsapp-inbox-number-done]')).toHaveText(
     `WhatsApp connected: ${SHOWN_NUMBER} (${SHOWN_NAME}).`,
   );
