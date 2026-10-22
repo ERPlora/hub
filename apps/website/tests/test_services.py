@@ -192,11 +192,12 @@ def test_publish_snapshots_only_the_chosen_categories(services_catalog):
     assert [group["name"] for group in groups] == ["Hair"]
 
 
-def test_publish_without_the_catalogs_app_leaves_an_empty_catalog_not_an_error(monkeypatch):
-    from django.apps import apps
+def test_publish_with_the_catalogs_app_off_leaves_an_empty_catalog_not_an_error(monkeypatch, services_catalog):
+    # flow: WEBSITE-F05 — Services has offered services, but it is off in the hub: none of them is copied.
+    from base import relay
 
-    real = apps.is_installed
-    monkeypatch.setattr(apps, "is_installed", lambda name: False if name == "apps.service" else real(name))
+    real = relay.active_apps
+    monkeypatch.setattr(relay, "active_apps", lambda scope: real(scope) - {"service"})
     save()
     run("website.site.publish")
     assert Site.objects.get().published_content["catalog"] == {"source": "service", "show_prices": True, "groups": []}

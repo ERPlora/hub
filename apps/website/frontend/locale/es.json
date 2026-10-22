@@ -110,6 +110,8 @@
       "sourceInventory": "Productos",
       "sourceService": "Servicios",
       "noSource": "Activa Inventario o Servicios para mostrar aquí tus productos o servicios.",
+      "sourceOffInventory": "Inventario no está activa en este negocio: tu página no muestra el catálogo hasta que la actives o elijas otra fuente.",
+      "sourceOffService": "Servicios no está activa en este negocio: tu página no muestra el catálogo hasta que la actives o elijas otra fuente.",
       "categories": "Categorías",
       "allCategories": "Todas las categorías",
       "categoriesError": "No se pudieron cargar las categorías",

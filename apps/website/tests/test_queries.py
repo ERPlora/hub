@@ -147,11 +147,18 @@ def test_a_category_filter_keeps_only_those_categories(products_catalog):
     assert [group["name"] for group in read_catalog(ctx_for(None), section)["groups"]] == ["Drinks"]
 
 
-def test_a_source_whose_app_is_not_installed_is_an_empty_catalog(monkeypatch, products_catalog):
-    from django.apps import apps
+def source_off(monkeypatch, label: str) -> None:
+    """``label`` off in every hub (``base.relay.active_apps``: in phase 1 every installed app is on; in phase 2 the
+    hub's activation), the website and the rest still on."""
+    from base import relay
 
-    real = apps.is_installed
-    monkeypatch.setattr(apps, "is_installed", lambda name: False if name == "apps.inventory" else real(name))
+    real = relay.active_apps
+    monkeypatch.setattr(relay, "active_apps", lambda scope: real(scope) - {label})
+
+
+def test_a_source_whose_app_is_off_in_the_hub_is_an_empty_catalog_not_an_error(monkeypatch, products_catalog):
+    # flow: WEBSITE-F05 — Inventory has products on sale, but it is not on in this hub: nothing is read from it.
+    source_off(monkeypatch, "inventory")
     assert read_catalog(ctx_for(None), CatalogSection(source="inventory"))["groups"] == []
 
 
@@ -171,11 +178,8 @@ def test_the_editor_lists_the_categories_of_a_source_to_choose_from(services_cat
         run("website.catalog.categories", {"source": "service"}, ctx_for("hub_manager"))
 
 
-def test_the_categories_of_a_source_whose_app_is_not_installed_are_none(monkeypatch):
-    from django.apps import apps
-
-    real = apps.is_installed
-    monkeypatch.setattr(apps, "is_installed", lambda name: False if name == "apps.service" else real(name))
+def test_the_categories_of_a_source_whose_app_is_off_in_the_hub_are_none(monkeypatch, services_catalog):
+    source_off(monkeypatch, "service")
     assert run("website.catalog.categories", {"source": "service"}).categories == []
 
 
@@ -246,6 +250,17 @@ def test_the_public_catalog_of_a_hidden_catalog_is_empty(services_catalog):
     save(full_content(catalog={"hidden": True}))
     run("website.site.publish")
     assert run("website.public.catalog", ctx=visitor()).groups == []
+
+
+def test_the_public_catalog_of_a_source_turned_off_after_publishing_is_empty_not_an_error(monkeypatch, services_catalog):
+    # flow: WEBSITE-F05 — the page refreshes its catalog on every visit: Services off in the hub, nothing is read.
+    save(full_content(catalog={"source": "service"}))
+    run("website.site.publish")
+    assert [group.name for group in run("website.public.catalog", ctx=visitor()).groups] == ["Nails", "Hair"]
+    cache.clear()
+    source_off(monkeypatch, "service")
+    catalog = run("website.public.catalog", ctx=visitor())
+    assert (catalog.source, catalog.groups) == ("service", [])
 
 
 def test_the_page_public_home_paints_is_the_live_publication_of_its_hub():
@@ -338,3 +353,16 @@ def test_hidden_reviews_are_not_given_to_visitors(settings, no_google):
     # Nor the place behind them: the public site leaves a hidden section empty.
     assert run("website.public.site", ctx=visitor()).content.reviews.place_ref == ""
 
+
+
+def test_the_public_reviews_come_from_the_sites_last_good_answer_when_the_cache_is_cold(settings, no_google):
+    # flow: WEBSITE-F12 — after a deploy or a cache restart the page's visitors still get the kept reviews.
+    from apps.website.models import Site
+
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    run("website.site.publish")
+    Site.objects.update(reviews_snapshot=google_reviews(count=9))
+    cache.clear()
+    out = run("website.public.reviews", ctx=visitor())
+    assert (out.available, out.count_label) == (True, "9 reviews on Google")

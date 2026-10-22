@@ -1,8 +1,7 @@
 # Workbook — Pagos (app)
 Prefijo: PAYMENT
 Alcance MVP: fuera del MVP (en la tienda; no viene en ninguna plantilla)
-Estado de la app: hecha (servidor y páginas); el aviso a Automatizaciones (PAYMENT-F07) sale al
-outbox, pero esa app todavía no existe en el Hub
+Estado de la app: completa (2026-10-23); sus avisos arrancan las automatizaciones (PAYMENT-F07)
 
 > Manual de usuario y especificación de la app `payment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -72,7 +71,7 @@ asistente.
 Título «Pagos salientes». Una tabla con las columnas **Referencia**, **Fecha**, **Beneficiario**,
 **Importe** y **Estado** (y **Método**, que se puede mostrar con el selector de columnas). Buscador
 «Buscar referencia o beneficiario…» (busca también en la referencia de la factura del proveedor),
-filtros por columna — referencia y beneficiario por un trozo del texto, la fecha por día, el importe
+filtros por columna — referencia y beneficiario por un trozo del texto, la fecha «desde / hasta», el importe
 «desde / hasta» en euros, el estado por lista —, orden por columna, vista de lista o de tarjetas y 50
 filas por página. Va ordenada por la **fecha del pago**, la más reciente arriba (no por la de alta).
 
@@ -120,10 +119,11 @@ Importes y fechas salen con el formato del idioma de quien mira; el importe, en 
 | PAYMENT-F04 | Marcar un pago como enviado y como completado | hecho |
 | PAYMENT-F05 | Cancelar un pago | hecho |
 | PAYMENT-F06 | Buscar y revisar los pagos | hecho |
-| PAYMENT-F07 | Avisar de un pago completado | hecho el aviso (outbox); Automatizaciones no existe aún en el Hub |
+| PAYMENT-F07 | Avisar de un pago completado | hecho |
 | PAYMENT-F08 | Editar, desactivar y reactivar un método de pago | hecho |
 
 ### PAYMENT-F01 Crear un método de pago
+<!-- origen: fi:modules/payments#command-payments-methods-create old:payments/WORKFLOW.md#payments-f01 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
@@ -139,9 +139,10 @@ Si falla: dentro del formulario, debajo de su campo: un nombre vacío; un nombre
 método, sin distinguir mayúsculas («Ya hay un método de pago con ese nombre. Elige otro nombre.»); un
 tipo fuera de la lista. Lo tecleado se conserva. Sin ningún método activo, «Nuevo pago» avisa
 «Todavía no hay métodos de pago activos. Crea uno en Métodos antes de registrar un pago.».
-Implicados: ninguno
+Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F02 Registrar un pago
+<!-- origen: fi:modules/payments#command-wasm-payments-payments-create-create_payment old:payments/WORKFLOW.md#payments-f02 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -153,8 +154,11 @@ Pasos:
 3. Pulsa **Registrar pago**.
 4. El formulario se cierra y el pago sale en la lista como **Borrador**, con su referencia. La lista
    va por la fecha del pago: uno con una fecha antigua no sale arriba.
+5. Si se corta la conexión y vuelves a pulsar **Registrar pago** en el mismo formulario, el pago se
+   registra una sola vez.
 Entra: los datos del formulario; la moneda del negocio. Por el asistente o la API, el método se dice
-por su id o por su nombre, y el importe va en céntimos.
+por su id o por su nombre, el importe va en céntimos y, si se quiere, una clave del intento: repetir
+la misma llamada con la misma clave responde el pago ya registrado en vez de registrar otro.
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` — la fecha es la del día del negocio en
 que se registra, no la del pago; el número cuenta por día y nunca se repite — y el aviso
 `payment.payment.created` (lleva la referencia, el beneficiario, el importe y la moneda).
@@ -165,10 +169,13 @@ puede ser 1.250 € o 1,25 €: hay que escribir los decimales); un beneficiario
 válido («Ese IBAN no es válido: revisa el país, los dígitos de control y la longitud.»); un método
 que no existe («Ese método de pago no existe en este negocio.») o desactivado («Ese método de pago
 está desactivado: elige uno activo.»). Por el asistente, un nombre de método que encaja con varios
-dice cuáles («“Caja” encaja con varios métodos de pago: …»).
-Implicados: FLOWS-F13
+dice cuáles («“Caja” encaja con varios métodos de pago: …»). Una clave de intento que ya registró
+otro pago se rechaza («Esa clave de intento ya registró otro pago. Crea una clave nueva para cada
+pago.») y no se guarda nada.
+Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
+<!-- origen: fi:modules/payments#command-payments-payments-approve old:payments/WORKFLOW.md#payments-f03 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -181,9 +188,10 @@ Sale: el estado, quién lo aprobó y cuándo (la fila lo enseña: «Aprobado por
 Si falla: quien solo registra pagos (sin permiso de aprobar) no ve la acción y la app lo rechaza.
 Aprobar un pago que ya no está en borrador no cambia nada, no avisa a nadie y dice por qué («Solo se
 puede aprobar un pago en borrador; este está Aprobado.»), encima de la tabla.
-Implicados: FLOWS-F13
+Implicados: FLOW-F21
 
 ### PAYMENT-F04 Marcar un pago como enviado y como completado
+<!-- origen: fi:modules/payments#command-payments-payments-mark_completed fi:modules/payments#command-payments-payments-mark_sent old:payments/WORKFLOW.md#payments-f04 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -197,9 +205,10 @@ ni se habla con ningún banco.
 Si falla: cada paso exige el anterior; saltarse uno no cambia nada, no avisa y dice por qué («Solo se
 puede marcar como enviado un pago aprobado; este está Borrador.», «Solo se puede marcar como
 completado un pago enviado; …»). Un pago completado o cancelado no ofrece más acciones.
-Implicados: FLOWS-F13
+Implicados: FLOW-F21
 
 ### PAYMENT-F05 Cancelar un pago
+<!-- origen: fi:modules/payments#command-payments-payments-cancel old:payments/WORKFLOW.md#payments-f05 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -210,41 +219,52 @@ Pasos:
 Entra: el pago y el motivo (obligatorio).
 Sale: el estado cancelado y el motivo guardados en el pago (no se borra nada); el aviso
 `payment.payment.cancelled`.
-Si falla: sin motivo no se puede pulsar; un motivo de solo espacios se rechaza debajo del campo. Un
-pago completado o cancelado no se puede cancelar («El pago ya no admite cancelación.»): no cambia
-nada y no avisa. Una aprobación no se deshace: se cancela el pago y se registra otro.
-Implicados: FLOWS-F13
+Si falla: sin motivo (o con solo espacios) no se puede pulsar; por el asistente, un motivo vacío se
+rechaza («Di por qué se cancela este pago: el motivo se queda en el pago.»). Un pago completado o
+cancelado no se puede cancelar («El pago ya no admite cancelación.»), dentro del formulario y con el
+motivo escrito: no cambia nada y no avisa. Una aprobación no se deshace: se cancela el pago y se registra otro.
+Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
+<!-- origen: fi:modules/payments#navigation-list-erp-payments-list fi:modules/payments#query-payments-payments-get fi:modules/payments#query-payments-payments-list old:payments/WORKFLOW.md#payments-f06 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Pagos
 Pasos:
 1. Abre **Pagos**.
 2. Escribe en el buscador un trozo de la referencia (los últimos dígitos, la fecha), del beneficiario
-   o de la factura del proveedor, o usa los filtros de columna.
+   o de la factura del proveedor, o usa los filtros de columna: la **Fecha** desde un día, hasta otro o
+   entre los dos; el **Importe** desde / hasta en euros; el **Estado** de la lista.
 3. Ordena por la columna que necesite.
 Entra: lo que teclea la persona.
 Sale: nada; solo lectura. La lista se pone al día sola cuando otra persona registra o cambia un pago.
 Por el asistente, «el pago PAY-20261014-0003» se lee entero, con su método, concepto, IBAN y factura.
-Si falla: error de carga con «Reintentar».
-Implicados: ninguno
+Si falla: si la lista no carga, la tabla lo dice («No se han podido cargar los pagos.») con
+«Reintentar», nunca «Sin pagos.». Un importe del filtro que no es una cifra no filtra (nunca «desde 0»).
+Implicados: FLOW-F11
 
 ### PAYMENT-F07 Avisar de un pago completado
-Estado: hecho el aviso; Automatizaciones no existe aún en el Hub
+<!-- origen: fi:modules/payments#event-emitidos-payment-created-approved-sent-completed-cancelled old:payments/WORKFLOW.md#payments-f07 -->
+Estado: hecho
 Actor: sistema
-Pantalla: ninguna
+Pantalla: ninguna (la automatización se crea en **Automatizaciones**)
 Pasos:
-1. Un pago pasa a **Completado** (PAYMENT-F04).
-2. El aviso `payment.payment.completed` queda en el outbox para quien quiera reaccionar (una
-   automatización que arranque con «pago completado»).
+1. En **Automatizaciones**, crea una automatización que arranque con «se completa un pago» (por
+   ejemplo, para que te deje la tarea de archivar el justificante) y enciéndela.
+2. Marca un pago como **Completado** (PAYMENT-F04).
+3. En unos segundos la automatización corre, una sola vez, con los datos de ese pago.
 Entra: el pago completado.
-Sale: el aviso, con el id, la referencia, el importe y la moneda. Solo sale cuando el pago cambia de
-verdad: un «completar» rechazado no avisa.
-Si falla: sin nadie que escuche, no pasa nada. Esta app no escucha a ninguna otra.
-Implicados: FLOWS-F13
+Sale: el aviso `payment.payment.completed`, con el id, la referencia, el estado, el importe y la
+moneda. Cada automatización que lo espera corre una vez por pago, aunque el aviso le llegue dos veces.
+Los demás pasos de un pago (registrar, aprobar, enviar, cancelar) y los cambios de un método también
+se pueden elegir como disparador.
+Si falla: solo sale cuando el pago cambia de verdad: un «completar» rechazado no avisa y no arranca
+nada. Sin ninguna automatización que lo espere, no pasa nada. El aviso de un negocio nunca arranca
+nada en otro. Esta app no escucha a ninguna otra.
+Implicados: FLOW-F21
 
 ### PAYMENT-F08 Editar, desactivar y reactivar un método de pago
+<!-- origen: old:payments/WORKFLOW.md#payments-f01 fi:modules/payments#query-payments-methods-list -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
@@ -258,7 +278,7 @@ Sale: el método cambiado (`payment.method.updated`, `.deactivated`, `.activated
 lo usaron lo conservan y enseñan su nombre nuevo.
 Si falla: un nombre que ya tiene otro método se rechaza debajo de Nombre. Desactivar uno desactivado
 o activar uno activo no cambia nada y dice por qué. Un método no se borra nunca.
-Implicados: ninguno
+Implicados: FLOW-F11, FLOW-F21
 
 ## Pagos: lo que entra y lo que sale
 
@@ -292,7 +312,11 @@ que su cambio y solo si el cambio ocurrió.
 
 ### A qué reacciona y lo que necesita de otras apps
 
-A nada y de nadie: `requires = []`. Ninguna otra app lee Pagos.
+A nada y de nadie: `requires = []`. Ninguna otra app lee Pagos salvo **Automatizaciones**, que
+escucha todos sus avisos y los ofrece como disparadores (PAYMENT-F07, FLOW-F21). Sus pasos también
+pueden consultar pagos y métodos y usar las acciones de Pagos que no piden confirmación (FLOW-F11):
+registrar un pago y crear, cambiar, desactivar o activar un método. Aprobar, marcar como enviado o
+completado y cancelar piden una persona: una automatización no los hace.
 
 ### Quién puede qué
 
@@ -351,8 +375,9 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
 
 - Anatomía completa (copia de `apps/service`): `apps.py`, `models.py`, `migrations/`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/`
-  y un `tests/test_<fichero>.py` por fichero, más `test_integration_sale.py` (con Ventas real) y
-  `test_concurrency.py` (hilos).
+  y un `tests/test_<fichero>.py` por fichero, más `test_integration_sale.py` (con Ventas real),
+  `test_concurrency.py` (hilos) y `test_relay.py` (el aviso por el relay real del worker hasta una
+  automatización real de Automatizaciones, PAYMENT-F07).
 - Modelos: `PaymentMethod` (nombre único sin distinguir mayúsculas, tipo, cuenta, activo),
   `Payment` (referencia única, método, fecha del pago, importe en la unidad menor de su moneda > 0,
   moneda ISO 4217, beneficiario, IBAN, concepto, estado, factura del proveedor, motivo de cancelación,
@@ -362,6 +387,12 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   registrarlo; el contador sube con `UPDATE … RETURNING` en la transacción del alta (nunca una
   secuencia), así que dos altas a la vez no repiten número y un alta rechazada no gasta ninguno. Por
   encima de 9999 al día, el número sale entero (`PAY-20261014-10000`).
+- **Un intento, un pago**: `payment.payment.create` acepta `idempotency_key` (UUID, opcional; columna
+  única). El mismo intento otra vez responde el pago que registró, tal como está, sin gastar número ni
+  avisar; dos a la vez: el segundo espera al primero (el bloqueo del método) y su alta choca con la
+  columna única dentro de un savepoint, que devuelve el número, y responde el del primero. Con otros
+  datos, 409 `payment.idempotency_key_reused`. «Nuevo pago» crea una clave al abrirse y la manda en cada
+  envío (la idea de `sale.sale.complete`; payments#8).
 - **Transiciones**: cada una bloquea la fila del pago (`select_for_update`) y comprueba el estado de
   origen; si no casa, 409 `payment.invalid_transition` (cancelar: `payment.not_cancellable`), sin
   cambio y sin aviso.
@@ -388,10 +419,16 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
 ### Cómo son las páginas
 
 - `frontend/pages/PaymentsPage.vue` y `MethodsPage.vue`, con la barra de pestañas de `frontend/tabs.ts`.
+  La Fecha de Pagos filtra por rango (`daterange`: `payment_date_from` y `payment_date_to`, cada extremo
+  por su lado).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
   con `MoneyInput` y `lib/money.ts`.
-- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (filtro de rango de fechas, iconos).
+- Los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `useGrouping: 'always'` en
+  `lib/format.ts`, porque el CLDR del español espera a cinco: hub#1090, que salió de payments#20), como
+  Carrito y Tarifas.
+- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md`: los iconos y las piezas que viven copiadas en
+  la app (tabla de servidor viva, `useT`, dinero y avisos de página).
 
 ### Tablas de paridad con el producto actual
 
@@ -426,10 +463,9 @@ Tests:
 
 ## Lo que queda fuera
 
-- **Automatizaciones** (PAYMENT-F07): el aviso sale al outbox; la app que reacciona no existe aún en
-  el Hub, y la entrega de avisos entre apps llega con el relay del outbox (fase 2).
-- **Filtro de fecha por rango en la pantalla**: el `DataTable` de `@erplora/ui` filtra un día; la
-  consulta ya acepta el rango (`UI-REQUESTS.md`).
+Nada de sus flujos: los ocho están hechos (hub#182; app completa el 2026-10-23). Lo que no hace a
+propósito, abajo. Lo que aún espera de `@erplora/ui` (iconos y piezas compartidas) está en
+`UI-REQUESTS.md`, con sustituto en uso y ningún flujo roto.
 
 ## Lo que NO hace, a propósito
 
@@ -442,6 +478,8 @@ Tests:
 
 ## Cambios frente al producto actual
 
+- **Repetir el alta no duplica el pago**: el mismo intento enviado otra vez (un reintento tras un corte,
+  un doble toque) responde el pago ya registrado; antes registraba otro, con su número (payments#8).
 - **Los rechazos ya no son mudos**: aprobar, enviar, completar o cancelar en el estado equivocado, o
   registrar con un método que no existe o desactivado, contesta con su motivo, no cambia nada, no
   gasta número y no avisa. Antes contestaba bien, gastaba número y emitía el aviso (incluido el de
@@ -459,4 +497,3 @@ Tests:
 - **Fuera de las plantillas** (decisión del 2026-10-14): el catálogo actual la tenía retirada del MVP
   (saas#1542), así que ni la peluquería ni el restaurante la traen al darse de alta (`verticals = []`);
   sigue en la tienda (`listed`), desde donde la enciende quien la quiera.
-- El filtro de fecha de la pantalla es de un día (la consulta acepta el rango).

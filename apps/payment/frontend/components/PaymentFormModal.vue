@@ -5,7 +5,9 @@
 // old payments#24): loading (the picker waits), could not be read (a notice with Retry), none yet (a
 // notice with «Go to Methods»). The amount is read as a person writes it (`parseMoney`); one that is not
 // an amount, or is 0, is refused under the field before asking the server. The server's refusals stay
-// in the form, under their field, with what was typed (the old pm#513).
+// in the form, under their field, with what was typed (the old pm#513). The attempt key is born with
+// each opening and travels on every send of it: a retry after a lost answer records one payment, never
+// two (the old payments#8); the next «New payment» is another attempt.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -38,6 +40,9 @@ const methods = useLive('payment.method.list', { is_active: true, limit: 100 });
 
 const blank = (): Form => ({ methodId: '', date: localDay(), amount: '', beneficiary: '', concept: '', iban: '', invoice: '' });
 const form = ref<Form>(blank());
+const newKey = (): string => globalThis.crypto.randomUUID();
+/** This opening's attempt: the server records at most one payment per key. */
+const attempt = ref(newKey());
 /** A save was tried: the amount field says what is wrong with it even if it was never left. */
 const tried = ref(false);
 /** The amount is an amount but not above 0 (said under the field, never sent). */
@@ -46,6 +51,7 @@ const notPositive = ref(false);
 watch(open, (isOpen) => {
   if (!isOpen) return;
   form.value = blank();
+  attempt.value = newKey();
   tried.value = false;
   notPositive.value = false;
   creation.error.value = null;
@@ -89,6 +95,7 @@ async function save(): Promise<void> {
       concept: f.concept.trim(),
       beneficiary_iban: f.iban.trim(),
       supplier_invoice_ref: f.invoice.trim(),
+      idempotency_key: attempt.value,
     });
   } catch {
     return; // The form paints the error; what was typed stays.
