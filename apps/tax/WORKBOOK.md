@@ -1,20 +1,24 @@
 # Workbook — Impuestos (app)
 Prefijo: TAX
 Alcance MVP: transversal
-Estado de la app: hecha (servidor y páginas); fuera, con su motivo: la región del negocio en Ventas (TAX-F11)
+Estado de la app: completa (2026-10-22)
+Lo que no entra todavía: ver «Lo que queda fuera». El paso «Tus impuestos» de la lista «Termina de configurar
+tu negocio» del Inicio espera a que el Inicio tenga esa lista.
 
 > Manual de usuario y especificación de la app `tax`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
 > (servidor y páginas). Parte del `WORKFLOW.md` del módulo Impuestos del producto actual
-> (`modules-workspace/modules/taxes`, `origin/main` `3755bc4`). La app hace lo mismo y se verá igual;
-> los números de flujo se conservan (`TAXES-Fnn` → `TAX-Fnn`) porque otras apps los citan.
+> (`modules-workspace/modules/taxes`, `origin/main` `3755bc4`). La app hace lo mismo y se verá igual,
+> salvo lo que dice «Cambios frente al producto actual», al final; los números de flujo se conservan
+> (`TAXES-Fnn` → `TAX-Fnn`) porque otras apps los citan.
 
 ## Para qué sirve y para quién
 
 Impuestos guarda lo que dice cuánto IVA lleva cada cosa que se vende:
 
 - las **categorías fiscales** («Restauración — comida», «Servicio — general»…), a las que apuntan los
-  productos de Inventario y los servicios de Servicios;
+  productos de Inventario, los servicios de Servicios, las secciones del precio libre de Ventas, los menús
+  y las opciones de suplemento que tributan aparte;
 - las **reglas**, que fijan el tipo de cada categoría en un país o una región y entre unas fechas, con
   su calificación fiscal (sujeta, exenta, no sujeta, con inversión del sujeto pasivo);
 - los **alias**, textos de fuera («comida», «beer», «IVA 10») que el importador de Inventario reconoce
@@ -49,14 +53,15 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
 
 - Al activar Impuestos, el negocio recibe de fábrica **11 categorías**, **18 alias** y **los tipos de
   España** (TAX-F16). Con eso un negocio español puede vender sin tocar nada.
-- Activar Inventario, Servicios, Ventas o Facturación activa Impuestos con ellos, y Impuestos no se
-  puede desactivar mientras alguna de ellas esté activa.
+- Activar Inventario, Servicios, Ventas, Facturación, Menús y combos o Suplementos activa Impuestos con
+  ellas, e Impuestos no se puede desactivar mientras alguna de ellas esté activa.
 - **País y territorio fiscal del negocio**: el país es el de la cuenta de ERPlora del negocio (en la fase 1,
   España para todos); el territorio fiscal —todo el país, Canarias, Ceuta o Melilla— se elige en
   **Impuestos → Ajustes** (TAX-F11). Ventas, Facturación, las pantallas y el asistente calculan con los
   dos mientras no se pregunte por otro país.
-- Si el negocio es de Portugal o de otro país, no hay ninguna regla de fábrica: hay que crearlas
-  (TAX-F04), y la consulta de primeros pasos lo avisa hasta que exista una (TAX-F17).
+- Las reglas de fábrica son solo de España. Un negocio de otro país (cuando la cuenta de ERPlora lo traiga)
+  tendrá que crear las suyas (TAX-F04); el aviso «Tus impuestos» (TAX-F17) todavía no lo detecta, porque
+  cuenta las reglas de cualquier país.
 - **«Hoy» es la hora de Madrid** en la fase 1: el Hub todavía no guarda la zona horaria del negocio.
   El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
   hora antes de su medianoche. Cuando el negocio tenga su zona horaria, «hoy» será el suyo.
@@ -159,7 +164,8 @@ Entra: nada; lee las categorías y las reglas vigentes hoy.
 Sale: nada (solo lectura). El nombre de una categoría de fábrica sale en el idioma de quien mira; una
 propia, con su texto. La búsqueda encuentra lo que se ve: «comida» encuentra «Restauración — comida».
 Si falla: el aviso de la tabla con «Reintentar». Sin permiso de consulta, «No tienes permiso».
-Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F06, SALE-F01, SERVICE-F01
+Implicados: COMBO-F02, INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F06, MODIFIER-F04, SALE-F01,
+SALE-F35, SERVICE-F01
 
 ### TAX-F02 Crear una categoría fiscal propia
 <!-- origen: fi:modules/taxes#command-taxes-categories-create old:taxes/WORKFLOW.md#taxes-f02 -->
@@ -341,7 +347,7 @@ Implicados: ninguno
 ### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
 <!-- origen: wf:cadena-fiscal#rec_fiscal-f04 old:taxes/WORKFLOW.md#taxes-f11 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, responsable
 Pantalla: Ajustes y Reglas
 Pasos:
 1. En **Impuestos → Ajustes** elige el «Territorio fiscal» del negocio: «Canarias (IGIC)», «Ceuta
@@ -372,7 +378,7 @@ ninguna regla fiscal se aplica aquí a su categoría fiscal …»), la factura l
 enseñan tipo; se arregla creando su regla (paso 2). Con «Todo el
 país (IVA)», las reglas regionales no se usan nunca. Quien solo consulta impuestos ve el
 territorio, pero no lo cambia.
-Implicados: INVOICE-F01, SALE-F01
+Implicados: INVOICE-F01, INVOICE-F03, SALE-F01
 
 ### TAX-F12 Crear varias reglas de golpe
 <!-- origen: fi:modules/taxes#command-handler-wasm-taxes-rules-bulk_create-bulk_create_rules old:taxes/WORKFLOW.md#taxes-f12 -->
@@ -476,9 +482,10 @@ Pasos:
 3. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo.
 Entra: las reglas y el país del negocio.
 Sale: cuántas reglas aplican hoy y si los impuestos están configurados. No bloquea vender por sí mismo.
-Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Sin país (el Hub aún no lo
-guarda), cuenta las reglas de cualquier país. Una regla exenta o de IGIC también cuenta: un negocio que
-solo vende servicios exentos está bien configurado.
+Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Hoy cuenta las reglas de
+cualquier país y de cualquier territorio: un negocio de Canarias sin ninguna regla de IGIC no ve el aviso,
+aunque el TPV le explica el motivo al cobrar y la ayuda de Ajustes lo dice (TAX-F11). Una regla exenta o
+de IGIC también cuenta: un negocio que solo vende servicios exentos está bien configurado.
 Implicados: ninguno
 
 ### TAX-F18 Calcular el impuesto de un importe
@@ -503,7 +510,7 @@ Si falla: sin regla aplicable, «Ninguna regla fiscal se aplica a esta categorí
 se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente (y entonces, con el impuesto
 de su territorio: IGIC en Canarias, IPSI en Ceuta y Melilla). Sin importe o sin categoría,
 debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin adivinar.
-Implicados: INVOICE-F01, SALE-F01
+Implicados: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
 
 ### TAX-F19 Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios
 <!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal wf:cadena-fiscal#rec_fiscal-f01 fi:modules/taxes#event-emit-taxes-category-created-taxes-rule-created-taxes-rule-deactivated-taxes-alias-created-declarados-taxes-rule-created-taxes-rules-bulk_create-report-emitidos-por-el-wasm-bulk fi:modules/taxes#query-taxes-categories-get old:taxes/WORKFLOW.md#taxes-f19 -->
@@ -514,13 +521,16 @@ Pasos:
 1. Quien cobra un tique, emite una factura o guarda un producto no abre Impuestos.
 2. Ventas y Facturación resuelven el tipo de cada línea con el mismo cálculo de TAX-F18, dentro de su
    propia operación: si las reglas no se pueden leer, la operación se rechaza antes de escribir nada.
-3. Inventario, Servicios y Ventas listan las categorías para elegirlas, con su tipo vigente.
+3. Inventario, Servicios, Ventas (sus secciones del precio libre), Menús y combos y Suplementos listan las
+   categorías para elegirlas, por el nombre en el idioma de quien mira y con su tipo vigente.
 Entra: lo que ya está guardado en Reglas y Categorías.
 Sale: lo que la línea de venta congela: categoría, tipo combinado, país, región y regla. Una línea con
-categoría y sin regla se rechaza («no hay regla»): nunca cae al 0 %. Qué hacer con una línea sin
-categoría es cosa de Ventas.
+categoría y sin regla se rechaza, nunca cae al 0 %: el TPV dice «… no se puede cobrar: ninguna regla
+fiscal se aplica aquí a su categoría fiscal …» y la factura, «Ninguna regla fiscal se aplica hoy a la
+categoría fiscal …» (TAX-F11). Qué hacer con una línea sin categoría es cosa de Ventas.
 Si falla: el cajero no cobra con un tipo supuesto.
-Implicados: INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F07, SERVICE-F01
+Implicados: COMBO-F09, INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, MODIFIER-F07, SALE-F01,
+SALE-F07, SERVICE-F01
 
 ## Servicios: lo que entra y lo que sale
 
@@ -577,7 +587,8 @@ Qué refresca cada aviso: las categorías, con «categoría nueva», con los cua
 «territorio fiscal cambiado» (el tipo vigente sale en la tabla); las reglas y el estado de
 configuración, con los cuatro de reglas y el del territorio; los ajustes, con «territorio fiscal
 cambiado»; los alias, con «alias nuevo». En Ventas, la caja abierta y el tipo de las secciones se
-recalculan con los cuatro de reglas y con el del territorio.
+recalculan con los cuatro de reglas y con el del territorio; en Facturación, el tipo general con que arranca
+una línea de la factura manual, también.
 
 ### A qué reacciona y lo que necesita de otras apps
 Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
@@ -586,9 +597,11 @@ Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
 
 | App | Para qué | Servicio |
 |---|---|---|
-| Inventario | Elegir la categoría fiscal de un producto, con su tipo; comprobar que existe; reconocer la columna fiscal de un CSV y aprender textos o crear categorías al importar | `tax.category.list`, `tax.category.get`, `tax.alias.list`, `tax.alias.resolve`, `tax.category.create`, `tax.alias.create` |
-| Servicios | Elegir la categoría fiscal de un servicio | `tax.category.list` |
-| Ventas y Facturación | El tipo y la calificación de cada línea, con el cálculo de TAX-F18, en el país y el territorio fiscal del negocio | `tax.rate.calculate` (o su función, dentro de su operación) |
+| Inventario | Elegir la categoría fiscal de un producto o de una categoría, con su tipo; reconocer la columna fiscal de un CSV y, al importar, aprender un texto o crear la categoría que falta | `tax.category.list`, `tax.alias.resolve`, `tax.alias.create`, `tax.category.create` |
+| Servicios | Elegir la categoría fiscal de un servicio y la de por defecto, con su tipo | `tax.category.list` |
+| Ventas | El tipo y la calificación de cada línea al cobrar, con el cálculo de TAX-F18, y el tipo de cada sección, en el país y el territorio fiscal del negocio; elegir la categoría de una sección; el nombre del impuesto del territorio («IVA», «IGIC», «IPSI») | `tax.rate.calculate` (su función, dentro de su operación), `tax.category.list`, `tax.settings.get` |
+| Facturación | El tipo y la calificación de cada línea con categoría; el impuesto de una línea sin regla, el de su territorio; el nombre del impuesto del territorio | `tax.rate.calculate` (su función, dentro de su operación), `tax.settings.get` |
+| Menús y combos, Suplementos | Elegir la categoría fiscal propia de un menú o de una opción, con su tipo | `tax.category.list` |
 
 ### Quién puede qué
 
@@ -603,14 +616,23 @@ cajero del producto actual es un empleado.
 ## Para quien lo mantiene
 
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
-  `migrations/` (`0002` siembra el catálogo de fábrica, con reverso), `schemas.py`, `queries.py`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py`
-  por fichero, y las páginas (`frontend/`: Categorías, Reglas y Alias, con sus diálogos) con su Vitest y
-  su e2e por flujo en tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules` y
-  `tax-employee`). País y Categoría de las altas son el `Combo` de `@erplora/ui` (el `ok-combo` de
-  antes): la categoría se busca en el servidor (`tax.category.list` por nombre), nunca se carga entera.
-- **Contrato con Inventario**: `TaxCategory` tiene clave UUIDv7 y `key` única (la `tax_category_key`
-  enlazable); Inventario pone su FK aquí. Ninguna categoría se borra.
+  `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
+  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries.py`, `services.py`, `events.py`,
+  `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero, y las páginas
+  (`frontend/`: Categorías, Reglas, Alias y Ajustes, con sus diálogos) con su Vitest y su e2e por flujo en
+  tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules`, `tax-employee`,
+  `tax-region-sale` y `tax-region-no-national-fallback`). País y Categoría de las altas son el `Combo` de
+  `@erplora/ui` (el `ok-combo` de antes): la categoría se busca en el servidor (`tax.category.list` por
+  nombre), nunca se carga entera.
+- **Contrato con quien enlaza una categoría**: `TaxCategory` tiene clave UUIDv7 y `key` única (la
+  `tax_category_key` enlazable). Ponen su FK aquí, todas `PROTECT`, Inventario (producto y categoría),
+  Servicios (servicio y ajustes), Ventas (sección), Menús y combos (menú) y Suplementos (opción). Ninguna
+  operación borra ni desactiva una categoría; desactivarla en el admin del Hub no es un borrado (no espera a
+  ninguna escritura) y deja sin vender lo que la nombra hasta que se elija otra.
+- **La lectura retenida de una categoría** (`queries.held_categories(keys)`, hub#62): `FOR KEY SHARE` en
+  orden de clave, el mismo patrón que `held()` de Inventario. La usa Servicios al guardar un servicio, el
+  alta en bloque o sus ajustes, para que un borrado a la vez espere a la escritura o la rechace como una
+  clave que no existe (422 `service.tax_category_unknown`), nunca con un 500 en el COMMIT.
 - **La resolución, una sola vez** (`queries.resolve_tax` y `queries.calculate_tax`): raíces activas y
   vigentes en la fecha, del país y la categoría; la región exacta gana a la del país entero y nunca se
   usa otra región; una región con impuesto propio (`own_tax_kind`: ES-CN, ES-CE, ES-ML) solo toma sus
@@ -662,9 +684,12 @@ cajero del producto actual es un empleado.
 - Los nombres de las categorías de fábrica se traducen en el código (`SYSTEM_CATEGORY_LABELS`, con su
   `es` en `locale/`), no en la base de datos: en la fila queda el nombre en inglés.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y
-  para el staff de la plataforma. Lo que guarda no pasa por las operaciones: no deja aviso ni comprueba
-  el solape ni la coherencia de un componente; la base de datos sigue rechazando el % fuera de 0–100, el
-  % en una clase sin impuesto, el rango al revés y la raíz gemela.
+  para el staff de la plataforma. Lo que guarda de categorías, reglas y alias no pasa por las operaciones:
+  no deja aviso ni comprueba el solape ni la coherencia de un componente; la base de datos sigue rechazando
+  el % fuera de 0–100, el % en una clase sin impuesto, el rango al revés y la raíz gemela. Los ajustes del
+  negocio sí (hub#42): el territorio es un desplegable con los del país del negocio más «Whole country», se
+  guarda por `tax.settings.update` (su actor y su evento en el outbox) y no se añade una segunda fila ni se
+  borra la que hay (borrarla movería el negocio a todo el país en silencio).
 - **Paridad con el producto actual**: las listas aceptan los mismos filtros, búsqueda y orden
   (`sort`, `dir`) que sus tablas; las filas llevan las mismas columnas (también Activa, siempre «Sí»:
   como antes, ninguna operación archiva una categoría o un alias). El alta de alias acepta Origen y la
@@ -675,8 +700,58 @@ cajero del producto actual es un empleado.
   reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas.py` su
   `description` (el JSON Schema de la herramienta).
 - **País y región** salen de `pycountry` (ISO 3166-1 y 3166-2), no de una lista copiada.
+- **Decisión de mercado: «Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de
+  los tipos que faltan en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business
+  Central) y en la propia pantalla de impuestos (WooCommerce, Shopify, Toast). El aviso va en Categorías,
+  Reglas y Alias y lee `tax.rule.status` sin país; el paso «Tus impuestos» de la lista «Termina de
+  configurar tu negocio» del Inicio (ronda 2026-10-21 de `PLAN-HUB.md`, que trae esa lista a `base`)
+  leerá la misma consulta (ver «Lo que queda fuera»).
+- **Decisión de mercado: el territorio fiscal del negocio (TAX-F11)**: vive en Impuestos, en la pestaña
+  **Ajustes**, como el «país fiscal» de Odoo en los ajustes de Contabilidad y el régimen IGIC de Holded o Sage
+  en los de impuestos; Square, Shopify y Toast lo sacan de la dirección del local. El país no se edita aquí:
+  es el de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro
+  (fase 2); hasta entonces, España. Ventas y Facturación leen los dos de la misma fuente (pm#629, VF-17).
 
-### Cambios frente al producto actual
+## Lo que queda fuera
+
+- **El paso «Tus impuestos» de «Termina de configurar tu negocio» del Inicio** (TAX-F17): es
+  `FIX-TAX-SETUP-HOOKS` de la cola, bloqueada hasta que se mergee APP-BASE-1 (hub#168, que trae
+  `base.setup.status`); el punto de extensión `LiveAppConfig.setup` ya está en `packages/live` (hub#167).
+  Ni está hecho ni se simula: `tax.rule.status` ya dice si los impuestos están configurados
+  (`configured`), que es lo que el paso leerá, con su texto en el idioma de quien mira (hub#2356).
+- **Que «Tus impuestos» mire el país y el territorio del negocio**: `SetupNotice.vue` pide
+  `tax.rule.status` sin país, así que cuenta las reglas raíz de cualquier país y territorio; un negocio de
+  Canarias, Ceuta o Melilla con solo las reglas de fábrica (IVA) no ve el aviso, aunque el TPV no le deja
+  cobrar esas categorías y le dice por qué. Es comportamiento nuevo: aplazado de la migración (ronda
+  FIX-TAX-REGION-NATIONAL-FALLBACK de `PLAN-HUB.md`).
+- **El país del negocio**: es `DEFAULT_COUNTRY` (`ES`) hasta que el Hub reciba el de la cuenta del SaaS con
+  el registro de la fase 2 (`PUT /internal/hubs/{id}` → `control.Hub`); no se edita en el Hub (BASE-G97
+  sigue `no hecho` por eso).
+- **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
+  Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
+  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`).
+- **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
+  (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
+- **El asistente (chat y voz) y las llaves de API del negocio** son de la plataforma, que aún no los tiene:
+  Impuestos ya declara cada operación para el asistente (`ai=`) y abre siete a las llaves (`expose_api`);
+  mientras tanto, TAX-F12 y TAX-F18 se piden por la API con la sesión.
+- **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en
+  [`UI-REQUESTS.md`](UI-REQUESTS.md), sin llegar a `ui`; propuestos para `## 6` de `MIGRATION.md` como
+  `tax:ui-live-server-table` y `tax:ui-percent-date-format`.
+
+## Lo que NO hace, a propósito
+
+- No fija el precio ni decide si va con el impuesto incluido: eso es de Ventas.
+- No cierra el tique ni agrupa por tipo para la factura o el registro de la AEAT: eso es de Ventas y
+  Facturación.
+- No guarda el país del negocio: es el de su cuenta de ERPlora. Sí guarda su territorio fiscal (TAX-F11).
+- No edita una regla (se cambia con fecha de fin y una regla nueva) ni borra reglas, categorías o
+  alias; no renombra ni archiva una categoría o un alias.
+- No hace depender el recargo de equivalencia del cliente: se suma a toda venta de la categoría.
+- No traduce los códigos de exención ni de régimen ni habla con la AEAT.
+- No siembra tipos de IGIC, IPSI, recargo de equivalencia ni de otros países.
+
+## Cambios frente al producto actual
 
 1. **Ninguna regla incoherente ni solapada puede nacer**, tampoco por el lote, que ahora aplica las
    mismas comprobaciones que el alta y es todo o nada. Por eso se retiran TAX-F09 (reparar) y TAX-F10
@@ -701,32 +776,10 @@ cajero del producto actual es un empleado.
    para llevar o a domicilio, al 21 %, tiene su categoría: `retail.alcohol`. Un hub que ya tuviera la
    semilla anterior recibe `retail.alcohol` (migración 0005) y conserva su regla de
    `restaurant.alcohol`: una migración nunca reescribe un tipo; se cambia con TAX-F07.
-11. **«Tus impuestos» sale en las pantallas de Impuestos** (TAX-F17), no en una lista de primeros pasos
-   del Hub, que todavía no existe.
+11. **«Tus impuestos» sale en las pantallas de Impuestos** (TAX-F17). En el producto actual era un paso de
+   la lista de primeros pasos del inicio (hub#2356); esa lista vuelve con el Inicio del hub viejo (ronda
+   2026-10-21) y su paso es `FIX-TAX-SETUP-HOOKS` (ver «Lo que queda fuera»).
 12. **El territorio fiscal se elige en una pantalla** (Impuestos → Ajustes, TAX-F11): antes solo se fijaba
    por la API de ajustes, y Ajustes del Hub dejaba elegir el país (España o Portugal), que ahora es el de
    la cuenta de ERPlora. Solo se admiten los territorios con impuestos propios (Canarias, Ceuta, Melilla),
    nunca un código cualquiera (hub#1496).
-
-- **«Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de los tipos que faltan
-  en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business Central) y en la propia
-  pantalla de impuestos (WooCommerce, Shopify, Toast). El Hub no tiene esa lista (sería de `base`), así
-  que el aviso va en las tres pantallas, con `tax.rule.status` sin país (el Hub no guarda el del
-  negocio). Cuando exista la lista de primeros pasos, su paso «Tus impuestos» lee la misma consulta.
-- **Territorio fiscal del negocio (TAX-F11)**: vive en Impuestos, en la pestaña **Ajustes**, como el
-  «país fiscal» de Odoo en los ajustes de Contabilidad y el régimen IGIC de Holded o Sage en los de
-  impuestos; Square, Shopify y Toast lo sacan de la dirección del local. El país no se edita aquí: es el
-  de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro (fase
-  2); hasta entonces, España. Ventas y Facturación leen los dos de la misma fuente (pm#629, VF-17).
-
-### Lo que NO hace, a propósito
-
-- No fija el precio ni decide si va con el impuesto incluido: eso es de Ventas.
-- No cierra el tique ni agrupa por tipo para la factura o el registro de la AEAT: eso es de Ventas y
-  Facturación.
-- No guarda el país ni la región del negocio.
-- No edita una regla (se cambia con fecha de fin y una regla nueva) ni borra reglas, categorías o
-  alias; no renombra ni archiva una categoría o un alias.
-- No hace depender el recargo de equivalencia del cliente: se suma a toda venta de la categoría.
-- No traduce los códigos de exención ni de régimen ni habla con la AEAT.
-- No siembra tipos de IGIC, IPSI, recargo de equivalencia ni de otros países.
