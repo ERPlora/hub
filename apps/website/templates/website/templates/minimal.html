@@ -47,7 +47,7 @@ apps/website/frontend/public/site.css.{% endcomment %}
   <div class="row justify-content-center">
     <div class="col-md-10 col-lg-8 border-top pt-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
       <span class="small fw-semibold text-uppercase ws-tracking">{{ site_name }}</span>
-      {% if content.footer.text %}<span class="small text-body-secondary">{{ content.footer.text }}</span>{% endif %}
+      {% if content.footer.text %}<span class="small text-body-secondary" data-ep-footer-text>{{ content.footer.text }}</span>{% endif %}
       <a class="small" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
     </div>
   </div>

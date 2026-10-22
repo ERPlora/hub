@@ -288,3 +288,21 @@ def test_the_page_is_laid_out_with_bootstraps_grid_and_fluid_images(template):
     for image in re.findall(r"<img\b[^>]*>", html):
         # A photo fits its column, or fills a Bootstrap ratio box without stretching.
         assert "img-fluid" in image or "object-fit-cover" in image, image
+
+
+def footer_of(html: str) -> str:
+    return re.search(r'<footer\b[^>]*data-ep-section="footer".*?</footer>', html, re.S).group(0)
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
+    # Regression (2026-10-22): the demo's footer showed a lone «h», which was the owner's text; the line is the text
+    # as written, in its own element, and with no text there is no line at all (no empty element left behind).
+    footer = footer_of(render(template, content=full_content(footer={"text": "Pepe Bistro S.L. · CIF B12345678"})))
+    lines = re.findall(r"<(\w+)\b[^>]*\bdata-ep-footer-text\b[^>]*>([^<]*)</\1>", footer)
+    assert [text for _tag, text in lines] == ["Pepe Bistro S.L. · CIF B12345678"]
+    empty = footer_of(render(template, content=full_content(footer={"text": ""})))
+    assert "data-ep-footer-text" not in empty
+    assert not re.search(r"<(p|span|small|div)\b[^>]*>\s*</\1>", empty), empty
+    # The name and «Log in» stay.
+    assert "Pepe&#x27;s Bistro" in empty and LOGIN.findall(empty) == ["Log in"]

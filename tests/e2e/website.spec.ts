@@ -1,8 +1,8 @@
 // The website module end to end (apps/website, rounds 2026-10-21 and 2026-10-22, PLAN §29): the owner fills the
-// editor at /website (hero, contact, «About us» typed key by key and then hidden, the «Forest» palette, «Auto» and the
-// «Modern» design) and publishes; a visitor without a session opens `/` and gets the public page with «Log in» and
-// without the hidden section, laid out for a phone, a tablet and a computer with nothing scrolling sideways and the top
-// bar's menu folding on the phone; «Log in» takes her to the SaaS's sign-in; «Auto» follows the device's light or
+// editor at /website (hero, contact, «About us» typed key by key and then hidden, the footer's line, the «Forest»
+// palette, «Auto» and the «Modern» design) and publishes; a visitor without a session opens `/` and gets the public
+// page with «Log in», the footer's line and without the hidden section, laid out for a phone, a tablet and a computer
+// with nothing scrolling sideways and the top bar's menu folding on the phone; «Log in» takes her to the SaaS's sign-in; «Auto» follows the device's light or
 // dark. Then each of the four designs is published in turn and captured at 390, 820 and 1440 px, light and dark
 // (`.artifacts/WEBSITE-<design>-<width>-<mode>.png`), with the editor's own captures. At the end the site is taken
 // offline again (`website.site.unpublish`): the other specs on hub `a` expect its `/` to jump to the login.
@@ -24,6 +24,8 @@ const HERO = 'Fresh food every day';
 const TAGLINE = 'Since 1998 in Gran Vía';
 const PHONE = '+34 600 123 456';
 const EMAIL = 'hola@pepe.es';
+/** The footer's line, as an owner writes it (the demo once showed a lone «h»: it was the text typed there). */
+const FOOTER = "Pepe's Bistro S.L. · Gran Vía 1, Madrid";
 
 interface ModeColours {
   primary: string;
@@ -115,6 +117,7 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   await expect(page.locator('[data-ep-section="contact"]')).toContainText(PHONE);
   await expect(page.locator('header a[href="/auth/login"]')).toHaveText('Log in');
   await expect(page.locator('footer a[href="/auth/login"]')).toHaveText('Log in');
+  await expect(page.locator('footer [data-ep-footer-text]')).toHaveText(FOOTER);
   // Bootstrap's own stylesheet reached the page (the bundle, under the public CSP).
   await expect(page.locator('header .navbar')).toHaveCSS('display', 'flex');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -182,6 +185,8 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
     await setToggle(page, 'website-show-contact', true);
     await field(page, 'website-field-contact-phone').fill(PHONE);
     await field(page, 'website-field-contact-email').fill(EMAIL);
+    await openSection(page, 'footer');
+    await field(page, 'website-field-footer-text').fill(FOOTER);
     await page.getByTestId('website-palette-forest').click();
     await expect(page.getByTestId('website-palette-forest')).toHaveAttribute('aria-checked', 'true');
     // (Vue sets an ion-segment-button's `value` as a property: no `[value=…]` selector matches it.)

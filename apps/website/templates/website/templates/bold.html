@@ -51,7 +51,7 @@ apps/website/frontend/public/site.css.{% endcomment %}
 <footer data-ep-section="footer" class="bg-body-tertiary text-body py-4" data-bs-theme="dark">
   <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
     <span class="fw-bold text-uppercase ws-display">{{ site_name }}</span>
-    {% if content.footer.text %}<span class="small text-body-secondary">{{ content.footer.text }}</span>{% endif %}
+    {% if content.footer.text %}<span class="small text-body-secondary" data-ep-footer-text>{{ content.footer.text }}</span>{% endif %}
     <a class="btn btn-sm btn-primary" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
   </div>
 </footer>
