@@ -18,9 +18,26 @@ const VIEWPORTS = {
 /** The side menu is pinned from 992 px; below it is a drawer behind the bar's menu button. */
 const PINNED_MIN = 992;
 
+/**
+ * Counts the Ionic overlays sliding in or out (between their «will» and «did» events): their animations run
+ * in shadow roots, out of `document.getAnimations()` (as demo-flows.spec.ts).
+ */
+function countMovingOverlays(): void {
+  const w = window as unknown as { __overlaysMoving: number };
+  w.__overlaysMoving = 0;
+  for (const kind of ['Modal', 'Popover']) {
+    for (const [start, end] of [['WillPresent', 'DidPresent'], ['WillDismiss', 'DidDismiss']]) {
+      document.addEventListener(`ion${kind}${start}`, () => (w.__overlaysMoving += 1));
+      document.addEventListener(`ion${kind}${end}`, () => (w.__overlaysMoving = Math.max(0, w.__overlaysMoving - 1)));
+    }
+  }
+}
+
 async function snap(page: Page, flow: string, width: number): Promise<void> {
-  await page.waitForFunction(() =>
-    document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity),
+  await page.waitForFunction(
+    () =>
+      ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0 &&
+      document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity),
   );
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
@@ -34,6 +51,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
   test(`BASE-F01 BASE-F02 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11 — the Home at ${width}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
+    await context.addInitScript(countMovingOverlays);
     await clearItems(context, A);
 
     // BASE-F02 — the Home at `/`, headed by the business (or a greeting) and today's date.
