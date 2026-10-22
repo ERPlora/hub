@@ -33,6 +33,15 @@ describe('UpgradePlanLink', () => {
     ]);
   });
 
+  it("on the rail keeps only its icon, as the menu's other labels, and still says where it goes", async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL });
+    const m = await mountBase(UpgradePlanLink, { locale: 'es' });
+    const link = m.wrapper.get('a[data-testid="upgrade-plan"]');
+    // polish.css hides `.nav-label` on `ion-split-pane.rail`: the text goes, the icon stays.
+    expect(link.get('.nav-label').text()).toBe('Actualizar plan');
+    expect([link.attributes('title'), link.attributes('aria-label')]).toEqual(['Actualizar plan', 'Actualizar plan']);
+  });
+
   it('paints nothing without the block (never a button that does nothing)', async () => {
     embed(null);
     const m = await mountBase(UpgradePlanLink);

@@ -293,8 +293,9 @@ Estado: parcial — un enlace normal, sin el pase de un solo uso, solo en el nav
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Menú lateral
 Pasos:
-  1. Al pie del menú lateral está «Actualizar plan». Lo ve cualquier perfil; lo que se puede hacer al
-     llegar lo decide erplora.com según quién entre.
+  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Actualizar plan». Lo ve cualquier
+     perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
+     sus iconos (escritorio), queda solo su icono, que dice «Actualizar plan» al pasar por encima.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com.
 Entra: el negocio en el que está.
 Sale: nada guardado en el hub.

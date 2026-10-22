@@ -274,8 +274,9 @@ Status: partial — a plain link, without the one-time pass, only in the browser
 Actor: owner, administrator, manager, employee
 Screen: Side menu
 Steps:
-  1. At the foot of the side menu is "Upgrade plan". Any profile sees it; what can be done on arriving is
-     decided by erplora.com according to who comes in.
+  1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Any profile
+     sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
+     menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover.
   2. They tap it: this business's plan page on erplora.com opens in a new tab.
 In: the business they are in.
 Out: nothing saved in the hub.

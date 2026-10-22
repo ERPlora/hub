@@ -21,9 +21,12 @@ const shown = computed(() => isWeb.value && planUrl !== '');
     :href="planUrl"
     target="_blank"
     rel="noopener"
+    :title="$t('base.plan.upgrade')"
+    :aria-label="$t('base.plan.upgrade')"
   >
     <HubIcon name="ion:sparkles-outline" />
-    <span>{{ $t('base.plan.upgrade') }}</span>
+    <!-- The menu folded to its rail (≥992 px) hides every `.nav-label` (polish.css): the icon stays, named above. -->
+    <span class="nav-label">{{ $t('base.plan.upgrade') }}</span>
   </a>
 </template>
 
