@@ -255,6 +255,8 @@ test.beforeAll(async ({ browser }) => {
     throw new Error('website-flows.spec.ts never asks Google: run it on a stack without GOOGLE_PLACES_API_KEY.');
   }
   owner = await hostPage(browser, A, { next: '/website', viewport: WIDE });
+  // The owner's session for the fleet's visual sweep of the editor (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await owner.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await seedServices(owner.context);
 });
 
