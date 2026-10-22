@@ -353,3 +353,16 @@ def test_hidden_reviews_are_not_given_to_visitors(settings, no_google):
     # Nor the place behind them: the public site leaves a hidden section empty.
     assert run("website.public.site", ctx=visitor()).content.reviews.place_ref == ""
 
+
+
+def test_the_public_reviews_come_from_the_sites_last_good_answer_when_the_cache_is_cold(settings, no_google):
+    # flow: WEBSITE-F12 — after a deploy or a cache restart the page's visitors still get the kept reviews.
+    from apps.website.models import Site
+
+    settings.GOOGLE_PLACES_API_KEY = "test-key"
+    save(full_content(reviews={"place_ref": PLACE_ID}))
+    run("website.site.publish")
+    Site.objects.update(reviews_snapshot=google_reviews(count=9))
+    cache.clear()
+    out = run("website.public.reviews", ctx=visitor())
+    assert (out.available, out.count_label) == (True, "9 reviews on Google")
