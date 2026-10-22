@@ -7,7 +7,7 @@
 // removed after it (and before, if a run died half-way).
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E';
 const PHONE = { width: 390, height: 844 };
@@ -26,7 +26,15 @@ function cleanup(): void {
   );
 }
 
-test.beforeAll(cleanup);
+// flow: ninguno (spec e2e de Personal) — FIX-HUB-E2E-STAFF-MEMBERS-FRESH-DB
+test.beforeAll(async ({ browser }) => {
+  cleanup();
+  // The employee's account exists in the hub only after their first sign-in (the SaaS creates it on the
+  // way in): STAFF-F03 picks it in «Hub user», so this file signs them in once instead of relying on
+  // another spec having done it first (a fresh e2e database has only the owner).
+  const employee = await hostPage(browser, A, { next: '/staff/members', credentials: EMPLOYEE });
+  await employee.context.close();
+});
 test.afterAll(cleanup);
 
 /** The owner signed in on `a`, in English (the language follows the browser's Accept-Language). */
