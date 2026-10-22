@@ -167,20 +167,27 @@ def test_the_signature_opens_the_door_on_any_host(client, db, host):
     assert answer.status_code == 200
 
 
-# Attempts: 30 calls with a bad signature per address in 5 minutes, then 429 until the window of the first one ends.
-# The SaaS never signs wrong: this is for whatever else reaches the door (a scanner inside the network).
+# Attempts: past 30 calls with a bad signature from an address in 5 minutes, its next bad one is 429 until the window
+# of the first one ends; a good signature is always heard. The SaaS never signs wrong: this is for whatever else reaches
+# the door (a scanner inside the network).
 
 BAD_SIGNATURES = 30
 
 
-def test_past_thirty_bad_signatures_the_address_waits_even_with_a_good_one(client, db):
+def test_past_thirty_bad_signatures_the_next_bad_one_is_429_with_retry_after(client, db):
     for _ in range(BAD_SIGNATURES):
         assert signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
-    answer = signed(client, "put", PATH, {"slug": "a", "version": 1})
+    answer = signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other")
     assert (answer.status_code, code(answer)) == (429, "base.rate_limited")
     assert 290 <= int(answer["Retry-After"]) <= 300
     assert answer["Cache-Control"].startswith("max-age=0")
-    assert Hub.objects.get(id=HUB_ID).state_version == 0, "nothing is applied while the address waits"
+
+
+def test_a_good_signature_is_heard_while_the_address_is_past_the_limit(client, db):
+    for _ in range(BAD_SIGNATURES + 1):
+        signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    assert signed(client, "put", PATH, {"slug": "a", "version": 1}).status_code == 200
+    assert Hub.objects.get(id=HUB_ID).state_version == 1
 
 
 def test_a_good_signature_is_not_counted(client, db):
@@ -189,24 +196,32 @@ def test_a_good_signature_is_not_counted(client, db):
     for version in range(1, 6):
         assert signed(client, "put", PATH, {"slug": "a", "version": version}).status_code == 200
     assert signed(client, "put", PATH, {"slug": "a", "version": 9}, secret="other").status_code == 401
-    assert signed(client, "put", PATH, {"slug": "a", "version": 9}).status_code == 429
+    assert signed(client, "put", PATH, {"slug": "a", "version": 9}, secret="other").status_code == 429
 
 
 def test_the_bad_signatures_count_per_address(db):
-    scanner, saas = Client(REMOTE_ADDR="10.0.9.9"), Client(REMOTE_ADDR="10.0.1.20")
+    scanner, other = Client(REMOTE_ADDR="10.0.9.9"), Client(REMOTE_ADDR="10.0.1.20")
     for _ in range(BAD_SIGNATURES):
         signed(scanner, "put", PATH, {"slug": "a", "version": 1}, secret="other")
-    assert signed(scanner, "put", PATH, {"slug": "a", "version": 1}).status_code == 429
-    assert signed(saas, "put", PATH, {"slug": "a", "version": 1}).status_code == 200
+    assert signed(scanner, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 429
+    assert signed(other, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
 
 
-def test_the_bad_signatures_count_per_address_as_the_proxies_saw_it(db, settings):
+@pytest.mark.parametrize(
+    ("caller", "same", "neighbour"),
+    [("203.0.113.7", "203.0.113.7", "203.0.113.8"), ("2001:db8:1:2::7", "2001:db8:1:2:ffff::1", "2001:db8:1:3::7")],
+)
+def test_the_bad_signatures_count_per_address_as_the_proxies_saw_it(db, settings, caller, same, neighbour):
     settings.TRUSTED_PROXY_HOPS = 1
     behind = Client(REMOTE_ADDR="10.0.0.5")
+
+    def bad(address):
+        return signed(behind, "put", PATH, {"slug": "a", "version": 1}, secret="other", HTTP_X_FORWARDED_FOR=address)
+
     for _ in range(BAD_SIGNATURES):
-        signed(behind, "put", PATH, {"slug": "a", "version": 1}, secret="other", HTTP_X_FORWARDED_FOR="203.0.113.7")
-    assert signed(behind, "put", PATH, {"slug": "a", "version": 1}, HTTP_X_FORWARDED_FOR="203.0.113.7").status_code == 429
-    assert signed(behind, "put", PATH, {"slug": "a", "version": 1}, HTTP_X_FORWARDED_FOR="203.0.113.8").status_code == 200
+        bad(caller)
+    assert bad(same).status_code == 429
+    assert bad(neighbour).status_code == 401
 
 
 def test_with_the_cache_away_the_signature_still_decides(client, db, monkeypatch):

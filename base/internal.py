@@ -13,9 +13,9 @@ passes: no downgrade); without v2, by v1. Each signature is checked against ever
 ``INTERNAL_SIGNATURE_MAX_AGE_SECONDS`` away is refused (401 ``internal.unsigned``). The signature is the
 authentication: the ALB never publishes ``/internal``, so the door answers on any host (the SaaS reaches it by the
 private name, ``hub.erplora.internal``; ``base.middleware`` leaves ``/internal/`` alone). Every refused signature counts
-against the caller's address (``base.throttle.client_address``): past :data:`SIGNATURE_ATTEMPTS` the door answers 429
-``base.rate_limited`` with ``Retry-After`` before it checks anything, until the window of the first refusal ends (the
-SaaS never signs wrong: this is for whatever else reaches the door).
+against the caller (``base.throttle.client_key``): past :data:`SIGNATURE_ATTEMPTS`, its next bad signature is answered
+429 ``base.rate_limited`` with ``Retry-After`` until the window of the first refusal ends; a good signature is always
+heard (the SaaS never signs wrong: this is for whatever else reaches the door).
 
 The registry of hubs (plan 2026-10-17, §1.5), each route one operation of ``base`` run as the platform on the
 registry's scope (``base.registry.REGISTRY_SCOPE``):
@@ -82,7 +82,7 @@ from base.registry import REGISTRY_SCOPE
 from base.tenancy.context import use_hub, use_shared_database
 from base.tenancy.identity import HubIdentityMismatch
 from base.services import DEMO_FULL_RETRY_AFTER_SECONDS, WHATSAPP_APP
-from base.throttle import AttemptLimit, RateLimited, client_address
+from base.throttle import AttemptLimit, RateLimited, client_key
 
 # ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
 # SaaS (``apps/verifactu/representation.py``); they are ``base.signing``'s.
@@ -90,7 +90,7 @@ from base.signing import SIGNATURE_V2_HEADER, sign_v2, verify_request  # noqa: F
 
 #: The business's commercial status as the photo says it (PLAN-SAAS §2.3).
 HUB_STATUSES = ("active", "past_due", "suspended")
-#: Calls with a refused signature per address: 30 within 5 minutes of the first (README, «Límites de intentos»).
+#: Calls with a refused signature per caller: 30 within 5 minutes of the first (README, «Límites de intentos»).
 SIGNATURE_ATTEMPTS = AttemptLimit("internal", attempts=30, window=300)
 
 
@@ -100,19 +100,19 @@ def refuse(status: int, code: str, message: str) -> JsonResponse:
 
 
 def internal_view(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
-    """A view of ``/internal``: no CSRF (no browser), never cached, 401 ``internal.unsigned`` unless signed and 429
-    ``base.rate_limited`` from an address past :data:`SIGNATURE_ATTEMPTS`."""
+    """A view of ``/internal``: no CSRF (no browser), never cached, and 401 ``internal.unsigned`` unless signed (429
+    ``base.rate_limited`` from a caller past :data:`SIGNATURE_ATTEMPTS`)."""
 
     @wraps(view)
     def guarded(request: HttpRequest, *args, **kwargs) -> HttpResponse:
-        address = client_address(request)
-        wait = SIGNATURE_ATTEMPTS.wait(address)
-        if wait:
-            limited = JsonResponse(RateLimited().envelope(), status=429)
-            limited["Retry-After"] = str(wait)
-            return limited
         if not verify_request(request):
-            SIGNATURE_ATTEMPTS.failed(address)
+            caller = client_key(request)
+            wait = SIGNATURE_ATTEMPTS.wait(caller)
+            if wait:
+                limited = JsonResponse(RateLimited().envelope(), status=429)
+                limited["Retry-After"] = str(wait)
+                return limited
+            SIGNATURE_ATTEMPTS.failed(caller)
             return refuse(
                 401,
                 "internal.unsigned",

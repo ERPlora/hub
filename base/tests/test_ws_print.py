@@ -454,7 +454,8 @@ async def test_a_session_that_ends_closes_the_socket_at_its_next_frame(sockets, 
     assert await socket.closed() == 4401
 
 
-# Attempts: 10 sessions refused per address in 5 minutes, then 4429 at the handshake until the window ends
+# Attempts: past 10 sessions refused from an address in 5 minutes, its next refused one is closed 4429 until the window
+# of the first one ends; a valid session always prints (the kitchen's printer is never locked out by a tablet next to it)
 
 
 REFUSED_SESSIONS = 10
@@ -469,53 +470,57 @@ async def refused_sessions(sockets, times: int = REFUSED_SESSIONS, **socket) -> 
         assert await guess.closed() == 4401
 
 
-async def test_past_ten_refused_sessions_the_address_is_closed_4429_without_reading_the_session(
-    sockets, session, monkeypatch
-):
-    cookie = await db(session)
+async def test_past_ten_refused_sessions_the_next_refused_one_is_closed_4429(sockets):
     await refused_sessions(sockets)
-    reads = []
-    real_load = SessionStore.load
-    monkeypatch.setattr(SessionStore, "load", lambda store: reads.append(store.session_key) or real_load(store))
 
-    socket = sockets(cookie=cookie, language="es")
+    socket = sockets(cookie="not-a-session-of-this-hub", language="es")
     assert (await socket.connect())["type"] == "websocket.accept"
-    frame = await socket.receive()
+    frame = await socket.hello("till-1", [])
 
     assert frame["type"] == "error" and frame["code"] == "base.rate_limited"
     assert frame["message"] == "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en 5 minutos."
     assert await socket.closed() == 4429
-    assert reads == []
+
+
+async def test_a_valid_session_prints_while_the_address_is_past_the_limit(sockets, session):
+    # One tablet with an expired session reconnects over and over: the kitchen's printer, same public address, keeps
+    # printing with its own session.
+    cookie = await db(session)
+    till = await db(printer)
+    await refused_sessions(sockets)
+    tablet = sockets(cookie="not-a-session-of-this-hub")
+    await tablet.connect()
+    assert (await tablet.hello("till-1", []))["code"] == "base.rate_limited"
+    assert await tablet.closed() == 4429
+
+    kitchen = sockets(cookie=cookie)
+    await kitchen.connect()
+    assert (await kitchen.hello("till-1", [till]))["type"] == "ready"
 
 
 async def test_a_hello_without_any_session_is_not_counted(sockets, session):
-    # Nothing was tried: a print host that has not signed in yet keeps asking without locking its neighbours out.
-    cookie = await db(session)
-    till = await db(printer)
+    # Nothing was tried: a print host that has not signed in yet keeps asking without counting against its neighbours.
     for _ in range(REFUSED_SESSIONS + 2):
         none = sockets()
         await none.connect()
-        assert (await none.hello("till-1", [till]))["code"] == "unauthenticated"
+        assert (await none.hello("till-1", []))["code"] == "unauthenticated"
         assert await none.closed() == 4401
-
-    signed_in = sockets(cookie=cookie)
-    await signed_in.connect()
-    assert (await signed_in.hello("till-1", [till]))["type"] == "ready"
+    await refused_sessions(sockets, REFUSED_SESSIONS)
 
 
-async def test_the_refused_sessions_count_per_address_as_the_proxies_saw_it(sockets, session, settings):
+@pytest.mark.parametrize(
+    ("caller", "same", "neighbour"),
+    [("203.0.113.7", "203.0.113.7", "203.0.113.8"), ("2001:db8:1:2::7", "2001:db8:1:2:ffff::1", "2001:db8:1:3::7")],
+)
+async def test_the_refused_sessions_count_per_address_as_the_proxies_saw_it(sockets, settings, caller, same, neighbour):
     settings.TRUSTED_PROXY_HOPS = 1
-    cookie = await db(session)
-    till = await db(printer)
-    await refused_sessions(sockets, forwarded_for="203.0.113.7")
+    await refused_sessions(sockets, forwarded_for=caller)
 
-    blocked = sockets(cookie=cookie, forwarded_for="203.0.113.7")
+    blocked = sockets(cookie="not-a-session-of-this-hub", forwarded_for=same)
     await blocked.connect()
-    assert (await blocked.receive())["code"] == "base.rate_limited"
+    assert (await blocked.hello("till-1", []))["code"] == "base.rate_limited"
     assert await blocked.closed() == 4429
-    neighbour = sockets(cookie=cookie, forwarded_for="203.0.113.8")
-    await neighbour.connect()
-    assert (await neighbour.hello("till-1", [till]))["type"] == "ready"
+    await refused_sessions(sockets, 1, forwarded_for=neighbour)
 
 
 async def test_hello_without_a_device_is_refused(sockets, session):

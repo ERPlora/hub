@@ -652,10 +652,12 @@ class TestDemoLogout:
         assert me(client, host_of(demo))["user"] is None
 
 
-# Attempts: 10 refused callbacks per address in 5 minutes, then 429 until the window of the first one ends
+# Attempts: past 10 refused callbacks of an address in 5 minutes, its next refused one is 429 until the window of the
+# first one ends; a good code always redeems (people behind the same address are never locked out)
 
 
 ATTEMPTS = 10
+INVALID = {"status": 400, "body": {"error": {"code": "invalid_code", "message": "Invalid"}}}
 
 
 def refused(client, times: int = 1, host: str = HOST, **meta):
@@ -673,20 +675,29 @@ def callback_from(client, data, host=HOST, **meta):
 
 
 class TestCallbackAttempts:
-    def test_past_ten_refused_codes_the_address_waits_and_the_saas_is_not_asked(self, client, fake_saas):
-        fake = fake_saas(status=400, body={"error": {"code": "invalid_code", "message": "Invalid"}})
+    def test_past_ten_refused_codes_the_next_refused_one_is_429_with_retry_after(self, client, fake_saas):
+        fake_saas(**INVALID)
         assert refused(client, ATTEMPTS).status_code == 302
-        fake_saas()  # even a good code: the address waits for the window's end
-        answer = callback(client, {"code": "c1", "next": "/"})
+        answer = refused(client)
         assert answer.status_code == 429
         assert 290 <= int(answer["Retry-After"]) <= 300
-        assert len(fake.calls) == ATTEMPTS
+        assert STATE_COOKIE not in answer.cookies, "no new jump while the address waits"
         assert me(client)["user"] is None
 
+    def test_a_good_code_redeems_while_the_address_is_past_the_limit(self, client, fake_saas):
+        # The tablet next to it guessed (or kept an expired code): the waiter with a good one still gets in.
+        fake_saas(**INVALID)
+        refused(client, ATTEMPTS + 1)
+        fake_saas()
+        waiter = Client()
+        response = callback(waiter, {"code": "c1", "next": "/demo/items"})
+        assert (response.status_code, response["Location"]) == (302, "/demo/items")
+        assert me(waiter)["user"]["label"] == "Ana"
+
     def test_the_429_is_a_page_of_the_hub_in_the_browser_s_language(self, client, fake_saas):
-        fake_saas(status=400, body={"error": {"code": "invalid_code", "message": "Invalid"}})
+        fake_saas(**INVALID)
         refused(client, ATTEMPTS)
-        answer = client.post("/auth/callback", {"code": "c1", "next": "/"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
+        answer = refused(client, HTTP_ACCEPT_LANGUAGE="es")
         page = answer.content.decode()
         assert answer.status_code == 429 and answer["Content-Type"].startswith("text/html")
         assert "Demasiados intentos de entrar" in page and "Vuelve a intentarlo en 5 minutos." in page
@@ -696,26 +707,26 @@ class TestCallbackAttempts:
         fake = fake_saas()
         for _ in range(ATTEMPTS):
             assert "error=invalid_code" in callback(client, {"next": "/"})["Location"]
-        assert callback(client, {"code": "c1", "next": "/"}).status_code == 429
+        assert callback(client, {"next": "/"}).status_code == 429
         assert fake.calls == []
 
     def test_a_good_redemption_is_not_counted(self, client, fake_saas):
-        bad = {"status": 400, "body": {"error": {"code": "invalid_code", "message": "Invalid"}}}
-        fake_saas(**bad)
+        fake_saas(**INVALID)
         refused(client, ATTEMPTS - 1)
         fake_saas()
         for _ in range(5):
             assert callback(client, {"code": "c1", "next": "/"})["Location"] == "/"
-        fake_saas(**bad)
+        fake_saas(**INVALID)
         assert refused(client).status_code == 302
-        assert callback(client, {"code": "c1", "next": "/"}).status_code == 429
+        assert refused(client).status_code == 429
 
     def test_a_callback_without_this_browser_s_state_counts(self, client, fake_saas):
         fake = fake_saas()
         for _ in range(ATTEMPTS):
             assert client.post("/auth/callback", {"code": "c1", "state": "forged"}, HTTP_HOST=HOST).status_code == 403
-        assert callback(client, {"code": "c1", "next": "/"}).status_code == 429
+        assert client.post("/auth/callback", {"code": "c1", "state": "forged"}, HTTP_HOST=HOST).status_code == 429
         assert fake.calls == []
+        assert callback(client, {"code": "c1", "next": "/"})["Location"] == "/", "with its state, the code redeems"
 
     @pytest.mark.parametrize(
         "saas_answer",
@@ -732,8 +743,8 @@ class TestCallbackAttempts:
         fake_saas(**saas_answer)
         for _ in range(ATTEMPTS + 2):
             assert callback(client, {"code": "c1", "next": "/"}).status_code == 302
-        fake_saas()
-        assert callback(client, {"code": "c1", "next": "/"})["Location"] == "/"
+        fake_saas(**INVALID)
+        assert refused(client).status_code == 302
 
     def test_a_deactivated_user_s_good_code_is_not_counted(self, client, fake_saas):
         fake_saas()
@@ -741,33 +752,45 @@ class TestCallbackAttempts:
         for _ in range(ATTEMPTS + 1):
             assert "error=user_inactive" in callback(client, {"code": "c1", "next": "/"})["Location"]
 
-    def test_the_count_is_per_address_as_the_proxies_saw_it(self, client, fake_saas, settings):
+    @pytest.mark.parametrize(
+        ("caller", "same", "neighbour"),
+        [
+            ("203.0.113.7", "203.0.113.7", "203.0.113.8"),
+            # IPv6: one subscriber holds a whole /64; its other addresses are the same caller.
+            ("2001:db8:1:2::7", "2001:db8:1:2:ffff::1", "2001:db8:1:3::7"),
+        ],
+    )
+    def test_the_count_is_per_address_as_the_proxies_saw_it(self, client, fake_saas, settings, caller, same, neighbour):
         settings.TRUSTED_PROXY_HOPS = 1
-        fake_saas(status=400, body={"error": {"code": "invalid_code", "message": "Invalid"}})
-        refused(client, ATTEMPTS, HTTP_X_FORWARDED_FOR="198.51.100.1, 203.0.113.7")
+        fake_saas(**INVALID)
+        refused(client, ATTEMPTS, HTTP_X_FORWARDED_FOR=f"198.51.100.1, {caller}")
         # The entry the client wrote is not who it is: changing it does not open a new count.
-        assert refused(client, HTTP_X_FORWARDED_FOR="198.51.100.2, 203.0.113.7").status_code == 429
-        other = Client()
-        assert refused(other, HTTP_X_FORWARDED_FOR="203.0.113.8").status_code == 302
+        assert refused(client, HTTP_X_FORWARDED_FOR=f"198.51.100.2, {same}").status_code == 429
+        assert refused(Client(), HTTP_X_FORWARDED_FOR=neighbour).status_code == 302
 
-    def test_a_demo_s_refused_codes_count_too(self, client, fake_saas, demo):
+    def test_a_demo_s_refused_codes_count_and_its_good_code_still_opens_it(self, client, fake_saas, demo):
         fake_saas()
         for _ in range(ATTEMPTS):
             assert callback(client, {"code": "guess", "next": "/"}, host=host_of(demo))["Location"] == SAAS_DEMO_FAILED
-        assert callback(client, {"code": a_code(demo), "next": "/"}, host=host_of(demo)).status_code == 429
+        assert callback(client, {"code": "guess", "next": "/"}, host=host_of(demo)).status_code == 429
+        assert callback(client, {"code": a_code(demo), "next": "/demo/items"}, host=host_of(demo))["Location"] == "/demo/items"
 
-    def test_the_staff_s_refused_codes_count_on_the_platform_host_and_the_wait_covers_it(self, client, fake_saas):
-        fake_saas(status=400, body={"error": {"code": "invalid_code", "message": "Invalid"}})
+    def test_the_staff_s_refused_codes_count_on_the_platform_host_and_on_the_hub_s(self, client, fake_saas):
+        fake_saas(**INVALID)
         for _ in range(ATTEMPTS):
             assert callback(client, {"code": "guess", "next": DEEP_LINK}, PLATFORM).status_code == 302
+        assert callback(client, {"code": "guess", "next": DEEP_LINK}, PLATFORM).status_code == 429
+        assert refused(client).status_code == 429
         fake_saas(body=ROOT)
-        assert callback(client, {"code": "c1", "next": DEEP_LINK}, PLATFORM).status_code == 429
-        assert callback(client, {"code": "c1", "next": "/"}).status_code == 429
+        assert callback(client, {"code": "c1", "next": DEEP_LINK}, PLATFORM)["Location"] == DEEP_LINK
 
     def test_a_staff_callback_without_this_browser_s_state_counts(self, client, fake_saas):
         fake = fake_saas(body=ROOT)
+
+        def forged():
+            return client.post("/auth/callback", {"code": "c1", "next": DEEP_LINK, "state": "forged"}, HTTP_HOST=PLATFORM)
+
         for _ in range(ATTEMPTS):
-            forged = client.post("/auth/callback", {"code": "c1", "next": DEEP_LINK, "state": "forged"}, HTTP_HOST=PLATFORM)
-            assert forged.status_code == 403
-        assert callback(client, {"code": "c1", "next": DEEP_LINK}, PLATFORM).status_code == 429
+            assert forged().status_code == 403
+        assert forged().status_code == 429
         assert fake.calls == []

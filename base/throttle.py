@@ -7,8 +7,9 @@ no: the API's error envelope, 429 ``base.rate_limited``, in the request's langua
 
 A door that checks a credential (the login's callback, ``/internal``'s signature, ``/ws/print``'s session) counts the
 attempts it refused with an :class:`AttemptLimit` instead: past its ``attempts`` within ``window`` seconds of the first
-failure, :meth:`AttemptLimit.wait` says how long the caller waits (``Retry-After``) and the door refuses before it
-checks anything; what it accepts is never counted.
+failure, the next refused attempt of that caller (:func:`client_key`) is answered 429 (:meth:`AttemptLimit.wait`, the
+``Retry-After``) until the window ends. The door checks the credential first: what it accepts is never counted nor
+refused, so a valid caller behind the same address (a restaurant's other devices) is never locked out.
 
 A cache that does not answer (Valkey down) makes :func:`allow` raise, as every other use of the cache does: the public
 route fails loudly rather than turning its limit off. An :class:`AttemptLimit` steps aside instead, with an error in
@@ -16,6 +17,7 @@ the log: the doors it guards (the login, printing, the SaaS's calls) must not st
 not, and the credential each one checks holds on its own.
 """
 
+import ipaddress
 import logging
 import math
 import time
@@ -74,8 +76,8 @@ class AttemptLimit:
     """At most ``attempts`` refused attempts of a key within ``window`` seconds of its first one.
 
     The key is ``limit:<name>:<parts…>`` (``limit:callback:<IP>``, ``limit:pin:<hub>:<employee>``…), under
-    :data:`KEY_PREFIX`. The door asks :meth:`wait` before it checks the credential and calls :meth:`failed` when it
-    refuses it; an accepted attempt is not counted."""
+    :data:`KEY_PREFIX`. The door checks the credential first; when it refuses it, :meth:`wait` says whether the caller
+    already waits (its 429) and otherwise :meth:`failed` counts it. An accepted attempt is neither counted nor refused."""
 
     name: str
     attempts: int
@@ -143,3 +145,21 @@ def client_address(request: HttpRequest) -> str:
     if hops < 1 or len(chain) < hops:
         return request.META.get("REMOTE_ADDR", "")
     return chain[-hops]
+
+
+def client_key(request: HttpRequest) -> str:
+    """The caller an :class:`AttemptLimit` counts: :func:`client_address`, or the /64 of an IPv6 one.
+
+    One subscriber holds a whole IPv6 /64 and picks any address inside it, so counting each address would let it try
+    without end. An IPv4 address inside IPv6 (``::ffff:a.b.c.d``) is that IPv4 address; what is not an address (none,
+    a test's) is kept as it is."""
+    address = client_address(request)
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
+    if ip.version == 4:
+        return str(ip)
+    if ip.ipv4_mapped is not None:
+        return str(ip.ipv4_mapped)
+    return str(ipaddress.IPv6Network((int(ip) >> 64 << 64, 64)))

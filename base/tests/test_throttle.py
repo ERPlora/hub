@@ -13,7 +13,7 @@ from django.core.cache import cache, caches
 from django.test import RequestFactory
 from django.utils import translation
 
-from base.throttle import KEY_PREFIX, AttemptLimit, RateLimited, allow, client_address
+from base.throttle import KEY_PREFIX, AttemptLimit, RateLimited, allow, client_address, client_key
 
 
 @pytest.fixture(autouse=True)
@@ -261,3 +261,23 @@ def test_a_public_count_still_fails_loudly_with_the_cache_away(monkeypatch):
 def test_an_attempt_limit_below_one_is_a_programming_error(attempts, window):
     with pytest.raises(ValueError):
         AttemptLimit("callback", attempts=attempts, window=window)
+
+
+# Which caller an attempt limit counts: the address, and for IPv6 its /64 (one subscriber holds a whole /64)
+
+
+@pytest.mark.parametrize(
+    ("address", "key"),
+    [
+        ("203.0.113.7", "203.0.113.7"),
+        ("2001:db8:1:2::7", "2001:db8:1:2::/64"),
+        ("2001:db8:1:2:ffff:ffff:ffff:ffff", "2001:db8:1:2::/64"),
+        ("2001:DB8:1:3::7", "2001:db8:1:3::/64"),
+        ("::ffff:203.0.113.7", "203.0.113.7"),
+        ("", ""),
+        ("not-an-address", "not-an-address"),
+    ],
+)
+def test_the_caller_of_an_attempt_limit_is_its_address_or_its_ipv6_64(settings, address, key):
+    settings.TRUSTED_PROXY_HOPS = 0
+    assert client_key(forwarded(remote=address)) == key
