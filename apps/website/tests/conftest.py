@@ -10,7 +10,6 @@ from dataclasses import replace
 
 import pytest
 from django.core.cache import cache
-from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 
@@ -50,15 +49,6 @@ def ctx_for(role: str | None = "hub_admin", scope: Scope = A, *, request=None, p
 
 def with_language(ctx: OperationContext, language: str) -> OperationContext:
     return replace(ctx, language=language)
-
-
-@pytest.fixture(autouse=True)
-def english_unless_a_test_says_otherwise():
-    """Every test starts in English, the source language: a request of another test in the same worker (the test
-    client's ``LocaleMiddleware``) leaves its language active in the thread, and a label or a message read outside
-    an operation would come out in it. A test that wants Spanish says so (``translation.override("es")``)."""
-    with translation.override("en"):
-        yield
 
 
 @pytest.fixture(autouse=True)
