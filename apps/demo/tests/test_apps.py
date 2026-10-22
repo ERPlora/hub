@@ -1,7 +1,10 @@
 """The demo app declares its module metadata, its menu entry, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.utils import translation
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, module_configs, permissions_for_role
+
+from apps.demo import events
 
 
 def demo():
@@ -74,6 +77,7 @@ def test_the_operations_of_the_app():
         "demo.item.list",
         "demo.item.detail",
         "demo.item.stats",
+        "demo.item.open_count",
     }
     assert {name for name, op in operations.items() if op.kind == "command"} == {
         "demo.item.create",
@@ -98,3 +102,47 @@ def test_deleting_an_item_is_the_only_high_risk_command():
     assert {name for name, op in demo_operations().items() if op.ai and op.ai.get("risk") == "high"} == {
         "demo.item.delete"
     }
+
+
+def test_the_homes_hooks_are_the_example_every_app_copies():
+    """PLAN-HUB round 2026-10-21: one step, one panel and one counter, each on a query of its own queries.py. The
+    demo is out of the store, so base shows them only where HOME_UNLISTED_HOOKS is on (development, tests, e2e)."""
+    config = apps.get_app_config("demo")
+    [step] = config.setup
+    [panel] = config.widgets
+    [counter] = config.bell
+
+    assert (step.key, step.operation, step.permission, step.required, step.route, step.icon) == (
+        "first_item",
+        "demo.item.stats",
+        "demo.manage",
+        False,
+        "/demo/items/new",
+        "ion:flask-outline",
+    )
+    assert list(step.configured_when) == [SetupCheck(field="total", truthy=True)]
+    with translation.override("en"):
+        texts = (str(step.title), str(step.description), str(counter.label))
+    assert texts == (
+        "Create your first item",
+        "Add an item and watch it appear on every screen of the business at once.",
+        "Open demo items",
+    )
+    assert (panel.key, panel.kind, panel.operation, dict(panel.map), panel.default, panel.permission, panel.size) == (
+        "open_items",
+        "kpi",
+        "demo.item.stats",
+        {"value": "open"},
+        True,
+        "demo.manage",
+        "sm",
+    )
+    assert (counter.key, counter.operation, counter.route, counter.permission) == (
+        "open_items",
+        "demo.item.open_count",
+        "/demo/items",
+        "demo.view",
+    )
+    for hook in (step, panel, counter):
+        assert set(hook.refresh_on) <= set(events.ALL), hook.key
+    assert config.listed is False

@@ -283,6 +283,10 @@ INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
 MAX_CONCURRENT_DEMOS = config("MAX_CONCURRENT_DEMOS", default=50, cast=int)
 DEMO_TTL_MINUTES = config("DEMO_TTL_MINUTES", default=60, cast=int)
 DEMO_TOMBSTONE_DAYS = config("DEMO_TOMBSTONE_DAYS", default=7, cast=int)
+# Whether a module kept out of the store (``listed = False``: today only apps/demo, the platform's reference) brings
+# its example steps, panels and counters to the Home (base.home, PLAN-HUB round 2026-10-21). On with DEBUG
+# (development, the tests and the e2e), off in prod and pre: a customer never sees the reference's examples.
+HOME_UNLISTED_HOOKS = config("HOME_UNLISTED_HOOKS", default=DEBUG, cast=bool)
 # The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals a business's own VeriFactu
 # certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
 # certificate is refused visibly (verifactu.certificate_storage_unavailable).

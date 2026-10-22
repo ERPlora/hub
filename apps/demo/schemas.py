@@ -104,5 +104,11 @@ class ItemStatsOut(Schema):
     lines: int
 
 
+class ItemCountOut(Schema):
+    """How many items there are of a kind: the bell's example counter (its first row brings ``count``)."""
+
+    count: int
+
+
 class DeletedOut(Schema):
     id: UUID

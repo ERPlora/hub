@@ -1,4 +1,4 @@
-"""GET /api/me: base.session.me over HTTP, open to anonymous visitors."""
+"""base over HTTP: GET /api/me (base.session.me, open to anonymous visitors) and the Home's three queries."""
 
 import pytest
 from django.urls import resolve
@@ -9,9 +9,8 @@ pytestmark = pytest.mark.django_db
 def test_me_is_bound_to_session_me():
     from base.api import router
 
-    [(path, view)] = router.path_operations.items()
-    [route] = view.operations
-    assert (path, route.methods, route.operation_id) == ("/me", ["GET"], "base.session.me")
+    [route] = router.path_operations["/me"].operations
+    assert (route.methods, route.operation_id) == (["GET"], "base.session.me")
     assert route.auth_param is None  # anonymous visitors get user: null, not a 401
     assert resolve("/api/me").url_name
 
@@ -38,3 +37,36 @@ def test_employee_on_its_host_and_elsewhere(client, make_user):
 def test_language_follows_the_request(client):
     body = client.get("/api/me", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es").json()
     assert body["language"] == "es"
+
+
+# The Home (PLAN-HUB round 2026-10-21): base.setup.status, base.widget.list and base.bell.counters
+
+
+@pytest.mark.parametrize(
+    ("path", "operation"),
+    [("/home/setup", "base.setup.status"), ("/home/widgets", "base.widget.list"), ("/home/bell", "base.bell.counters")],
+)
+def test_the_homes_routes_are_bound_to_its_queries(path, operation):
+    from base.api import router
+
+    [route] = router.path_operations[path].operations
+    assert (route.methods, route.operation_id) == (["GET"], operation)
+    assert resolve(f"/api{path}").url_name
+
+
+def test_the_list_of_an_owner_over_http(client, make_user, settings):
+    settings.HOME_UNLISTED_HOOKS = False
+    client.force_login(make_user("ana", host="a", role="hub_owner"))
+
+    response = client.get("/api/home/setup", HTTP_HOST="a.localhost:8000")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["key"] for item in body["items"]] == ["base.apps", "base.team"]
+    assert body["blocking_pending"] == 0
+
+
+def test_an_anonymous_visitor_gets_no_home(client):
+    for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell"):
+        response = client.get(path, HTTP_HOST="a.localhost:8000")
+        assert response.status_code in (401, 403), path

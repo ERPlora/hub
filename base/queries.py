@@ -1,18 +1,23 @@
-"""Read operations of base: the session's ``me``, the registry's row of a hub (``base.hub.get``) and a demo's status
-(``base.demo.get``)."""
+"""Read operations of base: the session's ``me``, the registry's row of a hub (``base.hub.get``), a demo's status
+(``base.demo.get``) and the Home's three live queries (``base.setup.status``, ``base.widget.list``,
+``base.bell.counters``; their rules are ``base.home``'s)."""
 
 from typing import Any
 
 from django.utils import translation
-from django.utils.translation import gettext
+from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
 from live.errors import NotFound
 from live.meta import module_configs
 from live.operations import operation
 
-from base.models import Hub
+from base import home
+from base.models import EventDelivery, Hub, Membership
 from base.registry import hub_answer, internal_only
+from base.relay import active_apps
 from base.schemas import (
+    BellCountersIn,
+    BellCountersOut,
     DemoSlugIn,
     DemoStatusOut,
     HubGetIn,
@@ -21,7 +26,15 @@ from base.schemas import (
     HubsBySlugOut,
     SessionMeIn,
     SessionMeOut,
+    SetupStatusIn,
+    SetupStatusOut,
+    WidgetListIn,
+    WidgetListOut,
 )
+
+#: Everyone of the hub sees the Home; who runs it (owner, admin) is told the platform's steps and counters.
+VIEW_HOME = "base.view_home"
+ADMINISTER_HUB = "base.administer_hub"
 
 
 @operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
@@ -105,3 +118,103 @@ def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
     if hub is None:
         raise NotFound(gettext("No demo has this address."))
     return {"slug": hub.slug, "status": hub.status, "expires_at": hub.expires_at}
+
+
+# --- The Home (PLAN-HUB round 2026-10-21) -----------------------------------------------------------------------
+
+
+@operation(
+    "base.setup.status",
+    kind="query",
+    permission=VIEW_HOME,
+    input=SetupStatusIn,
+    output=SetupStatusOut,
+    ai={
+        "description": "Reads the checklist «Finish setting up your business» of this hub, as this person may see "
+        "it: each step with its state (done, pending, or not available — ours, never something to ask the person "
+        "to do), its level (needed to invoice, important, recommended), whether the person can set it up "
+        "(otherwise an administrator must) and the screen that completes it; with how many are pending."
+    },
+)
+def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
+    """The old hub's ``hub.setup.status``: the platform's steps (``base.apps``, ``base.team``) and the modules'."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        on = active_apps(ctx.scope)
+        items = _platform_steps(ctx, on) + home.module_steps(ctx, home.home_modules(on), hub.country if hub else "")
+        return home.document(items)
+
+
+def _platform_steps(ctx: OperationContext, on: frozenset[str]) -> list[dict]:
+    """«Your apps» (some business app on) and «Your team» (more than one active person), for who runs the hub."""
+    if not ctx.has(ADMINISTER_HUB):
+        return []
+    business_apps = home.business_apps()
+    if any(label in on for label in business_apps):
+        apps_state = home.STATE_DONE
+    else:
+        apps_state = home.STATE_PENDING if business_apps else home.STATE_UNAVAILABLE
+    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).count()
+    return [
+        home.item(
+            "base.apps",
+            "base",
+            state=apps_state,
+            required=True,
+            level=home.level_of("base.apps", True),
+            actionable=True,
+            title=gettext_lazy("Your apps"),
+            description=gettext_lazy("Turn on at least one business app so your till has something to sell."),
+            icon="ion:grid-outline",
+            route="/apps",
+            order=10,
+        ),
+        home.item(
+            "base.team",
+            "base",
+            state=home.STATE_DONE if people > 1 else home.STATE_PENDING,
+            required=False,
+            level=home.level_of("base.team", False),
+            actionable=True,
+            title=gettext_lazy("Your team"),
+            description=gettext_lazy("Add the people who will use the till, each with their own way in."),
+            icon="ion:people-outline",
+            route="/employees",
+            order=80,
+        ),
+    ]
+
+
+@operation("base.widget.list", kind="query", permission=VIEW_HOME, input=WidgetListIn, output=WidgetListOut)
+def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
+    """The panels of the apps on that this person may see, of the hub's vertical; the SPA follows each one's data."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        configs = home.home_modules(active_apps(ctx.scope))
+        return {"widgets": home.widgets(ctx, configs, hub.vertical if hub else "")}
+
+
+@operation("base.bell.counters", kind="query", permission=VIEW_HOME, input=BellCountersIn, output=BellCountersOut)
+def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
+    """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on."""
+    with translation.override(ctx.language):
+        counters = home.bell_counters(ctx, home.home_modules(active_apps(ctx.scope)))
+        if ctx.has(ADMINISTER_HUB):
+            failed = EventDelivery.objects.filter(
+                status=EventDelivery.Status.DEAD,
+                event__scope_kind=ctx.scope.kind,
+                event__scope_key=ctx.scope.key,
+            ).count()
+            if failed:
+                counters.insert(
+                    0,
+                    {
+                        "key": "base.failed_events",
+                        "app": "base",
+                        "count": failed,
+                        "route": "/system#events",
+                        "label": gettext("Failed events"),
+                        "icon": "ion:warning-outline",
+                    },
+                )
+        return {"counters": counters}

@@ -1,7 +1,9 @@
 """The demo app: the reference every app of hub-next copies (plan §4.5)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+
+from apps.demo.events import ITEM_CREATED, ITEM_DELETED, ITEM_UPDATED
 
 
 class DemoConfig(LiveAppConfig):
@@ -33,3 +35,45 @@ class DemoConfig(LiveAppConfig):
         "hub_employee": ["demo.view"],
     }
     navigation = [Nav(id="demo", label=_("Demo"), icon="ion:flask-outline", path="/demo/items")]
+    # The Home's hooks (PLAN-HUB round 2026-10-21), the example every module copies: a step of «Finish setting up
+    # your business», a panel of the dashboard and a counter of the bell, each on a query of queries.py. Out of the
+    # store (listed = False), so base shows them only where HOME_UNLISTED_HOOKS is on: never to a customer.
+    setup = [
+        SetupStep(
+            key="first_item",
+            operation="demo.item.stats",
+            configured_when=[SetupCheck(field="total", truthy=True)],
+            title=_("Create your first item"),
+            description=_("Add an item and watch it appear on every screen of the business at once."),
+            icon="ion:flask-outline",
+            route="/demo/items/new",
+            permission="demo.manage",
+            required=False,
+            refresh_on=[ITEM_CREATED, ITEM_DELETED],
+        )
+    ]
+    widgets = [
+        Widget(
+            key="open_items",
+            title=_("Open items"),
+            icon="ion:flask-outline",
+            size="sm",
+            permission="demo.manage",
+            default=True,
+            refresh_on=[ITEM_CREATED, ITEM_UPDATED, ITEM_DELETED],
+            kind="kpi",
+            operation="demo.item.stats",
+            map={"value": "open"},
+        )
+    ]
+    bell = [
+        BellCounter(
+            key="open_items",
+            operation="demo.item.open_count",
+            route="/demo/items",
+            label=_("Open demo items"),
+            icon="ion:flask-outline",
+            permission="demo.view",
+            refresh_on=[ITEM_CREATED, ITEM_UPDATED, ITEM_DELETED],
+        )
+    ]
