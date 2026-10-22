@@ -62,9 +62,9 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
 - Las reglas de fábrica son solo de España. Un negocio de otro país (cuando la cuenta de ERPlora lo traiga)
   tendrá que crear las suyas (TAX-F04); el aviso «Tus impuestos» (TAX-F17) todavía no lo detecta, porque
   cuenta las reglas de cualquier país.
-- **«Hoy» es la hora de Madrid** en la fase 1: el Hub todavía no guarda la zona horaria del negocio.
+- **«Hoy» es la hora de Madrid** en la fase 1: Impuestos todavía no usa la zona horaria del negocio.
   El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
-  hora antes de su medianoche. Cuando el negocio tenga su zona horaria, «hoy» será el suyo.
+  hora antes de su medianoche. Cuando use la del negocio, «hoy» será el suyo.
 
 Configuración inicial, paso a paso:
 
@@ -86,7 +86,7 @@ botón.
 
 ### Categorías
 Tabla con Clave, Nombre, Descripción, Origen («Sistema» o «Propia»), Activa y el tipo vigente en el
-país del negocio («21 %», «exenta»…). Buscador «Buscar clave o nombre…» (clave, nombre y descripción,
+país del negocio («21,00 %», «Exenta»…). Buscador «Buscar clave o nombre…» (clave, nombre y descripción,
 guardados o traducidos), filtros por columna (Clave, Nombre, Descripción y Origen) y orden por cualquier
 columna; 50 por página, ordenadas por clave de entrada. Las de fábrica salen con su nombre en el idioma
 de la persona; las propias, con el texto que se tecleó. Botón **+** que abre el panel de alta (Clave,
