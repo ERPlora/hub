@@ -21,6 +21,9 @@
 // tests/e2e/panel/project.ts), on its own database created fresh by its tests/e2e/database.ts (the seed refuses one
 // whose `a` has another id). `E2E_SAAS_DIR` (that checkout; by default `../saas` beside this one), `E2E_SAAS_DB` (by
 // default `saas_e2e_<SAAS_URL's port>`) and `E2E_WHATSAPP_APP_SECRET` say where it is.
+// whatsapp-inbox-connect-return.spec.ts also needs erplora.com started with `HTTPS_PROXY` and `SSL_CERT_FILE` (its
+// header) toward a Graph that lives only while that spec runs: the specs whose doors reach Meta itself (a reply, a
+// template) get «Meta did not answer» from such an erplora.com, so they run against one started without them.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
