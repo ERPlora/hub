@@ -7,7 +7,7 @@ import pytest
 
 from apps.website.palettes import PALETTES
 from apps.website.schemas import (
-
+    MAX_GALLERY_IMAGES,
     PALETTE_IDS,
     SECTIONS,
     TEMPLATES,
@@ -20,19 +20,19 @@ from apps.website.schemas import (
 
 
 def test_content_is_a_closed_set_of_sections_and_topbar_and_hero_cannot_hide():
-    assert SECTIONS == ("topbar", "hero", "about", "catalog", "contact", "location", "footer")
+    assert SECTIONS == ("topbar", "hero", "about", "catalog", "gallery", "contact", "location", "footer")
     assert set(Content.model_fields) == set(SECTIONS)
     # An empty draft is a valid one: every section with its defaults, the optional ones shown.
     empty = Content()
     assert [name for name in SECTIONS if getattr(getattr(empty, name), "hidden", False)] == []
-    # A section that is not one of the seven is refused: no free blocks.
+    # A section that is not one of the fixed ones is refused: no free blocks.
     with pytest.raises(pydantic.ValidationError):
-        Content.model_validate({"gallery": {}})
+        Content.model_validate({"blog": {}})
     # The top bar (with its «Log in»), the hero and the footer are always there.
     for fixed in ("topbar", "hero", "footer"):
         with pytest.raises(pydantic.ValidationError):
             Content.model_validate({fixed: {"hidden": True}})
-    for optional in ("about", "catalog", "contact", "location"):
+    for optional in ("about", "catalog", "gallery", "contact", "location"):
         assert getattr(Content.model_validate({optional: {"hidden": True}}), optional).hidden is True
 
 
@@ -122,6 +122,21 @@ def test_an_image_is_an_id_whose_url_the_server_writes():
     assert content.hero.cover.id == image
     with pytest.raises(pydantic.ValidationError):
         Content.model_validate({"hero": {"cover": {"url": "/p/media/x/y.png"}}})
+
+
+def test_the_gallery_holds_up_to_twelve_uploaded_images_in_their_order():
+    assert Content().gallery.model_dump() == {"hidden": False, "title": "", "images": []}
+    ids = [uuid.uuid4() for _ in range(MAX_GALLERY_IMAGES)]
+    gallery = Content.model_validate({"gallery": {"images": [{"id": str(id_)} for id_ in ids]}}).gallery
+    assert [image.id for image in gallery.images] == ids
+    assert MAX_GALLERY_IMAGES == 12
+    with pytest.raises(pydantic.ValidationError):
+        Content.model_validate({"gallery": {"images": [{"id": str(uuid.uuid4())} for _ in range(13)]}})
+    # An image is an upload's id, as anywhere else: never a link typed by hand.
+    with pytest.raises(pydantic.ValidationError):
+        Content.model_validate({"gallery": {"images": [{"url": "https://evil.example/x.png"}]}})
+    with pytest.raises(pydantic.ValidationError):
+        Content.model_validate({"gallery": {"title": "x" * 81}})
 
 
 def test_the_theme_is_a_palette_and_a_mode_auto_by_default():

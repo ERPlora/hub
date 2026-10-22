@@ -118,6 +118,30 @@ def test_an_image_that_is_no_upload_of_this_hub_is_refused(hub_files):
     assert set(refused.value.fields) == {"content.topbar.logo"}
 
 
+def test_the_gallery_keeps_its_uploads_in_their_order_with_the_servers_urls(hub_files):
+    first, second = upload(png_bytes(colour=(10, 20, 30))), upload(png_bytes(colour=(40, 50, 60)))
+    images = [{"id": str(second.id), "url": "https://evil.example/2.png"}, {"id": str(first.id), "url": ""}]
+    out = save(full_content(gallery={"images": images}))
+    assert [(image.id, image.url) for image in out.content.gallery.images] == [
+        (second.id, second.url),
+        (first.id, first.url),
+    ]
+    assert Site.objects.get().content["gallery"]["images"] == [
+        {"id": str(second.id), "url": second.url},
+        {"id": str(first.id), "url": first.url},
+    ]
+
+
+def test_a_gallery_image_that_is_no_upload_of_this_hub_is_refused_at_its_place(hub_files):
+    mine = upload(png_bytes())
+    theirs = upload(png_bytes(colour=(1, 2, 3)), ctx=ctx_for(scope=B))
+    images = [{"id": str(mine.id), "url": ""}, {"id": str(theirs.id), "url": ""}, {"id": str(uuid.uuid4()), "url": ""}]
+    with pytest.raises(InvalidPayload) as refused:
+        save(full_content(gallery={"images": images}))
+    assert set(refused.value.fields) == {"content.gallery.images.1", "content.gallery.images.2"}
+    assert not Site.objects.exists()
+
+
 # Publish
 
 

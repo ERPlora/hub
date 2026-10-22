@@ -2,7 +2,7 @@
 
 The content of a site is a closed set of fixed sections (``SECTIONS``), the same for the four templates: changing
 the template changes one field and never the content. ``topbar`` (with its «Log in»), ``hero`` and ``footer`` are
-always on the page and cannot hide; the other four carry ``hidden``. Every text is bounded, every link is ``https://``
+always on the page and cannot hide; the other five carry ``hidden``. Every text is bounded, every link is ``https://``
 and an image is the id of an upload, whose URL the server writes (``services.save_site``): nothing the owner types
 becomes HTML, a script or a link of another scheme.
 """
@@ -22,7 +22,7 @@ from apps.website.palettes import own_colours
 
 
 #: The fixed sections, in the order every template paints them.
-SECTIONS = ("topbar", "hero", "about", "catalog", "contact", "location", "footer")
+SECTIONS = ("topbar", "hero", "about", "catalog", "gallery", "contact", "location", "footer")
 #: The templates, the id the owner picks (``templates/website/templates/<id>.html``).
 TEMPLATES = ("classic", "modern", "minimal", "bold")
 #: The palettes (``palettes.json``) in the editor's order; the owner may change any one's two colours.
@@ -38,6 +38,8 @@ IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
 #: The largest image, in bytes (before base64).
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_CATEGORIES = 50
+#: The most photos the gallery shows.
+MAX_GALLERY_IMAGES = 12
 
 Template = Literal["classic", "modern", "minimal", "bold"]
 PaletteId = Literal["ocean", "forest", "terracotta", "slate", "rose", "sand", "midnight", "olive"]
@@ -185,6 +187,17 @@ class CatalogSection(Strict):
     show_prices: bool = Field(True, description="Whether the page shows the prices.")
 
 
+class GallerySection(Strict):
+    hidden: bool = Field(False, description="True: not on the page.")
+    title: Text80 = Field("", description="The section's heading; empty = «Gallery».")
+    images: list[ImageRef] = Field(
+        default_factory=list,
+        max_length=MAX_GALLERY_IMAGES,
+        description="Up to 12 uploaded photos (website.image.upload), in the order the page shows them; empty = no "
+        "gallery.",
+    )
+
+
 class Socials(Strict):
     instagram: HttpsUrl = Field("", description="The Instagram profile (https://…).")
     facebook: HttpsUrl = Field("", description="The Facebook page (https://…).")
@@ -251,6 +264,9 @@ class Content(Strict):
     about: AboutSection = Field(default_factory=AboutSection, description="About us: a few words and a photo.")
     catalog: CatalogSection = Field(
         default_factory=CatalogSection, description="The products or services the page lists, with their prices."
+    )
+    gallery: GallerySection = Field(
+        default_factory=GallerySection, description="A grid of up to 12 photos (the work, the place, the team)."
     )
     contact: ContactSection = Field(
         default_factory=ContactSection, description="Phone, WhatsApp, email, social profiles and opening hours."

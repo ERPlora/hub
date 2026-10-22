@@ -19,6 +19,7 @@ import binascii
 import hashlib
 import io
 import uuid
+from collections.abc import Iterator
 from functools import partial
 from typing import Any
 
@@ -41,6 +42,7 @@ from apps.website.schemas import (
     MAX_IMAGE_BYTES,
     Content,
     ImageOut,
+    ImageRef,
     ImageUploadIn,
     NoIn,
     PublicationOut,
@@ -54,7 +56,7 @@ from base.operations import hub_id
 MAX_IMAGE_SIDE = 8000
 #: What Pillow calls each type the website takes.
 PILLOW_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
-#: The parts of the content that hold an image.
+#: The parts of the content that hold one image (the gallery holds a list of them).
 IMAGE_FIELDS = (("topbar", "logo"), ("hero", "cover"), ("about", "image"))
 
 IMAGE_NOT_FOUND = _("This image was not uploaded to this business's website: upload it again.")
@@ -78,17 +80,25 @@ def _locked_site(hub: uuid.UUID) -> tuple[Site, bool]:
     return Site.objects.select_for_update().get(hub_id=hub), created
 
 
-def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
-    """``content`` with each image's URL written from its upload; 422 for an image that is no upload of ``hub``."""
-    refused: dict[str, str] = {}
+def _image_refs(content: Content) -> Iterator[tuple[str, ImageRef]]:
+    """Each image the content names, with the path of its field (the 422's key)."""
     for section, field in IMAGE_FIELDS:
         ref = getattr(getattr(content, section), field)
-        if ref is None:
-            continue
-        image = Image.objects.filter(id=ref.id, hub_id=hub).first()
-        ref.url = image_url(hub, image.key) if image is not None else ""
+        if ref is not None:
+            yield f"content.{section}.{field}", ref
+    for index, ref in enumerate(content.gallery.images):
+        yield f"content.gallery.images.{index}", ref
+
+
+def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
+    """``content`` with each image's URL written from its upload; 422 for an image that is no upload of ``hub``."""
+    refs = list(_image_refs(content))
+    keys = dict(Image.objects.filter(hub_id=hub, id__in={ref.id for _path, ref in refs}).values_list("id", "key"))
+    refused: dict[str, str] = {}
+    for path, ref in refs:
+        ref.url = image_url(hub, keys[ref.id]) if ref.id in keys else ""
         if not ref.url:
-            refused[f"content.{section}.{field}"] = str(IMAGE_NOT_FOUND)
+            refused[path] = str(IMAGE_NOT_FOUND)
     if refused:
         raise InvalidPayload(str(IMAGE_NOT_FOUND), fields=refused)
     return content
@@ -106,12 +116,12 @@ def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
         "website.site.get, change only what was asked and send everything back (a section left out goes back to "
         "empty). It holds the template (classic, modern, minimal or bold), the theme (a palette by its id, optionally "
         "with the owner's own primary and accent colours over it in custom, null for the palette's own, and the "
-        "page's mode: light, dark or auto) and the content of each "
-
-        "section: the top bar's name, the hero's title and tagline, about us (Markdown text), the catalog's source, "
-        "contact (phone, WhatsApp, email, social links and the opening hours, one row per day with up to three "
-        "intervals HH:MM-HH:MM), location (address lines and an https:// map link) and the footer's line; about, "
-        "catalog, contact and location can be hidden. Visitors see it only once it is published.",
+        "page's mode: light, dark or auto) and the content of each section: the top bar's name, the hero's title "
+        "and tagline, about us (Markdown text), the catalog's source, the gallery (up to 12 photos already uploaded, "
+        "by id, in their order), contact (phone, WhatsApp, email, social links and the opening hours, one row per "
+        "day with up to three intervals HH:MM-HH:MM), location (address lines and an https:// map link) and the "
+        "footer's line; about, catalog, gallery, contact and location can be hidden. Visitors see it only once it "
+        "is published.",
         "risk": "normal",
     },
 )

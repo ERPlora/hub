@@ -88,6 +88,7 @@
       "hero": "Cabecera",
       "about": "Sobre nosotros",
       "catalog": "Catálogo",
+      "gallery": "Galería",
       "contact": "Contacto",
       "location": "Ubicación",
       "footer": "Pie de página"
@@ -145,6 +146,16 @@
         "sat": "Sábado",
         "sun": "Domingo"
       }
+    },
+    "gallery": {
+      "label": "Fotos de la galería",
+      "count": "{n} de {max} fotos",
+      "empty": "Aún no hay fotos: añade la primera. Se muestran en este orden.",
+      "photo": "Foto {n}",
+      "add": "Añadir una foto",
+      "full": "La galería está completa ({max} fotos): quita una para añadir otra.",
+      "up": "Subir",
+      "down": "Bajar"
     },
     "share": {
       "title": "Comparte tu página web",

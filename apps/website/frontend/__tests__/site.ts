@@ -10,6 +10,7 @@ export const SITE: SiteOut = {
     hero: { title: 'Fresh food', tagline: '', cover: null },
     about: { hidden: false, title: '', text: '', image: null },
     catalog: { hidden: false, title: '', source: null, category_ids: [], show_prices: true },
+    gallery: { hidden: false, title: '', images: [] },
     contact: {
       hidden: false,
       title: '',

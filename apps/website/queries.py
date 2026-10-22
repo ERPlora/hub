@@ -34,7 +34,7 @@ from live.operations import get, operation, registry
 
 from apps.website.models import Site
 from apps.website.qr import CONTENT_TYPES, public_url, qr_image
-from apps.website.render import catalog_view, local_day, render_site
+from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site
 from apps.website.schemas import (
     DAYS,
     CatalogOut,
@@ -258,7 +258,7 @@ def live_version(scope: Scope) -> int:
 def _without_hidden(content: dict) -> dict:
     """``content`` with each hidden section back to its defaults (still hidden): nothing hidden leaves the Hub."""
     valid = Content.model_validate(content)
-    for name in ("about", "catalog", "contact", "location"):
+    for name in BODY_SECTIONS:
         if getattr(valid, name).hidden:
             setattr(valid, name, type(getattr(valid, name))(hidden=True))
     return valid.model_dump(mode="json")

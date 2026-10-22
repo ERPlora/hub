@@ -1,10 +1,10 @@
-<!-- generated from WORKBOOK.md sha256:2d4cfbfaed44daf765e29288229fa50d343de6d616212fae715f85035f82357e -->
+<!-- generated from WORKBOOK.md sha256:9cdb509573ee305528b3c253db4bb747bf872b9644f72c8ee407ca1cc8470601 -->
 
 ## What it is for and who it is for
 
 Website gives each business a simple page of its own at its ERPlora address (`https://<your-business>.erplora.com/`).
 The owner picks one of four designs, fills in its sections (name and logo, title and cover photo, a few words about
-the business, its catalog, how to get in touch, where it is) and its colours, hides what she does not use and
+the business, its catalog, a photo gallery, how to get in touch, where it is) and its colours, hides what she does not use and
 publishes. Whoever opens that address without having signed in sees the page; the team signs in from its **Log in**
 button, which every template has and cannot be removed. While the page is not published (or has been taken offline),
 the address still leads to the team's sign-in, as always.
@@ -54,6 +54,9 @@ switches between the two.
     Markdown; no HTML) and a photo.
   - **Catalog**: **Show**, heading (empty = «Our products» or «Our services»), **What to show** (Nothing, Products or
     Services; only those of the apps the business has), the **Categories** (none chosen = all) and **Show prices**.
+  - **Gallery**: **Show**, heading (empty = «Gallery») and up to 12 photos, in the order they will be seen: each with
+    **Replace image** and **Remove** and the **Move up** and **Move down** arrows; **Add a photo** puts another one at
+    the end while there is room, and a counter says how many there are («3 of 12 photos»).
   - **Contact**: **Show**, heading, phone, WhatsApp (with the country code), email, Instagram, Facebook, TikTok and X
     (`https://` links) and, if **Show opening hours** is on, the week's opening hours: each day open or closed and up
     to three time slots (a closing time earlier than the opening one runs past midnight).
@@ -77,9 +80,11 @@ logo, the name, the sections' menu (folded on a phone) and **Log in** (an outlin
 (or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
 **Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
 without contact or address, one to the first section. Each section has a small line over its heading («Who we are»,
-«What we offer», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
+«What we offer», «Take a look», «Get in touch», «Visit us») and its content in rounded cards: About us with its photo framed beside
 the text; the catalog as a grid of cards (a gradient with the initial, since items have no photo; the price in a pill;
-pills to jump between categories when there are two or more); the contact as chips with an icon (phone, email),
+pills to jump between categories when there are two or more); the gallery as a grid of square, rounded photos (two
+a row on a phone, three on a tablet, four on a computer) that grow a little under the pointer and open whole apart;
+the contact as chips with an icon (phone, email),
 WhatsApp as a button and the socials as pills; the opening hours as a list with **today** highlighted (the business's
 day, in the hub's time zone; Madrid's without one); the address in a card with **Open the map**. A footer in columns:
 the name and the footer's line, links to the sections and **Log in**, and last the credit «© <year> ERPlora» (opened
@@ -118,6 +123,7 @@ what the owner writes, as written.
 | WEBSITE-F08 | Take the page offline | done |
 | WEBSITE-F09 | Share the address and the QR | done |
 | WEBSITE-F10 | Visit the public page | done |
+| WEBSITE-F11 | Show a photo gallery | done |
 
 ### WEBSITE-F01 Fill in and save the draft
 Status: done (server and screen)
@@ -127,7 +133,7 @@ Steps:
 1. Open **Website** and unfold a section.
 2. Type: the draft saves itself two seconds after the last change, or when you press **Save**; also when you leave
    the screen if something was left.
-In: the template, the colours and the full content of the seven sections. Images are named by their id; the address
+In: the template, the colours and the full content of the eight sections. Images are named by their id; the address
 they are served at is written by the server.
 Out: the saved draft; customers see nothing until it is published. Notice `website.site.updated` (only if something
 changed).
@@ -145,15 +151,16 @@ If it fails: a mistyped colour is not saved and the field says so: «Write the c
 
 ### WEBSITE-F03 Show or hide a section
 Status: done (server and screen)
-Steps: in About us, Catalog, Contact or Location, the **Show** switch. The top bar, the header and the footer cannot
+Steps: in About us, Catalog, Gallery, Contact or Location, the **Show** switch. The top bar, the header and the footer cannot
 be hidden.
 Out: what is hidden is not painted on the page nor given by the public API; it is kept to show it again. A section
-that is shown but has nothing (no text nor photo, no contact details, no address nor map, no catalog) is not painted
-either.
+that is shown but has nothing (no text nor photo, no catalog, no photos in the gallery, no contact details, no
+address nor map) is not painted either.
 
 ### WEBSITE-F04 Upload an image
 Status: done (server and screen)
-Steps: on the logo, the cover or the About us photo, **Choose image**; **Remove** leaves it empty.
+Steps: on the logo, the cover, the About us photo or the gallery's, **Choose image**; **Remove** leaves it empty (in
+the gallery, takes it out of the list).
 In: jpeg, png or webp, up to 5 MB and 8000 pixels a side; the content is checked, not only the name.
 Out: the image kept in the business's file store (S3 in AWS) under a name taken from its content; the same image
 twice is a single file. Notice `website.image.uploaded`.
@@ -204,6 +211,18 @@ Out: the published page in the browser's language, without cookies, with its own
 only the page's bundle, Bootstrap and the catalog's refresh). With a session open, the address opens the app as
 always.
 
+### WEBSITE-F11 Show a photo gallery
+Status: done (server, screen and e2e)
+Actor: owner, administrator, assistant (ordering or removing photos already uploaded), API
+Steps: in **Gallery**, **Add a photo** (one by one, up to 12); **Move up** or **Move down** change their order and
+**Remove** takes one out. It saves as in F01 and shows once published.
+In: the photos, by their upload id (F04), in their order; the server writes their address.
+Out: on the page, a grid of square photos in that order (2, 3 or 4 a row depending on the screen), served by the Hub
+(`/p/media/…`, cached for a year); each one opens whole in another tab. Without photos, or with the gallery hidden,
+there is no section (nor a link in the menu).
+If it fails: more than 12 photos are not saved; a photo that is not an upload of this business: «This image was not
+uploaded to this business's website: upload it again.» under the gallery.
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of whoever
@@ -235,8 +254,8 @@ The two public ones answer only with the page online (otherwise, 404 `website.no
 ### Assistant
 The assistant (by voice or by text) uses, with the session and permissions of whoever speaks, `website.site.get`,
 `website.site.save`, `website.site.publish`, `website.site.unpublish` and `website.catalog.categories`. Every field of
-the draft carries its description (name, tagline, about text, contact, opening hours, location, template, palette and
-background), and the save's description tells it the draft is sent whole: it reads it first with `website.site.get`,
+the draft carries its description (name, tagline, about text, gallery, contact, opening hours, location, template,
+palette and background), and the save's description tells it the draft is sent whole: it reads it first with `website.site.get`,
 changes only what was asked and sends it back. Example: «Put on the website the opening hours Monday to Friday from 9
 to 8 pm» → it reads the draft, puts the five days with the interval `09:00`–`20:00` in `contact.hours` (leaving the
 rest as it was) and calls `website.site.save`; if she adds «and publish it», `website.site.publish`. Not assistant
@@ -279,6 +298,7 @@ visitors' two public reads (`website.public.*`).
 - Images are kept as they are (no size variants nor cropping, and their EXIF metadata is not removed); the ones that
   are no longer used and the old versions are not deleted.
 - No sitemap nor robots beyond the preview's `noindex` tag.
+- The gallery has no caption per photo nor a full-screen viewer: each photo opens whole in another tab.
 - The footer's credit «© <year> ERPlora» cannot be removed or changed: the business's name and legal details go in
   the footer's line.
 - The real activation of the module per business (`AppActivation`) comes in phase 2.

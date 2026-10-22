@@ -26,6 +26,10 @@ const PHONE = '+34 600 123 456';
 const EMAIL = 'hola@pepe.es';
 /** The footer's line, as an owner writes it (the demo once showed a lone «h»: it was the text typed there). */
 const FOOTER = "Pepe's Bistro S.L. · Gran Vía 1, Madrid";
+/** The gallery's photos, each drawn with its own mark (two different files). */
+const GALLERY = ['Lunch', 'Dinner'] as const;
+/** Their addresses on the Hub, in the order the editor kept them (filled once they are uploaded). */
+let galleryUrls: string[] = [];
 
 interface ModeColours {
   primary: string;
@@ -75,13 +79,15 @@ async function seedServices(context: BrowserContext): Promise<void> {
   }
 }
 
-/** The catalog section on, from Services, with its own heading and every category (whatever a run before left). */
+/** The catalog section on, from Services, with its own heading and every category, and an empty gallery (whatever a
+ * run before left). */
 async function showServices(context: BrowserContext): Promise<void> {
   const site = await api<{ template: string; theme: unknown; content: Record<string, unknown> }>(context, A, 'GET', '/website/site');
   expect(site.status).toBe(200);
   const { template, theme, content } = site.data;
   const catalog = { hidden: false, title: '', source: 'service', category_ids: [], show_prices: true };
-  const saved = await api(context, A, 'POST', '/website/site', { template, theme, content: { ...content, catalog } });
+  const gallery = { hidden: false, title: '', images: [] };
+  const saved = await api(context, A, 'POST', '/website/site', { template, theme, content: { ...content, catalog, gallery } });
   expect(saved.status, JSON.stringify(saved.data)).toBe(200);
 }
 
@@ -214,6 +220,20 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   await expect(cover).toBeVisible();
   await expect(cover).toHaveCSS('object-fit', 'cover');
   await expect.poll(() => cover.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // The gallery: the two photos in a grid of squares, in the owner's order, served by the Hub, and they load.
+  const grid = page.locator('[data-ep-section="gallery"] .row-cols-2');
+  await expect(grid).toHaveCount(1);
+  await expect(grid).toHaveClass(/\brow-cols-md-3\b.*\brow-cols-lg-4\b/);
+  const photos = grid.locator('img');
+  await expect(photos).toHaveCount(GALLERY.length);
+  expect(await photos.evaluateAll((images) => images.map((image) => image.getAttribute('src')))).toEqual(galleryUrls);
+  for (let index = 0; index < GALLERY.length; index++) {
+    const photo = photos.nth(index);
+    await expect(photo).toHaveAttribute('src', /^\/p\/media\//);
+    await expect(photo).toHaveCSS('object-fit', 'cover');
+    await photo.scrollIntoViewIfNeeded();
+    await expect.poll(() => photo.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  }
   // Bootstrap's own stylesheet reached the page (the bundle, under the public CSP).
   await expect(page.locator('header .navbar')).toHaveCSS('display', 'flex');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -267,6 +287,20 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
       buffer: await samplePhoto(page, 1600, 900, "Pepe's Bistro"),
     });
     await expect(page.getByTestId('website-image-cover-image')).toBeVisible({ timeout: 15_000 });
+    // The gallery (2026-10-22, for a hair salon's work): two photos through its own uploads, kept in their order.
+    await openSection(page, 'gallery');
+    for (const [index, label] of GALLERY.entries()) {
+      await page.getByTestId('website-gallery-add-file').setInputFiles({
+        name: `work-${index + 1}.jpg`,
+        mimeType: 'image/jpeg',
+        buffer: await samplePhoto(page, 900, 900, label),
+      });
+      await expect(page.getByTestId(`website-gallery-photo-${index}-image`)).toBeVisible({ timeout: 15_000 });
+    }
+    await expect(page.getByTestId('website-gallery-count')).toHaveText(/2 of 12 photos/);
+    galleryUrls = await Promise.all(
+      GALLERY.map(async (_label, index) => (await page.getByTestId(`website-gallery-photo-${index}-image`).getAttribute('src')) ?? ''),
+    );
 
     // Regression (Ioan, 2026-10-22): typing key by key in a section opened by hand keeps the section open, the
     // cursor in the field and every letter, also across the autosave and its result coming back live.

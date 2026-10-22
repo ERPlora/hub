@@ -78,6 +78,7 @@ describe('the public website’s classes', () => {
         'templates/bold.html',
         'sections/about.html',
         'sections/catalog.html',
+        'sections/gallery.html',
         'sections/contact.html',
         'sections/location.html',
       ]),

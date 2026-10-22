@@ -30,6 +30,7 @@ import {
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import CategoryPicker from '../components/CategoryPicker.vue';
+import GalleryEditor from '../components/GalleryEditor.vue';
 import HoursEditor from '../components/HoursEditor.vue';
 import PalettePicker from '../components/PalettePicker.vue';
 import PreviewFrame from '../components/PreviewFrame.vue';
@@ -45,7 +46,7 @@ import type { CatalogSource, Content, SaveIn, ThemeMode } from '../operations';
 /** Saved this long after the last change. */
 const AUTOSAVE_MS = 2000;
 /** The sections a visitor may not see, each with its «Show». */
-const OPTIONAL = ['about', 'catalog', 'contact', 'location'] as const;
+const OPTIONAL = ['about', 'catalog', 'gallery', 'contact', 'location'] as const;
 type Optional = (typeof OPTIONAL)[number];
 const SOCIALS = ['instagram', 'facebook', 'tiktok', 'x'] as const;
 const CONTACT_FIELDS = ['phone', 'whatsapp', 'email'] as const;
@@ -623,6 +624,13 @@ function setHoursShown(shown: boolean): void {
                     </template>
                   </template>
 
+                  <GalleryEditor
+                    v-else-if="name === 'gallery'"
+                    v-model="draft.content.gallery.images"
+                    :upload="upload"
+                    :error="err('content.gallery.images')"
+                  />
+
                   <template v-else-if="name === 'contact'">
                     <ion-item
                       v-for="field in CONTACT_FIELDS"
@@ -674,7 +682,7 @@ function setHoursShown(shown: boolean): void {
                     />
                   </template>
 
-                  <template v-else>
+                  <template v-else-if="name === 'location'">
                     <ion-item
                       v-for="(line, index) in draft.content.location.address_lines"
                       :key="index"

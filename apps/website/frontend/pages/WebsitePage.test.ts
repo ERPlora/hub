@@ -20,6 +20,7 @@ import {
 import PALETTES from '../../palettes.json';
 import { SITE } from '../__tests__/site';
 import type { SiteOut } from '../operations';
+import GalleryEditor from '../components/GalleryEditor.vue';
 import WebsitePage from './WebsitePage.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn() }));
@@ -311,6 +312,44 @@ describe('WebsitePage', () => {
     expect(s.control('website-field-location-map_url').errorText).toBe('Enter a link that starts with https://.');
     expect(s.testid('website-save-error').exists()).toBe(true);
     expect(s.control('website-field-location-map_url').value).toBe('http://x');
+  });
+
+  it('the gallery takes its photos through the uploads, in their order, and can hide', async () => {
+    const s = await setup();
+    await s.show();
+    expect(s.testid('website-section-gallery').exists()).toBe(true);
+    const gallery = s.wrapper.findComponent(GalleryEditor);
+    expect(gallery.props('modelValue')).toEqual([]);
+    const photos = [
+      { id: 'p2', url: '/p/media/a/website/img/p2.jpg' },
+      { id: 'p1', url: '/p/media/a/website/img/p1.jpg' },
+    ];
+    gallery.vm.$emit('update:modelValue', photos);
+    await ionChecked(s.wrapper.get('[data-testid="website-show-gallery"]').element, false);
+    await s.wrapper.get('[data-testid="website-save"]').trigger('click');
+    await settle();
+    expect(s.body().content.gallery).toEqual({ hidden: true, title: '', images: photos });
+  });
+
+  it('a photo of the gallery the server refuses says so under the gallery', async () => {
+    const message = 'This image was not uploaded to this business’s website: upload it again.';
+    const s = await setup({
+      api: () =>
+        Response.json(
+          { error: { code: 'invalid_payload', message, fields: { 'content.gallery.images.1': message } } },
+          { status: 422 },
+        ),
+    });
+    await s.show();
+    const photos = [
+      { id: 'p1', url: '/p/media/a/website/img/p1.jpg' },
+      { id: 'x9', url: '/p/media/b/website/img/x9.jpg' },
+    ];
+    s.wrapper.findComponent(GalleryEditor).vm.$emit('update:modelValue', photos);
+    await s.wrapper.get('[data-testid="website-save"]').trigger('click');
+    await settle();
+    expect(s.wrapper.findComponent(GalleryEditor).props('error')).toBe(message);
+    expect(s.wrapper.findComponent(GalleryEditor).props('modelValue')).toEqual(photos);
   });
 
   it('publishes after a confirmation, saving first what is unsaved', async () => {

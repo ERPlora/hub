@@ -60,6 +60,13 @@ export interface CatalogSection {
   show_prices: boolean;
 }
 
+/** Up to 12 uploaded photos, in the order the page shows them. */
+export interface GallerySection {
+  hidden: boolean;
+  title: string;
+  images: ImageRef[];
+}
+
 export interface Socials {
   instagram: string;
   facebook: string;
@@ -103,6 +110,7 @@ export interface Content {
   hero: HeroSection;
   about: AboutSection;
   catalog: CatalogSection;
+  gallery: GallerySection;
   contact: ContactSection;
   location: LocationSection;
   footer: FooterSection;

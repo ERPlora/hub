@@ -203,6 +203,23 @@ def test_the_public_site_is_what_was_published_without_the_hidden_sections():
     assert out.content.about.hidden is True and out.content.about.text == ""
 
 
+def test_a_hidden_gallery_leaves_no_photo_in_the_public_site(hub_files):
+    import io
+
+    from PIL import Image as PILImage
+
+    buffer = io.BytesIO()
+    PILImage.new("RGB", (4, 3), (9, 9, 9)).save(buffer, format="PNG")
+    photo = run(
+        "website.image.upload",
+        {"filename": "a.png", "content_type": "image/png", "data_base64": base64.b64encode(buffer.getvalue()).decode()},
+    )
+    save(full_content(gallery={"hidden": True, "title": "Our work", "images": [{"id": str(photo.id), "url": ""}]}))
+    run("website.site.publish")
+    gallery = run("website.public.site", ctx=visitor()).content.gallery
+    assert gallery.model_dump() == {"hidden": True, "title": "", "images": []}
+
+
 def test_the_public_catalog_is_read_live_priced_for_the_visitor_and_cached_a_minute(services_catalog):
     save()
     run("website.site.publish")

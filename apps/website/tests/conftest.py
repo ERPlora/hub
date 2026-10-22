@@ -114,6 +114,7 @@ def full_content(**overrides) -> dict:
         "hero": {"title": "Fresh food every day", "tagline": "Since 1998 in Gran Vía", "cover": None},
         "about": {"hidden": False, "title": "", "text": "We cook **everything** at home.", "image": None},
         "catalog": {"hidden": False, "title": "", "source": "service", "category_ids": [], "show_prices": True},
+        "gallery": {"hidden": False, "title": "", "images": []},
         "contact": {
             "hidden": False,
             "title": "",

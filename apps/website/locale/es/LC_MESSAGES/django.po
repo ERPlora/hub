@@ -286,3 +286,11 @@ msgstr "Cómo llegar"
 msgctxt "website"
 msgid "Today"
 msgstr "Hoy"
+
+msgctxt "website"
+msgid "Gallery"
+msgstr "Galería"
+
+msgctxt "website"
+msgid "Take a look"
+msgstr "Echa un vistazo"

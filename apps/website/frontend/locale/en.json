@@ -88,6 +88,7 @@
       "hero": "Header",
       "about": "About us",
       "catalog": "Catalog",
+      "gallery": "Gallery",
       "contact": "Contact",
       "location": "Location",
       "footer": "Footer"
@@ -145,6 +146,16 @@
         "sat": "Saturday",
         "sun": "Sunday"
       }
+    },
+    "gallery": {
+      "label": "Gallery photos",
+      "count": "{n} of {max} photos",
+      "empty": "No photos yet: add the first one. They show in this order.",
+      "photo": "Photo {n}",
+      "add": "Add a photo",
+      "full": "The gallery is full ({max} photos): remove one to add another.",
+      "up": "Move up",
+      "down": "Move down"
     },
     "share": {
       "title": "Share your website",

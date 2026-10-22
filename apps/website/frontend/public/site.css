@@ -7,7 +7,7 @@
  *      one set for `data-bs-theme="light"` and one for "dark";
  *   2. draws what Bootstrap has no utility for, through `ws-*` hooks: the see-through top bar, the header's cover veil
  *      and its palette gradient, the eyebrows, the contact's chips and their icons, the catalog's placeholders, the
- *      map panel, the photo frame, and each template's type and spacing;
+ *      map panel, the photo frame, the gallery's zoom, and each template's type and spacing;
  *   3. the icons: Ionicons (`ion:`, MIT) as @erplora/ui ships them, as CSS masks (icons.test.ts checks each one).
  * Fonts are system stacks (CSP: nothing from a CDN), chosen to look right on macOS, iOS, Windows and Android. Motion is
  * only a hover's transition, and none for who asks the system for less. */
@@ -286,9 +286,22 @@ body[data-ep-preview] a {
     linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.16), rgba(var(--bs-secondary-rgb), 0.24));
 }
 
+/* A gallery photo: it grows a little inside its rounded square under the pointer or the keyboard's focus. */
+.ws-zoom img {
+  transition: transform 0.4s ease;
+}
+
+.ws-zoom:hover img,
+a:focus-visible > .ws-zoom img {
+  transform: scale(1.06);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ws-lift,
-  .ws-lift:hover {
+  .ws-lift:hover,
+  .ws-zoom img,
+  .ws-zoom:hover img,
+  a:focus-visible > .ws-zoom img {
     transform: none;
     transition: none;
   }

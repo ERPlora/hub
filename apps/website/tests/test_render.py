@@ -21,13 +21,19 @@ pytestmark = pytest.mark.usefixtures("website_manifest")
 THEME = {"palette": "ocean", "custom": None, "mode": "light"}
 LOGIN = re.compile(r'<a\b[^>]*href="/auth/login"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+?)\s*<')
 IMAGE_URL = f"/p/media/{uuid.uuid4().hex}/website/img/0123456789abcdef.png"
+#: The gallery's photos, in the order the owner put them.
+GALLERY_URLS = [f"/p/media/{uuid.uuid4().hex}/website/img/{number:016x}.jpg" for number in (3, 1, 2)]
+
+
+def gallery(urls=GALLERY_URLS, **fields) -> dict:
+    return {"images": [{"id": str(uuid.uuid4()), "url": url} for url in urls], **fields}
 
 
 def render(template="classic", content=None, lang="en", catalog=None, preview=False, theme=None, today=None) -> str:
     return render_site(
         template,
         theme or THEME,
-        full_content() if content is None else content,
+        full_content(gallery=gallery()) if content is None else content,
         lang,
         hub="a",
         catalog=catalog_snapshot() if catalog is None else catalog,
@@ -86,11 +92,15 @@ def test_the_four_templates_are_four_different_pages():
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_a_hidden_section_is_not_painted(template):
     content = full_content(
-        about={"hidden": True}, catalog={"hidden": True}, contact={"hidden": True}, location={"hidden": True}
+        about={"hidden": True},
+        catalog={"hidden": True},
+        gallery=gallery(hidden=True),
+        contact={"hidden": True},
+        location={"hidden": True},
     )
     html = render(template, content)
     assert sections(html) == ["topbar", "hero", "footer"]
-    for gone in ("We cook", "data-ep-block", "Gran Vía 1", "hola@pepe.es", "Monday"):
+    for gone in ("We cook", "data-ep-block", GALLERY_URLS[0], "Gran Vía 1", "hola@pepe.es", "Monday"):
         assert gone not in html, gone
     assert LOGIN.findall(html) == ["Log in", "Log in"]
 
@@ -346,12 +356,20 @@ def test_the_top_bar_is_a_sticky_glass_bar_with_the_logo_and_an_outline_pill_to_
     assert "<img" not in re.search(r"<header.*?</header>", render(template), re.S).group(0)
 
 
-EYEBROWS = {"about": "Who we are", "catalog": "What we offer", "contact": "Get in touch", "location": "Visit us"}
+EYEBROWS = {
+    "about": "Who we are",
+    "catalog": "What we offer",
+    "gallery": "Take a look",
+    "contact": "Get in touch",
+    "location": "Visit us",
+}
 
 
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_each_section_has_an_eyebrow_over_its_heading_and_its_content_in_rounded_cards(template):
-    html = render(template, content=full_content(about={"image": {"id": str(uuid.uuid4()), "url": IMAGE_URL}}))
+    html = render(
+        template, content=full_content(about={"image": {"id": str(uuid.uuid4()), "url": IMAGE_URL}}, gallery=gallery())
+    )
     for name, eyebrow in EYEBROWS.items():
         section = section_of(html, name)
         assert re.search(rf'<p class="[^"]*\bws-eyebrow\b[^"]*">{eyebrow}</p>\s*<h2\b', section), (name, section)
@@ -369,6 +387,34 @@ def test_about_puts_its_photo_in_a_rounded_frame_beside_the_text(template):
     assert "rounded-4" in before[before.rfind("<div") :]
     assert about.count("col-lg-6") == 2
     assert "col-lg-6" not in section_of(render(template), "about")
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_gallery_is_a_responsive_grid_of_square_photos_in_the_owners_order(template):
+    section = section_of(render(template), "gallery")
+    assert section.count('class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3"') == 1
+    assert re.findall(r'<img class="img-fluid object-fit-cover" src="([^"]+)" alt="" loading="lazy">', section) == (
+        GALLERY_URLS
+    )
+    # Each photo in a rounded square that zooms a little under the pointer; a click opens it whole in a new tab.
+    assert section.count('class="ratio ratio-1x1 rounded-4 overflow-hidden shadow-sm ws-zoom') == 3
+    assert re.findall(r'<a class="[^"]*" href="([^"]+)" target="_blank" rel="noopener"', section) == GALLERY_URLS
+    assert re.search(r">\s*Gallery\s*</h2>", section)
+    assert 'href="#gallery"' in render(template)
+
+
+def test_the_gallery_takes_the_owners_heading_and_speaks_the_visitors_language():
+    assert re.search(r">\s*Our work\s*</h2>", section_of(render(content=full_content(gallery=gallery(title="Our work"))), "gallery"))
+    spanish = section_of(render(lang="es"), "gallery")
+    assert re.search(r">\s*Galería\s*</h2>", spanish) and "Echa un vistazo" in spanish
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_an_empty_or_hidden_gallery_is_not_painted(template):
+    assert "gallery" not in sections(render(template, content=full_content()))
+    hidden = render(template, content=full_content(gallery=gallery(hidden=True)))
+    assert "gallery" not in sections(hidden)
+    assert GALLERY_URLS[0] not in hidden and 'href="#gallery"' not in hidden
 
 
 def test_the_catalog_is_a_grid_of_cards_with_a_placeholder_a_price_pill_and_category_pills():
@@ -436,7 +482,7 @@ def test_the_location_is_a_card_with_an_open_the_map_pill(template):
 def test_the_footer_has_columns_the_sections_and_log_in(template):
     footer = footer_of(render(template))
     assert 'class="row' in footer and len(re.findall(r'class="col-', footer)) >= 2
-    assert re.findall(r'href="#([a-z]+)"', footer) == ["about", "catalog", "contact", "location"]
+    assert re.findall(r'href="#([a-z]+)"', footer) == ["about", "catalog", "gallery", "contact", "location"]
     assert "small" in footer and "text-body-secondary" in footer
     login = re.search(r'<a class="([^"]*)" href="/auth/login"', footer).group(1).split()
     assert {"btn", "rounded-pill"} <= set(login)

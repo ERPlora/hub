@@ -36,7 +36,7 @@ from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
 #: The currency of the prices (ERPlora sells in Spain; the sale's own default).
 CURRENCY = "EUR"
 #: The sections between the hero and the footer, in their order.
-BODY_SECTIONS = ("about", "catalog", "contact", "location")
+BODY_SECTIONS = ("about", "catalog", "gallery", "contact", "location")
 #: The business's time zone when its hub has none: ERPlora sells in Spain.
 DEFAULT_TIME_ZONE = "Europe/Madrid"
 
@@ -57,6 +57,7 @@ def _eyebrows() -> dict[str, str]:
     return {
         "about": pgettext("website", "Who we are"),
         "catalog": pgettext("website", "What we offer"),
+        "gallery": pgettext("website", "Take a look"),
         "contact": pgettext("website", "Get in touch"),
         "location": pgettext("website", "Visit us"),
     }
@@ -243,7 +244,7 @@ def _body(content: Content, catalog: dict | None, today: str | None) -> list[dic
         elif name == "contact":
             data = _contact(section, today)
         else:
-            data = {"about": _about, "location": _location}[name](section)
+            data = {"about": _about, "gallery": _gallery, "location": _location}[name](section)
         if data is not None:
             data["eyebrow"] = eyebrows[name]
             body.append({"name": name, "partial": f"website/sections/{name}.html", "data": data})
@@ -258,6 +259,12 @@ def _about(section) -> dict | None:
         "html": render_markdown(section.text),
         "image": section.image,
     }
+
+
+def _gallery(section) -> dict | None:
+    if not section.images:
+        return None
+    return {"title": section.title or pgettext("website", "Gallery"), "images": section.images}
 
 
 def _catalog(section, catalog: dict | None) -> dict | None:
