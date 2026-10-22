@@ -70,7 +70,7 @@ def test_nested_contexts_restore_the_outer_one_even_after_an_error():
                 assert context.current_hub() is b
             assert context.current_hub() is a
             with pytest.raises(ZeroDivisionError), context.use_control():
-                1 / 0
+                raise ZeroDivisionError
             assert context.current_hub() is a
         with pytest.raises(HubContextMissing):
             context.current()

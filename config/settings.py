@@ -141,6 +141,8 @@ MIDDLEWARE = [
     "base.middleware.HubDatabaseMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # A session opened on another host (another hub's, the platform's) is no session here (phase 2, S1).
+    "base.middleware.SessionHostMiddleware",
     # The platform host (hubs.localhost) is only the Hub admin for the staff (PLAN §18.1).
     "base.middleware.PlatformHostMiddleware",
     # No login of its own: a browser without a session on a SPA route goes to the SaaS's login.

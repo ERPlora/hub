@@ -14,7 +14,6 @@ import json
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import Client
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.models import OutboxEvent
@@ -52,10 +51,11 @@ def items_in(hub=None) -> list[str]:
 
 
 @pytest.mark.django_db
-def test_a_request_on_a_hub_of_the_shared_database_works_as_in_phase_one(client):
-    client.force_login(member("a"))
+@pytest.mark.parametrize("slug", ["a", "b"])
+def test_a_request_on_a_hub_of_the_shared_database_works_as_in_phase_one(client, slug):
+    client.force_login(member(slug))
 
-    created = api_post(client, "a.localhost", "/demo/items", {"name": "Shared"})
+    created = api_post(client, f"{slug}.localhost", "/demo/items", {"name": "Shared"})
 
     assert created.status_code == 201
     assert items_in() == ["Shared"]

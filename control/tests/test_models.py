@@ -80,3 +80,27 @@ def test_a_hub_is_due_once_keyed_by_the_hub():
 
     assert due.pk == hub.pk
     assert (due.lease_until, due.fiscal_oldest_pending_at) == (None, None)
+
+
+def test_its_words_are_translated():
+    from django.apps import apps
+    from django.utils import translation
+
+    from base import registry
+    from base.models import HubIdentity
+
+    with translation.override("es"):
+        assert str(apps.get_app_config("control").verbose_name) == "Control"
+        assert str(Hub._meta.get_field("db_name").verbose_name) == "base de datos"
+        assert str(Hub._meta.get_field("schema_state").verbose_name) == "esquema"
+        assert [str(label) for label in Hub.SchemaState.labels] == ["Al día", "Atrasado"]
+        assert str(Hub._meta.get_field("schema_apps").verbose_name) == "apps creadas"
+        assert str(Hub._meta.get_field("is_platform").verbose_name) == "hub de la plataforma"
+        assert str(Cluster._meta.verbose_name_plural) == "clústeres"
+        assert str(Cluster._meta.get_field("host").verbose_name) == "host del escritor"
+        assert str(Cluster._meta.get_field("pooler_port").verbose_name) == "puerto de PgBouncer"
+        assert str(Cluster._meta.get_field("is_open").verbose_name) == "abierto a hubs nuevos"
+        assert str(HubDue._meta.verbose_name_plural) == "hubs con trabajo pendiente"
+        assert str(HubDue._meta.get_field("lease_until").verbose_name) == "reservado hasta"
+        assert str(HubIdentity._meta.verbose_name) == "identidad del hub"
+        assert registry.unavailable().message == "Este hub no se puede abrir ahora; inténtalo más tarde."

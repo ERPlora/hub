@@ -29,7 +29,7 @@ def verify(alias: str, hub_id: uuid.UUID) -> None:
         return
     try:
         with connections[alias].cursor() as cursor:
-            cursor.execute(f"SELECT hub_id FROM {IDENTITY_TABLE}")  # noqa: S608 (a constant, no input)
+            cursor.execute(f"SELECT hub_id FROM {IDENTITY_TABLE}")
             found = [row[0] for row in cursor.fetchall()]
     except DatabaseError as error:
         raise HubIdentityMismatch(f"The database of {alias} has no readable identity ({error}): refused.") from error
@@ -45,6 +45,6 @@ def write(alias: str, hub_id: uuid.UUID) -> None:
     """Write the identity of the database behind ``alias``, made for the hub ``hub_id`` (its provisioning; S2)."""
     with connections[alias].cursor() as cursor:
         cursor.execute(
-            f"INSERT INTO {IDENTITY_TABLE} (hub_id) VALUES (%s) ON CONFLICT DO NOTHING",  # noqa: S608
+            f"INSERT INTO {IDENTITY_TABLE} (hub_id) VALUES (%s) ON CONFLICT DO NOTHING",
             [hub_id],
         )

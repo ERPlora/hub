@@ -35,6 +35,8 @@ def test_a_database_that_is_its_hub_is_used(hub_a):
     with context.use_hub(hub_a) as active:
         assert active.alias == hubs.HUB_A_ALIAS
         assert django_connections[active.alias].settings_dict["NAME"] == hub_a.db_name
+    # Its settings are the template's, and nobody connects to the template (its clone would fail).
+    assert django_connections[connections.TEMPLATE_ALIAS].connection is None
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)

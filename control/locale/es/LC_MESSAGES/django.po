@@ -1,0 +1,71 @@
+# Spanish translation of the control app (phase 2, S1).
+msgid ""
+msgstr ""
+"Project-Id-Version: hub-next control\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: apps.py
+msgid "Control"
+msgstr "Control"
+
+#: models.py
+msgid "cluster"
+msgstr "clúster"
+
+msgid "clusters"
+msgstr "clústeres"
+
+msgid "writer host"
+msgstr "host del escritor"
+
+msgid "writer port"
+msgstr "puerto del escritor"
+
+msgid "PgBouncer host"
+msgstr "host de PgBouncer"
+
+msgid "PgBouncer port"
+msgstr "puerto de PgBouncer"
+
+msgid "open to new hubs"
+msgstr "abierto a hubs nuevos"
+
+msgid "database"
+msgstr "base de datos"
+
+msgid "schema"
+msgstr "esquema"
+
+msgctxt "hub schema"
+msgid "Current"
+msgstr "Al día"
+
+msgctxt "hub schema"
+msgid "Behind"
+msgstr "Atrasado"
+
+msgid "created apps"
+msgstr "apps creadas"
+
+msgid "platform hub"
+msgstr "hub de la plataforma"
+
+msgid "hub due"
+msgstr "hub con trabajo pendiente"
+
+msgid "hubs due"
+msgstr "hubs con trabajo pendiente"
+
+msgid "due at"
+msgstr "pendiente desde"
+
+msgid "leased until"
+msgstr "reservado hasta"
+
+msgid "oldest fiscal record pending since"
+msgstr "registro fiscal pendiente más antiguo desde"
