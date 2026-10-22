@@ -45,7 +45,7 @@
       },
       "loadError": "The opening hours could not be loaded.",
       "defaultWeek": {
-        "message": "These are default opening hours we set up for you. Check they match your business — bookings outside them are refused.",
+        "message": "These are default opening hours we set up for you. Check they match your business — appointments outside them are refused.",
         "confirm": "Yes, these are my hours"
       },
       "form": {
