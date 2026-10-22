@@ -1,7 +1,7 @@
 // Payments → Payments (WORKBOOK «Pantallas · Pagos»; PAYMENT-F02 to F06): «Outgoing payments», the live
 // `payment.payment.list` with the old table's Reference, Date, Beneficiary, Amount and Status (and
 // Method in the column chooser), «Search reference or beneficiary…», filters per column (the
-// reference and the beneficiary by fragment, the date by day, the amount from / to in euros, the
+// reference and the beneficiary by fragment, the date from / to, the amount from / to in euros, the
 // status by list), newest payment date first, 50 a page. Each row offers the step it can take, named
 // by what it does (Approve, Mark as sent, Mark as completed), and «Cancel payment» while not finished;
 // none on a finished one, and only what the person may do. «New payment» opens the form; a payment
@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { PaymentOut, PaymentStatus } from '../operations';
-import { EMPLOYEE, flush, type MountOptions, mountPayment, page, RECORDER } from '../__tests__/mount-payment';
+import { EMPLOYEE, errorFrame, flush, type MountOptions, mountPayment, page, RECORDER } from '../__tests__/mount-payment';
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
 import PaymentsPage from './PaymentsPage.vue';
@@ -108,13 +108,13 @@ describe('PaymentsPage', () => {
     expect(s.cells(4)[4]).toContain('Reason: Duplicated');
   });
 
-  it('filters on the server: the reference and the beneficiary by fragment, the day, the amount in euros, the status', async () => {
+  it('filters on the server: the reference and the beneficiary by fragment, the dates, the amount in euros, the status', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     const columns = s.prop<Array<{ key: string; filter?: { type: string; options?: Array<{ value: string; label: string }> } }>>('columns');
     expect(columns.map((c) => [c.key, c.filter?.type ?? null])).toEqual([
       ['reference', 'text'],
-      ['payment_date', 'date'],
+      ['payment_date', 'daterange'],
       ['beneficiary_name', 'text'],
       ['amount', 'range'],
       ['status', 'select'],
@@ -123,7 +123,8 @@ describe('PaymentsPage', () => {
     expect(columns[4].filter?.options?.map((o) => o.label)).toEqual(['Draft', 'Approved', 'Sent', 'Completed', 'Cancelled']);
     s.table().vm.$emit('filtersChange', {
       reference: '0003',
-      payment_date: '2026-08-21',
+      payment_date_from: '2026-08-01',
+      payment_date_to: '2026-08-31',
       beneficiary_name: 'norte',
       amount_from: '12',
       amount_to: '12,5',
@@ -133,8 +134,8 @@ describe('PaymentsPage', () => {
     expect(s.list()).toEqual([
       {
         reference: '0003',
-        payment_date_from: '2026-08-21',
-        payment_date_to: '2026-08-21',
+        payment_date_from: '2026-08-01',
+        payment_date_to: '2026-08-31',
         beneficiary_name: 'norte',
         amount_min: 1200,
         amount_max: 1250,
@@ -144,6 +145,26 @@ describe('PaymentsPage', () => {
         offset: 0,
       },
     ]);
+  });
+
+  it('a date range with one end only bounds that end only (PAYMENT-F06)', async () => {
+    const s = await setup();
+    s.table().vm.$emit('filtersChange', { payment_date_from: '2026-08-01' });
+    await flush();
+    expect(s.list()).toEqual([{ payment_date_from: '2026-08-01', sort: '-payment_date', limit: 50, offset: 0 }]);
+    s.table().vm.$emit('filtersChange', { payment_date_to: '2026-08-31' });
+    await flush();
+    expect(s.list()).toEqual([{ payment_date_to: '2026-08-31', sort: '-payment_date', limit: 50, offset: 0 }]);
+  });
+
+  it('a list that cannot load says so in the table and offers «Retry», never «No payments.» (pm#533)', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
+    await flush();
+    expect(s.prop('error')).toBe('The payments could not be loaded.');
+    expect(s.prop<{ retry: string }>('labels').retry).toBe('Retry');
+    expect(s.prop('rows')).toEqual([]);
+    expect(s.wrapper.text()).not.toContain('No payments.');
   });
 
   it('an amount bound that is not an amount is left out, never «from 0»', async () => {

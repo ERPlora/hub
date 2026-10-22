@@ -206,6 +206,11 @@ def test_ranges_include_both_ends(ledger):
         "PAY-20260821-0003",
     ]
     assert listed(payment_date_to=dt.date(2025, 12, 31)) == ["PAY-20250114-0999"]
+    # The screen's date range sends each end on its own (PAYMENT-F06): from a day on, or a whole month.
+    assert listed(payment_date_from=dt.date(2026, 9, 1)) == ["PAY-20261001-0001"]
+    assert listed(
+        payment_date_from=dt.date(2026, 8, 1), payment_date_to=dt.date(2026, 8, 31)
+    ) == ["PAY-20260821-0004", "PAY-20260821-0003"]
     assert listed(amount_min=40_00, amount_max=60_00) == [
         "PAY-20261001-0001",
         "PAY-20260821-0004",

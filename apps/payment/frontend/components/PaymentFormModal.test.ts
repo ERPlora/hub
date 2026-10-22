@@ -32,6 +32,7 @@ const method = (id: string, name: string): MethodOut => ({
 const BANK = method('m1', 'BBVA account');
 const CASH = method('m2', 'Cash drawer');
 const CREATED = { id: 'p1', reference: 'PAY-20261014-0001' } as PaymentOut;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountPayment(PaymentFormModal, { props: { open: false }, locale, session: RECORDER });
@@ -97,11 +98,35 @@ describe('PaymentFormModal', () => {
           concept: 'Tintes',
           beneficiary_iban: '',
           supplier_invoice_ref: 'F-118',
+          idempotency_key: expect.stringMatching(UUID),
         },
       },
     ]);
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
     expect(s.wrapper.emitted('created')).toEqual([[CREATED]]);
+  });
+
+  it('the same form sent again carries the same attempt key; the next «New payment» makes a new one (payments#8)', async () => {
+    const s = await setup();
+    await s.result(METHODS, page([BANK]));
+    s.answer(503, { error: { code: 'unavailable', message: 'Try again in a moment.' } });
+    await s.fill();
+    await click(s.save());
+    s.answer(201, CREATED);
+    await click(s.save());
+    const keys = () => s.sent().map((call) => (call.body as { idempotency_key: string }).idempotency_key);
+    expect(keys()).toHaveLength(2);
+    expect(keys()[0]).toMatch(UUID);
+    expect(keys()[1]).toBe(keys()[0]);
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    await s.fill();
+    await click(s.save());
+    expect(keys()).toHaveLength(3);
+    expect(keys()[2]).toMatch(UUID);
+    expect(keys()[2]).not.toBe(keys()[0]);
   });
 
   it('an amount that is not one, or is 0, is refused under the field and nothing is sent', async () => {

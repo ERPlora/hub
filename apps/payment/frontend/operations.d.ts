@@ -97,6 +97,8 @@ export interface PaymentIn {
   concept?: string;
   supplier_invoice_ref?: string;
   currency?: string | null;
+  /** UUID made once per payment the caller means to record: sent again, it answers that payment. */
+  idempotency_key?: string | null;
 }
 
 export interface PaymentOut {

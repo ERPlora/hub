@@ -6,7 +6,9 @@ payment it did not save and emitted the event anyway). A step locks the payment'
 people pressing at once go one after the other and the second hears why. The reference of the day
 comes from the counter's row raised with ``UPDATE … RETURNING`` in the payment's transaction (never a
 sequence). A method name two saves take at once ends in the database's unique constraint, translated
-to the same 409 as the check.
+to the same 409 as the check. A payment sent with the key of its attempt is recorded once: the same
+attempt sent again (a retry, a double tap, both at once) answers the payment already recorded, without
+a second number or notice.
 """
 
 from django.db import IntegrityError, transaction
@@ -58,6 +60,9 @@ COMPLETE_REFUSED = _(
     "Only a sent payment can be marked as completed; this one is %(status)s."
 )
 NOT_CANCELLABLE = _("This payment can no longer be cancelled.")
+KEY_REUSED = _(
+    "That attempt key already recorded another payment. Make a new key for each payment."
+)
 
 #: A finished payment admits no step and no cancellation.
 FINISHED = (Payment.Status.COMPLETED, Payment.Status.CANCELLED)
@@ -260,6 +265,47 @@ def _number(day) -> int:
     return counter.last
 
 
+#: What a payment keeps of its attempt: the same attempt sent again carries the same.
+ATTEMPT_FIELDS = (
+    "payment_date",
+    "amount",
+    "beneficiary_name",
+    "beneficiary_iban",
+    "concept",
+    "supplier_invoice_ref",
+)
+
+
+def _same_attempt(payment: Payment, data: PaymentIn) -> bool:
+    if any(getattr(payment, field) != getattr(data, field) for field in ATTEMPT_FIELDS):
+        return False
+    if payment.currency != (data.currency or business_currency()):
+        return False
+    if data.method_id is not None:
+        return payment.method_id == data.method_id
+    try:
+        return find_method(None, data.method).pk == payment.method_id
+    except (NotFound, Conflict):
+        return False
+
+
+def _recorded(data: PaymentIn) -> dict | None:
+    """The payment the attempt of ``data`` already recorded, as it is now; 409 when its key recorded
+    another payment."""
+    if data.idempotency_key is None:
+        return None
+    payment = (
+        Payment.objects.select_related("method")
+        .filter(idempotency_key=data.idempotency_key)
+        .first()
+    )
+    if payment is None:
+        return None
+    if not _same_attempt(payment, data):
+        raise Conflict(str(KEY_REUSED), code="payment.idempotency_key_reused")
+    return payment_row(payment)
+
+
 @operation(
     "payment.payment.create",
     kind="command",
@@ -276,23 +322,35 @@ def _number(day) -> int:
     },
 )
 def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
+    recorded = _recorded(data)
+    if recorded is not None:
+        return recorded
     method = _method_to_pay_from(data)
     day = timezone.localdate()
-    reference = f"PAY-{day:%Y%m%d}-{_number(day):04d}"
     actor = _actor(ctx)
-    payment = Payment.objects.create(
-        reference=reference,
-        method=method,
-        payment_date=data.payment_date,
-        amount=data.amount,
-        currency=data.currency or business_currency(),
-        beneficiary_name=data.beneficiary_name,
-        beneficiary_iban=data.beneficiary_iban,
-        concept=data.concept,
-        supplier_invoice_ref=data.supplier_invoice_ref,
-        created_by=actor,
-        updated_by=actor,
-    )
+    try:
+        # The number and the row in one savepoint: an attempt that lost the race to its twin gives its
+        # number back and answers the twin's payment.
+        with transaction.atomic():
+            payment = Payment.objects.create(
+                reference=f"PAY-{day:%Y%m%d}-{_number(day):04d}",
+                method=method,
+                payment_date=data.payment_date,
+                amount=data.amount,
+                currency=data.currency or business_currency(),
+                beneficiary_name=data.beneficiary_name,
+                beneficiary_iban=data.beneficiary_iban,
+                concept=data.concept,
+                supplier_invoice_ref=data.supplier_invoice_ref,
+                idempotency_key=data.idempotency_key,
+                created_by=actor,
+                updated_by=actor,
+            )
+    except IntegrityError:
+        recorded = _recorded(data)
+        if recorded is None:
+            raise
+        return recorded
     record_event(
         ctx,
         events.PAYMENT_CREATED,

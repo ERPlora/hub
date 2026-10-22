@@ -106,6 +106,11 @@ class Payment(UUIDModel):
         _("supplier invoice"), max_length=INVOICE_REF_MAX_LENGTH, blank=True
     )
     cancel_reason = models.TextField(_("cancellation reason"), blank=True)
+    # The key of the attempt that recorded it, when the caller gave one: the same attempt sent again
+    # (a retry, a double tap) answers this payment instead of recording another one.
+    idempotency_key = models.UUIDField(
+        pgettext_lazy("payment", "attempt key"), null=True, blank=True, unique=True, editable=False
+    )
     # The trail of the ladder: who approved (``updated_by`` is only whoever moved it last) and when
     # each step happened, set by the step itself.
     approved_by = models.CharField(

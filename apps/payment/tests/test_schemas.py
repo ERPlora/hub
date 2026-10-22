@@ -129,6 +129,16 @@ def test_an_invalid_iban_is_refused_with_its_reason(iban):
     assert messages(caught.value) == {"beneficiary_iban": str(IBAN_INVALID)}
 
 
+def test_the_attempt_key_is_a_uuid_and_optional():
+    # payments#8: a caller that may send twice (a retry, a double tap) says which attempt it is.
+    key = "0192f0a4-6f43-7b4e-9a8e-2f1c3d4b5a69"
+    assert str(payment_in(idempotency_key=key).idempotency_key) == key
+    assert payment_in().idempotency_key is None
+    with pytest.raises(ValidationError) as caught:
+        payment_in(idempotency_key="twice")
+    assert list(messages(caught.value)) == ["idempotency_key"]
+
+
 def test_an_unknown_field_is_refused():
     with pytest.raises(ValidationError):
         payment_in(status="approved")
