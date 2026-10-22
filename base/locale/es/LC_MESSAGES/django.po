@@ -543,3 +543,19 @@ msgstr "identidades del hub"
 #: registry.py
 msgid "This hub cannot be opened right now; try again later."
 msgstr "Este hub no se puede abrir ahora; inténtalo más tarde."
+
+#: templates/base/too_many_attempts.html
+msgid "Too many sign-in attempts"
+msgstr "Demasiados intentos de entrar"
+
+#: templates/base/too_many_attempts.html
+msgid "For your security, signing in from this connection is paused for a while."
+msgstr "Por tu seguridad, la entrada desde esta conexión se ha pausado un rato."
+
+#: templates/base/too_many_attempts.html
+#, python-format
+msgid "Try again in %(minutes)s minute."
+msgid_plural "Try again in %(minutes)s minutes."
+msgstr[0] "Vuelve a intentarlo en %(minutes)s minuto."
+msgstr[1] "Vuelve a intentarlo en %(minutes)s minutos."
+msgstr[2] "Vuelve a intentarlo en %(minutes)s minutos."

@@ -1,0 +1,25 @@
+{% load i18n static %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+429 of /auth/callback when this address refused too many sign-ins (base.auth_views, base.throttle.AttemptLimit),
+with Retry-After. Rendered without the request: no context processors, no database, no scripts nor inline styles
+(strict CSP, no nonce): its look is base/gate.css, a static file.
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% translate "Too many sign-in attempts" %}</title>
+  <link rel="stylesheet" href="{% static 'base/gate.css' %}">
+</head>
+<body>
+  <main>
+    <div class="ep-gate__brand">
+      <img class="ep-gate__logo" src="{% static 'base/img/logo.png' %}" alt="" width="28" height="28"><span>ERPlora</span>
+    </div>
+    <h1>{% translate "Too many sign-in attempts" %}</h1>
+    <p>{% translate "For your security, signing in from this connection is paused for a while." %}</p>
+    <p>{% blocktranslate count minutes=minutes trimmed %}Try again in {{ minutes }} minute.{% plural %}Try again in {{ minutes }} minutes.{% endblocktranslate %}</p>
+  </main>
+</body>
+</html>

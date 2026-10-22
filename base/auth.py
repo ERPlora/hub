@@ -111,6 +111,9 @@ class RedeemedUser:
 class RedeemResult:
     user: RedeemedUser | None = None
     error: str | None = None
+    #: The code itself was refused (none, or the SaaS's 400): a guess the callback's attempt limit counts. A failure
+    #: on the Hub's side (the SaaS away, its signature) or a good code that opens nothing here is not.
+    refused: bool = False
 
     @property
     def ok(self) -> bool:
@@ -246,7 +249,7 @@ def redeem_code(code: str | None, slug: str, audience: str = HUB_SESSION_AUDIENC
     if audience not in _ROLES_BY_AUDIENCE:
         raise ValueError(f"Unknown audience {audience!r}.")
     if not code or not code.strip():
-        return RedeemResult(error=INVALID_CODE)
+        return RedeemResult(error=INVALID_CODE, refused=True)
     payload = {"code": code, "hub": slug}
     if audience != HUB_SESSION_AUDIENCE:
         payload["audience"] = audience
@@ -265,7 +268,7 @@ def redeem_code(code: str | None, slug: str, audience: str = HUB_SESSION_AUDIENC
     if status == 400:
         error = _error_code(answer) or INVALID_CODE
         logger.warning("Redeeming a login code for hub %r: the SaaS refused it (%s).", slug, error)
-        return RedeemResult(error=error)
+        return RedeemResult(error=error, refused=True)
     if status in (401, 403):
         logger.warning("Redeeming a login code for hub %r: the SaaS rejected the hub's signature (%s).", slug, status)
         return RedeemResult(error=HUB_UNAUTHORIZED)
