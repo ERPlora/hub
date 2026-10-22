@@ -123,6 +123,7 @@ Importes y fechas salen con el formato del idioma de quien mira; el importe, en 
 | PAYMENT-F08 | Editar, desactivar y reactivar un método de pago | hecho |
 
 ### PAYMENT-F01 Crear un método de pago
+<!-- origen: fi:modules/payments#command-payments-methods-create old:payments/WORKFLOW.md#payments-f01 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
@@ -174,6 +175,7 @@ pago.») y no se guarda nada.
 Implicados: FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
+<!-- origen: fi:modules/payments#command-payments-payments-approve old:payments/WORKFLOW.md#payments-f03 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -189,6 +191,7 @@ puede aprobar un pago en borrador; este está Aprobado.»), encima de la tabla.
 Implicados: FLOW-F21
 
 ### PAYMENT-F04 Marcar un pago como enviado y como completado
+<!-- origen: fi:modules/payments#command-payments-payments-mark_completed fi:modules/payments#command-payments-payments-mark_sent old:payments/WORKFLOW.md#payments-f04 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -205,6 +208,7 @@ completado un pago enviado; …»). Un pago completado o cancelado no ofrece má
 Implicados: FLOW-F21
 
 ### PAYMENT-F05 Cancelar un pago
+<!-- origen: fi:modules/payments#command-payments-payments-cancel old:payments/WORKFLOW.md#payments-f05 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -215,9 +219,10 @@ Pasos:
 Entra: el pago y el motivo (obligatorio).
 Sale: el estado cancelado y el motivo guardados en el pago (no se borra nada); el aviso
 `payment.payment.cancelled`.
-Si falla: sin motivo no se puede pulsar; un motivo de solo espacios se rechaza debajo del campo. Un
-pago completado o cancelado no se puede cancelar («El pago ya no admite cancelación.»): no cambia
-nada y no avisa. Una aprobación no se deshace: se cancela el pago y se registra otro.
+Si falla: sin motivo (o con solo espacios) no se puede pulsar; por el asistente, un motivo vacío se
+rechaza («Di por qué se cancela este pago: el motivo se queda en el pago.»). Un pago completado o
+cancelado no se puede cancelar («El pago ya no admite cancelación.»), dentro del formulario y con el
+motivo escrito: no cambia nada y no avisa. Una aprobación no se deshace: se cancela el pago y se registra otro.
 Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
@@ -259,6 +264,7 @@ nada en otro. Esta app no escucha a ninguna otra.
 Implicados: FLOW-F21
 
 ### PAYMENT-F08 Editar, desactivar y reactivar un método de pago
+<!-- origen: old:payments/WORKFLOW.md#payments-f01 fi:modules/payments#query-payments-methods-list -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
