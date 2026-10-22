@@ -14,7 +14,13 @@ import { mount } from '@vue/test-utils';
 import { type Component, createApp, ref } from 'vue';
 import { createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router';
 
-import { createTestClient, flush, resultFrame, type StreamCall } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+import {
+  type ApiHandler,
+  createTestClient,
+  flush,
+  resultFrame,
+  type StreamCall,
+} from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -59,6 +65,8 @@ export interface MountOptions {
   routes?: string[];
   stubs?: Record<string, unknown>;
   sidebar?: ShellSidebar;
+  /** What the fake API answers, set before mounting (a component may ask on mount). */
+  onApi?: ApiHandler;
 }
 
 /** The subscription id the stream holds for `op` (the first one). */
@@ -70,6 +78,7 @@ export function subId(client: LiveClient, op: OpName): string {
 
 export async function mountBase(component: Component, options: MountOptions = {}) {
   const harness = createTestClient({ routes: OPERATION_ROUTES });
+  if (options.onApi) harness.net.onApi(options.onApi);
   const known: RouteRecordRaw[] = (options.routes ?? []).map((path) => ({ path, component: BLANK }));
   const router = createRouter({
     history: createMemoryHistory(),
