@@ -439,9 +439,12 @@ describe('WebsitePage', () => {
     expect(mocks.toastError).toHaveBeenCalledWith('The website could not be published');
   });
 
+  // flow: WEBSITE-F09
   it('opens «Share and QR» with the public address', async () => {
     const s = await setup();
     await s.show();
+    // One hook per control: the button and its dialog are told apart (the e2e clicks the button by it).
+    expect(s.wrapper.findAll('[data-testid="website-share"]')).toHaveLength(1);
     await s.wrapper.get('[data-testid="website-share"]').trigger('click');
     await settle();
     expect(s.testid('website-share-url').text()).toBe('https://a.erplora.com/');

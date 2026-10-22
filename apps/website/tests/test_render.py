@@ -251,6 +251,35 @@ def test_the_mode_light_dark_or_auto_reaches_the_page(mode, first_paint, scheme)
     assert f'<meta name="color-scheme" content="{scheme}">' in html
 
 
+ICON = re.compile(r'<link rel="icon" href="([^"]+)">')
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_page_names_its_own_icon_the_logo_when_there_is_one(template):
+    # flow: WEBSITE-F10 — without one the browser asks the hub for /favicon.ico, which is no page of the website.
+    with_logo = full_content(topbar={"name": "Pepe", "logo": {"id": str(uuid.uuid4()), "url": IMAGE_URL}})
+    assert ICON.findall(render(template, content=with_logo)) == [IMAGE_URL]
+
+
+def test_without_a_logo_the_icon_is_the_names_initial_on_the_palettes_colour():
+    from urllib.parse import unquote
+
+    [icon] = ICON.findall(render(content=full_content(topbar={"name": "pepe", "logo": None})))
+    assert icon.startswith("data:image/svg+xml,")
+    svg = unquote(icon.removeprefix("data:image/svg+xml,"))
+    assert ">P</text>" in svg
+    assert f"fill='{resolve('ocean', None)['light']['primary']}'" in svg
+
+
+def test_an_initial_that_is_markup_is_written_as_text_in_the_icon():
+    from urllib.parse import unquote
+
+    [icon] = ICON.findall(render(content=full_content(topbar={"name": "<b>&", "logo": None})))
+    svg = unquote(icon.removeprefix("data:image/svg+xml,"))
+    assert ">&lt;</text>" in svg
+    assert "<b>" not in svg
+
+
 def test_the_preview_is_marked_and_kept_out_of_search_engines():
     preview = render(preview=True)
     assert "data-ep-preview" in preview and '<meta name="robots" content="noindex">' in preview

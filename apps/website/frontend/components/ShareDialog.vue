@@ -42,7 +42,7 @@ async function copy(url: string): Promise<void> {
   <ion-modal
     :is-open="open"
     class="ws-share"
-    data-testid="website-share"
+    data-testid="website-share-dialog"
     @did-dismiss="close"
   >
     <ion-header>
