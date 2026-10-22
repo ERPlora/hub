@@ -1,7 +1,7 @@
-// «Activity» on the Home (BASE-G129) against the real Sales: a sale charged through its API shows up live in
+// «Activity» on the Home (BASE-F09) against the real Sales: a sale charged through its API shows up live in
 // the table at `/#actividad` with its number, amount in euros and status, and its date and time are read whole
 // in the three viewports (hub#2637: at about 820 px the old hub's «Date» column cut the time off).
-// flow: BASE-G129
+// flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
@@ -57,7 +57,7 @@ async function rowOf(page: Page, id: string): Promise<Locator> {
   return row;
 }
 
-test('BASE-G129 — a sale shows up live in «Activity», its date and time whole at 390, 834 and 1440', async ({ page, context }) => {
+test('BASE-F09 — a sale shows up live in «Activity», its date and time whole at 390, 834 and 1440', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/');
   await page.goto(`${A}/#actividad`);
@@ -79,6 +79,6 @@ test('BASE-G129 — a sale shows up live in «Activity», its date and time whol
     await expect.poll(() => cuts(date), `date at ${vp.label}`).toEqual([]);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `no sideways scroll at ${vp.label}`).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: shot(`APP-BASE-1-BASE-G129-sale-${vp.label}`) });
+    await page.screenshot({ path: shot(`APP-BASE-1-BASE-F09-sale-${vp.label}`) });
   }
 });

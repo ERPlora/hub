@@ -4,7 +4,7 @@
 // development server shows), the board with the demo's panel — followed live: an item created elsewhere moves
 // it without a reload —, «Customize panel», the bell, «Upgrade plan» in the side menu and «Activity» at
 // `/#actividad`. Each flow leaves its capture `APP-BASE-1-<flow>-<width>` once nothing scrolls sideways.
-// flow: BASE-G127 BASE-G22 BASE-G130 BASE-G165 BASE-G166 BASE-G167 BASE-G168 BASE-G129 BASE-G137 BASE-G169
+// flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, clearItems, hostPage, shot, shown, uniqueName } from './helpers';
@@ -32,29 +32,29 @@ const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`the Home at ${width}: heading, my apps, setup list, live board, bell, plan and activity`, async ({ browser }) => {
+  test(`BASE-F01 BASE-F02 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11 — the Home at ${width}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
     await clearItems(context, A);
 
-    // BASE-G127 — the Home at `/`, headed by the business (or a greeting) and today's date.
+    // BASE-F02 — the Home at `/`, headed by the business (or a greeting) and today's date.
     await page.goto(`${A}/`);
     await expect(shown(page).locator('h1')).toBeVisible();
     await expect(testid(page, 'home-date')).toBeVisible();
-    // BASE-G165 — «My apps»: the demo among the apps this person can open.
+    // BASE-F05 — «My apps»: the demo among the apps this person can open.
     const myApps = testid(page, 'home-my-apps');
     await expect(myApps.locator('[data-testid="home-my-app"]').first()).toBeVisible();
     await expect(myApps.locator('[data-testid="home-my-app"][href="/demo/items"]')).toHaveCount(1);
-    await snap(page, 'BASE-G127', width);
-    await snap(page, 'BASE-G165', width);
+    await snap(page, 'BASE-F02', width);
+    await snap(page, 'BASE-F05', width);
 
-    // BASE-G22 / BASE-G164 — the list from base.setup.status: the demo's example step, pending with no items.
+    // BASE-F01 — the list from base.setup.status: the demo's example step, pending with no items.
     const card = testid(page, 'setup-card');
     await expect(card).toHaveAttribute('aria-busy', 'false');
     await expect(card.locator('[data-testid="setup-row"][data-key="demo.first_item"]')).toBeVisible();
     await card.scrollIntoViewIfNeeded();
-    await snap(page, 'BASE-G22', width);
+    await snap(page, 'BASE-F01', width);
 
-    // BASE-G166 / BASE-G168 — the demo's panel «Open items», and a new open item moves it without a reload.
+    // BASE-F06 / BASE-F08 — the demo's panel «Open items», and a new open item moves it without a reload.
     const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
     const value = panel.locator('[data-testid="widget-value"]');
     await expect(value).toHaveText('0');
@@ -63,23 +63,23 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     // The step «Create your first item» is done now: the list re-ran on the server too.
     await expect(card.locator('[data-testid="setup-row"][data-key="demo.first_item"]')).toHaveCount(0);
     await panel.scrollIntoViewIfNeeded();
-    await snap(page, 'BASE-G166', width);
-    await snap(page, 'BASE-G168', width);
+    await snap(page, 'BASE-F06', width);
+    await snap(page, 'BASE-F08', width);
 
-    // BASE-G130 — «Set up» of a row leads to its screen (the demo's step, while it was pending).
+    // BASE-F03 — «Set up» of a row leads to its screen (the demo's step, while it was pending).
     await clearItems(context, A);
     const configure = card.locator('[data-testid="setup-configure-demo.first_item"]');
     await expect(configure).toBeVisible();
-    await snap(page, 'BASE-G130', width);
+    await snap(page, 'BASE-F03', width);
     await configure.click();
     await expect(page).toHaveURL(`${A}/demo/items/new`);
     await page.goto(`${A}/`);
 
-    // BASE-G167 — «Customize panel»: the demo's panel among the active ones; removing it empties the board.
+    // BASE-F07 — «Customize panel»: the demo's panel among the active ones; removing it empties the board.
     await testid(page, 'widgets-customize').click();
     const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
     await expect(picker.locator('[data-testid="widgets-active-item"][data-key="demo.open_items"]')).toBeVisible();
-    await snap(page, 'BASE-G167', width);
+    await snap(page, 'BASE-F07', width);
     await picker.locator('[data-testid="widgets-remove-demo.open_items"]').click();
     await picker.locator('[data-testid="widgets-close"]').click();
     await expect(picker).toBeHidden();
@@ -90,30 +90,30 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await page.reload();
     await expect(testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]')).toBeVisible();
 
-    // BASE-G137 — the bell (base.bell.counters): the demo's «Open demo items» counter once there is one open.
+    // BASE-F10 — the bell (base.bell.counters): the demo's «Open demo items» counter once there is one open.
     await api(context, A, 'POST', '/demo/items', { name: uniqueName('Bell') });
     const bell = testid(page, 'hub-bell');
     await expect(bell.locator('[data-testid="hub-bell-badge"]')).toHaveText('1');
     await bell.click();
     const rows = page.locator('ion-popover [data-testid="hub-bell-row"]');
     await expect(rows).toHaveCount(1);
-    await snap(page, 'BASE-G137', width);
+    await snap(page, 'BASE-F10', width);
     await rows.first().click();
     await expect(page).toHaveURL(`${A}/demo/items`);
     await page.goto(`${A}/`);
 
-    // BASE-G169 — «Upgrade plan» at the foot of the side menu, to this hub's plan on the SaaS.
+    // BASE-F11 — «Upgrade plan» at the foot of the side menu, to this hub's plan on the SaaS.
     if (width < PINNED_MIN) await shown(page).locator('ion-menu-button').click();
     const upgrade = page.locator('ion-menu [data-testid="upgrade-plan"]');
     await expect(upgrade).toBeVisible();
     await expect(upgrade).toHaveAttribute('href', /\/store\/plans\?business=[0-9a-f-]{36}$/);
     await expect(upgrade).toHaveAttribute('target', '_blank');
-    await snap(page, 'BASE-G169', width);
+    await snap(page, 'BASE-F11', width);
     // A fresh page, without the drawer (closing it while it still slides in is ignored by Ionic).
     if (width < PINNED_MIN) await page.reload();
     await expect(testid(page, 'home-my-apps')).toBeVisible();
 
-    // BASE-G129 — «Activity» at `/#actividad`: the table of the last sales.
+    // BASE-F09 — «Activity» at `/#actividad`: the table of the last sales.
     await page.goto(`${A}/#actividad`);
     await expect(shown(page).locator('[data-testid="tab-activity"]')).toHaveClass(/segment-button-checked/);
     await expect(shown(page).locator('[data-testid="home-activity-search"]')).toBeVisible();
@@ -123,7 +123,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(testid(page, 'home-my-apps')).toBeVisible();
     await page.goto(`${A}/#actividad`);
     await expect(shown(page).locator('[data-testid="home-activity-search"]')).toBeVisible();
-    await snap(page, 'BASE-G129', width);
+    await snap(page, 'BASE-F09', width);
 
     await clearItems(context, A);
     await context.close();
