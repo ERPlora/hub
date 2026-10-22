@@ -72,16 +72,16 @@ test('the «My apps» sheet leads to Personal, the tabbar to every section, and 
     // Ajustes (STAFF-F22): the proposed values; «Guardar» only when something changed.
     const save = shown(page).locator('[data-testid=staff-settings-save]');
     await expect(save).toHaveAttribute('disabled', /.*/);
-    const before = await api<{ max_daily_hours: number }>(context, A, 'GET', '/staff/settings');
-    const next = before.data.max_daily_hours === 11 ? '10' : '11';
+    const before = await api<{ default_break_duration: number }>(context, A, 'GET', '/staff/settings');
+    const next = before.data.default_break_duration === 45 ? '30' : '45';
     try {
-      await shown(page).locator('[data-testid=staff-settings-max_daily_hours] input').fill(next);
+      await shown(page).locator('[data-testid=staff-settings-default_break_duration] input').fill(next);
       await save.click();
       await expect(shown(page).locator('[data-testid=staff-settings-saved]')).toContainText('Ajustes guardados');
-      expect((await api<{ max_daily_hours: number }>(context, A, 'GET', '/staff/settings')).data.max_daily_hours).toBe(Number(next));
+      expect((await api<{ default_break_duration: number }>(context, A, 'GET', '/staff/settings')).data.default_break_duration).toBe(Number(next));
     } finally {
       // Back as it was, whatever happened above.
-      expect((await api(context, A, 'POST', '/staff/settings', { max_daily_hours: before.data.max_daily_hours })).status).toBe(200);
+      expect((await api(context, A, 'POST', '/staff/settings', { default_break_duration: before.data.default_break_duration })).status).toBe(200);
     }
   } finally {
     await context.close();

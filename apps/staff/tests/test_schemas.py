@@ -805,7 +805,7 @@ def test_a_retired_setting_is_refused_by_its_name():
         assert errors(SettingsIn, **{field: value})[field]["type"] == "extra_forbidden", field
 
 
-def test_the_settings_are_the_default_working_day_with_hours_as_hh_mm():
+def test_settings_out_shows_hours_as_hh_mm():
     assert list(SettingsOut.model_fields) == [
         "default_work_start",
         "default_work_end",

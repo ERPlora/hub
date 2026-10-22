@@ -66,8 +66,8 @@ ha vendido y ganado cada profesional.
    para la agenda cuando están **Aprobadas** (STAFF-F18).
 6. La zona horaria del negocio decide qué es «hoy» para «Ausentes hoy», para el bloqueo de
    Desactivar y para el último día de una baja.
-7. Los **Ajustes de Personal** existen y se guardan (STAFF-F22), pero todavía ningún comportamiento
-   los lee.
+7. En **Personal → Ajustes**, la **jornada por defecto** (inicio, fin y descanso) es la que propone un
+   horario nuevo (STAFF-F22 y STAFF-F13); sin tocarla, de 09:00 a 18:00 con una hora de descanso.
 
 ## Pantallas
 
@@ -110,7 +110,7 @@ Selector **Miembro** y la tabla de sus horarios: **Horario, Por defecto, Desde, 
 Horas** (la semana resumida). Acciones de fila: **Editar**, **Activar / desactivar** y **Eliminar**
 (con confirmación). **+** abre **Nuevo**: **Horario** (nombre; vacío, «Horario habitual»), **Vigente
 desde, Vigente hasta, Por defecto** y una fila por día de la semana con **Inicio, Fin, Inicio
-descanso, Fin descanso** (o «No trabaja»).
+descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Ajustes** ya puesta.
 
 ### Comisiones
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
@@ -124,11 +124,10 @@ nombre, rol, vendido o comisión. En el móvil, una tarjeta por persona. Se pone
 o devolver una venta y al cambiar una ficha.
 
 ### Ajustes de Personal
-«Inicio de jornada (HH:MM)», «Fin de jornada (HH:MM)», «Duración del descanso (minutos)»,
-«Antelación mínima de reserva (horas)», «Horas máximas por día», «Umbral de horas extra
-(horas/semana)», «Mostrar fotos del personal», «Mostrar biografía del personal», «Permitir elegir
-profesional», «Avisar de nueva cita», «Avisar de cancelación» y **Guardar**. Mientras el negocio no
-ha guardado nunca, salen los valores propuestos.
+«Jornada por defecto», con «Un horario nuevo propone esta jornada de lunes a viernes, con el descanso
+en mitad del día.»: «Inicio de jornada (HH:MM)», «Fin de jornada (HH:MM)»,
+«Duración del descanso (minutos)» y **Guardar**. Mientras el negocio no ha guardado nunca, salen los
+valores propuestos.
 
 ### Paneles del inicio
 El Hub todavía no tiene un Inicio con paneles. Mientras tanto, los cinco paneles del producto actual
@@ -349,8 +348,10 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horarios
 Pasos:
-1. Elige a la persona y pulsa **+**: se abre **Nuevo** con una semana propuesta (lunes a viernes de
-   09:00 a 18:00).
+1. Elige a la persona y pulsa **+**: se abre **Nuevo** con una semana propuesta: de lunes a viernes, la
+   jornada por defecto de **Ajustes** (STAFF-F22), con el descanso en mitad del día y su inicio en el
+   cuarto de hora anterior; sin tocar los ajustes, de 09:00 a 18:00 con descanso de 13:00 a 14:00. Un
+   día que no trabaja propone las mismas horas si se marca.
 2. Pon el nombre (vacío, «Horario habitual»), la vigencia si solo vale en unas fechas, «Por defecto»
    si es el habitual y, día a día, Inicio, Fin y, si hay pausa, Inicio y Fin de descanso.
 3. Pulsa **Crear horario**.
@@ -519,19 +520,21 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Ajustes de Personal
 Pasos:
-1. Abre **Ajustes**: salen los guardados o, si nunca se guardaron, los propuestos (jornada de 09:00 a
-   18:00, descanso de 60 minutos, antelación de 1 hora, 12 horas máximas por día, umbral de 40 horas
-   semanales y los cinco interruptores encendidos).
-2. Cambia lo que quieras: jornada en HH:MM (un fin antes del inicio es un turno de noche),
-   descanso de 0 a 480 minutos, antelación de 0 a 168 horas, de 1 a 24 horas por día, umbral de 1 a
-   168 horas por semana, y los interruptores.
+1. Abre **Ajustes**: sale la jornada por defecto guardada o, si nunca se guardó, la propuesta (de 09:00
+   a 18:00 con 60 minutos de descanso).
+2. Cambia el inicio y el fin en HH:MM (el fin, después del inicio: un día de horario no cruza la
+   medianoche) y el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
 3. Pulsa **Guardar**.
 Entra: lo enviado; lo demás se queda como estaba.
-Sale: los ajustes del negocio (`staff.settings.updated`), con las horas siempre en HH:MM. Hoy ningún
-comportamiento los lee (como en el producto actual).
-Si falla: un valor fuera de su rango sale debajo de su campo y no se guarda nada. Si los ajustes no se
-pueden leer, «No se pudieron cargar los ajustes» con «Reintentar», sin formulario: nunca se ofrecen
-para guardar unos valores que no son los del negocio.
+Sale: los ajustes del negocio (`staff.settings.updated`), con las horas siempre en HH:MM. Desde ese
+momento, un horario nuevo propone esa jornada de lunes a viernes, con el descanso en mitad del día
+(STAFF-F13).
+Si falla: un valor fuera de su rango sale debajo de su campo y no se guarda nada. Una jornada que
+acaba antes de empezar dice «La hora de inicio tiene que ser anterior a la de fin.» debajo de «Fin de
+jornada (HH:MM)» (debajo de «Inicio de jornada (HH:MM)» si solo se cambió el inicio), y un descanso
+que no cabe en la jornada, «El descanso debe caer dentro del intervalo de trabajo.» debajo del
+descanso; no se guarda nada. Si los ajustes no se pueden leer, «No se pudieron cargar los ajustes» con
+«Reintentar», sin formulario: nunca se ofrecen para guardar unos valores que no son los del negocio.
 Implicados: ninguno
 
 ### STAFF-F23 Ver las cifras de la plantilla y por rol
@@ -675,6 +678,12 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - Modelos: `Role` (el rol de catálogo), `Member` (la ficha), `Schedule` y `ScheduleDay` (el horario y
   sus días, lunes = 0; un día que no está es libre), `TimeOff` (la ausencia) y `StaffSettings` (una
   sola fila, restricción `staff_settings_singleton`). UUIDv7, sin `hub_id`.
+- De `StaffSettings` solo viven tres columnas, la jornada por defecto (`default_work_start`,
+  `default_work_end`, `default_break_duration`); sus reglas (`StaffSettings.workday_errors`) las aplican
+  `staff.settings.update` y el admin. Las otras ocho son los ajustes retirados
+  (FIX-STAFF-SETTINGS-ORPHANS): ni el esquema ni el admin las exponen, `SettingsIn` rechaza su nombre
+  (`extra="forbid"`, 422 «This field is not allowed.») y se quedan en la tabla hasta el paso de
+  contract que las borre (expand/contract, PLAN-DB).
 - La ficha cuelga del usuario de la plataforma con una FK a `settings.AUTH_USER_MODEL`
   (`SET_NULL`), como `base.Membership`; «con acceso a este negocio» es tener `Membership` en el
   ámbito (fase 1). La fase 2 (usuarios del hub en su BD) cambia esa FK y esa comprobación junto con
@@ -740,6 +749,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   no le quita la marca al habitual sin que nadie lo pida.
 - Ajustes envía solo los campos que la persona tocó y cambió; lo que otra persona guarde mientras
   tanto entra en los demás campos sin pisar lo tecleado.
+- El formulario de horario (`frontend/components/ScheduleFormModal.vue`) sigue `staff.settings.get` y,
+  al abrir **Nuevo**, propone su jornada (`frontend/lib/scheduleForm.ts`: `defaultWeek`,
+  `proposedBreak`); hasta que llega la primera lectura, los valores propuestos de Ajustes
+  (`DEFAULT_WORKDAY`). Un día libre de un horario que se edita propone esa misma jornada al marcarlo.
 - «Mi ficha» (STAFF-F08) es un botón de la barra de Personal para quien tiene ficha vinculada; «Mis
   ausencias» es el selector «Todas / Mis ausencias» de Ausencias (con el motivo).
 - Los selectores de listas largas (miembro, rol, usuario del Hub) buscan en el servidor
@@ -790,7 +803,13 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   omite con su motivo en vez de tumbar el lote; más de 100 filas se rechaza en vez de perder las
   sobrantes; no avisa de una ficha nueva si no entra ninguna.
 - **Notas de RRHH**: se ven con la compensación (antes se escribían y nadie las leía).
-- **Ajustes**: las horas salen siempre en HH:MM; se guarda solo lo enviado.
+- **Ajustes** son solo la **jornada por defecto**, y ahora sirve: un horario nuevo la propone (antes
+  ningún módulo leía los ajustes y el horario nuevo salía de 09:00 a 18:00 fijo y sin descanso). Las
+  horas salen siempre en HH:MM, se guarda solo lo enviado y una jornada que acaba antes de empezar ya no
+  se admite (un día de horario no cruza la medianoche). Se retiran los otros ocho ajustes, que no
+  cambiaban nada: la antelación mínima de reserva y el permitir elegir profesional repetían los de Citas
+  y Reservas online, que son los que mandan; las horas máximas por día, el umbral de horas extra,
+  mostrar fotos y biografía del personal y los dos avisos no los leía nadie.
 - **Foto** de la ficha y **orden** de la ficha: no se portan; ninguna pantalla ni comando los escribía.
 - Las cifras ya no cuentan las ausencias pendientes de una ficha dada de baja.
 - **Los paneles del Inicio** (Plantilla activa, Ausentes hoy, Ausencias pendientes, Ausencias de hoy y
