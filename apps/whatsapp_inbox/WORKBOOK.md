@@ -5,9 +5,9 @@ Estado de la app: hecha en el Hub (servidor y páginas), también las plantillas
 borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se desconecta desde Ajustes. erplora.com
 tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están probados de punta a punta contra
 el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
-la opción tocada, contestar, enviar una plantilla, editarla y borrarla, y olvidar un número. Quedan en parcial
-conectar el número (falta la página de erplora.com a la que Meta devuelve su código, F01 y F02), llegar al
-tope del mes (F13), la lista de plantillas de Meta (F27, F28) y la cabecera con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
+la opción tocada, contestar, enviar una plantilla, editarla y borrarla, olvidar un número, conectar el número,
+llegar al tope del mes (F13) y la lista de plantillas que erplora.com trae de Meta (F27, F28). Queda en parcial
+la cabecera con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
 esperan al asistente del Hub y a que Automatizaciones pueda mandar un mensaje a un cliente.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
@@ -172,7 +172,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | hecho | comun |
 | WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | hecho | comun |
 | WHATSAPP_INBOX-F12 | Unir dos fichas de la misma clienta | hecho | comun |
-| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | parcial — el Hub enseña las cifras del mes que manda erplora.com y frena el envío en el tope, pero llegar al tope no se ha visto de punta a punta: erplora.com solo cuenta lo que Meta acepta, y su número de pruebas lleva un permiso inventado que Meta rechaza | comun |
+| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | hecho | comun |
 | WHATSAPP_INBOX-F14 | Activar «Reservar citas» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe la clienta) | peluqueria |
 | WHATSAPP_INBOX-F15 | Activar «Reservar mesa» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe el cliente) | restaurante |
 | WHATSAPP_INBOX-F16 | Decidir si las reservas por WhatsApp se confirman solas | parcial — el interruptor va en la tarjeta de F14 o F15, que todavía no aparece; mientras, la misma decisión se toma en Citas («Ajustar las reglas de reserva») y en Reservas («Elegir si las reservas se confirman solas») | comun |
@@ -186,8 +186,8 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | parcial — el asistente, que lee el mensaje, busca sitio y redacta la respuesta, todavía no está en el Hub; hoy la reserva se toma a mano en Reservas | restaurante |
 | WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub; hoy se cambia o se anula a mano en Reservas | restaurante |
 | WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | parcial — Automatizaciones ya puede mandar el aviso (FLOW-F31), pero Reservas todavía no dice el día de la reserva en palabras, en el idioma del negocio: la automatización no se ofrece y el cliente no recibe el aviso | restaurante |
-| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | parcial — la tabla enseña lo que el Hub sabe y cambia sola; la lista que llega de erplora.com no se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del número, y el de su número de pruebas es inventado | comun |
-| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | parcial — el Hub guarda lo que le llega; la lista que llega de erplora.com no se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del número, y el de su número de pruebas es inventado | comun |
+| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | hecho | comun |
+| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | hecho | comun |
 | WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se hace en WhatsApp Manager) | comun |
 | WHATSAPP_INBOX-F30 | Editar una plantilla | hecho | comun |
 | WHATSAPP_INBOX-F31 | Borrar una plantilla | hecho | comun |
@@ -427,16 +427,14 @@ Implicados: Clientes
 
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
 <!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
-Estado: parcial — el Hub enseña las cifras del mes que manda erplora.com y frena el envío en el tope,
-pero llegar al tope no se ha visto de punta a punta: erplora.com solo cuenta lo que Meta acepta, y su
-número de pruebas lleva un permiso inventado que Meta rechaza
+Estado: hecho
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
 Pasos:
 1. **Ajustes → Este mes** enseña los mensajes enviados este mes frente a los del plan; los dos
    números los pone erplora.com. Si el plan no incluye mensajes de WhatsApp, lo dice («Tu plan no incluye
-   mensajes de WhatsApp.»), nunca que no tiene límite; antes de que erplora.com hable, «erplora.com todavía no ha
-   informado de los mensajes de este mes.».
+   mensajes de WhatsApp.»), nunca que no tiene límite; en el tope, «Has usado todos los mensajes de tu plan este
+   mes.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este mes.».
 2. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
    enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve **Mejorar el plan**, que abre
@@ -446,8 +444,10 @@ Pasos:
    plan no incluye mensajes, sigue.
 Entra: el consumo y el tope del mes que manda erplora.com (0: el plan no incluye ninguno).
 Sale: el aviso en la bandeja; nada se guarda.
-Si falla: si erplora.com rechaza un envío por el tope, el mensaje no sale y se dice por qué; si pide ir
-más despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
+Si falla: si erplora.com rechaza un envío por el tope (las cifras del Hub iban por detrás), el mensaje no
+llega a Meta ni se cuenta, queda «No entregado» y lo dice con «Los mensajes de WhatsApp de tu plan de este mes
+están gastados: no se puede enviar nada hasta el mes que viene.», nunca como motivo de Meta; si pide ir más
+despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
@@ -742,9 +742,7 @@ Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, WHATSAPP_INBOX-F15, WHAT
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
-Estado: parcial — la tabla enseña lo que el Hub sabe y cambia sola; la lista que llega de erplora.com no
-se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el
-permiso del número, y el de su número de pruebas es inventado
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -759,9 +757,7 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
-Estado: parcial — el Hub guarda lo que le llega; la lista que llega de erplora.com no se ha visto
-todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del
-número, y el de su número de pruebas es inventado
+Estado: hecho
 Actor: sistema
 Pantalla: Ajustes
 Pasos:
@@ -769,8 +765,9 @@ Pasos:
 2. Aparece en **Ajustes → Plantillas de Meta** en cuanto erplora.com la manda, con su texto, sus
    variables, sus botones y su estado.
 3. Las que el Hub no sabe rellenar al enviar (cabecera con foto, vídeo, documento o una variable;
-   variables con nombre en vez de número; códigos de verificación) se ven, pero no se ofrecen para
-   enviar ni se editan aquí.
+   variables con nombre en vez de número; códigos de verificación) se ven con su estado y «No se puede
+   enviar ni editar aquí: se gestiona en WhatsApp Manager.», pero no se ofrecen para enviar ni se editan
+   aquí; sí se pueden borrar.
 Entra: la lista de plantillas que erplora.com trae de Meta.
 Sale: cada plantilla guardada como la tiene Meta.
 Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de vuelta una borrada aquí.

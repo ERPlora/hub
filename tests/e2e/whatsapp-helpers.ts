@@ -55,8 +55,9 @@ import {
   WABA_ID,
 } from './whatsapp-graph';
 import { messageIds, type Push, pushProblem } from './whatsapp-pushes';
+import { type ErploraSeed, SEED_TEMPLATES, seedArguments } from './whatsapp-seed';
 
-export { NUMBER_ID, WABA_ID };
+export { NUMBER_ID, SEED_TEMPLATES, WABA_ID };
 
 /** Every WhatsApp id, template and card name of a run starts like this. */
 export const PREFIX = 'e2e.';
@@ -135,20 +136,27 @@ export const BUSINESS_PHONE = '34910000101';
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
 const SAAS_DB = process.env.E2E_SAAS_DB || `saas_e2e_${new URL(SAAS).port || '80'}`;
 
-/** Gives `a` its WhatsApp number in the run's erplora.com, with erplora.com's own test seed, and has it push the
- *  photo to this Hub: what the seed printed (`delivered` true when this Hub took it). Running it again keeps what
- *  exists, connects the number again (a reconnect asked by Meta is cleared) and pushes once more. */
-export function seedErplora(): { delivered: boolean; hub_error: string } {
-  const script = join(SAAS_DIR, 'tests', 'e2e', 'panel', 'whatsapp_hub_seed.py');
-  if (!existsSync(script)) {
-    throw new Error(`erplora.com's checkout with ${script} is needed (E2E_SAAS_DIR): see whatsapp-helpers.ts.`);
-  }
-  const ids = Object.fromEntries(
+/** The Hub's ids of `a` and `b` (the ones erplora.com's seed gives them). */
+const hubIds = (): Record<string, string> =>
+  Object.fromEntries(
     psql("select slug || '=' || id from base_hub where slug in ('a', 'b') order by slug")
       .split('\n')
       .map((row) => row.split('=')),
   );
-  const out = execFileSync('uv', ['run', 'python', script, ids.a, ids.b], {
+
+/** Gives `a` its WhatsApp number in the run's erplora.com, with erplora.com's own test seed, and has it push the
+ *  photo to this Hub: what the seed printed (`delivered` true when this Hub took it). The seed also keeps `a`'s
+ *  templates as erplora.com does after reading Meta's list (`SEED_TEMPLATES`) and sets the month's usage to `used`
+ *  (whatsapp-seed.ts).
+ *  Running it again keeps what exists, connects the number again (a reconnect asked by Meta is cleared), sets the
+ *  usage again and pushes once more. */
+export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_error: string } {
+  const script = join(SAAS_DIR, 'tests', 'e2e', 'panel', 'whatsapp_hub_seed.py');
+  if (!existsSync(script)) {
+    throw new Error(`erplora.com's checkout with ${script} is needed (E2E_SAAS_DIR): see whatsapp-helpers.ts.`);
+  }
+  const ids = hubIds();
+  const out = execFileSync('uv', ['run', 'python', script, ids.a, ids.b, ...seedArguments(seed)], {
     cwd: SAAS_DIR,
     encoding: 'utf8',
     env: { ...process.env, DEBUG: 'True', DB_NAME: SAAS_DB, HUB_INTERNAL_URL: `http://127.0.0.1:${STACK.hubPort}` },
@@ -268,6 +276,18 @@ function pushesOf(ids: string[]): Push[] {
     encoding: 'utf8',
   });
   return JSON.parse(out.trim()) as Push[];
+}
+
+/** The WhatsApp messages erplora.com counts for `a` this calendar month (UTC), as its plan's allowance reads them. */
+export function erploraUsage(): number {
+  const sql =
+    "select coalesce(max(used), 0) from whatsapp_usage where month = to_char(now() at time zone 'utc', 'YYYY-MM') " +
+    `and hub_id = '${hubIds().a.replace(/'/g, '')}'`;
+  const out = execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'hub', '-d', SAAS_DB, '-At', '-c', sql], {
+    cwd: REPO_DIR,
+    encoding: 'utf8',
+  });
+  return Number(out.trim());
 }
 
 /** Posts `body` to erplora.com's webhook as Meta does (`meta`) and fails saying why unless erplora.com took it and

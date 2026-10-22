@@ -554,6 +554,28 @@ def test_a_template_made_in_whatsapp_manager_the_hub_cannot_fill_is_brought_but_
     assert excinfo.value.code == "whatsapp_inbox.template_not_sendable"
 
 
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"header_format": "IMAGE", "header": ""},
+        {"body": "Hola {{nombre}}, te damos la bienvenida."},
+        {"category": "AUTHENTICATION"},
+    ],
+)
+@respx.mock
+def test_the_list_says_which_templates_the_hub_cannot_fill_whatever_meta_says_of_them(fields):
+    """F28: Settings says of a template the Hub cannot fill that it is not sent nor edited here, so the list tells
+    it apart from one Meta has not approved (in review: not sendable, not editable, yet the Hub fills it)."""
+    connect(templates=[template("de_manager", **fields), template("en_revision", status="PENDING"), template("sencilla")])
+    by_name = {t.name: t for t in listed()}
+    assert {name: row.supported for name, row in by_name.items()} == {
+        "de_manager": False,
+        "en_revision": True,
+        "sencilla": True,
+    }
+    assert (by_name["de_manager"].editable, by_name["de_manager"].sendable) == (False, False)
+
+
 # ── The worker hands again what never ended (phase 1 runs its scheduled task too) ───────────────
 
 

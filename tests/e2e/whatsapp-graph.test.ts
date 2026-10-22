@@ -25,6 +25,7 @@ import {
   graphAnswer,
   type GraphCall,
   graphProblem,
+  messageSends,
   META_APP,
   NUMBER_ID,
   PROBE_CODE,
@@ -86,6 +87,21 @@ describe('graphAnswer', () => {
     const unknown = graphAnswer(call('GET', '/me', { token: TOKEN }));
     expect(unknown[0]).toBe(400);
     expect(metaCode(unknown)).toBe(100);
+  });
+});
+
+describe('messageSends', () => {
+  it('keeps the messages erplora.com asked Meta to send from `a`’s number, and nothing else it asked', () => {
+    const sent = call('POST', `/${NUMBER_ID}/messages`, { token: SEED_TOKEN });
+    const calls = [
+      call('GET', '/oauth/access_token', { query: { code: PROBE_CODE } }),
+      sent,
+      call('GET', `/${NUMBER_ID}/messages`, { token: SEED_TOKEN }),
+      call('POST', `/${WABA_ID}/message_templates`, { token: SEED_TOKEN }),
+      call('POST', '/880000000000999/messages', { token: SEED_TOKEN }),
+    ];
+    expect(messageSends(calls)).toEqual([sent]);
+    expect(messageSends([])).toEqual([]);
   });
 });
 

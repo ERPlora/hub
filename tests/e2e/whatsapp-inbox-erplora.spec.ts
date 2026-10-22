@@ -4,7 +4,8 @@
 // Meta permission) and pushes its photo here; then:
 // - F03, F08, F34, F38: what Meta posts to erplora.com's webhook, signed as Meta signs it — a customer's message (twice:
 //   one message), the owner's answer from the WhatsApp Business app, Meta's statuses of it and the option she taps —
-//   reaches the open inbox through erplora.com's doors 1 and 2, without a reload;
+//   reaches the open inbox through erplora.com's doors 1 and 2, without a reload; each post fails on the spot, saying
+//   why, unless erplora.com handed every message it carries to this Hub (`metaHandsOver`);
 // - F32: the owner's reply goes through erplora.com (door 5) to Meta, which refuses the made-up permission: the bubble
 //   says «Not delivered» with erplora.com's reason, and erplora.com's next photo says the number must be reconnected;
 // - F10, F11: erasing a number, in the inbox or from the customer's card, has erplora.com forget it (door 6), which
@@ -18,7 +19,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp as cleanUpCards, inputOf } from './customer-helpers';
 import { A, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { BUSINESS_PHONE, cleanUp, e2ePhone, meta, metaGraph, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
+import { BUSINESS_PHONE, cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -61,7 +62,7 @@ const said = (phone: string, name: string, id: string, body: string) =>
 /** The inbox open at `phone`'s conversation, once Meta's message of her has arrived through erplora.com. */
 async function arrived(page: Page, phone: string, name: string, body: string): Promise<void> {
   await shown(page).locator('[data-testid=whatsapp-inbox-search] input').fill(phone.slice(3));
-  expect(await meta(page.request, said(phone, name, `${PREFIX}wamid.${Date.now()}.in`, body))).toBe(200);
+  await metaHandsOver(page.request, said(phone, name, `${PREFIX}wamid.${Date.now()}.in`, body));
   await expect(rowOf(page, phone)).toBeVisible({ timeout: 30_000 });
 }
 
@@ -89,11 +90,11 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
   // again is still one message.
   await shown(page).locator('[data-testid=whatsapp-inbox-search] input').fill(phone.slice(3));
   const first = said(phone, name, `${PREFIX}wamid.${run}.in`, 'Hola, ¿me dais cita el viernes?');
-  expect(await meta(page.request, first)).toBe(200);
+  await metaHandsOver(page.request, first);
   await expect(rowOf(page, phone)).toBeVisible({ timeout: 30_000 });
   await expect(rowOf(page, phone)).toContainText(name);
   await expect(rowOf(page, phone).locator('[data-testid=whatsapp-inbox-unread]')).toHaveText('1');
-  expect(await meta(page.request, first)).toBe(200);
+  await metaHandsOver(page.request, first);
   await shots(page, 'F03', async (p) => {
     await expect(rowOf(p, phone).locator('[data-testid=whatsapp-inbox-unread]')).toHaveText('1');
   });
@@ -104,7 +105,7 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
   // F03: closed, her next message opens it again.
   await panel(page).locator('[data-testid=whatsapp-inbox-detail-status-closed]').click();
   await expect(panel(page).locator('[data-testid=whatsapp-inbox-detail-status]')).toContainText('Closed');
-  expect(await meta(page.request, said(phone, name, `${PREFIX}wamid.${run}.in2`, 'Mejor por la tarde.'))).toBe(200);
+  await metaHandsOver(page.request, said(phone, name, `${PREFIX}wamid.${run}.in2`, 'Mejor por la tarde.'));
   await expect(bubbles(page, 'inbound')).toHaveCount(2, { timeout: 30_000 });
   await expect(panel(page).locator('[data-testid=whatsapp-inbox-detail-status]')).toContainText('Open');
 
@@ -115,7 +116,7 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
       { from: BUSINESS_PHONE, to: phone.slice(1), id: echo, timestamp: metaNow(), type: 'text', text: { body: 'Sí, el viernes a las 17:00.' } },
     ],
   });
-  expect(await meta(page.request, echoed)).toBe(200);
+  await metaHandsOver(page.request, echoed);
   const answer = bubbles(page, 'outbound').filter({ hasText: 'el viernes a las 17:00' });
   await expect(answer.locator('[data-testid=whatsapp-inbox-message-from-phone]')).toHaveText('From the phone', { timeout: 30_000 });
   await expect(rowOf(page, phone).locator('[data-testid=whatsapp-inbox-unread]')).toHaveText('—');
@@ -127,11 +128,11 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
   const status = (value: string) =>
     notice('messages', { statuses: [{ id: echo, status: value, timestamp: metaNow(), recipient_id: phone.slice(1) }] });
   const state = answer.locator('[data-testid=whatsapp-inbox-message-status]');
-  expect(await meta(page.request, status('delivered'))).toBe(200);
+  await metaHandsOver(page.request, status('delivered'));
   await expect(state).toContainText('Delivered', { timeout: 30_000 });
-  expect(await meta(page.request, status('read'))).toBe(200);
+  await metaHandsOver(page.request, status('read'));
   await expect(state).toContainText('Read', { timeout: 30_000 });
-  expect(await meta(page.request, status('delivered'))).toBe(200);
+  await metaHandsOver(page.request, status('delivered'));
   await shots(page, 'F34', async () => {
     await expect(state).toContainText('Read');
   });
@@ -149,7 +150,7 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
       },
     ],
   });
-  expect(await meta(page.request, tapped)).toBe(200);
+  await metaHandsOver(page.request, tapped);
   const option = bubbles(page, 'inbound').filter({ hasText: 'Confirmar' });
   await expect(option).toBeVisible({ timeout: 30_000 });
   await shots(page, 'F38', async () => {

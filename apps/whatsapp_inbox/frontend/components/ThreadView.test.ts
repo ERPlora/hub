@@ -86,6 +86,27 @@ describe('ThreadView', () => {
     expect(failed.text()).toContain("Meta's reason: Re-engagement message");
   });
 
+  it('a send erplora.com refused for the plan’s cap says it in the Hub’s words, never as Meta’s reason (WHATSAPP_INBOX-F13)', async () => {
+    const capped = message({
+      id: 'g',
+      direction: 'outbound',
+      origin: 'hub',
+      status: 'failed',
+      error_code: 'whatsapp_inbox.cap_reached',
+      error_message: "The plan's WhatsApp messages of this month are spent.",
+    });
+    for (const [locale, said] of [
+      ['en', "This month's WhatsApp messages of your plan are spent: nothing can be sent until next month."],
+      ['es', 'Los mensajes de WhatsApp de tu plan de este mes están gastados: no se puede enviar nada hasta el mes que viene.'],
+    ] as const) {
+      const s = await setup({ messages: [capped] }, locale);
+      const error = s.bubbles()[0].find('[data-testid="whatsapp-inbox-message-error"]');
+      expect(error.attributes('data-code'), locale).toBe('whatsapp_inbox.cap_reached');
+      expect(error.text(), locale).toBe(said);
+      expect(s.bubbles()[0].text(), locale).not.toMatch(/Meta's reason|Motivo de Meta|The plan's WhatsApp/);
+    }
+  });
+
   it('opens an attachment at erplora.com in a new tab, named by its kind, file and caption', async () => {
     const s = await setup({
       messages: [

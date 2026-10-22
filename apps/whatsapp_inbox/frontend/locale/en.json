@@ -224,7 +224,8 @@
         "sending": "Sending to Meta…",
         "notAccepted": "Not accepted: {reason}",
         "notSent": "Changes not sent: {reason}",
-        "deleting": "Being deleted at Meta"
+        "deleting": "Being deleted at Meta",
+        "unfillable": "Can't be sent or edited here: it is managed in WhatsApp Manager."
       }
     },
     "settings": {

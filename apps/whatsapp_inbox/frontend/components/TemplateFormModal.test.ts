@@ -39,6 +39,7 @@ const approved = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   submit_error: '',
   editable: true,
   sendable: true,
+  supported: true,
   deleting: false,
   ...over,
 });

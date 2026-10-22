@@ -242,6 +242,8 @@ export interface TemplateOut {
   submit_error: string;
   editable: boolean;
   sendable: boolean;
+  /** Whether the Hub fills it when sending; else it is only sent and changed from WhatsApp Manager (F28). */
+  supported: boolean;
   deleting: boolean;
 }
 

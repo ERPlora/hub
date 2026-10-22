@@ -809,6 +809,10 @@ class TemplateOut(Schema):
     submit_error: str = Field(description="The reason, in words.")
     editable: bool = Field(description="Whether it can be changed here (else only in WhatsApp Manager).")
     sendable: bool = Field(description="Whether the Hub can send it now.")
+    supported: bool = Field(
+        description="Whether the Hub fills it when sending, whatever Meta says of it (else it is only sent and "
+        "changed from WhatsApp Manager: a file or place header, named variables, a code…)."
+    )
     deleting: bool = Field(description="Deleted here, still being deleted at Meta.")
 
 
