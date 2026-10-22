@@ -136,6 +136,27 @@ describe('CommissionsPage', () => {
     expect(s.find('staff-commissions-from').exists()).toBe(false);
   });
 
+  it('on a phone, the same five choices in a select (the strip would hide «Custom» past the edge); picking one there follows it', async () => {
+    const s = await setup();
+    await s.show(REPORT);
+    const select = s.find('staff-commissions-period-select');
+    expect(select.findAll('ion-select-option').map((o) => [(o.element as Control).value, o.text()])).toEqual([
+      ['today', 'Today'],
+      ['yesterday', 'Yesterday'],
+      ['this_week', 'This week'],
+      ['this_month', 'This month'],
+      ['custom', 'Custom'],
+    ]);
+    const control = select.element as Control;
+    expect([control.value, control.label, control.getAttribute('mode'), control.fill]).toEqual(['today', 'Period', 'md', 'outline']);
+    control.value = 'custom';
+    select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'custom' } }));
+    await s.reopen();
+    // One control in two shapes: the strip follows the select, and «Custom» opens the days here too.
+    expect((s.control('staff-commissions-period') as Control).value).toBe('custom');
+    expect(s.report()).toEqual([{ date_from: '2026-08-19', date_to: '2026-08-19' }]);
+  });
+
   it('a «To» before «From»: the server’s word goes under «To» and the list waits', async () => {
     const s = await setup();
     await s.show(REPORT);

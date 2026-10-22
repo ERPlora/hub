@@ -10,7 +10,7 @@
 import { type DataTableColumn, DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type LiveStatus, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonInput, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
+import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -164,6 +164,26 @@ const blocked = computed(() => blockingError(error.value));
             <ion-label>{{ $t(`staff.commissions.period.${value}`) }}</ion-label>
           </ion-segment-button>
         </ion-segment>
+        <!-- On a phone the strip would hide «Custom» past its edge with nothing peeking: the same choices as a select. -->
+        <ion-select
+          class="staff-commissions__select"
+          data-testid="staff-commissions-period-select"
+          interface="popover"
+          mode="md"
+          fill="outline"
+          label-placement="floating"
+          :label="$t('staff.commissions.period.label')"
+          :value="choice"
+          @ion-change="pick"
+        >
+          <ion-select-option
+            v-for="value in CHOICES"
+            :key="value"
+            :value="value"
+          >
+            {{ $t(`staff.commissions.period.${value}`) }}
+          </ion-select-option>
+        </ion-select>
         <div
           v-if="choice === 'custom'"
           class="staff-commissions__range"
@@ -293,6 +313,11 @@ const blocked = computed(() => blockingError(error.value));
   max-width: 100%;
 }
 
+/* The select stands in for the strip on a phone only (same breakpoint as the cards below). */
+.staff-commissions__select {
+  display: none;
+}
+
 .staff-commissions__range {
   display: grid;
   grid-template-columns: repeat(2, minmax(9rem, 12rem));
@@ -363,6 +388,13 @@ const blocked = computed(() => blockingError(error.value));
 }
 
 @media (max-width: 575px) {
+  .staff-commissions__choices {
+    display: none;
+  }
+  .staff-commissions__select {
+    display: block;
+    width: 100%;
+  }
   .staff-commissions__range {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;

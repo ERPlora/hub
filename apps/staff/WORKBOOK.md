@@ -115,7 +115,8 @@ descanso, Fin descanso** (o «No trabaja»).
 ### Comisiones
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
-días que cuenta. Debajo, dos cifras: **Vendido** y **Comisiones** del periodo. Después, la lista con
+días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
+Debajo, dos cifras: **Vendido** y **Comisiones** del periodo. Después, la lista con
 buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
 persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
 en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
@@ -729,7 +730,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   lleva: una entrada de menú no puede depender de un permiso (`live.meta.Nav`).
 - Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo
   resuelve el servidor en días del negocio, y «Personalizado» envía `date_from` y `date_to`. Su 422 sale
-  bajo «Hasta». Solo se suscribe quien ve la compensación. La consulta pide `sale.sale.by_staff` por su
+  bajo «Hasta». Hasta 575 px el periodo es un `ion-select` (popover, `mode="md"`) con las mismas opciones
+  y el mismo manejador: la fila de botones desplazable dejaba «Personalizado» fuera de pantalla a 375 y
+  390 px sin que nada asomara (la ilusión de que la fila acaba ahí, la misma trampa de la barra de pestañas). Solo se suscribe quien ve la compensación. La consulta pide `sale.sale.by_staff` por su
   nombre (`live.operations.get`): Ventas ausente o apagada da `sales_available: false`.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas como suscripciones aparte: el servidor no da
   más de 100) y `useServerTable` (orden `columna`/`-columna`); escrituras con `useCommand`.
