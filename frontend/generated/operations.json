@@ -108,6 +108,7 @@
   "staff.member.deactivate": { "method": "post", "path": "/api/staff/members/deactivate" },
   "staff.member.terminate": { "method": "post", "path": "/api/staff/members/terminate" },
   "staff.commission.summary": { "method": "get", "path": "/api/staff/commissions" },
+  "staff.commission.report": { "method": "get", "path": "/api/staff/commissions/report" },
   "staff.account.list": { "method": "get", "path": "/api/staff/accounts" },
   "staff.role.list": { "method": "get", "path": "/api/staff/roles" },
   "staff.role.create": { "method": "post", "path": "/api/staff/roles" },

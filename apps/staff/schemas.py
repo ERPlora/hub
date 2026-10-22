@@ -36,6 +36,7 @@ NO_DAYS = _("A schedule needs at least one working day with hours.")
 WEEKDAY_REPEATED = _("Each weekday can appear only once.")
 SCHEDULE_RANGE = _("The schedule's validity ends before it starts.")
 END_BEFORE_START = _("The end date cannot be before the start date.")
+PERIOD_BOTH_DAYS = _("A period of your own needs its first and its last day.")
 RANGE_TOO_LONG = _("Ask for at most 731 days at a time.")
 TIMES_REQUIRED = _("A half-day absence needs a start and an end time.")
 
@@ -49,6 +50,10 @@ MAX_ORDER = 2_147_483_647
 MemberStatus = Literal["active", "inactive", "on_leave"]
 LeaveType = Literal["vacation", "sick", "personal", "training", "other"]
 TimeOffStatus = Literal["pending", "approved", "rejected", "cancelled"]
+#: A record's status as the commission report shows it: someone who left still earned what they sold.
+RecordStatus = Literal["active", "inactive", "on_leave", "terminated"]
+#: The commission report's periods, counted in business days up to today.
+CommissionPeriod = Literal["today", "yesterday", "this_week", "this_month"]
 
 # The columns each list sorts by, both ways ("-" first = descending); id is always the tie-break.
 MEMBER_SORTS = (
@@ -392,6 +397,35 @@ class CommissionSummaryIn(PageIn):
     search: Search | None = Field(None, description="Text to look for in the name.")
 
 
+class CommissionReportIn(Schema):
+    period: CommissionPeriod = Field(
+        "today",
+        description="today (the default), yesterday, this_week (from Monday) or this_month (from the 1st), "
+        "in business days up to today. date_from and date_to replace it.",
+    )
+    date_from: dt.date | None = Field(
+        None, description="A period of your own: its first business day (YYYY-MM-DD), with date_to."
+    )
+    date_to: dt.date | None = Field(
+        None,
+        validate_default=True,
+        description="A period of your own: its last business day (YYYY-MM-DD), at most 731 days after date_from.",
+    )
+
+    @field_validator("date_to")
+    @classmethod
+    def _own_period(cls, value: dt.date | None, info: ValidationInfo) -> dt.date | None:
+        start = info.data.get("date_from")
+        if (start is None) != (value is None):
+            raise ValueError(str(PERIOD_BOTH_DAYS))
+        if start is not None and value is not None:
+            if value < start:
+                raise ValueError(str(END_BEFORE_START))
+            if (value - start).days >= MAX_AVAILABILITY_DAYS:
+                raise ValueError(str(RANGE_TOO_LONG))
+        return value
+
+
 class MemberOut(Schema):
     id: UUID
     first_name: str
@@ -443,8 +477,8 @@ class CompensationOut(Schema):
 
 
 class CommissionOut(Schema):
-    """Both ids of a person: their sales come under the record (from an appointment) or under the user
-    (at the counter); add them up before applying the rate."""
+    """Who can earn a commission, with their rate. A sale names its professional by the record's id; what
+    each one earned in a period is ``staff.commission.report``."""
 
     id: UUID = Field(description="The staff record's id.")
     user_id: int | None = Field(
@@ -461,6 +495,32 @@ class CommissionOut(Schema):
 MemberPage = Page[MemberOut]
 CompensationPage = Page[CompensationOut]
 CommissionPage = Page[CommissionOut]
+
+
+class CommissionReportRow(Schema):
+    member_id: UUID = Field(description="The staff record's id.")
+    full_name: str
+    role_name: str | None
+    status: RecordStatus = Field(
+        description="active or on_leave (who can earn a commission); inactive or terminated when they sold in the period."
+    )
+    commission_rate: Decimal = Field(description="Commission, in percent.")
+    sold: int = Field(description="What they sold in the period, refunds taken off, in cents.")
+    commission: int = Field(description="sold x rate / 100, in cents, rounded half up once.")
+
+
+class CommissionReportOut(Schema):
+    date_from: dt.date = Field(description="The period's first business day.")
+    date_to: dt.date = Field(description="The period's last business day.")
+    sales_available: bool = Field(
+        description="False when the business has no Sales: there is nothing to work a commission out from."
+    )
+    rows: list[CommissionReportRow] = Field(
+        description="Everyone who can earn a commission (active or on leave), also without sales, and whoever "
+        "sold in the period though inactive or terminated, by name."
+    )
+    total_sold: int = Field(description="What the rows sold, in cents.")
+    total_commission: int = Field(description="The rows' commissions added up, in cents.")
 
 
 class MemberStatsOut(Schema):

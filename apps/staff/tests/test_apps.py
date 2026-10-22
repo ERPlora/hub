@@ -27,6 +27,7 @@ QUERIES = {
     "staff.member.compensation",
     "staff.member.stats",
     "staff.commission.summary",
+    "staff.commission.report",
     "staff.role.list",
     "staff.schedule.list",
     "staff.schedule.detail",
