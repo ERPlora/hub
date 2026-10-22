@@ -1,8 +1,8 @@
 # Workbook — Página web (app)
 Prefijo: WEBSITE
 Alcance MVP: transversal (peluquería y restaurante: la página del negocio en su propia dirección)
-Estado de la app: completa (2026-10-22)
-Lo que no entra todavía: ver «Lo que NO hace, a propósito».
+Estado de la app: completa (2026-10-23)
+Lo que no entra todavía: ver «Lo que queda fuera» y «Lo que NO hace, a propósito».
 
 > Manual de usuario y especificación de la app `website`. Nace en la ronda 2026-10-21 (PLAN §29, con su ampliación del
 > 2026-10-22): no es un porte del producto actual, que no tenía página pública por negocio. Cada flujo está `hecho`
@@ -551,12 +551,16 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   (`sections/reviews.html`) y en el paquete (`frontend/public/reviews.ts`, que rehace el resumen y las tarjetas):
   `frontend/public/reviews.fixture.json` guarda ese marcado y lo comprueban los dos lados. Sin foto del autor (la CSP
   solo deja imágenes del Hub) ni logotipo: «Google Maps» va en texto, con `translate="no"`, como piden las normas de
-  Google. **Clave**: `GOOGLE_PLACES_API_KEY` (`config/settings.py`, `.env.example`); en AWS va en Secrets Manager y en la
-  definición de tarea del Hub (Terraform, pendiente en `aws/`). Restringirla a la Places API (New).
+  Google. **Clave**: `GOOGLE_PLACES_API_KEY` (`config/settings.py`, `.env.example`); en AWS va en Secrets Manager
+  (`erplora/prod/hub` y `erplora/pre/app`) y Terraform la da a las tareas de la imagen del Hub (`hub`, `worker`,
+  `hub-migrate` y `db-bootstrap`; ERPlora/aws#10), cuyo `scripts/post-apply-verify.sh` exige que esté rellena.
+  Restringirla a la Places API (New).
 - **Migración 0004** (`0004_site_reviews_snapshot`, reversible): añade `Site.reviews_snapshot` (JSON, `{}` por defecto).
 - La subida va en base64 dentro del JSON de la operación (como el certificado de VeriFactu), con
   `accept_body_up_to(7 100 000)` en su ruta: una sola puerta para la SPA, las API keys y el asistente.
-- El QR es `qrcode` (la misma librería del QR de VeriFactu), corrección media y zona tranquila de cuatro módulos.
+- El QR es `qrcode` (la misma librería del QR de VeriFactu), corrección media y zona tranquila de cuatro módulos. No
+  `segno`, que nombraban PLAN §29 y el diseño de referencia: una sola librería de QR en el Hub (ronda CLOSE-WEBSITE de
+  PLAN-HUB).
 - El admin del Hub (`hubs.erplora.com/admin`) es de solo lectura salvo `is_live` (desconectar una página por
   soporte): no se añade ni se borra nada desde allí, y esa escritura no deja aviso.
 - Asistente: las cinco operaciones que usa (`website.site.get`, `website.site.save`, `website.site.publish`,
@@ -627,10 +631,30 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   tecla). Las e2e nunca preguntan a Google: `website-flows.spec.ts` se niega a correr con `GOOGLE_PLACES_API_KEY` y
   WEBSITE-F12 enseña las reseñas desde una última respuesta buena escrita en la fila del sitio.
 
+## Lo que queda fuera
+
+- **`ai=` en las seis operaciones que no son herramienta del asistente** (`website.site.preview`, `website.qr.get`,
+  `website.image.upload`, `website.public.site`, `website.public.catalog` y `website.public.reviews`): PLAN §30 pide
+  `ai=` en toda operación, y estas seis esperan al marcador `INTERNAL` y al check `live.E017`, que aún no existen en
+  `packages/live` (ver «Asistente» en «Para quien lo mantiene»). El QR no hace falta como herramienta:
+  `website.site.get` ya da la dirección pública.
+- **Dominio propio para la web** (ADR-0502): HUBS-F17, en «Fuera por ahora» (`## 6`) de `MIGRATION.md` y en PLAN-SAAS
+  §8 (ronda 2026-10-22). Llega a la vez con sus tres piezas: la verificación en el SaaS, el certificado en el ALB de
+  `aws` y la resolución por host en `base`. Hasta entonces, la web vive solo en la dirección del hub.
+- **Dos arreglos fuera de la app, en la cola** (`TODO.md`, vistos en APP-WEBSITE):
+  - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`): en el host de un hub, `/favicon.ico`, `/robots.txt` o
+    cualquier ruta sin URL propia pedida sin `Accept: text/html` responde la SPA con 200 y una cookie `csrftoken`. La
+    web ya no lo dispara (declara su icono, «El icono de la página» arriba), pero un buscador sigue leyendo un
+    `robots.txt` que es HTML.
+  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`): en `ImageUpload` la miniatura y su texto se tocan, sin
+    hueco, en los tres tamaños (logotipo, portada, Sobre nosotros y galería).
+- **La fuente del catálogo apagada no se ve en la e2e**: en la fase 1 toda app instalada está activa, así que ese caso
+  de WEBSITE-F05 lo cubren pytest (servidor) y Vitest (editor), no Playwright.
+
 ## Lo que NO hace, a propósito
 
 - Una sola página por negocio: sin páginas adicionales ni `/p/<página>`.
-- Sin dominio propio por negocio (ADR-0502), sin HTML, CSS ni JS del usuario y sin más plantillas que las cuatro.
+- Sin HTML, CSS ni JS del usuario y sin más plantillas que las cuatro. El dominio propio, en «Lo que queda fuera».
 - El horario no se importa de Horarios; no hay enlace de reservas hasta que exista la página de Reservas online en
   `/p/…`.
 - Las imágenes se guardan tal cual (sin variantes de tamaño ni recorte, y sin quitarles los metadatos EXIF); no se
