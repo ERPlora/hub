@@ -209,6 +209,18 @@ def test_the_bad_signatures_count_per_address_as_the_proxies_saw_it(db, settings
     assert signed(behind, "put", PATH, {"slug": "a", "version": 1}, HTTP_X_FORWARDED_FOR="203.0.113.8").status_code == 200
 
 
+def test_with_the_cache_away_the_signature_still_decides(client, db, monkeypatch):
+    from django.core.cache import caches
+
+    def away(*args, **kwargs):
+        raise ConnectionError("Valkey is not answering")
+
+    for method in ("get_many", "add", "incr", "set", "touch"):
+        monkeypatch.setattr(caches["default"], method, away)
+    assert signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
+    assert signed(client, "put", PATH, {"slug": "a", "version": 1}).status_code == 200
+
+
 def test_the_state_is_only_put(client, db):
     assert signed(client, "post", PATH, {"slug": "a", "version": 1}).status_code == 405
 

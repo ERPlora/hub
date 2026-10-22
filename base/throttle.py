@@ -10,8 +10,10 @@ attempts it refused with an :class:`AttemptLimit` instead: past its ``attempts``
 failure, :meth:`AttemptLimit.wait` says how long the caller waits (``Retry-After``) and the door refuses before it
 checks anything; what it accepts is never counted.
 
-A cache that does not answer (Valkey down) raises, as every other use of the cache does: the route fails loudly
-rather than turning its limit off.
+A cache that does not answer (Valkey down) makes :func:`allow` raise, as every other use of the cache does: the public
+route fails loudly rather than turning its limit off. An :class:`AttemptLimit` steps aside instead, with an error in
+the log: the doors it guards (the login, printing, the SaaS's calls) must not stop with Valkey, as ``/readyz`` does
+not, and the credential each one checks holds on its own.
 """
 
 import logging
@@ -89,9 +91,15 @@ class AttemptLimit:
         return ":".join(("limit", self.name, *parts))
 
     def wait(self, *parts: str) -> int:
-        """0 while ``parts`` may try; once its failures reached the limit, the seconds until its window ends."""
+        """0 while ``parts`` may try; once its failures reached the limit, the seconds until its window ends.
+
+        0 too when the cache does not answer (logged): the door goes on to check the credential."""
         cache_key = f"{KEY_PREFIX}{self.key(*parts)}"
-        found = cache.get_many([cache_key, cache_key + UNTIL_SUFFIX])
+        try:
+            found = cache.get_many([cache_key, cache_key + UNTIL_SUFFIX])
+        except Exception:
+            logger.exception("Attempt limit %r is off for this call: the cache did not answer.", self.name)
+            return 0
         if found.get(cache_key, 0) < self.attempts:
             return 0
         until = found.get(cache_key + UNTIL_SUFFIX)
@@ -101,12 +109,18 @@ class AttemptLimit:
         return max(1, math.ceil(until - time.time()))
 
     def failed(self, *parts: str) -> None:
-        """Count one refused attempt of ``parts``; the one that reaches the limit is logged (never the credential)."""
+        """Count one refused attempt of ``parts``; the one that reaches the limit is logged (never the credential).
+
+        Not counted when the cache does not answer (logged)."""
         key = self.key(*parts)
         cache_key = f"{KEY_PREFIX}{key}"
-        count = _count(cache_key, self.window)
-        if count == 1:
-            cache.set(cache_key + UNTIL_SUFFIX, time.time() + self.window, timeout=self.window)
+        try:
+            count = _count(cache_key, self.window)
+            if count == 1:
+                cache.set(cache_key + UNTIL_SUFFIX, time.time() + self.window, timeout=self.window)
+        except Exception:
+            logger.exception("Attempt limit %r did not count a refused attempt: the cache did not answer.", self.name)
+            return
         if count == self.attempts:
             logger.warning(
                 "Attempt limit %r reached by %s: %s refused attempts within %s s; it waits for the window's end.",

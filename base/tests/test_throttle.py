@@ -233,6 +233,30 @@ def test_the_failure_that_reaches_the_limit_is_logged_once(caplog):
     assert "callback" in record.getMessage() and "203.0.113.7" in record.getMessage()
 
 
+def cache_away(*args, **kwargs):
+    raise ConnectionError("Valkey is not answering")
+
+
+def test_with_the_cache_away_the_door_still_checks_and_the_outage_is_logged(monkeypatch, caplog):
+    # Login, printing and the SaaS's calls must not stop with Valkey (as /readyz does not): the credential each door
+    # checks holds on its own, so the limit steps aside, loudly, instead of refusing everyone or failing the request.
+    backend = caches["default"]
+    for method in ("get_many", "add", "incr", "set", "touch"):
+        monkeypatch.setattr(backend, method, cache_away)
+    with caplog.at_level(logging.ERROR, logger="base.throttle"):
+        assert CALLBACK.wait("203.0.113.7") == 0
+        CALLBACK.failed("203.0.113.7")
+    assert [record.levelno for record in caplog.records] == [logging.ERROR, logging.ERROR]
+    assert all("callback" in record.getMessage() and record.exc_info for record in caplog.records)
+
+
+def test_a_public_count_still_fails_loudly_with_the_cache_away(monkeypatch):
+    # ``allow`` (the public website) keeps its rule: no cache, no answer.
+    monkeypatch.setattr(caches["default"], "add", cache_away)
+    with pytest.raises(ConnectionError):
+        allow("acme:203.0.113.7", limit=3, window=60)
+
+
 @pytest.mark.parametrize(("attempts", "window"), [(0, 60), (5, 0), (-1, 60)])
 def test_an_attempt_limit_below_one_is_a_programming_error(attempts, window):
     with pytest.raises(ValueError):
