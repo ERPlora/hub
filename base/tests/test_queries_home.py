@@ -351,6 +351,10 @@ def test_a_module_out_of_the_store_brings_no_step_to_a_customer(modules, declare
     settings.HOME_UNLISTED_HOOKS = False
     assert keys(setup_status(ctx())) == []
 
+    # A demo's hub shows the reference's example: there it is what the visitor came to see.
+    Hub.objects.filter(slug="a").update(is_demo=True)
+    assert keys(setup_status(ctx())) == ["demo.first_item"]
+
 
 def test_order_then_key_and_the_titles_in_the_persons_language(modules, declare, make_user):
     declare("stock.catalog.status", {"n": 1})
@@ -460,6 +464,9 @@ def test_panels_of_a_module_off_or_out_of_the_store(modules, settings):
     settings.HOME_UNLISTED_HOOKS = False
     assert widget_list(ctx()) == []
 
+    Hub.objects.filter(slug="a").update(is_demo=True)
+    assert [w["key"] for w in widget_list(ctx())] == ["demo.w"]
+
 
 # --- base.bell.counters ---------------------------------------------------------------------------------
 
@@ -515,6 +522,9 @@ def test_the_counters_of_a_module_out_of_the_store_only_where_the_setting_says(m
 
     settings.HOME_UNLISTED_HOOKS = False
     assert bell(ctx()) == []
+
+    Hub.objects.filter(slug="a").update(is_demo=True)
+    assert [c["key"] for c in bell(ctx())] == ["demo.open"]
 
 
 def dead_event(scope, status=EventDelivery.Status.DEAD):

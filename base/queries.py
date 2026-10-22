@@ -141,7 +141,8 @@ def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = active_apps(ctx.scope)
-        items = _platform_steps(ctx, on) + home.module_steps(ctx, home.home_modules(on), hub.country if hub else "")
+        modules = home.home_modules(on, demo_hub=bool(hub and hub.is_demo))
+        items = _platform_steps(ctx, on) + home.module_steps(ctx, modules, hub.country if hub else "")
         return home.document(items)
 
 
@@ -190,7 +191,7 @@ def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
     """The panels of the apps on that this person may see, of the hub's vertical; the SPA follows each one's data."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        configs = home.home_modules(active_apps(ctx.scope))
+        configs = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"widgets": home.widgets(ctx, configs, hub.vertical if hub else "")}
 
 
@@ -198,7 +199,9 @@ def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
 def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
     """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on."""
     with translation.override(ctx.language):
-        counters = home.bell_counters(ctx, home.home_modules(active_apps(ctx.scope)))
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
+        counters = home.bell_counters(ctx, modules)
         if ctx.has(ADMINISTER_HUB):
             failed = EventDelivery.objects.filter(
                 status=EventDelivery.Status.DEAD,

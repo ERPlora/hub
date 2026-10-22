@@ -46,13 +46,17 @@ DEFAULT_ORDER = 500
 DEFAULT_STEP_ICON = "ion:settings-outline"
 
 
-def home_modules(on: Iterable[str]) -> list[LiveAppConfig]:
-    """The modules whose steps, panels and counters reach the Home of a scope where the apps ``on`` are on."""
+def home_modules(on: Iterable[str], *, demo_hub: bool = False) -> list[LiveAppConfig]:
+    """The modules whose steps, panels and counters reach the Home of a scope where the apps ``on`` are on.
+
+    A module out of the store (the reference app) only where ``HOME_UNLISTED_HOOKS`` says (development, the tests)
+    or on a demo's hub: never on a customer's.
+    """
     on = set(on)
     return [
         config
         for config in module_configs()
-        if config.label in on and (config.listed or settings.HOME_UNLISTED_HOOKS)
+        if config.label in on and (config.listed or settings.HOME_UNLISTED_HOOKS or demo_hub)
     ]
 
 
