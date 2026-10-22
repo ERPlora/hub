@@ -235,8 +235,11 @@ class HubDatabaseMiddleware:
 
     async def __acall__(self, request: HttpRequest):
         try:
-            # Reading the session and checking a database's identity reach the database: not in the event loop.
-            resolved = await sync_to_async(self._resolve)(request)
+            if _reaches_the_database(request):
+                # Reading the session and checking a database's identity reach the database: not in the event loop.
+                resolved = await sync_to_async(self._resolve)(request)
+            else:
+                resolved = self._resolve(request)
         except HubIdentityMismatch:
             return self._unavailable(request)
         with self._entered(resolved):
@@ -267,6 +270,12 @@ class HubDatabaseMiddleware:
         logger.critical("base.hub_unavailable hub=%s: its database is not its own; nothing is served.", hub)
         refusal = registry.unavailable()
         return _envelope(refusal.status, refusal.code, refusal.message)
+
+
+def _reaches_the_database(request: HttpRequest) -> bool:
+    """Whether resolving the request's context reads the database: the admin's session, a hub's own database."""
+    hub = getattr(request, "hub", None)
+    return getattr(request, "platform_host", False) or (hub is not None and bool(hub.db_name))
 
 
 def _admin_hub(request: HttpRequest):

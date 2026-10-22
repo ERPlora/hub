@@ -35,6 +35,8 @@ ENV_KEYS = (
     "DB_SSLMODE",
     "DB_SSLROOTCERT",
     "DB_APPLICATION_NAME",
+    "PGBOUNCER_HOST",
+    "PGBOUNCER_PORT",
     "DB_CONNECT_TIMEOUT",
     "SECURE_HSTS_SECONDS",
     "SECURE_HSTS_INCLUDE_SUBDOMAINS",
@@ -878,6 +880,37 @@ def test_the_test_databases_are_named_by_the_environment(load_settings):
     ]
     assert databases["default"]["TEST"]["NAME"] == "test_hub_sup"
     assert databases["shared"]["TEST"]["NAME"] == "test_hub_sup_shared"
+
+
+def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_in_development(load_settings):
+    """Phase 2, S1: every hub's alias copies hub_template (base.tenancy.connections); locally, the compose Postgres."""
+    databases = load_settings(**DEVELOPMENT_ENV, DB_NAME="pre_hub", TEST_DB_NAME="test_hub_sup")["DATABASES"]
+    template = databases["hub_template"]
+
+    assert template["NAME"] == "pre_hub_template"
+    assert (template["HOST"], template["PORT"]) == (databases["default"]["HOST"], databases["default"]["PORT"])
+    assert (template["CONN_MAX_AGE"], template["DISABLE_SERVER_SIDE_CURSORS"]) == (0, True)
+    assert template["OPTIONS"] == {"connect_timeout": 5}
+    assert template["TEST"]["NAME"] == "test_hub_sup_template"
+
+
+def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load_settings):
+    """The sidecar listens on the task's loopback; TLS goes from it to Aurora (PLAN-DB §5), so the alias drops the
+    writer's sslmode and certificate and keeps the rest."""
+    loaded = load_settings(
+        **PRODUCTION_ENV,
+        DB_HOST="writer.cluster.eu-west-1.rds.amazonaws.com",
+        DB_SSLMODE="verify-full",
+        DB_SSLROOTCERT="/etc/ssl/certs/rds-global-bundle.pem",
+        DB_APPLICATION_NAME="hub",
+        PGBOUNCER_HOST="127.0.0.1",
+        PGBOUNCER_PORT="6432",
+    )
+    template = loaded["DATABASES"]["hub_template"]
+
+    assert (template["HOST"], template["PORT"]) == ("127.0.0.1", 6432)
+    assert template["OPTIONS"] == {"connect_timeout": 5, "application_name": "hub"}
+    assert loaded["DATABASE_ROUTERS"] == ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
 
 
 def test_the_shared_alias_opens_one_short_connection_without_a_pool(load_settings):

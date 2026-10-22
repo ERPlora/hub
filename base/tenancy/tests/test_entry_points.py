@@ -14,6 +14,7 @@ import json
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.db import connections
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.models import OutboxEvent
@@ -288,3 +289,40 @@ def test_nothing_of_a_hub_runs_without_a_context():
 
     with pytest.raises(context.HubContextMissing):
         contextvars.Context().run(touch)
+
+
+async def asgi_post(async_client, host: str, path: str, data: dict):
+    """A POST through the ASGI handler with ``host`` as its only Host header (``AsyncClient.post`` always adds
+    ``testserver``, and two Host headers are one invalid one)."""
+    from django.test.client import FakePayload
+
+    body = json.dumps(data).encode()
+    return await async_client.request(
+        method="POST",
+        path=path,
+        query_string="",
+        headers=[
+            (b"host", host.encode()),
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(body)).encode()),
+        ],
+        _body_file=FakePayload(body),
+    )
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+@pytest.mark.parametrize("own_database", [False, True], ids=["shared", "own"])
+async def test_an_asgi_request_runs_in_its_hub_too(async_client, hub_a, own_database):
+    """Daphne runs the middleware asynchronously (``HubDatabaseMiddleware.__acall__``): the same context."""
+    from asgiref.sync import sync_to_async
+
+    slug = hub_a.slug if own_database else "a"
+    await sync_to_async(member)(slug)
+    await async_client.aforce_login(await sync_to_async(get_user_model().objects.get)(username="boss"))
+
+    created = await asgi_post(async_client, f"{slug}.localhost", "/api/demo/items", {"name": "Async"})
+
+    assert created.status_code == 201
+    assert await sync_to_async(items_in)(hub_a if own_database else None) == ["Async"]
+    # The connections of the ASGI handler's thread, not the test's: closed before the databases are flushed.
+    await sync_to_async(connections.close_all)()
