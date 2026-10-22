@@ -91,7 +91,7 @@ for (const vp of [VIEWPORTS[0], VIEWPORTS[2]]) {
     await listReady(page);
     await goHomeFromMenu(page);
     await expect(page).toHaveURL(`${A}/`);
-    await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+    await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
     await expect(topbar(page).back).toHaveCount(0);
     await expect(topbar(page).apps).toBeVisible();
   });
@@ -116,14 +116,14 @@ test('the «My apps» sheet opens another app, and closes', async ({ page }) => 
 // the page stuck on its skeleton. Back to Home is the menu's Home now (pinned at this width).
 test('apps and Home, fast and repeated: the address and the page stay in step', async ({ page }) => {
   await login(page, A, '/');
-  await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+  await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
   for (let round = 0; round < 4; round += 1) {
     const sheet = await openApps(page);
     await sheet.locator('[data-testid=apps-launcher-app]', { hasText: 'Demo' }).click();
     await page.locator('ion-menu.dash-menu [data-testid=nav-home]').click();
   }
   await expect(page).toHaveURL(`${A}/`);
-  await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+  await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
   await expect(page.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)')).toHaveCount(1);
 
   const sheet = await openApps(page);

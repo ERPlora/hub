@@ -1,0 +1,28 @@
+/* The cards of the Home (the old hub's dashboard): white, rounded, one under another, with their title on top. */
+.home-card {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--ion-color-step-150, #e4e7ec);
+  border-radius: var(--ep-radius-lg, 16px);
+  background: var(--ion-card-background, var(--ion-background-color, #fff));
+}
+
+.home-card-title {
+  margin: 0 0 12px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+/* Read by a screen reader, not painted. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

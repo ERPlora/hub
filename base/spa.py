@@ -3,7 +3,11 @@
 Next to ``spa-config`` it embeds the result of ``base.session.me`` (``session-me``), so the shell
 paints the menu and decides on the login without a first round trip. ``spa-config`` carries
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
-jump to the SaaS's login, which gives it its ``state``.
+jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
+Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
+plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1). It goes only
+to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the business
+nor the hub's id.
 
 ``spa`` is the view ``base.middleware`` knows by identity; it dispatches. A visitor without a session who loads
 ``/`` of a hub with a published website gets that website (``base.public_home``), which never passes through
@@ -17,8 +21,10 @@ from live.ninja import run_operation_sync
 from live.spa import render_spa
 
 from base import public_home, queries
+from base.auth import saas_url
 
 SESSION_ME_ID = "session-me"
+HUB_HOME_ID = "hub-home"
 
 
 @require_safe
@@ -31,8 +37,17 @@ def spa(request: HttpRequest) -> HttpResponse:
 def _shell(request: HttpRequest) -> HttpResponse:
     """The SPA's HTML (``render_spa``: never cached, with the CSRF cookie the SDK sends back)."""
     me = run_operation_sync(request, queries.session_me)
+    extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
+    hub = getattr(request, "hub", None)
+    if hub is not None and request.user.is_authenticated:
+        extra_json[HUB_HOME_ID] = {
+            "name": hub.name,
+            "plan_url": saas_url(f"/store/plans?business={hub.id}"),
+            "account_url": saas_url("/account"),
+            "report_url": saas_url("/report-a-problem"),
+        }
     return render_spa(
         request,
-        extra_json={SESSION_ME_ID: me.model_dump(mode="json")},
+        extra_json=extra_json,
         extra_config={"loginUrl": reverse("auth-login")},
     )

@@ -111,3 +111,37 @@ def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(
     client.cookies["ep_palette"] = cookie
     response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
     assert f'data-ep-palette="{painted}"' in response.content.decode()
+
+
+@pytest.mark.parametrize("slug", ["a", "b"])
+def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_saas(client, settings, make_user, slug):
+    # BASE-G127: the Home is headed by the business's name; BASE-G169: «Upgrade plan» opens its plan on erplora.com.
+    # APP-BASE-1 (PLAN-SAAS §1.1): the user menu's «My account» and «Report a problem» open the SaaS's own pages.
+    from base.models import Hub
+
+    Hub.objects.filter(slug=slug).update(name=f"Bar {slug.upper()}")
+    hub = Hub.objects.get(slug=slug)
+    saas = settings.SAAS_URL.rstrip("/")
+    client.force_login(make_user("ana", host=slug, role="hub_employee"))
+    _, home = json_block(client.get("/demo/items", HTTP_HOST=f"{slug}.localhost:8000"), "hub-home")
+    assert home == {
+        "name": f"Bar {slug.upper()}",
+        "plan_url": f"{saas}/store/plans?business={hub.id}",
+        "account_url": f"{saas}/account",
+        "report_url": f"{saas}/report-a-problem",
+    }
+
+
+def test_a_visitor_without_a_session_learns_nothing_of_the_hub(client):
+    # The shell's auth gate sends a visitor without a session to the login, so the HTML carries no `hub-home`:
+    # neither the business's name nor the hub's id (the one in the plan's address on erplora.com).
+    from base.models import Hub
+
+    Hub.objects.filter(slug="a").update(name="Bar Secreto")
+    hub = Hub.objects.get(slug="a")
+    response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert 'id="hub-home"' not in html
+    assert "Bar Secreto" not in html
+    assert str(hub.id) not in html

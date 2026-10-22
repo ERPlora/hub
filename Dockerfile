@@ -26,7 +26,10 @@ COPY packages/ui packages/ui
 # tests import (scripts/, gen:app-icons) are not needed here. Vite's esbuild reads tsconfig.json and the projects
 # it references (tsconfig.test.ts): without them it compiles class fields otherwise and ships another bundle.
 COPY tsconfig*.json vite.config.ts ./
+# What the SPA is made of: the shell entry, base's Home (main.ts imports and globs it) and each app's frontend.
+# Every file `pnpm build` reads must be copied here: tsconfig.test.ts checks it against this stage.
 COPY frontend frontend
+COPY base/frontend base/frontend
 COPY apps apps
 RUN pnpm build
 

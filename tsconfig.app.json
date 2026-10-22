@@ -6,6 +6,6 @@
   // reaches them through tsconfig.json.
   "extends": "./packages/ui/tsconfig.base.json",
   "compilerOptions": { "allowJs": true, "resolveJsonModule": true },
-  "include": ["frontend/**/*", "apps/*/frontend/**/*", "packages/ui/src/shell/shims.d.ts"],
+  "include": ["frontend/**/*", "base/frontend/**/*", "apps/*/frontend/**/*", "packages/ui/src/shell/shims.d.ts"],
   "exclude": ["node_modules", "frontend/dist", "**/*.test.ts", "**/__tests__/**", "frontend/testing/**"]
 }

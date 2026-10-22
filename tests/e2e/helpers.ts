@@ -46,6 +46,27 @@ export async function iconStates(page: Page): Promise<{ name: string; painted: b
   );
 }
 
+/**
+ * Waits until nothing animates on screen, in the page nor in a shadow root (an `ion-progress-bar` slides its bar
+ * there, an `ion-segment` its indicator), a shimmer that never ends aside: a capture taken mid-animation shows a
+ * state the screen is leaving.
+ */
+export async function untilStill(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const animations = [...document.getAnimations()];
+    const walk = (root: Document | ShadowRoot) => {
+      for (const el of root.querySelectorAll('*')) {
+        if (el.shadowRoot) {
+          animations.push(...el.shadowRoot.getAnimations());
+          walk(el.shadowRoot);
+        }
+      }
+    };
+    walk(document);
+    return animations.every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity);
+  });
+}
+
 /** Path of a screenshot under `.artifacts/` (created on demand). */
 export function shot(name: string): string {
   mkdirSync(ARTIFACTS, { recursive: true });
