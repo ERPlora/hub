@@ -39,7 +39,9 @@ describe('pushProblem', () => {
   it('gives what erplora.com recorded, without the attachment’s variable, for any other message it could not hand over', () => {
     const textRefused = push({ delivered: false, error: 'HTTP 422 internal.payload_invalid' });
     const unreachable = push({ attachment: true, delivered: false, error: 'HTTP 503 hub_unavailable' });
-    for (const one of [textRefused, unreachable]) {
+    // Another 4xx of an attachment is not its origin: a stack whose two ends sign with different secrets gets this.
+    const unsigned = push({ attachment: true, delivered: false, error: 'HTTP 401 internal.unsigned' });
+    for (const one of [textRefused, unreachable, unsigned]) {
       const problem = pushProblem(['e2e.wamid.1'], [one], WHERE);
       expect(problem).toContain('e2e.wamid.1');
       expect(problem).toContain(one.error);
