@@ -19,17 +19,19 @@ const VIEWPORTS = {
 const PINNED_MIN = 992;
 
 /**
- * Counts the Ionic overlays sliding in or out (between their «will» and «did» events): their animations run
- * in shadow roots, out of `document.getAnimations()` (as demo-flows.spec.ts).
+ * Counts the Ionic overlays sliding in or out: their animations run in shadow roots, out of
+ * `document.getAnimations()` (as demo-flows.spec.ts). A present counts from `ionMount`, not from «will
+ * present»: an inline overlay paints its content on mount and waits a frame before its animation starts.
  */
 function countMovingOverlays(): void {
   const w = window as unknown as { __overlaysMoving: number };
   w.__overlaysMoving = 0;
+  const done = () => (w.__overlaysMoving = Math.max(0, w.__overlaysMoving - 1));
+  document.addEventListener('ionMount', () => (w.__overlaysMoving += 1));
   for (const kind of ['Modal', 'Popover']) {
-    for (const [start, end] of [['WillPresent', 'DidPresent'], ['WillDismiss', 'DidDismiss']]) {
-      document.addEventListener(`ion${kind}${start}`, () => (w.__overlaysMoving += 1));
-      document.addEventListener(`ion${kind}${end}`, () => (w.__overlaysMoving = Math.max(0, w.__overlaysMoving - 1)));
-    }
+    document.addEventListener(`ion${kind}DidPresent`, done);
+    document.addEventListener(`ion${kind}WillDismiss`, () => (w.__overlaysMoving += 1));
+    document.addEventListener(`ion${kind}DidDismiss`, done);
   }
 }
 
