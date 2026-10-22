@@ -1000,3 +1000,20 @@ def test_the_workbook_translation_model_has_a_default_and_comes_from_the_environ
         **DEVELOPMENT_ENV, WORKBOOK_TRANSLATION_MODEL="claude-opus-5-5"
     )
     assert loaded["WORKBOOK_TRANSLATION_MODEL"] == "claude-opus-5-5"
+
+
+def test_the_test_run_keeps_its_cache_in_memory_even_with_a_valkey_in_the_environment():
+    # conftest.py empties the cache around every test (base.throttle's attempt counts): pointed at a real Valkey, that
+    # would wipe whatever it holds. The test settings keep the process's memory whatever VALKEY_URL says.
+    env = {**os.environ, "VALKEY_URL": "rediss://valkey.invalid:6379/0", "DJANGO_SETTINGS_MODULE": "config.settings_pytest"}
+    result = subprocess.run(
+        [sys.executable, "-c", "from django.conf import settings; print(settings.CACHES['default']['BACKEND'])"],
+        cwd=BASE_DIR,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "django.core.cache.backends.locmem.LocMemCache"
+    assert settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.locmem.LocMemCache"
