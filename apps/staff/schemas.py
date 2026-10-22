@@ -18,6 +18,7 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
+    ConfigDict,
     StringConstraints,
     ValidationInfo,
     field_validator,
@@ -996,36 +997,23 @@ TimeOffDetailPage = Page[TimeOffDetailOut]
 
 
 class SettingsIn(Schema):
-    """Only the settings sent are changed. Ranges and defaults are the old module's."""
+    """The default working day, which proposes the week of a new schedule; only what is sent changes.
+    The old module's other eight settings changed nothing and are retired: sending one is refused by
+    its name."""
+
+    model_config = ConfigDict(extra="forbid")
 
     default_work_start: dt.time | None = Field(
         None, description="Working day starts (HH:MM)."
     )
     default_work_end: dt.time | None = Field(
-        None, description="Working day ends (HH:MM); before the start = a night shift."
+        None, description="Working day ends (HH:MM), after the start."
     )
     default_break_duration: int | None = Field(
-        None, ge=0, le=480, description="Break duration, 0 to 480 minutes."
-    )
-    min_advance_booking: int | None = Field(
-        None, ge=0, le=168, description="Minimum booking notice, 0 to 168 hours."
-    )
-    max_daily_hours: int | None = Field(
-        None, ge=1, le=24, description="Maximum hours per day, 1 to 24."
-    )
-    overtime_threshold: int | None = Field(
-        None, ge=1, le=168, description="Overtime threshold, 1 to 168 hours a week."
-    )
-    show_staff_photos: bool | None = Field(None, description="Show staff photos.")
-    show_staff_bio: bool | None = Field(None, description="Show staff bio.")
-    allow_staff_selection: bool | None = Field(
-        None, description="Let customers choose the professional."
-    )
-    notify_new_appointment: bool | None = Field(
-        None, description="Notify on a new appointment."
-    )
-    notify_cancellation: bool | None = Field(
-        None, description="Notify on a cancellation."
+        None,
+        ge=0,
+        le=480,
+        description="Break duration, 0 to 480 minutes, shorter than the working day.",
     )
 
 
@@ -1033,11 +1021,3 @@ class SettingsOut(Schema):
     default_work_start: str = Field(description="HH:MM.")
     default_work_end: str = Field(description="HH:MM.")
     default_break_duration: int
-    min_advance_booking: int
-    max_daily_hours: int
-    overtime_threshold: int
-    show_staff_photos: bool
-    show_staff_bio: bool
-    allow_staff_selection: bool
-    notify_new_appointment: bool
-    notify_cancellation: bool

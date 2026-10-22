@@ -403,12 +403,18 @@ def test_the_schedule_round_trip(boss, client):
 def test_settings_and_bulk_over_http(boss, client):
     assert get(client, "/staff/settings").json()["default_work_start"] == "09:00"
     saved = post(
-        client, "/staff/settings", {"default_work_start": "08:30", "max_daily_hours": 9}
+        client, "/staff/settings", {"default_work_start": "08:30", "default_break_duration": 45}
     )
-    assert (saved.json()["default_work_start"], saved.json()["max_daily_hours"]) == (
-        "08:30",
-        9,
-    )
+    assert saved.json() == {
+        "default_work_start": "08:30",
+        "default_work_end": "18:00",
+        "default_break_duration": 45,
+    }
+    # A retired setting (it changed nothing) is refused by its name, and nothing is saved.
+    retired = post(client, "/staff/settings", {"default_break_duration": 30, "max_daily_hours": 9})
+    assert retired.status_code == 422
+    assert retired.json()["error"]["fields"] == {"max_daily_hours": "This field is not allowed."}
+    assert get(client, "/staff/settings").json()["default_break_duration"] == 45
     bulk = post(
         client,
         "/staff/members/bulk_create",

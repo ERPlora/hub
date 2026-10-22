@@ -444,32 +444,17 @@ export interface TimeOffDetailOut extends TimeOffOut {
 
 // ── Settings ───────────────────────────────────────────────────────────────────────────────────
 
+/** The default working day that a new schedule proposes (STAFF-F22); any other field is refused. */
 export interface SettingsIn {
   default_work_start?: string;
   default_work_end?: string;
   default_break_duration?: number;
-  min_advance_booking?: number;
-  max_daily_hours?: number;
-  overtime_threshold?: number;
-  show_staff_photos?: boolean;
-  show_staff_bio?: boolean;
-  allow_staff_selection?: boolean;
-  notify_new_appointment?: boolean;
-  notify_cancellation?: boolean;
 }
 
 export interface SettingsOut {
   default_work_start: string;
   default_work_end: string;
   default_break_duration: number;
-  min_advance_booking: number;
-  max_daily_hours: number;
-  overtime_threshold: number;
-  show_staff_photos: boolean;
-  show_staff_bio: boolean;
-  allow_staff_selection: boolean;
-  notify_new_appointment: boolean;
-  notify_cancellation: boolean;
 }
 
 type NoInput = Record<string, never>;

@@ -8,12 +8,15 @@ are per scope. Phase 2 moves them to each hub's database. The record hangs from 
 import datetime as dt
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
+
+from apps.staff.schemas import BREAK_INSIDE, TIME_ORDER
 
 
 class Role(UUIDModel):
@@ -302,8 +305,10 @@ class TimeOff(UUIDModel):
 class StaffSettings(UUIDModel):
     """The settings of the staff app: one row, created by the first save (until then, the defaults).
 
-    The eleven settings of the old module, with its defaults and ranges. None of them changes how
-    Staff, Appointments or the till behave yet: they are kept for the screens that will read them.
+    The default working day (start, end and break) proposes the week of a new schedule (STAFF-F13).
+    The other eight columns are the old module's settings that nothing ever read: retired from the
+    screen, the API and the admin (FIX-STAFF-SETTINGS-ORPHANS), they stay until the contract step that
+    drops them, so a deployment still running the previous code can read them.
     """
 
     slot = models.PositiveSmallIntegerField(_("slot"), default=1, editable=False)
@@ -351,3 +356,19 @@ class StaffSettings(UUIDModel):
 
     def __str__(self) -> str:
         return str(self._meta.verbose_name)
+
+    def workday_errors(self) -> dict[str, str]:
+        """What keeps the working day from being a schedule's day, by field: a schedule's day never
+        crosses midnight (it ends after it starts) and its break is shorter than the day."""
+        start, end = self.default_work_start, self.default_work_end
+        if end <= start:
+            return {"default_work_end": str(TIME_ORDER)}
+        minutes = (end.hour - start.hour) * 60 + end.minute - start.minute
+        if self.default_break_duration >= minutes:
+            return {"default_break_duration": str(BREAK_INSIDE)}
+        return {}
+
+    def clean(self) -> None:
+        """The admin's form keeps the same rules as the screen."""
+        if errors := self.workday_errors():
+            raise ValidationError(errors)

@@ -773,33 +773,44 @@ def test_time_off_outputs():
 # Settings
 
 
+#: The old module's settings that nothing reads (FIX-STAFF-SETTINGS-ORPHANS): retired from the API.
+RETIRED_SETTINGS = {
+    "min_advance_booking": 1,
+    "max_daily_hours": 8,
+    "overtime_threshold": 40,
+    "show_staff_photos": True,
+    "show_staff_bio": True,
+    "allow_staff_selection": True,
+    "notify_new_appointment": True,
+    "notify_cancellation": True,
+}
+
+
 def test_settings_are_sent_partially_with_the_old_ranges():
     assert SettingsIn().model_dump(exclude_unset=True) == {}
     assert SettingsIn(default_work_start="07:30:00").default_work_start == dt.time(
         7, 30
     )
     for field, value in (
+        ("default_break_duration", -1),
         ("default_break_duration", 481),
-        ("min_advance_booking", 169),
-        ("max_daily_hours", 0),
-        ("max_daily_hours", 25),
-        ("overtime_threshold", 0),
-        ("overtime_threshold", 169),
         ("default_work_end", "24:00"),
     ):
         assert invalid_fields(SettingsIn, **{field: value}) == {field}, field
-    # A night shift (the day ends before it starts) is valid, as in the old module.
-    assert SettingsIn(
-        default_work_start="22:00", default_work_end="06:00"
-    ).default_work_end == dt.time(6)
 
 
-def test_settings_out_shows_hours_as_hh_mm():
-    assert list(SettingsOut.model_fields)[:2] == [
+def test_a_retired_setting_is_refused_by_its_name():
+    for field, value in RETIRED_SETTINGS.items():
+        # The HTTP layer words it «This field is not allowed.» (test_api.py).
+        assert errors(SettingsIn, **{field: value})[field]["type"] == "extra_forbidden", field
+
+
+def test_the_settings_are_the_default_working_day_with_hours_as_hh_mm():
+    assert list(SettingsOut.model_fields) == [
         "default_work_start",
         "default_work_end",
+        "default_break_duration",
     ]
-    assert len(SettingsOut.model_fields) == 11
     assert SettingsOut.model_fields["default_work_start"].annotation is str
 
 
