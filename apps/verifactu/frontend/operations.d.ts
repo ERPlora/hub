@@ -62,7 +62,7 @@ export interface RepresentationSubmitIn {
   representation_proof_base64?: string;
 }
 
-/** The blank official model (Anexo I of Convenio 17), a PDF in base64. */
+/** The official model (Anexo I of Convenio 17) with Invoicing's issuer written in, a PDF in base64. */
 export interface RepresentationModelOut {
   filename: string;
   content_type: string;

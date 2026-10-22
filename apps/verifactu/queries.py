@@ -94,6 +94,20 @@ def issuer_identity() -> tuple[str, str]:
     return (row.tax_id, row.legal_name) if row else ("", "")
 
 
+def issuer_model_details() -> dict[str, str]:
+    """Invoicing's issuer as the model of the authorisation names the taxpayer (``representation.MODEL_FIELDS``): its
+    tax ID, legal name and fiscal address, the number within the street as the issuer keeps it; empty without one."""
+    row = Issuer.objects.first()
+    if row is None:
+        return {}
+    return {
+        "taxpayer_tax_id": row.tax_id,
+        "taxpayer_name": row.legal_name,
+        "municipality": row.city,
+        "street": row.address,
+    }
+
+
 def issuer_configured() -> bool:
     row = Issuer.objects.first()
     return bool(row and row.configured)
@@ -988,14 +1002,15 @@ def saas_unreachable() -> OperationError:
     input=NoInput,
     output=RepresentationModelOut,
     ai={
-        "description": "The blank official model of the representation authorisation (Anexo I of the AEAT's "
-        "Convenio 17), a PDF the business prints and signs by hand, or signs with AutoFirma, before sending it "
-        "for ERPlora to file on its behalf."
+        "description": "The official model of the representation authorisation (Anexo I of the AEAT's Convenio "
+        "17) with the business's legal name, tax ID and address from Invoicing already written in, a PDF the "
+        "business prints and signs by hand, or signs with AutoFirma, before sending it for ERPlora to file on its "
+        "behalf."
     },
 )
 def representation_model(ctx: OperationContext, data: NoInput) -> RepresentationModelOut:
     try:
-        content = representation.model_pdf()
+        content = representation.model_pdf(issuer_model_details())
     except representation.SaasUnreachable:
         raise saas_unreachable() from None
     return RepresentationModelOut(
